@@ -1,0 +1,39 @@
+repos:
+    - repo: https://github.com/benbenbang/pre-commit-rust
+      rev: v1.0.0
+      hooks:
+        - id: fmt
+        - id: check
+        - id: clippy
+        - id: test
+    - repo: https://github.com/pre-commit/pre-commit-hooks
+      rev: v6.0.0
+      hooks:
+        - id: check-yaml
+          args:
+            - --allow-multiple-documents
+            - --unsafe
+        - id: end-of-file-fixer
+        - id: trailing-whitespace
+        - id: check-added-large-files
+          args:
+            - --maxkb=1024
+          stages:
+            - pre-commit
+        - id: requirements-txt-fixer
+        - id: check-merge-conflict
+        - id: debug-statements
+        - id: pretty-format-json
+          args:
+            - --autofix
+            - --indent=2
+    - repo: local
+      hooks:
+        - id: validate-commit-msg
+          name: commit message is valid
+          args:
+            - --negate
+          entry: ^(build|ci|docs|feat|fix|perf|refactor|style|test|revert|hotfix|ops|chore)\([\w,\.,\-,\(,\),\/]+\)(!?)(:)\s{1}([\w,\W,:]+)$
+          language: pygrep
+          stages:
+            - commit-msg
