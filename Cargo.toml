@@ -1,6 +1,7 @@
-[package]
-name = "ito-fin"
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
 version = "0.1.0"
 edition = "2024"
-
-[dependencies]

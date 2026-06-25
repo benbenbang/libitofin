@@ -3,5 +3,5 @@
 version = 4
 
 [[package]]
-name = "ito-fin"
+name = "itofin"
 version = "0.1.0"
