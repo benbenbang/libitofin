@@ -1,0 +1,28 @@
+enhancement:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "src/**/*.rs"
+          - "crates/**/src/**/*"
+          - "crates/**/*"
+
+workflows:
+  - changed-files:
+      - any-glob-to-any-file:
+          - ".github/**/*"
+          - makefile
+          - "scripts/**/*"
+          - "releaserc.json"
+
+build:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/*.toml"
+          - "**/*.lock"
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - README.md
+          - "**/*.md"
+          - "docs/**/*.md"
+          - "docs/mkdocs.yml"

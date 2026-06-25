@@ -1,0 +1,28 @@
+name: semantic-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      prompt:
+        description: "If you are sure to launch a new release, put the value to true."
+        default: "false"
+        required: true
+        type: choice
+        options:
+          - "true"
+          - "false"
+
+jobs:
+  semantic-release:
+    name: semantic-release
+    if: ${{ inputs.prompt == 'true' }}
+    uses: benbenbang/r-workflows/.github/workflows/semantic-release.yml@main
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      statuses: read
+      packages: read
+    secrets: inherit
+    with:
+      new_version_title: "🧮 LibItoFin"
