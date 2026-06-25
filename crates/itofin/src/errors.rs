@@ -6,12 +6,11 @@
 //! `Result<T, QlError>`, raised with the [`fail!`], [`require!`], [`assert_ql!`]
 //! and [`ensure!`] macros.
 
-use std::fmt;
-
 use thiserror::Error;
 
 /// Base error type, carrying the message and the source location that raised it.
 #[derive(Debug, Clone, Error)]
+#[error("{file}:{line}: {message}")]
 pub struct QlError {
     message: String,
     file: &'static str,
@@ -31,12 +30,6 @@ impl QlError {
     /// The error message, without location information.
     pub fn message(&self) -> &str {
         &self.message
-    }
-}
-
-impl fmt::Display for QlError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}:{}: {}", self.file, self.line, self.message)
     }
 }
 
