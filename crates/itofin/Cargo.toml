@@ -7,3 +7,4 @@ edition.workspace = true
 name = "itofin"
 
 [dependencies]
+thiserror = "2.0.12"
