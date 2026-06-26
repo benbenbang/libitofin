@@ -17,7 +17,7 @@ concurrency:
 jobs:
   pre-commit:
     name: pre-commit checks
-    uses: benbenbang/reusable-workflows/.github/workflows/prek.yml@1.0.0
+    uses: benbenbang/reusable-workflows/.github/workflows/prek.yml@1.0.1
     permissions:
       contents: read
       packages: read

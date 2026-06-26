@@ -16,7 +16,7 @@ jobs:
   semantic-release:
     name: semantic-release
     if: ${{ inputs.prompt == 'true' }}
-    uses: benbenbang/reusable-workflows/.github/workflows/semantic-release.yml@1.0.0
+    uses: benbenbang/reusable-workflows/.github/workflows/semantic-release.yml@1.0.1
     permissions:
       contents: read
       pull-requests: write
