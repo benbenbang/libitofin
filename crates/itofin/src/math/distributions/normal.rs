@@ -50,7 +50,7 @@ impl NormalDistribution {
     pub fn value(&self, x: Real) -> Real {
         let deltax = x - self.average;
         let exponent = -(deltax * deltax) / self.denominator;
-        // exp(x) underflows to 0 well before this
+        // below this, exp(exponent) is ~1e-300 or less; QuantLib treats it as 0
         if exponent <= -690.0 {
             0.0
         } else {
