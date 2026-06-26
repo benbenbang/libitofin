@@ -64,10 +64,11 @@ FFI shape constraints (design the core API around these, don't compromise the co
 ### D8 — Logging / observability (deferred; does not block any ticket)
 
 QuantLib has no logging — it's a numeric library, not a service. The core stays **dep-free and IO-free**, so
-logging is opt-in and must impose **zero cost when unused**:
+logging is opt-in and must impose **minimal overhead when disabled**:
 
-- Use the **`log` facade** (not `tracing`): a `log::debug!` with no installed logger compiles to a near-noop and
-  pulls in no runtime. `tracing`'s spans/subscribers are heavier and belong to a service layer, not the core.
+- Use the **`log` facade** (not `tracing`): with no installed logger a `log::debug!` does only a cheap level
+  check (a relaxed atomic load against the max level — not literally free, but negligible) and pulls in no
+  runtime. `tracing`'s spans/subscribers are heavier and belong to a service layer, not the core.
 - **Coarse boundaries only.** Log at calibration/bootstrap entry-exit or solver non-convergence — *never* inside
   hot paths like `Observable::notify_observers`, relinks, or per-path/per-scenario loops (D6), which would emit
   millions of lines and distort timing.
