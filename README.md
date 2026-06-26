@@ -17,8 +17,10 @@ a C ABI for everything else).
 QuantLib is ~470k lines of mature, battle-tested C++ across 16 modules. This
 project re-expresses that core in safe, idiomatic Rust:
 
-- **Memory-safe and thread-safe by construction** — no manual `shared_ptr`
-  cycles, no data races on the compute path.
+- **Memory-safe by construction** — no manual `shared_ptr` cycles or
+  use-after-free. The core is single-threaded-mutable during setup, then frozen
+  into immutable snapshots for data-race-free parallel compute (`rayon`); see
+  the concurrency model (D6) in [`TICKETS.md`](TICKETS.md).
 - **A clean FFI story** — a single core crate with Python (PyO3) and C-ABI
   (cbindgen) bindings layered on top, so the same engine is reachable from
   Python, C, C++, Julia, R, and more.
@@ -29,8 +31,8 @@ project re-expresses that core in safe, idiomatic Rust:
 ## Status
 
 The port proceeds **bottom-up** through dependency layers L0→L11; each layer
-depends only on the ones above it. The full backlog lives in
-[`TICKETS.md`](TICKETS.md).
+depends only on lower-numbered layers (L1 builds on L0, L2 on L0–L1, and so on).
+The full backlog lives in [`TICKETS.md`](TICKETS.md).
 
 | Layer | Epic | Scope | State |
 |------|------|-------|-------|
@@ -92,12 +94,15 @@ pre-commit run --all-files
 
 ```
 crates/itofin/        the core library (libitofin) — FFI-agnostic, idiomatic Rust
-crates/itofin-ffi/    extern "C" + cbindgen → C header   (planned)
-crates/itofin-py/     PyO3 + maturin → pip-installable wheel (planned)
-QuantLib/             symlink to the C++ source tree — the reference / oracle
+crates/itofin-ffi/    extern "C" + cbindgen → C header          (planned)
+crates/itofin-py/     PyO3 + maturin → pip-installable wheel     (planned)
 TICKETS.md            dependency-ordered porting backlog + design decisions D1–D8
-CLAUDE.md             contributor guidelines
+QuantLib/             reference C++ tree + test oracle           (git-ignored)
 ```
+
+The `QuantLib/` entry is a **git-ignored local symlink**, not committed — point
+it at a QuantLib checkout to have the reference source and test-suite oracle
+available locally: `ln -s /path/to/QuantLib QuantLib`.
 
 ## Design principles
 
