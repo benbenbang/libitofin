@@ -49,8 +49,8 @@ impl LazyObject {
     }
 
     /// Access to the embedded observable for registering downstream observers.
-    pub fn observable(&mut self) -> &mut Observable {
-        &mut self.observable
+    pub fn observable(&self) -> &Observable {
+        &self.observable
     }
 
     /// Whether cached results are currently valid.
@@ -139,7 +139,7 @@ impl LazyObject {
     }
 
     /// Registers an observer with this object's embedded observable.
-    pub fn register_observer(&mut self, observer: &SharedMut<dyn Observer>) -> bool {
+    pub fn register_observer(&self, observer: &SharedMut<dyn Observer>) -> bool {
         self.observable.register_observer(observer)
     }
 }
@@ -190,6 +190,19 @@ mod tests {
             let count = &mut self.calc_count;
             let fail = self.fail;
             self.lazy.calculate(|| {
+                *count += 1;
+                if fail {
+                    fail!("intentional failure");
+                }
+                Ok(())
+            })
+        }
+
+        /// Forces a recalculation, mirroring `LazyObject::recalculate`.
+        fn force_npv(&mut self) -> QlResult<()> {
+            let count = &mut self.calc_count;
+            let fail = self.fail;
+            self.lazy.recalculate(|| {
                 *count += 1;
                 if fail {
                     fail!("intentional failure");
@@ -293,6 +306,32 @@ mod tests {
         // ...but a second change without recalculation is discarded
         s.on_input_change();
         assert!(!flag.borrow().up);
+    }
+
+    #[test]
+    fn recalculate_notifies_even_when_perform_fails() {
+        let mut s = Lazy::new(false);
+        let flag = Flag::new();
+        s.lazy
+            .register_observer(&(flag.clone() as SharedMut<dyn Observer>));
+
+        // QuantLib's catch block calls notifyObservers() before re-throwing, so a
+        // failed recalculation must still notify observers and propagate the error.
+        s.fail = true;
+        assert!(s.force_npv().is_err());
+        assert!(
+            flag.borrow().up,
+            "failed recalculate must still notify observers"
+        );
+
+        // a successful recalculation notifies as well
+        flag.borrow_mut().up = false;
+        s.fail = false;
+        s.force_npv().unwrap();
+        assert!(
+            flag.borrow().up,
+            "successful recalculate notifies observers"
+        );
     }
 
     #[test]
