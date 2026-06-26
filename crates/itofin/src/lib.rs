@@ -4,6 +4,7 @@
 //! via cbindgen) live in sibling crates and depend on this one.
 
 pub mod errors;
+pub mod handle;
 pub mod patterns;
 pub mod shared;
 pub mod types;
