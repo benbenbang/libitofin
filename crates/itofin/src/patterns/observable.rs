@@ -64,9 +64,15 @@ impl Observable {
     pub fn unregister_observer(&self, observer: &SharedMut<dyn Observer>) -> bool {
         let target = SharedMut::downgrade(observer);
         let mut observers = self.observers.borrow_mut();
-        let before = observers.len();
-        observers.retain(|w| !w.ptr_eq(&target) && w.strong_count() > 0);
-        before != observers.len()
+        let mut removed = false;
+        observers.retain(|w| {
+            if w.ptr_eq(&target) {
+                removed = true;
+                return false;
+            }
+            w.strong_count() > 0
+        });
+        removed
     }
 
     /// Notifies every currently registered, still-live observer.
@@ -157,6 +163,26 @@ mod tests {
         let observable = Observable::new();
         let counter = UpdateCounter::new();
         assert!(!observable.unregister_observer(&as_observer(&counter)));
+    }
+
+    #[test]
+    fn unregister_unknown_observer_is_not_confused_by_dead_weaks() {
+        // A registered-then-dropped observer leaves a dead weak in the registry;
+        // unregistering a never-registered observer must still report `false`
+        // rather than mistaking the dead-weak pruning for a real removal.
+        let observable = Observable::new();
+        let registered = UpdateCounter::new();
+        observable.register_observer(&as_observer(&registered));
+        {
+            let transient = UpdateCounter::new();
+            observable.register_observer(&as_observer(&transient));
+        }
+
+        let never_registered = UpdateCounter::new();
+        assert!(!observable.unregister_observer(&as_observer(&never_registered)));
+        // the genuinely registered observer is still notified afterwards
+        observable.notify_observers();
+        assert_eq!(registered.borrow().counter, 1);
     }
 
     #[test]
