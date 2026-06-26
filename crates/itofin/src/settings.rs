@@ -64,6 +64,19 @@ impl<D> Settings<D> {
         }
     }
 
+    /// Resets the evaluation date to the floating "use today's date" state,
+    /// notifying observers only if a concrete date had been set.
+    ///
+    /// Mirrors QuantLib's `resetEvaluationDate()` (which assigns the null
+    /// `Date()`). Its companion `anchorEvaluationDate()` is deferred until
+    /// EPIC-2 provides a concrete today's-date for the payload type.
+    pub fn reset_evaluation_date(&mut self) {
+        if self.evaluation_date.is_some() {
+            self.evaluation_date = None;
+            self.eval_date_observable.notify_observers();
+        }
+    }
+
     /// Registers an observer to be notified on evaluation-date changes.
     pub fn register_eval_date_observer(&self, observer: &SharedMut<dyn Observer>) -> bool {
         self.eval_date_observable.register_observer(observer)
@@ -138,6 +151,25 @@ mod tests {
         settings.set_evaluation_date(d2);
         assert!(flag.borrow().up);
         assert_eq!(settings.evaluation_date(), Some(&d2));
+    }
+
+    #[test]
+    fn reset_returns_to_floating_and_notifies_once() {
+        let mut settings: Settings<i64> = Settings::new();
+        settings.set_evaluation_date(44238_i64);
+
+        let flag = shared_mut(Flag::default());
+        settings.register_eval_date_observer(&(flag.clone() as SharedMut<dyn Observer>));
+
+        // resetting away from a concrete date notifies and returns to None
+        settings.reset_evaluation_date();
+        assert!(flag.borrow().up);
+        assert_eq!(settings.evaluation_date(), None);
+
+        // resetting again while already floating sends no notification
+        flag.borrow_mut().up = false;
+        settings.reset_evaluation_date();
+        assert!(!flag.borrow().up);
     }
 
     #[test]
