@@ -3,4 +3,5 @@
 pub mod array;
 pub mod distributions;
 pub mod errorfunction;
+pub mod interpolations;
 pub mod matrix;
