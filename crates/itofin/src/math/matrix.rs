@@ -31,8 +31,11 @@ impl Matrix {
 
     /// A `rows`×`columns` matrix of zeros.
     pub fn with_size(rows: Size, columns: Size) -> Self {
+        let len = rows
+            .checked_mul(columns)
+            .expect("matrix size overflows usize");
         Matrix {
-            data: vec![0.0; rows * columns],
+            data: vec![0.0; len],
             rows,
             columns,
         }
@@ -40,8 +43,11 @@ impl Matrix {
 
     /// A `rows`×`columns` matrix filled with `value`.
     pub fn filled(rows: Size, columns: Size, value: Real) -> Self {
+        let len = rows
+            .checked_mul(columns)
+            .expect("matrix size overflows usize");
         Matrix {
-            data: vec![value; rows * columns],
+            data: vec![value; len],
             rows,
             columns,
         }
@@ -64,11 +70,21 @@ impl Matrix {
 
     /// Borrows row `i` as a slice.
     pub fn row(&self, i: Size) -> &[Real] {
+        assert!(
+            i < self.rows,
+            "row index {i} out of bounds for {} rows",
+            self.rows
+        );
         &self.data[i * self.columns..(i + 1) * self.columns]
     }
 
     /// Mutably borrows row `i` as a slice.
     pub fn row_mut(&mut self, i: Size) -> &mut [Real] {
+        assert!(
+            i < self.rows,
+            "row index {i} out of bounds for {} rows",
+            self.rows
+        );
         &mut self.data[i * self.columns..(i + 1) * self.columns]
     }
 
@@ -310,5 +326,14 @@ mod tests {
     #[should_panic(expected = "matrix product shape mismatch")]
     fn product_shape_mismatch_panics() {
         let _ = &Matrix::with_size(2, 3) * &Matrix::with_size(2, 2);
+    }
+
+    #[test]
+    #[should_panic(expected = "out of bounds")]
+    fn row_out_of_bounds_panics_even_with_zero_columns() {
+        // with columns == 0 the slice range is 0..0 for any i; the explicit
+        // bounds check is what makes an out-of-range row index still panic
+        let m = Matrix::with_size(3, 0);
+        let _ = m.row(5);
     }
 }
