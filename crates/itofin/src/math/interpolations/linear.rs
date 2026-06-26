@@ -85,6 +85,9 @@ impl LinearInterpolation {
     }
 
     fn check_range(&self, x: Real) -> QlResult<()> {
+        if x.is_nan() {
+            fail!("interpolation cannot be evaluated at NaN");
+        }
         if !self.allow_extrapolation && !self.is_in_range(x) {
             fail!(
                 "interpolation range is [{}, {}]: extrapolation at {x} not allowed",
@@ -186,6 +189,16 @@ mod tests {
         assert!(f.allows_extrapolation());
         assert_eq!(f.value(-1.0).unwrap(), -2.0); // extends slope-2 segment below
         assert_eq!(f.value(4.0).unwrap(), 2.0); // extends flat segment above
+    }
+
+    #[test]
+    fn nan_input_is_rejected_even_with_extrapolation() {
+        // NaN bypasses the range check (it's neither in nor out of range), so
+        // without an explicit guard it underflows `locate` and panics.
+        let f = sample().with_extrapolation(true);
+        assert!(f.value(Real::NAN).is_err());
+        assert!(f.derivative(Real::NAN).is_err());
+        assert!(f.primitive(Real::NAN).is_err());
     }
 
     #[test]
