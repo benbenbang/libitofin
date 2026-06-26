@@ -6,5 +6,6 @@
 pub mod errors;
 pub mod handle;
 pub mod patterns;
+pub mod settings;
 pub mod shared;
 pub mod types;
