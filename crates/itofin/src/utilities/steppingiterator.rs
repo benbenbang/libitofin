@@ -23,7 +23,9 @@ impl<'a, T> Iterator for StepIterator<'a, T> {
             return None;
         }
         let item = &self.data[self.pos];
-        self.pos += self.step;
+        // saturate so a ZST slice near usize::MAX still terminates instead of
+        // wrapping `pos` back below `len`
+        self.pos = self.pos.saturating_add(self.step);
         Some(item)
     }
 }

@@ -32,7 +32,8 @@ pub fn ordinal(n: Size) -> String {
 
 /// Formats a real as a percentage, e.g. `0.05` → `"5.000000 %"`.
 pub fn percent(value: Real) -> String {
-    format!("{} %", value * 100.0)
+    // QuantLib emits this with `std::fixed` at the default precision of 6.
+    format!("{:.6} %", value * 100.0)
 }
 
 /// Formats a rate as a percentage.
@@ -71,8 +72,8 @@ mod tests {
 
     #[test]
     fn percentages() {
-        assert_eq!(percent(0.05), "5 %");
-        assert_eq!(rate(0.05), "5 %");
-        assert_eq!(volatility(0.2), "20 %");
+        assert_eq!(percent(0.05), "5.000000 %");
+        assert_eq!(rate(0.05), "5.000000 %");
+        assert_eq!(volatility(0.2), "20.000000 %");
     }
 }
