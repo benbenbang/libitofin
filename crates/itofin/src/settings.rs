@@ -38,7 +38,7 @@ impl<D> Default for Settings<D> {
     }
 }
 
-impl<D: PartialEq + Clone> Settings<D> {
+impl<D> Settings<D> {
     /// Creates settings with no explicit evaluation date set.
     pub fn new() -> Self {
         Settings::default()
@@ -54,7 +54,10 @@ impl<D: PartialEq + Clone> Settings<D> {
     }
 
     /// Sets the evaluation date, notifying observers only if it actually changed.
-    pub fn set_evaluation_date(&mut self, date: D) {
+    pub fn set_evaluation_date(&mut self, date: D)
+    where
+        D: PartialEq,
+    {
         if self.evaluation_date.as_ref() != Some(&date) {
             self.evaluation_date = Some(date);
             self.eval_date_observable.notify_observers();
@@ -62,7 +65,7 @@ impl<D: PartialEq + Clone> Settings<D> {
     }
 
     /// Registers an observer to be notified on evaluation-date changes.
-    pub fn register_eval_date_observer(&mut self, observer: &SharedMut<dyn Observer>) -> bool {
+    pub fn register_eval_date_observer(&self, observer: &SharedMut<dyn Observer>) -> bool {
         self.eval_date_observable.register_observer(observer)
     }
 
