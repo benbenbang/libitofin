@@ -24,8 +24,9 @@ written. Proposed defaults below are **single-threaded first** — revisit `Arc`
 | D5 | `Settings` singleton (global eval date) | explicit `&Context` (NOT `thread_local` — invisible to compute threads, see D6) | ⬜ needs sign-off |
 | D6 | runtime concurrency model | `rayon` **snapshot-and-fan-out**; no `async` in the core | ⬜ needs sign-off |
 | D7 | language bindings | PyO3 + maturin (Python); `extern "C"` + cbindgen (C ABI) in sibling crates | ⬜ needs sign-off |
+| D8 | logging / observability | `log` facade (zero-cost without a subscriber), coarse boundaries only — **deferred, non-blocking** | ⬜ deferred |
 
-**D1–D5 are the QL-0.x foundation tickets — see Epic L0. D6/D7 shape the core API and couple back to D3.**
+**D1–D5 are the QL-0.x foundation tickets — see Epic L0. D6/D7 shape the core API and couple back to D3. D8 is deferred — it touches no existing ticket and can land any time.**
 
 ### D6 — Concurrency model (`rayon` only; the core does no IO)
 
@@ -59,6 +60,21 @@ crates/itofin-py    PyO3 + maturin → pip-installable wheel
 FFI shape constraints (design the core API around these, don't compromise the core):
 - generics/trait objects don't cross FFI → expose concrete/enum facades in the binding layer, keep the core generic.
 - ownership across the boundary → opaque handles; PyO3 manages it, the raw C ABI needs explicit `free` fns.
+
+### D8 — Logging / observability (deferred; does not block any ticket)
+
+QuantLib has no logging — it's a numeric library, not a service. The core stays **dep-free and IO-free**, so
+logging is opt-in and should impose **minimal overhead when disabled**:
+
+- Use the **`log` facade** (not `tracing`): a `log::debug!` with no installed logger is a near-noop and
+  avoids formatting work. `tracing`'s spans/subscribers are heavier and belong to a service layer, not the core.
+- **Coarse boundaries only.** Log at calibration/bootstrap entry-exit or solver non-convergence — *never* inside
+  hot paths like `Observable::notify_observers`, relinks, or per-path/per-scenario loops (D6), which would emit
+  millions of lines and distort timing.
+- Bindings choose the sink: the PyO3 crate (D7) can bridge `log` → Python `logging`; the C ABI exposes a callback.
+
+**Status: deferred.** No existing ticket depends on it; it can be added in any later PR without reworking the
+core. Revisit when a real diagnostic need appears (e.g. debugging curve bootstrap non-convergence in L4).
 
 ---
 
