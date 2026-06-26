@@ -18,20 +18,23 @@ use crate::shared::{Shared, SharedMut, shared_mut};
 /// observable, through which relinks are broadcast.
 pub struct Link<T> {
     current: Option<Shared<T>>,
-    observable: Observable,
+    observable: Shared<Observable>,
 }
 
 impl<T> Link<T> {
     fn new(pointee: Option<Shared<T>>) -> Self {
         Link {
             current: pointee,
-            observable: Observable::new(),
+            observable: Shared::new(Observable::new()),
         }
     }
 
-    fn link_to(&mut self, pointee: Option<Shared<T>>) {
+    /// Repoints the link and returns its observable so the caller can notify
+    /// *after* dropping the link borrow — observers commonly read or relink the
+    /// handle from `update()`, which would otherwise re-borrow this cell.
+    fn link_to(&mut self, pointee: Option<Shared<T>>) -> Shared<Observable> {
         self.current = pointee;
-        self.observable.notify_observers();
+        self.observable.clone()
     }
 
     fn is_empty(&self) -> bool {
@@ -119,12 +122,14 @@ impl<T> RelinkableHandle<T> {
 
     /// Points the shared link at `pointee`, notifying observers.
     pub fn link_to(&self, pointee: Shared<T>) {
-        self.handle.link.borrow_mut().link_to(Some(pointee));
+        let observable = self.handle.link.borrow_mut().link_to(Some(pointee));
+        observable.notify_observers();
     }
 
     /// Clears the shared link, notifying observers.
     pub fn reset(&self) {
-        self.handle.link.borrow_mut().link_to(None);
+        let observable = self.handle.link.borrow_mut().link_to(None);
+        observable.notify_observers();
     }
 
     /// Borrows this as a plain [`Handle`] (e.g. to hand out non-relinkable copies).
@@ -196,5 +201,35 @@ mod tests {
 
         assert!(flag.borrow().up);
         assert!(observed.is_empty());
+    }
+
+    /// Observer that reads its shared handle while being notified — the common
+    /// "recompute on relink" pattern. This must not hit a `RefCell` borrow panic.
+    struct Reader {
+        handle: Handle<i32>,
+        seen: Option<i32>,
+    }
+
+    impl Observer for Reader {
+        fn update(&mut self) {
+            self.seen = self.handle.current_link().ok().map(|v| *v);
+        }
+    }
+
+    #[test]
+    fn observer_may_read_handle_during_relink() {
+        let rh = RelinkableHandle::new(shared(1_i32));
+        let reader = shared_mut(Reader {
+            handle: rh.handle(),
+            seen: None,
+        });
+        rh.handle()
+            .register_observer(&(reader.clone() as SharedMut<dyn Observer>));
+
+        rh.link_to(shared(2_i32));
+
+        // the relink borrow is released before observers run, so the observer
+        // can dereference the handle and sees the freshly-linked value
+        assert_eq!(reader.borrow().seen, Some(2));
     }
 }
