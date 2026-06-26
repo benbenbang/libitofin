@@ -102,8 +102,9 @@ Port order is top-to-bottom. `experimental/` is excluded (port last or never).
 
 ## 2. Ticket convention
 
-Modules are far larger than one PR, so the hierarchy is **Epic → Ticket → PR**, and PRs stay **≤300 LOC**
-per project guidelines. Any source file >300 LOC is split into multiple tickets (struct/ctors → methods → tests).
+Modules are far larger than one PR, so the hierarchy is **Epic → Ticket → PR**, and PRs stay **≤350 LOC**
+(400 hard cap) per project guidelines. Any source file over that is split into multiple tickets
+(struct/ctors → methods → tests).
 
 ```
 [QL-<epic>.<n>] <component>
@@ -111,7 +112,7 @@ per project guidelines. Any source file >300 LOC is split into multiple tickets 
  Depends on:  [QL-x.y, ...]
  Port:        ql/<path>  ->  crate::<module>
  Acceptance:  port test-suite/<name>.cpp cases; match C++ within <tol>
- Size:        S (<100 LOC) | M (100-300) | L (must be split)
+ Size:        S (<100 LOC) | M (100-350) | L (must be split)
 ```
 
 ---
@@ -158,13 +159,14 @@ Acceptance: `europeanoption.cpp` price + greeks match within 1e-10.
 
 ## 6. EPIC-1 — math (L1)
 
-Slice-critical tickets first (needed for Milestone 1), then the wide independent set.
+Slice-critical tickets first (needed for Milestone 1), then the wide independent set. ✅ = merged to `main`.
 
 | ID | Component | Port | Acceptance | Size |
 |---|---|---|---|---|
-| QL-1.1 | Array | `ql/math/array.hpp` | `array.cpp` | M |
+| ✅ QL-1.1 | Array | `ql/math/array.hpp` | `array.cpp` | M |
 | QL-1.2 | Matrix + core matrixutilities | `ql/math/matrix.hpp`, `ql/math/matrixutilities/` (basics) | `matrices.cpp` | L → split (Matrix ops / decompositions) |
-| QL-1.3 | Distributions — Normal | `ql/math/distributions/normaldistribution.*` (pdf/cdf/inverse) | `distributions.cpp` (normal cases) | M |
+| ✅ QL-1.3a | ErrorFunction (`erf`) | `ql/math/errorfunction.{hpp,cpp}` — prerequisite for the Normal CDF | reference values across all `erf` regions (exercised via `distributions.cpp`) | M |
+| ✅ QL-1.3 | Distributions — Normal | `ql/math/distributions/normaldistribution.*` (pdf/cdf/inverse) | `distributions.cpp` (normal cases) | M |
 | QL-1.4 | Interpolations — Linear | `ql/math/interpolations/linearinterpolation.*` + `interpolation` base | `interpolations.cpp` (linear) | M |
 | QL-1.5 | Solvers1D | `ql/math/solvers1d/` (Brent, Bisection, Newton, …) | `solvers.cpp` | M → 1 ticket per solver |
 | QL-1.6 | Distributions — rest | bivariate normal, poisson, chi-square, gamma, … | `distributions.cpp` (rest) | L → split |
