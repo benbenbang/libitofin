@@ -13,6 +13,7 @@ use crate::fail;
 use crate::types::Real;
 
 pub mod normal;
+pub mod studentt;
 
 /// A probability value, validated to lie in the closed interval `[0, 1]`.
 ///
