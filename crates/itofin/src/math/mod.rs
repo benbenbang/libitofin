@@ -3,5 +3,6 @@
 pub mod array;
 pub mod distributions;
 pub mod errorfunction;
+pub mod gammafunction;
 pub mod interpolations;
 pub mod matrix;
