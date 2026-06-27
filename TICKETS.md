@@ -1,19 +1,19 @@
-# ito-fin — QuantLib → Rust Porting Backlog
+# ito-fin - QuantLib → Rust Porting Backlog
 
 A ticketized plan for translating [QuantLib](https://github.com/lballabio/QuantLib) (`ql/`, ~470k LOC,
 16 modules) into idiomatic Rust. Port **bottom-up**: each layer depends only on layers above it.
 
-The QuantLib `test-suite/` (186 `.cpp` files) is the **porting oracle** — every ticket is "done" when
+The QuantLib `test-suite/` (186 `.cpp` files) is the **porting oracle** - every ticket is "done" when
 the matching test cases are ported and the Rust output matches the C++ numbers within tolerance.
 
 > Source of truth for the C++ tree: the `QuantLib/` symlink at repo root.
 
 ---
 
-## 0. Cross-cutting design decisions (DECIDE FIRST — blocks all porting)
+## 0. Cross-cutting design decisions (DECIDE FIRST - blocks all porting)
 
 These five C++ idioms appear in every module; their Rust mapping defines how every other ticket is
-written. Proposed defaults below are **single-threaded first** — revisit `Arc`/threading after Milestone 1.
+written. Proposed defaults below are **single-threaded first** - revisit `Arc`/threading after Milestone 1.
 
 | # | QuantLib idiom | Proposed Rust mapping | Status |
 |---|---|---|---|
@@ -21,34 +21,34 @@ written. Proposed defaults below are **single-threaded first** — revisit `Arc`
 | D2 | `Handle<T>` / `RelinkableHandle<T>` | `Handle<T>` newtype over `Rc<RefCell<Link<T>>>` | ⬜ needs sign-off |
 | D3 | `ext::shared_ptr<T>` (pervasive) | `Rc<T>` now; `Arc<T>` only if/when threaded | ⬜ needs sign-off |
 | D4 | `QL_REQUIRE` / `QL_FAIL` (exceptions) | `Result<T, QlError>` with `thiserror` | ⬜ needs sign-off |
-| D5 | `Settings` singleton (global eval date) | explicit `&Context` (NOT `thread_local` — invisible to compute threads, see D6) | ⬜ needs sign-off |
+| D5 | `Settings` singleton (global eval date) | explicit `&Context` (NOT `thread_local` - invisible to compute threads, see D6) | ⬜ needs sign-off |
 | D6 | runtime concurrency model | `rayon` **snapshot-and-fan-out**; no `async` in the core | ⬜ needs sign-off |
 | D7 | language bindings | PyO3 + maturin (Python); `extern "C"` + cbindgen (C ABI) in sibling crates | ⬜ needs sign-off |
-| D8 | logging / observability | `log` facade (zero-cost without a subscriber), coarse boundaries only — **deferred, non-blocking** | ⬜ deferred |
+| D8 | logging / observability | `log` facade (zero-cost without a subscriber), coarse boundaries only - **deferred, non-blocking** | ⬜ deferred |
 
-**D1–D5 are the QL-0.x foundation tickets — see Epic L0. D6/D7 shape the core API and couple back to D3. D8 is deferred — it touches no existing ticket and can land any time.**
+**D1–D5 are the QL-0.x foundation tickets - see Epic L0. D6/D7 shape the core API and couple back to D3. D8 is deferred - it touches no existing ticket and can land any time.**
 
-### D6 — Concurrency model (`rayon` only; the core does no IO)
+### D6 - Concurrency model (`rayon` only; the core does no IO)
 
-QuantLib fetches no market data — quotes/curves are user input — so the core has **no `async`/`tokio` story**.
+QuantLib fetches no market data - quotes/curves are user input - so the core has **no `async`/`tokio` story**.
 `async` belongs only to an optional service built *on top* of `libitofin`, which is out of scope here.
 
 Runtime parallelism is CPU-bound → **`rayon` threads**, using **snapshot-and-fan-out**:
 
-1. *Setup/calibration* — single-threaded; mutate the observable graph (D1/D2), warm `LazyObject` caches.
-2. *Compute* — freeze an **immutable snapshot** of inputs, then `par_iter` over it with a shared `&Snapshot`
-   (`Sync` because immutable — no locks on the hot path).
+1. *Setup/calibration* - single-threaded; mutate the observable graph (D1/D2), warm `LazyObject` caches.
+2. *Compute* - freeze an **immutable snapshot** of inputs, then `par_iter` over it with a shared `&Snapshot`
+   (`Sync` because immutable - no locks on the hot path).
 
 High-value parallel features (land in L9–L11, but the pattern is a core constraint now): Monte Carlo (per-path),
 greeks/scenario revaluation (per-scenario), portfolio pricing (per-instrument), calibration (per-basket-instrument).
 Not parallel: within-curve bootstrap (iterative), FD time-stepping (serial).
 
-### D7 — Binding strategy (couples to D3)
+### D7 - Binding strategy (couples to D3)
 
 Core stays idiomatic and FFI-agnostic; binding crates adapt at the edge:
 
 ```
-crates/itofin       core (libitofin) — knows nothing about FFI
+crates/itofin       core (libitofin) - knows nothing about FFI
 crates/itofin-ffi   extern "C" + cbindgen → C header (lingua franca for C/C++/Julia/R/C#/Java)
 crates/itofin-py    PyO3 + maturin → pip-installable wheel
 ```
@@ -61,14 +61,14 @@ FFI shape constraints (design the core API around these, don't compromise the co
 - generics/trait objects don't cross FFI → expose concrete/enum facades in the binding layer, keep the core generic.
 - ownership across the boundary → opaque handles; PyO3 manages it, the raw C ABI needs explicit `free` fns.
 
-### D8 — Logging / observability (deferred; does not block any ticket)
+### D8 - Logging / observability (deferred; does not block any ticket)
 
-QuantLib has no logging — it's a numeric library, not a service. The core stays **dep-free and IO-free**, so
+QuantLib has no logging - it's a numeric library, not a service. The core stays **dep-free and IO-free**, so
 logging is opt-in and should impose **minimal overhead when disabled**:
 
 - Use the **`log` facade** (not `tracing`): a `log::debug!` with no installed logger is a near-noop and
   avoids formatting work. `tracing`'s spans/subscribers are heavier and belong to a service layer, not the core.
-- **Coarse boundaries only.** Log at calibration/bootstrap entry-exit or solver non-convergence — *never* inside
+- **Coarse boundaries only.** Log at calibration/bootstrap entry-exit or solver non-convergence - *never* inside
   hot paths like `Observable::notify_observers`, relinks, or per-path/per-scenario loops (D6), which would emit
   millions of lines and distort timing.
 - Bindings choose the sink: the PyO3 crate (D7) can bridge `log` → Python `logging`; the C ABI exposes a callback.
@@ -84,7 +84,7 @@ Port order is top-to-bottom. `experimental/` is excluded (port last or never).
 
 | Layer | Epic | Modules | ~LOC | Depends on |
 |---|---|---|---|---|
-| L0 | **EPIC-0 core** | `types`, `errors`, `patterns/`, `settings`, `handle`, `utilities/` | 5k | — |
+| L0 | **EPIC-0 core** | `types`, `errors`, `patterns/`, `settings`, `handle`, `utilities/` | 5k | - |
 | L1 | **EPIC-1 math** | array/matrix, distributions, interpolations, integrals, solvers, optimization, statistics, rng, ode | 34k | L0 |
 | L2 | **EPIC-2 time** | `Date`, `Period`, `Calendar`, `DayCounter`, `Schedule` | 20k | L0 |
 | L3 | **EPIC-3 quotes** | `Quote`, `SimpleQuote`, `interestrate`, `compounding` | 1.5k | L0, L2 |
@@ -96,7 +96,7 @@ Port order is top-to-bottom. `experimental/` is excluded (port last or never).
 | L9 | **EPIC-9 methods** | montecarlo, lattices, finitedifferences | 21k | L5 |
 | L10 | **EPIC-10 models** | shortrate, equity (Heston), marketmodels | 33k | L5, L9 |
 | L11 | **EPIC-11 engines** | vanilla, barrier, asian, swaption, ... | 46k | L8, L9, L10 |
-| L12 | ~~experimental~~ | — | 66k | EXCLUDED |
+| L12 | ~~experimental~~ | - | 66k | EXCLUDED |
 
 ---
 
@@ -117,7 +117,7 @@ Modules are far larger than one PR, so the hierarchy is **Epic → Ticket → PR
 
 ---
 
-## 3. Milestone 1 — Vertical slice (do this BEFORE going wide)
+## 3. Milestone 1 - Vertical slice (do this BEFORE going wide)
 
 **Goal: price one European option under Black-Scholes-Merton, end-to-end, matching `europeanoption.cpp`.**
 
@@ -131,7 +131,7 @@ Acceptance: `europeanoption.cpp` price + greeks match within 1e-10.
 
 ---
 
-## 4. EPIC-0 — core (L0)  ✳️ start here
+## 4. EPIC-0 - core (L0)  ✳️ start here
 
 | ID | Component | Port | Acceptance | Size |
 |---|---|---|---|---|
@@ -145,7 +145,7 @@ Acceptance: `europeanoption.cpp` price + greeks match within 1e-10.
 
 ---
 
-## 5. EPIC-2 — time (L2)  ✳️ parallelizable with EPIC-1
+## 5. EPIC-2 - time (L2)  ✳️ parallelizable with EPIC-1
 
 | ID | Component | Port | Acceptance | Size |
 |---|---|---|---|---|
@@ -157,7 +157,7 @@ Acceptance: `europeanoption.cpp` price + greeks match within 1e-10.
 
 ---
 
-## 6. EPIC-1 — math (L1)
+## 6. EPIC-1 - math (L1)
 
 Slice-critical tickets first (needed for Milestone 1), then the wide independent set. ✅ = merged to `main`.
 
@@ -165,26 +165,26 @@ Slice-critical tickets first (needed for Milestone 1), then the wide independent
 |---|---|---|---|---|
 | ✅ QL-1.1 | Array | `ql/math/array.hpp` | `array.cpp` | M |
 | QL-1.2 | Matrix + core matrixutilities | `ql/math/matrix.hpp`, `ql/math/matrixutilities/` (basics) | `matrices.cpp` | L → split (Matrix ops / decompositions) |
-| ✅ QL-1.3a | ErrorFunction (`erf`) | `ql/math/errorfunction.{hpp,cpp}` — prerequisite for the Normal CDF | reference values across all `erf` regions (exercised via `distributions.cpp`) | M |
-| ✅ QL-1.3 | Distributions — Normal | `ql/math/distributions/normaldistribution.*` (pdf/cdf/inverse) | `distributions.cpp` (normal cases) | M |
-| QL-1.4 | Interpolations — Linear | `ql/math/interpolations/linearinterpolation.*` + `interpolation` base | `interpolations.cpp` (linear) | M |
+| ✅ QL-1.3a | ErrorFunction (`erf`) | `ql/math/errorfunction.{hpp,cpp}` - prerequisite for the Normal CDF | reference values across all `erf` regions (exercised via `distributions.cpp`) | M |
+| ✅ QL-1.3 | Distributions - Normal | `ql/math/distributions/normaldistribution.*` (pdf/cdf/inverse) | `distributions.cpp` (normal cases) | M |
+| QL-1.4 | Interpolations - Linear | `ql/math/interpolations/linearinterpolation.*` + `interpolation` base | `interpolations.cpp` (linear) | M |
 | QL-1.5 | Solvers1D | `ql/math/solvers1d/` (Brent, Bisection, Newton, …) | `solvers.cpp` | M → 1 ticket per solver |
-| QL-1.6 | Distributions — rest | bivariate normal, poisson, chi-square, gamma, … | `distributions.cpp` (rest) | L → split |
-| QL-1.7 | Interpolations — rest | cubic/spline, loglinear, flat, 2D | `interpolations.cpp` (rest) | L → split |
+| QL-1.6 | Distributions - rest | bivariate normal, poisson, chi-square, gamma, … | `distributions.cpp` (rest) | L → split |
+| QL-1.7 | Interpolations - rest | cubic/spline, loglinear, flat, 2D | `interpolations.cpp` (rest) | L → split |
 | QL-1.8 | Integrals | `ql/math/integrals/` (segment, Simpson, GaussKronrod, Gauss-*) | `integrals.cpp` | L → split |
 | QL-1.9 | Optimization | `ql/math/optimization/` (Simplex, LevenbergMarquardt, conjugate gradient, constraints) | `optimizers.cpp` | L → 1 ticket per optimizer |
 | QL-1.10 | Statistics | `ql/math/statistics/` (general, risk, incremental, histogram) | `riskstats.cpp` | L → split |
-| QL-1.11 | RNG — generators | `ql/math/randomnumbers/` MT19937, knuth, ranlux, box-muller, ziggurat (ALGORITHMS only) | `lowdiscrepancysequences.cpp` (rng part) | M |
-| QL-1.12 | RNG — Sobol + data tables | `sobolrsg.cpp`, `primitivepolynomials.cpp`, `latticerules.cpp` (~115k LOC = static DATA) | `lowdiscrepancysequences.cpp` (sobol) | L → mechanical data transcription, script-assisted |
+| QL-1.11 | RNG - generators | `ql/math/randomnumbers/` MT19937, knuth, ranlux, box-muller, ziggurat (ALGORITHMS only) | `lowdiscrepancysequences.cpp` (rng part) | M |
+| QL-1.12 | RNG - Sobol + data tables | `sobolrsg.cpp`, `primitivepolynomials.cpp`, `latticerules.cpp` (~115k LOC = static DATA) | `lowdiscrepancysequences.cpp` (sobol) | L → mechanical data transcription, script-assisted |
 | QL-1.13 | ODE + copulas | `ql/math/ode/`, `ql/math/copulas/` | per-file cases | S each |
-| QL-1.14 | Matrixutilities — decompositions | SVD, QR, Cholesky, pseudo-sqrt, symmetric schur | `matrices.cpp` (decomp) | L → 1 ticket per decomposition |
+| QL-1.14 | Matrixutilities - decompositions | SVD, QR, Cholesky, pseudo-sqrt, symmetric schur | `matrices.cpp` (decomp) | L → 1 ticket per decomposition |
 
 > ⚠️ **QL-1.12 note:** `randomnumbers` reads as 118k LOC but ~115k is static direction-integer / primitive-polynomial
 > tables. The algorithm is small; the bulk is mechanical and should be transcribed with a generator script, not by hand.
 
 ---
 
-## 7. EPIC-3 — quotes (L3, tiny — pulls into Milestone 1)
+## 7. EPIC-3 - quotes (L3, tiny - pulls into Milestone 1)
 
 | ID | Component | Port | Acceptance | Size |
 |---|---|---|---|---|
@@ -194,7 +194,7 @@ Slice-critical tickets first (needed for Milestone 1), then the wide independent
 
 ---
 
-## 8. Epics L4–L11 (headline only — break down after L0–L2 land)
+## 8. Epics L4–L11 (headline only - break down after L0–L2 land)
 
 Each becomes its own detailed ticket table once its dependencies are in place. Natural sub-epic boundaries:
 
@@ -204,8 +204,8 @@ Each becomes its own detailed ticket table once its dependencies are in place. N
 - **EPIC-6 indexes** → `iborindex`, `swapindex`, ibor/swap families, inflation indices.
 - **EPIC-7 cashflows** → coupon base, fixed/floating coupons, leg builders, cashflow vectors.
 - **EPIC-8 instruments** → `instrument` base, `payoff`, `exercise`, `option`, vanilla options, `bonds/`, swaps.
-- **EPIC-9 methods** → `montecarlo/`, `lattices/`, `finitedifferences/` (17k — large sub-epic).
-- **EPIC-10 models** → `shortrate/`, `equity/` (Heston calibration), `marketmodels/` (24k — large sub-epic).
+- **EPIC-9 methods** → `montecarlo/`, `lattices/`, `finitedifferences/` (17k - large sub-epic).
+- **EPIC-10 models** → `shortrate/`, `equity/` (Heston calibration), `marketmodels/` (24k - large sub-epic).
 - **EPIC-11 engines** → `vanilla/` (14k), `barrier/`, `asian/`, `swaption/`, `basket/`, `bond/`, … (1 sub-epic per pricing family).
 
 ---
@@ -213,7 +213,7 @@ Each becomes its own detailed ticket table once its dependencies are in place. N
 ## 9. Execution notes
 
 1. **Decide D1–D5 before writing porting code.** They are QL-0.1–0.6 and gate everything.
-2. **Milestone 1 vertical slice before going wide** — derisk the architecture against `europeanoption.cpp`.
+2. **Milestone 1 vertical slice before going wide** - derisk the architecture against `europeanoption.cpp`.
 3. After the slice, **L0 → L1/L2 in parallel** (independent), then proceed down the layer map.
-4. Every ticket ports its matching `test-suite/*.cpp` cases as Rust tests — the C++ outputs are the oracle.
+4. Every ticket ports its matching `test-suite/*.cpp` cases as Rust tests - the C++ outputs are the oracle.
 5. Keep PRs ≤300 LOC; split any L-sized ticket as noted.
