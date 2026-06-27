@@ -30,7 +30,7 @@ impl<T> Link<T> {
     }
 
     /// Repoints the link and returns its observable so the caller can notify
-    /// *after* dropping the link borrow — observers commonly read or relink the
+    /// *after* dropping the link borrow - observers commonly read or relink the
     /// handle from `update()`, which would otherwise re-borrow this cell.
     fn link_to(&mut self, pointee: Option<Shared<T>>) -> Shared<Observable> {
         self.current = pointee;
@@ -203,7 +203,7 @@ mod tests {
         assert!(observed.is_empty());
     }
 
-    /// Observer that reads its shared handle while being notified — the common
+    /// Observer that reads its shared handle while being notified - the common
     /// "recompute on relink" pattern. This must not hit a `RefCell` borrow panic.
     struct Reader {
         handle: Handle<i32>,
