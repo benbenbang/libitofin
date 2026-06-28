@@ -30,20 +30,28 @@ pub struct NormalDistribution {
 
 impl NormalDistribution {
     /// A normal density with the given mean and standard deviation.
-    pub fn new(average: Real, sigma: Real) -> Self {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless `sigma` is finite and `> 0` (a non-positive sigma
+    /// would yield negative densities; a non-finite one, NaN outputs).
+    pub fn new(average: Real, sigma: Real) -> QlResult<Self> {
+        if !sigma.is_finite() || sigma <= 0.0 {
+            fail!("sigma must be a finite positive number ({sigma} given)");
+        }
         let normalization_factor = M_SQRT_2 * M_1_SQRTPI / sigma;
         let der_normalization_factor = sigma * sigma;
-        NormalDistribution {
+        Ok(NormalDistribution {
             average,
             normalization_factor,
             denominator: 2.0 * der_normalization_factor,
             der_normalization_factor,
-        }
+        })
     }
 
     /// The standard normal density `N(0, 1)`.
     pub fn standard() -> Self {
-        NormalDistribution::new(0.0, 1.0)
+        NormalDistribution::new(0.0, 1.0).expect("standard normal (0, 1) is valid")
     }
 
     /// The density at `x`.
@@ -81,8 +89,8 @@ pub struct CumulativeNormalDistribution {
 impl CumulativeNormalDistribution {
     /// A cumulative normal for the given mean and standard deviation.
     pub fn new(average: Real, sigma: Real) -> QlResult<Self> {
-        if sigma <= 0.0 {
-            fail!("sigma must be greater than 0.0 ({sigma} given)");
+        if !sigma.is_finite() || sigma <= 0.0 {
+            fail!("sigma must be a finite positive number ({sigma} given)");
         }
         Ok(CumulativeNormalDistribution {
             average,
@@ -173,8 +181,8 @@ pub struct InverseCumulativeNormal {
 impl InverseCumulativeNormal {
     /// An inverse cumulative normal for the given mean and standard deviation.
     pub fn new(average: Real, sigma: Real) -> QlResult<Self> {
-        if sigma <= 0.0 {
-            fail!("sigma must be greater than 0.0 ({sigma} given)");
+        if !sigma.is_finite() || sigma <= 0.0 {
+            fail!("sigma must be a finite positive number ({sigma} given)");
         }
         Ok(InverseCumulativeNormal { average, sigma })
     }
@@ -207,8 +215,9 @@ impl InverseCumulativeNormal {
     }
 
     fn tail_value(x: Real) -> QlResult<Real> {
-        if x <= 0.0 || x >= 1.0 {
+        if !x.is_finite() || x <= 0.0 || x >= 1.0 {
             // recover from numerical error at the boundaries; otherwise reject
+            // (this also rejects NaN/infinite x, which the range check routes here)
             if (x - 1.0).abs() <= 42.0 * Real::EPSILON {
                 return Ok(Real::MAX);
             } else if x.abs() < Real::EPSILON {
@@ -266,7 +275,7 @@ mod tests {
     #[test]
     fn cdf_derivative_is_density() {
         let c = CumulativeNormalDistribution::new(0.3, 1.7).unwrap();
-        let n = NormalDistribution::new(0.3, 1.7);
+        let n = NormalDistribution::new(0.3, 1.7).unwrap();
         for &x in &[-2.0, -0.5, 0.0, 1.1, 3.0] {
             assert!((c.derivative(x) - n.value(x)).abs() < TOL);
         }
@@ -294,14 +303,30 @@ mod tests {
     }
 
     #[test]
-    fn nonpositive_sigma_is_rejected() {
-        assert!(CumulativeNormalDistribution::new(0.0, 0.0).is_err());
-        assert!(InverseCumulativeNormal::new(0.0, -1.0).is_err());
+    fn invalid_sigma_is_rejected() {
+        // every constructor must reject non-positive and non-finite sigma.
+        for s in [0.0, -1.0, Real::NAN, Real::INFINITY, Real::NEG_INFINITY] {
+            assert!(
+                NormalDistribution::new(0.0, s).is_err(),
+                "density sigma={s}"
+            );
+            assert!(
+                CumulativeNormalDistribution::new(0.0, s).is_err(),
+                "cumulative sigma={s}"
+            );
+            assert!(
+                InverseCumulativeNormal::new(0.0, s).is_err(),
+                "inverse sigma={s}"
+            );
+        }
     }
 
     #[test]
     fn inverse_outside_unit_interval_errors() {
         assert!(InverseCumulativeNormal::standard_value(-0.1).is_err());
         assert!(InverseCumulativeNormal::standard_value(1.5).is_err());
+        // NaN and infinities must error, not fall through to Ok(NaN).
+        assert!(InverseCumulativeNormal::standard_value(Real::NAN).is_err());
+        assert!(InverseCumulativeNormal::standard_value(Real::INFINITY).is_err());
     }
 }
