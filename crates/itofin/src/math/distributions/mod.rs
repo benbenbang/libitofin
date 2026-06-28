@@ -15,6 +15,7 @@ use crate::types::Real;
 pub mod chisquare;
 pub mod gamma;
 pub mod normal;
+pub mod poisson;
 pub mod studentt;
 
 /// A probability value, validated to lie in the closed interval `[0, 1]`.
