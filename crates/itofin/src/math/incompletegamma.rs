@@ -35,13 +35,14 @@ const MAX_ITERATIONS: u32 = 100;
 /// # Ok::<(), itofin::errors::QlError>(())
 /// ```
 pub fn incomplete_gamma(a: Real, x: Real) -> QlResult<Real> {
-    // `is_nan` is explicit: a bare comparison lets NaN through (all NaN
-    // comparisons are false), but QuantLib's QL_REQUIRE rejects it.
-    if a <= 0.0 || a.is_nan() {
-        fail!("incomplete_gamma requires a > 0, got a={a}");
+    // `is_finite` is explicit: a bare comparison lets NaN and ±infinity through
+    // (all NaN comparisons are false, and +infinity is not <= 0 / not < 0), but
+    // QuantLib's QL_REQUIRE rejects them.
+    if !a.is_finite() || a <= 0.0 {
+        fail!("incomplete_gamma requires a finite a > 0, got a={a}");
     }
-    if x < 0.0 || x.is_nan() {
-        fail!("incomplete_gamma requires x >= 0, got x={x}");
+    if !x.is_finite() || x < 0.0 {
+        fail!("incomplete_gamma requires a finite x >= 0, got x={x}");
     }
     if x < a + 1.0 {
         series_repr(a, x)
@@ -178,5 +179,7 @@ mod tests {
         assert!(incomplete_gamma(1.0, -1.0).is_err()); // x < 0
         assert!(incomplete_gamma(Real::NAN, 1.0).is_err()); // NaN a
         assert!(incomplete_gamma(1.0, Real::NAN).is_err()); // NaN x
+        assert!(incomplete_gamma(Real::INFINITY, 1.0).is_err()); // +inf a
+        assert!(incomplete_gamma(1.0, Real::INFINITY).is_err()); // +inf x
     }
 }

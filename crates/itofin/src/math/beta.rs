@@ -52,13 +52,14 @@ pub fn beta_function(z: Real, w: Real) -> QlResult<Real> {
 /// # Ok::<(), itofin::errors::QlError>(())
 /// ```
 pub fn incomplete_beta(a: Real, b: Real, x: Real) -> QlResult<Real> {
-    // `is_nan()` is required: a bare `<= 0.0` lets NaN through (all NaN
-    // comparisons are false), but QuantLib's QL_REQUIRE(a > 0) rejects it
-    if a <= 0.0 || a.is_nan() {
-        fail!("incomplete_beta requires a > 0, got a={a}");
+    // `is_finite()` is required: a bare `<= 0.0` lets NaN and +infinity through
+    // (all NaN comparisons are false, and +infinity is not <= 0), but
+    // QuantLib's QL_REQUIRE(a > 0) rejects them
+    if !a.is_finite() || a <= 0.0 {
+        fail!("incomplete_beta requires a finite a > 0, got a={a}");
     }
-    if b <= 0.0 || b.is_nan() {
-        fail!("incomplete_beta requires b > 0, got b={b}");
+    if !b.is_finite() || b <= 0.0 {
+        fail!("incomplete_beta requires a finite b > 0, got b={b}");
     }
     // `contains` is false for NaN, so this also rejects NaN
     if !(0.0..=1.0).contains(&x) {
@@ -196,5 +197,9 @@ mod tests {
         assert!(incomplete_beta(1.0, 1.0, Real::NAN).is_err()); // NaN x
         assert!(incomplete_beta(Real::NAN, 1.0, 0.5).is_err()); // NaN a
         assert!(incomplete_beta(1.0, Real::NAN, 0.5).is_err()); // NaN b
+        assert!(incomplete_beta(Real::INFINITY, 1.0, 0.5).is_err()); // +inf a
+        assert!(incomplete_beta(1.0, Real::INFINITY, 0.5).is_err()); // +inf b
+        // beta_function propagates through log_gamma, so infinity errors too
+        assert!(beta_function(Real::INFINITY, 1.0).is_err());
     }
 }
