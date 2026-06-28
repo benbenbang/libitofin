@@ -35,6 +35,16 @@ impl LinearInterpolation {
                 x.len()
             );
         }
+        for &xi in &x {
+            if !xi.is_finite() {
+                fail!("x values must be finite, got {xi}");
+            }
+        }
+        for &yi in &y {
+            if !yi.is_finite() {
+                fail!("y values must be finite, got {yi}");
+            }
+        }
         for w in x.windows(2) {
             if w[1] <= w[0] {
                 fail!("x values must be strictly increasing");
@@ -206,5 +216,14 @@ mod tests {
         assert!(LinearInterpolation::new(vec![0.0, 1.0], vec![0.0]).is_err());
         assert!(LinearInterpolation::new(vec![0.0], vec![0.0]).is_err());
         assert!(LinearInterpolation::new(vec![0.0, 0.0], vec![1.0, 2.0]).is_err());
+    }
+
+    #[test]
+    fn non_finite_nodes_rejected() {
+        // A NaN x-node slips past the strictly-increasing check (all NaN
+        // comparisons are false) and must be rejected explicitly.
+        assert!(LinearInterpolation::new(vec![0.0, Real::NAN], vec![0.0, 1.0]).is_err());
+        assert!(LinearInterpolation::new(vec![0.0, Real::INFINITY], vec![0.0, 1.0]).is_err());
+        assert!(LinearInterpolation::new(vec![0.0, 1.0], vec![0.0, Real::NAN]).is_err());
     }
 }
