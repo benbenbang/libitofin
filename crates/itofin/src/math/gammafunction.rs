@@ -50,10 +50,11 @@ const SQRT_TWO_PI: Real = 2.5066282746310005;
 /// # Ok::<(), itofin::errors::QlError>(())
 /// ```
 pub fn log_gamma(x: Real) -> QlResult<Real> {
-    // reject x <= 0 and NaN, matching QuantLib's QL_REQUIRE(x > 0); a bare
-    // `x <= 0.0` would let NaN through (all NaN comparisons are false)
-    if x <= 0.0 || x.is_nan() {
-        fail!("log_gamma requires a positive argument, got {x}");
+    // reject non-finite and x <= 0, matching QuantLib's QL_REQUIRE(x > 0); a
+    // bare `x <= 0.0` would let NaN and +infinity through (all NaN comparisons
+    // are false, and +infinity is not <= 0)
+    if !x.is_finite() || x <= 0.0 {
+        fail!("log_gamma requires a finite positive argument, got {x}");
     }
     let mut temp = x + 5.5;
     temp -= (x + 0.5) * temp.ln();
@@ -87,9 +88,13 @@ pub fn log_gamma(x: Real) -> QlResult<Real> {
 /// assert!((gamma(0.5) - std::f64::consts::PI.sqrt()).abs() < 1e-9);
 /// ```
 pub fn gamma(x: Real) -> Real {
-    // A NaN argument would recurse forever on the reflection branch.
-    if x.is_nan() {
-        return Real::NAN;
+    // Non-finite inputs are handled up front: +inf would hit log_gamma's
+    // finite-only domain and panic the expect below, -inf would recurse into
+    // gamma(+inf) and do the same, and NaN would recurse forever on the
+    // reflection branch. Gamma diverges to +inf at +inf and has no limit at
+    // -inf (NaN), as for NaN input.
+    if !x.is_finite() {
+        return if x > 0.0 { Real::INFINITY } else { Real::NAN };
     }
     if x >= 1.0 {
         // x >= 1 > 0 is always a valid log_gamma argument.
@@ -155,6 +160,9 @@ mod tests {
         assert!(log_gamma(-1.0).is_err());
         // NaN must be rejected too, matching QuantLib's QL_REQUIRE(x > 0)
         assert!(log_gamma(Real::NAN).is_err());
+        // +infinity must be rejected: a bare `x <= 0.0` would let it through
+        assert!(log_gamma(Real::INFINITY).is_err());
+        assert!(log_gamma(Real::NEG_INFINITY).is_err());
     }
 
     #[test]
@@ -215,5 +223,14 @@ mod tests {
         assert!(gamma(-20.0).is_finite());
         // NaN propagates.
         assert!(gamma(Real::NAN).is_nan());
+    }
+
+    #[test]
+    fn value_at_infinities_does_not_panic() {
+        // Regression: log_gamma now rejects non-finite x, so gamma must handle
+        // +-inf before the expect path rather than panic. Gamma diverges to +inf
+        // at +inf and has no limit at -inf.
+        assert_eq!(gamma(Real::INFINITY), Real::INFINITY);
+        assert!(gamma(Real::NEG_INFINITY).is_nan());
     }
 }
