@@ -12,6 +12,7 @@ use crate::errors::{QlError, QlResult};
 use crate::fail;
 use crate::types::Real;
 
+pub mod binomial;
 pub mod chisquare;
 pub mod gamma;
 pub mod normal;
