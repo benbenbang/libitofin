@@ -5,5 +5,6 @@ pub mod beta;
 pub mod distributions;
 pub mod errorfunction;
 pub mod gammafunction;
+pub mod incompletegamma;
 pub mod interpolations;
 pub mod matrix;
