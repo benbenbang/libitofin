@@ -15,6 +15,7 @@ use std::f64::consts::PI;
 
 use super::normal::CumulativeNormalDistribution;
 use crate::errors::QlResult;
+use crate::math::integrals::tabulatedgausslegendre::TabulatedGaussLegendre;
 use crate::require;
 use crate::types::Real;
 
@@ -142,18 +143,161 @@ impl BivariateCumulativeNormalDistributionDr78 {
     }
 }
 
+/// West's 2004 bivariate cumulative normal distribution with correlation `rho`.
+///
+/// The accurate default method (~1e-15), implementing Genz's (2004) hybrid
+/// numerical integration: the integrands are evaluated with
+/// [`TabulatedGaussLegendre`] at order 6, 12 or 20 chosen by `|rho|`. Unlike
+/// [`BivariateCumulativeNormalDistributionDr78`] it has no `sqrt(1 - rho^2)`
+/// division, so perfect correlation is handled by the algorithm itself.
+/// Aliased as [`BivariateCumulativeNormalDistribution`].
+#[derive(Clone, Copy, Debug)]
+pub struct BivariateCumulativeNormalDistributionWe04DP {
+    rho: Real,
+}
+
+impl BivariateCumulativeNormalDistributionWe04DP {
+    /// A bivariate normal CDF with correlation `rho`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless `rho` lies in `[-1, 1]` (so `NaN` and the
+    /// infinities are rejected).
+    pub fn new(rho: Real) -> QlResult<Self> {
+        require!(
+            (-1.0..=1.0).contains(&rho),
+            "correlation rho must be in [-1, 1], got {rho}"
+        );
+        Ok(BivariateCumulativeNormalDistributionWe04DP { rho })
+    }
+
+    /// `P(X <= x, Y <= y)` for the standard bivariate normal with correlation
+    /// `rho`. A `NaN` argument yields `NaN`; infinite arguments give the exact
+    /// CDF limits.
+    pub fn value(&self, x: Real, y: Real) -> Real {
+        if x.is_nan() || y.is_nan() {
+            return Real::NAN;
+        }
+        let cum = CumulativeNormalDistribution::standard();
+        // CDF limits at infinity, which the numerical path below would turn into
+        // NaN (it forms h*k = inf*0): F(-inf, .) = F(., -inf) = 0;
+        // F(+inf, y) = Phi(y); F(x, +inf) = Phi(x) (Phi(+inf) = 1 covers the
+        // (+inf, +inf) corner).
+        if (x.is_infinite() && x < 0.0) || (y.is_infinite() && y < 0.0) {
+            return 0.0;
+        }
+        if x.is_infinite() {
+            return cum.value(y);
+        }
+        if y.is_infinite() {
+            return cum.value(x);
+        }
+        let rho = self.rho;
+        let abs_rho = rho.abs();
+        // higher order for stronger correlation, matching QuantLib
+        let order = if abs_rho < 0.3 {
+            6
+        } else if abs_rho < 0.75 {
+            12
+        } else {
+            20
+        };
+        let quad = TabulatedGaussLegendre::new(order).expect("order 6/12/20 is supported");
+
+        let h = -x;
+        let mut k = -y;
+        let mut hk = h * k;
+        let mut bvn = 0.0;
+
+        if abs_rho < 0.925 {
+            if abs_rho > 0.0 {
+                let asr = rho.asin();
+                let hs = (h * h + k * k) / 2.0;
+                // Genz eqn3
+                bvn = quad.integrate(move |t| {
+                    let sn = (asr * (-t + 1.0) * 0.5).sin();
+                    ((sn * hk - hs) / (1.0 - sn * sn)).exp()
+                });
+                bvn *= asr * (0.25 / PI);
+            }
+            bvn += cum.value(-h) * cum.value(-k);
+        } else {
+            if rho < 0.0 {
+                k = -k;
+                hk = -hk;
+            }
+            if abs_rho < 1.0 {
+                let ass = (1.0 - rho) * (1.0 + rho);
+                let mut a = ass.sqrt();
+                let bs = (h - k) * (h - k);
+                let c = (4.0 - hk) / 8.0;
+                let d = (12.0 - hk) / 16.0;
+                let asr = -(bs / ass + hk) / 2.0;
+                if asr > -100.0 {
+                    bvn = a
+                        * asr.exp()
+                        * (1.0 - c * (bs - ass) * (1.0 - d * bs / 5.0) / 3.0
+                            + c * d * ass * ass / 5.0);
+                }
+                if -hk < 100.0 {
+                    let b = bs.sqrt();
+                    bvn -= (-hk / 2.0).exp()
+                        * 2.506628274631
+                        * cum.value(-b / a)
+                        * b
+                        * (1.0 - c * bs * (1.0 - d * bs / 5.0) / 3.0);
+                }
+                a /= 2.0;
+                // Genz eqn6
+                bvn += quad.integrate(move |t| {
+                    let mut xs = a * (-t + 1.0);
+                    xs = (xs * xs).abs();
+                    let rs = (1.0 - xs).sqrt();
+                    let asr = -(bs / xs + hk) / 2.0;
+                    if asr > -100.0 {
+                        a * asr.exp()
+                            * ((-hk * (1.0 - rs) / (2.0 * (1.0 + rs))).exp() / rs
+                                - (1.0 + c * xs * (1.0 + d * xs)))
+                    } else {
+                        0.0
+                    }
+                });
+                bvn /= -2.0 * PI;
+            }
+            if rho > 0.0 {
+                bvn += cum.value(-h.max(k));
+            } else {
+                bvn = -bvn;
+                if k > h {
+                    // evaluate cumnorm in the lower tail, where f64 is most precise
+                    if h >= 0.0 {
+                        bvn += cum.value(-h) - cum.value(-k);
+                    } else {
+                        bvn += cum.value(k) - cum.value(h);
+                    }
+                }
+            }
+        }
+        bvn
+    }
+}
+
+/// The default bivariate cumulative normal distribution (West 2004).
+pub type BivariateCumulativeNormalDistribution = BivariateCumulativeNormalDistributionWe04DP;
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     type Dr78 = BivariateCumulativeNormalDistributionDr78;
+    type We04 = BivariateCumulativeNormalDistributionWe04DP;
 
     // Port of QuantLib checkBivariate: tabulated values from Haug, "Option
     // pricing formulas" (1998) p.193, plus known analytical/degenerate cases.
-    #[test]
-    fn matches_reference_table() {
+    // Shared by the Dr78 and We04DP checks.
+    fn reference_cases() -> [(Real, Real, Real, Real); 43] {
         let third = 1.0 / 3.0;
-        let cases: [(Real, Real, Real, Real); 43] = [
+        [
             (0.0, 0.0, 0.0, 0.250000),
             (0.0, 0.0, -0.5, 0.166667),
             (0.0, 0.0, 0.5, third),
@@ -197,14 +341,86 @@ mod tests {
             (-30.0, -1.0, 1.0, 0.000000),
             (-30.0, 0.0, 1.0, 0.000000),
             (-30.0, 1.0, 1.0, 0.000000),
-        ];
-        for (a, b, rho, expected) in cases {
+        ]
+    }
+
+    #[test]
+    fn dr78_matches_reference_table() {
+        for (a, b, rho, expected) in reference_cases() {
             let got = Dr78::new(rho).unwrap().value(a, b);
             assert!(
                 (got - expected).abs() < 1e-6,
-                "BVN({a}, {b}; {rho}) = {got}, expected {expected}"
+                "Dr78 BVN({a}, {b}; {rho}) = {got}, expected {expected}"
             );
         }
+    }
+
+    #[test]
+    fn we04_matches_reference_table() {
+        for (a, b, rho, expected) in reference_cases() {
+            let got = We04::new(rho).unwrap().value(a, b);
+            assert!(
+                (got - expected).abs() < 1e-6,
+                "We04 BVN({a}, {b}; {rho}) = {got}, expected {expected}"
+            );
+        }
+    }
+
+    // West 2004 reaches ~1e-15 accuracy, so it must satisfy the analytical
+    // BVN(0, 0, rho) = 1/4 + asin(rho)/(2 pi) identity far more tightly than Dr78.
+    #[test]
+    fn we04_at_zero_matches_arcsin_identity() {
+        let rhos = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.99999];
+        for r in rhos {
+            for sgn in [-1.0, 1.0] {
+                let rho = sgn * r;
+                let got = We04::new(rho).unwrap().value(0.0, 0.0);
+                let expected = 0.25 + rho.asin() / (2.0 * PI);
+                assert!(
+                    (got - expected).abs() < 1e-15,
+                    "rho={rho}: {got} vs {expected}"
+                );
+            }
+        }
+    }
+
+    // checkBivariateTail for We04DP runs at 1e-6 and 1e-8.
+    #[test]
+    fn we04_tail_is_monotonic() {
+        let bvn = We04::new(-0.999).unwrap();
+        for tol in [1e-6, 1e-8] {
+            let x = -6.9;
+            let mut y = 6.9;
+            for _ in 0..10 {
+                let cdf0 = bvn.value(x, y);
+                y += tol;
+                let cdf1 = bvn.value(x, y);
+                assert!(cdf0 <= cdf1, "We04 cdf decreased in tail: {cdf0} -> {cdf1}");
+            }
+        }
+    }
+
+    #[test]
+    fn we04_rejects_correlation_outside_unit_interval() {
+        assert!(We04::new(-1.5).is_err());
+        assert!(We04::new(1.5).is_err());
+        assert!(We04::new(Real::NAN).is_err());
+        assert!(We04::new(0.5).unwrap().value(Real::NAN, 0.0).is_nan());
+    }
+
+    // Regression: infinite arguments used to form h*k = inf*0 = NaN. The exact
+    // CDF limits are F(+inf, y) = Phi(y), F(x, +inf) = Phi(x), F(-inf or -inf) = 0.
+    #[test]
+    fn we04_infinity_boundaries() {
+        let cum = CumulativeNormalDistribution::standard();
+        let bvn = We04::new(0.5).unwrap();
+        assert_eq!(bvn.value(Real::INFINITY, 0.0), cum.value(0.0));
+        assert_eq!(bvn.value(Real::INFINITY, 1.0), cum.value(1.0));
+        assert_eq!(bvn.value(0.0, Real::INFINITY), cum.value(0.0));
+        assert_eq!(bvn.value(Real::NEG_INFINITY, 0.0), 0.0);
+        assert_eq!(bvn.value(0.0, Real::NEG_INFINITY), 0.0);
+        assert_eq!(bvn.value(Real::INFINITY, Real::INFINITY), 1.0);
+        assert_eq!(bvn.value(Real::INFINITY, Real::NEG_INFINITY), 0.0);
     }
 
     // Port of checkBivariateAtZero: BVN(0, 0, rho) = 1/4 + asin(rho)/(2 pi).
