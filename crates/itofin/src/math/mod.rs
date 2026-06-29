@@ -6,5 +6,6 @@ pub mod distributions;
 pub mod errorfunction;
 pub mod gammafunction;
 pub mod incompletegamma;
+pub mod integrals;
 pub mod interpolations;
 pub mod matrix;
