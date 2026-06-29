@@ -14,6 +14,7 @@ use crate::types::Real;
 
 pub mod binomial;
 pub mod bivariatenormal;
+pub mod bivariatestudentt;
 pub mod chisquare;
 pub mod gamma;
 pub mod normal;
