@@ -13,6 +13,7 @@ use crate::fail;
 use crate::types::Real;
 
 pub mod binomial;
+pub mod bivariatenormal;
 pub mod chisquare;
 pub mod gamma;
 pub mod normal;
