@@ -1,0 +1,343 @@
+{
+  "commonPrefix": "",
+  "crossCategoryEdges": [
+    {
+      "count": 1,
+      "edgeType": "documents",
+      "fromType": "document",
+      "toType": "config"
+    },
+    {
+      "count": 2,
+      "edgeType": "configures",
+      "fromType": "config",
+      "toType": "file"
+    }
+  ],
+  "dataPipeline": {
+    "apiHandlerFiles": [],
+    "dataModelFiles": [],
+    "migrationFiles": [],
+    "schemaFiles": []
+  },
+  "dependencyDirection": [],
+  "deploymentTopology": {
+    "hasCI": true,
+    "hasCompose": false,
+    "hasDockerfile": true,
+    "hasK8s": false,
+    "hasTerraform": false,
+    "infraFiles": [
+      ".github/images/prek/Dockerfile",
+      ".github/workflows/pull-request.yml",
+      ".github/workflows/semantic-release.yml"
+    ]
+  },
+  "directoryGroups": {
+    ".github": [
+      "service:.github/images/prek/Dockerfile",
+      "pipeline:.github/workflows/pull-request.yml",
+      "pipeline:.github/workflows/semantic-release.yml",
+      "document:.github/copilot-instructions.md",
+      "file:.github/images/prek/build.sh",
+      "document:.github/images/README.md",
+      "config:.github/labeler.yml"
+    ],
+    ".understand-anything": [
+      "file:.understand-anything/.understandignore",
+      "config:.understand-anything/config.json"
+    ],
+    "crates": [
+      "file:crates/itofin/src/errors.rs",
+      "file:crates/itofin/src/math/beta.rs",
+      "file:crates/itofin/src/math/distributions/binomial.rs",
+      "file:crates/itofin/src/math/distributions/chisquare.rs",
+      "file:crates/itofin/src/math/distributions/gamma.rs",
+      "file:crates/itofin/src/math/distributions/mod.rs",
+      "file:crates/itofin/src/math/distributions/normal.rs",
+      "file:crates/itofin/src/math/distributions/poisson.rs",
+      "file:crates/itofin/src/math/distributions/studentt.rs",
+      "file:crates/itofin/src/math/errorfunction.rs",
+      "file:crates/itofin/src/math/gammafunction.rs",
+      "file:crates/itofin/src/math/incompletegamma.rs",
+      "file:crates/itofin/src/types.rs",
+      "file:crates/itofin/src/handle.rs",
+      "file:crates/itofin/src/lib.rs",
+      "file:crates/itofin/src/patterns/lazyobject.rs",
+      "file:crates/itofin/src/patterns/mod.rs",
+      "file:crates/itofin/src/patterns/observable.rs",
+      "file:crates/itofin/src/patterns/visitor.rs",
+      "file:crates/itofin/src/settings.rs",
+      "file:crates/itofin/src/shared.rs",
+      "file:crates/itofin/src/math/array.rs",
+      "file:crates/itofin/src/math/interpolations/linear.rs",
+      "file:crates/itofin/src/math/interpolations/mod.rs",
+      "file:crates/itofin/src/math/matrix.rs",
+      "file:crates/itofin/src/math/mod.rs",
+      "file:crates/itofin/src/utilities/clone.rs",
+      "file:crates/itofin/src/utilities/dataformatters.rs",
+      "file:crates/itofin/src/utilities/mod.rs",
+      "file:crates/itofin/src/utilities/null.rs",
+      "file:crates/itofin/src/utilities/steppingiterator.rs",
+      "config:crates/itofin/Cargo.toml"
+    ],
+    "root": [
+      "service:.dockerignore",
+      "config:.pre-commit-config.yaml",
+      "config:.releaserc.json",
+      "config:Cargo.toml",
+      "document:README.md",
+      "document:TICKETS.md",
+      "config:rust-toolchain.toml"
+    ],
+    "scripts": [
+      "file:scripts/check_extension.sh",
+      "file:scripts/hadolint.sh",
+      "config:scripts/hadolint.yml",
+      "file:scripts/init.sh"
+    ]
+  },
+  "docCoverage": {
+    "coverageRatio": 0.4,
+    "groupsWithDocs": 2,
+    "totalGroups": 5,
+    "undocumentedGroups": [
+      "crates",
+      "scripts",
+      ".understand-anything"
+    ]
+  },
+  "fileFanIn": {
+    "config:.github/labeler.yml": 0,
+    "config:.pre-commit-config.yaml": 0,
+    "config:.releaserc.json": 0,
+    "config:.understand-anything/config.json": 0,
+    "config:Cargo.toml": 0,
+    "config:crates/itofin/Cargo.toml": 0,
+    "config:rust-toolchain.toml": 0,
+    "config:scripts/hadolint.yml": 0,
+    "document:.github/copilot-instructions.md": 0,
+    "document:.github/images/README.md": 0,
+    "document:README.md": 0,
+    "document:TICKETS.md": 0,
+    "file:.github/images/prek/build.sh": 0,
+    "file:.understand-anything/.understandignore": 0,
+    "file:crates/itofin/src/errors.rs": 15,
+    "file:crates/itofin/src/handle.rs": 1,
+    "file:crates/itofin/src/lib.rs": 0,
+    "file:crates/itofin/src/math/array.rs": 2,
+    "file:crates/itofin/src/math/beta.rs": 3,
+    "file:crates/itofin/src/math/distributions/binomial.rs": 1,
+    "file:crates/itofin/src/math/distributions/chisquare.rs": 1,
+    "file:crates/itofin/src/math/distributions/gamma.rs": 1,
+    "file:crates/itofin/src/math/distributions/mod.rs": 1,
+    "file:crates/itofin/src/math/distributions/normal.rs": 1,
+    "file:crates/itofin/src/math/distributions/poisson.rs": 1,
+    "file:crates/itofin/src/math/distributions/studentt.rs": 1,
+    "file:crates/itofin/src/math/errorfunction.rs": 2,
+    "file:crates/itofin/src/math/gammafunction.rs": 4,
+    "file:crates/itofin/src/math/incompletegamma.rs": 2,
+    "file:crates/itofin/src/math/interpolations/linear.rs": 1,
+    "file:crates/itofin/src/math/interpolations/mod.rs": 2,
+    "file:crates/itofin/src/math/matrix.rs": 1,
+    "file:crates/itofin/src/math/mod.rs": 1,
+    "file:crates/itofin/src/patterns/lazyobject.rs": 1,
+    "file:crates/itofin/src/patterns/mod.rs": 1,
+    "file:crates/itofin/src/patterns/observable.rs": 4,
+    "file:crates/itofin/src/patterns/visitor.rs": 1,
+    "file:crates/itofin/src/settings.rs": 1,
+    "file:crates/itofin/src/shared.rs": 5,
+    "file:crates/itofin/src/types.rs": 19,
+    "file:crates/itofin/src/utilities/clone.rs": 1,
+    "file:crates/itofin/src/utilities/dataformatters.rs": 1,
+    "file:crates/itofin/src/utilities/mod.rs": 1,
+    "file:crates/itofin/src/utilities/null.rs": 2,
+    "file:crates/itofin/src/utilities/steppingiterator.rs": 1,
+    "file:scripts/check_extension.sh": 0,
+    "file:scripts/hadolint.sh": 0,
+    "file:scripts/init.sh": 0,
+    "pipeline:.github/workflows/pull-request.yml": 0,
+    "pipeline:.github/workflows/semantic-release.yml": 0,
+    "service:.dockerignore": 0,
+    "service:.github/images/prek/Dockerfile": 0
+  },
+  "fileFanOut": {
+    "config:.github/labeler.yml": 0,
+    "config:.pre-commit-config.yaml": 0,
+    "config:.releaserc.json": 0,
+    "config:.understand-anything/config.json": 0,
+    "config:Cargo.toml": 0,
+    "config:crates/itofin/Cargo.toml": 0,
+    "config:rust-toolchain.toml": 0,
+    "config:scripts/hadolint.yml": 0,
+    "document:.github/copilot-instructions.md": 0,
+    "document:.github/images/README.md": 0,
+    "document:README.md": 0,
+    "document:TICKETS.md": 0,
+    "file:.github/images/prek/build.sh": 0,
+    "file:.understand-anything/.understandignore": 0,
+    "file:crates/itofin/src/errors.rs": 0,
+    "file:crates/itofin/src/handle.rs": 3,
+    "file:crates/itofin/src/lib.rs": 8,
+    "file:crates/itofin/src/math/array.rs": 1,
+    "file:crates/itofin/src/math/beta.rs": 3,
+    "file:crates/itofin/src/math/distributions/binomial.rs": 3,
+    "file:crates/itofin/src/math/distributions/chisquare.rs": 2,
+    "file:crates/itofin/src/math/distributions/gamma.rs": 3,
+    "file:crates/itofin/src/math/distributions/mod.rs": 8,
+    "file:crates/itofin/src/math/distributions/normal.rs": 3,
+    "file:crates/itofin/src/math/distributions/poisson.rs": 2,
+    "file:crates/itofin/src/math/distributions/studentt.rs": 4,
+    "file:crates/itofin/src/math/errorfunction.rs": 1,
+    "file:crates/itofin/src/math/gammafunction.rs": 2,
+    "file:crates/itofin/src/math/incompletegamma.rs": 3,
+    "file:crates/itofin/src/math/interpolations/linear.rs": 3,
+    "file:crates/itofin/src/math/interpolations/mod.rs": 3,
+    "file:crates/itofin/src/math/matrix.rs": 2,
+    "file:crates/itofin/src/math/mod.rs": 8,
+    "file:crates/itofin/src/patterns/lazyobject.rs": 3,
+    "file:crates/itofin/src/patterns/mod.rs": 3,
+    "file:crates/itofin/src/patterns/observable.rs": 1,
+    "file:crates/itofin/src/patterns/visitor.rs": 0,
+    "file:crates/itofin/src/settings.rs": 2,
+    "file:crates/itofin/src/shared.rs": 0,
+    "file:crates/itofin/src/types.rs": 0,
+    "file:crates/itofin/src/utilities/clone.rs": 0,
+    "file:crates/itofin/src/utilities/dataformatters.rs": 2,
+    "file:crates/itofin/src/utilities/mod.rs": 4,
+    "file:crates/itofin/src/utilities/null.rs": 1,
+    "file:crates/itofin/src/utilities/steppingiterator.rs": 1,
+    "file:scripts/check_extension.sh": 0,
+    "file:scripts/hadolint.sh": 0,
+    "file:scripts/init.sh": 0,
+    "pipeline:.github/workflows/pull-request.yml": 0,
+    "pipeline:.github/workflows/semantic-release.yml": 0,
+    "service:.dockerignore": 0,
+    "service:.github/images/prek/Dockerfile": 0
+  },
+  "fileLevelPatterns": {
+    "config:Cargo.toml": "config",
+    "config:crates/itofin/Cargo.toml": "config",
+    "document:.github/copilot-instructions.md": "documentation",
+    "document:.github/images/README.md": "documentation",
+    "document:README.md": "documentation",
+    "document:TICKETS.md": "documentation",
+    "pipeline:.github/workflows/pull-request.yml": "ci-cd",
+    "pipeline:.github/workflows/semantic-release.yml": "ci-cd",
+    "service:.github/images/prek/Dockerfile": "infrastructure"
+  },
+  "fileStats": {
+    "filesPerGroup": {
+      ".github": 7,
+      ".understand-anything": 2,
+      "crates": 32,
+      "root": 7,
+      "scripts": 4
+    },
+    "nodeTypeCounts": {
+      "config": 8,
+      "document": 4,
+      "file": 36,
+      "pipeline": 2,
+      "service": 2
+    },
+    "totalFileNodes": 52
+  },
+  "interGroupImports": [],
+  "intraGroupDensity": {
+    ".github": {
+      "density": 0,
+      "internalEdges": 0,
+      "totalEdges": 0
+    },
+    ".understand-anything": {
+      "density": 0,
+      "internalEdges": 0,
+      "totalEdges": 0
+    },
+    "crates": {
+      "density": 1,
+      "internalEdges": 79,
+      "totalEdges": 79
+    },
+    "root": {
+      "density": 0,
+      "internalEdges": 0,
+      "totalEdges": 0
+    },
+    "scripts": {
+      "density": 0,
+      "internalEdges": 0,
+      "totalEdges": 0
+    }
+  },
+  "nodeTypeGroups": {
+    "config": [
+      "config:.pre-commit-config.yaml",
+      "config:.releaserc.json",
+      "config:Cargo.toml",
+      "config:rust-toolchain.toml",
+      "config:scripts/hadolint.yml",
+      "config:.github/labeler.yml",
+      "config:.understand-anything/config.json",
+      "config:crates/itofin/Cargo.toml"
+    ],
+    "document": [
+      "document:README.md",
+      "document:TICKETS.md",
+      "document:.github/copilot-instructions.md",
+      "document:.github/images/README.md"
+    ],
+    "file": [
+      "file:crates/itofin/src/errors.rs",
+      "file:crates/itofin/src/math/beta.rs",
+      "file:crates/itofin/src/math/distributions/binomial.rs",
+      "file:crates/itofin/src/math/distributions/chisquare.rs",
+      "file:crates/itofin/src/math/distributions/gamma.rs",
+      "file:crates/itofin/src/math/distributions/mod.rs",
+      "file:crates/itofin/src/math/distributions/normal.rs",
+      "file:crates/itofin/src/math/distributions/poisson.rs",
+      "file:crates/itofin/src/math/distributions/studentt.rs",
+      "file:crates/itofin/src/math/errorfunction.rs",
+      "file:crates/itofin/src/math/gammafunction.rs",
+      "file:crates/itofin/src/math/incompletegamma.rs",
+      "file:crates/itofin/src/types.rs",
+      "file:crates/itofin/src/handle.rs",
+      "file:crates/itofin/src/lib.rs",
+      "file:crates/itofin/src/patterns/lazyobject.rs",
+      "file:crates/itofin/src/patterns/mod.rs",
+      "file:crates/itofin/src/patterns/observable.rs",
+      "file:crates/itofin/src/patterns/visitor.rs",
+      "file:crates/itofin/src/settings.rs",
+      "file:crates/itofin/src/shared.rs",
+      "file:crates/itofin/src/math/array.rs",
+      "file:crates/itofin/src/math/interpolations/linear.rs",
+      "file:crates/itofin/src/math/interpolations/mod.rs",
+      "file:crates/itofin/src/math/matrix.rs",
+      "file:crates/itofin/src/math/mod.rs",
+      "file:crates/itofin/src/utilities/clone.rs",
+      "file:crates/itofin/src/utilities/dataformatters.rs",
+      "file:crates/itofin/src/utilities/mod.rs",
+      "file:crates/itofin/src/utilities/null.rs",
+      "file:crates/itofin/src/utilities/steppingiterator.rs",
+      "file:scripts/check_extension.sh",
+      "file:scripts/hadolint.sh",
+      "file:scripts/init.sh",
+      "file:.github/images/prek/build.sh",
+      "file:.understand-anything/.understandignore"
+    ],
+    "pipeline": [
+      "pipeline:.github/workflows/pull-request.yml",
+      "pipeline:.github/workflows/semantic-release.yml"
+    ],
+    "service": [
+      "service:.github/images/prek/Dockerfile",
+      "service:.dockerignore"
+    ]
+  },
+  "patternMatches": {
+    ".github": "ci-cd",
+    "scripts": "infrastructure"
+  },
+  "scriptCompleted": true
+}

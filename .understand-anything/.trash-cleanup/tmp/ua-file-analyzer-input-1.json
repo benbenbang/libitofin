@@ -1,0 +1,143 @@
+{
+  "batchFiles": [
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/errors.rs",
+      "sizeLines": 134
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/beta.rs",
+      "sizeLines": 205
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/distributions/binomial.rs",
+      "sizeLines": 214
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/distributions/chisquare.rs",
+      "sizeLines": 123
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/distributions/gamma.rs",
+      "sizeLines": 133
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/distributions/mod.rs",
+      "sizeLines": 152
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/distributions/normal.rs",
+      "sizeLines": 332
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/distributions/poisson.rs",
+      "sizeLines": 307
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/distributions/studentt.rs",
+      "sizeLines": 343
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/errorfunction.rs",
+      "sizeLines": 193
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/gammafunction.rs",
+      "sizeLines": 236
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/incompletegamma.rs",
+      "sizeLines": 185
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/types.rs",
+      "sizeLines": 71
+    }
+  ],
+  "batchImportData": {
+    "crates/itofin/src/errors.rs": [],
+    "crates/itofin/src/math/beta.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/math/gammafunction.rs",
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/distributions/binomial.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/math/beta.rs",
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/distributions/chisquare.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/distributions/gamma.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/math/incompletegamma.rs",
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/distributions/mod.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/math/distributions/binomial.rs",
+      "crates/itofin/src/math/distributions/chisquare.rs",
+      "crates/itofin/src/math/distributions/gamma.rs",
+      "crates/itofin/src/math/distributions/normal.rs",
+      "crates/itofin/src/math/distributions/poisson.rs",
+      "crates/itofin/src/math/distributions/studentt.rs",
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/distributions/normal.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/math/errorfunction.rs",
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/distributions/poisson.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/distributions/studentt.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/math/beta.rs",
+      "crates/itofin/src/math/gammafunction.rs",
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/errorfunction.rs": [
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/gammafunction.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/incompletegamma.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/math/gammafunction.rs",
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/types.rs": []
+  },
+  "projectRoot": "/Users/bn/Git/benbenbang/ito-fin"
+}

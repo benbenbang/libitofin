@@ -1,0 +1,41 @@
+{
+  "issues": [],
+  "stats": {
+    "edgeTypes": {
+      "calls": 12,
+      "configures": 4,
+      "contains": 58,
+      "depends_on": 3,
+      "documents": 1,
+      "exports": 40,
+      "implements": 1,
+      "imports": 79,
+      "related": 2
+    },
+    "nodeTypes": {
+      "class": 31,
+      "config": 8,
+      "document": 4,
+      "file": 36,
+      "function": 27,
+      "pipeline": 2,
+      "service": 2
+    },
+    "totalEdges": 200,
+    "totalLayers": 7,
+    "totalNodes": 110,
+    "tourSteps": 12
+  },
+  "warnings": [
+    "Node 'service:.github/images/prek/Dockerfile' has no edges (orphan)",
+    "Node 'pipeline:.github/workflows/pull-request.yml' has no edges (orphan)",
+    "Node 'pipeline:.github/workflows/semantic-release.yml' has no edges (orphan)",
+    "Node 'service:.dockerignore' has no edges (orphan)",
+    "Node 'document:.github/copilot-instructions.md' has no edges (orphan)",
+    "Node 'file:.github/images/prek/build.sh' has no edges (orphan)",
+    "Node 'document:.github/images/README.md' has no edges (orphan)",
+    "Node 'config:.github/labeler.yml' has no edges (orphan)",
+    "Node 'file:.understand-anything/.understandignore' has no edges (orphan)",
+    "Node 'config:.understand-anything/config.json' has no edges (orphan)"
+  ]
+}

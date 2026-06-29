@@ -1,0 +1,54 @@
+{
+  "batchFiles": [
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/utilities/clone.rs",
+      "sizeLines": 99
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/utilities/dataformatters.rs",
+      "sizeLines": 79
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/utilities/mod.rs",
+      "sizeLines": 6
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/utilities/null.rs",
+      "sizeLines": 62
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/utilities/steppingiterator.rs",
+      "sizeLines": 71
+    }
+  ],
+  "batchImportData": {
+    "crates/itofin/src/utilities/clone.rs": [],
+    "crates/itofin/src/utilities/dataformatters.rs": [
+      "crates/itofin/src/types.rs",
+      "crates/itofin/src/utilities/null.rs"
+    ],
+    "crates/itofin/src/utilities/mod.rs": [
+      "crates/itofin/src/utilities/clone.rs",
+      "crates/itofin/src/utilities/dataformatters.rs",
+      "crates/itofin/src/utilities/null.rs",
+      "crates/itofin/src/utilities/steppingiterator.rs"
+    ],
+    "crates/itofin/src/utilities/null.rs": [
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/utilities/steppingiterator.rs": [
+      "crates/itofin/src/types.rs"
+    ]
+  },
+  "projectRoot": "/Users/bn/Git/benbenbang/ito-fin"
+}

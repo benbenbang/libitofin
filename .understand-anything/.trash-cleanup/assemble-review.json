@@ -1,0 +1,16 @@
+{
+  "complexityRemapped": 0,
+  "crossBatchEdgesAdded": 0,
+  "edgesRestored": 0,
+  "fixedSectionOk": true,
+  "nodesRecovered": 0,
+  "notes": [
+    "Merge was lossless: input 110 nodes/200 edges == output 110 nodes/200 edges; nothing dropped or normalized.",
+    "No 'Could not fix' items to resolve: zero nodes missing an id, zero unknown node types (all in file/class/function/config/document/service/pipeline), zero unknown complexity values (54 simple, 41 moderate, 15 complex).",
+    "Cross-batch imports verified: all 79 import relations in scan-result.json importMap (52 file entries) are present as file->file 'imports' edges; 0 missing, 0 spurious, 0 duplicate (source,target,type) keys, 0 self-edges.",
+    "Edge integrity OK: 0 dangling edges referencing missing nodes; all edges carry source/target/type/weight/direction.",
+    "The script's 'Recovered 0 imports edges' is correct - the batch outputs already contained every importMap edge, so there was no cross-batch gap to fill.",
+    "No upstream ID-correction concern: the Fixed section reported no normalizations, indicating clean batch node IDs."
+  ],
+  "typesRemapped": 0
+}

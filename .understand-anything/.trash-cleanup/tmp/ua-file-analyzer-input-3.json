@@ -1,0 +1,64 @@
+{
+  "batchFiles": [
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/array.rs",
+      "sizeLines": 289
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/interpolations/linear.rs",
+      "sizeLines": 229
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/interpolations/mod.rs",
+      "sizeLines": 32
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/matrix.rs",
+      "sizeLines": 339
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/mod.rs",
+      "sizeLines": 10
+    }
+  ],
+  "batchImportData": {
+    "crates/itofin/src/math/array.rs": [
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/interpolations/linear.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/math/interpolations/mod.rs",
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/interpolations/mod.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/math/interpolations/linear.rs",
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/matrix.rs": [
+      "crates/itofin/src/math/array.rs",
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/mod.rs": [
+      "crates/itofin/src/math/array.rs",
+      "crates/itofin/src/math/beta.rs",
+      "crates/itofin/src/math/distributions/mod.rs",
+      "crates/itofin/src/math/errorfunction.rs",
+      "crates/itofin/src/math/gammafunction.rs",
+      "crates/itofin/src/math/incompletegamma.rs",
+      "crates/itofin/src/math/interpolations/mod.rs",
+      "crates/itofin/src/math/matrix.rs"
+    ]
+  },
+  "projectRoot": "/Users/bn/Git/benbenbang/ito-fin"
+}

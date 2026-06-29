@@ -1,0 +1,1112 @@
+{
+  "algorithm": "louvain",
+  "batches": [
+    {
+      "batchImportData": {
+        "crates/itofin/src/errors.rs": [],
+        "crates/itofin/src/math/beta.rs": [
+          "crates/itofin/src/errors.rs",
+          "crates/itofin/src/math/gammafunction.rs",
+          "crates/itofin/src/types.rs"
+        ],
+        "crates/itofin/src/math/distributions/binomial.rs": [
+          "crates/itofin/src/errors.rs",
+          "crates/itofin/src/math/beta.rs",
+          "crates/itofin/src/types.rs"
+        ],
+        "crates/itofin/src/math/distributions/chisquare.rs": [
+          "crates/itofin/src/errors.rs",
+          "crates/itofin/src/types.rs"
+        ],
+        "crates/itofin/src/math/distributions/gamma.rs": [
+          "crates/itofin/src/errors.rs",
+          "crates/itofin/src/math/incompletegamma.rs",
+          "crates/itofin/src/types.rs"
+        ],
+        "crates/itofin/src/math/distributions/mod.rs": [
+          "crates/itofin/src/errors.rs",
+          "crates/itofin/src/math/distributions/binomial.rs",
+          "crates/itofin/src/math/distributions/chisquare.rs",
+          "crates/itofin/src/math/distributions/gamma.rs",
+          "crates/itofin/src/math/distributions/normal.rs",
+          "crates/itofin/src/math/distributions/poisson.rs",
+          "crates/itofin/src/math/distributions/studentt.rs",
+          "crates/itofin/src/types.rs"
+        ],
+        "crates/itofin/src/math/distributions/normal.rs": [
+          "crates/itofin/src/errors.rs",
+          "crates/itofin/src/math/errorfunction.rs",
+          "crates/itofin/src/types.rs"
+        ],
+        "crates/itofin/src/math/distributions/poisson.rs": [
+          "crates/itofin/src/errors.rs",
+          "crates/itofin/src/types.rs"
+        ],
+        "crates/itofin/src/math/distributions/studentt.rs": [
+          "crates/itofin/src/errors.rs",
+          "crates/itofin/src/math/beta.rs",
+          "crates/itofin/src/math/gammafunction.rs",
+          "crates/itofin/src/types.rs"
+        ],
+        "crates/itofin/src/math/errorfunction.rs": [
+          "crates/itofin/src/types.rs"
+        ],
+        "crates/itofin/src/math/gammafunction.rs": [
+          "crates/itofin/src/errors.rs",
+          "crates/itofin/src/types.rs"
+        ],
+        "crates/itofin/src/math/incompletegamma.rs": [
+          "crates/itofin/src/errors.rs",
+          "crates/itofin/src/math/gammafunction.rs",
+          "crates/itofin/src/types.rs"
+        ],
+        "crates/itofin/src/types.rs": []
+      },
+      "batchIndex": 1,
+      "files": [
+        {
+          "fileCategory": "code",
+          "language": "rust",
+          "path": "crates/itofin/src/errors.rs",
+          "sizeLines": 134
+        },
+        {
+          "fileCategory": "code",
+          "language": "rust",
+          "path": "crates/itofin/src/math/beta.rs",
+          "sizeLines": 205
+        },
+        {
+          "fileCategory": "code",
+          "language": "rust",
+          "path": "crates/itofin/src/math/distributions/binomial.rs",
+          "sizeLines": 214
+        },
+        {
+          "fileCategory": "code",
+          "language": "rust",
+          "path": "crates/itofin/src/math/distributions/chisquare.rs",
+          "sizeLines": 123
+        },
+        {
+          "fileCategory": "code",
+          "language": "rust",
+          "path": "crates/itofin/src/math/distributions/gamma.rs",
+          "sizeLines": 133
+        },
+        {
+          "fileCategory": "code",
+          "language": "rust",
+          "path": "crates/itofin/src/math/distributions/mod.rs",
+          "sizeLines": 152
+        },
+        {
+          "fileCategory": "code",
+          "language": "rust",
+          "path": "crates/itofin/src/math/distributions/normal.rs",
+          "sizeLines": 332
+        },
+        {
+          "fileCategory": "code",
+          "language": "rust",
+          "path": "crates/itofin/src/math/distributions/poisson.rs",
+          "sizeLines": 307
+        },
+        {
+          "fileCategory": "code",
+          "language": "rust",
+          "path": "crates/itofin/src/math/distributions/studentt.rs",
+          "sizeLines": 343
+        },
+        {
+          "fileCategory": "code",
+          "language": "rust",
+          "path": "crates/itofin/src/math/errorfunction.rs",
+          "sizeLines": 193
+        },
+        {
+          "fileCategory": "code",
+          "language": "rust",
+          "path": "crates/itofin/src/math/gammafunction.rs",
+          "sizeLines": 236
+        },
+        {
+          "fileCategory": "code",
+          "language": "rust",
+          "path": "crates/itofin/src/math/incompletegamma.rs",
+          "sizeLines": 185
+        },
+        {
+          "fileCategory": "code",
+          "language": "rust",
+          "path": "crates/itofin/src/types.rs",
+          "sizeLines": 71
+        }
+      ],
+      "neighborMap": {
+        "crates/itofin/src/errors.rs": [
+          {
+            "batchIndex": 2,
+            "path": "crates/itofin/src/handle.rs",
+            "symbols": [
+              "Link",
+              "Handle",
+              "empty",
+              "new",
+              "current_link",
+              "is_empty",
+              "register_observer",
+              "points_to_same_link",
+              "RelinkableHandle",
+              "empty",
+              "new",
+              "link_to",
+              "reset",
+              "handle"
+            ]
+          },
+          {
+            "batchIndex": 2,
+            "path": "crates/itofin/src/lib.rs",
+            "symbols": []
+          },
+          {
+            "batchIndex": 3,
+            "path": "crates/itofin/src/math/interpolations/linear.rs",
+            "symbols": [
+              "LinearInterpolation",
+              "new",
+              "with_extrapolation",
+              "allows_extrapolation"
+            ]
+          },
+          {
+            "batchIndex": 3,
+            "path": "crates/itofin/src/math/interpolations/mod.rs",
+            "symbols": [
+              "Interpolation"
+            ]
+          },
+          {
+            "batchIndex": 2,
+            "path": "crates/itofin/src/patterns/lazyobject.rs",
+            "symbols": [
+              "LazyObject",
+              "new",
+              "observable",
+              "is_calculated",
+              "forward_first_notification_only",
+              "always_forward_notifications",
+              "on_update",
+              "calculate",
+              "recalculate",
+              "freeze",
+              "unfreeze",
+              "register_observer"
+            ]
+          }
+        ],
+        "crates/itofin/src/math/beta.rs": [
+          {
+            "batchIndex": 3,
+            "path": "crates/itofin/src/math/mod.rs",
+            "symbols": []
+          }
+        ],
+        "crates/itofin/src/math/distributions/mod.rs": [
+          {
+            "batchIndex": 3,
+            "path": "crates/itofin/src/math/mod.rs",
+            "symbols": []
+          }
+        ],
+        "crates/itofin/src/math/errorfunction.rs": [
+          {
+            "batchIndex": 3,
+            "path": "crates/itofin/src/math/mod.rs",
+            "symbols": []
+          }
+        ],
+        "crates/itofin/src/math/gammafunction.rs": [
+          {
+            "batchIndex": 3,
+            "path": "crates/itofin/src/math/mod.rs",
+            "symbols": []
+          }
+        ],
+        "crates/itofin/src/math/incompletegamma.rs": [
+          {
+            "batchIndex": 3,
+            "path": "crates/itofin/src/math/mod.rs",
+            "symbols": []
+          }
+        ],
+        "crates/itofin/src/types.rs": [
+          {
+            "batchIndex": 2,
+            "path": "crates/itofin/src/lib.rs",
+            "symbols": []
+          },
+          {
+            "batchIndex": 3,
+            "path": "crates/itofin/src/math/array.rs",
+            "symbols": [
+              "Array",
+              "new",
+              "with_size",
+              "filled",
+              "incremental",
+              "size",
+              "is_empty",
+              "resize",
+              "dot",
+              "norm2",
+              "abs",
+              "sqrt",
+              "log",
+              "exp",
+              "pow"
+            ]
+          },
+          {
+            "batchIndex": 3,
+            "path": "crates/itofin/src/math/interpolations/linear.rs",
+            "symbols": [
+              "LinearInterpolation",
+              "new",
+              "with_extrapolation",
+              "allows_extrapolation"
+            ]
+          },
+          {
+            "batchIndex": 3,
+            "path": "crates/itofin/src/math/interpolations/mod.rs",
+            "symbols": [
+              "Interpolation"
+            ]
+          },
+          {
+            "batchIndex": 3,
+            "path": "crates/itofin/src/math/matrix.rs",
+            "symbols": [
+              "Matrix",
+              "new",
+              "with_size",
+              "filled",
+              "rows",
+              "columns",
+              "is_empty",
+              "row",
+              "row_mut",
+              "diagonal",
+              "transpose"
+            ]
+          },
+          {
+            "batchIndex": 4,
+            "path": "crates/itofin/src/utilities/dataformatters.rs",
+            "symbols": [
+              "check_null",
+              "ordinal",
+              "percent",
+              "rate",
+              "volatility"
+            ]
+          },
+          {
+            "batchIndex": 4,
+            "path": "crates/itofin/src/utilities/null.rs",
+            "symbols": [
+              "Null"
+            ]
+          },
+          {
+            "batchIndex": 4,
+            "path": "crates/itofin/src/utilities/steppingiterator.rs",
+            "symbols": [
+              "StepIterator",
+              "step_iter"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "batchImportData": {
+        "crates/itofin/src/handle.rs": [
+          "crates/itofin/src/errors.rs",
+          "crates/itofin/src/patterns/observable.rs",
+          "crates/itofin/src/shared.rs"
+        ],
+        "crates/itofin/src/lib.rs": [
+          "crates/itofin/src/errors.rs",
+          "crates/itofin/src/handle.rs",
+          "crates/itofin/src/math/mod.rs",
+          "crates/itofin/src/patterns/mod.rs",
+          "crates/itofin/src/settings.rs",
+          "crates/itofin/src/shared.rs",
+          "crates/itofin/src/types.rs",
+          "crates/itofin/src/utilities/mod.rs"
+        ],
+        "crates/itofin/src/patterns/lazyobject.rs": [
+          "crates/itofin/src/errors.rs",
+          "crates/itofin/src/patterns/observable.rs",
+          "crates/itofin/src/shared.rs"
+        ],
+        "crates/itofin/src/patterns/mod.rs": [
+          "crates/itofin/src/patterns/lazyobject.rs",
+          "crates/itofin/src/patterns/observable.rs",
+          "crates/itofin/src/patterns/visitor.rs"
+        ],
+        "crates/itofin/src/patterns/observable.rs": [
+          "crates/itofin/src/shared.rs"
+        ],
+        "crates/itofin/src/patterns/visitor.rs": [],
+        "crates/itofin/src/settings.rs": [
+          "crates/itofin/src/patterns/observable.rs",
+          "crates/itofin/src/shared.rs"
+        ],
+        "crates/itofin/src/shared.rs": []
+      },
+      "batchIndex": 2,
+      "files": [
+        {
+          "fileCategory": "code",
+          "language": "rust",
+          "path": "crates/itofin/src/handle.rs",
+          "sizeLines": 235
+        },
+        {
+          "fileCategory": "code",
+          "language": "rust",
+          "path": "crates/itofin/src/lib.rs",
+          "sizeLines": 13
+        },
+        {
+          "fileCategory": "code",
+          "language": "rust",
+          "path": "crates/itofin/src/patterns/lazyobject.rs",
+          "sizeLines": 365
+        },
+        {
+          "fileCategory": "code",
+          "language": "rust",
+          "path": "crates/itofin/src/patterns/mod.rs",
+          "sizeLines": 5
+        },
+        {
+          "fileCategory": "code",
+          "language": "rust",
+          "path": "crates/itofin/src/patterns/observable.rs",
+          "sizeLines": 253
+        },
+        {
+          "fileCategory": "code",
+          "language": "rust",
+          "path": "crates/itofin/src/patterns/visitor.rs",
+          "sizeLines": 21
+        },
+        {
+          "fileCategory": "code",
+          "language": "rust",
+          "path": "crates/itofin/src/settings.rs",
+          "sizeLines": 190
+        },
+        {
+          "fileCategory": "code",
+          "language": "rust",
+          "path": "crates/itofin/src/shared.rs",
+          "sizeLines": 58
+        }
+      ],
+      "neighborMap": {
+        "crates/itofin/src/handle.rs": [
+          {
+            "batchIndex": 1,
+            "path": "crates/itofin/src/errors.rs",
+            "symbols": [
+              "QlError",
+              "new",
+              "message"
+            ]
+          }
+        ],
+        "crates/itofin/src/lib.rs": [
+          {
+            "batchIndex": 1,
+            "path": "crates/itofin/src/errors.rs",
+            "symbols": [
+              "QlError",
+              "new",
+              "message"
+            ]
+          },
+          {
+            "batchIndex": 3,
+            "path": "crates/itofin/src/math/mod.rs",
+            "symbols": []
+          },
+          {
+            "batchIndex": 1,
+            "path": "crates/itofin/src/types.rs",
+            "symbols": []
+          },
+          {
+            "batchIndex": 4,
+            "path": "crates/itofin/src/utilities/mod.rs",
+            "symbols": []
+          }
+        ],
+        "crates/itofin/src/patterns/lazyobject.rs": [
+          {
+            "batchIndex": 1,
+            "path": "crates/itofin/src/errors.rs",
+            "symbols": [
+              "QlError",
+              "new",
+              "message"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "batchImportData": {
+        "crates/itofin/src/math/array.rs": [
+          "crates/itofin/src/types.rs"
+        ],
+        "crates/itofin/src/math/interpolations/linear.rs": [
+          "crates/itofin/src/errors.rs",
+          "crates/itofin/src/math/interpolations/mod.rs",
+          "crates/itofin/src/types.rs"
+        ],
+        "crates/itofin/src/math/interpolations/mod.rs": [
+          "crates/itofin/src/errors.rs",
+          "crates/itofin/src/math/interpolations/linear.rs",
+          "crates/itofin/src/types.rs"
+        ],
+        "crates/itofin/src/math/matrix.rs": [
+          "crates/itofin/src/math/array.rs",
+          "crates/itofin/src/types.rs"
+        ],
+        "crates/itofin/src/math/mod.rs": [
+          "crates/itofin/src/math/array.rs",
+          "crates/itofin/src/math/beta.rs",
+          "crates/itofin/src/math/distributions/mod.rs",
+          "crates/itofin/src/math/errorfunction.rs",
+          "crates/itofin/src/math/gammafunction.rs",
+          "crates/itofin/src/math/incompletegamma.rs",
+          "crates/itofin/src/math/interpolations/mod.rs",
+          "crates/itofin/src/math/matrix.rs"
+        ]
+      },
+      "batchIndex": 3,
+      "files": [
+        {
+          "fileCategory": "code",
+          "language": "rust",
+          "path": "crates/itofin/src/math/array.rs",
+          "sizeLines": 289
+        },
+        {
+          "fileCategory": "code",
+          "language": "rust",
+          "path": "crates/itofin/src/math/interpolations/linear.rs",
+          "sizeLines": 229
+        },
+        {
+          "fileCategory": "code",
+          "language": "rust",
+          "path": "crates/itofin/src/math/interpolations/mod.rs",
+          "sizeLines": 32
+        },
+        {
+          "fileCategory": "code",
+          "language": "rust",
+          "path": "crates/itofin/src/math/matrix.rs",
+          "sizeLines": 339
+        },
+        {
+          "fileCategory": "code",
+          "language": "rust",
+          "path": "crates/itofin/src/math/mod.rs",
+          "sizeLines": 10
+        }
+      ],
+      "neighborMap": {
+        "crates/itofin/src/math/array.rs": [
+          {
+            "batchIndex": 1,
+            "path": "crates/itofin/src/types.rs",
+            "symbols": []
+          }
+        ],
+        "crates/itofin/src/math/interpolations/linear.rs": [
+          {
+            "batchIndex": 1,
+            "path": "crates/itofin/src/errors.rs",
+            "symbols": [
+              "QlError",
+              "new",
+              "message"
+            ]
+          },
+          {
+            "batchIndex": 1,
+            "path": "crates/itofin/src/types.rs",
+            "symbols": []
+          }
+        ],
+        "crates/itofin/src/math/interpolations/mod.rs": [
+          {
+            "batchIndex": 1,
+            "path": "crates/itofin/src/errors.rs",
+            "symbols": [
+              "QlError",
+              "new",
+              "message"
+            ]
+          },
+          {
+            "batchIndex": 1,
+            "path": "crates/itofin/src/types.rs",
+            "symbols": []
+          }
+        ],
+        "crates/itofin/src/math/matrix.rs": [
+          {
+            "batchIndex": 1,
+            "path": "crates/itofin/src/types.rs",
+            "symbols": []
+          }
+        ],
+        "crates/itofin/src/math/mod.rs": [
+          {
+            "batchIndex": 1,
+            "path": "crates/itofin/src/math/beta.rs",
+            "symbols": [
+              "beta_function",
+              "incomplete_beta"
+            ]
+          },
+          {
+            "batchIndex": 1,
+            "path": "crates/itofin/src/math/distributions/mod.rs",
+            "symbols": [
+              "Probability",
+              "value",
+              "Density",
+              "Cdf",
+              "Quantile",
+              "Support"
+            ]
+          },
+          {
+            "batchIndex": 1,
+            "path": "crates/itofin/src/math/errorfunction.rs",
+            "symbols": [
+              "erf"
+            ]
+          },
+          {
+            "batchIndex": 1,
+            "path": "crates/itofin/src/math/gammafunction.rs",
+            "symbols": [
+              "log_gamma",
+              "gamma"
+            ]
+          },
+          {
+            "batchIndex": 1,
+            "path": "crates/itofin/src/math/incompletegamma.rs",
+            "symbols": [
+              "incomplete_gamma"
+            ]
+          },
+          {
+            "batchIndex": 2,
+            "path": "crates/itofin/src/lib.rs",
+            "symbols": []
+          }
+        ]
+      }
+    },
+    {
+      "batchImportData": {
+        "crates/itofin/src/utilities/clone.rs": [],
+        "crates/itofin/src/utilities/dataformatters.rs": [
+          "crates/itofin/src/types.rs",
+          "crates/itofin/src/utilities/null.rs"
+        ],
+        "crates/itofin/src/utilities/mod.rs": [
+          "crates/itofin/src/utilities/clone.rs",
+          "crates/itofin/src/utilities/dataformatters.rs",
+          "crates/itofin/src/utilities/null.rs",
+          "crates/itofin/src/utilities/steppingiterator.rs"
+        ],
+        "crates/itofin/src/utilities/null.rs": [
+          "crates/itofin/src/types.rs"
+        ],
+        "crates/itofin/src/utilities/steppingiterator.rs": [
+          "crates/itofin/src/types.rs"
+        ]
+      },
+      "batchIndex": 4,
+      "files": [
+        {
+          "fileCategory": "code",
+          "language": "rust",
+          "path": "crates/itofin/src/utilities/clone.rs",
+          "sizeLines": 99
+        },
+        {
+          "fileCategory": "code",
+          "language": "rust",
+          "path": "crates/itofin/src/utilities/dataformatters.rs",
+          "sizeLines": 79
+        },
+        {
+          "fileCategory": "code",
+          "language": "rust",
+          "path": "crates/itofin/src/utilities/mod.rs",
+          "sizeLines": 6
+        },
+        {
+          "fileCategory": "code",
+          "language": "rust",
+          "path": "crates/itofin/src/utilities/null.rs",
+          "sizeLines": 62
+        },
+        {
+          "fileCategory": "code",
+          "language": "rust",
+          "path": "crates/itofin/src/utilities/steppingiterator.rs",
+          "sizeLines": 71
+        }
+      ],
+      "neighborMap": {
+        "crates/itofin/src/utilities/dataformatters.rs": [
+          {
+            "batchIndex": 1,
+            "path": "crates/itofin/src/types.rs",
+            "symbols": []
+          }
+        ],
+        "crates/itofin/src/utilities/mod.rs": [
+          {
+            "batchIndex": 2,
+            "path": "crates/itofin/src/lib.rs",
+            "symbols": []
+          }
+        ],
+        "crates/itofin/src/utilities/null.rs": [
+          {
+            "batchIndex": 1,
+            "path": "crates/itofin/src/types.rs",
+            "symbols": []
+          }
+        ],
+        "crates/itofin/src/utilities/steppingiterator.rs": [
+          {
+            "batchIndex": 1,
+            "path": "crates/itofin/src/types.rs",
+            "symbols": []
+          }
+        ]
+      }
+    },
+    {
+      "batchImportData": {
+        ".github/images/prek/Dockerfile": []
+      },
+      "batchIndex": 5,
+      "files": [
+        {
+          "fileCategory": "infra",
+          "language": "dockerfile",
+          "path": ".github/images/prek/Dockerfile",
+          "sizeLines": 11
+        }
+      ],
+      "neighborMap": {}
+    },
+    {
+      "batchImportData": {
+        ".github/workflows/pull-request.yml": [],
+        ".github/workflows/semantic-release.yml": []
+      },
+      "batchIndex": 6,
+      "files": [
+        {
+          "fileCategory": "infra",
+          "language": "yaml",
+          "path": ".github/workflows/pull-request.yml",
+          "sizeLines": 42
+        },
+        {
+          "fileCategory": "infra",
+          "language": "yaml",
+          "path": ".github/workflows/semantic-release.yml",
+          "sizeLines": 28
+        }
+      ],
+      "neighborMap": {}
+    },
+    {
+      "batchImportData": {
+        ".dockerignore": [],
+        ".pre-commit-config.yaml": [],
+        ".releaserc.json": [],
+        "Cargo.toml": [],
+        "README.md": [],
+        "TICKETS.md": [],
+        "rust-toolchain.toml": []
+      },
+      "batchIndex": 7,
+      "files": [
+        {
+          "fileCategory": "infra",
+          "language": "unknown",
+          "path": ".dockerignore",
+          "sizeLines": 1
+        },
+        {
+          "fileCategory": "config",
+          "language": "yaml",
+          "path": ".pre-commit-config.yaml",
+          "sizeLines": 39
+        },
+        {
+          "fileCategory": "config",
+          "language": "json",
+          "path": ".releaserc.json",
+          "sizeLines": 146
+        },
+        {
+          "fileCategory": "config",
+          "language": "toml",
+          "path": "Cargo.toml",
+          "sizeLines": 7
+        },
+        {
+          "fileCategory": "docs",
+          "language": "markdown",
+          "path": "README.md",
+          "sizeLines": 124
+        },
+        {
+          "fileCategory": "docs",
+          "language": "markdown",
+          "path": "TICKETS.md",
+          "sizeLines": 219
+        },
+        {
+          "fileCategory": "config",
+          "language": "toml",
+          "path": "rust-toolchain.toml",
+          "sizeLines": 3
+        }
+      ],
+      "neighborMap": {}
+    },
+    {
+      "batchImportData": {
+        "scripts/check_extension.sh": [],
+        "scripts/hadolint.sh": [],
+        "scripts/hadolint.yml": [],
+        "scripts/init.sh": []
+      },
+      "batchIndex": 8,
+      "files": [
+        {
+          "fileCategory": "script",
+          "language": "shell",
+          "path": "scripts/check_extension.sh",
+          "sizeLines": 15
+        },
+        {
+          "fileCategory": "script",
+          "language": "shell",
+          "path": "scripts/hadolint.sh",
+          "sizeLines": 101
+        },
+        {
+          "fileCategory": "config",
+          "language": "yaml",
+          "path": "scripts/hadolint.yml",
+          "sizeLines": 8
+        },
+        {
+          "fileCategory": "script",
+          "language": "shell",
+          "path": "scripts/init.sh",
+          "sizeLines": 27
+        }
+      ],
+      "neighborMap": {}
+    },
+    {
+      "batchImportData": {
+        ".github/copilot-instructions.md": [],
+        ".github/images/README.md": [],
+        ".github/images/prek/build.sh": [],
+        ".github/labeler.yml": [],
+        ".understand-anything/.understandignore": [],
+        ".understand-anything/config.json": [],
+        "crates/itofin/Cargo.toml": []
+      },
+      "batchIndex": 9,
+      "files": [
+        {
+          "fileCategory": "docs",
+          "language": "markdown",
+          "path": ".github/copilot-instructions.md",
+          "sizeLines": 134
+        },
+        {
+          "fileCategory": "script",
+          "language": "shell",
+          "path": ".github/images/prek/build.sh",
+          "sizeLines": 9
+        },
+        {
+          "fileCategory": "docs",
+          "language": "markdown",
+          "path": ".github/images/README.md",
+          "sizeLines": 0
+        },
+        {
+          "fileCategory": "config",
+          "language": "yaml",
+          "path": ".github/labeler.yml",
+          "sizeLines": 28
+        },
+        {
+          "fileCategory": "code",
+          "language": "unknown",
+          "path": ".understand-anything/.understandignore",
+          "sizeLines": 124
+        },
+        {
+          "fileCategory": "config",
+          "language": "json",
+          "path": ".understand-anything/config.json",
+          "sizeLines": 1
+        },
+        {
+          "fileCategory": "config",
+          "language": "toml",
+          "path": "crates/itofin/Cargo.toml",
+          "sizeLines": 10
+        }
+      ],
+      "neighborMap": {}
+    }
+  ],
+  "exportsByPath": {
+    ".understand-anything/.understandignore": [],
+    "crates/itofin/src/errors.rs": [
+      "QlError",
+      "new",
+      "message"
+    ],
+    "crates/itofin/src/handle.rs": [
+      "Link",
+      "Handle",
+      "empty",
+      "new",
+      "current_link",
+      "is_empty",
+      "register_observer",
+      "points_to_same_link",
+      "RelinkableHandle",
+      "empty",
+      "new",
+      "link_to",
+      "reset",
+      "handle"
+    ],
+    "crates/itofin/src/lib.rs": [],
+    "crates/itofin/src/math/array.rs": [
+      "Array",
+      "new",
+      "with_size",
+      "filled",
+      "incremental",
+      "size",
+      "is_empty",
+      "resize",
+      "dot",
+      "norm2",
+      "abs",
+      "sqrt",
+      "log",
+      "exp",
+      "pow"
+    ],
+    "crates/itofin/src/math/beta.rs": [
+      "beta_function",
+      "incomplete_beta"
+    ],
+    "crates/itofin/src/math/distributions/binomial.rs": [
+      "BinomialDistribution",
+      "new",
+      "pmf",
+      "CumulativeBinomialDistribution",
+      "new",
+      "cdf"
+    ],
+    "crates/itofin/src/math/distributions/chisquare.rs": [
+      "CumulativeChiSquareDistribution",
+      "new"
+    ],
+    "crates/itofin/src/math/distributions/gamma.rs": [
+      "CumulativeGammaDistribution",
+      "new"
+    ],
+    "crates/itofin/src/math/distributions/mod.rs": [
+      "Probability",
+      "value",
+      "Density",
+      "Cdf",
+      "Quantile",
+      "Support"
+    ],
+    "crates/itofin/src/math/distributions/normal.rs": [
+      "NormalDistribution",
+      "new",
+      "standard",
+      "value",
+      "derivative",
+      "CumulativeNormalDistribution",
+      "new",
+      "standard",
+      "value",
+      "derivative",
+      "InverseCumulativeNormal",
+      "new",
+      "standard",
+      "value",
+      "standard_value"
+    ],
+    "crates/itofin/src/math/distributions/poisson.rs": [
+      "PoissonDistribution",
+      "new",
+      "pmf",
+      "CumulativePoissonDistribution",
+      "new",
+      "cdf",
+      "InverseCumulativePoisson",
+      "new"
+    ],
+    "crates/itofin/src/math/distributions/studentt.rs": [
+      "StudentT",
+      "new"
+    ],
+    "crates/itofin/src/math/errorfunction.rs": [
+      "erf"
+    ],
+    "crates/itofin/src/math/gammafunction.rs": [
+      "log_gamma",
+      "gamma"
+    ],
+    "crates/itofin/src/math/incompletegamma.rs": [
+      "incomplete_gamma"
+    ],
+    "crates/itofin/src/math/interpolations/linear.rs": [
+      "LinearInterpolation",
+      "new",
+      "with_extrapolation",
+      "allows_extrapolation"
+    ],
+    "crates/itofin/src/math/interpolations/mod.rs": [
+      "Interpolation"
+    ],
+    "crates/itofin/src/math/matrix.rs": [
+      "Matrix",
+      "new",
+      "with_size",
+      "filled",
+      "rows",
+      "columns",
+      "is_empty",
+      "row",
+      "row_mut",
+      "diagonal",
+      "transpose"
+    ],
+    "crates/itofin/src/math/mod.rs": [],
+    "crates/itofin/src/patterns/lazyobject.rs": [
+      "LazyObject",
+      "new",
+      "observable",
+      "is_calculated",
+      "forward_first_notification_only",
+      "always_forward_notifications",
+      "on_update",
+      "calculate",
+      "recalculate",
+      "freeze",
+      "unfreeze",
+      "register_observer"
+    ],
+    "crates/itofin/src/patterns/mod.rs": [],
+    "crates/itofin/src/patterns/observable.rs": [
+      "Observer",
+      "Observable",
+      "new",
+      "register_observer",
+      "unregister_observer",
+      "notify_observers"
+    ],
+    "crates/itofin/src/patterns/visitor.rs": [
+      "Visitor"
+    ],
+    "crates/itofin/src/settings.rs": [
+      "Settings",
+      "new",
+      "evaluation_date",
+      "set_evaluation_date",
+      "reset_evaluation_date",
+      "register_eval_date_observer",
+      "include_reference_date_events",
+      "set_include_reference_date_events",
+      "include_todays_cash_flows",
+      "set_include_todays_cash_flows",
+      "enforces_todays_historic_fixings",
+      "set_enforces_todays_historic_fixings"
+    ],
+    "crates/itofin/src/shared.rs": [
+      "shared",
+      "shared_mut"
+    ],
+    "crates/itofin/src/types.rs": [],
+    "crates/itofin/src/utilities/clone.rs": [
+      "ValueBox",
+      "empty",
+      "new",
+      "is_empty",
+      "get",
+      "get_mut",
+      "swap"
+    ],
+    "crates/itofin/src/utilities/dataformatters.rs": [
+      "check_null",
+      "ordinal",
+      "percent",
+      "rate",
+      "volatility"
+    ],
+    "crates/itofin/src/utilities/mod.rs": [],
+    "crates/itofin/src/utilities/null.rs": [
+      "Null"
+    ],
+    "crates/itofin/src/utilities/steppingiterator.rs": [
+      "StepIterator",
+      "step_iter"
+    ]
+  },
+  "schemaVersion": 1,
+  "totalBatches": 9,
+  "totalFiles": 52
+}

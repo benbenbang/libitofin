@@ -1,0 +1,482 @@
+{
+  "description": "A ground-up port of QuantLib (the C++ quantitative-finance library) into idiomatic Rust, delivered as a core library (libitofin) with thin language bindings planned (Python first, then a C ABI). Early-stage: the foundational EPIC-0 layer (types, errors, observer/observable patterns, handles, settings, utilities) plus core math primitives are in place, not yet usable for pricing.",
+  "estimatedComplexity": "moderate",
+  "files": [
+    {
+      "fileCategory": "infra",
+      "language": "unknown",
+      "path": ".dockerignore",
+      "sizeLines": 1
+    },
+    {
+      "fileCategory": "docs",
+      "language": "markdown",
+      "path": ".github/copilot-instructions.md",
+      "sizeLines": 134
+    },
+    {
+      "fileCategory": "script",
+      "language": "shell",
+      "path": ".github/images/prek/build.sh",
+      "sizeLines": 9
+    },
+    {
+      "fileCategory": "infra",
+      "language": "dockerfile",
+      "path": ".github/images/prek/Dockerfile",
+      "sizeLines": 11
+    },
+    {
+      "fileCategory": "docs",
+      "language": "markdown",
+      "path": ".github/images/README.md",
+      "sizeLines": 0
+    },
+    {
+      "fileCategory": "config",
+      "language": "yaml",
+      "path": ".github/labeler.yml",
+      "sizeLines": 28
+    },
+    {
+      "fileCategory": "infra",
+      "language": "yaml",
+      "path": ".github/workflows/pull-request.yml",
+      "sizeLines": 42
+    },
+    {
+      "fileCategory": "infra",
+      "language": "yaml",
+      "path": ".github/workflows/semantic-release.yml",
+      "sizeLines": 28
+    },
+    {
+      "fileCategory": "config",
+      "language": "yaml",
+      "path": ".pre-commit-config.yaml",
+      "sizeLines": 39
+    },
+    {
+      "fileCategory": "config",
+      "language": "json",
+      "path": ".releaserc.json",
+      "sizeLines": 146
+    },
+    {
+      "fileCategory": "config",
+      "language": "toml",
+      "path": "Cargo.toml",
+      "sizeLines": 7
+    },
+    {
+      "fileCategory": "config",
+      "language": "toml",
+      "path": "crates/itofin/Cargo.toml",
+      "sizeLines": 10
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/errors.rs",
+      "sizeLines": 134
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/handle.rs",
+      "sizeLines": 235
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/lib.rs",
+      "sizeLines": 13
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/array.rs",
+      "sizeLines": 289
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/beta.rs",
+      "sizeLines": 205
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/distributions/binomial.rs",
+      "sizeLines": 214
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/distributions/chisquare.rs",
+      "sizeLines": 123
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/distributions/gamma.rs",
+      "sizeLines": 133
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/distributions/mod.rs",
+      "sizeLines": 152
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/distributions/normal.rs",
+      "sizeLines": 332
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/distributions/poisson.rs",
+      "sizeLines": 307
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/distributions/studentt.rs",
+      "sizeLines": 343
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/errorfunction.rs",
+      "sizeLines": 193
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/gammafunction.rs",
+      "sizeLines": 236
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/incompletegamma.rs",
+      "sizeLines": 185
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/interpolations/linear.rs",
+      "sizeLines": 229
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/interpolations/mod.rs",
+      "sizeLines": 32
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/matrix.rs",
+      "sizeLines": 339
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/mod.rs",
+      "sizeLines": 10
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/patterns/lazyobject.rs",
+      "sizeLines": 365
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/patterns/mod.rs",
+      "sizeLines": 5
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/patterns/observable.rs",
+      "sizeLines": 253
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/patterns/visitor.rs",
+      "sizeLines": 21
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/settings.rs",
+      "sizeLines": 190
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/shared.rs",
+      "sizeLines": 58
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/types.rs",
+      "sizeLines": 71
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/utilities/clone.rs",
+      "sizeLines": 99
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/utilities/dataformatters.rs",
+      "sizeLines": 79
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/utilities/mod.rs",
+      "sizeLines": 6
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/utilities/null.rs",
+      "sizeLines": 62
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/utilities/steppingiterator.rs",
+      "sizeLines": 71
+    },
+    {
+      "fileCategory": "docs",
+      "language": "markdown",
+      "path": "README.md",
+      "sizeLines": 124
+    },
+    {
+      "fileCategory": "config",
+      "language": "toml",
+      "path": "rust-toolchain.toml",
+      "sizeLines": 3
+    },
+    {
+      "fileCategory": "script",
+      "language": "shell",
+      "path": "scripts/check_extension.sh",
+      "sizeLines": 15
+    },
+    {
+      "fileCategory": "script",
+      "language": "shell",
+      "path": "scripts/hadolint.sh",
+      "sizeLines": 101
+    },
+    {
+      "fileCategory": "config",
+      "language": "yaml",
+      "path": "scripts/hadolint.yml",
+      "sizeLines": 8
+    },
+    {
+      "fileCategory": "script",
+      "language": "shell",
+      "path": "scripts/init.sh",
+      "sizeLines": 27
+    },
+    {
+      "fileCategory": "docs",
+      "language": "markdown",
+      "path": "TICKETS.md",
+      "sizeLines": 219
+    }
+  ],
+  "filteredByIgnore": 0,
+  "frameworks": [
+    "Cargo",
+    "Docker",
+    "GitHub Actions"
+  ],
+  "importMap": {
+    ".dockerignore": [],
+    ".github/copilot-instructions.md": [],
+    ".github/images/README.md": [],
+    ".github/images/prek/Dockerfile": [],
+    ".github/images/prek/build.sh": [],
+    ".github/labeler.yml": [],
+    ".github/workflows/pull-request.yml": [],
+    ".github/workflows/semantic-release.yml": [],
+    ".pre-commit-config.yaml": [],
+    ".releaserc.json": [],
+    ".understand-anything/.understandignore": [],
+    ".understand-anything/config.json": [],
+    "Cargo.toml": [],
+    "README.md": [],
+    "TICKETS.md": [],
+    "crates/itofin/Cargo.toml": [],
+    "crates/itofin/src/errors.rs": [],
+    "crates/itofin/src/handle.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/patterns/observable.rs",
+      "crates/itofin/src/shared.rs"
+    ],
+    "crates/itofin/src/lib.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/handle.rs",
+      "crates/itofin/src/math/mod.rs",
+      "crates/itofin/src/patterns/mod.rs",
+      "crates/itofin/src/settings.rs",
+      "crates/itofin/src/shared.rs",
+      "crates/itofin/src/types.rs",
+      "crates/itofin/src/utilities/mod.rs"
+    ],
+    "crates/itofin/src/math/array.rs": [
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/beta.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/math/gammafunction.rs",
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/distributions/binomial.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/math/beta.rs",
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/distributions/chisquare.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/distributions/gamma.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/math/incompletegamma.rs",
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/distributions/mod.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/math/distributions/binomial.rs",
+      "crates/itofin/src/math/distributions/chisquare.rs",
+      "crates/itofin/src/math/distributions/gamma.rs",
+      "crates/itofin/src/math/distributions/normal.rs",
+      "crates/itofin/src/math/distributions/poisson.rs",
+      "crates/itofin/src/math/distributions/studentt.rs",
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/distributions/normal.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/math/errorfunction.rs",
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/distributions/poisson.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/distributions/studentt.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/math/beta.rs",
+      "crates/itofin/src/math/gammafunction.rs",
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/errorfunction.rs": [
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/gammafunction.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/incompletegamma.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/math/gammafunction.rs",
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/interpolations/linear.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/math/interpolations/mod.rs",
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/interpolations/mod.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/math/interpolations/linear.rs",
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/matrix.rs": [
+      "crates/itofin/src/math/array.rs",
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/mod.rs": [
+      "crates/itofin/src/math/array.rs",
+      "crates/itofin/src/math/beta.rs",
+      "crates/itofin/src/math/distributions/mod.rs",
+      "crates/itofin/src/math/errorfunction.rs",
+      "crates/itofin/src/math/gammafunction.rs",
+      "crates/itofin/src/math/incompletegamma.rs",
+      "crates/itofin/src/math/interpolations/mod.rs",
+      "crates/itofin/src/math/matrix.rs"
+    ],
+    "crates/itofin/src/patterns/lazyobject.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/patterns/observable.rs",
+      "crates/itofin/src/shared.rs"
+    ],
+    "crates/itofin/src/patterns/mod.rs": [
+      "crates/itofin/src/patterns/lazyobject.rs",
+      "crates/itofin/src/patterns/observable.rs",
+      "crates/itofin/src/patterns/visitor.rs"
+    ],
+    "crates/itofin/src/patterns/observable.rs": [
+      "crates/itofin/src/shared.rs"
+    ],
+    "crates/itofin/src/patterns/visitor.rs": [],
+    "crates/itofin/src/settings.rs": [
+      "crates/itofin/src/patterns/observable.rs",
+      "crates/itofin/src/shared.rs"
+    ],
+    "crates/itofin/src/shared.rs": [],
+    "crates/itofin/src/types.rs": [],
+    "crates/itofin/src/utilities/clone.rs": [],
+    "crates/itofin/src/utilities/dataformatters.rs": [
+      "crates/itofin/src/types.rs",
+      "crates/itofin/src/utilities/null.rs"
+    ],
+    "crates/itofin/src/utilities/mod.rs": [
+      "crates/itofin/src/utilities/clone.rs",
+      "crates/itofin/src/utilities/dataformatters.rs",
+      "crates/itofin/src/utilities/null.rs",
+      "crates/itofin/src/utilities/steppingiterator.rs"
+    ],
+    "crates/itofin/src/utilities/null.rs": [
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/utilities/steppingiterator.rs": [
+      "crates/itofin/src/types.rs"
+    ],
+    "rust-toolchain.toml": [],
+    "scripts/check_extension.sh": [],
+    "scripts/hadolint.sh": [],
+    "scripts/hadolint.yml": [],
+    "scripts/init.sh": []
+  },
+  "languages": [
+    "dockerfile",
+    "json",
+    "markdown",
+    "rust",
+    "shell",
+    "toml",
+    "yaml"
+  ],
+  "name": "itofin",
+  "totalFiles": 50
+}

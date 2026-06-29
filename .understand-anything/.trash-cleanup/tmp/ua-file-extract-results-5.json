@@ -1,0 +1,53 @@
+{
+  "filesAnalyzed": 1,
+  "filesSkipped": [],
+  "results": [
+    {
+      "fileCategory": "infra",
+      "language": "dockerfile",
+      "metrics": {
+        "classCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "importCount": 0,
+        "serviceCount": 1,
+        "stepCount": 4
+      },
+      "nonEmptyLines": 8,
+      "path": ".github/images/prek/Dockerfile",
+      "services": [
+        {
+          "endLine": 12,
+          "image": "rust:slim-bookworm",
+          "name": "rust",
+          "ports": [],
+          "startLine": 1
+        }
+      ],
+      "steps": [
+        {
+          "endLine": 1,
+          "name": "FROM rust:slim-bookworm",
+          "startLine": 1
+        },
+        {
+          "endLine": 3,
+          "name": "WORKDIR /workspace",
+          "startLine": 3
+        },
+        {
+          "endLine": 5,
+          "name": "ENV PATH=/root/.local/bin:$PATH",
+          "startLine": 5
+        },
+        {
+          "endLine": 7,
+          "name": "RUN apt update && \\",
+          "startLine": 7
+        }
+      ],
+      "totalLines": 11
+    }
+  ],
+  "scriptCompleted": true
+}

@@ -1,0 +1,139 @@
+{
+  "edges": [
+    {
+      "direction": "forward",
+      "source": "config:rust-toolchain.toml",
+      "target": "config:Cargo.toml",
+      "type": "configures",
+      "weight": 0.6
+    },
+    {
+      "direction": "forward",
+      "source": "config:.pre-commit-config.yaml",
+      "target": "config:Cargo.toml",
+      "type": "configures",
+      "weight": 0.6
+    },
+    {
+      "direction": "forward",
+      "source": "config:.releaserc.json",
+      "target": "config:Cargo.toml",
+      "type": "related",
+      "weight": 0.5
+    },
+    {
+      "direction": "forward",
+      "source": "document:README.md",
+      "target": "config:Cargo.toml",
+      "type": "documents",
+      "weight": 0.5
+    },
+    {
+      "direction": "forward",
+      "source": "document:README.md",
+      "target": "document:TICKETS.md",
+      "type": "related",
+      "weight": 0.5
+    }
+  ],
+  "nodes": [
+    {
+      "complexity": "simple",
+      "filePath": ".dockerignore",
+      "id": "service:.dockerignore",
+      "name": ".dockerignore",
+      "summary": "Docker build context exclusion file for the repository; minimal single-line rule keeping unwanted files out of any container build context.",
+      "tags": [
+        "infrastructure",
+        "containerization",
+        "build-system"
+      ],
+      "type": "service"
+    },
+    {
+      "complexity": "simple",
+      "filePath": ".pre-commit-config.yaml",
+      "id": "config:.pre-commit-config.yaml",
+      "languageNotes": "Hooks enforce the project's quality gates (fmt/clippy/test) locally, mirroring CI.",
+      "name": ".pre-commit-config.yaml",
+      "summary": "Pre-commit hook configuration running cargo fmt, check, clippy, and test plus conventional-commit and file-hygiene checks before every commit across the Cargo workspace.",
+      "tags": [
+        "configuration",
+        "ci-cd",
+        "build-system",
+        "validation"
+      ],
+      "type": "config"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": ".releaserc.json",
+      "id": "config:.releaserc.json",
+      "languageNotes": "Uses a conventional-commits preset with custom presetConfig to drive automated semantic versioning.",
+      "name": ".releaserc.json",
+      "summary": "semantic-release configuration defining branches, conventional-commit parsing, changelog/release-note presets, and tag format for automated versioning and releases.",
+      "tags": [
+        "configuration",
+        "ci-cd",
+        "deployment",
+        "release-management"
+      ],
+      "type": "config"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "Cargo.toml",
+      "id": "config:Cargo.toml",
+      "languageNotes": "Virtual workspace with members = [\"crates/*\"] so new crates need no root-manifest edit.",
+      "name": "Cargo.toml",
+      "summary": "Virtual Cargo workspace manifest (resolver 3, edition 2024) declaring workspace members under crates/* and shared workspace.package metadata.",
+      "tags": [
+        "configuration",
+        "build-system",
+        "rust",
+        "workspace"
+      ],
+      "type": "config"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "README.md",
+      "id": "document:README.md",
+      "name": "README.md",
+      "summary": "Project overview documentation for Lib-It\u00f4-Fin covering motivation, current EPIC-0 status, getting-started instructions, project layout, and design principles.",
+      "tags": [
+        "documentation",
+        "entry-point",
+        "overview"
+      ],
+      "type": "document"
+    },
+    {
+      "complexity": "complex",
+      "filePath": "TICKETS.md",
+      "id": "document:TICKETS.md",
+      "name": "TICKETS.md",
+      "summary": "Dependency-ordered QuantLib to Rust porting backlog: cross-cutting design decisions (D1-D8), epic dependency map (L0-L11), ticket conventions, and Milestone 1 vertical slice.",
+      "tags": [
+        "documentation",
+        "planning",
+        "roadmap"
+      ],
+      "type": "document"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "rust-toolchain.toml",
+      "id": "config:rust-toolchain.toml",
+      "name": "rust-toolchain.toml",
+      "summary": "Pins the Rust toolchain (1.96.0 with rustfmt and clippy components) so plain cargo uses the project-mandated version across the workspace.",
+      "tags": [
+        "configuration",
+        "build-system",
+        "rust",
+        "toolchain"
+      ],
+      "type": "config"
+    }
+  ]
+}

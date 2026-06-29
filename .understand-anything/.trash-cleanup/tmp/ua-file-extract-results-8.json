@@ -1,0 +1,101 @@
+{
+  "filesAnalyzed": 4,
+  "filesSkipped": [],
+  "results": [
+    {
+      "fileCategory": "script",
+      "functions": [
+        {
+          "endLine": 13,
+          "name": "check_extension",
+          "params": [],
+          "startLine": 4
+        }
+      ],
+      "language": "shell",
+      "metrics": {
+        "classCount": 0,
+        "exportCount": 0,
+        "functionCount": 1,
+        "importCount": 0
+      },
+      "nonEmptyLines": 13,
+      "path": "scripts/check_extension.sh",
+      "totalLines": 15
+    },
+    {
+      "fileCategory": "script",
+      "functions": [
+        {
+          "endLine": 42,
+          "name": "get_default_branch",
+          "params": [],
+          "startLine": 29
+        },
+        {
+          "endLine": 56,
+          "name": "hadolint_runner",
+          "params": [],
+          "startLine": 44
+        },
+        {
+          "endLine": 92,
+          "name": "lint_wrapper",
+          "params": [],
+          "startLine": 58
+        },
+        {
+          "endLine": 99,
+          "name": "run_docker_lint",
+          "params": [],
+          "startLine": 94
+        }
+      ],
+      "language": "shell",
+      "metrics": {
+        "classCount": 0,
+        "exportCount": 0,
+        "functionCount": 4,
+        "importCount": 0
+      },
+      "nonEmptyLines": 87,
+      "path": "scripts/hadolint.sh",
+      "totalLines": 101
+    },
+    {
+      "fileCategory": "config",
+      "language": "yaml",
+      "metrics": {
+        "classCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "importCount": 0,
+        "sectionCount": 1
+      },
+      "nonEmptyLines": 8,
+      "path": "scripts/hadolint.yml",
+      "sections": [
+        {
+          "heading": "ignored",
+          "level": 1,
+          "line": 1
+        }
+      ],
+      "totalLines": 8
+    },
+    {
+      "fileCategory": "script",
+      "language": "shell",
+      "metrics": {
+        "classCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "importCount": 0
+      },
+      "nonEmptyLines": 21,
+      "path": "scripts/init.sh",
+      "totalLines": 27
+    }
+  ],
+  "scriptCompleted": true
+}

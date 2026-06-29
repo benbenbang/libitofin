@@ -1,0 +1,126 @@
+[
+  {
+    "description": "Start with the README to understand what Lib-It\u00f4-Fin is: a ground-up port of QuantLib's C++ quant-finance library into idiomatic Rust, built bottom-up through dependency layers L0->L11. TICKETS.md is the single source of truth for what gets ported and in what order, including the cross-cutting design decisions (Rc vs Arc, error handling, concurrency, bindings). Read these first to get the map before walking the territory.",
+    "nodeIds": [
+      "document:README.md",
+      "document:TICKETS.md"
+    ],
+    "order": 1,
+    "title": "Project Mission & Roadmap"
+  },
+  {
+    "description": "lib.rs is the crate root for libitofin. It wires together every foundational module (errors, types, patterns, handle, settings, shared, math, utilities) and defines the public API surface. Skimming the module declarations here gives you a bird's-eye view of the whole crate's structure before you dive into any single piece.",
+    "languageLesson": "In Rust, a library crate's root (lib.rs) uses `mod` to declare submodules and `pub use` to re-export their items, shaping a clean public API distinct from the internal file layout.",
+    "nodeIds": [
+      "file:crates/itofin/src/lib.rs"
+    ],
+    "order": 2,
+    "title": "The Crate Root"
+  },
+  {
+    "description": "These are the two most widely depended-upon files in the codebase (types.rs has fan-in 19, errors.rs fan-in 15). types.rs defines the numeric aliases (Real, Size, Time, Rate) that form the shared vocabulary of every later layer, while errors.rs ports QuantLib's QL_REQUIRE/QL_ENSURE idioms into a QlError type plus require/ensure macros used for input validation throughout the math layer. Understand these first - nearly everything builds on them.",
+    "languageLesson": "Rust uses `Result<T, E>` for fallible operations instead of exceptions. The QlError struct carries source file/line context, mirroring QuantLib's location-aware C++ exceptions while staying idiomatic.",
+    "nodeIds": [
+      "file:crates/itofin/src/types.rs",
+      "file:crates/itofin/src/errors.rs"
+    ],
+    "order": 3,
+    "title": "Foundational Types & Errors"
+  },
+  {
+    "description": "Building on the core types, this trio provides the plumbing the rest of the library leans on. shared.rs defines the smart-pointer aliases (the Rc-vs-Arc decision), handle.rs implements Handle/RelinkableHandle - the QuantLib indirection that lets quotes and term structures be swapped without rewiring observers - and settings.rs holds the global evaluation-date state. This is the highest-risk translation area called out in the project notes.",
+    "nodeIds": [
+      "file:crates/itofin/src/shared.rs",
+      "file:crates/itofin/src/handle.rs",
+      "file:crates/itofin/src/settings.rs"
+    ],
+    "order": 4,
+    "title": "Indirection: Handle, Settings & Shared Pointers"
+  },
+  {
+    "description": "QuantLib's reactive core is the Observable/Observer graph: when market data changes, dependents are notified and recompute. observable.rs implements that notification graph (notify_observers is a high fan-in hot path), lazyobject.rs adds deferred recalculation so values are only recomputed when actually read, and visitor.rs provides double-dispatch. These patterns underpin how pricing engines will react to changing inputs once higher layers land.",
+    "nodeIds": [
+      "file:crates/itofin/src/patterns/observable.rs",
+      "file:crates/itofin/src/patterns/lazyobject.rs",
+      "file:crates/itofin/src/patterns/visitor.rs"
+    ],
+    "order": 5,
+    "title": "Design Patterns: Observable, LazyObject & Visitor"
+  },
+  {
+    "description": "A small toolbox built on the core types. null.rs provides QuantLib's Null sentinel for 'unset' numeric values, dataformatters.rs handles human-readable formatting, steppingiterator.rs is an iterator adaptor that walks a range in fixed strides, and clone.rs offers clone helpers. These are leaf utilities the math layer reaches for without pulling in heavier machinery.",
+    "nodeIds": [
+      "file:crates/itofin/src/utilities/null.rs",
+      "file:crates/itofin/src/utilities/dataformatters.rs",
+      "file:crates/itofin/src/utilities/steppingiterator.rs",
+      "file:crates/itofin/src/utilities/clone.rs"
+    ],
+    "order": 6,
+    "title": "Utility Helpers"
+  },
+  {
+    "description": "The first stop in the L1 math layer. array.rs and matrix.rs are the linear-algebra containers - dense, owning numeric vectors and 2D matrices - that every numerical routine above them operates on. They depend only on the core types, keeping the math layer cleanly stacked on the foundation you just toured.",
+    "nodeIds": [
+      "file:crates/itofin/src/math/array.rs",
+      "file:crates/itofin/src/math/matrix.rs"
+    ],
+    "order": 7,
+    "title": "Math Containers: Array & Matrix"
+  },
+  {
+    "description": "The numerical workhorses behind the distributions. gammafunction.rs (its log_gamma has the highest fan-in of any math routine), beta.rs, errorfunction.rs (erf), and incompletegamma.rs implement the classical special functions QuantLib relies on. They are validated against the C++ test-suite oracle within tolerance, and the distributions in the next step are largely thin wrappers over these.",
+    "nodeIds": [
+      "file:crates/itofin/src/math/gammafunction.rs",
+      "file:crates/itofin/src/math/beta.rs",
+      "file:crates/itofin/src/math/errorfunction.rs",
+      "file:crates/itofin/src/math/incompletegamma.rs"
+    ],
+    "order": 8,
+    "title": "Special Functions"
+  },
+  {
+    "description": "interpolations/mod.rs defines the shared Interpolation interface and linear.rs gives the first concrete implementation - linear interpolation over (x, y) nodes, with the recent fix rejecting non-finite inputs. Interpolation is foundational for the term structures and curves that later pricing layers will build, so the abstraction is introduced here even with a single implementation.",
+    "nodeIds": [
+      "file:crates/itofin/src/math/interpolations/mod.rs",
+      "file:crates/itofin/src/math/interpolations/linear.rs"
+    ],
+    "order": 9,
+    "title": "Interpolation"
+  },
+  {
+    "description": "The top of the current math stack. distributions/mod.rs defines the shared Probability newtype and the Density/Cdf/Quantile/Support traits forming a common interface, then normal.rs, gamma.rs, poisson.rs, and binomial.rs implement concrete distributions built on the special functions from Step 8. Each distribution is 'done' only when its matching C++ test-suite cases pass within tolerance.",
+    "languageLesson": "Rust traits (Density, Cdf, Quantile, Support) let each distribution share one interface while keeping implementations distinct - the idiomatic replacement for C++ abstract base classes, resolved statically with zero vtable cost where generics are used.",
+    "nodeIds": [
+      "file:crates/itofin/src/math/distributions/mod.rs",
+      "file:crates/itofin/src/math/distributions/normal.rs",
+      "file:crates/itofin/src/math/distributions/gamma.rs",
+      "file:crates/itofin/src/math/distributions/poisson.rs",
+      "file:crates/itofin/src/math/distributions/binomial.rs"
+    ],
+    "order": 10,
+    "title": "Probability Distributions"
+  },
+  {
+    "description": "How code quality is enforced. The pull-request.yml and semantic-release.yml GitHub Actions workflows run linting, tests, and automated versioned releases, while the prek Dockerfile packages a reproducible linting image and hadolint.sh lints that very Dockerfile. This is the automation safety net that guards the porting effort - every PR must pass fmt, check, clippy, and the test oracle.",
+    "languageLesson": "GitHub Actions workflows use `on` triggers and `jobs` of sequential `steps`. Semantic-release derives the next version number from conventional-commit messages, automating changelog and tagging.",
+    "nodeIds": [
+      "pipeline:.github/workflows/pull-request.yml",
+      "pipeline:.github/workflows/semantic-release.yml",
+      "service:.github/images/prek/Dockerfile",
+      "file:scripts/hadolint.sh"
+    ],
+    "order": 11,
+    "title": "Tooling & CI/CD"
+  },
+  {
+    "description": "The setup that ties it all together. Cargo.toml is the virtual workspace manifest (resolver 3, edition 2024) with members = crates/*, rust-toolchain.toml pins the exact compiler (1.96.0 + rustfmt/clippy) so plain cargo is reproducible, and .pre-commit-config.yaml runs fmt/check/clippy/test plus commit-message linting on every commit. Together they make the bottom-up porting workflow deterministic and enforced.",
+    "languageLesson": "A Cargo virtual workspace has a root manifest with no [package], only [workspace] members. Pinning the toolchain via rust-toolchain.toml guarantees every contributor and CI runner compiles with identical compiler and lint versions.",
+    "nodeIds": [
+      "config:Cargo.toml",
+      "config:rust-toolchain.toml",
+      "config:.pre-commit-config.yaml"
+    ],
+    "order": 12,
+    "title": "Project Configuration"
+  }
+]

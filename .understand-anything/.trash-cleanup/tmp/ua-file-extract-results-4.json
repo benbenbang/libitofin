@@ -1,0 +1,505 @@
+{
+  "filesAnalyzed": 5,
+  "filesSkipped": [],
+  "results": [
+    {
+      "callGraph": [
+        {
+          "callee": "Some",
+          "caller": "new",
+          "lineNumber": 27
+        },
+        {
+          "callee": "Box::new",
+          "caller": "new",
+          "lineNumber": 27
+        },
+        {
+          "callee": "self.ptr.is_none",
+          "caller": "is_empty",
+          "lineNumber": 33
+        },
+        {
+          "callee": "self.ptr.as_deref",
+          "caller": "get",
+          "lineNumber": 38
+        },
+        {
+          "callee": "self.ptr.as_deref_mut",
+          "caller": "get_mut",
+          "lineNumber": 43
+        },
+        {
+          "callee": "std::mem::swap",
+          "caller": "swap",
+          "lineNumber": 48
+        },
+        {
+          "callee": "self.ptr.clone",
+          "caller": "clone",
+          "lineNumber": 55
+        },
+        {
+          "callee": "ValueBox::empty",
+          "caller": "default",
+          "lineNumber": 62
+        },
+        {
+          "callee": "ValueBox::empty",
+          "caller": "empty_and_filled",
+          "lineNumber": 72
+        },
+        {
+          "callee": "ValueBox::new",
+          "caller": "empty_and_filled",
+          "lineNumber": 76
+        },
+        {
+          "callee": "ValueBox::new",
+          "caller": "clone_is_a_deep_copy",
+          "lineNumber": 83
+        },
+        {
+          "callee": "original.clone",
+          "caller": "clone_is_a_deep_copy",
+          "lineNumber": 84
+        },
+        {
+          "callee": "copy.get_mut().unwrap().push",
+          "caller": "clone_is_a_deep_copy",
+          "lineNumber": 85
+        },
+        {
+          "callee": "copy.get_mut().unwrap",
+          "caller": "clone_is_a_deep_copy",
+          "lineNumber": 85
+        },
+        {
+          "callee": "copy.get_mut",
+          "caller": "clone_is_a_deep_copy",
+          "lineNumber": 85
+        },
+        {
+          "callee": "ValueBox::new",
+          "caller": "swap_exchanges_contents",
+          "lineNumber": 93
+        },
+        {
+          "callee": "ValueBox::new",
+          "caller": "swap_exchanges_contents",
+          "lineNumber": 94
+        },
+        {
+          "callee": "a.swap",
+          "caller": "swap_exchanges_contents",
+          "lineNumber": 95
+        }
+      ],
+      "classes": [
+        {
+          "endLine": 16,
+          "methods": [],
+          "name": "ValueBox",
+          "properties": [
+            "ptr"
+          ],
+          "startLine": 14
+        }
+      ],
+      "exports": [
+        {
+          "isDefault": false,
+          "line": 14,
+          "name": "ValueBox"
+        },
+        {
+          "isDefault": false,
+          "line": 20,
+          "name": "empty"
+        },
+        {
+          "isDefault": false,
+          "line": 25,
+          "name": "new"
+        },
+        {
+          "isDefault": false,
+          "line": 32,
+          "name": "is_empty"
+        },
+        {
+          "isDefault": false,
+          "line": 37,
+          "name": "get"
+        },
+        {
+          "isDefault": false,
+          "line": 42,
+          "name": "get_mut"
+        },
+        {
+          "isDefault": false,
+          "line": 47,
+          "name": "swap"
+        }
+      ],
+      "fileCategory": "code",
+      "functions": [
+        {
+          "endLine": 22,
+          "name": "empty",
+          "params": [],
+          "startLine": 20
+        },
+        {
+          "endLine": 29,
+          "name": "new",
+          "params": [
+            "value"
+          ],
+          "startLine": 25
+        },
+        {
+          "endLine": 34,
+          "name": "is_empty",
+          "params": [],
+          "startLine": 32
+        },
+        {
+          "endLine": 39,
+          "name": "get",
+          "params": [],
+          "startLine": 37
+        },
+        {
+          "endLine": 44,
+          "name": "get_mut",
+          "params": [],
+          "startLine": 42
+        },
+        {
+          "endLine": 49,
+          "name": "swap",
+          "params": [
+            "other"
+          ],
+          "startLine": 47
+        },
+        {
+          "endLine": 57,
+          "name": "clone",
+          "params": [],
+          "startLine": 53
+        },
+        {
+          "endLine": 63,
+          "name": "default",
+          "params": [],
+          "startLine": 61
+        }
+      ],
+      "language": "rust",
+      "metrics": {
+        "classCount": 1,
+        "exportCount": 7,
+        "functionCount": 8,
+        "importCount": 0
+      },
+      "nonEmptyLines": 84,
+      "path": "crates/itofin/src/utilities/clone.rs",
+      "totalLines": 99
+    },
+    {
+      "callGraph": [
+        {
+          "callee": "value.is_null",
+          "caller": "check_null",
+          "lineNumber": 14
+        },
+        {
+          "callee": "\"null\".to_string",
+          "caller": "check_null",
+          "lineNumber": 15
+        },
+        {
+          "callee": "value.to_string",
+          "caller": "check_null",
+          "lineNumber": 17
+        },
+        {
+          "callee": "percent",
+          "caller": "rate",
+          "lineNumber": 41
+        },
+        {
+          "callee": "percent",
+          "caller": "volatility",
+          "lineNumber": 46
+        }
+      ],
+      "exports": [
+        {
+          "isDefault": false,
+          "line": 13,
+          "name": "check_null"
+        },
+        {
+          "isDefault": false,
+          "line": 22,
+          "name": "ordinal"
+        },
+        {
+          "isDefault": false,
+          "line": 34,
+          "name": "percent"
+        },
+        {
+          "isDefault": false,
+          "line": 40,
+          "name": "rate"
+        },
+        {
+          "isDefault": false,
+          "line": 45,
+          "name": "volatility"
+        }
+      ],
+      "fileCategory": "code",
+      "functions": [
+        {
+          "endLine": 19,
+          "name": "check_null",
+          "params": [
+            "value"
+          ],
+          "startLine": 13
+        },
+        {
+          "endLine": 31,
+          "name": "ordinal",
+          "params": [
+            "n"
+          ],
+          "startLine": 22
+        },
+        {
+          "endLine": 37,
+          "name": "percent",
+          "params": [
+            "value"
+          ],
+          "startLine": 34
+        },
+        {
+          "endLine": 42,
+          "name": "rate",
+          "params": [
+            "r"
+          ],
+          "startLine": 40
+        },
+        {
+          "endLine": 47,
+          "name": "volatility",
+          "params": [
+            "v"
+          ],
+          "startLine": 45
+        }
+      ],
+      "language": "rust",
+      "metrics": {
+        "classCount": 0,
+        "exportCount": 5,
+        "functionCount": 5,
+        "importCount": 2
+      },
+      "nonEmptyLines": 69,
+      "path": "crates/itofin/src/utilities/dataformatters.rs",
+      "totalLines": 79
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "metrics": {
+        "classCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "importCount": 4
+      },
+      "nonEmptyLines": 5,
+      "path": "crates/itofin/src/utilities/mod.rs",
+      "totalLines": 6
+    },
+    {
+      "callGraph": [
+        {
+          "callee": "Self::null",
+          "caller": "is_null",
+          "lineNumber": 17
+        }
+      ],
+      "classes": [
+        {
+          "endLine": 19,
+          "methods": [
+            "null",
+            "is_null"
+          ],
+          "name": "Null",
+          "properties": [],
+          "startLine": 11
+        }
+      ],
+      "exports": [
+        {
+          "isDefault": false,
+          "line": 11,
+          "name": "Null"
+        }
+      ],
+      "fileCategory": "code",
+      "functions": [
+        {
+          "endLine": 25,
+          "name": "null",
+          "params": [],
+          "startLine": 22
+        }
+      ],
+      "language": "rust",
+      "metrics": {
+        "classCount": 1,
+        "exportCount": 1,
+        "functionCount": 1,
+        "importCount": 1
+      },
+      "nonEmptyLines": 53,
+      "path": "crates/itofin/src/utilities/null.rs",
+      "totalLines": 62
+    },
+    {
+      "callGraph": [
+        {
+          "callee": "self.data.len",
+          "caller": "next",
+          "lineNumber": 22
+        },
+        {
+          "callee": "self.pos.saturating_add",
+          "caller": "next",
+          "lineNumber": 28
+        },
+        {
+          "callee": "Some",
+          "caller": "next",
+          "lineNumber": 29
+        },
+        {
+          "callee": "step_iter(&data, 2).copied().collect",
+          "caller": "advances_in_constant_steps",
+          "lineNumber": 48
+        },
+        {
+          "callee": "step_iter(&data, 2).copied",
+          "caller": "advances_in_constant_steps",
+          "lineNumber": 48
+        },
+        {
+          "callee": "step_iter",
+          "caller": "advances_in_constant_steps",
+          "lineNumber": 48
+        },
+        {
+          "callee": "step_iter(&data, 1).copied().collect",
+          "caller": "step_of_one_yields_every_element",
+          "lineNumber": 55
+        },
+        {
+          "callee": "step_iter(&data, 1).copied",
+          "caller": "step_of_one_yields_every_element",
+          "lineNumber": 55
+        },
+        {
+          "callee": "step_iter",
+          "caller": "step_of_one_yields_every_element",
+          "lineNumber": 55
+        },
+        {
+          "callee": "step_iter(&data, 10).copied().collect",
+          "caller": "step_larger_than_len_yields_first_only",
+          "lineNumber": 62
+        },
+        {
+          "callee": "step_iter(&data, 10).copied",
+          "caller": "step_larger_than_len_yields_first_only",
+          "lineNumber": 62
+        },
+        {
+          "callee": "step_iter",
+          "caller": "step_larger_than_len_yields_first_only",
+          "lineNumber": 62
+        },
+        {
+          "callee": "step_iter",
+          "caller": "zero_step_panics",
+          "lineNumber": 69
+        }
+      ],
+      "classes": [
+        {
+          "endLine": 16,
+          "methods": [],
+          "name": "StepIterator",
+          "properties": [
+            "data",
+            "pos",
+            "step"
+          ],
+          "startLine": 12
+        }
+      ],
+      "exports": [
+        {
+          "isDefault": false,
+          "line": 12,
+          "name": "StepIterator"
+        },
+        {
+          "isDefault": false,
+          "line": 36,
+          "name": "step_iter"
+        }
+      ],
+      "fileCategory": "code",
+      "functions": [
+        {
+          "endLine": 30,
+          "name": "next",
+          "params": [],
+          "startLine": 21
+        },
+        {
+          "endLine": 39,
+          "name": "step_iter",
+          "params": [
+            "data",
+            "step"
+          ],
+          "startLine": 36
+        }
+      ],
+      "language": "rust",
+      "metrics": {
+        "classCount": 1,
+        "exportCount": 2,
+        "functionCount": 2,
+        "importCount": 1
+      },
+      "nonEmptyLines": 61,
+      "path": "crates/itofin/src/utilities/steppingiterator.rs",
+      "totalLines": 71
+    }
+  ],
+  "scriptCompleted": true
+}

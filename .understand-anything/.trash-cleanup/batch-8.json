@@ -1,0 +1,183 @@
+{
+  "edges": [
+    {
+      "direction": "forward",
+      "source": "file:scripts/check_extension.sh",
+      "target": "function:scripts/check_extension.sh:check_extension",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:scripts/check_extension.sh",
+      "target": "file:scripts/init.sh",
+      "type": "depends_on",
+      "weight": 0.6
+    },
+    {
+      "direction": "forward",
+      "source": "file:scripts/hadolint.sh",
+      "target": "function:scripts/hadolint.sh:get_default_branch",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:scripts/hadolint.sh",
+      "target": "function:scripts/hadolint.sh:hadolint_runner",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:scripts/hadolint.sh",
+      "target": "function:scripts/hadolint.sh:lint_wrapper",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:scripts/hadolint.sh",
+      "target": "file:scripts/init.sh",
+      "type": "depends_on",
+      "weight": 0.6
+    },
+    {
+      "direction": "forward",
+      "source": "config:scripts/hadolint.yml",
+      "target": "file:scripts/hadolint.sh",
+      "type": "configures",
+      "weight": 0.6
+    }
+  ],
+  "nodes": [
+    {
+      "complexity": "simple",
+      "filePath": "scripts/check_extension.sh",
+      "id": "file:scripts/check_extension.sh",
+      "name": "check_extension.sh",
+      "summary": "Pre-commit helper that scans staged files and aborts the commit if any file matches a forbidden extension (e.g. Jupyter notebooks). Sources init.sh for shared environment setup.",
+      "tags": [
+        "script",
+        "git-hook",
+        "validation",
+        "pre-commit",
+        "tooling"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "scripts/check_extension.sh",
+      "id": "function:scripts/check_extension.sh:check_extension",
+      "lineRange": [
+        4,
+        13
+      ],
+      "name": "check_extension",
+      "summary": "Iterates over staged files from git diff and exits non-zero with a message if any file ends with the extension passed as an argument.",
+      "tags": [
+        "validation",
+        "git",
+        "guard"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "scripts/hadolint.sh",
+      "id": "file:scripts/hadolint.sh",
+      "languageNotes": "Uses bash arrays populated from git diff and a binary-or-Docker fallback pattern for the linter.",
+      "name": "hadolint.sh",
+      "summary": "Lints changed (or all) Dockerfiles using hadolint, falling back to the hadolint Docker image when the binary is absent, and fails the run on any lint error. Sources init.sh and uses scripts/hadolint.yml for rule configuration.",
+      "tags": [
+        "script",
+        "linting",
+        "ci-cd",
+        "docker",
+        "tooling"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "scripts/hadolint.sh",
+      "id": "function:scripts/hadolint.sh:get_default_branch",
+      "lineRange": [
+        29,
+        42
+      ],
+      "name": "get_default_branch",
+      "summary": "Resolves the repository's default branch by probing origin/main then origin/master, falling back to main.",
+      "tags": [
+        "git",
+        "utility",
+        "branch-detection"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "scripts/hadolint.sh",
+      "id": "function:scripts/hadolint.sh:hadolint_runner",
+      "lineRange": [
+        44,
+        56
+      ],
+      "name": "hadolint_runner",
+      "summary": "Runs hadolint against the given Dockerfile arguments, using the local binary if available or otherwise the hadolint/hadolint Docker image, with the project config file.",
+      "tags": [
+        "linting",
+        "docker",
+        "wrapper"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "scripts/hadolint.sh",
+      "id": "function:scripts/hadolint.sh:lint_wrapper",
+      "lineRange": [
+        58,
+        92
+      ],
+      "name": "lint_wrapper",
+      "summary": "Collects changed Dockerfiles via git diff against the default branch and lints them (or all Dockerfiles when passed 'all'), returning non-zero on the first failure.",
+      "tags": [
+        "linting",
+        "git",
+        "orchestration"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "scripts/hadolint.yml",
+      "id": "config:scripts/hadolint.yml",
+      "name": "hadolint.yml",
+      "summary": "Hadolint configuration that ignores a curated set of Dockerfile lint rules (DL3003/3006/3008/3013/3020/3022, SC2086) deemed acceptable for this project's images.",
+      "tags": [
+        "configuration",
+        "linting",
+        "docker",
+        "ci-cd"
+      ],
+      "type": "config"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "scripts/init.sh",
+      "id": "file:scripts/init.sh",
+      "name": "init.sh",
+      "summary": "Shared bootstrap sourced by the other helper scripts: enables strict mode, exports the scripts and git root paths, defines terminal color variables, and prepares the hadolint log cache directory.",
+      "tags": [
+        "script",
+        "bootstrap",
+        "shared",
+        "tooling",
+        "environment"
+      ],
+      "type": "file"
+    }
+  ]
+}

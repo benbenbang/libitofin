@@ -1,0 +1,89 @@
+{
+  "batchFiles": [
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/handle.rs",
+      "sizeLines": 235
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/lib.rs",
+      "sizeLines": 13
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/patterns/lazyobject.rs",
+      "sizeLines": 365
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/patterns/mod.rs",
+      "sizeLines": 5
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/patterns/observable.rs",
+      "sizeLines": 253
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/patterns/visitor.rs",
+      "sizeLines": 21
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/settings.rs",
+      "sizeLines": 190
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/shared.rs",
+      "sizeLines": 58
+    }
+  ],
+  "batchImportData": {
+    "crates/itofin/src/handle.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/patterns/observable.rs",
+      "crates/itofin/src/shared.rs"
+    ],
+    "crates/itofin/src/lib.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/handle.rs",
+      "crates/itofin/src/math/mod.rs",
+      "crates/itofin/src/patterns/mod.rs",
+      "crates/itofin/src/settings.rs",
+      "crates/itofin/src/shared.rs",
+      "crates/itofin/src/types.rs",
+      "crates/itofin/src/utilities/mod.rs"
+    ],
+    "crates/itofin/src/patterns/lazyobject.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/patterns/observable.rs",
+      "crates/itofin/src/shared.rs"
+    ],
+    "crates/itofin/src/patterns/mod.rs": [
+      "crates/itofin/src/patterns/lazyobject.rs",
+      "crates/itofin/src/patterns/observable.rs",
+      "crates/itofin/src/patterns/visitor.rs"
+    ],
+    "crates/itofin/src/patterns/observable.rs": [
+      "crates/itofin/src/shared.rs"
+    ],
+    "crates/itofin/src/patterns/visitor.rs": [],
+    "crates/itofin/src/settings.rs": [
+      "crates/itofin/src/patterns/observable.rs",
+      "crates/itofin/src/shared.rs"
+    ],
+    "crates/itofin/src/shared.rs": []
+  },
+  "projectRoot": "/Users/bn/Git/benbenbang/ito-fin"
+}

@@ -1,0 +1,445 @@
+{
+  "edges": [
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/array.rs",
+      "target": "file:crates/itofin/src/types.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/interpolations/linear.rs",
+      "target": "file:crates/itofin/src/errors.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/interpolations/linear.rs",
+      "target": "file:crates/itofin/src/math/interpolations/mod.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/interpolations/linear.rs",
+      "target": "file:crates/itofin/src/types.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/interpolations/mod.rs",
+      "target": "file:crates/itofin/src/errors.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/interpolations/mod.rs",
+      "target": "file:crates/itofin/src/math/interpolations/linear.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/interpolations/mod.rs",
+      "target": "file:crates/itofin/src/types.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/matrix.rs",
+      "target": "file:crates/itofin/src/math/array.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/matrix.rs",
+      "target": "file:crates/itofin/src/types.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/mod.rs",
+      "target": "file:crates/itofin/src/math/array.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/mod.rs",
+      "target": "file:crates/itofin/src/math/beta.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/mod.rs",
+      "target": "file:crates/itofin/src/math/distributions/mod.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/mod.rs",
+      "target": "file:crates/itofin/src/math/errorfunction.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/mod.rs",
+      "target": "file:crates/itofin/src/math/gammafunction.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/mod.rs",
+      "target": "file:crates/itofin/src/math/incompletegamma.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/mod.rs",
+      "target": "file:crates/itofin/src/math/interpolations/mod.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/mod.rs",
+      "target": "file:crates/itofin/src/math/matrix.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/array.rs",
+      "target": "class:crates/itofin/src/math/array.rs:Array",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/array.rs",
+      "target": "class:crates/itofin/src/math/array.rs:Array",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/interpolations/linear.rs",
+      "target": "class:crates/itofin/src/math/interpolations/linear.rs:LinearInterpolation",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/interpolations/linear.rs",
+      "target": "class:crates/itofin/src/math/interpolations/linear.rs:LinearInterpolation",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/interpolations/linear.rs",
+      "target": "function:crates/itofin/src/math/interpolations/linear.rs:new",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/interpolations/linear.rs",
+      "target": "function:crates/itofin/src/math/interpolations/linear.rs:check_range",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/interpolations/linear.rs",
+      "target": "function:crates/itofin/src/math/interpolations/linear.rs:locate",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "class:crates/itofin/src/math/interpolations/linear.rs:LinearInterpolation",
+      "target": "class:crates/itofin/src/math/interpolations/mod.rs:Interpolation",
+      "type": "implements",
+      "weight": 0.9
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/interpolations/mod.rs",
+      "target": "class:crates/itofin/src/math/interpolations/mod.rs:Interpolation",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/interpolations/mod.rs",
+      "target": "class:crates/itofin/src/math/interpolations/mod.rs:Interpolation",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/matrix.rs",
+      "target": "class:crates/itofin/src/math/matrix.rs:Matrix",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/matrix.rs",
+      "target": "class:crates/itofin/src/math/matrix.rs:Matrix",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/matrix.rs",
+      "target": "function:crates/itofin/src/math/matrix.rs:transpose",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/matrix.rs",
+      "target": "function:crates/itofin/src/math/matrix.rs:mul",
+      "type": "contains",
+      "weight": 1.0
+    }
+  ],
+  "nodes": [
+    {
+      "complexity": "complex",
+      "filePath": "crates/itofin/src/math/array.rs",
+      "id": "file:crates/itofin/src/math/array.rs",
+      "languageNotes": "Heavy use of Deref/Index/Neg/FromIterator trait impls and closure-based element-wise mapping to provide an ergonomic numeric vector type.",
+      "name": "array.rs",
+      "summary": "Defines the core `Array` 1-D vector primitive wrapping a `Vec<Real>`, with constructors, element-wise math (abs/sqrt/log/exp/pow), dot product, norm, and Deref/Index/operator trait impls. Mirrors QuantLib's Array type for the linear-algebra layer.",
+      "tags": [
+        "data-model",
+        "linear-algebra",
+        "numeric",
+        "utility"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "complex",
+      "filePath": "crates/itofin/src/math/array.rs",
+      "id": "class:crates/itofin/src/math/array.rs:Array",
+      "lineRange": [
+        16,
+        18
+      ],
+      "name": "Array",
+      "summary": "1-D numeric array over `Real` backed by `Vec`, offering constructors (filled, incremental), element-wise transforms, dot/norm2, and Deref/Index/operator overloads.",
+      "tags": [
+        "data-model",
+        "linear-algebra",
+        "numeric"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "complex",
+      "filePath": "crates/itofin/src/math/interpolations/linear.rs",
+      "id": "file:crates/itofin/src/math/interpolations/linear.rs",
+      "languageNotes": "Uses `partition_point` for binary segment location and fallible `Result`-returning evaluation methods for out-of-range/NaN handling.",
+      "name": "linear.rs",
+      "summary": "Implements `LinearInterpolation` over monotonically increasing x-nodes, precomputing segment slopes and cumulative primitives, with optional extrapolation and NaN/finiteness validation. Ports QuantLib's LinearInterpolation.",
+      "tags": [
+        "service",
+        "interpolation",
+        "numeric",
+        "validation"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "complex",
+      "filePath": "crates/itofin/src/math/interpolations/linear.rs",
+      "id": "class:crates/itofin/src/math/interpolations/linear.rs:LinearInterpolation",
+      "lineRange": [
+        13,
+        19
+      ],
+      "name": "LinearInterpolation",
+      "summary": "Piecewise-linear interpolant holding x/y nodes, precomputed slopes and cumulative primitives, supporting value/derivative/primitive evaluation with optional extrapolation.",
+      "tags": [
+        "service",
+        "interpolation",
+        "numeric"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/math/interpolations/linear.rs",
+      "id": "function:crates/itofin/src/math/interpolations/linear.rs:new",
+      "lineRange": [
+        24,
+        71
+      ],
+      "name": "new",
+      "summary": "Constructs a LinearInterpolation, validating equal/sufficient lengths, finiteness, and strict monotonicity of x, then precomputing per-segment slopes and cumulative primitives.",
+      "tags": [
+        "factory",
+        "validation",
+        "interpolation"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/math/interpolations/linear.rs",
+      "id": "function:crates/itofin/src/math/interpolations/linear.rs:check_range",
+      "lineRange": [
+        97,
+        109
+      ],
+      "name": "check_range",
+      "summary": "Rejects NaN inputs and out-of-domain x values when extrapolation is disabled, returning a QlError otherwise Ok.",
+      "tags": [
+        "validation",
+        "numeric"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/math/interpolations/linear.rs",
+      "id": "function:crates/itofin/src/math/interpolations/linear.rs:locate",
+      "lineRange": [
+        86,
+        95
+      ],
+      "name": "locate",
+      "summary": "Binary-searches the x-node array via partition_point to find the segment index containing a query point, clamping at the end segments.",
+      "tags": [
+        "utility",
+        "interpolation",
+        "search"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/math/interpolations/mod.rs",
+      "id": "file:crates/itofin/src/math/interpolations/mod.rs",
+      "name": "mod.rs",
+      "summary": "Interpolations module barrel that re-exports the linear submodule and defines the common `Interpolation` trait (value/derivative/primitive/domain queries) implemented by concrete interpolators.",
+      "tags": [
+        "type-definition",
+        "interpolation",
+        "barrel",
+        "entry-point"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/math/interpolations/mod.rs",
+      "id": "class:crates/itofin/src/math/interpolations/mod.rs:Interpolation",
+      "lineRange": [
+        13,
+        32
+      ],
+      "name": "Interpolation",
+      "summary": "Trait defining the common interpolation interface: value, derivative, primitive, x_min/x_max bounds, and in-range checks.",
+      "tags": [
+        "type-definition",
+        "interpolation",
+        "interface"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "complex",
+      "filePath": "crates/itofin/src/math/matrix.rs",
+      "id": "file:crates/itofin/src/math/matrix.rs",
+      "languageNotes": "Uses checked_mul for overflow-safe capacity, 1-D and 2-D Index impls, and multiple Mul trait impls for matrix*matrix, matrix*vector, and scalar products.",
+      "name": "matrix.rs",
+      "summary": "Defines the `Matrix` 2-D dense matrix primitive (row-major `Vec<Real>`) with constructors, row/diagonal/transpose accessors, indexing, and matrix/vector/scalar multiplication. Ports QuantLib's Matrix type.",
+      "tags": [
+        "data-model",
+        "linear-algebra",
+        "numeric"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "complex",
+      "filePath": "crates/itofin/src/math/matrix.rs",
+      "id": "class:crates/itofin/src/math/matrix.rs:Matrix",
+      "lineRange": [
+        16,
+        20
+      ],
+      "name": "Matrix",
+      "summary": "Dense row-major 2-D matrix over `Real` with constructors, row/diagonal/transpose access, 1-D and 2-D indexing, and overloaded multiplication operators.",
+      "tags": [
+        "data-model",
+        "linear-algebra",
+        "numeric"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/math/matrix.rs",
+      "id": "function:crates/itofin/src/math/matrix.rs:transpose",
+      "lineRange": [
+        98,
+        106
+      ],
+      "name": "transpose",
+      "summary": "Returns a new matrix with rows and columns swapped by copying each element to its transposed position.",
+      "tags": [
+        "utility",
+        "linear-algebra"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/math/matrix.rs",
+      "id": "function:crates/itofin/src/math/matrix.rs:mul",
+      "lineRange": [
+        209,
+        221
+      ],
+      "name": "mul",
+      "summary": "Matrix-matrix product implementation computing the row-by-column dot products with shape-conformance checks.",
+      "tags": [
+        "linear-algebra",
+        "operator",
+        "numeric"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/math/mod.rs",
+      "id": "file:crates/itofin/src/math/mod.rs",
+      "name": "mod.rs",
+      "summary": "Math module barrel that declares and re-exports the array, matrix, interpolations, distributions, and special-function (beta/gamma/error) submodules.",
+      "tags": [
+        "barrel",
+        "entry-point",
+        "module"
+      ],
+      "type": "file"
+    }
+  ]
+}

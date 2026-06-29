@@ -1,0 +1,126 @@
+# .understandignore — patterns for files/dirs to exclude from analysis
+# Syntax: same as .gitignore (globs, # comments, ! negation, trailing / for dirs)
+# Lines below are suggestions — uncomment to activate.
+# Use ! prefix to force-include something excluded by defaults.
+#
+# Built-in defaults (always excluded unless negated):
+#   node_modules/, .git/, dist/, build/, obj/, *.lock, *.min.js, etc.
+#
+
+# --- ACTIVE exclusions (scope: Rust crates + repo docs/configs) ---
+# The QuantLib/ symlink is the C++ reference oracle, not part of this Rust
+# port's source. Exclude it (and Rust build artifacts) from analysis.
+QuantLib
+QuantLib/
+/target
+target/
+# This tool's own scaffolding should not appear in the graph.
+.understand-anything/
+
+# --- From .gitignore (uncomment to exclude) ---
+
+# *.py[cod]
+# *$py.class
+# *.pyc
+# *.so
+# .claude
+# .codex
+# .gemini
+# .Python
+# develop-eggs/
+# downloads/
+# eggs/
+# .eggs/
+# lib/*
+# !lib/*.py
+# lib64/
+# parts/
+# sdist/
+# var/
+# wheels/
+# *.egg-info/
+# .installed.cfg
+# *.egg
+# MANIFEST
+# *.manifest
+# *.spec
+# .Rhistory
+# pip-log.txt
+# pip-delete-this-directory.txt
+# htmlcov/
+# .tox/
+# .coverage
+# .coverage.*
+# nosetests.xml
+# coverage.xml
+# *.cover
+# .hypothesis/
+# .pytest_cache/
+# *.mo
+# *.pot
+# local_settings.py
+# db.sqlite3
+# instance/
+# .webassets-cache
+# .scrapy
+# docs/_build/
+# docs/source/*.rst
+# !docs/source/index.rst
+# */docs/_build/
+# */docs/source/*.rst
+# !*/docs/source/index.rst
+# .ipynb_checkpoints
+# .python-version
+# celerybeat-schedule
+# *.sage.py
+# .env
+# env/
+# ENV/
+# env.bak/
+# venv.bak/
+# *.db
+# *.rdb
+# .spyderproject
+# .spyproject
+# .ropeproject
+# /site
+# .mypy_cache/
+# .DS_Store
+# data/
+# mlruns/
+# *.csv
+# *.h5
+# *.hdf5
+# *.pickle
+# *.sublime-workspace
+# *.sublime-project
+# .anaconda
+# pyrightconfig.json
+# _vendor*
+# .pcg.yaml
+# QuantLib
+# /target
+# .zed
+
+# --- Detected directories (uncomment to exclude) ---
+
+# scripts/
+
+# --- Test file patterns (uncomment to exclude) ---
+
+# JS / TS
+# *.test.*
+# *.spec.*
+# *.snap
+# C# / .NET
+# **/*Tests.cs
+# **/*Test.cs
+# **/*Fixture.cs
+# **/*.Tests.csproj
+# Java / Kotlin
+# **/src/test/**
+# **/*Test.java
+# **/*IT.java
+# **/*Spec.kt
+# Go
+# **/*_test.go

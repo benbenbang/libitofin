@@ -1,0 +1,1280 @@
+{
+  "edges": [
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/errors.rs",
+      "target": "class:crates/itofin/src/errors.rs:QlError",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/errors.rs",
+      "target": "class:crates/itofin/src/errors.rs:QlError",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/beta.rs",
+      "target": "file:crates/itofin/src/errors.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/beta.rs",
+      "target": "file:crates/itofin/src/math/gammafunction.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/beta.rs",
+      "target": "file:crates/itofin/src/types.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/beta.rs",
+      "target": "function:crates/itofin/src/math/beta.rs:beta_function",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/beta.rs",
+      "target": "function:crates/itofin/src/math/beta.rs:incomplete_beta",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/beta.rs",
+      "target": "function:crates/itofin/src/math/beta.rs:beta_continued_fraction",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/beta.rs",
+      "target": "function:crates/itofin/src/math/beta.rs:beta_function",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/beta.rs",
+      "target": "function:crates/itofin/src/math/beta.rs:incomplete_beta",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/beta.rs",
+      "target": "function:crates/itofin/src/math/gammafunction.rs:log_gamma",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/binomial.rs",
+      "target": "file:crates/itofin/src/errors.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/binomial.rs",
+      "target": "file:crates/itofin/src/math/beta.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/binomial.rs",
+      "target": "file:crates/itofin/src/types.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/binomial.rs",
+      "target": "class:crates/itofin/src/math/distributions/binomial.rs:BinomialDistribution",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/binomial.rs",
+      "target": "class:crates/itofin/src/math/distributions/binomial.rs:CumulativeBinomialDistribution",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/binomial.rs",
+      "target": "class:crates/itofin/src/math/distributions/binomial.rs:BinomialDistribution",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/binomial.rs",
+      "target": "class:crates/itofin/src/math/distributions/binomial.rs:CumulativeBinomialDistribution",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/binomial.rs",
+      "target": "function:crates/itofin/src/math/beta.rs:incomplete_beta",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/chisquare.rs",
+      "target": "file:crates/itofin/src/errors.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/chisquare.rs",
+      "target": "file:crates/itofin/src/types.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/chisquare.rs",
+      "target": "class:crates/itofin/src/math/distributions/chisquare.rs:CumulativeChiSquareDistribution",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/chisquare.rs",
+      "target": "class:crates/itofin/src/math/distributions/chisquare.rs:CumulativeChiSquareDistribution",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/chisquare.rs",
+      "target": "class:crates/itofin/src/math/distributions/gamma.rs:CumulativeGammaDistribution",
+      "type": "depends_on",
+      "weight": 0.6
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/gamma.rs",
+      "target": "file:crates/itofin/src/errors.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/gamma.rs",
+      "target": "file:crates/itofin/src/math/incompletegamma.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/gamma.rs",
+      "target": "file:crates/itofin/src/types.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/gamma.rs",
+      "target": "class:crates/itofin/src/math/distributions/gamma.rs:CumulativeGammaDistribution",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/gamma.rs",
+      "target": "class:crates/itofin/src/math/distributions/gamma.rs:CumulativeGammaDistribution",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/gamma.rs",
+      "target": "function:crates/itofin/src/math/incompletegamma.rs:incomplete_gamma",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/mod.rs",
+      "target": "file:crates/itofin/src/errors.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/mod.rs",
+      "target": "file:crates/itofin/src/math/distributions/binomial.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/mod.rs",
+      "target": "file:crates/itofin/src/math/distributions/chisquare.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/mod.rs",
+      "target": "file:crates/itofin/src/math/distributions/gamma.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/mod.rs",
+      "target": "file:crates/itofin/src/math/distributions/normal.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/mod.rs",
+      "target": "file:crates/itofin/src/math/distributions/poisson.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/mod.rs",
+      "target": "file:crates/itofin/src/math/distributions/studentt.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/mod.rs",
+      "target": "file:crates/itofin/src/types.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/mod.rs",
+      "target": "class:crates/itofin/src/math/distributions/mod.rs:Probability",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/mod.rs",
+      "target": "class:crates/itofin/src/math/distributions/mod.rs:Density",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/mod.rs",
+      "target": "class:crates/itofin/src/math/distributions/mod.rs:Cdf",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/mod.rs",
+      "target": "class:crates/itofin/src/math/distributions/mod.rs:Quantile",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/mod.rs",
+      "target": "class:crates/itofin/src/math/distributions/mod.rs:Support",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/mod.rs",
+      "target": "class:crates/itofin/src/math/distributions/mod.rs:Probability",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/mod.rs",
+      "target": "class:crates/itofin/src/math/distributions/mod.rs:Density",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/mod.rs",
+      "target": "class:crates/itofin/src/math/distributions/mod.rs:Cdf",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/mod.rs",
+      "target": "class:crates/itofin/src/math/distributions/mod.rs:Quantile",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/mod.rs",
+      "target": "class:crates/itofin/src/math/distributions/mod.rs:Support",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/normal.rs",
+      "target": "file:crates/itofin/src/errors.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/normal.rs",
+      "target": "file:crates/itofin/src/math/errorfunction.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/normal.rs",
+      "target": "file:crates/itofin/src/types.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/normal.rs",
+      "target": "class:crates/itofin/src/math/distributions/normal.rs:NormalDistribution",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/normal.rs",
+      "target": "class:crates/itofin/src/math/distributions/normal.rs:CumulativeNormalDistribution",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/normal.rs",
+      "target": "class:crates/itofin/src/math/distributions/normal.rs:InverseCumulativeNormal",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/normal.rs",
+      "target": "class:crates/itofin/src/math/distributions/normal.rs:NormalDistribution",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/normal.rs",
+      "target": "class:crates/itofin/src/math/distributions/normal.rs:CumulativeNormalDistribution",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/normal.rs",
+      "target": "class:crates/itofin/src/math/distributions/normal.rs:InverseCumulativeNormal",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/normal.rs",
+      "target": "function:crates/itofin/src/math/errorfunction.rs:erf",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/poisson.rs",
+      "target": "file:crates/itofin/src/errors.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/poisson.rs",
+      "target": "file:crates/itofin/src/types.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/poisson.rs",
+      "target": "class:crates/itofin/src/math/distributions/poisson.rs:PoissonDistribution",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/poisson.rs",
+      "target": "class:crates/itofin/src/math/distributions/poisson.rs:CumulativePoissonDistribution",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/poisson.rs",
+      "target": "class:crates/itofin/src/math/distributions/poisson.rs:InverseCumulativePoisson",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/poisson.rs",
+      "target": "class:crates/itofin/src/math/distributions/poisson.rs:PoissonDistribution",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/poisson.rs",
+      "target": "class:crates/itofin/src/math/distributions/poisson.rs:CumulativePoissonDistribution",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/poisson.rs",
+      "target": "class:crates/itofin/src/math/distributions/poisson.rs:InverseCumulativePoisson",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/studentt.rs",
+      "target": "file:crates/itofin/src/errors.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/studentt.rs",
+      "target": "file:crates/itofin/src/math/beta.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/studentt.rs",
+      "target": "file:crates/itofin/src/math/gammafunction.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/studentt.rs",
+      "target": "file:crates/itofin/src/types.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/studentt.rs",
+      "target": "class:crates/itofin/src/math/distributions/studentt.rs:StudentT",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/studentt.rs",
+      "target": "class:crates/itofin/src/math/distributions/studentt.rs:StudentT",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/studentt.rs",
+      "target": "function:crates/itofin/src/math/gammafunction.rs:log_gamma",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/studentt.rs",
+      "target": "function:crates/itofin/src/math/beta.rs:incomplete_beta",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/errorfunction.rs",
+      "target": "file:crates/itofin/src/types.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/errorfunction.rs",
+      "target": "function:crates/itofin/src/math/errorfunction.rs:erf",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/errorfunction.rs",
+      "target": "function:crates/itofin/src/math/errorfunction.rs:erf",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/gammafunction.rs",
+      "target": "file:crates/itofin/src/errors.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/gammafunction.rs",
+      "target": "file:crates/itofin/src/types.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/gammafunction.rs",
+      "target": "function:crates/itofin/src/math/gammafunction.rs:log_gamma",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/gammafunction.rs",
+      "target": "function:crates/itofin/src/math/gammafunction.rs:gamma",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/gammafunction.rs",
+      "target": "function:crates/itofin/src/math/gammafunction.rs:log_gamma",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/gammafunction.rs",
+      "target": "function:crates/itofin/src/math/gammafunction.rs:gamma",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/gammafunction.rs",
+      "target": "function:crates/itofin/src/math/gammafunction.rs:log_gamma",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/incompletegamma.rs",
+      "target": "file:crates/itofin/src/errors.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/incompletegamma.rs",
+      "target": "file:crates/itofin/src/math/gammafunction.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/incompletegamma.rs",
+      "target": "file:crates/itofin/src/types.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/incompletegamma.rs",
+      "target": "function:crates/itofin/src/math/incompletegamma.rs:incomplete_gamma",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/incompletegamma.rs",
+      "target": "function:crates/itofin/src/math/incompletegamma.rs:series_repr",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/incompletegamma.rs",
+      "target": "function:crates/itofin/src/math/incompletegamma.rs:continued_fraction_repr",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/incompletegamma.rs",
+      "target": "function:crates/itofin/src/math/incompletegamma.rs:incomplete_gamma",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/incompletegamma.rs",
+      "target": "function:crates/itofin/src/math/gammafunction.rs:log_gamma",
+      "type": "calls",
+      "weight": 0.8
+    }
+  ],
+  "nodes": [
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/errors.rs",
+      "id": "file:crates/itofin/src/errors.rs",
+      "languageNotes": "Carries source file/line context in the error struct, mirroring QuantLib's location-aware exceptions.",
+      "name": "errors.rs",
+      "summary": "Defines the crate-wide QlError type and result alias plus require/ensure helper macros used to validate inputs across the math layer, porting QuantLib's QL_REQUIRE/QL_ENSURE error idioms to idiomatic Rust.",
+      "tags": [
+        "error-handling",
+        "validation",
+        "core",
+        "utility"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/errors.rs",
+      "id": "class:crates/itofin/src/errors.rs:QlError",
+      "lineRange": [
+        14,
+        18
+      ],
+      "name": "QlError",
+      "summary": "Error struct carrying a message plus originating file and line, the single fallible-result error type for the core crate.",
+      "tags": [
+        "error-handling",
+        "data-model",
+        "core"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/math/beta.rs",
+      "id": "file:crates/itofin/src/math/beta.rs",
+      "languageNotes": "Uses the modified Lentz algorithm for the continued fraction, a standard Numerical Recipes technique.",
+      "name": "beta.rs",
+      "summary": "Implements the complete and regularized incomplete beta function via a Lentz continued-fraction expansion, underpinning the binomial CDF and Student-t distribution.",
+      "tags": [
+        "special-functions",
+        "numerical-methods",
+        "math",
+        "serialization"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/math/beta.rs",
+      "id": "function:crates/itofin/src/math/beta.rs:beta_function",
+      "lineRange": [
+        32,
+        34
+      ],
+      "name": "beta_function",
+      "summary": "Computes the complete beta function B(z,w) by exponentiating the log-gamma identity.",
+      "tags": [
+        "special-functions",
+        "math"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/math/beta.rs",
+      "id": "function:crates/itofin/src/math/beta.rs:incomplete_beta",
+      "lineRange": [
+        54,
+        84
+      ],
+      "name": "incomplete_beta",
+      "summary": "Computes the regularized incomplete beta function I_x(a,b), validating inputs and dispatching to the continued-fraction helper with the symmetry reflection for fast convergence.",
+      "tags": [
+        "special-functions",
+        "numerical-methods",
+        "validation"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/math/beta.rs",
+      "id": "function:crates/itofin/src/math/beta.rs:beta_continued_fraction",
+      "lineRange": [
+        87,
+        135
+      ],
+      "name": "beta_continued_fraction",
+      "summary": "Evaluates the continued-fraction representation of the incomplete beta function using the modified Lentz iteration.",
+      "tags": [
+        "numerical-methods",
+        "special-functions",
+        "math"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/math/distributions/binomial.rs",
+      "id": "file:crates/itofin/src/math/distributions/binomial.rs",
+      "name": "binomial.rs",
+      "summary": "Provides the binomial probability mass function and its cumulative distribution, computing the PMF in log-space and the CDF through the incomplete beta relation.",
+      "tags": [
+        "data-model",
+        "math",
+        "statistics",
+        "distribution"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/math/distributions/binomial.rs",
+      "id": "class:crates/itofin/src/math/distributions/binomial.rs:BinomialDistribution",
+      "lineRange": [
+        32,
+        36
+      ],
+      "name": "BinomialDistribution",
+      "summary": "Binomial distribution computing the PMF via log-factorials and precomputed log-probabilities for numerical stability.",
+      "tags": [
+        "data-model",
+        "statistics",
+        "distribution"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/math/distributions/binomial.rs",
+      "id": "class:crates/itofin/src/math/distributions/binomial.rs:CumulativeBinomialDistribution",
+      "lineRange": [
+        80,
+        83
+      ],
+      "name": "CumulativeBinomialDistribution",
+      "summary": "Cumulative binomial distribution evaluating the CDF through the regularized incomplete beta function.",
+      "tags": [
+        "data-model",
+        "statistics",
+        "distribution"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/math/distributions/chisquare.rs",
+      "id": "file:crates/itofin/src/math/distributions/chisquare.rs",
+      "name": "chisquare.rs",
+      "summary": "Provides the cumulative chi-square distribution as a thin wrapper that delegates to the cumulative gamma distribution at half the degrees of freedom.",
+      "tags": [
+        "data-model",
+        "math",
+        "statistics",
+        "distribution"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/math/distributions/chisquare.rs",
+      "id": "class:crates/itofin/src/math/distributions/chisquare.rs:CumulativeChiSquareDistribution",
+      "lineRange": [
+        18,
+        20
+      ],
+      "name": "CumulativeChiSquareDistribution",
+      "summary": "Cumulative chi-square distribution that reuses a CumulativeGammaDistribution configured with half the degrees of freedom.",
+      "tags": [
+        "data-model",
+        "statistics",
+        "distribution"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/math/distributions/gamma.rs",
+      "id": "file:crates/itofin/src/math/distributions/gamma.rs",
+      "name": "gamma.rs",
+      "summary": "Provides the cumulative gamma distribution, evaluating its CDF through the regularized lower incomplete gamma function with edge-case handling for NaN and infinities.",
+      "tags": [
+        "data-model",
+        "math",
+        "statistics",
+        "distribution"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/math/distributions/gamma.rs",
+      "id": "class:crates/itofin/src/math/distributions/gamma.rs:CumulativeGammaDistribution",
+      "lineRange": [
+        18,
+        20
+      ],
+      "name": "CumulativeGammaDistribution",
+      "summary": "Cumulative gamma distribution evaluating P(a, x) via the regularized incomplete gamma function.",
+      "tags": [
+        "data-model",
+        "statistics",
+        "distribution"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/math/distributions/mod.rs",
+      "id": "file:crates/itofin/src/math/distributions/mod.rs",
+      "languageNotes": "Uses a validated Probability newtype with TryFrom plus trait-based interfaces to express the distribution contract.",
+      "name": "mod.rs",
+      "summary": "Distributions module root that re-exports all distribution types and defines the shared Probability newtype and the Density, Cdf, Quantile, and Support traits forming the common distribution interface.",
+      "tags": [
+        "barrel",
+        "type-definition",
+        "entry-point",
+        "math"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/math/distributions/mod.rs",
+      "id": "class:crates/itofin/src/math/distributions/mod.rs:Probability",
+      "lineRange": [
+        38,
+        56
+      ],
+      "name": "Probability",
+      "summary": "Validated newtype wrapping a probability in [0,1], constructed fallibly via TryFrom to enforce the invariant.",
+      "tags": [
+        "type-definition",
+        "validation",
+        "data-model"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/math/distributions/mod.rs",
+      "id": "class:crates/itofin/src/math/distributions/mod.rs:Density",
+      "lineRange": [
+        60,
+        73
+      ],
+      "name": "Density",
+      "summary": "Trait for probability density functions exposing pdf and a default ln_pdf implementation.",
+      "tags": [
+        "type-definition",
+        "math",
+        "statistics"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/math/distributions/mod.rs",
+      "id": "class:crates/itofin/src/math/distributions/mod.rs:Cdf",
+      "lineRange": [
+        76,
+        88
+      ],
+      "name": "Cdf",
+      "summary": "Trait for cumulative distribution functions exposing cdf and a default survival function.",
+      "tags": [
+        "type-definition",
+        "math",
+        "statistics"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/math/distributions/mod.rs",
+      "id": "class:crates/itofin/src/math/distributions/mod.rs:Quantile",
+      "lineRange": [
+        91,
+        99
+      ],
+      "name": "Quantile",
+      "summary": "Trait for inverse CDF (quantile) functions mapping a Probability back to the random variable's value.",
+      "tags": [
+        "type-definition",
+        "math",
+        "statistics"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/math/distributions/mod.rs",
+      "id": "class:crates/itofin/src/math/distributions/mod.rs:Support",
+      "lineRange": [
+        102,
+        108
+      ],
+      "name": "Support",
+      "summary": "Trait describing a distribution's support via lower and upper bound accessors.",
+      "tags": [
+        "type-definition",
+        "math",
+        "statistics"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "complex",
+      "filePath": "crates/itofin/src/math/distributions/normal.rs",
+      "id": "file:crates/itofin/src/math/distributions/normal.rs",
+      "languageNotes": "The inverse CDF splits a rational central approximation from a tail expansion, the classic Acklam/Moro algorithm.",
+      "name": "normal.rs",
+      "summary": "Implements the Gaussian family: the normal density, the cumulative normal via the error function, and the Beasley-Springer-Moro inverse cumulative normal used pervasively in option pricing.",
+      "tags": [
+        "data-model",
+        "math",
+        "statistics",
+        "distribution"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/math/distributions/normal.rs",
+      "id": "class:crates/itofin/src/math/distributions/normal.rs:NormalDistribution",
+      "lineRange": [
+        24,
+        29
+      ],
+      "name": "NormalDistribution",
+      "summary": "Gaussian probability density function with precomputed normalization factors and a standard-normal constructor.",
+      "tags": [
+        "data-model",
+        "statistics",
+        "distribution"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/math/distributions/normal.rs",
+      "id": "class:crates/itofin/src/math/distributions/normal.rs:CumulativeNormalDistribution",
+      "lineRange": [
+        83,
+        87
+      ],
+      "name": "CumulativeNormalDistribution",
+      "summary": "Cumulative normal distribution computing the CDF from the error function with a high-accuracy correction term, plus its density as derivative.",
+      "tags": [
+        "data-model",
+        "statistics",
+        "distribution"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/math/distributions/normal.rs",
+      "id": "class:crates/itofin/src/math/distributions/normal.rs:InverseCumulativeNormal",
+      "lineRange": [
+        176,
+        179
+      ],
+      "name": "InverseCumulativeNormal",
+      "summary": "Inverse cumulative normal (quantile) using a rational central region approximation and a logarithmic tail expansion.",
+      "tags": [
+        "data-model",
+        "numerical-methods",
+        "distribution"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "complex",
+      "filePath": "crates/itofin/src/math/distributions/poisson.rs",
+      "id": "file:crates/itofin/src/math/distributions/poisson.rs",
+      "languageNotes": "Recurrence paths guard against floating-point underflow for large means, returning errors rather than silently producing zeros.",
+      "name": "poisson.rs",
+      "summary": "Implements the Poisson family: the PMF in log-space, the cumulative distribution via a stable recurrence, and the inverse cumulative (quantile) searching upward from the mass at zero.",
+      "tags": [
+        "data-model",
+        "math",
+        "statistics",
+        "distribution"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/math/distributions/poisson.rs",
+      "id": "class:crates/itofin/src/math/distributions/poisson.rs:PoissonDistribution",
+      "lineRange": [
+        29,
+        32
+      ],
+      "name": "PoissonDistribution",
+      "summary": "Poisson distribution computing the PMF in log-space with a precomputed log-mean.",
+      "tags": [
+        "data-model",
+        "statistics",
+        "distribution"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/math/distributions/poisson.rs",
+      "id": "class:crates/itofin/src/math/distributions/poisson.rs:CumulativePoissonDistribution",
+      "lineRange": [
+        65,
+        67
+      ],
+      "name": "CumulativePoissonDistribution",
+      "summary": "Cumulative Poisson distribution accumulating the PMF through a numerically stable recurrence.",
+      "tags": [
+        "data-model",
+        "statistics",
+        "distribution"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/math/distributions/poisson.rs",
+      "id": "class:crates/itofin/src/math/distributions/poisson.rs:InverseCumulativePoisson",
+      "lineRange": [
+        105,
+        107
+      ],
+      "name": "InverseCumulativePoisson",
+      "summary": "Inverse cumulative Poisson (quantile) walking up the mass function until the target probability is reached.",
+      "tags": [
+        "data-model",
+        "numerical-methods",
+        "distribution"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "complex",
+      "filePath": "crates/itofin/src/math/distributions/studentt.rs",
+      "id": "file:crates/itofin/src/math/distributions/studentt.rs",
+      "languageNotes": "Quantile uses Newton iteration over the CDF/PDF pair with support-bound clamping at the probability endpoints.",
+      "name": "studentt.rs",
+      "summary": "Implements the Student-t distribution with density, CDF via the incomplete beta function, survival, support bounds, and a Newton-based quantile solver.",
+      "tags": [
+        "data-model",
+        "math",
+        "statistics",
+        "distribution"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "complex",
+      "filePath": "crates/itofin/src/math/distributions/studentt.rs",
+      "id": "class:crates/itofin/src/math/distributions/studentt.rs:StudentT",
+      "lineRange": [
+        27,
+        31
+      ],
+      "name": "StudentT",
+      "summary": "Student-t distribution providing pdf, ln_pdf, cdf, survival, support bounds, and a quantile solver, parameterized by degrees of freedom with a cached log-normalization constant.",
+      "tags": [
+        "data-model",
+        "statistics",
+        "distribution"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/math/errorfunction.rs",
+      "id": "file:crates/itofin/src/math/errorfunction.rs",
+      "languageNotes": "Uses region-dependent rational approximations with hardcoded coefficient tables for full double precision.",
+      "name": "errorfunction.rs",
+      "summary": "Implements the Gauss error function erf(x) using a piecewise rational/polynomial approximation, the numerical foundation for the cumulative normal distribution.",
+      "tags": [
+        "special-functions",
+        "numerical-methods",
+        "math",
+        "utility"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/math/errorfunction.rs",
+      "id": "function:crates/itofin/src/math/errorfunction.rs:erf",
+      "lineRange": [
+        85,
+        141
+      ],
+      "name": "erf",
+      "summary": "Computes the error function erf(x) with NaN/infinity handling and piecewise rational approximations across magnitude regions.",
+      "tags": [
+        "special-functions",
+        "numerical-methods",
+        "math"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/math/gammafunction.rs",
+      "id": "file:crates/itofin/src/math/gammafunction.rs",
+      "languageNotes": "Lanczos series with a fixed coefficient table; gamma applies the reflection formula for x < 1.",
+      "name": "gammafunction.rs",
+      "summary": "Implements the log-gamma function via the Lanczos approximation and the gamma function with reflection for negative arguments, the backbone of the beta and incomplete-gamma routines.",
+      "tags": [
+        "special-functions",
+        "numerical-methods",
+        "math",
+        "utility"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/math/gammafunction.rs",
+      "id": "function:crates/itofin/src/math/gammafunction.rs:log_gamma",
+      "lineRange": [
+        52,
+        66
+      ],
+      "name": "log_gamma",
+      "summary": "Computes ln(Gamma(x)) for x >= 1 using the Lanczos approximation, validating finiteness of the input.",
+      "tags": [
+        "special-functions",
+        "numerical-methods",
+        "math"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/math/gammafunction.rs",
+      "id": "function:crates/itofin/src/math/gammafunction.rs:gamma",
+      "lineRange": [
+        90,
+        109
+      ],
+      "name": "gamma",
+      "summary": "Computes Gamma(x) by exponentiating log_gamma, applying the reflection formula for arguments below one.",
+      "tags": [
+        "special-functions",
+        "numerical-methods",
+        "math"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/math/incompletegamma.rs",
+      "id": "file:crates/itofin/src/math/incompletegamma.rs",
+      "languageNotes": "Chooses series vs continued-fraction representation by comparing x against a+1 for optimal convergence.",
+      "name": "incompletegamma.rs",
+      "summary": "Implements the regularized lower incomplete gamma function P(a,x), dispatching between a series expansion and a continued fraction, powering the gamma and chi-square CDFs.",
+      "tags": [
+        "special-functions",
+        "numerical-methods",
+        "math"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/math/incompletegamma.rs",
+      "id": "function:crates/itofin/src/math/incompletegamma.rs:incomplete_gamma",
+      "lineRange": [
+        37,
+        53
+      ],
+      "name": "incomplete_gamma",
+      "summary": "Computes the regularized lower incomplete gamma P(a,x), validating inputs and selecting the series or continued-fraction representation.",
+      "tags": [
+        "special-functions",
+        "numerical-methods",
+        "validation"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/math/incompletegamma.rs",
+      "id": "function:crates/itofin/src/math/incompletegamma.rs:series_repr",
+      "lineRange": [
+        56,
+        73
+      ],
+      "name": "series_repr",
+      "summary": "Evaluates the incomplete gamma function via its convergent power series, best for x < a+1.",
+      "tags": [
+        "numerical-methods",
+        "special-functions",
+        "math"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/math/incompletegamma.rs",
+      "id": "function:crates/itofin/src/math/incompletegamma.rs:continued_fraction_repr",
+      "lineRange": [
+        77,
+        103
+      ],
+      "name": "continued_fraction_repr",
+      "summary": "Evaluates the incomplete gamma function via the Lentz continued fraction, best for x >= a+1.",
+      "tags": [
+        "numerical-methods",
+        "special-functions",
+        "math"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/types.rs",
+      "id": "file:crates/itofin/src/types.rs",
+      "name": "types.rs",
+      "summary": "Defines the crate's fundamental scalar type aliases (Real, Size, Integer, Time, and related) that mirror QuantLib's typedefs and keep the numeric vocabulary consistent across the library.",
+      "tags": [
+        "type-definition",
+        "core",
+        "utility"
+      ],
+      "type": "file"
+    }
+  ]
+}

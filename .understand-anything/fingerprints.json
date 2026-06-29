@@ -1,0 +1,3090 @@
+{
+  "files": {
+    ".dockerignore": {
+      "classes": [],
+      "contentHash": "64263feac7b00952e9ec3b6c1fd11316faa58ff673c6bd085fac9f6f8d8389f6",
+      "exports": [],
+      "filePath": ".dockerignore",
+      "functions": [],
+      "hasStructuralAnalysis": false,
+      "imports": [],
+      "totalLines": 2
+    },
+    ".github/copilot-instructions.md": {
+      "classes": [],
+      "contentHash": "972dffd6fe81cbbcd97633cc2bc9d1341706dfba18f5f5d6fdf96395a4757795",
+      "exports": [],
+      "filePath": ".github/copilot-instructions.md",
+      "functions": [],
+      "hasStructuralAnalysis": true,
+      "imports": [],
+      "totalLines": 135
+    },
+    ".github/images/README.md": {
+      "classes": [],
+      "contentHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exports": [],
+      "filePath": ".github/images/README.md",
+      "functions": [],
+      "hasStructuralAnalysis": true,
+      "imports": [],
+      "totalLines": 1
+    },
+    ".github/images/prek/Dockerfile": {
+      "classes": [],
+      "contentHash": "5f76c632d0faa45feced3eae718ceef806eea4e84f3bf00e7eedd32b0bab4ec9",
+      "exports": [],
+      "filePath": ".github/images/prek/Dockerfile",
+      "functions": [],
+      "hasStructuralAnalysis": true,
+      "imports": [],
+      "totalLines": 12
+    },
+    ".github/images/prek/build.sh": {
+      "classes": [],
+      "contentHash": "b7a5d71cc1bb3cf4bd513762061600e0f067044d73dee2f9c0c03185eef99bf0",
+      "exports": [],
+      "filePath": ".github/images/prek/build.sh",
+      "functions": [],
+      "hasStructuralAnalysis": true,
+      "imports": [],
+      "totalLines": 10
+    },
+    ".github/labeler.yml": {
+      "classes": [],
+      "contentHash": "ba0301fa466636cc5318674f068545483ecf9aad5eb4406c438780d7877cc3f0",
+      "exports": [],
+      "filePath": ".github/labeler.yml",
+      "functions": [],
+      "hasStructuralAnalysis": true,
+      "imports": [],
+      "totalLines": 29
+    },
+    ".github/workflows/pull-request.yml": {
+      "classes": [],
+      "contentHash": "b7f3eb2feaec996e4ad9a357e859fa0c4218ca62611babda5635fb22ae81e96f",
+      "exports": [],
+      "filePath": ".github/workflows/pull-request.yml",
+      "functions": [],
+      "hasStructuralAnalysis": true,
+      "imports": [],
+      "totalLines": 43
+    },
+    ".github/workflows/semantic-release.yml": {
+      "classes": [],
+      "contentHash": "4e49d77051b1ce48e2cdcaa726deede89fc3db4fd5bafe1043815d523f159481",
+      "exports": [],
+      "filePath": ".github/workflows/semantic-release.yml",
+      "functions": [],
+      "hasStructuralAnalysis": true,
+      "imports": [],
+      "totalLines": 29
+    },
+    ".pre-commit-config.yaml": {
+      "classes": [],
+      "contentHash": "b6e42e91d35e08505f96acdb730a27ff408bd38e3078e2b7d590db735d45ecf1",
+      "exports": [],
+      "filePath": ".pre-commit-config.yaml",
+      "functions": [],
+      "hasStructuralAnalysis": true,
+      "imports": [],
+      "totalLines": 40
+    },
+    ".releaserc.json": {
+      "classes": [],
+      "contentHash": "e44ca4ead06f67a5b184ddaf80951413c8f7952d2473bf3bc1d1f29850ca2744",
+      "exports": [],
+      "filePath": ".releaserc.json",
+      "functions": [],
+      "hasStructuralAnalysis": true,
+      "imports": [],
+      "totalLines": 147
+    },
+    "Cargo.toml": {
+      "classes": [],
+      "contentHash": "45dbab4528e468c2fac85170dacec1534ad3671da8328105a784de543fb83e8b",
+      "exports": [],
+      "filePath": "Cargo.toml",
+      "functions": [],
+      "hasStructuralAnalysis": true,
+      "imports": [],
+      "totalLines": 8
+    },
+    "README.md": {
+      "classes": [],
+      "contentHash": "92a973661e94b9d8f5bbbf4c10aebc27b8f212f3eb7f23fee69a34663979f9e4",
+      "exports": [],
+      "filePath": "README.md",
+      "functions": [],
+      "hasStructuralAnalysis": true,
+      "imports": [],
+      "totalLines": 125
+    },
+    "TICKETS.md": {
+      "classes": [],
+      "contentHash": "b4808615bbdfbd972757692db9509eab40bed1d047e441ede42036bdb38d38d7",
+      "exports": [],
+      "filePath": "TICKETS.md",
+      "functions": [],
+      "hasStructuralAnalysis": true,
+      "imports": [],
+      "totalLines": 220
+    },
+    "crates/itofin/Cargo.toml": {
+      "classes": [],
+      "contentHash": "2ba3952fcbb1a057c7d1e19590a9d68e6d33bf339026cf0a62dc09750ff4346a",
+      "exports": [],
+      "filePath": "crates/itofin/Cargo.toml",
+      "functions": [],
+      "hasStructuralAnalysis": true,
+      "imports": [],
+      "totalLines": 11
+    },
+    "crates/itofin/src/errors.rs": {
+      "classes": [
+        {
+          "exported": true,
+          "lineCount": 5,
+          "methods": [
+            "new",
+            "message"
+          ],
+          "name": "QlError",
+          "properties": [
+            "message",
+            "file",
+            "line"
+          ]
+        }
+      ],
+      "contentHash": "097951b34fa6e06a8083a32a5b9bb40c5808c08d4c28d9f5647370cc0d31643c",
+      "exports": [
+        "QlError",
+        "new",
+        "message"
+      ],
+      "filePath": "crates/itofin/src/errors.rs",
+      "functions": [
+        {
+          "exported": true,
+          "lineCount": 7,
+          "name": "new",
+          "params": [
+            "message",
+            "file",
+            "line"
+          ],
+          "returnType": "Self"
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "message",
+          "params": [],
+          "returnType": "&str"
+        }
+      ],
+      "hasStructuralAnalysis": true,
+      "imports": [
+        {
+          "source": "thiserror",
+          "specifiers": [
+            "Error"
+          ]
+        }
+      ],
+      "totalLines": 135
+    },
+    "crates/itofin/src/handle.rs": {
+      "classes": [
+        {
+          "exported": true,
+          "lineCount": 4,
+          "methods": [],
+          "name": "Link",
+          "properties": [
+            "current",
+            "observable"
+          ]
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "methods": [],
+          "name": "Handle",
+          "properties": [
+            "link"
+          ]
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "methods": [],
+          "name": "RelinkableHandle",
+          "properties": [
+            "handle"
+          ]
+        }
+      ],
+      "contentHash": "abcf55befab06a27d22282b973fe0c4ec1f2590986301dc66190a5936c12fdb0",
+      "exports": [
+        "Link",
+        "Handle",
+        "empty",
+        "new",
+        "current_link",
+        "is_empty",
+        "register_observer",
+        "points_to_same_link",
+        "RelinkableHandle",
+        "empty",
+        "new",
+        "link_to",
+        "reset",
+        "handle"
+      ],
+      "filePath": "crates/itofin/src/handle.rs",
+      "functions": [
+        {
+          "exported": true,
+          "lineCount": 6,
+          "name": "new",
+          "params": [
+            "pointee"
+          ],
+          "returnType": "Self"
+        },
+        {
+          "exported": true,
+          "lineCount": 4,
+          "name": "link_to",
+          "params": [
+            "pointee"
+          ],
+          "returnType": "Shared<Observable>"
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "is_empty",
+          "params": [],
+          "returnType": "bool"
+        },
+        {
+          "exported": true,
+          "lineCount": 5,
+          "name": "empty",
+          "params": [],
+          "returnType": "Self"
+        },
+        {
+          "exported": true,
+          "lineCount": 5,
+          "name": "new",
+          "params": [
+            "pointee"
+          ],
+          "returnType": "Self"
+        },
+        {
+          "exported": true,
+          "lineCount": 4,
+          "name": "current_link",
+          "params": [],
+          "returnType": "QlResult<Shared<T>>"
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "is_empty",
+          "params": [],
+          "returnType": "bool"
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "register_observer",
+          "params": [
+            "observer"
+          ],
+          "returnType": "bool"
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "points_to_same_link",
+          "params": [
+            "other"
+          ],
+          "returnType": "bool"
+        },
+        {
+          "exported": false,
+          "lineCount": 5,
+          "name": "clone",
+          "params": [],
+          "returnType": "Self"
+        },
+        {
+          "exported": true,
+          "lineCount": 5,
+          "name": "empty",
+          "params": [],
+          "returnType": "Self"
+        },
+        {
+          "exported": true,
+          "lineCount": 5,
+          "name": "new",
+          "params": [
+            "pointee"
+          ],
+          "returnType": "Self"
+        },
+        {
+          "exported": true,
+          "lineCount": 4,
+          "name": "link_to",
+          "params": [
+            "pointee"
+          ]
+        },
+        {
+          "exported": true,
+          "lineCount": 4,
+          "name": "reset",
+          "params": []
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "handle",
+          "params": [],
+          "returnType": "Handle<T>"
+        }
+      ],
+      "hasStructuralAnalysis": true,
+      "imports": [
+        {
+          "source": "crate::errors",
+          "specifiers": [
+            "QlResult"
+          ]
+        },
+        {
+          "source": "crate::patterns::observable",
+          "specifiers": [
+            "Observable",
+            "Observer"
+          ]
+        },
+        {
+          "source": "crate",
+          "specifiers": [
+            "require"
+          ]
+        },
+        {
+          "source": "crate::shared",
+          "specifiers": [
+            "Shared",
+            "SharedMut",
+            "shared_mut"
+          ]
+        }
+      ],
+      "totalLines": 236
+    },
+    "crates/itofin/src/lib.rs": {
+      "classes": [],
+      "contentHash": "1f28efab00cd1d57a8613411f7da6e1c6ec627274404fdd7e67efc2da15f0c67",
+      "exports": [],
+      "filePath": "crates/itofin/src/lib.rs",
+      "functions": [],
+      "hasStructuralAnalysis": true,
+      "imports": [],
+      "totalLines": 14
+    },
+    "crates/itofin/src/math/array.rs": {
+      "classes": [
+        {
+          "exported": true,
+          "lineCount": 3,
+          "methods": [
+            "new",
+            "with_size",
+            "filled",
+            "incremental",
+            "size",
+            "is_empty",
+            "resize",
+            "dot",
+            "norm2",
+            "abs",
+            "sqrt",
+            "log",
+            "exp",
+            "pow",
+            "map",
+            "deref",
+            "deref_mut",
+            "index",
+            "index_mut",
+            "from",
+            "from",
+            "from_iter"
+          ],
+          "name": "Array",
+          "properties": [
+            "data"
+          ]
+        }
+      ],
+      "contentHash": "e7cc490a69fa22b89787fe8eac7010f389343e29cb59b8999d72fcc86b6ea04c",
+      "exports": [
+        "Array",
+        "new",
+        "with_size",
+        "filled",
+        "incremental",
+        "size",
+        "is_empty",
+        "resize",
+        "dot",
+        "norm2",
+        "abs",
+        "sqrt",
+        "log",
+        "exp",
+        "pow"
+      ],
+      "filePath": "crates/itofin/src/math/array.rs",
+      "functions": [
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "new",
+          "params": [],
+          "returnType": "Self"
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "with_size",
+          "params": [
+            "n"
+          ],
+          "returnType": "Self"
+        },
+        {
+          "exported": true,
+          "lineCount": 5,
+          "name": "filled",
+          "params": [
+            "n",
+            "value"
+          ],
+          "returnType": "Self"
+        },
+        {
+          "exported": true,
+          "lineCount": 5,
+          "name": "incremental",
+          "params": [
+            "n",
+            "value",
+            "increment"
+          ],
+          "returnType": "Self"
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "size",
+          "params": [],
+          "returnType": "Size"
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "is_empty",
+          "params": [],
+          "returnType": "bool"
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "resize",
+          "params": [
+            "n"
+          ]
+        },
+        {
+          "exported": true,
+          "lineCount": 4,
+          "name": "dot",
+          "params": [
+            "other"
+          ],
+          "returnType": "Real"
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "norm2",
+          "params": [],
+          "returnType": "Real"
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "abs",
+          "params": [],
+          "returnType": "Array"
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "sqrt",
+          "params": [],
+          "returnType": "Array"
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "log",
+          "params": [],
+          "returnType": "Array"
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "exp",
+          "params": [],
+          "returnType": "Array"
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "pow",
+          "params": [
+            "exponent"
+          ],
+          "returnType": "Array"
+        },
+        {
+          "exported": false,
+          "lineCount": 5,
+          "name": "map",
+          "params": [
+            "f"
+          ],
+          "returnType": "Array"
+        },
+        {
+          "exported": false,
+          "lineCount": 3,
+          "name": "deref",
+          "params": [],
+          "returnType": "&[Real]"
+        },
+        {
+          "exported": false,
+          "lineCount": 3,
+          "name": "deref_mut",
+          "params": [],
+          "returnType": "&mut [Real]"
+        },
+        {
+          "exported": false,
+          "lineCount": 3,
+          "name": "index",
+          "params": [
+            "i"
+          ],
+          "returnType": "&Real"
+        },
+        {
+          "exported": false,
+          "lineCount": 3,
+          "name": "index_mut",
+          "params": [
+            "i"
+          ],
+          "returnType": "&mut Real"
+        },
+        {
+          "exported": false,
+          "lineCount": 3,
+          "name": "from",
+          "params": [
+            "data"
+          ],
+          "returnType": "Self"
+        },
+        {
+          "exported": false,
+          "lineCount": 5,
+          "name": "from",
+          "params": [
+            "values"
+          ],
+          "returnType": "Self"
+        },
+        {
+          "exported": false,
+          "lineCount": 5,
+          "name": "from_iter",
+          "params": [
+            "iter"
+          ],
+          "returnType": "Self"
+        },
+        {
+          "exported": false,
+          "lineCount": 3,
+          "name": "neg",
+          "params": [],
+          "returnType": "Array"
+        }
+      ],
+      "hasStructuralAnalysis": true,
+      "imports": [
+        {
+          "source": "std::ops",
+          "specifiers": [
+            "Add",
+            "Deref",
+            "DerefMut",
+            "Div",
+            "Index",
+            "IndexMut",
+            "Mul",
+            "Neg",
+            "Sub"
+          ]
+        },
+        {
+          "source": "crate::types",
+          "specifiers": [
+            "Real",
+            "Size"
+          ]
+        }
+      ],
+      "totalLines": 290
+    },
+    "crates/itofin/src/math/beta.rs": {
+      "classes": [],
+      "contentHash": "29e1f29360d419d7a8c52ccac3b97fc6747cf781c2b246d65e1818f50710cde7",
+      "exports": [
+        "beta_function",
+        "incomplete_beta"
+      ],
+      "filePath": "crates/itofin/src/math/beta.rs",
+      "functions": [
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "beta_function",
+          "params": [
+            "z",
+            "w"
+          ],
+          "returnType": "QlResult<Real>"
+        },
+        {
+          "exported": true,
+          "lineCount": 31,
+          "name": "incomplete_beta",
+          "params": [
+            "a",
+            "b",
+            "x"
+          ],
+          "returnType": "QlResult<Real>"
+        },
+        {
+          "exported": false,
+          "lineCount": 49,
+          "name": "beta_continued_fraction",
+          "params": [
+            "a",
+            "b",
+            "x"
+          ],
+          "returnType": "QlResult<Real>"
+        }
+      ],
+      "hasStructuralAnalysis": true,
+      "imports": [
+        {
+          "source": "crate::errors",
+          "specifiers": [
+            "QlResult"
+          ]
+        },
+        {
+          "source": "crate",
+          "specifiers": [
+            "fail"
+          ]
+        },
+        {
+          "source": "crate::math::gammafunction",
+          "specifiers": [
+            "log_gamma"
+          ]
+        },
+        {
+          "source": "crate::types",
+          "specifiers": [
+            "Real"
+          ]
+        }
+      ],
+      "totalLines": 206
+    },
+    "crates/itofin/src/math/distributions/binomial.rs": {
+      "classes": [
+        {
+          "exported": true,
+          "lineCount": 5,
+          "methods": [
+            "new",
+            "pmf"
+          ],
+          "name": "BinomialDistribution",
+          "properties": [
+            "n",
+            "log_p",
+            "log_one_minus_p"
+          ]
+        },
+        {
+          "exported": true,
+          "lineCount": 4,
+          "methods": [
+            "new",
+            "cdf"
+          ],
+          "name": "CumulativeBinomialDistribution",
+          "properties": [
+            "n",
+            "p"
+          ]
+        }
+      ],
+      "contentHash": "59c49ec9d832de9d7b05161b084c4910df5458aa20c66e877250ef209b497e60",
+      "exports": [
+        "BinomialDistribution",
+        "new",
+        "pmf",
+        "CumulativeBinomialDistribution",
+        "new",
+        "cdf"
+      ],
+      "filePath": "crates/itofin/src/math/distributions/binomial.rs",
+      "functions": [
+        {
+          "exported": false,
+          "lineCount": 3,
+          "name": "ln_factorial",
+          "params": [
+            "m"
+          ],
+          "returnType": "Real"
+        },
+        {
+          "exported": false,
+          "lineCount": 3,
+          "name": "ln_binomial_coefficient",
+          "params": [
+            "n",
+            "k"
+          ],
+          "returnType": "Real"
+        },
+        {
+          "exported": true,
+          "lineCount": 13,
+          "name": "new",
+          "params": [
+            "p",
+            "n"
+          ],
+          "returnType": "QlResult<Self>"
+        },
+        {
+          "exported": true,
+          "lineCount": 17,
+          "name": "pmf",
+          "params": [
+            "k"
+          ],
+          "returnType": "Real"
+        },
+        {
+          "exported": true,
+          "lineCount": 7,
+          "name": "new",
+          "params": [
+            "p",
+            "n"
+          ],
+          "returnType": "QlResult<Self>"
+        },
+        {
+          "exported": true,
+          "lineCount": 10,
+          "name": "cdf",
+          "params": [
+            "k"
+          ],
+          "returnType": "Real"
+        }
+      ],
+      "hasStructuralAnalysis": true,
+      "imports": [
+        {
+          "source": "crate::errors",
+          "specifiers": [
+            "QlResult"
+          ]
+        },
+        {
+          "source": "crate::math::beta",
+          "specifiers": [
+            "incomplete_beta"
+          ]
+        },
+        {
+          "source": "crate",
+          "specifiers": [
+            "require"
+          ]
+        },
+        {
+          "source": "crate::types",
+          "specifiers": [
+            "Real"
+          ]
+        }
+      ],
+      "totalLines": 215
+    },
+    "crates/itofin/src/math/distributions/chisquare.rs": {
+      "classes": [
+        {
+          "exported": true,
+          "lineCount": 3,
+          "methods": [
+            "new",
+            "cdf"
+          ],
+          "name": "CumulativeChiSquareDistribution",
+          "properties": [
+            "gamma"
+          ]
+        }
+      ],
+      "contentHash": "b79328b0818ce9b75b39d207650cde654347c69d1cf7e60913ab416df0c65724",
+      "exports": [
+        "CumulativeChiSquareDistribution",
+        "new"
+      ],
+      "filePath": "crates/itofin/src/math/distributions/chisquare.rs",
+      "functions": [
+        {
+          "exported": true,
+          "lineCount": 9,
+          "name": "new",
+          "params": [
+            "df"
+          ],
+          "returnType": "QlResult<Self>"
+        },
+        {
+          "exported": false,
+          "lineCount": 4,
+          "name": "cdf",
+          "params": [
+            "x"
+          ],
+          "returnType": "Real"
+        }
+      ],
+      "hasStructuralAnalysis": true,
+      "imports": [
+        {
+          "source": "super",
+          "specifiers": [
+            "Cdf"
+          ]
+        },
+        {
+          "source": "super::gamma",
+          "specifiers": [
+            "CumulativeGammaDistribution"
+          ]
+        },
+        {
+          "source": "crate::errors",
+          "specifiers": [
+            "QlResult"
+          ]
+        },
+        {
+          "source": "crate",
+          "specifiers": [
+            "require"
+          ]
+        },
+        {
+          "source": "crate::types",
+          "specifiers": [
+            "Real"
+          ]
+        }
+      ],
+      "totalLines": 124
+    },
+    "crates/itofin/src/math/distributions/gamma.rs": {
+      "classes": [
+        {
+          "exported": true,
+          "lineCount": 3,
+          "methods": [
+            "new",
+            "cdf"
+          ],
+          "name": "CumulativeGammaDistribution",
+          "properties": [
+            "a"
+          ]
+        }
+      ],
+      "contentHash": "0a8bde2e97cb92d2fd95e0be7e528c4ae9d8a2b42578863937e5ca3b732efeb2",
+      "exports": [
+        "CumulativeGammaDistribution",
+        "new"
+      ],
+      "filePath": "crates/itofin/src/math/distributions/gamma.rs",
+      "functions": [
+        {
+          "exported": true,
+          "lineCount": 7,
+          "name": "new",
+          "params": [
+            "a"
+          ],
+          "returnType": "QlResult<Self>"
+        },
+        {
+          "exported": false,
+          "lineCount": 19,
+          "name": "cdf",
+          "params": [
+            "x"
+          ],
+          "returnType": "Real"
+        }
+      ],
+      "hasStructuralAnalysis": true,
+      "imports": [
+        {
+          "source": "super",
+          "specifiers": [
+            "Cdf"
+          ]
+        },
+        {
+          "source": "crate::errors",
+          "specifiers": [
+            "QlResult"
+          ]
+        },
+        {
+          "source": "crate::math::incompletegamma",
+          "specifiers": [
+            "incomplete_gamma"
+          ]
+        },
+        {
+          "source": "crate",
+          "specifiers": [
+            "require"
+          ]
+        },
+        {
+          "source": "crate::types",
+          "specifiers": [
+            "Real"
+          ]
+        }
+      ],
+      "totalLines": 134
+    },
+    "crates/itofin/src/math/distributions/mod.rs": {
+      "classes": [
+        {
+          "exported": true,
+          "lineCount": 1,
+          "methods": [
+            "value",
+            "try_from"
+          ],
+          "name": "Probability",
+          "properties": []
+        },
+        {
+          "exported": true,
+          "lineCount": 14,
+          "methods": [
+            "pdf",
+            "ln_pdf"
+          ],
+          "name": "Density",
+          "properties": []
+        },
+        {
+          "exported": true,
+          "lineCount": 13,
+          "methods": [
+            "cdf",
+            "survival"
+          ],
+          "name": "Cdf",
+          "properties": []
+        },
+        {
+          "exported": true,
+          "lineCount": 9,
+          "methods": [
+            "quantile"
+          ],
+          "name": "Quantile",
+          "properties": []
+        },
+        {
+          "exported": true,
+          "lineCount": 7,
+          "methods": [
+            "lower_bound",
+            "upper_bound"
+          ],
+          "name": "Support",
+          "properties": []
+        }
+      ],
+      "contentHash": "966af2d8a4d0071ee2d0fc5693f74110298722bfc6b432693019a5f70c9b89c7",
+      "exports": [
+        "Probability",
+        "value",
+        "Density",
+        "Cdf",
+        "Quantile",
+        "Support"
+      ],
+      "filePath": "crates/itofin/src/math/distributions/mod.rs",
+      "functions": [
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "value",
+          "params": [],
+          "returnType": "Real"
+        },
+        {
+          "exported": false,
+          "lineCount": 7,
+          "name": "try_from",
+          "params": [
+            "value"
+          ],
+          "returnType": "QlResult<Self>"
+        }
+      ],
+      "hasStructuralAnalysis": true,
+      "imports": [
+        {
+          "source": "crate::errors",
+          "specifiers": [
+            "QlError",
+            "QlResult"
+          ]
+        },
+        {
+          "source": "crate",
+          "specifiers": [
+            "fail"
+          ]
+        },
+        {
+          "source": "crate::types",
+          "specifiers": [
+            "Real"
+          ]
+        }
+      ],
+      "totalLines": 153
+    },
+    "crates/itofin/src/math/distributions/normal.rs": {
+      "classes": [
+        {
+          "exported": true,
+          "lineCount": 6,
+          "methods": [
+            "new",
+            "standard",
+            "value",
+            "derivative",
+            "default"
+          ],
+          "name": "NormalDistribution",
+          "properties": [
+            "average",
+            "normalization_factor",
+            "denominator",
+            "der_normalization_factor"
+          ]
+        },
+        {
+          "exported": true,
+          "lineCount": 5,
+          "methods": [
+            "new",
+            "standard",
+            "value",
+            "derivative"
+          ],
+          "name": "CumulativeNormalDistribution",
+          "properties": [
+            "average",
+            "sigma",
+            "gaussian"
+          ]
+        },
+        {
+          "exported": true,
+          "lineCount": 4,
+          "methods": [
+            "new",
+            "standard",
+            "value",
+            "standard_value",
+            "tail_value"
+          ],
+          "name": "InverseCumulativeNormal",
+          "properties": [
+            "average",
+            "sigma"
+          ]
+        }
+      ],
+      "contentHash": "3c5f47e0c36a23798b6349de7495a31cf80a7390b63c86890ff743621bc70b4f",
+      "exports": [
+        "NormalDistribution",
+        "new",
+        "standard",
+        "value",
+        "derivative",
+        "CumulativeNormalDistribution",
+        "new",
+        "standard",
+        "value",
+        "derivative",
+        "InverseCumulativeNormal",
+        "new",
+        "standard",
+        "value",
+        "standard_value"
+      ],
+      "filePath": "crates/itofin/src/math/distributions/normal.rs",
+      "functions": [
+        {
+          "exported": true,
+          "lineCount": 13,
+          "name": "new",
+          "params": [
+            "average",
+            "sigma"
+          ],
+          "returnType": "QlResult<Self>"
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "standard",
+          "params": [],
+          "returnType": "Self"
+        },
+        {
+          "exported": true,
+          "lineCount": 10,
+          "name": "value",
+          "params": [
+            "x"
+          ],
+          "returnType": "Real"
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "derivative",
+          "params": [
+            "x"
+          ],
+          "returnType": "Real"
+        },
+        {
+          "exported": false,
+          "lineCount": 3,
+          "name": "default",
+          "params": [],
+          "returnType": "Self"
+        },
+        {
+          "exported": true,
+          "lineCount": 10,
+          "name": "new",
+          "params": [
+            "average",
+            "sigma"
+          ],
+          "returnType": "QlResult<Self>"
+        },
+        {
+          "exported": true,
+          "lineCount": 7,
+          "name": "standard",
+          "params": [],
+          "returnType": "Self"
+        },
+        {
+          "exported": true,
+          "lineCount": 29,
+          "name": "value",
+          "params": [
+            "x"
+          ],
+          "returnType": "Real"
+        },
+        {
+          "exported": true,
+          "lineCount": 4,
+          "name": "derivative",
+          "params": [
+            "x"
+          ],
+          "returnType": "Real"
+        },
+        {
+          "exported": true,
+          "lineCount": 6,
+          "name": "new",
+          "params": [
+            "average",
+            "sigma"
+          ],
+          "returnType": "QlResult<Self>"
+        },
+        {
+          "exported": true,
+          "lineCount": 6,
+          "name": "standard",
+          "params": [],
+          "returnType": "Self"
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "value",
+          "params": [
+            "x"
+          ],
+          "returnType": "QlResult<Real>"
+        },
+        {
+          "exported": true,
+          "lineCount": 12,
+          "name": "standard_value",
+          "params": [
+            "x"
+          ],
+          "returnType": "QlResult<Real>"
+        },
+        {
+          "exported": false,
+          "lineCount": 21,
+          "name": "tail_value",
+          "params": [
+            "x"
+          ],
+          "returnType": "QlResult<Real>"
+        }
+      ],
+      "hasStructuralAnalysis": true,
+      "imports": [
+        {
+          "source": "crate::errors",
+          "specifiers": [
+            "QlResult"
+          ]
+        },
+        {
+          "source": "crate",
+          "specifiers": [
+            "fail"
+          ]
+        },
+        {
+          "source": "crate::math::errorfunction",
+          "specifiers": [
+            "erf"
+          ]
+        },
+        {
+          "source": "crate::types",
+          "specifiers": [
+            "Real"
+          ]
+        }
+      ],
+      "totalLines": 333
+    },
+    "crates/itofin/src/math/distributions/poisson.rs": {
+      "classes": [
+        {
+          "exported": true,
+          "lineCount": 4,
+          "methods": [
+            "new",
+            "pmf"
+          ],
+          "name": "PoissonDistribution",
+          "properties": [
+            "mu",
+            "log_mu"
+          ]
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "methods": [
+            "new",
+            "cdf"
+          ],
+          "name": "CumulativePoissonDistribution",
+          "properties": [
+            "mu"
+          ]
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "methods": [
+            "new",
+            "quantile"
+          ],
+          "name": "InverseCumulativePoisson",
+          "properties": [
+            "lambda"
+          ]
+        }
+      ],
+      "contentHash": "7f8ecda9b24fdc1dd4815a9c61b253c84697019d70d5d16fde455ba7eadbbb18",
+      "exports": [
+        "PoissonDistribution",
+        "new",
+        "pmf",
+        "CumulativePoissonDistribution",
+        "new",
+        "cdf",
+        "InverseCumulativePoisson",
+        "new"
+      ],
+      "filePath": "crates/itofin/src/math/distributions/poisson.rs",
+      "functions": [
+        {
+          "exported": true,
+          "lineCount": 8,
+          "name": "new",
+          "params": [
+            "mu"
+          ],
+          "returnType": "QlResult<Self>"
+        },
+        {
+          "exported": true,
+          "lineCount": 11,
+          "name": "pmf",
+          "params": [
+            "k"
+          ],
+          "returnType": "Real"
+        },
+        {
+          "exported": true,
+          "lineCount": 10,
+          "name": "new",
+          "params": [
+            "mu"
+          ],
+          "returnType": "QlResult<Self>"
+        },
+        {
+          "exported": true,
+          "lineCount": 11,
+          "name": "cdf",
+          "params": [
+            "k"
+          ],
+          "returnType": "Real"
+        },
+        {
+          "exported": true,
+          "lineCount": 12,
+          "name": "new",
+          "params": [
+            "lambda"
+          ],
+          "returnType": "QlResult<Self>"
+        },
+        {
+          "exported": false,
+          "lineCount": 30,
+          "name": "quantile",
+          "params": [
+            "p"
+          ],
+          "returnType": "QlResult<Real>"
+        }
+      ],
+      "hasStructuralAnalysis": true,
+      "imports": [
+        {
+          "source": "super",
+          "specifiers": [
+            "Probability",
+            "Quantile"
+          ]
+        },
+        {
+          "source": "crate::errors",
+          "specifiers": [
+            "QlResult"
+          ]
+        },
+        {
+          "source": "crate::types",
+          "specifiers": [
+            "Real"
+          ]
+        },
+        {
+          "source": "crate",
+          "specifiers": [
+            "fail",
+            "require"
+          ]
+        }
+      ],
+      "totalLines": 308
+    },
+    "crates/itofin/src/math/distributions/studentt.rs": {
+      "classes": [
+        {
+          "exported": true,
+          "lineCount": 5,
+          "methods": [
+            "new",
+            "pdf",
+            "ln_pdf",
+            "cdf",
+            "survival",
+            "lower_bound",
+            "upper_bound",
+            "quantile"
+          ],
+          "name": "StudentT",
+          "properties": [
+            "degrees_of_freedom",
+            "ln_normalization"
+          ]
+        }
+      ],
+      "contentHash": "2d866a939f3c108bb073a8bbeb67b9137c00a279cc77a89c593228258a40bba8",
+      "exports": [
+        "StudentT",
+        "new"
+      ],
+      "filePath": "crates/itofin/src/math/distributions/studentt.rs",
+      "functions": [
+        {
+          "exported": true,
+          "lineCount": 16,
+          "name": "new",
+          "params": [
+            "degrees_of_freedom"
+          ],
+          "returnType": "QlResult<Self>"
+        },
+        {
+          "exported": false,
+          "lineCount": 6,
+          "name": "pdf",
+          "params": [
+            "x"
+          ],
+          "returnType": "Real"
+        },
+        {
+          "exported": false,
+          "lineCount": 4,
+          "name": "ln_pdf",
+          "params": [
+            "x"
+          ],
+          "returnType": "Real"
+        },
+        {
+          "exported": false,
+          "lineCount": 17,
+          "name": "cdf",
+          "params": [
+            "x"
+          ],
+          "returnType": "Real"
+        },
+        {
+          "exported": false,
+          "lineCount": 6,
+          "name": "survival",
+          "params": [
+            "x"
+          ],
+          "returnType": "Real"
+        },
+        {
+          "exported": false,
+          "lineCount": 3,
+          "name": "lower_bound",
+          "params": [],
+          "returnType": "Real"
+        },
+        {
+          "exported": false,
+          "lineCount": 3,
+          "name": "upper_bound",
+          "params": [],
+          "returnType": "Real"
+        },
+        {
+          "exported": false,
+          "lineCount": 25,
+          "name": "quantile",
+          "params": [
+            "p"
+          ],
+          "returnType": "QlResult<Real>"
+        }
+      ],
+      "hasStructuralAnalysis": true,
+      "imports": [
+        {
+          "source": "std::f64::consts",
+          "specifiers": [
+            "PI"
+          ]
+        },
+        {
+          "source": "super",
+          "specifiers": [
+            "Cdf",
+            "Density",
+            "Probability",
+            "Quantile",
+            "Support"
+          ]
+        },
+        {
+          "source": "crate::errors",
+          "specifiers": [
+            "QlResult"
+          ]
+        },
+        {
+          "source": "crate",
+          "specifiers": [
+            "fail"
+          ]
+        },
+        {
+          "source": "crate::math::beta",
+          "specifiers": [
+            "incomplete_beta"
+          ]
+        },
+        {
+          "source": "crate::math::gammafunction",
+          "specifiers": [
+            "log_gamma"
+          ]
+        },
+        {
+          "source": "crate",
+          "specifiers": [
+            "require"
+          ]
+        },
+        {
+          "source": "crate::types",
+          "specifiers": [
+            "Real"
+          ]
+        }
+      ],
+      "totalLines": 344
+    },
+    "crates/itofin/src/math/errorfunction.rs": {
+      "classes": [],
+      "contentHash": "0623d75a501a2cfb4c484da1b150f09bc30ef01f946afe63c7848faf3caff7f1",
+      "exports": [
+        "erf"
+      ],
+      "filePath": "crates/itofin/src/math/errorfunction.rs",
+      "functions": [
+        {
+          "exported": true,
+          "lineCount": 57,
+          "name": "erf",
+          "params": [
+            "x"
+          ],
+          "returnType": "Real"
+        }
+      ],
+      "hasStructuralAnalysis": true,
+      "imports": [
+        {
+          "source": "crate::types",
+          "specifiers": [
+            "Real"
+          ]
+        }
+      ],
+      "totalLines": 194
+    },
+    "crates/itofin/src/math/gammafunction.rs": {
+      "classes": [],
+      "contentHash": "2bac8faa219945a1046db5ef91de4b0e8c148ebf0e4a2997ed21e1abc563214b",
+      "exports": [
+        "log_gamma",
+        "gamma"
+      ],
+      "filePath": "crates/itofin/src/math/gammafunction.rs",
+      "functions": [
+        {
+          "exported": true,
+          "lineCount": 15,
+          "name": "log_gamma",
+          "params": [
+            "x"
+          ],
+          "returnType": "QlResult<Real>"
+        },
+        {
+          "exported": true,
+          "lineCount": 20,
+          "name": "gamma",
+          "params": [
+            "x"
+          ],
+          "returnType": "Real"
+        }
+      ],
+      "hasStructuralAnalysis": true,
+      "imports": [
+        {
+          "source": "std::f64::consts",
+          "specifiers": [
+            "PI"
+          ]
+        },
+        {
+          "source": "crate::errors",
+          "specifiers": [
+            "QlResult"
+          ]
+        },
+        {
+          "source": "crate",
+          "specifiers": [
+            "fail"
+          ]
+        },
+        {
+          "source": "crate::types",
+          "specifiers": [
+            "Real"
+          ]
+        }
+      ],
+      "totalLines": 237
+    },
+    "crates/itofin/src/math/incompletegamma.rs": {
+      "classes": [],
+      "contentHash": "a157926ffc35e1a9e85d13a5c6e1edd3ecfbf3ce18edf4a6b87a84e51ecaa289",
+      "exports": [
+        "incomplete_gamma"
+      ],
+      "filePath": "crates/itofin/src/math/incompletegamma.rs",
+      "functions": [
+        {
+          "exported": true,
+          "lineCount": 17,
+          "name": "incomplete_gamma",
+          "params": [
+            "a",
+            "x"
+          ],
+          "returnType": "QlResult<Real>"
+        },
+        {
+          "exported": false,
+          "lineCount": 18,
+          "name": "series_repr",
+          "params": [
+            "a",
+            "x"
+          ],
+          "returnType": "QlResult<Real>"
+        },
+        {
+          "exported": false,
+          "lineCount": 27,
+          "name": "continued_fraction_repr",
+          "params": [
+            "a",
+            "x"
+          ],
+          "returnType": "QlResult<Real>"
+        }
+      ],
+      "hasStructuralAnalysis": true,
+      "imports": [
+        {
+          "source": "crate::errors",
+          "specifiers": [
+            "QlResult"
+          ]
+        },
+        {
+          "source": "crate",
+          "specifiers": [
+            "fail"
+          ]
+        },
+        {
+          "source": "crate::math::gammafunction",
+          "specifiers": [
+            "log_gamma"
+          ]
+        },
+        {
+          "source": "crate::types",
+          "specifiers": [
+            "Real"
+          ]
+        }
+      ],
+      "totalLines": 186
+    },
+    "crates/itofin/src/math/interpolations/linear.rs": {
+      "classes": [
+        {
+          "exported": true,
+          "lineCount": 7,
+          "methods": [
+            "new",
+            "with_extrapolation",
+            "allows_extrapolation",
+            "locate",
+            "check_range",
+            "value",
+            "derivative",
+            "primitive",
+            "x_min",
+            "x_max",
+            "is_in_range"
+          ],
+          "name": "LinearInterpolation",
+          "properties": [
+            "x",
+            "y",
+            "slopes",
+            "primitive_const",
+            "allow_extrapolation"
+          ]
+        }
+      ],
+      "contentHash": "e5ac1e827943caa7ccdaded63e2d1018c202a799f09210367ffa85d711392183",
+      "exports": [
+        "LinearInterpolation",
+        "new",
+        "with_extrapolation",
+        "allows_extrapolation"
+      ],
+      "filePath": "crates/itofin/src/math/interpolations/linear.rs",
+      "functions": [
+        {
+          "exported": true,
+          "lineCount": 48,
+          "name": "new",
+          "params": [
+            "x",
+            "y"
+          ],
+          "returnType": "QlResult<Self>"
+        },
+        {
+          "exported": true,
+          "lineCount": 4,
+          "name": "with_extrapolation",
+          "params": [
+            "allow"
+          ],
+          "returnType": "Self"
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "allows_extrapolation",
+          "params": [],
+          "returnType": "bool"
+        },
+        {
+          "exported": false,
+          "lineCount": 10,
+          "name": "locate",
+          "params": [
+            "x"
+          ],
+          "returnType": "Size"
+        },
+        {
+          "exported": false,
+          "lineCount": 13,
+          "name": "check_range",
+          "params": [
+            "x"
+          ],
+          "returnType": "QlResult<()>"
+        },
+        {
+          "exported": false,
+          "lineCount": 5,
+          "name": "value",
+          "params": [
+            "x"
+          ],
+          "returnType": "QlResult<Real>"
+        },
+        {
+          "exported": false,
+          "lineCount": 4,
+          "name": "derivative",
+          "params": [
+            "x"
+          ],
+          "returnType": "QlResult<Real>"
+        },
+        {
+          "exported": false,
+          "lineCount": 6,
+          "name": "primitive",
+          "params": [
+            "x"
+          ],
+          "returnType": "QlResult<Real>"
+        },
+        {
+          "exported": false,
+          "lineCount": 3,
+          "name": "x_min",
+          "params": [],
+          "returnType": "Real"
+        },
+        {
+          "exported": false,
+          "lineCount": 3,
+          "name": "x_max",
+          "params": [],
+          "returnType": "Real"
+        },
+        {
+          "exported": false,
+          "lineCount": 3,
+          "name": "is_in_range",
+          "params": [
+            "x"
+          ],
+          "returnType": "bool"
+        }
+      ],
+      "hasStructuralAnalysis": true,
+      "imports": [
+        {
+          "source": "crate::errors",
+          "specifiers": [
+            "QlResult"
+          ]
+        },
+        {
+          "source": "crate",
+          "specifiers": [
+            "fail"
+          ]
+        },
+        {
+          "source": "crate::math::interpolations",
+          "specifiers": [
+            "Interpolation"
+          ]
+        },
+        {
+          "source": "crate::types",
+          "specifiers": [
+            "Real",
+            "Size"
+          ]
+        }
+      ],
+      "totalLines": 230
+    },
+    "crates/itofin/src/math/interpolations/mod.rs": {
+      "classes": [
+        {
+          "exported": true,
+          "lineCount": 20,
+          "methods": [
+            "value",
+            "derivative",
+            "primitive",
+            "x_min",
+            "x_max",
+            "is_in_range"
+          ],
+          "name": "Interpolation",
+          "properties": []
+        }
+      ],
+      "contentHash": "81a93c6729fbdff1ab1631f4653dcd025cffc12ca95d9892cde05ad5fd83438b",
+      "exports": [
+        "Interpolation"
+      ],
+      "filePath": "crates/itofin/src/math/interpolations/mod.rs",
+      "functions": [],
+      "hasStructuralAnalysis": true,
+      "imports": [
+        {
+          "source": "crate::errors",
+          "specifiers": [
+            "QlResult"
+          ]
+        },
+        {
+          "source": "crate::types",
+          "specifiers": [
+            "Real"
+          ]
+        }
+      ],
+      "totalLines": 33
+    },
+    "crates/itofin/src/math/matrix.rs": {
+      "classes": [
+        {
+          "exported": true,
+          "lineCount": 5,
+          "methods": [
+            "new",
+            "with_size",
+            "filled",
+            "rows",
+            "columns",
+            "is_empty",
+            "row",
+            "row_mut",
+            "diagonal",
+            "transpose",
+            "from",
+            "index",
+            "index_mut",
+            "index",
+            "index_mut"
+          ],
+          "name": "Matrix",
+          "properties": [
+            "data",
+            "rows",
+            "columns"
+          ]
+        }
+      ],
+      "contentHash": "8675aa0221fdd54d00dccde854bd3388c5af8c0b1fe4d954c44f8d25dd7be623",
+      "exports": [
+        "Matrix",
+        "new",
+        "with_size",
+        "filled",
+        "rows",
+        "columns",
+        "is_empty",
+        "row",
+        "row_mut",
+        "diagonal",
+        "transpose"
+      ],
+      "filePath": "crates/itofin/src/math/matrix.rs",
+      "functions": [
+        {
+          "exported": true,
+          "lineCount": 7,
+          "name": "new",
+          "params": [],
+          "returnType": "Self"
+        },
+        {
+          "exported": true,
+          "lineCount": 10,
+          "name": "with_size",
+          "params": [
+            "rows",
+            "columns"
+          ],
+          "returnType": "Self"
+        },
+        {
+          "exported": true,
+          "lineCount": 10,
+          "name": "filled",
+          "params": [
+            "rows",
+            "columns",
+            "value"
+          ],
+          "returnType": "Self"
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "rows",
+          "params": [],
+          "returnType": "Size"
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "columns",
+          "params": [],
+          "returnType": "Size"
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "is_empty",
+          "params": [],
+          "returnType": "bool"
+        },
+        {
+          "exported": true,
+          "lineCount": 8,
+          "name": "row",
+          "params": [
+            "i"
+          ],
+          "returnType": "&[Real]"
+        },
+        {
+          "exported": true,
+          "lineCount": 8,
+          "name": "row_mut",
+          "params": [
+            "i"
+          ],
+          "returnType": "&mut [Real]"
+        },
+        {
+          "exported": true,
+          "lineCount": 4,
+          "name": "diagonal",
+          "params": [],
+          "returnType": "Array"
+        },
+        {
+          "exported": true,
+          "lineCount": 9,
+          "name": "transpose",
+          "params": [],
+          "returnType": "Matrix"
+        },
+        {
+          "exported": false,
+          "lineCount": 7,
+          "name": "from",
+          "params": [
+            "rows"
+          ],
+          "returnType": "Self"
+        },
+        {
+          "exported": false,
+          "lineCount": 3,
+          "name": "index",
+          "params": [
+            "i"
+          ],
+          "returnType": "&[Real]"
+        },
+        {
+          "exported": false,
+          "lineCount": 3,
+          "name": "index_mut",
+          "params": [
+            "i"
+          ],
+          "returnType": "&mut [Real]"
+        },
+        {
+          "exported": false,
+          "lineCount": 3,
+          "name": "index",
+          "params": [
+            "(i, j)"
+          ],
+          "returnType": "&Real"
+        },
+        {
+          "exported": false,
+          "lineCount": 3,
+          "name": "index_mut",
+          "params": [
+            "(i, j)"
+          ],
+          "returnType": "&mut Real"
+        },
+        {
+          "exported": false,
+          "lineCount": 7,
+          "name": "neg",
+          "params": [],
+          "returnType": "Matrix"
+        },
+        {
+          "exported": false,
+          "lineCount": 3,
+          "name": "mul",
+          "params": [
+            "rhs"
+          ],
+          "returnType": "Matrix"
+        },
+        {
+          "exported": false,
+          "lineCount": 13,
+          "name": "mul",
+          "params": [
+            "rhs"
+          ],
+          "returnType": "Matrix"
+        },
+        {
+          "exported": false,
+          "lineCount": 6,
+          "name": "mul",
+          "params": [
+            "rhs"
+          ],
+          "returnType": "Array"
+        },
+        {
+          "exported": false,
+          "lineCount": 6,
+          "name": "mul",
+          "params": [
+            "rhs"
+          ],
+          "returnType": "Array"
+        }
+      ],
+      "hasStructuralAnalysis": true,
+      "imports": [
+        {
+          "source": "std::ops",
+          "specifiers": [
+            "Add",
+            "Div",
+            "Index",
+            "IndexMut",
+            "Mul",
+            "Neg",
+            "Sub"
+          ]
+        },
+        {
+          "source": "crate::math::array",
+          "specifiers": [
+            "Array"
+          ]
+        },
+        {
+          "source": "crate::types",
+          "specifiers": [
+            "Real",
+            "Size"
+          ]
+        }
+      ],
+      "totalLines": 340
+    },
+    "crates/itofin/src/math/mod.rs": {
+      "classes": [],
+      "contentHash": "22c825a2dfaec68a8099605d016fa57d5fbcde8ccd866a41f12000e836d9042f",
+      "exports": [],
+      "filePath": "crates/itofin/src/math/mod.rs",
+      "functions": [],
+      "hasStructuralAnalysis": true,
+      "imports": [],
+      "totalLines": 11
+    },
+    "crates/itofin/src/patterns/lazyobject.rs": {
+      "classes": [
+        {
+          "exported": true,
+          "lineCount": 8,
+          "methods": [
+            "new",
+            "observable",
+            "is_calculated",
+            "forward_first_notification_only",
+            "always_forward_notifications",
+            "on_update",
+            "calculate",
+            "recalculate",
+            "freeze",
+            "unfreeze",
+            "register_observer"
+          ],
+          "name": "LazyObject",
+          "properties": [
+            "observable",
+            "calculated",
+            "frozen",
+            "failed",
+            "always_forward",
+            "updating"
+          ]
+        }
+      ],
+      "contentHash": "fb083f91f7644dc67aacd432578c1fd83232b835e15124171fae02a5ae64d98f",
+      "exports": [
+        "LazyObject",
+        "new",
+        "observable",
+        "is_calculated",
+        "forward_first_notification_only",
+        "always_forward_notifications",
+        "on_update",
+        "calculate",
+        "recalculate",
+        "freeze",
+        "unfreeze",
+        "register_observer"
+      ],
+      "filePath": "crates/itofin/src/patterns/lazyobject.rs",
+      "functions": [
+        {
+          "exported": true,
+          "lineCount": 10,
+          "name": "new",
+          "params": [
+            "always_forward"
+          ],
+          "returnType": "Self"
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "observable",
+          "params": [],
+          "returnType": "&Observable"
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "is_calculated",
+          "params": [],
+          "returnType": "bool"
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "forward_first_notification_only",
+          "params": []
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "always_forward_notifications",
+          "params": []
+        },
+        {
+          "exported": true,
+          "lineCount": 17,
+          "name": "on_update",
+          "params": [],
+          "returnType": "bool"
+        },
+        {
+          "exported": true,
+          "lineCount": 14,
+          "name": "calculate",
+          "params": [
+            "perform"
+          ],
+          "returnType": "QlResult<()>"
+        },
+        {
+          "exported": true,
+          "lineCount": 10,
+          "name": "recalculate",
+          "params": [
+            "perform"
+          ],
+          "returnType": "QlResult<()>"
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "freeze",
+          "params": []
+        },
+        {
+          "exported": true,
+          "lineCount": 6,
+          "name": "unfreeze",
+          "params": []
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "register_observer",
+          "params": [
+            "observer"
+          ],
+          "returnType": "bool"
+        }
+      ],
+      "hasStructuralAnalysis": true,
+      "imports": [
+        {
+          "source": "crate::errors",
+          "specifiers": [
+            "QlResult"
+          ]
+        },
+        {
+          "source": "crate::patterns::observable",
+          "specifiers": [
+            "Observable"
+          ]
+        },
+        {
+          "source": "crate::shared",
+          "specifiers": [
+            "SharedMut"
+          ]
+        },
+        {
+          "source": "super::observable",
+          "specifiers": [
+            "Observer"
+          ]
+        }
+      ],
+      "totalLines": 366
+    },
+    "crates/itofin/src/patterns/mod.rs": {
+      "classes": [],
+      "contentHash": "7b0b70b736e7aafb4a9d2535b7217c345415b4cdee6f450e9e08a6cb8c310fc5",
+      "exports": [],
+      "filePath": "crates/itofin/src/patterns/mod.rs",
+      "functions": [],
+      "hasStructuralAnalysis": true,
+      "imports": [],
+      "totalLines": 6
+    },
+    "crates/itofin/src/patterns/observable.rs": {
+      "classes": [
+        {
+          "exported": true,
+          "lineCount": 4,
+          "methods": [
+            "update"
+          ],
+          "name": "Observer",
+          "properties": []
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "methods": [
+            "new",
+            "register_observer",
+            "unregister_observer",
+            "notify_observers"
+          ],
+          "name": "Observable",
+          "properties": [
+            "observers"
+          ]
+        }
+      ],
+      "contentHash": "8d92ec8d5c3f689dd568cac27599f4354da3df56da18991a89c31dd2813de2bd",
+      "exports": [
+        "Observer",
+        "Observable",
+        "new",
+        "register_observer",
+        "unregister_observer",
+        "notify_observers"
+      ],
+      "filePath": "crates/itofin/src/patterns/observable.rs",
+      "functions": [
+        {
+          "exported": true,
+          "lineCount": 5,
+          "name": "new",
+          "params": [],
+          "returnType": "Self"
+        },
+        {
+          "exported": true,
+          "lineCount": 10,
+          "name": "register_observer",
+          "params": [
+            "observer"
+          ],
+          "returnType": "bool"
+        },
+        {
+          "exported": true,
+          "lineCount": 13,
+          "name": "unregister_observer",
+          "params": [
+            "observer"
+          ],
+          "returnType": "bool"
+        },
+        {
+          "exported": true,
+          "lineCount": 10,
+          "name": "notify_observers",
+          "params": []
+        }
+      ],
+      "hasStructuralAnalysis": true,
+      "imports": [
+        {
+          "source": "std::cell",
+          "specifiers": [
+            "RefCell"
+          ]
+        },
+        {
+          "source": "crate::shared",
+          "specifiers": [
+            "SharedMut",
+            "WeakMut"
+          ]
+        }
+      ],
+      "totalLines": 254
+    },
+    "crates/itofin/src/patterns/visitor.rs": {
+      "classes": [
+        {
+          "exported": true,
+          "lineCount": 4,
+          "methods": [
+            "visit"
+          ],
+          "name": "Visitor",
+          "properties": []
+        }
+      ],
+      "contentHash": "bb779e374b82a0b239ef5b22830b57aa59a357c072a198a16db9c87cdbc737ac",
+      "exports": [
+        "Visitor"
+      ],
+      "filePath": "crates/itofin/src/patterns/visitor.rs",
+      "functions": [],
+      "hasStructuralAnalysis": true,
+      "imports": [],
+      "totalLines": 22
+    },
+    "crates/itofin/src/settings.rs": {
+      "classes": [
+        {
+          "exported": true,
+          "lineCount": 7,
+          "methods": [],
+          "name": "Settings",
+          "properties": [
+            "evaluation_date",
+            "eval_date_observable",
+            "include_reference_date_events",
+            "include_todays_cash_flows",
+            "enforces_todays_historic_fixings"
+          ]
+        }
+      ],
+      "contentHash": "0c74a761a728f657dd70c11b5e54d793ef3279f89ff83264ec459c1338c14bb6",
+      "exports": [
+        "Settings",
+        "new",
+        "evaluation_date",
+        "set_evaluation_date",
+        "reset_evaluation_date",
+        "register_eval_date_observer",
+        "include_reference_date_events",
+        "set_include_reference_date_events",
+        "include_todays_cash_flows",
+        "set_include_todays_cash_flows",
+        "enforces_todays_historic_fixings",
+        "set_enforces_todays_historic_fixings"
+      ],
+      "filePath": "crates/itofin/src/settings.rs",
+      "functions": [
+        {
+          "exported": false,
+          "lineCount": 9,
+          "name": "default",
+          "params": [],
+          "returnType": "Self"
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "new",
+          "params": [],
+          "returnType": "Self"
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "evaluation_date",
+          "params": [],
+          "returnType": "Option<&D>"
+        },
+        {
+          "exported": true,
+          "lineCount": 9,
+          "name": "set_evaluation_date",
+          "params": [
+            "date"
+          ]
+        },
+        {
+          "exported": true,
+          "lineCount": 6,
+          "name": "reset_evaluation_date",
+          "params": []
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "register_eval_date_observer",
+          "params": [
+            "observer"
+          ],
+          "returnType": "bool"
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "include_reference_date_events",
+          "params": [],
+          "returnType": "bool"
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "set_include_reference_date_events",
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "include_todays_cash_flows",
+          "params": [],
+          "returnType": "Option<bool>"
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "set_include_todays_cash_flows",
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "enforces_todays_historic_fixings",
+          "params": [],
+          "returnType": "bool"
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "set_enforces_todays_historic_fixings",
+          "params": [
+            "value"
+          ]
+        }
+      ],
+      "hasStructuralAnalysis": true,
+      "imports": [
+        {
+          "source": "crate::patterns::observable",
+          "specifiers": [
+            "Observable",
+            "Observer"
+          ]
+        },
+        {
+          "source": "crate::shared",
+          "specifiers": [
+            "SharedMut"
+          ]
+        }
+      ],
+      "totalLines": 191
+    },
+    "crates/itofin/src/shared.rs": {
+      "classes": [],
+      "contentHash": "2c22d28090051fc3747e471105feaf706f93ee21b564904ddbf75009203d2935",
+      "exports": [
+        "shared",
+        "shared_mut"
+      ],
+      "filePath": "crates/itofin/src/shared.rs",
+      "functions": [
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "shared",
+          "params": [
+            "value"
+          ],
+          "returnType": "Shared<T>"
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "shared_mut",
+          "params": [
+            "value"
+          ],
+          "returnType": "SharedMut<T>"
+        }
+      ],
+      "hasStructuralAnalysis": true,
+      "imports": [
+        {
+          "source": "std::cell",
+          "specifiers": [
+            "RefCell"
+          ]
+        },
+        {
+          "source": "std::rc",
+          "specifiers": [
+            "Rc",
+            "Weak"
+          ]
+        }
+      ],
+      "totalLines": 59
+    },
+    "crates/itofin/src/types.rs": {
+      "classes": [],
+      "contentHash": "97945cd399f7f91c1c83c9ee7bf081e8b42c18cdf4aa1a500325c681280a3fc5",
+      "exports": [],
+      "filePath": "crates/itofin/src/types.rs",
+      "functions": [],
+      "hasStructuralAnalysis": true,
+      "imports": [],
+      "totalLines": 72
+    },
+    "crates/itofin/src/utilities/clone.rs": {
+      "classes": [
+        {
+          "exported": true,
+          "lineCount": 3,
+          "methods": [],
+          "name": "ValueBox",
+          "properties": [
+            "ptr"
+          ]
+        }
+      ],
+      "contentHash": "473b60fe0b84bc118ce36ca82df33d36e737fa98f8e0f6c241e79eac760b2e8f",
+      "exports": [
+        "ValueBox",
+        "empty",
+        "new",
+        "is_empty",
+        "get",
+        "get_mut",
+        "swap"
+      ],
+      "filePath": "crates/itofin/src/utilities/clone.rs",
+      "functions": [
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "empty",
+          "params": [],
+          "returnType": "Self"
+        },
+        {
+          "exported": true,
+          "lineCount": 5,
+          "name": "new",
+          "params": [
+            "value"
+          ],
+          "returnType": "Self"
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "is_empty",
+          "params": [],
+          "returnType": "bool"
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "get",
+          "params": [],
+          "returnType": "Option<&T>"
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "get_mut",
+          "params": [],
+          "returnType": "Option<&mut T>"
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "swap",
+          "params": [
+            "other"
+          ]
+        },
+        {
+          "exported": false,
+          "lineCount": 5,
+          "name": "clone",
+          "params": [],
+          "returnType": "Self"
+        },
+        {
+          "exported": false,
+          "lineCount": 3,
+          "name": "default",
+          "params": [],
+          "returnType": "Self"
+        }
+      ],
+      "hasStructuralAnalysis": true,
+      "imports": [],
+      "totalLines": 100
+    },
+    "crates/itofin/src/utilities/dataformatters.rs": {
+      "classes": [],
+      "contentHash": "b2cdedc0973ce4276abd625544ea64ac57289b4875c9b400b5cea29a817a3401",
+      "exports": [
+        "check_null",
+        "ordinal",
+        "percent",
+        "rate",
+        "volatility"
+      ],
+      "filePath": "crates/itofin/src/utilities/dataformatters.rs",
+      "functions": [
+        {
+          "exported": true,
+          "lineCount": 7,
+          "name": "check_null",
+          "params": [
+            "value"
+          ],
+          "returnType": "String"
+        },
+        {
+          "exported": true,
+          "lineCount": 10,
+          "name": "ordinal",
+          "params": [
+            "n"
+          ],
+          "returnType": "String"
+        },
+        {
+          "exported": true,
+          "lineCount": 4,
+          "name": "percent",
+          "params": [
+            "value"
+          ],
+          "returnType": "String"
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "rate",
+          "params": [
+            "r"
+          ],
+          "returnType": "String"
+        },
+        {
+          "exported": true,
+          "lineCount": 3,
+          "name": "volatility",
+          "params": [
+            "v"
+          ],
+          "returnType": "String"
+        }
+      ],
+      "hasStructuralAnalysis": true,
+      "imports": [
+        {
+          "source": "crate::types",
+          "specifiers": [
+            "Rate",
+            "Real",
+            "Size",
+            "Volatility"
+          ]
+        },
+        {
+          "source": "crate::utilities::null",
+          "specifiers": [
+            "Null"
+          ]
+        }
+      ],
+      "totalLines": 80
+    },
+    "crates/itofin/src/utilities/mod.rs": {
+      "classes": [],
+      "contentHash": "e2475b8cad0ed2cae65a6c8ba0b211695f9288139c90ea483928beccabb0f0e3",
+      "exports": [],
+      "filePath": "crates/itofin/src/utilities/mod.rs",
+      "functions": [],
+      "hasStructuralAnalysis": true,
+      "imports": [],
+      "totalLines": 7
+    },
+    "crates/itofin/src/utilities/null.rs": {
+      "classes": [
+        {
+          "exported": true,
+          "lineCount": 9,
+          "methods": [
+            "null",
+            "is_null"
+          ],
+          "name": "Null",
+          "properties": []
+        }
+      ],
+      "contentHash": "1fffe89786f108e83ddbb79b8aac18a61e57cc9e02f439fbb3f77e46431ad3b7",
+      "exports": [
+        "Null"
+      ],
+      "filePath": "crates/itofin/src/utilities/null.rs",
+      "functions": [
+        {
+          "exported": false,
+          "lineCount": 4,
+          "name": "null",
+          "params": [],
+          "returnType": "Self"
+        }
+      ],
+      "hasStructuralAnalysis": true,
+      "imports": [
+        {
+          "source": "crate::types",
+          "specifiers": [
+            "BigInteger",
+            "BigNatural",
+            "Integer",
+            "Natural",
+            "Real",
+            "Size"
+          ]
+        }
+      ],
+      "totalLines": 63
+    },
+    "crates/itofin/src/utilities/steppingiterator.rs": {
+      "classes": [
+        {
+          "exported": true,
+          "lineCount": 5,
+          "methods": [],
+          "name": "StepIterator",
+          "properties": [
+            "data",
+            "pos",
+            "step"
+          ]
+        }
+      ],
+      "contentHash": "f601b48379736424f2a88cb579d219055238b39adfb2beed2f3cf523539667cf",
+      "exports": [
+        "StepIterator",
+        "step_iter"
+      ],
+      "filePath": "crates/itofin/src/utilities/steppingiterator.rs",
+      "functions": [
+        {
+          "exported": false,
+          "lineCount": 10,
+          "name": "next",
+          "params": [],
+          "returnType": "Option<Self::Item>"
+        },
+        {
+          "exported": true,
+          "lineCount": 4,
+          "name": "step_iter",
+          "params": [
+            "data",
+            "step"
+          ],
+          "returnType": "StepIterator<'_, T>"
+        }
+      ],
+      "hasStructuralAnalysis": true,
+      "imports": [
+        {
+          "source": "crate::types",
+          "specifiers": [
+            "Size"
+          ]
+        }
+      ],
+      "totalLines": 72
+    },
+    "rust-toolchain.toml": {
+      "classes": [],
+      "contentHash": "e59c5da37d1f9f4e0f815bc188cb6056fc7410c9cdaa9673c2d44da557c75d12",
+      "exports": [],
+      "filePath": "rust-toolchain.toml",
+      "functions": [],
+      "hasStructuralAnalysis": true,
+      "imports": [],
+      "totalLines": 4
+    },
+    "scripts/check_extension.sh": {
+      "classes": [],
+      "contentHash": "512a19ceaa3c37544f2900c0626d7346377d46022573f417724b89742ec345b6",
+      "exports": [],
+      "filePath": "scripts/check_extension.sh",
+      "functions": [
+        {
+          "exported": false,
+          "lineCount": 10,
+          "name": "check_extension",
+          "params": []
+        }
+      ],
+      "hasStructuralAnalysis": true,
+      "imports": [],
+      "totalLines": 16
+    },
+    "scripts/hadolint.sh": {
+      "classes": [],
+      "contentHash": "20539ff1171aa719d870a91313e14bf93e8ed67c67861bc529bc5203285b7747",
+      "exports": [],
+      "filePath": "scripts/hadolint.sh",
+      "functions": [
+        {
+          "exported": false,
+          "lineCount": 14,
+          "name": "get_default_branch",
+          "params": []
+        },
+        {
+          "exported": false,
+          "lineCount": 13,
+          "name": "hadolint_runner",
+          "params": []
+        },
+        {
+          "exported": false,
+          "lineCount": 35,
+          "name": "lint_wrapper",
+          "params": []
+        },
+        {
+          "exported": false,
+          "lineCount": 6,
+          "name": "run_docker_lint",
+          "params": []
+        }
+      ],
+      "hasStructuralAnalysis": true,
+      "imports": [],
+      "totalLines": 102
+    },
+    "scripts/hadolint.yml": {
+      "classes": [],
+      "contentHash": "0f4170140e0c793d0a92567e18ef57613fbaaedfe7d80e02bffee88b55a576ed",
+      "exports": [],
+      "filePath": "scripts/hadolint.yml",
+      "functions": [],
+      "hasStructuralAnalysis": true,
+      "imports": [],
+      "totalLines": 9
+    },
+    "scripts/init.sh": {
+      "classes": [],
+      "contentHash": "37d32ffc204a7104c177f8d022d1ec1d889138f74df760ea3dfd394e7d597673",
+      "exports": [],
+      "filePath": "scripts/init.sh",
+      "functions": [],
+      "hasStructuralAnalysis": true,
+      "imports": [],
+      "totalLines": 28
+    }
+  },
+  "generatedAt": "2026-06-29T01:37:53.874Z",
+  "gitCommitHash": "caa6e02cbf2bbf4a8160ecdba49ba8dc3f7eb6ac",
+  "version": "1.0.0"
+}

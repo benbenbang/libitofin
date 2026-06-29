@@ -1,0 +1,1550 @@
+{
+  "filesAnalyzed": 5,
+  "filesSkipped": [],
+  "results": [
+    {
+      "callGraph": [
+        {
+          "callee": "Vec::new",
+          "caller": "new",
+          "lineNumber": 23
+        },
+        {
+          "callee": "(0..n).map(|i| value + i as Real * increment).collect",
+          "caller": "incremental",
+          "lineNumber": 41
+        },
+        {
+          "callee": "(0..n).map",
+          "caller": "incremental",
+          "lineNumber": 41
+        },
+        {
+          "callee": "self.data.len",
+          "caller": "size",
+          "lineNumber": 47
+        },
+        {
+          "callee": "self.data.is_empty",
+          "caller": "is_empty",
+          "lineNumber": 52
+        },
+        {
+          "callee": "self.data.resize",
+          "caller": "resize",
+          "lineNumber": 58
+        },
+        {
+          "callee": "self.data.iter().zip(&other.data).map(|(a, b)| a * b).sum",
+          "caller": "dot",
+          "lineNumber": 64
+        },
+        {
+          "callee": "self.data.iter().zip(&other.data).map",
+          "caller": "dot",
+          "lineNumber": 64
+        },
+        {
+          "callee": "self.data.iter().zip",
+          "caller": "dot",
+          "lineNumber": 64
+        },
+        {
+          "callee": "self.data.iter",
+          "caller": "dot",
+          "lineNumber": 64
+        },
+        {
+          "callee": "self.dot(self).sqrt",
+          "caller": "norm2",
+          "lineNumber": 69
+        },
+        {
+          "callee": "self.dot",
+          "caller": "norm2",
+          "lineNumber": 69
+        },
+        {
+          "callee": "self.map",
+          "caller": "abs",
+          "lineNumber": 74
+        },
+        {
+          "callee": "self.map",
+          "caller": "sqrt",
+          "lineNumber": 79
+        },
+        {
+          "callee": "self.map",
+          "caller": "log",
+          "lineNumber": 84
+        },
+        {
+          "callee": "self.map",
+          "caller": "exp",
+          "lineNumber": 89
+        },
+        {
+          "callee": "self.map",
+          "caller": "pow",
+          "lineNumber": 94
+        },
+        {
+          "callee": "x.powf",
+          "caller": "pow",
+          "lineNumber": 94
+        },
+        {
+          "callee": "self.data.iter().copied().map(f).collect",
+          "caller": "map",
+          "lineNumber": 99
+        },
+        {
+          "callee": "self.data.iter().copied().map",
+          "caller": "map",
+          "lineNumber": 99
+        },
+        {
+          "callee": "self.data.iter().copied",
+          "caller": "map",
+          "lineNumber": 99
+        },
+        {
+          "callee": "self.data.iter",
+          "caller": "map",
+          "lineNumber": 99
+        },
+        {
+          "callee": "values.to_vec",
+          "caller": "from",
+          "lineNumber": 139
+        },
+        {
+          "callee": "iter.into_iter().collect",
+          "caller": "from_iter",
+          "lineNumber": 147
+        },
+        {
+          "callee": "iter.into_iter",
+          "caller": "from_iter",
+          "lineNumber": 147
+        },
+        {
+          "callee": "self.map",
+          "caller": "neg",
+          "lineNumber": 155
+        },
+        {
+          "callee": "a.iter().zip",
+          "caller": "assert_close",
+          "lineNumber": 199
+        },
+        {
+          "callee": "a.iter",
+          "caller": "assert_close",
+          "lineNumber": 199
+        },
+        {
+          "callee": "Array::filled",
+          "caller": "construction",
+          "lineNumber": 210
+        },
+        {
+          "callee": "Array::incremental",
+          "caller": "construction",
+          "lineNumber": 214
+        },
+        {
+          "callee": "assert_close",
+          "caller": "construction",
+          "lineNumber": 215
+        },
+        {
+          "callee": "Array::from",
+          "caller": "construction",
+          "lineNumber": 217
+        },
+        {
+          "callee": "assert_close",
+          "caller": "construction",
+          "lineNumber": 218
+        },
+        {
+          "callee": "Array::from",
+          "caller": "indexing_and_first_last",
+          "lineNumber": 223
+        },
+        {
+          "callee": "Array::incremental",
+          "caller": "resize_preserves_prefix",
+          "lineNumber": 232
+        },
+        {
+          "callee": "a.resize",
+          "caller": "resize_preserves_prefix",
+          "lineNumber": 233
+        },
+        {
+          "callee": "assert_close",
+          "caller": "resize_preserves_prefix",
+          "lineNumber": 234
+        },
+        {
+          "callee": "a.resize",
+          "caller": "resize_preserves_prefix",
+          "lineNumber": 235
+        },
+        {
+          "callee": "assert_close",
+          "caller": "resize_preserves_prefix",
+          "lineNumber": 237
+        },
+        {
+          "callee": "(0..5).map(|i| (i as Real).sin() + 1.1).collect",
+          "caller": "functions_match_scalar_maps",
+          "lineNumber": 242
+        },
+        {
+          "callee": "(0..5).map",
+          "caller": "functions_match_scalar_maps",
+          "lineNumber": 242
+        },
+        {
+          "callee": "(i as Real).sin",
+          "caller": "functions_match_scalar_maps",
+          "lineNumber": 242
+        },
+        {
+          "callee": "a.iter().enumerate",
+          "caller": "functions_match_scalar_maps",
+          "lineNumber": 243
+        },
+        {
+          "callee": "a.iter",
+          "caller": "functions_match_scalar_maps",
+          "lineNumber": 243
+        },
+        {
+          "callee": "Array::from",
+          "caller": "dot_and_norm",
+          "lineNumber": 254
+        },
+        {
+          "callee": "Array::from",
+          "caller": "unary_operators",
+          "lineNumber": 261
+        },
+        {
+          "callee": "assert_close",
+          "caller": "unary_operators",
+          "lineNumber": 262
+        },
+        {
+          "callee": "Array::from",
+          "caller": "array_array_operators",
+          "lineNumber": 267
+        },
+        {
+          "callee": "assert_close",
+          "caller": "array_array_operators",
+          "lineNumber": 268
+        },
+        {
+          "callee": "assert_close",
+          "caller": "array_array_operators",
+          "lineNumber": 269
+        },
+        {
+          "callee": "assert_close",
+          "caller": "array_array_operators",
+          "lineNumber": 270
+        },
+        {
+          "callee": "assert_close",
+          "caller": "array_array_operators",
+          "lineNumber": 271
+        },
+        {
+          "callee": "Array::from",
+          "caller": "array_scalar_operators",
+          "lineNumber": 276
+        },
+        {
+          "callee": "assert_close",
+          "caller": "array_scalar_operators",
+          "lineNumber": 277
+        },
+        {
+          "callee": "assert_close",
+          "caller": "array_scalar_operators",
+          "lineNumber": 278
+        },
+        {
+          "callee": "assert_close",
+          "caller": "array_scalar_operators",
+          "lineNumber": 279
+        },
+        {
+          "callee": "assert_close",
+          "caller": "array_scalar_operators",
+          "lineNumber": 280
+        },
+        {
+          "callee": "assert_close",
+          "caller": "array_scalar_operators",
+          "lineNumber": 281
+        },
+        {
+          "callee": "Array::with_size",
+          "caller": "size_mismatch_panics",
+          "lineNumber": 287
+        },
+        {
+          "callee": "Array::with_size",
+          "caller": "size_mismatch_panics",
+          "lineNumber": 287
+        }
+      ],
+      "classes": [
+        {
+          "endLine": 18,
+          "methods": [
+            "new",
+            "with_size",
+            "filled",
+            "incremental",
+            "size",
+            "is_empty",
+            "resize",
+            "dot",
+            "norm2",
+            "abs",
+            "sqrt",
+            "log",
+            "exp",
+            "pow",
+            "map",
+            "deref",
+            "deref_mut",
+            "index",
+            "index_mut",
+            "from",
+            "from",
+            "from_iter"
+          ],
+          "name": "Array",
+          "properties": [
+            "data"
+          ],
+          "startLine": 16
+        }
+      ],
+      "exports": [
+        {
+          "isDefault": false,
+          "line": 16,
+          "name": "Array"
+        },
+        {
+          "isDefault": false,
+          "line": 22,
+          "name": "new"
+        },
+        {
+          "isDefault": false,
+          "line": 27,
+          "name": "with_size"
+        },
+        {
+          "isDefault": false,
+          "line": 32,
+          "name": "filled"
+        },
+        {
+          "isDefault": false,
+          "line": 39,
+          "name": "incremental"
+        },
+        {
+          "isDefault": false,
+          "line": 46,
+          "name": "size"
+        },
+        {
+          "isDefault": false,
+          "line": 51,
+          "name": "is_empty"
+        },
+        {
+          "isDefault": false,
+          "line": 57,
+          "name": "resize"
+        },
+        {
+          "isDefault": false,
+          "line": 62,
+          "name": "dot"
+        },
+        {
+          "isDefault": false,
+          "line": 68,
+          "name": "norm2"
+        },
+        {
+          "isDefault": false,
+          "line": 73,
+          "name": "abs"
+        },
+        {
+          "isDefault": false,
+          "line": 78,
+          "name": "sqrt"
+        },
+        {
+          "isDefault": false,
+          "line": 83,
+          "name": "log"
+        },
+        {
+          "isDefault": false,
+          "line": 88,
+          "name": "exp"
+        },
+        {
+          "isDefault": false,
+          "line": 93,
+          "name": "pow"
+        }
+      ],
+      "fileCategory": "code",
+      "functions": [
+        {
+          "endLine": 24,
+          "name": "new",
+          "params": [],
+          "startLine": 22
+        },
+        {
+          "endLine": 29,
+          "name": "with_size",
+          "params": [
+            "n"
+          ],
+          "startLine": 27
+        },
+        {
+          "endLine": 36,
+          "name": "filled",
+          "params": [
+            "n",
+            "value"
+          ],
+          "startLine": 32
+        },
+        {
+          "endLine": 43,
+          "name": "incremental",
+          "params": [
+            "n",
+            "value",
+            "increment"
+          ],
+          "startLine": 39
+        },
+        {
+          "endLine": 48,
+          "name": "size",
+          "params": [],
+          "startLine": 46
+        },
+        {
+          "endLine": 53,
+          "name": "is_empty",
+          "params": [],
+          "startLine": 51
+        },
+        {
+          "endLine": 59,
+          "name": "resize",
+          "params": [
+            "n"
+          ],
+          "startLine": 57
+        },
+        {
+          "endLine": 65,
+          "name": "dot",
+          "params": [
+            "other"
+          ],
+          "startLine": 62
+        },
+        {
+          "endLine": 70,
+          "name": "norm2",
+          "params": [],
+          "startLine": 68
+        },
+        {
+          "endLine": 75,
+          "name": "abs",
+          "params": [],
+          "startLine": 73
+        },
+        {
+          "endLine": 80,
+          "name": "sqrt",
+          "params": [],
+          "startLine": 78
+        },
+        {
+          "endLine": 85,
+          "name": "log",
+          "params": [],
+          "startLine": 83
+        },
+        {
+          "endLine": 90,
+          "name": "exp",
+          "params": [],
+          "startLine": 88
+        },
+        {
+          "endLine": 95,
+          "name": "pow",
+          "params": [
+            "exponent"
+          ],
+          "startLine": 93
+        },
+        {
+          "endLine": 101,
+          "name": "map",
+          "params": [
+            "f"
+          ],
+          "startLine": 97
+        },
+        {
+          "endLine": 108,
+          "name": "deref",
+          "params": [],
+          "startLine": 106
+        },
+        {
+          "endLine": 114,
+          "name": "deref_mut",
+          "params": [],
+          "startLine": 112
+        },
+        {
+          "endLine": 121,
+          "name": "index",
+          "params": [
+            "i"
+          ],
+          "startLine": 119
+        },
+        {
+          "endLine": 127,
+          "name": "index_mut",
+          "params": [
+            "i"
+          ],
+          "startLine": 125
+        },
+        {
+          "endLine": 133,
+          "name": "from",
+          "params": [
+            "data"
+          ],
+          "startLine": 131
+        },
+        {
+          "endLine": 141,
+          "name": "from",
+          "params": [
+            "values"
+          ],
+          "startLine": 137
+        },
+        {
+          "endLine": 149,
+          "name": "from_iter",
+          "params": [
+            "iter"
+          ],
+          "startLine": 145
+        },
+        {
+          "endLine": 156,
+          "name": "neg",
+          "params": [],
+          "startLine": 154
+        }
+      ],
+      "language": "rust",
+      "metrics": {
+        "classCount": 1,
+        "exportCount": 15,
+        "functionCount": 23,
+        "importCount": 1
+      },
+      "nonEmptyLines": 246,
+      "path": "crates/itofin/src/math/array.rs",
+      "totalLines": 289
+    },
+    {
+      "callGraph": [
+        {
+          "callee": "x.len",
+          "caller": "new",
+          "lineNumber": 25
+        },
+        {
+          "callee": "y.len",
+          "caller": "new",
+          "lineNumber": 25
+        },
+        {
+          "callee": "x.len",
+          "caller": "new",
+          "lineNumber": 32
+        },
+        {
+          "callee": "xi.is_finite",
+          "caller": "new",
+          "lineNumber": 39
+        },
+        {
+          "callee": "yi.is_finite",
+          "caller": "new",
+          "lineNumber": 44
+        },
+        {
+          "callee": "x.windows",
+          "caller": "new",
+          "lineNumber": 48
+        },
+        {
+          "callee": "x.len",
+          "caller": "new",
+          "lineNumber": 54
+        },
+        {
+          "callee": "Ok",
+          "caller": "new",
+          "lineNumber": 64
+        },
+        {
+          "callee": "self.x.len",
+          "caller": "locate",
+          "lineNumber": 87
+        },
+        {
+          "callee": "self.x[..n - 1].partition_point",
+          "caller": "locate",
+          "lineNumber": 93
+        },
+        {
+          "callee": "x.is_nan",
+          "caller": "check_range",
+          "lineNumber": 98
+        },
+        {
+          "callee": "self.is_in_range",
+          "caller": "check_range",
+          "lineNumber": 101
+        },
+        {
+          "callee": "Ok",
+          "caller": "check_range",
+          "lineNumber": 108
+        },
+        {
+          "callee": "self.check_range",
+          "caller": "value",
+          "lineNumber": 114
+        },
+        {
+          "callee": "self.locate",
+          "caller": "value",
+          "lineNumber": 115
+        },
+        {
+          "callee": "Ok",
+          "caller": "value",
+          "lineNumber": 116
+        },
+        {
+          "callee": "self.check_range",
+          "caller": "derivative",
+          "lineNumber": 120
+        },
+        {
+          "callee": "Ok",
+          "caller": "derivative",
+          "lineNumber": 121
+        },
+        {
+          "callee": "self.locate",
+          "caller": "derivative",
+          "lineNumber": 121
+        },
+        {
+          "callee": "self.check_range",
+          "caller": "primitive",
+          "lineNumber": 125
+        },
+        {
+          "callee": "self.locate",
+          "caller": "primitive",
+          "lineNumber": 126
+        },
+        {
+          "callee": "Ok",
+          "caller": "primitive",
+          "lineNumber": 128
+        },
+        {
+          "callee": "self.x.len",
+          "caller": "x_max",
+          "lineNumber": 136
+        },
+        {
+          "callee": "self.x_min",
+          "caller": "is_in_range",
+          "lineNumber": 140
+        },
+        {
+          "callee": "self.x_max",
+          "caller": "is_in_range",
+          "lineNumber": 140
+        },
+        {
+          "callee": "LinearInterpolation::new(vec![0.0, 1.0, 3.0], vec![0.0, 2.0, 2.0]).unwrap",
+          "caller": "sample",
+          "lineNumber": 150
+        },
+        {
+          "callee": "LinearInterpolation::new",
+          "caller": "sample",
+          "lineNumber": 150
+        },
+        {
+          "callee": "sample",
+          "caller": "value_at_nodes_and_between",
+          "lineNumber": 155
+        },
+        {
+          "callee": "sample",
+          "caller": "derivative_is_segment_slope",
+          "lineNumber": 165
+        },
+        {
+          "callee": "sample",
+          "caller": "primitive_is_cumulative_area",
+          "lineNumber": 172
+        },
+        {
+          "callee": "sample",
+          "caller": "domain_and_in_range",
+          "lineNumber": 181
+        },
+        {
+          "callee": "sample",
+          "caller": "extrapolation_disabled_errors_out_of_range",
+          "lineNumber": 191
+        },
+        {
+          "callee": "sample().with_extrapolation",
+          "caller": "extrapolation_enabled_extends_end_segments",
+          "lineNumber": 198
+        },
+        {
+          "callee": "sample",
+          "caller": "extrapolation_enabled_extends_end_segments",
+          "lineNumber": 198
+        },
+        {
+          "callee": "sample().with_extrapolation",
+          "caller": "nan_input_is_rejected_even_with_extrapolation",
+          "lineNumber": 208
+        },
+        {
+          "callee": "sample",
+          "caller": "nan_input_is_rejected_even_with_extrapolation",
+          "lineNumber": 208
+        }
+      ],
+      "classes": [
+        {
+          "endLine": 19,
+          "methods": [
+            "new",
+            "with_extrapolation",
+            "allows_extrapolation",
+            "locate",
+            "check_range",
+            "value",
+            "derivative",
+            "primitive",
+            "x_min",
+            "x_max",
+            "is_in_range"
+          ],
+          "name": "LinearInterpolation",
+          "properties": [
+            "x",
+            "y",
+            "slopes",
+            "primitive_const",
+            "allow_extrapolation"
+          ],
+          "startLine": 13
+        }
+      ],
+      "exports": [
+        {
+          "isDefault": false,
+          "line": 13,
+          "name": "LinearInterpolation"
+        },
+        {
+          "isDefault": false,
+          "line": 24,
+          "name": "new"
+        },
+        {
+          "isDefault": false,
+          "line": 75,
+          "name": "with_extrapolation"
+        },
+        {
+          "isDefault": false,
+          "line": 81,
+          "name": "allows_extrapolation"
+        }
+      ],
+      "fileCategory": "code",
+      "functions": [
+        {
+          "endLine": 71,
+          "name": "new",
+          "params": [
+            "x",
+            "y"
+          ],
+          "startLine": 24
+        },
+        {
+          "endLine": 78,
+          "name": "with_extrapolation",
+          "params": [
+            "allow"
+          ],
+          "startLine": 75
+        },
+        {
+          "endLine": 83,
+          "name": "allows_extrapolation",
+          "params": [],
+          "startLine": 81
+        },
+        {
+          "endLine": 95,
+          "name": "locate",
+          "params": [
+            "x"
+          ],
+          "startLine": 86
+        },
+        {
+          "endLine": 109,
+          "name": "check_range",
+          "params": [
+            "x"
+          ],
+          "startLine": 97
+        },
+        {
+          "endLine": 117,
+          "name": "value",
+          "params": [
+            "x"
+          ],
+          "startLine": 113
+        },
+        {
+          "endLine": 122,
+          "name": "derivative",
+          "params": [
+            "x"
+          ],
+          "startLine": 119
+        },
+        {
+          "endLine": 129,
+          "name": "primitive",
+          "params": [
+            "x"
+          ],
+          "startLine": 124
+        },
+        {
+          "endLine": 133,
+          "name": "x_min",
+          "params": [],
+          "startLine": 131
+        },
+        {
+          "endLine": 137,
+          "name": "x_max",
+          "params": [],
+          "startLine": 135
+        },
+        {
+          "endLine": 141,
+          "name": "is_in_range",
+          "params": [
+            "x"
+          ],
+          "startLine": 139
+        }
+      ],
+      "language": "rust",
+      "metrics": {
+        "classCount": 1,
+        "exportCount": 4,
+        "functionCount": 11,
+        "importCount": 3
+      },
+      "nonEmptyLines": 203,
+      "path": "crates/itofin/src/math/interpolations/linear.rs",
+      "totalLines": 229
+    },
+    {
+      "classes": [
+        {
+          "endLine": 32,
+          "methods": [
+            "value",
+            "derivative",
+            "primitive",
+            "x_min",
+            "x_max",
+            "is_in_range"
+          ],
+          "name": "Interpolation",
+          "properties": [],
+          "startLine": 13
+        }
+      ],
+      "exports": [
+        {
+          "isDefault": false,
+          "line": 13,
+          "name": "Interpolation"
+        }
+      ],
+      "fileCategory": "code",
+      "language": "rust",
+      "metrics": {
+        "classCount": 1,
+        "exportCount": 1,
+        "functionCount": 0,
+        "importCount": 3
+      },
+      "nonEmptyLines": 24,
+      "path": "crates/itofin/src/math/interpolations/mod.rs",
+      "totalLines": 32
+    },
+    {
+      "callGraph": [
+        {
+          "callee": "Vec::new",
+          "caller": "new",
+          "lineNumber": 26
+        },
+        {
+          "callee": "rows\n            .checked_mul(columns).expect",
+          "caller": "with_size",
+          "lineNumber": 34
+        },
+        {
+          "callee": "rows.checked_mul",
+          "caller": "with_size",
+          "lineNumber": 34
+        },
+        {
+          "callee": "rows\n            .checked_mul(columns).expect",
+          "caller": "filled",
+          "lineNumber": 46
+        },
+        {
+          "callee": "rows.checked_mul",
+          "caller": "filled",
+          "lineNumber": 46
+        },
+        {
+          "callee": "self.data.is_empty",
+          "caller": "is_empty",
+          "lineNumber": 68
+        },
+        {
+          "callee": "self.rows.min",
+          "caller": "diagonal",
+          "lineNumber": 93
+        },
+        {
+          "callee": "(0..n).map(|i| self[(i, i)]).collect",
+          "caller": "diagonal",
+          "lineNumber": 94
+        },
+        {
+          "callee": "(0..n).map",
+          "caller": "diagonal",
+          "lineNumber": 94
+        },
+        {
+          "callee": "Matrix::with_size",
+          "caller": "transpose",
+          "lineNumber": 99
+        },
+        {
+          "callee": "rows.iter().flatten().copied().collect",
+          "caller": "from",
+          "lineNumber": 113
+        },
+        {
+          "callee": "rows.iter().flatten().copied",
+          "caller": "from",
+          "lineNumber": 113
+        },
+        {
+          "callee": "rows.iter().flatten",
+          "caller": "from",
+          "lineNumber": 113
+        },
+        {
+          "callee": "rows.iter",
+          "caller": "from",
+          "lineNumber": 113
+        },
+        {
+          "callee": "self.row",
+          "caller": "index",
+          "lineNumber": 123
+        },
+        {
+          "callee": "self.row_mut",
+          "caller": "index_mut",
+          "lineNumber": 129
+        },
+        {
+          "callee": "self.data.iter().map(|x| -x).collect",
+          "caller": "neg",
+          "lineNumber": 150
+        },
+        {
+          "callee": "self.data.iter().map",
+          "caller": "neg",
+          "lineNumber": 150
+        },
+        {
+          "callee": "self.data.iter",
+          "caller": "neg",
+          "lineNumber": 150
+        },
+        {
+          "callee": "Matrix::with_size",
+          "caller": "mul",
+          "lineNumber": 211
+        },
+        {
+          "callee": "(0..self.rows)\n            .map(|i| self.row(i).iter().zip(rhs.iter()).map(|(a, b)| a * b).sum()).collect",
+          "caller": "mul",
+          "lineNumber": 228
+        },
+        {
+          "callee": "(0..self.rows).map",
+          "caller": "mul",
+          "lineNumber": 228
+        },
+        {
+          "callee": "self.row(i).iter().zip(rhs.iter()).map(|(a, b)| a * b).sum",
+          "caller": "mul",
+          "lineNumber": 229
+        },
+        {
+          "callee": "self.row(i).iter().zip(rhs.iter()).map",
+          "caller": "mul",
+          "lineNumber": 229
+        },
+        {
+          "callee": "self.row(i).iter().zip",
+          "caller": "mul",
+          "lineNumber": 229
+        },
+        {
+          "callee": "self.row(i).iter",
+          "caller": "mul",
+          "lineNumber": 229
+        },
+        {
+          "callee": "self.row",
+          "caller": "mul",
+          "lineNumber": 229
+        },
+        {
+          "callee": "rhs.iter",
+          "caller": "mul",
+          "lineNumber": 229
+        },
+        {
+          "callee": "(0..rhs.columns)\n            .map(|j| (0..rhs.rows).map(|i| self[i] * rhs[(i, j)]).sum()).collect",
+          "caller": "mul",
+          "lineNumber": 238
+        },
+        {
+          "callee": "(0..rhs.columns).map",
+          "caller": "mul",
+          "lineNumber": 238
+        },
+        {
+          "callee": "(0..rhs.rows).map(|i| self[i] * rhs[(i, j)]).sum",
+          "caller": "mul",
+          "lineNumber": 239
+        },
+        {
+          "callee": "(0..rhs.rows).map",
+          "caller": "mul",
+          "lineNumber": 239
+        },
+        {
+          "callee": "m.data.iter().zip",
+          "caller": "assert_close",
+          "lineNumber": 255
+        },
+        {
+          "callee": "m.data.iter",
+          "caller": "assert_close",
+          "lineNumber": 255
+        },
+        {
+          "callee": "Matrix::with_size",
+          "caller": "construction_and_access",
+          "lineNumber": 263
+        },
+        {
+          "callee": "Matrix::from",
+          "caller": "construction_and_access",
+          "lineNumber": 267
+        },
+        {
+          "callee": "Matrix::with_size",
+          "caller": "mutation_through_indexing",
+          "lineNumber": 276
+        },
+        {
+          "callee": "Matrix::filled",
+          "caller": "elementwise_and_scalar_operators",
+          "lineNumber": 285
+        },
+        {
+          "callee": "assert_close",
+          "caller": "elementwise_and_scalar_operators",
+          "lineNumber": 286
+        },
+        {
+          "callee": "Matrix::filled",
+          "caller": "elementwise_and_scalar_operators",
+          "lineNumber": 286
+        },
+        {
+          "callee": "assert_close",
+          "caller": "elementwise_and_scalar_operators",
+          "lineNumber": 287
+        },
+        {
+          "callee": "Matrix::filled",
+          "caller": "elementwise_and_scalar_operators",
+          "lineNumber": 287
+        },
+        {
+          "callee": "assert_close",
+          "caller": "elementwise_and_scalar_operators",
+          "lineNumber": 288
+        },
+        {
+          "callee": "Matrix::filled",
+          "caller": "elementwise_and_scalar_operators",
+          "lineNumber": 288
+        },
+        {
+          "callee": "assert_close",
+          "caller": "elementwise_and_scalar_operators",
+          "lineNumber": 289
+        },
+        {
+          "callee": "Matrix::filled",
+          "caller": "elementwise_and_scalar_operators",
+          "lineNumber": 289
+        },
+        {
+          "callee": "assert_close",
+          "caller": "elementwise_and_scalar_operators",
+          "lineNumber": 290
+        },
+        {
+          "callee": "Matrix::filled",
+          "caller": "elementwise_and_scalar_operators",
+          "lineNumber": 290
+        },
+        {
+          "callee": "assert_close",
+          "caller": "elementwise_and_scalar_operators",
+          "lineNumber": 291
+        },
+        {
+          "callee": "Matrix::filled",
+          "caller": "elementwise_and_scalar_operators",
+          "lineNumber": 291
+        },
+        {
+          "callee": "Matrix::from",
+          "caller": "matrix_product",
+          "lineNumber": 296
+        },
+        {
+          "callee": "Matrix::from",
+          "caller": "matrix_product",
+          "lineNumber": 297
+        },
+        {
+          "callee": "assert_close",
+          "caller": "matrix_product",
+          "lineNumber": 299
+        },
+        {
+          "callee": "Matrix::from",
+          "caller": "matrix_product",
+          "lineNumber": 299
+        },
+        {
+          "callee": "Matrix::from",
+          "caller": "matrix_vector_products",
+          "lineNumber": 304
+        },
+        {
+          "callee": "Array::from",
+          "caller": "matrix_vector_products",
+          "lineNumber": 305
+        },
+        {
+          "callee": "Array::from",
+          "caller": "matrix_vector_products",
+          "lineNumber": 309
+        },
+        {
+          "callee": "Matrix::from",
+          "caller": "transpose_and_diagonal",
+          "lineNumber": 315
+        },
+        {
+          "callee": "m.transpose",
+          "caller": "transpose_and_diagonal",
+          "lineNumber": 316
+        },
+        {
+          "callee": "Matrix::from",
+          "caller": "transpose_and_diagonal",
+          "lineNumber": 321
+        },
+        {
+          "callee": "Matrix::with_size",
+          "caller": "product_shape_mismatch_panics",
+          "lineNumber": 328
+        },
+        {
+          "callee": "Matrix::with_size",
+          "caller": "product_shape_mismatch_panics",
+          "lineNumber": 328
+        },
+        {
+          "callee": "Matrix::with_size",
+          "caller": "row_out_of_bounds_panics_even_with_zero_columns",
+          "lineNumber": 336
+        },
+        {
+          "callee": "m.row",
+          "caller": "row_out_of_bounds_panics_even_with_zero_columns",
+          "lineNumber": 337
+        }
+      ],
+      "classes": [
+        {
+          "endLine": 20,
+          "methods": [
+            "new",
+            "with_size",
+            "filled",
+            "rows",
+            "columns",
+            "is_empty",
+            "row",
+            "row_mut",
+            "diagonal",
+            "transpose",
+            "from",
+            "index",
+            "index_mut",
+            "index",
+            "index_mut"
+          ],
+          "name": "Matrix",
+          "properties": [
+            "data",
+            "rows",
+            "columns"
+          ],
+          "startLine": 16
+        }
+      ],
+      "exports": [
+        {
+          "isDefault": false,
+          "line": 16,
+          "name": "Matrix"
+        },
+        {
+          "isDefault": false,
+          "line": 24,
+          "name": "new"
+        },
+        {
+          "isDefault": false,
+          "line": 33,
+          "name": "with_size"
+        },
+        {
+          "isDefault": false,
+          "line": 45,
+          "name": "filled"
+        },
+        {
+          "isDefault": false,
+          "line": 57,
+          "name": "rows"
+        },
+        {
+          "isDefault": false,
+          "line": 62,
+          "name": "columns"
+        },
+        {
+          "isDefault": false,
+          "line": 67,
+          "name": "is_empty"
+        },
+        {
+          "isDefault": false,
+          "line": 72,
+          "name": "row"
+        },
+        {
+          "isDefault": false,
+          "line": 82,
+          "name": "row_mut"
+        },
+        {
+          "isDefault": false,
+          "line": 92,
+          "name": "diagonal"
+        },
+        {
+          "isDefault": false,
+          "line": 98,
+          "name": "transpose"
+        }
+      ],
+      "fileCategory": "code",
+      "functions": [
+        {
+          "endLine": 30,
+          "name": "new",
+          "params": [],
+          "startLine": 24
+        },
+        {
+          "endLine": 42,
+          "name": "with_size",
+          "params": [
+            "rows",
+            "columns"
+          ],
+          "startLine": 33
+        },
+        {
+          "endLine": 54,
+          "name": "filled",
+          "params": [
+            "rows",
+            "columns",
+            "value"
+          ],
+          "startLine": 45
+        },
+        {
+          "endLine": 59,
+          "name": "rows",
+          "params": [],
+          "startLine": 57
+        },
+        {
+          "endLine": 64,
+          "name": "columns",
+          "params": [],
+          "startLine": 62
+        },
+        {
+          "endLine": 69,
+          "name": "is_empty",
+          "params": [],
+          "startLine": 67
+        },
+        {
+          "endLine": 79,
+          "name": "row",
+          "params": [
+            "i"
+          ],
+          "startLine": 72
+        },
+        {
+          "endLine": 89,
+          "name": "row_mut",
+          "params": [
+            "i"
+          ],
+          "startLine": 82
+        },
+        {
+          "endLine": 95,
+          "name": "diagonal",
+          "params": [],
+          "startLine": 92
+        },
+        {
+          "endLine": 106,
+          "name": "transpose",
+          "params": [],
+          "startLine": 98
+        },
+        {
+          "endLine": 117,
+          "name": "from",
+          "params": [
+            "rows"
+          ],
+          "startLine": 111
+        },
+        {
+          "endLine": 124,
+          "name": "index",
+          "params": [
+            "i"
+          ],
+          "startLine": 122
+        },
+        {
+          "endLine": 130,
+          "name": "index_mut",
+          "params": [
+            "i"
+          ],
+          "startLine": 128
+        },
+        {
+          "endLine": 137,
+          "name": "index",
+          "params": [
+            "(i, j)"
+          ],
+          "startLine": 135
+        },
+        {
+          "endLine": 143,
+          "name": "index_mut",
+          "params": [
+            "(i, j)"
+          ],
+          "startLine": 141
+        },
+        {
+          "endLine": 154,
+          "name": "neg",
+          "params": [],
+          "startLine": 148
+        },
+        {
+          "endLine": 204,
+          "name": "mul",
+          "params": [
+            "rhs"
+          ],
+          "startLine": 202
+        },
+        {
+          "endLine": 221,
+          "name": "mul",
+          "params": [
+            "rhs"
+          ],
+          "startLine": 209
+        },
+        {
+          "endLine": 231,
+          "name": "mul",
+          "params": [
+            "rhs"
+          ],
+          "startLine": 226
+        },
+        {
+          "endLine": 241,
+          "name": "mul",
+          "params": [
+            "rhs"
+          ],
+          "startLine": 236
+        }
+      ],
+      "language": "rust",
+      "metrics": {
+        "classCount": 1,
+        "exportCount": 11,
+        "functionCount": 20,
+        "importCount": 2
+      },
+      "nonEmptyLines": 299,
+      "path": "crates/itofin/src/math/matrix.rs",
+      "totalLines": 339
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "metrics": {
+        "classCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "importCount": 8
+      },
+      "nonEmptyLines": 9,
+      "path": "crates/itofin/src/math/mod.rs",
+      "totalLines": 10
+    }
+  ],
+  "scriptCompleted": true
+}

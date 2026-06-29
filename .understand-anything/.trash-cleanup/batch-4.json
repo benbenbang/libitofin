@@ -1,0 +1,324 @@
+{
+  "edges": [
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/utilities/clone.rs",
+      "target": "class:crates/itofin/src/utilities/clone.rs:ValueBox",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/utilities/clone.rs",
+      "target": "class:crates/itofin/src/utilities/clone.rs:ValueBox",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/utilities/dataformatters.rs",
+      "target": "function:crates/itofin/src/utilities/dataformatters.rs:check_null",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/utilities/dataformatters.rs",
+      "target": "function:crates/itofin/src/utilities/dataformatters.rs:ordinal",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/utilities/dataformatters.rs",
+      "target": "function:crates/itofin/src/utilities/dataformatters.rs:check_null",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/utilities/dataformatters.rs",
+      "target": "function:crates/itofin/src/utilities/dataformatters.rs:ordinal",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/utilities/null.rs",
+      "target": "class:crates/itofin/src/utilities/null.rs:Null",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/utilities/null.rs",
+      "target": "class:crates/itofin/src/utilities/null.rs:Null",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/utilities/steppingiterator.rs",
+      "target": "class:crates/itofin/src/utilities/steppingiterator.rs:StepIterator",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/utilities/steppingiterator.rs",
+      "target": "function:crates/itofin/src/utilities/steppingiterator.rs:step_iter",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/utilities/steppingiterator.rs",
+      "target": "class:crates/itofin/src/utilities/steppingiterator.rs:StepIterator",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/utilities/steppingiterator.rs",
+      "target": "function:crates/itofin/src/utilities/steppingiterator.rs:step_iter",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/utilities/dataformatters.rs",
+      "target": "file:crates/itofin/src/types.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/utilities/dataformatters.rs",
+      "target": "file:crates/itofin/src/utilities/null.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/utilities/mod.rs",
+      "target": "file:crates/itofin/src/utilities/clone.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/utilities/mod.rs",
+      "target": "file:crates/itofin/src/utilities/dataformatters.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/utilities/mod.rs",
+      "target": "file:crates/itofin/src/utilities/null.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/utilities/mod.rs",
+      "target": "file:crates/itofin/src/utilities/steppingiterator.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/utilities/null.rs",
+      "target": "file:crates/itofin/src/types.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/utilities/steppingiterator.rs",
+      "target": "file:crates/itofin/src/types.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/utilities/dataformatters.rs",
+      "target": "class:crates/itofin/src/utilities/null.rs:Null",
+      "type": "calls",
+      "weight": 0.8
+    }
+  ],
+  "nodes": [
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/utilities/clone.rs",
+      "id": "file:crates/itofin/src/utilities/clone.rs",
+      "languageNotes": "Implements custom Clone/Default rather than deriving, using Box<T> with Option to model an optionally-empty owned slot.",
+      "name": "clone.rs",
+      "summary": "Provides ValueBox, a deep-clone heap container that ports QuantLib's clone-on-Clone semantics so cloning duplicates the owned value rather than sharing a pointer.",
+      "tags": [
+        "utility",
+        "data-model",
+        "deep-clone",
+        "memory"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/utilities/dataformatters.rs",
+      "id": "file:crates/itofin/src/utilities/dataformatters.rs",
+      "name": "dataformatters.rs",
+      "summary": "String formatting helpers for quantitative values (null sentinels, ordinals, percentages, rates, volatilities) ported from QuantLib's DataFormatters.",
+      "tags": [
+        "utility",
+        "formatting",
+        "serialization"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/utilities/mod.rs",
+      "id": "file:crates/itofin/src/utilities/mod.rs",
+      "name": "mod.rs",
+      "summary": "Module barrel that declares and re-exports the utilities submodules (clone, dataformatters, null, steppingiterator).",
+      "tags": [
+        "barrel",
+        "entry-point",
+        "module"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/utilities/null.rs",
+      "id": "file:crates/itofin/src/utilities/null.rs",
+      "languageNotes": "Uses a trait with an associated null() sentinel and provided is_null() default method to emulate C++ template specialization.",
+      "name": "null.rs",
+      "summary": "Defines the Null trait providing sentinel null values and is_null checks for numeric types, porting QuantLib's Null<T> template.",
+      "tags": [
+        "utility",
+        "type-definition",
+        "validation",
+        "sentinel"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/utilities/steppingiterator.rs",
+      "id": "file:crates/itofin/src/utilities/steppingiterator.rs",
+      "languageNotes": "Implements the std Iterator trait and uses saturating_add to avoid index overflow when stepping past the slice end.",
+      "name": "steppingiterator.rs",
+      "summary": "Provides StepIterator and the step_iter constructor that yield every nth element of a slice, porting QuantLib's stepping iterator.",
+      "tags": [
+        "utility",
+        "iterator",
+        "data-model"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/utilities/clone.rs",
+      "id": "class:crates/itofin/src/utilities/clone.rs:ValueBox",
+      "lineRange": [
+        14,
+        16
+      ],
+      "name": "ValueBox",
+      "summary": "Heap-allocated, optionally-empty owned value with deep-clone semantics; exposes empty/new constructors plus get, get_mut, swap, and is_empty accessors.",
+      "tags": [
+        "data-model",
+        "deep-clone",
+        "container"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/utilities/dataformatters.rs",
+      "id": "function:crates/itofin/src/utilities/dataformatters.rs:check_null",
+      "lineRange": [
+        13,
+        19
+      ],
+      "name": "check_null",
+      "summary": "Formats a value as the literal \"null\" when it is the Null sentinel, otherwise delegates to its Display representation.",
+      "tags": [
+        "formatting",
+        "validation",
+        "utility"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/utilities/dataformatters.rs",
+      "id": "function:crates/itofin/src/utilities/dataformatters.rs:ordinal",
+      "lineRange": [
+        22,
+        31
+      ],
+      "name": "ordinal",
+      "summary": "Renders an integer as an English ordinal string (1st, 2nd, 3rd, ...) handling the 11-13 suffix exceptions.",
+      "tags": [
+        "formatting",
+        "utility"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/utilities/null.rs",
+      "id": "class:crates/itofin/src/utilities/null.rs:Null",
+      "lineRange": [
+        11,
+        19
+      ],
+      "name": "Null",
+      "summary": "Trait supplying a type-specific null() sentinel value and an is_null() comparison used to mark unset numeric quantities.",
+      "tags": [
+        "type-definition",
+        "sentinel",
+        "validation"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/utilities/steppingiterator.rs",
+      "id": "class:crates/itofin/src/utilities/steppingiterator.rs:StepIterator",
+      "lineRange": [
+        12,
+        16
+      ],
+      "name": "StepIterator",
+      "summary": "Iterator over a slice that advances by a fixed step, yielding every nth element starting at position zero.",
+      "tags": [
+        "iterator",
+        "data-model",
+        "utility"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/utilities/steppingiterator.rs",
+      "id": "function:crates/itofin/src/utilities/steppingiterator.rs:step_iter",
+      "lineRange": [
+        36,
+        39
+      ],
+      "name": "step_iter",
+      "summary": "Public constructor that builds a StepIterator over a slice with the given step size.",
+      "tags": [
+        "iterator",
+        "factory",
+        "utility"
+      ],
+      "type": "function"
+    }
+  ]
+}

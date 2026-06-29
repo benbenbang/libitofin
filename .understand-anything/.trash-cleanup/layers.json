@@ -1,0 +1,103 @@
+[
+  {
+    "description": "Foundational primitives shared across the whole crate: numeric type aliases, the error hierarchy, the Handle indirection, global Settings, shared smart-pointer aliases, and the crate root that re-exports every module.",
+    "id": "layer:core",
+    "name": "Core Foundation",
+    "nodeIds": [
+      "file:crates/itofin/src/types.rs",
+      "file:crates/itofin/src/errors.rs",
+      "file:crates/itofin/src/handle.rs",
+      "file:crates/itofin/src/settings.rs",
+      "file:crates/itofin/src/shared.rs",
+      "file:crates/itofin/src/lib.rs"
+    ]
+  },
+  {
+    "description": "Cross-cutting behavioral infrastructure ported from QuantLib's patterns module: the Observable/Observer graph, LazyObject recalculation, and the Visitor dispatch mechanism.",
+    "id": "layer:patterns",
+    "name": "Design Patterns",
+    "nodeIds": [
+      "file:crates/itofin/src/patterns/observable.rs",
+      "file:crates/itofin/src/patterns/lazyobject.rs",
+      "file:crates/itofin/src/patterns/visitor.rs",
+      "file:crates/itofin/src/patterns/mod.rs"
+    ]
+  },
+  {
+    "description": "General-purpose helpers built on the core types: Null sentinel values, data formatters, clone helpers, and the stepping iterator adaptor.",
+    "id": "layer:utility",
+    "name": "Utilities",
+    "nodeIds": [
+      "file:crates/itofin/src/utilities/null.rs",
+      "file:crates/itofin/src/utilities/dataformatters.rs",
+      "file:crates/itofin/src/utilities/clone.rs",
+      "file:crates/itofin/src/utilities/steppingiterator.rs",
+      "file:crates/itofin/src/utilities/mod.rs"
+    ]
+  },
+  {
+    "description": "Numerical building blocks - Array and Matrix containers, special functions (beta, error function, gamma, incomplete gamma), and linear interpolation - that depend only on the core layer.",
+    "id": "layer:math",
+    "name": "Math Primitives",
+    "nodeIds": [
+      "file:crates/itofin/src/math/array.rs",
+      "file:crates/itofin/src/math/matrix.rs",
+      "file:crates/itofin/src/math/beta.rs",
+      "file:crates/itofin/src/math/errorfunction.rs",
+      "file:crates/itofin/src/math/gammafunction.rs",
+      "file:crates/itofin/src/math/incompletegamma.rs",
+      "file:crates/itofin/src/math/interpolations/linear.rs",
+      "file:crates/itofin/src/math/interpolations/mod.rs",
+      "file:crates/itofin/src/math/mod.rs"
+    ]
+  },
+  {
+    "description": "Statistical distribution implementations (normal, Poisson, binomial, Student-t, chi-square, gamma) that build on the math special-functions and the core types.",
+    "id": "layer:distributions",
+    "name": "Probability Distributions",
+    "nodeIds": [
+      "file:crates/itofin/src/math/distributions/normal.rs",
+      "file:crates/itofin/src/math/distributions/poisson.rs",
+      "file:crates/itofin/src/math/distributions/binomial.rs",
+      "file:crates/itofin/src/math/distributions/studentt.rs",
+      "file:crates/itofin/src/math/distributions/chisquare.rs",
+      "file:crates/itofin/src/math/distributions/gamma.rs",
+      "file:crates/itofin/src/math/distributions/mod.rs"
+    ]
+  },
+  {
+    "description": "Repository automation: GitHub Actions workflows, the prek linting Docker image and its build script, shell helpers for extension checks and hadolint, the labeler config, and Copilot/CI documentation.",
+    "id": "layer:infrastructure",
+    "name": "Tooling & CI/CD",
+    "nodeIds": [
+      "pipeline:.github/workflows/pull-request.yml",
+      "pipeline:.github/workflows/semantic-release.yml",
+      "service:.github/images/prek/Dockerfile",
+      "file:.github/images/prek/build.sh",
+      "service:.dockerignore",
+      "file:scripts/check_extension.sh",
+      "file:scripts/hadolint.sh",
+      "config:scripts/hadolint.yml",
+      "file:scripts/init.sh",
+      "config:.github/labeler.yml",
+      "document:.github/copilot-instructions.md",
+      "document:.github/images/README.md"
+    ]
+  },
+  {
+    "description": "Top-level project setup and documentation: the Cargo workspace and crate manifests, pinned toolchain, pre-commit and semantic-release configs, the README and TICKETS backlog, and analysis tooling config.",
+    "id": "layer:config",
+    "name": "Project Configuration & Docs",
+    "nodeIds": [
+      "config:Cargo.toml",
+      "config:crates/itofin/Cargo.toml",
+      "config:rust-toolchain.toml",
+      "config:.pre-commit-config.yaml",
+      "config:.releaserc.json",
+      "document:README.md",
+      "document:TICKETS.md",
+      "config:.understand-anything/config.json",
+      "file:.understand-anything/.understandignore"
+    ]
+  }
+]

@@ -1,0 +1,271 @@
+{
+  "filesAnalyzed": 7,
+  "filesSkipped": [],
+  "results": [
+    {
+      "fileCategory": "infra",
+      "language": "unknown",
+      "metrics": {},
+      "nonEmptyLines": 1,
+      "path": ".dockerignore",
+      "totalLines": 1
+    },
+    {
+      "fileCategory": "config",
+      "language": "yaml",
+      "metrics": {
+        "classCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "importCount": 0,
+        "sectionCount": 1
+      },
+      "nonEmptyLines": 39,
+      "path": ".pre-commit-config.yaml",
+      "sections": [
+        {
+          "heading": "repos",
+          "level": 1,
+          "line": 1
+        }
+      ],
+      "totalLines": 39
+    },
+    {
+      "fileCategory": "config",
+      "language": "json",
+      "metrics": {
+        "classCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "importCount": 0,
+        "sectionCount": 6
+      },
+      "nonEmptyLines": 146,
+      "path": ".releaserc.json",
+      "sections": [
+        {
+          "heading": "branches",
+          "level": 1,
+          "line": 2
+        },
+        {
+          "heading": "parserOpts",
+          "level": 1,
+          "line": 5
+        },
+        {
+          "heading": "plugins",
+          "level": 1,
+          "line": 8
+        },
+        {
+          "heading": "preset",
+          "level": 1,
+          "line": 18
+        },
+        {
+          "heading": "presetConfig",
+          "level": 1,
+          "line": 72
+        },
+        {
+          "heading": "tagFormat",
+          "level": 1,
+          "line": 145
+        }
+      ],
+      "totalLines": 146
+    },
+    {
+      "fileCategory": "config",
+      "language": "toml",
+      "metrics": {
+        "classCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "importCount": 0,
+        "sectionCount": 2
+      },
+      "nonEmptyLines": 6,
+      "path": "Cargo.toml",
+      "sections": [
+        {
+          "heading": "workspace",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "workspace.package",
+          "level": 2,
+          "line": 5
+        }
+      ],
+      "totalLines": 7
+    },
+    {
+      "fileCategory": "docs",
+      "language": "markdown",
+      "metrics": {
+        "classCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "importCount": 0,
+        "sectionCount": 8
+      },
+      "nonEmptyLines": 97,
+      "path": "README.md",
+      "sections": [
+        {
+          "heading": "Lib-It\u00f4-Fin",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "Why",
+          "level": 2,
+          "line": 15
+        },
+        {
+          "heading": "Status",
+          "level": 2,
+          "line": 31
+        },
+        {
+          "heading": "What EPIC-0 provides today",
+          "level": 3,
+          "line": 48
+        },
+        {
+          "heading": "Getting started",
+          "level": 2,
+          "line": 66
+        },
+        {
+          "heading": "Project layout",
+          "level": 2,
+          "line": 93
+        },
+        {
+          "heading": "Design principles",
+          "level": 2,
+          "line": 107
+        },
+        {
+          "heading": "License",
+          "level": 2,
+          "line": 121
+        }
+      ],
+      "totalLines": 124
+    },
+    {
+      "fileCategory": "docs",
+      "language": "markdown",
+      "metrics": {
+        "classCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "importCount": 0,
+        "sectionCount": 14
+      },
+      "nonEmptyLines": 162,
+      "path": "TICKETS.md",
+      "sections": [
+        {
+          "heading": "ito-fin - QuantLib \u2192 Rust Porting Backlog",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "0. Cross-cutting design decisions (DECIDE FIRST - blocks all porting)",
+          "level": 2,
+          "line": 13
+        },
+        {
+          "heading": "D6 - Concurrency model (`rayon` only; the core does no IO)",
+          "level": 3,
+          "line": 31
+        },
+        {
+          "heading": "D7 - Binding strategy (couples to D3)",
+          "level": 3,
+          "line": 46
+        },
+        {
+          "heading": "D8 - Logging / observability (deferred; does not block any ticket)",
+          "level": 3,
+          "line": 64
+        },
+        {
+          "heading": "1. Epic dependency map",
+          "level": 2,
+          "line": 81
+        },
+        {
+          "heading": "2. Ticket convention",
+          "level": 2,
+          "line": 103
+        },
+        {
+          "heading": "3. Milestone 1 - Vertical slice (do this BEFORE going wide)",
+          "level": 2,
+          "line": 120
+        },
+        {
+          "heading": "4. EPIC-0 - core (L0)  \u2733\ufe0f start here",
+          "level": 2,
+          "line": 134
+        },
+        {
+          "heading": "5. EPIC-2 - time (L2)  \u2733\ufe0f parallelizable with EPIC-1",
+          "level": 2,
+          "line": 148
+        },
+        {
+          "heading": "6. EPIC-1 - math (L1)",
+          "level": 2,
+          "line": 160
+        },
+        {
+          "heading": "7. EPIC-3 - quotes (L3, tiny - pulls into Milestone 1)",
+          "level": 2,
+          "line": 187
+        },
+        {
+          "heading": "8. Epics L4\u2013L11 (headline only - break down after L0\u2013L2 land)",
+          "level": 2,
+          "line": 197
+        },
+        {
+          "heading": "9. Execution notes",
+          "level": 2,
+          "line": 213
+        }
+      ],
+      "totalLines": 219
+    },
+    {
+      "fileCategory": "config",
+      "language": "toml",
+      "metrics": {
+        "classCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "importCount": 0,
+        "sectionCount": 1
+      },
+      "nonEmptyLines": 3,
+      "path": "rust-toolchain.toml",
+      "sections": [
+        {
+          "heading": "toolchain",
+          "level": 1,
+          "line": 1
+        }
+      ],
+      "totalLines": 3
+    }
+  ],
+  "scriptCompleted": true
+}

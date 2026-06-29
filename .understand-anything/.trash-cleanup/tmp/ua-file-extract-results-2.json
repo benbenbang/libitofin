@@ -1,0 +1,2106 @@
+{
+  "filesAnalyzed": 8,
+  "filesSkipped": [],
+  "results": [
+    {
+      "callGraph": [
+        {
+          "callee": "Shared::new",
+          "caller": "new",
+          "lineNumber": 28
+        },
+        {
+          "callee": "Observable::new",
+          "caller": "new",
+          "lineNumber": 28
+        },
+        {
+          "callee": "self.observable.clone",
+          "caller": "link_to",
+          "lineNumber": 37
+        },
+        {
+          "callee": "self.current.is_none",
+          "caller": "is_empty",
+          "lineNumber": 41
+        },
+        {
+          "callee": "shared_mut",
+          "caller": "empty",
+          "lineNumber": 57
+        },
+        {
+          "callee": "Link::new",
+          "caller": "empty",
+          "lineNumber": 57
+        },
+        {
+          "callee": "shared_mut",
+          "caller": "new",
+          "lineNumber": 64
+        },
+        {
+          "callee": "Link::new",
+          "caller": "new",
+          "lineNumber": 64
+        },
+        {
+          "callee": "Some",
+          "caller": "new",
+          "lineNumber": 64
+        },
+        {
+          "callee": "Ok",
+          "caller": "current_link",
+          "lineNumber": 74
+        },
+        {
+          "callee": "self.link.borrow().current.clone().unwrap",
+          "caller": "current_link",
+          "lineNumber": 74
+        },
+        {
+          "callee": "self.link.borrow().current.clone",
+          "caller": "current_link",
+          "lineNumber": 74
+        },
+        {
+          "callee": "self.link.borrow",
+          "caller": "current_link",
+          "lineNumber": 74
+        },
+        {
+          "callee": "self.link.borrow().is_empty",
+          "caller": "is_empty",
+          "lineNumber": 79
+        },
+        {
+          "callee": "self.link.borrow",
+          "caller": "is_empty",
+          "lineNumber": 79
+        },
+        {
+          "callee": "self.link.borrow().observable.register_observer",
+          "caller": "register_observer",
+          "lineNumber": 86
+        },
+        {
+          "callee": "self.link.borrow",
+          "caller": "register_observer",
+          "lineNumber": 86
+        },
+        {
+          "callee": "SharedMut::ptr_eq",
+          "caller": "points_to_same_link",
+          "lineNumber": 91
+        },
+        {
+          "callee": "SharedMut::clone",
+          "caller": "clone",
+          "lineNumber": 98
+        },
+        {
+          "callee": "Handle::empty",
+          "caller": "empty",
+          "lineNumber": 112
+        },
+        {
+          "callee": "Handle::new",
+          "caller": "new",
+          "lineNumber": 119
+        },
+        {
+          "callee": "self.handle.link.borrow_mut().link_to",
+          "caller": "link_to",
+          "lineNumber": 125
+        },
+        {
+          "callee": "self.handle.link.borrow_mut",
+          "caller": "link_to",
+          "lineNumber": 125
+        },
+        {
+          "callee": "Some",
+          "caller": "link_to",
+          "lineNumber": 125
+        },
+        {
+          "callee": "observable.notify_observers",
+          "caller": "link_to",
+          "lineNumber": 126
+        },
+        {
+          "callee": "self.handle.link.borrow_mut().link_to",
+          "caller": "reset",
+          "lineNumber": 131
+        },
+        {
+          "callee": "self.handle.link.borrow_mut",
+          "caller": "reset",
+          "lineNumber": 131
+        },
+        {
+          "callee": "observable.notify_observers",
+          "caller": "reset",
+          "lineNumber": 132
+        },
+        {
+          "callee": "self.handle.clone",
+          "caller": "handle",
+          "lineNumber": 137
+        },
+        {
+          "callee": "Handle::empty",
+          "caller": "empty_handle_cannot_be_dereferenced",
+          "lineNumber": 159
+        },
+        {
+          "callee": "Handle::new",
+          "caller": "handle_dereferences_to_pointee",
+          "lineNumber": 166
+        },
+        {
+          "callee": "shared",
+          "caller": "handle_dereferences_to_pointee",
+          "lineNumber": 166
+        },
+        {
+          "callee": "Handle::new",
+          "caller": "copies_share_one_link",
+          "lineNumber": 173
+        },
+        {
+          "callee": "shared",
+          "caller": "copies_share_one_link",
+          "lineNumber": 173
+        },
+        {
+          "callee": "h.clone",
+          "caller": "copies_share_one_link",
+          "lineNumber": 174
+        },
+        {
+          "callee": "RelinkableHandle::new",
+          "caller": "relink_propagates_notification_to_observers",
+          "lineNumber": 180
+        },
+        {
+          "callee": "shared",
+          "caller": "relink_propagates_notification_to_observers",
+          "lineNumber": 180
+        },
+        {
+          "callee": "rh.handle",
+          "caller": "relink_propagates_notification_to_observers",
+          "lineNumber": 181
+        },
+        {
+          "callee": "shared_mut",
+          "caller": "relink_propagates_notification_to_observers",
+          "lineNumber": 183
+        },
+        {
+          "callee": "Flag::default",
+          "caller": "relink_propagates_notification_to_observers",
+          "lineNumber": 183
+        },
+        {
+          "callee": "observed.register_observer",
+          "caller": "relink_propagates_notification_to_observers",
+          "lineNumber": 184
+        },
+        {
+          "callee": "flag.clone",
+          "caller": "relink_propagates_notification_to_observers",
+          "lineNumber": 184
+        },
+        {
+          "callee": "rh.link_to",
+          "caller": "relink_propagates_notification_to_observers",
+          "lineNumber": 186
+        },
+        {
+          "callee": "shared",
+          "caller": "relink_propagates_notification_to_observers",
+          "lineNumber": 186
+        },
+        {
+          "callee": "RelinkableHandle::new",
+          "caller": "reset_empties_and_notifies",
+          "lineNumber": 195
+        },
+        {
+          "callee": "shared",
+          "caller": "reset_empties_and_notifies",
+          "lineNumber": 195
+        },
+        {
+          "callee": "rh.handle",
+          "caller": "reset_empties_and_notifies",
+          "lineNumber": 196
+        },
+        {
+          "callee": "shared_mut",
+          "caller": "reset_empties_and_notifies",
+          "lineNumber": 197
+        },
+        {
+          "callee": "Flag::default",
+          "caller": "reset_empties_and_notifies",
+          "lineNumber": 197
+        },
+        {
+          "callee": "observed.register_observer",
+          "caller": "reset_empties_and_notifies",
+          "lineNumber": 198
+        },
+        {
+          "callee": "flag.clone",
+          "caller": "reset_empties_and_notifies",
+          "lineNumber": 198
+        },
+        {
+          "callee": "rh.reset",
+          "caller": "reset_empties_and_notifies",
+          "lineNumber": 200
+        },
+        {
+          "callee": "self.handle.current_link().ok().map",
+          "caller": "update",
+          "lineNumber": 215
+        },
+        {
+          "callee": "self.handle.current_link().ok",
+          "caller": "update",
+          "lineNumber": 215
+        },
+        {
+          "callee": "self.handle.current_link",
+          "caller": "update",
+          "lineNumber": 215
+        },
+        {
+          "callee": "RelinkableHandle::new",
+          "caller": "observer_may_read_handle_during_relink",
+          "lineNumber": 221
+        },
+        {
+          "callee": "shared",
+          "caller": "observer_may_read_handle_during_relink",
+          "lineNumber": 221
+        },
+        {
+          "callee": "shared_mut",
+          "caller": "observer_may_read_handle_during_relink",
+          "lineNumber": 222
+        },
+        {
+          "callee": "rh.handle",
+          "caller": "observer_may_read_handle_during_relink",
+          "lineNumber": 223
+        },
+        {
+          "callee": "rh.handle().register_observer",
+          "caller": "observer_may_read_handle_during_relink",
+          "lineNumber": 226
+        },
+        {
+          "callee": "rh.handle",
+          "caller": "observer_may_read_handle_during_relink",
+          "lineNumber": 226
+        },
+        {
+          "callee": "reader.clone",
+          "caller": "observer_may_read_handle_during_relink",
+          "lineNumber": 227
+        },
+        {
+          "callee": "rh.link_to",
+          "caller": "observer_may_read_handle_during_relink",
+          "lineNumber": 229
+        },
+        {
+          "callee": "shared",
+          "caller": "observer_may_read_handle_during_relink",
+          "lineNumber": 229
+        }
+      ],
+      "classes": [
+        {
+          "endLine": 22,
+          "methods": [],
+          "name": "Link",
+          "properties": [
+            "current",
+            "observable"
+          ],
+          "startLine": 19
+        },
+        {
+          "endLine": 51,
+          "methods": [],
+          "name": "Handle",
+          "properties": [
+            "link"
+          ],
+          "startLine": 49
+        },
+        {
+          "endLine": 106,
+          "methods": [],
+          "name": "RelinkableHandle",
+          "properties": [
+            "handle"
+          ],
+          "startLine": 104
+        }
+      ],
+      "exports": [
+        {
+          "isDefault": false,
+          "line": 19,
+          "name": "Link"
+        },
+        {
+          "isDefault": false,
+          "line": 49,
+          "name": "Handle"
+        },
+        {
+          "isDefault": false,
+          "line": 55,
+          "name": "empty"
+        },
+        {
+          "isDefault": false,
+          "line": 62,
+          "name": "new"
+        },
+        {
+          "isDefault": false,
+          "line": 72,
+          "name": "current_link"
+        },
+        {
+          "isDefault": false,
+          "line": 78,
+          "name": "is_empty"
+        },
+        {
+          "isDefault": false,
+          "line": 85,
+          "name": "register_observer"
+        },
+        {
+          "isDefault": false,
+          "line": 90,
+          "name": "points_to_same_link"
+        },
+        {
+          "isDefault": false,
+          "line": 104,
+          "name": "RelinkableHandle"
+        },
+        {
+          "isDefault": false,
+          "line": 110,
+          "name": "empty"
+        },
+        {
+          "isDefault": false,
+          "line": 117,
+          "name": "new"
+        },
+        {
+          "isDefault": false,
+          "line": 124,
+          "name": "link_to"
+        },
+        {
+          "isDefault": false,
+          "line": 130,
+          "name": "reset"
+        },
+        {
+          "isDefault": false,
+          "line": 136,
+          "name": "handle"
+        }
+      ],
+      "fileCategory": "code",
+      "functions": [
+        {
+          "endLine": 30,
+          "name": "new",
+          "params": [
+            "pointee"
+          ],
+          "startLine": 25
+        },
+        {
+          "endLine": 38,
+          "name": "link_to",
+          "params": [
+            "pointee"
+          ],
+          "startLine": 35
+        },
+        {
+          "endLine": 42,
+          "name": "is_empty",
+          "params": [],
+          "startLine": 40
+        },
+        {
+          "endLine": 59,
+          "name": "empty",
+          "params": [],
+          "startLine": 55
+        },
+        {
+          "endLine": 66,
+          "name": "new",
+          "params": [
+            "pointee"
+          ],
+          "startLine": 62
+        },
+        {
+          "endLine": 75,
+          "name": "current_link",
+          "params": [],
+          "startLine": 72
+        },
+        {
+          "endLine": 80,
+          "name": "is_empty",
+          "params": [],
+          "startLine": 78
+        },
+        {
+          "endLine": 87,
+          "name": "register_observer",
+          "params": [
+            "observer"
+          ],
+          "startLine": 85
+        },
+        {
+          "endLine": 92,
+          "name": "points_to_same_link",
+          "params": [
+            "other"
+          ],
+          "startLine": 90
+        },
+        {
+          "endLine": 100,
+          "name": "clone",
+          "params": [],
+          "startLine": 96
+        },
+        {
+          "endLine": 114,
+          "name": "empty",
+          "params": [],
+          "startLine": 110
+        },
+        {
+          "endLine": 121,
+          "name": "new",
+          "params": [
+            "pointee"
+          ],
+          "startLine": 117
+        },
+        {
+          "endLine": 127,
+          "name": "link_to",
+          "params": [
+            "pointee"
+          ],
+          "startLine": 124
+        },
+        {
+          "endLine": 133,
+          "name": "reset",
+          "params": [],
+          "startLine": 130
+        },
+        {
+          "endLine": 138,
+          "name": "handle",
+          "params": [],
+          "startLine": 136
+        }
+      ],
+      "language": "rust",
+      "metrics": {
+        "classCount": 3,
+        "exportCount": 14,
+        "functionCount": 15,
+        "importCount": 3
+      },
+      "nonEmptyLines": 198,
+      "path": "crates/itofin/src/handle.rs",
+      "totalLines": 235
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "metrics": {
+        "classCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "importCount": 8
+      },
+      "nonEmptyLines": 12,
+      "path": "crates/itofin/src/lib.rs",
+      "totalLines": 13
+    },
+    {
+      "callGraph": [
+        {
+          "callee": "Observable::new",
+          "caller": "new",
+          "lineNumber": 42
+        },
+        {
+          "callee": "self.observable.notify_observers",
+          "caller": "on_update",
+          "lineNumber": 85
+        },
+        {
+          "callee": "perform",
+          "caller": "calculate",
+          "lineNumber": 101
+        },
+        {
+          "callee": "Err",
+          "caller": "calculate",
+          "lineNumber": 106
+        },
+        {
+          "callee": "Ok",
+          "caller": "calculate",
+          "lineNumber": 110
+        },
+        {
+          "callee": "self.calculate",
+          "caller": "recalculate",
+          "lineNumber": 122
+        },
+        {
+          "callee": "self.observable.notify_observers",
+          "caller": "recalculate",
+          "lineNumber": 124
+        },
+        {
+          "callee": "self.observable.notify_observers",
+          "caller": "unfreeze",
+          "lineNumber": 137
+        },
+        {
+          "callee": "self.observable.register_observer",
+          "caller": "register_observer",
+          "lineNumber": 143
+        },
+        {
+          "callee": "shared_mut",
+          "caller": "new",
+          "lineNumber": 162
+        },
+        {
+          "callee": "Flag::default",
+          "caller": "new",
+          "lineNumber": 162
+        },
+        {
+          "callee": "LazyObject::new",
+          "caller": "new",
+          "lineNumber": 183
+        },
+        {
+          "callee": "self.lazy.calculate",
+          "caller": "npv",
+          "lineNumber": 192
+        },
+        {
+          "callee": "Ok",
+          "caller": "npv",
+          "lineNumber": 197
+        },
+        {
+          "callee": "self.lazy.recalculate",
+          "caller": "force_npv",
+          "lineNumber": 205
+        },
+        {
+          "callee": "Ok",
+          "caller": "force_npv",
+          "lineNumber": 210
+        },
+        {
+          "callee": "self.lazy.on_update",
+          "caller": "on_input_change",
+          "lineNumber": 216
+        },
+        {
+          "callee": "Lazy::new",
+          "caller": "calculate_runs_once_until_invalidated",
+          "lineNumber": 222
+        },
+        {
+          "callee": "s.npv().unwrap",
+          "caller": "calculate_runs_once_until_invalidated",
+          "lineNumber": 223
+        },
+        {
+          "callee": "s.npv",
+          "caller": "calculate_runs_once_until_invalidated",
+          "lineNumber": 223
+        },
+        {
+          "callee": "s.npv().unwrap",
+          "caller": "calculate_runs_once_until_invalidated",
+          "lineNumber": 224
+        },
+        {
+          "callee": "s.npv",
+          "caller": "calculate_runs_once_until_invalidated",
+          "lineNumber": 224
+        },
+        {
+          "callee": "s.on_input_change",
+          "caller": "calculate_runs_once_until_invalidated",
+          "lineNumber": 228
+        },
+        {
+          "callee": "s.npv().unwrap",
+          "caller": "calculate_runs_once_until_invalidated",
+          "lineNumber": 229
+        },
+        {
+          "callee": "s.npv",
+          "caller": "calculate_runs_once_until_invalidated",
+          "lineNumber": 229
+        },
+        {
+          "callee": "Lazy::new",
+          "caller": "forward_first_notification_only",
+          "lineNumber": 235
+        },
+        {
+          "callee": "Flag::new",
+          "caller": "forward_first_notification_only",
+          "lineNumber": 236
+        },
+        {
+          "callee": "s.lazy.register_observer",
+          "caller": "forward_first_notification_only",
+          "lineNumber": 237
+        },
+        {
+          "callee": "flag.clone",
+          "caller": "forward_first_notification_only",
+          "lineNumber": 238
+        },
+        {
+          "callee": "s.npv().unwrap",
+          "caller": "forward_first_notification_only",
+          "lineNumber": 240
+        },
+        {
+          "callee": "s.npv",
+          "caller": "forward_first_notification_only",
+          "lineNumber": 240
+        },
+        {
+          "callee": "s.on_input_change",
+          "caller": "forward_first_notification_only",
+          "lineNumber": 241
+        },
+        {
+          "callee": "flag.borrow_mut",
+          "caller": "forward_first_notification_only",
+          "lineNumber": 244
+        },
+        {
+          "callee": "s.on_input_change",
+          "caller": "forward_first_notification_only",
+          "lineNumber": 245
+        },
+        {
+          "callee": "flag.borrow_mut",
+          "caller": "forward_first_notification_only",
+          "lineNumber": 251
+        },
+        {
+          "callee": "s.npv().unwrap",
+          "caller": "forward_first_notification_only",
+          "lineNumber": 252
+        },
+        {
+          "callee": "s.npv",
+          "caller": "forward_first_notification_only",
+          "lineNumber": 252
+        },
+        {
+          "callee": "s.on_input_change",
+          "caller": "forward_first_notification_only",
+          "lineNumber": 253
+        },
+        {
+          "callee": "Lazy::new",
+          "caller": "always_forward_notifications",
+          "lineNumber": 259
+        },
+        {
+          "callee": "Flag::new",
+          "caller": "always_forward_notifications",
+          "lineNumber": 260
+        },
+        {
+          "callee": "s.lazy.register_observer",
+          "caller": "always_forward_notifications",
+          "lineNumber": 261
+        },
+        {
+          "callee": "flag.clone",
+          "caller": "always_forward_notifications",
+          "lineNumber": 262
+        },
+        {
+          "callee": "s.npv().unwrap",
+          "caller": "always_forward_notifications",
+          "lineNumber": 264
+        },
+        {
+          "callee": "s.npv",
+          "caller": "always_forward_notifications",
+          "lineNumber": 264
+        },
+        {
+          "callee": "s.on_input_change",
+          "caller": "always_forward_notifications",
+          "lineNumber": 265
+        },
+        {
+          "callee": "flag.borrow_mut",
+          "caller": "always_forward_notifications",
+          "lineNumber": 268
+        },
+        {
+          "callee": "s.on_input_change",
+          "caller": "always_forward_notifications",
+          "lineNumber": 269
+        },
+        {
+          "callee": "Lazy::new",
+          "caller": "notification_after_failed_calculation",
+          "lineNumber": 275
+        },
+        {
+          "callee": "Flag::new",
+          "caller": "notification_after_failed_calculation",
+          "lineNumber": 276
+        },
+        {
+          "callee": "s.lazy.register_observer",
+          "caller": "notification_after_failed_calculation",
+          "lineNumber": 277
+        },
+        {
+          "callee": "flag.clone",
+          "caller": "notification_after_failed_calculation",
+          "lineNumber": 278
+        },
+        {
+          "callee": "s.npv().unwrap",
+          "caller": "notification_after_failed_calculation",
+          "lineNumber": 281
+        },
+        {
+          "callee": "s.npv",
+          "caller": "notification_after_failed_calculation",
+          "lineNumber": 281
+        },
+        {
+          "callee": "s.on_input_change",
+          "caller": "notification_after_failed_calculation",
+          "lineNumber": 282
+        },
+        {
+          "callee": "flag.borrow_mut",
+          "caller": "notification_after_failed_calculation",
+          "lineNumber": 284
+        },
+        {
+          "callee": "s.on_input_change",
+          "caller": "notification_after_failed_calculation",
+          "lineNumber": 293
+        },
+        {
+          "callee": "flag.borrow_mut",
+          "caller": "notification_after_failed_calculation",
+          "lineNumber": 295
+        },
+        {
+          "callee": "s.npv().unwrap",
+          "caller": "notification_after_failed_calculation",
+          "lineNumber": 298
+        },
+        {
+          "callee": "s.npv",
+          "caller": "notification_after_failed_calculation",
+          "lineNumber": 298
+        },
+        {
+          "callee": "s.on_input_change",
+          "caller": "notification_after_failed_calculation",
+          "lineNumber": 302
+        },
+        {
+          "callee": "flag.borrow_mut",
+          "caller": "notification_after_failed_calculation",
+          "lineNumber": 304
+        },
+        {
+          "callee": "s.on_input_change",
+          "caller": "notification_after_failed_calculation",
+          "lineNumber": 307
+        },
+        {
+          "callee": "Lazy::new",
+          "caller": "recalculate_notifies_even_when_perform_fails",
+          "lineNumber": 313
+        },
+        {
+          "callee": "Flag::new",
+          "caller": "recalculate_notifies_even_when_perform_fails",
+          "lineNumber": 314
+        },
+        {
+          "callee": "s.lazy.register_observer",
+          "caller": "recalculate_notifies_even_when_perform_fails",
+          "lineNumber": 315
+        },
+        {
+          "callee": "flag.clone",
+          "caller": "recalculate_notifies_even_when_perform_fails",
+          "lineNumber": 316
+        },
+        {
+          "callee": "flag.borrow_mut",
+          "caller": "recalculate_notifies_even_when_perform_fails",
+          "lineNumber": 328
+        },
+        {
+          "callee": "s.force_npv().unwrap",
+          "caller": "recalculate_notifies_even_when_perform_fails",
+          "lineNumber": 330
+        },
+        {
+          "callee": "s.force_npv",
+          "caller": "recalculate_notifies_even_when_perform_fails",
+          "lineNumber": 330
+        },
+        {
+          "callee": "Lazy::new",
+          "caller": "recursive_update_is_broken_by_guard",
+          "lineNumber": 341
+        },
+        {
+          "callee": "s.npv().unwrap",
+          "caller": "recursive_update_is_broken_by_guard",
+          "lineNumber": 342
+        },
+        {
+          "callee": "s.npv",
+          "caller": "recursive_update_is_broken_by_guard",
+          "lineNumber": 342
+        },
+        {
+          "callee": "s.on_input_change",
+          "caller": "recursive_update_is_broken_by_guard",
+          "lineNumber": 345
+        },
+        {
+          "callee": "s.on_input_change",
+          "caller": "recursive_update_is_broken_by_guard",
+          "lineNumber": 346
+        },
+        {
+          "callee": "Lazy::new",
+          "caller": "freeze_suppresses_notifications",
+          "lineNumber": 352
+        },
+        {
+          "callee": "Flag::new",
+          "caller": "freeze_suppresses_notifications",
+          "lineNumber": 353
+        },
+        {
+          "callee": "s.lazy.register_observer",
+          "caller": "freeze_suppresses_notifications",
+          "lineNumber": 354
+        },
+        {
+          "callee": "flag.clone",
+          "caller": "freeze_suppresses_notifications",
+          "lineNumber": 355
+        },
+        {
+          "callee": "s.npv().unwrap",
+          "caller": "freeze_suppresses_notifications",
+          "lineNumber": 357
+        },
+        {
+          "callee": "s.npv",
+          "caller": "freeze_suppresses_notifications",
+          "lineNumber": 357
+        },
+        {
+          "callee": "s.lazy.freeze",
+          "caller": "freeze_suppresses_notifications",
+          "lineNumber": 358
+        },
+        {
+          "callee": "s.on_input_change",
+          "caller": "freeze_suppresses_notifications",
+          "lineNumber": 359
+        },
+        {
+          "callee": "s.lazy.unfreeze",
+          "caller": "freeze_suppresses_notifications",
+          "lineNumber": 362
+        }
+      ],
+      "classes": [
+        {
+          "endLine": 32,
+          "methods": [
+            "new",
+            "observable",
+            "is_calculated",
+            "forward_first_notification_only",
+            "always_forward_notifications",
+            "on_update",
+            "calculate",
+            "recalculate",
+            "freeze",
+            "unfreeze",
+            "register_observer"
+          ],
+          "name": "LazyObject",
+          "properties": [
+            "observable",
+            "calculated",
+            "frozen",
+            "failed",
+            "always_forward",
+            "updating"
+          ],
+          "startLine": 25
+        }
+      ],
+      "exports": [
+        {
+          "isDefault": false,
+          "line": 25,
+          "name": "LazyObject"
+        },
+        {
+          "isDefault": false,
+          "line": 40,
+          "name": "new"
+        },
+        {
+          "isDefault": false,
+          "line": 52,
+          "name": "observable"
+        },
+        {
+          "isDefault": false,
+          "line": 57,
+          "name": "is_calculated"
+        },
+        {
+          "isDefault": false,
+          "line": 62,
+          "name": "forward_first_notification_only"
+        },
+        {
+          "isDefault": false,
+          "line": 67,
+          "name": "always_forward_notifications"
+        },
+        {
+          "isDefault": false,
+          "line": 75,
+          "name": "on_update"
+        },
+        {
+          "isDefault": false,
+          "line": 98,
+          "name": "calculate"
+        },
+        {
+          "isDefault": false,
+          "line": 117,
+          "name": "recalculate"
+        },
+        {
+          "isDefault": false,
+          "line": 129,
+          "name": "freeze"
+        },
+        {
+          "isDefault": false,
+          "line": 134,
+          "name": "unfreeze"
+        },
+        {
+          "isDefault": false,
+          "line": 142,
+          "name": "register_observer"
+        }
+      ],
+      "fileCategory": "code",
+      "functions": [
+        {
+          "endLine": 49,
+          "name": "new",
+          "params": [
+            "always_forward"
+          ],
+          "startLine": 40
+        },
+        {
+          "endLine": 54,
+          "name": "observable",
+          "params": [],
+          "startLine": 52
+        },
+        {
+          "endLine": 59,
+          "name": "is_calculated",
+          "params": [],
+          "startLine": 57
+        },
+        {
+          "endLine": 64,
+          "name": "forward_first_notification_only",
+          "params": [],
+          "startLine": 62
+        },
+        {
+          "endLine": 69,
+          "name": "always_forward_notifications",
+          "params": [],
+          "startLine": 67
+        },
+        {
+          "endLine": 91,
+          "name": "on_update",
+          "params": [],
+          "startLine": 75
+        },
+        {
+          "endLine": 111,
+          "name": "calculate",
+          "params": [
+            "perform"
+          ],
+          "startLine": 98
+        },
+        {
+          "endLine": 126,
+          "name": "recalculate",
+          "params": [
+            "perform"
+          ],
+          "startLine": 117
+        },
+        {
+          "endLine": 131,
+          "name": "freeze",
+          "params": [],
+          "startLine": 129
+        },
+        {
+          "endLine": 139,
+          "name": "unfreeze",
+          "params": [],
+          "startLine": 134
+        },
+        {
+          "endLine": 144,
+          "name": "register_observer",
+          "params": [
+            "observer"
+          ],
+          "startLine": 142
+        }
+      ],
+      "language": "rust",
+      "metrics": {
+        "classCount": 1,
+        "exportCount": 12,
+        "functionCount": 11,
+        "importCount": 3
+      },
+      "nonEmptyLines": 319,
+      "path": "crates/itofin/src/patterns/lazyobject.rs",
+      "totalLines": 365
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "metrics": {
+        "classCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "importCount": 3
+      },
+      "nonEmptyLines": 4,
+      "path": "crates/itofin/src/patterns/mod.rs",
+      "totalLines": 5
+    },
+    {
+      "callGraph": [
+        {
+          "callee": "RefCell::new",
+          "caller": "new",
+          "lineNumber": 44
+        },
+        {
+          "callee": "Vec::new",
+          "caller": "new",
+          "lineNumber": 44
+        },
+        {
+          "callee": "SharedMut::downgrade",
+          "caller": "register_observer",
+          "lineNumber": 53
+        },
+        {
+          "callee": "self.observers.borrow_mut",
+          "caller": "register_observer",
+          "lineNumber": 54
+        },
+        {
+          "callee": "observers.retain",
+          "caller": "register_observer",
+          "lineNumber": 55
+        },
+        {
+          "callee": "w.strong_count",
+          "caller": "register_observer",
+          "lineNumber": 55
+        },
+        {
+          "callee": "observers.iter().any",
+          "caller": "register_observer",
+          "lineNumber": 56
+        },
+        {
+          "callee": "observers.iter",
+          "caller": "register_observer",
+          "lineNumber": 56
+        },
+        {
+          "callee": "w.ptr_eq",
+          "caller": "register_observer",
+          "lineNumber": 56
+        },
+        {
+          "callee": "observers.push",
+          "caller": "register_observer",
+          "lineNumber": 59
+        },
+        {
+          "callee": "SharedMut::downgrade",
+          "caller": "unregister_observer",
+          "lineNumber": 65
+        },
+        {
+          "callee": "self.observers.borrow_mut",
+          "caller": "unregister_observer",
+          "lineNumber": 66
+        },
+        {
+          "callee": "observers.retain",
+          "caller": "unregister_observer",
+          "lineNumber": 68
+        },
+        {
+          "callee": "w.ptr_eq",
+          "caller": "unregister_observer",
+          "lineNumber": 69
+        },
+        {
+          "callee": "w.strong_count",
+          "caller": "unregister_observer",
+          "lineNumber": 73
+        },
+        {
+          "callee": "self.observers.borrow_mut",
+          "caller": "notify_observers",
+          "lineNumber": 86
+        },
+        {
+          "callee": "observers.retain",
+          "caller": "notify_observers",
+          "lineNumber": 87
+        },
+        {
+          "callee": "w.strong_count",
+          "caller": "notify_observers",
+          "lineNumber": 87
+        },
+        {
+          "callee": "observers.iter().filter_map(WeakMut::upgrade).collect",
+          "caller": "notify_observers",
+          "lineNumber": 88
+        },
+        {
+          "callee": "observers.iter().filter_map",
+          "caller": "notify_observers",
+          "lineNumber": 88
+        },
+        {
+          "callee": "observers.iter",
+          "caller": "notify_observers",
+          "lineNumber": 88
+        },
+        {
+          "callee": "observer.borrow_mut().update",
+          "caller": "notify_observers",
+          "lineNumber": 91
+        },
+        {
+          "callee": "observer.borrow_mut",
+          "caller": "notify_observers",
+          "lineNumber": 91
+        },
+        {
+          "callee": "shared_mut",
+          "caller": "new",
+          "lineNumber": 108
+        },
+        {
+          "callee": "obs.clone",
+          "caller": "as_observer",
+          "lineNumber": 119
+        },
+        {
+          "callee": "Observable::new",
+          "caller": "notify_increments_registered_observers",
+          "lineNumber": 124
+        },
+        {
+          "callee": "UpdateCounter::new",
+          "caller": "notify_increments_registered_observers",
+          "lineNumber": 125
+        },
+        {
+          "callee": "observable.notify_observers",
+          "caller": "notify_increments_registered_observers",
+          "lineNumber": 129
+        },
+        {
+          "callee": "observable.notify_observers",
+          "caller": "notify_increments_registered_observers",
+          "lineNumber": 132
+        },
+        {
+          "callee": "Observable::new",
+          "caller": "registration_is_idempotent",
+          "lineNumber": 138
+        },
+        {
+          "callee": "UpdateCounter::new",
+          "caller": "registration_is_idempotent",
+          "lineNumber": 139
+        },
+        {
+          "callee": "observable.notify_observers",
+          "caller": "registration_is_idempotent",
+          "lineNumber": 143
+        },
+        {
+          "callee": "Observable::new",
+          "caller": "unregister_stops_notifications",
+          "lineNumber": 149
+        },
+        {
+          "callee": "UpdateCounter::new",
+          "caller": "unregister_stops_notifications",
+          "lineNumber": 150
+        },
+        {
+          "callee": "observable.register_observer",
+          "caller": "unregister_stops_notifications",
+          "lineNumber": 151
+        },
+        {
+          "callee": "as_observer",
+          "caller": "unregister_stops_notifications",
+          "lineNumber": 151
+        },
+        {
+          "callee": "observable.notify_observers",
+          "caller": "unregister_stops_notifications",
+          "lineNumber": 154
+        },
+        {
+          "callee": "Observable::new",
+          "caller": "unregister_on_empty_is_harmless",
+          "lineNumber": 163
+        },
+        {
+          "callee": "UpdateCounter::new",
+          "caller": "unregister_on_empty_is_harmless",
+          "lineNumber": 164
+        },
+        {
+          "callee": "Observable::new",
+          "caller": "unregister_unknown_observer_is_not_confused_by_dead_weaks",
+          "lineNumber": 173
+        },
+        {
+          "callee": "UpdateCounter::new",
+          "caller": "unregister_unknown_observer_is_not_confused_by_dead_weaks",
+          "lineNumber": 174
+        },
+        {
+          "callee": "observable.register_observer",
+          "caller": "unregister_unknown_observer_is_not_confused_by_dead_weaks",
+          "lineNumber": 175
+        },
+        {
+          "callee": "as_observer",
+          "caller": "unregister_unknown_observer_is_not_confused_by_dead_weaks",
+          "lineNumber": 175
+        },
+        {
+          "callee": "UpdateCounter::new",
+          "caller": "unregister_unknown_observer_is_not_confused_by_dead_weaks",
+          "lineNumber": 177
+        },
+        {
+          "callee": "observable.register_observer",
+          "caller": "unregister_unknown_observer_is_not_confused_by_dead_weaks",
+          "lineNumber": 178
+        },
+        {
+          "callee": "as_observer",
+          "caller": "unregister_unknown_observer_is_not_confused_by_dead_weaks",
+          "lineNumber": 178
+        },
+        {
+          "callee": "UpdateCounter::new",
+          "caller": "unregister_unknown_observer_is_not_confused_by_dead_weaks",
+          "lineNumber": 181
+        },
+        {
+          "callee": "observable.notify_observers",
+          "caller": "unregister_unknown_observer_is_not_confused_by_dead_weaks",
+          "lineNumber": 184
+        },
+        {
+          "callee": "Observable::new",
+          "caller": "dropped_observers_are_pruned",
+          "lineNumber": 190
+        },
+        {
+          "callee": "UpdateCounter::new",
+          "caller": "dropped_observers_are_pruned",
+          "lineNumber": 191
+        },
+        {
+          "callee": "observable.register_observer",
+          "caller": "dropped_observers_are_pruned",
+          "lineNumber": 192
+        },
+        {
+          "callee": "as_observer",
+          "caller": "dropped_observers_are_pruned",
+          "lineNumber": 192
+        },
+        {
+          "callee": "UpdateCounter::new",
+          "caller": "dropped_observers_are_pruned",
+          "lineNumber": 194
+        },
+        {
+          "callee": "observable.register_observer",
+          "caller": "dropped_observers_are_pruned",
+          "lineNumber": 195
+        },
+        {
+          "callee": "as_observer",
+          "caller": "dropped_observers_are_pruned",
+          "lineNumber": 195
+        },
+        {
+          "callee": "observable.notify_observers",
+          "caller": "dropped_observers_are_pruned",
+          "lineNumber": 199
+        },
+        {
+          "callee": "UpdateCounter::new",
+          "caller": "update",
+          "lineNumber": 217
+        },
+        {
+          "callee": "self.observable.register_observer",
+          "caller": "update",
+          "lineNumber": 218
+        },
+        {
+          "callee": "extra.clone",
+          "caller": "update",
+          "lineNumber": 219
+        },
+        {
+          "callee": "self.spawned.borrow_mut().push",
+          "caller": "update",
+          "lineNumber": 220
+        },
+        {
+          "callee": "self.spawned.borrow_mut",
+          "caller": "update",
+          "lineNumber": 220
+        },
+        {
+          "callee": "Shared::new",
+          "caller": "add_observers_during_notify_does_not_miss_initial_observers",
+          "lineNumber": 229
+        },
+        {
+          "callee": "Observable::new",
+          "caller": "add_observers_during_notify_does_not_miss_initial_observers",
+          "lineNumber": 229
+        },
+        {
+          "callee": "shared_mut",
+          "caller": "add_observers_during_notify_does_not_miss_initial_observers",
+          "lineNumber": 230
+        },
+        {
+          "callee": "Vec::new",
+          "caller": "add_observers_during_notify_does_not_miss_initial_observers",
+          "lineNumber": 230
+        },
+        {
+          "callee": "UpdateCounter::new",
+          "caller": "add_observers_during_notify_does_not_miss_initial_observers",
+          "lineNumber": 232
+        },
+        {
+          "callee": "observable.register_observer",
+          "caller": "add_observers_during_notify_does_not_miss_initial_observers",
+          "lineNumber": 233
+        },
+        {
+          "callee": "as_observer",
+          "caller": "add_observers_during_notify_does_not_miss_initial_observers",
+          "lineNumber": 233
+        },
+        {
+          "callee": "shared_mut",
+          "caller": "add_observers_during_notify_does_not_miss_initial_observers",
+          "lineNumber": 235
+        },
+        {
+          "callee": "observable.clone",
+          "caller": "add_observers_during_notify_does_not_miss_initial_observers",
+          "lineNumber": 237
+        },
+        {
+          "callee": "spawned.clone",
+          "caller": "add_observers_during_notify_does_not_miss_initial_observers",
+          "lineNumber": 238
+        },
+        {
+          "callee": "observable.register_observer",
+          "caller": "add_observers_during_notify_does_not_miss_initial_observers",
+          "lineNumber": 241
+        },
+        {
+          "callee": "reentrant.clone",
+          "caller": "add_observers_during_notify_does_not_miss_initial_observers",
+          "lineNumber": 241
+        },
+        {
+          "callee": "observable.notify_observers",
+          "caller": "add_observers_during_notify_does_not_miss_initial_observers",
+          "lineNumber": 243
+        }
+      ],
+      "classes": [
+        {
+          "endLine": 24,
+          "methods": [
+            "update"
+          ],
+          "name": "Observer",
+          "properties": [],
+          "startLine": 21
+        },
+        {
+          "endLine": 38,
+          "methods": [
+            "new",
+            "register_observer",
+            "unregister_observer",
+            "notify_observers"
+          ],
+          "name": "Observable",
+          "properties": [
+            "observers"
+          ],
+          "startLine": 36
+        }
+      ],
+      "exports": [
+        {
+          "isDefault": false,
+          "line": 21,
+          "name": "Observer"
+        },
+        {
+          "isDefault": false,
+          "line": 36,
+          "name": "Observable"
+        },
+        {
+          "isDefault": false,
+          "line": 42,
+          "name": "new"
+        },
+        {
+          "isDefault": false,
+          "line": 52,
+          "name": "register_observer"
+        },
+        {
+          "isDefault": false,
+          "line": 64,
+          "name": "unregister_observer"
+        },
+        {
+          "isDefault": false,
+          "line": 84,
+          "name": "notify_observers"
+        }
+      ],
+      "fileCategory": "code",
+      "functions": [
+        {
+          "endLine": 46,
+          "name": "new",
+          "params": [],
+          "startLine": 42
+        },
+        {
+          "endLine": 61,
+          "name": "register_observer",
+          "params": [
+            "observer"
+          ],
+          "startLine": 52
+        },
+        {
+          "endLine": 76,
+          "name": "unregister_observer",
+          "params": [
+            "observer"
+          ],
+          "startLine": 64
+        },
+        {
+          "endLine": 93,
+          "name": "notify_observers",
+          "params": [],
+          "startLine": 84
+        }
+      ],
+      "language": "rust",
+      "metrics": {
+        "classCount": 2,
+        "exportCount": 6,
+        "functionCount": 4,
+        "importCount": 1
+      },
+      "nonEmptyLines": 221,
+      "path": "crates/itofin/src/patterns/observable.rs",
+      "totalLines": 253
+    },
+    {
+      "classes": [
+        {
+          "endLine": 21,
+          "methods": [
+            "visit"
+          ],
+          "name": "Visitor",
+          "properties": [],
+          "startLine": 18
+        }
+      ],
+      "exports": [
+        {
+          "isDefault": false,
+          "line": 18,
+          "name": "Visitor"
+        }
+      ],
+      "fileCategory": "code",
+      "language": "rust",
+      "metrics": {
+        "classCount": 1,
+        "exportCount": 1,
+        "functionCount": 0,
+        "importCount": 0
+      },
+      "nonEmptyLines": 20,
+      "path": "crates/itofin/src/patterns/visitor.rs",
+      "totalLines": 21
+    },
+    {
+      "callGraph": [
+        {
+          "callee": "Observable::new",
+          "caller": "default",
+          "lineNumber": 33
+        },
+        {
+          "callee": "Settings::default",
+          "caller": "new",
+          "lineNumber": 44
+        },
+        {
+          "callee": "self.evaluation_date.as_ref",
+          "caller": "evaluation_date",
+          "lineNumber": 53
+        },
+        {
+          "callee": "self.evaluation_date.as_ref",
+          "caller": "set_evaluation_date",
+          "lineNumber": 61
+        },
+        {
+          "callee": "Some",
+          "caller": "set_evaluation_date",
+          "lineNumber": 61
+        },
+        {
+          "callee": "Some",
+          "caller": "set_evaluation_date",
+          "lineNumber": 62
+        },
+        {
+          "callee": "self.eval_date_observable.notify_observers",
+          "caller": "set_evaluation_date",
+          "lineNumber": 63
+        },
+        {
+          "callee": "self.evaluation_date.is_some",
+          "caller": "reset_evaluation_date",
+          "lineNumber": 74
+        },
+        {
+          "callee": "self.eval_date_observable.notify_observers",
+          "caller": "reset_evaluation_date",
+          "lineNumber": 76
+        },
+        {
+          "callee": "self.eval_date_observable.register_observer",
+          "caller": "register_eval_date_observer",
+          "lineNumber": 82
+        },
+        {
+          "callee": "Settings::new",
+          "caller": "notifies_only_on_actual_date_change",
+          "lineNumber": 137
+        },
+        {
+          "callee": "settings.set_evaluation_date",
+          "caller": "notifies_only_on_actual_date_change",
+          "lineNumber": 141
+        },
+        {
+          "callee": "shared_mut",
+          "caller": "notifies_only_on_actual_date_change",
+          "lineNumber": 143
+        },
+        {
+          "callee": "Flag::default",
+          "caller": "notifies_only_on_actual_date_change",
+          "lineNumber": 143
+        },
+        {
+          "callee": "settings.register_eval_date_observer",
+          "caller": "notifies_only_on_actual_date_change",
+          "lineNumber": 144
+        },
+        {
+          "callee": "flag.clone",
+          "caller": "notifies_only_on_actual_date_change",
+          "lineNumber": 144
+        },
+        {
+          "callee": "settings.set_evaluation_date",
+          "caller": "notifies_only_on_actual_date_change",
+          "lineNumber": 147
+        },
+        {
+          "callee": "settings.set_evaluation_date",
+          "caller": "notifies_only_on_actual_date_change",
+          "lineNumber": 151
+        },
+        {
+          "callee": "Settings::new",
+          "caller": "reset_returns_to_floating_and_notifies_once",
+          "lineNumber": 158
+        },
+        {
+          "callee": "settings.set_evaluation_date",
+          "caller": "reset_returns_to_floating_and_notifies_once",
+          "lineNumber": 159
+        },
+        {
+          "callee": "shared_mut",
+          "caller": "reset_returns_to_floating_and_notifies_once",
+          "lineNumber": 161
+        },
+        {
+          "callee": "Flag::default",
+          "caller": "reset_returns_to_floating_and_notifies_once",
+          "lineNumber": 161
+        },
+        {
+          "callee": "settings.register_eval_date_observer",
+          "caller": "reset_returns_to_floating_and_notifies_once",
+          "lineNumber": 162
+        },
+        {
+          "callee": "flag.clone",
+          "caller": "reset_returns_to_floating_and_notifies_once",
+          "lineNumber": 162
+        },
+        {
+          "callee": "settings.reset_evaluation_date",
+          "caller": "reset_returns_to_floating_and_notifies_once",
+          "lineNumber": 165
+        },
+        {
+          "callee": "flag.borrow_mut",
+          "caller": "reset_returns_to_floating_and_notifies_once",
+          "lineNumber": 170
+        },
+        {
+          "callee": "settings.reset_evaluation_date",
+          "caller": "reset_returns_to_floating_and_notifies_once",
+          "lineNumber": 171
+        },
+        {
+          "callee": "Settings::new",
+          "caller": "flags_round_trip",
+          "lineNumber": 177
+        },
+        {
+          "callee": "settings.set_include_reference_date_events",
+          "caller": "flags_round_trip",
+          "lineNumber": 182
+        },
+        {
+          "callee": "settings.set_include_todays_cash_flows",
+          "caller": "flags_round_trip",
+          "lineNumber": 183
+        },
+        {
+          "callee": "Some",
+          "caller": "flags_round_trip",
+          "lineNumber": 183
+        },
+        {
+          "callee": "settings.set_enforces_todays_historic_fixings",
+          "caller": "flags_round_trip",
+          "lineNumber": 184
+        }
+      ],
+      "classes": [
+        {
+          "endLine": 27,
+          "methods": [],
+          "name": "Settings",
+          "properties": [
+            "evaluation_date",
+            "eval_date_observable",
+            "include_reference_date_events",
+            "include_todays_cash_flows",
+            "enforces_todays_historic_fixings"
+          ],
+          "startLine": 21
+        }
+      ],
+      "exports": [
+        {
+          "isDefault": false,
+          "line": 21,
+          "name": "Settings"
+        },
+        {
+          "isDefault": false,
+          "line": 43,
+          "name": "new"
+        },
+        {
+          "isDefault": false,
+          "line": 52,
+          "name": "evaluation_date"
+        },
+        {
+          "isDefault": false,
+          "line": 57,
+          "name": "set_evaluation_date"
+        },
+        {
+          "isDefault": false,
+          "line": 73,
+          "name": "reset_evaluation_date"
+        },
+        {
+          "isDefault": false,
+          "line": 81,
+          "name": "register_eval_date_observer"
+        },
+        {
+          "isDefault": false,
+          "line": 87,
+          "name": "include_reference_date_events"
+        },
+        {
+          "isDefault": false,
+          "line": 92,
+          "name": "set_include_reference_date_events"
+        },
+        {
+          "isDefault": false,
+          "line": 97,
+          "name": "include_todays_cash_flows"
+        },
+        {
+          "isDefault": false,
+          "line": 102,
+          "name": "set_include_todays_cash_flows"
+        },
+        {
+          "isDefault": false,
+          "line": 107,
+          "name": "enforces_todays_historic_fixings"
+        },
+        {
+          "isDefault": false,
+          "line": 112,
+          "name": "set_enforces_todays_historic_fixings"
+        }
+      ],
+      "fileCategory": "code",
+      "functions": [
+        {
+          "endLine": 38,
+          "name": "default",
+          "params": [],
+          "startLine": 30
+        },
+        {
+          "endLine": 45,
+          "name": "new",
+          "params": [],
+          "startLine": 43
+        },
+        {
+          "endLine": 54,
+          "name": "evaluation_date",
+          "params": [],
+          "startLine": 52
+        },
+        {
+          "endLine": 65,
+          "name": "set_evaluation_date",
+          "params": [
+            "date"
+          ],
+          "startLine": 57
+        },
+        {
+          "endLine": 78,
+          "name": "reset_evaluation_date",
+          "params": [],
+          "startLine": 73
+        },
+        {
+          "endLine": 83,
+          "name": "register_eval_date_observer",
+          "params": [
+            "observer"
+          ],
+          "startLine": 81
+        },
+        {
+          "endLine": 89,
+          "name": "include_reference_date_events",
+          "params": [],
+          "startLine": 87
+        },
+        {
+          "endLine": 94,
+          "name": "set_include_reference_date_events",
+          "params": [
+            "value"
+          ],
+          "startLine": 92
+        },
+        {
+          "endLine": 99,
+          "name": "include_todays_cash_flows",
+          "params": [],
+          "startLine": 97
+        },
+        {
+          "endLine": 104,
+          "name": "set_include_todays_cash_flows",
+          "params": [
+            "value"
+          ],
+          "startLine": 102
+        },
+        {
+          "endLine": 109,
+          "name": "enforces_todays_historic_fixings",
+          "params": [],
+          "startLine": 107
+        },
+        {
+          "endLine": 114,
+          "name": "set_enforces_todays_historic_fixings",
+          "params": [
+            "value"
+          ],
+          "startLine": 112
+        }
+      ],
+      "language": "rust",
+      "metrics": {
+        "classCount": 1,
+        "exportCount": 12,
+        "functionCount": 12,
+        "importCount": 2
+      },
+      "nonEmptyLines": 161,
+      "path": "crates/itofin/src/settings.rs",
+      "totalLines": 190
+    },
+    {
+      "callGraph": [
+        {
+          "callee": "Rc::new",
+          "caller": "shared",
+          "lineNumber": 22
+        },
+        {
+          "callee": "Rc::new",
+          "caller": "shared_mut",
+          "lineNumber": 27
+        },
+        {
+          "callee": "RefCell::new",
+          "caller": "shared_mut",
+          "lineNumber": 27
+        },
+        {
+          "callee": "shared",
+          "caller": "shared_clones_share_one_pointee",
+          "lineNumber": 36
+        },
+        {
+          "callee": "Shared::clone",
+          "caller": "shared_clones_share_one_pointee",
+          "lineNumber": 37
+        },
+        {
+          "callee": "shared_mut",
+          "caller": "shared_mut_mutation_is_visible_through_clones",
+          "lineNumber": 44
+        },
+        {
+          "callee": "SharedMut::clone",
+          "caller": "shared_mut_mutation_is_visible_through_clones",
+          "lineNumber": 45
+        },
+        {
+          "callee": "b.borrow_mut",
+          "caller": "shared_mut_mutation_is_visible_through_clones",
+          "lineNumber": 46
+        },
+        {
+          "callee": "shared_mut",
+          "caller": "weak_does_not_keep_pointee_alive",
+          "lineNumber": 53
+        },
+        {
+          "callee": "SharedMut::downgrade",
+          "caller": "weak_does_not_keep_pointee_alive",
+          "lineNumber": 54
+        }
+      ],
+      "exports": [
+        {
+          "isDefault": false,
+          "line": 21,
+          "name": "shared"
+        },
+        {
+          "isDefault": false,
+          "line": 26,
+          "name": "shared_mut"
+        }
+      ],
+      "fileCategory": "code",
+      "functions": [
+        {
+          "endLine": 23,
+          "name": "shared",
+          "params": [
+            "value"
+          ],
+          "startLine": 21
+        },
+        {
+          "endLine": 28,
+          "name": "shared_mut",
+          "params": [
+            "value"
+          ],
+          "startLine": 26
+        }
+      ],
+      "language": "rust",
+      "metrics": {
+        "classCount": 0,
+        "exportCount": 2,
+        "functionCount": 2,
+        "importCount": 0
+      },
+      "nonEmptyLines": 48,
+      "path": "crates/itofin/src/shared.rs",
+      "totalLines": 58
+    }
+  ],
+  "scriptCompleted": true
+}

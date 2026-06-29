@@ -1,0 +1,20 @@
+{
+  "edges": [],
+  "nodes": [
+    {
+      "complexity": "simple",
+      "filePath": ".github/images/prek/Dockerfile",
+      "id": "service:.github/images/prek/Dockerfile",
+      "languageNotes": "Single-stage build chaining apt, the astral.sh uv install script, and `cargo install prek` in one RUN layer to keep the image lean.",
+      "name": "Dockerfile",
+      "summary": "Builds a Rust slim-bookworm tooling image for pre-commit/prek CI runs, installing curl, git, the uv installer, and the prek hook runner via cargo.",
+      "tags": [
+        "containerization",
+        "infrastructure",
+        "ci-cd",
+        "tooling"
+      ],
+      "type": "service"
+    }
+  ]
+}

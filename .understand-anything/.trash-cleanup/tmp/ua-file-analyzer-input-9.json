@@ -1,0 +1,56 @@
+{
+  "batchFiles": [
+    {
+      "fileCategory": "docs",
+      "language": "markdown",
+      "path": ".github/copilot-instructions.md",
+      "sizeLines": 134
+    },
+    {
+      "fileCategory": "script",
+      "language": "shell",
+      "path": ".github/images/prek/build.sh",
+      "sizeLines": 9
+    },
+    {
+      "fileCategory": "docs",
+      "language": "markdown",
+      "path": ".github/images/README.md",
+      "sizeLines": 0
+    },
+    {
+      "fileCategory": "config",
+      "language": "yaml",
+      "path": ".github/labeler.yml",
+      "sizeLines": 28
+    },
+    {
+      "fileCategory": "code",
+      "language": "unknown",
+      "path": ".understand-anything/.understandignore",
+      "sizeLines": 124
+    },
+    {
+      "fileCategory": "config",
+      "language": "json",
+      "path": ".understand-anything/config.json",
+      "sizeLines": 1
+    },
+    {
+      "fileCategory": "config",
+      "language": "toml",
+      "path": "crates/itofin/Cargo.toml",
+      "sizeLines": 10
+    }
+  ],
+  "batchImportData": {
+    ".github/copilot-instructions.md": [],
+    ".github/images/README.md": [],
+    ".github/images/prek/build.sh": [],
+    ".github/labeler.yml": [],
+    ".understand-anything/.understandignore": [],
+    ".understand-anything/config.json": [],
+    "crates/itofin/Cargo.toml": []
+  },
+  "projectRoot": "/Users/bn/Git/benbenbang/ito-fin"
+}

@@ -1,0 +1,21 @@
+{
+  "batchFiles": [
+    {
+      "fileCategory": "infra",
+      "language": "yaml",
+      "path": ".github/workflows/pull-request.yml",
+      "sizeLines": 42
+    },
+    {
+      "fileCategory": "infra",
+      "language": "yaml",
+      "path": ".github/workflows/semantic-release.yml",
+      "sizeLines": 28
+    }
+  ],
+  "batchImportData": {
+    ".github/workflows/pull-request.yml": [],
+    ".github/workflows/semantic-release.yml": []
+  },
+  "projectRoot": "/Users/bn/Git/benbenbang/ito-fin"
+}

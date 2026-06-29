@@ -1,0 +1,14 @@
+{
+  "batchFiles": [
+    {
+      "fileCategory": "infra",
+      "language": "dockerfile",
+      "path": ".github/images/prek/Dockerfile",
+      "sizeLines": 11
+    }
+  ],
+  "batchImportData": {
+    ".github/images/prek/Dockerfile": []
+  },
+  "projectRoot": "/Users/bn/Git/benbenbang/ito-fin"
+}

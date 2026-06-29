@@ -1,0 +1,109 @@
+{
+  "edges": [
+    {
+      "direction": "forward",
+      "source": "config:crates/itofin/Cargo.toml",
+      "target": "file:crates/itofin/src/lib.rs",
+      "type": "configures",
+      "weight": 0.6
+    }
+  ],
+  "nodes": [
+    {
+      "complexity": "moderate",
+      "filePath": ".github/copilot-instructions.md",
+      "id": "document:.github/copilot-instructions.md",
+      "name": "copilot-instructions.md",
+      "summary": "GitHub Copilot guidance for the libitofin port, codifying the QuantLib-oracle rule, settled design decisions, naming/numeric conventions, error-handling rules, PR sizing, and review expectations across 10 sections.",
+      "tags": [
+        "documentation",
+        "configuration",
+        "development",
+        "conventions"
+      ],
+      "type": "document"
+    },
+    {
+      "complexity": "simple",
+      "filePath": ".github/images/prek/build.sh",
+      "id": "file:.github/images/prek/build.sh",
+      "languageNotes": "Uses docker buildx with --platform for multi-architecture image builds.",
+      "name": "build.sh",
+      "summary": "Shell script that builds and pushes the multi-arch (amd64/arm64) prek tooling Docker image to ghcr.io via docker buildx.",
+      "tags": [
+        "script",
+        "containerization",
+        "build-system",
+        "deployment"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "simple",
+      "filePath": ".github/images/README.md",
+      "id": "document:.github/images/README.md",
+      "name": "README.md",
+      "summary": "Placeholder README for the .github/images tooling-image directory; currently empty.",
+      "tags": [
+        "documentation",
+        "placeholder",
+        "infrastructure"
+      ],
+      "type": "document"
+    },
+    {
+      "complexity": "simple",
+      "filePath": ".github/labeler.yml",
+      "id": "config:.github/labeler.yml",
+      "name": "labeler.yml",
+      "summary": "GitHub Actions labeler configuration mapping changed file paths to PR labels (enhancement, workflows, build, documentation).",
+      "tags": [
+        "configuration",
+        "ci-cd",
+        "automation",
+        "github"
+      ],
+      "type": "config"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": ".understand-anything/.understandignore",
+      "id": "file:.understand-anything/.understandignore",
+      "name": ".understandignore",
+      "summary": "Ignore-pattern file telling the Understand-Anything tooling which paths to exclude from codebase analysis.",
+      "tags": [
+        "configuration",
+        "tooling",
+        "ignore-rules"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "simple",
+      "filePath": ".understand-anything/config.json",
+      "id": "config:.understand-anything/config.json",
+      "name": "config.json",
+      "summary": "Configuration for the Understand-Anything tooling, setting the output language for generated analysis.",
+      "tags": [
+        "configuration",
+        "tooling"
+      ],
+      "type": "config"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/Cargo.toml",
+      "id": "config:crates/itofin/Cargo.toml",
+      "languageNotes": "Inherits version and edition from the workspace via version.workspace/edition.workspace.",
+      "name": "Cargo.toml",
+      "summary": "Cargo manifest for the core itofin crate (libitofin), declaring the lib target, workspace-inherited version/edition, and the thiserror dependency.",
+      "tags": [
+        "configuration",
+        "build-system",
+        "rust",
+        "manifest"
+      ],
+      "type": "config"
+    }
+  ]
+}

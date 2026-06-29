@@ -1,0 +1,196 @@
+{
+  "filesAnalyzed": 7,
+  "filesSkipped": [],
+  "results": [
+    {
+      "fileCategory": "docs",
+      "language": "markdown",
+      "metrics": {
+        "classCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "importCount": 0,
+        "sectionCount": 10
+      },
+      "nonEmptyLines": 96,
+      "path": ".github/copilot-instructions.md",
+      "sections": [
+        {
+          "heading": "Copilot Instructions - libitofin",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "1. The oracle always wins",
+          "level": 2,
+          "line": 10
+        },
+        {
+          "heading": "2. Settled design decisions - do not reopen",
+          "level": 2,
+          "line": 25
+        },
+        {
+          "heading": "3. Naming conventions",
+          "level": 2,
+          "line": 43
+        },
+        {
+          "heading": "4. Numeric types",
+          "level": 2,
+          "line": 59
+        },
+        {
+          "heading": "5. Shared-ownership aliases",
+          "level": 2,
+          "line": 73
+        },
+        {
+          "heading": "6. Error-handling rules",
+          "level": 2,
+          "line": 90
+        },
+        {
+          "heading": "7. PR size and structure",
+          "level": 2,
+          "line": 100
+        },
+        {
+          "heading": "8. Testing philosophy",
+          "level": 2,
+          "line": 110
+        },
+        {
+          "heading": "9. What good review feedback looks like",
+          "level": 2,
+          "line": 120
+        }
+      ],
+      "totalLines": 134
+    },
+    {
+      "fileCategory": "script",
+      "language": "shell",
+      "metrics": {
+        "classCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "importCount": 0
+      },
+      "nonEmptyLines": 8,
+      "path": ".github/images/prek/build.sh",
+      "totalLines": 9
+    },
+    {
+      "fileCategory": "docs",
+      "language": "markdown",
+      "metrics": {
+        "classCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "importCount": 0,
+        "sectionCount": 0
+      },
+      "nonEmptyLines": 0,
+      "path": ".github/images/README.md",
+      "totalLines": 1
+    },
+    {
+      "fileCategory": "config",
+      "language": "yaml",
+      "metrics": {
+        "classCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "importCount": 0,
+        "sectionCount": 4
+      },
+      "nonEmptyLines": 25,
+      "path": ".github/labeler.yml",
+      "sections": [
+        {
+          "heading": "enhancement",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "workflows",
+          "level": 1,
+          "line": 8
+        },
+        {
+          "heading": "build",
+          "level": 1,
+          "line": 16
+        },
+        {
+          "heading": "documentation",
+          "level": 1,
+          "line": 22
+        }
+      ],
+      "totalLines": 28
+    },
+    {
+      "fileCategory": "code",
+      "language": "unknown",
+      "metrics": {},
+      "nonEmptyLines": 117,
+      "path": ".understand-anything/.understandignore",
+      "totalLines": 124
+    },
+    {
+      "fileCategory": "config",
+      "language": "json",
+      "metrics": {
+        "classCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "importCount": 0,
+        "sectionCount": 1
+      },
+      "nonEmptyLines": 1,
+      "path": ".understand-anything/config.json",
+      "sections": [
+        {
+          "heading": "outputLanguage",
+          "level": 1,
+          "line": 1
+        }
+      ],
+      "totalLines": 1
+    },
+    {
+      "fileCategory": "config",
+      "language": "toml",
+      "metrics": {
+        "classCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "importCount": 0,
+        "sectionCount": 3
+      },
+      "nonEmptyLines": 8,
+      "path": "crates/itofin/Cargo.toml",
+      "sections": [
+        {
+          "heading": "package",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "lib",
+          "level": 1,
+          "line": 6
+        },
+        {
+          "heading": "dependencies",
+          "level": 1,
+          "line": 9
+        }
+      ],
+      "totalLines": 10
+    }
+  ],
+  "scriptCompleted": true
+}

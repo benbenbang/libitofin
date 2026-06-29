@@ -1,0 +1,265 @@
+{
+  "files": [
+    {
+      "fileCategory": "infra",
+      "language": "unknown",
+      "path": ".dockerignore"
+    },
+    {
+      "fileCategory": "docs",
+      "language": "markdown",
+      "path": ".github/copilot-instructions.md"
+    },
+    {
+      "fileCategory": "script",
+      "language": "shell",
+      "path": ".github/images/prek/build.sh"
+    },
+    {
+      "fileCategory": "infra",
+      "language": "dockerfile",
+      "path": ".github/images/prek/Dockerfile"
+    },
+    {
+      "fileCategory": "docs",
+      "language": "markdown",
+      "path": ".github/images/README.md"
+    },
+    {
+      "fileCategory": "config",
+      "language": "yaml",
+      "path": ".github/labeler.yml"
+    },
+    {
+      "fileCategory": "infra",
+      "language": "yaml",
+      "path": ".github/workflows/pull-request.yml"
+    },
+    {
+      "fileCategory": "infra",
+      "language": "yaml",
+      "path": ".github/workflows/semantic-release.yml"
+    },
+    {
+      "fileCategory": "config",
+      "language": "yaml",
+      "path": ".pre-commit-config.yaml"
+    },
+    {
+      "fileCategory": "config",
+      "language": "json",
+      "path": ".releaserc.json"
+    },
+    {
+      "fileCategory": "code",
+      "language": "unknown",
+      "path": ".understand-anything/.understandignore"
+    },
+    {
+      "fileCategory": "config",
+      "language": "json",
+      "path": ".understand-anything/config.json"
+    },
+    {
+      "fileCategory": "config",
+      "language": "toml",
+      "path": "Cargo.toml"
+    },
+    {
+      "fileCategory": "config",
+      "language": "toml",
+      "path": "crates/itofin/Cargo.toml"
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/errors.rs"
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/handle.rs"
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/lib.rs"
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/array.rs"
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/beta.rs"
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/distributions/binomial.rs"
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/distributions/chisquare.rs"
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/distributions/gamma.rs"
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/distributions/mod.rs"
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/distributions/normal.rs"
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/distributions/poisson.rs"
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/distributions/studentt.rs"
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/errorfunction.rs"
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/gammafunction.rs"
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/incompletegamma.rs"
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/interpolations/linear.rs"
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/interpolations/mod.rs"
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/matrix.rs"
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/math/mod.rs"
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/patterns/lazyobject.rs"
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/patterns/mod.rs"
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/patterns/observable.rs"
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/patterns/visitor.rs"
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/settings.rs"
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/shared.rs"
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/types.rs"
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/utilities/clone.rs"
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/utilities/dataformatters.rs"
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/utilities/mod.rs"
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/utilities/null.rs"
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "path": "crates/itofin/src/utilities/steppingiterator.rs"
+    },
+    {
+      "fileCategory": "docs",
+      "language": "markdown",
+      "path": "README.md"
+    },
+    {
+      "fileCategory": "config",
+      "language": "toml",
+      "path": "rust-toolchain.toml"
+    },
+    {
+      "fileCategory": "script",
+      "language": "shell",
+      "path": "scripts/check_extension.sh"
+    },
+    {
+      "fileCategory": "script",
+      "language": "shell",
+      "path": "scripts/hadolint.sh"
+    },
+    {
+      "fileCategory": "config",
+      "language": "yaml",
+      "path": "scripts/hadolint.yml"
+    },
+    {
+      "fileCategory": "script",
+      "language": "shell",
+      "path": "scripts/init.sh"
+    },
+    {
+      "fileCategory": "docs",
+      "language": "markdown",
+      "path": "TICKETS.md"
+    }
+  ],
+  "projectRoot": "/Users/bn/Git/benbenbang/ito-fin"
+}

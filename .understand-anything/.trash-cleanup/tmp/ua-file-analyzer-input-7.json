@@ -1,0 +1,56 @@
+{
+  "batchFiles": [
+    {
+      "fileCategory": "infra",
+      "language": "unknown",
+      "path": ".dockerignore",
+      "sizeLines": 1
+    },
+    {
+      "fileCategory": "config",
+      "language": "yaml",
+      "path": ".pre-commit-config.yaml",
+      "sizeLines": 39
+    },
+    {
+      "fileCategory": "config",
+      "language": "json",
+      "path": ".releaserc.json",
+      "sizeLines": 146
+    },
+    {
+      "fileCategory": "config",
+      "language": "toml",
+      "path": "Cargo.toml",
+      "sizeLines": 7
+    },
+    {
+      "fileCategory": "docs",
+      "language": "markdown",
+      "path": "README.md",
+      "sizeLines": 124
+    },
+    {
+      "fileCategory": "docs",
+      "language": "markdown",
+      "path": "TICKETS.md",
+      "sizeLines": 219
+    },
+    {
+      "fileCategory": "config",
+      "language": "toml",
+      "path": "rust-toolchain.toml",
+      "sizeLines": 3
+    }
+  ],
+  "batchImportData": {
+    ".dockerignore": [],
+    ".pre-commit-config.yaml": [],
+    ".releaserc.json": [],
+    "Cargo.toml": [],
+    "README.md": [],
+    "TICKETS.md": [],
+    "rust-toolchain.toml": []
+  },
+  "projectRoot": "/Users/bn/Git/benbenbang/ito-fin"
+}

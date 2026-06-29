@@ -1,0 +1,74 @@
+{
+  "filesAnalyzed": 2,
+  "filesSkipped": [],
+  "results": [
+    {
+      "fileCategory": "infra",
+      "language": "yaml",
+      "metrics": {
+        "classCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "importCount": 0,
+        "sectionCount": 4
+      },
+      "nonEmptyLines": 37,
+      "path": ".github/workflows/pull-request.yml",
+      "sections": [
+        {
+          "heading": "name",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "on",
+          "level": 1,
+          "line": 3
+        },
+        {
+          "heading": "concurrency",
+          "level": 1,
+          "line": 13
+        },
+        {
+          "heading": "jobs",
+          "level": 1,
+          "line": 17
+        }
+      ],
+      "totalLines": 42
+    },
+    {
+      "fileCategory": "infra",
+      "language": "yaml",
+      "metrics": {
+        "classCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "importCount": 0,
+        "sectionCount": 3
+      },
+      "nonEmptyLines": 26,
+      "path": ".github/workflows/semantic-release.yml",
+      "sections": [
+        {
+          "heading": "name",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "on",
+          "level": 1,
+          "line": 3
+        },
+        {
+          "heading": "jobs",
+          "level": 1,
+          "line": 15
+        }
+      ],
+      "totalLines": 28
+    }
+  ],
+  "scriptCompleted": true
+}

@@ -1,0 +1,3407 @@
+{
+  "filesAnalyzed": 13,
+  "filesSkipped": [],
+  "results": [
+    {
+      "callGraph": [
+        {
+          "callee": "message.into",
+          "caller": "new",
+          "lineNumber": 24
+        },
+        {
+          "callee": "Ok",
+          "caller": "requires_positive",
+          "lineNumber": 100
+        },
+        {
+          "callee": "Ok",
+          "caller": "ensures_positive",
+          "lineNumber": 105
+        },
+        {
+          "callee": "fails_with(7).unwrap_err",
+          "caller": "fail_returns_err_with_message",
+          "lineNumber": 110
+        },
+        {
+          "callee": "fails_with",
+          "caller": "fail_returns_err_with_message",
+          "lineNumber": 110
+        },
+        {
+          "callee": "requires_positive(-1).unwrap_err",
+          "caller": "require_passes_and_fails",
+          "lineNumber": 117
+        },
+        {
+          "callee": "requires_positive",
+          "caller": "require_passes_and_fails",
+          "lineNumber": 117
+        },
+        {
+          "callee": "requires_positive(-1).unwrap_err",
+          "caller": "display_includes_location",
+          "lineNumber": 129
+        },
+        {
+          "callee": "requires_positive",
+          "caller": "display_includes_location",
+          "lineNumber": 129
+        },
+        {
+          "callee": "err.to_string",
+          "caller": "display_includes_location",
+          "lineNumber": 130
+        }
+      ],
+      "classes": [
+        {
+          "endLine": 18,
+          "methods": [
+            "new",
+            "message"
+          ],
+          "name": "QlError",
+          "properties": [
+            "message",
+            "file",
+            "line"
+          ],
+          "startLine": 14
+        }
+      ],
+      "exports": [
+        {
+          "isDefault": false,
+          "line": 14,
+          "name": "QlError"
+        },
+        {
+          "isDefault": false,
+          "line": 22,
+          "name": "new"
+        },
+        {
+          "isDefault": false,
+          "line": 31,
+          "name": "message"
+        }
+      ],
+      "fileCategory": "code",
+      "functions": [
+        {
+          "endLine": 28,
+          "name": "new",
+          "params": [
+            "message",
+            "file",
+            "line"
+          ],
+          "startLine": 22
+        },
+        {
+          "endLine": 33,
+          "name": "message",
+          "params": [],
+          "startLine": 31
+        }
+      ],
+      "language": "rust",
+      "metrics": {
+        "classCount": 1,
+        "exportCount": 3,
+        "functionCount": 2,
+        "importCount": 0
+      },
+      "nonEmptyLines": 117,
+      "path": "crates/itofin/src/errors.rs",
+      "totalLines": 134
+    },
+    {
+      "callGraph": [
+        {
+          "callee": "Ok",
+          "caller": "beta_function",
+          "lineNumber": 33
+        },
+        {
+          "callee": "(log_gamma(z)? + log_gamma(w)? - log_gamma(z + w)?).exp",
+          "caller": "beta_function",
+          "lineNumber": 33
+        },
+        {
+          "callee": "log_gamma",
+          "caller": "beta_function",
+          "lineNumber": 33
+        },
+        {
+          "callee": "log_gamma",
+          "caller": "beta_function",
+          "lineNumber": 33
+        },
+        {
+          "callee": "log_gamma",
+          "caller": "beta_function",
+          "lineNumber": 33
+        },
+        {
+          "callee": "a.is_finite",
+          "caller": "incomplete_beta",
+          "lineNumber": 58
+        },
+        {
+          "callee": "b.is_finite",
+          "caller": "incomplete_beta",
+          "lineNumber": 61
+        },
+        {
+          "callee": "(0.0..=1.0).contains",
+          "caller": "incomplete_beta",
+          "lineNumber": 65
+        },
+        {
+          "callee": "Ok",
+          "caller": "incomplete_beta",
+          "lineNumber": 69
+        },
+        {
+          "callee": "Ok",
+          "caller": "incomplete_beta",
+          "lineNumber": 72
+        },
+        {
+          "callee": "(log_gamma(a + b)? - log_gamma(a)? - log_gamma(b)? + a * x.ln() + b * (1.0 - x).ln()).exp",
+          "caller": "incomplete_beta",
+          "lineNumber": 76
+        },
+        {
+          "callee": "log_gamma",
+          "caller": "incomplete_beta",
+          "lineNumber": 76
+        },
+        {
+          "callee": "log_gamma",
+          "caller": "incomplete_beta",
+          "lineNumber": 76
+        },
+        {
+          "callee": "log_gamma",
+          "caller": "incomplete_beta",
+          "lineNumber": 76
+        },
+        {
+          "callee": "x.ln",
+          "caller": "incomplete_beta",
+          "lineNumber": 76
+        },
+        {
+          "callee": "(1.0 - x).ln",
+          "caller": "incomplete_beta",
+          "lineNumber": 76
+        },
+        {
+          "callee": "Ok",
+          "caller": "incomplete_beta",
+          "lineNumber": 80
+        },
+        {
+          "callee": "beta_continued_fraction",
+          "caller": "incomplete_beta",
+          "lineNumber": 80
+        },
+        {
+          "callee": "Ok",
+          "caller": "incomplete_beta",
+          "lineNumber": 82
+        },
+        {
+          "callee": "beta_continued_fraction",
+          "caller": "incomplete_beta",
+          "lineNumber": 82
+        },
+        {
+          "callee": "d.abs",
+          "caller": "beta_continued_fraction",
+          "lineNumber": 94
+        },
+        {
+          "callee": "d.abs",
+          "caller": "beta_continued_fraction",
+          "lineNumber": 107
+        },
+        {
+          "callee": "c.abs",
+          "caller": "beta_continued_fraction",
+          "lineNumber": 111
+        },
+        {
+          "callee": "d.abs",
+          "caller": "beta_continued_fraction",
+          "lineNumber": 120
+        },
+        {
+          "callee": "c.abs",
+          "caller": "beta_continued_fraction",
+          "lineNumber": 124
+        },
+        {
+          "callee": "(del - 1.0).abs",
+          "caller": "beta_continued_fraction",
+          "lineNumber": 130
+        },
+        {
+          "callee": "Ok",
+          "caller": "beta_continued_fraction",
+          "lineNumber": 131
+        },
+        {
+          "callee": "expected.abs",
+          "caller": "assert_close",
+          "lineNumber": 144
+        },
+        {
+          "callee": "assert_close",
+          "caller": "beta_function_known_values",
+          "lineNumber": 155
+        },
+        {
+          "callee": "beta_function(2.0, 3.0).unwrap",
+          "caller": "beta_function_known_values",
+          "lineNumber": 155
+        },
+        {
+          "callee": "beta_function",
+          "caller": "beta_function_known_values",
+          "lineNumber": 155
+        },
+        {
+          "callee": "assert_close",
+          "caller": "beta_function_known_values",
+          "lineNumber": 157
+        },
+        {
+          "callee": "beta_function(0.5, 0.5).unwrap",
+          "caller": "beta_function_known_values",
+          "lineNumber": 157
+        },
+        {
+          "callee": "beta_function",
+          "caller": "beta_function_known_values",
+          "lineNumber": 157
+        },
+        {
+          "callee": "assert_close",
+          "caller": "boundaries_and_uniform",
+          "lineNumber": 165
+        },
+        {
+          "callee": "incomplete_beta(1.0, 1.0, 0.3).unwrap",
+          "caller": "boundaries_and_uniform",
+          "lineNumber": 165
+        },
+        {
+          "callee": "incomplete_beta",
+          "caller": "boundaries_and_uniform",
+          "lineNumber": 165
+        },
+        {
+          "callee": "assert_close",
+          "caller": "boundaries_and_uniform",
+          "lineNumber": 166
+        },
+        {
+          "callee": "incomplete_beta(1.0, 1.0, 0.5).unwrap",
+          "caller": "boundaries_and_uniform",
+          "lineNumber": 166
+        },
+        {
+          "callee": "incomplete_beta",
+          "caller": "boundaries_and_uniform",
+          "lineNumber": 166
+        },
+        {
+          "callee": "assert_close",
+          "caller": "known_values",
+          "lineNumber": 172
+        },
+        {
+          "callee": "incomplete_beta(2.0, 2.0, 0.5).unwrap",
+          "caller": "known_values",
+          "lineNumber": 172
+        },
+        {
+          "callee": "incomplete_beta",
+          "caller": "known_values",
+          "lineNumber": 172
+        },
+        {
+          "callee": "assert_close",
+          "caller": "known_values",
+          "lineNumber": 174
+        },
+        {
+          "callee": "incomplete_beta(2.0, 3.0, 0.5).unwrap",
+          "caller": "known_values",
+          "lineNumber": 174
+        },
+        {
+          "callee": "incomplete_beta",
+          "caller": "known_values",
+          "lineNumber": 174
+        },
+        {
+          "callee": "assert_close",
+          "caller": "known_values",
+          "lineNumber": 176
+        },
+        {
+          "callee": "incomplete_beta(2.0, 3.0, 0.3).unwrap",
+          "caller": "known_values",
+          "lineNumber": 176
+        },
+        {
+          "callee": "incomplete_beta",
+          "caller": "known_values",
+          "lineNumber": 176
+        },
+        {
+          "callee": "incomplete_beta(a, b, x).unwrap",
+          "caller": "symmetry_identity",
+          "lineNumber": 183
+        },
+        {
+          "callee": "incomplete_beta",
+          "caller": "symmetry_identity",
+          "lineNumber": 183
+        },
+        {
+          "callee": "incomplete_beta(b, a, 1.0 - x).unwrap",
+          "caller": "symmetry_identity",
+          "lineNumber": 184
+        },
+        {
+          "callee": "incomplete_beta",
+          "caller": "symmetry_identity",
+          "lineNumber": 184
+        }
+      ],
+      "exports": [
+        {
+          "isDefault": false,
+          "line": 32,
+          "name": "beta_function"
+        },
+        {
+          "isDefault": false,
+          "line": 54,
+          "name": "incomplete_beta"
+        }
+      ],
+      "fileCategory": "code",
+      "functions": [
+        {
+          "endLine": 34,
+          "name": "beta_function",
+          "params": [
+            "z",
+            "w"
+          ],
+          "startLine": 32
+        },
+        {
+          "endLine": 84,
+          "name": "incomplete_beta",
+          "params": [
+            "a",
+            "b",
+            "x"
+          ],
+          "startLine": 54
+        },
+        {
+          "endLine": 135,
+          "name": "beta_continued_fraction",
+          "params": [
+            "a",
+            "b",
+            "x"
+          ],
+          "startLine": 87
+        }
+      ],
+      "language": "rust",
+      "metrics": {
+        "classCount": 0,
+        "exportCount": 2,
+        "functionCount": 3,
+        "importCount": 3
+      },
+      "nonEmptyLines": 187,
+      "path": "crates/itofin/src/math/beta.rs",
+      "totalLines": 205
+    },
+    {
+      "callGraph": [
+        {
+          "callee": "(1..=m).map(|j| (j as Real).ln()).sum",
+          "caller": "ln_factorial",
+          "lineNumber": 21
+        },
+        {
+          "callee": "(1..=m).map",
+          "caller": "ln_factorial",
+          "lineNumber": 21
+        },
+        {
+          "callee": "(j as Real).ln",
+          "caller": "ln_factorial",
+          "lineNumber": 21
+        },
+        {
+          "callee": "ln_factorial",
+          "caller": "ln_binomial_coefficient",
+          "lineNumber": 26
+        },
+        {
+          "callee": "ln_factorial",
+          "caller": "ln_binomial_coefficient",
+          "lineNumber": 26
+        },
+        {
+          "callee": "ln_factorial",
+          "caller": "ln_binomial_coefficient",
+          "lineNumber": 26
+        },
+        {
+          "callee": "Ok",
+          "caller": "new",
+          "lineNumber": 51
+        },
+        {
+          "callee": "p.ln",
+          "caller": "new",
+          "lineNumber": 53
+        },
+        {
+          "callee": "(1.0 - p).ln",
+          "caller": "new",
+          "lineNumber": 54
+        },
+        {
+          "callee": "(ln_binomial_coefficient(self.n, k)\n            + k as Real * self.log_p\n            + (self.n - k) as Real * self.log_one_minus_p).exp",
+          "caller": "pmf",
+          "lineNumber": 71
+        },
+        {
+          "callee": "ln_binomial_coefficient",
+          "caller": "pmf",
+          "lineNumber": 71
+        },
+        {
+          "callee": "Ok",
+          "caller": "new",
+          "lineNumber": 96
+        },
+        {
+          "callee": "incomplete_beta((k + 1) as Real, (self.n - k) as Real, self.p).expect",
+          "caller": "cdf",
+          "lineNumber": 107
+        },
+        {
+          "callee": "incomplete_beta",
+          "caller": "cdf",
+          "lineNumber": 107
+        },
+        {
+          "callee": "BinomialDistribution::new(0.3, 1).unwrap",
+          "caller": "pmf_single_trial",
+          "lineNumber": 126
+        },
+        {
+          "callee": "BinomialDistribution::new",
+          "caller": "pmf_single_trial",
+          "lineNumber": 126
+        },
+        {
+          "callee": "assert_close",
+          "caller": "pmf_single_trial",
+          "lineNumber": 127
+        },
+        {
+          "callee": "dist.pmf",
+          "caller": "pmf_single_trial",
+          "lineNumber": 127
+        },
+        {
+          "callee": "assert_close",
+          "caller": "pmf_single_trial",
+          "lineNumber": 128
+        },
+        {
+          "callee": "dist.pmf",
+          "caller": "pmf_single_trial",
+          "lineNumber": 128
+        },
+        {
+          "callee": "BinomialDistribution::new(0.5, 4).unwrap",
+          "caller": "pmf_matches_fair_coin_closed_form",
+          "lineNumber": 135
+        },
+        {
+          "callee": "BinomialDistribution::new",
+          "caller": "pmf_matches_fair_coin_closed_form",
+          "lineNumber": 135
+        },
+        {
+          "callee": "[1.0, 4.0, 6.0, 4.0, 1.0].map",
+          "caller": "pmf_matches_fair_coin_closed_form",
+          "lineNumber": 136
+        },
+        {
+          "callee": "expected.iter().enumerate",
+          "caller": "pmf_matches_fair_coin_closed_form",
+          "lineNumber": 137
+        },
+        {
+          "callee": "expected.iter",
+          "caller": "pmf_matches_fair_coin_closed_form",
+          "lineNumber": 137
+        },
+        {
+          "callee": "assert_close",
+          "caller": "pmf_matches_fair_coin_closed_form",
+          "lineNumber": 138
+        },
+        {
+          "callee": "dist.pmf",
+          "caller": "pmf_matches_fair_coin_closed_form",
+          "lineNumber": 138
+        },
+        {
+          "callee": "BinomialDistribution::new(p, n).unwrap",
+          "caller": "pmf_sums_to_one",
+          "lineNumber": 145
+        },
+        {
+          "callee": "BinomialDistribution::new",
+          "caller": "pmf_sums_to_one",
+          "lineNumber": 145
+        },
+        {
+          "callee": "(0..=n).map(|k| dist.pmf(k)).sum",
+          "caller": "pmf_sums_to_one",
+          "lineNumber": 146
+        },
+        {
+          "callee": "(0..=n).map",
+          "caller": "pmf_sums_to_one",
+          "lineNumber": 146
+        },
+        {
+          "callee": "dist.pmf",
+          "caller": "pmf_sums_to_one",
+          "lineNumber": 146
+        },
+        {
+          "callee": "assert_close",
+          "caller": "pmf_sums_to_one",
+          "lineNumber": 147
+        },
+        {
+          "callee": "BinomialDistribution::new(0.3, 12).unwrap",
+          "caller": "pmf_is_symmetric_under_p_swap",
+          "lineNumber": 154
+        },
+        {
+          "callee": "BinomialDistribution::new",
+          "caller": "pmf_is_symmetric_under_p_swap",
+          "lineNumber": 154
+        },
+        {
+          "callee": "BinomialDistribution::new(0.7, 12).unwrap",
+          "caller": "pmf_is_symmetric_under_p_swap",
+          "lineNumber": 155
+        },
+        {
+          "callee": "BinomialDistribution::new",
+          "caller": "pmf_is_symmetric_under_p_swap",
+          "lineNumber": 155
+        },
+        {
+          "callee": "assert_close",
+          "caller": "pmf_is_symmetric_under_p_swap",
+          "lineNumber": 157
+        },
+        {
+          "callee": "a.pmf",
+          "caller": "pmf_is_symmetric_under_p_swap",
+          "lineNumber": 157
+        },
+        {
+          "callee": "b.pmf",
+          "caller": "pmf_is_symmetric_under_p_swap",
+          "lineNumber": 157
+        },
+        {
+          "callee": "BinomialDistribution::new(0.0, 5).unwrap",
+          "caller": "pmf_degenerate_p",
+          "lineNumber": 163
+        },
+        {
+          "callee": "BinomialDistribution::new",
+          "caller": "pmf_degenerate_p",
+          "lineNumber": 163
+        },
+        {
+          "callee": "BinomialDistribution::new(1.0, 5).unwrap",
+          "caller": "pmf_degenerate_p",
+          "lineNumber": 166
+        },
+        {
+          "callee": "BinomialDistribution::new",
+          "caller": "pmf_degenerate_p",
+          "lineNumber": 166
+        },
+        {
+          "callee": "BinomialDistribution::new(p, n).unwrap",
+          "caller": "cdf_equals_cumulative_pmf",
+          "lineNumber": 177
+        },
+        {
+          "callee": "BinomialDistribution::new",
+          "caller": "cdf_equals_cumulative_pmf",
+          "lineNumber": 177
+        },
+        {
+          "callee": "CumulativeBinomialDistribution::new(p, n).unwrap",
+          "caller": "cdf_equals_cumulative_pmf",
+          "lineNumber": 178
+        },
+        {
+          "callee": "CumulativeBinomialDistribution::new",
+          "caller": "cdf_equals_cumulative_pmf",
+          "lineNumber": 178
+        },
+        {
+          "callee": "pmf.pmf",
+          "caller": "cdf_equals_cumulative_pmf",
+          "lineNumber": 181
+        },
+        {
+          "callee": "assert_close",
+          "caller": "cdf_equals_cumulative_pmf",
+          "lineNumber": 182
+        },
+        {
+          "callee": "cdf.cdf",
+          "caller": "cdf_equals_cumulative_pmf",
+          "lineNumber": 182
+        },
+        {
+          "callee": "CumulativeBinomialDistribution::new(0.4, 8).unwrap",
+          "caller": "cdf_boundaries",
+          "lineNumber": 189
+        },
+        {
+          "callee": "CumulativeBinomialDistribution::new",
+          "caller": "cdf_boundaries",
+          "lineNumber": 189
+        },
+        {
+          "callee": "CumulativeBinomialDistribution::new(0.0, 6).unwrap",
+          "caller": "cdf_degenerate_p",
+          "lineNumber": 197
+        },
+        {
+          "callee": "CumulativeBinomialDistribution::new",
+          "caller": "cdf_degenerate_p",
+          "lineNumber": 197
+        },
+        {
+          "callee": "CumulativeBinomialDistribution::new(1.0, 6).unwrap",
+          "caller": "cdf_degenerate_p",
+          "lineNumber": 201
+        },
+        {
+          "callee": "CumulativeBinomialDistribution::new",
+          "caller": "cdf_degenerate_p",
+          "lineNumber": 201
+        }
+      ],
+      "classes": [
+        {
+          "endLine": 36,
+          "methods": [
+            "new",
+            "pmf"
+          ],
+          "name": "BinomialDistribution",
+          "properties": [
+            "n",
+            "log_p",
+            "log_one_minus_p"
+          ],
+          "startLine": 32
+        },
+        {
+          "endLine": 83,
+          "methods": [
+            "new",
+            "cdf"
+          ],
+          "name": "CumulativeBinomialDistribution",
+          "properties": [
+            "n",
+            "p"
+          ],
+          "startLine": 80
+        }
+      ],
+      "exports": [
+        {
+          "isDefault": false,
+          "line": 32,
+          "name": "BinomialDistribution"
+        },
+        {
+          "isDefault": false,
+          "line": 44,
+          "name": "new"
+        },
+        {
+          "isDefault": false,
+          "line": 59,
+          "name": "pmf"
+        },
+        {
+          "isDefault": false,
+          "line": 80,
+          "name": "CumulativeBinomialDistribution"
+        },
+        {
+          "isDefault": false,
+          "line": 91,
+          "name": "new"
+        },
+        {
+          "isDefault": false,
+          "line": 100,
+          "name": "cdf"
+        }
+      ],
+      "fileCategory": "code",
+      "functions": [
+        {
+          "endLine": 22,
+          "name": "ln_factorial",
+          "params": [
+            "m"
+          ],
+          "startLine": 20
+        },
+        {
+          "endLine": 27,
+          "name": "ln_binomial_coefficient",
+          "params": [
+            "n",
+            "k"
+          ],
+          "startLine": 25
+        },
+        {
+          "endLine": 56,
+          "name": "new",
+          "params": [
+            "p",
+            "n"
+          ],
+          "startLine": 44
+        },
+        {
+          "endLine": 75,
+          "name": "pmf",
+          "params": [
+            "k"
+          ],
+          "startLine": 59
+        },
+        {
+          "endLine": 97,
+          "name": "new",
+          "params": [
+            "p",
+            "n"
+          ],
+          "startLine": 91
+        },
+        {
+          "endLine": 109,
+          "name": "cdf",
+          "params": [
+            "k"
+          ],
+          "startLine": 100
+        }
+      ],
+      "language": "rust",
+      "metrics": {
+        "classCount": 2,
+        "exportCount": 6,
+        "functionCount": 6,
+        "importCount": 3
+      },
+      "nonEmptyLines": 194,
+      "path": "crates/itofin/src/math/distributions/binomial.rs",
+      "totalLines": 214
+    },
+    {
+      "callGraph": [
+        {
+          "callee": "Ok",
+          "caller": "new",
+          "lineNumber": 38
+        },
+        {
+          "callee": "CumulativeGammaDistribution::new",
+          "caller": "new",
+          "lineNumber": 39
+        },
+        {
+          "callee": "self.gamma.cdf",
+          "caller": "cdf",
+          "lineNumber": 47
+        },
+        {
+          "callee": "CumulativeChiSquareDistribution::new(3.0).unwrap",
+          "caller": "boundary_values_at_support_edges",
+          "lineNumber": 65
+        },
+        {
+          "callee": "CumulativeChiSquareDistribution::new",
+          "caller": "boundary_values_at_support_edges",
+          "lineNumber": 65
+        },
+        {
+          "callee": "CumulativeChiSquareDistribution::new(2.0).unwrap",
+          "caller": "df_eq_2_is_exponential",
+          "lineNumber": 75
+        },
+        {
+          "callee": "CumulativeChiSquareDistribution::new",
+          "caller": "df_eq_2_is_exponential",
+          "lineNumber": 75
+        },
+        {
+          "callee": "assert_close",
+          "caller": "df_eq_2_is_exponential",
+          "lineNumber": 77
+        },
+        {
+          "callee": "dist.cdf",
+          "caller": "df_eq_2_is_exponential",
+          "lineNumber": 77
+        },
+        {
+          "callee": "(-0.5 * x).exp",
+          "caller": "df_eq_2_is_exponential",
+          "lineNumber": 77
+        },
+        {
+          "callee": "CumulativeChiSquareDistribution::new(df).unwrap",
+          "caller": "agrees_with_gamma_at_half_arguments",
+          "lineNumber": 84
+        },
+        {
+          "callee": "CumulativeChiSquareDistribution::new",
+          "caller": "agrees_with_gamma_at_half_arguments",
+          "lineNumber": 84
+        },
+        {
+          "callee": "CumulativeGammaDistribution::new(0.5 * df).unwrap",
+          "caller": "agrees_with_gamma_at_half_arguments",
+          "lineNumber": 85
+        },
+        {
+          "callee": "CumulativeGammaDistribution::new",
+          "caller": "agrees_with_gamma_at_half_arguments",
+          "lineNumber": 85
+        },
+        {
+          "callee": "CumulativeChiSquareDistribution::new(5.0).unwrap",
+          "caller": "stays_in_unit_interval_and_increases",
+          "lineNumber": 94
+        },
+        {
+          "callee": "CumulativeChiSquareDistribution::new",
+          "caller": "stays_in_unit_interval_and_increases",
+          "lineNumber": 94
+        },
+        {
+          "callee": "dist.cdf",
+          "caller": "stays_in_unit_interval_and_increases",
+          "lineNumber": 99
+        }
+      ],
+      "classes": [
+        {
+          "endLine": 20,
+          "methods": [
+            "new",
+            "cdf"
+          ],
+          "name": "CumulativeChiSquareDistribution",
+          "properties": [
+            "gamma"
+          ],
+          "startLine": 18
+        }
+      ],
+      "exports": [
+        {
+          "isDefault": false,
+          "line": 18,
+          "name": "CumulativeChiSquareDistribution"
+        },
+        {
+          "isDefault": false,
+          "line": 33,
+          "name": "new"
+        }
+      ],
+      "fileCategory": "code",
+      "functions": [
+        {
+          "endLine": 41,
+          "name": "new",
+          "params": [
+            "df"
+          ],
+          "startLine": 33
+        },
+        {
+          "endLine": 48,
+          "name": "cdf",
+          "params": [
+            "x"
+          ],
+          "startLine": 45
+        }
+      ],
+      "language": "rust",
+      "metrics": {
+        "classCount": 1,
+        "exportCount": 2,
+        "functionCount": 2,
+        "importCount": 2
+      },
+      "nonEmptyLines": 111,
+      "path": "crates/itofin/src/math/distributions/chisquare.rs",
+      "totalLines": 123
+    },
+    {
+      "callGraph": [
+        {
+          "callee": "Ok",
+          "caller": "new",
+          "lineNumber": 34
+        },
+        {
+          "callee": "x.is_nan",
+          "caller": "cdf",
+          "lineNumber": 40
+        },
+        {
+          "callee": "x.is_infinite",
+          "caller": "cdf",
+          "lineNumber": 49
+        },
+        {
+          "callee": "incomplete_gamma(self.a, x).expect",
+          "caller": "cdf",
+          "lineNumber": 55
+        },
+        {
+          "callee": "incomplete_gamma",
+          "caller": "cdf",
+          "lineNumber": 55
+        },
+        {
+          "callee": "CumulativeGammaDistribution::new(2.5).unwrap",
+          "caller": "boundary_values_at_support_edges",
+          "lineNumber": 75
+        },
+        {
+          "callee": "CumulativeGammaDistribution::new",
+          "caller": "boundary_values_at_support_edges",
+          "lineNumber": 75
+        },
+        {
+          "callee": "CumulativeGammaDistribution::new(1.0).unwrap",
+          "caller": "a_eq_1_is_exponential_cdf",
+          "lineNumber": 86
+        },
+        {
+          "callee": "CumulativeGammaDistribution::new",
+          "caller": "a_eq_1_is_exponential_cdf",
+          "lineNumber": 86
+        },
+        {
+          "callee": "assert_close",
+          "caller": "a_eq_1_is_exponential_cdf",
+          "lineNumber": 88
+        },
+        {
+          "callee": "dist.cdf",
+          "caller": "a_eq_1_is_exponential_cdf",
+          "lineNumber": 88
+        },
+        {
+          "callee": "(-x).exp",
+          "caller": "a_eq_1_is_exponential_cdf",
+          "lineNumber": 88
+        },
+        {
+          "callee": "CumulativeGammaDistribution::new(a).unwrap",
+          "caller": "agrees_with_incomplete_gamma_for_positive_x",
+          "lineNumber": 95
+        },
+        {
+          "callee": "CumulativeGammaDistribution::new",
+          "caller": "agrees_with_incomplete_gamma_for_positive_x",
+          "lineNumber": 95
+        },
+        {
+          "callee": "CumulativeGammaDistribution::new(3.0).unwrap",
+          "caller": "stays_in_unit_interval_and_increases",
+          "lineNumber": 104
+        },
+        {
+          "callee": "CumulativeGammaDistribution::new",
+          "caller": "stays_in_unit_interval_and_increases",
+          "lineNumber": 104
+        },
+        {
+          "callee": "dist.cdf",
+          "caller": "stays_in_unit_interval_and_increases",
+          "lineNumber": 109
+        }
+      ],
+      "classes": [
+        {
+          "endLine": 20,
+          "methods": [
+            "new",
+            "cdf"
+          ],
+          "name": "CumulativeGammaDistribution",
+          "properties": [
+            "a"
+          ],
+          "startLine": 18
+        }
+      ],
+      "exports": [
+        {
+          "isDefault": false,
+          "line": 18,
+          "name": "CumulativeGammaDistribution"
+        },
+        {
+          "isDefault": false,
+          "line": 29,
+          "name": "new"
+        }
+      ],
+      "fileCategory": "code",
+      "functions": [
+        {
+          "endLine": 35,
+          "name": "new",
+          "params": [
+            "a"
+          ],
+          "startLine": 29
+        },
+        {
+          "endLine": 57,
+          "name": "cdf",
+          "params": [
+            "x"
+          ],
+          "startLine": 39
+        }
+      ],
+      "language": "rust",
+      "metrics": {
+        "classCount": 1,
+        "exportCount": 2,
+        "functionCount": 2,
+        "importCount": 3
+      },
+      "nonEmptyLines": 121,
+      "path": "crates/itofin/src/math/distributions/gamma.rs",
+      "totalLines": 133
+    },
+    {
+      "callGraph": [
+        {
+          "callee": "(0.0..=1.0).contains",
+          "caller": "try_from",
+          "lineNumber": 52
+        },
+        {
+          "callee": "Ok",
+          "caller": "try_from",
+          "lineNumber": 55
+        },
+        {
+          "callee": "Self",
+          "caller": "try_from",
+          "lineNumber": 55
+        },
+        {
+          "callee": "self.pdf(x).ln",
+          "caller": "ln_pdf",
+          "lineNumber": 71
+        },
+        {
+          "callee": "self.pdf",
+          "caller": "ln_pdf",
+          "lineNumber": 71
+        },
+        {
+          "callee": "self.cdf",
+          "caller": "survival",
+          "lineNumber": 86
+        }
+      ],
+      "classes": [
+        {
+          "endLine": 38,
+          "methods": [
+            "value",
+            "try_from"
+          ],
+          "name": "Probability",
+          "properties": [],
+          "startLine": 38
+        },
+        {
+          "endLine": 73,
+          "methods": [
+            "pdf",
+            "ln_pdf"
+          ],
+          "name": "Density",
+          "properties": [],
+          "startLine": 60
+        },
+        {
+          "endLine": 88,
+          "methods": [
+            "cdf",
+            "survival"
+          ],
+          "name": "Cdf",
+          "properties": [],
+          "startLine": 76
+        },
+        {
+          "endLine": 99,
+          "methods": [
+            "quantile"
+          ],
+          "name": "Quantile",
+          "properties": [],
+          "startLine": 91
+        },
+        {
+          "endLine": 108,
+          "methods": [
+            "lower_bound",
+            "upper_bound"
+          ],
+          "name": "Support",
+          "properties": [],
+          "startLine": 102
+        }
+      ],
+      "exports": [
+        {
+          "isDefault": false,
+          "line": 38,
+          "name": "Probability"
+        },
+        {
+          "isDefault": false,
+          "line": 42,
+          "name": "value"
+        },
+        {
+          "isDefault": false,
+          "line": 60,
+          "name": "Density"
+        },
+        {
+          "isDefault": false,
+          "line": 76,
+          "name": "Cdf"
+        },
+        {
+          "isDefault": false,
+          "line": 91,
+          "name": "Quantile"
+        },
+        {
+          "isDefault": false,
+          "line": 102,
+          "name": "Support"
+        }
+      ],
+      "fileCategory": "code",
+      "functions": [
+        {
+          "endLine": 44,
+          "name": "value",
+          "params": [],
+          "startLine": 42
+        },
+        {
+          "endLine": 56,
+          "name": "try_from",
+          "params": [
+            "value"
+          ],
+          "startLine": 50
+        }
+      ],
+      "language": "rust",
+      "metrics": {
+        "classCount": 5,
+        "exportCount": 6,
+        "functionCount": 2,
+        "importCount": 8
+      },
+      "nonEmptyLines": 131,
+      "path": "crates/itofin/src/math/distributions/mod.rs",
+      "totalLines": 152
+    },
+    {
+      "callGraph": [
+        {
+          "callee": "sigma.is_finite",
+          "caller": "new",
+          "lineNumber": 39
+        },
+        {
+          "callee": "Ok",
+          "caller": "new",
+          "lineNumber": 44
+        },
+        {
+          "callee": "NormalDistribution::new(0.0, 1.0).expect",
+          "caller": "standard",
+          "lineNumber": 54
+        },
+        {
+          "callee": "NormalDistribution::new",
+          "caller": "standard",
+          "lineNumber": 54
+        },
+        {
+          "callee": "exponent.exp",
+          "caller": "value",
+          "lineNumber": 65
+        },
+        {
+          "callee": "self.value",
+          "caller": "derivative",
+          "lineNumber": 71
+        },
+        {
+          "callee": "NormalDistribution::standard",
+          "caller": "default",
+          "lineNumber": 77
+        },
+        {
+          "callee": "sigma.is_finite",
+          "caller": "new",
+          "lineNumber": 92
+        },
+        {
+          "callee": "Ok",
+          "caller": "new",
+          "lineNumber": 95
+        },
+        {
+          "callee": "NormalDistribution::standard",
+          "caller": "new",
+          "lineNumber": 98
+        },
+        {
+          "callee": "NormalDistribution::standard",
+          "caller": "standard",
+          "lineNumber": 107
+        },
+        {
+          "callee": "erf",
+          "caller": "value",
+          "lineNumber": 114
+        },
+        {
+          "callee": "a.abs",
+          "caller": "value",
+          "lineNumber": 131
+        },
+        {
+          "callee": "(sum * Real::EPSILON).abs",
+          "caller": "value",
+          "lineNumber": 132
+        },
+        {
+          "callee": "self.gaussian.value",
+          "caller": "value",
+          "lineNumber": 136
+        },
+        {
+          "callee": "self.gaussian.value",
+          "caller": "derivative",
+          "lineNumber": 145
+        },
+        {
+          "callee": "sigma.is_finite",
+          "caller": "new",
+          "lineNumber": 184
+        },
+        {
+          "callee": "Ok",
+          "caller": "new",
+          "lineNumber": 187
+        },
+        {
+          "callee": "Ok",
+          "caller": "value",
+          "lineNumber": 200
+        },
+        {
+          "callee": "Self::standard_value",
+          "caller": "value",
+          "lineNumber": 200
+        },
+        {
+          "callee": "(X_LOW..=X_HIGH).contains",
+          "caller": "standard_value",
+          "lineNumber": 205
+        },
+        {
+          "callee": "Self::tail_value",
+          "caller": "standard_value",
+          "lineNumber": 206
+        },
+        {
+          "callee": "Ok",
+          "caller": "standard_value",
+          "lineNumber": 210
+        },
+        {
+          "callee": "x.is_finite",
+          "caller": "tail_value",
+          "lineNumber": 218
+        },
+        {
+          "callee": "(x - 1.0).abs",
+          "caller": "tail_value",
+          "lineNumber": 221
+        },
+        {
+          "callee": "Ok",
+          "caller": "tail_value",
+          "lineNumber": 222
+        },
+        {
+          "callee": "x.abs",
+          "caller": "tail_value",
+          "lineNumber": 223
+        },
+        {
+          "callee": "Ok",
+          "caller": "tail_value",
+          "lineNumber": 224
+        },
+        {
+          "callee": "Ok",
+          "caller": "tail_value",
+          "lineNumber": 228
+        },
+        {
+          "callee": "(-2.0 * x.ln()).sqrt",
+          "caller": "tail_value",
+          "lineNumber": 229
+        },
+        {
+          "callee": "x.ln",
+          "caller": "tail_value",
+          "lineNumber": 229
+        },
+        {
+          "callee": "(-2.0 * (1.0 - x).ln()).sqrt",
+          "caller": "tail_value",
+          "lineNumber": 233
+        },
+        {
+          "callee": "(1.0 - x).ln",
+          "caller": "tail_value",
+          "lineNumber": 233
+        },
+        {
+          "callee": "NormalDistribution::standard",
+          "caller": "density_matches_analytic_gaussian",
+          "lineNumber": 248
+        },
+        {
+          "callee": "CumulativeNormalDistribution::standard",
+          "caller": "cdf_known_values",
+          "lineNumber": 257
+        },
+        {
+          "callee": "CumulativeNormalDistribution::standard",
+          "caller": "cdf_asymptotic_tail_for_very_negative",
+          "lineNumber": 270
+        },
+        {
+          "callee": "CumulativeNormalDistribution::new(0.3, 1.7).unwrap",
+          "caller": "cdf_derivative_is_density",
+          "lineNumber": 277
+        },
+        {
+          "callee": "CumulativeNormalDistribution::new",
+          "caller": "cdf_derivative_is_density",
+          "lineNumber": 277
+        },
+        {
+          "callee": "NormalDistribution::new(0.3, 1.7).unwrap",
+          "caller": "cdf_derivative_is_density",
+          "lineNumber": 278
+        },
+        {
+          "callee": "NormalDistribution::new",
+          "caller": "cdf_derivative_is_density",
+          "lineNumber": 278
+        },
+        {
+          "callee": "InverseCumulativeNormal::standard",
+          "caller": "inverse_of_one_half_is_zero",
+          "lineNumber": 286
+        },
+        {
+          "callee": "CumulativeNormalDistribution::new(0.1, 1.3).unwrap",
+          "caller": "inverse_round_trips_with_cdf",
+          "lineNumber": 292
+        },
+        {
+          "callee": "CumulativeNormalDistribution::new",
+          "caller": "inverse_round_trips_with_cdf",
+          "lineNumber": 292
+        },
+        {
+          "callee": "InverseCumulativeNormal::new(0.1, 1.3).unwrap",
+          "caller": "inverse_round_trips_with_cdf",
+          "lineNumber": 293
+        },
+        {
+          "callee": "InverseCumulativeNormal::new",
+          "caller": "inverse_round_trips_with_cdf",
+          "lineNumber": 293
+        },
+        {
+          "callee": "inv.value(cum.value(x)).unwrap",
+          "caller": "inverse_round_trips_with_cdf",
+          "lineNumber": 299
+        },
+        {
+          "callee": "inv.value",
+          "caller": "inverse_round_trips_with_cdf",
+          "lineNumber": 299
+        },
+        {
+          "callee": "cum.value",
+          "caller": "inverse_round_trips_with_cdf",
+          "lineNumber": 299
+        },
+        {
+          "callee": "max_err.max",
+          "caller": "inverse_round_trips_with_cdf",
+          "lineNumber": 300
+        },
+        {
+          "callee": "(round - x).abs",
+          "caller": "inverse_round_trips_with_cdf",
+          "lineNumber": 300
+        }
+      ],
+      "classes": [
+        {
+          "endLine": 29,
+          "methods": [
+            "new",
+            "standard",
+            "value",
+            "derivative",
+            "default"
+          ],
+          "name": "NormalDistribution",
+          "properties": [
+            "average",
+            "normalization_factor",
+            "denominator",
+            "der_normalization_factor"
+          ],
+          "startLine": 24
+        },
+        {
+          "endLine": 87,
+          "methods": [
+            "new",
+            "standard",
+            "value",
+            "derivative"
+          ],
+          "name": "CumulativeNormalDistribution",
+          "properties": [
+            "average",
+            "sigma",
+            "gaussian"
+          ],
+          "startLine": 83
+        },
+        {
+          "endLine": 179,
+          "methods": [
+            "new",
+            "standard",
+            "value",
+            "standard_value",
+            "tail_value"
+          ],
+          "name": "InverseCumulativeNormal",
+          "properties": [
+            "average",
+            "sigma"
+          ],
+          "startLine": 176
+        }
+      ],
+      "exports": [
+        {
+          "isDefault": false,
+          "line": 24,
+          "name": "NormalDistribution"
+        },
+        {
+          "isDefault": false,
+          "line": 38,
+          "name": "new"
+        },
+        {
+          "isDefault": false,
+          "line": 53,
+          "name": "standard"
+        },
+        {
+          "isDefault": false,
+          "line": 58,
+          "name": "value"
+        },
+        {
+          "isDefault": false,
+          "line": 70,
+          "name": "derivative"
+        },
+        {
+          "isDefault": false,
+          "line": 83,
+          "name": "CumulativeNormalDistribution"
+        },
+        {
+          "isDefault": false,
+          "line": 91,
+          "name": "new"
+        },
+        {
+          "isDefault": false,
+          "line": 103,
+          "name": "standard"
+        },
+        {
+          "isDefault": false,
+          "line": 112,
+          "name": "value"
+        },
+        {
+          "isDefault": false,
+          "line": 143,
+          "name": "derivative"
+        },
+        {
+          "isDefault": false,
+          "line": 176,
+          "name": "InverseCumulativeNormal"
+        },
+        {
+          "isDefault": false,
+          "line": 183,
+          "name": "new"
+        },
+        {
+          "isDefault": false,
+          "line": 191,
+          "name": "standard"
+        },
+        {
+          "isDefault": false,
+          "line": 199,
+          "name": "value"
+        },
+        {
+          "isDefault": false,
+          "line": 204,
+          "name": "standard_value"
+        }
+      ],
+      "fileCategory": "code",
+      "functions": [
+        {
+          "endLine": 50,
+          "name": "new",
+          "params": [
+            "average",
+            "sigma"
+          ],
+          "startLine": 38
+        },
+        {
+          "endLine": 55,
+          "name": "standard",
+          "params": [],
+          "startLine": 53
+        },
+        {
+          "endLine": 67,
+          "name": "value",
+          "params": [
+            "x"
+          ],
+          "startLine": 58
+        },
+        {
+          "endLine": 72,
+          "name": "derivative",
+          "params": [
+            "x"
+          ],
+          "startLine": 70
+        },
+        {
+          "endLine": 78,
+          "name": "default",
+          "params": [],
+          "startLine": 76
+        },
+        {
+          "endLine": 100,
+          "name": "new",
+          "params": [
+            "average",
+            "sigma"
+          ],
+          "startLine": 91
+        },
+        {
+          "endLine": 109,
+          "name": "standard",
+          "params": [],
+          "startLine": 103
+        },
+        {
+          "endLine": 140,
+          "name": "value",
+          "params": [
+            "x"
+          ],
+          "startLine": 112
+        },
+        {
+          "endLine": 146,
+          "name": "derivative",
+          "params": [
+            "x"
+          ],
+          "startLine": 143
+        },
+        {
+          "endLine": 188,
+          "name": "new",
+          "params": [
+            "average",
+            "sigma"
+          ],
+          "startLine": 183
+        },
+        {
+          "endLine": 196,
+          "name": "standard",
+          "params": [],
+          "startLine": 191
+        },
+        {
+          "endLine": 201,
+          "name": "value",
+          "params": [
+            "x"
+          ],
+          "startLine": 199
+        },
+        {
+          "endLine": 215,
+          "name": "standard_value",
+          "params": [
+            "x"
+          ],
+          "startLine": 204
+        },
+        {
+          "endLine": 237,
+          "name": "tail_value",
+          "params": [
+            "x"
+          ],
+          "startLine": 217
+        }
+      ],
+      "language": "rust",
+      "metrics": {
+        "classCount": 3,
+        "exportCount": 15,
+        "functionCount": 14,
+        "importCount": 3
+      },
+      "nonEmptyLines": 301,
+      "path": "crates/itofin/src/math/distributions/normal.rs",
+      "totalLines": 332
+    },
+    {
+      "callGraph": [
+        {
+          "callee": "mu.ln",
+          "caller": "new",
+          "lineNumber": 45
+        },
+        {
+          "callee": "Ok",
+          "caller": "new",
+          "lineNumber": 46
+        },
+        {
+          "callee": "(1..=k).map(|j| (j as Real).ln()).sum",
+          "caller": "pmf",
+          "lineNumber": 58
+        },
+        {
+          "callee": "(1..=k).map",
+          "caller": "pmf",
+          "lineNumber": 58
+        },
+        {
+          "callee": "(j as Real).ln",
+          "caller": "pmf",
+          "lineNumber": 58
+        },
+        {
+          "callee": "(k as Real * self.log_mu - ln_factorial - self.mu).exp",
+          "caller": "pmf",
+          "lineNumber": 59
+        },
+        {
+          "callee": "(-mu).exp",
+          "caller": "new",
+          "lineNumber": 83
+        },
+        {
+          "callee": "Ok",
+          "caller": "new",
+          "lineNumber": 86
+        },
+        {
+          "callee": "(-self.mu).exp",
+          "caller": "cdf",
+          "lineNumber": 93
+        },
+        {
+          "callee": "(-lambda).exp",
+          "caller": "new",
+          "lineNumber": 123
+        },
+        {
+          "callee": "Ok",
+          "caller": "new",
+          "lineNumber": 128
+        },
+        {
+          "callee": "p.value",
+          "caller": "quantile",
+          "lineNumber": 143
+        },
+        {
+          "callee": "Ok",
+          "caller": "quantile",
+          "lineNumber": 145
+        },
+        {
+          "callee": "Ok",
+          "caller": "quantile",
+          "lineNumber": 148
+        },
+        {
+          "callee": "(-self.lambda).exp",
+          "caller": "quantile",
+          "lineNumber": 154
+        },
+        {
+          "callee": "Ok",
+          "caller": "quantile",
+          "lineNumber": 170
+        },
+        {
+          "callee": "PoissonDistribution::new(mean).unwrap",
+          "caller": "pmf_matches_reference",
+          "lineNumber": 184
+        },
+        {
+          "callee": "PoissonDistribution::new",
+          "caller": "pmf_matches_reference",
+          "lineNumber": 184
+        },
+        {
+          "callee": "mean.ln",
+          "caller": "pmf_matches_reference",
+          "lineNumber": 191
+        },
+        {
+          "callee": "(i as Real).ln",
+          "caller": "pmf_matches_reference",
+          "lineNumber": 191
+        },
+        {
+          "callee": "log_helper.exp",
+          "caller": "pmf_matches_reference",
+          "lineNumber": 192
+        },
+        {
+          "callee": "CumulativePoissonDistribution::new(mean).unwrap",
+          "caller": "cdf_matches_reference",
+          "lineNumber": 209
+        },
+        {
+          "callee": "CumulativePoissonDistribution::new",
+          "caller": "cdf_matches_reference",
+          "lineNumber": 209
+        },
+        {
+          "callee": "log_helper.exp",
+          "caller": "cdf_matches_reference",
+          "lineNumber": 211
+        },
+        {
+          "callee": "mean.ln",
+          "caller": "cdf_matches_reference",
+          "lineNumber": 217
+        },
+        {
+          "callee": "(i as Real).ln",
+          "caller": "cdf_matches_reference",
+          "lineNumber": 217
+        },
+        {
+          "callee": "log_helper.exp",
+          "caller": "cdf_matches_reference",
+          "lineNumber": 218
+        },
+        {
+          "callee": "InverseCumulativePoisson::new(1.0).unwrap",
+          "caller": "inverse_matches_reference",
+          "lineNumber": 234
+        },
+        {
+          "callee": "InverseCumulativePoisson::new",
+          "caller": "inverse_matches_reference",
+          "lineNumber": 234
+        },
+        {
+          "callee": "data.iter().enumerate",
+          "caller": "inverse_matches_reference",
+          "lineNumber": 239
+        },
+        {
+          "callee": "data.iter",
+          "caller": "inverse_matches_reference",
+          "lineNumber": 239
+        },
+        {
+          "callee": "icp.quantile(Probability::try_from(x).unwrap()).unwrap",
+          "caller": "inverse_matches_reference",
+          "lineNumber": 240
+        },
+        {
+          "callee": "icp.quantile",
+          "caller": "inverse_matches_reference",
+          "lineNumber": 240
+        },
+        {
+          "callee": "Probability::try_from(x).unwrap",
+          "caller": "inverse_matches_reference",
+          "lineNumber": 240
+        },
+        {
+          "callee": "Probability::try_from",
+          "caller": "inverse_matches_reference",
+          "lineNumber": 240
+        },
+        {
+          "callee": "PoissonDistribution::new(0.0).unwrap",
+          "caller": "mu_zero_is_point_mass_at_zero",
+          "lineNumber": 247
+        },
+        {
+          "callee": "PoissonDistribution::new",
+          "caller": "mu_zero_is_point_mass_at_zero",
+          "lineNumber": 247
+        },
+        {
+          "callee": "CumulativePoissonDistribution::new(0.0).unwrap",
+          "caller": "mu_zero_is_point_mass_at_zero",
+          "lineNumber": 250
+        },
+        {
+          "callee": "CumulativePoissonDistribution::new",
+          "caller": "mu_zero_is_point_mass_at_zero",
+          "lineNumber": 250
+        },
+        {
+          "callee": "InverseCumulativePoisson::new(2.5).unwrap",
+          "caller": "inverse_endpoints",
+          "lineNumber": 257
+        },
+        {
+          "callee": "InverseCumulativePoisson::new",
+          "caller": "inverse_endpoints",
+          "lineNumber": 257
+        },
+        {
+          "callee": "InverseCumulativePoisson::new(707.0).unwrap",
+          "caller": "inverse_errors_for_p_within_rounding_of_one",
+          "lineNumber": 272
+        },
+        {
+          "callee": "InverseCumulativePoisson::new",
+          "caller": "inverse_errors_for_p_within_rounding_of_one",
+          "lineNumber": 272
+        },
+        {
+          "callee": "Probability::try_from(1.0_f64.next_down()).unwrap",
+          "caller": "inverse_errors_for_p_within_rounding_of_one",
+          "lineNumber": 273
+        },
+        {
+          "callee": "Probability::try_from",
+          "caller": "inverse_errors_for_p_within_rounding_of_one",
+          "lineNumber": 273
+        },
+        {
+          "callee": "1.0_f64.next_down",
+          "caller": "inverse_errors_for_p_within_rounding_of_one",
+          "lineNumber": 273
+        },
+        {
+          "callee": "CumulativePoissonDistribution::new(700.0).unwrap",
+          "caller": "recurrence_paths_reject_means_that_underflow",
+          "lineNumber": 297
+        },
+        {
+          "callee": "CumulativePoissonDistribution::new",
+          "caller": "recurrence_paths_reject_means_that_underflow",
+          "lineNumber": 297
+        },
+        {
+          "callee": "InverseCumulativePoisson::new(700.0).unwrap",
+          "caller": "recurrence_paths_reject_means_that_underflow",
+          "lineNumber": 303
+        },
+        {
+          "callee": "InverseCumulativePoisson::new",
+          "caller": "recurrence_paths_reject_means_that_underflow",
+          "lineNumber": 303
+        },
+        {
+          "callee": "icp.quantile(Probability::try_from(0.5).unwrap()).unwrap",
+          "caller": "recurrence_paths_reject_means_that_underflow",
+          "lineNumber": 304
+        },
+        {
+          "callee": "icp.quantile",
+          "caller": "recurrence_paths_reject_means_that_underflow",
+          "lineNumber": 304
+        },
+        {
+          "callee": "Probability::try_from(0.5).unwrap",
+          "caller": "recurrence_paths_reject_means_that_underflow",
+          "lineNumber": 304
+        },
+        {
+          "callee": "Probability::try_from",
+          "caller": "recurrence_paths_reject_means_that_underflow",
+          "lineNumber": 304
+        }
+      ],
+      "classes": [
+        {
+          "endLine": 32,
+          "methods": [
+            "new",
+            "pmf"
+          ],
+          "name": "PoissonDistribution",
+          "properties": [
+            "mu",
+            "log_mu"
+          ],
+          "startLine": 29
+        },
+        {
+          "endLine": 67,
+          "methods": [
+            "new",
+            "cdf"
+          ],
+          "name": "CumulativePoissonDistribution",
+          "properties": [
+            "mu"
+          ],
+          "startLine": 65
+        },
+        {
+          "endLine": 107,
+          "methods": [
+            "new",
+            "quantile"
+          ],
+          "name": "InverseCumulativePoisson",
+          "properties": [
+            "lambda"
+          ],
+          "startLine": 105
+        }
+      ],
+      "exports": [
+        {
+          "isDefault": false,
+          "line": 29,
+          "name": "PoissonDistribution"
+        },
+        {
+          "isDefault": false,
+          "line": 40,
+          "name": "new"
+        },
+        {
+          "isDefault": false,
+          "line": 50,
+          "name": "pmf"
+        },
+        {
+          "isDefault": false,
+          "line": 65,
+          "name": "CumulativePoissonDistribution"
+        },
+        {
+          "isDefault": false,
+          "line": 78,
+          "name": "new"
+        },
+        {
+          "isDefault": false,
+          "line": 90,
+          "name": "cdf"
+        },
+        {
+          "isDefault": false,
+          "line": 105,
+          "name": "InverseCumulativePoisson"
+        },
+        {
+          "isDefault": false,
+          "line": 118,
+          "name": "new"
+        }
+      ],
+      "fileCategory": "code",
+      "functions": [
+        {
+          "endLine": 47,
+          "name": "new",
+          "params": [
+            "mu"
+          ],
+          "startLine": 40
+        },
+        {
+          "endLine": 60,
+          "name": "pmf",
+          "params": [
+            "k"
+          ],
+          "startLine": 50
+        },
+        {
+          "endLine": 87,
+          "name": "new",
+          "params": [
+            "mu"
+          ],
+          "startLine": 78
+        },
+        {
+          "endLine": 100,
+          "name": "cdf",
+          "params": [
+            "k"
+          ],
+          "startLine": 90
+        },
+        {
+          "endLine": 129,
+          "name": "new",
+          "params": [
+            "lambda"
+          ],
+          "startLine": 118
+        },
+        {
+          "endLine": 171,
+          "name": "quantile",
+          "params": [
+            "p"
+          ],
+          "startLine": 142
+        }
+      ],
+      "language": "rust",
+      "metrics": {
+        "classCount": 3,
+        "exportCount": 8,
+        "functionCount": 6,
+        "importCount": 2
+      },
+      "nonEmptyLines": 288,
+      "path": "crates/itofin/src/math/distributions/poisson.rs",
+      "totalLines": 307
+    },
+    {
+      "callGraph": [
+        {
+          "callee": "log_gamma",
+          "caller": "new",
+          "lineNumber": 54
+        },
+        {
+          "callee": "log_gamma",
+          "caller": "new",
+          "lineNumber": 54
+        },
+        {
+          "callee": "(degrees_of_freedom * PI).ln",
+          "caller": "new",
+          "lineNumber": 54
+        },
+        {
+          "callee": "Ok",
+          "caller": "new",
+          "lineNumber": 55
+        },
+        {
+          "callee": "self.ln_pdf(x).exp",
+          "caller": "pdf",
+          "lineNumber": 67
+        },
+        {
+          "callee": "self.ln_pdf",
+          "caller": "pdf",
+          "lineNumber": 67
+        },
+        {
+          "callee": "(1.0 + x * x / nu).ln",
+          "caller": "ln_pdf",
+          "lineNumber": 72
+        },
+        {
+          "callee": "x.is_nan",
+          "caller": "cdf",
+          "lineNumber": 78
+        },
+        {
+          "callee": "incomplete_beta(0.5 * nu, 0.5, z).expect",
+          "caller": "cdf",
+          "lineNumber": 90
+        },
+        {
+          "callee": "incomplete_beta",
+          "caller": "cdf",
+          "lineNumber": 90
+        },
+        {
+          "callee": "self.cdf",
+          "caller": "survival",
+          "lineNumber": 99
+        },
+        {
+          "callee": "p.value",
+          "caller": "quantile",
+          "lineNumber": 115
+        },
+        {
+          "callee": "Ok",
+          "caller": "quantile",
+          "lineNumber": 118
+        },
+        {
+          "callee": "self.lower_bound",
+          "caller": "quantile",
+          "lineNumber": 118
+        },
+        {
+          "callee": "Ok",
+          "caller": "quantile",
+          "lineNumber": 121
+        },
+        {
+          "callee": "self.upper_bound",
+          "caller": "quantile",
+          "lineNumber": 121
+        },
+        {
+          "callee": "self.cdf",
+          "caller": "quantile",
+          "lineNumber": 128
+        },
+        {
+          "callee": "self.pdf",
+          "caller": "quantile",
+          "lineNumber": 128
+        },
+        {
+          "callee": "diff.abs",
+          "caller": "quantile",
+          "lineNumber": 130
+        },
+        {
+          "callee": "Ok",
+          "caller": "quantile",
+          "lineNumber": 131
+        },
+        {
+          "callee": "StudentT::new(nu).unwrap",
+          "caller": "cdf_stays_in_unit_interval_across_supported_domain",
+          "lineNumber": 179
+        },
+        {
+          "callee": "StudentT::new",
+          "caller": "cdf_stays_in_unit_interval_across_supported_domain",
+          "lineNumber": 179
+        },
+        {
+          "callee": "dist.cdf",
+          "caller": "cdf_stays_in_unit_interval_across_supported_domain",
+          "lineNumber": 181
+        },
+        {
+          "callee": "StudentT::new(1.0).unwrap",
+          "caller": "cdf_matches_cauchy_closed_form",
+          "lineNumber": 191
+        },
+        {
+          "callee": "StudentT::new",
+          "caller": "cdf_matches_cauchy_closed_form",
+          "lineNumber": 191
+        },
+        {
+          "callee": "x.atan",
+          "caller": "cdf_matches_cauchy_closed_form",
+          "lineNumber": 193
+        },
+        {
+          "callee": "assert_close",
+          "caller": "cdf_matches_cauchy_closed_form",
+          "lineNumber": 194
+        },
+        {
+          "callee": "dist.cdf",
+          "caller": "cdf_matches_cauchy_closed_form",
+          "lineNumber": 194
+        },
+        {
+          "callee": "StudentT::new(2.0).unwrap",
+          "caller": "cdf_matches_nu2_closed_form",
+          "lineNumber": 201
+        },
+        {
+          "callee": "StudentT::new",
+          "caller": "cdf_matches_nu2_closed_form",
+          "lineNumber": 201
+        },
+        {
+          "callee": "(x * x + 2.0).sqrt",
+          "caller": "cdf_matches_nu2_closed_form",
+          "lineNumber": 203
+        },
+        {
+          "callee": "assert_close",
+          "caller": "cdf_matches_nu2_closed_form",
+          "lineNumber": 204
+        },
+        {
+          "callee": "dist.cdf",
+          "caller": "cdf_matches_nu2_closed_form",
+          "lineNumber": 204
+        },
+        {
+          "callee": "StudentT::new(1.0e8).unwrap",
+          "caller": "cdf_approaches_normal_for_large_dof",
+          "lineNumber": 211
+        },
+        {
+          "callee": "StudentT::new",
+          "caller": "cdf_approaches_normal_for_large_dof",
+          "lineNumber": 211
+        },
+        {
+          "callee": "assert_close",
+          "caller": "cdf_approaches_normal_for_large_dof",
+          "lineNumber": 213
+        },
+        {
+          "callee": "dist.cdf",
+          "caller": "cdf_approaches_normal_for_large_dof",
+          "lineNumber": 213
+        },
+        {
+          "callee": "assert_close",
+          "caller": "cdf_approaches_normal_for_large_dof",
+          "lineNumber": 214
+        },
+        {
+          "callee": "dist.cdf",
+          "caller": "cdf_approaches_normal_for_large_dof",
+          "lineNumber": 214
+        },
+        {
+          "callee": "assert_close",
+          "caller": "pdf_at_zero_matches_analytic",
+          "lineNumber": 224
+        },
+        {
+          "callee": "StudentT::new(1.0).unwrap().pdf",
+          "caller": "pdf_at_zero_matches_analytic",
+          "lineNumber": 224
+        },
+        {
+          "callee": "StudentT::new(1.0).unwrap",
+          "caller": "pdf_at_zero_matches_analytic",
+          "lineNumber": 224
+        },
+        {
+          "callee": "StudentT::new",
+          "caller": "pdf_at_zero_matches_analytic",
+          "lineNumber": 224
+        },
+        {
+          "callee": "assert_close",
+          "caller": "pdf_at_zero_matches_analytic",
+          "lineNumber": 226
+        },
+        {
+          "callee": "StudentT::new(2.0).unwrap().pdf",
+          "caller": "pdf_at_zero_matches_analytic",
+          "lineNumber": 227
+        },
+        {
+          "callee": "StudentT::new(2.0).unwrap",
+          "caller": "pdf_at_zero_matches_analytic",
+          "lineNumber": 227
+        },
+        {
+          "callee": "StudentT::new",
+          "caller": "pdf_at_zero_matches_analytic",
+          "lineNumber": 227
+        },
+        {
+          "callee": "2.0_f64.sqrt",
+          "caller": "pdf_at_zero_matches_analytic",
+          "lineNumber": 228
+        },
+        {
+          "callee": "StudentT::new(7.0).unwrap",
+          "caller": "pdf_is_exp_of_ln_pdf",
+          "lineNumber": 235
+        },
+        {
+          "callee": "StudentT::new",
+          "caller": "pdf_is_exp_of_ln_pdf",
+          "lineNumber": 235
+        },
+        {
+          "callee": "assert_close",
+          "caller": "pdf_is_exp_of_ln_pdf",
+          "lineNumber": 237
+        },
+        {
+          "callee": "dist.pdf",
+          "caller": "pdf_is_exp_of_ln_pdf",
+          "lineNumber": 237
+        },
+        {
+          "callee": "dist.ln_pdf(x).exp",
+          "caller": "pdf_is_exp_of_ln_pdf",
+          "lineNumber": 237
+        },
+        {
+          "callee": "dist.ln_pdf",
+          "caller": "pdf_is_exp_of_ln_pdf",
+          "lineNumber": 237
+        },
+        {
+          "callee": "StudentT::new(4.0).unwrap",
+          "caller": "limits_at_infinity",
+          "lineNumber": 244
+        },
+        {
+          "callee": "StudentT::new",
+          "caller": "limits_at_infinity",
+          "lineNumber": 244
+        },
+        {
+          "callee": "StudentT::new(nu).unwrap",
+          "caller": "cdf_is_symmetric",
+          "lineNumber": 261
+        },
+        {
+          "callee": "StudentT::new",
+          "caller": "cdf_is_symmetric",
+          "lineNumber": 261
+        },
+        {
+          "callee": "assert_close",
+          "caller": "cdf_is_symmetric",
+          "lineNumber": 263
+        },
+        {
+          "callee": "dist.cdf",
+          "caller": "cdf_is_symmetric",
+          "lineNumber": 263
+        },
+        {
+          "callee": "dist.cdf",
+          "caller": "cdf_is_symmetric",
+          "lineNumber": 263
+        },
+        {
+          "callee": "StudentT::new(6.0).unwrap",
+          "caller": "cdf_is_strictly_increasing",
+          "lineNumber": 270
+        },
+        {
+          "callee": "StudentT::new",
+          "caller": "cdf_is_strictly_increasing",
+          "lineNumber": 270
+        },
+        {
+          "callee": "dist.cdf",
+          "caller": "cdf_is_strictly_increasing",
+          "lineNumber": 271
+        },
+        {
+          "callee": "dist.cdf",
+          "caller": "cdf_is_strictly_increasing",
+          "lineNumber": 275
+        },
+        {
+          "callee": "StudentT::new(9.0).unwrap",
+          "caller": "survival_is_complement_and_uses_symmetry",
+          "lineNumber": 283
+        },
+        {
+          "callee": "StudentT::new",
+          "caller": "survival_is_complement_and_uses_symmetry",
+          "lineNumber": 283
+        },
+        {
+          "callee": "assert_close",
+          "caller": "survival_is_complement_and_uses_symmetry",
+          "lineNumber": 285
+        },
+        {
+          "callee": "dist.survival",
+          "caller": "survival_is_complement_and_uses_symmetry",
+          "lineNumber": 285
+        },
+        {
+          "callee": "dist.cdf",
+          "caller": "survival_is_complement_and_uses_symmetry",
+          "lineNumber": 285
+        },
+        {
+          "callee": "StudentT::new(5.0).unwrap",
+          "caller": "quantile_endpoints_are_support_bounds",
+          "lineNumber": 294
+        },
+        {
+          "callee": "StudentT::new",
+          "caller": "quantile_endpoints_are_support_bounds",
+          "lineNumber": 294
+        },
+        {
+          "callee": "StudentT::new(nu).unwrap",
+          "caller": "quantile_of_half_is_zero",
+          "lineNumber": 308
+        },
+        {
+          "callee": "StudentT::new",
+          "caller": "quantile_of_half_is_zero",
+          "lineNumber": 308
+        },
+        {
+          "callee": "dist.quantile(Probability::try_from(0.5).unwrap()).unwrap",
+          "caller": "quantile_of_half_is_zero",
+          "lineNumber": 309
+        },
+        {
+          "callee": "dist.quantile",
+          "caller": "quantile_of_half_is_zero",
+          "lineNumber": 309
+        },
+        {
+          "callee": "Probability::try_from(0.5).unwrap",
+          "caller": "quantile_of_half_is_zero",
+          "lineNumber": 309
+        },
+        {
+          "callee": "Probability::try_from",
+          "caller": "quantile_of_half_is_zero",
+          "lineNumber": 309
+        },
+        {
+          "callee": "assert_close",
+          "caller": "quantile_of_half_is_zero",
+          "lineNumber": 310
+        },
+        {
+          "callee": "StudentT::new(nu).unwrap",
+          "caller": "quantile_round_trips_with_cdf",
+          "lineNumber": 317
+        },
+        {
+          "callee": "StudentT::new",
+          "caller": "quantile_round_trips_with_cdf",
+          "lineNumber": 317
+        },
+        {
+          "callee": "dist.quantile(Probability::try_from(p).unwrap()).unwrap",
+          "caller": "quantile_round_trips_with_cdf",
+          "lineNumber": 319
+        },
+        {
+          "callee": "dist.quantile",
+          "caller": "quantile_round_trips_with_cdf",
+          "lineNumber": 319
+        },
+        {
+          "callee": "Probability::try_from(p).unwrap",
+          "caller": "quantile_round_trips_with_cdf",
+          "lineNumber": 319
+        },
+        {
+          "callee": "Probability::try_from",
+          "caller": "quantile_round_trips_with_cdf",
+          "lineNumber": 319
+        },
+        {
+          "callee": "assert_close",
+          "caller": "quantile_round_trips_with_cdf",
+          "lineNumber": 320
+        },
+        {
+          "callee": "dist.cdf",
+          "caller": "quantile_round_trips_with_cdf",
+          "lineNumber": 320
+        },
+        {
+          "callee": "StudentT::new(1.0).unwrap",
+          "caller": "quantile_matches_cauchy_known_value",
+          "lineNumber": 328
+        },
+        {
+          "callee": "StudentT::new",
+          "caller": "quantile_matches_cauchy_known_value",
+          "lineNumber": 328
+        },
+        {
+          "callee": "dist.quantile(Probability::try_from(0.75).unwrap()).unwrap",
+          "caller": "quantile_matches_cauchy_known_value",
+          "lineNumber": 329
+        },
+        {
+          "callee": "dist.quantile",
+          "caller": "quantile_matches_cauchy_known_value",
+          "lineNumber": 329
+        },
+        {
+          "callee": "Probability::try_from(0.75).unwrap",
+          "caller": "quantile_matches_cauchy_known_value",
+          "lineNumber": 329
+        },
+        {
+          "callee": "Probability::try_from",
+          "caller": "quantile_matches_cauchy_known_value",
+          "lineNumber": 329
+        },
+        {
+          "callee": "assert_close",
+          "caller": "quantile_matches_cauchy_known_value",
+          "lineNumber": 330
+        }
+      ],
+      "classes": [
+        {
+          "endLine": 31,
+          "methods": [
+            "new",
+            "pdf",
+            "ln_pdf",
+            "cdf",
+            "survival",
+            "lower_bound",
+            "upper_bound",
+            "quantile"
+          ],
+          "name": "StudentT",
+          "properties": [
+            "degrees_of_freedom",
+            "ln_normalization"
+          ],
+          "startLine": 27
+        }
+      ],
+      "exports": [
+        {
+          "isDefault": false,
+          "line": 27,
+          "name": "StudentT"
+        },
+        {
+          "isDefault": false,
+          "line": 44,
+          "name": "new"
+        }
+      ],
+      "fileCategory": "code",
+      "functions": [
+        {
+          "endLine": 59,
+          "name": "new",
+          "params": [
+            "degrees_of_freedom"
+          ],
+          "startLine": 44
+        },
+        {
+          "endLine": 68,
+          "name": "pdf",
+          "params": [
+            "x"
+          ],
+          "startLine": 63
+        },
+        {
+          "endLine": 73,
+          "name": "ln_pdf",
+          "params": [
+            "x"
+          ],
+          "startLine": 70
+        },
+        {
+          "endLine": 93,
+          "name": "cdf",
+          "params": [
+            "x"
+          ],
+          "startLine": 77
+        },
+        {
+          "endLine": 100,
+          "name": "survival",
+          "params": [
+            "x"
+          ],
+          "startLine": 95
+        },
+        {
+          "endLine": 106,
+          "name": "lower_bound",
+          "params": [],
+          "startLine": 104
+        },
+        {
+          "endLine": 110,
+          "name": "upper_bound",
+          "params": [],
+          "startLine": 108
+        },
+        {
+          "endLine": 138,
+          "name": "quantile",
+          "params": [
+            "p"
+          ],
+          "startLine": 114
+        }
+      ],
+      "language": "rust",
+      "metrics": {
+        "classCount": 1,
+        "exportCount": 2,
+        "functionCount": 8,
+        "importCount": 4
+      },
+      "nonEmptyLines": 312,
+      "path": "crates/itofin/src/math/distributions/studentt.rs",
+      "totalLines": 343
+    },
+    {
+      "callGraph": [
+        {
+          "callee": "x.is_finite",
+          "caller": "erf",
+          "lineNumber": 86
+        },
+        {
+          "callee": "x.is_nan",
+          "caller": "erf",
+          "lineNumber": 87
+        },
+        {
+          "callee": "x.abs",
+          "caller": "erf",
+          "lineNumber": 96
+        },
+        {
+          "callee": "(-ax * ax - 0.5625 + r / denom).exp",
+          "caller": "erf",
+          "lineNumber": 139
+        },
+        {
+          "callee": "(a - b).abs",
+          "caller": "close",
+          "lineNumber": 152
+        }
+      ],
+      "exports": [
+        {
+          "isDefault": false,
+          "line": 85,
+          "name": "erf"
+        }
+      ],
+      "fileCategory": "code",
+      "functions": [
+        {
+          "endLine": 141,
+          "name": "erf",
+          "params": [
+            "x"
+          ],
+          "startLine": 85
+        }
+      ],
+      "language": "rust",
+      "metrics": {
+        "classCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "importCount": 1
+      },
+      "nonEmptyLines": 173,
+      "path": "crates/itofin/src/math/errorfunction.rs",
+      "totalLines": 193
+    },
+    {
+      "callGraph": [
+        {
+          "callee": "x.is_finite",
+          "caller": "log_gamma",
+          "lineNumber": 56
+        },
+        {
+          "callee": "temp.ln",
+          "caller": "log_gamma",
+          "lineNumber": 60
+        },
+        {
+          "callee": "COEFFS.iter().enumerate",
+          "caller": "log_gamma",
+          "lineNumber": 62
+        },
+        {
+          "callee": "COEFFS.iter",
+          "caller": "log_gamma",
+          "lineNumber": 62
+        },
+        {
+          "callee": "Ok",
+          "caller": "log_gamma",
+          "lineNumber": 65
+        },
+        {
+          "callee": "(SQRT_TWO_PI * ser / x).ln",
+          "caller": "log_gamma",
+          "lineNumber": 65
+        },
+        {
+          "callee": "x.is_finite",
+          "caller": "gamma",
+          "lineNumber": 96
+        },
+        {
+          "callee": "log_gamma(x).expect(\"log_gamma is valid for x >= 1\").exp",
+          "caller": "gamma",
+          "lineNumber": 101
+        },
+        {
+          "callee": "log_gamma(x).expect",
+          "caller": "gamma",
+          "lineNumber": 101
+        },
+        {
+          "callee": "log_gamma",
+          "caller": "gamma",
+          "lineNumber": 101
+        },
+        {
+          "callee": "gamma",
+          "caller": "gamma",
+          "lineNumber": 104
+        },
+        {
+          "callee": "gamma",
+          "caller": "gamma",
+          "lineNumber": 107
+        },
+        {
+          "callee": "(PI * x).sin",
+          "caller": "gamma",
+          "lineNumber": 107
+        },
+        {
+          "callee": "expected.abs",
+          "caller": "assert_close",
+          "lineNumber": 120
+        },
+        {
+          "callee": "assert_close",
+          "caller": "matches_known_values",
+          "lineNumber": 131
+        },
+        {
+          "callee": "log_gamma(1.0).unwrap",
+          "caller": "matches_known_values",
+          "lineNumber": 131
+        },
+        {
+          "callee": "log_gamma",
+          "caller": "matches_known_values",
+          "lineNumber": 131
+        },
+        {
+          "callee": "assert_close",
+          "caller": "matches_known_values",
+          "lineNumber": 132
+        },
+        {
+          "callee": "log_gamma(2.0).unwrap",
+          "caller": "matches_known_values",
+          "lineNumber": 132
+        },
+        {
+          "callee": "log_gamma",
+          "caller": "matches_known_values",
+          "lineNumber": 132
+        },
+        {
+          "callee": "assert_close",
+          "caller": "matches_known_values",
+          "lineNumber": 134
+        },
+        {
+          "callee": "log_gamma(0.5).unwrap",
+          "caller": "matches_known_values",
+          "lineNumber": 134
+        },
+        {
+          "callee": "log_gamma",
+          "caller": "matches_known_values",
+          "lineNumber": 134
+        },
+        {
+          "callee": "assert_close",
+          "caller": "matches_known_values",
+          "lineNumber": 136
+        },
+        {
+          "callee": "log_gamma(5.0).unwrap",
+          "caller": "matches_known_values",
+          "lineNumber": 136
+        },
+        {
+          "callee": "log_gamma",
+          "caller": "matches_known_values",
+          "lineNumber": 136
+        },
+        {
+          "callee": "assert_close",
+          "caller": "matches_known_values",
+          "lineNumber": 137
+        },
+        {
+          "callee": "log_gamma(10.0).unwrap",
+          "caller": "matches_known_values",
+          "lineNumber": 137
+        },
+        {
+          "callee": "log_gamma",
+          "caller": "matches_known_values",
+          "lineNumber": 137
+        },
+        {
+          "callee": "assert_close",
+          "caller": "small_and_large_arguments",
+          "lineNumber": 142
+        },
+        {
+          "callee": "log_gamma(0.1).unwrap",
+          "caller": "small_and_large_arguments",
+          "lineNumber": 142
+        },
+        {
+          "callee": "log_gamma",
+          "caller": "small_and_large_arguments",
+          "lineNumber": 142
+        },
+        {
+          "callee": "assert_close",
+          "caller": "small_and_large_arguments",
+          "lineNumber": 143
+        },
+        {
+          "callee": "log_gamma(100.0).unwrap",
+          "caller": "small_and_large_arguments",
+          "lineNumber": 143
+        },
+        {
+          "callee": "log_gamma",
+          "caller": "small_and_large_arguments",
+          "lineNumber": 143
+        },
+        {
+          "callee": "log_gamma(x + 1.0).unwrap",
+          "caller": "recurrence_ln_gamma_x_plus_1",
+          "lineNumber": 151
+        },
+        {
+          "callee": "log_gamma",
+          "caller": "recurrence_ln_gamma_x_plus_1",
+          "lineNumber": 151
+        },
+        {
+          "callee": "log_gamma(x).unwrap",
+          "caller": "recurrence_ln_gamma_x_plus_1",
+          "lineNumber": 152
+        },
+        {
+          "callee": "log_gamma",
+          "caller": "recurrence_ln_gamma_x_plus_1",
+          "lineNumber": 152
+        },
+        {
+          "callee": "x.ln",
+          "caller": "recurrence_ln_gamma_x_plus_1",
+          "lineNumber": 152
+        },
+        {
+          "callee": "Real::from(i).ln",
+          "caller": "matches_cumulative_log_factorial_through_9000",
+          "lineNumber": 175
+        },
+        {
+          "callee": "Real::from",
+          "caller": "matches_cumulative_log_factorial_through_9000",
+          "lineNumber": 175
+        },
+        {
+          "callee": "log_gamma(Real::from(i + 1)).unwrap",
+          "caller": "matches_cumulative_log_factorial_through_9000",
+          "lineNumber": 176
+        },
+        {
+          "callee": "log_gamma",
+          "caller": "matches_cumulative_log_factorial_through_9000",
+          "lineNumber": 176
+        },
+        {
+          "callee": "Real::from",
+          "caller": "matches_cumulative_log_factorial_through_9000",
+          "lineNumber": 176
+        },
+        {
+          "callee": "gamma",
+          "caller": "value_matches_reference_table",
+          "lineNumber": 203
+        },
+        {
+          "callee": "expected.abs",
+          "caller": "value_matches_reference_table",
+          "lineNumber": 204
+        }
+      ],
+      "exports": [
+        {
+          "isDefault": false,
+          "line": 52,
+          "name": "log_gamma"
+        },
+        {
+          "isDefault": false,
+          "line": 90,
+          "name": "gamma"
+        }
+      ],
+      "fileCategory": "code",
+      "functions": [
+        {
+          "endLine": 66,
+          "name": "log_gamma",
+          "params": [
+            "x"
+          ],
+          "startLine": 52
+        },
+        {
+          "endLine": 109,
+          "name": "gamma",
+          "params": [
+            "x"
+          ],
+          "startLine": 90
+        }
+      ],
+      "language": "rust",
+      "metrics": {
+        "classCount": 0,
+        "exportCount": 2,
+        "functionCount": 2,
+        "importCount": 2
+      },
+      "nonEmptyLines": 218,
+      "path": "crates/itofin/src/math/gammafunction.rs",
+      "totalLines": 236
+    },
+    {
+      "callGraph": [
+        {
+          "callee": "a.is_finite",
+          "caller": "incomplete_gamma",
+          "lineNumber": 41
+        },
+        {
+          "callee": "x.is_finite",
+          "caller": "incomplete_gamma",
+          "lineNumber": 44
+        },
+        {
+          "callee": "series_repr",
+          "caller": "incomplete_gamma",
+          "lineNumber": 48
+        },
+        {
+          "callee": "Ok",
+          "caller": "incomplete_gamma",
+          "lineNumber": 51
+        },
+        {
+          "callee": "continued_fraction_repr",
+          "caller": "incomplete_gamma",
+          "lineNumber": 51
+        },
+        {
+          "callee": "Ok",
+          "caller": "series_repr",
+          "lineNumber": 58
+        },
+        {
+          "callee": "log_gamma",
+          "caller": "series_repr",
+          "lineNumber": 60
+        },
+        {
+          "callee": "del.abs",
+          "caller": "series_repr",
+          "lineNumber": 68
+        },
+        {
+          "callee": "sum.abs",
+          "caller": "series_repr",
+          "lineNumber": 68
+        },
+        {
+          "callee": "Ok",
+          "caller": "series_repr",
+          "lineNumber": 69
+        },
+        {
+          "callee": "(-x + a * x.ln() - gln).exp",
+          "caller": "series_repr",
+          "lineNumber": 69
+        },
+        {
+          "callee": "x.ln",
+          "caller": "series_repr",
+          "lineNumber": 69
+        },
+        {
+          "callee": "log_gamma",
+          "caller": "continued_fraction_repr",
+          "lineNumber": 79
+        },
+        {
+          "callee": "d.abs",
+          "caller": "continued_fraction_repr",
+          "lineNumber": 88
+        },
+        {
+          "callee": "c.abs",
+          "caller": "continued_fraction_repr",
+          "lineNumber": 92
+        },
+        {
+          "callee": "(del - 1.0).abs",
+          "caller": "continued_fraction_repr",
+          "lineNumber": 98
+        },
+        {
+          "callee": "Ok",
+          "caller": "continued_fraction_repr",
+          "lineNumber": 99
+        },
+        {
+          "callee": "(-x + a * x.ln() - gln).exp",
+          "caller": "continued_fraction_repr",
+          "lineNumber": 99
+        },
+        {
+          "callee": "x.ln",
+          "caller": "continued_fraction_repr",
+          "lineNumber": 99
+        },
+        {
+          "callee": "expected.abs",
+          "caller": "assert_close",
+          "lineNumber": 113
+        },
+        {
+          "callee": "assert_close",
+          "caller": "matches_exponential_cdf_a_eq_1",
+          "lineNumber": 132
+        },
+        {
+          "callee": "incomplete_gamma(1.0, x).unwrap",
+          "caller": "matches_exponential_cdf_a_eq_1",
+          "lineNumber": 132
+        },
+        {
+          "callee": "incomplete_gamma",
+          "caller": "matches_exponential_cdf_a_eq_1",
+          "lineNumber": 132
+        },
+        {
+          "callee": "(-x).exp",
+          "caller": "matches_exponential_cdf_a_eq_1",
+          "lineNumber": 132
+        },
+        {
+          "callee": "(-x).exp",
+          "caller": "matches_integer_a_closed_forms",
+          "lineNumber": 140
+        },
+        {
+          "callee": "assert_close",
+          "caller": "matches_integer_a_closed_forms",
+          "lineNumber": 141
+        },
+        {
+          "callee": "incomplete_gamma(2.0, x).unwrap",
+          "caller": "matches_integer_a_closed_forms",
+          "lineNumber": 141
+        },
+        {
+          "callee": "incomplete_gamma",
+          "caller": "matches_integer_a_closed_forms",
+          "lineNumber": 141
+        },
+        {
+          "callee": "assert_close",
+          "caller": "matches_integer_a_closed_forms",
+          "lineNumber": 142
+        },
+        {
+          "callee": "incomplete_gamma(3.0, x).unwrap",
+          "caller": "matches_integer_a_closed_forms",
+          "lineNumber": 143
+        },
+        {
+          "callee": "incomplete_gamma",
+          "caller": "matches_integer_a_closed_forms",
+          "lineNumber": 143
+        },
+        {
+          "callee": "assert_close",
+          "caller": "matches_erf_a_eq_half",
+          "lineNumber": 153
+        },
+        {
+          "callee": "incomplete_gamma(0.5, x).unwrap",
+          "caller": "matches_erf_a_eq_half",
+          "lineNumber": 153
+        },
+        {
+          "callee": "incomplete_gamma",
+          "caller": "matches_erf_a_eq_half",
+          "lineNumber": 153
+        },
+        {
+          "callee": "erf",
+          "caller": "matches_erf_a_eq_half",
+          "lineNumber": 153
+        },
+        {
+          "callee": "x.sqrt",
+          "caller": "matches_erf_a_eq_half",
+          "lineNumber": 153
+        },
+        {
+          "callee": "assert_close",
+          "caller": "approaches_one_in_the_tail",
+          "lineNumber": 159
+        },
+        {
+          "callee": "incomplete_gamma(3.0, 60.0).unwrap",
+          "caller": "approaches_one_in_the_tail",
+          "lineNumber": 159
+        },
+        {
+          "callee": "incomplete_gamma",
+          "caller": "approaches_one_in_the_tail",
+          "lineNumber": 159
+        },
+        {
+          "callee": "incomplete_gamma(a, 0.0).unwrap",
+          "caller": "is_monotonic_increasing_in_x",
+          "lineNumber": 165
+        },
+        {
+          "callee": "incomplete_gamma",
+          "caller": "is_monotonic_increasing_in_x",
+          "lineNumber": 165
+        },
+        {
+          "callee": "incomplete_gamma(a, x).unwrap",
+          "caller": "is_monotonic_increasing_in_x",
+          "lineNumber": 169
+        },
+        {
+          "callee": "incomplete_gamma",
+          "caller": "is_monotonic_increasing_in_x",
+          "lineNumber": 169
+        }
+      ],
+      "exports": [
+        {
+          "isDefault": false,
+          "line": 37,
+          "name": "incomplete_gamma"
+        }
+      ],
+      "fileCategory": "code",
+      "functions": [
+        {
+          "endLine": 53,
+          "name": "incomplete_gamma",
+          "params": [
+            "a",
+            "x"
+          ],
+          "startLine": 37
+        },
+        {
+          "endLine": 73,
+          "name": "series_repr",
+          "params": [
+            "a",
+            "x"
+          ],
+          "startLine": 56
+        },
+        {
+          "endLine": 103,
+          "name": "continued_fraction_repr",
+          "params": [
+            "a",
+            "x"
+          ],
+          "startLine": 77
+        }
+      ],
+      "language": "rust",
+      "metrics": {
+        "classCount": 0,
+        "exportCount": 1,
+        "functionCount": 3,
+        "importCount": 3
+      },
+      "nonEmptyLines": 170,
+      "path": "crates/itofin/src/math/incompletegamma.rs",
+      "totalLines": 185
+    },
+    {
+      "fileCategory": "code",
+      "language": "rust",
+      "metrics": {
+        "classCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "importCount": 0
+      },
+      "nonEmptyLines": 55,
+      "path": "crates/itofin/src/types.rs",
+      "totalLines": 71
+    }
+  ],
+  "scriptCompleted": true
+}

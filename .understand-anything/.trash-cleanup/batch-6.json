@@ -1,0 +1,35 @@
+{
+  "edges": [],
+  "nodes": [
+    {
+      "complexity": "simple",
+      "filePath": ".github/workflows/pull-request.yml",
+      "id": "pipeline:.github/workflows/pull-request.yml",
+      "languageNotes": "Uses a reusable workflow (benbenbang/reusable-workflows prek.yml) plus a concurrency group to cancel superseded runs.",
+      "name": "pull-request.yml",
+      "summary": "GitHub Actions pull-request workflow that runs pre-commit checks via a reusable workflow and applies PR labels on non-fork pull requests targeting main.",
+      "tags": [
+        "ci-cd",
+        "infrastructure",
+        "deployment",
+        "pull-request"
+      ],
+      "type": "pipeline"
+    },
+    {
+      "complexity": "simple",
+      "filePath": ".github/workflows/semantic-release.yml",
+      "id": "pipeline:.github/workflows/semantic-release.yml",
+      "languageNotes": "workflow_dispatch with a required boolean choice input gates the reusable semantic-release.yml workflow.",
+      "name": "semantic-release.yml",
+      "summary": "Manually-dispatched GitHub Actions workflow that triggers a semantic-release reusable workflow to cut a new versioned release when explicitly confirmed.",
+      "tags": [
+        "ci-cd",
+        "infrastructure",
+        "release",
+        "deployment"
+      ],
+      "type": "pipeline"
+    }
+  ]
+}

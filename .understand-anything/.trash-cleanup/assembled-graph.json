@@ -1,0 +1,3383 @@
+{
+  "edges": [
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/errors.rs",
+      "target": "class:crates/itofin/src/errors.rs:QlError",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/errors.rs",
+      "target": "class:crates/itofin/src/errors.rs:QlError",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/beta.rs",
+      "target": "file:crates/itofin/src/errors.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/beta.rs",
+      "target": "file:crates/itofin/src/math/gammafunction.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/beta.rs",
+      "target": "file:crates/itofin/src/types.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/beta.rs",
+      "target": "function:crates/itofin/src/math/beta.rs:beta_function",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/beta.rs",
+      "target": "function:crates/itofin/src/math/beta.rs:incomplete_beta",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/beta.rs",
+      "target": "function:crates/itofin/src/math/beta.rs:beta_continued_fraction",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/beta.rs",
+      "target": "function:crates/itofin/src/math/beta.rs:beta_function",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/beta.rs",
+      "target": "function:crates/itofin/src/math/beta.rs:incomplete_beta",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/beta.rs",
+      "target": "function:crates/itofin/src/math/gammafunction.rs:log_gamma",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/binomial.rs",
+      "target": "file:crates/itofin/src/errors.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/binomial.rs",
+      "target": "file:crates/itofin/src/math/beta.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/binomial.rs",
+      "target": "file:crates/itofin/src/types.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/binomial.rs",
+      "target": "class:crates/itofin/src/math/distributions/binomial.rs:BinomialDistribution",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/binomial.rs",
+      "target": "class:crates/itofin/src/math/distributions/binomial.rs:CumulativeBinomialDistribution",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/binomial.rs",
+      "target": "class:crates/itofin/src/math/distributions/binomial.rs:BinomialDistribution",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/binomial.rs",
+      "target": "class:crates/itofin/src/math/distributions/binomial.rs:CumulativeBinomialDistribution",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/binomial.rs",
+      "target": "function:crates/itofin/src/math/beta.rs:incomplete_beta",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/chisquare.rs",
+      "target": "file:crates/itofin/src/errors.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/chisquare.rs",
+      "target": "file:crates/itofin/src/types.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/chisquare.rs",
+      "target": "class:crates/itofin/src/math/distributions/chisquare.rs:CumulativeChiSquareDistribution",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/chisquare.rs",
+      "target": "class:crates/itofin/src/math/distributions/chisquare.rs:CumulativeChiSquareDistribution",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/chisquare.rs",
+      "target": "class:crates/itofin/src/math/distributions/gamma.rs:CumulativeGammaDistribution",
+      "type": "depends_on",
+      "weight": 0.6
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/gamma.rs",
+      "target": "file:crates/itofin/src/errors.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/gamma.rs",
+      "target": "file:crates/itofin/src/math/incompletegamma.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/gamma.rs",
+      "target": "file:crates/itofin/src/types.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/gamma.rs",
+      "target": "class:crates/itofin/src/math/distributions/gamma.rs:CumulativeGammaDistribution",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/gamma.rs",
+      "target": "class:crates/itofin/src/math/distributions/gamma.rs:CumulativeGammaDistribution",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/gamma.rs",
+      "target": "function:crates/itofin/src/math/incompletegamma.rs:incomplete_gamma",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/mod.rs",
+      "target": "file:crates/itofin/src/errors.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/mod.rs",
+      "target": "file:crates/itofin/src/math/distributions/binomial.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/mod.rs",
+      "target": "file:crates/itofin/src/math/distributions/chisquare.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/mod.rs",
+      "target": "file:crates/itofin/src/math/distributions/gamma.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/mod.rs",
+      "target": "file:crates/itofin/src/math/distributions/normal.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/mod.rs",
+      "target": "file:crates/itofin/src/math/distributions/poisson.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/mod.rs",
+      "target": "file:crates/itofin/src/math/distributions/studentt.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/mod.rs",
+      "target": "file:crates/itofin/src/types.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/mod.rs",
+      "target": "class:crates/itofin/src/math/distributions/mod.rs:Probability",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/mod.rs",
+      "target": "class:crates/itofin/src/math/distributions/mod.rs:Density",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/mod.rs",
+      "target": "class:crates/itofin/src/math/distributions/mod.rs:Cdf",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/mod.rs",
+      "target": "class:crates/itofin/src/math/distributions/mod.rs:Quantile",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/mod.rs",
+      "target": "class:crates/itofin/src/math/distributions/mod.rs:Support",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/mod.rs",
+      "target": "class:crates/itofin/src/math/distributions/mod.rs:Probability",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/mod.rs",
+      "target": "class:crates/itofin/src/math/distributions/mod.rs:Density",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/mod.rs",
+      "target": "class:crates/itofin/src/math/distributions/mod.rs:Cdf",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/mod.rs",
+      "target": "class:crates/itofin/src/math/distributions/mod.rs:Quantile",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/mod.rs",
+      "target": "class:crates/itofin/src/math/distributions/mod.rs:Support",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/normal.rs",
+      "target": "file:crates/itofin/src/errors.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/normal.rs",
+      "target": "file:crates/itofin/src/math/errorfunction.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/normal.rs",
+      "target": "file:crates/itofin/src/types.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/normal.rs",
+      "target": "class:crates/itofin/src/math/distributions/normal.rs:NormalDistribution",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/normal.rs",
+      "target": "class:crates/itofin/src/math/distributions/normal.rs:CumulativeNormalDistribution",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/normal.rs",
+      "target": "class:crates/itofin/src/math/distributions/normal.rs:InverseCumulativeNormal",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/normal.rs",
+      "target": "class:crates/itofin/src/math/distributions/normal.rs:NormalDistribution",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/normal.rs",
+      "target": "class:crates/itofin/src/math/distributions/normal.rs:CumulativeNormalDistribution",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/normal.rs",
+      "target": "class:crates/itofin/src/math/distributions/normal.rs:InverseCumulativeNormal",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/normal.rs",
+      "target": "function:crates/itofin/src/math/errorfunction.rs:erf",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/poisson.rs",
+      "target": "file:crates/itofin/src/errors.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/poisson.rs",
+      "target": "file:crates/itofin/src/types.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/poisson.rs",
+      "target": "class:crates/itofin/src/math/distributions/poisson.rs:PoissonDistribution",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/poisson.rs",
+      "target": "class:crates/itofin/src/math/distributions/poisson.rs:CumulativePoissonDistribution",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/poisson.rs",
+      "target": "class:crates/itofin/src/math/distributions/poisson.rs:InverseCumulativePoisson",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/poisson.rs",
+      "target": "class:crates/itofin/src/math/distributions/poisson.rs:PoissonDistribution",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/poisson.rs",
+      "target": "class:crates/itofin/src/math/distributions/poisson.rs:CumulativePoissonDistribution",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/poisson.rs",
+      "target": "class:crates/itofin/src/math/distributions/poisson.rs:InverseCumulativePoisson",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/studentt.rs",
+      "target": "file:crates/itofin/src/errors.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/studentt.rs",
+      "target": "file:crates/itofin/src/math/beta.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/studentt.rs",
+      "target": "file:crates/itofin/src/math/gammafunction.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/studentt.rs",
+      "target": "file:crates/itofin/src/types.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/studentt.rs",
+      "target": "class:crates/itofin/src/math/distributions/studentt.rs:StudentT",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/studentt.rs",
+      "target": "class:crates/itofin/src/math/distributions/studentt.rs:StudentT",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/studentt.rs",
+      "target": "function:crates/itofin/src/math/gammafunction.rs:log_gamma",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/distributions/studentt.rs",
+      "target": "function:crates/itofin/src/math/beta.rs:incomplete_beta",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/errorfunction.rs",
+      "target": "file:crates/itofin/src/types.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/errorfunction.rs",
+      "target": "function:crates/itofin/src/math/errorfunction.rs:erf",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/errorfunction.rs",
+      "target": "function:crates/itofin/src/math/errorfunction.rs:erf",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/gammafunction.rs",
+      "target": "file:crates/itofin/src/errors.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/gammafunction.rs",
+      "target": "file:crates/itofin/src/types.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/gammafunction.rs",
+      "target": "function:crates/itofin/src/math/gammafunction.rs:log_gamma",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/gammafunction.rs",
+      "target": "function:crates/itofin/src/math/gammafunction.rs:gamma",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/gammafunction.rs",
+      "target": "function:crates/itofin/src/math/gammafunction.rs:log_gamma",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/gammafunction.rs",
+      "target": "function:crates/itofin/src/math/gammafunction.rs:gamma",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/gammafunction.rs",
+      "target": "function:crates/itofin/src/math/gammafunction.rs:log_gamma",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/incompletegamma.rs",
+      "target": "file:crates/itofin/src/errors.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/incompletegamma.rs",
+      "target": "file:crates/itofin/src/math/gammafunction.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/incompletegamma.rs",
+      "target": "file:crates/itofin/src/types.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/incompletegamma.rs",
+      "target": "function:crates/itofin/src/math/incompletegamma.rs:incomplete_gamma",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/incompletegamma.rs",
+      "target": "function:crates/itofin/src/math/incompletegamma.rs:series_repr",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/incompletegamma.rs",
+      "target": "function:crates/itofin/src/math/incompletegamma.rs:continued_fraction_repr",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/incompletegamma.rs",
+      "target": "function:crates/itofin/src/math/incompletegamma.rs:incomplete_gamma",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/incompletegamma.rs",
+      "target": "function:crates/itofin/src/math/gammafunction.rs:log_gamma",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/handle.rs",
+      "target": "file:crates/itofin/src/errors.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/handle.rs",
+      "target": "file:crates/itofin/src/patterns/observable.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/handle.rs",
+      "target": "file:crates/itofin/src/shared.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/lib.rs",
+      "target": "file:crates/itofin/src/errors.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/lib.rs",
+      "target": "file:crates/itofin/src/handle.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/lib.rs",
+      "target": "file:crates/itofin/src/math/mod.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/lib.rs",
+      "target": "file:crates/itofin/src/patterns/mod.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/lib.rs",
+      "target": "file:crates/itofin/src/settings.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/lib.rs",
+      "target": "file:crates/itofin/src/shared.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/lib.rs",
+      "target": "file:crates/itofin/src/types.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/lib.rs",
+      "target": "file:crates/itofin/src/utilities/mod.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/patterns/lazyobject.rs",
+      "target": "file:crates/itofin/src/errors.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/patterns/lazyobject.rs",
+      "target": "file:crates/itofin/src/patterns/observable.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/patterns/lazyobject.rs",
+      "target": "file:crates/itofin/src/shared.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/patterns/mod.rs",
+      "target": "file:crates/itofin/src/patterns/lazyobject.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/patterns/mod.rs",
+      "target": "file:crates/itofin/src/patterns/observable.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/patterns/mod.rs",
+      "target": "file:crates/itofin/src/patterns/visitor.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/patterns/observable.rs",
+      "target": "file:crates/itofin/src/shared.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/settings.rs",
+      "target": "file:crates/itofin/src/patterns/observable.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/settings.rs",
+      "target": "file:crates/itofin/src/shared.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/handle.rs",
+      "target": "class:crates/itofin/src/handle.rs:Handle",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/handle.rs",
+      "target": "class:crates/itofin/src/handle.rs:RelinkableHandle",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/patterns/lazyobject.rs",
+      "target": "class:crates/itofin/src/patterns/lazyobject.rs:LazyObject",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/patterns/lazyobject.rs",
+      "target": "function:crates/itofin/src/patterns/lazyobject.rs:on_update",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/patterns/lazyobject.rs",
+      "target": "function:crates/itofin/src/patterns/lazyobject.rs:calculate",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/patterns/lazyobject.rs",
+      "target": "function:crates/itofin/src/patterns/lazyobject.rs:recalculate",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/patterns/observable.rs",
+      "target": "class:crates/itofin/src/patterns/observable.rs:Observer",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/patterns/observable.rs",
+      "target": "class:crates/itofin/src/patterns/observable.rs:Observable",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/patterns/observable.rs",
+      "target": "function:crates/itofin/src/patterns/observable.rs:unregister_observer",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/patterns/observable.rs",
+      "target": "function:crates/itofin/src/patterns/observable.rs:notify_observers",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/patterns/visitor.rs",
+      "target": "class:crates/itofin/src/patterns/visitor.rs:Visitor",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/settings.rs",
+      "target": "class:crates/itofin/src/settings.rs:Settings",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/settings.rs",
+      "target": "function:crates/itofin/src/settings.rs:set_evaluation_date",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/handle.rs",
+      "target": "class:crates/itofin/src/handle.rs:Handle",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/handle.rs",
+      "target": "class:crates/itofin/src/handle.rs:RelinkableHandle",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/patterns/lazyobject.rs",
+      "target": "class:crates/itofin/src/patterns/lazyobject.rs:LazyObject",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/patterns/observable.rs",
+      "target": "class:crates/itofin/src/patterns/observable.rs:Observer",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/patterns/observable.rs",
+      "target": "class:crates/itofin/src/patterns/observable.rs:Observable",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/patterns/visitor.rs",
+      "target": "class:crates/itofin/src/patterns/visitor.rs:Visitor",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/settings.rs",
+      "target": "class:crates/itofin/src/settings.rs:Settings",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/handle.rs",
+      "target": "function:crates/itofin/src/patterns/observable.rs:notify_observers",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/patterns/lazyobject.rs",
+      "target": "function:crates/itofin/src/patterns/observable.rs:notify_observers",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/settings.rs",
+      "target": "function:crates/itofin/src/patterns/observable.rs:notify_observers",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/array.rs",
+      "target": "file:crates/itofin/src/types.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/interpolations/linear.rs",
+      "target": "file:crates/itofin/src/errors.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/interpolations/linear.rs",
+      "target": "file:crates/itofin/src/math/interpolations/mod.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/interpolations/linear.rs",
+      "target": "file:crates/itofin/src/types.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/interpolations/mod.rs",
+      "target": "file:crates/itofin/src/errors.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/interpolations/mod.rs",
+      "target": "file:crates/itofin/src/math/interpolations/linear.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/interpolations/mod.rs",
+      "target": "file:crates/itofin/src/types.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/matrix.rs",
+      "target": "file:crates/itofin/src/math/array.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/matrix.rs",
+      "target": "file:crates/itofin/src/types.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/mod.rs",
+      "target": "file:crates/itofin/src/math/array.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/mod.rs",
+      "target": "file:crates/itofin/src/math/beta.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/mod.rs",
+      "target": "file:crates/itofin/src/math/distributions/mod.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/mod.rs",
+      "target": "file:crates/itofin/src/math/errorfunction.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/mod.rs",
+      "target": "file:crates/itofin/src/math/gammafunction.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/mod.rs",
+      "target": "file:crates/itofin/src/math/incompletegamma.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/mod.rs",
+      "target": "file:crates/itofin/src/math/interpolations/mod.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/mod.rs",
+      "target": "file:crates/itofin/src/math/matrix.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/array.rs",
+      "target": "class:crates/itofin/src/math/array.rs:Array",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/array.rs",
+      "target": "class:crates/itofin/src/math/array.rs:Array",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/interpolations/linear.rs",
+      "target": "class:crates/itofin/src/math/interpolations/linear.rs:LinearInterpolation",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/interpolations/linear.rs",
+      "target": "class:crates/itofin/src/math/interpolations/linear.rs:LinearInterpolation",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/interpolations/linear.rs",
+      "target": "function:crates/itofin/src/math/interpolations/linear.rs:new",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/interpolations/linear.rs",
+      "target": "function:crates/itofin/src/math/interpolations/linear.rs:check_range",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/interpolations/linear.rs",
+      "target": "function:crates/itofin/src/math/interpolations/linear.rs:locate",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "class:crates/itofin/src/math/interpolations/linear.rs:LinearInterpolation",
+      "target": "class:crates/itofin/src/math/interpolations/mod.rs:Interpolation",
+      "type": "implements",
+      "weight": 0.9
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/interpolations/mod.rs",
+      "target": "class:crates/itofin/src/math/interpolations/mod.rs:Interpolation",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/interpolations/mod.rs",
+      "target": "class:crates/itofin/src/math/interpolations/mod.rs:Interpolation",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/matrix.rs",
+      "target": "class:crates/itofin/src/math/matrix.rs:Matrix",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/matrix.rs",
+      "target": "class:crates/itofin/src/math/matrix.rs:Matrix",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/matrix.rs",
+      "target": "function:crates/itofin/src/math/matrix.rs:transpose",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/math/matrix.rs",
+      "target": "function:crates/itofin/src/math/matrix.rs:mul",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/utilities/clone.rs",
+      "target": "class:crates/itofin/src/utilities/clone.rs:ValueBox",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/utilities/clone.rs",
+      "target": "class:crates/itofin/src/utilities/clone.rs:ValueBox",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/utilities/dataformatters.rs",
+      "target": "function:crates/itofin/src/utilities/dataformatters.rs:check_null",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/utilities/dataformatters.rs",
+      "target": "function:crates/itofin/src/utilities/dataformatters.rs:ordinal",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/utilities/dataformatters.rs",
+      "target": "function:crates/itofin/src/utilities/dataformatters.rs:check_null",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/utilities/dataformatters.rs",
+      "target": "function:crates/itofin/src/utilities/dataformatters.rs:ordinal",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/utilities/null.rs",
+      "target": "class:crates/itofin/src/utilities/null.rs:Null",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/utilities/null.rs",
+      "target": "class:crates/itofin/src/utilities/null.rs:Null",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/utilities/steppingiterator.rs",
+      "target": "class:crates/itofin/src/utilities/steppingiterator.rs:StepIterator",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/utilities/steppingiterator.rs",
+      "target": "function:crates/itofin/src/utilities/steppingiterator.rs:step_iter",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/utilities/steppingiterator.rs",
+      "target": "class:crates/itofin/src/utilities/steppingiterator.rs:StepIterator",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/utilities/steppingiterator.rs",
+      "target": "function:crates/itofin/src/utilities/steppingiterator.rs:step_iter",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/utilities/dataformatters.rs",
+      "target": "file:crates/itofin/src/types.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/utilities/dataformatters.rs",
+      "target": "file:crates/itofin/src/utilities/null.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/utilities/mod.rs",
+      "target": "file:crates/itofin/src/utilities/clone.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/utilities/mod.rs",
+      "target": "file:crates/itofin/src/utilities/dataformatters.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/utilities/mod.rs",
+      "target": "file:crates/itofin/src/utilities/null.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/utilities/mod.rs",
+      "target": "file:crates/itofin/src/utilities/steppingiterator.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/utilities/null.rs",
+      "target": "file:crates/itofin/src/types.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/utilities/steppingiterator.rs",
+      "target": "file:crates/itofin/src/types.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/utilities/dataformatters.rs",
+      "target": "class:crates/itofin/src/utilities/null.rs:Null",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "config:rust-toolchain.toml",
+      "target": "config:Cargo.toml",
+      "type": "configures",
+      "weight": 0.6
+    },
+    {
+      "direction": "forward",
+      "source": "config:.pre-commit-config.yaml",
+      "target": "config:Cargo.toml",
+      "type": "configures",
+      "weight": 0.6
+    },
+    {
+      "direction": "forward",
+      "source": "config:.releaserc.json",
+      "target": "config:Cargo.toml",
+      "type": "related",
+      "weight": 0.5
+    },
+    {
+      "direction": "forward",
+      "source": "document:README.md",
+      "target": "config:Cargo.toml",
+      "type": "documents",
+      "weight": 0.5
+    },
+    {
+      "direction": "forward",
+      "source": "document:README.md",
+      "target": "document:TICKETS.md",
+      "type": "related",
+      "weight": 0.5
+    },
+    {
+      "direction": "forward",
+      "source": "file:scripts/check_extension.sh",
+      "target": "function:scripts/check_extension.sh:check_extension",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:scripts/check_extension.sh",
+      "target": "file:scripts/init.sh",
+      "type": "depends_on",
+      "weight": 0.6
+    },
+    {
+      "direction": "forward",
+      "source": "file:scripts/hadolint.sh",
+      "target": "function:scripts/hadolint.sh:get_default_branch",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:scripts/hadolint.sh",
+      "target": "function:scripts/hadolint.sh:hadolint_runner",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:scripts/hadolint.sh",
+      "target": "function:scripts/hadolint.sh:lint_wrapper",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "direction": "forward",
+      "source": "file:scripts/hadolint.sh",
+      "target": "file:scripts/init.sh",
+      "type": "depends_on",
+      "weight": 0.6
+    },
+    {
+      "direction": "forward",
+      "source": "config:scripts/hadolint.yml",
+      "target": "file:scripts/hadolint.sh",
+      "type": "configures",
+      "weight": 0.6
+    },
+    {
+      "direction": "forward",
+      "source": "config:crates/itofin/Cargo.toml",
+      "target": "file:crates/itofin/src/lib.rs",
+      "type": "configures",
+      "weight": 0.6
+    }
+  ],
+  "layers": [
+    {
+      "description": "Foundational primitives shared across the whole crate: numeric type aliases, the error hierarchy, the Handle indirection, global Settings, shared smart-pointer aliases, and the crate root that re-exports every module.",
+      "id": "layer:core",
+      "name": "Core Foundation",
+      "nodeIds": [
+        "file:crates/itofin/src/types.rs",
+        "file:crates/itofin/src/errors.rs",
+        "file:crates/itofin/src/handle.rs",
+        "file:crates/itofin/src/settings.rs",
+        "file:crates/itofin/src/shared.rs",
+        "file:crates/itofin/src/lib.rs"
+      ]
+    },
+    {
+      "description": "Cross-cutting behavioral infrastructure ported from QuantLib's patterns module: the Observable/Observer graph, LazyObject recalculation, and the Visitor dispatch mechanism.",
+      "id": "layer:patterns",
+      "name": "Design Patterns",
+      "nodeIds": [
+        "file:crates/itofin/src/patterns/observable.rs",
+        "file:crates/itofin/src/patterns/lazyobject.rs",
+        "file:crates/itofin/src/patterns/visitor.rs",
+        "file:crates/itofin/src/patterns/mod.rs"
+      ]
+    },
+    {
+      "description": "General-purpose helpers built on the core types: Null sentinel values, data formatters, clone helpers, and the stepping iterator adaptor.",
+      "id": "layer:utility",
+      "name": "Utilities",
+      "nodeIds": [
+        "file:crates/itofin/src/utilities/null.rs",
+        "file:crates/itofin/src/utilities/dataformatters.rs",
+        "file:crates/itofin/src/utilities/clone.rs",
+        "file:crates/itofin/src/utilities/steppingiterator.rs",
+        "file:crates/itofin/src/utilities/mod.rs"
+      ]
+    },
+    {
+      "description": "Numerical building blocks - Array and Matrix containers, special functions (beta, error function, gamma, incomplete gamma), and linear interpolation - that depend only on the core layer.",
+      "id": "layer:math",
+      "name": "Math Primitives",
+      "nodeIds": [
+        "file:crates/itofin/src/math/array.rs",
+        "file:crates/itofin/src/math/matrix.rs",
+        "file:crates/itofin/src/math/beta.rs",
+        "file:crates/itofin/src/math/errorfunction.rs",
+        "file:crates/itofin/src/math/gammafunction.rs",
+        "file:crates/itofin/src/math/incompletegamma.rs",
+        "file:crates/itofin/src/math/interpolations/linear.rs",
+        "file:crates/itofin/src/math/interpolations/mod.rs",
+        "file:crates/itofin/src/math/mod.rs"
+      ]
+    },
+    {
+      "description": "Statistical distribution implementations (normal, Poisson, binomial, Student-t, chi-square, gamma) that build on the math special-functions and the core types.",
+      "id": "layer:distributions",
+      "name": "Probability Distributions",
+      "nodeIds": [
+        "file:crates/itofin/src/math/distributions/normal.rs",
+        "file:crates/itofin/src/math/distributions/poisson.rs",
+        "file:crates/itofin/src/math/distributions/binomial.rs",
+        "file:crates/itofin/src/math/distributions/studentt.rs",
+        "file:crates/itofin/src/math/distributions/chisquare.rs",
+        "file:crates/itofin/src/math/distributions/gamma.rs",
+        "file:crates/itofin/src/math/distributions/mod.rs"
+      ]
+    },
+    {
+      "description": "Repository automation: GitHub Actions workflows, the prek linting Docker image and its build script, shell helpers for extension checks and hadolint, the labeler config, and Copilot/CI documentation.",
+      "id": "layer:infrastructure",
+      "name": "Tooling & CI/CD",
+      "nodeIds": [
+        "pipeline:.github/workflows/pull-request.yml",
+        "pipeline:.github/workflows/semantic-release.yml",
+        "service:.github/images/prek/Dockerfile",
+        "file:.github/images/prek/build.sh",
+        "service:.dockerignore",
+        "file:scripts/check_extension.sh",
+        "file:scripts/hadolint.sh",
+        "config:scripts/hadolint.yml",
+        "file:scripts/init.sh",
+        "config:.github/labeler.yml",
+        "document:.github/copilot-instructions.md",
+        "document:.github/images/README.md"
+      ]
+    },
+    {
+      "description": "Top-level project setup and documentation: the Cargo workspace and crate manifests, pinned toolchain, pre-commit and semantic-release configs, the README and TICKETS backlog, and analysis tooling config.",
+      "id": "layer:config",
+      "name": "Project Configuration & Docs",
+      "nodeIds": [
+        "config:Cargo.toml",
+        "config:crates/itofin/Cargo.toml",
+        "config:rust-toolchain.toml",
+        "config:.pre-commit-config.yaml",
+        "config:.releaserc.json",
+        "document:README.md",
+        "document:TICKETS.md",
+        "config:.understand-anything/config.json",
+        "file:.understand-anything/.understandignore"
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/errors.rs",
+      "id": "file:crates/itofin/src/errors.rs",
+      "languageNotes": "Carries source file/line context in the error struct, mirroring QuantLib's location-aware exceptions.",
+      "name": "errors.rs",
+      "summary": "Defines the crate-wide QlError type and result alias plus require/ensure helper macros used to validate inputs across the math layer, porting QuantLib's QL_REQUIRE/QL_ENSURE error idioms to idiomatic Rust.",
+      "tags": [
+        "error-handling",
+        "validation",
+        "core",
+        "utility"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/errors.rs",
+      "id": "class:crates/itofin/src/errors.rs:QlError",
+      "lineRange": [
+        14,
+        18
+      ],
+      "name": "QlError",
+      "summary": "Error struct carrying a message plus originating file and line, the single fallible-result error type for the core crate.",
+      "tags": [
+        "error-handling",
+        "data-model",
+        "core"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/math/beta.rs",
+      "id": "file:crates/itofin/src/math/beta.rs",
+      "languageNotes": "Uses the modified Lentz algorithm for the continued fraction, a standard Numerical Recipes technique.",
+      "name": "beta.rs",
+      "summary": "Implements the complete and regularized incomplete beta function via a Lentz continued-fraction expansion, underpinning the binomial CDF and Student-t distribution.",
+      "tags": [
+        "special-functions",
+        "numerical-methods",
+        "math",
+        "serialization"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/math/beta.rs",
+      "id": "function:crates/itofin/src/math/beta.rs:beta_function",
+      "lineRange": [
+        32,
+        34
+      ],
+      "name": "beta_function",
+      "summary": "Computes the complete beta function B(z,w) by exponentiating the log-gamma identity.",
+      "tags": [
+        "special-functions",
+        "math"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/math/beta.rs",
+      "id": "function:crates/itofin/src/math/beta.rs:incomplete_beta",
+      "lineRange": [
+        54,
+        84
+      ],
+      "name": "incomplete_beta",
+      "summary": "Computes the regularized incomplete beta function I_x(a,b), validating inputs and dispatching to the continued-fraction helper with the symmetry reflection for fast convergence.",
+      "tags": [
+        "special-functions",
+        "numerical-methods",
+        "validation"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/math/beta.rs",
+      "id": "function:crates/itofin/src/math/beta.rs:beta_continued_fraction",
+      "lineRange": [
+        87,
+        135
+      ],
+      "name": "beta_continued_fraction",
+      "summary": "Evaluates the continued-fraction representation of the incomplete beta function using the modified Lentz iteration.",
+      "tags": [
+        "numerical-methods",
+        "special-functions",
+        "math"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/math/distributions/binomial.rs",
+      "id": "file:crates/itofin/src/math/distributions/binomial.rs",
+      "name": "binomial.rs",
+      "summary": "Provides the binomial probability mass function and its cumulative distribution, computing the PMF in log-space and the CDF through the incomplete beta relation.",
+      "tags": [
+        "data-model",
+        "math",
+        "statistics",
+        "distribution"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/math/distributions/binomial.rs",
+      "id": "class:crates/itofin/src/math/distributions/binomial.rs:BinomialDistribution",
+      "lineRange": [
+        32,
+        36
+      ],
+      "name": "BinomialDistribution",
+      "summary": "Binomial distribution computing the PMF via log-factorials and precomputed log-probabilities for numerical stability.",
+      "tags": [
+        "data-model",
+        "statistics",
+        "distribution"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/math/distributions/binomial.rs",
+      "id": "class:crates/itofin/src/math/distributions/binomial.rs:CumulativeBinomialDistribution",
+      "lineRange": [
+        80,
+        83
+      ],
+      "name": "CumulativeBinomialDistribution",
+      "summary": "Cumulative binomial distribution evaluating the CDF through the regularized incomplete beta function.",
+      "tags": [
+        "data-model",
+        "statistics",
+        "distribution"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/math/distributions/chisquare.rs",
+      "id": "file:crates/itofin/src/math/distributions/chisquare.rs",
+      "name": "chisquare.rs",
+      "summary": "Provides the cumulative chi-square distribution as a thin wrapper that delegates to the cumulative gamma distribution at half the degrees of freedom.",
+      "tags": [
+        "data-model",
+        "math",
+        "statistics",
+        "distribution"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/math/distributions/chisquare.rs",
+      "id": "class:crates/itofin/src/math/distributions/chisquare.rs:CumulativeChiSquareDistribution",
+      "lineRange": [
+        18,
+        20
+      ],
+      "name": "CumulativeChiSquareDistribution",
+      "summary": "Cumulative chi-square distribution that reuses a CumulativeGammaDistribution configured with half the degrees of freedom.",
+      "tags": [
+        "data-model",
+        "statistics",
+        "distribution"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/math/distributions/gamma.rs",
+      "id": "file:crates/itofin/src/math/distributions/gamma.rs",
+      "name": "gamma.rs",
+      "summary": "Provides the cumulative gamma distribution, evaluating its CDF through the regularized lower incomplete gamma function with edge-case handling for NaN and infinities.",
+      "tags": [
+        "data-model",
+        "math",
+        "statistics",
+        "distribution"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/math/distributions/gamma.rs",
+      "id": "class:crates/itofin/src/math/distributions/gamma.rs:CumulativeGammaDistribution",
+      "lineRange": [
+        18,
+        20
+      ],
+      "name": "CumulativeGammaDistribution",
+      "summary": "Cumulative gamma distribution evaluating P(a, x) via the regularized incomplete gamma function.",
+      "tags": [
+        "data-model",
+        "statistics",
+        "distribution"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/math/distributions/mod.rs",
+      "id": "file:crates/itofin/src/math/distributions/mod.rs",
+      "languageNotes": "Uses a validated Probability newtype with TryFrom plus trait-based interfaces to express the distribution contract.",
+      "name": "mod.rs",
+      "summary": "Distributions module root that re-exports all distribution types and defines the shared Probability newtype and the Density, Cdf, Quantile, and Support traits forming the common distribution interface.",
+      "tags": [
+        "barrel",
+        "type-definition",
+        "entry-point",
+        "math"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/math/distributions/mod.rs",
+      "id": "class:crates/itofin/src/math/distributions/mod.rs:Probability",
+      "lineRange": [
+        38,
+        56
+      ],
+      "name": "Probability",
+      "summary": "Validated newtype wrapping a probability in [0,1], constructed fallibly via TryFrom to enforce the invariant.",
+      "tags": [
+        "type-definition",
+        "validation",
+        "data-model"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/math/distributions/mod.rs",
+      "id": "class:crates/itofin/src/math/distributions/mod.rs:Density",
+      "lineRange": [
+        60,
+        73
+      ],
+      "name": "Density",
+      "summary": "Trait for probability density functions exposing pdf and a default ln_pdf implementation.",
+      "tags": [
+        "type-definition",
+        "math",
+        "statistics"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/math/distributions/mod.rs",
+      "id": "class:crates/itofin/src/math/distributions/mod.rs:Cdf",
+      "lineRange": [
+        76,
+        88
+      ],
+      "name": "Cdf",
+      "summary": "Trait for cumulative distribution functions exposing cdf and a default survival function.",
+      "tags": [
+        "type-definition",
+        "math",
+        "statistics"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/math/distributions/mod.rs",
+      "id": "class:crates/itofin/src/math/distributions/mod.rs:Quantile",
+      "lineRange": [
+        91,
+        99
+      ],
+      "name": "Quantile",
+      "summary": "Trait for inverse CDF (quantile) functions mapping a Probability back to the random variable's value.",
+      "tags": [
+        "type-definition",
+        "math",
+        "statistics"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/math/distributions/mod.rs",
+      "id": "class:crates/itofin/src/math/distributions/mod.rs:Support",
+      "lineRange": [
+        102,
+        108
+      ],
+      "name": "Support",
+      "summary": "Trait describing a distribution's support via lower and upper bound accessors.",
+      "tags": [
+        "type-definition",
+        "math",
+        "statistics"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "complex",
+      "filePath": "crates/itofin/src/math/distributions/normal.rs",
+      "id": "file:crates/itofin/src/math/distributions/normal.rs",
+      "languageNotes": "The inverse CDF splits a rational central approximation from a tail expansion, the classic Acklam/Moro algorithm.",
+      "name": "normal.rs",
+      "summary": "Implements the Gaussian family: the normal density, the cumulative normal via the error function, and the Beasley-Springer-Moro inverse cumulative normal used pervasively in option pricing.",
+      "tags": [
+        "data-model",
+        "math",
+        "statistics",
+        "distribution"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/math/distributions/normal.rs",
+      "id": "class:crates/itofin/src/math/distributions/normal.rs:NormalDistribution",
+      "lineRange": [
+        24,
+        29
+      ],
+      "name": "NormalDistribution",
+      "summary": "Gaussian probability density function with precomputed normalization factors and a standard-normal constructor.",
+      "tags": [
+        "data-model",
+        "statistics",
+        "distribution"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/math/distributions/normal.rs",
+      "id": "class:crates/itofin/src/math/distributions/normal.rs:CumulativeNormalDistribution",
+      "lineRange": [
+        83,
+        87
+      ],
+      "name": "CumulativeNormalDistribution",
+      "summary": "Cumulative normal distribution computing the CDF from the error function with a high-accuracy correction term, plus its density as derivative.",
+      "tags": [
+        "data-model",
+        "statistics",
+        "distribution"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/math/distributions/normal.rs",
+      "id": "class:crates/itofin/src/math/distributions/normal.rs:InverseCumulativeNormal",
+      "lineRange": [
+        176,
+        179
+      ],
+      "name": "InverseCumulativeNormal",
+      "summary": "Inverse cumulative normal (quantile) using a rational central region approximation and a logarithmic tail expansion.",
+      "tags": [
+        "data-model",
+        "numerical-methods",
+        "distribution"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "complex",
+      "filePath": "crates/itofin/src/math/distributions/poisson.rs",
+      "id": "file:crates/itofin/src/math/distributions/poisson.rs",
+      "languageNotes": "Recurrence paths guard against floating-point underflow for large means, returning errors rather than silently producing zeros.",
+      "name": "poisson.rs",
+      "summary": "Implements the Poisson family: the PMF in log-space, the cumulative distribution via a stable recurrence, and the inverse cumulative (quantile) searching upward from the mass at zero.",
+      "tags": [
+        "data-model",
+        "math",
+        "statistics",
+        "distribution"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/math/distributions/poisson.rs",
+      "id": "class:crates/itofin/src/math/distributions/poisson.rs:PoissonDistribution",
+      "lineRange": [
+        29,
+        32
+      ],
+      "name": "PoissonDistribution",
+      "summary": "Poisson distribution computing the PMF in log-space with a precomputed log-mean.",
+      "tags": [
+        "data-model",
+        "statistics",
+        "distribution"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/math/distributions/poisson.rs",
+      "id": "class:crates/itofin/src/math/distributions/poisson.rs:CumulativePoissonDistribution",
+      "lineRange": [
+        65,
+        67
+      ],
+      "name": "CumulativePoissonDistribution",
+      "summary": "Cumulative Poisson distribution accumulating the PMF through a numerically stable recurrence.",
+      "tags": [
+        "data-model",
+        "statistics",
+        "distribution"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/math/distributions/poisson.rs",
+      "id": "class:crates/itofin/src/math/distributions/poisson.rs:InverseCumulativePoisson",
+      "lineRange": [
+        105,
+        107
+      ],
+      "name": "InverseCumulativePoisson",
+      "summary": "Inverse cumulative Poisson (quantile) walking up the mass function until the target probability is reached.",
+      "tags": [
+        "data-model",
+        "numerical-methods",
+        "distribution"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "complex",
+      "filePath": "crates/itofin/src/math/distributions/studentt.rs",
+      "id": "file:crates/itofin/src/math/distributions/studentt.rs",
+      "languageNotes": "Quantile uses Newton iteration over the CDF/PDF pair with support-bound clamping at the probability endpoints.",
+      "name": "studentt.rs",
+      "summary": "Implements the Student-t distribution with density, CDF via the incomplete beta function, survival, support bounds, and a Newton-based quantile solver.",
+      "tags": [
+        "data-model",
+        "math",
+        "statistics",
+        "distribution"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "complex",
+      "filePath": "crates/itofin/src/math/distributions/studentt.rs",
+      "id": "class:crates/itofin/src/math/distributions/studentt.rs:StudentT",
+      "lineRange": [
+        27,
+        31
+      ],
+      "name": "StudentT",
+      "summary": "Student-t distribution providing pdf, ln_pdf, cdf, survival, support bounds, and a quantile solver, parameterized by degrees of freedom with a cached log-normalization constant.",
+      "tags": [
+        "data-model",
+        "statistics",
+        "distribution"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/math/errorfunction.rs",
+      "id": "file:crates/itofin/src/math/errorfunction.rs",
+      "languageNotes": "Uses region-dependent rational approximations with hardcoded coefficient tables for full double precision.",
+      "name": "errorfunction.rs",
+      "summary": "Implements the Gauss error function erf(x) using a piecewise rational/polynomial approximation, the numerical foundation for the cumulative normal distribution.",
+      "tags": [
+        "special-functions",
+        "numerical-methods",
+        "math",
+        "utility"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/math/errorfunction.rs",
+      "id": "function:crates/itofin/src/math/errorfunction.rs:erf",
+      "lineRange": [
+        85,
+        141
+      ],
+      "name": "erf",
+      "summary": "Computes the error function erf(x) with NaN/infinity handling and piecewise rational approximations across magnitude regions.",
+      "tags": [
+        "special-functions",
+        "numerical-methods",
+        "math"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/math/gammafunction.rs",
+      "id": "file:crates/itofin/src/math/gammafunction.rs",
+      "languageNotes": "Lanczos series with a fixed coefficient table; gamma applies the reflection formula for x < 1.",
+      "name": "gammafunction.rs",
+      "summary": "Implements the log-gamma function via the Lanczos approximation and the gamma function with reflection for negative arguments, the backbone of the beta and incomplete-gamma routines.",
+      "tags": [
+        "special-functions",
+        "numerical-methods",
+        "math",
+        "utility"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/math/gammafunction.rs",
+      "id": "function:crates/itofin/src/math/gammafunction.rs:log_gamma",
+      "lineRange": [
+        52,
+        66
+      ],
+      "name": "log_gamma",
+      "summary": "Computes ln(Gamma(x)) for x >= 1 using the Lanczos approximation, validating finiteness of the input.",
+      "tags": [
+        "special-functions",
+        "numerical-methods",
+        "math"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/math/gammafunction.rs",
+      "id": "function:crates/itofin/src/math/gammafunction.rs:gamma",
+      "lineRange": [
+        90,
+        109
+      ],
+      "name": "gamma",
+      "summary": "Computes Gamma(x) by exponentiating log_gamma, applying the reflection formula for arguments below one.",
+      "tags": [
+        "special-functions",
+        "numerical-methods",
+        "math"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/math/incompletegamma.rs",
+      "id": "file:crates/itofin/src/math/incompletegamma.rs",
+      "languageNotes": "Chooses series vs continued-fraction representation by comparing x against a+1 for optimal convergence.",
+      "name": "incompletegamma.rs",
+      "summary": "Implements the regularized lower incomplete gamma function P(a,x), dispatching between a series expansion and a continued fraction, powering the gamma and chi-square CDFs.",
+      "tags": [
+        "special-functions",
+        "numerical-methods",
+        "math"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/math/incompletegamma.rs",
+      "id": "function:crates/itofin/src/math/incompletegamma.rs:incomplete_gamma",
+      "lineRange": [
+        37,
+        53
+      ],
+      "name": "incomplete_gamma",
+      "summary": "Computes the regularized lower incomplete gamma P(a,x), validating inputs and selecting the series or continued-fraction representation.",
+      "tags": [
+        "special-functions",
+        "numerical-methods",
+        "validation"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/math/incompletegamma.rs",
+      "id": "function:crates/itofin/src/math/incompletegamma.rs:series_repr",
+      "lineRange": [
+        56,
+        73
+      ],
+      "name": "series_repr",
+      "summary": "Evaluates the incomplete gamma function via its convergent power series, best for x < a+1.",
+      "tags": [
+        "numerical-methods",
+        "special-functions",
+        "math"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/math/incompletegamma.rs",
+      "id": "function:crates/itofin/src/math/incompletegamma.rs:continued_fraction_repr",
+      "lineRange": [
+        77,
+        103
+      ],
+      "name": "continued_fraction_repr",
+      "summary": "Evaluates the incomplete gamma function via the Lentz continued fraction, best for x >= a+1.",
+      "tags": [
+        "numerical-methods",
+        "special-functions",
+        "math"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/types.rs",
+      "id": "file:crates/itofin/src/types.rs",
+      "name": "types.rs",
+      "summary": "Defines the crate's fundamental scalar type aliases (Real, Size, Integer, Time, and related) that mirror QuantLib's typedefs and keep the numeric vocabulary consistent across the library.",
+      "tags": [
+        "type-definition",
+        "core",
+        "utility"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "complex",
+      "filePath": "crates/itofin/src/handle.rs",
+      "id": "file:crates/itofin/src/handle.rs",
+      "languageNotes": "Uses Rc<RefCell<Link>> interior mutability so cloned handles share one mutable link and relinking propagates to all holders.",
+      "name": "handle.rs",
+      "summary": "Implements QuantLib's Handle/RelinkableHandle smart-pointer abstraction: a shared, observable indirection to a pointee whose target can be relinked at runtime with automatic observer notification.",
+      "tags": [
+        "data-model",
+        "observable",
+        "smart-pointer",
+        "core"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/lib.rs",
+      "id": "file:crates/itofin/src/lib.rs",
+      "languageNotes": "Rust crate root declaring the module tree with mod/pub use re-exports.",
+      "name": "lib.rs",
+      "summary": "Crate root for libitofin that wires together the foundational modules (errors, types, patterns, handle, settings, shared, math, utilities) and exposes the public API surface.",
+      "tags": [
+        "entry-point",
+        "barrel",
+        "crate-root"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "complex",
+      "filePath": "crates/itofin/src/patterns/lazyobject.rs",
+      "id": "file:crates/itofin/src/patterns/lazyobject.rs",
+      "languageNotes": "Bool state flags (calculated/frozen/failed/updating) replicate the C++ recalculation state machine; the updating guard breaks recursive update cycles.",
+      "name": "lazyobject.rs",
+      "summary": "Ports QuantLib's LazyObject: caches an expensive calculation, invalidates it on input changes, and re-forwards notifications to downstream observers with freeze/unfreeze and recursion-guard semantics.",
+      "tags": [
+        "pattern",
+        "observable",
+        "lazy-evaluation",
+        "core"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/patterns/mod.rs",
+      "id": "file:crates/itofin/src/patterns/mod.rs",
+      "name": "mod.rs",
+      "summary": "Module barrel for the patterns package, re-exporting the observable, lazyobject, and visitor design-pattern primitives.",
+      "tags": [
+        "barrel",
+        "entry-point",
+        "module"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "complex",
+      "filePath": "crates/itofin/src/patterns/observable.rs",
+      "id": "file:crates/itofin/src/patterns/observable.rs",
+      "languageNotes": "Observers are held as WeakMut to avoid keeping them alive; dead weaks are pruned on register/unregister/notify, and notify snapshots the list to tolerate reentrant registration.",
+      "name": "observable.rs",
+      "summary": "Implements the Observer/Observable notification pattern at the heart of QuantLib's dependency graph, with idempotent registration, weak-reference observer tracking, and reentrancy-safe notification.",
+      "tags": [
+        "pattern",
+        "observable",
+        "event-handler",
+        "core"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/patterns/visitor.rs",
+      "id": "file:crates/itofin/src/patterns/visitor.rs",
+      "languageNotes": "A single generic trait Visitor<T> with one visit method, mirroring QuantLib's AcyclicVisitor entry point.",
+      "name": "visitor.rs",
+      "summary": "Defines the generic Visitor trait used to implement the visitor pattern across QuantLib-ported types.",
+      "tags": [
+        "pattern",
+        "type-definition",
+        "visitor"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/settings.rs",
+      "id": "file:crates/itofin/src/settings.rs",
+      "languageNotes": "Evaluation date is Option<Date> (None = floating/today); set/reset only fire notify_observers when the value genuinely changes.",
+      "name": "settings.rs",
+      "summary": "Ports QuantLib's global Settings singleton: holds the evaluation date and pricing flags, notifying registered observers when the evaluation date actually changes or resets to floating.",
+      "tags": [
+        "config",
+        "singleton",
+        "observable",
+        "core"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/shared.rs",
+      "id": "file:crates/itofin/src/shared.rs",
+      "languageNotes": "Centralizes the Rc/RefCell choice (decision D3) behind aliases so the smart-pointer kind can be swapped in one place.",
+      "name": "shared.rs",
+      "summary": "Defines the project's shared-ownership type aliases (Shared/SharedMut/Weak/WeakMut over Rc/RefCell) and ergonomic constructor helpers used throughout the observable graph.",
+      "tags": [
+        "utility",
+        "type-definition",
+        "factory",
+        "core"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/handle.rs",
+      "id": "class:crates/itofin/src/handle.rs:Handle",
+      "lineRange": [
+        49,
+        51
+      ],
+      "name": "Handle",
+      "summary": "Shared observable handle wrapping a Link; clones share one underlying link so all holders see the same pointee and observer registrations.",
+      "tags": [
+        "data-model",
+        "smart-pointer",
+        "observable"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/handle.rs",
+      "id": "class:crates/itofin/src/handle.rs:RelinkableHandle",
+      "lineRange": [
+        104,
+        106
+      ],
+      "name": "RelinkableHandle",
+      "summary": "Owner-facing wrapper around a Handle that allows relinking or resetting the pointee at runtime, notifying observers on every change.",
+      "tags": [
+        "data-model",
+        "smart-pointer",
+        "observable"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "complex",
+      "filePath": "crates/itofin/src/patterns/lazyobject.rs",
+      "id": "class:crates/itofin/src/patterns/lazyobject.rs:LazyObject",
+      "lineRange": [
+        25,
+        32
+      ],
+      "name": "LazyObject",
+      "summary": "Core lazy-calculation state machine that memoizes results, invalidates on input change, and forwards notifications, supporting freeze/unfreeze and failure handling.",
+      "tags": [
+        "pattern",
+        "lazy-evaluation",
+        "observable"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/patterns/observable.rs",
+      "id": "class:crates/itofin/src/patterns/observable.rs:Observer",
+      "lineRange": [
+        21,
+        24
+      ],
+      "name": "Observer",
+      "summary": "Trait for objects that react to change notifications from an Observable via an update method.",
+      "tags": [
+        "pattern",
+        "type-definition",
+        "event-handler"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/patterns/observable.rs",
+      "id": "class:crates/itofin/src/patterns/observable.rs:Observable",
+      "lineRange": [
+        36,
+        38
+      ],
+      "name": "Observable",
+      "summary": "Subject that maintains a weak-reference observer list and notifies them of changes, with idempotent registration and automatic pruning of dropped observers.",
+      "tags": [
+        "pattern",
+        "observable",
+        "event-handler"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/patterns/visitor.rs",
+      "id": "class:crates/itofin/src/patterns/visitor.rs:Visitor",
+      "lineRange": [
+        18,
+        21
+      ],
+      "name": "Visitor",
+      "summary": "Generic visitor trait exposing a single visit method for double-dispatch over visited types.",
+      "tags": [
+        "pattern",
+        "type-definition",
+        "visitor"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/settings.rs",
+      "id": "class:crates/itofin/src/settings.rs:Settings",
+      "lineRange": [
+        21,
+        27
+      ],
+      "name": "Settings",
+      "summary": "Global pricing settings holding the evaluation date and reference-date/cash-flow/fixing flags, with an observable for evaluation-date changes.",
+      "tags": [
+        "config",
+        "singleton",
+        "data-model"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/patterns/lazyobject.rs",
+      "id": "function:crates/itofin/src/patterns/lazyobject.rs:on_update",
+      "lineRange": [
+        75,
+        91
+      ],
+      "name": "on_update",
+      "summary": "Handles an incoming input-change notification: invalidates the cached result and conditionally forwards the notification downstream based on freeze/forward policy.",
+      "tags": [
+        "event-handler",
+        "lazy-evaluation",
+        "observable"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/patterns/lazyobject.rs",
+      "id": "function:crates/itofin/src/patterns/lazyobject.rs:calculate",
+      "lineRange": [
+        98,
+        111
+      ],
+      "name": "calculate",
+      "summary": "Runs the supplied calculation closure once when not yet calculated, caching the result and recording failure state.",
+      "tags": [
+        "lazy-evaluation",
+        "core",
+        "memoization"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/patterns/lazyobject.rs",
+      "id": "function:crates/itofin/src/patterns/lazyobject.rs:recalculate",
+      "lineRange": [
+        117,
+        126
+      ],
+      "name": "recalculate",
+      "summary": "Forces recomputation by re-running the calculation closure and notifying observers even when the perform step fails.",
+      "tags": [
+        "lazy-evaluation",
+        "core",
+        "event-handler"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/patterns/observable.rs",
+      "id": "function:crates/itofin/src/patterns/observable.rs:unregister_observer",
+      "lineRange": [
+        64,
+        76
+      ],
+      "name": "unregister_observer",
+      "summary": "Removes a specific observer from the subject's list by weak-pointer identity while pruning dead weak references.",
+      "tags": [
+        "observable",
+        "event-handler",
+        "core"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/patterns/observable.rs",
+      "id": "function:crates/itofin/src/patterns/observable.rs:notify_observers",
+      "lineRange": [
+        84,
+        93
+      ],
+      "name": "notify_observers",
+      "summary": "Snapshots and upgrades the live observer list and invokes update on each, tolerating observers registered during notification.",
+      "tags": [
+        "observable",
+        "event-handler",
+        "core"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/settings.rs",
+      "id": "function:crates/itofin/src/settings.rs:set_evaluation_date",
+      "lineRange": [
+        57,
+        65
+      ],
+      "name": "set_evaluation_date",
+      "summary": "Sets the global evaluation date and notifies registered observers only when the date actually changes.",
+      "tags": [
+        "config",
+        "event-handler",
+        "observable"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "complex",
+      "filePath": "crates/itofin/src/math/array.rs",
+      "id": "file:crates/itofin/src/math/array.rs",
+      "languageNotes": "Heavy use of Deref/Index/Neg/FromIterator trait impls and closure-based element-wise mapping to provide an ergonomic numeric vector type.",
+      "name": "array.rs",
+      "summary": "Defines the core `Array` 1-D vector primitive wrapping a `Vec<Real>`, with constructors, element-wise math (abs/sqrt/log/exp/pow), dot product, norm, and Deref/Index/operator trait impls. Mirrors QuantLib's Array type for the linear-algebra layer.",
+      "tags": [
+        "data-model",
+        "linear-algebra",
+        "numeric",
+        "utility"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "complex",
+      "filePath": "crates/itofin/src/math/array.rs",
+      "id": "class:crates/itofin/src/math/array.rs:Array",
+      "lineRange": [
+        16,
+        18
+      ],
+      "name": "Array",
+      "summary": "1-D numeric array over `Real` backed by `Vec`, offering constructors (filled, incremental), element-wise transforms, dot/norm2, and Deref/Index/operator overloads.",
+      "tags": [
+        "data-model",
+        "linear-algebra",
+        "numeric"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "complex",
+      "filePath": "crates/itofin/src/math/interpolations/linear.rs",
+      "id": "file:crates/itofin/src/math/interpolations/linear.rs",
+      "languageNotes": "Uses `partition_point` for binary segment location and fallible `Result`-returning evaluation methods for out-of-range/NaN handling.",
+      "name": "linear.rs",
+      "summary": "Implements `LinearInterpolation` over monotonically increasing x-nodes, precomputing segment slopes and cumulative primitives, with optional extrapolation and NaN/finiteness validation. Ports QuantLib's LinearInterpolation.",
+      "tags": [
+        "service",
+        "interpolation",
+        "numeric",
+        "validation"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "complex",
+      "filePath": "crates/itofin/src/math/interpolations/linear.rs",
+      "id": "class:crates/itofin/src/math/interpolations/linear.rs:LinearInterpolation",
+      "lineRange": [
+        13,
+        19
+      ],
+      "name": "LinearInterpolation",
+      "summary": "Piecewise-linear interpolant holding x/y nodes, precomputed slopes and cumulative primitives, supporting value/derivative/primitive evaluation with optional extrapolation.",
+      "tags": [
+        "service",
+        "interpolation",
+        "numeric"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/math/interpolations/linear.rs",
+      "id": "function:crates/itofin/src/math/interpolations/linear.rs:new",
+      "lineRange": [
+        24,
+        71
+      ],
+      "name": "new",
+      "summary": "Constructs a LinearInterpolation, validating equal/sufficient lengths, finiteness, and strict monotonicity of x, then precomputing per-segment slopes and cumulative primitives.",
+      "tags": [
+        "factory",
+        "validation",
+        "interpolation"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/math/interpolations/linear.rs",
+      "id": "function:crates/itofin/src/math/interpolations/linear.rs:check_range",
+      "lineRange": [
+        97,
+        109
+      ],
+      "name": "check_range",
+      "summary": "Rejects NaN inputs and out-of-domain x values when extrapolation is disabled, returning a QlError otherwise Ok.",
+      "tags": [
+        "validation",
+        "numeric"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/math/interpolations/linear.rs",
+      "id": "function:crates/itofin/src/math/interpolations/linear.rs:locate",
+      "lineRange": [
+        86,
+        95
+      ],
+      "name": "locate",
+      "summary": "Binary-searches the x-node array via partition_point to find the segment index containing a query point, clamping at the end segments.",
+      "tags": [
+        "utility",
+        "interpolation",
+        "search"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/math/interpolations/mod.rs",
+      "id": "file:crates/itofin/src/math/interpolations/mod.rs",
+      "name": "mod.rs",
+      "summary": "Interpolations module barrel that re-exports the linear submodule and defines the common `Interpolation` trait (value/derivative/primitive/domain queries) implemented by concrete interpolators.",
+      "tags": [
+        "type-definition",
+        "interpolation",
+        "barrel",
+        "entry-point"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/math/interpolations/mod.rs",
+      "id": "class:crates/itofin/src/math/interpolations/mod.rs:Interpolation",
+      "lineRange": [
+        13,
+        32
+      ],
+      "name": "Interpolation",
+      "summary": "Trait defining the common interpolation interface: value, derivative, primitive, x_min/x_max bounds, and in-range checks.",
+      "tags": [
+        "type-definition",
+        "interpolation",
+        "interface"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "complex",
+      "filePath": "crates/itofin/src/math/matrix.rs",
+      "id": "file:crates/itofin/src/math/matrix.rs",
+      "languageNotes": "Uses checked_mul for overflow-safe capacity, 1-D and 2-D Index impls, and multiple Mul trait impls for matrix*matrix, matrix*vector, and scalar products.",
+      "name": "matrix.rs",
+      "summary": "Defines the `Matrix` 2-D dense matrix primitive (row-major `Vec<Real>`) with constructors, row/diagonal/transpose accessors, indexing, and matrix/vector/scalar multiplication. Ports QuantLib's Matrix type.",
+      "tags": [
+        "data-model",
+        "linear-algebra",
+        "numeric"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "complex",
+      "filePath": "crates/itofin/src/math/matrix.rs",
+      "id": "class:crates/itofin/src/math/matrix.rs:Matrix",
+      "lineRange": [
+        16,
+        20
+      ],
+      "name": "Matrix",
+      "summary": "Dense row-major 2-D matrix over `Real` with constructors, row/diagonal/transpose access, 1-D and 2-D indexing, and overloaded multiplication operators.",
+      "tags": [
+        "data-model",
+        "linear-algebra",
+        "numeric"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/math/matrix.rs",
+      "id": "function:crates/itofin/src/math/matrix.rs:transpose",
+      "lineRange": [
+        98,
+        106
+      ],
+      "name": "transpose",
+      "summary": "Returns a new matrix with rows and columns swapped by copying each element to its transposed position.",
+      "tags": [
+        "utility",
+        "linear-algebra"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/math/matrix.rs",
+      "id": "function:crates/itofin/src/math/matrix.rs:mul",
+      "lineRange": [
+        209,
+        221
+      ],
+      "name": "mul",
+      "summary": "Matrix-matrix product implementation computing the row-by-column dot products with shape-conformance checks.",
+      "tags": [
+        "linear-algebra",
+        "operator",
+        "numeric"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/math/mod.rs",
+      "id": "file:crates/itofin/src/math/mod.rs",
+      "name": "mod.rs",
+      "summary": "Math module barrel that declares and re-exports the array, matrix, interpolations, distributions, and special-function (beta/gamma/error) submodules.",
+      "tags": [
+        "barrel",
+        "entry-point",
+        "module"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/utilities/clone.rs",
+      "id": "file:crates/itofin/src/utilities/clone.rs",
+      "languageNotes": "Implements custom Clone/Default rather than deriving, using Box<T> with Option to model an optionally-empty owned slot.",
+      "name": "clone.rs",
+      "summary": "Provides ValueBox, a deep-clone heap container that ports QuantLib's clone-on-Clone semantics so cloning duplicates the owned value rather than sharing a pointer.",
+      "tags": [
+        "utility",
+        "data-model",
+        "deep-clone",
+        "memory"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/utilities/dataformatters.rs",
+      "id": "file:crates/itofin/src/utilities/dataformatters.rs",
+      "name": "dataformatters.rs",
+      "summary": "String formatting helpers for quantitative values (null sentinels, ordinals, percentages, rates, volatilities) ported from QuantLib's DataFormatters.",
+      "tags": [
+        "utility",
+        "formatting",
+        "serialization"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/utilities/mod.rs",
+      "id": "file:crates/itofin/src/utilities/mod.rs",
+      "name": "mod.rs",
+      "summary": "Module barrel that declares and re-exports the utilities submodules (clone, dataformatters, null, steppingiterator).",
+      "tags": [
+        "barrel",
+        "entry-point",
+        "module"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/utilities/null.rs",
+      "id": "file:crates/itofin/src/utilities/null.rs",
+      "languageNotes": "Uses a trait with an associated null() sentinel and provided is_null() default method to emulate C++ template specialization.",
+      "name": "null.rs",
+      "summary": "Defines the Null trait providing sentinel null values and is_null checks for numeric types, porting QuantLib's Null<T> template.",
+      "tags": [
+        "utility",
+        "type-definition",
+        "validation",
+        "sentinel"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/utilities/steppingiterator.rs",
+      "id": "file:crates/itofin/src/utilities/steppingiterator.rs",
+      "languageNotes": "Implements the std Iterator trait and uses saturating_add to avoid index overflow when stepping past the slice end.",
+      "name": "steppingiterator.rs",
+      "summary": "Provides StepIterator and the step_iter constructor that yield every nth element of a slice, porting QuantLib's stepping iterator.",
+      "tags": [
+        "utility",
+        "iterator",
+        "data-model"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/utilities/clone.rs",
+      "id": "class:crates/itofin/src/utilities/clone.rs:ValueBox",
+      "lineRange": [
+        14,
+        16
+      ],
+      "name": "ValueBox",
+      "summary": "Heap-allocated, optionally-empty owned value with deep-clone semantics; exposes empty/new constructors plus get, get_mut, swap, and is_empty accessors.",
+      "tags": [
+        "data-model",
+        "deep-clone",
+        "container"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/utilities/dataformatters.rs",
+      "id": "function:crates/itofin/src/utilities/dataformatters.rs:check_null",
+      "lineRange": [
+        13,
+        19
+      ],
+      "name": "check_null",
+      "summary": "Formats a value as the literal \"null\" when it is the Null sentinel, otherwise delegates to its Display representation.",
+      "tags": [
+        "formatting",
+        "validation",
+        "utility"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/utilities/dataformatters.rs",
+      "id": "function:crates/itofin/src/utilities/dataformatters.rs:ordinal",
+      "lineRange": [
+        22,
+        31
+      ],
+      "name": "ordinal",
+      "summary": "Renders an integer as an English ordinal string (1st, 2nd, 3rd, ...) handling the 11-13 suffix exceptions.",
+      "tags": [
+        "formatting",
+        "utility"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/utilities/null.rs",
+      "id": "class:crates/itofin/src/utilities/null.rs:Null",
+      "lineRange": [
+        11,
+        19
+      ],
+      "name": "Null",
+      "summary": "Trait supplying a type-specific null() sentinel value and an is_null() comparison used to mark unset numeric quantities.",
+      "tags": [
+        "type-definition",
+        "sentinel",
+        "validation"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/utilities/steppingiterator.rs",
+      "id": "class:crates/itofin/src/utilities/steppingiterator.rs:StepIterator",
+      "lineRange": [
+        12,
+        16
+      ],
+      "name": "StepIterator",
+      "summary": "Iterator over a slice that advances by a fixed step, yielding every nth element starting at position zero.",
+      "tags": [
+        "iterator",
+        "data-model",
+        "utility"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/utilities/steppingiterator.rs",
+      "id": "function:crates/itofin/src/utilities/steppingiterator.rs:step_iter",
+      "lineRange": [
+        36,
+        39
+      ],
+      "name": "step_iter",
+      "summary": "Public constructor that builds a StepIterator over a slice with the given step size.",
+      "tags": [
+        "iterator",
+        "factory",
+        "utility"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "simple",
+      "filePath": ".github/images/prek/Dockerfile",
+      "id": "service:.github/images/prek/Dockerfile",
+      "languageNotes": "Single-stage build chaining apt, the astral.sh uv install script, and `cargo install prek` in one RUN layer to keep the image lean.",
+      "name": "Dockerfile",
+      "summary": "Builds a Rust slim-bookworm tooling image for pre-commit/prek CI runs, installing curl, git, the uv installer, and the prek hook runner via cargo.",
+      "tags": [
+        "containerization",
+        "infrastructure",
+        "ci-cd",
+        "tooling"
+      ],
+      "type": "service"
+    },
+    {
+      "complexity": "simple",
+      "filePath": ".github/workflows/pull-request.yml",
+      "id": "pipeline:.github/workflows/pull-request.yml",
+      "languageNotes": "Uses a reusable workflow (benbenbang/reusable-workflows prek.yml) plus a concurrency group to cancel superseded runs.",
+      "name": "pull-request.yml",
+      "summary": "GitHub Actions pull-request workflow that runs pre-commit checks via a reusable workflow and applies PR labels on non-fork pull requests targeting main.",
+      "tags": [
+        "ci-cd",
+        "infrastructure",
+        "deployment",
+        "pull-request"
+      ],
+      "type": "pipeline"
+    },
+    {
+      "complexity": "simple",
+      "filePath": ".github/workflows/semantic-release.yml",
+      "id": "pipeline:.github/workflows/semantic-release.yml",
+      "languageNotes": "workflow_dispatch with a required boolean choice input gates the reusable semantic-release.yml workflow.",
+      "name": "semantic-release.yml",
+      "summary": "Manually-dispatched GitHub Actions workflow that triggers a semantic-release reusable workflow to cut a new versioned release when explicitly confirmed.",
+      "tags": [
+        "ci-cd",
+        "infrastructure",
+        "release",
+        "deployment"
+      ],
+      "type": "pipeline"
+    },
+    {
+      "complexity": "simple",
+      "filePath": ".dockerignore",
+      "id": "service:.dockerignore",
+      "name": ".dockerignore",
+      "summary": "Docker build context exclusion file for the repository; minimal single-line rule keeping unwanted files out of any container build context.",
+      "tags": [
+        "infrastructure",
+        "containerization",
+        "build-system"
+      ],
+      "type": "service"
+    },
+    {
+      "complexity": "simple",
+      "filePath": ".pre-commit-config.yaml",
+      "id": "config:.pre-commit-config.yaml",
+      "languageNotes": "Hooks enforce the project's quality gates (fmt/clippy/test) locally, mirroring CI.",
+      "name": ".pre-commit-config.yaml",
+      "summary": "Pre-commit hook configuration running cargo fmt, check, clippy, and test plus conventional-commit and file-hygiene checks before every commit across the Cargo workspace.",
+      "tags": [
+        "configuration",
+        "ci-cd",
+        "build-system",
+        "validation"
+      ],
+      "type": "config"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": ".releaserc.json",
+      "id": "config:.releaserc.json",
+      "languageNotes": "Uses a conventional-commits preset with custom presetConfig to drive automated semantic versioning.",
+      "name": ".releaserc.json",
+      "summary": "semantic-release configuration defining branches, conventional-commit parsing, changelog/release-note presets, and tag format for automated versioning and releases.",
+      "tags": [
+        "configuration",
+        "ci-cd",
+        "deployment",
+        "release-management"
+      ],
+      "type": "config"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "Cargo.toml",
+      "id": "config:Cargo.toml",
+      "languageNotes": "Virtual workspace with members = [\"crates/*\"] so new crates need no root-manifest edit.",
+      "name": "Cargo.toml",
+      "summary": "Virtual Cargo workspace manifest (resolver 3, edition 2024) declaring workspace members under crates/* and shared workspace.package metadata.",
+      "tags": [
+        "configuration",
+        "build-system",
+        "rust",
+        "workspace"
+      ],
+      "type": "config"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "README.md",
+      "id": "document:README.md",
+      "name": "README.md",
+      "summary": "Project overview documentation for Lib-It\u00f4-Fin covering motivation, current EPIC-0 status, getting-started instructions, project layout, and design principles.",
+      "tags": [
+        "documentation",
+        "entry-point",
+        "overview"
+      ],
+      "type": "document"
+    },
+    {
+      "complexity": "complex",
+      "filePath": "TICKETS.md",
+      "id": "document:TICKETS.md",
+      "name": "TICKETS.md",
+      "summary": "Dependency-ordered QuantLib to Rust porting backlog: cross-cutting design decisions (D1-D8), epic dependency map (L0-L11), ticket conventions, and Milestone 1 vertical slice.",
+      "tags": [
+        "documentation",
+        "planning",
+        "roadmap"
+      ],
+      "type": "document"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "rust-toolchain.toml",
+      "id": "config:rust-toolchain.toml",
+      "name": "rust-toolchain.toml",
+      "summary": "Pins the Rust toolchain (1.96.0 with rustfmt and clippy components) so plain cargo uses the project-mandated version across the workspace.",
+      "tags": [
+        "configuration",
+        "build-system",
+        "rust",
+        "toolchain"
+      ],
+      "type": "config"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "scripts/check_extension.sh",
+      "id": "file:scripts/check_extension.sh",
+      "name": "check_extension.sh",
+      "summary": "Pre-commit helper that scans staged files and aborts the commit if any file matches a forbidden extension (e.g. Jupyter notebooks). Sources init.sh for shared environment setup.",
+      "tags": [
+        "script",
+        "git-hook",
+        "validation",
+        "pre-commit",
+        "tooling"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "scripts/check_extension.sh",
+      "id": "function:scripts/check_extension.sh:check_extension",
+      "lineRange": [
+        4,
+        13
+      ],
+      "name": "check_extension",
+      "summary": "Iterates over staged files from git diff and exits non-zero with a message if any file ends with the extension passed as an argument.",
+      "tags": [
+        "validation",
+        "git",
+        "guard"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "scripts/hadolint.sh",
+      "id": "file:scripts/hadolint.sh",
+      "languageNotes": "Uses bash arrays populated from git diff and a binary-or-Docker fallback pattern for the linter.",
+      "name": "hadolint.sh",
+      "summary": "Lints changed (or all) Dockerfiles using hadolint, falling back to the hadolint Docker image when the binary is absent, and fails the run on any lint error. Sources init.sh and uses scripts/hadolint.yml for rule configuration.",
+      "tags": [
+        "script",
+        "linting",
+        "ci-cd",
+        "docker",
+        "tooling"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "scripts/hadolint.sh",
+      "id": "function:scripts/hadolint.sh:get_default_branch",
+      "lineRange": [
+        29,
+        42
+      ],
+      "name": "get_default_branch",
+      "summary": "Resolves the repository's default branch by probing origin/main then origin/master, falling back to main.",
+      "tags": [
+        "git",
+        "utility",
+        "branch-detection"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "scripts/hadolint.sh",
+      "id": "function:scripts/hadolint.sh:hadolint_runner",
+      "lineRange": [
+        44,
+        56
+      ],
+      "name": "hadolint_runner",
+      "summary": "Runs hadolint against the given Dockerfile arguments, using the local binary if available or otherwise the hadolint/hadolint Docker image, with the project config file.",
+      "tags": [
+        "linting",
+        "docker",
+        "wrapper"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "scripts/hadolint.sh",
+      "id": "function:scripts/hadolint.sh:lint_wrapper",
+      "lineRange": [
+        58,
+        92
+      ],
+      "name": "lint_wrapper",
+      "summary": "Collects changed Dockerfiles via git diff against the default branch and lints them (or all Dockerfiles when passed 'all'), returning non-zero on the first failure.",
+      "tags": [
+        "linting",
+        "git",
+        "orchestration"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "scripts/hadolint.yml",
+      "id": "config:scripts/hadolint.yml",
+      "name": "hadolint.yml",
+      "summary": "Hadolint configuration that ignores a curated set of Dockerfile lint rules (DL3003/3006/3008/3013/3020/3022, SC2086) deemed acceptable for this project's images.",
+      "tags": [
+        "configuration",
+        "linting",
+        "docker",
+        "ci-cd"
+      ],
+      "type": "config"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "scripts/init.sh",
+      "id": "file:scripts/init.sh",
+      "name": "init.sh",
+      "summary": "Shared bootstrap sourced by the other helper scripts: enables strict mode, exports the scripts and git root paths, defines terminal color variables, and prepares the hadolint log cache directory.",
+      "tags": [
+        "script",
+        "bootstrap",
+        "shared",
+        "tooling",
+        "environment"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": ".github/copilot-instructions.md",
+      "id": "document:.github/copilot-instructions.md",
+      "name": "copilot-instructions.md",
+      "summary": "GitHub Copilot guidance for the libitofin port, codifying the QuantLib-oracle rule, settled design decisions, naming/numeric conventions, error-handling rules, PR sizing, and review expectations across 10 sections.",
+      "tags": [
+        "documentation",
+        "configuration",
+        "development",
+        "conventions"
+      ],
+      "type": "document"
+    },
+    {
+      "complexity": "simple",
+      "filePath": ".github/images/prek/build.sh",
+      "id": "file:.github/images/prek/build.sh",
+      "languageNotes": "Uses docker buildx with --platform for multi-architecture image builds.",
+      "name": "build.sh",
+      "summary": "Shell script that builds and pushes the multi-arch (amd64/arm64) prek tooling Docker image to ghcr.io via docker buildx.",
+      "tags": [
+        "script",
+        "containerization",
+        "build-system",
+        "deployment"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "simple",
+      "filePath": ".github/images/README.md",
+      "id": "document:.github/images/README.md",
+      "name": "README.md",
+      "summary": "Placeholder README for the .github/images tooling-image directory; currently empty.",
+      "tags": [
+        "documentation",
+        "placeholder",
+        "infrastructure"
+      ],
+      "type": "document"
+    },
+    {
+      "complexity": "simple",
+      "filePath": ".github/labeler.yml",
+      "id": "config:.github/labeler.yml",
+      "name": "labeler.yml",
+      "summary": "GitHub Actions labeler configuration mapping changed file paths to PR labels (enhancement, workflows, build, documentation).",
+      "tags": [
+        "configuration",
+        "ci-cd",
+        "automation",
+        "github"
+      ],
+      "type": "config"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": ".understand-anything/.understandignore",
+      "id": "file:.understand-anything/.understandignore",
+      "name": ".understandignore",
+      "summary": "Ignore-pattern file telling the Understand-Anything tooling which paths to exclude from codebase analysis.",
+      "tags": [
+        "configuration",
+        "tooling",
+        "ignore-rules"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "simple",
+      "filePath": ".understand-anything/config.json",
+      "id": "config:.understand-anything/config.json",
+      "name": "config.json",
+      "summary": "Configuration for the Understand-Anything tooling, setting the output language for generated analysis.",
+      "tags": [
+        "configuration",
+        "tooling"
+      ],
+      "type": "config"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/Cargo.toml",
+      "id": "config:crates/itofin/Cargo.toml",
+      "languageNotes": "Inherits version and edition from the workspace via version.workspace/edition.workspace.",
+      "name": "Cargo.toml",
+      "summary": "Cargo manifest for the core itofin crate (libitofin), declaring the lib target, workspace-inherited version/edition, and the thiserror dependency.",
+      "tags": [
+        "configuration",
+        "build-system",
+        "rust",
+        "manifest"
+      ],
+      "type": "config"
+    }
+  ],
+  "project": {
+    "analyzedAt": "2026-06-29T01:36:58.758Z",
+    "description": "A ground-up port of QuantLib (the C++ quantitative-finance library) into idiomatic Rust, delivered as a core library (libitofin) with thin language bindings planned (Python first, then a C ABI). Early-stage: the foundational EPIC-0 layer (types, errors, observer/observable patterns, handles, settings, utilities) plus core math primitives are in place, not yet usable for pricing.",
+    "frameworks": [
+      "Cargo",
+      "Docker",
+      "GitHub Actions"
+    ],
+    "gitCommitHash": "caa6e02cbf2bbf4a8160ecdba49ba8dc3f7eb6ac",
+    "languages": [
+      "dockerfile",
+      "json",
+      "markdown",
+      "rust",
+      "shell",
+      "toml",
+      "yaml"
+    ],
+    "name": "itofin"
+  },
+  "tour": [
+    {
+      "description": "Start with the README to understand what Lib-It\u00f4-Fin is: a ground-up port of QuantLib's C++ quant-finance library into idiomatic Rust, built bottom-up through dependency layers L0->L11. TICKETS.md is the single source of truth for what gets ported and in what order, including the cross-cutting design decisions (Rc vs Arc, error handling, concurrency, bindings). Read these first to get the map before walking the territory.",
+      "nodeIds": [
+        "document:README.md",
+        "document:TICKETS.md"
+      ],
+      "order": 1,
+      "title": "Project Mission & Roadmap"
+    },
+    {
+      "description": "lib.rs is the crate root for libitofin. It wires together every foundational module (errors, types, patterns, handle, settings, shared, math, utilities) and defines the public API surface. Skimming the module declarations here gives you a bird's-eye view of the whole crate's structure before you dive into any single piece.",
+      "languageLesson": "In Rust, a library crate's root (lib.rs) uses `mod` to declare submodules and `pub use` to re-export their items, shaping a clean public API distinct from the internal file layout.",
+      "nodeIds": [
+        "file:crates/itofin/src/lib.rs"
+      ],
+      "order": 2,
+      "title": "The Crate Root"
+    },
+    {
+      "description": "These are the two most widely depended-upon files in the codebase (types.rs has fan-in 19, errors.rs fan-in 15). types.rs defines the numeric aliases (Real, Size, Time, Rate) that form the shared vocabulary of every later layer, while errors.rs ports QuantLib's QL_REQUIRE/QL_ENSURE idioms into a QlError type plus require/ensure macros used for input validation throughout the math layer. Understand these first - nearly everything builds on them.",
+      "languageLesson": "Rust uses `Result<T, E>` for fallible operations instead of exceptions. The QlError struct carries source file/line context, mirroring QuantLib's location-aware C++ exceptions while staying idiomatic.",
+      "nodeIds": [
+        "file:crates/itofin/src/types.rs",
+        "file:crates/itofin/src/errors.rs"
+      ],
+      "order": 3,
+      "title": "Foundational Types & Errors"
+    },
+    {
+      "description": "Building on the core types, this trio provides the plumbing the rest of the library leans on. shared.rs defines the smart-pointer aliases (the Rc-vs-Arc decision), handle.rs implements Handle/RelinkableHandle - the QuantLib indirection that lets quotes and term structures be swapped without rewiring observers - and settings.rs holds the global evaluation-date state. This is the highest-risk translation area called out in the project notes.",
+      "nodeIds": [
+        "file:crates/itofin/src/shared.rs",
+        "file:crates/itofin/src/handle.rs",
+        "file:crates/itofin/src/settings.rs"
+      ],
+      "order": 4,
+      "title": "Indirection: Handle, Settings & Shared Pointers"
+    },
+    {
+      "description": "QuantLib's reactive core is the Observable/Observer graph: when market data changes, dependents are notified and recompute. observable.rs implements that notification graph (notify_observers is a high fan-in hot path), lazyobject.rs adds deferred recalculation so values are only recomputed when actually read, and visitor.rs provides double-dispatch. These patterns underpin how pricing engines will react to changing inputs once higher layers land.",
+      "nodeIds": [
+        "file:crates/itofin/src/patterns/observable.rs",
+        "file:crates/itofin/src/patterns/lazyobject.rs",
+        "file:crates/itofin/src/patterns/visitor.rs"
+      ],
+      "order": 5,
+      "title": "Design Patterns: Observable, LazyObject & Visitor"
+    },
+    {
+      "description": "A small toolbox built on the core types. null.rs provides QuantLib's Null sentinel for 'unset' numeric values, dataformatters.rs handles human-readable formatting, steppingiterator.rs is an iterator adaptor that walks a range in fixed strides, and clone.rs offers clone helpers. These are leaf utilities the math layer reaches for without pulling in heavier machinery.",
+      "nodeIds": [
+        "file:crates/itofin/src/utilities/null.rs",
+        "file:crates/itofin/src/utilities/dataformatters.rs",
+        "file:crates/itofin/src/utilities/steppingiterator.rs",
+        "file:crates/itofin/src/utilities/clone.rs"
+      ],
+      "order": 6,
+      "title": "Utility Helpers"
+    },
+    {
+      "description": "The first stop in the L1 math layer. array.rs and matrix.rs are the linear-algebra containers - dense, owning numeric vectors and 2D matrices - that every numerical routine above them operates on. They depend only on the core types, keeping the math layer cleanly stacked on the foundation you just toured.",
+      "nodeIds": [
+        "file:crates/itofin/src/math/array.rs",
+        "file:crates/itofin/src/math/matrix.rs"
+      ],
+      "order": 7,
+      "title": "Math Containers: Array & Matrix"
+    },
+    {
+      "description": "The numerical workhorses behind the distributions. gammafunction.rs (its log_gamma has the highest fan-in of any math routine), beta.rs, errorfunction.rs (erf), and incompletegamma.rs implement the classical special functions QuantLib relies on. They are validated against the C++ test-suite oracle within tolerance, and the distributions in the next step are largely thin wrappers over these.",
+      "nodeIds": [
+        "file:crates/itofin/src/math/gammafunction.rs",
+        "file:crates/itofin/src/math/beta.rs",
+        "file:crates/itofin/src/math/errorfunction.rs",
+        "file:crates/itofin/src/math/incompletegamma.rs"
+      ],
+      "order": 8,
+      "title": "Special Functions"
+    },
+    {
+      "description": "interpolations/mod.rs defines the shared Interpolation interface and linear.rs gives the first concrete implementation - linear interpolation over (x, y) nodes, with the recent fix rejecting non-finite inputs. Interpolation is foundational for the term structures and curves that later pricing layers will build, so the abstraction is introduced here even with a single implementation.",
+      "nodeIds": [
+        "file:crates/itofin/src/math/interpolations/mod.rs",
+        "file:crates/itofin/src/math/interpolations/linear.rs"
+      ],
+      "order": 9,
+      "title": "Interpolation"
+    },
+    {
+      "description": "The top of the current math stack. distributions/mod.rs defines the shared Probability newtype and the Density/Cdf/Quantile/Support traits forming a common interface, then normal.rs, gamma.rs, poisson.rs, and binomial.rs implement concrete distributions built on the special functions from Step 8. Each distribution is 'done' only when its matching C++ test-suite cases pass within tolerance.",
+      "languageLesson": "Rust traits (Density, Cdf, Quantile, Support) let each distribution share one interface while keeping implementations distinct - the idiomatic replacement for C++ abstract base classes, resolved statically with zero vtable cost where generics are used.",
+      "nodeIds": [
+        "file:crates/itofin/src/math/distributions/mod.rs",
+        "file:crates/itofin/src/math/distributions/normal.rs",
+        "file:crates/itofin/src/math/distributions/gamma.rs",
+        "file:crates/itofin/src/math/distributions/poisson.rs",
+        "file:crates/itofin/src/math/distributions/binomial.rs"
+      ],
+      "order": 10,
+      "title": "Probability Distributions"
+    },
+    {
+      "description": "How code quality is enforced. The pull-request.yml and semantic-release.yml GitHub Actions workflows run linting, tests, and automated versioned releases, while the prek Dockerfile packages a reproducible linting image and hadolint.sh lints that very Dockerfile. This is the automation safety net that guards the porting effort - every PR must pass fmt, check, clippy, and the test oracle.",
+      "languageLesson": "GitHub Actions workflows use `on` triggers and `jobs` of sequential `steps`. Semantic-release derives the next version number from conventional-commit messages, automating changelog and tagging.",
+      "nodeIds": [
+        "pipeline:.github/workflows/pull-request.yml",
+        "pipeline:.github/workflows/semantic-release.yml",
+        "service:.github/images/prek/Dockerfile",
+        "file:scripts/hadolint.sh"
+      ],
+      "order": 11,
+      "title": "Tooling & CI/CD"
+    },
+    {
+      "description": "The setup that ties it all together. Cargo.toml is the virtual workspace manifest (resolver 3, edition 2024) with members = crates/*, rust-toolchain.toml pins the exact compiler (1.96.0 + rustfmt/clippy) so plain cargo is reproducible, and .pre-commit-config.yaml runs fmt/check/clippy/test plus commit-message linting on every commit. Together they make the bottom-up porting workflow deterministic and enforced.",
+      "languageLesson": "A Cargo virtual workspace has a root manifest with no [package], only [workspace] members. Pinning the toolchain via rust-toolchain.toml guarantees every contributor and CI runner compiles with identical compiler and lint versions.",
+      "nodeIds": [
+        "config:Cargo.toml",
+        "config:rust-toolchain.toml",
+        "config:.pre-commit-config.yaml"
+      ],
+      "order": 12,
+      "title": "Project Configuration"
+    }
+  ],
+  "version": "1.0.0"
+}

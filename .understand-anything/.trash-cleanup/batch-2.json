@@ -1,0 +1,644 @@
+{
+  "edges": [
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/handle.rs",
+      "target": "file:crates/itofin/src/errors.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/handle.rs",
+      "target": "file:crates/itofin/src/patterns/observable.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/handle.rs",
+      "target": "file:crates/itofin/src/shared.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/lib.rs",
+      "target": "file:crates/itofin/src/errors.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/lib.rs",
+      "target": "file:crates/itofin/src/handle.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/lib.rs",
+      "target": "file:crates/itofin/src/math/mod.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/lib.rs",
+      "target": "file:crates/itofin/src/patterns/mod.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/lib.rs",
+      "target": "file:crates/itofin/src/settings.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/lib.rs",
+      "target": "file:crates/itofin/src/shared.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/lib.rs",
+      "target": "file:crates/itofin/src/types.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/lib.rs",
+      "target": "file:crates/itofin/src/utilities/mod.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/patterns/lazyobject.rs",
+      "target": "file:crates/itofin/src/errors.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/patterns/lazyobject.rs",
+      "target": "file:crates/itofin/src/patterns/observable.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/patterns/lazyobject.rs",
+      "target": "file:crates/itofin/src/shared.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/patterns/mod.rs",
+      "target": "file:crates/itofin/src/patterns/lazyobject.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/patterns/mod.rs",
+      "target": "file:crates/itofin/src/patterns/observable.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/patterns/mod.rs",
+      "target": "file:crates/itofin/src/patterns/visitor.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/patterns/observable.rs",
+      "target": "file:crates/itofin/src/shared.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/settings.rs",
+      "target": "file:crates/itofin/src/patterns/observable.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/settings.rs",
+      "target": "file:crates/itofin/src/shared.rs",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/handle.rs",
+      "target": "class:crates/itofin/src/handle.rs:Handle",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/handle.rs",
+      "target": "class:crates/itofin/src/handle.rs:RelinkableHandle",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/patterns/lazyobject.rs",
+      "target": "class:crates/itofin/src/patterns/lazyobject.rs:LazyObject",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/patterns/lazyobject.rs",
+      "target": "function:crates/itofin/src/patterns/lazyobject.rs:on_update",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/patterns/lazyobject.rs",
+      "target": "function:crates/itofin/src/patterns/lazyobject.rs:calculate",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/patterns/lazyobject.rs",
+      "target": "function:crates/itofin/src/patterns/lazyobject.rs:recalculate",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/patterns/observable.rs",
+      "target": "class:crates/itofin/src/patterns/observable.rs:Observer",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/patterns/observable.rs",
+      "target": "class:crates/itofin/src/patterns/observable.rs:Observable",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/patterns/observable.rs",
+      "target": "function:crates/itofin/src/patterns/observable.rs:unregister_observer",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/patterns/observable.rs",
+      "target": "function:crates/itofin/src/patterns/observable.rs:notify_observers",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/patterns/visitor.rs",
+      "target": "class:crates/itofin/src/patterns/visitor.rs:Visitor",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/settings.rs",
+      "target": "class:crates/itofin/src/settings.rs:Settings",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/settings.rs",
+      "target": "function:crates/itofin/src/settings.rs:set_evaluation_date",
+      "type": "contains",
+      "weight": 1.0
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/handle.rs",
+      "target": "class:crates/itofin/src/handle.rs:Handle",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/handle.rs",
+      "target": "class:crates/itofin/src/handle.rs:RelinkableHandle",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/patterns/lazyobject.rs",
+      "target": "class:crates/itofin/src/patterns/lazyobject.rs:LazyObject",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/patterns/observable.rs",
+      "target": "class:crates/itofin/src/patterns/observable.rs:Observer",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/patterns/observable.rs",
+      "target": "class:crates/itofin/src/patterns/observable.rs:Observable",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/patterns/visitor.rs",
+      "target": "class:crates/itofin/src/patterns/visitor.rs:Visitor",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/settings.rs",
+      "target": "class:crates/itofin/src/settings.rs:Settings",
+      "type": "exports",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/handle.rs",
+      "target": "function:crates/itofin/src/patterns/observable.rs:notify_observers",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/patterns/lazyobject.rs",
+      "target": "function:crates/itofin/src/patterns/observable.rs:notify_observers",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "direction": "forward",
+      "source": "file:crates/itofin/src/settings.rs",
+      "target": "function:crates/itofin/src/patterns/observable.rs:notify_observers",
+      "type": "calls",
+      "weight": 0.8
+    }
+  ],
+  "nodes": [
+    {
+      "complexity": "complex",
+      "filePath": "crates/itofin/src/handle.rs",
+      "id": "file:crates/itofin/src/handle.rs",
+      "languageNotes": "Uses Rc<RefCell<Link>> interior mutability so cloned handles share one mutable link and relinking propagates to all holders.",
+      "name": "handle.rs",
+      "summary": "Implements QuantLib's Handle/RelinkableHandle smart-pointer abstraction: a shared, observable indirection to a pointee whose target can be relinked at runtime with automatic observer notification.",
+      "tags": [
+        "data-model",
+        "observable",
+        "smart-pointer",
+        "core"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/lib.rs",
+      "id": "file:crates/itofin/src/lib.rs",
+      "languageNotes": "Rust crate root declaring the module tree with mod/pub use re-exports.",
+      "name": "lib.rs",
+      "summary": "Crate root for libitofin that wires together the foundational modules (errors, types, patterns, handle, settings, shared, math, utilities) and exposes the public API surface.",
+      "tags": [
+        "entry-point",
+        "barrel",
+        "crate-root"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "complex",
+      "filePath": "crates/itofin/src/patterns/lazyobject.rs",
+      "id": "file:crates/itofin/src/patterns/lazyobject.rs",
+      "languageNotes": "Bool state flags (calculated/frozen/failed/updating) replicate the C++ recalculation state machine; the updating guard breaks recursive update cycles.",
+      "name": "lazyobject.rs",
+      "summary": "Ports QuantLib's LazyObject: caches an expensive calculation, invalidates it on input changes, and re-forwards notifications to downstream observers with freeze/unfreeze and recursion-guard semantics.",
+      "tags": [
+        "pattern",
+        "observable",
+        "lazy-evaluation",
+        "core"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/patterns/mod.rs",
+      "id": "file:crates/itofin/src/patterns/mod.rs",
+      "name": "mod.rs",
+      "summary": "Module barrel for the patterns package, re-exporting the observable, lazyobject, and visitor design-pattern primitives.",
+      "tags": [
+        "barrel",
+        "entry-point",
+        "module"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "complex",
+      "filePath": "crates/itofin/src/patterns/observable.rs",
+      "id": "file:crates/itofin/src/patterns/observable.rs",
+      "languageNotes": "Observers are held as WeakMut to avoid keeping them alive; dead weaks are pruned on register/unregister/notify, and notify snapshots the list to tolerate reentrant registration.",
+      "name": "observable.rs",
+      "summary": "Implements the Observer/Observable notification pattern at the heart of QuantLib's dependency graph, with idempotent registration, weak-reference observer tracking, and reentrancy-safe notification.",
+      "tags": [
+        "pattern",
+        "observable",
+        "event-handler",
+        "core"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/patterns/visitor.rs",
+      "id": "file:crates/itofin/src/patterns/visitor.rs",
+      "languageNotes": "A single generic trait Visitor<T> with one visit method, mirroring QuantLib's AcyclicVisitor entry point.",
+      "name": "visitor.rs",
+      "summary": "Defines the generic Visitor trait used to implement the visitor pattern across QuantLib-ported types.",
+      "tags": [
+        "pattern",
+        "type-definition",
+        "visitor"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/settings.rs",
+      "id": "file:crates/itofin/src/settings.rs",
+      "languageNotes": "Evaluation date is Option<Date> (None = floating/today); set/reset only fire notify_observers when the value genuinely changes.",
+      "name": "settings.rs",
+      "summary": "Ports QuantLib's global Settings singleton: holds the evaluation date and pricing flags, notifying registered observers when the evaluation date actually changes or resets to floating.",
+      "tags": [
+        "config",
+        "singleton",
+        "observable",
+        "core"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/shared.rs",
+      "id": "file:crates/itofin/src/shared.rs",
+      "languageNotes": "Centralizes the Rc/RefCell choice (decision D3) behind aliases so the smart-pointer kind can be swapped in one place.",
+      "name": "shared.rs",
+      "summary": "Defines the project's shared-ownership type aliases (Shared/SharedMut/Weak/WeakMut over Rc/RefCell) and ergonomic constructor helpers used throughout the observable graph.",
+      "tags": [
+        "utility",
+        "type-definition",
+        "factory",
+        "core"
+      ],
+      "type": "file"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/handle.rs",
+      "id": "class:crates/itofin/src/handle.rs:Handle",
+      "lineRange": [
+        49,
+        51
+      ],
+      "name": "Handle",
+      "summary": "Shared observable handle wrapping a Link; clones share one underlying link so all holders see the same pointee and observer registrations.",
+      "tags": [
+        "data-model",
+        "smart-pointer",
+        "observable"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/handle.rs",
+      "id": "class:crates/itofin/src/handle.rs:RelinkableHandle",
+      "lineRange": [
+        104,
+        106
+      ],
+      "name": "RelinkableHandle",
+      "summary": "Owner-facing wrapper around a Handle that allows relinking or resetting the pointee at runtime, notifying observers on every change.",
+      "tags": [
+        "data-model",
+        "smart-pointer",
+        "observable"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "complex",
+      "filePath": "crates/itofin/src/patterns/lazyobject.rs",
+      "id": "class:crates/itofin/src/patterns/lazyobject.rs:LazyObject",
+      "lineRange": [
+        25,
+        32
+      ],
+      "name": "LazyObject",
+      "summary": "Core lazy-calculation state machine that memoizes results, invalidates on input change, and forwards notifications, supporting freeze/unfreeze and failure handling.",
+      "tags": [
+        "pattern",
+        "lazy-evaluation",
+        "observable"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/patterns/observable.rs",
+      "id": "class:crates/itofin/src/patterns/observable.rs:Observer",
+      "lineRange": [
+        21,
+        24
+      ],
+      "name": "Observer",
+      "summary": "Trait for objects that react to change notifications from an Observable via an update method.",
+      "tags": [
+        "pattern",
+        "type-definition",
+        "event-handler"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/patterns/observable.rs",
+      "id": "class:crates/itofin/src/patterns/observable.rs:Observable",
+      "lineRange": [
+        36,
+        38
+      ],
+      "name": "Observable",
+      "summary": "Subject that maintains a weak-reference observer list and notifies them of changes, with idempotent registration and automatic pruning of dropped observers.",
+      "tags": [
+        "pattern",
+        "observable",
+        "event-handler"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/patterns/visitor.rs",
+      "id": "class:crates/itofin/src/patterns/visitor.rs:Visitor",
+      "lineRange": [
+        18,
+        21
+      ],
+      "name": "Visitor",
+      "summary": "Generic visitor trait exposing a single visit method for double-dispatch over visited types.",
+      "tags": [
+        "pattern",
+        "type-definition",
+        "visitor"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/settings.rs",
+      "id": "class:crates/itofin/src/settings.rs:Settings",
+      "lineRange": [
+        21,
+        27
+      ],
+      "name": "Settings",
+      "summary": "Global pricing settings holding the evaluation date and reference-date/cash-flow/fixing flags, with an observable for evaluation-date changes.",
+      "tags": [
+        "config",
+        "singleton",
+        "data-model"
+      ],
+      "type": "class"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/patterns/lazyobject.rs",
+      "id": "function:crates/itofin/src/patterns/lazyobject.rs:on_update",
+      "lineRange": [
+        75,
+        91
+      ],
+      "name": "on_update",
+      "summary": "Handles an incoming input-change notification: invalidates the cached result and conditionally forwards the notification downstream based on freeze/forward policy.",
+      "tags": [
+        "event-handler",
+        "lazy-evaluation",
+        "observable"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/patterns/lazyobject.rs",
+      "id": "function:crates/itofin/src/patterns/lazyobject.rs:calculate",
+      "lineRange": [
+        98,
+        111
+      ],
+      "name": "calculate",
+      "summary": "Runs the supplied calculation closure once when not yet calculated, caching the result and recording failure state.",
+      "tags": [
+        "lazy-evaluation",
+        "core",
+        "memoization"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/patterns/lazyobject.rs",
+      "id": "function:crates/itofin/src/patterns/lazyobject.rs:recalculate",
+      "lineRange": [
+        117,
+        126
+      ],
+      "name": "recalculate",
+      "summary": "Forces recomputation by re-running the calculation closure and notifying observers even when the perform step fails.",
+      "tags": [
+        "lazy-evaluation",
+        "core",
+        "event-handler"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/patterns/observable.rs",
+      "id": "function:crates/itofin/src/patterns/observable.rs:unregister_observer",
+      "lineRange": [
+        64,
+        76
+      ],
+      "name": "unregister_observer",
+      "summary": "Removes a specific observer from the subject's list by weak-pointer identity while pruning dead weak references.",
+      "tags": [
+        "observable",
+        "event-handler",
+        "core"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "moderate",
+      "filePath": "crates/itofin/src/patterns/observable.rs",
+      "id": "function:crates/itofin/src/patterns/observable.rs:notify_observers",
+      "lineRange": [
+        84,
+        93
+      ],
+      "name": "notify_observers",
+      "summary": "Snapshots and upgrades the live observer list and invokes update on each, tolerating observers registered during notification.",
+      "tags": [
+        "observable",
+        "event-handler",
+        "core"
+      ],
+      "type": "function"
+    },
+    {
+      "complexity": "simple",
+      "filePath": "crates/itofin/src/settings.rs",
+      "id": "function:crates/itofin/src/settings.rs:set_evaluation_date",
+      "lineRange": [
+        57,
+        65
+      ],
+      "name": "set_evaluation_date",
+      "summary": "Sets the global evaluation date and notifies registered observers only when the date actually changes.",
+      "tags": [
+        "config",
+        "event-handler",
+        "observable"
+      ],
+      "type": "function"
+    }
+  ]
+}

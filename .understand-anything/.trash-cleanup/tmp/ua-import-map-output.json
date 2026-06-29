@@ -1,0 +1,167 @@
+{
+  "importMap": {
+    ".dockerignore": [],
+    ".github/copilot-instructions.md": [],
+    ".github/images/README.md": [],
+    ".github/images/prek/Dockerfile": [],
+    ".github/images/prek/build.sh": [],
+    ".github/labeler.yml": [],
+    ".github/workflows/pull-request.yml": [],
+    ".github/workflows/semantic-release.yml": [],
+    ".pre-commit-config.yaml": [],
+    ".releaserc.json": [],
+    ".understand-anything/.understandignore": [],
+    ".understand-anything/config.json": [],
+    "Cargo.toml": [],
+    "README.md": [],
+    "TICKETS.md": [],
+    "crates/itofin/Cargo.toml": [],
+    "crates/itofin/src/errors.rs": [],
+    "crates/itofin/src/handle.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/patterns/observable.rs",
+      "crates/itofin/src/shared.rs"
+    ],
+    "crates/itofin/src/lib.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/handle.rs",
+      "crates/itofin/src/math/mod.rs",
+      "crates/itofin/src/patterns/mod.rs",
+      "crates/itofin/src/settings.rs",
+      "crates/itofin/src/shared.rs",
+      "crates/itofin/src/types.rs",
+      "crates/itofin/src/utilities/mod.rs"
+    ],
+    "crates/itofin/src/math/array.rs": [
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/beta.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/math/gammafunction.rs",
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/distributions/binomial.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/math/beta.rs",
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/distributions/chisquare.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/distributions/gamma.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/math/incompletegamma.rs",
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/distributions/mod.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/math/distributions/binomial.rs",
+      "crates/itofin/src/math/distributions/chisquare.rs",
+      "crates/itofin/src/math/distributions/gamma.rs",
+      "crates/itofin/src/math/distributions/normal.rs",
+      "crates/itofin/src/math/distributions/poisson.rs",
+      "crates/itofin/src/math/distributions/studentt.rs",
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/distributions/normal.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/math/errorfunction.rs",
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/distributions/poisson.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/distributions/studentt.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/math/beta.rs",
+      "crates/itofin/src/math/gammafunction.rs",
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/errorfunction.rs": [
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/gammafunction.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/incompletegamma.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/math/gammafunction.rs",
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/interpolations/linear.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/math/interpolations/mod.rs",
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/interpolations/mod.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/math/interpolations/linear.rs",
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/matrix.rs": [
+      "crates/itofin/src/math/array.rs",
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/math/mod.rs": [
+      "crates/itofin/src/math/array.rs",
+      "crates/itofin/src/math/beta.rs",
+      "crates/itofin/src/math/distributions/mod.rs",
+      "crates/itofin/src/math/errorfunction.rs",
+      "crates/itofin/src/math/gammafunction.rs",
+      "crates/itofin/src/math/incompletegamma.rs",
+      "crates/itofin/src/math/interpolations/mod.rs",
+      "crates/itofin/src/math/matrix.rs"
+    ],
+    "crates/itofin/src/patterns/lazyobject.rs": [
+      "crates/itofin/src/errors.rs",
+      "crates/itofin/src/patterns/observable.rs",
+      "crates/itofin/src/shared.rs"
+    ],
+    "crates/itofin/src/patterns/mod.rs": [
+      "crates/itofin/src/patterns/lazyobject.rs",
+      "crates/itofin/src/patterns/observable.rs",
+      "crates/itofin/src/patterns/visitor.rs"
+    ],
+    "crates/itofin/src/patterns/observable.rs": [
+      "crates/itofin/src/shared.rs"
+    ],
+    "crates/itofin/src/patterns/visitor.rs": [],
+    "crates/itofin/src/settings.rs": [
+      "crates/itofin/src/patterns/observable.rs",
+      "crates/itofin/src/shared.rs"
+    ],
+    "crates/itofin/src/shared.rs": [],
+    "crates/itofin/src/types.rs": [],
+    "crates/itofin/src/utilities/clone.rs": [],
+    "crates/itofin/src/utilities/dataformatters.rs": [
+      "crates/itofin/src/types.rs",
+      "crates/itofin/src/utilities/null.rs"
+    ],
+    "crates/itofin/src/utilities/mod.rs": [
+      "crates/itofin/src/utilities/clone.rs",
+      "crates/itofin/src/utilities/dataformatters.rs",
+      "crates/itofin/src/utilities/null.rs",
+      "crates/itofin/src/utilities/steppingiterator.rs"
+    ],
+    "crates/itofin/src/utilities/null.rs": [
+      "crates/itofin/src/types.rs"
+    ],
+    "crates/itofin/src/utilities/steppingiterator.rs": [
+      "crates/itofin/src/types.rs"
+    ],
+    "rust-toolchain.toml": [],
+    "scripts/check_extension.sh": [],
+    "scripts/hadolint.sh": [],
+    "scripts/hadolint.yml": [],
+    "scripts/init.sh": []
+  },
+  "scriptCompleted": true,
+  "stats": {
+    "filesScanned": 52,
+    "filesWithImports": 26,
+    "totalEdges": 79
+  }
+}

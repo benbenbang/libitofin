@@ -1,0 +1,35 @@
+{
+  "batchFiles": [
+    {
+      "fileCategory": "script",
+      "language": "shell",
+      "path": "scripts/check_extension.sh",
+      "sizeLines": 15
+    },
+    {
+      "fileCategory": "script",
+      "language": "shell",
+      "path": "scripts/hadolint.sh",
+      "sizeLines": 101
+    },
+    {
+      "fileCategory": "config",
+      "language": "yaml",
+      "path": "scripts/hadolint.yml",
+      "sizeLines": 8
+    },
+    {
+      "fileCategory": "script",
+      "language": "shell",
+      "path": "scripts/init.sh",
+      "sizeLines": 27
+    }
+  ],
+  "batchImportData": {
+    "scripts/check_extension.sh": [],
+    "scripts/hadolint.sh": [],
+    "scripts/hadolint.yml": [],
+    "scripts/init.sh": []
+  },
+  "projectRoot": "/Users/bn/Git/benbenbang/ito-fin"
+}
