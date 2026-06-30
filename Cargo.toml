@@ -1,6 +1,9 @@
 [workspace]
 resolver = "3"
 members = ["crates/*"]
+# `crates/worktrees` is a tooling-created directory for git worktrees, not a
+# crate; exclude it so the `crates/*` glob does not try to load it as a member.
+exclude = ["crates/worktrees"]
 
 [workspace.package]
 version = "0.1.0"
