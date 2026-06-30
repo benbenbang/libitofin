@@ -367,30 +367,73 @@ where
 /// a [`Function1D`] rather than a bare value closure. It still reuses the shared
 /// bracketing helpers for the auto-bracketing and bracket-validation phases.
 pub trait DerivativeSolver {
+    /// The shared configuration (evaluation cap, domain bounds).
+    fn config(&self) -> &SolverConfig;
+
+    /// Refine an already-bracketed root of `g` to the given `accuracy`, with the
+    /// bracket invariants documented on [`Solver1DState`] guaranteed by the driver
+    /// (the derivative-solver analogue of [`Solver1D::solve_impl`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the refinement exhausts the evaluation budget or the
+    /// method cannot proceed (e.g. a pure Newton step leaves the bracket).
+    fn refine<G: Function1D>(
+        &self,
+        g: &mut G,
+        accuracy: Real,
+        state: Solver1DState,
+    ) -> QlResult<Real>;
+
     /// Find a zero of `g` near `guess`, auto-bracketing in steps of `step`.
     ///
     /// # Errors
     ///
-    /// Returns an error if `accuracy <= 0`, no bracket is found, the refinement
-    /// exhausts the evaluation budget, or the method leaves the bracket / hits an
-    /// unusable derivative.
-    fn solve<G: Function1D>(&self, g: G, accuracy: Real, guess: Real, step: Real)
-    -> QlResult<Real>;
+    /// Returns an error if `accuracy <= 0`, no bracket is found, or [`refine`](Self::refine) fails.
+    fn solve<G: Function1D>(
+        &self,
+        mut g: G,
+        accuracy: Real,
+        guess: Real,
+        step: Real,
+    ) -> QlResult<Real> {
+        if accuracy <= 0.0 {
+            fail!("accuracy ({accuracy}) must be positive");
+        }
+        let accuracy = accuracy.max(Real::EPSILON);
+        // Bind before matching so the value-closure's borrow of `g` is released
+        // before `refine` takes `&mut g`.
+        let bracketed = bracket_by_stepping(self.config(), &mut |x| g.value(x), guess, step)?;
+        match bracketed {
+            Bracketed::Root(x) => Ok(x),
+            Bracketed::Ready(st) => self.refine(&mut g, accuracy, st),
+        }
+    }
 
     /// Find a zero of `g` in the caller-supplied bracket `[x_min, x_max]`.
     ///
     /// # Errors
     ///
-    /// As for [`solve`](DerivativeSolver::solve), plus the bracket-validation
-    /// errors of the shared driver.
+    /// As for [`solve`](Self::solve), plus the bracket-validation errors of the
+    /// shared driver.
     fn solve_bracketed<G: Function1D>(
         &self,
-        g: G,
+        mut g: G,
         accuracy: Real,
         guess: Real,
         x_min: Real,
         x_max: Real,
-    ) -> QlResult<Real>;
+    ) -> QlResult<Real> {
+        if accuracy <= 0.0 {
+            fail!("accuracy ({accuracy}) must be positive");
+        }
+        let accuracy = accuracy.max(Real::EPSILON);
+        let bracketed = bracket_given(self.config(), &mut |x| g.value(x), guess, x_min, x_max)?;
+        match bracketed {
+            Bracketed::Root(x) => Ok(x),
+            Bracketed::Ready(st) => self.refine(&mut g, accuracy, st),
+        }
+    }
 }
 
 #[cfg(test)]
