@@ -29,6 +29,11 @@ pub fn d1(x: Real) -> Real {
 pub fn d2(x: Real) -> Real {
     -2.0 * x
 }
+/// `f3'(x) = 1 / (1 + (x - 1)^2)`.
+pub fn d3(x: Real) -> Real {
+    let u = x - 1.0;
+    1.0 / (1.0 + u * u)
+}
 
 const ACCURACIES: [Real; 3] = [1.0e-4, 1.0e-6, 1.0e-8];
 
@@ -192,4 +197,17 @@ pub fn check_derivative_rejects<S: DerivativeSolver>(make: impl Fn() -> S) {
             .solve_bracketed(func1d(f1, d1), 1e-8, 5.0, 0.0, 2.0)
             .is_err()
     );
+}
+
+/// Port of `test_solver`'s `f3 = atan(x - 1)`, `guess = 1.00001` case, which
+/// forces a Newton step out of the bracket. Only safe (bisection-fallback)
+/// derivative solvers survive it; pure Newton errors instead.
+pub fn check_safe_derivative_solver<S: DerivativeSolver>(make: impl Fn() -> S) {
+    for acc in ACCURACIES {
+        let root = make().solve(func1d(f3, d3), acc, 1.00001, 0.1).unwrap();
+        assert!(
+            (root - 1.0).abs() <= acc,
+            "f3 stress: acc={acc} root={root}"
+        );
+    }
 }
