@@ -17,6 +17,7 @@ pub mod bivariatenormal;
 pub mod bivariatestudentt;
 pub mod chisquare;
 pub mod gamma;
+pub mod noncentralchisquare;
 pub mod normal;
 pub mod poisson;
 pub mod studentt;
