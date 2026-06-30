@@ -11,3 +11,4 @@ pub mod integrals;
 pub mod interpolations;
 pub mod matrix;
 pub mod solver1d;
+pub mod solvers1d;
