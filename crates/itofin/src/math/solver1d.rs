@@ -323,6 +323,76 @@ where
     Ok(Bracketed::Ready(st))
 }
 
+/// A function paired with its first derivative, the input to derivative-based
+/// solvers (mirroring QuantLib's functor with an `operator()` and a
+/// `derivative()`). Build one from a pair of closures with [`func1d`].
+///
+/// The methods take `&mut self` so a stateful functor can be used, matching the
+/// `FnMut` value closures the [`Solver1D`] drivers accept.
+pub trait Function1D {
+    /// `f(x)`.
+    fn value(&mut self, x: Real) -> Real;
+    /// `f'(x)`.
+    fn derivative(&mut self, x: Real) -> Real;
+}
+
+/// Adapt a value closure and a derivative closure into a [`Function1D`].
+pub fn func1d<F, D>(value: F, derivative: D) -> impl Function1D
+where
+    F: FnMut(Real) -> Real,
+    D: FnMut(Real) -> Real,
+{
+    struct Pair<F, D> {
+        value: F,
+        derivative: D,
+    }
+    impl<F, D> Function1D for Pair<F, D>
+    where
+        F: FnMut(Real) -> Real,
+        D: FnMut(Real) -> Real,
+    {
+        fn value(&mut self, x: Real) -> Real {
+            (self.value)(x)
+        }
+        fn derivative(&mut self, x: Real) -> Real {
+            (self.derivative)(x)
+        }
+    }
+    Pair { value, derivative }
+}
+
+/// A 1-D root finder that uses the function's derivative (Newton and friends).
+///
+/// A separate contract from [`Solver1D`]: its refinement needs `f'`, so it takes
+/// a [`Function1D`] rather than a bare value closure. It still reuses the shared
+/// bracketing helpers for the auto-bracketing and bracket-validation phases.
+pub trait DerivativeSolver {
+    /// Find a zero of `g` near `guess`, auto-bracketing in steps of `step`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `accuracy <= 0`, no bracket is found, the refinement
+    /// exhausts the evaluation budget, or the method leaves the bracket / hits an
+    /// unusable derivative.
+    fn solve<G: Function1D>(&self, g: G, accuracy: Real, guess: Real, step: Real)
+    -> QlResult<Real>;
+
+    /// Find a zero of `g` in the caller-supplied bracket `[x_min, x_max]`.
+    ///
+    /// # Errors
+    ///
+    /// As for [`solve`](DerivativeSolver::solve), plus the bracket-validation
+    /// errors of the shared driver.
+    fn solve_bracketed<G: Function1D>(
+        &self,
+        g: G,
+        accuracy: Real,
+        guess: Real,
+        x_min: Real,
+        x_max: Real,
+    ) -> QlResult<Real>;
+}
+
 #[cfg(test)]
 mod tests {
     use std::cell::Cell;
