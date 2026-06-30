@@ -145,76 +145,10 @@ pub trait Solver1D {
             fail!("accuracy ({accuracy}) must be positive");
         }
         let accuracy = accuracy.max(Real::EPSILON);
-
-        let growth_factor = 1.6;
-        let mut flipflop: i32 = -1;
-        let mut st = Solver1DState {
-            root: guess,
-            ..Default::default()
-        };
-        st.fx_max = f(st.root);
-
-        // monotonically crescent bias, as in optionValue(volatility)
-        if close(st.fx_max, 0.0) {
-            return Ok(st.root);
-        } else if st.fx_max > 0.0 {
-            st.x_min = self.config().enforce_bounds(st.root - step);
-            st.fx_min = f(st.x_min);
-            st.x_max = st.root;
-        } else {
-            st.x_min = st.root;
-            st.fx_min = st.fx_max;
-            st.x_max = self.config().enforce_bounds(st.root + step);
-            st.fx_max = f(st.x_max);
+        match bracket_by_stepping(self.config(), &mut f, guess, step)? {
+            Bracketed::Root(x) => Ok(x),
+            Bracketed::Ready(mut st) => self.solve_impl(&mut f, accuracy, &mut st),
         }
-
-        st.evaluation_number = 2;
-        while st.evaluation_number <= self.max_evaluations() {
-            if st.fx_min * st.fx_max <= 0.0 {
-                if close(st.fx_min, 0.0) {
-                    return Ok(st.x_min);
-                }
-                if close(st.fx_max, 0.0) {
-                    return Ok(st.x_max);
-                }
-                st.root = (st.x_max + st.x_min) / 2.0;
-                return self.solve_impl(&mut f, accuracy, &mut st);
-            }
-            if st.fx_min.abs() < st.fx_max.abs() {
-                st.x_min = self
-                    .config()
-                    .enforce_bounds(st.x_min + growth_factor * (st.x_min - st.x_max));
-                st.fx_min = f(st.x_min);
-            } else if st.fx_min.abs() > st.fx_max.abs() {
-                st.x_max = self
-                    .config()
-                    .enforce_bounds(st.x_max + growth_factor * (st.x_max - st.x_min));
-                st.fx_max = f(st.x_max);
-            } else if flipflop == -1 {
-                st.x_min = self
-                    .config()
-                    .enforce_bounds(st.x_min + growth_factor * (st.x_min - st.x_max));
-                st.fx_min = f(st.x_min);
-                st.evaluation_number += 1;
-                flipflop = 1;
-            } else if flipflop == 1 {
-                st.x_max = self
-                    .config()
-                    .enforce_bounds(st.x_max + growth_factor * (st.x_max - st.x_min));
-                st.fx_max = f(st.x_max);
-                flipflop = -1;
-            }
-            st.evaluation_number += 1;
-        }
-
-        fail!(
-            "unable to bracket root in {} function evaluations (last bracket attempt: f[{}, {}] -> [{}, {}])",
-            self.max_evaluations(),
-            st.x_min,
-            st.x_max,
-            st.fx_min,
-            st.fx_max
-        )
     }
 
     /// Find a zero of `f` in the caller-supplied bracket `[x_min, x_max]`, with
@@ -240,53 +174,153 @@ pub trait Solver1D {
             fail!("accuracy ({accuracy}) must be positive");
         }
         let accuracy = accuracy.max(Real::EPSILON);
-
-        let mut st = Solver1DState {
-            x_min,
-            x_max,
-            ..Default::default()
-        };
-        if st.x_min >= st.x_max {
-            fail!("invalid range: x_min ({x_min}) >= x_max ({x_max})");
+        match bracket_given(self.config(), &mut f, guess, x_min, x_max)? {
+            Bracketed::Root(x) => Ok(x),
+            Bracketed::Ready(mut st) => self.solve_impl(&mut f, accuracy, &mut st),
         }
-        if let Some(lb) = self.config().lower_bound
-            && st.x_min < lb
-        {
-            fail!("x_min ({x_min}) < enforced lower bound ({lb})");
-        }
-        if let Some(ub) = self.config().upper_bound
-            && st.x_max > ub
-        {
-            fail!("x_max ({x_max}) > enforced upper bound ({ub})");
-        }
-
-        st.fx_min = f(st.x_min);
-        if close(st.fx_min, 0.0) {
-            return Ok(st.x_min);
-        }
-        st.fx_max = f(st.x_max);
-        if close(st.fx_max, 0.0) {
-            return Ok(st.x_max);
-        }
-        st.evaluation_number = 2;
-
-        if st.fx_min * st.fx_max >= 0.0 {
-            fail!(
-                "root not bracketed: f[{x_min}, {x_max}] -> [{}, {}]",
-                st.fx_min,
-                st.fx_max
-            );
-        }
-        if guess <= st.x_min {
-            fail!("guess ({guess}) < x_min ({x_min})");
-        }
-        if guess >= st.x_max {
-            fail!("guess ({guess}) > x_max ({x_max})");
-        }
-
-        st.root = guess;
-        self.solve_impl(&mut f, accuracy, &mut st)
     }
+}
+
+/// Outcome of the bracketing phase shared by every solver's `solve` entry points.
+pub(crate) enum Bracketed {
+    /// An endpoint already lies (within tolerance) at the root.
+    Root(Real),
+    /// A valid bracket prepared for refinement by `solve_impl`.
+    Ready(Solver1DState),
+}
+
+/// Auto-bracket a root of `f` near `guess` by scanning outward in steps of
+/// `step`, clamping every expansion to `config`'s domain bounds (QuantLib's
+/// `Solver1D::solve` step routine).
+pub(crate) fn bracket_by_stepping<F>(
+    config: &SolverConfig,
+    f: &mut F,
+    guess: Real,
+    step: Real,
+) -> QlResult<Bracketed>
+where
+    F: FnMut(Real) -> Real,
+{
+    let growth_factor = 1.6;
+    let mut flipflop: i32 = -1;
+    let mut st = Solver1DState {
+        root: guess,
+        ..Default::default()
+    };
+    st.fx_max = f(st.root);
+
+    // monotonically crescent bias, as in optionValue(volatility)
+    if close(st.fx_max, 0.0) {
+        return Ok(Bracketed::Root(st.root));
+    } else if st.fx_max > 0.0 {
+        st.x_min = config.enforce_bounds(st.root - step);
+        st.fx_min = f(st.x_min);
+        st.x_max = st.root;
+    } else {
+        st.x_min = st.root;
+        st.fx_min = st.fx_max;
+        st.x_max = config.enforce_bounds(st.root + step);
+        st.fx_max = f(st.x_max);
+    }
+
+    st.evaluation_number = 2;
+    while st.evaluation_number <= config.max_evaluations {
+        if st.fx_min * st.fx_max <= 0.0 {
+            if close(st.fx_min, 0.0) {
+                return Ok(Bracketed::Root(st.x_min));
+            }
+            if close(st.fx_max, 0.0) {
+                return Ok(Bracketed::Root(st.x_max));
+            }
+            st.root = (st.x_max + st.x_min) / 2.0;
+            return Ok(Bracketed::Ready(st));
+        }
+        if st.fx_min.abs() < st.fx_max.abs() {
+            st.x_min = config.enforce_bounds(st.x_min + growth_factor * (st.x_min - st.x_max));
+            st.fx_min = f(st.x_min);
+        } else if st.fx_min.abs() > st.fx_max.abs() {
+            st.x_max = config.enforce_bounds(st.x_max + growth_factor * (st.x_max - st.x_min));
+            st.fx_max = f(st.x_max);
+        } else if flipflop == -1 {
+            st.x_min = config.enforce_bounds(st.x_min + growth_factor * (st.x_min - st.x_max));
+            st.fx_min = f(st.x_min);
+            st.evaluation_number += 1;
+            flipflop = 1;
+        } else if flipflop == 1 {
+            st.x_max = config.enforce_bounds(st.x_max + growth_factor * (st.x_max - st.x_min));
+            st.fx_max = f(st.x_max);
+            flipflop = -1;
+        }
+        st.evaluation_number += 1;
+    }
+
+    fail!(
+        "unable to bracket root in {} function evaluations (last bracket attempt: f[{}, {}] -> [{}, {}])",
+        config.max_evaluations,
+        st.x_min,
+        st.x_max,
+        st.fx_min,
+        st.fx_max
+    )
+}
+
+/// Validate the caller-supplied bracket `[x_min, x_max]` against `config` and
+/// `guess`, preparing it for refinement (QuantLib's bracketed `Solver1D::solve`).
+pub(crate) fn bracket_given<F>(
+    config: &SolverConfig,
+    f: &mut F,
+    guess: Real,
+    x_min: Real,
+    x_max: Real,
+) -> QlResult<Bracketed>
+where
+    F: FnMut(Real) -> Real,
+{
+    let mut st = Solver1DState {
+        x_min,
+        x_max,
+        ..Default::default()
+    };
+    if st.x_min >= st.x_max {
+        fail!("invalid range: x_min ({x_min}) >= x_max ({x_max})");
+    }
+    if let Some(lb) = config.lower_bound
+        && st.x_min < lb
+    {
+        fail!("x_min ({x_min}) < enforced lower bound ({lb})");
+    }
+    if let Some(ub) = config.upper_bound
+        && st.x_max > ub
+    {
+        fail!("x_max ({x_max}) > enforced upper bound ({ub})");
+    }
+
+    st.fx_min = f(st.x_min);
+    if close(st.fx_min, 0.0) {
+        return Ok(Bracketed::Root(st.x_min));
+    }
+    st.fx_max = f(st.x_max);
+    if close(st.fx_max, 0.0) {
+        return Ok(Bracketed::Root(st.x_max));
+    }
+    st.evaluation_number = 2;
+
+    if st.fx_min * st.fx_max >= 0.0 {
+        fail!(
+            "root not bracketed: f[{x_min}, {x_max}] -> [{}, {}]",
+            st.fx_min,
+            st.fx_max
+        );
+    }
+    if guess <= st.x_min {
+        fail!("guess ({guess}) < x_min ({x_min})");
+    }
+    if guess >= st.x_max {
+        fail!("guess ({guess}) > x_max ({x_max})");
+    }
+
+    st.root = guess;
+    Ok(Bracketed::Ready(st))
 }
 
 #[cfg(test)]
