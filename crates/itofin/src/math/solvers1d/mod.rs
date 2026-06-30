@@ -7,6 +7,7 @@ pub mod bisection;
 pub mod brent;
 pub mod falseposition;
 pub mod finitedifferencenewtonsafe;
+pub mod halley;
 pub mod newton;
 pub mod newtonsafe;
 pub mod ridder;
