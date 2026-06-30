@@ -1,5 +1,6 @@
 //! Interpolation framework and concrete interpolations from `ql/math/interpolations/`.
 
+pub mod flat;
 pub mod linear;
 
 use crate::errors::QlResult;
