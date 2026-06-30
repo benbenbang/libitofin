@@ -5,6 +5,7 @@
 
 pub mod bisection;
 pub mod brent;
+pub mod falseposition;
 
 #[cfg(test)]
 pub(crate) mod testkit;
