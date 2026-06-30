@@ -6,6 +6,7 @@
 pub mod bisection;
 pub mod brent;
 pub mod falseposition;
+pub mod ridder;
 pub mod secant;
 
 #[cfg(test)]
