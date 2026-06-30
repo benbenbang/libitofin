@@ -34,6 +34,20 @@ pub fn d3(x: Real) -> Real {
     let u = x - 1.0;
     1.0 / (1.0 + u * u)
 }
+/// `f1''(x) = 2`.
+pub fn dd1(_x: Real) -> Real {
+    2.0
+}
+/// `f2''(x) = -2`.
+pub fn dd2(_x: Real) -> Real {
+    -2.0
+}
+/// `f3''(x) = -2(x - 1) / (1 + (x - 1)^2)^2`.
+pub fn dd3(x: Real) -> Real {
+    let u = x - 1.0;
+    let d = 1.0 + u * u;
+    -2.0 * u / (d * d)
+}
 
 const ACCURACIES: [Real; 3] = [1.0e-4, 1.0e-6, 1.0e-8];
 

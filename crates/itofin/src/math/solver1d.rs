@@ -361,6 +361,56 @@ where
     Pair { value, derivative }
 }
 
+/// A [`Function1D`] that also exposes its second derivative, for solvers that use
+/// curvature (Halley). Build one from three closures with [`func2d`].
+pub trait Function2D: Function1D {
+    /// `f''(x)`.
+    fn second_derivative(&mut self, x: Real) -> Real;
+}
+
+/// Adapt value, first-derivative and second-derivative closures into a
+/// [`Function2D`].
+pub fn func2d<F, D, S>(value: F, derivative: D, second_derivative: S) -> impl Function2D
+where
+    F: FnMut(Real) -> Real,
+    D: FnMut(Real) -> Real,
+    S: FnMut(Real) -> Real,
+{
+    struct Triple<F, D, S> {
+        value: F,
+        derivative: D,
+        second_derivative: S,
+    }
+    impl<F, D, S> Function1D for Triple<F, D, S>
+    where
+        F: FnMut(Real) -> Real,
+        D: FnMut(Real) -> Real,
+        S: FnMut(Real) -> Real,
+    {
+        fn value(&mut self, x: Real) -> Real {
+            (self.value)(x)
+        }
+        fn derivative(&mut self, x: Real) -> Real {
+            (self.derivative)(x)
+        }
+    }
+    impl<F, D, S> Function2D for Triple<F, D, S>
+    where
+        F: FnMut(Real) -> Real,
+        D: FnMut(Real) -> Real,
+        S: FnMut(Real) -> Real,
+    {
+        fn second_derivative(&mut self, x: Real) -> Real {
+            (self.second_derivative)(x)
+        }
+    }
+    Triple {
+        value,
+        derivative,
+        second_derivative,
+    }
+}
+
 /// A 1-D root finder that uses the function's derivative (Newton and friends).
 ///
 /// A separate contract from [`Solver1D`]: its refinement needs `f'`, so it takes
