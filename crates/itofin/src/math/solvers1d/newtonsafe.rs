@@ -12,10 +12,7 @@
 use crate::errors::QlResult;
 use crate::fail;
 use crate::math::comparison::close;
-use crate::math::solver1d::{
-    Bracketed, DerivativeSolver, Function1D, Solver1DState, SolverConfig, bracket_by_stepping,
-    bracket_given,
-};
+use crate::math::solver1d::{DerivativeSolver, Function1D, Solver1DState, SolverConfig};
 use crate::types::Real;
 
 /// Newton-safe root finder (Newton with a bisection fallback).
@@ -49,8 +46,19 @@ impl NewtonSafe {
         self.config.upper_bound = Some(upper_bound);
         self
     }
+}
 
-    /// Safe Newton iteration on a prepared bracket.
+impl Default for NewtonSafe {
+    fn default() -> Self {
+        NewtonSafe::new()
+    }
+}
+
+impl DerivativeSolver for NewtonSafe {
+    fn config(&self) -> &SolverConfig {
+        &self.config
+    }
+
     fn refine<G: Function1D>(
         &self,
         g: &mut G,
@@ -113,53 +121,6 @@ impl NewtonSafe {
             "maximum number of function evaluations ({}) exceeded",
             self.config.max_evaluations
         )
-    }
-}
-
-impl Default for NewtonSafe {
-    fn default() -> Self {
-        NewtonSafe::new()
-    }
-}
-
-impl DerivativeSolver for NewtonSafe {
-    fn solve<G: Function1D>(
-        &self,
-        mut g: G,
-        accuracy: Real,
-        guess: Real,
-        step: Real,
-    ) -> QlResult<Real> {
-        if accuracy <= 0.0 {
-            fail!("accuracy ({accuracy}) must be positive");
-        }
-        let accuracy = accuracy.max(Real::EPSILON);
-        // Bind before matching so the value-closure's borrow of `g` is released
-        // before `refine` takes `&mut g`.
-        let bracketed = bracket_by_stepping(&self.config, &mut |x| g.value(x), guess, step)?;
-        match bracketed {
-            Bracketed::Root(x) => Ok(x),
-            Bracketed::Ready(st) => self.refine(&mut g, accuracy, st),
-        }
-    }
-
-    fn solve_bracketed<G: Function1D>(
-        &self,
-        mut g: G,
-        accuracy: Real,
-        guess: Real,
-        x_min: Real,
-        x_max: Real,
-    ) -> QlResult<Real> {
-        if accuracy <= 0.0 {
-            fail!("accuracy ({accuracy}) must be positive");
-        }
-        let accuracy = accuracy.max(Real::EPSILON);
-        let bracketed = bracket_given(&self.config, &mut |x| g.value(x), guess, x_min, x_max)?;
-        match bracketed {
-            Bracketed::Root(x) => Ok(x),
-            Bracketed::Ready(st) => self.refine(&mut g, accuracy, st),
-        }
     }
 }
 
