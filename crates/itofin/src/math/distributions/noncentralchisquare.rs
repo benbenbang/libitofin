@@ -1,17 +1,21 @@
 //! Noncentral chi-square distribution.
 //!
-//! Port of `NonCentralCumulativeChiSquareDistribution` and
-//! `NonCentralCumulativeChiSquareSankaranApprox` from
+//! Port of `NonCentralCumulativeChiSquareDistribution`,
+//! `NonCentralCumulativeChiSquareSankaranApprox` and
+//! `InverseNonCentralCumulativeChiSquareDistribution` from
 //! `ql/math/distributions/chisquaredistribution.{hpp,cpp}`: the noncentral
 //! chi-square CDF with `df` degrees of freedom and noncentrality `ncp`, via
-//! Ding's (1992) Poisson-weighted series, and Sankaran's normal-based
-//! approximation. (The inverse needs a 1D solver - QL-1.5 - and is deferred.)
+//! Ding's (1992) Poisson-weighted series, Sankaran's normal-based approximation,
+//! and the inverse CDF (a Brent search over the forward CDF).
 
 use std::f64::consts::PI;
 
 use super::normal::CumulativeNormalDistribution;
+use super::{Probability, Quantile};
 use crate::errors::QlResult;
 use crate::math::gammafunction::log_gamma;
+use crate::math::solver1d::Solver1D;
+use crate::math::solvers1d::brent::Brent;
 use crate::require;
 use crate::types::Real;
 
@@ -204,6 +208,101 @@ impl NonCentralCumulativeChiSquareSankaranApprox {
         let u = ((x / (df + ncp)).powf(h) - (1.0 + h * p * (h - 1.0 - 0.5 * (2.0 - h) * m * p)))
             / (h * (2.0 * p).sqrt() * (1.0 + 0.5 * m * p));
         CumulativeNormalDistribution::standard().value(u)
+    }
+}
+
+/// The inverse of the noncentral chi-square CDF: the quantile function.
+///
+/// Port of `InverseNonCentralCumulativeChiSquareDistribution`. There is no closed
+/// form, so it brackets the root by doubling out from the mean `df + ncp` and
+/// then refines it with a [`Brent`] search over the forward CDF.
+#[derive(Clone, Copy, Debug)]
+pub struct InverseNonCentralCumulativeChiSquareDistribution {
+    dist: NonCentralCumulativeChiSquareDistribution,
+    guess: Real,
+    max_evaluations: usize,
+    accuracy: Real,
+}
+
+impl InverseNonCentralCumulativeChiSquareDistribution {
+    /// An inverse noncentral chi-square CDF with `df` degrees of freedom and
+    /// noncentrality `ncp`, with `1e-8` accuracy and a budget of `100`.
+    ///
+    /// The single budget is shared (as in QuantLib) between the bracketing
+    /// doublings and the Brent search. We deviate from QuantLib's default of `10`,
+    /// which is too small to converge to `1e-8` for ordinary tail probabilities
+    /// once a doubling or two has consumed part of it; `100` leaves the solver
+    /// ample room while still stopping the doublings as soon as the CDF reaches
+    /// `p`. Override either via [`with_max_evaluations`](Self::with_max_evaluations)
+    /// / [`with_accuracy`](Self::with_accuracy).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless `df` is finite and `> 0` and `ncp` is finite and
+    /// `>= 0`.
+    pub fn new(df: Real, ncp: Real) -> QlResult<Self> {
+        Ok(InverseNonCentralCumulativeChiSquareDistribution {
+            dist: NonCentralCumulativeChiSquareDistribution::new(df, ncp)?,
+            guess: df + ncp,
+            max_evaluations: 100,
+            accuracy: 1e-8,
+        })
+    }
+
+    /// Set the number of bracketing doublings and the Brent evaluation budget.
+    pub fn with_max_evaluations(mut self, max_evaluations: usize) -> Self {
+        self.max_evaluations = max_evaluations;
+        self
+    }
+
+    /// Set the root-finding accuracy.
+    pub fn with_accuracy(mut self, accuracy: Real) -> Self {
+        self.accuracy = accuracy;
+        self
+    }
+}
+
+impl Quantile for InverseNonCentralCumulativeChiSquareDistribution {
+    /// The smallest `x` with `cdf(x) >= p`, found by bracketing then Brent.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the interior Brent search fails to bracket or converge.
+    fn quantile(&self, p: Probability) -> QlResult<Real> {
+        let x = p.value();
+        // The generalized inverse maps the closed endpoints to the support
+        // [0, +inf), as in the Poisson and Student-t inverses. Without this, p = 1
+        // drives the bracketing to cdf(y) - 1 < 0 everywhere ("root not bracketed").
+        if x == 0.0 {
+            return Ok(0.0);
+        }
+        if x == 1.0 {
+            return Ok(Real::INFINITY);
+        }
+
+        // Find the right end of the bracket: double out from the mean until the
+        // CDF reaches x (or the doubling budget is spent).
+        let mut upper = self.guess;
+        let mut evaluations = self.max_evaluations;
+        while self.dist.value(upper) < x && evaluations > 0 {
+            upper *= 2.0;
+            evaluations -= 1;
+        }
+        // The left end is 0 if no doubling was needed, else the prior upper.
+        let lower = if evaluations == self.max_evaluations {
+            0.0
+        } else {
+            0.5 * upper
+        };
+
+        let mut solver = Brent::new().with_max_evaluations(evaluations);
+        solver.solve_bracketed(
+            |y| self.dist.value(y) - x,
+            self.accuracy,
+            0.75 * upper,
+            lower,
+            upper,
+        )
     }
 }
 
@@ -444,5 +543,58 @@ mod tests {
         assert!(NonCentral::new(2.0, -0.5).is_err());
         assert!(NonCentral::new(Real::NAN, 1.0).is_err());
         assert!(Sankaran::new(2.0, Real::INFINITY).is_err());
+    }
+
+    type InverseNonCentral = InverseNonCentralCumulativeChiSquareDistribution;
+
+    fn prob(p: Real) -> Probability {
+        Probability::try_from(p).unwrap()
+    }
+
+    // The inverse must undo the forward CDF: cdf(quantile(p)) == p. This is the
+    // natural oracle for an inverse with no closed form, and exercises the default
+    // evaluation budget (which must be large enough to converge for ordinary tails).
+    #[test]
+    fn inverse_round_trips_the_cdf() {
+        for df in [2.0, 4.0, 10.0] {
+            for ncp in [0.0, 1.0, 5.0] {
+                let fwd = NonCentral::new(df, ncp).unwrap();
+                let inv = InverseNonCentral::new(df, ncp).unwrap();
+                for p in [0.05, 0.25, 0.5, 0.75, 0.95] {
+                    let q = inv.quantile(prob(p)).unwrap();
+                    let back = fwd.value(q);
+                    assert!(
+                        (back - p).abs() < 1e-6,
+                        "df={df} ncp={ncp} p={p}: q={q} cdf(q)={back}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn inverse_is_monotone() {
+        let inv = InverseNonCentral::new(4.0, 2.0).unwrap();
+        let mut prev = 0.0;
+        for p in [0.1, 0.3, 0.5, 0.7, 0.9, 0.99] {
+            let q = inv.quantile(prob(p)).unwrap();
+            assert!(q >= prev, "not increasing at p={p}: {prev} -> {q}");
+            prev = q;
+        }
+    }
+
+    // The closed endpoints map to the support [0, +inf), matching Poisson/Student-t.
+    #[test]
+    fn inverse_endpoints_are_support_bounds() {
+        let inv = InverseNonCentral::new(4.0, 2.0).unwrap();
+        assert_eq!(inv.quantile(prob(0.0)).unwrap(), 0.0);
+        assert_eq!(inv.quantile(prob(1.0)).unwrap(), Real::INFINITY);
+    }
+
+    #[test]
+    fn inverse_rejects_invalid_parameters() {
+        assert!(InverseNonCentral::new(0.0, 1.0).is_err());
+        assert!(InverseNonCentral::new(2.0, -0.5).is_err());
+        assert!(InverseNonCentral::new(Real::INFINITY, 1.0).is_err());
     }
 }
