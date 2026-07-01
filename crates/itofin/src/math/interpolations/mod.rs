@@ -1,6 +1,7 @@
 //! Interpolation framework and concrete interpolations from `ql/math/interpolations/`.
 
 pub mod bilinear;
+pub mod cubic;
 pub mod flat;
 pub mod linear;
 pub mod loglinear;
