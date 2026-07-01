@@ -2,6 +2,7 @@
 
 pub mod flat;
 pub mod linear;
+pub mod loglinear;
 
 use crate::errors::QlResult;
 use crate::types::Real;
