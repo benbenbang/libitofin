@@ -3,8 +3,9 @@
 //! Port of `ql/errors.{hpp,cpp}` (design decision D4). QuantLib throws
 //! `QuantLib::Error` via the `QL_FAIL`, `QL_REQUIRE`, `QL_ASSERT` and
 //! `QL_ENSURE` macros; we model failures as a [`QlError`] returned through
-//! `Result<T, QlError>`, raised with the [`fail!`], [`require!`], [`assert_ql!`]
-//! and [`ensure!`] macros.
+//! `Result<T, QlError>`, raised with the [`fail!`](crate::fail),
+//! [`require!`](crate::require), [`assert_ql!`](crate::assert_ql) and
+//! [`ensure!`](crate::ensure) macros.
 
 use thiserror::Error;
 
