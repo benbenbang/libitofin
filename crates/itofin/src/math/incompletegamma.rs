@@ -12,7 +12,22 @@ use crate::math::gammafunction::log_gamma;
 use crate::types::Real;
 
 const ACCURACY: Real = 1.0e-13;
-const MAX_ITERATIONS: u32 = 100;
+
+/// Iteration cap for both the series and continued-fraction expansions.
+///
+/// QuantLib hard-codes 100 (Numerical Recipes' `ITMAX`), but near `x ≈ a` both
+/// expansions need on the order of `8·√a` terms to reach `ACCURACY`, so 100 is
+/// exceeded once `a` grows past ~150 (e.g. a central chi-square CDF with `df`
+/// above ~190) and the caller's infallible `.expect()` would panic. The cap
+/// `a + 100` provably dominates that `8·√a` requirement for every `a > 0` (the
+/// minimum of `a + 100 - 8·√a` is ~+84 at `a = 16`) with ample headroom, so a
+/// valid evaluation always converges before the cap; the cap survives only as a
+/// backstop against a non-convergent loop. The `as u32` cast saturates rather
+/// than wrapping, and the `saturating_add` keeps even an unphysically large `a`
+/// (whose cast already hit `u32::MAX`) from overflowing the `+ 100`.
+fn max_iterations(a: Real) -> u32 {
+    100u32.saturating_add(a.ceil() as u32)
+}
 
 /// The regularized lower incomplete gamma function `P(a, x)`.
 ///
@@ -61,7 +76,7 @@ fn series_repr(a: Real, x: Real) -> QlResult<Real> {
     let mut ap = a;
     let mut del = 1.0 / a;
     let mut sum = del;
-    for _ in 1..=MAX_ITERATIONS {
+    for _ in 1..=max_iterations(a) {
         ap += 1.0;
         del *= x / ap;
         sum += del;
@@ -81,7 +96,7 @@ fn continued_fraction_repr(a: Real, x: Real) -> QlResult<Real> {
     let mut c = 1.0 / eps;
     let mut d = 1.0 / b;
     let mut h = d;
-    for i in 1..=MAX_ITERATIONS {
+    for i in 1..=max_iterations(a) {
         let an = -(i as Real) * (i as Real - a);
         b += 2.0;
         d = an * d + b;
@@ -170,6 +185,19 @@ mod tests {
             assert!(cur >= prev, "not increasing at x={x}: {prev} -> {cur}");
             prev = cur;
         }
+    }
+
+    #[test]
+    fn converges_for_large_a() {
+        // Regression: with the old fixed cap of 100, both branches hit the
+        // ~8·√a iteration requirement and failed to converge for a ≳ 150.
+        // Converged values, each cross-checked to ~1e-10 against an independent
+        // high-iteration reference implementation of the same expansions.
+        // Series branch (x < a+1), x = a:
+        assert_close(incomplete_gamma(500.0, 500.0).unwrap(), 0.5059471460854907);
+        assert_close(incomplete_gamma(200.0, 200.0).unwrap(), 0.5094034179355048);
+        // Continued-fraction branch (x >= a+1) with large a near the boundary.
+        assert_close(incomplete_gamma(500.0, 600.0).unwrap(), 0.9999877440576714);
     }
 
     #[test]
