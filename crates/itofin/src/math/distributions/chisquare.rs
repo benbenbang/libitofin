@@ -104,6 +104,32 @@ mod tests {
     }
 
     #[test]
+    fn large_df_near_mean_does_not_panic() {
+        // Regression (#92): df above ~190 drove the underlying incomplete_gamma
+        // series past its old 100-iteration cap and the infallible cdf panicked.
+        // At the mean the chi-square CDF is just above 0.5 (right-skewed => mean
+        // above median). Reference value 0.505947 (df = 1000) cross-checked with
+        // the Wilson-Hilferty approximation (0.5059).
+        let d1000 = CumulativeChiSquareDistribution::new(1000.0).unwrap();
+        assert!((d1000.cdf(1000.0) - 0.5059471460854907).abs() < 1e-12);
+        assert!((d1000.cdf(1200.0) - 0.9999877440576714).abs() < 1e-12);
+
+        // Sweep the mean region for several large df: in range and monotone.
+        for df in [400.0, 1000.0, 5000.0] {
+            let dist = CumulativeChiSquareDistribution::new(df).unwrap();
+            let mut prev = 0.0;
+            let mut x = 0.5 * df;
+            while x <= 1.5 * df {
+                let p = dist.cdf(x);
+                assert!((0.0..=1.0).contains(&p), "cdf({x}) = {p} for df={df}");
+                assert!(p >= prev, "not increasing at x={x} for df={df}");
+                prev = p;
+                x += 0.02 * df;
+            }
+        }
+    }
+
+    #[test]
     fn nan_x_is_nan() {
         assert!(
             CumulativeChiSquareDistribution::new(3.0)
