@@ -25,6 +25,15 @@ pub enum CubicDerivativeApprox {
     /// Kruger approximation (local, monotonic): a harmonic-style blend that
     /// zeroes the derivative where the slope changes sign.
     Kruger,
+    /// Fritsch-Butland approximation (local, non-linear): a weighted harmonic
+    /// mean of adjacent slopes. Monotone for monotone data, but the raw
+    /// approximation is not monotone at extrema (QuantLib's convenience class
+    /// pairs it with the Hyman filter, which lands in a later layer).
+    FritschButland,
+    /// Weighted harmonic mean approximation (local, monotonic, non-linear):
+    /// distance-weighted harmonic mean of adjacent slopes, zeroed where the
+    /// slope changes sign, with the end slopes clamped against overshoot.
+    Harmonic,
 }
 
 /// Boundary condition for the (non-local) spline schemes. Its shape is final;
@@ -234,6 +243,55 @@ fn node_derivatives(da: CubicDerivativeApprox, dx: &[Real], s: &[Real]) -> Vec<R
             d[0] = (3.0 * s[0] - d[1]) / 2.0;
             d[n - 1] = (3.0 * s[n - 2] - d[n - 2]) / 2.0;
         }
+        CubicDerivativeApprox::FritschButland => {
+            for i in 1..n - 1 {
+                let s_min = s[i - 1].min(s[i]);
+                let s_max = s[i - 1].max(s[i]);
+                d[i] = if s_max + 2.0 * s_min == 0.0 {
+                    // Degenerate denominator: QuantLib falls back to signed
+                    // extremes (QL_MIN_REAL / QL_MAX_REAL) or zero.
+                    if s_min * s_max < 0.0 {
+                        Real::MIN
+                    } else if s_min * s_max == 0.0 {
+                        0.0
+                    } else {
+                        Real::MAX
+                    }
+                } else {
+                    3.0 * s_min * s_max / (s_max + 2.0 * s_min)
+                };
+            }
+            // end points reuse the parabolic estimate
+            d[0] = ((2.0 * dx[0] + dx[1]) * s[0] - dx[0] * s[1]) / (dx[0] + dx[1]);
+            d[n - 1] = ((2.0 * dx[n - 2] + dx[n - 3]) * s[n - 2] - dx[n - 2] * s[n - 3])
+                / (dx[n - 2] + dx[n - 3]);
+        }
+        CubicDerivativeApprox::Harmonic => {
+            for i in 1..n - 1 {
+                let w1 = 2.0 * dx[i] + dx[i - 1];
+                let w2 = dx[i] + 2.0 * dx[i - 1];
+                d[i] = if s[i - 1] * s[i] <= 0.0 {
+                    // slope changes sign at the point
+                    0.0
+                } else {
+                    (w1 + w2) / (w1 / s[i - 1] + w2 / s[i])
+                };
+            }
+            // end points: parabolic estimate, clamped against overshoot
+            d[0] = ((2.0 * dx[0] + dx[1]) * s[0] - dx[0] * s[1]) / (dx[1] + dx[0]);
+            if d[0] * s[0] < 0.0 {
+                d[0] = 0.0;
+            } else if s[0] * s[1] < 0.0 && d[0].abs() > (3.0 * s[0]).abs() {
+                d[0] = 3.0 * s[0];
+            }
+            d[n - 1] = ((2.0 * dx[n - 2] + dx[n - 3]) * s[n - 2] - dx[n - 2] * s[n - 3])
+                / (dx[n - 3] + dx[n - 2]);
+            if d[n - 1] * s[n - 2] < 0.0 {
+                d[n - 1] = 0.0;
+            } else if s[n - 2] * s[n - 3] < 0.0 && d[n - 1].abs() > (3.0 * s[n - 2]).abs() {
+                d[n - 1] = 3.0 * s[n - 2];
+            }
+        }
     }
     d
 }
@@ -301,6 +359,24 @@ impl KrugerCubicInterpolation {
     }
 }
 
+/// Harmonic cubic interpolation (local, monotonic).
+///
+/// QuantLib's `FritschButlandCubic` convenience type pairs the FritschButland
+/// scheme with the Hyman monotonicity filter, so its factory lands with the
+/// Hyman layer; the raw scheme is reachable now via
+/// [`CubicDerivativeApprox::FritschButland`].
+pub struct HarmonicCubicInterpolation;
+
+impl HarmonicCubicInterpolation {
+    /// Builds a Harmonic cubic interpolation through `(x, y)`.
+    // A factory for the underlying CubicInterpolation, mirroring QuantLib's
+    // convenience subclasses, so it deliberately does not return Self.
+    #[allow(clippy::new_ret_no_self)]
+    pub fn new(x: Vec<Real>, y: Vec<Real>) -> QlResult<CubicInterpolation> {
+        CubicInterpolation::new(x, y, CubicDerivativeApprox::Harmonic)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -358,6 +434,33 @@ mod tests {
         // is the harmonic mean 2/(1/0.5 + 1/1.5) = 0.75.
         let g = KrugerCubicInterpolation::new(vec![0.0, 1.0, 2.0], vec![0.0, 0.5, 2.0]).unwrap();
         assert_close(g.derivative(1.0).unwrap(), 0.75);
+    }
+
+    #[test]
+    fn harmonic_and_fritsch_butland_node_derivatives() {
+        // x = [0,1,3], y = [0,1,4]: dx = [1,2], S = [1, 1.5]. At the interior
+        // node the Harmonic weights are w1 = 5, w2 = 4, giving
+        // (5+4)/(5/1 + 4/1.5) = 27/23; Fritsch-Butland gives 3*1*1.5/3.5 = 9/7.
+        let h = HarmonicCubicInterpolation::new(vec![0.0, 1.0, 3.0], vec![0.0, 1.0, 4.0]).unwrap();
+        assert_close(h.value(1.0).unwrap(), 1.0);
+        assert_close(h.derivative(1.0).unwrap(), 27.0 / 23.0);
+        let fb = CubicInterpolation::new(
+            vec![0.0, 1.0, 3.0],
+            vec![0.0, 1.0, 4.0],
+            CubicDerivativeApprox::FritschButland,
+        )
+        .unwrap();
+        assert_close(fb.value(1.0).unwrap(), 1.0);
+        assert_close(fb.derivative(1.0).unwrap(), 9.0 / 7.0);
+    }
+
+    #[test]
+    fn harmonic_zeroes_derivative_at_sign_change() {
+        // y = [0, 1, 0]: S[0]=1, S[1]=-1 (product < 0), so the interior derivative
+        // is zeroed and the sample passes through the nodes.
+        let h = HarmonicCubicInterpolation::new(vec![0.0, 1.0, 2.0], vec![0.0, 1.0, 0.0]).unwrap();
+        assert_close(h.value(1.0).unwrap(), 1.0);
+        assert_close(h.derivative(1.0).unwrap(), 0.0);
     }
 
     #[test]
