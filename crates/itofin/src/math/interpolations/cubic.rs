@@ -39,6 +39,11 @@ pub enum CubicDerivativeApprox {
     /// exact-equality special case where consecutive slopes coincide. Needs at
     /// least 4 points; the two nodes on each end use distinct bespoke formulas.
     Akima,
+    /// Cubic spline (non-local, `C^2`): node derivatives solve a tridiagonal
+    /// system, so the second derivative is continuous. This layer supports only
+    /// the natural spline (`SecondDerivative` boundary, value 0); other boundary
+    /// conditions error until they are ported.
+    Spline,
 }
 
 /// Boundary condition for the (non-local) spline schemes. Its shape is final;
@@ -53,9 +58,9 @@ enum CubicBoundaryCondition {
     Lagrange,
 }
 
-/// The full cubic configuration. Its shape is final from day one; `monotonic`
-/// and the boundary conditions are inert until the Hyman and spline layers
-/// consume them, so they are allowed to sit unread for now.
+/// The full cubic configuration. The spline scheme now consumes the boundary
+/// fields; only `monotonic` stays inert until the Hyman layer, so the struct
+/// keeps a `dead_code` allowance for that one field.
 #[derive(Clone, Copy, Debug)]
 #[allow(dead_code)]
 struct CubicConfig {
@@ -68,8 +73,9 @@ struct CubicConfig {
 }
 
 impl CubicConfig {
-    /// The QuantLib `Cubic` defaults, specialized to a derivative scheme.
-    fn local(da: CubicDerivativeApprox) -> Self {
+    /// The QuantLib `Cubic` defaults, specialized to a derivative scheme
+    /// (natural `SecondDerivative` boundaries, value 0, non-monotonic).
+    fn defaults(da: CubicDerivativeApprox) -> Self {
         CubicConfig {
             da,
             monotonic: false,
@@ -97,7 +103,7 @@ impl CubicInterpolation {
     /// `da`. The `x` values must be strictly increasing with at least two
     /// points.
     pub fn new(x: Vec<Real>, y: Vec<Real>, da: CubicDerivativeApprox) -> QlResult<Self> {
-        Self::build(x, y, CubicConfig::local(da))
+        Self::build(x, y, CubicConfig::defaults(da))
     }
 
     fn build(x: Vec<Real>, y: Vec<Real>, config: CubicConfig) -> QlResult<Self> {
@@ -144,7 +150,7 @@ impl CubicInterpolation {
             s[i] = (y[i + 1] - y[i]) / dx[i];
         }
 
-        let d = node_derivatives(config.da, &dx, &s);
+        let d = node_derivatives(&config, &dx, &s)?;
 
         let mut a = vec![0.0; n - 1];
         let mut b = vec![0.0; n - 1];
@@ -223,17 +229,25 @@ impl CubicInterpolation {
     }
 }
 
-/// The node first-derivatives for a local scheme, given segment widths `dx` and
-/// secant slopes `s` (both length `n-1`). Returns a length-`n` vector.
-fn node_derivatives(da: CubicDerivativeApprox, dx: &[Real], s: &[Real]) -> Vec<Real> {
+/// The node first-derivatives for a scheme, given segment widths `dx` and
+/// secant slopes `s` (both length `n-1`). Returns a length-`n` vector. Fails
+/// only for the spline schemes (singular system or an unsupported boundary
+/// condition); the local schemes are infallible.
+fn node_derivatives(config: &CubicConfig, dx: &[Real], s: &[Real]) -> QlResult<Vec<Real>> {
     let n = dx.len() + 1;
     // Two points degenerate to the single secant slope for every scheme.
     if n == 2 {
-        return vec![s[0], s[0]];
+        return Ok(vec![s[0], s[0]]);
+    }
+    // The spline is non-local: it solves a tridiagonal system rather than a
+    // per-node formula, so it is dispatched before the local match.
+    if config.da == CubicDerivativeApprox::Spline {
+        return spline_node_derivatives(config, dx, s);
     }
 
     let mut d = vec![0.0; n];
-    match da {
+    match config.da {
+        CubicDerivativeApprox::Spline => unreachable!("spline dispatched before the local match"),
         CubicDerivativeApprox::Parabolic => {
             for i in 1..n - 1 {
                 d[i] = (dx[i - 1] * s[i] + dx[i] * s[i - 1]) / (dx[i] + dx[i - 1]);
@@ -370,7 +384,82 @@ fn node_derivatives(da: CubicDerivativeApprox, dx: &[Real], s: &[Real]) -> Vec<R
             };
         }
     }
-    d
+    Ok(d)
+}
+
+/// Node first-derivatives for a cubic spline: build and solve the tridiagonal
+/// system `L d = rhs` (QuantLib's `TridiagonalOperator`). Interior rows are
+/// standard; the first and last rows encode the boundary conditions. Only the
+/// `SecondDerivative` condition is supported here.
+fn spline_node_derivatives(config: &CubicConfig, dx: &[Real], s: &[Real]) -> QlResult<Vec<Real>> {
+    if config.left_cond != CubicBoundaryCondition::SecondDerivative
+        || config.right_cond != CubicBoundaryCondition::SecondDerivative
+    {
+        fail!("only the SecondDerivative spline boundary condition is implemented yet");
+    }
+
+    let n = dx.len() + 1;
+    let mut lower = vec![0.0; n - 1];
+    let mut diag = vec![0.0; n];
+    let mut upper = vec![0.0; n - 1];
+    let mut rhs = vec![0.0; n];
+
+    // interior rows: L[i] = (dx[i], 2(dx[i]+dx[i-1]), dx[i-1])
+    for i in 1..n - 1 {
+        lower[i - 1] = dx[i];
+        diag[i] = 2.0 * (dx[i] + dx[i - 1]);
+        upper[i] = dx[i - 1];
+        rhs[i] = 3.0 * (dx[i] * s[i - 1] + dx[i - 1] * s[i]);
+    }
+
+    // SecondDerivative boundary rows (value is the target second derivative).
+    diag[0] = 2.0;
+    upper[0] = 1.0;
+    rhs[0] = 3.0 * s[0] - config.left_value * dx[0] / 2.0;
+    lower[n - 2] = 1.0;
+    diag[n - 1] = 2.0;
+    rhs[n - 1] = 3.0 * s[n - 2] + config.right_value * dx[n - 2] / 2.0;
+
+    solve_tridiagonal(&lower, &diag, &upper, &rhs)
+}
+
+/// Solves the tridiagonal system `M x = rhs` by the Thomas algorithm, where `M`
+/// has sub-diagonal `lower` (length `n-1`), main diagonal `diag` (length `n`),
+/// and super-diagonal `upper` (length `n-1`). Fails on a zero pivot (singular or
+/// ill-conditioned system).
+fn solve_tridiagonal(
+    lower: &[Real],
+    diag: &[Real],
+    upper: &[Real],
+    rhs: &[Real],
+) -> QlResult<Vec<Real>> {
+    let n = diag.len();
+    // Forward elimination, carrying modified super-diagonal `cp` and rhs `dp`.
+    let mut cp = vec![0.0; n];
+    let mut dp = vec![0.0; n];
+    if diag[0] == 0.0 {
+        fail!("tridiagonal system is singular (zero pivot at row 0)");
+    }
+    cp[0] = upper[0] / diag[0];
+    dp[0] = rhs[0] / diag[0];
+    for i in 1..n {
+        let pivot = diag[i] - lower[i - 1] * cp[i - 1];
+        if pivot == 0.0 {
+            fail!("tridiagonal system is singular (zero pivot at row {i})");
+        }
+        if i < n - 1 {
+            cp[i] = upper[i] / pivot;
+        }
+        dp[i] = (rhs[i] - lower[i - 1] * dp[i - 1]) / pivot;
+    }
+
+    // Back substitution.
+    let mut x = vec![0.0; n];
+    x[n - 1] = dp[n - 1];
+    for i in (0..n - 1).rev() {
+        x[i] = dp[i] - cp[i] * x[i + 1];
+    }
+    Ok(x)
 }
 
 impl Interpolation for CubicInterpolation {
@@ -464,6 +553,20 @@ impl AkimaCubicInterpolation {
     #[allow(clippy::new_ret_no_self)]
     pub fn new(x: Vec<Real>, y: Vec<Real>) -> QlResult<CubicInterpolation> {
         CubicInterpolation::new(x, y, CubicDerivativeApprox::Akima)
+    }
+}
+
+/// Natural cubic spline (non-local, `C^2`): the spline scheme with zero second
+/// derivative at both ends.
+pub struct CubicNaturalSpline;
+
+impl CubicNaturalSpline {
+    /// Builds a natural cubic spline through `(x, y)`.
+    // A factory for the underlying CubicInterpolation, mirroring QuantLib's
+    // convenience subclasses, so it deliberately does not return Self.
+    #[allow(clippy::new_ret_no_self)]
+    pub fn new(x: Vec<Real>, y: Vec<Real>) -> QlResult<CubicInterpolation> {
+        CubicInterpolation::new(x, y, CubicDerivativeApprox::Spline)
     }
 }
 
@@ -576,9 +679,10 @@ mod tests {
         // branches without the indirection of a full x/y dataset.
         // S = [1,2,3,3,1,0.5]: branch "S[i-2]!=S[i-1], S[i]==S[i+1]" at i=2,
         // "S[i]==S[i-1]" at i=3, "S[i-2]==S[i-1], S[i]!=S[i+1]" at i=4.
+        let cfg = CubicConfig::defaults(CubicDerivativeApprox::Akima);
         let dx = vec![1.0; 6];
         let s = vec![1.0, 2.0, 3.0, 3.0, 1.0, 0.5];
-        let d = node_derivatives(CubicDerivativeApprox::Akima, &dx, &s);
+        let d = node_derivatives(&cfg, &dx, &s).unwrap();
         let oracle = [1.6, 1.75, 3.0, 3.0, 3.0, 0.6, 1.0];
         for i in 0..d.len() {
             assert_close(d[i], oracle[i]);
@@ -587,7 +691,7 @@ mod tests {
         // S = [1,1,1,2,2,-1] hits the remaining branch, the average
         // "S[i-2]==S[i-1], S[i-1]!=S[i], S[i]==S[i+1]", at i=3.
         let s2 = vec![1.0, 1.0, 1.0, 2.0, 2.0, -1.0];
-        let d2 = node_derivatives(CubicDerivativeApprox::Akima, &dx, &s2);
+        let d2 = node_derivatives(&cfg, &dx, &s2).unwrap();
         assert_close(d2[3], 1.5);
     }
 
@@ -648,5 +752,65 @@ mod tests {
         assert!(CubicInterpolation::new(vec![0.0, 1.0], vec![1.0], da).is_err());
         assert!(CubicInterpolation::new(vec![1.0, 1.0], vec![1.0, 2.0], da).is_err());
         assert!(CubicInterpolation::new(vec![0.0, Real::NAN], vec![1.0, 2.0], da).is_err());
+    }
+
+    #[test]
+    fn natural_spline_matches_reference() {
+        // x = [0,1,2,3], y = [0,1,0,1]. Reference values from an independent
+        // Thomas solve of the natural-spline system: node derivatives
+        // [5/3, -1/3, -1/3, 5/3], giving value(0.5)=0.75, value(1.5)=0.5,
+        // value(2.5)=0.25.
+        let f =
+            CubicNaturalSpline::new(vec![0.0, 1.0, 2.0, 3.0], vec![0.0, 1.0, 0.0, 1.0]).unwrap();
+        for (x, y) in [(0.0, 0.0), (1.0, 1.0), (2.0, 0.0), (3.0, 1.0)] {
+            assert_close(f.value(x).unwrap(), y);
+        }
+        assert_close(f.value(0.5).unwrap(), 0.75);
+        assert_close(f.value(1.5).unwrap(), 0.5);
+        assert_close(f.value(2.5).unwrap(), 0.25);
+        assert_close(f.derivative(0.0).unwrap(), 5.0 / 3.0);
+    }
+
+    #[test]
+    fn natural_spline_is_c2_with_zero_end_curvature() {
+        // Defining properties: zero second derivative at both ends, and the
+        // second derivative is continuous across an interior knot.
+        let f =
+            CubicNaturalSpline::new(vec![0.0, 1.0, 3.0, 4.0], vec![0.0, 2.0, 1.0, 3.0]).unwrap();
+        assert_close(f.second_derivative(0.0).unwrap(), 0.0);
+        assert_close(f.second_derivative(4.0).unwrap(), 0.0);
+        let below = f.second_derivative(1.0 - 1e-7).unwrap();
+        let above = f.second_derivative(1.0 + 1e-7).unwrap();
+        assert!(
+            (below - above).abs() < 1e-5,
+            "2nd derivative jumps: {below} vs {above}"
+        );
+    }
+
+    #[test]
+    fn spline_reproduces_linear_data() {
+        // A line has zero curvature everywhere, matching the natural boundary,
+        // so the natural spline reproduces it exactly.
+        let f =
+            CubicNaturalSpline::new(vec![0.0, 1.0, 2.0, 4.0], vec![1.0, 3.0, 5.0, 9.0]).unwrap();
+        for &x in &[0.3, 1.7, 3.5_f64] {
+            assert_close(f.value(x).unwrap(), 1.0 + 2.0 * x);
+            assert_close(f.derivative(x).unwrap(), 2.0);
+        }
+    }
+
+    #[test]
+    fn solve_tridiagonal_known_system_and_singular() {
+        // [[2,1,0],[1,4,1],[0,1,2]] x = [3,0,3] has solution [2,-1,2].
+        let x = solve_tridiagonal(&[1.0, 1.0], &[2.0, 4.0, 2.0], &[1.0, 1.0], &[3.0, 0.0, 3.0])
+            .unwrap();
+        assert_close(x[0], 2.0);
+        assert_close(x[1], -1.0);
+        assert_close(x[2], 2.0);
+        // A zero leading pivot makes the system singular.
+        assert!(solve_tridiagonal(&[1.0], &[0.0, 1.0], &[1.0], &[1.0, 1.0]).is_err());
+        // A zero pivot produced during elimination is also rejected: row 1
+        // pivot = 1 - 1*(1/1) = 0.
+        assert!(solve_tridiagonal(&[1.0], &[1.0, 1.0], &[1.0], &[1.0, 1.0]).is_err());
     }
 }
