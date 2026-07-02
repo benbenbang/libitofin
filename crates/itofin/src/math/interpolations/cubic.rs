@@ -43,7 +43,8 @@ pub enum CubicDerivativeApprox {
     /// system, so the second derivative is continuous. Boundary conditions are
     /// chosen with [`CubicInterpolation::with_boundary_conditions`]
     /// (`SecondDerivative` value 0 - the default - gives the natural spline;
-    /// `FirstDerivative` gives the clamped spline).
+    /// `FirstDerivative` gives the clamped spline; `NotAKnot` reproduces cubic
+    /// polynomials exactly).
     Spline,
 }
 
@@ -59,6 +60,11 @@ pub enum CubicBoundaryCondition {
     /// Match the first derivative (end slope) at the end; the boundary value is
     /// that slope (the clamped spline).
     FirstDerivative,
+    /// Not-a-knot: make the second (or second-to-last) point an inactive knot,
+    /// so the first two (or last two) segments share one cubic. Reproduces cubic
+    /// polynomials exactly. The boundary value is ignored. A not-a-knot end needs
+    /// at least 3 points; using it on both ends needs at least 4.
+    NotAKnot,
 }
 
 /// The full cubic configuration, retained on the interpolation so a
@@ -430,9 +436,24 @@ fn node_derivatives(config: &CubicConfig, dx: &[Real], s: &[Real]) -> QlResult<V
 /// Node first-derivatives for a cubic spline: build and solve the tridiagonal
 /// system `L d = rhs` (QuantLib's `TridiagonalOperator`). Interior rows are
 /// standard; the first and last rows encode the boundary conditions. The
-/// `SecondDerivative` and `FirstDerivative` conditions are supported here.
+/// `SecondDerivative`, `FirstDerivative`, and `NotAKnot` conditions are
+/// supported here.
 fn spline_node_derivatives(config: &CubicConfig, dx: &[Real], s: &[Real]) -> QlResult<Vec<Real>> {
     let n = dx.len() + 1;
+    // A not-a-knot end row references dx[1] / dx[n-3], so each not-a-knot side
+    // needs at least 3 points; with both ends not-a-knot the two conditions
+    // coincide on a single interior knot and the system is singular below 4
+    // points. Each boundary row is otherwise independent, so a mixed 3-point
+    // case (one not-a-knot end) is valid. QuantLib leaves both unchecked
+    // (out-of-bounds / singular); we reject them up front with a clear error.
+    let left_nak = config.left_cond == CubicBoundaryCondition::NotAKnot;
+    let right_nak = config.right_cond == CubicBoundaryCondition::NotAKnot;
+    if (left_nak || right_nak) && n < 3 {
+        fail!("the not-a-knot spline boundary condition requires at least 3 points, got {n}");
+    }
+    if left_nak && right_nak && n < 4 {
+        fail!("two not-a-knot spline boundary conditions require at least 4 points, got {n}");
+    }
     let mut lower = vec![0.0; n - 1];
     let mut diag = vec![0.0; n];
     let mut upper = vec![0.0; n - 1];
@@ -458,6 +479,11 @@ fn spline_node_derivatives(config: &CubicConfig, dx: &[Real], s: &[Real]) -> QlR
             upper[0] = 0.0;
             rhs[0] = config.left_value;
         }
+        CubicBoundaryCondition::NotAKnot => {
+            diag[0] = dx[1] * (dx[1] + dx[0]);
+            upper[0] = (dx[0] + dx[1]) * (dx[0] + dx[1]);
+            rhs[0] = s[0] * dx[1] * (2.0 * dx[1] + 3.0 * dx[0]) + s[1] * dx[0] * dx[0];
+        }
     }
 
     // Right boundary row, from right_cond.
@@ -471,6 +497,12 @@ fn spline_node_derivatives(config: &CubicConfig, dx: &[Real], s: &[Real]) -> QlR
             lower[n - 2] = 0.0;
             diag[n - 1] = 1.0;
             rhs[n - 1] = config.right_value;
+        }
+        CubicBoundaryCondition::NotAKnot => {
+            lower[n - 2] = -(dx[n - 2] + dx[n - 3]) * (dx[n - 2] + dx[n - 3]);
+            diag[n - 1] = -dx[n - 3] * (dx[n - 3] + dx[n - 2]);
+            rhs[n - 1] = -s[n - 3] * dx[n - 2] * dx[n - 2]
+                - s[n - 2] * dx[n - 3] * (3.0 * dx[n - 2] + 2.0 * dx[n - 3]);
         }
     }
 
@@ -631,6 +663,11 @@ mod tests {
     // Parabolic reproduces q(x) = 1 + 2x + 3x^2 exactly. Non-uniform nodes.
     fn q(x: Real) -> Real {
         1.0 + 2.0 * x + 3.0 * x * x
+    }
+
+    // Not-a-knot reproduces this cubic exactly (derivative 2 + 6x + 12x^2).
+    fn cubic(x: Real) -> Real {
+        1.0 + 2.0 * x + 3.0 * x * x + 4.0 * x * x * x
     }
 
     fn parabolic_sample() -> CubicInterpolation {
@@ -851,6 +888,77 @@ mod tests {
             assert_close(f.value(x).unwrap(), 1.0 + 2.0 * x);
             assert_close(f.derivative(x).unwrap(), 2.0);
         }
+    }
+
+    #[test]
+    fn notaknot_spline_reproduces_cubic() {
+        // Not-a-knot makes the end segments share a cubic, so a cubic-sampled
+        // dataset is reproduced exactly - value and derivative - on any grid.
+        let x = vec![0.0, 1.0, 2.5, 4.0, 6.0];
+        let y: Vec<Real> = x.iter().map(|&xi| cubic(xi)).collect();
+        let f = CubicNaturalSpline::new(x, y)
+            .unwrap()
+            .with_boundary_conditions(
+                CubicBoundaryCondition::NotAKnot,
+                0.0,
+                CubicBoundaryCondition::NotAKnot,
+                0.0,
+            )
+            .unwrap();
+        for &xx in &[0.0, 0.7, 2.5, 3.3, 5.1, 6.0_f64] {
+            assert_close(f.value(xx).unwrap(), cubic(xx));
+            assert_close(f.derivative(xx).unwrap(), 2.0 + 6.0 * xx + 12.0 * xx * xx);
+        }
+    }
+
+    #[test]
+    fn notaknot_point_count_guards() {
+        // Two not-a-knot ends coincide on a single interior knot at 3 points
+        // (singular), and either not-a-knot end indexes out of bounds at 2
+        // points, so both are rejected. A mixed 3-point case (one not-a-knot
+        // end) is well posed and accepted, matching QuantLib's independent rows.
+        let three = || CubicNaturalSpline::new(vec![0.0, 1.0, 2.0], vec![0.0, 1.0, 0.5]).unwrap();
+        assert!(
+            three()
+                .with_boundary_conditions(
+                    CubicBoundaryCondition::NotAKnot,
+                    0.0,
+                    CubicBoundaryCondition::NotAKnot,
+                    0.0,
+                )
+                .is_err()
+        );
+        // One not-a-knot end at 3 points is valid and passes through the nodes.
+        let mixed = three()
+            .with_boundary_conditions(
+                CubicBoundaryCondition::NotAKnot,
+                0.0,
+                CubicBoundaryCondition::SecondDerivative,
+                0.0,
+            )
+            .unwrap();
+        assert_close(mixed.value(0.0).unwrap(), 0.0);
+        assert_close(mixed.value(1.0).unwrap(), 1.0);
+        assert_close(mixed.value(2.0).unwrap(), 0.5);
+        // Either not-a-knot end at 2 points indexes out of bounds, so rejected.
+        let two = || {
+            CubicInterpolation::new(
+                vec![0.0, 1.0],
+                vec![0.0, 1.0],
+                CubicDerivativeApprox::Spline,
+            )
+            .unwrap()
+        };
+        assert!(
+            two()
+                .with_boundary_conditions(
+                    CubicBoundaryCondition::NotAKnot,
+                    0.0,
+                    CubicBoundaryCondition::SecondDerivative,
+                    0.0,
+                )
+                .is_err()
+        );
     }
 
     #[test]
