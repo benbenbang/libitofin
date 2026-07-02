@@ -43,8 +43,8 @@ pub enum CubicDerivativeApprox {
     /// system, so the second derivative is continuous. Boundary conditions are
     /// chosen with [`CubicInterpolation::with_boundary_conditions`]
     /// (`SecondDerivative` value 0 - the default - gives the natural spline;
-    /// `FirstDerivative` gives the clamped spline; `NotAKnot` reproduces cubic
-    /// polynomials exactly).
+    /// `FirstDerivative` gives the clamped spline; `NotAKnot` and `Lagrange`
+    /// reproduce cubic polynomials exactly).
     Spline,
 }
 
@@ -65,6 +65,10 @@ pub enum CubicBoundaryCondition {
     /// polynomials exactly. The boundary value is ignored. A not-a-knot end needs
     /// at least 3 points; using it on both ends needs at least 4.
     NotAKnot,
+    /// Lagrange: match the end slope to that of the cubic through the four
+    /// nearest points, so it also reproduces cubic polynomials exactly. The
+    /// boundary value is ignored, and either Lagrange end needs at least 4 points.
+    Lagrange,
 }
 
 /// The full cubic configuration, retained on the interpolation so a
@@ -161,7 +165,14 @@ impl CubicInterpolation {
             s[i] = (y[i + 1] - y[i]) / dx[i];
         }
 
-        let d = node_derivatives(&config, &dx, &s)?;
+        // The spline is non-local: it solves a tridiagonal system (and needs the
+        // node coordinates for the Lagrange boundary), so it is dispatched
+        // separately from the infallible per-node local schemes.
+        let d = if config.da == CubicDerivativeApprox::Spline {
+            spline_node_derivatives(&config, &x, &y, &dx, &s)?
+        } else {
+            node_derivatives(&config, &dx, &s)
+        };
 
         let mut a = vec![0.0; n - 1];
         let mut b = vec![0.0; n - 1];
@@ -274,26 +285,19 @@ impl CubicInterpolation {
     }
 }
 
-/// The node first-derivatives for a scheme, given segment widths `dx` and
-/// secant slopes `s` (both length `n-1`). Returns a length-`n` vector. Fails
-/// only for the spline schemes (singular system or an unsupported boundary
-/// condition); the local schemes are infallible.
-fn node_derivatives(config: &CubicConfig, dx: &[Real], s: &[Real]) -> QlResult<Vec<Real>> {
+/// The node first-derivatives for a local scheme, given segment widths `dx` and
+/// secant slopes `s` (both length `n-1`). Returns a length-`n` vector. The
+/// non-local spline is handled separately by [`spline_node_derivatives`].
+fn node_derivatives(config: &CubicConfig, dx: &[Real], s: &[Real]) -> Vec<Real> {
     let n = dx.len() + 1;
-    // The spline is non-local: it solves a tridiagonal system rather than a
-    // per-node formula (and its two-point case depends on the boundary
-    // conditions), so it is dispatched before the local shortcut and match.
-    if config.da == CubicDerivativeApprox::Spline {
-        return spline_node_derivatives(config, dx, s);
-    }
     // Two points degenerate to the single secant slope for the local schemes.
     if n == 2 {
-        return Ok(vec![s[0], s[0]]);
+        return vec![s[0], s[0]];
     }
 
     let mut d = vec![0.0; n];
     match config.da {
-        CubicDerivativeApprox::Spline => unreachable!("spline dispatched before the local match"),
+        CubicDerivativeApprox::Spline => unreachable!("spline handled by the caller"),
         CubicDerivativeApprox::Parabolic => {
             for i in 1..n - 1 {
                 d[i] = (dx[i - 1] * s[i] + dx[i] * s[i - 1]) / (dx[i] + dx[i - 1]);
@@ -430,15 +434,21 @@ fn node_derivatives(config: &CubicConfig, dx: &[Real], s: &[Real]) -> QlResult<V
             };
         }
     }
-    Ok(d)
+    d
 }
 
 /// Node first-derivatives for a cubic spline: build and solve the tridiagonal
 /// system `L d = rhs` (QuantLib's `TridiagonalOperator`). Interior rows are
 /// standard; the first and last rows encode the boundary conditions. The
-/// `SecondDerivative`, `FirstDerivative`, and `NotAKnot` conditions are
-/// supported here.
-fn spline_node_derivatives(config: &CubicConfig, dx: &[Real], s: &[Real]) -> QlResult<Vec<Real>> {
+/// `SecondDerivative`, `FirstDerivative`, `NotAKnot`, and `Lagrange` conditions
+/// are supported here (the last needs the node coordinates).
+fn spline_node_derivatives(
+    config: &CubicConfig,
+    x: &[Real],
+    y: &[Real],
+    dx: &[Real],
+    s: &[Real],
+) -> QlResult<Vec<Real>> {
     let n = dx.len() + 1;
     // A not-a-knot end row references dx[1] / dx[n-3], so each not-a-knot side
     // needs at least 3 points; with both ends not-a-knot the two conditions
@@ -453,6 +463,14 @@ fn spline_node_derivatives(config: &CubicConfig, dx: &[Real], s: &[Real]) -> QlR
     }
     if left_nak && right_nak && n < 4 {
         fail!("two not-a-knot spline boundary conditions require at least 4 points, got {n}");
+    }
+    // A Lagrange end row fits the cubic through the four nearest points, so
+    // either Lagrange side needs at least 4 points (matching QuantLib's check).
+    if (config.left_cond == CubicBoundaryCondition::Lagrange
+        || config.right_cond == CubicBoundaryCondition::Lagrange)
+        && n < 4
+    {
+        fail!("the Lagrange spline boundary condition requires at least 4 points, got {n}");
     }
     let mut lower = vec![0.0; n - 1];
     let mut diag = vec![0.0; n];
@@ -484,6 +502,15 @@ fn spline_node_derivatives(config: &CubicConfig, dx: &[Real], s: &[Real]) -> QlR
             upper[0] = (dx[0] + dx[1]) * (dx[0] + dx[1]);
             rhs[0] = s[0] * dx[1] * (2.0 * dx[1] + 3.0 * dx[0]) + s[1] * dx[0] * dx[0];
         }
+        CubicBoundaryCondition::Lagrange => {
+            diag[0] = 1.0;
+            upper[0] = 0.0;
+            rhs[0] = cubic_interpolating_polynomial_derivative(
+                [x[0], x[1], x[2], x[3]],
+                [y[0], y[1], y[2], y[3]],
+                x[0],
+            );
+        }
     }
 
     // Right boundary row, from right_cond.
@@ -504,9 +531,36 @@ fn spline_node_derivatives(config: &CubicConfig, dx: &[Real], s: &[Real]) -> QlR
             rhs[n - 1] = -s[n - 3] * dx[n - 2] * dx[n - 2]
                 - s[n - 2] * dx[n - 3] * (3.0 * dx[n - 2] + 2.0 * dx[n - 3]);
         }
+        CubicBoundaryCondition::Lagrange => {
+            lower[n - 2] = 0.0;
+            diag[n - 1] = 1.0;
+            rhs[n - 1] = cubic_interpolating_polynomial_derivative(
+                [x[n - 4], x[n - 3], x[n - 2], x[n - 1]],
+                [y[n - 4], y[n - 3], y[n - 2], y[n - 1]],
+                x[n - 1],
+            );
+        }
     }
 
     solve_tridiagonal(&lower, &diag, &upper, &rhs)
+}
+
+/// The derivative at `x` of the cubic polynomial interpolating the four points
+/// `(xs[i], ys[i])`. A literal port of QuantLib's
+/// `cubicInterpolatingPolynomialDerivative`, used to set the Lagrange end slope.
+fn cubic_interpolating_polynomial_derivative(xs: [Real; 4], ys: [Real; 4], x: Real) -> Real {
+    let [a, b, c, d] = xs;
+    let [u, v, w, z] = ys;
+    let num = (((a - c) * (b - c) * (c - x) * z - (a - d) * (b - d) * (d - x) * w)
+        * (a - x + b - x)
+        + ((a - c) * (b - c) * z - (a - d) * (b - d) * w) * (a - x) * (b - x))
+        * (a - b)
+        + ((a - c) * (a - d) * v - (b - c) * (b - d) * u) * (c - d) * (c - x) * (d - x)
+        + ((a - c) * (a - d) * (a - x) * v - (b - c) * (b - d) * (b - x) * u)
+            * (c - x + d - x)
+            * (c - d);
+    let den = (a - b) * (a - c) * (a - d) * (b - c) * (b - d) * (c - d);
+    -num / den
 }
 
 /// Solves the tridiagonal system `M x = rhs` by the Thomas algorithm, where `M`
@@ -773,7 +827,7 @@ mod tests {
         let cfg = CubicConfig::defaults(CubicDerivativeApprox::Akima);
         let dx = vec![1.0; 6];
         let s = vec![1.0, 2.0, 3.0, 3.0, 1.0, 0.5];
-        let d = node_derivatives(&cfg, &dx, &s).unwrap();
+        let d = node_derivatives(&cfg, &dx, &s);
         let oracle = [1.6, 1.75, 3.0, 3.0, 3.0, 0.6, 1.0];
         for i in 0..d.len() {
             assert_close(d[i], oracle[i]);
@@ -782,7 +836,7 @@ mod tests {
         // S = [1,1,1,2,2,-1] hits the remaining branch, the average
         // "S[i-2]==S[i-1], S[i-1]!=S[i], S[i]==S[i+1]", at i=3.
         let s2 = vec![1.0, 1.0, 1.0, 2.0, 2.0, -1.0];
-        let d2 = node_derivatives(&cfg, &dx, &s2).unwrap();
+        let d2 = node_derivatives(&cfg, &dx, &s2);
         assert_close(d2[3], 1.5);
     }
 
@@ -909,6 +963,57 @@ mod tests {
             assert_close(f.value(xx).unwrap(), cubic(xx));
             assert_close(f.derivative(xx).unwrap(), 2.0 + 6.0 * xx + 12.0 * xx * xx);
         }
+    }
+
+    #[test]
+    fn lagrange_spline_reproduces_cubic() {
+        // Lagrange matches each end slope to the cubic through the four nearest
+        // points, so a cubic-sampled dataset is reproduced exactly.
+        let x = vec![0.0, 1.0, 2.5, 4.0, 6.0];
+        let y: Vec<Real> = x.iter().map(|&xi| cubic(xi)).collect();
+        let f = CubicNaturalSpline::new(x, y)
+            .unwrap()
+            .with_boundary_conditions(
+                CubicBoundaryCondition::Lagrange,
+                0.0,
+                CubicBoundaryCondition::Lagrange,
+                0.0,
+            )
+            .unwrap();
+        for &xx in &[0.0, 0.7, 2.5, 3.3, 5.1, 6.0_f64] {
+            assert_close(f.value(xx).unwrap(), cubic(xx));
+            assert_close(f.derivative(xx).unwrap(), 2.0 + 6.0 * xx + 12.0 * xx * xx);
+        }
+    }
+
+    #[test]
+    fn cubic_interpolating_polynomial_derivative_matches_cubic() {
+        // The helper returns the exact derivative of the cubic through 4 points.
+        let (a, b, c, d) = (0.0, 1.0, 2.5, 4.0);
+        let (u, v, w, z) = (cubic(a), cubic(b), cubic(c), cubic(d));
+        for &xx in &[0.0, 1.3, 2.5, 4.0, -0.5_f64] {
+            assert_close(
+                cubic_interpolating_polynomial_derivative([a, b, c, d], [u, v, w, z], xx),
+                2.0 + 6.0 * xx + 12.0 * xx * xx,
+            );
+        }
+    }
+
+    #[test]
+    fn lagrange_requires_at_least_4_points() {
+        // Either Lagrange end fits the four nearest points, so 3 points are
+        // rejected up front.
+        let three = || CubicNaturalSpline::new(vec![0.0, 1.0, 2.0], vec![0.0, 1.0, 0.5]).unwrap();
+        assert!(
+            three()
+                .with_boundary_conditions(
+                    CubicBoundaryCondition::Lagrange,
+                    0.0,
+                    CubicBoundaryCondition::SecondDerivative,
+                    0.0,
+                )
+                .is_err()
+        );
     }
 
     #[test]
