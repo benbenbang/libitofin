@@ -3,11 +3,12 @@
 //! Port of `CubicInterpolation` from
 //! `ql/math/interpolations/cubicinterpolation.hpp`. On each segment
 //! `P_i(x) = y_i + a_i (x-x_i) + b_i (x-x_i)^2 + c_i (x-x_i)^3`, with the node
-//! first-derivatives supplied by a [`CubicDerivativeApprox`] scheme. This layer
-//! ports the coefficient/evaluation engine and the two simplest local schemes,
-//! Parabolic and Kruger. The non-local spline schemes and the Hyman
-//! monotonicity filter land in later layers; a private `CubicConfig` already
-//! carries their knobs so those layers slot in without reshaping the pipeline.
+//! first-derivatives supplied by a [`CubicDerivativeApprox`] scheme: the local
+//! schemes (Parabolic, Kruger, Fritsch-Butland, Harmonic, Akima) and the
+//! non-local cubic spline with selectable [`CubicBoundaryCondition`]s. Hyman's
+//! monotonicity filter can be layered on any scheme. The `SplineOM1`/`SplineOM2`
+//! and `FourthOrder` schemes and the `Periodic` boundary are not ported
+//! (QuantLib leaves the last two unimplemented too).
 
 use crate::errors::QlResult;
 use crate::fail;
@@ -27,8 +28,8 @@ pub enum CubicDerivativeApprox {
     Kruger,
     /// Fritsch-Butland approximation (local, non-linear): a weighted harmonic
     /// mean of adjacent slopes. Monotone for monotone data, but the raw
-    /// approximation is not monotone at extrema (QuantLib's convenience class
-    /// pairs it with the Hyman filter, which lands in a later layer).
+    /// approximation is not monotone at extrema, so [`FritschButlandCubic`]
+    /// pairs it with the Hyman filter.
     FritschButland,
     /// Weighted harmonic mean approximation (local, monotonic, non-linear):
     /// distance-weighted harmonic mean of adjacent slopes, zeroed where the
@@ -77,8 +78,6 @@ pub enum CubicBoundaryCondition {
 #[derive(Clone, Copy, Debug)]
 struct CubicConfig {
     da: CubicDerivativeApprox,
-    /// Carried through but not yet consumed; the Hyman layer will read it.
-    #[allow(dead_code)]
     monotonic: bool,
     left_cond: CubicBoundaryCondition,
     left_value: Real,
@@ -168,11 +167,16 @@ impl CubicInterpolation {
         // The spline is non-local: it solves a tridiagonal system (and needs the
         // node coordinates for the Lagrange boundary), so it is dispatched
         // separately from the infallible per-node local schemes.
-        let d = if config.da == CubicDerivativeApprox::Spline {
+        let mut d = if config.da == CubicDerivativeApprox::Spline {
             spline_node_derivatives(&config, &x, &y, &dx, &s)?
         } else {
             node_derivatives(&config, &dx, &s)
         };
+        // Hyman's filter clamps the node derivatives so the interpolant stays
+        // monotone over intervals where the data is monotone.
+        if config.monotonic {
+            apply_hyman_filter(&mut d, &dx, &s);
+        }
 
         let mut a = vec![0.0; n - 1];
         let mut b = vec![0.0; n - 1];
@@ -242,6 +246,21 @@ impl CubicInterpolation {
             left_value,
             right_cond,
             right_value,
+            ..self.config
+        };
+        let allow_extrapolation = self.allow_extrapolation;
+        let mut rebuilt = Self::build(self.x, self.y, config)?;
+        rebuilt.allow_extrapolation = allow_extrapolation;
+        Ok(rebuilt)
+    }
+
+    /// Rebuilds the interpolation with Hyman's monotonicity filter enabled or
+    /// disabled, preserving the derivative scheme, boundary conditions, and
+    /// extrapolation setting. When enabled, node derivatives are clamped so the
+    /// interpolant stays monotone over intervals where the data is monotone.
+    pub fn with_monotonicity(self, monotonic: bool) -> QlResult<Self> {
+        let config = CubicConfig {
+            monotonic,
             ..self.config
         };
         let allow_extrapolation = self.allow_extrapolation;
@@ -435,6 +454,53 @@ fn node_derivatives(config: &CubicConfig, dx: &[Real], s: &[Real]) -> Vec<Real> 
         }
     }
     d
+}
+
+/// Applies Hyman's monotonicity-constrained filter to the node derivatives `d`
+/// in place, given segment widths `dx` and secant slopes `s`. Each derivative is
+/// clamped toward the local secant so the interpolant does not overshoot where
+/// the data is monotone. A literal port of the `monotonic_` branch in QuantLib's
+/// `CubicInterpolationImpl::update`.
+fn apply_hyman_filter(d: &mut [Real], dx: &[Real], s: &[Real]) {
+    let n = d.len();
+    for i in 0..n {
+        let correction = if i == 0 {
+            if d[i] * s[0] > 0.0 {
+                d[i].signum() * d[i].abs().min((3.0 * s[0]).abs())
+            } else {
+                0.0
+            }
+        } else if i == n - 1 {
+            if d[i] * s[n - 2] > 0.0 {
+                d[i].signum() * d[i].abs().min((3.0 * s[n - 2]).abs())
+            } else {
+                0.0
+            }
+        } else {
+            let pm = (s[i - 1] * dx[i] + s[i] * dx[i - 1]) / (dx[i - 1] + dx[i]);
+            let mut m = 3.0 * s[i - 1].abs().min(s[i].abs()).min(pm.abs());
+            if i > 1 && (s[i - 1] - s[i - 2]) * (s[i] - s[i - 1]) > 0.0 {
+                let pd = (s[i - 1] * (2.0 * dx[i - 1] + dx[i - 2]) - s[i - 2] * dx[i - 1])
+                    / (dx[i - 2] + dx[i - 1]);
+                if pm * pd > 0.0 && pm * (s[i - 1] - s[i - 2]) > 0.0 {
+                    m = m.max(1.5 * pm.abs().min(pd.abs()));
+                }
+            }
+            if i < n - 2 && (s[i] - s[i - 1]) * (s[i + 1] - s[i]) > 0.0 {
+                let pu =
+                    (s[i] * (2.0 * dx[i] + dx[i + 1]) - s[i + 1] * dx[i]) / (dx[i] + dx[i + 1]);
+                if pm * pu > 0.0 && -pm * (s[i] - s[i - 1]) > 0.0 {
+                    m = m.max(1.5 * pm.abs().min(pu.abs()));
+                }
+            }
+            if d[i] * pm > 0.0 {
+                d[i].signum() * d[i].abs().min(m)
+            } else {
+                0.0
+            }
+        };
+        d[i] = correction;
+    }
 }
 
 /// Node first-derivatives for a cubic spline: build and solve the tridiagonal
@@ -666,11 +732,6 @@ impl KrugerCubicInterpolation {
 }
 
 /// Harmonic cubic interpolation (local, monotonic).
-///
-/// QuantLib's `FritschButlandCubic` convenience type pairs the FritschButland
-/// scheme with the Hyman monotonicity filter, so its factory lands with the
-/// Hyman layer; the raw scheme is reachable now via
-/// [`CubicDerivativeApprox::FritschButland`].
 pub struct HarmonicCubicInterpolation;
 
 impl HarmonicCubicInterpolation {
@@ -707,6 +768,57 @@ impl CubicNaturalSpline {
     #[allow(clippy::new_ret_no_self)]
     pub fn new(x: Vec<Real>, y: Vec<Real>) -> QlResult<CubicInterpolation> {
         CubicInterpolation::new(x, y, CubicDerivativeApprox::Spline)
+    }
+}
+
+/// Builds a monotone cubic interpolation for `da` (Hyman filter enabled).
+fn monotonic(
+    da: CubicDerivativeApprox,
+    x: Vec<Real>,
+    y: Vec<Real>,
+) -> QlResult<CubicInterpolation> {
+    CubicInterpolation::build(
+        x,
+        y,
+        CubicConfig {
+            monotonic: true,
+            ..CubicConfig::defaults(da)
+        },
+    )
+}
+
+/// Fritsch-Butland monotone cubic interpolation (the raw scheme with the Hyman
+/// filter, which the raw approximation needs to stay monotone at extrema).
+pub struct FritschButlandCubic;
+
+impl FritschButlandCubic {
+    /// Builds a Fritsch-Butland monotone cubic interpolation through `(x, y)`.
+    #[allow(clippy::new_ret_no_self)]
+    pub fn new(x: Vec<Real>, y: Vec<Real>) -> QlResult<CubicInterpolation> {
+        monotonic(CubicDerivativeApprox::FritschButland, x, y)
+    }
+}
+
+/// Parabolic monotone cubic interpolation (Parabolic scheme with the Hyman
+/// filter).
+pub struct MonotonicParabolicInterpolation;
+
+impl MonotonicParabolicInterpolation {
+    /// Builds a monotone parabolic cubic interpolation through `(x, y)`.
+    #[allow(clippy::new_ret_no_self)]
+    pub fn new(x: Vec<Real>, y: Vec<Real>) -> QlResult<CubicInterpolation> {
+        monotonic(CubicDerivativeApprox::Parabolic, x, y)
+    }
+}
+
+/// Monotone natural cubic spline (natural spline with the Hyman filter).
+pub struct MonotonicCubicNaturalSpline;
+
+impl MonotonicCubicNaturalSpline {
+    /// Builds a monotone natural cubic spline through `(x, y)`.
+    #[allow(clippy::new_ret_no_self)]
+    pub fn new(x: Vec<Real>, y: Vec<Real>) -> QlResult<CubicInterpolation> {
+        monotonic(CubicDerivativeApprox::Spline, x, y)
     }
 }
 
@@ -1174,5 +1286,124 @@ mod tests {
                 )
                 .unwrap();
         assert_close(rebuilt.value(2.0).unwrap(), before);
+    }
+
+    #[test]
+    fn hyman_clamps_fritsch_butland_peak_derivative() {
+        // Raw Fritsch-Butland at the peak of y = [0, 1, 0] gives derivative 3
+        // (non-monotone); the Hyman filter clamps it to 0, and the interpolant
+        // still passes through the nodes.
+        let f = FritschButlandCubic::new(vec![0.0, 1.0, 2.0], vec![0.0, 1.0, 0.0]).unwrap();
+        assert_close(f.value(1.0).unwrap(), 1.0);
+        assert_close(f.derivative(1.0).unwrap(), 0.0);
+    }
+
+    #[test]
+    fn monotonic_spline_removes_overshoot() {
+        // The natural spline of this monotone step overshoots below 0; the
+        // monotone variant stays non-decreasing.
+        let x = vec![0.0, 1.0, 2.0, 3.0, 4.0];
+        let y = vec![0.0, 0.0, 0.0, 1.0, 1.0];
+        let raw = CubicNaturalSpline::new(x.clone(), y.clone()).unwrap();
+        let mono = MonotonicCubicNaturalSpline::new(x, y).unwrap();
+
+        // Integer stepping keeps the samples inside [0, 4] (200 / 50 = 4 exactly).
+        let (mut raw_dips, mut prev_raw, mut prev_mono) =
+            (false, raw.value(0.0).unwrap(), mono.value(0.0).unwrap());
+        for k in 1..=200 {
+            let xx = k as Real / 50.0;
+            let (r, m) = (raw.value(xx).unwrap(), mono.value(xx).unwrap());
+            if r < prev_raw - 1e-9 {
+                raw_dips = true;
+            }
+            assert!(
+                m >= prev_mono - 1e-12,
+                "monotone spline decreased at x={xx}"
+            );
+            prev_raw = r;
+            prev_mono = m;
+        }
+        assert!(raw_dips, "expected the raw natural spline to overshoot");
+    }
+
+    #[test]
+    fn monotonicity_filter_is_noop_on_linear_data() {
+        // Linear data is already monotone, so enabling the filter changes
+        // nothing: the line is still reproduced.
+        let f = MonotonicParabolicInterpolation::new(
+            vec![0.0, 1.0, 2.0, 4.0],
+            vec![1.0, 3.0, 5.0, 9.0],
+        )
+        .unwrap();
+        for &x in &[0.3, 1.7, 3.5_f64] {
+            assert_close(f.value(x).unwrap(), 1.0 + 2.0 * x);
+            assert_close(f.derivative(x).unwrap(), 2.0);
+        }
+    }
+
+    #[test]
+    fn with_monotonicity_builder_matches_convenience_type() {
+        // The builder and the convenience factory produce the same interpolant.
+        let x = vec![0.0, 1.0, 2.0, 3.0, 4.0];
+        let y = vec![0.0, 0.0, 0.0, 1.0, 1.0];
+        let via_builder = CubicNaturalSpline::new(x.clone(), y.clone())
+            .unwrap()
+            .with_monotonicity(true)
+            .unwrap();
+        let via_factory = MonotonicCubicNaturalSpline::new(x, y).unwrap();
+        for &xx in &[0.5, 1.5, 2.5, 3.5_f64] {
+            assert_close(
+                via_builder.value(xx).unwrap(),
+                via_factory.value(xx).unwrap(),
+            );
+        }
+    }
+
+    #[test]
+    fn non_restrictive_hyman_filter() {
+        // Ported from QuantLib's testNonRestrictiveHymanFilter. On y = -x^2 over
+        // x = [-2, -2/3, 2/3, 2], the two middle nodes share y = -4/9, so the
+        // parabola humps up to 0 at x = 0 between them. The relaxed 1989 Hyman
+        // filter must not over-restrict: each monotone spline that reproduces the
+        // parabola (not-a-knot, clamped with the exact end slopes +/-4, and
+        // second-derivative with the exact y'' = -2) still yields f(0) = 0.
+        let x = vec![-2.0, -2.0 / 3.0, 2.0 / 3.0, 2.0];
+        let y: Vec<Real> = x.iter().map(|&xi| -xi * xi).collect();
+        let base = || CubicNaturalSpline::new(x.clone(), y.clone()).unwrap();
+
+        let not_a_knot = base()
+            .with_boundary_conditions(
+                CubicBoundaryCondition::NotAKnot,
+                0.0,
+                CubicBoundaryCondition::NotAKnot,
+                0.0,
+            )
+            .unwrap()
+            .with_monotonicity(true)
+            .unwrap();
+        let clamped = base()
+            .with_boundary_conditions(
+                CubicBoundaryCondition::FirstDerivative,
+                4.0,
+                CubicBoundaryCondition::FirstDerivative,
+                -4.0,
+            )
+            .unwrap()
+            .with_monotonicity(true)
+            .unwrap();
+        let second = base()
+            .with_boundary_conditions(
+                CubicBoundaryCondition::SecondDerivative,
+                -2.0,
+                CubicBoundaryCondition::SecondDerivative,
+                -2.0,
+            )
+            .unwrap()
+            .with_monotonicity(true)
+            .unwrap();
+
+        for f in [not_a_knot, clamped, second] {
+            assert!(f.value(0.0).unwrap().abs() < 1e-14);
+        }
     }
 }
