@@ -40,31 +40,35 @@ pub enum CubicDerivativeApprox {
     /// least 4 points; the two nodes on each end use distinct bespoke formulas.
     Akima,
     /// Cubic spline (non-local, `C^2`): node derivatives solve a tridiagonal
-    /// system, so the second derivative is continuous. This layer supports only
-    /// the natural spline (`SecondDerivative` boundary, value 0); other boundary
-    /// conditions error until they are ported.
+    /// system, so the second derivative is continuous. Boundary conditions are
+    /// chosen with [`CubicInterpolation::with_boundary_conditions`]
+    /// (`SecondDerivative` value 0 - the default - gives the natural spline;
+    /// `FirstDerivative` gives the clamped spline).
     Spline,
 }
 
-/// Boundary condition for the (non-local) spline schemes. Its shape is final;
-/// only the default is exercised until the spline layer consumes the rest.
+/// Boundary condition for the (non-local) spline schemes. Variants are added as
+/// they are ported, so it is `#[non_exhaustive]`: downstream matches must
+/// include a wildcard arm.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[allow(dead_code)]
-enum CubicBoundaryCondition {
-    NotAKnot,
-    FirstDerivative,
+#[non_exhaustive]
+pub enum CubicBoundaryCondition {
+    /// Match the second derivative at the end; the boundary value is that second
+    /// derivative (0 gives the natural spline).
     SecondDerivative,
-    Periodic,
-    Lagrange,
+    /// Match the first derivative (end slope) at the end; the boundary value is
+    /// that slope (the clamped spline).
+    FirstDerivative,
 }
 
-/// The full cubic configuration. The spline scheme now consumes the boundary
-/// fields; only `monotonic` stays inert until the Hyman layer, so the struct
-/// keeps a `dead_code` allowance for that one field.
+/// The full cubic configuration, retained on the interpolation so a
+/// [`CubicInterpolation::with_boundary_conditions`] change can rebuild the
+/// coefficients from the original data.
 #[derive(Clone, Copy, Debug)]
-#[allow(dead_code)]
 struct CubicConfig {
     da: CubicDerivativeApprox,
+    /// Carried through but not yet consumed; the Hyman layer will read it.
+    #[allow(dead_code)]
     monotonic: bool,
     left_cond: CubicBoundaryCondition,
     left_value: Real,
@@ -95,6 +99,7 @@ pub struct CubicInterpolation {
     b: Vec<Real>,
     c: Vec<Real>,
     primitive_const: Vec<Real>,
+    config: CubicConfig,
     allow_extrapolation: bool,
 }
 
@@ -178,6 +183,7 @@ impl CubicInterpolation {
             b,
             c,
             primitive_const,
+            config,
             allow_extrapolation: false,
         })
     }
@@ -192,6 +198,39 @@ impl CubicInterpolation {
     /// Whether extrapolation is currently permitted.
     pub fn allows_extrapolation(&self) -> bool {
         self.allow_extrapolation
+    }
+
+    /// Rebuilds the interpolation with the given spline boundary conditions,
+    /// preserving the derivative scheme and extrapolation setting. The boundary
+    /// conditions only affect the `Spline` scheme; for the local schemes they
+    /// are carried through but leave the coefficients unchanged, matching
+    /// QuantLib.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if either boundary value is not finite, which would
+    /// otherwise poison the spline's right-hand side and yield `NaN` results.
+    pub fn with_boundary_conditions(
+        self,
+        left_cond: CubicBoundaryCondition,
+        left_value: Real,
+        right_cond: CubicBoundaryCondition,
+        right_value: Real,
+    ) -> QlResult<Self> {
+        if !left_value.is_finite() || !right_value.is_finite() {
+            fail!("boundary values must be finite, got left {left_value}, right {right_value}");
+        }
+        let config = CubicConfig {
+            left_cond,
+            left_value,
+            right_cond,
+            right_value,
+            ..self.config
+        };
+        let allow_extrapolation = self.allow_extrapolation;
+        let mut rebuilt = Self::build(self.x, self.y, config)?;
+        rebuilt.allow_extrapolation = allow_extrapolation;
+        Ok(rebuilt)
     }
 
     /// The second derivative at `x`.
@@ -235,14 +274,15 @@ impl CubicInterpolation {
 /// condition); the local schemes are infallible.
 fn node_derivatives(config: &CubicConfig, dx: &[Real], s: &[Real]) -> QlResult<Vec<Real>> {
     let n = dx.len() + 1;
-    // Two points degenerate to the single secant slope for every scheme.
-    if n == 2 {
-        return Ok(vec![s[0], s[0]]);
-    }
     // The spline is non-local: it solves a tridiagonal system rather than a
-    // per-node formula, so it is dispatched before the local match.
+    // per-node formula (and its two-point case depends on the boundary
+    // conditions), so it is dispatched before the local shortcut and match.
     if config.da == CubicDerivativeApprox::Spline {
         return spline_node_derivatives(config, dx, s);
+    }
+    // Two points degenerate to the single secant slope for the local schemes.
+    if n == 2 {
+        return Ok(vec![s[0], s[0]]);
     }
 
     let mut d = vec![0.0; n];
@@ -389,15 +429,9 @@ fn node_derivatives(config: &CubicConfig, dx: &[Real], s: &[Real]) -> QlResult<V
 
 /// Node first-derivatives for a cubic spline: build and solve the tridiagonal
 /// system `L d = rhs` (QuantLib's `TridiagonalOperator`). Interior rows are
-/// standard; the first and last rows encode the boundary conditions. Only the
-/// `SecondDerivative` condition is supported here.
+/// standard; the first and last rows encode the boundary conditions. The
+/// `SecondDerivative` and `FirstDerivative` conditions are supported here.
 fn spline_node_derivatives(config: &CubicConfig, dx: &[Real], s: &[Real]) -> QlResult<Vec<Real>> {
-    if config.left_cond != CubicBoundaryCondition::SecondDerivative
-        || config.right_cond != CubicBoundaryCondition::SecondDerivative
-    {
-        fail!("only the SecondDerivative spline boundary condition is implemented yet");
-    }
-
     let n = dx.len() + 1;
     let mut lower = vec![0.0; n - 1];
     let mut diag = vec![0.0; n];
@@ -412,13 +446,33 @@ fn spline_node_derivatives(config: &CubicConfig, dx: &[Real], s: &[Real]) -> QlR
         rhs[i] = 3.0 * (dx[i] * s[i - 1] + dx[i - 1] * s[i]);
     }
 
-    // SecondDerivative boundary rows (value is the target second derivative).
-    diag[0] = 2.0;
-    upper[0] = 1.0;
-    rhs[0] = 3.0 * s[0] - config.left_value * dx[0] / 2.0;
-    lower[n - 2] = 1.0;
-    diag[n - 1] = 2.0;
-    rhs[n - 1] = 3.0 * s[n - 2] + config.right_value * dx[n - 2] / 2.0;
+    // Left boundary row, from left_cond (value is the target derivative).
+    match config.left_cond {
+        CubicBoundaryCondition::SecondDerivative => {
+            diag[0] = 2.0;
+            upper[0] = 1.0;
+            rhs[0] = 3.0 * s[0] - config.left_value * dx[0] / 2.0;
+        }
+        CubicBoundaryCondition::FirstDerivative => {
+            diag[0] = 1.0;
+            upper[0] = 0.0;
+            rhs[0] = config.left_value;
+        }
+    }
+
+    // Right boundary row, from right_cond.
+    match config.right_cond {
+        CubicBoundaryCondition::SecondDerivative => {
+            lower[n - 2] = 1.0;
+            diag[n - 1] = 2.0;
+            rhs[n - 1] = 3.0 * s[n - 2] + config.right_value * dx[n - 2] / 2.0;
+        }
+        CubicBoundaryCondition::FirstDerivative => {
+            lower[n - 2] = 0.0;
+            diag[n - 1] = 1.0;
+            rhs[n - 1] = config.right_value;
+        }
+    }
 
     solve_tridiagonal(&lower, &diag, &upper, &rhs)
 }
@@ -812,5 +866,100 @@ mod tests {
         // A zero pivot produced during elimination is also rejected: row 1
         // pivot = 1 - 1*(1/1) = 0.
         assert!(solve_tridiagonal(&[1.0], &[1.0, 1.0], &[1.0], &[1.0, 1.0]).is_err());
+    }
+
+    #[test]
+    fn clamped_spline_matches_end_slopes_and_reference() {
+        // FirstDerivative both ends (clamped) with slopes 1 and -1. The
+        // FirstDerivative row sets d[0]/d[n-1] directly, so the end derivatives
+        // equal the clamps exactly. Interior value cross-checked with an
+        // independent Thomas solve (value(0.5) = 2/3).
+        let f = CubicNaturalSpline::new(vec![0.0, 1.0, 2.0, 3.0], vec![0.0, 1.0, 0.0, 1.0])
+            .unwrap()
+            .with_boundary_conditions(
+                CubicBoundaryCondition::FirstDerivative,
+                1.0,
+                CubicBoundaryCondition::FirstDerivative,
+                -1.0,
+            )
+            .unwrap();
+        for (x, y) in [(0.0, 0.0), (1.0, 1.0), (2.0, 0.0), (3.0, 1.0)] {
+            assert_close(f.value(x).unwrap(), y);
+        }
+        assert_close(f.derivative(0.0).unwrap(), 1.0);
+        assert_close(f.derivative(3.0).unwrap(), -1.0);
+        assert_close(f.value(0.5).unwrap(), 2.0 / 3.0);
+    }
+
+    #[test]
+    fn clamped_spline_two_points() {
+        // n == 2 now flows through the spline solver: a clamped two-point spline
+        // takes the end slopes directly, so its node derivatives are [0.5, 3.0].
+        let f = CubicInterpolation::new(
+            vec![0.0, 2.0],
+            vec![1.0, 5.0],
+            CubicDerivativeApprox::Spline,
+        )
+        .unwrap()
+        .with_boundary_conditions(
+            CubicBoundaryCondition::FirstDerivative,
+            0.5,
+            CubicBoundaryCondition::FirstDerivative,
+            3.0,
+        )
+        .unwrap();
+        assert_close(f.derivative(0.0).unwrap(), 0.5);
+        assert_close(f.derivative(2.0).unwrap(), 3.0);
+        assert_close(f.value(0.0).unwrap(), 1.0);
+        assert_close(f.value(2.0).unwrap(), 5.0);
+    }
+
+    #[test]
+    fn boundary_conditions_reject_non_finite_values() {
+        // A NaN or infinite boundary value would flow into the spline RHS and
+        // silently poison later value/derivative results, so it is rejected.
+        let spline =
+            || CubicNaturalSpline::new(vec![0.0, 1.0, 2.0, 3.0], vec![0.0, 1.0, 0.0, 1.0]).unwrap();
+        assert!(
+            spline()
+                .with_boundary_conditions(
+                    CubicBoundaryCondition::FirstDerivative,
+                    Real::NAN,
+                    CubicBoundaryCondition::FirstDerivative,
+                    -1.0,
+                )
+                .is_err()
+        );
+        assert!(
+            spline()
+                .with_boundary_conditions(
+                    CubicBoundaryCondition::SecondDerivative,
+                    0.0,
+                    CubicBoundaryCondition::SecondDerivative,
+                    Real::INFINITY,
+                )
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn boundary_conditions_are_noop_for_local_schemes() {
+        // Local schemes ignore the boundary conditions, so rebuilding a Parabolic
+        // interpolation with different ends leaves its values unchanged.
+        let base =
+            ParabolicInterpolation::new(vec![0.0, 1.0, 3.0, 4.0], vec![1.0, 6.0, 34.0, 57.0])
+                .unwrap();
+        let before = base.value(2.0).unwrap();
+        let rebuilt =
+            ParabolicInterpolation::new(vec![0.0, 1.0, 3.0, 4.0], vec![1.0, 6.0, 34.0, 57.0])
+                .unwrap()
+                .with_boundary_conditions(
+                    CubicBoundaryCondition::FirstDerivative,
+                    99.0,
+                    CubicBoundaryCondition::SecondDerivative,
+                    -7.0,
+                )
+                .unwrap();
+        assert_close(rebuilt.value(2.0).unwrap(), before);
     }
 }
