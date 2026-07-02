@@ -34,6 +34,11 @@ pub enum CubicDerivativeApprox {
     /// distance-weighted harmonic mean of adjacent slopes, zeroed where the
     /// slope changes sign, with the end slopes clamped against overshoot.
     Harmonic,
+    /// Akima approximation (local, non-monotonic): a weighted average of
+    /// adjacent slopes that favors the less-curved side, falling back to an
+    /// exact-equality special case where consecutive slopes coincide. Needs at
+    /// least 4 points; the two nodes on each end use distinct bespoke formulas.
+    Akima,
 }
 
 /// Boundary condition for the (non-local) spline schemes. Its shape is final;
@@ -123,6 +128,12 @@ impl CubicInterpolation {
             if w[1] <= w[0] {
                 fail!("x values must be strictly increasing");
             }
+        }
+        if config.da == CubicDerivativeApprox::Akima && x.len() < 4 {
+            fail!(
+                "Akima approximation requires at least 4 points, got {}",
+                x.len()
+            );
         }
 
         let n = x.len();
@@ -292,6 +303,72 @@ fn node_derivatives(da: CubicDerivativeApprox, dx: &[Real], s: &[Real]) -> Vec<R
                 d[n - 1] = 3.0 * s[n - 2];
             }
         }
+        // Literal port of QuantLib's endpoint formulas, including the
+        // s[i-2] == s[i-1] exact-equality branches: both are meaningful
+        // comparisons in the source algorithm (flagging perfectly straight
+        // segments), not incidental floating-point drift.
+        #[allow(clippy::float_cmp)]
+        CubicDerivativeApprox::Akima => {
+            // Hardening deviation from QuantLib: each endpoint blend divides by a
+            // sum of absolute weights that is exactly zero for flat data and for
+            // a constant slope of 0.5 (numerator zero too, so the raw formula
+            // yields NaN even at a knot). In every such case the adjacent slopes
+            // are equal, so we fall back to the relevant secant slope, which is
+            // the value the blend would take. Only an exact zero triggers this;
+            // a tiny nonzero denominator still yields a finite ratio.
+            let w0 = (s[1] - s[0]).abs();
+            let w0b = (2.0 * s[0] * s[1] - 4.0 * s[0] * s[0] * s[1]).abs();
+            d[0] = if w0 + w0b == 0.0 {
+                s[0]
+            } else {
+                (w0 * 2.0 * s[0] * s[1] + w0b * s[0]) / (w0 + w0b)
+            };
+
+            let w1 = (s[2] - s[1]).abs();
+            let w1b = (s[0] - 2.0 * s[0] * s[1]).abs();
+            d[1] = if w1 + w1b == 0.0 {
+                s[1]
+            } else {
+                (w1 * s[0] + w1b * s[1]) / (w1 + w1b)
+            };
+
+            for i in 2..n - 2 {
+                // Two guards below assign the same s[i], but the guard
+                // conditions are distinct branches of QuantLib's original
+                // if/else-if chain, kept separate for faithfulness.
+                #[allow(clippy::if_same_then_else)]
+                let di = if s[i - 2] == s[i - 1] && s[i] != s[i + 1] {
+                    s[i - 1]
+                } else if s[i - 2] != s[i - 1] && s[i] == s[i + 1] {
+                    s[i]
+                } else if s[i] == s[i - 1] {
+                    s[i]
+                } else if s[i - 2] == s[i - 1] && s[i - 1] != s[i] && s[i] == s[i + 1] {
+                    (s[i - 1] + s[i]) / 2.0
+                } else {
+                    let wl = (s[i + 1] - s[i]).abs();
+                    let wr = (s[i - 1] - s[i - 2]).abs();
+                    (wl * s[i - 1] + wr * s[i]) / (wl + wr)
+                };
+                d[i] = di;
+            }
+
+            let wn2 = (2.0 * s[n - 2] * s[n - 3] - s[n - 2]).abs();
+            let wn2b = (s[n - 3] - s[n - 4]).abs();
+            d[n - 2] = if wn2 + wn2b == 0.0 {
+                s[n - 3]
+            } else {
+                (wn2 * s[n - 3] + wn2b * s[n - 2]) / (wn2 + wn2b)
+            };
+
+            let wn1 = (4.0 * s[n - 2] * s[n - 2] * s[n - 3] - 2.0 * s[n - 2] * s[n - 3]).abs();
+            let wn1b = (s[n - 2] - s[n - 3]).abs();
+            d[n - 1] = if wn1 + wn1b == 0.0 {
+                s[n - 2]
+            } else {
+                (wn1 * s[n - 2] + wn1b * 2.0 * s[n - 2] * s[n - 3]) / (wn1 + wn1b)
+            };
+        }
     }
     d
 }
@@ -374,6 +451,19 @@ impl HarmonicCubicInterpolation {
     #[allow(clippy::new_ret_no_self)]
     pub fn new(x: Vec<Real>, y: Vec<Real>) -> QlResult<CubicInterpolation> {
         CubicInterpolation::new(x, y, CubicDerivativeApprox::Harmonic)
+    }
+}
+
+/// Akima cubic interpolation (local, non-monotonic). Needs at least 4 points.
+pub struct AkimaCubicInterpolation;
+
+impl AkimaCubicInterpolation {
+    /// Builds an Akima cubic interpolation through `(x, y)`.
+    // A factory for the underlying CubicInterpolation, mirroring QuantLib's
+    // convenience subclasses, so it deliberately does not return Self.
+    #[allow(clippy::new_ret_no_self)]
+    pub fn new(x: Vec<Real>, y: Vec<Real>) -> QlResult<CubicInterpolation> {
+        CubicInterpolation::new(x, y, CubicDerivativeApprox::Akima)
     }
 }
 
@@ -461,6 +551,72 @@ mod tests {
         let h = HarmonicCubicInterpolation::new(vec![0.0, 1.0, 2.0], vec![0.0, 1.0, 0.0]).unwrap();
         assert_close(h.value(1.0).unwrap(), 1.0);
         assert_close(h.derivative(1.0).unwrap(), 0.0);
+    }
+
+    #[test]
+    fn akima_reproduces_reference_node_derivatives() {
+        // x = [0,1,2,4,7], y = [0,1,0,2,3] -> S = [1,-1,1,1/3]. Exercises the
+        // generic interior branch (node 2) and all four bespoke endpoint
+        // formulas; oracle cross-checked with an independent transcription of
+        // the same formula.
+        let x = vec![0.0, 1.0, 2.0, 4.0, 7.0];
+        let y = vec![0.0, 1.0, 0.0, 2.0, 3.0];
+        let f = AkimaCubicInterpolation::new(x.clone(), y.clone()).unwrap();
+        let oracle = [-0.5, -0.2, 0.5, 3.0 / 7.0, 7.0 / 12.0];
+        for i in 0..x.len() {
+            assert_close(f.value(x[i]).unwrap(), y[i]);
+            assert_close(f.derivative(x[i]).unwrap(), oracle[i]);
+        }
+    }
+
+    #[test]
+    fn akima_interior_special_case_branches() {
+        // node_derivatives is exercised directly (unit spacing, so S = the
+        // secant slopes below) to pin the three exact-equality interior
+        // branches without the indirection of a full x/y dataset.
+        // S = [1,2,3,3,1,0.5]: branch "S[i-2]!=S[i-1], S[i]==S[i+1]" at i=2,
+        // "S[i]==S[i-1]" at i=3, "S[i-2]==S[i-1], S[i]!=S[i+1]" at i=4.
+        let dx = vec![1.0; 6];
+        let s = vec![1.0, 2.0, 3.0, 3.0, 1.0, 0.5];
+        let d = node_derivatives(CubicDerivativeApprox::Akima, &dx, &s);
+        let oracle = [1.6, 1.75, 3.0, 3.0, 3.0, 0.6, 1.0];
+        for i in 0..d.len() {
+            assert_close(d[i], oracle[i]);
+        }
+
+        // S = [1,1,1,2,2,-1] hits the remaining branch, the average
+        // "S[i-2]==S[i-1], S[i-1]!=S[i], S[i]==S[i+1]", at i=3.
+        let s2 = vec![1.0, 1.0, 1.0, 2.0, 2.0, -1.0];
+        let d2 = node_derivatives(CubicDerivativeApprox::Akima, &dx, &s2);
+        assert_close(d2[3], 1.5);
+    }
+
+    #[test]
+    fn akima_handles_zero_denominator_endpoints() {
+        // Flat and constant-slope-0.5 data zero every endpoint denominator; the
+        // raw formula would return NaN even at a knot. The secant fallback keeps
+        // the interpolant exact (flat data reproduced, and the 0.5 line
+        // reproduced with a constant derivative of 0.5).
+        let flat = AkimaCubicInterpolation::new(vec![0.0, 1.0, 2.0, 3.0], vec![0.0; 4]).unwrap();
+        for &x in &[0.0, 0.5, 1.7, 3.0_f64] {
+            assert_close(flat.value(x).unwrap(), 0.0);
+            assert_close(flat.derivative(x).unwrap(), 0.0);
+        }
+        let line = AkimaCubicInterpolation::new(vec![0.0, 1.0, 2.0, 3.0], vec![0.0, 0.5, 1.0, 1.5])
+            .unwrap();
+        for &x in &[0.0, 0.75, 2.4, 3.0_f64] {
+            assert_close(line.value(x).unwrap(), 0.5 * x);
+            assert_close(line.derivative(x).unwrap(), 0.5);
+        }
+    }
+
+    #[test]
+    fn akima_requires_at_least_4_points() {
+        assert!(AkimaCubicInterpolation::new(vec![0.0, 1.0, 2.0], vec![0.0, 1.0, 0.0]).is_err());
+        assert!(
+            AkimaCubicInterpolation::new(vec![0.0, 1.0, 2.0, 3.0], vec![0.0, 1.0, 0.0, 2.0])
+                .is_ok()
+        );
     }
 
     #[test]
