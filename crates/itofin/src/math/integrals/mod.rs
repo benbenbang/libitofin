@@ -1,11 +1,23 @@
 //! Numerical integration ported from `ql/math/integrals/`.
 
 pub mod segment;
+pub mod simpson;
 pub mod tabulatedgausslegendre;
+pub mod trapezoid;
 
 use crate::errors::QlResult;
 use crate::fail;
 use crate::types::Real;
+
+/// Validates the absolute accuracy shared by the adaptive integrators: finite
+/// and above machine epsilon, matching QuantLib's `Integrator` precondition
+/// (extended to reject the non-finite values QuantLib leaves unchecked).
+pub(crate) fn require_accuracy(accuracy: Real) -> QlResult<()> {
+    if !accuracy.is_finite() || accuracy <= Real::EPSILON {
+        fail!("required accuracy ({accuracy}) must be finite and exceed machine epsilon");
+    }
+    Ok(())
+}
 
 /// A one-dimensional numerical integrator over `[a, b]`.
 ///
