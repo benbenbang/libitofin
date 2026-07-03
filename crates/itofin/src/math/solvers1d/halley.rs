@@ -117,6 +117,19 @@ impl Halley {
             let f_prime = g.derivative(st.root);
             let lf = fx * g.second_derivative(st.root) / (f_prime * f_prime);
             let step = 1.0 / (1.0 - 0.5 * lf) * fx / f_prime;
+
+            // A zero or non-finite first derivative (or the degenerate
+            // 1 - lf/2 = 0) makes the step non-finite; stepping to NaN would then
+            // silently defeat the bracket-escape check below and burn the whole
+            // budget. Newton/NewtonSafe guard the same divisions - here we hand
+            // the rest of the search to NewtonSafe, which bisects safely from the
+            // current, still-in-bracket root.
+            if !step.is_finite() {
+                let remaining = self.config.max_evaluations - st.evaluation_number;
+                return NewtonSafe::new()
+                    .with_max_evaluations(remaining)
+                    .solve_bracketed(g, x_accuracy, st.root, st.x_min, st.x_max);
+            }
             st.root -= step;
 
             // Jumped out of the bracket: hand the rest to NewtonSafe (which needs
@@ -236,6 +249,28 @@ mod tests {
                 );
             }
         }
+    }
+
+    // Regression: a zero (or non-finite) first derivative makes the Halley step
+    // NaN. The old code did `root -= NaN`, which slipped past the bracket-escape
+    // check (NaN comparisons are false) and exhausted the whole budget with an
+    // unhelpful error. The unusable step is now detected and the search handed to
+    // NewtonSafe, which bisects and still finds the root.
+    #[test]
+    fn unusable_derivative_hands_off_to_newton_safe() {
+        // f(x) = x^2 - 2, root sqrt(2) in [1, 2]. The derivative reports 0 on its
+        // first call (at the guess 1.5), as a finite-difference derivative might
+        // when it underflows, then behaves normally.
+        let first = Cell::new(true);
+        let g = func2d(
+            |x: Real| x * x - 2.0,
+            |x: Real| if first.replace(false) { 0.0 } else { 2.0 * x },
+            |_: Real| 2.0,
+        );
+        let root = Halley::new()
+            .solve_bracketed(g, 1e-10, 1.5, 1.0, 2.0)
+            .unwrap();
+        assert!((root - 2.0_f64.sqrt()).abs() <= 1e-9, "root={root}");
     }
 
     #[test]
