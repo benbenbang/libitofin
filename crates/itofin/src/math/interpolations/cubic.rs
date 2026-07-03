@@ -327,8 +327,11 @@ fn node_derivatives(config: &CubicConfig, dx: &[Real], s: &[Real]) -> Vec<Real> 
         }
         CubicDerivativeApprox::Kruger => {
             for i in 1..n - 1 {
-                d[i] = if s[i - 1] * s[i] < 0.0 {
-                    // slope changes sign at the point
+                d[i] = if s[i - 1] * s[i] < 0.0 || s[i - 1] == 0.0 || s[i] == 0.0 {
+                    // Slope changes sign, or either secant is zero. The harmonic
+                    // mean below tends to zero as either slope does (QuantLib's
+                    // intent), but a mix of +0.0 and -0.0 makes it 1/+0 + 1/-0 =
+                    // +inf + -inf = NaN, so pin the zero case here (-0.0 == 0.0).
                     0.0
                 } else {
                     2.0 / (1.0 / s[i - 1] + 1.0 / s[i])
@@ -884,6 +887,25 @@ mod tests {
         // is the harmonic mean 2/(1/0.5 + 1/1.5) = 0.75.
         let g = KrugerCubicInterpolation::new(vec![0.0, 1.0, 2.0], vec![0.0, 0.5, 2.0]).unwrap();
         assert_close(g.derivative(1.0).unwrap(), 0.75);
+    }
+
+    // Regression: y = [0, -0, 0] yields secants S[0] = -0.0 - 0.0 = -0.0 and
+    // S[1] = 0.0 - (-0.0) = +0.0. The old `S[0]*S[1] < 0.0` test misses this
+    // (-0.0 * +0.0 = -0.0, which is not < 0.0), so the harmonic mean computed
+    // 1/-0.0 + 1/+0.0 = -inf + +inf = NaN and poisoned the whole curve. The zero
+    // case is now pinned to a 0 derivative, keeping the interpolant finite.
+    #[test]
+    fn kruger_signed_zero_slopes_do_not_produce_nan() {
+        let f = KrugerCubicInterpolation::new(vec![0.0, 1.0, 2.0], vec![0.0, -0.0, 0.0]).unwrap();
+        for x in [0.0, 0.3, 1.0, 1.5, 2.0] {
+            let v = f.value(x).unwrap();
+            assert!(v.is_finite(), "value({x}) = {v}");
+            assert_close(v, 0.0);
+            assert!(
+                f.derivative(x).unwrap().is_finite(),
+                "derivative({x}) is NaN"
+            );
+        }
     }
 
     #[test]
