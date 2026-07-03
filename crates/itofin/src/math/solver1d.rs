@@ -203,8 +203,12 @@ where
 {
     let growth_factor = 1.6;
     let mut flipflop: i32 = -1;
+    // Clamp the guess into the enforced domain before the first evaluation.
+    // QuantLib evaluates the raw guess here (bounds only constrain the later
+    // expansions), which lets a caller-supplied out-of-domain guess reach `f`;
+    // clamping first keeps every evaluation, including this one, in bounds.
     let mut st = Solver1DState {
-        root: guess,
+        root: config.enforce_bounds(guess),
         ..Default::default()
     };
     st.fx_max = f(st.root);
@@ -626,6 +630,27 @@ mod tests {
         // Same sign on both ends is genuinely unbracketed and must fail.
         let mut same_sign = |_: Real| 1e-20;
         assert!(bracket_given(&cfg, &mut same_sign, 1.5, 1.0, 2.0).is_err());
+    }
+
+    #[test]
+    fn auto_bracketing_clamps_the_initial_guess_to_bounds() {
+        // The guess (-10) lies below the enforced lower bound; it must be clamped
+        // before the first evaluation so f is never sampled outside [0, 5]. Root
+        // of x^2 - 2 is sqrt(2), inside the domain.
+        let lo = Cell::new(Real::INFINITY);
+        let hi = Cell::new(Real::NEG_INFINITY);
+        let f = |x: Real| {
+            lo.set(lo.get().min(x));
+            hi.set(hi.get().max(x));
+            x * x - 2.0
+        };
+        let mut solver = bisection();
+        solver.set_lower_bound(0.0);
+        solver.set_upper_bound(5.0);
+        let root = solver.solve(f, 1e-10, -10.0, 0.1).unwrap();
+        assert!((root - 2.0_f64.sqrt()).abs() <= 1e-9, "root={root}");
+        assert!(lo.get() >= 0.0, "evaluated below lower bound: {}", lo.get());
+        assert!(hi.get() <= 5.0, "evaluated above upper bound: {}", hi.get());
     }
 
     #[test]
