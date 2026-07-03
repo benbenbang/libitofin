@@ -16,6 +16,16 @@ use crate::shared::SharedMut;
 
 use super::observable::Observer;
 
+/// Resets the [`LazyObject`] re-entrancy flag when dropped, so it is cleared on
+/// every exit from `on_update` - including a panic unwinding out of an observer.
+struct UpdatingGuard<'a>(&'a mut bool);
+
+impl Drop for UpdatingGuard<'_> {
+    fn drop(&mut self) {
+        *self.0 = false;
+    }
+}
+
 /// Framework for calculation on demand and result caching.
 ///
 /// Embed one in a type that derives results from observable inputs. Drive it
@@ -77,6 +87,11 @@ impl LazyObject {
             return false;
         }
         self.updating = true;
+        // Reset the re-entrancy guard on every exit path, including an observer
+        // panicking inside `notify_observers`. A manual `self.updating = false`
+        // at the end would be skipped while the panic unwinds, latching the flag
+        // and silently suppressing every future notification.
+        let _reset = UpdatingGuard(&mut self.updating);
         let mut notified = false;
         if self.calculated || self.failed || self.always_forward {
             self.calculated = false;
@@ -86,7 +101,6 @@ impl LazyObject {
                 notified = true;
             }
         }
-        self.updating = false;
         notified
     }
 
@@ -345,6 +359,54 @@ mod tests {
         s.on_input_change();
         s.on_input_change();
         assert!(!s.lazy.is_calculated());
+    }
+
+    // Regression: an observer that panics inside notify_observers must not leave
+    // the `updating` re-entrancy flag latched. Previously the manual
+    // `self.updating = false` was skipped as the panic unwound, so every later
+    // on_update returned early and all notifications were silently suppressed.
+    #[test]
+    fn panicking_observer_does_not_latch_the_update_guard() {
+        use std::panic::{AssertUnwindSafe, catch_unwind};
+
+        // Panics on its first notification only, so the recovery call is clean.
+        struct Panicker {
+            armed: bool,
+        }
+        impl Observer for Panicker {
+            fn update(&mut self) {
+                if self.armed {
+                    self.armed = false;
+                    panic!("observer panic during notification");
+                }
+            }
+        }
+
+        let mut s = Lazy::new(true);
+        let flag = Flag::new();
+        // Keep a strong ref alive (the registry holds weak refs and prunes any
+        // observer with no live owner before notifying).
+        let panicker = shared_mut(Panicker { armed: true });
+        s.lazy
+            .register_observer(&(panicker.clone() as SharedMut<dyn Observer>));
+        s.lazy
+            .register_observer(&(flag.clone() as SharedMut<dyn Observer>));
+        s.npv().unwrap();
+
+        // The first observer panics mid-notification; the guard must still reset.
+        let panicked = catch_unwind(AssertUnwindSafe(|| s.on_input_change()));
+        assert!(panicked.is_err(), "the observer panic should propagate");
+
+        // A latched guard would make this return false and never notify again.
+        flag.borrow_mut().up = false;
+        assert!(
+            s.lazy.on_update(),
+            "a panicking observer must not latch the update guard"
+        );
+        assert!(
+            flag.borrow().up,
+            "observers are notified again after recovery"
+        );
     }
 
     #[test]
