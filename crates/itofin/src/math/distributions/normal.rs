@@ -19,6 +19,19 @@ use crate::types::Real;
 const M_SQRT_2: Real = std::f64::consts::FRAC_1_SQRT_2;
 const M_1_SQRTPI: Real = 0.564189583547756286948;
 
+/// Validates the `(average, sigma)` shared by the three normal distributions.
+/// QuantLib validates neither; we reject a non-finite `average` (which would
+/// otherwise make every `value` NaN) and a non-finite or non-positive `sigma`.
+fn validate_params(average: Real, sigma: Real) -> QlResult<()> {
+    if !average.is_finite() {
+        fail!("average must be a finite number ({average} given)");
+    }
+    if !sigma.is_finite() || sigma <= 0.0 {
+        fail!("sigma must be a finite positive number ({sigma} given)");
+    }
+    Ok(())
+}
+
 /// Gaussian probability density `N(average, sigma)`.
 #[derive(Clone, Copy, Debug)]
 pub struct NormalDistribution {
@@ -33,12 +46,11 @@ impl NormalDistribution {
     ///
     /// # Errors
     ///
-    /// Returns an error unless `sigma` is finite and `> 0` (a non-positive sigma
-    /// would yield negative densities; a non-finite one, NaN outputs).
+    /// Returns an error unless `average` is finite and `sigma` is finite and
+    /// `> 0` (a non-finite `average` yields NaN densities; a non-positive
+    /// `sigma`, negative densities; a non-finite `sigma`, NaN outputs).
     pub fn new(average: Real, sigma: Real) -> QlResult<Self> {
-        if !sigma.is_finite() || sigma <= 0.0 {
-            fail!("sigma must be a finite positive number ({sigma} given)");
-        }
+        validate_params(average, sigma)?;
         let normalization_factor = M_SQRT_2 * M_1_SQRTPI / sigma;
         let der_normalization_factor = sigma * sigma;
         Ok(NormalDistribution {
@@ -88,10 +100,12 @@ pub struct CumulativeNormalDistribution {
 
 impl CumulativeNormalDistribution {
     /// A cumulative normal for the given mean and standard deviation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless `average` is finite and `sigma` is finite and `> 0`.
     pub fn new(average: Real, sigma: Real) -> QlResult<Self> {
-        if !sigma.is_finite() || sigma <= 0.0 {
-            fail!("sigma must be a finite positive number ({sigma} given)");
-        }
+        validate_params(average, sigma)?;
         Ok(CumulativeNormalDistribution {
             average,
             sigma,
@@ -180,10 +194,12 @@ pub struct InverseCumulativeNormal {
 
 impl InverseCumulativeNormal {
     /// An inverse cumulative normal for the given mean and standard deviation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless `average` is finite and `sigma` is finite and `> 0`.
     pub fn new(average: Real, sigma: Real) -> QlResult<Self> {
-        if !sigma.is_finite() || sigma <= 0.0 {
-            fail!("sigma must be a finite positive number ({sigma} given)");
-        }
+        validate_params(average, sigma)?;
         Ok(InverseCumulativeNormal { average, sigma })
     }
 
@@ -317,6 +333,26 @@ mod tests {
             assert!(
                 InverseCumulativeNormal::new(0.0, s).is_err(),
                 "inverse sigma={s}"
+            );
+        }
+    }
+
+    #[test]
+    fn non_finite_average_is_rejected() {
+        // a non-finite average would otherwise make every density/CDF NaN, so
+        // every constructor rejects it even though sigma is valid.
+        for a in [Real::NAN, Real::INFINITY, Real::NEG_INFINITY] {
+            assert!(
+                NormalDistribution::new(a, 1.0).is_err(),
+                "density average={a}"
+            );
+            assert!(
+                CumulativeNormalDistribution::new(a, 1.0).is_err(),
+                "cumulative average={a}"
+            );
+            assert!(
+                InverseCumulativeNormal::new(a, 1.0).is_err(),
+                "inverse average={a}"
             );
         }
     }
