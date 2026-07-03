@@ -130,16 +130,32 @@ impl IndexMut<Size> for Matrix {
     }
 }
 
+impl Matrix {
+    /// The flat data index for element `(i, j)`, bounds-checked on both axes.
+    /// Without the column check `i * columns + j` would alias the next row for
+    /// `j >= columns` instead of panicking like a slice access.
+    fn element_index(&self, i: Size, j: Size) -> Size {
+        assert!(
+            i < self.rows && j < self.columns,
+            "matrix index ({i}, {j}) out of bounds for a {}x{} matrix",
+            self.rows,
+            self.columns
+        );
+        i * self.columns + j
+    }
+}
+
 impl Index<(Size, Size)> for Matrix {
     type Output = Real;
     fn index(&self, (i, j): (Size, Size)) -> &Real {
-        &self.data[i * self.columns + j]
+        &self.data[self.element_index(i, j)]
     }
 }
 
 impl IndexMut<(Size, Size)> for Matrix {
     fn index_mut(&mut self, (i, j): (Size, Size)) -> &mut Real {
-        &mut self.data[i * self.columns + j]
+        let k = self.element_index(i, j);
+        &mut self.data[k]
     }
 }
 
@@ -278,6 +294,28 @@ mod tests {
         m[1][0] = 9.0;
         assert_eq!(m[(0, 1)], 7.0);
         assert_eq!(m[(1, 0)], 9.0);
+    }
+
+    #[test]
+    #[should_panic(expected = "out of bounds")]
+    fn tuple_index_column_out_of_range_panics() {
+        // Before the fix m[(0, 3)] aliased m[(1, 0)] instead of panicking.
+        let m = Matrix::from([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]);
+        let _ = m[(0, 3)];
+    }
+
+    #[test]
+    #[should_panic(expected = "out of bounds")]
+    fn tuple_index_row_out_of_range_panics() {
+        let m = Matrix::from([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]);
+        let _ = m[(2, 0)];
+    }
+
+    #[test]
+    #[should_panic(expected = "out of bounds")]
+    fn tuple_index_mut_out_of_range_panics() {
+        let mut m = Matrix::with_size(2, 2);
+        m[(0, 2)] = 1.0;
     }
 
     #[test]
