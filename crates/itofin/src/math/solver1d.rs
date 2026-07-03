@@ -305,7 +305,12 @@ where
     }
     st.evaluation_number = 2;
 
-    if st.fx_min * st.fx_max >= 0.0 {
+    // Both endpoints are non-zero here (the close-to-zero checks above returned
+    // early otherwise), so a valid bracket is exactly a sign difference. Compare
+    // the signs directly rather than the product `fx_min * fx_max >= 0.0`: a
+    // product of opposite tiny magnitudes can underflow to -0.0, which the `>= 0`
+    // test would then misread as "same sign" and reject a genuine bracket.
+    if st.fx_min.signum() == st.fx_max.signum() {
         fail!(
             "root not bracketed: f[{x_min}, {x_max}] -> [{}, {}]",
             st.fx_min,
@@ -603,6 +608,24 @@ mod tests {
                 .solve_bracketed(quadratic, 1e-8, 0.75, 0.0, 2.0)
                 .is_err()
         );
+    }
+
+    // The bracket check accepts a bracket by sign difference, not by the sign of
+    // `fx_min * fx_max`. Endpoint values whose magnitudes are just above the
+    // close-to-zero floor (so they are not treated as roots) but whose product
+    // would underflow toward zero must still be accepted when the signs differ,
+    // and same-sign endpoints must still be rejected.
+    #[test]
+    fn bracket_accepts_opposite_signs_and_rejects_equal_signs() {
+        let cfg = SolverConfig::new();
+        // Opposite signs at tiny magnitudes: a valid bracket around a root in
+        // (x_min, x_max). `bracket_given` must report Ready, not "not bracketed".
+        let mut straddling = |x: Real| 1e-20 * (x - 1.5);
+        let ready = bracket_given(&cfg, &mut straddling, 1.5, 1.0, 2.0).unwrap();
+        assert!(matches!(ready, Bracketed::Ready(_)));
+        // Same sign on both ends is genuinely unbracketed and must fail.
+        let mut same_sign = |_: Real| 1e-20;
+        assert!(bracket_given(&cfg, &mut same_sign, 1.5, 1.0, 2.0).is_err());
     }
 
     #[test]
