@@ -129,6 +129,24 @@ flat yield/vol term structures · `Payoff`+`Exercise`+`VanillaOption` · `Analyt
 
 Acceptance: `europeanoption.cpp` price + greeks match within 1e-10.
 
+### Near-term roadmap
+
+Finish the current L1 interpolation work, then pivot toward the Milestone 1 slice instead of continuing
+wide through all remaining math tickets:
+
+1. **QL-1.7 final PR** - bicubic spline / remaining 2D interpolation; closes the interpolation epic.
+2. **Math API hardening** - scoped pass over already-exposed public math APIs for invalid `f64` inputs
+   (NaN, infinities, degenerate endpoints) where they can panic or return nonsense. Keep this narrow.
+3. **QL-1.8 Integrals** - split as listed in the EPIC-1 table below.
+4. **QL-2.1 Date + Period** - start the time foundation required by term structures and option expiry.
+5. **Minimal QL-2.2 DayCounter slice** - start with the day-count conventions needed by
+   `europeanoption.cpp` and flat curves.
+6. **QL-3.1 / QL-3.2 Quotes and rates** - `Quote`, `SimpleQuote`, `InterestRate`, compounding/frequency.
+7. **Minimal flat term structures** - flat yield curve and flat Black volatility term structure/surface
+   needed by the Black-Scholes-Merton process.
+8. **Thin option slice** - payoff, exercise, vanilla option, Black-Scholes-Merton process, and
+   `AnalyticEuropeanEngine` against `europeanoption.cpp`.
+
 ---
 
 ## 4. EPIC-0 - core (L0)  ✳️ start here
@@ -171,7 +189,7 @@ Slice-critical tickets first (needed for Milestone 1), then the wide independent
 | QL-1.5 | Solvers1D | `ql/math/solvers1d/` (Brent, Bisection, Newton, …) | `solvers.cpp` | M → 1 ticket per solver |
 | QL-1.6 | Distributions - rest | bivariate normal, poisson, chi-square, gamma, … | `distributions.cpp` (rest) | L → split |
 | QL-1.7 | Interpolations - rest | cubic/spline, loglinear, flat, 2D | `interpolations.cpp` (rest) | L → split |
-| QL-1.8 | Integrals | `ql/math/integrals/` (segment, Simpson, GaussKronrod, Gauss-*) | `integrals.cpp` | L → split |
+| QL-1.8 | Integrals | `ql/math/integrals/` (segment, Simpson, GaussKronrod, Gauss-*) | `integrals.cpp`, `gaussianquadratures.cpp` | L → split (see below) |
 | QL-1.9 | Optimization | `ql/math/optimization/` (Simplex, LevenbergMarquardt, conjugate gradient, constraints) | `optimizers.cpp` | L → 1 ticket per optimizer |
 | QL-1.10 | Statistics | `ql/math/statistics/` (general, risk, incremental, histogram) | `riskstats.cpp` | L → split |
 | QL-1.11 | RNG - generators | `ql/math/randomnumbers/` MT19937, knuth, ranlux, box-muller, ziggurat (ALGORITHMS only) | `lowdiscrepancysequences.cpp` (rng part) | M |
@@ -181,6 +199,27 @@ Slice-critical tickets first (needed for Milestone 1), then the wide independent
 
 > ⚠️ **QL-1.12 note:** `randomnumbers` reads as 118k LOC but ~115k is static direction-integer / primitive-polynomial
 > tables. The algorithm is small; the bulk is mechanical and should be transcribed with a generator script, not by hand.
+
+### QL-1.8 Integrals split
+
+Keep each PR below the normal review cap and port the matching `integrals.cpp` or
+`gaussianquadratures.cpp` cases with the implementation:
+
+1. **Base + SegmentIntegral** - `integral.{hpp,cpp}`, `segmentintegral.*`; common integrator shape.
+2. **Trapezoid + Simpson** - `trapezoidintegral.hpp`, `simpsonintegral.hpp`; default and midpoint variants.
+3. **Gauss-Kronrod** - `kronrodintegral.*`; split adaptive and non-adaptive if the PR grows past the cap.
+4. **Gauss-Lobatto** - `gausslobattointegral.*`.
+5. **TanhSinh + ExpSinh** - `tanhsinhintegral.hpp`, `expsinhintegral.hpp`.
+6. **TwoDimensional + PiecewiseIntegral** - `twodimensionalintegral.hpp` plus `PiecewiseIntegral`.
+7. **Discrete integrals** - `discreteintegrals.*`; discrete Simpson/trapezoid plus fixed-grid integrators.
+8. **Filon integral** - `filonintegral.*`.
+9. **Exponential integrals** - `exponentialintegrals.*`; Ei, E1, Si, Ci, and limit cases.
+10. **Gaussian quadrature framework** - `gaussianorthogonalpolynomial.*`, `gaussianquadratures.*`;
+    Legendre, Chebyshev, Chebyshev2nd, Gegenbauer, Jacobi, Laguerre, Hermite, Hyperbolic. Reuse the
+    existing tabulated Gauss-Legendre module.
+11. **Advanced Gaussian quadratures** - `momentbasedgaussianpolynomial.hpp`,
+    `gausslaguerrecosinepolynomial.hpp`, non-central chi-square polynomial, and multidimensional Gaussian
+    integration.
 
 ---
 
@@ -213,7 +252,8 @@ Each becomes its own detailed ticket table once its dependencies are in place. N
 ## 9. Execution notes
 
 1. **Decide D1–D5 before writing porting code.** They are QL-0.1–0.6 and gate everything.
-2. **Milestone 1 vertical slice before going wide** - derisk the architecture against `europeanoption.cpp`.
+2. **Milestone 1 vertical slice before going wide** - after QL-1.7, scoped math hardening, and QL-1.8,
+   pivot to the near-term roadmap above instead of continuing through all remaining L1 math.
 3. After the slice, **L0 → L1/L2 in parallel** (independent), then proceed down the layer map.
 4. Every ticket ports its matching `test-suite/*.cpp` cases as Rust tests - the C++ outputs are the oracle.
 5. Keep PRs ≤300 LOC; split any L-sized ticket as noted.
