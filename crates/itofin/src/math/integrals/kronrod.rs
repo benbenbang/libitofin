@@ -79,6 +79,14 @@ impl GaussKronrodAdaptive {
     where
         F: FnMut(Real) -> Real,
     {
+        // Each level spends 15 evaluations before it can test for convergence, so
+        // reserve them up front: refuse to descend unless the budget covers this
+        // rule. This caps total evaluations at `max_evaluations` even when a node
+        // converges (and so never reaches the recursion guard below).
+        if *evaluations + 15 > self.max_evaluations {
+            fail!("maximum number of function evaluations exceeded");
+        }
+
         let halflength = (b - a) / 2.0;
         let center = (a + b) / 2.0;
 
@@ -110,12 +118,11 @@ impl GaussKronrodAdaptive {
         *evaluations += 15;
 
         // The error is bounded by |K15 - G7|; refine if it exceeds the tolerance.
+        // Each half re-checks the budget at the top of its own call before
+        // spending, so recursion can never overshoot `max_evaluations`.
         if (k15 - g7).abs() < tolerance {
             Ok(k15)
         } else {
-            if *evaluations + 30 > self.max_evaluations {
-                fail!("maximum number of function evaluations exceeded");
-            }
             let left = self.integrate_recursively(f, a, center, tolerance / 2.0, evaluations)?;
             let right = self.integrate_recursively(f, center, b, tolerance / 2.0, evaluations)?;
             Ok(left + right)
@@ -485,6 +492,27 @@ mod tests {
         // budget (one rule, no room to bisect).
         let gk = GaussKronrodAdaptive::new(1e-13, 15).unwrap();
         assert!(gk.integrate(|x| (50.0 * x).sin(), 0.0, 1.0).is_err());
+    }
+
+    #[test]
+    fn never_exceeds_the_evaluation_budget() {
+        // Regression: a converging node used to spend its 15 evaluations without
+        // ever testing the budget, so an oscillatory integrand under a tight
+        // tolerance could finish (Ok) or recurse well past `max_evaluations`. The
+        // count must never exceed the cap, whether the run succeeds or fails.
+        for max in [15, 30, 45, 120, 300] {
+            let gk = GaussKronrodAdaptive::new(1e-13, max).unwrap();
+            let mut calls = 0usize;
+            let _ = gk.integrate(
+                |x| {
+                    calls += 1;
+                    (50.0 * x).sin()
+                },
+                0.0,
+                1.0,
+            );
+            assert!(calls <= max, "max={max} spent {calls} evaluations");
+        }
     }
 
     #[test]
