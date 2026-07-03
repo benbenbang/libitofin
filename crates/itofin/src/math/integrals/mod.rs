@@ -1,5 +1,6 @@
 //! Numerical integration ported from `ql/math/integrals/`.
 
+pub mod kronrod;
 pub mod segment;
 pub mod simpson;
 pub mod tabulatedgausslegendre;
