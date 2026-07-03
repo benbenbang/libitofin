@@ -139,6 +139,18 @@ impl NonCentralCumulativeChiSquareDistribution {
             f_x_2n += 2.0;
         }
 
+        // Phase 1 exits either because f_x_2n turned positive (the series has
+        // reached its convergent region) or because it hit itrmax first. The
+        // latter is only reachable when x lies more than 2*itrmax above df while
+        // the leading term t is still normal, i.e. for very large df. There the
+        // series has not begun converging, so `bound` below would be negative and
+        // silently skip both phase 2 and the convergence assert, returning a
+        // partial sum. Fall back to Sankaran, which is highly accurate for such
+        // large df (the same fallback the seed-underflow guards above use).
+        if f_x_2n <= 0.0 {
+            return self.sankaran().value(x);
+        }
+
         // Phase 2: keep accumulating with the error-bound test.
         let mut bound = t * x / f_x_2n;
         while bound > errmax && n <= itrmax {
@@ -534,6 +546,27 @@ mod tests {
                 x += 50.0;
             }
         }
+    }
+
+    // Regression: for very large df, x can sit more than 2*itrmax (20000) above
+    // df while the leading term t is still a normal f64, so phase 1 exhausts the
+    // iteration budget before f_x_2n turns positive. The old code then computed a
+    // negative `bound`, skipped phase 2, and passed the convergence assert on an
+    // unconverged partial sum. Such a state must instead fall back to Sankaran.
+    #[test]
+    fn phase_one_exhaustion_falls_back_to_sankaran() {
+        // df = 1e6, x = df + 25000: phase 1 needs 12500 > itrmax (10000) steps,
+        // and t ~ 9e-4 stays normal, so the direct series cannot converge.
+        let df = 1.0e6;
+        let x = df + 25_000.0;
+        let d = NonCentral::new(df, 0.0).unwrap();
+        let p = d.value(x);
+        assert!((0.0..=1.0).contains(&p), "{p} out of [0,1]");
+        // Deep right tail (~17 std above the mean df); the CDF is essentially 1.
+        assert!(p > 0.999, "right tail should saturate, got {p}");
+        // It is exactly the Sankaran fallback, not a truncated partial sum.
+        let s = Sankaran::new(df, 0.0).unwrap();
+        assert_eq!(p, s.value(x));
     }
 
     #[test]
