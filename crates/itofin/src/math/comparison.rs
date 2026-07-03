@@ -30,6 +30,12 @@ pub fn close_n(x: Real, y: Real, n: usize) -> bool {
     if x == y {
         return true;
     }
+    // Non-equal non-finite operands (e.g. +inf vs -inf, or any NaN) are never
+    // close: their difference is infinite/NaN and would spuriously pass the
+    // relative test, where inf <= tolerance * inf holds.
+    if !x.is_finite() || !y.is_finite() {
+        return false;
+    }
     let diff = (x - y).abs();
     let tolerance = n as Real * Real::EPSILON;
     #[allow(clippy::float_cmp)]
@@ -56,6 +62,10 @@ pub fn close_enough_n(x: Real, y: Real, n: usize) -> bool {
     #[allow(clippy::float_cmp)]
     if x == y {
         return true;
+    }
+    // See `close_n`: non-equal non-finite operands are never close.
+    if !x.is_finite() || !y.is_finite() {
+        return false;
     }
     let diff = (x - y).abs();
     let tolerance = n as Real * Real::EPSILON;
@@ -112,5 +122,23 @@ mod tests {
         assert!(close_enough(3.5, 3.5));
         assert!(close_enough(0.0, 1e-30));
         assert!(!close_enough(1.0, 1.0 + 1e-6));
+    }
+
+    #[test]
+    fn non_equal_non_finite_values_are_not_close() {
+        // Matching infinities are close (handled by the exact-equality path)...
+        assert!(close(Real::INFINITY, Real::INFINITY));
+        assert!(close_enough(Real::NEG_INFINITY, Real::NEG_INFINITY));
+        // ...but opposite or mismatched non-finite values are not (the relative
+        // test would otherwise accept inf <= tolerance * inf).
+        for &(x, y) in &[
+            (Real::INFINITY, Real::NEG_INFINITY),
+            (Real::INFINITY, 1.0),
+            (Real::NAN, Real::NAN),
+            (Real::NAN, 0.0),
+        ] {
+            assert!(!close(x, y), "close({x}, {y})");
+            assert!(!close_enough(x, y), "close_enough({x}, {y})");
+        }
     }
 }
