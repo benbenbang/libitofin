@@ -15,6 +15,8 @@
 
 pub mod austria;
 pub mod bespokecalendar;
+pub mod croatia;
+pub mod czechrepublic;
 pub mod france;
 pub mod germany;
 pub mod islamicholidays;
@@ -22,16 +24,22 @@ pub mod italy;
 pub mod jointcalendar;
 pub mod malta;
 pub mod nullcalendar;
+pub mod slovakia;
+pub mod slovenia;
 pub mod target;
 pub mod weekendsonly;
 
 pub use austria::Austria;
 pub use bespokecalendar::BespokeCalendar;
+pub use croatia::Croatia;
+pub use czechrepublic::CzechRepublic;
 pub use france::France;
 pub use germany::Germany;
 pub use italy::Italy;
 pub use jointcalendar::{JointCalendar, JointCalendarRule};
 pub use malta::Malta;
 pub use nullcalendar::NullCalendar;
+pub use slovakia::Slovakia;
+pub use slovenia::Slovenia;
 pub use target::Target;
 pub use weekendsonly::WeekendsOnly;
