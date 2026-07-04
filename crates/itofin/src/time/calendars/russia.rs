@@ -9,12 +9,11 @@ use crate::time::weekday::Weekday;
 
 /// Market handled by the Russian calendar.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[allow(clippy::upper_case_acronyms)]
 pub enum Market {
     /// Generic settlement calendar.
     Settlement,
     /// Moscow Exchange calendar.
-    MOEX,
+    Moex,
 }
 
 /// The Russian calendar. The default market is [`Market::Settlement`].
@@ -25,7 +24,7 @@ impl Russia {
     pub fn new(market: Market) -> Calendar {
         let imp: crate::shared::Shared<dyn CalendarImpl> = match market {
             Market::Settlement => shared(SettlementImpl),
-            Market::MOEX => shared(ExchangeImpl),
+            Market::Moex => shared(ExchangeImpl),
         };
         Calendar::from_impl(imp)
     }
@@ -257,7 +256,7 @@ mod tests {
     #[test]
     fn names_match_quantlib() {
         assert_eq!(Russia::new(Market::Settlement).name(), "Russian settlement");
-        assert_eq!(Russia::new(Market::MOEX).name(), "Moscow exchange");
+        assert_eq!(Russia::new(Market::Moex).name(), "Moscow exchange");
     }
 
     #[test]

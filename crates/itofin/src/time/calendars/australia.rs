@@ -18,7 +18,7 @@ pub enum Market {
     /// Generic settlement calendar.
     Settlement,
     /// Australia ASX calendar.
-    ASX,
+    Asx,
 }
 
 /// The Australian calendar.
@@ -29,7 +29,7 @@ impl Australia {
     pub fn new(market: Market) -> Calendar {
         let imp: crate::shared::Shared<dyn CalendarImpl> = match market {
             Market::Settlement => shared(SettlementImpl),
-            Market::ASX => shared(AsxImpl),
+            Market::Asx => shared(AsxImpl),
         };
         Calendar::from_impl(imp)
     }
@@ -134,7 +134,7 @@ mod tests {
             Australia::new(Market::Settlement).name(),
             "Australia settlement"
         );
-        assert_eq!(Australia::new(Market::ASX).name(), "Australia exchange");
+        assert_eq!(Australia::new(Market::Asx).name(), "Australia exchange");
     }
 
     #[test]
@@ -146,7 +146,7 @@ mod tests {
 
     #[test]
     fn weekend_rule() {
-        let c = Australia::new(Market::ASX);
+        let c = Australia::new(Market::Asx);
         assert!(c.is_weekend(Weekday::Saturday));
         assert!(c.is_weekend(Weekday::Sunday));
         assert!(!c.is_weekend(Weekday::Monday));

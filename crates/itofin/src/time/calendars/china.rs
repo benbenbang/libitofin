@@ -17,13 +17,13 @@ const HOLIDAY_HORIZON: Year = 2026;
 
 /// Chinese markets.
 ///
-/// QuantLib defaults to [`Market::SSE`].
+/// QuantLib defaults to [`Market::Sse`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Market {
     /// Shanghai stock exchange.
-    SSE,
+    Sse,
     /// Interbank calendar.
-    IB,
+    Ib,
 }
 
 /// The Chinese calendar.
@@ -39,8 +39,8 @@ impl China {
     /// Builds a Chinese calendar for the given market.
     pub fn new(market: Market) -> Calendar {
         let imp: crate::shared::Shared<dyn CalendarImpl> = match market {
-            Market::SSE => shared(SseImpl),
-            Market::IB => shared(IbImpl),
+            Market::Sse => shared(SseImpl),
+            Market::Ib => shared(IbImpl),
         };
         Calendar::from_impl(imp)
     }
@@ -429,21 +429,21 @@ mod tests {
     // Spot-checks, not a full transcription of test-suite/calendars.cpp.
     #[test]
     fn names_match_quantlib() {
-        assert_eq!(China::new(Market::SSE).name(), "Shanghai stock exchange");
-        assert_eq!(China::new(Market::IB).name(), "China inter bank market");
+        assert_eq!(China::new(Market::Sse).name(), "Shanghai stock exchange");
+        assert_eq!(China::new(Market::Ib).name(), "China inter bank market");
     }
 
     #[test]
     fn unconditional_holidays() {
-        let c = China::new(Market::SSE);
+        let c = China::new(Market::Sse);
         assert!(c.is_holiday(Date::new(1, Month::January, 2019))); // New Year's Day
     }
 
     #[test]
     fn ib_working_weekend_is_business_day() {
         // 5 February 2005 is a Saturday but an IB working weekend.
-        let ib = China::new(Market::IB);
-        let sse = China::new(Market::SSE);
+        let ib = China::new(Market::Ib);
+        let sse = China::new(Market::Sse);
         let date = Date::new(5, Month::February, 2005);
         assert!(ib.is_business_day(date));
         assert!(sse.is_holiday(date));
@@ -451,7 +451,7 @@ mod tests {
 
     #[test]
     fn weekend_rule() {
-        let c = China::new(Market::SSE);
+        let c = China::new(Market::Sse);
         assert!(c.is_weekend(Weekday::Saturday));
         assert!(c.is_weekend(Weekday::Sunday));
         assert!(!c.is_weekend(Weekday::Monday));
@@ -459,21 +459,21 @@ mod tests {
 
     #[test]
     fn in_horizon_query_works() {
-        let c = China::new(Market::SSE);
+        let c = China::new(Market::Sse);
         assert!(c.is_holiday(Date::new(1, Month::January, HOLIDAY_HORIZON)));
     }
 
     #[test]
     #[should_panic(expected = "beyond the supported horizon")]
     fn beyond_horizon_panics() {
-        let c = China::new(Market::SSE);
+        let c = China::new(Market::Sse);
         let _ = c.is_business_day(Date::new(1, Month::January, HOLIDAY_HORIZON + 1));
     }
 
     #[test]
     #[should_panic(expected = "beyond the supported horizon")]
     fn beyond_horizon_panics_ib() {
-        let ib = China::new(Market::IB);
+        let ib = China::new(Market::Ib);
         let _ = ib.is_business_day(Date::new(1, Month::January, HOLIDAY_HORIZON + 1));
     }
 }

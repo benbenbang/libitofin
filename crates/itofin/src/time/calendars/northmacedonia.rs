@@ -16,13 +16,12 @@ const HOLIDAY_HORIZON: Year = 2040;
 
 /// Market handled by the North Macedonia calendar.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[allow(clippy::upper_case_acronyms)]
 pub enum Market {
     /// Macedonian Stock Exchange.
-    MSE,
+    Mse,
 }
 
-/// The North Macedonia calendar. The default market is [`Market::MSE`].
+/// The North Macedonia calendar. The default market is [`Market::Mse`].
 ///
 /// # Accuracy
 ///
@@ -35,7 +34,7 @@ impl NorthMacedonia {
     /// Builds a North Macedonia calendar for the given `market`.
     pub fn new(market: Market) -> Calendar {
         let imp: crate::shared::Shared<dyn CalendarImpl> = match market {
-            Market::MSE => shared(MseImpl),
+            Market::Mse => shared(MseImpl),
         };
         Calendar::from_impl(imp)
     }
@@ -100,14 +99,14 @@ mod tests {
     #[test]
     fn name_matches_quantlib() {
         assert_eq!(
-            NorthMacedonia::new(Market::MSE).name(),
+            NorthMacedonia::new(Market::Mse).name(),
             "Macedonian Stock Exchange"
         );
     }
 
     #[test]
     fn fixed_holidays() {
-        let c = NorthMacedonia::new(Market::MSE);
+        let c = NorthMacedonia::new(Market::Mse);
         for (d, m) in [
             (1, Month::January),   // New Year
             (7, Month::January),   // Orthodox Christmas
@@ -125,7 +124,7 @@ mod tests {
 
     #[test]
     fn weekend_rule() {
-        let c = NorthMacedonia::new(Market::MSE);
+        let c = NorthMacedonia::new(Market::Mse);
         assert!(c.is_weekend(Weekday::Saturday));
         assert!(c.is_weekend(Weekday::Sunday));
         assert!(!c.is_weekend(Weekday::Friday));
@@ -135,14 +134,14 @@ mod tests {
     fn in_horizon_query_works() {
         // A query at the last tabulated year must not panic. New Year is
         // unconditional.
-        let c = NorthMacedonia::new(Market::MSE);
+        let c = NorthMacedonia::new(Market::Mse);
         assert!(c.is_holiday(Date::new(1, Month::January, HOLIDAY_HORIZON)));
     }
 
     #[test]
     #[should_panic(expected = "beyond the supported horizon")]
     fn beyond_horizon_panics() {
-        let c = NorthMacedonia::new(Market::MSE);
+        let c = NorthMacedonia::new(Market::Mse);
         let _ = c.is_business_day(Date::new(1, Month::January, HOLIDAY_HORIZON + 1));
     }
 }

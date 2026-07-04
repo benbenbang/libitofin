@@ -15,17 +15,17 @@ pub enum Market {
     /// Generic settlement calendar.
     Settlement,
     /// New York stock exchange calendar.
-    NYSE,
+    Nyse,
     /// Government-bond calendar.
     GovernmentBond,
     /// Off-peak days for NERC.
-    NERC,
+    Nerc,
     /// Libor impact calendar.
     LiborImpact,
     /// Federal Reserve Bankwire System.
     FederalReserve,
     /// SOFR fixing calendar.
-    SOFR,
+    Sofr,
 }
 
 /// United States calendar.
@@ -36,12 +36,12 @@ impl UnitedStates {
     pub fn new(market: Market) -> Calendar {
         let imp: crate::shared::Shared<dyn CalendarImpl> = match market {
             Market::Settlement => shared(SettlementImpl),
-            Market::NYSE => shared(NyseImpl),
+            Market::Nyse => shared(NyseImpl),
             Market::GovernmentBond => shared(GovernmentBondImpl),
-            Market::NERC => shared(NercImpl),
+            Market::Nerc => shared(NercImpl),
             Market::LiborImpact => shared(LiborImpactImpl),
             Market::FederalReserve => shared(FederalReserveImpl),
-            Market::SOFR => shared(SofrImpl),
+            Market::Sofr => shared(SofrImpl),
         };
         Calendar::from_impl(imp)
     }
@@ -490,7 +490,7 @@ mod tests {
             "US with Libor impact"
         );
         assert_eq!(
-            UnitedStates::new(Market::NYSE).name(),
+            UnitedStates::new(Market::Nyse).name(),
             "New York stock exchange"
         );
         assert_eq!(
@@ -498,11 +498,11 @@ mod tests {
             "US government bond market"
         );
         assert_eq!(
-            UnitedStates::new(Market::SOFR).name(),
+            UnitedStates::new(Market::Sofr).name(),
             "SOFR fixing calendar"
         );
         assert_eq!(
-            UnitedStates::new(Market::NERC).name(),
+            UnitedStates::new(Market::Nerc).name(),
             "North American Energy Reliability Council"
         );
         assert_eq!(
