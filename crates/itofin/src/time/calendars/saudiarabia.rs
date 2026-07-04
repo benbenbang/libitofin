@@ -12,10 +12,13 @@ use crate::time::calendar::{Calendar, CalendarImpl};
 use crate::time::date::{Date, Month, Year};
 use crate::time::weekday::Weekday;
 
-/// Last year for which Saudi Arabia's Islamic (Eid) holidays are tabulated
-/// (matching QuantLib's data). Queries beyond this year cannot be answered
-/// reliably and panic rather than silently omitting holidays.
-const HOLIDAY_HORIZON: Year = 2029;
+/// Last year for which *all* of Saudi Arabia's Islamic holiday tables are
+/// complete (matching QuantLib's data). This is the MINIMUM across the required
+/// moving-holiday tables, not the maximum: QuantLib's Eid al-Fitr table runs to
+/// 2029 but its Eid al-Adha table stops at 2022, so from 2023 onward Eid al-Adha
+/// would be silently omitted. Queries beyond this year cannot be answered
+/// reliably and panic instead.
+const HOLIDAY_HORIZON: Year = 2022;
 
 /// Market handled by the Saudi Arabian calendar.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -29,8 +32,9 @@ pub enum Market {
 /// # Accuracy
 ///
 /// Saudi Arabia's Islamic (Eid) holidays are tabulated (from QuantLib) only
-/// through 2029. Querying a date after 2029 panics rather than silently
-/// returning an unreliable business-day result.
+/// through 2022 - the Eid al-Adha table ends there, even though Eid al-Fitr
+/// extends to 2029. Querying a date after 2022 panics rather than silently
+/// omitting Eid al-Adha and returning an unreliable business-day result.
 pub struct SaudiArabia;
 
 impl SaudiArabia {
