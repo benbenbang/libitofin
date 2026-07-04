@@ -2,6 +2,7 @@
 
 pub mod kronrod;
 pub mod lobatto;
+pub mod piecewise;
 pub mod segment;
 pub mod simpson;
 pub mod tabulatedgausslegendre;
