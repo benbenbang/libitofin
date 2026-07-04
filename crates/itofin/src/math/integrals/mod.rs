@@ -6,6 +6,7 @@ pub mod segment;
 pub mod simpson;
 pub mod tabulatedgausslegendre;
 pub mod trapezoid;
+pub mod twodimensional;
 
 use crate::errors::QlResult;
 use crate::fail;
