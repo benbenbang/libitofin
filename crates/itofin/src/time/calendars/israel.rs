@@ -422,6 +422,17 @@ fn is_simchat_torah(d: Date) -> bool {
     shift(d, -7).is_some_and(is_sukkot)
 }
 
+/// The Tel Aviv (TASE) weekend, which changed from Friday/Saturday to
+/// Saturday/Sunday on 5th January 2026.
+fn tase_weekend(date: Date) -> bool {
+    let w = date.weekday();
+    if date >= Date::new(5, Month::January, 2026) {
+        w == Weekday::Saturday || w == Weekday::Sunday
+    } else {
+        w == Weekday::Friday || w == Weekday::Saturday
+    }
+}
+
 struct TelAvivImpl;
 
 impl CalendarImpl for TelAvivImpl {
@@ -433,8 +444,13 @@ impl CalendarImpl for TelAvivImpl {
         w == Weekday::Saturday || w == Weekday::Sunday
     }
 
+    /// Date-dependent weekend (Fri/Sat before 5 Jan 2026, Sat/Sun after), so
+    /// `holiday_list` filters weekends correctly across the switch.
+    fn is_weekend_on(&self, date: Date) -> bool {
+        tase_weekend(date)
+    }
+
     fn is_business_day(&self, date: Date) -> bool {
-        let w = date.weekday();
         let y = date.year();
 
         assert!(
@@ -443,13 +459,7 @@ impl CalendarImpl for TelAvivImpl {
              (matching QuantLib); year {y} is beyond the supported horizon"
         );
 
-        let switch_date = Date::new(5, Month::January, 2026);
-
-        let weekend = if date >= switch_date {
-            w == Weekday::Saturday || w == Weekday::Sunday
-        } else {
-            w == Weekday::Friday || w == Weekday::Saturday
-        };
+        let weekend = tase_weekend(date);
 
         !(weekend
             || is_purim(date)
