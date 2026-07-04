@@ -561,6 +561,157 @@ fn year_offset(y: Year) -> SerialNumber {
     YEAR_OFFSET[(y - 1900) as usize]
 }
 
+/// Output manipulators for [`Date`], porting QuantLib's `io` namespace.
+///
+/// Each function returns a lightweight `Display` wrapper, so they compose with
+/// `format!`/`write!` without allocating: `format!("{}", io::long_date(d))`.
+/// The null date renders as `"null date"` in every format. The general
+/// `formatted_date` manipulator (arbitrary strftime-style patterns) is not
+/// ported: QuantLib delegates it to Boost's date facet, out of scope here.
+pub mod io {
+    use super::{Date, Day};
+    use std::fmt;
+
+    /// `Display` wrapper for the short (`mm/dd/yyyy`) format.
+    pub struct ShortDate(Date);
+    /// `Display` wrapper for the long (`Month ordinal, yyyy`) format.
+    pub struct LongDate(Date);
+    /// `Display` wrapper for the ISO (`yyyy-mm-dd`) format.
+    pub struct IsoDate(Date);
+
+    /// Formats `d` in short format, e.g. `05/01/2023` (US `mm/dd/yyyy`).
+    pub fn short_date(d: Date) -> ShortDate {
+        ShortDate(d)
+    }
+
+    /// Formats `d` in long format, e.g. `May 1st, 2023`.
+    pub fn long_date(d: Date) -> LongDate {
+        LongDate(d)
+    }
+
+    /// Formats `d` in ISO format, e.g. `2023-05-01` (`yyyy-mm-dd`).
+    pub fn iso_date(d: Date) -> IsoDate {
+        IsoDate(d)
+    }
+
+    /// The English ordinal suffix of a day-of-month, e.g. `1 -> "st"`,
+    /// `2 -> "nd"`, `11 -> "th"`. Matches QuantLib's `io::ordinal`.
+    fn ordinal_suffix(n: Day) -> &'static str {
+        match n {
+            11..=13 => "th",
+            _ => match n % 10 {
+                1 => "st",
+                2 => "nd",
+                3 => "rd",
+                _ => "th",
+            },
+        }
+    }
+
+    impl fmt::Display for ShortDate {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            if self.0 == Date::null() {
+                return f.write_str("null date");
+            }
+            write!(
+                f,
+                "{:02}/{:02}/{}",
+                self.0.month().ordinal(),
+                self.0.day_of_month(),
+                self.0.year()
+            )
+        }
+    }
+
+    impl fmt::Display for LongDate {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            if self.0 == Date::null() {
+                return f.write_str("null date");
+            }
+            let day = self.0.day_of_month();
+            write!(
+                f,
+                "{} {}{}, {}",
+                self.0.month(),
+                day,
+                ordinal_suffix(day),
+                self.0.year()
+            )
+        }
+    }
+
+    impl fmt::Display for IsoDate {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            if self.0 == Date::null() {
+                return f.write_str("null date");
+            }
+            write!(
+                f,
+                "{:04}-{:02}-{:02}",
+                self.0.year(),
+                self.0.month().ordinal(),
+                self.0.day_of_month()
+            )
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::super::{Date, Month};
+        use super::{iso_date, long_date, short_date};
+
+        #[test]
+        fn formats_match_quantlib() {
+            let d = Date::new(1, Month::May, 2023);
+            assert_eq!(short_date(d).to_string(), "05/01/2023");
+            assert_eq!(long_date(d).to_string(), "May 1st, 2023");
+            assert_eq!(iso_date(d).to_string(), "2023-05-01");
+        }
+
+        #[test]
+        fn ordinal_suffixes() {
+            let y = 2023;
+            assert_eq!(
+                long_date(Date::new(2, Month::May, y)).to_string(),
+                "May 2nd, 2023"
+            );
+            assert_eq!(
+                long_date(Date::new(3, Month::May, y)).to_string(),
+                "May 3rd, 2023"
+            );
+            assert_eq!(
+                long_date(Date::new(4, Month::May, y)).to_string(),
+                "May 4th, 2023"
+            );
+            // 11th/12th/13th are "th", not "st/nd/rd"
+            assert_eq!(
+                long_date(Date::new(11, Month::May, y)).to_string(),
+                "May 11th, 2023"
+            );
+            assert_eq!(
+                long_date(Date::new(12, Month::May, y)).to_string(),
+                "May 12th, 2023"
+            );
+            assert_eq!(
+                long_date(Date::new(13, Month::May, y)).to_string(),
+                "May 13th, 2023"
+            );
+            assert_eq!(
+                long_date(Date::new(21, Month::May, y)).to_string(),
+                "May 21st, 2023"
+            );
+        }
+
+        #[test]
+        fn null_date_renders_uniformly() {
+            let n = Date::null();
+            assert_eq!(short_date(n).to_string(), "null date");
+            assert_eq!(long_date(n).to_string(), "null date");
+            assert_eq!(iso_date(n).to_string(), "null date");
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
