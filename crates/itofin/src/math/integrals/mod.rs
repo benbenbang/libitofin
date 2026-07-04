@@ -1,6 +1,7 @@
 //! Numerical integration ported from `ql/math/integrals/`.
 
 pub mod discrete;
+pub mod exponential_integrals;
 pub mod filon;
 pub mod kronrod;
 pub mod lobatto;
