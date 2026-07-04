@@ -9,5 +9,6 @@ pub mod math;
 pub mod patterns;
 pub mod settings;
 pub mod shared;
+pub mod time;
 pub mod types;
 pub mod utilities;
