@@ -9,6 +9,7 @@
 //! `Schedule` machinery from EPIC-2 is out of scope for this branch.
 
 pub mod businessdayconvention;
+pub mod date;
 pub mod period;
 pub mod timeunit;
 pub mod weekday;
