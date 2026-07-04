@@ -13,14 +13,18 @@
 #![allow(clippy::new_ret_no_self)]
 #![allow(clippy::manual_range_contains)]
 
+pub mod austria;
 pub mod bespokecalendar;
+pub mod germany;
 pub mod islamicholidays;
 pub mod jointcalendar;
 pub mod nullcalendar;
 pub mod target;
 pub mod weekendsonly;
 
+pub use austria::Austria;
 pub use bespokecalendar::BespokeCalendar;
+pub use germany::Germany;
 pub use jointcalendar::{JointCalendar, JointCalendarRule};
 pub use nullcalendar::NullCalendar;
 pub use target::Target;
