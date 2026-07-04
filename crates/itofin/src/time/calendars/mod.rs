@@ -13,10 +13,15 @@
 #![allow(clippy::new_ret_no_self)]
 #![allow(clippy::manual_range_contains)]
 
+pub mod bespokecalendar;
+pub mod islamicholidays;
+pub mod jointcalendar;
 pub mod nullcalendar;
 pub mod target;
 pub mod weekendsonly;
 
+pub use bespokecalendar::BespokeCalendar;
+pub use jointcalendar::{JointCalendar, JointCalendarRule};
 pub use nullcalendar::NullCalendar;
 pub use target::Target;
 pub use weekendsonly::WeekendsOnly;
