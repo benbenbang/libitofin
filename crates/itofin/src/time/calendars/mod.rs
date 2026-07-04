@@ -14,6 +14,7 @@
 #![allow(clippy::manual_range_contains)]
 
 pub mod argentina;
+pub mod australia;
 pub mod austria;
 pub mod bespokecalendar;
 pub mod brazil;
@@ -32,6 +33,7 @@ pub mod jointcalendar;
 pub mod malta;
 pub mod mexico;
 pub mod montenegro;
+pub mod newzealand;
 pub mod norway;
 pub mod nullcalendar;
 pub mod serbia;
@@ -45,6 +47,7 @@ pub mod unitedstates;
 pub mod weekendsonly;
 
 pub use argentina::Argentina;
+pub use australia::Australia;
 pub use austria::Austria;
 pub use bespokecalendar::BespokeCalendar;
 pub use brazil::Brazil;
@@ -62,6 +65,7 @@ pub use jointcalendar::{JointCalendar, JointCalendarRule};
 pub use malta::Malta;
 pub use mexico::Mexico;
 pub use montenegro::Montenegro;
+pub use newzealand::NewZealand;
 pub use norway::Norway;
 pub use nullcalendar::NullCalendar;
 pub use serbia::Serbia;
