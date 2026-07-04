@@ -15,6 +15,9 @@
 
 pub mod austria;
 pub mod bespokecalendar;
+pub mod brazil;
+pub mod canada;
+pub mod chile;
 pub mod croatia;
 pub mod czechrepublic;
 pub mod denmark;
@@ -41,6 +44,9 @@ pub mod weekendsonly;
 
 pub use austria::Austria;
 pub use bespokecalendar::BespokeCalendar;
+pub use brazil::Brazil;
+pub use canada::Canada;
+pub use chile::Chile;
 pub use croatia::Croatia;
 pub use czechrepublic::CzechRepublic;
 pub use denmark::Denmark;
