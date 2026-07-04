@@ -35,6 +35,7 @@ pub mod slovenia;
 pub mod sweden;
 pub mod switzerland;
 pub mod target;
+pub mod unitedstates;
 pub mod weekendsonly;
 
 pub use austria::Austria;
@@ -58,4 +59,5 @@ pub use slovenia::Slovenia;
 pub use sweden::Sweden;
 pub use switzerland::Switzerland;
 pub use target::Target;
+pub use unitedstates::UnitedStates;
 pub use weekendsonly::WeekendsOnly;
