@@ -9,11 +9,11 @@ use crate::time::weekday::Weekday;
 
 /// Mexican calendar markets.
 ///
-/// QuantLib defaults this to [`Market::BMV`].
+/// QuantLib defaults this to [`Market::Bmv`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Market {
     /// Mexican stock exchange.
-    BMV,
+    Bmv,
 }
 
 /// The Mexican calendar.
@@ -21,10 +21,10 @@ pub struct Mexico;
 
 impl Mexico {
     /// Builds a Mexican calendar for the given market. QuantLib defaults to
-    /// [`Market::BMV`].
+    /// [`Market::Bmv`].
     pub fn new(market: Market) -> Calendar {
         let imp: crate::shared::Shared<dyn CalendarImpl> = match market {
-            Market::BMV => shared(BmvImpl),
+            Market::Bmv => shared(BmvImpl),
         };
         Calendar::from_impl(imp)
     }
@@ -87,12 +87,12 @@ mod tests {
     // test-suite/calendars.cpp.
     #[test]
     fn name_matches_quantlib() {
-        assert_eq!(Mexico::new(Market::BMV).name(), "Mexican stock exchange");
+        assert_eq!(Mexico::new(Market::Bmv).name(), "Mexican stock exchange");
     }
 
     #[test]
     fn fixed_holidays() {
-        let c = Mexico::new(Market::BMV);
+        let c = Mexico::new(Market::Bmv);
         assert!(c.is_holiday(Date::new(1, Month::January, 2019)));
         assert!(c.is_holiday(Date::new(1, Month::May, 2019)));
         assert!(c.is_holiday(Date::new(16, Month::September, 2019)));
@@ -103,7 +103,7 @@ mod tests {
 
     #[test]
     fn weekend_rule() {
-        let c = Mexico::new(Market::BMV);
+        let c = Mexico::new(Market::Bmv);
         assert!(c.is_weekend(Weekday::Saturday));
         assert!(c.is_weekend(Weekday::Sunday));
     }

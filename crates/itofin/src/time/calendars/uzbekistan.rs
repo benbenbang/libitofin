@@ -15,13 +15,12 @@ const HOLIDAY_HORIZON: Year = 2040;
 
 /// Market handled by the Uzbekistan calendar.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[allow(clippy::upper_case_acronyms)]
 pub enum Market {
     /// Uzbekistan Stock Exchange.
-    UZSE,
+    Uzse,
 }
 
-/// The Uzbekistan calendar. The default market is [`Market::UZSE`].
+/// The Uzbekistan calendar. The default market is [`Market::Uzse`].
 ///
 /// # Accuracy
 ///
@@ -34,7 +33,7 @@ impl Uzbekistan {
     /// Builds an Uzbekistan calendar for the given `market`.
     pub fn new(market: Market) -> Calendar {
         let imp: crate::shared::Shared<dyn CalendarImpl> = match market {
-            Market::UZSE => shared(Impl),
+            Market::Uzse => shared(Impl),
         };
         Calendar::from_impl(imp)
     }
@@ -91,14 +90,14 @@ mod tests {
     #[test]
     fn name_matches_quantlib() {
         assert_eq!(
-            Uzbekistan::new(Market::UZSE).name(),
+            Uzbekistan::new(Market::Uzse).name(),
             "Uzbekistan Stock Exchange"
         );
     }
 
     #[test]
     fn fixed_holidays() {
-        let c = Uzbekistan::new(Market::UZSE);
+        let c = Uzbekistan::new(Market::Uzse);
         for (d, m) in [
             (1, Month::January),   // New Year's Day
             (8, Month::March),     // International Women's Day
@@ -114,7 +113,7 @@ mod tests {
 
     #[test]
     fn weekend_rule() {
-        let c = Uzbekistan::new(Market::UZSE);
+        let c = Uzbekistan::new(Market::Uzse);
         assert!(c.is_weekend(Weekday::Saturday));
         assert!(c.is_weekend(Weekday::Sunday));
         assert!(!c.is_weekend(Weekday::Friday));
@@ -124,14 +123,14 @@ mod tests {
     fn in_horizon_query_works() {
         // A query at the last tabulated year must not panic. New Year's Day is
         // unconditional.
-        let c = Uzbekistan::new(Market::UZSE);
+        let c = Uzbekistan::new(Market::Uzse);
         assert!(c.is_holiday(Date::new(1, Month::January, HOLIDAY_HORIZON)));
     }
 
     #[test]
     #[should_panic(expected = "beyond the supported horizon")]
     fn beyond_horizon_panics() {
-        let c = Uzbekistan::new(Market::UZSE);
+        let c = Uzbekistan::new(Market::Uzse);
         let _ = c.is_business_day(Date::new(1, Month::January, HOLIDAY_HORIZON + 1));
     }
 }

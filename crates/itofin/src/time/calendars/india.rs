@@ -22,11 +22,11 @@ const HOLIDAY_HORIZON: Year = 2026;
 
 /// Indian markets.
 ///
-/// QuantLib defaults to [`Market::NSE`].
+/// QuantLib defaults to [`Market::Nse`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Market {
     /// National Stock Exchange.
-    NSE,
+    Nse,
 }
 
 /// Indian calendars.
@@ -42,7 +42,7 @@ impl India {
     /// Builds an Indian calendar for the given market.
     pub fn new(market: Market) -> Calendar {
         let imp: crate::shared::Shared<dyn CalendarImpl> = match market {
-            Market::NSE => shared(NseImpl),
+            Market::Nse => shared(NseImpl),
         };
         Calendar::from_impl(imp)
     }
@@ -609,14 +609,14 @@ mod tests {
     #[test]
     fn name_matches_quantlib() {
         assert_eq!(
-            India::new(Market::NSE).name(),
+            India::new(Market::Nse).name(),
             "National Stock Exchange of India"
         );
     }
 
     #[test]
     fn unconditional_fixed_holidays() {
-        let c = India::new(Market::NSE);
+        let c = India::new(Market::Nse);
         // Republic Day
         assert!(c.is_holiday(Date::new(26, Month::January, 2019)));
         // Ambedkar Jayanti
@@ -633,7 +633,7 @@ mod tests {
 
     #[test]
     fn weekend_rule() {
-        let c = India::new(Market::NSE);
+        let c = India::new(Market::Nse);
         assert!(c.is_weekend(Weekday::Saturday));
         assert!(c.is_weekend(Weekday::Sunday));
         assert!(!c.is_weekend(Weekday::Monday));
@@ -641,7 +641,7 @@ mod tests {
 
     #[test]
     fn in_horizon_query_works() {
-        let c = India::new(Market::NSE);
+        let c = India::new(Market::Nse);
         // Republic Day at the horizon year does not panic.
         assert!(c.is_holiday(Date::new(26, Month::January, HOLIDAY_HORIZON)));
     }
@@ -649,7 +649,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "beyond the supported horizon")]
     fn beyond_horizon_panics() {
-        let c = India::new(Market::NSE);
+        let c = India::new(Market::Nse);
         let _ = c.is_business_day(Date::new(1, Month::January, HOLIDAY_HORIZON + 1));
     }
 }

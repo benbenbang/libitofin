@@ -9,13 +9,13 @@ use crate::time::weekday::Weekday;
 
 /// Romanian calendar markets.
 ///
-/// QuantLib defaults this to [`Market::BVB`].
+/// QuantLib defaults this to [`Market::Bvb`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Market {
     /// Public holidays.
     Public,
     /// Bucharest stock exchange.
-    BVB,
+    Bvb,
 }
 
 /// The Romanian calendar.
@@ -23,11 +23,11 @@ pub struct Romania;
 
 impl Romania {
     /// Builds a Romanian calendar for the given market. QuantLib defaults to
-    /// [`Market::BVB`].
+    /// [`Market::Bvb`].
     pub fn new(market: Market) -> Calendar {
         let imp: crate::shared::Shared<dyn CalendarImpl> = match market {
             Market::Public => shared(PublicImpl),
-            Market::BVB => shared(BvbImpl),
+            Market::Bvb => shared(BvbImpl),
         };
         Calendar::from_impl(imp)
     }
@@ -118,7 +118,7 @@ mod tests {
     #[test]
     fn names_match_quantlib() {
         assert_eq!(Romania::new(Market::Public).name(), "Romania");
-        assert_eq!(Romania::new(Market::BVB).name(), "Bucharest stock exchange");
+        assert_eq!(Romania::new(Market::Bvb).name(), "Bucharest stock exchange");
     }
 
     #[test]
@@ -137,14 +137,14 @@ mod tests {
 
     #[test]
     fn bvb_one_off_closings() {
-        let c = Romania::new(Market::BVB);
+        let c = Romania::new(Market::Bvb);
         assert!(c.is_holiday(Date::new(24, Month::December, 2014)));
         assert!(c.is_holiday(Date::new(31, Month::December, 2014)));
     }
 
     #[test]
     fn weekend_rule() {
-        let c = Romania::new(Market::BVB);
+        let c = Romania::new(Market::Bvb);
         assert!(c.is_weekend(Weekday::Saturday));
         assert!(c.is_weekend(Weekday::Sunday));
     }

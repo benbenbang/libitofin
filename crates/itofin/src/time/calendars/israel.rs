@@ -19,19 +19,18 @@ const HOLIDAY_HORIZON: Year = 2050;
 
 /// Market handled by the Israeli calendar.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[allow(clippy::upper_case_acronyms)]
 pub enum Market {
-    /// Generic settlement calendar (deprecated in QuantLib; use [`Market::TASE`]).
+    /// Generic settlement calendar (deprecated in QuantLib; use [`Market::Tase`]).
     Settlement,
     /// Tel-Aviv stock exchange calendar.
-    TASE,
+    Tase,
     /// SHIR fixing calendar.
-    SHIR,
+    Shir,
     /// Telbor fixing calendar.
     Telbor,
 }
 
-/// The Israeli calendar. The default market is [`Market::TASE`].
+/// The Israeli calendar. The default market is [`Market::Tase`].
 ///
 /// # Accuracy
 ///
@@ -44,9 +43,9 @@ impl Israel {
     /// Builds an Israeli calendar for the given `market`.
     pub fn new(market: Market) -> Calendar {
         let imp: crate::shared::Shared<dyn CalendarImpl> = match market {
-            Market::Settlement | Market::TASE => shared(TelAvivImpl),
+            Market::Settlement | Market::Tase => shared(TelAvivImpl),
             Market::Telbor => shared(TelborImpl),
-            Market::SHIR => shared(ShirImpl),
+            Market::Shir => shared(ShirImpl),
         };
         Calendar::from_impl(imp)
     }
@@ -603,13 +602,13 @@ mod tests {
     // Spot-checks, not a full transcription of test-suite/calendars.cpp.
     #[test]
     fn names_match_quantlib() {
-        assert_eq!(Israel::new(Market::TASE).name(), "Tel Aviv stock exchange");
+        assert_eq!(Israel::new(Market::Tase).name(), "Tel Aviv stock exchange");
         assert_eq!(
             Israel::new(Market::Settlement).name(),
             "Tel Aviv stock exchange"
         );
         assert_eq!(Israel::new(Market::Telbor).name(), "Telbor fixing calendar");
-        assert_eq!(Israel::new(Market::SHIR).name(), "SHIR fixing calendar");
+        assert_eq!(Israel::new(Market::Shir).name(), "SHIR fixing calendar");
     }
 
     #[test]
@@ -625,9 +624,9 @@ mod tests {
     fn purim_is_a_holiday_across_markets() {
         // 1 March 2018 was Purim.
         let purim = Date::new(1, Month::March, 2018);
-        assert!(Israel::new(Market::TASE).is_holiday(purim));
+        assert!(Israel::new(Market::Tase).is_holiday(purim));
         assert!(Israel::new(Market::Telbor).is_holiday(purim));
-        assert!(Israel::new(Market::SHIR).is_holiday(purim));
+        assert!(Israel::new(Market::Shir).is_holiday(purim));
     }
 
     #[test]
@@ -639,8 +638,8 @@ mod tests {
         // covered by `beyond_horizon_panics` rather than exercised here.
         for market in [
             Market::Settlement,
-            Market::TASE,
-            Market::SHIR,
+            Market::Tase,
+            Market::Shir,
             Market::Telbor,
         ] {
             let c = Israel::new(market);
@@ -651,7 +650,7 @@ mod tests {
 
     #[test]
     fn weekend_rule() {
-        let c = Israel::new(Market::TASE);
+        let c = Israel::new(Market::Tase);
         assert!(c.is_weekend(Weekday::Saturday));
         assert!(c.is_weekend(Weekday::Sunday));
         assert!(!c.is_weekend(Weekday::Friday));
@@ -668,7 +667,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "beyond the supported horizon")]
     fn beyond_horizon_panics() {
-        let c = Israel::new(Market::TASE);
+        let c = Israel::new(Market::Tase);
         let _ = c.is_business_day(Date::new(1, Month::January, HOLIDAY_HORIZON + 1));
     }
 }

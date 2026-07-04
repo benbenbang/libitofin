@@ -22,16 +22,16 @@ const HOLIDAY_HORIZON: Year = 2014;
 
 /// Indonesian markets.
 ///
-/// QuantLib defaults to [`Market::IDX`]. `BEJ`, `JSX` and `IDX` all share the
+/// QuantLib defaults to [`Market::Idx`]. `BEJ`, `JSX` and `IDX` all share the
 /// same holiday schedule (BEJ and JSX were merged into IDX).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Market {
     /// Jakarta stock exchange (merged into IDX).
-    BEJ,
+    Bej,
     /// Jakarta stock exchange (merged into IDX).
-    JSX,
+    Jsx,
     /// Indonesia stock exchange.
-    IDX,
+    Idx,
 }
 
 /// Indonesian calendars.
@@ -47,7 +47,7 @@ impl Indonesia {
     /// Builds an Indonesian calendar for the given market.
     pub fn new(market: Market) -> Calendar {
         let imp: crate::shared::Shared<dyn CalendarImpl> = match market {
-            Market::BEJ | Market::JSX | Market::IDX => shared(BejImpl),
+            Market::Bej | Market::Jsx | Market::Idx => shared(BejImpl),
         };
         Calendar::from_impl(imp)
     }
@@ -342,14 +342,14 @@ mod tests {
     // Spot-checks, not a full transcription of test-suite/calendars.cpp.
     #[test]
     fn name_matches_quantlib() {
-        assert_eq!(Indonesia::new(Market::IDX).name(), "Jakarta stock exchange");
-        assert_eq!(Indonesia::new(Market::BEJ).name(), "Jakarta stock exchange");
-        assert_eq!(Indonesia::new(Market::JSX).name(), "Jakarta stock exchange");
+        assert_eq!(Indonesia::new(Market::Idx).name(), "Jakarta stock exchange");
+        assert_eq!(Indonesia::new(Market::Bej).name(), "Jakarta stock exchange");
+        assert_eq!(Indonesia::new(Market::Jsx).name(), "Jakarta stock exchange");
     }
 
     #[test]
     fn unconditional_fixed_holidays() {
-        let c = Indonesia::new(Market::IDX);
+        let c = Indonesia::new(Market::Idx);
         // New Year's Day
         assert!(c.is_holiday(Date::new(1, Month::January, 2014)));
         // Independence Day
@@ -360,7 +360,7 @@ mod tests {
 
     #[test]
     fn weekend_rule() {
-        let c = Indonesia::new(Market::IDX);
+        let c = Indonesia::new(Market::Idx);
         assert!(c.is_weekend(Weekday::Saturday));
         assert!(c.is_weekend(Weekday::Sunday));
         assert!(!c.is_weekend(Weekday::Monday));
@@ -368,14 +368,14 @@ mod tests {
 
     #[test]
     fn in_horizon_query_works() {
-        let c = Indonesia::new(Market::IDX);
+        let c = Indonesia::new(Market::Idx);
         assert!(c.is_holiday(Date::new(1, Month::January, HOLIDAY_HORIZON)));
     }
 
     #[test]
     #[should_panic(expected = "beyond the supported horizon")]
     fn beyond_horizon_panics() {
-        let c = Indonesia::new(Market::IDX);
+        let c = Indonesia::new(Market::Idx);
         let _ = c.is_business_day(Date::new(1, Month::January, HOLIDAY_HORIZON + 1));
     }
 }

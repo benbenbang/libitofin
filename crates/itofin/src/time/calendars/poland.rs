@@ -15,7 +15,7 @@ pub enum Market {
     /// Settlement calendar.
     Settlement,
     /// Warsaw stock exchange calendar.
-    WSE,
+    Wse,
 }
 
 /// The Polish calendar.
@@ -27,7 +27,7 @@ impl Poland {
     pub fn new(market: Market) -> Calendar {
         let imp: crate::shared::Shared<dyn CalendarImpl> = match market {
             Market::Settlement => shared(SettlementImpl),
-            Market::WSE => shared(WseImpl),
+            Market::Wse => shared(WseImpl),
         };
         Calendar::from_impl(imp)
     }
@@ -115,7 +115,7 @@ mod tests {
     #[test]
     fn names_match_quantlib() {
         assert_eq!(Poland::new(Market::Settlement).name(), "Poland Settlement");
-        assert_eq!(Poland::new(Market::WSE).name(), "Warsaw stock exchange");
+        assert_eq!(Poland::new(Market::Wse).name(), "Warsaw stock exchange");
     }
 
     #[test]
@@ -133,7 +133,7 @@ mod tests {
 
     #[test]
     fn wse_extra_holidays() {
-        let c = Poland::new(Market::WSE);
+        let c = Poland::new(Market::Wse);
         assert!(c.is_holiday(Date::new(24, Month::December, 2019)));
         assert!(c.is_holiday(Date::new(31, Month::December, 2019)));
     }

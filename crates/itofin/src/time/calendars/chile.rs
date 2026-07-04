@@ -9,11 +9,11 @@ use crate::time::weekday::Weekday;
 
 /// Chilean markets.
 ///
-/// QuantLib defaults this to [`Market::SSE`].
+/// QuantLib defaults this to [`Market::Sse`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Market {
     /// Santiago Stock Exchange.
-    SSE,
+    Sse,
 }
 
 /// Chilean calendar.
@@ -23,7 +23,7 @@ impl Chile {
     /// Builds a Chilean calendar for the given market.
     pub fn new(market: Market) -> Calendar {
         let imp: crate::shared::Shared<dyn CalendarImpl> = match market {
-            Market::SSE => shared(SseImpl),
+            Market::Sse => shared(SseImpl),
         };
         Calendar::from_impl(imp)
     }
@@ -143,12 +143,12 @@ mod tests {
     // Spot-checks, not a full transcription of test-suite/calendars.cpp.
     #[test]
     fn name_matches_quantlib() {
-        assert_eq!(Chile::new(Market::SSE).name(), "Santiago Stock Exchange");
+        assert_eq!(Chile::new(Market::Sse).name(), "Santiago Stock Exchange");
     }
 
     #[test]
     fn fixed_holidays() {
-        let c = Chile::new(Market::SSE);
+        let c = Chile::new(Market::Sse);
         assert!(c.is_holiday(Date::new(1, Month::January, 2019))); // New Year's Day
         assert!(c.is_holiday(Date::new(1, Month::May, 2019))); // Labour Day
         assert!(c.is_holiday(Date::new(21, Month::May, 2019))); // Navy Day
@@ -164,7 +164,7 @@ mod tests {
 
     #[test]
     fn weekend_rule() {
-        let c = Chile::new(Market::SSE);
+        let c = Chile::new(Market::Sse);
         assert!(c.is_weekend(Weekday::Saturday));
         assert!(c.is_weekend(Weekday::Sunday));
     }

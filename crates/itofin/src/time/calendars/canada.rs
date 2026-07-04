@@ -15,7 +15,7 @@ pub enum Market {
     /// Generic settlement calendar.
     Settlement,
     /// Toronto stock exchange calendar.
-    TSX,
+    Tsx,
 }
 
 /// Canadian calendar.
@@ -26,7 +26,7 @@ impl Canada {
     pub fn new(market: Market) -> Calendar {
         let imp: crate::shared::Shared<dyn CalendarImpl> = match market {
             Market::Settlement => shared(SettlementImpl),
-            Market::TSX => shared(TsxImpl),
+            Market::Tsx => shared(TsxImpl),
         };
         Calendar::from_impl(imp)
     }
@@ -136,7 +136,7 @@ mod tests {
     #[test]
     fn names_match_quantlib() {
         assert_eq!(Canada::new(Market::Settlement).name(), "Canada");
-        assert_eq!(Canada::new(Market::TSX).name(), "TSX");
+        assert_eq!(Canada::new(Market::Tsx).name(), "TSX");
     }
 
     #[test]

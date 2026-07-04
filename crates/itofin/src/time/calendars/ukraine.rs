@@ -9,20 +9,19 @@ use crate::time::weekday::Weekday;
 
 /// Market handled by the Ukrainian calendar.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[allow(clippy::upper_case_acronyms)]
 pub enum Market {
     /// Ukrainian stock exchange.
-    USE,
+    Use,
 }
 
-/// The Ukrainian calendar. The default market is [`Market::USE`].
+/// The Ukrainian calendar. The default market is [`Market::Use`].
 pub struct Ukraine;
 
 impl Ukraine {
     /// Builds a Ukrainian calendar for the given `market`.
     pub fn new(market: Market) -> Calendar {
         let imp: crate::shared::Shared<dyn CalendarImpl> = match market {
-            Market::USE => shared(UseImpl),
+            Market::Use => shared(UseImpl),
         };
         Calendar::from_impl(imp)
     }
@@ -80,12 +79,12 @@ mod tests {
     // Spot-checks, not a full transcription of test-suite/calendars.cpp.
     #[test]
     fn name_matches_quantlib() {
-        assert_eq!(Ukraine::new(Market::USE).name(), "Ukrainian stock exchange");
+        assert_eq!(Ukraine::new(Market::Use).name(), "Ukrainian stock exchange");
     }
 
     #[test]
     fn fixed_holidays() {
-        let c = Ukraine::new(Market::USE);
+        let c = Ukraine::new(Market::Use);
         for (d, m) in [
             (28, Month::June),   // Constitution Day
             (24, Month::August), // Independence Day
@@ -96,7 +95,7 @@ mod tests {
 
     #[test]
     fn weekend_rule() {
-        let c = Ukraine::new(Market::USE);
+        let c = Ukraine::new(Market::Use);
         assert!(c.is_weekend(Weekday::Saturday));
         assert!(c.is_weekend(Weekday::Sunday));
         assert!(!c.is_weekend(Weekday::Friday));
