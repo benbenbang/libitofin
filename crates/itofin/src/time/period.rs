@@ -2,9 +2,9 @@
 //!
 //! Port of `ql/time/period.{hpp,cpp}`: a [`Period`] is an integer length in a
 //! [`TimeUnit`], with the limited algebra QuantLib defines - arithmetic
-//! operators, a *partial* ordering, and normalization. The
-//! [`Frequency`](crate::time::frequency::Frequency) conversions and the
-//! `years`/`months`/`weeks`/`days` helpers live alongside this type.
+//! operators, a *partial* ordering, and normalization. The [`Frequency`]
+//! conversions and the `years`/`months`/`weeks`/`days` helpers live alongside
+//! this type.
 //!
 //! # Divergences from QuantLib
 //!
@@ -21,8 +21,10 @@ use std::cmp::Ordering;
 use std::fmt;
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
+use crate::errors::{QlError, QlResult};
+use crate::time::frequency::Frequency;
 use crate::time::timeunit::TimeUnit;
-use crate::types::Integer;
+use crate::types::{Integer, Real};
 
 /// A time span expressed as an integer `length` of a given [`TimeUnit`].
 ///
@@ -83,6 +85,144 @@ impl Period {
         let mut p = *self;
         p.normalize();
         p
+    }
+
+    /// The [`Frequency`] this period corresponds to, or
+    /// [`OtherFrequency`](Frequency::OtherFrequency) when it maps to none of the
+    /// named ones (e.g. `5 Years`). A zero length is [`Once`](Frequency::Once)
+    /// for years and [`NoFrequency`](Frequency::NoFrequency) otherwise.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the period uses a sub-day unit (matching QuantLib's `QL_FAIL`).
+    pub fn frequency(&self) -> Frequency {
+        let length = self.length.unsigned_abs();
+        if length == 0 {
+            return if self.units == TimeUnit::Years {
+                Frequency::Once
+            } else {
+                Frequency::NoFrequency
+            };
+        }
+        match self.units {
+            TimeUnit::Years if length == 1 => Frequency::Annual,
+            TimeUnit::Months if 12 % length == 0 && length <= 12 => match 12 / length {
+                1 => Frequency::Annual,
+                2 => Frequency::Semiannual,
+                3 => Frequency::EveryFourthMonth,
+                4 => Frequency::Quarterly,
+                6 => Frequency::Bimonthly,
+                _ => Frequency::Monthly,
+            },
+            TimeUnit::Weeks => match length {
+                1 => Frequency::Weekly,
+                2 => Frequency::Biweekly,
+                4 => Frequency::EveryFourthWeek,
+                _ => Frequency::OtherFrequency,
+            },
+            TimeUnit::Days if length == 1 => Frequency::Daily,
+            TimeUnit::Days | TimeUnit::Months | TimeUnit::Years => Frequency::OtherFrequency,
+            other => panic!("cannot compute the frequency of a period in {other}"),
+        }
+    }
+}
+
+impl TryFrom<Frequency> for Period {
+    type Error = QlError;
+
+    /// Builds the canonical period for a frequency (`Annual -> 1 Year`,
+    /// `Quarterly -> 3 Months`, ...).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for [`OtherFrequency`](Frequency::OtherFrequency), which
+    /// names no definite period (matching QuantLib's `QL_FAIL`).
+    fn try_from(f: Frequency) -> QlResult<Period> {
+        let n = Integer::from(f as i16);
+        let p = match f {
+            Frequency::NoFrequency => Period::new(0, TimeUnit::Days),
+            Frequency::Once => Period::new(0, TimeUnit::Years),
+            Frequency::Annual => Period::new(1, TimeUnit::Years),
+            Frequency::Semiannual
+            | Frequency::EveryFourthMonth
+            | Frequency::Quarterly
+            | Frequency::Bimonthly
+            | Frequency::Monthly => Period::new(12 / n, TimeUnit::Months),
+            Frequency::EveryFourthWeek | Frequency::Biweekly | Frequency::Weekly => {
+                Period::new(52 / n, TimeUnit::Weeks)
+            }
+            Frequency::Daily => Period::new(1, TimeUnit::Days),
+            Frequency::OtherFrequency => {
+                crate::fail!("cannot build a Period from an unknown frequency")
+            }
+        };
+        Ok(p)
+    }
+}
+
+/// The period as a fractional number of years.
+///
+/// # Errors
+///
+/// Returns an error for day- or week-based periods, which QuantLib cannot
+/// express in years.
+pub fn years(p: &Period) -> QlResult<Real> {
+    if p.length() == 0 {
+        return Ok(0.0);
+    }
+    match p.units() {
+        TimeUnit::Months => Ok(Real::from(p.length()) / 12.0),
+        TimeUnit::Years => Ok(Real::from(p.length())),
+        other => crate::fail!("cannot convert a period in {other} into years"),
+    }
+}
+
+/// The period as a fractional number of months.
+///
+/// # Errors
+///
+/// Returns an error for day- or week-based periods.
+pub fn months(p: &Period) -> QlResult<Real> {
+    if p.length() == 0 {
+        return Ok(0.0);
+    }
+    match p.units() {
+        TimeUnit::Months => Ok(Real::from(p.length())),
+        TimeUnit::Years => Ok(Real::from(p.length()) * 12.0),
+        other => crate::fail!("cannot convert a period in {other} into months"),
+    }
+}
+
+/// The period as a fractional number of weeks.
+///
+/// # Errors
+///
+/// Returns an error for month- or year-based periods.
+pub fn weeks(p: &Period) -> QlResult<Real> {
+    if p.length() == 0 {
+        return Ok(0.0);
+    }
+    match p.units() {
+        TimeUnit::Days => Ok(Real::from(p.length()) / 7.0),
+        TimeUnit::Weeks => Ok(Real::from(p.length())),
+        other => crate::fail!("cannot convert a period in {other} into weeks"),
+    }
+}
+
+/// The period as a fractional number of days.
+///
+/// # Errors
+///
+/// Returns an error for month- or year-based periods, whose day count is not
+/// fixed.
+pub fn days(p: &Period) -> QlResult<Real> {
+    if p.length() == 0 {
+        return Ok(0.0);
+    }
+    match p.units() {
+        TimeUnit::Days => Ok(Real::from(p.length())),
+        TimeUnit::Weeks => Ok(Real::from(p.length()) * 7.0),
+        other => crate::fail!("cannot convert a period in {other} into days"),
     }
 }
 
@@ -430,5 +570,82 @@ mod tests {
         let b = Period::new(30, Days);
         assert_eq!(a.partial_cmp(&b), None);
         assert!(a != b);
+    }
+
+    // test-suite/period.cpp testFrequencyComputation: frequency -> period ->
+    // frequency round-trips for every named frequency.
+    #[test]
+    fn frequency_round_trip() {
+        use Frequency::*;
+        for f in [
+            NoFrequency,
+            Once,
+            Annual,
+            Semiannual,
+            EveryFourthMonth,
+            Quarterly,
+            Bimonthly,
+            Monthly,
+            EveryFourthWeek,
+            Biweekly,
+            Weekly,
+            Daily,
+        ] {
+            let p = Period::try_from(f).unwrap();
+            assert_eq!(p.frequency(), f, "round trip failed for {f}");
+        }
+    }
+
+    #[test]
+    fn frequency_from_count_and_unit() {
+        assert_eq!(Period::new(1, Years).frequency(), Frequency::Annual);
+        assert_eq!(Period::new(6, Months).frequency(), Frequency::Semiannual);
+        assert_eq!(
+            Period::new(4, Months).frequency(),
+            Frequency::EveryFourthMonth
+        );
+        assert_eq!(Period::new(3, Months).frequency(), Frequency::Quarterly);
+        assert_eq!(Period::new(2, Months).frequency(), Frequency::Bimonthly);
+        assert_eq!(Period::new(1, Months).frequency(), Frequency::Monthly);
+        assert_eq!(
+            Period::new(4, Weeks).frequency(),
+            Frequency::EveryFourthWeek
+        );
+        assert_eq!(Period::new(2, Weeks).frequency(), Frequency::Biweekly);
+        assert_eq!(Period::new(1, Weeks).frequency(), Frequency::Weekly);
+        assert_eq!(Period::new(1, Days).frequency(), Frequency::Daily);
+        // no matching named frequency
+        assert_eq!(Period::new(5, Years).frequency(), Frequency::OtherFrequency);
+    }
+
+    #[test]
+    fn unknown_frequency_has_no_period() {
+        assert!(Period::try_from(Frequency::OtherFrequency).is_err());
+    }
+
+    // test-suite/period.cpp testConvertTo{Years,Months,Weeks}
+    #[test]
+    fn unit_conversions() {
+        let tol = 1e-12;
+        assert_eq!(years(&Period::new(0, Years)).unwrap(), 0.0);
+        assert_eq!(years(&Period::new(5, Years)).unwrap(), 5.0);
+        assert!((years(&Period::new(8, Months)).unwrap() - 8.0 / 12.0).abs() < tol);
+        assert_eq!(years(&Period::new(12, Months)).unwrap(), 1.0);
+
+        assert_eq!(months(&Period::new(5, Months)).unwrap(), 5.0);
+        assert_eq!(months(&Period::new(3, Years)).unwrap(), 36.0);
+
+        assert!((weeks(&Period::new(3, Days)).unwrap() - 3.0 / 7.0).abs() < tol);
+        assert_eq!(weeks(&Period::new(5, Weeks)).unwrap(), 5.0);
+
+        assert_eq!(days(&Period::new(2, Weeks)).unwrap(), 14.0);
+        assert_eq!(days(&Period::new(3, Days)).unwrap(), 3.0);
+    }
+
+    #[test]
+    fn incompatible_unit_conversions_error() {
+        assert!(years(&Period::new(3, Days)).is_err());
+        assert!(weeks(&Period::new(1, Months)).is_err());
+        assert!(days(&Period::new(1, Years)).is_err());
     }
 }
