@@ -118,6 +118,34 @@ available locally: `ln -s /path/to/QuantLib QuantLib`.
   see **D1–D8** in [`TICKETS.md`](TICKETS.md) (`Rc` vs `Arc`, error handling,
   concurrency, bindings, logging, …).
 
+## Divergences from QuantLib
+
+The port targets **semantic** faithfulness (matching QuantLib's results), not
+bit-for-bit reproduction of its implementation. A small, deliberate set of
+divergences is catalogued here. Each is an intentional, reviewed decision (not an
+oversight) and is documented at the point of divergence in the source.
+
+**Time / calendars (EPIC-2):**
+
+- **Calendar holiday overrides are per-value, not process-global.** QuantLib
+  shares one global `Impl` per market, so `addHoliday` on any `TARGET()` handle
+  is visible through every other. This port shares added/removed holidays only
+  among *clones* of a `Calendar` value, matching the "explicit state, no hidden
+  singletons" decision (D5). The built-in holiday rules are identical; only the
+  reach of `add_holiday`/`remove_holiday` differs.
+- **`holiday_list` filters weekends by a date-aware rule.** QuantLib's
+  `holidayList` excludes weekends using the weekday-only `isWeekend`, which
+  misclassifies holidays for markets whose weekend changed over time (Saudi
+  Arabia's Thu/Fri→Fri/Sat in 2013, Israel/TASE's Fri/Sat→Sat/Sun in 2026). This
+  port filters with a date-aware `is_weekend_on`; fixed-weekend calendars are
+  unaffected (the default equals the weekday rule).
+- **Table-backed calendars fail loudly past their data horizon.** Where QuantLib
+  tabulates lunar / religious / observed holidays only up to a fixed year and
+  then silently returns "business day" for later dates, this port panics with a
+  clear message once a query passes the last fully-tabulated year (the
+  *minimum* across a calendar's required holiday tables). QuantLib's tables are
+  kept verbatim; we never fabricate future dates.
+
 ## License
 
 This is a port of QuantLib, which is distributed under a modified BSD license.
