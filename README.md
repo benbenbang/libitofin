@@ -145,6 +145,14 @@ oversight) and is documented at the point of divergence in the source.
   clear message once a query passes the last fully-tabulated year (the
   *minimum* across a calendar's required holiday tables). QuantLib's tables are
   kept verbatim; we never fabricate future dates.
+- **`Period` comparison is a partial order, and fixes a negative-period bug.**
+  QuantLib's `operator<`/`operator==` throw when two periods have overlapping
+  day ranges (e.g. `1 Month` vs `30 Days`); this port returns `None` from
+  `partial_cmp` instead, so comparison never panics. It also orders the day
+  bounds `min <= max` before comparing, which QuantLib omits: for negative
+  lengths QuantLib's inverted bounds make overlapping periods (like `-1 Month`
+  vs `-30 Days`) look decidably ordered, whereas this port correctly reports
+  them as undecidable. Positive comparisons are unaffected.
 
 ## License
 
