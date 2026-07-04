@@ -12,6 +12,7 @@ pub mod businessdayconvention;
 pub mod calendar;
 pub mod calendars;
 pub mod date;
+pub mod frequency;
 pub mod period;
 pub mod timeunit;
 pub mod weekday;
