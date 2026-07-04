@@ -12,10 +12,17 @@
 //! (e.g. `1 Month` vs `30 Days`, whose day ranges overlap). This port instead
 //! models the relation as a genuine partial order: [`PartialOrd::partial_cmp`]
 //! returns `None` for those pairs and `==` is then simply `false`, so ordinary
-//! comparison never panics. Every *decidable* comparison matches QuantLib
-//! exactly. Only the four calendar units (`Days`/`Weeks`/`Months`/`Years`)
-//! participate in the algebra, mirroring QuantLib; the sub-day units panic if
-//! fed to it.
+//! comparison never panics. Only the four calendar units
+//! (`Days`/`Weeks`/`Months`/`Years`) participate in the algebra, mirroring
+//! QuantLib; the sub-day units panic if fed to it.
+//!
+//! Every *decidable* comparison matches QuantLib, with one intentional bug fix:
+//! QuantLib computes a period's day-range bounds as `28*length` / `31*length`
+//! (and `365`/`366` for years) without reordering them, so for a *negative*
+//! length the pair comes out inverted and its `operator<` then reports
+//! overlapping negative periods (e.g. `-1 Month` vs `-30 Days`) as decidably
+//! ordered. This port orders the bounds `min <= max`, so those pairs are
+//! correctly undecidable (`None`). Positive comparisons are unaffected.
 
 use std::cmp::Ordering;
 use std::fmt;
@@ -233,15 +240,26 @@ impl Default for Period {
     }
 }
 
-/// The `[min, max]` number of days a period can span, used to compare periods
-/// whose units are not exactly convertible. Months are 28-31 days, years
+/// The `(min, max)` number of days a period can span, used to compare periods
+/// whose units are not exactly convertible. A month is 28-31 days, a year
 /// 365-366.
+///
+/// The bounds are ordered `min <= max` even for negative lengths: multiplying a
+/// negative length by the day factors flips their order (e.g. `-1 Month` gives
+/// `28*-1 = -28` and `31*-1 = -31`), so we `min`/`max` the products. QuantLib's
+/// `daysMinMax` skips this and hands the inverted pair straight to `operator<`,
+/// which then reports overlapping negative periods as decidably ordered; see the
+/// [module docs](self) for this deliberate divergence.
 fn days_min_max(p: &Period) -> (Integer, Integer) {
+    let bounds = |lo_factor: Integer, hi_factor: Integer| {
+        let (a, b) = (lo_factor * p.length, hi_factor * p.length);
+        (a.min(b), a.max(b))
+    };
     match p.units {
         TimeUnit::Days => (p.length, p.length),
         TimeUnit::Weeks => (7 * p.length, 7 * p.length),
-        TimeUnit::Months => (28 * p.length, 31 * p.length),
-        TimeUnit::Years => (365 * p.length, 366 * p.length),
+        TimeUnit::Months => bounds(28, 31),
+        TimeUnit::Years => bounds(365, 366),
         other => panic!("cannot compare a period in {other}"),
     }
 }
@@ -570,6 +588,25 @@ mod tests {
         let b = Period::new(30, Days);
         assert_eq!(a.partial_cmp(&b), None);
         assert!(a != b);
+    }
+
+    #[test]
+    fn negative_inexact_comparison() {
+        // -1 month spans [-31, -28] days, which straddles -30: undecidable.
+        // (QuantLib's un-ordered bounds wrongly report this as decidably <.)
+        assert_eq!(
+            Period::new(-1, Months).partial_cmp(&Period::new(-30, Days)),
+            None
+        );
+        assert_eq!(
+            Period::new(-1, Years).partial_cmp(&Period::new(-365, Days)),
+            None
+        );
+        // but ranges that clear -30 stay decidable in both directions
+        // -1 month in [-31, -28] is strictly greater than -40 days
+        assert!(Period::new(-1, Months) > Period::new(-40, Days));
+        // and strictly less than -20 days
+        assert!(Period::new(-1, Months) < Period::new(-20, Days));
     }
 
     // test-suite/period.cpp testFrequencyComputation: frequency -> period ->
