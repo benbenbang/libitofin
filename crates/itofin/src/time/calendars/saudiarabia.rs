@@ -152,6 +152,12 @@ impl CalendarImpl for TadawulImpl {
         w == Weekday::Friday || w == Weekday::Saturday
     }
 
+    /// Date-dependent weekend (Thu/Fri before 29 June 2013, Fri/Sat after), so
+    /// `holiday_list` filters weekends correctly across the switch.
+    fn is_weekend_on(&self, date: Date) -> bool {
+        is_true_weekend(date)
+    }
+
     fn is_business_day(&self, date: Date) -> bool {
         let d = date.day_of_month();
         let m = date.month();

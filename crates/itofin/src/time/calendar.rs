@@ -7,17 +7,29 @@
 //! [`Rc`](std::rc::Rc): [`Calendar`] holds the shared implementation plus the
 //! per-instance added/removed holiday overrides.
 //!
-//! ## Divergence from QuantLib
+//! ## Divergences from QuantLib
 //!
-//! In QuantLib every construction of, say, `TARGET()` shares one process-global
-//! `Impl` instance, so a holiday added through one handle is visible through an
-//! independently constructed one. That global mutable state conflicts with this
-//! port's "explicit state, no hidden singletons" design decision. Here the
-//! added/removed holiday sets are shared only among *clones* of a given
-//! [`Calendar`] value (they sit behind a shared [`RefCell`](std::cell::RefCell)),
-//! not across separately constructed calendars. The natural (built-in) holiday
-//! rules are identical; only the reach of `add_holiday`/`remove_holiday`
-//! differs.
+//! Both of the following are deliberate decisions made for this port (not
+//! accidental), chosen by the maintainer.
+//!
+//! 1. **Holiday-set sharing.** In QuantLib every construction of, say,
+//!    `TARGET()` shares one process-global `Impl` instance, so a holiday added
+//!    through one handle is visible through an independently constructed one.
+//!    That global mutable state conflicts with this port's "explicit state, no
+//!    hidden singletons" design decision. Here the added/removed holiday sets
+//!    are shared only among *clones* of a given [`Calendar`] value (they sit
+//!    behind a shared [`RefCell`](std::cell::RefCell)), not across separately
+//!    constructed calendars. The natural (built-in) holiday rules are identical;
+//!    only the reach of `add_holiday`/`remove_holiday` differs.
+//!
+//! 2. **Date-aware weekend filtering in [`Calendar::holiday_list`].** QuantLib's
+//!    `holidayList` filters weekends with the weekday-only `isWeekend`, which is
+//!    wrong for markets whose weekend rule changed over time (Saudi Arabia,
+//!    Israel/TASE): a holiday on a day that was a weekend *then* can be wrongly
+//!    kept, or one on a then-business day wrongly dropped. This port filters
+//!    with the date-aware [`CalendarImpl::is_weekend_on`] instead. Calendars
+//!    with a fixed weekend are unaffected (the default `is_weekend_on` equals
+//!    the weekday rule).
 
 use std::collections::BTreeSet;
 use std::fmt;
@@ -42,6 +54,17 @@ pub trait CalendarImpl {
     fn is_business_day(&self, date: Date) -> bool;
     /// Whether `weekday` is part of the weekend for this market.
     fn is_weekend(&self, weekday: Weekday) -> bool;
+    /// Whether `date` falls on a weekend, allowing for markets whose weekend has
+    /// changed over time (e.g. Saudi Arabia, Israel/TASE).
+    ///
+    /// Defaults to the weekday-only [`is_weekend`](Self::is_weekend); markets
+    /// with a date-dependent weekend override this. Used by
+    /// [`Calendar::holiday_list`] so weekend filtering is correct even across a
+    /// weekend-rule change. This is a deliberate improvement over QuantLib,
+    /// whose `holidayList` filters on the fixed weekday rule only.
+    fn is_weekend_on(&self, date: Date) -> bool {
+        self.is_weekend(date.weekday())
+    }
 }
 
 /// Whether `w` is a Saturday or Sunday (the Western/Orthodox weekend).
@@ -98,6 +121,13 @@ impl Calendar {
     /// Whether `w` is part of the weekend for this market.
     pub fn is_weekend(&self, w: Weekday) -> bool {
         self.imp.is_weekend(w)
+    }
+
+    /// Whether `d` falls on a weekend, honouring markets whose weekend rule has
+    /// changed over time (Saudi Arabia, Israel/TASE). For markets with a fixed
+    /// weekend this equals [`is_weekend`](Self::is_weekend) of `d.weekday()`.
+    pub fn is_weekend_on(&self, d: Date) -> bool {
+        self.imp.is_weekend_on(d)
     }
 
     /// The set of holidays added on top of the natural schedule.
@@ -161,11 +191,23 @@ impl Calendar {
     /// The holidays between `from` and `to` (inclusive).
     ///
     /// Weekends are included only when `include_weekends` is set.
+    ///
+    /// # Divergence from QuantLib (chosen for this port)
+    ///
+    /// The weekend filter uses the *date-aware*
+    /// [`is_weekend_on`](Self::is_weekend_on) rather than the fixed weekday rule.
+    /// QuantLib's `holidayList` filters on the weekday-only `isWeekend`, so for
+    /// markets whose weekend changed over time (Saudi Arabia's Thu/Fri->Fri/Sat
+    /// in 2013, Israel/TASE's Fri/Sat->Sat/Sun in 2026) it can wrongly keep a
+    /// holiday that fell on a then-weekend day, or drop one that fell on a
+    /// then-business day. This port deliberately fixes that; every calendar with
+    /// a fixed weekend is unaffected (the default `is_weekend_on` is identical to
+    /// the weekday rule).
     pub fn holiday_list(&self, from: Date, to: Date, include_weekends: bool) -> Vec<Date> {
         let mut result = Vec::new();
         let mut d = from;
         while d <= to {
-            if self.is_holiday(d) && (include_weekends || !self.is_weekend(d.weekday())) {
+            if self.is_holiday(d) && (include_weekends || !self.is_weekend_on(d)) {
                 result.push(d);
             }
             // Stop before incrementing past the inclusive endpoint; otherwise
@@ -487,6 +529,49 @@ mod tests {
 
     fn cal() -> Calendar {
         Calendar::from_impl(shared(WeekendsCal))
+    }
+
+    /// A calendar whose weekend changed on 29 June 2013 (Thu/Fri before,
+    /// Fri/Sat after), used to check that `holiday_list` filters weekends by the
+    /// date-aware rule, not the fixed weekday rule.
+    struct SwitchingWeekendCal;
+    impl CalendarImpl for SwitchingWeekendCal {
+        fn name(&self) -> String {
+            "switching test".to_string()
+        }
+        fn is_weekend(&self, w: Weekday) -> bool {
+            // Fixed rule (matches the "current" weekend), as QuantLib's
+            // weekday-only isWeekend would report.
+            w == Weekday::Friday || w == Weekday::Saturday
+        }
+        fn is_weekend_on(&self, date: Date) -> bool {
+            let w = date.weekday();
+            if date < Date::new(29, Month::June, 2013) {
+                w == Weekday::Thursday || w == Weekday::Friday
+            } else {
+                w == Weekday::Friday || w == Weekday::Saturday
+            }
+        }
+        fn is_business_day(&self, date: Date) -> bool {
+            !self.is_weekend_on(date)
+        }
+    }
+
+    #[test]
+    fn holiday_list_uses_date_aware_weekend() {
+        let c = Calendar::from_impl(shared(SwitchingWeekendCal));
+        // Thursday 27 June 2013 - a weekend day *before* the switch, but the
+        // fixed weekday rule (Fri/Sat) would not call Thursday a weekend.
+        let thu = Date::new(27, Month::June, 2013);
+        assert_eq!(thu.weekday(), Weekday::Thursday);
+        assert!(c.is_weekend_on(thu));
+        assert!(!c.is_weekend(thu.weekday())); // fixed rule disagrees
+
+        // With include_weekends = false, the date-aware filter excludes it;
+        // the old fixed-weekday filter would have wrongly kept it.
+        assert!(c.holiday_list(thu, thu, false).is_empty());
+        // With include_weekends = true it is listed.
+        assert_eq!(c.holiday_list(thu, thu, true), vec![thu]);
     }
 
     #[test]
