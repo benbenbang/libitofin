@@ -10,3 +10,4 @@
 #![allow(clippy::new_ret_no_self)]
 
 pub mod actual360;
+pub mod actual365fixed;
