@@ -11,9 +11,11 @@
 use crate::errors::QlResult;
 use crate::types::{Real, Size};
 
+mod gaussianstatistics;
 mod generalstatistics;
 mod incrementalstatistics;
 
+pub use gaussianstatistics::{GaussianStatistics, StatsHolder};
 pub use generalstatistics::GeneralStatistics;
 pub use incrementalstatistics::IncrementalStatistics;
 
