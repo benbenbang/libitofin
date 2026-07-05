@@ -65,9 +65,12 @@ impl DayCounterImpl for CanadianImpl {
 
     /// # Panics
     ///
-    /// Panics (mirroring QuantLib's `QL_REQUIRE`) if the reference period is
-    /// absent, shorter than a month, or longer than a year - the Canadian bond
-    /// convention cannot infer a coupon frequency without a valid one.
+    /// Panics if the reference period is absent, inverted (`ref_end` not after
+    /// `ref_start`), shorter than a month, or longer than a year - the Canadian
+    /// bond convention cannot infer a coupon frequency without a valid one. The
+    /// absent/short/long checks mirror QuantLib's `QL_REQUIRE`s; rejecting an
+    /// inverted period is a deliberate hardening - QuantLib omits that check and
+    /// would derive a negative frequency and return a nonsensical fraction.
     fn year_fraction(&self, d1: Date, d2: Date, ref_start: Date, ref_end: Date) -> Time {
         if d1 == d2 {
             return 0.0;
@@ -76,6 +79,10 @@ impl DayCounterImpl for CanadianImpl {
         // The reference period is needed to recover the coupon frequency.
         assert!(ref_start != Date::null(), "invalid refPeriodStart");
         assert!(ref_end != Date::null(), "invalid refPeriodEnd");
+        assert!(
+            ref_end > ref_start,
+            "invalid reference period for Act/365 Canadian; end must be after start"
+        );
 
         let dcs = Time::from(d2 - d1);
         let dcc = Time::from(ref_end - ref_start);
@@ -194,6 +201,20 @@ mod tests {
             d(8, Month::January, 2027),
             d(8, Month::January, 2025),
             d(8, Month::January, 2027),
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "end must be after start")]
+    fn canadian_inverted_reference_panics() {
+        // An inverted reference period would otherwise yield a negative
+        // frequency and a nonsensical fraction; reject it up front.
+        let dc = Actual365Fixed::with_convention(Convention::Canadian);
+        dc.year_fraction_ref(
+            d(10, Month::September, 2018),
+            d(10, Month::October, 2018),
+            d(10, Month::March, 2019),
+            d(10, Month::September, 2018),
         );
     }
 
