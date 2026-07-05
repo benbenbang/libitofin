@@ -12,3 +12,4 @@ pub mod interpolations;
 pub mod matrix;
 pub mod solver1d;
 pub mod solvers1d;
+pub mod statistics;
