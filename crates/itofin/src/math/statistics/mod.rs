@@ -13,11 +13,13 @@ use crate::types::{Real, Size};
 
 mod gaussianstatistics;
 mod generalstatistics;
+mod histogram;
 mod incrementalstatistics;
 mod riskstatistics;
 
 pub use gaussianstatistics::{GaussianStatistics, StatsHolder};
 pub use generalstatistics::GeneralStatistics;
+pub use histogram::{Histogram, HistogramAlgorithm};
 pub use incrementalstatistics::IncrementalStatistics;
 pub use riskstatistics::RiskStatistics;
 
