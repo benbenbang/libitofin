@@ -13,7 +13,11 @@
 //! QuantLib's default-constructed `DayCounter` is *empty* (a null `impl_`), and
 //! its accessors `QL_REQUIRE` a non-null implementation. This port omits the
 //! empty state: a [`DayCounter`] always wraps a concrete implementation, so the
-//! accessors cannot fail. The empty placeholder is only used by higher layers
+//! wrapper's accessors never trip the null-implementation check QuantLib guards
+//! against. (This does not make every call infallible: individual conventions
+//! may still panic on their own preconditions - for example the Canadian and
+//! ISMA counters require a valid reference period - as documented in their
+//! `# Panics` sections.) The empty placeholder is only used by higher layers
 //! (schedules, coupons) as a "not yet set" marker; it will be reintroduced as an
 //! `Option<DayCounter>` at those call sites when they are ported, keeping the
 //! counter type itself always-valid.
@@ -127,6 +131,11 @@ impl fmt::Display for DayCounter {
 impl PartialEq for DayCounter {
     /// Two day counters are equal iff they share the same name, matching
     /// QuantLib's `operator==` (which compares the derived-class name).
+    ///
+    /// Because equality is purely by name, a custom [`DayCounterImpl`] must
+    /// return a name distinct from the built-in conventions (and from other
+    /// customs) or it will compare equal to them despite different behaviour -
+    /// the same caveat applies to user-defined day counters in QuantLib.
     fn eq(&self, other: &DayCounter) -> bool {
         self.name() == other.name()
     }
