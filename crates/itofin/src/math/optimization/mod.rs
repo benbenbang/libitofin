@@ -5,3 +5,7 @@ pub mod costfunction;
 pub mod endcriteria;
 pub mod method;
 pub mod problem;
+pub mod simplex;
+
+#[cfg(test)]
+pub(crate) mod testsupport;
