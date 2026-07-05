@@ -118,6 +118,15 @@ impl DayCounterImpl for IsmaImpl {
         // Estimate roughly the length in months of a period.
         let mut months = (12.0 * days_between(ref_start, ref_end) / 365.0).round() as Integer;
         if months == 0 {
+            // A short stub with no usable reference period is treated as a
+            // fraction of the year following d1. Building d1 + 1*Years overflows
+            // the supported date range when d1 is in the last representable
+            // year; there d2 is necessarily within that same year, so the result
+            // reduces to the stub over the year's length (365 - neither the last
+            // supported year nor the next one is a leap year).
+            if d1.year() == Date::max_date().year() {
+                return days_between(d1, d2) / 365.0;
+            }
             // ...take the reference period as 1 year from d1.
             ref_start = d1;
             ref_end = d1 + 1 * TimeUnit::Years;
@@ -289,6 +298,15 @@ mod tests {
         // A same-year period in 2199 must not reach for Jan 1st 2200, which
         // is outside the supported date range.
         let dc = ActualActual::with_convention(Convention::ISDA);
+        let t = dc.year_fraction(d(1, Month::January, 2199), d(2, Month::January, 2199));
+        assert!((t - 1.0 / 365.0).abs() < TOL, "got {t}");
+    }
+
+    #[test]
+    fn isma_handles_the_last_supported_year() {
+        // A short stub in the last supported year rounds to 0 months and would
+        // otherwise fall back to d1 + 1 year (Jan 1st 2200), outside the range.
+        let dc = ActualActual::with_convention(Convention::ISMA);
         let t = dc.year_fraction(d(1, Month::January, 2199), d(2, Month::January, 2199));
         assert!((t - 1.0 / 365.0).abs() < TOL, "got {t}");
     }
