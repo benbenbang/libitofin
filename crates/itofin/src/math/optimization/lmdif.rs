@@ -10,6 +10,34 @@ use crate::types::Real;
 
 /// Resolution of arithmetic assumed by MINPACK.
 pub(crate) const MACHEP: Real = 1.2e-16;
+/// Smallest nonzero number assumed by MINPACK.
+pub(crate) const DWARF: Real = 1.0e-38;
+
+/// The user-supplied functions minimized by [`lmdif`].
+///
+/// The C original takes plain function pointers for the residuals and the
+/// optional analytic Jacobian; a single trait keeps both callbacks able to
+/// share mutable state.
+pub trait LmdifCostFunction {
+    /// Evaluates the `m` functions at `x`, writing them into `fvec`.
+    fn fcn(&mut self, x: &[Real], fvec: &mut [Real]);
+
+    /// Whether [`Self::jacobian`] is available; when `false`, [`lmdif`] uses
+    /// the forward-difference approximation [`fdjac2`].
+    fn has_jacobian(&self) -> bool {
+        false
+    }
+
+    /// Evaluates the `m` by `n` Jacobian at `x` into the column-major `fjac`.
+    ///
+    /// # Panics
+    ///
+    /// The default implementation panics; [`lmdif`] only calls it when
+    /// [`Self::has_jacobian`] returns `true`.
+    fn jacobian(&mut self, _x: &[Real], _fjac: &mut [Real]) {
+        unimplemented!("no user-supplied jacobian")
+    }
+}
 
 /// Computes the Euclidean norm of `x`.
 ///
@@ -289,6 +317,196 @@ pub fn qrsolv(
     }
 }
 
+/// Computes a forward-difference approximation to the `m` by `n` Jacobian at
+/// `x` into the column-major `fjac`.
+///
+/// `fvec` must contain the functions evaluated at `x`; `epsfcn` estimates
+/// the relative error in the functions (machine precision is assumed when it
+/// is smaller); `wa` is a work array of length `m`. `x` is perturbed and
+/// restored in place.
+#[allow(clippy::too_many_arguments)]
+pub fn fdjac2(
+    m: usize,
+    n: usize,
+    x: &mut [Real],
+    fvec: &[Real],
+    fjac: &mut [Real],
+    epsfcn: Real,
+    wa: &mut [Real],
+    fcn: &mut dyn LmdifCostFunction,
+) {
+    let eps = epsfcn.max(MACHEP).sqrt();
+    for j in 0..n {
+        let temp = x[j];
+        let mut h = eps * temp.abs();
+        if h == 0.0 {
+            h = eps;
+        }
+        x[j] = temp + h;
+        fcn.fcn(x, wa);
+        x[j] = temp;
+        for i in 0..m {
+            fjac[i + m * j] = (wa[i] - fvec[i]) / h;
+        }
+    }
+}
+
+/// Determines the Levenberg-Marquardt parameter `par` and the corresponding
+/// step `x` such that, with `dxnorm = ||D*x||`, either `par` is zero and
+/// `dxnorm - delta <= 0.1 * delta`, or `par` is positive and
+/// `|dxnorm - delta| <= 0.1 * delta`.
+///
+/// `r`, `ldr` and `ipvt` hold the QR factorization from [`qrfac`], `diag`
+/// the scaling `D` and `qtb` the first `n` elements of `Q^T * b`. On exit
+/// `x` holds the step, `sdiag` and the strict lower triangle of `r` the
+/// factor `S` from [`qrsolv`]; `wa1` and `wa2` are work arrays of length
+/// `n`.
+#[allow(clippy::too_many_arguments)]
+pub fn lmpar(
+    n: usize,
+    r: &mut [Real],
+    ldr: usize,
+    ipvt: &[usize],
+    diag: &[Real],
+    qtb: &[Real],
+    delta: Real,
+    par: &mut Real,
+    x: &mut [Real],
+    sdiag: &mut [Real],
+    wa1: &mut [Real],
+    wa2: &mut [Real],
+) {
+    const P1: Real = 0.1;
+    const P001: Real = 0.001;
+
+    // compute and store in x the gauss-newton direction; if the jacobian is
+    // rank-deficient, obtain a least squares solution
+    let mut nsing = n;
+    for j in 0..n {
+        wa1[j] = qtb[j];
+        if r[j + ldr * j] == 0.0 && nsing == n {
+            nsing = j;
+        }
+        if nsing < n {
+            wa1[j] = 0.0;
+        }
+    }
+    for k in 0..nsing {
+        let j = nsing - k - 1;
+        wa1[j] /= r[j + ldr * j];
+        let temp = wa1[j];
+        for i in 0..j {
+            wa1[i] -= r[i + ldr * j] * temp;
+        }
+    }
+    for j in 0..n {
+        x[ipvt[j]] = wa1[j];
+    }
+
+    // evaluate the function at the origin, and test for acceptance of the
+    // gauss-newton direction
+    let mut iter = 0;
+    for j in 0..n {
+        wa2[j] = diag[j] * x[j];
+    }
+    let mut dxnorm = enorm(&wa2[..n]);
+    let mut fp = dxnorm - delta;
+    if fp <= P1 * delta {
+        *par = 0.0;
+        return;
+    }
+
+    // if the jacobian is not rank deficient, the newton step provides a
+    // lower bound, parl, for the zero of the function
+    let mut parl = 0.0;
+    if nsing >= n {
+        for j in 0..n {
+            let l = ipvt[j];
+            wa1[j] = diag[l] * (wa2[l] / dxnorm);
+        }
+        for j in 0..n {
+            let mut sum = 0.0;
+            for i in 0..j {
+                sum += r[i + ldr * j] * wa1[i];
+            }
+            wa1[j] = (wa1[j] - sum) / r[j + ldr * j];
+        }
+        let temp = enorm(&wa1[..n]);
+        parl = ((fp / delta) / temp) / temp;
+    }
+
+    // calculate an upper bound, paru, for the zero of the function
+    for j in 0..n {
+        let mut sum = 0.0;
+        for i in 0..=j {
+            sum += r[i + ldr * j] * qtb[i];
+        }
+        wa1[j] = sum / diag[ipvt[j]];
+    }
+    let gnorm = enorm(&wa1[..n]);
+    let mut paru = gnorm / delta;
+    if paru == 0.0 {
+        paru = DWARF / delta.min(P1);
+    }
+
+    // if the input par lies outside of the interval (parl, paru), set par
+    // to the closer endpoint
+    *par = (*par).max(parl).min(paru);
+    if *par == 0.0 {
+        *par = gnorm / dxnorm;
+    }
+
+    loop {
+        iter += 1;
+        // evaluate the function at the current value of par
+        if *par == 0.0 {
+            *par = DWARF.max(P001 * paru);
+        }
+        let temp = par.sqrt();
+        for j in 0..n {
+            wa1[j] = temp * diag[j];
+        }
+        qrsolv(n, r, ldr, ipvt, wa1, qtb, x, sdiag, wa2);
+        for j in 0..n {
+            wa2[j] = diag[j] * x[j];
+        }
+        dxnorm = enorm(&wa2[..n]);
+        let temp = fp;
+        fp = dxnorm - delta;
+
+        // if the function is small enough, accept the current value of par;
+        // also test for the exceptional cases where parl is zero or the
+        // number of iterations has reached 10
+        if fp.abs() <= P1 * delta || (parl == 0.0 && fp <= temp && temp < 0.0) || iter == 10 {
+            return;
+        }
+
+        // compute the newton correction
+        for j in 0..n {
+            let l = ipvt[j];
+            wa1[j] = diag[l] * (wa2[l] / dxnorm);
+        }
+        for j in 0..n {
+            wa1[j] /= sdiag[j];
+            let temp = wa1[j];
+            for i in (j + 1)..n {
+                wa1[i] -= r[i + ldr * j] * temp;
+            }
+        }
+        let temp = enorm(&wa1[..n]);
+        let parc = ((fp / delta) / temp) / temp;
+
+        // depending on the sign of the function, update parl or paru
+        if fp > 0.0 {
+            parl = parl.max(*par);
+        }
+        if fp < 0.0 {
+            paru = paru.min(*par);
+        }
+        *par = parl.max(*par + parc);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -367,6 +585,83 @@ mod tests {
         // R x = qtb => x1 = 2, x0 = (5 - 1*2)/2 = 1.5
         assert!((x[0] - 1.5).abs() < TOL);
         assert!((x[1] - 2.0).abs() < TOL);
+    }
+
+    struct LinearSystem {
+        with_jacobian: bool,
+    }
+
+    impl LmdifCostFunction for LinearSystem {
+        fn fcn(&mut self, x: &[Real], fvec: &mut [Real]) {
+            fvec[0] = x[0] + 2.0 * x[1] - 4.0;
+            fvec[1] = 3.0 * x[0] - x[1] - 5.0;
+        }
+
+        fn has_jacobian(&self) -> bool {
+            self.with_jacobian
+        }
+
+        fn jacobian(&mut self, _x: &[Real], fjac: &mut [Real]) {
+            // column-major 2x2: d f_i / d x_j at fjac[i + 2 j]
+            fjac.copy_from_slice(&[1.0, 3.0, 2.0, -1.0]);
+        }
+    }
+
+    #[test]
+    fn fdjac2_approximates_the_jacobian() {
+        let (m, n) = (2, 2);
+        let mut fcn = LinearSystem {
+            with_jacobian: false,
+        };
+        let mut x = vec![1.0, 2.0];
+        let mut fvec = vec![0.0; m];
+        let x0 = x.clone();
+        fcn.fcn(&x0, &mut fvec);
+        let mut fjac = vec![0.0; m * n];
+        let mut wa = vec![0.0; m];
+        let residuals = fvec.clone();
+        fdjac2(m, n, &mut x, &residuals, &mut fjac, 1e-8, &mut wa, &mut fcn);
+        assert_eq!(x, x0);
+        let exact = [1.0, 3.0, 2.0, -1.0];
+        for k in 0..m * n {
+            assert!((fjac[k] - exact[k]).abs() < 1e-6, "entry {k}: {}", fjac[k]);
+        }
+    }
+
+    #[test]
+    fn lmpar_returns_gauss_newton_step_inside_trust_region() {
+        let n = 2;
+        let mut r = [1.0, 0.0, 0.0, 1.0];
+        let ipvt = [0_usize, 1];
+        let diag = [1.0, 1.0];
+        let qtb = [3.0, 4.0];
+        let mut par = 0.0;
+        let (mut x, mut sdiag, mut wa1, mut wa2) = ([0.0; 2], [0.0; 2], [0.0; 2], [0.0; 2]);
+        lmpar(
+            n, &mut r, 2, &ipvt, &diag, &qtb, 100.0, &mut par, &mut x, &mut sdiag, &mut wa1,
+            &mut wa2,
+        );
+        assert_eq!(par, 0.0);
+        assert!((x[0] - 3.0).abs() < TOL);
+        assert!((x[1] - 4.0).abs() < TOL);
+    }
+
+    #[test]
+    fn lmpar_damps_step_to_the_trust_region_boundary() {
+        let n = 2;
+        let delta = 1.0;
+        let mut r = [1.0, 0.0, 0.0, 1.0];
+        let ipvt = [0_usize, 1];
+        let diag = [1.0, 1.0];
+        let qtb = [3.0, 4.0];
+        let mut par = 0.0;
+        let (mut x, mut sdiag, mut wa1, mut wa2) = ([0.0; 2], [0.0; 2], [0.0; 2], [0.0; 2]);
+        lmpar(
+            n, &mut r, 2, &ipvt, &diag, &qtb, delta, &mut par, &mut x, &mut sdiag, &mut wa1,
+            &mut wa2,
+        );
+        assert!(par > 0.0);
+        assert!((enorm(&x) - delta).abs() <= 0.1 * delta);
     }
 
     #[test]
