@@ -10,6 +10,7 @@ pub mod incompletegamma;
 pub mod integrals;
 pub mod interpolations;
 pub mod matrix;
+pub mod ode;
 pub mod optimization;
 pub mod randomnumbers;
 pub mod solver1d;
