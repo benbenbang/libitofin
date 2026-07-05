@@ -13,10 +13,14 @@
 
 use crate::types::Real;
 
+pub mod knuthuniformrng;
 pub mod mt19937uniformrng;
+pub mod ranluxuniformrng;
 pub mod seedgenerator;
 
+pub use knuthuniformrng::KnuthUniformRng;
 pub use mt19937uniformrng::MersenneTwisterUniformRng;
+pub use ranluxuniformrng::{Ranlux3UniformRng, Ranlux4UniformRng, Ranlux64UniformRng};
 
 /// A generator of uniform pseudo-random deviates in the open `(0, 1)`
 /// interval.
