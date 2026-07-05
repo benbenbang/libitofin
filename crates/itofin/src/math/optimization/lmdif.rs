@@ -242,9 +242,7 @@ pub fn qrsolv(
         // element using p from the qr factorization
         let l = ipvt[j];
         if diag[l] != 0.0 {
-            for item in sdiag.iter_mut().take(n).skip(j) {
-                *item = 0.0;
-            }
+            sdiag[j..n].fill(0.0);
             sdiag[j] = diag[l];
 
             // the transformations to eliminate the row of d modify only a
@@ -680,9 +678,7 @@ pub fn lmdif(
 
             // compute the scaled predicted reduction and the scaled
             // directional derivative
-            for item in wa3.iter_mut() {
-                *item = 0.0;
-            }
+            wa3.fill(0.0);
             for j in 0..n {
                 let temp = wa1[ipvt[j]];
                 for i in 0..=j {
