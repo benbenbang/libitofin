@@ -6,10 +6,14 @@
 //! [`MeanStdDev`] is the minimal interface (what a precomputed-distribution
 //! holder provides), [`Statistics`] the full accumulator interface, and
 //! [`EmpiricalStatistics`] the extra interface of accumulators that keep the
-//! whole sample set.
+//! whole sample set, such as [`GeneralStatistics`].
 
 use crate::errors::QlResult;
 use crate::types::{Real, Size};
+
+mod generalstatistics;
+
+pub use generalstatistics::GeneralStatistics;
 
 /// Mean and standard deviation of a distribution, the minimal interface
 /// required by the gaussian-assumption risk measures.
@@ -161,4 +165,45 @@ pub trait EmpiricalStatistics: Statistics {
     /// Returns an error unless `percent` lies in `(0, 1]` and the sample
     /// weights have a positive sum.
     fn top_percentile(&mut self, percent: Real) -> QlResult<Real>;
+}
+
+#[cfg(test)]
+pub(crate) mod testutil {
+    //! Oracle data mirroring `test-suite/riskstats.cpp`, which draws
+    //! `2^16 - 1` inverse-cumulative-normal variates from a dimension-1
+    //! `SobolRsg`. That sequence is the gray-code van der Corput sequence in
+    //! base 2, reproduced here without porting the generator.
+
+    use crate::math::distributions::normal::InverseCumulativeNormal;
+    use crate::types::Real;
+
+    pub const AVERAGES: [Real; 5] = [-100.0, -1.0, 0.0, 1.0, 100.0];
+    pub const SIGMAS: [Real; 3] = [0.1, 1.0, 100.0];
+    pub const N_SAMPLES: usize = (1 << 16) - 1;
+
+    pub fn sobol_normal_samples(average: Real, sigma: Real) -> Vec<Real> {
+        let inverse =
+            InverseCumulativeNormal::new(average, sigma).expect("valid normal parameters");
+        (1..=N_SAMPLES as u32)
+            .map(|i| {
+                let gray = i ^ (i >> 1);
+                let u = Real::from(gray.reverse_bits()) / (1u64 << 32) as Real;
+                inverse.value(u).expect("u lies in (0, 1)")
+            })
+            .collect()
+    }
+
+    pub fn check(
+        label: &str,
+        average: Real,
+        sigma: Real,
+        calculated: Real,
+        expected: Real,
+        tolerance: Real,
+    ) {
+        assert!(
+            (calculated - expected).abs() <= tolerance,
+            "wrong {label} for N({average}, {sigma}): calculated {calculated}, expected {expected}, tolerance {tolerance}"
+        );
+    }
 }
