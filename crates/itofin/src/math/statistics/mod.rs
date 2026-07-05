@@ -12,8 +12,10 @@ use crate::errors::QlResult;
 use crate::types::{Real, Size};
 
 mod generalstatistics;
+mod incrementalstatistics;
 
 pub use generalstatistics::GeneralStatistics;
+pub use incrementalstatistics::IncrementalStatistics;
 
 /// Mean and standard deviation of a distribution, the minimal interface
 /// required by the gaussian-assumption risk measures.
