@@ -43,7 +43,7 @@ impl OptimizationMethod for SteepestDescent {
             problem,
             end_criteria,
             &mut *self.line_search,
-            |_problem, _gold2, _old_gradient, line_search| -line_search.last_gradient(),
+            |_problem, _gold2, line_search| -line_search.last_gradient(),
         )
     }
 }

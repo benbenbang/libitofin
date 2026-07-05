@@ -63,7 +63,6 @@ impl Default for LevenbergMarquardt {
 /// away from infeasible or non-finite regions.
 struct ProblemAdapter<'a, 'b> {
     problem: &'a mut Problem<'b>,
-    init_cost_values: Array,
     init_jacobian: Option<Matrix>,
     m: usize,
     n: usize,
@@ -74,18 +73,18 @@ impl LmdifCostFunction for ProblemAdapter<'_, '_> {
         let xt: Array = x.iter().copied().collect();
         if self.problem.constraint().test(&xt) {
             let tmp = self.problem.values(&xt);
-            if tmp.iter().all(|value| value.is_finite()) {
+            if tmp.size() == fvec.len() && tmp.iter().all(|value| value.is_finite()) {
                 fvec.copy_from_slice(&tmp);
                 return;
             }
         }
-        // Constraint violated or evaluation produced non-finite values:
+        // Constraint violated, wrong residual count, or non-finite values:
         // return a large, uniform penalty so the optimizer steers away. A
         // fixed constant is used instead of the initial cost values because
         // the latter can be very small (even zero) when the starting point
         // is near-optimal, which would fail to deter the optimizer from
         // exploring infeasible regions.
-        fvec[..self.init_cost_values.size()].fill(1.0e10);
+        fvec.fill(1.0e10);
     }
 
     fn has_jacobian(&self) -> bool {
@@ -184,7 +183,6 @@ impl OptimizationMethod for LevenbergMarquardt {
         let mut fvec = vec![0.0; m];
         let mut adapter = ProblemAdapter {
             problem,
-            init_cost_values,
             init_jacobian,
             m,
             n,
@@ -302,6 +300,28 @@ mod tests {
             "unexpected message: {}",
             err.message()
         );
+    }
+
+    #[test]
+    fn tolerates_a_cost_function_with_a_varying_residual_count() {
+        // The residual count depends on x, so trial points can return a
+        // different length than the initial evaluation; those evaluations
+        // must take the penalty path instead of panicking.
+        struct VaryingLength;
+        impl CostFunction for VaryingLength {
+            fn values(&self, x: &Array) -> Array {
+                if x[0] > 0.0 {
+                    Array::from([x[0], x[0]])
+                } else {
+                    Array::from([x[0]])
+                }
+            }
+        }
+        let cost = VaryingLength;
+        let constraint = NoConstraint;
+        let mut problem = Problem::new(&cost, &constraint, Array::from([1.0]));
+        let end_criteria = EndCriteria::new(1000, Some(100), 1e-8, 1e-8, None).unwrap();
+        let _ = LevenbergMarquardt::default().minimize(&mut problem, &end_criteria);
     }
 
     #[test]

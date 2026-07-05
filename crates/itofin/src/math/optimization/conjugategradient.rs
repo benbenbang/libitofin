@@ -46,7 +46,7 @@ impl OptimizationMethod for ConjugateGradient {
             problem,
             end_criteria,
             &mut *self.line_search,
-            |problem, gold2, _old_gradient, line_search| {
+            |problem, gold2, line_search| {
                 &(-line_search.last_gradient())
                     + &(line_search.search_direction() * (problem.gradient_norm_value() / gold2))
             },

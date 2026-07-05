@@ -16,12 +16,22 @@ use crate::types::{Real, Size};
 fn compute_simplex_size(vertices: &[Array]) -> Real {
     let mut center = Array::with_size(vertices[0].size());
     for vertex in vertices {
-        center = &center + vertex;
+        for (c, v) in center.iter_mut().zip(vertex.iter()) {
+            *c += v;
+        }
     }
-    center = &center * (1.0 / vertices.len() as Real);
+    let scale = 1.0 / vertices.len() as Real;
+    for c in center.iter_mut() {
+        *c *= scale;
+    }
     let mut result = 0.0;
     for vertex in vertices {
-        result += (vertex - &center).norm2();
+        let distance2: Real = vertex
+            .iter()
+            .zip(center.iter())
+            .map(|(v, c)| (v - c) * (v - c))
+            .sum();
+        result += distance2.sqrt();
     }
     result / vertices.len() as Real
 }
@@ -132,8 +142,10 @@ impl OptimizationMethod for Simplex {
 
         loop {
             self.sum = Array::with_size(n);
-            for i in 0..=n {
-                self.sum = &self.sum + &self.vertices[i];
+            for vertex in &self.vertices {
+                for (s, v) in self.sum.iter_mut().zip(vertex.iter()) {
+                    *s += v;
+                }
             }
             // determine the best (lowest), worst (highest) and second-worst
             // (next-highest) vertices
