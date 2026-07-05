@@ -507,6 +507,265 @@ pub fn lmpar(
     }
 }
 
+/// Minimizes the sum of the squares of `m` nonlinear functions in `n`
+/// variables by the Levenberg-Marquardt algorithm, approximating the
+/// Jacobian by forward differences unless `fcn` supplies it.
+///
+/// `x` holds the initial estimate and, on exit, the final one; `fvec` (of
+/// length `m`) receives the functions at `x`. `ftol`, `xtol` and `gtol`
+/// bound the relative reductions, the relative step and the cosine of the
+/// gradient angle; `maxfev` caps the function evaluations, `epsfcn` seeds
+/// the finite-difference step and `factor` bounds the initial trust region.
+/// The original's `diag`, `mode` and `nprint` arguments are fixed to
+/// QuantLib's usage (internal scaling, no printing). As in the original,
+/// the evaluation count grows by `n` per Jacobian pass even when the
+/// analytic Jacobian is supplied, so `maxfev` keeps its MINPACK meaning of
+/// roughly `iterations * (n + 1)` in both modes.
+///
+/// Returns the MINPACK `info` code: `0` improper input, `1`-`4` converged
+/// (ftol/xtol/both/gtol), `5` `maxfev` reached, `6` `ftol` too small, `7`
+/// `xtol` too small, `8` `gtol` too small.
+#[allow(clippy::too_many_arguments)]
+pub fn lmdif(
+    m: usize,
+    n: usize,
+    x: &mut [Real],
+    fvec: &mut [Real],
+    ftol: Real,
+    xtol: Real,
+    gtol: Real,
+    maxfev: usize,
+    epsfcn: Real,
+    factor: Real,
+    fcn: &mut dyn LmdifCostFunction,
+) -> i32 {
+    const P1: Real = 0.1;
+    const P5: Real = 0.5;
+    const P25: Real = 0.25;
+    const P75: Real = 0.75;
+    const P0001: Real = 1.0e-4;
+
+    if n == 0 || m < n || ftol < 0.0 || xtol < 0.0 || gtol < 0.0 || maxfev == 0 || factor <= 0.0 {
+        return 0;
+    }
+
+    let mut diag = vec![0.0; n];
+    let mut fjac = vec![0.0; m * n];
+    let mut ipvt = vec![0_usize; n];
+    let mut qtf = vec![0.0; n];
+    let mut wa1 = vec![0.0; n];
+    let mut wa2 = vec![0.0; n];
+    let mut wa3 = vec![0.0; n];
+    let mut wa4 = vec![0.0; m];
+
+    // evaluate the function at the starting point and calculate its norm
+    fcn.fcn(x, fvec);
+    let mut nfev = 1;
+    let mut fnorm = enorm(fvec);
+
+    let mut par = 0.0;
+    let mut iter = 1;
+    let mut xnorm = 0.0;
+    let mut delta = 0.0;
+    let mut info = 0;
+
+    // outer loop: one jacobian evaluation per pass
+    'outer: loop {
+        if fcn.has_jacobian() {
+            fcn.jacobian(x, &mut fjac);
+        } else {
+            fdjac2(m, n, x, fvec, &mut fjac, epsfcn, &mut wa4, fcn);
+        }
+        nfev += n;
+
+        // compute the qr factorization of the jacobian
+        qrfac(
+            m, n, &mut fjac, true, &mut ipvt, &mut wa1, &mut wa2, &mut wa3,
+        );
+
+        // on the first iteration scale according to the norms of the
+        // columns of the initial jacobian and calculate the initial step
+        // bound delta
+        if iter == 1 {
+            for j in 0..n {
+                diag[j] = if wa2[j] == 0.0 { 1.0 } else { wa2[j] };
+            }
+            for j in 0..n {
+                wa3[j] = diag[j] * x[j];
+            }
+            xnorm = enorm(&wa3);
+            delta = factor * xnorm;
+            if delta == 0.0 {
+                delta = factor;
+            }
+        }
+
+        // form q^T * fvec and store the first n components in qtf
+        wa4.copy_from_slice(fvec);
+        for j in 0..n {
+            let jj = j + m * j;
+            let temp3 = fjac[jj];
+            if temp3 != 0.0 {
+                let mut sum = 0.0;
+                for i in j..m {
+                    sum += fjac[i + m * j] * wa4[i];
+                }
+                let temp = -sum / temp3;
+                for i in j..m {
+                    wa4[i] += fjac[i + m * j] * temp;
+                }
+            }
+            fjac[jj] = wa1[j];
+            qtf[j] = wa4[j];
+        }
+
+        // compute the norm of the scaled gradient
+        let mut gnorm: Real = 0.0;
+        if fnorm != 0.0 {
+            for j in 0..n {
+                let l = ipvt[j];
+                if wa2[l] != 0.0 {
+                    let mut sum = 0.0;
+                    for i in 0..=j {
+                        sum += fjac[i + m * j] * (qtf[i] / fnorm);
+                    }
+                    gnorm = gnorm.max((sum / wa2[l]).abs());
+                }
+            }
+        }
+
+        // test for convergence of the gradient norm
+        if gnorm <= gtol {
+            info = 4;
+            break 'outer;
+        }
+
+        // rescale
+        for j in 0..n {
+            diag[j] = diag[j].max(wa2[j]);
+        }
+
+        // inner loop: repeat until a successful iteration
+        loop {
+            // determine the levenberg-marquardt parameter
+            lmpar(
+                n, &mut fjac, m, &ipvt, &diag, &qtf, delta, &mut par, &mut wa1, &mut wa2, &mut wa3,
+                &mut wa4,
+            );
+
+            // store the direction p and x + p; calculate the norm of p
+            for j in 0..n {
+                wa1[j] = -wa1[j];
+                wa2[j] = x[j] + wa1[j];
+                wa3[j] = diag[j] * wa1[j];
+            }
+            let pnorm = enorm(&wa3);
+
+            // on the first iteration, adjust the initial step bound
+            if iter == 1 {
+                delta = delta.min(pnorm);
+            }
+
+            // evaluate the function at x + p and calculate its norm
+            fcn.fcn(&wa2, &mut wa4);
+            nfev += 1;
+            let fnorm1 = enorm(&wa4);
+
+            // compute the scaled actual reduction
+            let mut actred = -1.0;
+            if P1 * fnorm1 < fnorm {
+                let temp = fnorm1 / fnorm;
+                actred = 1.0 - temp * temp;
+            }
+
+            // compute the scaled predicted reduction and the scaled
+            // directional derivative
+            for item in wa3.iter_mut() {
+                *item = 0.0;
+            }
+            for j in 0..n {
+                let temp = wa1[ipvt[j]];
+                for i in 0..=j {
+                    wa3[i] += fjac[i + m * j] * temp;
+                }
+            }
+            let temp1 = enorm(&wa3) / fnorm;
+            let temp2 = (par.sqrt() * pnorm) / fnorm;
+            let prered = temp1 * temp1 + (temp2 * temp2) / P5;
+            let dirder = -(temp1 * temp1 + temp2 * temp2);
+
+            // compute the ratio of the actual to the predicted reduction
+            let ratio = if prered != 0.0 { actred / prered } else { 0.0 };
+
+            // update the step bound
+            if ratio <= P25 {
+                let mut temp = if actred >= 0.0 {
+                    P5
+                } else {
+                    P5 * dirder / (dirder + P5 * actred)
+                };
+                if P1 * fnorm1 >= fnorm || temp < P1 {
+                    temp = P1;
+                }
+                delta = temp * delta.min(pnorm / P1);
+                par /= temp;
+            } else if par == 0.0 || ratio >= P75 {
+                delta = pnorm / P5;
+                par *= P5;
+            }
+
+            let successful = ratio >= P0001;
+            if successful {
+                // successful iteration: update x, fvec, and their norms
+                for j in 0..n {
+                    x[j] = wa2[j];
+                    wa2[j] = diag[j] * x[j];
+                }
+                fvec.copy_from_slice(&wa4);
+                xnorm = enorm(&wa2);
+                fnorm = fnorm1;
+                iter += 1;
+            }
+
+            // tests for convergence
+            if actred.abs() <= ftol && prered <= ftol && P5 * ratio <= 1.0 {
+                info = 1;
+            }
+            if delta <= xtol * xnorm {
+                info = 2;
+            }
+            if actred.abs() <= ftol && prered <= ftol && P5 * ratio <= 1.0 && info == 2 {
+                info = 3;
+            }
+            if info != 0 {
+                break 'outer;
+            }
+
+            // tests for termination and stringent tolerances
+            if nfev >= maxfev {
+                info = 5;
+            }
+            if actred.abs() <= MACHEP && prered <= MACHEP && P5 * ratio <= 1.0 {
+                info = 6;
+            }
+            if delta <= MACHEP * xnorm {
+                info = 7;
+            }
+            if gnorm <= MACHEP {
+                info = 8;
+            }
+            if info != 0 {
+                break 'outer;
+            }
+
+            if successful {
+                break;
+            }
+        }
+    }
+    info
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -662,6 +921,84 @@ mod tests {
         );
         assert!(par > 0.0);
         assert!((enorm(&x) - delta).abs() <= 0.1 * delta);
+    }
+
+    struct LineFit;
+
+    impl LmdifCostFunction for LineFit {
+        fn fcn(&mut self, x: &[Real], fvec: &mut [Real]) {
+            // residuals of y = a + b*t through (0, 1), (1, 3), (2, 5)
+            for (i, fv) in fvec.iter_mut().enumerate() {
+                let t = i as Real;
+                *fv = x[0] + x[1] * t - (1.0 + 2.0 * t);
+            }
+        }
+    }
+
+    fn run_lmdif(m: usize, n: usize, fcn: &mut dyn LmdifCostFunction) -> (Vec<Real>, i32) {
+        let mut x = vec![0.0; n];
+        let mut fvec = vec![0.0; m];
+        let info = lmdif(
+            m, n, &mut x, &mut fvec, 1e-10, 1e-10, 1e-10, 400, 1e-8, 100.0, fcn,
+        );
+        (x, info)
+    }
+
+    #[test]
+    fn lmdif_solves_square_linear_system() {
+        let (x, info) = run_lmdif(
+            2,
+            2,
+            &mut LinearSystem {
+                with_jacobian: false,
+            },
+        );
+        assert!((1..=4).contains(&info), "info = {info}");
+        assert!((x[0] - 2.0).abs() < 1e-8, "x0 = {}", x[0]);
+        assert!((x[1] - 1.0).abs() < 1e-8, "x1 = {}", x[1]);
+    }
+
+    #[test]
+    fn lmdif_uses_the_supplied_jacobian() {
+        let (x, info) = run_lmdif(
+            2,
+            2,
+            &mut LinearSystem {
+                with_jacobian: true,
+            },
+        );
+        assert!((1..=4).contains(&info), "info = {info}");
+        assert!((x[0] - 2.0).abs() < 1e-8);
+        assert!((x[1] - 1.0).abs() < 1e-8);
+    }
+
+    #[test]
+    fn lmdif_fits_overdetermined_least_squares() {
+        let (x, info) = run_lmdif(3, 2, &mut LineFit);
+        assert!((1..=4).contains(&info), "info = {info}");
+        assert!((x[0] - 1.0).abs() < 1e-8);
+        assert!((x[1] - 2.0).abs() < 1e-8);
+    }
+
+    #[test]
+    fn lmdif_rejects_improper_input() {
+        let mut fcn = LineFit;
+        let mut x = vec![0.0; 2];
+        let mut fvec = vec![0.0; 3];
+        // fewer functions than variables
+        assert_eq!(
+            lmdif(
+                1, 2, &mut x, &mut fvec, 1e-10, 1e-10, 1e-10, 400, 1e-8, 100.0, &mut fcn
+            ),
+            0
+        );
+        // negative tolerance
+        assert_eq!(
+            lmdif(
+                3, 2, &mut x, &mut fvec, -1.0, 1e-10, 1e-10, 400, 1e-8, 100.0, &mut fcn
+            ),
+            0
+        );
     }
 
     #[test]
