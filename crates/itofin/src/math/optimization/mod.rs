@@ -4,6 +4,7 @@ pub mod conjugategradient;
 pub mod constraint;
 pub mod costfunction;
 pub mod endcriteria;
+pub mod levenbergmarquardt;
 pub mod linesearch;
 pub mod linesearchbasedmethod;
 pub mod lmdif;
