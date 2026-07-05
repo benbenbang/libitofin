@@ -11,6 +11,7 @@ pub mod incompletegamma;
 pub mod integrals;
 pub mod interpolations;
 pub mod matrix;
+pub mod matrixutilities;
 pub mod ode;
 pub mod optimization;
 pub mod randomnumbers;
