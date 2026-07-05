@@ -6,6 +6,7 @@ pub mod costfunction;
 pub mod endcriteria;
 pub mod linesearch;
 pub mod linesearchbasedmethod;
+pub mod lmdif;
 pub mod method;
 pub mod problem;
 pub mod simplex;
