@@ -153,6 +153,30 @@ oversight) and is documented at the point of divergence in the source.
   lengths QuantLib's inverted bounds make overlapping periods (like `-1 Month`
   vs `-30 Days`) look decidably ordered, whereas this port correctly reports
   them as undecidable. Positive comparisons are unaffected.
+- **`DayCounter` is always valid; there is no empty placeholder.** QuantLib's
+  default-constructed `DayCounter` holds a null `impl_` and `QL_REQUIRE`s a
+  non-null one on every call. This port omits the empty state, so a
+  `DayCounter` always wraps a concrete convention and its accessors never trip
+  that null check. (Individual conventions may still panic on their own
+  preconditions - the Canadian and ISMA counters require a valid reference
+  period - so a call is not unconditionally infallible.) The "not yet set"
+  placeholder used by higher layers (schedules, coupons) will be an
+  `Option<DayCounter>` at those call sites when they are ported.
+- **`Business/252` counts directly instead of via a process-global cache.**
+  QuantLib memoizes per-month and per-year business-day totals in global
+  `std::map`s keyed by calendar name. That hidden mutable state conflicts with
+  the "explicit state, no singletons" decision (D5), so this port counts with
+  `Calendar::business_days_between` directly. With a calendar's built-in
+  schedule the results are identical (QuantLib's month/year decomposition is a
+  pure caching optimization whose segments telescope to a single count); once
+  holidays are overridden they can differ, since QuantLib's name-keyed cache is
+  populated once and goes stale while this port always reflects the current
+  holiday set.
+- **`Actual/Actual (ISMA)` uses the reference-date algorithm only.** QuantLib
+  picks a schedule-driven implementation when a `Schedule` is supplied and a
+  reference-date one otherwise; only the reference-date path is ported, since
+  `Schedule` is not yet available. The schedule-driven overload will follow when
+  `Schedule` lands.
 
 ## License
 

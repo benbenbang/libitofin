@@ -12,11 +12,16 @@
 //! this port's "explicit state, no hidden singletons" decision (D5), the same
 //! reason [`Calendar`] holiday overrides are
 //! per-value here. This port drops the cache and counts directly with
-//! [`Calendar::business_days_between`] (first day included, last excluded). The
-//! two are numerically identical:
-//! QuantLib's month/year decomposition is a pure caching optimization whose
-//! contiguous `[include-first, exclude-last]` segments telescope back to a
-//! single `businessDaysBetween(d1, d2)`.
+//! [`Calendar::business_days_between`] (first day included, last excluded).
+//!
+//! For a calendar with its built-in schedule the two agree exactly: QuantLib's
+//! month/year decomposition is a pure caching optimization whose contiguous
+//! `[include-first, exclude-last]` segments telescope back to a single
+//! `businessDaysBetween(d1, d2)`. They can diverge once holidays are
+//! *overridden*, though: QuantLib populates each cached figure once and keys it
+//! only by calendar name, so an `addHoliday`/`removeHoliday` after the first
+//! query leaves the cache stale, while this port always reflects the current
+//! holiday set. In that case the direct count is the more correct of the two.
 
 use crate::shared::shared;
 use crate::time::calendar::Calendar;
