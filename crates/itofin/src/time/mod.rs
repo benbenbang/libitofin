@@ -4,14 +4,17 @@
 //! [`Date`](date::Date) serial-number type and its component enums
 //! ([`Weekday`](weekday::Weekday), [`Month`](date::Month),
 //! [`TimeUnit`](timeunit::TimeUnit)) - plus the [`Calendar`](calendar::Calendar)
-//! base and the per-market calendars under [`calendars`]. Only what the calendar
-//! port requires is covered here; the fuller `Period`, `DayCounter` and
-//! `Schedule` machinery from EPIC-2 is out of scope for this branch.
+//! base and the per-market calendars under [`calendars`], plus the
+//! [`Period`](period::Period), [`Frequency`](frequency::Frequency) and
+//! [`DayCounter`](daycounter::DayCounter) machinery. The `Schedule` layer from
+//! EPIC-2 is still out of scope for this branch.
 
 pub mod businessdayconvention;
 pub mod calendar;
 pub mod calendars;
 pub mod date;
+pub mod daycounter;
+pub mod daycounters;
 pub mod frequency;
 pub mod period;
 pub mod timeunit;
