@@ -14,10 +14,12 @@ use crate::types::{Real, Size};
 mod gaussianstatistics;
 mod generalstatistics;
 mod incrementalstatistics;
+mod riskstatistics;
 
 pub use gaussianstatistics::{GaussianStatistics, StatsHolder};
 pub use generalstatistics::GeneralStatistics;
 pub use incrementalstatistics::IncrementalStatistics;
+pub use riskstatistics::RiskStatistics;
 
 /// Mean and standard deviation of a distribution, the minimal interface
 /// required by the gaussian-assumption risk measures.
