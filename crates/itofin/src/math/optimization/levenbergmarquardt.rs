@@ -7,7 +7,7 @@
 //! (a central difference by default, order 2 but costlier) is used instead.
 //!
 //! Several deviations guard against silent false convergence, all stemming
-//! from the penalty fallbacks that [`ProblemAdapter`] returns for a bad
+//! from the penalty fallbacks that `ProblemAdapter` returns for a bad
 //! evaluation (which yield a zero/flat Jacobian and let lmdif report
 //! convergence). The starting point is validated against the constraint -
 //! QuantLib accepts an infeasible start and converges there - and the
