@@ -2,3 +2,4 @@
 
 pub mod constraint;
 pub mod costfunction;
+pub mod endcriteria;
