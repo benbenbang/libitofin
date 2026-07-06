@@ -20,6 +20,10 @@ pub type BigNatural = u64;
 /// Real number (`QL_REAL`, default `double`).
 pub type Real = f64;
 
+/// Complex number over [`Real`] (`std::complex<Real>`), backed by the
+/// `num-complex` crate (design decision D9).
+pub type Complex = num_complex::Complex<Real>;
+
 /// Decimal number.
 pub type Decimal = Real;
 

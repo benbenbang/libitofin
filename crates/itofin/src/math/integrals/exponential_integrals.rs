@@ -1,14 +1,20 @@
 //! Sine and cosine integrals `Si` and `Ci`.
 //!
-//! Port of the real-valued part of `ql/math/integrals/exponentialintegrals.*`:
-//! the sine integral [`si`] and cosine integral [`ci`]. Both use rational
-//! (minimax) approximations for `|x| <= 4` and an asymptotic form built from the
-//! auxiliary functions `f` and `g` beyond that. The complex `Ei`/`E1`/`Si`/`Ci`
-//! family is a separate, later addition.
+//! Port of `ql/math/integrals/exponentialintegrals.*`. The real-valued sine
+//! integral [`si`] and cosine integral [`ci`] use rational (minimax)
+//! approximations for `|x| <= 4` and an asymptotic form built from the
+//! auxiliary functions `f` and `g` beyond that. The complex-valued family
+//! ([`ei`], [`e1`]) follows Pegoraro & Slusallek, "On the Evaluation of the
+//! Complex-Valued Exponential Integral", combining a power series, an
+//! asymptotic series and a continued fraction by region.
 
 #![allow(clippy::excessive_precision)]
 
-use crate::types::Real;
+use crate::errors::QlResult;
+use crate::types::{Complex, Real, Size};
+use crate::{fail, require};
+
+use std::f64::consts::PI;
 
 /// The Euler-Mascheroni constant (QuantLib's `M_EULER_MASCHERONI`).
 const EULER_MASCHERONI: Real = 0.5772156649015328606065120900824024;
@@ -157,6 +163,108 @@ pub fn ci(x: Real) -> Real {
     f_aux(x) * x.sin() - g_aux(x) * x.cos()
 }
 
+/// Sign function matching `boost::math::sign`: `0` at zero (either signed
+/// zero), otherwise `+1`/`-1`. Distinct from `f64::signum`, which maps `-0.0`
+/// to `-1.0`.
+fn sign(x: Real) -> Real {
+    if x > 0.0 {
+        1.0
+    } else if x < 0.0 {
+        -1.0
+    } else {
+        0.0
+    }
+}
+
+/// `Ei(z) + acc`, where `acc` carries the branch adjustment used by [`e1`].
+fn ei_with_acc(z: Complex, acc: Complex) -> QlResult<Complex> {
+    if z.re == 0.0 && z.im == 0.0 {
+        return Ok(Complex::new(Real::NEG_INFINITY, 0.0));
+    }
+
+    const DIST: Real = 4.5;
+    const MAX_ERROR: Real = 5.0 * Real::EPSILON;
+
+    let z_inf = (0.01 * Real::MAX).ln() + 100.0_f64.ln();
+    let below_overflow_threshold = z.re < z_inf;
+    require!(below_overflow_threshold, "argument error {z}");
+
+    let z_asym = 2.0 - 1.035 * MAX_ERROR.ln();
+    let abs_z = z.norm();
+
+    let matches = |z1: Complex, z2: Complex| -> bool {
+        let d = z1 - z2;
+        d.re.abs() <= MAX_ERROR * z1.re.abs() && d.im.abs() <= MAX_ERROR * z1.im.abs()
+    };
+
+    if z.re > z_inf {
+        return Ok(z.exp() / z + acc);
+    }
+
+    if abs_z > 1.1 * z_asym {
+        let mut ei = acc + Complex::new(0.0, sign(z.im) * PI);
+        let mut s = z.exp() / z;
+        let last = abs_z.floor() as Size + 1;
+        for i in 1..=last {
+            if matches(ei + s, ei) {
+                return Ok(ei + s);
+            }
+            ei += s;
+            s *= i as Real / z;
+        }
+        fail!("series conversion issue for Ei({z})");
+    }
+
+    if abs_z > DIST && (z.re < 0.0 || z.im.abs() > DIST) {
+        let mut cf = Complex::new(0.0, 0.0);
+        for k in (1..=47u32).rev() {
+            cf = -((k * k) as Real / (2.0 * k as Real + 1.0 - z + cf));
+        }
+        return Ok((acc + Complex::new(0.0, sign(z.im) * PI)) - z.exp() / (1.0 - z + cf));
+    }
+
+    let mut s = Complex::new(0.0, 0.0);
+    let mut sn = z;
+    let mut nn: Real = 1.0;
+    let mut n: Size = 2;
+    while n < 1000 && s + sn * nn != s {
+        s += sn * nn;
+        if (n & 1) != 0 {
+            nn += 1.0 / (2.0 * (n / 2) as Real + 1.0);
+        }
+        sn *= -z / (2.0 * n as Real);
+        n += 1;
+    }
+    require!(n < 1000, "series conversion issue for Ei({z})");
+
+    let r = (EULER_MASCHERONI + acc) + z.ln() + (0.5 * z).exp() * s;
+    if z.im != 0.0 {
+        Ok(r)
+    } else {
+        Ok(Complex::new(r.re, acc.im))
+    }
+}
+
+/// The complex exponential integral `Ei(z)` (principal branch).
+///
+/// `Ei(0)` is `-inf`; arguments with a real part beyond the overflow threshold
+/// of `exp` are out of domain and return `Err`.
+pub fn ei(z: Complex) -> QlResult<Complex> {
+    ei_with_acc(z, Complex::new(0.0, 0.0))
+}
+
+/// The complex exponential integral `E1(z) = -Ei(-z)` on the principal branch.
+pub fn e1(z: Complex) -> QlResult<Complex> {
+    let acc = if z.im < 0.0 {
+        Complex::new(0.0, -PI)
+    } else if z.im > 0.0 || z.re < 0.0 {
+        Complex::new(0.0, PI)
+    } else {
+        Complex::new(0.0, 0.0)
+    };
+    Ok(-(ei_with_acc(-z, acc)?))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -216,5 +324,91 @@ mod tests {
     #[test]
     fn si_at_zero_is_zero() {
         assert_eq!(si(0.0), 0.0);
+    }
+
+    // Port of testExponentialIntegralLimits: QL_CHECK_CLOSE(a, b, t) is
+    // BOOST_CHECK_CLOSE, whose tolerance is a percentage, hence the /100.
+    fn assert_close(label: &str, value: Real, reference: Real, rel_tol_percent: Real) {
+        let rel = rel_tol_percent / 100.0;
+        assert!(
+            value == reference
+                || ((value - reference).abs() <= rel * value.abs()
+                    && (value - reference).abs() <= rel * reference.abs()),
+            "{label}: {value} vs {reference} (rel tol {rel})"
+        );
+    }
+
+    #[test]
+    fn ei_limit_for_large_arguments() {
+        let tol = 1000.0 * Real::EPSILON;
+        let large_value = 0.75 * (0.1 * Real::MAX).ln();
+        let expected_real = large_value.exp() / large_value;
+
+        let pos_imag = ei(Complex::new(large_value, Real::MIN_POSITIVE)).unwrap();
+        assert_close("Ei imag (+0 side)", pos_imag.im, PI, tol);
+        assert_close(
+            "Ei real (+0 side)",
+            pos_imag.re,
+            expected_real,
+            1e3 / large_value,
+        );
+
+        let neg_imag = ei(Complex::new(large_value, -Real::MIN_POSITIVE)).unwrap();
+        assert_close("Ei imag (-0 side)", neg_imag.im, -PI, tol);
+        assert_close(
+            "Ei real (-0 side)",
+            neg_imag.re,
+            expected_real,
+            1e3 / large_value,
+        );
+
+        let zero_imag = ei(Complex::new(large_value, 0.0)).unwrap();
+        assert_eq!(zero_imag.im, 0.0);
+    }
+
+    #[test]
+    fn ei_at_zero_is_negative_infinity() {
+        let value = ei(Complex::new(0.0, 0.0)).unwrap();
+        assert_eq!(value, Complex::new(Real::NEG_INFINITY, 0.0));
+    }
+
+    #[test]
+    fn ei_is_out_of_domain_beyond_exp_overflow() {
+        assert!(ei(Complex::new(710.0, 0.0)).is_err());
+    }
+
+    #[test]
+    fn ei_small_circle_limit_is_euler_plus_log() {
+        let tol = 1000.0 * Real::EPSILON;
+        let small_r = Real::EPSILON * Real::EPSILON;
+        for x in -100..100 {
+            let phi = x as Real / 100.0 * PI;
+            let z = Complex::from_polar(small_r, phi);
+            let value = ei(z).unwrap();
+            let limit = EULER_MASCHERONI + z.ln();
+            assert_close("Ei small-circle real", value.re, limit.re, tol);
+            assert_close("Ei small-circle imag", value.im, limit.im, tol);
+        }
+    }
+
+    #[test]
+    fn ei_large_circle_limit_is_signed_pi() {
+        let tol = 1000.0 * Real::EPSILON;
+        let close_enough_tol = 42.0 * Real::EPSILON;
+        let large_r = 0.75 * (0.1 * Real::MAX).ln();
+        for x in -10..10 {
+            let phi = x as Real / 10.0 * PI;
+            if phi.abs() > 0.5 * PI {
+                let z = Complex::from_polar(large_r, phi);
+                let value = ei(z).unwrap();
+                let limit_imag = sign(z.im) * PI;
+                assert!(
+                    value.re == 0.0 || value.re.abs() < close_enough_tol * close_enough_tol,
+                    "Ei large-circle real: {} not close enough to 0",
+                    value.re
+                );
+                assert_close("Ei large-circle imag", value.im, limit_imag, tol);
+            }
+        }
     }
 }
