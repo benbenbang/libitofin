@@ -11,7 +11,7 @@ use crate::ensure;
 use crate::errors::QlResult;
 use crate::handle::{AsObservable, Handle};
 use crate::patterns::observable::{Observable, Observer};
-use crate::shared::{Shared, SharedMut, shared, shared_mut};
+use crate::shared::{Shared, SharedMut};
 use crate::types::Real;
 
 use super::{Invalidator, Quote};
@@ -35,12 +35,7 @@ impl<F: Fn(Real, Real) -> Real> CompositeQuote<F> {
     /// registering with both handles like the C++ constructor's
     /// `registerWith` calls.
     pub fn new(element1: Handle<dyn Quote>, element2: Handle<dyn Quote>, f: F) -> Self {
-        let cache = shared(Cell::new(None));
-        let observable = shared(Observable::new());
-        let listener = shared_mut(Invalidator {
-            cache: Shared::clone(&cache),
-            observable: Shared::clone(&observable),
-        });
+        let (cache, observable, listener) = Invalidator::new();
         let observer = listener.clone() as SharedMut<dyn Observer>;
         element1.register_observer(&observer);
         element2.register_observer(&observer);
@@ -93,17 +88,7 @@ mod tests {
     use super::*;
     use crate::quotes::SimpleQuote;
     use crate::shared::shared;
-
-    #[derive(Default)]
-    struct Flag {
-        up: bool,
-    }
-
-    impl Observer for Flag {
-        fn update(&mut self) {
-            self.up = true;
-        }
-    }
+    use crate::test_support::{Flag, as_observer};
 
     /// Port of `testComposite` (test-suite/quotes.cpp): the composite value
     /// tracks `f(source1, source2)` across source changes for several
@@ -146,18 +131,18 @@ mod tests {
         assert_eq!(composite.value1().unwrap(), 1.0);
         assert_eq!(composite.value2().unwrap(), 2.0);
 
-        let flag = shared_mut(Flag::default());
+        let flag = Flag::new();
         composite
             .observable()
-            .register_observer(&(flag.clone() as SharedMut<dyn Observer>));
+            .register_observer(&as_observer(&flag));
 
         me1.set_value(10.0);
-        assert!(flag.borrow().up, "first source change must notify");
+        assert!(Flag::is_up(&flag), "first source change must notify");
         assert_eq!(composite.value().unwrap(), 12.0);
 
-        flag.borrow_mut().up = false;
+        Flag::lower(&flag);
         me2.set_value(20.0);
-        assert!(flag.borrow().up, "second source change must notify");
+        assert!(Flag::is_up(&flag), "second source change must notify");
         assert_eq!(composite.value().unwrap(), 30.0);
     }
 
