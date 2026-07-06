@@ -37,11 +37,19 @@ pub(crate) fn require_accuracy(accuracy: Real) -> QlResult<()> {
 /// shared by the tanh-sinh and exp-sinh integrators.
 ///
 /// Sums `w * f(x)` over the grid `t = k * h` for `|t| <= t_max`, where `node`
-/// maps `t` to the transformed abscissa and weight (`None` drops a tail node
-/// past the transform's usable floating-point range). Each refinement halves
-/// `h`, reusing every previous sample; iteration stops when two consecutive
-/// levels agree to `rel_tolerance` against the L1 norm of the integral, the
-/// termination rule of `boost::math::quadrature`'s DE schemes.
+/// maps `t` to the transformed abscissa and weight. `None` drops a node past
+/// the transform's usable floating-point range and ends that tail, so `node`'s
+/// truncation must be monotone in `|t|` on each side, as it is for both
+/// transforms. Each refinement halves `h`, reusing every previous sample.
+///
+/// Two rules are taken from `boost::math::quadrature`'s DE schemes. A tail
+/// walk stops, for this and all finer levels, once a term no longer changes
+/// the running (nonzero) sum, so the integrand is never evaluated at extreme
+/// abscissas where a decayed-to-zero product could overflow into `inf * 0`;
+/// while the sum is still zero the full range is kept, in case the mass has
+/// simply not been found yet. And iteration stops when two consecutive levels
+/// agree to `rel_tolerance` against the L1 norm of the integral, checked from
+/// the second refinement onward.
 pub(crate) fn de_quadrature<F, N>(
     f: &mut F,
     node: N,
@@ -53,46 +61,77 @@ where
     F: FnMut(Real) -> Real,
     N: Fn(Real) -> Option<(Real, Real)>,
 {
-    fn term<F, N>(f: &mut F, node: &N, t: Real) -> QlResult<(Real, Real)>
+    struct Tally {
+        sum: Real,
+        abs_sum: Real,
+    }
+
+    fn term<F, N>(f: &mut F, node: &N, t: Real) -> QlResult<Option<(Real, Real)>>
     where
         F: FnMut(Real) -> Real,
         N: Fn(Real) -> Option<(Real, Real)>,
     {
         let Some((x, w)) = node(t) else {
-            return Ok((0.0, 0.0));
+            return Ok(None);
         };
         let y = f(x);
         if !y.is_finite() {
             fail!("integrand returned a non-finite value ({y}) at x = {x}");
         }
-        Ok((w * y, (w * y).abs()))
+        Ok(Some((w * y, (w * y).abs())))
     }
 
-    let (mut sum, mut abs_sum) = term(f, &node, 0.0)?;
-    let mut t = 1.0;
-    while t <= t_max {
-        let (plus, abs_plus) = term(f, &node, t)?;
-        let (minus, abs_minus) = term(f, &node, -t)?;
-        sum += plus + minus;
-        abs_sum += abs_plus + abs_minus;
-        t += 1.0;
-    }
-    let mut h = 1.0;
-    let mut value = sum;
-    for _ in 0..max_refinements {
-        h *= 0.5;
-        let mut t = h;
-        while t <= t_max {
-            let (plus, abs_plus) = term(f, &node, t)?;
-            let (minus, abs_minus) = term(f, &node, -t)?;
-            sum += plus + minus;
-            abs_sum += abs_plus + abs_minus;
-            t += 2.0 * h;
+    fn walk_side<F, N>(
+        f: &mut F,
+        node: &N,
+        start: Real,
+        step: Real,
+        cutoff: &mut Real,
+        tally: &mut Tally,
+    ) -> QlResult<()>
+    where
+        F: FnMut(Real) -> Real,
+        N: Fn(Real) -> Option<(Real, Real)>,
+    {
+        let mut t = start;
+        while t.abs() <= *cutoff {
+            let Some((v, av)) = term(f, node, t)? else {
+                break;
+            };
+            let before = tally.sum;
+            tally.sum += v;
+            tally.abs_sum += av;
+            if tally.sum == before && tally.sum != 0.0 {
+                *cutoff = t.abs();
+                break;
+            }
+            t += step;
         }
-        let refined = h * sum;
+        Ok(())
+    }
+
+    let mut tally = Tally {
+        sum: 0.0,
+        abs_sum: 0.0,
+    };
+    if let Some((v, av)) = term(f, &node, 0.0)? {
+        tally.sum += v;
+        tally.abs_sum += av;
+    }
+    let mut pos_cutoff = t_max;
+    let mut neg_cutoff = t_max;
+    walk_side(f, &node, 1.0, 1.0, &mut pos_cutoff, &mut tally)?;
+    walk_side(f, &node, -1.0, -1.0, &mut neg_cutoff, &mut tally)?;
+    let mut h = 1.0;
+    let mut value = tally.sum;
+    for refinement in 0..max_refinements {
+        h *= 0.5;
+        walk_side(f, &node, h, 2.0 * h, &mut pos_cutoff, &mut tally)?;
+        walk_side(f, &node, -h, -2.0 * h, &mut neg_cutoff, &mut tally)?;
+        let refined = h * tally.sum;
         let error = (refined - value).abs();
         value = refined;
-        if error <= rel_tolerance * (h * abs_sum) {
+        if refinement > 0 && error <= rel_tolerance * (h * tally.abs_sum) {
             return Ok(value);
         }
     }
