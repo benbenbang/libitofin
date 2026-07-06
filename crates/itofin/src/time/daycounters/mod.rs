@@ -17,5 +17,6 @@ pub mod actual366;
 pub mod actualactual;
 pub mod business252;
 pub mod one;
+pub mod simpledaycounter;
 pub mod thirty360;
 pub mod thirty365;
