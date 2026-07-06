@@ -13,10 +13,12 @@
 
 mod compositequote;
 mod derivedquote;
+mod multicompositequote;
 mod simplequote;
 
 pub use compositequote::CompositeQuote;
 pub use derivedquote::DerivedQuote;
+pub use multicompositequote::MultiCompositeQuote;
 pub use simplequote::{SimpleQuote, make_quote_handle};
 
 use std::cell::Cell;
