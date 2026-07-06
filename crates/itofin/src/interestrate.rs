@@ -511,4 +511,102 @@ mod tests {
         assert!(ir.compound_factor(-0.5).is_err());
         assert!(ir.discount_factor(-0.5).is_err());
     }
+
+    fn time_to_days(t: Time) -> crate::time::date::SerialNumber {
+        (t * 360.0).round() as crate::time::date::SerialNumber
+    }
+
+    fn round_closest(value: Real, precision: i32) -> Real {
+        let scale = 10f64.powi(precision);
+        (value * scale).round() / scale
+    }
+
+    #[test]
+    #[rustfmt::skip]
+    fn conversions_match_quantlib() {
+        use crate::time::date::Month;
+        use Compounding::{Compounded, Continuous, Simple, SimpleThenCompounded};
+        use Frequency::{Annual, Bimonthly, EveryFourthMonth, Monthly, Quarterly, Semiannual};
+
+        type Row = (Rate, Compounding, Frequency, Time, Compounding, Frequency, Rate, i32);
+        let cases: [Row; 31] = [
+            (0.0800, Compounded, Quarterly, 1.00, Continuous, Annual, 0.0792, 4),
+            (0.1200, Continuous, Annual, 1.00, Compounded, Annual, 0.1275, 4),
+            (0.0800, Compounded, Quarterly, 1.00, Compounded, Annual, 0.0824, 4),
+            (0.0700, Compounded, Quarterly, 1.00, Compounded, Semiannual, 0.0706, 4),
+            (0.0100, Compounded, Annual, 1.00, Simple, Annual, 0.0100, 4),
+            (0.0200, Simple, Annual, 1.00, Compounded, Annual, 0.0200, 4),
+            (0.0300, Compounded, Semiannual, 0.50, Simple, Annual, 0.0300, 4),
+            (0.0400, Simple, Annual, 0.50, Compounded, Semiannual, 0.0400, 4),
+            (0.0500, Compounded, EveryFourthMonth, 1.0 / 3.0, Simple, Annual, 0.0500, 4),
+            (0.0600, Simple, Annual, 1.0 / 3.0, Compounded, EveryFourthMonth, 0.0600, 4),
+            (0.0500, Compounded, Quarterly, 0.25, Simple, Annual, 0.0500, 4),
+            (0.0600, Simple, Annual, 0.25, Compounded, Quarterly, 0.0600, 4),
+            (0.0700, Compounded, Bimonthly, 1.0 / 6.0, Simple, Annual, 0.0700, 4),
+            (0.0800, Simple, Annual, 1.0 / 6.0, Compounded, Bimonthly, 0.0800, 4),
+            (0.0900, Compounded, Monthly, 1.0 / 12.0, Simple, Annual, 0.0900, 4),
+            (0.1000, Simple, Annual, 1.0 / 12.0, Compounded, Monthly, 0.1000, 4),
+            (0.0300, SimpleThenCompounded, Semiannual, 0.25, Simple, Annual, 0.0300, 4),
+            (0.0300, SimpleThenCompounded, Semiannual, 0.25, Simple, Semiannual, 0.0300, 4),
+            (0.0300, SimpleThenCompounded, Semiannual, 0.25, Simple, Quarterly, 0.0300, 4),
+            (0.0300, SimpleThenCompounded, Semiannual, 0.50, Simple, Annual, 0.0300, 4),
+            (0.0300, SimpleThenCompounded, Semiannual, 0.50, Simple, Semiannual, 0.0300, 4),
+            (0.0300, SimpleThenCompounded, Semiannual, 0.75, Compounded, Semiannual, 0.0300, 4),
+            (0.0400, Simple, Semiannual, 0.25, SimpleThenCompounded, Quarterly, 0.0400, 4),
+            (0.0400, Simple, Semiannual, 0.25, SimpleThenCompounded, Semiannual, 0.0400, 4),
+            (0.0400, Simple, Semiannual, 0.25, SimpleThenCompounded, Annual, 0.0400, 4),
+            (0.0400, Compounded, Quarterly, 0.50, SimpleThenCompounded, Quarterly, 0.0400, 4),
+            (0.0400, Simple, Semiannual, 0.50, SimpleThenCompounded, Semiannual, 0.0400, 4),
+            (0.0400, Simple, Semiannual, 0.50, SimpleThenCompounded, Annual, 0.0400, 4),
+            (0.0400, Compounded, Quarterly, 0.75, SimpleThenCompounded, Quarterly, 0.0400, 4),
+            (0.0400, Compounded, Semiannual, 0.75, SimpleThenCompounded, Semiannual, 0.0400, 4),
+            (0.0400, Simple, Semiannual, 0.75, SimpleThenCompounded, Annual, 0.0400, 4),
+        ];
+
+        let d1 = Date::new(6, Month::July, 2026);
+        for &(r, comp, freq, t, comp2, freq2, expected, precision) in &cases {
+            let ir = InterestRate::new(r, Actual360::new(), comp, freq)
+                .expect("valid interest rate");
+            let d2 = d1 + time_to_days(t);
+
+            let compound = ir.compound_factor_between(d1, d2).expect("valid dates");
+            let disc = ir.discount_factor_between(d1, d2).expect("valid dates");
+            let error = (disc - 1.0 / compound).abs();
+            assert!(
+                error <= 1e-15,
+                "{ir}: discount {disc} is not the reciprocal of compound {compound} ({error})"
+            );
+
+            let ir2 = ir
+                .equivalent_rate_between(
+                    ir.day_counter().clone(),
+                    ir.compounding(),
+                    ir.frequency(),
+                    d1,
+                    d2,
+                )
+                .expect("valid conversion");
+            let error = (ir.rate() - ir2.rate()).abs();
+            assert!(error <= 1e-15, "roundtrip of {ir} gave {ir2} ({error})");
+            assert_eq!(ir.day_counter(), ir2.day_counter(), "roundtrip of {ir}");
+            assert_eq!(ir.compounding(), ir2.compounding(), "roundtrip of {ir}");
+            assert_eq!(ir.frequency(), ir2.frequency(), "roundtrip of {ir}");
+
+            let ir3 = ir
+                .equivalent_rate_between(ir.day_counter().clone(), comp2, freq2, d1, d2)
+                .expect("valid conversion");
+            let expected_ir =
+                InterestRate::new(expected, ir.day_counter().clone(), comp2, freq2)
+                    .expect("valid interest rate");
+            let r3 = round_closest(ir3.rate(), precision);
+            let error = (r3 - expected_ir.rate()).abs();
+            assert!(
+                error <= 1e-17,
+                "{ir} converted to {ir3}, truncated to {r3}, expected {expected_ir} ({error})"
+            );
+            assert_eq!(ir3.day_counter(), expected_ir.day_counter(), "conversion of {ir}");
+            assert_eq!(ir3.compounding(), expected_ir.compounding(), "conversion of {ir}");
+            assert_eq!(ir3.frequency(), expected_ir.frequency(), "conversion of {ir}");
+        }
+    }
 }
