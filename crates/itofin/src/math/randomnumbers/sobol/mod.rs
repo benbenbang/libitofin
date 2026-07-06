@@ -330,3 +330,123 @@ impl SobolRsg {
         self.dimensionality
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{DirectionIntegers, PPMT_MAX_DIM, SobolRsg, tables};
+
+    const EXPECTED_POLYNOMIAL_COUNTS: [usize; 18] = [
+        1, 1, 2, 2, 6, 6, 18, 16, 48, 60, 176, 144, 630, 756, 1800, 2048, 7710, 7776,
+    ];
+
+    const VAN_DER_CORPUT_SEQUENCE_MODULO_TWO: [f64; 31] = [
+        0.50000, 0.75000, 0.25000, 0.37500, 0.87500, 0.62500, 0.12500, 0.18750, 0.68750, 0.93750,
+        0.43750, 0.31250, 0.81250, 0.56250, 0.06250, 0.09375, 0.59375, 0.84375, 0.34375, 0.46875,
+        0.96875, 0.71875, 0.21875, 0.15625, 0.65625, 0.90625, 0.40625, 0.28125, 0.78125, 0.53125,
+        0.03125,
+    ];
+
+    #[test]
+    fn polynomials_modulo_two_counts() {
+        let mut total = 0;
+        for (i, polynomials) in tables::PRIMITIVE_POLYNOMIALS.iter().enumerate() {
+            assert_eq!(
+                polynomials.len(),
+                EXPECTED_POLYNOMIAL_COUNTS[i],
+                "only {} polynomials in degree {} instead of {}",
+                polynomials.len(),
+                i + 1,
+                EXPECTED_POLYNOMIAL_COUNTS[i]
+            );
+            total += polynomials.len();
+        }
+        assert_eq!(total, PPMT_MAX_DIM);
+    }
+
+    #[test]
+    fn sobol_max_dimensionality() {
+        let dimensionality = PPMT_MAX_DIM;
+        let mut rsg = SobolRsg::new(dimensionality, 123456, DirectionIntegers::Jaeckel);
+        for _ in 0..100 {
+            let point = rsg.next_sequence();
+            assert_eq!(point.len(), dimensionality);
+        }
+    }
+
+    #[test]
+    fn sobol_homogeneity() {
+        let tolerance = 1.0e-15;
+        let dimensionality = 33;
+        let mut rsg = SobolRsg::new(dimensionality, 123456, DirectionIntegers::Jaeckel);
+        let mut sums = vec![0.0f64; dimensionality];
+        let mut k = 0usize;
+        for j in 1..5u32 {
+            let points = 2usize.pow(j) - 1;
+            while k < points {
+                for (sum, &x) in sums.iter_mut().zip(rsg.next_sequence()) {
+                    *sum += x;
+                }
+                k += 1;
+            }
+            for (i, sum) in sums.iter().enumerate() {
+                let mean = sum / k as f64;
+                let error = (mean - 0.5).abs();
+                assert!(
+                    error <= tolerance,
+                    "dimension {}: mean {mean} at the end of cycle {j} is not 0.5 (error = {error})",
+                    i + 1
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn sobol_van_der_corput_first_dimension() {
+        let tolerance = 1.0e-15;
+        let mut rsg = SobolRsg::new(1, 0, DirectionIntegers::Jaeckel);
+        for (i, &expected) in VAN_DER_CORPUT_SEQUENCE_MODULO_TWO.iter().enumerate() {
+            let point = rsg.next_sequence();
+            let error = (point[0] - expected).abs();
+            assert!(
+                error <= tolerance,
+                "draw {}: {} is not in the van der Corput sequence modulo two: it should have been {expected} (error = {error})",
+                i + 1,
+                point[0]
+            );
+        }
+    }
+
+    #[test]
+    fn sobol_skipping() {
+        let seed = 42;
+        let dimensionalities = [1usize, 10, 100, 1000];
+        let skips = [0u32, 1, 42, 512, 100_000];
+        let families = [
+            DirectionIntegers::Unit,
+            DirectionIntegers::Jaeckel,
+            DirectionIntegers::SobolLevitan,
+            DirectionIntegers::SobolLevitanLemieux,
+        ];
+
+        for family in families {
+            for dimensionality in dimensionalities {
+                for skip in skips {
+                    let mut rsg1 = SobolRsg::new(dimensionality, seed, family);
+                    for _ in 0..skip {
+                        rsg1.next_int32_sequence();
+                    }
+                    let mut rsg2 = SobolRsg::new(dimensionality, seed, family);
+                    rsg2.skip_to(skip);
+                    for _ in 0..100 {
+                        let s1 = rsg1.next_int32_sequence().to_vec();
+                        let s2 = rsg2.next_int32_sequence();
+                        assert_eq!(
+                            s1, s2,
+                            "mismatch after skipping: family {family:?}, size {dimensionality}, skipped {skip}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}

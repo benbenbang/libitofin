@@ -57,3 +57,23 @@ impl MersenneTwister {
         (f64::from(self.next_u32()) + 0.5) / 4_294_967_296.0
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::MersenneTwister;
+
+    #[test]
+    fn matches_reference_mt19937_outputs() {
+        let mut rng = MersenneTwister::new(5489);
+        let expected = [
+            3_499_211_612u32,
+            581_869_302,
+            3_890_346_734,
+            3_586_334_585,
+            545_404_204,
+        ];
+        for (i, &e) in expected.iter().enumerate() {
+            assert_eq!(rng.next_u32(), e, "draw {i}");
+        }
+    }
+}
