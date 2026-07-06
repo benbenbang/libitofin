@@ -46,6 +46,11 @@ impl Copula for AliMikhailHaqCopula {
 }
 
 /// Clayton copula. Port of `QuantLib::ClaytonCopula`.
+///
+/// Deliberate divergence from QuantLib: for `theta` in `(-1, 0)` the term
+/// `x^-theta + y^-theta - 1` can go negative, where C++ `std::max` propagates
+/// the `NaN` produced by `pow`; this port clamps the value to `0.0`, the
+/// standard literature definition of the Clayton copula in that region.
 #[derive(Clone, Copy, Debug)]
 pub struct ClaytonCopula {
     theta: Real,
@@ -483,6 +488,21 @@ mod tests {
         let husler_reiss = HuslerReissCopula::new(1.5).unwrap();
         assert!(husler_reiss.value(p(0.0), p(Y)).abs() <= 1e-12);
         assert!(husler_reiss.value(p(1.0), p(Y)).is_nan());
+    }
+
+    #[test]
+    fn clayton_clamps_negative_generator_region_to_zero() {
+        let copula = ClaytonCopula::new(-0.4).unwrap();
+        assert_eq!(copula.value(p(0.1), p(0.1)), 0.0);
+    }
+
+    #[test]
+    fn gaussian_boundary_values_match_copula_limits() {
+        let copula = GaussianCopula::new(0.5).unwrap();
+        let lower = copula.value(p(0.0), p(Y));
+        assert!(lower.abs() <= 1e-8, "C(0, y) = {lower}");
+        let upper = copula.value(p(1.0), p(Y));
+        assert!((upper - Y).abs() <= 1e-8, "C(1, y) = {upper}, want {Y}");
     }
 
     #[test]
