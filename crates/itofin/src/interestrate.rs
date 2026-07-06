@@ -212,6 +212,175 @@ impl InterestRate {
     ) -> QlResult<DiscountFactor> {
         Ok(1.0 / self.compound_factor_between_ref(d1, d2, ref_start, ref_end)?)
     }
+
+    /// Implied interest rate for a given compound factor at a given time.
+    ///
+    /// The resulting rate carries the day counter provided as input; time must
+    /// be measured using that same day counter.
+    pub fn implied_rate(
+        compound: Real,
+        result_dc: DayCounter,
+        comp: Compounding,
+        freq: Frequency,
+        t: Time,
+    ) -> QlResult<InterestRate> {
+        if compound <= 0.0 {
+            fail!("positive compound factor required");
+        }
+        let rate = if compound == 1.0 {
+            if t < 0.0 {
+                fail!("non negative time ({t}) required");
+            }
+            0.0
+        } else {
+            if t <= 0.0 {
+                fail!("positive time ({t}) required");
+            }
+            let f = freq as i16 as Real;
+            match comp {
+                Compounding::Simple => (compound - 1.0) / t,
+                Compounding::Compounded => (compound.powf(1.0 / (f * t)) - 1.0) * f,
+                Compounding::Continuous => compound.ln() / t,
+                Compounding::SimpleThenCompounded => {
+                    if t <= 1.0 / f {
+                        (compound - 1.0) / t
+                    } else {
+                        (compound.powf(1.0 / (f * t)) - 1.0) * f
+                    }
+                }
+                Compounding::CompoundedThenSimple => {
+                    if t > 1.0 / f {
+                        (compound - 1.0) / t
+                    } else {
+                        (compound.powf(1.0 / (f * t)) - 1.0) * f
+                    }
+                }
+            }
+        };
+        InterestRate::new(rate, result_dc, comp, freq)
+    }
+
+    /// Implied rate for a given compound factor between two dates.
+    pub fn implied_rate_between(
+        compound: Real,
+        result_dc: DayCounter,
+        comp: Compounding,
+        freq: Frequency,
+        d1: Date,
+        d2: Date,
+    ) -> QlResult<InterestRate> {
+        Self::implied_rate_between_ref(
+            compound,
+            result_dc,
+            comp,
+            freq,
+            d1,
+            d2,
+            Date::null(),
+            Date::null(),
+        )
+    }
+
+    /// Implied rate between two dates, given an explicit reference period for
+    /// schedule-aware day counters.
+    #[allow(clippy::too_many_arguments)]
+    pub fn implied_rate_between_ref(
+        compound: Real,
+        result_dc: DayCounter,
+        comp: Compounding,
+        freq: Frequency,
+        d1: Date,
+        d2: Date,
+        ref_start: Date,
+        ref_end: Date,
+    ) -> QlResult<InterestRate> {
+        require!(d2 >= d1, "d1 ({d1}) later than d2 ({d2})");
+        let t = result_dc.year_fraction_ref(d1, d2, ref_start, ref_end);
+        Self::implied_rate(compound, result_dc, comp, freq, t)
+    }
+
+    /// Equivalent interest rate for a compounding period `t`.
+    ///
+    /// The result shares the day counter of this instance; time must be
+    /// measured using this instance's own day counter.
+    pub fn equivalent_rate(
+        &self,
+        comp: Compounding,
+        freq: Frequency,
+        t: Time,
+    ) -> QlResult<InterestRate> {
+        Self::implied_rate(
+            self.compound_factor(t)?,
+            self.day_counter.clone(),
+            comp,
+            freq,
+            t,
+        )
+    }
+
+    /// Equivalent rate for a compounding period between two dates.
+    ///
+    /// The result is calculated taking the requested day-counting rule into
+    /// account.
+    pub fn equivalent_rate_between(
+        &self,
+        result_dc: DayCounter,
+        comp: Compounding,
+        freq: Frequency,
+        d1: Date,
+        d2: Date,
+    ) -> QlResult<InterestRate> {
+        self.equivalent_rate_between_ref(result_dc, comp, freq, d1, d2, Date::null(), Date::null())
+    }
+
+    /// Equivalent rate between two dates, given an explicit reference period
+    /// for schedule-aware day counters.
+    #[allow(clippy::too_many_arguments)]
+    pub fn equivalent_rate_between_ref(
+        &self,
+        result_dc: DayCounter,
+        comp: Compounding,
+        freq: Frequency,
+        d1: Date,
+        d2: Date,
+        ref_start: Date,
+        ref_end: Date,
+    ) -> QlResult<InterestRate> {
+        require!(d2 >= d1, "d1 ({d1}) later than d2 ({d2})");
+        let t1 = self
+            .day_counter
+            .year_fraction_ref(d1, d2, ref_start, ref_end);
+        let t2 = result_dc.year_fraction_ref(d1, d2, ref_start, ref_end);
+        Self::implied_rate(self.compound_factor(t1)?, result_dc, comp, freq, t2)
+    }
+}
+
+impl fmt::Display for InterestRate {
+    /// Renders the rate as QuantLib's `operator<<` does, e.g.
+    /// `8 % Actual/360 Quarterly compounding`.
+    ///
+    /// The rate is printed as a percentage with Rust's default float
+    /// formatting (QuantLib inherits the stream's precision instead).
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} % {} ", self.rate * 100.0, self.day_counter.name())?;
+        match self.compounding {
+            Compounding::Simple => write!(f, "simple compounding"),
+            Compounding::Compounded => write!(f, "{} compounding", self.frequency),
+            Compounding::Continuous => write!(f, "continuous compounding"),
+            Compounding::SimpleThenCompounded => write!(
+                f,
+                "simple compounding up to {} months, then {} compounding",
+                12 / self.frequency as i16,
+                self.frequency
+            ),
+            Compounding::CompoundedThenSimple => write!(
+                f,
+                "compounding up to {} months, then {} simple compounding",
+                12 / self.frequency as i16,
+                self.frequency
+            ),
+        }
+    }
 }
 
 #[cfg(test)]
