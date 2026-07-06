@@ -7,7 +7,7 @@
 
 use crate::errors::QlResult;
 use crate::handle::{AsObservable, Handle};
-use crate::patterns::observable::{Observable, Observer};
+use crate::patterns::observable::{Forwarder, Observable, Observer};
 use crate::shared::{Shared, SharedMut, shared, shared_mut};
 use crate::types::{Real, Time};
 
@@ -43,18 +43,6 @@ pub enum AtmType {
     GammaMax,
     /// K such that call delta = 0.50 (only for forward delta).
     PutCall50,
-}
-
-/// Observer half of the quote (the C++ `update()`): passes every notification
-/// from the volatility handle on to the quote's own observers.
-struct Forwarder {
-    observable: Shared<Observable>,
-}
-
-impl Observer for Forwarder {
-    fn update(&mut self) {
-        self.observable.notify_observers();
-    }
 }
 
 /// Quote for the delta of an option and its volatility.
@@ -157,17 +145,7 @@ mod tests {
     use super::*;
     use crate::quotes::{SimpleQuote, make_quote_handle};
     use crate::shared::shared;
-
-    #[derive(Default)]
-    struct Flag {
-        up: bool,
-    }
-
-    impl Observer for Flag {
-        fn update(&mut self) {
-            self.up = true;
-        }
-    }
+    use crate::test_support::{Flag, as_observer};
 
     #[test]
     fn value_and_inspectors_mirror_the_construction() {
@@ -197,19 +175,17 @@ mod tests {
         let rh = make_quote_handle(0.2);
         let quote = DeltaVolQuote::new(0.25, rh.handle(), 1.0, DeltaType::PaSpot);
 
-        let flag = shared_mut(Flag::default());
-        quote
-            .observable()
-            .register_observer(&(flag.clone() as SharedMut<dyn Observer>));
+        let flag = Flag::new();
+        quote.observable().register_observer(&as_observer(&flag));
 
         let vol = shared(SimpleQuote::new(0.3));
         rh.link_to(vol.clone());
-        assert!(flag.borrow().up, "relink must reach quote observers");
+        assert!(Flag::is_up(&flag), "relink must reach quote observers");
         assert_eq!(quote.value().unwrap(), 0.3);
 
-        flag.borrow_mut().up = false;
+        Flag::lower(&flag);
         vol.set_value(0.4);
-        assert!(flag.borrow().up, "vol change must reach quote observers");
+        assert!(Flag::is_up(&flag), "vol change must reach quote observers");
         assert_eq!(quote.value().unwrap(), 0.4);
     }
 

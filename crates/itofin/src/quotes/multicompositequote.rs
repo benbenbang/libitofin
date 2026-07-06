@@ -13,7 +13,7 @@ use crate::handle::{AsObservable, Handle};
 use crate::math::array::Array;
 use crate::patterns::observable::{Observable, Observer};
 use crate::require;
-use crate::shared::{Shared, SharedMut, shared, shared_mut};
+use crate::shared::{Shared, SharedMut};
 use crate::types::{Real, Size};
 
 use super::{Invalidator, Quote};
@@ -35,12 +35,7 @@ impl<F: Fn(&Array) -> Real> MultiCompositeQuote<F> {
     /// Creates a quote combining `elements` through `f`, registering with
     /// every handle like the C++ constructor's `registerWith` loop.
     pub fn new(elements: Vec<Handle<dyn Quote>>, f: F) -> Self {
-        let cache = shared(Cell::new(None));
-        let observable = shared(Observable::new());
-        let listener = shared_mut(Invalidator {
-            cache: Shared::clone(&cache),
-            observable: Shared::clone(&observable),
-        });
+        let (cache, observable, listener) = Invalidator::new();
         let observer = listener.clone() as SharedMut<dyn Observer>;
         for element in &elements {
             element.register_observer(&observer);
@@ -102,17 +97,7 @@ mod tests {
     use super::*;
     use crate::quotes::SimpleQuote;
     use crate::shared::shared;
-
-    #[derive(Default)]
-    struct Flag {
-        up: bool,
-    }
-
-    impl Observer for Flag {
-        fn update(&mut self) {
-            self.up = true;
-        }
-    }
+    use crate::test_support::{Flag, as_observer};
 
     /// Port of `testMultiComposite` (test-suite/quotes.cpp): the composite
     /// value tracks `f(sources)` for growing source sets and several array
@@ -156,14 +141,14 @@ mod tests {
         let composite = MultiCompositeQuote::new(handles, |a| a.iter().sum());
         assert_eq!(composite.value().unwrap(), 6.0);
 
-        let flag = shared_mut(Flag::default());
+        let flag = Flag::new();
         composite
             .observable()
-            .register_observer(&(flag.clone() as SharedMut<dyn Observer>));
+            .register_observer(&as_observer(&flag));
 
         me3.set_value(30.0);
 
-        assert!(flag.borrow().up, "any source change must notify");
+        assert!(Flag::is_up(&flag), "any source change must notify");
         assert_eq!(composite.value().unwrap(), 33.0);
     }
 
