@@ -8,6 +8,8 @@
 
 use crate::errors::QlResult;
 use crate::math::distributions::Probability;
+use crate::math::distributions::bivariatenormal::BivariateCumulativeNormalDistributionWe04DP;
+use crate::math::distributions::normal::{CumulativeNormalDistribution, InverseCumulativeNormal};
 use crate::require;
 use crate::types::Real;
 
@@ -125,6 +127,129 @@ impl Copula for FrankCopula {
     }
 }
 
+/// Galambos copula. Port of `QuantLib::GalambosCopula`.
+#[derive(Clone, Copy, Debug)]
+pub struct GalambosCopula {
+    theta: Real,
+}
+
+impl GalambosCopula {
+    /// # Errors
+    ///
+    /// Returns an error unless `theta >= 0`.
+    pub fn new(theta: Real) -> QlResult<Self> {
+        require!(
+            (0.0..).contains(&theta),
+            "theta ({theta}) must be greater or equal to 0"
+        );
+        Ok(GalambosCopula { theta })
+    }
+}
+
+impl Copula for GalambosCopula {
+    fn value(&self, x: Probability, y: Probability) -> Real {
+        let (x, y) = (x.value(), y.value());
+        x * y
+            * ((-x.ln()).powf(-self.theta) + (-y.ln()).powf(-self.theta))
+                .powf(-1.0 / self.theta)
+                .exp()
+    }
+}
+
+/// Gaussian copula. Port of `QuantLib::GaussianCopula`.
+#[derive(Clone, Copy, Debug)]
+pub struct GaussianCopula {
+    bivariate_normal_cdf: BivariateCumulativeNormalDistributionWe04DP,
+}
+
+impl GaussianCopula {
+    /// # Errors
+    ///
+    /// Returns an error unless `rho` is in `[-1, 1]`.
+    pub fn new(rho: Real) -> QlResult<Self> {
+        require!((-1.0..=1.0).contains(&rho), "rho ({rho}) must be in [-1,1]");
+        Ok(GaussianCopula {
+            bivariate_normal_cdf: BivariateCumulativeNormalDistributionWe04DP::new(rho)?,
+        })
+    }
+}
+
+impl Copula for GaussianCopula {
+    fn value(&self, x: Probability, y: Probability) -> Real {
+        let inverse = |p: Probability| {
+            InverseCumulativeNormal::standard_value(p.value())
+                .expect("the standard inverse cumulative normal is defined on [0, 1]")
+        };
+        self.bivariate_normal_cdf.value(inverse(x), inverse(y))
+    }
+}
+
+/// Gumbel copula. Port of `QuantLib::GumbelCopula`.
+#[derive(Clone, Copy, Debug)]
+pub struct GumbelCopula {
+    theta: Real,
+}
+
+impl GumbelCopula {
+    /// # Errors
+    ///
+    /// Returns an error unless `theta >= 1`.
+    pub fn new(theta: Real) -> QlResult<Self> {
+        require!(
+            (1.0..).contains(&theta),
+            "theta ({theta}) must be greater or equal to 1"
+        );
+        Ok(GumbelCopula { theta })
+    }
+}
+
+impl Copula for GumbelCopula {
+    fn value(&self, x: Probability, y: Probability) -> Real {
+        let (x, y) = (x.value(), y.value());
+        (-((-x.ln()).powf(self.theta) + (-y.ln()).powf(self.theta)).powf(1.0 / self.theta)).exp()
+    }
+}
+
+/// Husler-Reiss copula. Port of `QuantLib::HuslerReissCopula`.
+///
+/// As in QuantLib, the value at `x == 1` or `y == 1` is `NaN` (the formula
+/// takes the log of a negative infinity there).
+#[derive(Clone, Copy, Debug)]
+pub struct HuslerReissCopula {
+    theta: Real,
+    cum_normal: CumulativeNormalDistribution,
+}
+
+impl HuslerReissCopula {
+    /// # Errors
+    ///
+    /// Returns an error unless `theta >= 0`.
+    pub fn new(theta: Real) -> QlResult<Self> {
+        require!(
+            (0.0..).contains(&theta),
+            "theta ({theta}) must be greater or equal to 0"
+        );
+        Ok(HuslerReissCopula {
+            theta,
+            cum_normal: CumulativeNormalDistribution::standard(),
+        })
+    }
+}
+
+impl Copula for HuslerReissCopula {
+    fn value(&self, x: Probability, y: Probability) -> Real {
+        let (x, y) = (x.value(), y.value());
+        let theta = self.theta;
+        x.powf(
+            self.cum_normal
+                .value(1.0 / theta + 0.5 * theta * (x.ln() / y.ln()).ln()),
+        ) * y.powf(
+            self.cum_normal
+                .value(1.0 / theta + 0.5 * theta * (y.ln() / x.ln()).ln()),
+        )
+    }
+}
+
 /// Independent copula `C(x, y) = x y`. Port of `QuantLib::IndependentCopula`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct IndependentCopula;
@@ -189,6 +314,35 @@ impl Copula for MinCopula {
     }
 }
 
+/// Plackett copula. Port of `QuantLib::PlackettCopula`.
+#[derive(Clone, Copy, Debug)]
+pub struct PlackettCopula {
+    theta: Real,
+}
+
+impl PlackettCopula {
+    /// # Errors
+    ///
+    /// Returns an error unless `theta >= 0` and `theta != 1`.
+    pub fn new(theta: Real) -> QlResult<Self> {
+        require!(
+            (0.0..).contains(&theta),
+            "theta ({theta}) must be greater or equal to 0"
+        );
+        require!(theta != 1.0, "theta ({theta}) must be different from 1");
+        Ok(PlackettCopula { theta })
+    }
+}
+
+impl Copula for PlackettCopula {
+    fn value(&self, x: Probability, y: Probability) -> Real {
+        let (x, y) = (x.value(), y.value());
+        let theta = self.theta;
+        let s = 1.0 + (theta - 1.0) * (x + y);
+        (s - (s.powi(2) - 4.0 * x * y * theta * (theta - 1.0)).sqrt()) / (2.0 * (theta - 1.0))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -223,6 +377,21 @@ mod tests {
                 Box::new(FrankCopula::new(2.0).unwrap()),
                 0.24972133337304844,
             ),
+            (
+                "galambos(1.5)",
+                Box::new(GalambosCopula::new(1.5).unwrap()),
+                0.2900199444768978,
+            ),
+            (
+                "gumbel(2)",
+                Box::new(GumbelCopula::new(2.0).unwrap()),
+                0.2848780620209499,
+            ),
+            (
+                "husler-reiss(1.5)",
+                Box::new(HuslerReissCopula::new(1.5).unwrap()),
+                0.2783507123856862,
+            ),
             ("independent", Box::new(IndependentCopula), 0.21),
             (
                 "marshall-olkin(0.25, 0.75)",
@@ -231,6 +400,11 @@ mod tests {
             ),
             ("max", Box::new(MaxCopula), 0.3),
             ("min", Box::new(MinCopula), 0.0),
+            (
+                "plackett(2)",
+                Box::new(PlackettCopula::new(2.0).unwrap()),
+                0.2384226894136091,
+            ),
         ];
         for (name, copula, expected) in cases {
             let got = copula.value(p(X), p(Y));
@@ -242,18 +416,38 @@ mod tests {
     }
 
     #[test]
+    fn gaussian_copula_composes_inverse_and_bivariate_cdf() {
+        let copula = GaussianCopula::new(0.5).unwrap();
+        let bvn = BivariateCumulativeNormalDistributionWe04DP::new(0.5).unwrap();
+        let a = InverseCumulativeNormal::standard_value(X).unwrap();
+        let b = InverseCumulativeNormal::standard_value(Y).unwrap();
+        assert_eq!(copula.value(p(X), p(Y)), bvn.value(a, b));
+
+        let frechet_upper = GaussianCopula::new(1.0).unwrap();
+        assert!((frechet_upper.value(p(X), p(Y)) - X.min(Y)).abs() <= 1e-7);
+    }
+
+    #[test]
     fn independence_special_cases_reduce_to_product() {
         let grid = [0.1, 0.3, 0.5, 0.9];
         for x in grid {
             for y in grid {
                 let product = x * y;
-                for copula in [
-                    Box::new(AliMikhailHaqCopula::new(0.0).unwrap()) as Box<dyn Copula>,
-                    Box::new(FarlieGumbelMorgensternCopula::new(0.0).unwrap()),
+                for (copula, tol) in [
+                    (
+                        Box::new(AliMikhailHaqCopula::new(0.0).unwrap()) as Box<dyn Copula>,
+                        1e-15,
+                    ),
+                    (
+                        Box::new(FarlieGumbelMorgensternCopula::new(0.0).unwrap()),
+                        1e-15,
+                    ),
+                    (Box::new(GumbelCopula::new(1.0).unwrap()), 1e-15),
+                    (Box::new(GaussianCopula::new(0.0).unwrap()), 1e-8),
                 ] {
                     let got = copula.value(p(x), p(y));
                     assert!(
-                        (got - product).abs() <= 1e-15,
+                        (got - product).abs() <= tol,
                         "C({x}, {y}) = {got}, want {product}"
                     );
                 }
@@ -268,10 +462,13 @@ mod tests {
             Box::new(ClaytonCopula::new(2.0).unwrap()),
             Box::new(FarlieGumbelMorgensternCopula::new(0.5).unwrap()),
             Box::new(FrankCopula::new(2.0).unwrap()),
+            Box::new(GalambosCopula::new(1.5).unwrap()),
+            Box::new(GumbelCopula::new(2.0).unwrap()),
             Box::new(IndependentCopula),
             Box::new(MarshallOlkinCopula::new(0.25, 0.75).unwrap()),
             Box::new(MaxCopula),
             Box::new(MinCopula),
+            Box::new(PlackettCopula::new(2.0).unwrap()),
         ];
         for (i, copula) in copulas.iter().enumerate() {
             let lower = copula.value(p(0.0), p(Y));
@@ -282,6 +479,10 @@ mod tests {
                 "copula #{i}: C(1, y) = {upper}, want {Y}"
             );
         }
+
+        let husler_reiss = HuslerReissCopula::new(1.5).unwrap();
+        assert!(husler_reiss.value(p(0.0), p(Y)).abs() <= 1e-12);
+        assert!(husler_reiss.value(p(1.0), p(Y)).is_nan());
     }
 
     #[test]
@@ -291,7 +492,13 @@ mod tests {
         assert!(ClaytonCopula::new(0.0).is_err());
         assert!(FarlieGumbelMorgensternCopula::new(-1.1).is_err());
         assert!(FrankCopula::new(0.0).is_err());
+        assert!(GalambosCopula::new(-0.1).is_err());
+        assert!(GaussianCopula::new(1.1).is_err());
+        assert!(GumbelCopula::new(0.9).is_err());
+        assert!(HuslerReissCopula::new(-0.1).is_err());
         assert!(MarshallOlkinCopula::new(-0.1, 0.5).is_err());
         assert!(MarshallOlkinCopula::new(0.5, -0.1).is_err());
+        assert!(PlackettCopula::new(-0.1).is_err());
+        assert!(PlackettCopula::new(1.0).is_err());
     }
 }
