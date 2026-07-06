@@ -276,11 +276,11 @@ impl MultiDimGaussianIntegration {
             }
         }
 
+        let dim_rules: Vec<&GaussianQuadrature> = ns.iter().map(|order| &rules[order]).collect();
         let mut weights: Array = std::iter::repeat_n(1.0, n).collect();
         let mut x = vec![Array::with_size(m); n];
         for i in 0..n {
-            for j in 0..m {
-                let rule = &rules[&ns[j]];
+            for (j, rule) in dim_rules.iter().enumerate() {
                 let nx = (i / spacing[j]) % ns[j];
                 weights[i] *= rule.weights()[nx];
                 x[i][j] = rule.abscissas()[nx];
@@ -652,6 +652,89 @@ mod tests {
                  diff {diff}, tolerance {}",
                 tols[n - 1]
             );
+        }
+
+        // Cross moments with mixed orders, continuing the same rng stream as
+        // the C++ test: E[x_i x_j] checked against
+        // sqrt(det(2 pi inv(A))) * inv(A)[i][j], once with high orders
+        // {22, 18, 26} and once exactly at order 2 via the change of
+        // variables x -> sqrt(2) inv(a^T) x. The inverse and determinant use
+        // the 3x3 cofactor closed form (the crate has no general inverse
+        // yet); inv(A) = inv(a^T) inv(a) since A = a a^T, and the quadrature
+        // side of each comparison is independent of these helpers, so the
+        // oracle also validates them.
+        fn det3(m: &Matrix) -> Real {
+            m[(0, 0)] * (m[(1, 1)] * m[(2, 2)] - m[(1, 2)] * m[(2, 1)])
+                - m[(0, 1)] * (m[(1, 0)] * m[(2, 2)] - m[(1, 2)] * m[(2, 0)])
+                + m[(0, 2)] * (m[(1, 0)] * m[(2, 1)] - m[(1, 1)] * m[(2, 0)])
+        }
+        fn inverse3(m: &Matrix) -> Matrix {
+            let d = det3(m);
+            let mut inv = Matrix::with_size(3, 3);
+            for i in 0..3 {
+                for j in 0..3 {
+                    inv[(j, i)] = (m[((i + 1) % 3, (j + 1) % 3)] * m[((i + 2) % 3, (j + 2) % 3)]
+                        - m[((i + 1) % 3, (j + 2) % 3)] * m[((i + 2) % 3, (j + 1) % 3)])
+                        / d;
+                }
+            }
+            inv
+        }
+
+        let mut a = Matrix::with_size(3, 3);
+        for i in 0..3 {
+            for j in 0..3 {
+                a[(i, j)] = if i == j {
+                    (i + 1) as Real
+                } else {
+                    rng.next_real()
+                };
+            }
+        }
+        let at = a.transpose();
+        let big_a = &a * &at;
+        let inva = inverse3(&at);
+        let inv_big_a = &inva * &inva.transpose();
+        let sqrt_det_2pi_inv_a = (std::f64::consts::TAU.powi(3) / (det3(&a) * det3(&a))).sqrt();
+
+        let quad_high = MultiDimGaussianIntegration::new(&[22, 18, 26], |order| {
+            GaussianQuadrature::hermite(order, 0.0)
+        })
+        .unwrap();
+        let quad2 = MultiDimGaussianIntegration::new(&[2, 2, 2], |order| {
+            GaussianQuadrature::hermite(order, 0.0)
+        })
+        .unwrap();
+        let det_sqrt2_inva = std::f64::consts::SQRT_2.powi(3) * det3(&inva);
+
+        for i in 0..3 {
+            for j in 0..3 {
+                let expected = sqrt_det_2pi_inv_a * inv_big_a[(i, j)];
+
+                let calculated =
+                    quad_high.integrate(|x| x[i] * x[j] * (-0.5 * x.dot(&(&big_a * x))).exp());
+                let diff = (calculated - expected).abs();
+                assert!(
+                    diff <= 1e-4,
+                    "failed to reproduce cross moment ({i}, {j}): \
+                     calculated {calculated}, expected {expected}, diff {diff}"
+                );
+
+                let calculated = quad2.integrate(|x| {
+                    let ax = &inva * x;
+                    let mut f = Array::with_size(3);
+                    for k in 0..3 {
+                        f[k] = std::f64::consts::SQRT_2 * ax[k];
+                    }
+                    f[i] * f[j] * (-x.dot(x)).exp()
+                }) * det_sqrt2_inva;
+                let diff = (calculated - expected).abs();
+                assert!(
+                    diff <= 1e4 * Real::EPSILON,
+                    "failed to reproduce cross moment ({i}, {j}) at order 2: \
+                     calculated {calculated}, expected {expected}, diff {diff}"
+                );
+            }
         }
     }
 }
