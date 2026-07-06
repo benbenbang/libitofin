@@ -9,6 +9,7 @@
 //! [`DayCounter`](daycounter::DayCounter) machinery. The `Schedule` layer from
 //! EPIC-2 is still out of scope for this branch.
 
+pub mod asx;
 pub mod businessdayconvention;
 pub mod calendar;
 pub mod calendars;
