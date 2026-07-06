@@ -3,6 +3,7 @@
 pub mod array;
 pub mod beta;
 pub mod comparison;
+pub mod copulas;
 pub mod distributions;
 pub mod errorfunction;
 pub mod gammafunction;
