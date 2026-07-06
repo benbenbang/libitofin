@@ -14,6 +14,7 @@ pub mod piecewise;
 pub mod segment;
 pub mod simpson;
 pub mod tabulatedgausslegendre;
+pub mod tanhsinh;
 pub mod trapezoid;
 pub mod twodimensional;
 
@@ -29,6 +30,74 @@ pub(crate) fn require_accuracy(accuracy: Real) -> QlResult<()> {
         fail!("required accuracy ({accuracy}) must be finite and exceed machine epsilon");
     }
     Ok(())
+}
+
+/// Trapezoidal double-exponential quadrature with successive level refinement,
+/// shared by the tanh-sinh and exp-sinh integrators.
+///
+/// Sums `w * f(x)` over the grid `t = k * h` for `|t| <= t_max`, where `node`
+/// maps `t` to the transformed abscissa and weight (`None` drops a tail node
+/// past the transform's usable floating-point range). Each refinement halves
+/// `h`, reusing every previous sample; iteration stops when two consecutive
+/// levels agree to `rel_tolerance` against the L1 norm of the integral, the
+/// termination rule of `boost::math::quadrature`'s DE schemes.
+pub(crate) fn de_quadrature<F, N>(
+    f: &mut F,
+    node: N,
+    t_max: Real,
+    rel_tolerance: Real,
+    max_refinements: usize,
+) -> QlResult<Real>
+where
+    F: FnMut(Real) -> Real,
+    N: Fn(Real) -> Option<(Real, Real)>,
+{
+    fn term<F, N>(f: &mut F, node: &N, t: Real) -> QlResult<(Real, Real)>
+    where
+        F: FnMut(Real) -> Real,
+        N: Fn(Real) -> Option<(Real, Real)>,
+    {
+        let Some((x, w)) = node(t) else {
+            return Ok((0.0, 0.0));
+        };
+        let y = f(x);
+        if !y.is_finite() {
+            fail!("integrand returned a non-finite value ({y}) at x = {x}");
+        }
+        Ok((w * y, (w * y).abs()))
+    }
+
+    let (mut sum, mut abs_sum) = term(f, &node, 0.0)?;
+    let mut t = 1.0;
+    while t <= t_max {
+        let (plus, abs_plus) = term(f, &node, t)?;
+        let (minus, abs_minus) = term(f, &node, -t)?;
+        sum += plus + minus;
+        abs_sum += abs_plus + abs_minus;
+        t += 1.0;
+    }
+    let mut h = 1.0;
+    let mut value = sum;
+    for _ in 0..max_refinements {
+        h *= 0.5;
+        let mut t = h;
+        while t <= t_max {
+            let (plus, abs_plus) = term(f, &node, t)?;
+            let (minus, abs_minus) = term(f, &node, -t)?;
+            sum += plus + minus;
+            abs_sum += abs_plus + abs_minus;
+            t += 2.0 * h;
+        }
+        let refined = h * sum;
+        let error = (refined - value).abs();
+        value = refined;
+        if error <= rel_tolerance * (h * abs_sum) {
+            return Ok(value);
+        }
+    }
+    fail!(
+        "double-exponential quadrature failed to reach relative tolerance {rel_tolerance} within {max_refinements} refinements"
+    );
 }
 
 /// A one-dimensional numerical integrator over `[a, b]`.
