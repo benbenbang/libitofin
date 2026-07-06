@@ -3,6 +3,7 @@
 pub mod discrete;
 pub mod exponential_integrals;
 pub mod filon;
+pub mod gaussiannoncentralchisquaredpolynomial;
 pub mod gaussianorthogonalpolynomial;
 pub mod gaussianquadratures;
 pub mod gausslaguerrecosinepolynomial;
