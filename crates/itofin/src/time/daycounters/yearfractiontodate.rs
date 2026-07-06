@@ -5,29 +5,44 @@
 //! days, and finally rounds to whichever neighbouring date reproduces the
 //! target fraction more closely.
 
+use crate::errors::QlResult;
 use crate::math::comparison::close_enough;
+use crate::require;
 use crate::time::date::Date;
 use crate::time::daycounter::DayCounter;
 use crate::time::period::Period;
 use crate::time::timeunit::TimeUnit;
 use crate::types::{Integer, Time};
 
+fn day_offset(x: Time) -> QlResult<Integer> {
+    let days = x.round();
+    require!(
+        days >= Time::from(Integer::MIN) && days <= Time::from(Integer::MAX),
+        "time {x} is out of range for a day offset"
+    );
+    Ok(days as Integer)
+}
+
 /// The date `d` such that `day_counter.year_fraction(reference_date, d)` is
 /// closest to `t`, QuantLib's `yearFractionToDate`.
-pub fn year_fraction_to_date(day_counter: &DayCounter, reference_date: Date, t: Time) -> Date {
-    let mut guess_date =
-        reference_date + Period::new((t * 365.25).round() as Integer, TimeUnit::Days);
+///
+/// # Errors
+///
+/// Returns an error if `t` is not finite or lies outside the representable
+/// day-offset range, where QuantLib's `boost::numeric_cast` throws.
+pub fn year_fraction_to_date(
+    day_counter: &DayCounter,
+    reference_date: Date,
+    t: Time,
+) -> QlResult<Date> {
+    let mut guess_date = reference_date + Period::new(day_offset(t * 365.25)?, TimeUnit::Days);
     let mut guess_time = day_counter.year_fraction(reference_date, guess_date);
 
-    guess_date = guess_date
-        + Period::new(
-            ((t - guess_time) * 365.25).round() as Integer,
-            TimeUnit::Days,
-        );
+    guess_date = guess_date + Period::new(day_offset((t - guess_time) * 365.25)?, TimeUnit::Days);
     guess_time = day_counter.year_fraction(reference_date, guess_date);
 
     if close_enough(guess_time, t) {
-        return guess_date;
+        return Ok(guess_date);
     }
 
     let search_direction = 1.0f64.copysign(t - guess_time) as Integer;
@@ -53,9 +68,9 @@ pub fn year_fraction_to_date(day_counter: &DayCounter, reference_date: Date, t: 
     if close_enough(guess_time, t)
         || (day_counter.year_fraction(reference_date, next_date) - t).abs() > (guess_time - t).abs()
     {
-        guess_date
+        Ok(guess_date)
     } else {
-        next_date
+        Ok(next_date)
     }
 }
 
@@ -115,7 +130,7 @@ mod tests {
                 let target = today + Period::new(i, TimeUnit::Days);
 
                 let t = dc.year_fraction(today, target);
-                let time_to_date = year_fraction_to_date(dc, today, t);
+                let time_to_date = year_fraction_to_date(dc, today, t).unwrap();
                 let t_new = dc.year_fraction(today, time_to_date);
 
                 assert!(
@@ -142,11 +157,23 @@ mod tests {
             let t = dc.year_fraction(d1, d2);
             let mut offset: Time = 0.0;
             while offset < 1.0 + 1e-10 {
-                let inv = year_fraction_to_date(dc, d1, t + offset / 360.0);
+                let inv = year_fraction_to_date(dc, d1, t + offset / 360.0).unwrap();
                 let expected = if offset < 0.4999 { d2 } else { d2 + 1 };
                 assert_eq!(inv, expected, "offset {offset}, day counter {}", dc.name());
                 offset += 0.05;
             }
         }
+    }
+
+    #[test]
+    fn rejects_non_finite_or_out_of_range_times() {
+        let dc = Actual360::new();
+        let reference = Date::new(1, Month::January, 2020);
+
+        assert!(year_fraction_to_date(&dc, reference, Time::NAN).is_err());
+        assert!(year_fraction_to_date(&dc, reference, Time::INFINITY).is_err());
+        assert!(year_fraction_to_date(&dc, reference, Time::NEG_INFINITY).is_err());
+        assert!(year_fraction_to_date(&dc, reference, 1e10).is_err());
+        assert!(year_fraction_to_date(&dc, reference, -1e10).is_err());
     }
 }
