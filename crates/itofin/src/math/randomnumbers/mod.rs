@@ -3,7 +3,8 @@
 //! QuantLib couples its generators through class templates whose `next()`
 //! returns a weighted `Sample<Real>`; for the pseudo-random generators the
 //! weight is always `1.0`, so we drop the wrapper and express the coupling
-//! with traits instead: [`UniformRng`] for uniform deviates in `(0, 1)`,
+//! with traits instead: [`UniformRng`] for uniform deviates in the unit
+//! interval,
 //! [`Uint64Rng`] for the generators that also expose their raw 64-bit output
 //! (what the Ziggurat transform consumes), and [`GaussianRng`] for normal
 //! deviates. Generators take `&mut self` where QuantLib mutates through
@@ -28,10 +29,12 @@ pub use ranluxuniformrng::{Ranlux3UniformRng, Ranlux4UniformRng, Ranlux64Uniform
 pub use xoshiro256starstaruniformrng::Xoshiro256StarStarUniformRng;
 pub use zigguratgaussianrng::ZigguratGaussianRng;
 
-/// A generator of uniform pseudo-random deviates in the open `(0, 1)`
-/// interval.
+/// A generator of uniform pseudo-random deviates in the unit interval.
+///
+/// Endpoint behavior is generator-specific (e.g. Ranlux can return exactly
+/// `0.0`); see each implementation's documentation.
 pub trait UniformRng {
-    /// The next uniform deviate in `(0, 1)`.
+    /// The next uniform deviate in the unit interval.
     fn next_real(&mut self) -> Real;
 }
 
