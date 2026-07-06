@@ -16,12 +16,12 @@ use crate::shared::{Shared, SharedMut, shared_mut};
 
 /// Inner shared cell of a [`Handle`]: the current pointee plus the link's own
 /// observable, through which relinks are broadcast.
-pub struct Link<T> {
+pub struct Link<T: ?Sized> {
     current: Option<Shared<T>>,
     observable: Shared<Observable>,
 }
 
-impl<T> Link<T> {
+impl<T: ?Sized> Link<T> {
     fn new(pointee: Option<Shared<T>>) -> Self {
         Link {
             current: pointee,
@@ -46,11 +46,11 @@ impl<T> Link<T> {
 ///
 /// Cloning a `Handle` shares the same underlying [`Link`]; see
 /// [`RelinkableHandle`] to relink it.
-pub struct Handle<T> {
+pub struct Handle<T: ?Sized> {
     link: SharedMut<Link<T>>,
 }
 
-impl<T> Handle<T> {
+impl<T: ?Sized> Handle<T> {
     /// Creates an empty handle.
     pub fn empty() -> Self {
         Handle {
@@ -92,7 +92,7 @@ impl<T> Handle<T> {
     }
 }
 
-impl<T> Clone for Handle<T> {
+impl<T: ?Sized> Clone for Handle<T> {
     fn clone(&self) -> Self {
         Handle {
             link: SharedMut::clone(&self.link),
@@ -101,11 +101,11 @@ impl<T> Clone for Handle<T> {
 }
 
 /// A [`Handle`] that can be relinked, propagating the change to all its copies.
-pub struct RelinkableHandle<T> {
+pub struct RelinkableHandle<T: ?Sized> {
     handle: Handle<T>,
 }
 
-impl<T> RelinkableHandle<T> {
+impl<T: ?Sized> RelinkableHandle<T> {
     /// Creates an empty relinkable handle.
     pub fn empty() -> Self {
         RelinkableHandle {
