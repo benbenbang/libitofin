@@ -23,6 +23,16 @@ pub trait Observer {
     fn update(&mut self);
 }
 
+/// Contract for types that embed an [`Observable`] and broadcast through it.
+///
+/// Mirrors QuantLib's "inherits from `Observable`" preconditions (e.g. the
+/// `handle.hpp` requirement on handle pointees): observers register with the
+/// embedded observable this accessor exposes.
+pub trait AsObservable {
+    /// Access to the embedded observable for registering observers.
+    fn observable(&self) -> &Observable;
+}
+
 /// Object that notifies its changes to a set of observers.
 ///
 /// Mirrors QuantLib's `Observable`. Embed one in any type that needs to notify;

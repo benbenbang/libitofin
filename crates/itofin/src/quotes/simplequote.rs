@@ -13,8 +13,8 @@ use std::cell::Cell;
 
 use crate::errors::QlResult;
 use crate::fail;
-use crate::handle::{AsObservable, RelinkableHandle};
-use crate::patterns::observable::Observable;
+use crate::handle::RelinkableHandle;
+use crate::patterns::observable::{AsObservable, Observable};
 use crate::shared::shared;
 use crate::types::Real;
 
