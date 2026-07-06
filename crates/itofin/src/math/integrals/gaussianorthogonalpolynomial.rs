@@ -203,6 +203,118 @@ impl GaussianOrthogonalPolynomial for GaussJacobiPolynomial {
     }
 }
 
+/// Generalized Gauss-Laguerre polynomial, weight `w(x; s) = x^s exp(-x)` on
+/// `[0, inf)` with `s > -1`.
+#[derive(Clone, Copy, Debug)]
+pub struct GaussLaguerrePolynomial {
+    s: Real,
+}
+
+impl GaussLaguerrePolynomial {
+    /// A Laguerre polynomial family with weight exponent `s` (QuantLib
+    /// defaults `s` to 0).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless `s > -1`.
+    pub fn new(s: Real) -> QlResult<Self> {
+        require!(s.is_finite() && s > -1.0, "s must be bigger than -1");
+        Ok(GaussLaguerrePolynomial { s })
+    }
+}
+
+impl GaussianOrthogonalPolynomial for GaussLaguerrePolynomial {
+    fn mu_0(&self) -> Real {
+        log_gamma(self.s + 1.0)
+            .expect("s + 1 > 0 by construction")
+            .exp()
+    }
+
+    fn alpha(&self, i: Size) -> Real {
+        2.0 * i as Real + 1.0 + self.s
+    }
+
+    fn beta(&self, i: Size) -> Real {
+        let i = i as Real;
+        i * (i + self.s)
+    }
+
+    fn w(&self, x: Real) -> Real {
+        x.powf(self.s) * (-x).exp()
+    }
+}
+
+/// Generalized Gauss-Hermite polynomial, weight
+/// `w(x; mu) = |x|^(2 mu) exp(-x^2)` on the real line with `mu > -1/2`.
+#[derive(Clone, Copy, Debug)]
+pub struct GaussHermitePolynomial {
+    mu: Real,
+}
+
+impl GaussHermitePolynomial {
+    /// A Hermite polynomial family with weight exponent `mu` (QuantLib
+    /// defaults `mu` to 0).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless `mu > -1/2`.
+    pub fn new(mu: Real) -> QlResult<Self> {
+        require!(mu.is_finite() && mu > -0.5, "mu must be bigger than -0.5");
+        Ok(GaussHermitePolynomial { mu })
+    }
+}
+
+impl GaussianOrthogonalPolynomial for GaussHermitePolynomial {
+    fn mu_0(&self) -> Real {
+        log_gamma(self.mu + 0.5)
+            .expect("mu + 1/2 > 0 by construction")
+            .exp()
+    }
+
+    fn alpha(&self, _i: Size) -> Real {
+        0.0
+    }
+
+    fn beta(&self, i: Size) -> Real {
+        if i.is_multiple_of(2) {
+            i as Real / 2.0
+        } else {
+            i as Real / 2.0 + self.mu
+        }
+    }
+
+    fn w(&self, x: Real) -> Real {
+        x.abs().powf(2.0 * self.mu) * (-x * x).exp()
+    }
+}
+
+/// Gauss hyperbolic polynomial, weight `w(x) = 1/cosh(x)` on the real line.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct GaussHyperbolicPolynomial;
+
+impl GaussianOrthogonalPolynomial for GaussHyperbolicPolynomial {
+    fn mu_0(&self) -> Real {
+        std::f64::consts::PI
+    }
+
+    fn alpha(&self, _i: Size) -> Real {
+        0.0
+    }
+
+    fn beta(&self, i: Size) -> Real {
+        use std::f64::consts::{FRAC_PI_2, PI};
+        if i != 0 {
+            FRAC_PI_2 * FRAC_PI_2 * i as Real * i as Real
+        } else {
+            PI
+        }
+    }
+
+    fn w(&self, x: Real) -> Real {
+        1.0 / x.cosh()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -264,5 +376,11 @@ mod tests {
         assert!(GaussJacobiPolynomial::new(0.0, -1.0).is_err());
         assert!(GaussJacobiPolynomial::new(-0.999, -1.5).is_err());
         assert!(GaussJacobiPolynomial::gegenbauer(-0.5).is_err());
+    }
+
+    #[test]
+    fn laguerre_and_hermite_reject_out_of_domain_exponents() {
+        assert!(GaussLaguerrePolynomial::new(-1.0).is_err());
+        assert!(GaussHermitePolynomial::new(-0.5).is_err());
     }
 }
