@@ -28,6 +28,8 @@ pub struct Schedule {
     termination_date_convention: Option<BusinessDayConvention>,
     rule: Option<DateGeneration>,
     end_of_month: Option<bool>,
+    first_date: Date,
+    next_to_last_date: Date,
     dates: Vec<Date>,
     is_regular: Vec<bool>,
 }
@@ -84,6 +86,8 @@ impl Schedule {
             termination_date_convention,
             rule,
             end_of_month,
+            first_date: Date::null(),
+            next_to_last_date: Date::null(),
             dates,
             is_regular,
         }
@@ -240,6 +244,107 @@ impl Schedule {
         );
         self.is_regular[i - 1]
     }
+
+    /// The index of the first date not earlier than `ref_date`.
+    pub fn lower_bound(&self, ref_date: Date) -> usize {
+        self.dates.partition_point(|d| *d < ref_date)
+    }
+
+    /// The first date later than or equal to `ref_date`, if any.
+    pub fn next_date(&self, ref_date: Date) -> Option<Date> {
+        self.dates.get(self.lower_bound(ref_date)).copied()
+    }
+
+    /// The last date earlier than `ref_date`, if any.
+    pub fn previous_date(&self, ref_date: Date) -> Option<Date> {
+        match self.lower_bound(ref_date) {
+            0 => None,
+            i => Some(self.dates[i - 1]),
+        }
+    }
+
+    /// The schedule truncated to the dates on or after `truncation_date`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `truncation_date` is not before the last schedule date.
+    pub fn after(&self, truncation_date: Date) -> Schedule {
+        let mut result = self.clone();
+
+        assert!(
+            truncation_date < result.dates[result.dates.len() - 1],
+            "truncation date {} must be before the last schedule date {}",
+            truncation_date,
+            result.dates[result.dates.len() - 1]
+        );
+        if truncation_date > result.dates[0] {
+            while result.dates[0] < truncation_date {
+                result.dates.remove(0);
+                if !result.is_regular.is_empty() {
+                    result.is_regular.remove(0);
+                }
+            }
+
+            if truncation_date != result.dates[0] {
+                result.dates.insert(0, truncation_date);
+                result.is_regular.insert(0, false);
+                result.termination_date_convention = Some(BusinessDayConvention::Unadjusted);
+            } else {
+                result.termination_date_convention = Some(self.convention);
+            }
+
+            if result.next_to_last_date <= truncation_date {
+                result.next_to_last_date = Date::null();
+            }
+            if result.first_date <= truncation_date {
+                result.first_date = Date::null();
+            }
+        }
+
+        result
+    }
+
+    /// The schedule truncated to the dates on or before `truncation_date`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `truncation_date` is not later than the first schedule
+    /// date.
+    pub fn until(&self, truncation_date: Date) -> Schedule {
+        let mut result = self.clone();
+
+        assert!(
+            truncation_date > result.dates[0],
+            "truncation date {} must be later than schedule first date {}",
+            truncation_date,
+            result.dates[0]
+        );
+        if truncation_date < result.dates[result.dates.len() - 1] {
+            while result.dates[result.dates.len() - 1] > truncation_date {
+                result.dates.pop();
+                if !result.is_regular.is_empty() {
+                    result.is_regular.pop();
+                }
+            }
+
+            if truncation_date != result.dates[result.dates.len() - 1] {
+                result.dates.push(truncation_date);
+                result.is_regular.push(false);
+                result.termination_date_convention = Some(BusinessDayConvention::Unadjusted);
+            } else {
+                result.termination_date_convention = Some(self.convention);
+            }
+
+            if result.next_to_last_date >= truncation_date {
+                result.next_to_last_date = Date::null();
+            }
+            if result.first_date >= truncation_date {
+                result.first_date = Date::null();
+            }
+        }
+
+        result
+    }
 }
 
 impl std::ops::Index<usize> for Schedule {
@@ -349,6 +454,29 @@ mod tests {
         assert_eq!(schedule.tenor(), Period::new(1, TimeUnit::Years));
         assert_eq!(schedule.rule(), DateGeneration::Backward);
         assert!(schedule.end_of_month());
+    }
+
+    #[test]
+    fn navigation_and_bounds() {
+        let schedule = Schedule::from_dates(vec![
+            d(16, Month::May, 2015),
+            d(18, Month::May, 2015),
+            d(18, Month::May, 2016),
+        ]);
+        assert_eq!(
+            schedule.next_date(d(17, Month::May, 2015)),
+            Some(d(18, Month::May, 2015))
+        );
+        assert_eq!(
+            schedule.next_date(d(18, Month::May, 2015)),
+            Some(d(18, Month::May, 2015))
+        );
+        assert_eq!(schedule.next_date(d(19, Month::May, 2016)), None);
+        assert_eq!(
+            schedule.previous_date(d(17, Month::May, 2015)),
+            Some(d(16, Month::May, 2015))
+        );
+        assert_eq!(schedule.previous_date(d(16, Month::May, 2015)), None);
     }
 
     #[test]
