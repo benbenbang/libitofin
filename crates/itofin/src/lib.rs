@@ -11,6 +11,8 @@ pub mod patterns;
 pub mod quotes;
 pub mod settings;
 pub mod shared;
+#[cfg(test)]
+pub(crate) mod test_support;
 pub mod time;
 pub mod types;
 pub mod utilities;
