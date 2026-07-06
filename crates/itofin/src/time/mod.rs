@@ -17,6 +17,7 @@ pub mod date;
 pub mod dategenerationrule;
 pub mod daycounter;
 pub mod daycounters;
+pub mod ecb;
 pub mod frequency;
 pub mod imm;
 pub mod period;
