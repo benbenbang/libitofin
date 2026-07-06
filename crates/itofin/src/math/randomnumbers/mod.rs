@@ -16,6 +16,8 @@ use crate::types::Real;
 
 pub mod boxmullergaussianrng;
 pub mod knuthuniformrng;
+pub mod lattice;
+mod lattice_tables;
 pub mod mt19937uniformrng;
 pub mod ranluxuniformrng;
 pub mod seedgenerator;
