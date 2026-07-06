@@ -253,4 +253,37 @@ mod tests {
 
         assert_eq!(reader.borrow().seen, Some(2.0));
     }
+
+    /// Observer that writes a normalized value back into the quote from within
+    /// `update()`, the re-entrant pattern QuantLib's `setValue` terminates via
+    /// its `diff != 0` guard.
+    struct Normalizer {
+        quote: Shared<SimpleQuote>,
+        cap: Real,
+    }
+
+    impl Observer for Normalizer {
+        fn update(&mut self) {
+            if let Ok(v) = self.quote.value()
+                && v > self.cap
+            {
+                self.quote.set_value(self.cap);
+            }
+        }
+    }
+
+    #[test]
+    fn observer_may_write_back_into_quote_during_notification() {
+        let me = shared(SimpleQuote::new(0.5));
+        let normalizer = shared_mut(Normalizer {
+            quote: me.clone(),
+            cap: 1.0,
+        });
+        me.observable()
+            .register_observer(&(normalizer.clone() as SharedMut<dyn Observer>));
+
+        me.set_value(2.0);
+
+        assert_eq!(me.value().unwrap(), 1.0);
+    }
 }
