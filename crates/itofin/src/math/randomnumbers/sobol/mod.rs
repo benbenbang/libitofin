@@ -234,6 +234,11 @@ impl SobolRsg {
     }
 
     /// Skips to the n-th sample in the low-discrepancy sequence and returns it.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `skip` is `u32::MAX`, i.e. if the requested sample index
+    /// exceeds the Sobol sequence period.
     pub fn skip_to(&mut self, skip: u32) -> &[u32] {
         let n = skip
             .checked_add(1)
@@ -333,7 +338,7 @@ impl SobolRsg {
 
 #[cfg(test)]
 mod tests {
-    use super::{DirectionIntegers, PPMT_MAX_DIM, SobolRsg, tables};
+    use super::{DirectionIntegers, PPMT_MAX_DIM, SobolRsg, initializer_table, tables};
 
     const EXPECTED_POLYNOMIAL_COUNTS: [usize; 18] = [
         1, 1, 2, 2, 6, 6, 18, 16, 48, 60, 176, 144, 630, 756, 1800, 2048, 7710, 7776,
@@ -413,6 +418,104 @@ mod tests {
                 i + 1,
                 point[0]
             );
+        }
+    }
+
+    #[test]
+    fn tabulated_family_initializer_entries() {
+        let cases: [(DirectionIntegers, usize, &[u32]); 6] = [
+            (
+                DirectionIntegers::Kuo,
+                4925,
+                &[
+                    1, 3, 7, 5, 23, 9, 25, 167, 241, 755, 1789, 1977, 6325, 5425, 23247, 64181,
+                ],
+            ),
+            (
+                DirectionIntegers::Kuo2,
+                3946,
+                &[
+                    1, 3, 3, 3, 19, 57, 23, 119, 75, 435, 1023, 2357, 4671, 14581, 15343, 2383,
+                ],
+            ),
+            (
+                DirectionIntegers::Kuo3,
+                4586,
+                &[
+                    1, 3, 7, 3, 25, 9, 25, 117, 315, 497, 1235, 1969, 7981, 9743, 20951, 30635,
+                ],
+            ),
+            (
+                DirectionIntegers::JoeKuoD5,
+                1999,
+                &[
+                    1, 1, 3, 15, 21, 55, 17, 57, 449, 811, 519, 2329, 7607, 4255, 2845,
+                ],
+            ),
+            (
+                DirectionIntegers::JoeKuoD6,
+                21200,
+                &[
+                    1, 1, 7, 11, 15, 7, 37, 239, 337, 245, 1557, 3681, 7357, 9639, 27367, 26869,
+                    114603, 86317,
+                ],
+            ),
+            (
+                DirectionIntegers::JoeKuoD7,
+                1899,
+                &[
+                    1, 1, 1, 3, 23, 17, 17, 39, 173, 1013, 527, 2563, 3623, 10049, 10919,
+                ],
+            ),
+        ];
+        for (family, dimensions, last_entry) in cases {
+            let table = initializer_table(family).expect("family is tabulated");
+            assert_eq!(table.tabulated_dimensions(), dimensions, "{family:?}");
+            assert_eq!(table.entry(0), &[1], "{family:?} first entry");
+            assert_eq!(
+                table.entry(dimensions - 1),
+                last_entry,
+                "{family:?} last entry"
+            );
+        }
+    }
+
+    #[test]
+    fn joe_kuo_d6_split_table_is_consistent() {
+        let table = initializer_table(DirectionIntegers::JoeKuoD6).expect("family is tabulated");
+        assert!(
+            table.parts.len() > 1,
+            "expected the JoeKuoD6 data to be split across generated files"
+        );
+        let parts_length: usize = table.parts.iter().map(|part| part.len()).sum();
+        let offsets_tail = table.offsets[table.offsets.len() - 1] as usize;
+        assert_eq!(offsets_tail, parts_length);
+        let entries_length: usize = (0..table.tabulated_dimensions())
+            .map(|k| table.entry(k).len())
+            .sum();
+        assert_eq!(entries_length, parts_length);
+    }
+
+    #[test]
+    fn tabulated_families_construct_and_draw() {
+        let families = [
+            DirectionIntegers::Kuo,
+            DirectionIntegers::Kuo2,
+            DirectionIntegers::Kuo3,
+            DirectionIntegers::JoeKuoD5,
+            DirectionIntegers::JoeKuoD6,
+            DirectionIntegers::JoeKuoD7,
+        ];
+        for family in families {
+            let mut rsg = SobolRsg::new(PPMT_MAX_DIM, 42, family);
+            for _ in 0..5 {
+                let point = rsg.next_sequence();
+                assert_eq!(point.len(), PPMT_MAX_DIM, "{family:?}");
+                assert!(
+                    point.iter().all(|x| (0.0..1.0).contains(x)),
+                    "{family:?} produced a point outside the unit interval"
+                );
+            }
         }
     }
 
