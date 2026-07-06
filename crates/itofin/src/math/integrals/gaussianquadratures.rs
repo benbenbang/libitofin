@@ -8,6 +8,8 @@
 //! `f` over the family's support - the weight function is folded into the
 //! quadrature weights.
 
+use std::collections::BTreeMap;
+
 use crate::math::array::Array;
 use crate::math::integrals::Integrator;
 use crate::math::integrals::gaussianorthogonalpolynomial::{
@@ -234,6 +236,77 @@ impl Integrator for GaussianQuadratureIntegrator {
         let c1 = 0.5 * (b - a);
         let c2 = 0.5 * (a + b);
         Ok(c1 * self.integration.integrate(|x| f(c1 * x + c2)))
+    }
+}
+
+/// Multi-dimensional Gaussian quadrature as the tensor product of
+/// one-dimensional rules.
+///
+/// Port of QuantLib's `MultiDimGaussianIntegration` (same C++ file): `ns[j]`
+/// is the number of points in dimension `j` and `gen_quad` builds the
+/// one-dimensional rule for a given order; rules for repeated orders are
+/// built once and shared.
+pub struct MultiDimGaussianIntegration {
+    weights: Array,
+    x: Vec<Array>,
+}
+
+impl MultiDimGaussianIntegration {
+    /// Builds the tensor-product rule over `ns.len()` dimensions.
+    ///
+    /// # Errors
+    ///
+    /// Propagates any error from `gen_quad`.
+    pub fn new<G>(ns: &[Size], gen_quad: G) -> crate::errors::QlResult<Self>
+    where
+        G: Fn(Size) -> crate::errors::QlResult<GaussianQuadrature>,
+    {
+        let m = ns.len();
+        let n: Size = ns.iter().product();
+
+        let mut spacing = vec![1; m];
+        for j in 1..m {
+            spacing[j] = spacing[j - 1] * ns[j - 1];
+        }
+
+        let mut rules: BTreeMap<Size, GaussianQuadrature> = BTreeMap::new();
+        for &order in ns {
+            if let std::collections::btree_map::Entry::Vacant(entry) = rules.entry(order) {
+                entry.insert(gen_quad(order)?);
+            }
+        }
+
+        let mut weights: Array = std::iter::repeat_n(1.0, n).collect();
+        let mut x = vec![Array::with_size(m); n];
+        for i in 0..n {
+            for j in 0..m {
+                let rule = &rules[&ns[j]];
+                let nx = (i / spacing[j]) % ns[j];
+                weights[i] *= rule.weights()[nx];
+                x[i][j] = rule.abscissas()[nx];
+            }
+        }
+
+        Ok(MultiDimGaussianIntegration { weights, x })
+    }
+
+    /// Integrates `f` over the product of the one-dimensional supports.
+    pub fn integrate<F: FnMut(&Array) -> Real>(&self, mut f: F) -> Real {
+        let mut sum = 0.0;
+        for i in 0..self.x.len() {
+            sum += self.weights[i] * f(&self.x[i]);
+        }
+        sum
+    }
+
+    /// The tensor-product quadrature weights.
+    pub fn weights(&self) -> &Array {
+        &self.weights
+    }
+
+    /// The tensor-product abscissas (QuantLib's `x()`), one point per entry.
+    pub fn abscissas(&self) -> &[Array] {
+        &self.x
     }
 }
 
@@ -506,5 +579,79 @@ mod tests {
             1.0,
         );
         check_degenerated_domain(&integrator);
+    }
+
+    #[test]
+    fn multi_dimensional_gauss_integration_hermite() {
+        for n in 1..5usize {
+            let ns: Vec<Size> = (1..=n).collect();
+            let quad = MultiDimGaussianIntegration::new(&ns, |order| {
+                GaussianQuadrature::hermite(order, 0.0)
+            })
+            .unwrap();
+
+            let tol = 1e4 * Real::EPSILON;
+            let calculated = quad.integrate(|x| (-x.dot(x)).exp());
+            let expected = std::f64::consts::PI.powi(n as i32).sqrt();
+            let diff = (expected - calculated).abs();
+            assert!(
+                diff <= tol,
+                "failed to reproduce multi dimensional Gaussian quadrature: \
+                 calculated {calculated}, expected {expected}, diff {diff}"
+            );
+        }
+    }
+
+    #[test]
+    fn multi_dimensional_gauss_integration_gaussian_integrals() {
+        use crate::math::matrix::Matrix;
+        use crate::math::matrixutilities::choleskydecomposition::cholesky_decomposition;
+        use crate::math::randomnumbers::UniformRng;
+        use crate::math::randomnumbers::mt19937uniformrng::MersenneTwisterUniformRng;
+
+        // Gaussian integrals: integral of exp(-x' A x / 2) over R^n equals
+        // sqrt(det(2 pi inv(A))) = sqrt((2 pi)^n / det(A)); det(A) comes from
+        // the Cholesky factor since A is symmetric positive-definite by
+        // construction (QuantLib computes it via inverse and determinant).
+        let mut rng = MersenneTwisterUniformRng::new(1234);
+        let ns = [20usize, 28, 16, 22];
+        let tols = [1e-8, 1e-6, 1e-2, 5e-2];
+        for n in 1..5usize {
+            let mut a = Matrix::with_size(n, n);
+            for i in 0..n {
+                for j in 0..n {
+                    a[(i, j)] = if i == j {
+                        (i + 1) as Real
+                    } else {
+                        rng.next_real()
+                    };
+                }
+            }
+
+            let at = a.transpose();
+            let big_a = &a * &at;
+
+            let l = cholesky_decomposition(&big_a, false);
+            let mut det = 1.0;
+            for i in 0..n {
+                det *= l[(i, i)] * l[(i, i)];
+            }
+            let expected = (std::f64::consts::TAU.powi(n as i32) / det).sqrt();
+
+            let quad = MultiDimGaussianIntegration::new(&ns[..n], |order| {
+                GaussianQuadrature::hermite(order, 0.0)
+            })
+            .unwrap();
+
+            let calculated = quad.integrate(|x| (-0.5 * x.dot(&(&big_a * x))).exp());
+            let diff = (calculated - expected).abs();
+            assert!(
+                diff <= tols[n - 1],
+                "failed to reproduce multi dimensional Gaussian quadrature \
+                 for dimension {n}: calculated {calculated}, expected {expected}, \
+                 diff {diff}, tolerance {}",
+                tols[n - 1]
+            );
+        }
     }
 }
