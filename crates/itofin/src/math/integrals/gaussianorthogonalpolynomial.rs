@@ -12,6 +12,10 @@
 //! quadrature rules", Math. Comput. 23 (1969); "Numerical Recipes in C", 2nd
 //! edition.
 
+use crate::errors::QlResult;
+use crate::math::comparison::close_enough;
+use crate::math::gammafunction::log_gamma;
+use crate::require;
 use crate::types::{Real, Size};
 
 /// A family of orthogonal polynomials defining a Gaussian quadrature: the
@@ -56,6 +60,149 @@ pub trait GaussianOrthogonalPolynomial {
     }
 }
 
+/// Gauss-Jacobi polynomial, weight `w(x) = (1-x)^alpha (1+x)^beta` on
+/// `[-1, 1]`.
+///
+/// The Legendre, Chebyshev (both kinds) and Gegenbauer families are the
+/// special cases exposed as constructors, replacing QuantLib's subclasses.
+#[derive(Clone, Copy, Debug)]
+pub struct GaussJacobiPolynomial {
+    alpha: Real,
+    beta: Real,
+}
+
+impl GaussJacobiPolynomial {
+    /// A Jacobi polynomial family with weight exponents `alpha` and `beta`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless `alpha > -1`, `beta > -1` and
+    /// `alpha + beta > -2`.
+    pub fn new(alpha: Real, beta: Real) -> QlResult<Self> {
+        require!(
+            (alpha + beta).is_finite() && alpha + beta > -2.0,
+            "alpha+beta must be bigger than -2"
+        );
+        require!(
+            alpha.is_finite() && alpha > -1.0,
+            "alpha must be bigger than -1"
+        );
+        require!(
+            beta.is_finite() && beta > -1.0,
+            "beta  must be bigger than -1"
+        );
+        Ok(GaussJacobiPolynomial { alpha, beta })
+    }
+
+    /// Gauss-Legendre polynomial: Jacobi with `alpha = beta = 0`, weight
+    /// `w(x) = 1`.
+    pub fn legendre() -> Self {
+        GaussJacobiPolynomial {
+            alpha: 0.0,
+            beta: 0.0,
+        }
+    }
+
+    /// Gauss-Chebyshev polynomial (first kind): Jacobi with
+    /// `alpha = beta = -1/2`, weight `w(x) = (1-x^2)^(-1/2)`.
+    pub fn chebyshev() -> Self {
+        GaussJacobiPolynomial {
+            alpha: -0.5,
+            beta: -0.5,
+        }
+    }
+
+    /// Gauss-Chebyshev polynomial (second kind): Jacobi with
+    /// `alpha = beta = 1/2`, weight `w(x) = (1-x^2)^(1/2)`.
+    pub fn chebyshev2nd() -> Self {
+        GaussJacobiPolynomial {
+            alpha: 0.5,
+            beta: 0.5,
+        }
+    }
+
+    /// Gauss-Gegenbauer polynomial: Jacobi with
+    /// `alpha = beta = lambda - 1/2`, weight `w(x) = (1-x^2)^(lambda-1/2)`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless `lambda > -1/2`.
+    pub fn gegenbauer(lambda: Real) -> QlResult<Self> {
+        Self::new(lambda - 0.5, lambda - 0.5)
+    }
+}
+
+impl GaussianOrthogonalPolynomial for GaussJacobiPolynomial {
+    fn mu_0(&self) -> Real {
+        // The gamma arguments are alpha+1, beta+1 and alpha+beta+2, all
+        // strictly positive by construction, so log_gamma cannot fail.
+        let log = log_gamma(self.alpha + 1.0).expect("alpha + 1 > 0 by construction")
+            + log_gamma(self.beta + 1.0).expect("beta + 1 > 0 by construction")
+            - log_gamma(self.alpha + self.beta + 2.0)
+                .expect("alpha + beta + 2 > 0 by construction");
+        (2.0 as Real).powf(self.alpha + self.beta + 1.0) * log.exp()
+    }
+
+    /// # Panics
+    ///
+    /// Panics where QuantLib throws: when the recurrence denominator vanishes
+    /// and l'Hospital's rule cannot recover it (unreachable for parameters
+    /// accepted by the constructors and `i >= 1`).
+    fn alpha(&self, i: Size) -> Real {
+        let i = i as Real;
+        let mut num = self.beta * self.beta - self.alpha * self.alpha;
+        let mut denom =
+            (2.0 * i + self.alpha + self.beta) * (2.0 * i + self.alpha + self.beta + 2.0);
+
+        if close_enough(denom, 0.0) {
+            assert!(
+                close_enough(num, 0.0),
+                "can't compute a_k for jacobi integration"
+            );
+            num = 2.0 * self.beta;
+            denom = 2.0 * (2.0 * i + self.alpha + self.beta + 1.0);
+            assert!(
+                !close_enough(denom, 0.0),
+                "can't compute a_k for jacobi integration"
+            );
+        }
+
+        num / denom
+    }
+
+    /// # Panics
+    ///
+    /// Panics where QuantLib throws: when the recurrence denominator vanishes
+    /// and l'Hospital's rule cannot recover it (unreachable for parameters
+    /// accepted by the constructors and `i >= 1`).
+    fn beta(&self, i: Size) -> Real {
+        let i = i as Real;
+        let s = 2.0 * i + self.alpha + self.beta;
+        let mut num = 4.0 * i * (i + self.alpha) * (i + self.beta) * (i + self.alpha + self.beta);
+        let mut denom = s * s * (s * s - 1.0);
+
+        if close_enough(denom, 0.0) {
+            assert!(
+                close_enough(num, 0.0),
+                "can't compute b_k for jacobi integration"
+            );
+            num = 4.0 * i * (i + self.beta) * (2.0 * i + 2.0 * self.alpha + self.beta);
+            denom = 2.0 * s;
+            denom *= denom - 1.0;
+            assert!(
+                !close_enough(denom, 0.0),
+                "can't compute b_k for jacobi integration"
+            );
+        }
+
+        num / denom
+    }
+
+    fn w(&self, x: Real) -> Real {
+        (1.0 - x).powf(self.alpha) * (1.0 + x).powf(self.beta)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -96,5 +243,26 @@ mod tests {
     fn weighted_value_scales_by_sqrt_of_weight() {
         let p = MonicLegendre;
         assert!((p.weighted_value(2, 0.5) - p.value(2, 0.5)).abs() < 1e-15);
+    }
+
+    #[test]
+    fn jacobi_with_zero_exponents_matches_legendre_recurrence() {
+        let jacobi = GaussJacobiPolynomial::legendre();
+        let legendre = MonicLegendre;
+        assert!((jacobi.mu_0() - 2.0).abs() < 1e-14);
+        for i in 0..10 {
+            assert!(jacobi.alpha(i).abs() < 1e-14);
+            if i > 0 {
+                assert!((jacobi.beta(i) - legendre.beta(i)).abs() < 1e-14);
+            }
+        }
+    }
+
+    #[test]
+    fn jacobi_rejects_out_of_domain_exponents() {
+        assert!(GaussJacobiPolynomial::new(-1.0, 0.0).is_err());
+        assert!(GaussJacobiPolynomial::new(0.0, -1.0).is_err());
+        assert!(GaussJacobiPolynomial::new(-0.999, -1.5).is_err());
+        assert!(GaussJacobiPolynomial::gegenbauer(-0.5).is_err());
     }
 }
