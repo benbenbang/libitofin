@@ -5,6 +5,7 @@ pub mod exponential_integrals;
 pub mod filon;
 pub mod gaussianorthogonalpolynomial;
 pub mod gaussianquadratures;
+pub mod gausslaguerrecosinepolynomial;
 pub mod kronrod;
 pub mod lobatto;
 pub mod momentbasedgaussianpolynomial;
