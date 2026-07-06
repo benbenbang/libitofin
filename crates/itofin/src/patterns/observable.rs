@@ -81,6 +81,13 @@ impl Observable {
     /// borrow is dropped before any `update` runs, so re-entrant
     /// registration/unregistration during `update` is safe and does not affect
     /// this round of notification. Dropped observers are pruned.
+    ///
+    /// An observer whose `update` is already running when a re-entrant
+    /// notification fires (e.g. it wrote a new value back into the notifying
+    /// observable) is skipped by the nested round: it is mid-reaction and can
+    /// read the latest state directly. QuantLib runs the nested `update` and
+    /// relies on the recursion terminating; skipping the in-flight observer
+    /// reaches the same final state without the unsatisfiable second `&mut`.
     pub fn notify_observers(&self) {
         let snapshot: Vec<SharedMut<dyn Observer>> = {
             let mut observers = self.observers.borrow_mut();
@@ -88,7 +95,9 @@ impl Observable {
             observers.iter().filter_map(WeakMut::upgrade).collect()
         };
         for observer in snapshot {
-            observer.borrow_mut().update();
+            if let Ok(mut observer) = observer.try_borrow_mut() {
+                observer.update();
+            }
         }
     }
 }
@@ -249,5 +258,42 @@ mod tests {
         // this notification round (snapshot-before-notify semantics).
         assert_eq!(spawned.borrow().len(), 10);
         assert!(spawned.borrow().iter().all(|o| o.borrow().counter == 0));
+    }
+
+    /// Observer that re-enters `notify_observers` from within its own `update`,
+    /// as a write-back observer does through the notifying observable.
+    struct Renotifier {
+        updates: usize,
+        observable: Shared<Observable>,
+    }
+
+    impl Observer for Renotifier {
+        fn update(&mut self) {
+            self.updates += 1;
+            if self.updates == 1 {
+                self.observable.notify_observers();
+            }
+        }
+    }
+
+    #[test]
+    fn reentrant_notification_skips_the_in_flight_observer() {
+        let observable = Shared::new(Observable::new());
+        let plain = UpdateCounter::new();
+        observable.register_observer(&as_observer(&plain));
+
+        let renotifier = shared_mut(Renotifier {
+            updates: 0,
+            observable: observable.clone(),
+        });
+        observable.register_observer(&(renotifier.clone() as SharedMut<dyn Observer>));
+
+        observable.notify_observers();
+
+        // the re-entrant round skipped the in-flight observer instead of
+        // panicking on a second mutable borrow...
+        assert_eq!(renotifier.borrow().updates, 1);
+        // ...while other observers received both the outer and nested rounds
+        assert_eq!(plain.borrow().counter, 2);
     }
 }
