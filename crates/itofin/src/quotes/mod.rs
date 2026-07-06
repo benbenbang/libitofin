@@ -10,13 +10,21 @@
 //! `handleFromVariant` (a `std::variant<Real, Handle<Quote>>` convenience for
 //! C++ term-structure constructors) has no caller in the core yet and is not
 //! ported.
+//!
+//! The remaining `ql/quotes/` classes depend on layers not yet ported and
+//! follow with them: `ForwardValueQuote` and `LastFixingQuote` (Index),
+//! `ForwardSwapQuote` (SwapIndex/VanillaSwap), `FuturesConvAdjustmentQuote`
+//! (IborIndex), `ImpliedStdDevQuote` and
+//! `EurodollarFuturesImpliedStdDevQuote` (`blackFormulaImpliedStdDev`).
 
 mod compositequote;
+mod deltavolquote;
 mod derivedquote;
 mod multicompositequote;
 mod simplequote;
 
 pub use compositequote::CompositeQuote;
+pub use deltavolquote::{AtmType, DeltaType, DeltaVolQuote};
 pub use derivedquote::DerivedQuote;
 pub use multicompositequote::MultiCompositeQuote;
 pub use simplequote::{SimpleQuote, make_quote_handle};
