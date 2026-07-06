@@ -13,6 +13,7 @@ pub mod businessdayconvention;
 pub mod calendar;
 pub mod calendars;
 pub mod date;
+pub mod dategenerationrule;
 pub mod daycounter;
 pub mod daycounters;
 pub mod frequency;
