@@ -11,9 +11,11 @@
 //! C++ term-structure constructors) has no caller in the core yet and is not
 //! ported.
 
+mod compositequote;
 mod derivedquote;
 mod simplequote;
 
+pub use compositequote::CompositeQuote;
 pub use derivedquote::DerivedQuote;
 pub use simplequote::{SimpleQuote, make_quote_handle};
 
