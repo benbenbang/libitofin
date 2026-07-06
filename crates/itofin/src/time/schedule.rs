@@ -1421,6 +1421,229 @@ mod tests {
     }
 
     #[test]
+    fn four_weeks_tenor() {
+        let s = MakeSchedule::new()
+            .from(d(13, Month::January, 2016))
+            .to(d(4, Month::May, 2016))
+            .with_calendar(Target::new())
+            .with_tenor(Period::new(4, TimeUnit::Weeks))
+            .with_convention(BusinessDayConvention::Following)
+            .forwards()
+            .build();
+        assert!(s.len() > 1);
+    }
+
+    #[test]
+    fn once_frequency() {
+        let s = MakeSchedule::new()
+            .from(d(13, Month::January, 2016))
+            .to(d(13, Month::January, 2019))
+            .with_frequency(Frequency::Once)
+            .forwards()
+            .build();
+
+        assert_eq!(s.len(), 2);
+        assert_eq!(s[0], d(13, Month::January, 2016));
+        assert_eq!(s[1], d(13, Month::January, 2019));
+    }
+
+    #[test]
+    fn schedule_always_has_a_start_date() {
+        let calendar = UnitedStates::new(Market::GovernmentBond);
+        let schedule = MakeSchedule::new()
+            .from(d(10, Month::January, 2017))
+            .with_first_date(d(31, Month::August, 2017))
+            .to(d(28, Month::February, 2026))
+            .with_frequency(Frequency::Semiannual)
+            .with_calendar(calendar.clone())
+            .with_convention(BusinessDayConvention::Unadjusted)
+            .backwards()
+            .end_of_month(false)
+            .build();
+        assert_eq!(
+            schedule.date(0),
+            d(10, Month::January, 2017),
+            "the first element should always be the start date"
+        );
+
+        let schedule = MakeSchedule::new()
+            .from(d(10, Month::January, 2017))
+            .to(d(28, Month::February, 2026))
+            .with_frequency(Frequency::Semiannual)
+            .with_calendar(calendar.clone())
+            .with_convention(BusinessDayConvention::Unadjusted)
+            .backwards()
+            .end_of_month(false)
+            .build();
+        assert_eq!(
+            schedule.date(0),
+            d(10, Month::January, 2017),
+            "the first element should always be the start date"
+        );
+
+        let schedule = MakeSchedule::new()
+            .from(d(31, Month::August, 2017))
+            .to(d(28, Month::February, 2026))
+            .with_frequency(Frequency::Semiannual)
+            .with_calendar(calendar)
+            .with_convention(BusinessDayConvention::Unadjusted)
+            .backwards()
+            .end_of_month(false)
+            .build();
+        assert_eq!(
+            schedule.date(0),
+            d(31, Month::August, 2017),
+            "the first element should always be the start date"
+        );
+    }
+
+    #[test]
+    fn short_eom_schedule() {
+        let s = MakeSchedule::new()
+            .from(d(21, Month::February, 2019))
+            .to(d(28, Month::February, 2019))
+            .with_calendar(Target::new())
+            .with_tenor(Period::new(1, TimeUnit::Years))
+            .with_convention(BusinessDayConvention::ModifiedFollowing)
+            .with_termination_date_convention(BusinessDayConvention::ModifiedFollowing)
+            .backwards()
+            .end_of_month(true)
+            .build();
+
+        assert_eq!(s.len(), 2);
+        assert_eq!(s[0], d(21, Month::February, 2019));
+        assert_eq!(s[1], d(28, Month::February, 2019));
+    }
+
+    #[test]
+    fn first_date_on_maturity() {
+        let expected = [d(20, Month::September, 2016), d(20, Month::December, 2016)];
+
+        let schedule = MakeSchedule::new()
+            .from(d(20, Month::September, 2016))
+            .to(d(20, Month::December, 2016))
+            .with_first_date(d(20, Month::December, 2016))
+            .with_frequency(Frequency::Quarterly)
+            .with_calendar(UnitedStates::new(Market::GovernmentBond))
+            .with_convention(BusinessDayConvention::Unadjusted)
+            .backwards()
+            .build();
+        check_dates(&schedule, &expected);
+
+        let schedule = MakeSchedule::new()
+            .from(d(20, Month::September, 2016))
+            .to(d(20, Month::December, 2016))
+            .with_first_date(d(20, Month::December, 2016))
+            .with_frequency(Frequency::Quarterly)
+            .with_calendar(UnitedStates::new(Market::GovernmentBond))
+            .with_convention(BusinessDayConvention::Unadjusted)
+            .forwards()
+            .build();
+        check_dates(&schedule, &expected);
+    }
+
+    #[test]
+    fn next_to_last_date_on_start() {
+        let expected = [d(20, Month::September, 2016), d(20, Month::December, 2016)];
+
+        let schedule = MakeSchedule::new()
+            .from(d(20, Month::September, 2016))
+            .to(d(20, Month::December, 2016))
+            .with_next_to_last_date(d(20, Month::September, 2016))
+            .with_frequency(Frequency::Quarterly)
+            .with_calendar(UnitedStates::new(Market::GovernmentBond))
+            .with_convention(BusinessDayConvention::Unadjusted)
+            .backwards()
+            .build();
+        check_dates(&schedule, &expected);
+    }
+
+    #[test]
+    fn truncation() {
+        let s = MakeSchedule::new()
+            .from(d(30, Month::September, 2009))
+            .to(d(15, Month::June, 2020))
+            .with_calendar(Japan::new())
+            .with_tenor(Period::new(6, TimeUnit::Months))
+            .with_convention(BusinessDayConvention::ModifiedFollowing)
+            .with_termination_date_convention(BusinessDayConvention::ModifiedFollowing)
+            .forwards()
+            .end_of_month(true)
+            .build();
+
+        let t = s.until(d(1, Month::January, 2014));
+        check_dates(
+            &t,
+            &[
+                d(30, Month::September, 2009),
+                d(31, Month::March, 2010),
+                d(30, Month::September, 2010),
+                d(31, Month::March, 2011),
+                d(30, Month::September, 2011),
+                d(30, Month::March, 2012),
+                d(28, Month::September, 2012),
+                d(29, Month::March, 2013),
+                d(30, Month::September, 2013),
+                d(1, Month::January, 2014),
+            ],
+        );
+        assert!(!t.is_regular()[t.is_regular().len() - 1]);
+
+        let t = s.until(d(30, Month::September, 2013));
+        check_dates(
+            &t,
+            &[
+                d(30, Month::September, 2009),
+                d(31, Month::March, 2010),
+                d(30, Month::September, 2010),
+                d(31, Month::March, 2011),
+                d(30, Month::September, 2011),
+                d(30, Month::March, 2012),
+                d(28, Month::September, 2012),
+                d(29, Month::March, 2013),
+                d(30, Month::September, 2013),
+            ],
+        );
+        assert!(t.is_regular()[t.is_regular().len() - 1]);
+
+        let t = s.after(d(1, Month::January, 2014));
+        check_dates(
+            &t,
+            &[
+                d(1, Month::January, 2014),
+                d(31, Month::March, 2014),
+                d(30, Month::September, 2014),
+                d(31, Month::March, 2015),
+                d(30, Month::September, 2015),
+                d(31, Month::March, 2016),
+                d(30, Month::September, 2016),
+                d(31, Month::March, 2017),
+                d(29, Month::September, 2017),
+                d(30, Month::March, 2018),
+                d(28, Month::September, 2018),
+                d(29, Month::March, 2019),
+                d(30, Month::September, 2019),
+                d(31, Month::March, 2020),
+                d(15, Month::June, 2020),
+            ],
+        );
+        assert!(!t.is_regular()[0]);
+
+        let t = s.after(d(28, Month::September, 2018));
+        check_dates(
+            &t,
+            &[
+                d(28, Month::September, 2018),
+                d(29, Month::March, 2019),
+                d(30, Month::September, 2019),
+                d(31, Month::March, 2020),
+                d(15, Month::June, 2020),
+            ],
+        );
+        assert!(t.is_regular()[0]);
+    }
+
+    #[test]
     fn backward_regular_first_period_with_first_date() {
         let semiannual = Period::new(6, TimeUnit::Months);
 
