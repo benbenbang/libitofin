@@ -10,7 +10,7 @@
 //! live observers and drops every borrow before calling `update`, so an observer
 //! may freely register, unregister or mutate the graph while being notified.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 
 use crate::shared::{SharedMut, WeakMut};
 
@@ -35,14 +35,13 @@ pub trait Observer {
 #[derive(Default)]
 pub struct Observable {
     observers: RefCell<Vec<WeakMut<dyn Observer>>>,
+    missed: Cell<bool>,
 }
 
 impl Observable {
     /// Creates an observable with no registered observers.
     pub fn new() -> Self {
-        Observable {
-            observers: RefCell::new(Vec::new()),
-        }
+        Observable::default()
     }
 
     /// Registers an observer, returning `true` if it was newly added.
@@ -84,20 +83,43 @@ impl Observable {
     ///
     /// An observer whose `update` is already running when a re-entrant
     /// notification fires (e.g. it wrote a new value back into the notifying
-    /// observable) is skipped by the nested round: it is mid-reaction and can
-    /// read the latest state directly. QuantLib runs the nested `update` and
-    /// relies on the recursion terminating; skipping the in-flight observer
-    /// reaches the same final state without the unsatisfiable second `&mut`.
+    /// observable) cannot take the unsatisfiable second `&mut`; QuantLib runs
+    /// the nested `update` recursively and relies on the recursion
+    /// terminating. Here the nested round skips the in-flight observer and
+    /// flags the miss, and the outer round on the same observable re-notifies
+    /// once that observer's `update` has returned, so every observer still
+    /// converges on the final state. The deferral matters for pass-through
+    /// observers like the handle forwarder, whose skip would otherwise cut
+    /// off every observer downstream of it. A miss can only be re-delivered
+    /// by an outer round on this observable; if the in-flight borrow belongs
+    /// to another observable's notification, the miss is dropped exactly as
+    /// before.
     pub fn notify_observers(&self) {
-        let snapshot: Vec<SharedMut<dyn Observer>> = {
-            let mut observers = self.observers.borrow_mut();
-            observers.retain(|w| w.strong_count() > 0);
-            observers.iter().filter_map(WeakMut::upgrade).collect()
-        };
-        for observer in snapshot {
-            if let Ok(mut observer) = observer.try_borrow_mut() {
-                observer.update();
+        loop {
+            self.missed.set(false);
+            let snapshot: Vec<SharedMut<dyn Observer>> = {
+                let mut observers = self.observers.borrow_mut();
+                observers.retain(|w| w.strong_count() > 0);
+                observers.iter().filter_map(WeakMut::upgrade).collect()
+            };
+            let mut skipped = false;
+            for observer in snapshot {
+                if let Ok(mut observer) = observer.try_borrow_mut() {
+                    observer.update();
+                } else {
+                    skipped = true;
+                }
             }
+            if self.missed.get() {
+                // a nested round on this observable skipped an observer whose
+                // update was running in this round; it has returned, so
+                // re-deliver the (now final) state
+                continue;
+            }
+            if skipped {
+                self.missed.set(true);
+            }
+            return;
         }
     }
 }
@@ -277,7 +299,7 @@ mod tests {
     }
 
     #[test]
-    fn reentrant_notification_skips_the_in_flight_observer() {
+    fn reentrant_notification_defers_the_in_flight_observer() {
         let observable = Shared::new(Observable::new());
         let plain = UpdateCounter::new();
         observable.register_observer(&as_observer(&plain));
@@ -290,10 +312,12 @@ mod tests {
 
         observable.notify_observers();
 
-        // the re-entrant round skipped the in-flight observer instead of
-        // panicking on a second mutable borrow...
-        assert_eq!(renotifier.borrow().updates, 1);
-        // ...while other observers received both the outer and nested rounds
-        assert_eq!(plain.borrow().counter, 2);
+        // instead of panicking on a second mutable borrow, the nested round
+        // skips the in-flight observer and the outer round re-delivers to it,
+        // matching the two updates C++ delivers through recursion...
+        assert_eq!(renotifier.borrow().updates, 2);
+        // ...while the other observer hears the outer, nested and re-delivery
+        // rounds (one idempotent update more than the C++ recursion)
+        assert_eq!(plain.borrow().counter, 3);
     }
 }
