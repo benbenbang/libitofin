@@ -958,11 +958,26 @@ fn is_imm_date(d: Date) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::time::calendars::japan::Japan;
     use crate::time::calendars::target::Target;
+    use crate::time::calendars::unitedstates::{Market, UnitedStates};
     use crate::time::date::{Day, Month, Year};
 
     fn d(day: Day, m: Month, y: Year) -> Date {
         Date::new(day, m, y)
+    }
+
+    fn check_dates(s: &Schedule, expected: &[Date]) {
+        assert_eq!(
+            s.len(),
+            expected.len(),
+            "expected {} dates, found {}",
+            expected.len(),
+            s.len()
+        );
+        for (i, e) in expected.iter().enumerate() {
+            assert_eq!(s[i], *e, "wrong date at index {i}");
+        }
     }
 
     #[test]
@@ -1062,6 +1077,346 @@ mod tests {
         assert_eq!(
             previous_twentieth(d(21, Month::March, 2016), DateGeneration::CDS2015),
             d(20, Month::March, 2016)
+        );
+    }
+
+    #[test]
+    fn daily_schedule() {
+        let start_date = d(17, Month::January, 2012);
+
+        let s = MakeSchedule::new()
+            .from(start_date)
+            .to(start_date + 7)
+            .with_calendar(Target::new())
+            .with_frequency(Frequency::Daily)
+            .with_convention(BusinessDayConvention::Preceding)
+            .build();
+
+        check_dates(
+            &s,
+            &[
+                d(17, Month::January, 2012),
+                d(18, Month::January, 2012),
+                d(19, Month::January, 2012),
+                d(20, Month::January, 2012),
+                d(23, Month::January, 2012),
+                d(24, Month::January, 2012),
+            ],
+        );
+    }
+
+    #[test]
+    fn eom_adjustment_with_different_conventions() {
+        let start_date = d(29, Month::February, 2024);
+        let end_date = start_date + Period::new(1, TimeUnit::Years);
+
+        let s1 = MakeSchedule::new()
+            .from(start_date)
+            .to(end_date)
+            .with_calendar(Target::new())
+            .with_frequency(Frequency::Monthly)
+            .with_convention(BusinessDayConvention::Unadjusted)
+            .end_of_month(true)
+            .build();
+
+        check_dates(
+            &s1,
+            &[
+                d(29, Month::February, 2024),
+                d(31, Month::March, 2024),
+                d(30, Month::April, 2024),
+                d(31, Month::May, 2024),
+                d(30, Month::June, 2024),
+                d(31, Month::July, 2024),
+                d(31, Month::August, 2024),
+                d(30, Month::September, 2024),
+                d(31, Month::October, 2024),
+                d(30, Month::November, 2024),
+                d(31, Month::December, 2024),
+                d(31, Month::January, 2025),
+                d(28, Month::February, 2025),
+            ],
+        );
+
+        let s2 = MakeSchedule::new()
+            .from(start_date)
+            .to(end_date)
+            .with_calendar(Target::new())
+            .with_frequency(Frequency::Monthly)
+            .with_convention(BusinessDayConvention::Following)
+            .end_of_month(true)
+            .build();
+
+        check_dates(
+            &s2,
+            &[
+                d(29, Month::February, 2024),
+                d(2, Month::April, 2024),
+                d(30, Month::April, 2024),
+                d(31, Month::May, 2024),
+                d(1, Month::July, 2024),
+                d(31, Month::July, 2024),
+                d(2, Month::September, 2024),
+                d(30, Month::September, 2024),
+                d(31, Month::October, 2024),
+                d(2, Month::December, 2024),
+                d(31, Month::December, 2024),
+                d(31, Month::January, 2025),
+                d(28, Month::February, 2025),
+            ],
+        );
+
+        let s3 = MakeSchedule::new()
+            .from(start_date)
+            .to(end_date)
+            .with_calendar(Target::new())
+            .with_frequency(Frequency::Monthly)
+            .with_convention(BusinessDayConvention::ModifiedPreceding)
+            .end_of_month(true)
+            .build();
+
+        check_dates(
+            &s3,
+            &[
+                d(29, Month::February, 2024),
+                d(28, Month::March, 2024),
+                d(30, Month::April, 2024),
+                d(31, Month::May, 2024),
+                d(28, Month::June, 2024),
+                d(31, Month::July, 2024),
+                d(30, Month::August, 2024),
+                d(30, Month::September, 2024),
+                d(31, Month::October, 2024),
+                d(29, Month::November, 2024),
+                d(31, Month::December, 2024),
+                d(31, Month::January, 2025),
+                d(28, Month::February, 2025),
+            ],
+        );
+    }
+
+    #[test]
+    fn end_date_with_eom_adjustment() {
+        let s = MakeSchedule::new()
+            .from(d(30, Month::September, 2009))
+            .to(d(15, Month::June, 2012))
+            .with_calendar(Japan::new())
+            .with_tenor(Period::new(6, TimeUnit::Months))
+            .with_convention(BusinessDayConvention::ModifiedFollowing)
+            .with_termination_date_convention(BusinessDayConvention::ModifiedFollowing)
+            .forwards()
+            .end_of_month(true)
+            .build();
+
+        check_dates(
+            &s,
+            &[
+                d(30, Month::September, 2009),
+                d(31, Month::March, 2010),
+                d(30, Month::September, 2010),
+                d(31, Month::March, 2011),
+                d(30, Month::September, 2011),
+                d(30, Month::March, 2012),
+                d(15, Month::June, 2012),
+            ],
+        );
+    }
+
+    #[test]
+    fn dates_past_end_date_with_eom_adjustment() {
+        let s = MakeSchedule::new()
+            .from(d(28, Month::March, 2013))
+            .to(d(30, Month::March, 2015))
+            .with_calendar(Target::new())
+            .with_tenor(Period::new(1, TimeUnit::Years))
+            .with_convention(BusinessDayConvention::Unadjusted)
+            .with_termination_date_convention(BusinessDayConvention::Unadjusted)
+            .forwards()
+            .end_of_month(true)
+            .build();
+
+        check_dates(
+            &s,
+            &[
+                d(28, Month::March, 2013),
+                d(31, Month::March, 2014),
+                d(30, Month::March, 2015),
+            ],
+        );
+        assert!(!s.is_regular_at(2), "last period should not be regular");
+    }
+
+    #[test]
+    fn dates_same_as_end_date_with_eom_adjustment() {
+        let s = MakeSchedule::new()
+            .from(d(28, Month::March, 2013))
+            .to(d(31, Month::March, 2015))
+            .with_calendar(Target::new())
+            .with_tenor(Period::new(1, TimeUnit::Years))
+            .with_convention(BusinessDayConvention::Unadjusted)
+            .with_termination_date_convention(BusinessDayConvention::Unadjusted)
+            .forwards()
+            .end_of_month(true)
+            .build();
+
+        check_dates(
+            &s,
+            &[
+                d(28, Month::March, 2013),
+                d(31, Month::March, 2014),
+                d(31, Month::March, 2015),
+            ],
+        );
+        assert!(s.is_regular_at(2), "last period should be regular");
+    }
+
+    #[test]
+    fn forward_dates_with_eom_adjustment() {
+        let s = MakeSchedule::new()
+            .from(d(31, Month::August, 1996))
+            .to(d(15, Month::September, 1997))
+            .with_calendar(UnitedStates::new(Market::GovernmentBond))
+            .with_tenor(Period::new(6, TimeUnit::Months))
+            .with_convention(BusinessDayConvention::Unadjusted)
+            .with_termination_date_convention(BusinessDayConvention::Unadjusted)
+            .forwards()
+            .end_of_month(true)
+            .build();
+
+        check_dates(
+            &s,
+            &[
+                d(31, Month::August, 1996),
+                d(28, Month::February, 1997),
+                d(31, Month::August, 1997),
+                d(15, Month::September, 1997),
+            ],
+        );
+    }
+
+    #[test]
+    fn backward_dates_with_eom_adjustment() {
+        let s = MakeSchedule::new()
+            .from(d(22, Month::August, 1996))
+            .to(d(31, Month::August, 1997))
+            .with_calendar(UnitedStates::new(Market::GovernmentBond))
+            .with_tenor(Period::new(6, TimeUnit::Months))
+            .with_convention(BusinessDayConvention::Unadjusted)
+            .with_termination_date_convention(BusinessDayConvention::Unadjusted)
+            .backwards()
+            .end_of_month(true)
+            .build();
+
+        check_dates(
+            &s,
+            &[
+                d(22, Month::August, 1996),
+                d(31, Month::August, 1996),
+                d(28, Month::February, 1997),
+                d(31, Month::August, 1997),
+            ],
+        );
+    }
+
+    #[test]
+    fn double_first_date_with_eom_adjustment() {
+        let s = MakeSchedule::new()
+            .from(d(22, Month::August, 1996))
+            .to(d(31, Month::August, 1997))
+            .with_calendar(UnitedStates::new(Market::GovernmentBond))
+            .with_tenor(Period::new(6, TimeUnit::Months))
+            .with_convention(BusinessDayConvention::ModifiedFollowing)
+            .with_termination_date_convention(BusinessDayConvention::Following)
+            .backwards()
+            .end_of_month(true)
+            .build();
+
+        check_dates(
+            &s,
+            &[
+                d(22, Month::August, 1996),
+                d(30, Month::August, 1996),
+                d(28, Month::February, 1997),
+                d(2, Month::September, 1997),
+            ],
+        );
+    }
+
+    #[test]
+    fn first_date_with_eom_adjustment() {
+        let s = MakeSchedule::new()
+            .from(d(10, Month::August, 1996))
+            .to(d(10, Month::August, 1998))
+            .with_first_date(d(28, Month::February, 1997))
+            .with_calendar(UnitedStates::new(Market::GovernmentBond))
+            .with_tenor(Period::new(6, TimeUnit::Months))
+            .with_convention(BusinessDayConvention::ModifiedFollowing)
+            .with_termination_date_convention(BusinessDayConvention::ModifiedFollowing)
+            .forwards()
+            .end_of_month(true)
+            .build();
+
+        check_dates(
+            &s,
+            &[
+                d(12, Month::August, 1996),
+                d(28, Month::February, 1997),
+                d(29, Month::August, 1997),
+                d(27, Month::February, 1998),
+                d(10, Month::August, 1998),
+            ],
+        );
+    }
+
+    #[test]
+    fn next_to_last_with_eom_adjustment() {
+        let s = MakeSchedule::new()
+            .from(d(10, Month::August, 1996))
+            .to(d(10, Month::August, 1998))
+            .with_next_to_last_date(d(28, Month::February, 1998))
+            .with_calendar(UnitedStates::new(Market::GovernmentBond))
+            .with_tenor(Period::new(6, TimeUnit::Months))
+            .with_convention(BusinessDayConvention::ModifiedFollowing)
+            .with_termination_date_convention(BusinessDayConvention::ModifiedFollowing)
+            .backwards()
+            .end_of_month(true)
+            .build();
+
+        check_dates(
+            &s,
+            &[
+                d(12, Month::August, 1996),
+                d(30, Month::August, 1996),
+                d(28, Month::February, 1997),
+                d(29, Month::August, 1997),
+                d(27, Month::February, 1998),
+                d(10, Month::August, 1998),
+            ],
+        );
+    }
+
+    #[test]
+    fn effective_date_with_eom_adjustment() {
+        let s = MakeSchedule::new()
+            .from(d(16, Month::January, 2023))
+            .to(d(16, Month::March, 2023))
+            .with_first_date(d(31, Month::January, 2023))
+            .with_calendar(NullCalendar::new())
+            .with_tenor(Period::new(1, TimeUnit::Months))
+            .with_convention(BusinessDayConvention::Unadjusted)
+            .with_termination_date_convention(BusinessDayConvention::Unadjusted)
+            .forwards()
+            .end_of_month(true)
+            .build();
+
+        check_dates(
+            &s,
+            &[
+                d(16, Month::January, 2023),
+                d(31, Month::January, 2023),
+                d(28, Month::February, 2023),
+                d(16, Month::March, 2023),
+            ],
         );
     }
 
