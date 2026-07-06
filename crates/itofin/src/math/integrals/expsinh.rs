@@ -188,6 +188,24 @@ mod tests {
     }
 
     #[test]
+    fn truncates_dead_tails_before_the_integrand_overflows() {
+        // x^2 * exp(-x^2), the Gaussian second moment: past x ~ 27 the terms
+        // underflow to zero, and past x ~ 1e154 the integrand itself computes
+        // inf * 0 = NaN. The driver must stop walking the dead tail, as Boost
+        // does, instead of erroring on the NaN.
+        let integrator = ExpSinhIntegral::new();
+        let expected = std::f64::consts::PI.sqrt() / 4.0;
+        assert!(
+            (integrator
+                .integrate_semi_infinite(|x| x * x * (-x * x).exp())
+                .unwrap()
+                - expected)
+                .abs()
+                < TOL
+        );
+    }
+
+    #[test]
     fn reports_non_convergence_on_divergent_integrand() {
         let integrator = ExpSinhIntegral::new();
         assert!(
