@@ -49,7 +49,17 @@ pub struct LatticeRsg {
 
 impl LatticeRsg {
     /// Creates a generator over `n` points using the generating vector `z`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `z` has fewer than `dimensionality` components; QuantLib
+    /// reads out of bounds there.
     pub fn new(dimensionality: usize, z: Vec<f64>, n: usize) -> Self {
+        assert!(
+            z.len() >= dimensionality,
+            "generating vector has {} components but the dimensionality is {dimensionality}",
+            z.len()
+        );
         Self {
             dimensionality,
             n,
@@ -117,6 +127,12 @@ mod tests {
     #[should_panic(expected = "N must be between")]
     fn get_rule_rejects_small_n() {
         LatticeRule::A.get_rule(512);
+    }
+
+    #[test]
+    #[should_panic(expected = "generating vector has")]
+    fn new_rejects_short_generating_vector() {
+        LatticeRsg::new(5, vec![1.0, 182667.0], 1024);
     }
 
     #[test]

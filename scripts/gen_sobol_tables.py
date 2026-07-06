@@ -245,8 +245,8 @@ def main():
     text = strip_comments((src / "latticerules.cpp").read_text(encoding="latin-1"))
     lattices = parse_int_arrays(text, r"const\s+Real\s+(lattice[ABCD])\[\]\s*=\s*\{(.*?)\};")
     for name, values in lattices.items():
-        if len(values) < 3600:
-            sys.exit(f"{name}: only {len(values)} values, expected at least 3600")
+        if len(values) != 3600:
+            sys.exit(f"{name}: {len(values)} values, expected exactly 3600")
     emit_lattices(out, lattices)
     subprocess.run(
         ["rustfmt", "--edition", "2024"] + [str(p) for p in WRITTEN], check=True
