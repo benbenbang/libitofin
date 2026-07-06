@@ -22,6 +22,7 @@ use crate::time::date::Date;
 use crate::time::daycounter::DayCounter;
 use crate::time::frequency::Frequency;
 use crate::types::{DiscountFactor, Rate, Real, Time};
+use crate::utilities::dataformatters;
 use crate::{fail, require};
 
 /// Interest-rate compounding rule.
@@ -68,7 +69,6 @@ pub struct InterestRate {
     day_counter: DayCounter,
     compounding: Compounding,
     frequency: Frequency,
-    freq_makes_sense: bool,
 }
 
 impl InterestRate {
@@ -85,13 +85,7 @@ impl InterestRate {
         compounding: Compounding,
         frequency: Frequency,
     ) -> QlResult<InterestRate> {
-        let freq_makes_sense = matches!(
-            compounding,
-            Compounding::Compounded
-                | Compounding::SimpleThenCompounded
-                | Compounding::CompoundedThenSimple
-        );
-        if freq_makes_sense {
+        if Self::freq_makes_sense(compounding) {
             require!(
                 frequency != Frequency::Once && frequency != Frequency::NoFrequency,
                 "frequency not allowed for this interest rate"
@@ -102,8 +96,16 @@ impl InterestRate {
             day_counter,
             compounding,
             frequency,
-            freq_makes_sense,
         })
+    }
+
+    fn freq_makes_sense(compounding: Compounding) -> bool {
+        matches!(
+            compounding,
+            Compounding::Compounded
+                | Compounding::SimpleThenCompounded
+                | Compounding::CompoundedThenSimple
+        )
     }
 
     /// The rate itself.
@@ -125,7 +127,7 @@ impl InterestRate {
     /// [`NoFrequency`](Frequency::NoFrequency) when the compounding convention
     /// does not use one (simple or continuous rates).
     pub fn frequency(&self) -> Frequency {
-        if self.freq_makes_sense {
+        if Self::freq_makes_sense(self.compounding) {
             self.frequency
         } else {
             Frequency::NoFrequency
@@ -357,12 +359,15 @@ impl InterestRate {
 
 impl fmt::Display for InterestRate {
     /// Renders the rate as QuantLib's `operator<<` does, e.g.
-    /// `8 % Actual/360 Quarterly compounding`.
-    ///
-    /// The rate is printed as a percentage with Rust's default float
-    /// formatting (QuantLib inherits the stream's precision instead).
+    /// `8.000000 % Actual/360 Quarterly compounding`, reusing
+    /// [`dataformatters::rate`] (the `io::rate` port the C++ calls here).
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} % {} ", self.rate * 100.0, self.day_counter.name())?;
+        write!(
+            f,
+            "{} {} ",
+            dataformatters::rate(self.rate),
+            self.day_counter.name()
+        )?;
         match self.compounding {
             Compounding::Simple => write!(f, "simple compounding"),
             Compounding::Compounded => write!(f, "{} compounding", self.frequency),
@@ -410,6 +415,14 @@ mod tests {
         assert_eq!(
             Compounding::CompoundedThenSimple.to_string(),
             "CompoundedThenSimple"
+        );
+    }
+
+    #[test]
+    fn interest_rate_display_matches_quantlib_format() {
+        assert_eq!(
+            quarterly_compounded(0.08).to_string(),
+            "8.000000 % Actual/360 Quarterly compounding"
         );
     }
 
