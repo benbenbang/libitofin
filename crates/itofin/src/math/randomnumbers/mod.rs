@@ -10,7 +10,7 @@
 //! deviates. Generators take `&mut self` where QuantLib mutates through
 //! `const`; the sequences are identical.
 //!
-//! Low-discrepancy (Sobol and friends) generation is a separate port.
+//! Low-discrepancy Sobol generation lives in [`sobol`].
 
 use crate::types::Real;
 
@@ -19,6 +19,7 @@ pub mod knuthuniformrng;
 pub mod mt19937uniformrng;
 pub mod ranluxuniformrng;
 pub mod seedgenerator;
+pub mod sobol;
 pub mod xoshiro256starstaruniformrng;
 pub mod zigguratgaussianrng;
 
