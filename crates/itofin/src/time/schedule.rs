@@ -15,6 +15,7 @@ use crate::time::calendar::Calendar;
 use crate::time::calendars::nullcalendar::NullCalendar;
 use crate::time::date::Date;
 use crate::time::dategenerationrule::DateGeneration;
+use crate::time::frequency::Frequency;
 use crate::time::period::Period;
 use crate::time::timeunit::TimeUnit;
 use crate::time::weekday::Weekday;
@@ -730,6 +731,176 @@ impl std::ops::Index<usize> for Schedule {
     }
 }
 
+/// Fluent builder over [`Schedule::new`], a port of QuantLib's
+/// `MakeSchedule` helper class.
+///
+/// Defaults match QuantLib: `Backward` generation, no end-of-month
+/// adjustment, a null calendar when none is given, `Following` when a
+/// calendar is given but no convention, `Unadjusted` otherwise, and the
+/// convention itself for the termination date when not overridden.
+#[derive(Clone)]
+pub struct MakeSchedule {
+    calendar: Option<Calendar>,
+    effective_date: Date,
+    termination_date: Date,
+    tenor: Option<Period>,
+    convention: Option<BusinessDayConvention>,
+    termination_date_convention: Option<BusinessDayConvention>,
+    rule: DateGeneration,
+    end_of_month: bool,
+    first_date: Date,
+    next_to_last_date: Date,
+}
+
+impl MakeSchedule {
+    /// Starts a schedule specification with the QuantLib defaults.
+    pub fn new() -> MakeSchedule {
+        MakeSchedule {
+            calendar: None,
+            effective_date: Date::null(),
+            termination_date: Date::null(),
+            tenor: None,
+            convention: None,
+            termination_date_convention: None,
+            rule: DateGeneration::Backward,
+            end_of_month: false,
+            first_date: Date::null(),
+            next_to_last_date: Date::null(),
+        }
+    }
+
+    /// Sets the effective date.
+    pub fn from(mut self, effective_date: Date) -> MakeSchedule {
+        self.effective_date = effective_date;
+        self
+    }
+
+    /// Sets the termination date.
+    pub fn to(mut self, termination_date: Date) -> MakeSchedule {
+        self.termination_date = termination_date;
+        self
+    }
+
+    /// Sets the tenor.
+    pub fn with_tenor(mut self, tenor: Period) -> MakeSchedule {
+        self.tenor = Some(tenor);
+        self
+    }
+
+    /// Sets the tenor from a frequency.
+    ///
+    /// # Panics
+    ///
+    /// Panics for [`Frequency::OtherFrequency`], which names no period.
+    pub fn with_frequency(mut self, frequency: Frequency) -> MakeSchedule {
+        self.tenor = Some(
+            Period::try_from(frequency).expect("no period equivalent for the given frequency"),
+        );
+        self
+    }
+
+    /// Sets the calendar.
+    pub fn with_calendar(mut self, calendar: Calendar) -> MakeSchedule {
+        self.calendar = Some(calendar);
+        self
+    }
+
+    /// Sets the business-day convention.
+    pub fn with_convention(mut self, convention: BusinessDayConvention) -> MakeSchedule {
+        self.convention = Some(convention);
+        self
+    }
+
+    /// Sets the business-day convention for the termination date.
+    pub fn with_termination_date_convention(
+        mut self,
+        convention: BusinessDayConvention,
+    ) -> MakeSchedule {
+        self.termination_date_convention = Some(convention);
+        self
+    }
+
+    /// Sets the date-generation rule.
+    pub fn with_rule(mut self, rule: DateGeneration) -> MakeSchedule {
+        self.rule = rule;
+        self
+    }
+
+    /// Selects forward generation.
+    pub fn forwards(self) -> MakeSchedule {
+        self.with_rule(DateGeneration::Forward)
+    }
+
+    /// Selects backward generation.
+    pub fn backwards(self) -> MakeSchedule {
+        self.with_rule(DateGeneration::Backward)
+    }
+
+    /// Sets the end-of-month adjustment flag.
+    pub fn end_of_month(mut self, flag: bool) -> MakeSchedule {
+        self.end_of_month = flag;
+        self
+    }
+
+    /// Sets the first (stub) date.
+    pub fn with_first_date(mut self, d: Date) -> MakeSchedule {
+        self.first_date = d;
+        self
+    }
+
+    /// Sets the next-to-last (stub) date.
+    pub fn with_next_to_last_date(mut self, d: Date) -> MakeSchedule {
+        self.next_to_last_date = d;
+        self
+    }
+
+    /// Builds the schedule, the equivalent of QuantLib's conversion
+    /// operator.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the effective date, termination date or tenor is missing,
+    /// or if [`Schedule::new`] rejects the specification.
+    pub fn build(self) -> Schedule {
+        assert!(
+            self.effective_date != Date::null(),
+            "effective date not provided"
+        );
+        assert!(
+            self.termination_date != Date::null(),
+            "termination date not provided"
+        );
+        let tenor = self.tenor.expect("tenor/frequency not provided");
+
+        let convention = match self.convention {
+            Some(convention) => convention,
+            None if self.calendar.is_some() => BusinessDayConvention::Following,
+            None => BusinessDayConvention::Unadjusted,
+        };
+        let termination_date_convention = self.termination_date_convention.unwrap_or(convention);
+        let calendar = self.calendar.unwrap_or_else(NullCalendar::new);
+
+        Schedule::new(
+            self.effective_date,
+            self.termination_date,
+            tenor,
+            calendar,
+            convention,
+            termination_date_convention,
+            self.rule,
+            self.end_of_month,
+            self.first_date,
+            self.next_to_last_date,
+        )
+    }
+}
+
+impl Default for MakeSchedule {
+    fn default() -> MakeSchedule {
+        MakeSchedule::new()
+    }
+}
+
 /// The date on or before `d` that is the 20th of the month, snapped back to
 /// the previous main IMM month (March, June, September, December) when the
 /// generation rule calls for it.
@@ -891,6 +1062,80 @@ mod tests {
         assert_eq!(
             previous_twentieth(d(21, Month::March, 2016), DateGeneration::CDS2015),
             d(20, Month::March, 2016)
+        );
+    }
+
+    #[test]
+    fn backward_regular_first_period_with_first_date() {
+        let semiannual = Period::new(6, TimeUnit::Months);
+
+        let backward = Schedule::new(
+            d(30, Month::September, 2017),
+            d(30, Month::September, 2024),
+            semiannual,
+            NullCalendar::new(),
+            BusinessDayConvention::Unadjusted,
+            BusinessDayConvention::Unadjusted,
+            DateGeneration::Backward,
+            true,
+            d(31, Month::March, 2018),
+            Date::null(),
+        );
+        assert!(
+            backward.is_regular_at(1),
+            "first period should be regular (effectiveDate + 6M == firstDate)"
+        );
+
+        let forward = Schedule::new(
+            d(30, Month::September, 2017),
+            d(30, Month::September, 2024),
+            semiannual,
+            NullCalendar::new(),
+            BusinessDayConvention::Unadjusted,
+            BusinessDayConvention::Unadjusted,
+            DateGeneration::Forward,
+            true,
+            d(31, Month::March, 2018),
+            Date::null(),
+        );
+        assert!(
+            forward.is_regular_at(1),
+            "forward first period should also be regular"
+        );
+
+        let irregular = Schedule::new(
+            d(3, Month::September, 2017),
+            d(30, Month::September, 2024),
+            semiannual,
+            NullCalendar::new(),
+            BusinessDayConvention::Unadjusted,
+            BusinessDayConvention::Unadjusted,
+            DateGeneration::Backward,
+            true,
+            d(31, Month::March, 2018),
+            Date::null(),
+        );
+        assert!(
+            !irregular.is_regular_at(1),
+            "first period should be irregular (effectiveDate + 6M != firstDate)"
+        );
+
+        let forward_ntl_irregular = Schedule::new(
+            d(30, Month::September, 2017),
+            d(30, Month::September, 2024),
+            semiannual,
+            NullCalendar::new(),
+            BusinessDayConvention::Unadjusted,
+            BusinessDayConvention::Unadjusted,
+            DateGeneration::Forward,
+            true,
+            Date::null(),
+            d(15, Month::March, 2024),
+        );
+        let n = forward_ntl_irregular.len();
+        assert!(
+            !forward_ntl_irregular.is_regular_at(n - 2),
+            "period ending at off-grid nextToLastDate should be irregular"
         );
     }
 
