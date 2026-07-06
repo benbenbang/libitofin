@@ -141,7 +141,7 @@ impl InterestRate {
     ///
     /// Time must be measured using the rate's own day counter.
     pub fn compound_factor(&self, t: Time) -> QlResult<Real> {
-        if t < 0.0 {
+        if t.is_nan() || t < 0.0 {
             fail!("negative time ({t}) not allowed");
         }
         let r = self.rate;
@@ -224,16 +224,16 @@ impl InterestRate {
         freq: Frequency,
         t: Time,
     ) -> QlResult<InterestRate> {
-        if compound <= 0.0 {
+        if compound.is_nan() || compound <= 0.0 {
             fail!("positive compound factor required");
         }
         let rate = if compound == 1.0 {
-            if t < 0.0 {
+            if t.is_nan() || t < 0.0 {
                 fail!("non negative time ({t}) required");
             }
             0.0
         } else {
-            if t <= 0.0 {
+            if t.is_nan() || t <= 0.0 {
                 fail!("positive time ({t}) required");
             }
             let f = freq as i16 as Real;
@@ -510,6 +510,27 @@ mod tests {
         let ir = quarterly_compounded(0.08);
         assert!(ir.compound_factor(-0.5).is_err());
         assert!(ir.discount_factor(-0.5).is_err());
+    }
+
+    #[test]
+    fn nan_inputs_are_rejected() {
+        let ir = quarterly_compounded(0.08);
+        assert!(ir.compound_factor(Real::NAN).is_err());
+        assert!(ir.discount_factor(Real::NAN).is_err());
+
+        let simple = (Compounding::Simple, Frequency::Annual);
+        assert!(
+            InterestRate::implied_rate(Real::NAN, Actual360::new(), simple.0, simple.1, 1.0)
+                .is_err()
+        );
+        assert!(
+            InterestRate::implied_rate(1.02, Actual360::new(), simple.0, simple.1, Real::NAN)
+                .is_err()
+        );
+        assert!(
+            InterestRate::implied_rate(1.0, Actual360::new(), simple.0, simple.1, Real::NAN)
+                .is_err()
+        );
     }
 
     fn time_to_days(t: Time) -> crate::time::date::SerialNumber {
