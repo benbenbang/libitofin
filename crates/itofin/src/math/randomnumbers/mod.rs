@@ -13,14 +13,18 @@
 
 use crate::types::Real;
 
+pub mod boxmullergaussianrng;
 pub mod knuthuniformrng;
 pub mod mt19937uniformrng;
 pub mod ranluxuniformrng;
 pub mod seedgenerator;
+pub mod xoshiro256starstaruniformrng;
 
+pub use boxmullergaussianrng::BoxMullerGaussianRng;
 pub use knuthuniformrng::KnuthUniformRng;
 pub use mt19937uniformrng::MersenneTwisterUniformRng;
 pub use ranluxuniformrng::{Ranlux3UniformRng, Ranlux4UniformRng, Ranlux64UniformRng};
+pub use xoshiro256starstaruniformrng::Xoshiro256StarStarUniformRng;
 
 /// A generator of uniform pseudo-random deviates in the open `(0, 1)`
 /// interval.
