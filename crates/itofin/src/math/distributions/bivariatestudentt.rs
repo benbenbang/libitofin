@@ -14,6 +14,7 @@ use std::f64::consts::{PI, TAU};
 use super::Cdf;
 use super::studentt::StudentT;
 use crate::errors::QlResult;
+use crate::math::comparison::sign;
 use crate::require;
 use crate::types::Real;
 
@@ -62,17 +63,6 @@ impl BivariateCumulativeStudentDistribution {
             return if x.is_infinite() { t.cdf(y) } else { t.cdf(x) };
         }
         p_n(x, y, self.n, self.rho)
-    }
-}
-
-/// The custom sign used by the series: 0 maps to 0 (not +-1).
-fn sign(val: Real) -> Real {
-    if val < 0.0 {
-        -1.0
-    } else if val > 0.0 {
-        1.0
-    } else {
-        0.0
     }
 }
 
