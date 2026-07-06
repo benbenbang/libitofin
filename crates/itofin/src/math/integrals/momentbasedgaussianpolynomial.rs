@@ -19,6 +19,30 @@ use crate::types::{Real, Size};
 
 use super::gaussianorthogonalpolynomial::GaussianOrthogonalPolynomial;
 
+/// Grow-on-demand memoization over a `RefCell<Vec<Real>>` cache with `NaN`
+/// marking the not-yet-computed entries, shared by the recurrence caches
+/// here and in the Laguerre-trigonometric families. The borrow is released
+/// before `compute` runs, so the closure may recurse into functions backed
+/// by the same cache.
+pub(super) fn memoized(
+    cache: &RefCell<Vec<Real>>,
+    n: Size,
+    compute: impl FnOnce() -> Real,
+) -> Real {
+    {
+        let mut c = cache.borrow_mut();
+        if c.len() <= n {
+            c.resize(n + 1, Real::NAN);
+        }
+        if !c[n].is_nan() {
+            return c[n];
+        }
+    }
+    let value = compute();
+    cache.borrow_mut()[n] = value;
+    value
+}
+
 /// A polynomial family described by the raw moments of its weight function,
 /// `moment(i) = integral of x^i w(x) dx`, together with the weight itself.
 ///
@@ -95,40 +119,20 @@ impl<P: MomentBasedPolynomial> MomentBasedGaussianPolynomial<P> {
     }
 
     fn alpha_(&self, u: Size) -> Real {
-        {
-            let mut b = self.b.borrow_mut();
-            if b.len() <= u {
-                b.resize(u + 1, Real::NAN);
+        memoized(&self.b, u, || {
+            if u == 0 {
+                self.poly.moment(1)
+            } else {
+                -self.z(u - 1, u) / self.z(u - 1, u - 1) + self.z(u, u + 1) / self.z(u, u)
             }
-            if !b[u].is_nan() {
-                return b[u];
-            }
-        }
-        let value = if u == 0 {
-            self.poly.moment(1)
-        } else {
-            -self.z(u - 1, u) / self.z(u - 1, u - 1) + self.z(u, u + 1) / self.z(u, u)
-        };
-        self.b.borrow_mut()[u] = value;
-        value
+        })
     }
 
     fn beta_(&self, u: Size) -> Real {
         if u == 0 {
             return 1.0;
         }
-        {
-            let mut c = self.c.borrow_mut();
-            if c.len() <= u {
-                c.resize(u + 1, Real::NAN);
-            }
-            if !c[u].is_nan() {
-                return c[u];
-            }
-        }
-        let value = self.z(u, u) / self.z(u - 1, u - 1);
-        self.c.borrow_mut()[u] = value;
-        value
+        memoized(&self.c, u, || self.z(u, u) / self.z(u - 1, u - 1))
     }
 }
 

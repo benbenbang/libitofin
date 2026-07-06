@@ -11,7 +11,7 @@ use std::cell::RefCell;
 
 use crate::types::{Real, Size};
 
-use super::momentbasedgaussianpolynomial::MomentBasedPolynomial;
+use super::momentbasedgaussianpolynomial::{MomentBasedPolynomial, memoized};
 
 /// The shared moment recursion of QuantLib's `GaussLaguerreTrigonometricBase`:
 /// the moments of `e^{-x} trig(u x)` satisfy
@@ -38,16 +38,7 @@ impl TrigonometricMoments {
     }
 
     fn moment_(&self, n: Size) -> Real {
-        {
-            let mut m = self.m.borrow_mut();
-            if m.len() <= n {
-                m.resize(n + 1, Real::NAN);
-            }
-            if !m[n].is_nan() {
-                return m[n];
-            }
-        }
-        let value = match n {
+        memoized(&self.m, n, || match n {
             0 => self.seed0,
             1 => self.seed1,
             _ => {
@@ -55,28 +46,17 @@ impl TrigonometricMoments {
                 (2.0 * n_ * self.moment_(n - 1) - n_ * (n_ - 1.0) * self.moment_(n - 2))
                     / (1.0 + self.u * self.u)
             }
-        };
-        self.m.borrow_mut()[n] = value;
-        value
+        })
     }
 
     fn fact(&self, n: Size) -> Real {
-        {
-            let mut f = self.f.borrow_mut();
-            if f.len() <= n {
-                f.resize(n + 1, Real::NAN);
+        memoized(&self.f, n, || {
+            if n == 0 {
+                1.0
+            } else {
+                n as Real * self.fact(n - 1)
             }
-            if !f[n].is_nan() {
-                return f[n];
-            }
-        }
-        let value = if n == 0 {
-            1.0
-        } else {
-            n as Real * self.fact(n - 1)
-        };
-        self.f.borrow_mut()[n] = value;
-        value
+        })
     }
 }
 
