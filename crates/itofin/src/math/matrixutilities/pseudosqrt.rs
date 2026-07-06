@@ -4,7 +4,7 @@
 //! with m * m^T equal to the input, salvaging matrices that are not positive
 //! semi-definite. The `Hypersphere` and `LowerDiagonal` salvaging variants
 //! (which wrap the conjugate-gradient optimizer) are not ported yet; the
-//! `matrices.cpp` oracle only exercises `None` and `Higham`.
+//! `matrices.cpp` oracle exercises `None`, `Higham` and `Principal`.
 
 use crate::math::matrix::Matrix;
 use crate::math::matrixutilities::choleskydecomposition::cholesky_decomposition;
@@ -290,7 +290,8 @@ pub fn rank_reduced_sqrt(
 mod tests {
     use super::*;
     use crate::math::matrixutilities::testsupport::{
-        matrices_m1, matrices_m5, matrices_m6, norm_matrix,
+        assert_close_matrix, create_test_correlation_matrix, matrices_m1, matrices_m5, matrices_m6,
+        norm_matrix,
     };
 
     #[test]
@@ -316,6 +317,17 @@ mod tests {
             error <= tolerance,
             "Higham matrix correction failed (error {error})"
         );
+    }
+
+    #[test]
+    fn principal_matricial_square_root() {
+        for n in [1, 4, 10, 40] {
+            let rho = create_test_correlation_matrix(n);
+            let sqrt_rho = pseudo_sqrt(&rho, SalvagingAlgorithm::Principal);
+
+            assert_close_matrix(&sqrt_rho, &sqrt_rho.transpose(), 1e3 * Real::EPSILON);
+            assert_close_matrix(&(&sqrt_rho * &sqrt_rho), &rho, 1e5 * Real::EPSILON);
+        }
     }
 
     #[test]

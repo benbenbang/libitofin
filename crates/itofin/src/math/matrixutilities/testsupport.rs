@@ -2,7 +2,7 @@
 //! `norm` helpers from `test-suite/matrices.cpp`.
 
 use crate::math::matrix::Matrix;
-use crate::types::Real;
+use crate::types::{Real, Size};
 
 pub(crate) fn matrices_m1() -> Matrix {
     Matrix::from([[1.0, 0.9, 0.7], [0.9, 1.0, 0.4], [0.7, 0.4, 1.0]])
@@ -79,6 +79,48 @@ impl TestRng {
             .wrapping_mul(6364136223846793005)
             .wrapping_add(1442695040888963407);
         (self.0 >> 11) as Real / (1_u64 << 53) as Real
+    }
+}
+
+/// The deterministic correlation matrix from
+/// `MatrixTests::createTestCorrelationMatrix` in `test-suite/matrices.cpp`.
+pub(crate) fn create_test_correlation_matrix(n: Size) -> Matrix {
+    let mut rho = Matrix::with_size(n, n);
+    for i in 0..n {
+        for j in i..n {
+            let value = (-0.1 * (i as Real - j as Real).abs()
+                - if i != j { 0.02 * (i + j) as Real } else { 0.0 })
+            .exp();
+            rho[(i, j)] = value;
+            rho[(j, i)] = value;
+        }
+    }
+    rho
+}
+
+/// Element-wise relative comparison matching `QL_CHECK_CLOSE_MATRIX_TOL` in
+/// `test-suite/matrices.cpp`: `tol_pct` is a percentage tolerance checked
+/// against both operands, as in `BOOST_CHECK_CLOSE`.
+pub(crate) fn assert_close_matrix(actual: &Matrix, expected: &Matrix, tol_pct: Real) {
+    assert!(
+        actual.rows() == expected.rows() && actual.columns() == expected.columns(),
+        "matrix dimensions do not match: {}x{} vs {}x{}",
+        actual.rows(),
+        actual.columns(),
+        expected.rows(),
+        expected.columns()
+    );
+    let fraction = tol_pct / 100.0;
+    for i in 0..actual.rows() {
+        for j in 0..actual.columns() {
+            let a = actual[(i, j)];
+            let e = expected[(i, j)];
+            let diff = (a - e).abs();
+            assert!(
+                diff <= fraction * a.abs() && diff <= fraction * e.abs(),
+                "matrices differ at ({i}, {j}): {a} vs {e} (tolerance {tol_pct}%)"
+            );
+        }
     }
 }
 
