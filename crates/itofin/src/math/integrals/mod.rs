@@ -7,6 +7,7 @@ pub mod gaussianorthogonalpolynomial;
 pub mod gaussianquadratures;
 pub mod kronrod;
 pub mod lobatto;
+pub mod momentbasedgaussianpolynomial;
 pub mod piecewise;
 pub mod segment;
 pub mod simpson;
