@@ -138,8 +138,8 @@ mod tests {
                         (x - y).abs() <= 1.0e-10,
                         "composite quote yields {x}, function result is {y}"
                     );
-                    for k in 0..mes.len() {
-                        assert_eq!(composite.input_value(k).unwrap(), mes[k].value().unwrap());
+                    for (k, me) in mes.iter().enumerate() {
+                        assert_eq!(composite.input_value(k).unwrap(), me.value().unwrap());
                     }
                 }
             }
