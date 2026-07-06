@@ -84,7 +84,8 @@ pub fn cholesky_solve_for(l: &Matrix, b: &Array) -> Array {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::Size;
+    use crate::math::matrixutilities::testsupport::assert_close_matrix;
+    use crate::types::{Real, Size};
 
     #[test]
     fn cholesky_decomposition_of_near_singular_matrix() {
@@ -274,6 +275,19 @@ mod tests {
         for i in 0..3 as Size {
             assert!((x[i] - expected[i]).abs() <= 1.0e-14);
         }
+    }
+
+    #[test]
+    fn cholesky_solver_for_incomplete_matrix() {
+        let n = 4;
+        let mut rho = Matrix::with_size(n, n);
+        rho[(0, 0)] = 1.0;
+        rho[(1, 1)] = 1.0;
+        rho[(0, 1)] = 0.9;
+        rho[(1, 0)] = 0.9;
+
+        let l = cholesky_decomposition(&rho, true);
+        assert_close_matrix(&(&l * &l.transpose()), &rho, 100.0 * Real::EPSILON);
     }
 
     #[test]
