@@ -76,6 +76,19 @@ pub fn close_enough_n(x: Real, y: Real, n: usize) -> bool {
     diff <= tolerance * x.abs() || diff <= tolerance * y.abs()
 }
 
+/// Sign function matching `boost::math::sign`: `0` at zero (either signed
+/// zero), otherwise `+1`/`-1`. Distinct from `f64::signum`, which maps `-0.0`
+/// to `-1.0`.
+pub(crate) fn sign(x: Real) -> Real {
+    if x > 0.0 {
+        1.0
+    } else if x < 0.0 {
+        -1.0
+    } else {
+        0.0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

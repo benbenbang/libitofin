@@ -11,6 +11,7 @@
 #![allow(clippy::excessive_precision)]
 
 use crate::errors::QlResult;
+use crate::math::comparison::sign;
 use crate::types::{Complex, Real, Size};
 use crate::{fail, require};
 
@@ -163,19 +164,6 @@ pub fn ci(x: Real) -> Real {
     f_aux(x) * x.sin() - g_aux(x) * x.cos()
 }
 
-/// Sign function matching `boost::math::sign`: `0` at zero (either signed
-/// zero), otherwise `+1`/`-1`. Distinct from `f64::signum`, which maps `-0.0`
-/// to `-1.0`.
-fn sign(x: Real) -> Real {
-    if x > 0.0 {
-        1.0
-    } else if x < 0.0 {
-        -1.0
-    } else {
-        0.0
-    }
-}
-
 /// `Ei(z) + acc`, where `acc` carries the branch adjustment used by [`e1`].
 fn ei_with_acc(z: Complex, acc: Complex) -> QlResult<Complex> {
     if z.re == 0.0 && z.im == 0.0 {
@@ -196,10 +184,6 @@ fn ei_with_acc(z: Complex, acc: Complex) -> QlResult<Complex> {
         let d = z1 - z2;
         d.re.abs() <= MAX_ERROR * z1.re.abs() && d.im.abs() <= MAX_ERROR * z1.im.abs()
     };
-
-    if z.re > z_inf {
-        return Ok(z.exp() / z + acc);
-    }
 
     if abs_z > 1.1 * z_asym {
         let mut ei = acc + Complex::new(0.0, sign(z.im) * PI);
@@ -442,7 +426,6 @@ mod tests {
     #[test]
     fn ei_large_circle_limit_is_signed_pi() {
         let tol = 1000.0 * Real::EPSILON;
-        let close_enough_tol = 42.0 * Real::EPSILON;
         let large_r = 0.75 * (0.1 * Real::MAX).ln();
         for x in -10..10 {
             let phi = x as Real / 10.0 * PI;
@@ -451,7 +434,7 @@ mod tests {
                 let value = ei(z).unwrap();
                 let limit_imag = sign(z.im) * PI;
                 assert!(
-                    value.re == 0.0 || value.re.abs() < close_enough_tol * close_enough_tol,
+                    crate::math::comparison::close_enough(value.re, 0.0),
                     "Ei large-circle real: {} not close enough to 0",
                     value.re
                 );
