@@ -13,7 +13,7 @@ use std::cell::Cell;
 
 use crate::errors::QlResult;
 use crate::fail;
-use crate::handle::RelinkableHandle;
+use crate::handle::{AsObservable, RelinkableHandle};
 use crate::patterns::observable::Observable;
 use crate::shared::shared;
 use crate::types::Real;
@@ -65,11 +65,13 @@ impl SimpleQuote {
     }
 }
 
-impl Quote for SimpleQuote {
+impl AsObservable for SimpleQuote {
     fn observable(&self) -> &Observable {
         &self.observable
     }
+}
 
+impl Quote for SimpleQuote {
     fn value(&self) -> QlResult<Real> {
         match self.value.get() {
             Some(value) => Ok(value),
