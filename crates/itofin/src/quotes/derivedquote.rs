@@ -11,7 +11,7 @@ use crate::ensure;
 use crate::errors::QlResult;
 use crate::handle::{AsObservable, Handle};
 use crate::patterns::observable::{Observable, Observer};
-use crate::shared::{Shared, SharedMut, shared, shared_mut};
+use crate::shared::{Shared, SharedMut};
 use crate::types::Real;
 
 use super::{Invalidator, Quote};
@@ -33,12 +33,7 @@ impl<F: Fn(Real) -> Real> DerivedQuote<F> {
     /// Creates a quote deriving its value from `element` through `f`,
     /// registering with the handle like the C++ constructor's `registerWith`.
     pub fn new(element: Handle<dyn Quote>, f: F) -> Self {
-        let cache = shared(Cell::new(None));
-        let observable = shared(Observable::new());
-        let listener = shared_mut(Invalidator {
-            cache: Shared::clone(&cache),
-            observable: Shared::clone(&observable),
-        });
+        let (cache, observable, listener) = Invalidator::new();
         element.register_observer(&(listener.clone() as SharedMut<dyn Observer>));
         DerivedQuote {
             element,
@@ -77,17 +72,7 @@ mod tests {
     use super::*;
     use crate::quotes::SimpleQuote;
     use crate::shared::shared;
-
-    #[derive(Default)]
-    struct Flag {
-        up: bool,
-    }
-
-    impl Observer for Flag {
-        fn update(&mut self) {
-            self.up = true;
-        }
-    }
+    use crate::test_support::{Flag, as_observer};
 
     /// Port of `testDerived` (test-suite/quotes.cpp): the derived value tracks
     /// `f(source)` across source changes for several functions.
@@ -119,14 +104,15 @@ mod tests {
         let derived = DerivedQuote::new(Handle::new(me.clone()), |x| 2.0 * x);
         assert_eq!(derived.value().unwrap(), 2.0);
 
-        let flag = shared_mut(Flag::default());
-        derived
-            .observable()
-            .register_observer(&(flag.clone() as SharedMut<dyn Observer>));
+        let flag = Flag::new();
+        derived.observable().register_observer(&as_observer(&flag));
 
         me.set_value(3.0);
 
-        assert!(flag.borrow().up, "source change must reach quote observers");
+        assert!(
+            Flag::is_up(&flag),
+            "source change must reach quote observers"
+        );
         assert_eq!(derived.value().unwrap(), 6.0);
     }
 
@@ -136,14 +122,12 @@ mod tests {
         let derived = DerivedQuote::new(rh.handle(), |x| x + 1.0);
         assert_eq!(derived.value().unwrap(), 2.0);
 
-        let flag = shared_mut(Flag::default());
-        derived
-            .observable()
-            .register_observer(&(flag.clone() as SharedMut<dyn Observer>));
+        let flag = Flag::new();
+        derived.observable().register_observer(&as_observer(&flag));
 
         rh.link_to(shared(SimpleQuote::new(5.0)));
 
-        assert!(flag.borrow().up, "relink must reach quote observers");
+        assert!(Flag::is_up(&flag), "relink must reach quote observers");
         assert_eq!(derived.value().unwrap(), 6.0);
     }
 

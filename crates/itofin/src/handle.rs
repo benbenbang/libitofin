@@ -13,21 +13,9 @@
 
 use crate::errors::QlResult;
 pub use crate::patterns::observable::AsObservable;
-use crate::patterns::observable::{Observable, Observer};
+use crate::patterns::observable::{Forwarder, Observable, Observer};
 use crate::require;
 use crate::shared::{Shared, SharedMut, shared_mut};
-
-/// Observer half of the link (QuantLib's `Link::update`): forwards every
-/// notification of the current pointee to the link's own observers.
-struct Forwarder {
-    observable: Shared<Observable>,
-}
-
-impl Observer for Forwarder {
-    fn update(&mut self) {
-        self.observable.notify_observers();
-    }
-}
 
 /// Inner shared cell of a [`Handle`]: the current pointee plus the link's own
 /// observable, through which relinks and pointee changes are broadcast.

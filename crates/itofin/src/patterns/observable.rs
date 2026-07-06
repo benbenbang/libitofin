@@ -18,7 +18,7 @@
 
 use std::cell::{Cell, RefCell};
 
-use crate::shared::{SharedMut, WeakMut};
+use crate::shared::{Shared, SharedMut, WeakMut};
 
 thread_local! {
     /// Nesting depth of [`Observable::notify_observers`] across all
@@ -133,6 +133,22 @@ pub trait Observer {
 pub trait AsObservable {
     /// Access to the embedded observable for registering observers.
     fn observable(&self) -> &Observable;
+}
+
+/// Observer that forwards every notification to another observable (the
+/// C++ `update()` of `Link`, `DeltaVolQuote` and friends).
+///
+/// The forwarding target embeds this in front of its own [`Observable`]: the
+/// forwarder registers with the source and passes each notification on to the
+/// target's observers.
+pub(crate) struct Forwarder {
+    pub(crate) observable: Shared<Observable>,
+}
+
+impl Observer for Forwarder {
+    fn update(&mut self) {
+        self.observable.notify_observers();
+    }
 }
 
 /// Object that notifies its changes to a set of observers.
