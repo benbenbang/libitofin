@@ -398,6 +398,62 @@ mod tests {
         );
     }
 
+    /// Caches the quote value it sees at notification time.
+    struct Cacher {
+        handle: Handle<SimpleQuote>,
+        seen: Option<f64>,
+    }
+
+    impl Observer for Cacher {
+        fn update(&mut self) {
+            self.seen = self.handle.current_link().ok().and_then(|q| q.value().ok());
+        }
+    }
+
+    /// Caps the quote at 1.0, writing back into it from inside `update`.
+    struct Normalizer {
+        quote: Shared<SimpleQuote>,
+    }
+
+    impl Observer for Normalizer {
+        fn update(&mut self) {
+            if let Ok(v) = self.quote.value() {
+                if v > 1.0 {
+                    self.quote.set_value(1.0);
+                }
+            }
+        }
+    }
+
+    /// A handle observer that writes back into the pointee mid-notification
+    /// re-notifies through the forwarder once the in-flight round finishes, so
+    /// every handle observer ends up with the final value - the state
+    /// QuantLib's recursive `Link::update` reaches directly.
+    #[test]
+    fn write_back_during_forwarded_notification_reaches_handle_observers() {
+        let quote = shared(SimpleQuote::new(0.5));
+        let h: Handle<SimpleQuote> = Handle::new(quote.clone());
+
+        let cacher = shared_mut(Cacher {
+            handle: h.clone(),
+            seen: None,
+        });
+        h.register_observer(&(cacher.clone() as SharedMut<dyn Observer>));
+        let normalizer = shared_mut(Normalizer {
+            quote: quote.clone(),
+        });
+        h.register_observer(&(normalizer.clone() as SharedMut<dyn Observer>));
+
+        quote.set_value(2.0);
+
+        assert_eq!(quote.value().unwrap(), 1.0);
+        assert_eq!(
+            cacher.borrow().seen,
+            Some(1.0),
+            "handle observers must see the written-back value, not the stale one"
+        );
+    }
+
     /// Dropping every handle drops the forwarder; the quote must keep working
     /// and silently prune the dead registration on its next notification.
     #[test]
