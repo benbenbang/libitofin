@@ -12,20 +12,10 @@
 //! notification to the link's own observers.
 
 use crate::errors::QlResult;
+pub use crate::patterns::observable::AsObservable;
 use crate::patterns::observable::{Observable, Observer};
 use crate::require;
 use crate::shared::{Shared, SharedMut, shared_mut};
-
-/// Pointee contract for [`Handle`]: access to the embedded [`Observable`]
-/// through which the pointee broadcasts its changes.
-///
-/// Mirrors the `handle.hpp` precondition that a handle target "must inherit
-/// from `Observable`". The handle's link registers with this observable, so a
-/// pointee change reaches every observer of the handle.
-pub trait AsObservable {
-    /// Access to the embedded observable for registering observers.
-    fn observable(&self) -> &Observable;
-}
 
 /// Observer half of the link (QuantLib's `Link::update`): forwards every
 /// notification of the current pointee to the link's own observers.
@@ -54,21 +44,22 @@ impl<T: ?Sized> Link<T> {
 }
 
 impl<T: AsObservable + ?Sized> Link<T> {
+    /// Builds the link and delegates the initial subscription to
+    /// [`link_to`](Link::link_to), as the C++ constructor delegates to
+    /// `linkTo`; no observers can exist yet, so the returned observable is
+    /// dropped unnotified.
     fn new(pointee: Option<Shared<T>>) -> Self {
         let observable = Shared::new(Observable::new());
         let forwarder = shared_mut(Forwarder {
             observable: Shared::clone(&observable),
         });
-        if let Some(pointee) = &pointee {
-            pointee
-                .observable()
-                .register_observer(&(forwarder.clone() as SharedMut<dyn Observer>));
-        }
-        Link {
-            current: pointee,
+        let mut link = Link {
+            current: None,
             observable,
             forwarder,
-        }
+        };
+        link.link_to(pointee);
+        link
     }
 
     /// Repoints the link, moving the pointee subscription from the old pointee
@@ -417,10 +408,10 @@ mod tests {
 
     impl Observer for Normalizer {
         fn update(&mut self) {
-            if let Ok(v) = self.quote.value() {
-                if v > 1.0 {
-                    self.quote.set_value(1.0);
-                }
+            if let Ok(v) = self.quote.value()
+                && v > 1.0
+            {
+                self.quote.set_value(1.0);
             }
         }
     }

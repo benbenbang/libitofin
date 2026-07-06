@@ -16,7 +16,7 @@ mod simplequote;
 pub use simplequote::{SimpleQuote, make_quote_handle};
 
 use crate::errors::QlResult;
-use crate::handle::AsObservable;
+use crate::patterns::observable::AsObservable;
 use crate::types::Real;
 
 /// Purely virtual base class for market observables.
