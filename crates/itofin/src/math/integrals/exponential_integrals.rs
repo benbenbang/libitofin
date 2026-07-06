@@ -204,13 +204,15 @@ fn ei_with_acc(z: Complex, acc: Complex) -> QlResult<Complex> {
     if abs_z > 1.1 * z_asym {
         let mut ei = acc + Complex::new(0.0, sign(z.im) * PI);
         let mut s = z.exp() / z;
-        let last = abs_z.floor() as Size + 1;
-        for i in 1..=last {
+        let last = abs_z.floor() + 1.0;
+        let mut i: Real = 1.0;
+        while i <= last {
             if matches(ei + s, ei) {
                 return Ok(ei + s);
             }
             ei += s;
-            s *= i as Real / z;
+            s *= i / z;
+            i += 1.0;
         }
         fail!("series conversion issue for Ei({z})");
     }
@@ -403,6 +405,13 @@ mod tests {
 
         let zero_imag = ei(Complex::new(large_value, 0.0)).unwrap();
         assert_eq!(zero_imag.im, 0.0);
+    }
+
+    #[test]
+    fn ei_huge_imaginary_argument_converges() {
+        let value = ei(Complex::new(0.0, 1e20)).unwrap();
+        assert_close("Ei huge-imag imag", value.im, PI, 1000.0 * Real::EPSILON);
+        assert!(value.re.abs() < 1e-15, "Ei huge-imag real: {}", value.re);
     }
 
     #[test]
