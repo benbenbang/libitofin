@@ -10,7 +10,8 @@
 
 use crate::math::array::Array;
 use crate::math::integrals::gaussianorthogonalpolynomial::{
-    GaussJacobiPolynomial, GaussianOrthogonalPolynomial,
+    GaussHermitePolynomial, GaussHyperbolicPolynomial, GaussJacobiPolynomial,
+    GaussLaguerrePolynomial, GaussianOrthogonalPolynomial,
 };
 use crate::math::matrixutilities::tqreigendecomposition::{
     EigenVectorCalculation, ShiftStrategy, TqrEigenDecomposition,
@@ -141,6 +142,36 @@ impl GaussianQuadrature {
     pub fn gegenbauer(n: Size, lambda: Real) -> crate::errors::QlResult<Self> {
         Self::new(n, &GaussJacobiPolynomial::gegenbauer(lambda)?)
     }
+
+    /// Generalized Gauss-Laguerre integration over `[0, inf)` (QuantLib's
+    /// `GaussLaguerreIntegration`; pass `s = 0` for the plain rule).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `n` is zero or `s <= -1`.
+    pub fn laguerre(n: Size, s: Real) -> crate::errors::QlResult<Self> {
+        Self::new(n, &GaussLaguerrePolynomial::new(s)?)
+    }
+
+    /// Generalized Gauss-Hermite integration over the real line (QuantLib's
+    /// `GaussHermiteIntegration`; pass `mu = 0` for the plain rule).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `n` is zero or `mu <= -1/2`.
+    pub fn hermite(n: Size, mu: Real) -> crate::errors::QlResult<Self> {
+        Self::new(n, &GaussHermitePolynomial::new(mu)?)
+    }
+
+    /// Gauss-Hyperbolic integration over the real line (QuantLib's
+    /// `GaussHyperbolicIntegration`).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `n` is zero.
+    pub fn hyperbolic(n: Size) -> crate::errors::QlResult<Self> {
+        Self::new(n, &GaussHyperbolicPolynomial)
+    }
 }
 
 #[cfg(test)]
@@ -250,5 +281,76 @@ mod tests {
         check_jacobi_family(&GaussianQuadrature::chebyshev(130).unwrap());
         check_jacobi_family(&GaussianQuadrature::chebyshev2nd(130).unwrap());
         check_jacobi_family(&GaussianQuadrature::gegenbauer(50, 0.55).unwrap());
+    }
+
+    // Faithful port of testLaguerre from test-suite/gaussianquadratures.cpp.
+    #[test]
+    fn laguerre_oracle() {
+        use crate::math::distributions::normal::NormalDistribution;
+
+        for quad in [
+            GaussianQuadrature::laguerre(16, 0.0).unwrap(),
+            GaussianQuadrature::laguerre(150, 0.01).unwrap(),
+        ] {
+            check_single(&quad, "f(x) = exp(-x)", |x| (-x).exp(), 1.0);
+            check_single(&quad, "f(x) = x*exp(-x)", |x| x * (-x).exp(), 1.0);
+            check_single(
+                &quad,
+                "f(x) = Gaussian(x)",
+                |x| NormalDistribution::standard().value(x),
+                0.5,
+            );
+        }
+
+        check_single(
+            &GaussianQuadrature::laguerre(16, 1.0).unwrap(),
+            "f(x) = x*exp(-x)",
+            |x| x * (-x).exp(),
+            1.0,
+        );
+        check_single(
+            &GaussianQuadrature::laguerre(32, 0.9).unwrap(),
+            "f(x) = x*exp(-x)",
+            |x| x * (-x).exp(),
+            1.0,
+        );
+    }
+
+    // Faithful port of testHermite from test-suite/gaussianquadratures.cpp.
+    #[test]
+    fn hermite_oracle() {
+        use crate::math::distributions::normal::NormalDistribution;
+
+        check_single(
+            &GaussianQuadrature::hermite(16, 0.0).unwrap(),
+            "f(x) = Gaussian(x)",
+            |x| NormalDistribution::standard().value(x),
+            1.0,
+        );
+        check_single(
+            &GaussianQuadrature::hermite(16, 0.5).unwrap(),
+            "f(x) = x*Gaussian(x)",
+            |x| x * NormalDistribution::standard().value(x),
+            0.0,
+        );
+        check_single(
+            &GaussianQuadrature::hermite(64, 0.9).unwrap(),
+            "f(x) = x*x*Gaussian(x)",
+            |x| x * x * NormalDistribution::standard().value(x),
+            1.0,
+        );
+    }
+
+    // Faithful port of testHyperbolic from test-suite/gaussianquadratures.cpp.
+    #[test]
+    fn hyperbolic_oracle() {
+        let quad = GaussianQuadrature::hyperbolic(16).unwrap();
+        check_single(
+            &quad,
+            "f(x) = 1/cosh(x)",
+            |x| 1.0 / x.cosh(),
+            std::f64::consts::PI,
+        );
+        check_single(&quad, "f(x) = x/cosh(x)", |x| x / x.cosh(), 0.0);
     }
 }
