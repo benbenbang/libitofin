@@ -28,6 +28,7 @@ struct SubtractWithCarry48 {
 
 impl SubtractWithCarry48 {
     fn new(seed: u64) -> Self {
+        let seed = if seed == 0 { 19_780_503 } else { seed };
         let mut lcg = (seed % 2_147_483_563).max(1);
         let mut next_lcg = || {
             lcg = (40014 * lcg) % 2_147_483_563;
@@ -79,8 +80,9 @@ pub type Ranlux3UniformRng = Ranlux64UniformRng<223, 24>;
 pub type Ranlux4UniformRng = Ranlux64UniformRng<389, 24>;
 
 impl<const P: usize, const R: usize> Ranlux64UniformRng<P, R> {
-    /// A generator initialized from the given seed (QuantLib's default seed
-    /// is `19780503`).
+    /// A generator initialized from the given seed. Seed `0` selects the
+    /// standard engine's default seed `19780503` (also QuantLib's default),
+    /// per the C++ standard's seeding scheme.
     pub fn new(seed: u64) -> Self {
         Ranlux64UniformRng {
             base: SubtractWithCarry48::new(seed),
@@ -159,6 +161,19 @@ mod tests {
             assert!(
                 close_enough(ranlux4.next_real(), ranlux4_expected[i]),
                 "ranlux4 mismatch at index {i}"
+            );
+        }
+    }
+
+    #[test]
+    fn seed_zero_selects_default_seed() {
+        let mut from_zero = Ranlux3UniformRng::new(0);
+        let mut from_default = Ranlux3UniformRng::new(19_780_503);
+        for i in 0..100 {
+            assert_eq!(
+                from_zero.next_u48(),
+                from_default.next_u48(),
+                "seed-0 sequence diverged from default seed at index {i}"
             );
         }
     }
