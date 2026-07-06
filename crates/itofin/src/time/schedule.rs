@@ -622,16 +622,32 @@ impl Schedule {
     }
 
     /// The index of the first date not earlier than `ref_date`.
+    ///
+    /// # Panics
+    ///
+    /// Panics on a null `ref_date`, which, unlike QuantLib, is never
+    /// inferred from the evaluation date.
     pub fn lower_bound(&self, ref_date: Date) -> usize {
+        assert!(ref_date != Date::null(), "null reference date");
         self.dates.partition_point(|d| *d < ref_date)
     }
 
     /// The first date later than or equal to `ref_date`, if any.
+    ///
+    /// # Panics
+    ///
+    /// Panics on a null `ref_date`, which, unlike QuantLib, is never
+    /// inferred from the evaluation date.
     pub fn next_date(&self, ref_date: Date) -> Option<Date> {
         self.dates.get(self.lower_bound(ref_date)).copied()
     }
 
     /// The last date earlier than `ref_date`, if any.
+    ///
+    /// # Panics
+    ///
+    /// Panics on a null `ref_date`, which, unlike QuantLib, is never
+    /// inferred from the evaluation date.
     pub fn previous_date(&self, ref_date: Date) -> Option<Date> {
         match self.lower_bound(ref_date) {
             0 => None,
@@ -643,10 +659,15 @@ impl Schedule {
     ///
     /// # Panics
     ///
-    /// Panics if `truncation_date` is not before the last schedule date.
+    /// Panics if the schedule is empty or `truncation_date` is not before
+    /// the last schedule date.
     pub fn after(&self, truncation_date: Date) -> Schedule {
         let mut result = self.clone();
 
+        assert!(
+            !result.dates.is_empty(),
+            "cannot truncate an empty schedule"
+        );
         assert!(
             truncation_date < result.dates[result.dates.len() - 1],
             "truncation date {} must be before the last schedule date {}",
@@ -654,12 +675,9 @@ impl Schedule {
             result.dates[result.dates.len() - 1]
         );
         if truncation_date > result.dates[0] {
-            while result.dates[0] < truncation_date {
-                result.dates.remove(0);
-                if !result.is_regular.is_empty() {
-                    result.is_regular.remove(0);
-                }
-            }
+            let cut = result.lower_bound(truncation_date);
+            result.dates.drain(..cut);
+            result.is_regular.drain(..cut.min(result.is_regular.len()));
 
             if truncation_date != result.dates[0] {
                 result.dates.insert(0, truncation_date);
@@ -684,11 +702,15 @@ impl Schedule {
     ///
     /// # Panics
     ///
-    /// Panics if `truncation_date` is not later than the first schedule
-    /// date.
+    /// Panics if the schedule is empty or `truncation_date` is not later
+    /// than the first schedule date.
     pub fn until(&self, truncation_date: Date) -> Schedule {
         let mut result = self.clone();
 
+        assert!(
+            !result.dates.is_empty(),
+            "cannot truncate an empty schedule"
+        );
         assert!(
             truncation_date > result.dates[0],
             "truncation date {} must be later than schedule first date {}",
@@ -2160,6 +2182,25 @@ mod tests {
             ],
         );
         assert!(t.is_regular()[0]);
+    }
+
+    #[test]
+    #[should_panic(expected = "null reference date")]
+    fn null_reference_date_is_rejected() {
+        let s = Schedule::from_dates(vec![d(1, Month::January, 2014)]);
+        s.next_date(Date::null());
+    }
+
+    #[test]
+    #[should_panic(expected = "cannot truncate an empty schedule")]
+    fn after_rejects_empty_schedule() {
+        Schedule::from_dates(vec![]).after(d(1, Month::January, 2014));
+    }
+
+    #[test]
+    #[should_panic(expected = "cannot truncate an empty schedule")]
+    fn until_rejects_empty_schedule() {
+        Schedule::from_dates(vec![]).until(d(1, Month::January, 2014));
     }
 
     #[test]
