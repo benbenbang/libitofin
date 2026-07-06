@@ -11,8 +11,8 @@
 
 use std::cell::Cell;
 
-use crate::ensure;
 use crate::errors::QlResult;
+use crate::fail;
 use crate::handle::RelinkableHandle;
 use crate::patterns::observable::Observable;
 use crate::shared::shared;
@@ -23,7 +23,9 @@ use super::Quote;
 /// Market element returning a stored value.
 ///
 /// Mirrors QuantLib's `SimpleQuote`: a settable value that notifies its
-/// observers on every actual change.
+/// observers on every actual change. The `Default` quote holds no value,
+/// mirroring the C++ default-constructed (invalid) `SimpleQuote()`.
+#[derive(Default)]
 pub struct SimpleQuote {
     value: Cell<Option<Real>>,
     observable: Observable,
@@ -63,20 +65,16 @@ impl SimpleQuote {
     }
 }
 
-impl Default for SimpleQuote {
-    fn default() -> Self {
-        SimpleQuote::new(None)
-    }
-}
-
 impl Quote for SimpleQuote {
     fn observable(&self) -> &Observable {
         &self.observable
     }
 
     fn value(&self) -> QlResult<Real> {
-        ensure!(self.is_valid(), "invalid SimpleQuote");
-        Ok(self.value.get().expect("validity was just checked"))
+        match self.value.get() {
+            Some(value) => Ok(value),
+            None => fail!("invalid SimpleQuote"),
+        }
     }
 
     fn is_valid(&self) -> bool {
@@ -97,36 +95,7 @@ mod tests {
     use crate::handle::Handle;
     use crate::patterns::observable::Observer;
     use crate::shared::{Shared, SharedMut, shared_mut};
-
-    /// Port of the test-suite `Flag` utility: records whether it was raised.
-    #[derive(Default)]
-    struct Flag {
-        up: bool,
-    }
-
-    impl Flag {
-        fn new() -> SharedMut<Flag> {
-            shared_mut(Flag::default())
-        }
-
-        fn lower(flag: &SharedMut<Flag>) {
-            flag.borrow_mut().up = false;
-        }
-
-        fn is_up(flag: &SharedMut<Flag>) -> bool {
-            flag.borrow().up
-        }
-    }
-
-    impl Observer for Flag {
-        fn update(&mut self) {
-            self.up = true;
-        }
-    }
-
-    fn as_observer(flag: &SharedMut<Flag>) -> SharedMut<dyn Observer> {
-        flag.clone()
-    }
+    use crate::test_support::{Flag, as_observer};
 
     #[test]
     #[allow(clippy::approx_constant)]
