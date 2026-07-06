@@ -17,6 +17,8 @@ use crate::time::date::Date;
 use crate::time::dategenerationrule::DateGeneration;
 use crate::time::period::Period;
 use crate::time::timeunit::TimeUnit;
+use crate::time::weekday::Weekday;
+use crate::types::Integer;
 
 /// A payment schedule: a non-decreasing sequence of dates plus the meta
 /// information used to build it, when available.
@@ -88,6 +90,379 @@ impl Schedule {
             end_of_month,
             first_date: Date::null(),
             next_to_last_date: Date::null(),
+            dates,
+            is_regular,
+        }
+    }
+
+    /// Builds a schedule from a date-generation rule. Pass [`Date::null()`]
+    /// to omit the optional `first_date`/`next_to_last_date` stub dates.
+    ///
+    /// # Panics
+    ///
+    /// Panics on a null or inconsistent date range, a negative tenor, a
+    /// stub date or end-of-month flag incompatible with the rule, or a
+    /// degenerate single-date result; also, unlike QuantLib, on a null
+    /// effective date (never inferred from the evaluation date).
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        effective_date: Date,
+        termination_date: Date,
+        mut tenor: Period,
+        calendar: Calendar,
+        convention: BusinessDayConvention,
+        termination_date_convention: BusinessDayConvention,
+        rule: DateGeneration,
+        end_of_month: bool,
+        first_date: Date,
+        next_to_last_date: Date,
+    ) -> Schedule {
+        let end_of_month = allows_end_of_month(tenor) && end_of_month;
+        let first_date = if first_date == effective_date {
+            Date::null()
+        } else {
+            first_date
+        };
+        let next_to_last_date = if next_to_last_date == termination_date {
+            Date::null()
+        } else {
+            next_to_last_date
+        };
+
+        assert!(termination_date != Date::null(), "null termination date");
+        assert!(effective_date != Date::null(), "null effective date");
+        assert!(
+            effective_date < termination_date,
+            "effective date ({effective_date}) later than or equal to termination date ({termination_date})"
+        );
+
+        let rule = if tenor.length() == 0 {
+            DateGeneration::Zero
+        } else {
+            assert!(
+                tenor.length() > 0,
+                "non positive tenor ({tenor}) not allowed"
+            );
+            rule
+        };
+
+        if first_date != Date::null() {
+            match rule {
+                DateGeneration::Backward | DateGeneration::Forward => assert!(
+                    first_date > effective_date && first_date <= termination_date,
+                    "first date ({first_date}) out of effective-termination date range ({effective_date}, {termination_date}]"
+                ),
+                DateGeneration::ThirdWednesday => assert!(
+                    is_imm_date(first_date),
+                    "first date ({first_date}) is not an IMM date"
+                ),
+                DateGeneration::Zero
+                | DateGeneration::Twentieth
+                | DateGeneration::TwentiethIMM
+                | DateGeneration::OldCDS
+                | DateGeneration::CDS
+                | DateGeneration::CDS2015 => {
+                    panic!("first date incompatible with {rule} date generation rule")
+                }
+                DateGeneration::ThirdWednesdayInclusive => panic!("unknown rule ({rule})"),
+            }
+        }
+        if next_to_last_date != Date::null() {
+            match rule {
+                DateGeneration::Backward | DateGeneration::Forward => assert!(
+                    next_to_last_date >= effective_date && next_to_last_date < termination_date,
+                    "next to last date ({next_to_last_date}) out of effective-termination date range [{effective_date}, {termination_date})"
+                ),
+                DateGeneration::ThirdWednesday => assert!(
+                    is_imm_date(next_to_last_date),
+                    "next-to-last date ({next_to_last_date}) is not an IMM date"
+                ),
+                DateGeneration::Zero
+                | DateGeneration::Twentieth
+                | DateGeneration::TwentiethIMM
+                | DateGeneration::OldCDS
+                | DateGeneration::CDS
+                | DateGeneration::CDS2015 => {
+                    panic!("next to last date incompatible with {rule} date generation rule")
+                }
+                DateGeneration::ThirdWednesdayInclusive => panic!("unknown rule ({rule})"),
+            }
+        }
+
+        let null_calendar = NullCalendar::new();
+        let mut periods: Integer = 1;
+        let mut seed = Date::null();
+        let mut dates: Vec<Date> = Vec::new();
+        let mut is_regular: Vec<bool> = Vec::new();
+
+        match rule {
+            DateGeneration::Zero => {
+                tenor = Period::new(0, TimeUnit::Years);
+                dates.push(effective_date);
+                dates.push(termination_date);
+                is_regular.push(true);
+            }
+
+            DateGeneration::Backward => {
+                dates.push(termination_date);
+
+                seed = termination_date;
+                if next_to_last_date != Date::null() {
+                    dates.push(next_to_last_date);
+                    let temp = null_calendar.advance_by_period(
+                        seed,
+                        -(periods * tenor),
+                        convention,
+                        end_of_month,
+                    );
+                    is_regular.push(temp == next_to_last_date);
+                    seed = next_to_last_date;
+                }
+
+                let mut exit_date = effective_date;
+                if first_date != Date::null() {
+                    exit_date = first_date;
+                }
+
+                loop {
+                    let temp = null_calendar.advance_by_period(
+                        seed,
+                        -(periods * tenor),
+                        convention,
+                        end_of_month,
+                    );
+                    if temp < exit_date {
+                        if first_date != Date::null()
+                            && calendar.adjust(dates[dates.len() - 1], convention)
+                                != calendar.adjust(first_date, convention)
+                        {
+                            let previous = dates[dates.len() - 1];
+                            dates.push(first_date);
+                            is_regular.push(
+                                null_calendar.advance_by_period(
+                                    previous,
+                                    -tenor,
+                                    convention,
+                                    end_of_month,
+                                ) == first_date,
+                            );
+                        }
+                        break;
+                    } else {
+                        if calendar.adjust(dates[dates.len() - 1], convention)
+                            != calendar.adjust(temp, convention)
+                        {
+                            dates.push(temp);
+                            is_regular.push(true);
+                        }
+                        periods += 1;
+                    }
+                }
+
+                if calendar.adjust(dates[dates.len() - 1], convention)
+                    != calendar.adjust(effective_date, convention)
+                {
+                    let previous = dates[dates.len() - 1];
+                    dates.push(effective_date);
+                    is_regular.push(
+                        null_calendar.advance_by_period(previous, -tenor, convention, end_of_month)
+                            == effective_date,
+                    );
+                }
+
+                dates.reverse();
+                is_regular.reverse();
+            }
+
+            _ => {
+                if matches!(
+                    rule,
+                    DateGeneration::Twentieth
+                        | DateGeneration::TwentiethIMM
+                        | DateGeneration::ThirdWednesday
+                        | DateGeneration::ThirdWednesdayInclusive
+                        | DateGeneration::OldCDS
+                        | DateGeneration::CDS
+                        | DateGeneration::CDS2015
+                ) {
+                    assert!(
+                        !end_of_month,
+                        "endOfMonth convention incompatible with {rule} date generation rule"
+                    );
+                }
+
+                if rule == DateGeneration::CDS || rule == DateGeneration::CDS2015 {
+                    let prev_twentieth = previous_twentieth(effective_date, rule);
+                    if calendar.adjust(prev_twentieth, convention) > effective_date {
+                        dates.push(prev_twentieth - Period::new(3, TimeUnit::Months));
+                        is_regular.push(true);
+                    }
+                    dates.push(prev_twentieth);
+                } else {
+                    dates.push(effective_date);
+                }
+
+                seed = dates[dates.len() - 1];
+
+                if first_date != Date::null() {
+                    dates.push(first_date);
+                    let temp = null_calendar.advance_by_period(
+                        seed,
+                        periods * tenor,
+                        convention,
+                        end_of_month,
+                    );
+                    is_regular.push(temp == first_date);
+                    seed = first_date;
+                } else if matches!(
+                    rule,
+                    DateGeneration::Twentieth
+                        | DateGeneration::TwentiethIMM
+                        | DateGeneration::OldCDS
+                        | DateGeneration::CDS
+                        | DateGeneration::CDS2015
+                ) {
+                    let mut next = next_twentieth(effective_date, rule);
+                    let stub_days = 30;
+                    if rule == DateGeneration::OldCDS && next - effective_date < stub_days {
+                        next = next_twentieth(next + 1, rule);
+                    }
+                    if next != effective_date {
+                        dates.push(next);
+                        is_regular
+                            .push(rule == DateGeneration::CDS || rule == DateGeneration::CDS2015);
+                        seed = next;
+                    }
+                }
+
+                let exit_date = if next_to_last_date != Date::null() {
+                    next_to_last_date
+                } else {
+                    termination_date
+                };
+                loop {
+                    let temp = null_calendar.advance_by_period(
+                        seed,
+                        periods * tenor,
+                        convention,
+                        end_of_month,
+                    );
+                    if temp > exit_date {
+                        if next_to_last_date != Date::null()
+                            && calendar.adjust(dates[dates.len() - 1], convention)
+                                != calendar.adjust(next_to_last_date, convention)
+                        {
+                            let previous = dates[dates.len() - 1];
+                            dates.push(next_to_last_date);
+                            is_regular.push(
+                                null_calendar.advance_by_period(
+                                    previous,
+                                    tenor,
+                                    convention,
+                                    end_of_month,
+                                ) == next_to_last_date,
+                            );
+                        }
+                        break;
+                    } else {
+                        if calendar.adjust(dates[dates.len() - 1], convention)
+                            != calendar.adjust(temp, convention)
+                        {
+                            dates.push(temp);
+                            is_regular.push(true);
+                        }
+                        periods += 1;
+                    }
+                }
+
+                if calendar.adjust(dates[dates.len() - 1], termination_date_convention)
+                    != calendar.adjust(termination_date, termination_date_convention)
+                {
+                    if matches!(
+                        rule,
+                        DateGeneration::Twentieth
+                            | DateGeneration::TwentiethIMM
+                            | DateGeneration::OldCDS
+                            | DateGeneration::CDS
+                            | DateGeneration::CDS2015
+                    ) {
+                        dates.push(next_twentieth(termination_date, rule));
+                        is_regular.push(true);
+                    } else {
+                        dates.push(termination_date);
+                        is_regular.push(false);
+                    }
+                }
+            }
+        }
+
+        if rule == DateGeneration::ThirdWednesday {
+            for i in 1..dates.len() - 1 {
+                dates[i] =
+                    Date::nth_weekday(3, Weekday::Wednesday, dates[i].month(), dates[i].year());
+            }
+        } else if rule == DateGeneration::ThirdWednesdayInclusive {
+            for date in &mut dates {
+                *date = Date::nth_weekday(3, Weekday::Wednesday, date.month(), date.year());
+            }
+        }
+
+        if convention != BusinessDayConvention::Unadjusted && rule != DateGeneration::OldCDS {
+            dates[0] = calendar.adjust(dates[0], convention);
+        }
+
+        if termination_date_convention != BusinessDayConvention::Unadjusted
+            && rule != DateGeneration::CDS
+            && rule != DateGeneration::CDS2015
+        {
+            let last = dates.len() - 1;
+            dates[last] = calendar.adjust(dates[last], termination_date_convention);
+        }
+
+        if end_of_month && seed != Date::null() && calendar.is_end_of_month(seed) {
+            for i in 1..dates.len() - 1 {
+                dates[i] = calendar.adjust(Date::end_of_month(dates[i]), convention);
+            }
+        } else {
+            for i in 1..dates.len() - 1 {
+                dates[i] = calendar.adjust(dates[i], convention);
+            }
+        }
+
+        if dates.len() >= 2 && dates[dates.len() - 2] >= dates[dates.len() - 1] {
+            if is_regular.len() >= 2 {
+                let n = is_regular.len();
+                is_regular[n - 2] = dates[dates.len() - 2] == dates[dates.len() - 1];
+            }
+            let n = dates.len();
+            dates[n - 2] = dates[n - 1];
+            dates.pop();
+            is_regular.pop();
+        }
+        if dates.len() >= 2 && dates[1] <= dates[0] {
+            if is_regular.len() >= 2 {
+                is_regular[1] = dates[1] == dates[0];
+            }
+            dates[1] = dates[0];
+            dates.remove(0);
+            is_regular.remove(0);
+        }
+
+        assert!(
+            dates.len() > 1,
+            "degenerate single date ({}) schedule: effective date: {effective_date}, termination date: {termination_date}, generation rule: {rule}, end of month: {end_of_month}",
+            dates[0]
+        );
+
+        Schedule {
+            tenor: Some(tenor),
+            calendar,
+            convention,
+            termination_date_convention: Some(termination_date_convention),
+            rule: Some(rule),
+            end_of_month: Some(end_of_month),
+            first_date,
+            next_to_last_date,
             dates,
             is_regular,
         }
@@ -383,6 +758,30 @@ pub fn previous_twentieth(d: Date, rule: DateGeneration) -> Date {
 pub fn allows_end_of_month(tenor: Period) -> bool {
     (tenor.units() == TimeUnit::Months || tenor.units() == TimeUnit::Years)
         && tenor >= Period::new(1, TimeUnit::Months)
+}
+
+fn next_twentieth(d: Date, rule: DateGeneration) -> Date {
+    let mut result = Date::new(20, d.month(), d.year());
+    if result < d {
+        result = result + Period::new(1, TimeUnit::Months);
+    }
+    if matches!(
+        rule,
+        DateGeneration::TwentiethIMM
+            | DateGeneration::OldCDS
+            | DateGeneration::CDS
+            | DateGeneration::CDS2015
+    ) {
+        let m = result.month().ordinal();
+        if m % 3 != 0 {
+            result = result + Period::new(3 - m % 3, TimeUnit::Months);
+        }
+    }
+    result
+}
+
+fn is_imm_date(d: Date) -> bool {
+    d.weekday() == Weekday::Wednesday && (15..=21).contains(&d.day_of_month())
 }
 
 #[cfg(test)]
