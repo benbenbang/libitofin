@@ -6,8 +6,8 @@
 //! [`TimeUnit`](timeunit::TimeUnit)) - plus the [`Calendar`](calendar::Calendar)
 //! base and the per-market calendars under [`calendars`], plus the
 //! [`Period`](period::Period), [`Frequency`](frequency::Frequency) and
-//! [`DayCounter`](daycounter::DayCounter) machinery. The `Schedule` layer from
-//! EPIC-2 is still out of scope for this branch.
+//! [`DayCounter`](daycounter::DayCounter) machinery, plus the
+//! [`Schedule`](schedule::Schedule) payment-date generation layer.
 
 pub mod asx;
 pub mod businessdayconvention;
@@ -21,5 +21,6 @@ pub mod ecb;
 pub mod frequency;
 pub mod imm;
 pub mod period;
+pub mod schedule;
 pub mod timeunit;
 pub mod weekday;
