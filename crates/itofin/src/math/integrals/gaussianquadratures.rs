@@ -9,6 +9,7 @@
 //! quadrature weights.
 
 use crate::math::array::Array;
+use crate::math::integrals::Integrator;
 use crate::math::integrals::gaussianorthogonalpolynomial::{
     GaussHermitePolynomial, GaussHyperbolicPolynomial, GaussJacobiPolynomial,
     GaussLaguerrePolynomial, GaussianOrthogonalPolynomial,
@@ -67,7 +68,7 @@ impl GaussianQuadrature {
 
     /// Integrates `f` over the family's support, summing in QuantLib's order
     /// (last node first) for bit-comparable results.
-    pub fn integrate<F: Fn(Real) -> Real>(&self, f: F) -> Real {
+    pub fn integrate<F: FnMut(Real) -> Real>(&self, mut f: F) -> Real {
         let mut sum = 0.0;
         for i in (0..self.order()).rev() {
             sum += self.w[i] * f(self.x[i]);
@@ -171,6 +172,68 @@ impl GaussianQuadrature {
     /// Returns an error if `n` is zero.
     pub fn hyperbolic(n: Size) -> crate::errors::QlResult<Self> {
         Self::new(n, &GaussHyperbolicPolynomial)
+    }
+}
+
+/// [`Integrator`] adapter over a `[-1, 1]` Gaussian quadrature rule, mapping
+/// `[a, b]` onto the rule's support affinely.
+///
+/// Port of QuantLib's `detail::GaussianQuadratureIntegrator` and its
+/// `GaussLegendreIntegrator`, `GaussChebyshevIntegrator` and
+/// `GaussChebyshev2ndIntegrator` instantiations.
+#[derive(Clone, Debug)]
+pub struct GaussianQuadratureIntegrator {
+    integration: GaussianQuadrature,
+}
+
+impl GaussianQuadratureIntegrator {
+    /// An integrator over the `n`-point Gauss-Legendre rule.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `n` is zero.
+    pub fn legendre(n: Size) -> crate::errors::QlResult<Self> {
+        Ok(GaussianQuadratureIntegrator {
+            integration: GaussianQuadrature::legendre(n)?,
+        })
+    }
+
+    /// An integrator over the `n`-point Gauss-Chebyshev (first kind) rule.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `n` is zero.
+    pub fn chebyshev(n: Size) -> crate::errors::QlResult<Self> {
+        Ok(GaussianQuadratureIntegrator {
+            integration: GaussianQuadrature::chebyshev(n)?,
+        })
+    }
+
+    /// An integrator over the `n`-point Gauss-Chebyshev (second kind) rule.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `n` is zero.
+    pub fn chebyshev2nd(n: Size) -> crate::errors::QlResult<Self> {
+        Ok(GaussianQuadratureIntegrator {
+            integration: GaussianQuadrature::chebyshev2nd(n)?,
+        })
+    }
+
+    /// The underlying quadrature rule (QuantLib's `getIntegration`).
+    pub fn integration(&self) -> &GaussianQuadrature {
+        &self.integration
+    }
+}
+
+impl Integrator for GaussianQuadratureIntegrator {
+    fn integrate_impl<F>(&self, f: &mut F, a: Real, b: Real) -> crate::errors::QlResult<Real>
+    where
+        F: FnMut(Real) -> Real,
+    {
+        let c1 = 0.5 * (b - a);
+        let c2 = 0.5 * (a + b);
+        Ok(c1 * self.integration.integrate(|x| f(c1 * x + c2)))
     }
 }
 
@@ -352,5 +415,96 @@ mod tests {
             std::f64::consts::PI,
         );
         check_single(&quad, "f(x) = x/cosh(x)", |x| x / x.cosh(), 0.0);
+    }
+
+    // Faithful ports of testGaussLegendreIntegrator, testGaussChebyshev
+    // Integrator and testGaussChebyshev2ndIntegrator from
+    // test-suite/integrals.cpp (Abcd case omitted, not yet ported); the
+    // shared tolerance there is 1e-6.
+    const INTEGRATOR_TOL: Real = 1.0e-6;
+
+    fn check_integrator_single<F: FnMut(Real) -> Real>(
+        integrator: &GaussianQuadratureIntegrator,
+        tag: &str,
+        f: F,
+        a: Real,
+        b: Real,
+        expected: Real,
+    ) {
+        let calculated = integrator.integrate(f, a, b).unwrap();
+        assert!(
+            (calculated - expected).abs() <= INTEGRATOR_TOL,
+            "integrating {tag}: calculated {calculated}, expected {expected}"
+        );
+    }
+
+    fn check_integrator_several(integrator: &GaussianQuadratureIntegrator) {
+        use crate::math::distributions::normal::NormalDistribution;
+        use std::f64::consts::PI;
+
+        check_integrator_single(integrator, "f(x) = 0", |_| 0.0, 0.0, 1.0, 0.0);
+        check_integrator_single(integrator, "f(x) = 1", |_| 1.0, 0.0, 1.0, 1.0);
+        check_integrator_single(integrator, "f(x) = x", |x| x, 0.0, 1.0, 0.5);
+        check_integrator_single(integrator, "f(x) = x^2", |x| x * x, 0.0, 1.0, 1.0 / 3.0);
+        check_integrator_single(integrator, "f(x) = sin(x)", |x| x.sin(), 0.0, PI, 2.0);
+        check_integrator_single(integrator, "f(x) = cos(x)", |x| x.cos(), 0.0, PI, 0.0);
+        check_integrator_single(
+            integrator,
+            "f(x) = Gaussian(x)",
+            |x| NormalDistribution::standard().value(x),
+            -10.0,
+            10.0,
+            1.0,
+        );
+    }
+
+    fn check_degenerated_domain(integrator: &GaussianQuadratureIntegrator) {
+        check_integrator_single(
+            integrator,
+            "f(x) = 0 over [1, 1 + macheps]",
+            |_| 0.0,
+            1.0,
+            1.0 + Real::EPSILON,
+            0.0,
+        );
+    }
+
+    #[test]
+    fn gauss_legendre_integrator_oracle() {
+        let integrator = GaussianQuadratureIntegrator::legendre(64).unwrap();
+        check_integrator_several(&integrator);
+        check_degenerated_domain(&integrator);
+    }
+
+    #[test]
+    fn gauss_chebyshev_integrator_oracle() {
+        use crate::math::distributions::normal::NormalDistribution;
+
+        let integrator = GaussianQuadratureIntegrator::chebyshev(64).unwrap();
+        check_integrator_single(
+            &integrator,
+            "f(x) = Gaussian(x)",
+            |x| NormalDistribution::standard().value(x),
+            -10.0,
+            10.0,
+            1.0,
+        );
+        check_degenerated_domain(&integrator);
+    }
+
+    #[test]
+    fn gauss_chebyshev2nd_integrator_oracle() {
+        use crate::math::distributions::normal::NormalDistribution;
+
+        let integrator = GaussianQuadratureIntegrator::chebyshev2nd(64).unwrap();
+        check_integrator_single(
+            &integrator,
+            "f(x) = Gaussian(x)",
+            |x| NormalDistribution::standard().value(x),
+            -10.0,
+            10.0,
+            1.0,
+        );
+        check_degenerated_domain(&integrator);
     }
 }
