@@ -5,6 +5,7 @@
 
 pub mod errors;
 pub mod handle;
+pub mod instrument;
 pub mod interestrate;
 pub mod math;
 pub mod patterns;
