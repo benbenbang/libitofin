@@ -67,7 +67,8 @@ pub fn code(imm_date: Date) -> QlResult<String> {
 /// The IMM date for the given IMM code (e.g. March 20th, 2013 for `H3`),
 /// resolved as the first such date on or after `reference_date`.
 ///
-/// Fails if the input string is not an IMM code.
+/// Fails if the input string is not an IMM code, or if the resolved date
+/// would fall outside the supported date range.
 pub fn date(imm_code: &str, reference_date: Date) -> QlResult<Date> {
     crate::require!(
         is_imm_code(imm_code, false),
@@ -88,6 +89,11 @@ pub fn date(imm_code: &str, reference_date: Date) -> QlResult<Date> {
     y += reference_date.year() - reference_date.year() % 10;
     let result = next_date(Date::new(1, m, y), false);
     if result < reference_date {
+        crate::require!(
+            y + 10 <= Date::max_date().year(),
+            "no IMM date matching {imm_code} on or after {reference_date} \
+             within the supported date range"
+        );
         return Ok(next_date(Date::new(1, m, y + 10), false));
     }
     Ok(result)
@@ -192,5 +198,11 @@ mod tests {
 
             counter += 1;
         }
+    }
+
+    #[test]
+    fn date_is_rejected_beyond_the_supported_range() {
+        let reference = Date::new(31, Month::December, 2199);
+        assert!(date("F9", reference).is_err());
     }
 }

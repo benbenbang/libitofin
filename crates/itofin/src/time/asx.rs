@@ -67,7 +67,8 @@ pub fn code(asx_date: Date) -> QlResult<String> {
 /// The ASX date for the given ASX code (e.g. March 8th, 2013 for `H3`),
 /// resolved as the first such date on or after `reference_date`.
 ///
-/// Fails if the input string is not an ASX code.
+/// Fails if the input string is not an ASX code, or if the resolved date
+/// would fall outside the supported date range.
 pub fn date(asx_code: &str, reference_date: Date) -> QlResult<Date> {
     crate::require!(
         is_asx_code(asx_code, false),
@@ -90,6 +91,11 @@ pub fn date(asx_code: &str, reference_date: Date) -> QlResult<Date> {
     if result >= reference_date {
         Ok(result)
     } else {
+        crate::require!(
+            y + 10 <= Date::max_date().year(),
+            "no ASX date matching {asx_code} on or after {reference_date} \
+             within the supported date range"
+        );
         Ok(next_date(Date::new(1, m, y + 10), false))
     }
 }
@@ -232,5 +238,11 @@ mod tests {
             next_code_from_code("Z4", true, Date::new(1, Month::January, 2020)).unwrap(),
             "H5"
         );
+    }
+
+    #[test]
+    fn date_is_rejected_beyond_the_supported_range() {
+        let reference = Date::new(31, Month::December, 2199);
+        assert!(date("F9", reference).is_err());
     }
 }
