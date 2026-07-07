@@ -22,7 +22,11 @@ use crate::types::{Real, Size};
 /// Nodes whose distance to an endpoint of the unit interval falls below the
 /// minimum complement, or whose mapped abscissa rounds onto an endpoint of
 /// `[a, b]`, are truncated, so the integrand is never evaluated at `a` or `b`
-/// themselves.
+/// themselves. When the interval is so narrow that no abscissa survives the
+/// truncation (the midpoint itself rounds onto an endpoint), the integral
+/// degenerates to a one-point midpoint rule, `f(mid) * (b - a)`, evaluated at
+/// the rounded midpoint - the vanishing-width limit of the scheme, matching
+/// Boost, which evaluates such rounded points directly.
 pub struct TanhSinhIntegral {
     rel_tolerance: Real,
     max_refinements: Size,
@@ -77,8 +81,17 @@ impl Integrator for TanhSinhIntegral {
     where
         F: FnMut(Real) -> Real,
     {
-        let center = 0.5 * (a + b);
-        let half_width = 0.5 * (b - a);
+        // Halved before combining: 0.5 * (a + b) overflows for large
+        // same-sign bounds, and an infinite center truncates every node.
+        let center = 0.5 * a + 0.5 * b;
+        let half_width = 0.5 * b - 0.5 * a;
+        if !(a < center && center < b) {
+            let y = f(center);
+            if !y.is_finite() {
+                fail!("integrand returned a non-finite value ({y}) at x = {center}");
+            }
+            return Ok(y * (b - a));
+        }
         let min_complement = self.min_complement;
         // With e = exp(-2|u|), the unit-interval complement 1 - |x| equals
         // 2e / (1 + e) and sech^2(u) equals 4e / (1 + e)^2, both stable where
@@ -166,6 +179,36 @@ mod tests {
     fn rejects_non_finite_integrand_values() {
         let ts = TanhSinhIntegral::new();
         assert!(ts.integrate(|x| (x - 0.5).recip(), 0.0, 1.0).is_err());
+    }
+
+    #[test]
+    fn ultra_narrow_intervals_fall_back_to_the_midpoint_rule() {
+        // One ULP wide: every node rounds onto an endpoint, so without the
+        // fallback the truncation leaves a spurious Ok(0.0).
+        let ts = TanhSinhIntegral::new();
+        let a: Real = 1.0;
+        let b = a.next_up();
+        let v = ts.integrate(|_| 3.0, a, b).unwrap();
+        assert!(v > 0.0);
+        assert!((v - 3.0 * (b - a)).abs() <= Real::EPSILON * v);
+        // Large same-sign bounds overflow a naive 0.5 * (a + b) midpoint into
+        // the same all-nodes-truncated spurious zero.
+        let wide = ts.integrate(|_| 1.0, 1.0e307, 1.6e307).unwrap();
+        assert!((wide - 0.6e307).abs() < TOL * 0.6e307);
+        // Near the top of the f64 range the level sums themselves overflow;
+        // that must surface as an error, not a spurious Ok(0.0) or Ok(inf).
+        assert!(ts.integrate(|_| 1.0, 1.0e308, 1.6e308).is_err());
+    }
+
+    #[test]
+    fn narrow_interval_fallback_keeps_singularities_honest() {
+        // The rounded midpoint of [0, next_up(0)] is 0.0 itself, where the
+        // integrand diverges: an Err, never a silent zero.
+        let ts = TanhSinhIntegral::new();
+        assert!(
+            ts.integrate(|x| 1.0 / x.sqrt(), 0.0, Real::from_bits(1))
+                .is_err()
+        );
     }
 
     #[test]
