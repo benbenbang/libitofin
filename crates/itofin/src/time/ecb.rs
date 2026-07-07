@@ -124,8 +124,19 @@ impl Ecb {
     }
 
     /// The maintenance period start date in the given month and year.
+    ///
+    /// Fails if the year falls outside the supported date range, or if no
+    /// known date starts in or after the given month. QuantLib expresses the
+    /// lookup as `nextDate(Date(1, m, y) - 1)`, whose day shift throws on the
+    /// first supported month; the port queries on-or-after directly instead.
     pub fn date_from_month_year(&self, month: Month, year: Year) -> QlResult<Date> {
-        self.next_date(Date::new(1, month, year) - 1)
+        crate::require!(
+            (Date::min_date().year()..=Date::max_date().year()).contains(&year),
+            "year {year} outside the supported range [{}, {}]",
+            Date::min_date().year(),
+            Date::max_date().year()
+        );
+        self.first_known_date((Bound::Included(Date::new(1, month, year)), Bound::Unbounded))
     }
 
     /// The ECB date for the given ECB code (e.g. March 14th, 2007 for
@@ -144,7 +155,7 @@ impl Ecb {
         if y < Date::min_date().year() {
             return self.next_date(Date::min_date());
         }
-        self.next_date(Date::new(1, m, y) - 1)
+        self.first_known_date((Bound::Included(Date::new(1, m, y)), Bound::Unbounded))
     }
 
     /// The ECB code for the given date (e.g. `MAR10` for March 10th, 2010).
@@ -166,11 +177,11 @@ impl Ecb {
     ///
     /// Fails if the given date falls at or beyond the last known date.
     pub fn next_date(&self, date: Date) -> QlResult<Date> {
-        match self
-            .known_dates
-            .range((Bound::Excluded(date), Bound::Unbounded))
-            .next()
-        {
+        self.first_known_date((Bound::Excluded(date), Bound::Unbounded))
+    }
+
+    fn first_known_date(&self, range: (Bound<Date>, Bound<Date>)) -> QlResult<Date> {
+        match self.known_dates.range(range).next() {
             Some(next) => Ok(*next),
             None => match self.known_dates.iter().next_back() {
                 Some(last) => crate::fail!("ECB dates after {last} are unknown"),
@@ -355,6 +366,29 @@ mod tests {
         assert_eq!(
             ecb.code(Date::new(1, Month::November, 2017)).unwrap(),
             "NOV17"
+        );
+    }
+
+    #[test]
+    fn ecb_date_from_month_year_is_total_at_the_date_bounds() {
+        let ecb = Ecb::new();
+        let first = *ecb.known_dates().iter().next().unwrap();
+        assert_eq!(
+            ecb.date_from_month_year(Month::January, 1901).unwrap(),
+            first
+        );
+        assert!(ecb.date_from_month_year(Month::January, 1900).is_err());
+        assert!(ecb.date_from_month_year(Month::January, 2200).is_err());
+        assert!(ecb.date_from_month_year(Month::December, 2199).is_err());
+    }
+
+    #[test]
+    fn ecb_date_resolves_min_year_codes_without_panicking() {
+        let ecb = Ecb::new();
+        let first = *ecb.known_dates().iter().next().unwrap();
+        assert_eq!(
+            ecb.date("JAN01", Date::new(15, Month::June, 1950)).unwrap(),
+            first
         );
     }
 
