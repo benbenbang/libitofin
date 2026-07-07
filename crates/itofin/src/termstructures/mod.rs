@@ -50,10 +50,10 @@ use crate::types::{Integer, Natural, Time};
 use crate::{fail, require};
 
 /// The lazily recomputed reference date shared between the holder and its
-/// observer half (C++'s `mutable referenceDate_`/`updated_`/`moving_`).
+/// observer half (C++'s `mutable referenceDate_`/`updated_`/`moving_`;
+/// `None` means stale for a moving structure and unmanaged otherwise).
 struct ReferenceState {
-    date: Cell<Date>,
-    updated: Cell<bool>,
+    date: Cell<Option<Date>>,
     moving: bool,
 }
 
@@ -68,7 +68,7 @@ struct Updater {
 impl Observer for Updater {
     fn update(&mut self) {
         if self.reference.moving {
-            self.reference.updated.set(false);
+            self.reference.date.set(None);
         }
         self.observable.notify_observers();
     }
@@ -97,12 +97,10 @@ impl TermStructureBase {
         day_counter: Option<DayCounter>,
         settings: Option<SharedMut<Settings<Date>>>,
         moving: bool,
-        reference_date: Date,
-        updated: bool,
+        reference_date: Option<Date>,
     ) -> TermStructureBase {
         let reference = shared(ReferenceState {
             date: Cell::new(reference_date),
-            updated: Cell::new(updated),
             moving,
         });
         let observable = shared(Observable::new());
@@ -125,7 +123,7 @@ impl TermStructureBase {
     /// Base for a curve that manages its own reference date by overriding
     /// [`TermStructure::reference_date`] (C++'s default constructor).
     pub fn new(day_counter: Option<DayCounter>) -> TermStructureBase {
-        Self::assemble(None, None, day_counter, None, false, Date::null(), true)
+        Self::assemble(None, None, day_counter, None, false, None)
     }
 
     /// Base with a fixed reference date.
@@ -140,8 +138,7 @@ impl TermStructureBase {
             day_counter,
             None,
             false,
-            reference_date,
-            true,
+            Some(reference_date),
         )
     }
 
@@ -166,8 +163,7 @@ impl TermStructureBase {
             day_counter,
             Some(settings.clone()),
             true,
-            Date::null(),
-            false,
+            None,
         );
         guard.register_eval_date_observer(&(base.updater.clone() as SharedMut<dyn Observer>));
         drop(guard);
@@ -177,7 +173,7 @@ impl TermStructureBase {
     /// The date at which discount = 1.0 and/or variance = 0.0, recomputing it
     /// off the evaluation date first when the structure is moving.
     pub fn reference_date(&self) -> QlResult<Date> {
-        if !self.reference.updated.get() {
+        if self.reference.moving && self.reference.date.get().is_none() {
             let settings = self
                 .settings
                 .as_ref()
@@ -215,15 +211,12 @@ impl TermStructureBase {
                 BusinessDayConvention::Following,
                 false,
             );
-            self.reference.date.set(advanced);
-            self.reference.updated.set(true);
+            self.reference.date.set(Some(advanced));
         }
-        let date = self.reference.date.get();
-        require!(
-            date != Date::null(),
-            "no reference date provided: construct with one or override reference_date"
-        );
-        Ok(date)
+        match self.reference.date.get() {
+            Some(date) if date != Date::null() => Ok(date),
+            _ => fail!("no reference date provided: construct with one or override reference_date"),
+        }
     }
 
     /// The day counter used for date/time conversion, when provided.
