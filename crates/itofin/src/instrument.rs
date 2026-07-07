@@ -676,4 +676,259 @@ mod tests {
         instrument.npv().unwrap();
         assert_eq!(calculations.get(), 2);
     }
+
+    /// Engine that writes back into an observed quote while pricing, the
+    /// implied-value pattern; C++ merely resets `calculated_` mid-calculation.
+    struct WriteBackEngine {
+        base: GenericEngine<MockArguments, InstrumentResults>,
+        market: Shared<SimpleQuote>,
+        write_back: Real,
+    }
+
+    impl AsObservable for WriteBackEngine {
+        fn observable(&self) -> &Observable {
+            self.base.observable()
+        }
+    }
+
+    impl PricingEngine for WriteBackEngine {
+        fn arguments_mut(&mut self) -> &mut dyn Arguments {
+            self.base.arguments_mut()
+        }
+
+        fn results(&self) -> &dyn Results {
+            self.base.results()
+        }
+
+        fn reset(&mut self) {
+            self.base.reset();
+        }
+
+        fn calculate(&mut self) -> QlResult<()> {
+            let market = self.base.arguments().market.expect("validated");
+            self.market.set_value(self.write_back);
+            self.base.results_mut().value = Some(2.0 * market);
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn write_back_during_calculation_invalidates_instead_of_panicking() {
+        let market = shared(SimpleQuote::new(2.0));
+        let mut instrument = MockInstrument::new(Shared::clone(&market));
+        let engine = shared_mut(WriteBackEngine {
+            base: GenericEngine::new(MockArguments::default(), InstrumentResults::default()),
+            market: Shared::clone(&market),
+            write_back: 3.0,
+        });
+        instrument.base_mut().set_pricing_engine(engine);
+
+        assert_eq!(instrument.npv().unwrap(), 4.0);
+        assert!(
+            !instrument.base().is_calculated(),
+            "mid-calculation write-back must leave the cache invalid"
+        );
+        assert_eq!(instrument.npv().unwrap(), 6.0);
+        assert!(
+            instrument.base().is_calculated(),
+            "an unchanged write-back must not invalidate"
+        );
+    }
+
+    /// Observer that reprices the instrument from inside its own update, the
+    /// standard dependent-repricing pattern C++ supports.
+    struct Reader {
+        instrument: SharedMut<MockInstrument>,
+        seen: Option<Real>,
+    }
+
+    impl Observer for Reader {
+        fn update(&mut self) {
+            self.seen = Some(self.instrument.borrow_mut().npv().unwrap());
+        }
+    }
+
+    #[test]
+    fn observer_may_query_the_instrument_during_notification() {
+        let market = shared(SimpleQuote::new(2.0));
+        let instrument = shared_mut(MockInstrument::new(Shared::clone(&market)));
+        let (engine, _) = mock_engine(true);
+        instrument
+            .borrow_mut()
+            .base_mut()
+            .set_pricing_engine(engine);
+        instrument.borrow_mut().npv().unwrap();
+
+        let reader = shared_mut(Reader {
+            instrument: SharedMut::clone(&instrument),
+            seen: None,
+        });
+        instrument
+            .borrow()
+            .base()
+            .register_observer(&(SharedMut::clone(&reader) as SharedMut<dyn Observer>));
+
+        market.set_value(5.0);
+        assert_eq!(
+            reader.borrow().seen,
+            Some(10.0),
+            "a notified observer must be able to reprice the instrument"
+        );
+    }
+
+    #[test]
+    fn detaching_the_engine_restores_the_null_engine_state() {
+        let market = shared(SimpleQuote::new(2.0));
+        let mut instrument = MockInstrument::new(Shared::clone(&market));
+        let (engine, _) = mock_engine(true);
+        instrument.base_mut().set_pricing_engine(engine.clone());
+        instrument.npv().unwrap();
+
+        let flag = Flag::new();
+        instrument.base().register_observer(&as_observer(&flag));
+
+        instrument.base_mut().detach_pricing_engine();
+        assert!(Flag::is_up(&flag), "detaching must notify observers");
+        assert!(!instrument.base().is_calculated());
+        let err = instrument.npv().unwrap_err();
+        assert_eq!(err.message(), "null pricing engine");
+
+        instrument.base_mut().results.value = Some(1.0);
+        instrument.base().lazy.borrow_mut().mark_calculated();
+        Flag::lower(&flag);
+        engine.borrow().observable().notify_observers();
+        assert!(
+            instrument.base().is_calculated(),
+            "a detached engine must no longer invalidate"
+        );
+        assert!(!Flag::is_up(&flag));
+    }
+
+    /// The freeze/unfreeze half of `instruments.cpp` `testObservable`.
+    #[test]
+    fn frozen_instrument_neither_notifies_nor_reprices_until_unfrozen() {
+        let market = shared(SimpleQuote::new(2.0));
+        let mut instrument = MockInstrument::new(Shared::clone(&market));
+        let (engine, calculations) = mock_engine(true);
+        instrument.base_mut().set_pricing_engine(engine);
+        assert_eq!(instrument.npv().unwrap(), 4.0);
+
+        let flag = Flag::new();
+        instrument.base().register_observer(&as_observer(&flag));
+
+        instrument.base_mut().freeze();
+        market.set_value(3.0);
+        assert!(
+            !Flag::is_up(&flag),
+            "frozen instrument must not notify observers"
+        );
+        assert_eq!(
+            instrument.npv().unwrap(),
+            4.0,
+            "frozen instrument must return the pinned value"
+        );
+        assert_eq!(calculations.get(), 1, "frozen instrument must not reprice");
+
+        instrument.base_mut().unfreeze();
+        assert!(Flag::is_up(&flag), "unfreezing must notify observers");
+        assert_eq!(instrument.npv().unwrap(), 6.0);
+        assert_eq!(calculations.get(), 2);
+    }
+
+    /// C++ `Instrument::calculate` sets `calculated_ = true` directly on the
+    /// expired branch, bypassing the frozen guard.
+    #[test]
+    fn frozen_expired_instrument_still_latches_calculated() {
+        let market = shared(SimpleQuote::new(2.0));
+        let mut instrument = MockInstrument::new(Shared::clone(&market));
+        instrument.expired = true;
+        instrument.base_mut().freeze();
+
+        assert_eq!(instrument.npv().unwrap(), 0.0);
+        assert!(instrument.base().is_calculated());
+    }
+
+    #[test]
+    fn recalculate_forces_pricing_and_notifies() {
+        let market = shared(SimpleQuote::new(2.0));
+        let mut instrument = MockInstrument::new(Shared::clone(&market));
+        let (engine, calculations) = mock_engine(true);
+        instrument.base_mut().set_pricing_engine(engine);
+        instrument.npv().unwrap();
+
+        let flag = Flag::new();
+        instrument.base().register_observer(&as_observer(&flag));
+
+        instrument.recalculate().unwrap();
+        assert_eq!(calculations.get(), 2, "recalculate must force a repricing");
+        assert!(Flag::is_up(&flag), "recalculate must notify observers");
+    }
+
+    /// Richer bundle embedding the instrument-level slice; the C++ default
+    /// `fetchResults` works for it through the `dynamic_cast` to the base.
+    struct RichResults {
+        instrument: InstrumentResults,
+        extra: Real,
+    }
+
+    impl Results for RichResults {
+        fn reset(&mut self) {
+            self.instrument.reset();
+            self.extra = 0.0;
+        }
+
+        fn as_instrument_results(&self) -> Option<&InstrumentResults> {
+            Some(&self.instrument)
+        }
+    }
+
+    struct RichEngine {
+        base: GenericEngine<MockArguments, RichResults>,
+    }
+
+    impl AsObservable for RichEngine {
+        fn observable(&self) -> &Observable {
+            self.base.observable()
+        }
+    }
+
+    impl PricingEngine for RichEngine {
+        fn arguments_mut(&mut self) -> &mut dyn Arguments {
+            self.base.arguments_mut()
+        }
+
+        fn results(&self) -> &dyn Results {
+            self.base.results()
+        }
+
+        fn reset(&mut self) {
+            self.base.reset();
+        }
+
+        fn calculate(&mut self) -> QlResult<()> {
+            let market = self.base.arguments().market.expect("validated");
+            let results = self.base.results_mut();
+            results.instrument.value = Some(2.0 * market);
+            results.extra = market;
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn richer_result_bundles_price_through_the_default_fetch() {
+        let market = shared(SimpleQuote::new(2.0));
+        let mut instrument = MockInstrument::new(Shared::clone(&market));
+        let engine = shared_mut(RichEngine {
+            base: GenericEngine::new(
+                MockArguments::default(),
+                RichResults {
+                    instrument: InstrumentResults::default(),
+                    extra: 0.0,
+                },
+            ),
+        });
+        instrument.base_mut().set_pricing_engine(engine);
+
+        assert_eq!(instrument.npv().unwrap(), 4.0);
+    }
 }
