@@ -87,8 +87,79 @@ impl<F: Fn(Real, Real) -> Real> Quote for CompositeQuote<F> {
 mod tests {
     use super::*;
     use crate::quotes::SimpleQuote;
-    use crate::shared::shared;
+    use crate::shared::{shared, shared_mut};
     use crate::test_support::{Flag, as_observer};
+
+    type SumQuote = CompositeQuote<fn(Real, Real) -> Real>;
+
+    /// Recomputes and records the composite value at notification time.
+    struct Recomputer {
+        composite: Shared<SumQuote>,
+        seen: Option<Real>,
+    }
+
+    impl Observer for Recomputer {
+        fn update(&mut self) {
+            self.seen = self.composite.value().ok();
+        }
+    }
+
+    /// Writes a value into another source quote from inside `update`.
+    struct Rebalancer {
+        other: Shared<SimpleQuote>,
+        target: Real,
+    }
+
+    impl Observer for Rebalancer {
+        fn update(&mut self) {
+            self.other.set_value(self.target);
+        }
+    }
+
+    /// A composite observer writing into source B while source A's
+    /// notification is in flight must not leave the cache stale: the shared
+    /// invalidator receives B's cross-observable notification once the
+    /// in-flight round ends, so every observer converges on `f(new1, new2)`.
+    #[test]
+    fn cross_source_write_back_does_not_leave_the_cache_stale() {
+        let me1 = shared(SimpleQuote::new(1.0));
+        let me2 = shared(SimpleQuote::new(2.0));
+        let h1: Handle<dyn Quote> = Handle::new(me1.clone());
+        let h2: Handle<dyn Quote> = Handle::new(me2.clone());
+        let composite = shared(CompositeQuote::new(
+            h1,
+            h2,
+            (|x, y| x + y) as fn(Real, Real) -> Real,
+        ));
+
+        let recomputer = shared_mut(Recomputer {
+            composite: composite.clone(),
+            seen: None,
+        });
+        composite
+            .observable()
+            .register_observer(&(recomputer.clone() as SharedMut<dyn Observer>));
+        let rebalancer = shared_mut(Rebalancer {
+            other: me2.clone(),
+            target: 20.0,
+        });
+        composite
+            .observable()
+            .register_observer(&(rebalancer.clone() as SharedMut<dyn Observer>));
+
+        me1.set_value(10.0);
+
+        assert_eq!(
+            composite.value().unwrap(),
+            30.0,
+            "cache must reflect the written-back source, not the stale one"
+        );
+        assert_eq!(
+            recomputer.borrow().seen,
+            Some(30.0),
+            "composite observers must converge on the final value"
+        );
+    }
 
     /// Port of `testComposite` (test-suite/quotes.cpp): the composite value
     /// tracks `f(source1, source2)` across source changes for several
