@@ -344,3 +344,191 @@ pub trait TermStructure: AsObservable {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_support::{Flag, as_observer};
+    use crate::time::calendars::target::Target;
+    use crate::time::date::Month;
+    use crate::time::daycounters::actual360::Actual360;
+
+    struct TestCurve {
+        base: TermStructureBase,
+        max: Date,
+    }
+
+    impl TestCurve {
+        fn fixed(reference_date: Date) -> TestCurve {
+            TestCurve {
+                base: TermStructureBase::with_reference_date(
+                    reference_date,
+                    None,
+                    Some(Actual360::new()),
+                ),
+                max: reference_date + 360,
+            }
+        }
+    }
+
+    impl AsObservable for TestCurve {
+        fn observable(&self) -> &Observable {
+            self.base.observable()
+        }
+    }
+
+    impl TermStructure for TestCurve {
+        fn base(&self) -> &TermStructureBase {
+            &self.base
+        }
+
+        fn max_date(&self) -> Date {
+            self.max
+        }
+    }
+
+    #[test]
+    fn fixed_reference_date_is_returned_verbatim() {
+        let reference = Date::new(15, Month::June, 2026);
+        let curve = TestCurve::fixed(reference);
+        assert_eq!(curve.reference_date().unwrap(), reference);
+        assert!(curve.settlement_days().is_err());
+        assert!(curve.calendar().is_none());
+    }
+
+    #[test]
+    fn time_from_reference_uses_the_day_counter() {
+        let reference = Date::new(15, Month::June, 2026);
+        let curve = TestCurve::fixed(reference);
+        let half_year = curve.time_from_reference(reference + 180).unwrap();
+        assert_eq!(half_year, 0.5);
+        assert_eq!(curve.max_time().unwrap(), 1.0);
+    }
+
+    #[test]
+    fn moving_reference_date_advances_off_the_evaluation_date() {
+        let settings = shared_mut(Settings::new());
+        settings
+            .borrow_mut()
+            .set_evaluation_date(Date::new(15, Month::January, 2026));
+        let curve = TestCurve {
+            base: TermStructureBase::moving(
+                2,
+                Target::new(),
+                Some(Actual360::new()),
+                settings.clone(),
+            ),
+            max: Date::new(15, Month::January, 2027),
+        };
+        assert_eq!(
+            curve.reference_date().unwrap(),
+            Date::new(19, Month::January, 2026)
+        );
+        assert_eq!(curve.settlement_days().unwrap(), 2);
+    }
+
+    #[test]
+    fn evaluation_date_change_recomputes_reference_and_notifies() {
+        let settings = shared_mut(Settings::new());
+        settings
+            .borrow_mut()
+            .set_evaluation_date(Date::new(15, Month::January, 2026));
+        let curve = TestCurve {
+            base: TermStructureBase::moving(
+                0,
+                Target::new(),
+                Some(Actual360::new()),
+                settings.clone(),
+            ),
+            max: Date::new(15, Month::January, 2027),
+        };
+        assert_eq!(
+            curve.reference_date().unwrap(),
+            Date::new(15, Month::January, 2026)
+        );
+
+        let flag = Flag::new();
+        curve.observable().register_observer(&as_observer(&flag));
+        settings
+            .borrow_mut()
+            .set_evaluation_date(Date::new(16, Month::January, 2026));
+
+        assert!(Flag::is_up(&flag));
+        assert_eq!(
+            curve.reference_date().unwrap(),
+            Date::new(16, Month::January, 2026)
+        );
+    }
+
+    #[test]
+    fn moving_without_evaluation_date_is_an_error() {
+        let settings = shared_mut(Settings::new());
+        let base = TermStructureBase::moving(2, Target::new(), Some(Actual360::new()), settings);
+        let err = base.reference_date().unwrap_err();
+        assert!(err.message().contains("no evaluation date set"));
+    }
+
+    #[test]
+    fn detached_base_has_no_reference_date() {
+        let base = TermStructureBase::new(Some(Actual360::new()));
+        assert!(base.reference_date().is_err());
+        assert!(base.settlement_days().is_err());
+    }
+
+    #[test]
+    fn updater_forwards_notifications_without_touching_a_fixed_reference() {
+        let reference = Date::new(15, Month::June, 2026);
+        let curve = TestCurve::fixed(reference);
+        let flag = Flag::new();
+        curve.observable().register_observer(&as_observer(&flag));
+
+        let source = Observable::new();
+        source.register_observer(&curve.base().updater());
+        source.notify_observers();
+
+        assert!(Flag::is_up(&flag));
+        assert_eq!(curve.reference_date().unwrap(), reference);
+    }
+
+    #[test]
+    fn check_range_date_enforces_reference_and_max() {
+        let reference = Date::new(15, Month::June, 2026);
+        let curve = TestCurve::fixed(reference);
+
+        assert!(curve.check_range_date(reference, false).is_ok());
+        assert!(curve.check_range_date(curve.max_date(), false).is_ok());
+
+        let before = curve.check_range_date(reference - 1, false).unwrap_err();
+        assert!(before.message().contains("before reference date"));
+
+        let past = curve
+            .check_range_date(curve.max_date() + 1, false)
+            .unwrap_err();
+        assert!(past.message().contains("past max curve date"));
+
+        assert!(curve.check_range_date(curve.max_date() + 1, true).is_ok());
+        curve.enable_extrapolation();
+        assert!(curve.check_range_date(curve.max_date() + 1, false).is_ok());
+        curve.disable_extrapolation();
+        assert!(curve.check_range_date(curve.max_date() + 1, false).is_err());
+    }
+
+    #[test]
+    fn check_range_time_enforces_sign_and_max() {
+        let curve = TestCurve::fixed(Date::new(15, Month::June, 2026));
+
+        assert!(curve.check_range_time(0.0, false).is_ok());
+        assert!(curve.check_range_time(1.0, false).is_ok());
+
+        let negative = curve.check_range_time(-0.1, false).unwrap_err();
+        assert!(negative.message().contains("negative time"));
+        assert!(curve.check_range_time(Time::NAN, false).is_err());
+
+        let past = curve.check_range_time(1.5, false).unwrap_err();
+        assert!(past.message().contains("past max curve time"));
+
+        assert!(curve.check_range_time(1.5, true).is_ok());
+        curve.enable_extrapolation();
+        assert!(curve.check_range_time(1.5, false).is_ok());
+    }
+}
