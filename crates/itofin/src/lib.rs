@@ -11,6 +11,7 @@ pub mod patterns;
 pub mod quotes;
 pub mod settings;
 pub mod shared;
+pub mod stochasticprocess;
 pub mod termstructures;
 #[cfg(test)]
 pub(crate) mod test_support;
