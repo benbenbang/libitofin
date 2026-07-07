@@ -23,22 +23,43 @@ fn day_offset(x: Time) -> QlResult<Integer> {
     Ok(days as Integer)
 }
 
+fn shifted_within_bounds(d: Date, days: Integer) -> Date {
+    let serial = (i64::from(d.serial_number()) + i64::from(days)).clamp(
+        i64::from(Date::min_date().serial_number()),
+        i64::from(Date::max_date().serial_number()),
+    );
+    Date::from_serial(serial as Integer)
+}
+
+fn step_within_bounds(d: Date, direction: Integer, u: TimeUnit) -> Option<Date> {
+    let worst_case_days = match u {
+        TimeUnit::Years => 366,
+        TimeUnit::Months => 31,
+        _ => 1,
+    };
+    let serial = i64::from(d.serial_number()) + i64::from(direction) * worst_case_days;
+    let in_bounds = serial >= i64::from(Date::min_date().serial_number())
+        && serial <= i64::from(Date::max_date().serial_number());
+    in_bounds.then(|| d + Period::new(direction, u))
+}
+
 /// The date `d` such that `day_counter.year_fraction(reference_date, d)` is
 /// closest to `t`, QuantLib's `yearFractionToDate`.
 ///
 /// # Errors
 ///
-/// Returns an error if `t` is not finite or lies outside the representable
-/// day-offset range, where QuantLib's `boost::numeric_cast` throws.
+/// Returns an error if `t` is not finite, lies outside the representable
+/// day-offset range where QuantLib's `boost::numeric_cast` throws, or maps to
+/// a date outside the supported range (where QuantLib's `Date` throws).
 pub fn year_fraction_to_date(
     day_counter: &DayCounter,
     reference_date: Date,
     t: Time,
 ) -> QlResult<Date> {
-    let mut guess_date = reference_date + Period::new(day_offset(t * 365.25)?, TimeUnit::Days);
+    let mut guess_date = shifted_within_bounds(reference_date, day_offset(t * 365.25)?);
     let mut guess_time = day_counter.year_fraction(reference_date, guess_date);
 
-    guess_date = guess_date + Period::new(day_offset((t - guess_time) * 365.25)?, TimeUnit::Days);
+    guess_date = shifted_within_bounds(guess_date, day_offset((t - guess_time) * 365.25)?);
     guess_time = day_counter.year_fraction(reference_date, guess_date);
 
     if close_enough(guess_time, t) {
@@ -50,8 +71,7 @@ pub fn year_fraction_to_date(
     let t = t + Time::from(search_direction) * 100.0 * f64::EPSILON;
 
     for u in [TimeUnit::Years, TimeUnit::Months, TimeUnit::Days] {
-        loop {
-            let next_date = guess_date + Period::new(search_direction, u);
+        while let Some(next_date) = step_within_bounds(guess_date, search_direction, u) {
             if Time::from(search_direction)
                 * (day_counter.year_fraction(reference_date, next_date) - t)
                 < 0.0
@@ -64,7 +84,13 @@ pub fn year_fraction_to_date(
     }
 
     let guess_time = day_counter.year_fraction(reference_date, guess_date);
-    let next_date = guess_date + Period::new(search_direction, TimeUnit::Days);
+    let Some(next_date) = step_within_bounds(guess_date, search_direction, TimeUnit::Days) else {
+        require!(
+            close_enough(guess_time, t) || Time::from(search_direction) * (guess_time - t) >= 0.0,
+            "time {t} maps to a date outside the supported date range from {reference_date}"
+        );
+        return Ok(guess_date);
+    };
     if close_enough(guess_time, t)
         || (day_counter.year_fraction(reference_date, next_date) - t).abs() > (guess_time - t).abs()
     {
@@ -175,5 +201,40 @@ mod tests {
         assert!(year_fraction_to_date(&dc, reference, Time::NEG_INFINITY).is_err());
         assert!(year_fraction_to_date(&dc, reference, 1e10).is_err());
         assert!(year_fraction_to_date(&dc, reference, -1e10).is_err());
+    }
+
+    #[test]
+    fn errs_instead_of_panicking_past_the_date_bounds() {
+        let dc = Actual360::new();
+        let reference = Date::new(1, Month::January, 2020);
+
+        assert!(year_fraction_to_date(&dc, reference, 500.0).is_err());
+        assert!(year_fraction_to_date(&dc, reference, -500.0).is_err());
+
+        let just_past_max = dc.year_fraction(reference, Date::max_date()) + 0.01;
+        assert!(year_fraction_to_date(&dc, reference, just_past_max).is_err());
+        let just_past_min = dc.year_fraction(reference, Date::min_date()) - 0.01;
+        assert!(year_fraction_to_date(&dc, reference, just_past_min).is_err());
+    }
+
+    #[test]
+    fn resolves_times_near_the_date_bounds() {
+        let dc = Actual360::new();
+        let reference = Date::new(1, Month::January, 2020);
+
+        let latest = dc.year_fraction(reference, Date::max_date());
+        assert_eq!(
+            year_fraction_to_date(&dc, reference, latest).unwrap(),
+            Date::max_date()
+        );
+        let earliest = dc.year_fraction(reference, Date::min_date());
+        assert_eq!(
+            year_fraction_to_date(&dc, reference, earliest).unwrap(),
+            Date::min_date()
+        );
+
+        let t = 182.0;
+        let inverse = year_fraction_to_date(&dc, reference, t).unwrap();
+        assert!(close_enough(dc.year_fraction(reference, inverse), t));
     }
 }
