@@ -4,6 +4,7 @@
 //! via cbindgen) live in sibling crates and depend on this one.
 
 pub mod errors;
+pub mod exercise;
 pub mod handle;
 pub mod instrument;
 pub mod instruments;
