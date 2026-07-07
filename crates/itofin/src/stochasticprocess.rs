@@ -14,10 +14,12 @@
 //! C++ `StochasticProcess` inherits `Observer` and `Observable`, with
 //! `update()` forwarding every input notification to its own observers. The
 //! trait carries the [`AsObservable`] half; a concrete process embeds an
-//! [`Observable`](crate::patterns::observable::Observable) and registers a
-//! `Forwarder` with each of its inputs at construction, as
-//! [`Handle`](crate::handle::Handle) and
-//! `DeltaVolQuote` already do.
+//! [`Observable`](crate::patterns::observable::Observable) and, at
+//! construction, registers with each of its inputs an
+//! [`Observer`](crate::patterns::observable::Observer) whose `update`
+//! forwards the notification to that embedded observable. Processes inside
+//! this crate reuse the crate-internal `Forwarder` for that observer, as
+//! [`Handle`](crate::handle::Handle) and `DeltaVolQuote` already do.
 
 use crate::errors::QlResult;
 use crate::fail;
@@ -95,13 +97,12 @@ pub trait StochasticProcess1D: AsObservable {
 mod tests {
     use super::*;
     use crate::patterns::observable::{Forwarder, Observable, Observer};
-    use crate::quotes::SimpleQuote;
+    use crate::quotes::{Quote, SimpleQuote};
     use crate::shared::{Shared, SharedMut, shared, shared_mut};
     use crate::test_support::{Flag, as_observer};
     use crate::time::date::Month;
 
     struct ConstantProcess {
-        initial: Real,
         mu: Real,
         sigma: Real,
         quote: Shared<SimpleQuote>,
@@ -120,7 +121,6 @@ mod tests {
                 .observable()
                 .register_observer(&(listener.clone() as SharedMut<dyn Observer>));
             ConstantProcess {
-                initial,
                 mu,
                 sigma,
                 quote,
@@ -138,7 +138,7 @@ mod tests {
 
     impl StochasticProcess1D for ConstantProcess {
         fn x0(&self) -> QlResult<Real> {
-            Ok(self.initial)
+            self.quote.value()
         }
 
         fn drift(&self, _t: Time, _x: Real) -> QlResult<Real> {
