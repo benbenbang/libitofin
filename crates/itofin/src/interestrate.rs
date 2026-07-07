@@ -14,6 +14,11 @@
 //!   as the always-valid [`DayCounter`]).
 //! - Constructor and conversion preconditions (`QL_REQUIRE`) surface as
 //!   [`QlResult`] per D4 instead of exceptions.
+//! - QuantLib lets `compoundFactor` return non-positive (or, for compounded
+//!   conventions with `1 + r/f <= 0`, NaN) factors, which turn into infinite
+//!   or negative discount factors downstream. Since this API is already
+//!   fallible, such out-of-domain inputs are rejected instead: simple factors
+//!   `1 + r t <= 0` and compounding bases `1 + r/f <= 0` return an error.
 
 use std::fmt;
 
@@ -142,6 +147,13 @@ impl InterestRate {
     /// at time `t`.
     ///
     /// Time must be measured using the rate's own day counter.
+    ///
+    /// # Errors
+    ///
+    /// Fails on negative or NaN time, and - diverging from QuantLib, which
+    /// returns the resulting garbage values - when the rate leaves the
+    /// compounding domain: a simple factor `1 + r t <= 0` or a compounding
+    /// base `1 + r/f <= 0`. Ordinary negative rates are unaffected.
     pub fn compound_factor(&self, t: Time) -> QlResult<Real> {
         if t.is_nan() || t < 0.0 {
             fail!("negative time ({t}) not allowed");
@@ -149,25 +161,41 @@ impl InterestRate {
         let r = self.rate;
         let f = self.freq_real();
         let factor = match self.compounding {
-            Compounding::Simple => 1.0 + r * t,
-            Compounding::Compounded => (1.0 + r / f).powf(f * t),
+            Compounding::Simple => Self::simple_factor(r, t)?,
+            Compounding::Compounded => Self::compounded_factor(r, f, t)?,
             Compounding::Continuous => (r * t).exp(),
             Compounding::SimpleThenCompounded => {
                 if t <= 1.0 / f {
-                    1.0 + r * t
+                    Self::simple_factor(r, t)?
                 } else {
-                    (1.0 + r / f).powf(f * t)
+                    Self::compounded_factor(r, f, t)?
                 }
             }
             Compounding::CompoundedThenSimple => {
                 if t > 1.0 / f {
-                    1.0 + r * t
+                    Self::simple_factor(r, t)?
                 } else {
-                    (1.0 + r / f).powf(f * t)
+                    Self::compounded_factor(r, f, t)?
                 }
             }
         };
         Ok(factor)
+    }
+
+    fn simple_factor(r: Rate, t: Time) -> QlResult<Real> {
+        let factor = 1.0 + r * t;
+        if factor.is_nan() || factor <= 0.0 {
+            fail!("non-positive compound factor ({factor}) for rate {r} at time {t}");
+        }
+        Ok(factor)
+    }
+
+    fn compounded_factor(r: Rate, f: Real, t: Time) -> QlResult<Real> {
+        let base = 1.0 + r / f;
+        if base.is_nan() || base <= 0.0 {
+            fail!("non-positive compounding base ({base}) for rate {r} at frequency {f}");
+        }
+        Ok(base.powf(f * t))
     }
 
     /// Compound factor implied by the rate compounded between two dates.
@@ -544,6 +572,65 @@ mod tests {
             InterestRate::implied_rate(1.0, Actual360::new(), simple.0, simple.1, Real::NAN)
                 .is_err()
         );
+    }
+
+    #[test]
+    fn non_positive_compound_factors_are_rejected() {
+        let simple = InterestRate::new(
+            -1.0,
+            Actual360::new(),
+            Compounding::Simple,
+            Frequency::Annual,
+        )
+        .expect("valid interest rate");
+        assert!(simple.compound_factor(1.0).is_err());
+        assert!(simple.discount_factor(1.0).is_err());
+        assert!(simple.compound_factor(0.5).is_ok());
+
+        let compounded = quarterly_compounded(-4.0);
+        assert!(compounded.compound_factor(1.0).is_err());
+        assert!(compounded.discount_factor(1.0).is_err());
+
+        let even_power = quarterly_compounded(-8.0);
+        assert!(even_power.compound_factor(1.0).is_err());
+
+        let stc = InterestRate::new(
+            -8.0,
+            Actual360::new(),
+            Compounding::SimpleThenCompounded,
+            Frequency::Quarterly,
+        )
+        .expect("valid interest rate");
+        assert!(stc.compound_factor(0.2).is_err());
+        assert!(stc.compound_factor(1.0).is_err());
+
+        let cts = InterestRate::new(
+            -8.0,
+            Actual360::new(),
+            Compounding::CompoundedThenSimple,
+            Frequency::Quarterly,
+        )
+        .expect("valid interest rate");
+        assert!(cts.compound_factor(0.2).is_err());
+        assert!(cts.compound_factor(1.0).is_err());
+    }
+
+    #[test]
+    fn ordinary_negative_rates_still_work() {
+        for comp in [
+            Compounding::Simple,
+            Compounding::Compounded,
+            Compounding::Continuous,
+            Compounding::SimpleThenCompounded,
+            Compounding::CompoundedThenSimple,
+        ] {
+            let ir = InterestRate::new(-0.01, Actual360::new(), comp, Frequency::Quarterly)
+                .expect("valid interest rate");
+            let compound = ir.compound_factor(1.0).expect("in-domain negative rate");
+            assert!(compound > 0.0 && compound < 1.0, "{comp}: {compound}");
+            let discount = ir.discount_factor(1.0).expect("in-domain negative rate");
+            assert!(discount > 1.0, "{comp}: {discount}");
+        }
     }
 
     fn time_to_days(t: Time) -> crate::time::date::SerialNumber {
