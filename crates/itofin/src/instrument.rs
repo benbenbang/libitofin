@@ -51,6 +51,10 @@ impl Results for InstrumentResults {
         self.valuation_date = None;
         self.additional_results.clear();
     }
+
+    fn as_instrument_results(&self) -> Option<&InstrumentResults> {
+        Some(self)
+    }
 }
 
 /// Observer half of an instrument: feeds input notifications into the lazy
@@ -61,7 +65,10 @@ struct Updater {
 
 impl Observer for Updater {
     fn update(&mut self) {
-        self.lazy.borrow_mut().on_update();
+        let notify = self.lazy.borrow_mut().deferred_update();
+        if let Some(observable) = notify {
+            observable.notify_observers();
+        }
     }
 }
 
@@ -105,15 +112,47 @@ impl InstrumentBase {
 
     /// Sets the pricing engine, re-pointing the instrument's observation from
     /// the old engine to the new one and invalidating cached results
-    /// (`Instrument::setPricingEngine`).
+    /// (`Instrument::setPricingEngine` with a non-null engine).
     pub fn set_pricing_engine(&mut self, engine: SharedMut<dyn PricingEngine>) {
+        self.swap_engine(Some(engine));
+    }
+
+    /// Detaches the pricing engine, unhooking the instrument's observation of
+    /// it and invalidating cached results (the C++ `setPricingEngine` called
+    /// with a null engine).
+    pub fn detach_pricing_engine(&mut self) {
+        self.swap_engine(None);
+    }
+
+    fn swap_engine(&mut self, engine: Option<SharedMut<dyn PricingEngine>>) {
         let observer = self.observer();
         if let Some(old) = &self.engine {
             old.borrow().observable().unregister_observer(&observer);
         }
-        engine.borrow().observable().register_observer(&observer);
-        self.engine = Some(engine);
-        self.lazy.borrow_mut().on_update();
+        if let Some(new) = &engine {
+            new.borrow().observable().register_observer(&observer);
+        }
+        self.engine = engine;
+        let notify = self.lazy.borrow_mut().deferred_update();
+        if let Some(observable) = notify {
+            observable.notify_observers();
+        }
+    }
+
+    /// Pins the currently cached results, suppressing recalculation and
+    /// downstream notification (`LazyObject::freeze`, inherited by every C++
+    /// instrument).
+    pub fn freeze(&mut self) {
+        self.lazy.borrow_mut().freeze();
+    }
+
+    /// Re-enables recalculation, notifying observers once if the instrument
+    /// was frozen (`LazyObject::unfreeze`).
+    pub fn unfreeze(&mut self) {
+        let notify = self.lazy.borrow_mut().deferred_unfreeze();
+        if let Some(observable) = notify {
+            observable.notify_observers();
+        }
     }
 
     /// The instrument's observer half, for registering with inputs whose
@@ -192,11 +231,12 @@ pub trait Instrument {
 
     /// Reads a calculation's outputs back from the engine's result bundle.
     ///
-    /// The default expects the bundle to be an [`InstrumentResults`];
-    /// instruments with richer bundles override this and feed the embedded
-    /// instrument-level part to [`InstrumentBase::store_results`].
+    /// The default stores the bundle's instrument-level slice (exposed through
+    /// [`Results::as_instrument_results`], the C++ `dynamic_cast` to
+    /// `Instrument::results`); instruments fetching more than that override
+    /// this and still feed the slice to [`InstrumentBase::store_results`].
     fn fetch_results(&mut self, results: &dyn Results) -> QlResult<()> {
-        let Some(results) = (results as &dyn Any).downcast_ref::<InstrumentResults>() else {
+        let Some(results) = results.as_instrument_results() else {
             fail!("no results returned from pricing engine");
         };
         self.base_mut().store_results(results);
@@ -216,6 +256,12 @@ pub trait Instrument {
     /// Runs the engine protocol (`performCalculations`): reset, fill and
     /// validate the arguments, calculate, fetch the results. Override only
     /// when pricing without an engine.
+    ///
+    /// The engine stays exclusively borrowed for the whole protocol, so
+    /// `setup_arguments` and `fetch_results` overrides must work from the
+    /// bundles they are handed, not reach back into
+    /// [`pricing_engine`](InstrumentBase::pricing_engine) (aliasing that C++
+    /// tolerates but `RefCell` forbids).
     fn perform_calculations(&mut self) -> QlResult<()> {
         let Some(engine) = self.base().pricing_engine().cloned() else {
             fail!("null pricing engine");
@@ -231,17 +277,43 @@ pub trait Instrument {
 
     /// Recomputes the results if the cache is stale, short-circuiting expired
     /// instruments (`Instrument::calculate`).
+    ///
+    /// The lazy core is not borrowed while
+    /// [`perform_calculations`](Instrument::perform_calculations) runs, so a
+    /// notification reaching the instrument mid-calculation (an engine writing
+    /// back to an observed input) invalidates the cache as in C++ instead of
+    /// panicking.
     fn calculate(&mut self) -> QlResult<()> {
         if self.base().is_calculated() {
             return Ok(());
         }
-        let lazy = SharedMut::clone(&self.base().lazy);
         if self.is_expired() {
             self.setup_expired();
-            lazy.borrow_mut().calculate(|| Ok(()))
-        } else {
-            lazy.borrow_mut().calculate(|| self.perform_calculations())
+            self.base().lazy.borrow_mut().mark_calculated();
+            return Ok(());
         }
+        let lazy = SharedMut::clone(&self.base().lazy);
+        if !lazy.borrow_mut().start_calculation() {
+            return Ok(());
+        }
+        let result = self.perform_calculations();
+        lazy.borrow_mut().finish_calculation(&result);
+        result
+    }
+
+    /// Forces a recalculation and notifies observers even on failure
+    /// (`LazyObject::recalculate`, inherited by every C++ instrument; goes
+    /// through the virtual `calculate`, so expired instruments short-circuit).
+    fn recalculate(&mut self) -> QlResult<()> {
+        let lazy = SharedMut::clone(&self.base().lazy);
+        let (was_frozen, observable) = {
+            let mut lazy = lazy.borrow_mut();
+            (lazy.start_recalculation(), lazy.observable_handle())
+        };
+        let result = self.calculate();
+        lazy.borrow_mut().finish_recalculation(was_frozen);
+        observable.notify_observers();
+        result
     }
 
     /// The net present value of the instrument (`NPV()`).

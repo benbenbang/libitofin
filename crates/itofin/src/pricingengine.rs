@@ -15,7 +15,7 @@ use std::any::Any;
 
 use crate::errors::QlResult;
 use crate::patterns::observable::{AsObservable, Forwarder, Observable, Observer};
-use crate::shared::{Shared, SharedMut, shared, shared_mut};
+use crate::shared::{Shared, SharedMut};
 
 /// Input bundle of a pricing engine (the C++ `PricingEngine::arguments`).
 pub trait Arguments: Any {
@@ -27,6 +27,18 @@ pub trait Arguments: Any {
 pub trait Results: Any {
     /// Clears the results ahead of a calculation.
     fn reset(&mut self);
+
+    /// The instrument-level slice of the bundle, when the bundle carries one.
+    ///
+    /// The counterpart of the C++ `dynamic_cast<const Instrument::results*>`
+    /// in the default `Instrument::fetchResults`, which succeeds for any
+    /// bundle deriving from `Instrument::results`: richer bundles embedding an
+    /// [`InstrumentResults`](crate::instrument::InstrumentResults) override
+    /// this to expose it, and the default `fetch_results` then works for them
+    /// exactly as in C++.
+    fn as_instrument_results(&self) -> Option<&crate::instrument::InstrumentResults> {
+        None
+    }
 }
 
 /// Interface for pricing engines.
@@ -66,10 +78,7 @@ pub struct GenericEngine<A, R> {
 impl<A: Arguments, R: Results> GenericEngine<A, R> {
     /// Creates the engine base around its argument and result bundles.
     pub fn new(arguments: A, results: R) -> Self {
-        let observable = shared(Observable::new());
-        let forwarder = shared_mut(Forwarder {
-            observable: Shared::clone(&observable),
-        });
+        let (observable, forwarder) = Forwarder::new();
         GenericEngine {
             arguments,
             results,
