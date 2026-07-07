@@ -292,3 +292,316 @@ pub trait Instrument {
         Ok(&self.base().results.additional_results)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cell::Cell;
+
+    use crate::patterns::observable::AsObservable;
+    use crate::pricingengine::GenericEngine;
+    use crate::quotes::{Quote, SimpleQuote};
+    use crate::require;
+    use crate::settings::Settings;
+    use crate::shared::shared;
+    use crate::test_support::{Flag, as_observer};
+    use crate::time::date::Month;
+
+    #[derive(Default)]
+    struct MockArguments {
+        market: Option<Real>,
+    }
+
+    impl Arguments for MockArguments {
+        fn validate(&self) -> QlResult<()> {
+            require!(self.market.is_some(), "market value not set");
+            Ok(())
+        }
+    }
+
+    /// Doubles the market value, so recomputations are visible in the NPV.
+    struct MockEngine {
+        base: GenericEngine<MockArguments, InstrumentResults>,
+        calculations: Shared<Cell<usize>>,
+        provide_npv: bool,
+    }
+
+    impl AsObservable for MockEngine {
+        fn observable(&self) -> &Observable {
+            self.base.observable()
+        }
+    }
+
+    impl PricingEngine for MockEngine {
+        fn arguments_mut(&mut self) -> &mut dyn Arguments {
+            self.base.arguments_mut()
+        }
+
+        fn results(&self) -> &dyn Results {
+            self.base.results()
+        }
+
+        fn reset(&mut self) {
+            self.base.reset();
+        }
+
+        fn calculate(&mut self) -> QlResult<()> {
+            self.calculations.set(self.calculations.get() + 1);
+            let market = self.base.arguments().market.expect("validated");
+            let results = self.base.results_mut();
+            if self.provide_npv {
+                results.value = Some(2.0 * market);
+                results.error_estimate = Some(0.0);
+                results.valuation_date = Some(Date::new(7, Month::July, 2026));
+                results
+                    .additional_results
+                    .insert("market".to_string(), shared(market) as Shared<dyn Any>);
+            }
+            Ok(())
+        }
+    }
+
+    fn mock_engine(provide_npv: bool) -> (SharedMut<MockEngine>, Shared<Cell<usize>>) {
+        let calculations = shared(Cell::new(0_usize));
+        let engine = shared_mut(MockEngine {
+            base: GenericEngine::new(MockArguments::default(), InstrumentResults::default()),
+            calculations: Shared::clone(&calculations),
+            provide_npv,
+        });
+        (engine, calculations)
+    }
+
+    struct MockInstrument {
+        base: InstrumentBase,
+        market: Shared<SimpleQuote>,
+        expired: bool,
+    }
+
+    impl MockInstrument {
+        /// An instrument observing its market quote directly, the usual
+        /// `registerWith` wiring.
+        fn new(market: Shared<SimpleQuote>) -> Self {
+            let instrument = MockInstrument::unwired(market);
+            instrument
+                .base
+                .register_with(instrument.market.observable());
+            instrument
+        }
+
+        /// An instrument NOT observing the quote, to prove invalidation
+        /// through other paths (the engine chain).
+        fn unwired(market: Shared<SimpleQuote>) -> Self {
+            MockInstrument {
+                base: InstrumentBase::new(),
+                market,
+                expired: false,
+            }
+        }
+    }
+
+    impl Instrument for MockInstrument {
+        fn base(&self) -> &InstrumentBase {
+            &self.base
+        }
+
+        fn base_mut(&mut self) -> &mut InstrumentBase {
+            &mut self.base
+        }
+
+        fn is_expired(&self) -> bool {
+            self.expired
+        }
+
+        fn setup_arguments(&self, arguments: &mut dyn Arguments) -> QlResult<()> {
+            let Some(arguments) = (arguments as &mut dyn Any).downcast_mut::<MockArguments>()
+            else {
+                fail!("wrong argument type");
+            };
+            arguments.market = Some(self.market.value()?);
+            Ok(())
+        }
+    }
+
+    /// The ticket's oracle: cache-on-repeat, recompute-on-notify.
+    #[test]
+    fn lazy_npv_caches_and_recomputes_on_quote_change() {
+        let market = shared(SimpleQuote::new(2.0));
+        let mut instrument = MockInstrument::new(Shared::clone(&market));
+        let (engine, calculations) = mock_engine(true);
+        instrument.base_mut().set_pricing_engine(engine);
+
+        assert_eq!(instrument.npv().unwrap(), 4.0);
+        assert_eq!(calculations.get(), 1);
+
+        assert_eq!(instrument.npv().unwrap(), 4.0);
+        assert_eq!(calculations.get(), 1, "second NPV must hit the cache");
+
+        market.set_value(3.0);
+        assert!(!instrument.base().is_calculated());
+        assert_eq!(instrument.npv().unwrap(), 6.0);
+        assert_eq!(
+            calculations.get(),
+            2,
+            "quote change must trigger a recalculation"
+        );
+
+        assert_eq!(instrument.error_estimate().unwrap(), 0.0);
+        assert_eq!(
+            instrument.valuation_date().unwrap(),
+            Date::new(7, Month::July, 2026)
+        );
+    }
+
+    /// The C++ instruments test: "observability of class instances is checked".
+    #[test]
+    fn instrument_notifies_downstream_observers_on_input_change() {
+        let market = shared(SimpleQuote::new(2.0));
+        let mut instrument = MockInstrument::new(Shared::clone(&market));
+        let (engine, _) = mock_engine(true);
+        instrument.base_mut().set_pricing_engine(engine);
+        instrument.npv().unwrap();
+
+        let flag = Flag::new();
+        instrument.base().register_observer(&as_observer(&flag));
+
+        market.set_value(3.0);
+        assert!(
+            Flag::is_up(&flag),
+            "input change must reach instrument observers"
+        );
+    }
+
+    #[test]
+    fn set_pricing_engine_switches_observation_and_invalidates() {
+        let market = shared(SimpleQuote::new(1.0));
+        let mut instrument = MockInstrument::new(Shared::clone(&market));
+        let (first, first_calls) = mock_engine(true);
+        instrument.base_mut().set_pricing_engine(first.clone());
+        instrument.npv().unwrap();
+
+        let flag = Flag::new();
+        instrument.base().register_observer(&as_observer(&flag));
+
+        let (second, second_calls) = mock_engine(true);
+        instrument.base_mut().set_pricing_engine(second.clone());
+        assert!(
+            Flag::is_up(&flag),
+            "switching engines must notify observers"
+        );
+        assert!(!instrument.base().is_calculated());
+
+        instrument.npv().unwrap();
+        assert_eq!(first_calls.get(), 1);
+        assert_eq!(second_calls.get(), 1, "the new engine must price");
+
+        first.borrow().observable().notify_observers();
+        assert!(
+            instrument.base().is_calculated(),
+            "old engine is unregistered"
+        );
+
+        second.borrow().observable().notify_observers();
+        assert!(!instrument.base().is_calculated(), "new engine invalidates");
+    }
+
+    /// The C++ chain: quote -> engine (GenericEngine forwarder) -> instrument.
+    #[test]
+    fn quote_change_reaches_instrument_through_the_engine() {
+        let market = shared(SimpleQuote::new(2.0));
+        let mut instrument = MockInstrument::unwired(Shared::clone(&market));
+        let (engine, calculations) = mock_engine(true);
+        engine.borrow().base.register_with(market.observable());
+        instrument.base_mut().set_pricing_engine(engine);
+
+        assert_eq!(instrument.npv().unwrap(), 4.0);
+
+        market.set_value(5.0);
+        assert!(!instrument.base().is_calculated());
+        assert_eq!(instrument.npv().unwrap(), 10.0);
+        assert_eq!(calculations.get(), 2);
+    }
+
+    #[test]
+    fn missing_engine_and_missing_npv_are_reported() {
+        let market = shared(SimpleQuote::new(2.0));
+        let mut instrument = MockInstrument::new(Shared::clone(&market));
+        let err = instrument.npv().unwrap_err();
+        assert_eq!(err.message(), "null pricing engine");
+
+        let (engine, _) = mock_engine(false);
+        instrument.base_mut().set_pricing_engine(engine);
+        let err = instrument.npv().unwrap_err();
+        assert_eq!(err.message(), "NPV not provided");
+        let err = instrument.error_estimate().unwrap_err();
+        assert_eq!(err.message(), "error estimate not provided");
+    }
+
+    #[test]
+    fn expired_instrument_reports_zero_without_pricing() {
+        let market = shared(SimpleQuote::new(2.0));
+        let mut instrument = MockInstrument::new(Shared::clone(&market));
+        let (engine, calculations) = mock_engine(true);
+        instrument.base_mut().set_pricing_engine(engine);
+        instrument.expired = true;
+
+        assert_eq!(instrument.npv().unwrap(), 0.0);
+        assert_eq!(instrument.error_estimate().unwrap(), 0.0);
+        assert_eq!(calculations.get(), 0, "expired instruments never price");
+
+        let err = instrument.valuation_date().unwrap_err();
+        assert_eq!(err.message(), "valuation date not provided");
+    }
+
+    #[test]
+    fn additional_results_round_trip_by_tag_and_type() {
+        let market = shared(SimpleQuote::new(2.0));
+        let mut instrument = MockInstrument::new(Shared::clone(&market));
+        let (engine, _) = mock_engine(true);
+        instrument.base_mut().set_pricing_engine(engine);
+
+        assert_eq!(instrument.result::<Real>("market").unwrap(), 2.0);
+        assert_eq!(instrument.additional_results().unwrap().len(), 1);
+
+        let err = instrument.result::<Real>("absent").unwrap_err();
+        assert_eq!(err.message(), "absent not provided");
+
+        let err = instrument.result::<i32>("market").unwrap_err();
+        assert_eq!(err.message(), "market does not hold the requested type");
+    }
+
+    #[test]
+    fn failed_calculation_recovers_after_the_input_is_fixed() {
+        let market = shared(SimpleQuote::default());
+        let mut instrument = MockInstrument::new(Shared::clone(&market));
+        let (engine, calculations) = mock_engine(true);
+        instrument.base_mut().set_pricing_engine(engine);
+
+        let err = instrument.npv().unwrap_err();
+        assert_eq!(err.message(), "invalid SimpleQuote");
+        assert!(!instrument.base().is_calculated());
+
+        market.set_value(4.0);
+        assert_eq!(instrument.npv().unwrap(), 8.0);
+        assert_eq!(calculations.get(), 1);
+    }
+
+    /// The C++ constructor's `registerWith(Settings evaluation date)`, wired
+    /// explicitly per D5.
+    #[test]
+    fn evaluation_date_change_invalidates_the_instrument() {
+        let market = shared(SimpleQuote::new(2.0));
+        let mut instrument = MockInstrument::new(Shared::clone(&market));
+        let (engine, calculations) = mock_engine(true);
+        instrument.base_mut().set_pricing_engine(engine);
+
+        let mut settings: Settings<Date> = Settings::new();
+        settings.set_evaluation_date(Date::new(7, Month::July, 2026));
+        settings.register_eval_date_observer(&instrument.base().observer());
+
+        instrument.npv().unwrap();
+        settings.set_evaluation_date(Date::new(8, Month::July, 2026));
+        assert!(!instrument.base().is_calculated());
+        instrument.npv().unwrap();
+        assert_eq!(calculations.get(), 2);
+    }
+}
