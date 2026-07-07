@@ -18,7 +18,7 @@
 
 use std::cell::{Cell, RefCell};
 
-use crate::shared::{Shared, SharedMut, WeakMut};
+use crate::shared::{Shared, SharedMut, WeakMut, shared, shared_mut};
 
 thread_local! {
     /// Nesting depth of [`Observable::notify_observers`] across all
@@ -143,6 +143,18 @@ pub trait AsObservable {
 /// target's observers.
 pub(crate) struct Forwarder {
     pub(crate) observable: Shared<Observable>,
+}
+
+impl Forwarder {
+    /// Builds a fresh observable and the forwarder wired to it, the shared
+    /// construction step of every forwarding type.
+    pub(crate) fn new() -> (Shared<Observable>, SharedMut<Forwarder>) {
+        let observable = shared(Observable::new());
+        let forwarder = shared_mut(Forwarder {
+            observable: Shared::clone(&observable),
+        });
+        (observable, forwarder)
+    }
 }
 
 impl Observer for Forwarder {

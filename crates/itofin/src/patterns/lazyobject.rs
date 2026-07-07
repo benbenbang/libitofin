@@ -12,7 +12,7 @@
 
 use crate::errors::QlResult;
 use crate::patterns::observable::Observable;
-use crate::shared::SharedMut;
+use crate::shared::{Shared, SharedMut, shared};
 
 use super::observable::Observer;
 
@@ -33,7 +33,7 @@ impl Drop for UpdatingGuard<'_> {
 /// at most once until invalidated) and feed it observer notifications via
 /// [`on_update`](LazyObject::on_update).
 pub struct LazyObject {
-    observable: Observable,
+    observable: Shared<Observable>,
     calculated: bool,
     frozen: bool,
     failed: bool,
@@ -49,7 +49,7 @@ impl LazyObject {
     /// forwards only the first received after a (re)calculation.
     pub fn new(always_forward: bool) -> Self {
         LazyObject {
-            observable: Observable::new(),
+            observable: shared(Observable::new()),
             calculated: false,
             frozen: false,
             failed: false,
@@ -61,6 +61,12 @@ impl LazyObject {
     /// Access to the embedded observable for registering downstream observers.
     pub fn observable(&self) -> &Observable {
         &self.observable
+    }
+
+    /// A shared handle to the embedded observable, for holders that must
+    /// notify after releasing their borrow of the lazy object.
+    pub fn observable_handle(&self) -> Shared<Observable> {
+        Shared::clone(&self.observable)
     }
 
     /// Whether cached results are currently valid.
@@ -104,24 +110,71 @@ impl LazyObject {
         notified
     }
 
+    /// The state half of [`on_update`](LazyObject::on_update) for lazy objects
+    /// held in a `SharedMut`: applies the invalidation and hands back the
+    /// observable to notify, so the holder can release its borrow first and a
+    /// notified observer may query the lazy object without a borrow conflict.
+    pub fn deferred_update(&mut self) -> Option<Shared<Observable>> {
+        if self.updating || !(self.calculated || self.failed || self.always_forward) {
+            return None;
+        }
+        self.calculated = false;
+        self.failed = false;
+        if self.frozen {
+            None
+        } else {
+            Some(Shared::clone(&self.observable))
+        }
+    }
+
+    /// Marks the results calculated without running a calculation, bypassing
+    /// the frozen guard (the C++ direct `calculated_ = true` write in
+    /// `Instrument::calculate`'s expired branch).
+    pub fn mark_calculated(&mut self) {
+        self.calculated = true;
+        self.failed = false;
+    }
+
+    /// First half of [`calculate`](LazyObject::calculate) for callers that
+    /// cannot hold a borrow across the computation: applies the cache and
+    /// frozen guards and marks the object calculated (the C++ pre-set that
+    /// breaks bootstrap recursion). Returns whether the computation must run;
+    /// when it does, report the outcome via
+    /// [`finish_calculation`](LazyObject::finish_calculation).
+    pub fn start_calculation(&mut self) -> bool {
+        if self.calculated || self.frozen {
+            return false;
+        }
+        self.calculated = true;
+        true
+    }
+
+    /// Second half of [`calculate`](LazyObject::calculate): records the
+    /// computation's outcome, reverting to a not-calculated/failed state on
+    /// error. A re-entrant invalidation during the computation is preserved:
+    /// a success does not re-mark the object calculated.
+    pub fn finish_calculation(&mut self, result: &QlResult<()>) {
+        match result {
+            Ok(()) => self.failed = false,
+            Err(_) => {
+                self.calculated = false;
+                self.failed = true;
+            }
+        }
+    }
+
     /// Runs `perform` to (re)compute results unless already cached or frozen.
     ///
     /// Mirrors `LazyObject::calculate`: marks the object calculated before
     /// running `perform` (to break bootstrap recursion), and on failure reverts
     /// to a not-calculated/failed state while propagating the error.
     pub fn calculate(&mut self, perform: impl FnOnce() -> QlResult<()>) -> QlResult<()> {
-        if !self.calculated && !self.frozen {
-            self.calculated = true;
-            match perform() {
-                Ok(()) => self.failed = false,
-                Err(e) => {
-                    self.calculated = false;
-                    self.failed = true;
-                    return Err(e);
-                }
-            }
+        if !self.start_calculation() {
+            return Ok(());
         }
-        Ok(())
+        let result = perform();
+        self.finish_calculation(&result);
+        result
     }
 
     /// Forces a recalculation and notifies observers.
@@ -129,14 +182,31 @@ impl LazyObject {
     /// Mirrors `LazyObject::recalculate`: clears the cached state, runs the
     /// calculation, and notifies observers afterwards (even on failure).
     pub fn recalculate(&mut self, perform: impl FnOnce() -> QlResult<()>) -> QlResult<()> {
+        let was_frozen = self.start_recalculation();
+        let result = self.calculate(perform);
+        self.finish_recalculation(was_frozen);
+        self.observable.notify_observers();
+        result
+    }
+
+    /// First half of [`recalculate`](LazyObject::recalculate) for holders that
+    /// run the computation outside the borrow: clears the cached state and the
+    /// frozen flag, returning the prior frozen state for
+    /// [`finish_recalculation`](LazyObject::finish_recalculation).
+    pub fn start_recalculation(&mut self) -> bool {
         let was_frozen = self.frozen;
         self.calculated = false;
         self.frozen = false;
         self.failed = false;
-        let result = self.calculate(perform);
+        was_frozen
+    }
+
+    /// Second half of [`recalculate`](LazyObject::recalculate): restores the
+    /// frozen state; the holder then notifies through
+    /// [`observable_handle`](LazyObject::observable_handle) (even on failure,
+    /// as in C++).
+    pub fn finish_recalculation(&mut self, was_frozen: bool) {
         self.frozen = was_frozen;
-        self.observable.notify_observers();
-        result
     }
 
     /// Pins the currently cached results, suppressing recalculation.
@@ -146,9 +216,20 @@ impl LazyObject {
 
     /// Re-enables recalculation, notifying observers once if it was frozen.
     pub fn unfreeze(&mut self) {
+        if let Some(observable) = self.deferred_unfreeze() {
+            observable.notify_observers();
+        }
+    }
+
+    /// The state half of [`unfreeze`](LazyObject::unfreeze) for lazy objects
+    /// held in a `SharedMut`: thaws and hands back the observable to notify
+    /// once the holder's borrow is released.
+    pub fn deferred_unfreeze(&mut self) -> Option<Shared<Observable>> {
         if self.frozen {
             self.frozen = false;
-            self.observable.notify_observers();
+            Some(Shared::clone(&self.observable))
+        } else {
+            None
         }
     }
 
