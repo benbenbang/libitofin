@@ -8,6 +8,7 @@ pub mod handle;
 pub mod interestrate;
 pub mod math;
 pub mod patterns;
+pub mod pricingengine;
 pub mod quotes;
 pub mod settings;
 pub mod shared;
