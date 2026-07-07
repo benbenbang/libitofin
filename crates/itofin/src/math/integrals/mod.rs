@@ -129,6 +129,11 @@ where
         walk_side(f, &node, h, 2.0 * h, &mut pos_cutoff, &mut tally)?;
         walk_side(f, &node, -h, -2.0 * h, &mut neg_cutoff, &mut tally)?;
         let refined = h * tally.sum;
+        if !refined.is_finite() {
+            fail!(
+                "double-exponential quadrature overflowed accumulating an integral near the top of the f64 range"
+            );
+        }
         let error = (refined - value).abs();
         value = refined;
         if refinement > 0 && error <= rel_tolerance * (h * tally.abs_sum) {
