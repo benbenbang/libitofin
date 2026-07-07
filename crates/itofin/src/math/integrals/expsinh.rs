@@ -7,8 +7,14 @@
 //! over `[0, inf)` into a doubly-exponentially decaying integral over the real
 //! line, evaluated by the trapezoidal rule with successive halving. As in
 //! Boost, the tolerance is used against the error estimate for the L1 norm of
-//! the integral, and a bound at or beyond `Real::MAX` in magnitude counts as
-//! infinite.
+//! the integral.
+//!
+//! The shared [`Integrator::integrate`] driver rejects non-finite bounds, so
+//! an actual `Real::INFINITY` cannot be passed through it: the sentinel for an
+//! infinite bound is `Real::MAX`, exactly as QuantLib calls the Boost
+//! integrator with `QL_MAX_REAL`. Alternatively,
+//! [`ExpSinhIntegral::integrate_semi_infinite`] integrates the native
+//! `[0, inf)` domain with no sentinel at all.
 
 use std::f64::consts::FRAC_PI_2;
 
@@ -23,6 +29,14 @@ use crate::types::{Real, Size};
 const T_MAX: Real = 7.0;
 
 /// Exp-sinh quadrature over `[a, inf)` or `(-inf, b]`.
+///
+/// Through the [`Integrator`] interface the infinite side is spelled
+/// `Real::MAX` (mirroring QuantLib's `QL_MAX_REAL`), since the shared driver
+/// rejects non-finite bounds; `integrate(f, a, Real::MAX)` integrates
+/// `[a, inf)` and `integrate(f, -Real::MAX, b)` integrates `(-inf, b]`. Any
+/// other finite interval is an error - see
+/// [`ExpSinhIntegral::integrate_semi_infinite`] for the native `[0, inf)`
+/// form.
 ///
 /// Tail nodes whose abscissa or weight leaves the positive finite `f64` range
 /// are truncated; their true contribution is below the underflow threshold for
@@ -183,6 +197,13 @@ mod tests {
         assert!(
             integrator
                 .integrate(|_| 0.0, -Real::MAX, Real::MAX)
+                .is_err()
+        );
+        // The documented sentinel for an infinite bound is Real::MAX; an
+        // actual infinity is rejected by the shared driver.
+        assert!(
+            integrator
+                .integrate(|x| (-x).exp(), 0.0, Real::INFINITY)
                 .is_err()
         );
     }
