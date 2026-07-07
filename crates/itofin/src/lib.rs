@@ -6,9 +6,12 @@
 pub mod errors;
 pub mod handle;
 pub mod instrument;
+pub mod instruments;
 pub mod interestrate;
 pub mod math;
+pub mod option;
 pub mod patterns;
+pub mod payoff;
 pub mod pricingengine;
 pub mod quotes;
 pub mod settings;
