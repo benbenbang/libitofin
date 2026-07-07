@@ -57,10 +57,11 @@ impl Payoff for PlainVanillaPayoff {
     }
 
     fn value(&self, price: Real) -> Real {
-        match self.option_type {
-            OptionType::Call => (price - self.strike).max(0.0),
-            OptionType::Put => (self.strike - price).max(0.0),
-        }
+        let intrinsic = match self.option_type {
+            OptionType::Call => price - self.strike,
+            OptionType::Put => self.strike - price,
+        };
+        if intrinsic < 0.0 { 0.0 } else { intrinsic }
     }
 }
 
@@ -94,6 +95,14 @@ mod tests {
         assert_eq!(payoff.value(90.0), 10.0);
         assert_eq!(payoff.value(100.0), 0.0);
         assert_eq!(payoff.value(110.0), 0.0);
+    }
+
+    #[test]
+    fn nan_price_propagates_like_cpp_std_max() {
+        let call = PlainVanillaPayoff::new(OptionType::Call, 100.0);
+        assert!(call.value(Real::NAN).is_nan());
+        let put = PlainVanillaPayoff::new(OptionType::Put, 100.0);
+        assert!(put.value(Real::NAN).is_nan());
     }
 
     #[test]
