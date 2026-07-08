@@ -1,10 +1,16 @@
 [package]
-name = "itofin"
+name = "libitofin"
 version.workspace = true
 edition.workspace = true
+description = "A ground-up Rust port of QuantLib: quantitative-finance primitives for pricing, risk, and numerical methods."
+license = "BSD-3-Clause"
+repository = "https://github.com/benbenbang/libitofin"
+readme = "README.md"
+keywords = ["quantlib", "quantitative-finance", "pricing", "derivatives", "finance"]
+categories = ["mathematics", "science"]
 
 [lib]
-name = "itofin"
+name = "libitofin"
 
 [dependencies]
 num-complex = "0.4.6"
