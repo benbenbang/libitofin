@@ -12,13 +12,14 @@
 //!
 //! - C++ splits the implementation adapters into two abstract classes:
 //!   `BlackVolatilityTermStructure` (derives variance from volatility) and
-//!   `BlackVarianceTermStructure` (derives volatility from variance). The
-//!   first is folded in here as the default
-//!   [`black_variance_impl`](BlackVolTermStructure::black_variance_impl);
-//!   volatility-quoted curves implement
-//!   [`black_vol_impl`](BlackVolTermStructure::black_vol_impl) alone. The
-//!   variance-quoted adapter follows with `BlackVarianceCurve`/`Surface`
-//!   (EPIC-4); such curves override both hooks, deriving the volatility as
+//!   `BlackVarianceTermStructure` (derives volatility from variance). Both
+//!   hooks stay required here, preserving C++'s pure-virtual guarantee; the
+//!   first adapter becomes the provided
+//!   [`variance_from_vol`](BlackVolTermStructure::variance_from_vol) helper,
+//!   which volatility-quoted curves call from their one-line
+//!   [`black_variance_impl`](BlackVolTermStructure::black_variance_impl).
+//!   The variance-quoted adapter follows with `BlackVarianceCurve`/`Surface`
+//!   (EPIC-4); such curves derive the volatility as
 //!   `sqrt(var(max(t, 1e-5)) / max(t, 1e-5))`.
 //! - `smileSection`/`atmLevel` need the smile-section layer and follow with
 //!   it; `accept(AcyclicVisitor&)` is not ported (dispatch happens through
@@ -95,9 +96,13 @@ pub trait BlackVolTermStructure: VolatilityTermStructure {
 
     /// Black variance calculation hook; range checks have already run.
     ///
-    /// The default derives the variance from the volatility as `vol^2 * t`
-    /// (C++'s `BlackVolatilityTermStructure` adapter).
-    fn black_variance_impl(&self, t: Time, strike: Real) -> QlResult<Real> {
+    /// Volatility-quoted curves delegate to
+    /// [`variance_from_vol`](Self::variance_from_vol).
+    fn black_variance_impl(&self, t: Time, strike: Real) -> QlResult<Real>;
+
+    /// Variance derived from the volatility as `vol^2 * t` (C++'s
+    /// `BlackVolatilityTermStructure` adapter).
+    fn variance_from_vol(&self, t: Time, strike: Real) -> QlResult<Real> {
         let vol = self.black_vol_impl(t, strike)?;
         Ok(vol * vol * t)
     }
@@ -179,17 +184,13 @@ pub trait BlackVolTermStructure: VolatilityTermStructure {
                 let epsilon = Time::min(1.0e-5, time1);
                 let var1 = self.black_variance_impl(time1 - epsilon, strike)?;
                 let var2 = self.black_variance_impl(time1 + epsilon, strike)?;
-                if var2 < var1 || var1.is_nan() || var2.is_nan() {
-                    fail!("variances must be non-decreasing");
-                }
+                ensure_non_decreasing(var1, var2)?;
                 Ok(((var2 - var1) / (2.0 * epsilon)).sqrt())
             }
         } else {
             let var1 = self.black_variance_impl(time1, strike)?;
             let var2 = self.black_variance_impl(time2, strike)?;
-            if var2 < var1 || var1.is_nan() || var2.is_nan() {
-                fail!("variances must be non-decreasing");
-            }
+            ensure_non_decreasing(var1, var2)?;
             Ok(((var2 - var1) / (time2 - time1)).sqrt())
         }
     }
@@ -224,11 +225,16 @@ pub trait BlackVolTermStructure: VolatilityTermStructure {
         self.check_strike(strike, extrapolate)?;
         let v1 = self.black_variance_impl(time1, strike)?;
         let v2 = self.black_variance_impl(time2, strike)?;
-        if v2 < v1 || v1.is_nan() || v2.is_nan() {
-            fail!("variances must be non-decreasing");
-        }
+        ensure_non_decreasing(v1, v2)?;
         Ok(v2 - v1)
     }
+}
+
+fn ensure_non_decreasing(var1: Real, var2: Real) -> QlResult<()> {
+    if var2 < var1 || var1.is_nan() || var2.is_nan() {
+        fail!("variances must be non-decreasing");
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -301,10 +307,7 @@ mod tests {
         fn black_variance_impl(&self, t: Time, strike: Real) -> QlResult<Real> {
             match self.variance_override {
                 Some(f) => Ok(f(t)),
-                None => {
-                    let vol = self.black_vol_impl(t, strike)?;
-                    Ok(vol * vol * t)
-                }
+                None => self.variance_from_vol(t, strike),
             }
         }
     }
