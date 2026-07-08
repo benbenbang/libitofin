@@ -1,13 +1,15 @@
 //! Pricing engines and their numeric cores.
 //!
-//! Port of the `ql/pricingengines` layer. Currently holds the Black 1976
-//! formula family and the [`BlackCalculator`] greeks core; the analytic
-//! vanilla engines build on them.
+//! Port of the `ql/pricingengines` layer: the Black 1976 formula family,
+//! the [`BlackCalculator`] greeks core, and the analytic vanilla engines
+//! built on them.
 
 pub mod blackcalculator;
 pub mod blackformula;
+pub mod vanilla;
 
 pub use blackcalculator::BlackCalculator;
+pub use vanilla::AnalyticEuropeanEngine;
 
 pub use blackformula::{
     black_formula, black_formula_asset_itm_probability, black_formula_cash_itm_probability,
