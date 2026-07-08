@@ -590,7 +590,7 @@ mod greek_gate {
             let expiry = today() + time_to_days(row.t);
             let mut option = market.option(row.option_type, row.strike, expiry);
 
-            let mut check = |name: &str, calculated: Real, expected: Real| {
+            let check = |name: &str, calculated: Real, expected: Real| {
                 assert!(
                     (calculated - expected).abs() <= GATE_TOLERANCE,
                     "{:?} K={} t={}: {name} {calculated} vs reference {expected} (error {})",
@@ -627,6 +627,289 @@ mod greek_gate {
                 option.itm_cash_probability().unwrap(),
                 row.itm_cash,
             );
+        }
+    }
+}
+
+#[cfg(test)]
+mod test_greek_values {
+    //! The `testGreekValues` oracle of `test-suite/europeanoption.cpp`:
+    //! published Haug greek values, asserted at the C++ tolerance of 1e-4.
+
+    use super::test_market::{market, time_to_days, today};
+    use crate::errors::QlResult;
+    use crate::instruments::EuropeanOption;
+    use crate::option::OptionType::{self, Call, Put};
+    use crate::types::{Rate, Real, Time, Volatility};
+
+    type Greek = fn(&mut EuropeanOption) -> QlResult<Real>;
+
+    /// name, greek accessor, type, strike, spot, q, r, t, vol, Haug value.
+    type Case = (
+        &'static str,
+        Greek,
+        OptionType,
+        Real,
+        Real,
+        Rate,
+        Rate,
+        Time,
+        Volatility,
+        Real,
+    );
+
+    #[test]
+    fn greek_values_match_haug_at_1e_4() {
+        #[rustfmt::skip]
+        let cases: &[Case] = &[
+            ("delta", |o| o.delta(), Call, 100.0, 105.0, 0.10, 0.10, 0.5, 0.36, 0.5946),
+            ("delta", |o| o.delta(), Put, 100.0, 105.0, 0.10, 0.10, 0.5, 0.36, -0.3566),
+            ("elasticity", |o| o.elasticity(), Put, 100.0, 105.0, 0.10, 0.10, 0.5, 0.36, -4.8775),
+            ("gamma", |o| o.gamma(), Call, 60.0, 55.0, 0.00, 0.10, 0.75, 0.30, 0.0278),
+            ("gamma", |o| o.gamma(), Put, 60.0, 55.0, 0.00, 0.10, 0.75, 0.30, 0.0278),
+            ("vega", |o| o.vega(), Call, 60.0, 55.0, 0.00, 0.10, 0.75, 0.30, 18.9358),
+            ("vega", |o| o.vega(), Put, 60.0, 55.0, 0.00, 0.10, 0.75, 0.30, 18.9358),
+            ("theta", |o| o.theta(), Put, 405.0, 430.0, 0.05, 0.07, 1.0 / 12.0, 0.20, -31.1924),
+            ("thetaPerDay", |o| o.theta_per_day(), Put, 405.0, 430.0, 0.05, 0.07, 1.0 / 12.0, 0.20, -0.0855),
+            ("rho", |o| o.rho(), Call, 75.0, 72.0, 0.00, 0.09, 1.0, 0.19, 38.7325),
+            ("dividendRho", |o| o.dividend_rho(), Put, 490.0, 500.0, 0.05, 0.08, 0.25, 0.15, 42.2254),
+        ];
+
+        let market = market();
+        for &(name, greek, option_type, strike, spot, q, r, t, vol, expected) in cases {
+            market.set(spot, q, r, vol);
+            let expiry = today() + time_to_days(t);
+            let mut option = market.option(option_type, strike, expiry);
+            let calculated = greek(&mut option).unwrap();
+            assert!(
+                (calculated - expected).abs() <= 1.0e-4,
+                "{name} of {option_type:?} K={strike} S={spot}: {calculated} vs Haug {expected}"
+            );
+        }
+    }
+}
+
+#[cfg(test)]
+mod test_greeks {
+    //! The `testGreeks` oracle of `test-suite/europeanoption.cpp`: analytic
+    //! greeks against central finite differences over the full plain-vanilla
+    //! grid, on curves moving off the evaluation date. The C++ test also
+    //! sweeps cash-or-nothing, asset-or-nothing and gap payoffs; those
+    //! payoffs are follow-up work and their sweeps come with them.
+
+    use super::AnalyticEuropeanEngine;
+    use super::test_market::{time_to_days, today};
+    use crate::exercise::EuropeanExercise;
+    use crate::handle::Handle;
+    use crate::instrument::Instrument;
+    use crate::instruments::{EuropeanOption, PlainVanillaPayoff};
+    use crate::interestrate::Compounding;
+    use crate::option::OptionType;
+    use crate::pricingengine::PricingEngine;
+    use crate::processes::BlackScholesMertonProcess;
+    use crate::quotes::{Quote, SimpleQuote};
+    use crate::settings::Settings;
+    use crate::shared::{Shared, SharedMut, shared, shared_mut};
+    use crate::termstructures::volatility::BlackConstantVol;
+    use crate::termstructures::yields::FlatForward;
+    use crate::termstructures::yieldtermstructure::YieldTermStructure;
+    use crate::time::calendars::NullCalendar;
+    use crate::time::date::Date;
+    use crate::time::daycounters::actual360::Actual360;
+    use crate::time::frequency::Frequency;
+    use crate::types::Real;
+
+    const TOLERANCE: Real = 1.0e-5;
+    const UNDERLYING: Real = 100.0;
+
+    struct MovingMarket {
+        settings: SharedMut<Settings<Date>>,
+        spot: Shared<SimpleQuote>,
+        q_rate: Shared<SimpleQuote>,
+        r_rate: Shared<SimpleQuote>,
+        vol: Shared<SimpleQuote>,
+        process: Shared<BlackScholesMertonProcess>,
+    }
+
+    fn quote_handle(quote: &Shared<SimpleQuote>) -> Handle<dyn Quote> {
+        Handle::new(Shared::clone(quote) as Shared<dyn Quote>)
+    }
+
+    fn moving_market() -> MovingMarket {
+        let settings = shared_mut(Settings::new());
+        settings.borrow_mut().set_evaluation_date(today());
+        let spot = shared(SimpleQuote::new(0.0));
+        let q_rate = shared(SimpleQuote::new(0.0));
+        let r_rate = shared(SimpleQuote::new(0.0));
+        let vol = shared(SimpleQuote::new(0.0));
+        let flat = |quote: &Shared<SimpleQuote>| {
+            shared(
+                FlatForward::moving(
+                    0,
+                    NullCalendar::new(),
+                    quote_handle(quote),
+                    Actual360::new(),
+                    Compounding::Continuous,
+                    Frequency::Annual,
+                    SharedMut::clone(&settings),
+                )
+                .unwrap(),
+            ) as Shared<dyn YieldTermStructure>
+        };
+        let process = shared(BlackScholesMertonProcess::new(
+            quote_handle(&spot),
+            Handle::new(flat(&q_rate)),
+            Handle::new(flat(&r_rate)),
+            Handle::new(shared(
+                BlackConstantVol::moving_with_quote(
+                    0,
+                    NullCalendar::new(),
+                    quote_handle(&vol),
+                    Actual360::new(),
+                    SharedMut::clone(&settings),
+                )
+                .unwrap(),
+            )
+                as Shared<
+                    dyn crate::termstructures::volatility::BlackVolTermStructure,
+                >),
+        ));
+        MovingMarket {
+            settings,
+            spot,
+            q_rate,
+            r_rate,
+            vol,
+            process,
+        }
+    }
+
+    fn relative_error(x1: Real, x2: Real, reference: Real) -> Real {
+        if reference != 0.0 {
+            (x1 - x2).abs() / reference
+        } else {
+            (x1 - x2).abs()
+        }
+    }
+
+    #[test]
+    fn analytic_greeks_are_consistent_with_finite_differences() {
+        let market = moving_market();
+        let types = [OptionType::Call, OptionType::Put];
+        let strikes = [50.0, 99.5, 100.0, 100.5, 150.0];
+        let q_rates = [0.04, 0.05, 0.06];
+        let r_rates = [0.01, 0.05, 0.15];
+        let residual_times = [1.0, 2.0];
+        let vols = [0.11, 0.50, 1.20];
+        let day_counter = Actual360::new();
+
+        for option_type in types {
+            for strike in strikes {
+                for residual_time in residual_times {
+                    let expiry = today() + time_to_days(residual_time);
+                    let payoff = shared(PlainVanillaPayoff::new(option_type, strike));
+                    let exercise = shared(EuropeanExercise::new(expiry));
+                    let mut option =
+                        EuropeanOption::new(payoff, exercise, SharedMut::clone(&market.settings))
+                            .unwrap();
+                    let engine =
+                        shared_mut(AnalyticEuropeanEngine::new(Shared::clone(&market.process)));
+                    option
+                        .base_mut()
+                        .set_pricing_engine(engine as SharedMut<dyn PricingEngine>);
+
+                    for q in q_rates {
+                        for r in r_rates {
+                            for vol in vols {
+                                let u = UNDERLYING;
+                                market.spot.set_value(u);
+                                market.q_rate.set_value(q);
+                                market.r_rate.set_value(r);
+                                market.vol.set_value(vol);
+
+                                let value = option.npv().unwrap();
+                                let delta = option.delta().unwrap();
+                                let gamma = option.gamma().unwrap();
+                                let theta = option.theta().unwrap();
+                                let rho = option.rho().unwrap();
+                                let dividend_rho = option.dividend_rho().unwrap();
+                                let vega = option.vega().unwrap();
+
+                                if value <= u * 1.0e-5 {
+                                    continue;
+                                }
+
+                                let du = u * 1.0e-4;
+                                market.spot.set_value(u + du);
+                                let value_p = option.npv().unwrap();
+                                let delta_p = option.delta().unwrap();
+                                market.spot.set_value(u - du);
+                                let value_m = option.npv().unwrap();
+                                let delta_m = option.delta().unwrap();
+                                market.spot.set_value(u);
+                                let expected_delta = (value_p - value_m) / (2.0 * du);
+                                let expected_gamma = (delta_p - delta_m) / (2.0 * du);
+
+                                let dr = r * 1.0e-4;
+                                market.r_rate.set_value(r + dr);
+                                let value_p = option.npv().unwrap();
+                                market.r_rate.set_value(r - dr);
+                                let value_m = option.npv().unwrap();
+                                market.r_rate.set_value(r);
+                                let expected_rho = (value_p - value_m) / (2.0 * dr);
+
+                                let dq = q * 1.0e-4;
+                                market.q_rate.set_value(q + dq);
+                                let value_p = option.npv().unwrap();
+                                market.q_rate.set_value(q - dq);
+                                let value_m = option.npv().unwrap();
+                                market.q_rate.set_value(q);
+                                let expected_dividend_rho = (value_p - value_m) / (2.0 * dq);
+
+                                let dv = vol * 1.0e-4;
+                                market.vol.set_value(vol + dv);
+                                let value_p = option.npv().unwrap();
+                                market.vol.set_value(vol - dv);
+                                let value_m = option.npv().unwrap();
+                                market.vol.set_value(vol);
+                                let expected_vega = (value_p - value_m) / (2.0 * dv);
+
+                                let dt = day_counter.year_fraction(today() - 1, today() + 1);
+                                market
+                                    .settings
+                                    .borrow_mut()
+                                    .set_evaluation_date(today() - 1);
+                                let value_m = option.npv().unwrap();
+                                market
+                                    .settings
+                                    .borrow_mut()
+                                    .set_evaluation_date(today() + 1);
+                                let value_p = option.npv().unwrap();
+                                market.settings.borrow_mut().set_evaluation_date(today());
+                                let expected_theta = (value_p - value_m) / dt;
+
+                                let checks = [
+                                    ("delta", expected_delta, delta),
+                                    ("gamma", expected_gamma, gamma),
+                                    ("theta", expected_theta, theta),
+                                    ("rho", expected_rho, rho),
+                                    ("divRho", expected_dividend_rho, dividend_rho),
+                                    ("vega", expected_vega, vega),
+                                ];
+                                for (name, expected, calculated) in checks {
+                                    let error = relative_error(expected, calculated, u);
+                                    assert!(
+                                        error <= TOLERANCE,
+                                        "{name} of {option_type:?} K={strike} T={residual_time} \
+                                         q={q} r={r} v={vol}: analytic {calculated} vs finite \
+                                         difference {expected} (relative error {error})"
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
