@@ -34,6 +34,8 @@
 //!   through the virtuals) must override
 //!   [`reference_date`](TermStructure::reference_date) as well.
 
+pub mod yieldtermstructure;
+
 use std::cell::Cell;
 
 use crate::errors::QlResult;
