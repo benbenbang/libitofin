@@ -5,12 +5,14 @@
 //! [`YieldTermStructure`](super::yieldtermstructure::YieldTermStructure).
 
 mod flatforward;
+mod forwardspreadedtermstructure;
 mod forwardstructure;
 mod impliedtermstructure;
 mod zerospreadedtermstructure;
 mod zeroyieldstructure;
 
 pub use flatforward::FlatForward;
+pub use forwardspreadedtermstructure::ForwardSpreadedTermStructure;
 pub use forwardstructure::ForwardRateStructure;
 pub use impliedtermstructure::ImpliedTermStructure;
 pub use zerospreadedtermstructure::ZeroSpreadedTermStructure;
