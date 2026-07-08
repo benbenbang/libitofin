@@ -9,9 +9,22 @@
 
 use crate::errors::QlResult;
 use crate::fail;
-use crate::math::interpolations::Interpolation;
 use crate::math::interpolations::linear::LinearInterpolation;
+use crate::math::interpolations::{Interpolation, Interpolator};
 use crate::types::Real;
+
+/// Factory for [`LogLinearInterpolation`] (QuantLib's `LogLinear` traits
+/// class).
+#[derive(Clone, Copy, Default)]
+pub struct LogLinear;
+
+impl Interpolator for LogLinear {
+    type Output = LogLinearInterpolation;
+
+    fn interpolate(&self, x: &[Real], y: &[Real]) -> QlResult<LogLinearInterpolation> {
+        LogLinearInterpolation::new(x.to_vec(), y.to_vec())
+    }
+}
 
 /// Log-linear (geometric) interpolation over strictly increasing `x` nodes.
 pub struct LogLinearInterpolation {
@@ -200,6 +213,14 @@ mod tests {
         assert!(LogLinearInterpolation::new(vec![0.0, 1.0], vec![1.0, 0.0]).is_err());
         assert!(LogLinearInterpolation::new(vec![0.0, 1.0], vec![1.0, -2.0]).is_err());
         assert!(LogLinearInterpolation::new(vec![0.0, 1.0], vec![Real::NAN, 1.0]).is_err());
+    }
+
+    #[test]
+    fn factory_builds_the_interpolation() {
+        let f = LogLinear.interpolate(&[0.0, 2.0], &[1.0, 9.0]).unwrap();
+        assert_close(f.value(1.0).unwrap(), 3.0);
+        assert_eq!(LogLinear.required_points(), 2);
+        assert!(LogLinear.interpolate(&[0.0, 1.0], &[1.0, -2.0]).is_err());
     }
 
     #[test]
