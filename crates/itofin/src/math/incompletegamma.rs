@@ -43,11 +43,11 @@ fn max_iterations(a: Real) -> u32 {
 /// # Examples
 ///
 /// ```
-/// use itofin::math::incompletegamma::incomplete_gamma;
+/// use libitofin::math::incompletegamma::incomplete_gamma;
 /// // P(1, x) is the exponential CDF 1 - e^{-x}
 /// let p = incomplete_gamma(1.0, 2.0)?;
 /// assert!((p - (1.0 - (-2.0_f64).exp())).abs() < 1e-12);
-/// # Ok::<(), itofin::errors::QlError>(())
+/// # Ok::<(), libitofin::errors::QlError>(())
 /// ```
 pub fn incomplete_gamma(a: Real, x: Real) -> QlResult<Real> {
     // `is_finite` is explicit: a bare comparison lets NaN and ±infinity through
