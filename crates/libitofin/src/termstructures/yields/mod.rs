@@ -7,9 +7,11 @@
 mod flatforward;
 mod forwardstructure;
 mod impliedtermstructure;
+mod zerospreadedtermstructure;
 mod zeroyieldstructure;
 
 pub use flatforward::FlatForward;
 pub use forwardstructure::ForwardRateStructure;
 pub use impliedtermstructure::ImpliedTermStructure;
+pub use zerospreadedtermstructure::ZeroSpreadedTermStructure;
 pub use zeroyieldstructure::ZeroYieldStructure;
