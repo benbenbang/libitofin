@@ -287,6 +287,14 @@ pub trait TermStructure: AsObservable {
         self.base().day_counter()
     }
 
+    /// The day counter, or an error for structures built without one.
+    fn require_day_counter(&self) -> QlResult<DayCounter> {
+        let Some(day_counter) = self.day_counter() else {
+            fail!("no day counter provided for this term structure");
+        };
+        Ok(day_counter)
+    }
+
     /// The calendar used for reference-date calculation, when provided.
     fn calendar(&self) -> Option<Calendar> {
         self.base().calendar()
@@ -304,9 +312,7 @@ pub trait TermStructure: AsObservable {
 
     /// The period from the reference date to `date` as a year fraction.
     fn time_from_reference(&self, date: Date) -> QlResult<Time> {
-        let Some(day_counter) = self.day_counter() else {
-            fail!("no day counter provided for this term structure");
-        };
+        let day_counter = self.require_day_counter()?;
         Ok(day_counter.year_fraction(self.reference_date()?, date))
     }
 
