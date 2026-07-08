@@ -6,15 +6,20 @@
 //!
 //! C++'s `LazyObject` half becomes a cached [`InterestRate`] invalidated by
 //! quote notifications: the curve's observer clears the cache *before*
-//! passing the notification on, so observers reading the curve during the
-//! same notification wave see fresh values. The value-backed constructors
-//! wrap the rate in an unshared [`SimpleQuote`] like the C++ ones; the
-//! subscription they add is inert since nothing else can change that quote.
+//! passing the notification on, so observers reading the curve during a
+//! quote-driven notification wave see fresh values. During an
+//! *evaluation-date* wave on a moving curve the settings stay locked (see the
+//! divergence notes in [`crate::termstructures`]), so reads that need the
+//! reference date - including non-extrapolating time-based `discount` calls,
+//! whose range check consults `max_time` - return `Err` until the wave ends.
+//! The value-backed constructors wrap the rate in an unshared [`SimpleQuote`]
+//! like the C++ ones; the subscription they add is inert since nothing else
+//! can change that quote.
 
 use crate::errors::QlResult;
 use crate::handle::Handle;
 use crate::interestrate::{Compounding, InterestRate};
-use crate::patterns::observable::{AsObservable, Observable, Observer};
+use crate::patterns::observable::{AsObservable, Observable, Observer, deliver};
 use crate::quotes::{Quote, SimpleQuote};
 use crate::settings::Settings;
 use crate::shared::{Shared, SharedMut, shared, shared_mut};
@@ -36,7 +41,7 @@ struct RateInvalidator {
 impl Observer for RateInvalidator {
     fn update(&mut self) {
         self.rate.borrow_mut().take();
-        self.updater.borrow_mut().update();
+        deliver(&self.updater);
     }
 }
 
@@ -386,6 +391,61 @@ mod tests {
             .discount_date(Date::new(20, Month::January, 2027), false)
             .unwrap();
         assert!((df - (-0.05_f64 * 365.0 / 360.0).exp()).abs() < 1.0e-15);
+    }
+
+    #[test]
+    fn quote_write_back_during_an_evaluation_date_wave_defers_instead_of_panicking() {
+        struct WriteBack {
+            quote: Shared<SimpleQuote>,
+            armed: bool,
+            notifications: usize,
+        }
+        impl Observer for WriteBack {
+            fn update(&mut self) {
+                self.notifications += 1;
+                if self.armed {
+                    self.armed = false;
+                    self.quote.set_value(0.09);
+                }
+            }
+        }
+
+        let settings = shared_mut(Settings::new());
+        settings
+            .borrow_mut()
+            .set_evaluation_date(Date::new(15, Month::January, 2026));
+        let quote = shared(SimpleQuote::new(0.05));
+        let curve = FlatForward::moving(
+            2,
+            Target::new(),
+            Handle::new(quote.clone() as Shared<dyn Quote>),
+            Actual360::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+            settings.clone(),
+        )
+        .unwrap();
+        curve.discount(1.0, false).unwrap();
+
+        let writer = shared_mut(WriteBack {
+            quote: quote.clone(),
+            armed: true,
+            notifications: 0,
+        });
+        curve
+            .observable()
+            .register_observer(&(writer.clone() as SharedMut<dyn Observer>));
+
+        settings
+            .borrow_mut()
+            .set_evaluation_date(Date::new(16, Month::January, 2026));
+
+        assert_eq!(
+            writer.borrow().notifications,
+            2,
+            "the write-back wave must re-notify curve observers exactly once more"
+        );
+        assert!((curve.discount(1.0, false).unwrap() - (-0.09_f64).exp()).abs() < 1.0e-15);
     }
 
     #[test]
