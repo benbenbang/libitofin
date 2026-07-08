@@ -16,6 +16,7 @@
 //!   [`max_date`](crate::termstructures::TermStructure::max_date) the null
 //!   date) where C++ dereferences a null pointer.
 
+use super::sync_extrapolation;
 use crate::errors::QlResult;
 use crate::handle::Handle;
 use crate::patterns::observable::{AsObservable, Observable, Observer, deliver};
@@ -42,16 +43,6 @@ impl Observer for CacheInvalidator {
         self.cache.borrow_mut().take();
         sync_extrapolation(&self.base, &self.original);
         deliver(&self.updater);
-    }
-}
-
-fn sync_extrapolation(base: &TermStructureBase, original: &Handle<dyn YieldTermStructure>) {
-    if let Ok(original) = original.current_link() {
-        if original.allows_extrapolation() {
-            base.enable_extrapolation();
-        } else {
-            base.disable_extrapolation();
-        }
     }
 }
 
