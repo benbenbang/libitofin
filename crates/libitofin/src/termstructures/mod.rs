@@ -34,6 +34,7 @@
 //!   through the virtuals) must override
 //!   [`reference_date`](TermStructure::reference_date) as well.
 
+pub mod interpolatedcurve;
 pub mod volatility;
 pub mod yields;
 pub mod yieldtermstructure;

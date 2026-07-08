@@ -6,8 +6,20 @@
 
 use crate::errors::QlResult;
 use crate::fail;
-use crate::math::interpolations::Interpolation;
+use crate::math::interpolations::{Interpolation, Interpolator};
 use crate::types::{Real, Size};
+
+/// Factory for [`LinearInterpolation`] (QuantLib's `Linear` traits class).
+#[derive(Clone, Copy, Default)]
+pub struct Linear;
+
+impl Interpolator for Linear {
+    type Output = LinearInterpolation;
+
+    fn interpolate(&self, x: &[Real], y: &[Real]) -> QlResult<LinearInterpolation> {
+        LinearInterpolation::new(x.to_vec(), y.to_vec())
+    }
+}
 
 /// Piecewise-linear interpolation over strictly increasing `x` nodes.
 pub struct LinearInterpolation {
@@ -216,6 +228,16 @@ mod tests {
         assert!(LinearInterpolation::new(vec![0.0, 1.0], vec![0.0]).is_err());
         assert!(LinearInterpolation::new(vec![0.0], vec![0.0]).is_err());
         assert!(LinearInterpolation::new(vec![0.0, 0.0], vec![1.0, 2.0]).is_err());
+    }
+
+    #[test]
+    fn factory_builds_the_interpolation() {
+        let f = Linear
+            .interpolate(&[0.0, 1.0, 3.0], &[0.0, 2.0, 2.0])
+            .unwrap();
+        assert_eq!(f.value(0.5).unwrap(), 1.0);
+        assert_eq!(Linear.required_points(), 2);
+        assert!(Linear.interpolate(&[0.0], &[0.0]).is_err());
     }
 
     #[test]
