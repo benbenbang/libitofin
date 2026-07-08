@@ -31,11 +31,11 @@ pub mod studentt;
 /// # Examples
 ///
 /// ```
-/// use itofin::math::distributions::Probability;
+/// use libitofin::math::distributions::Probability;
 /// assert_eq!(Probability::try_from(0.25)?.value(), 0.25);
 /// assert!(Probability::try_from(1.5).is_err());
 /// assert!(Probability::try_from(f64::NAN).is_err());
-/// # Ok::<(), itofin::errors::QlError>(())
+/// # Ok::<(), libitofin::errors::QlError>(())
 /// ```
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub struct Probability(Real);

@@ -23,11 +23,11 @@ const MAX_ITERATIONS: u32 = 100;
 /// # Examples
 ///
 /// ```
-/// use itofin::math::beta::beta_function;
+/// use libitofin::math::beta::beta_function;
 /// // B(2, 3) = 1!·2!/4! = 1/12
 /// let b = beta_function(2.0, 3.0)?;
 /// assert!((b - 1.0 / 12.0).abs() < 1e-12);
-/// # Ok::<(), itofin::errors::QlError>(())
+/// # Ok::<(), libitofin::errors::QlError>(())
 /// ```
 pub fn beta_function(z: Real, w: Real) -> QlResult<Real> {
     Ok((log_gamma(z)? + log_gamma(w)? - log_gamma(z + w)?).exp())
@@ -45,11 +45,11 @@ pub fn beta_function(z: Real, w: Real) -> QlResult<Real> {
 /// # Examples
 ///
 /// ```
-/// use itofin::math::beta::incomplete_beta;
+/// use libitofin::math::beta::incomplete_beta;
 /// // Beta(1, 1) is uniform, so I_x(1, 1) = x
 /// let p = incomplete_beta(1.0, 1.0, 0.25)?;
 /// assert!((p - 0.25).abs() < 1e-12);
-/// # Ok::<(), itofin::errors::QlError>(())
+/// # Ok::<(), libitofin::errors::QlError>(())
 /// ```
 pub fn incomplete_beta(a: Real, b: Real, x: Real) -> QlResult<Real> {
     // `is_finite()` is required: a bare `<= 0.0` lets NaN and +infinity through

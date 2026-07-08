@@ -70,12 +70,12 @@ const DC6: Real = C6 - 0.25;
 /// # Examples
 ///
 /// ```
-/// use itofin::math::ode::AdaptiveRungeKutta;
+/// use libitofin::math::ode::AdaptiveRungeKutta;
 ///
 /// let rk = AdaptiveRungeKutta::default();
 /// let y = rk.solve_1d(|_x, y: f64| y, 1.0, 0.0, 1.0)?;
 /// assert!((y - 1.0_f64.exp()).abs() < 1e-5);
-/// # Ok::<(), itofin::errors::QlError>(())
+/// # Ok::<(), libitofin::errors::QlError>(())
 /// ```
 #[derive(Clone, Copy, Debug)]
 pub struct AdaptiveRungeKutta {

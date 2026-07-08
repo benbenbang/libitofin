@@ -43,11 +43,11 @@ const SQRT_TWO_PI: Real = 2.5066282746310005;
 /// # Examples
 ///
 /// ```
-/// use itofin::math::gammafunction::log_gamma;
+/// use libitofin::math::gammafunction::log_gamma;
 /// // Γ(5) = 4! = 24
 /// let v = log_gamma(5.0)?;
 /// assert!((v - 24.0_f64.ln()).abs() < 1e-9);
-/// # Ok::<(), itofin::errors::QlError>(())
+/// # Ok::<(), libitofin::errors::QlError>(())
 /// ```
 pub fn log_gamma(x: Real) -> QlResult<Real> {
     // reject non-finite and x <= 0, matching QuantLib's QL_REQUIRE(x > 0); a
@@ -81,7 +81,7 @@ pub fn log_gamma(x: Real) -> QlResult<Real> {
 /// # Examples
 ///
 /// ```
-/// use itofin::math::gammafunction::gamma;
+/// use libitofin::math::gammafunction::gamma;
 /// // Γ(5) = 4! = 24
 /// assert!((gamma(5.0) - 24.0).abs() < 1e-6);
 /// // Γ(1/2) = √π
