@@ -5,8 +5,8 @@
 //! contract. The generalized Black-Scholes process (with its Merton
 //! convenience) is the first resident; the sibling conveniences
 //! (`BlackScholesProcess`, `BlackProcess`, `GarmanKohlagenProcess`) and the
-//! pluggable discretization objects follow as noted in
-//! [`blackscholesprocess`](self::blackscholesprocess).
+//! pluggable discretization objects follow as noted on
+//! [`GeneralizedBlackScholesProcess`].
 
 mod blackscholesprocess;
 
