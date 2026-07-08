@@ -8,7 +8,7 @@ pub mod linear;
 pub mod loglinear;
 
 use crate::errors::QlResult;
-use crate::types::Real;
+use crate::types::{Real, Size};
 
 /// A one-dimensional interpolation over sorted `x` nodes.
 ///
@@ -34,6 +34,24 @@ pub trait Interpolation {
 
     /// Whether `x` lies within `[x_min, x_max]`.
     fn is_in_range(&self, x: Real) -> bool;
+}
+
+/// A factory building an [`Interpolation`] over `(x, y)` nodes.
+///
+/// Mirrors QuantLib's interpolator traits classes (`Linear`, `LogLinear`,
+/// ...): term structures store the factory alongside their node data and
+/// rebuild the interpolation from it whenever the data changes.
+pub trait Interpolator {
+    /// The interpolation type this factory builds.
+    type Output: Interpolation;
+
+    /// Builds an interpolation through `(x, y)`.
+    fn interpolate(&self, x: &[Real], y: &[Real]) -> QlResult<Self::Output>;
+
+    /// The minimum number of nodes the interpolation requires.
+    fn required_points(&self) -> Size {
+        2
+    }
 }
 
 /// A two-dimensional interpolation over sorted `x` and `y` node grids and a
