@@ -8,6 +8,7 @@ mod flatforward;
 mod forwardspreadedtermstructure;
 mod forwardstructure;
 mod impliedtermstructure;
+mod zerocurve;
 mod zerospreadedtermstructure;
 mod zeroyieldstructure;
 
@@ -15,6 +16,7 @@ pub use flatforward::FlatForward;
 pub use forwardspreadedtermstructure::ForwardSpreadedTermStructure;
 pub use forwardstructure::ForwardRateStructure;
 pub use impliedtermstructure::ImpliedTermStructure;
+pub use zerocurve::{InterpolatedZeroCurve, ZeroCurve};
 pub use zerospreadedtermstructure::ZeroSpreadedTermStructure;
 pub use zeroyieldstructure::ZeroYieldStructure;
 
