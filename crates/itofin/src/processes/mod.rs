@@ -1,0 +1,13 @@
+//! Stochastic processes for specific models.
+//!
+//! Port of `ql/processes/`: concrete implementations of the
+//! [`StochasticProcess1D`](crate::stochasticprocess::StochasticProcess1D)
+//! contract. The generalized Black-Scholes process (with its Merton
+//! convenience) is the first resident; the sibling conveniences
+//! (`BlackScholesProcess`, `BlackProcess`, `GarmanKohlagenProcess`) and the
+//! pluggable discretization objects follow as noted in
+//! [`blackscholesprocess`](self::blackscholesprocess).
+
+mod blackscholesprocess;
+
+pub use blackscholesprocess::{BlackScholesMertonProcess, GeneralizedBlackScholesProcess};
