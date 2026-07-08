@@ -14,10 +14,11 @@
 //!
 //! One deviation from the C++ reference: at `std_dev == 0` the reference's
 //! `blackFormulaAssetItmProbability` tests `forward * sign < strike * sign`,
-//! which contradicts its own `std_dev -> 0` limit (`N(sign * d1) -> 1` exactly
+//! which inverts its own `std_dev -> 0` limit (`N(sign * d1) -> 1` exactly
 //! when `sign * (forward - strike) > 0`) and the cash probability next to it.
-//! The port uses the limit; a test locks continuity with a tiny standard
-//! deviation.
+//! The port uses the limit off the money; exactly at the money it returns
+//! 0.0 like both C++ probability branches, where the limit would be 0.5.
+//! Tests lock the off-the-money continuity and the at-the-money convention.
 
 use crate::errors::QlResult;
 use crate::fail;
@@ -273,9 +274,9 @@ pub fn black_formula_std_dev_second_derivative(
 mod tests {
     use super::*;
 
-    const HULL_FORWARD: Real = 44.15338604779301;
-    const HULL_DISCOUNT: Real = 0.951229424500714;
-    const HULL_STD_DEV: Real = 0.14142135623730953;
+    use crate::pricingengines::hull_fixture::{
+        DISCOUNT as HULL_DISCOUNT, FORWARD as HULL_FORWARD, STD_DEV as HULL_STD_DEV,
+    };
 
     fn assert_close(actual: Real, expected: Real, tolerance: Real) {
         assert!(
@@ -545,6 +546,18 @@ mod tests {
             let at_zero = black_formula_asset_itm_probability(option_type, 40.0, forward, 0.0, 0.0)
                 .expect("valid inputs");
             assert_close(at_zero, limit, 1e-9);
+        }
+    }
+
+    #[test]
+    fn itm_probabilities_at_the_money_keep_the_zero_convention() {
+        for option_type in [OptionType::Call, OptionType::Put] {
+            let asset = black_formula_asset_itm_probability(option_type, 40.0, 40.0, 0.0, 0.0)
+                .expect("valid inputs");
+            assert_close(asset, 0.0, 0.0);
+            let cash = black_formula_cash_itm_probability(option_type, 40.0, 40.0, 0.0, 0.0)
+                .expect("valid inputs");
+            assert_close(cash, 0.0, 0.0);
         }
     }
 }

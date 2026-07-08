@@ -14,3 +14,18 @@ pub use blackformula::{
     black_formula_forward_derivative, black_formula_std_dev_derivative,
     black_formula_std_dev_second_derivative, black_formula_vol_derivative,
 };
+
+#[cfg(test)]
+pub(crate) mod hull_fixture {
+    //! Hull's S=42, K=40, r=10%, q=0, sigma=20%, T=0.5 European option,
+    //! shared by the blackformula and blackcalculator oracle tests.
+
+    use crate::types::{Real, Time};
+
+    pub(crate) const SPOT: Real = 42.0;
+    pub(crate) const STRIKE: Real = 40.0;
+    pub(crate) const MATURITY: Time = 0.5;
+    pub(crate) const FORWARD: Real = 44.15338604779301;
+    pub(crate) const DISCOUNT: Real = 0.951229424500714;
+    pub(crate) const STD_DEV: Real = 0.14142135623730953;
+}
