@@ -188,3 +188,225 @@ impl YieldTermStructure for FlatForward {
         self.flat_rate()?.discount_factor(t)
     }
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shared::shared;
+    use crate::test_support::{Flag, as_observer};
+    use crate::time::calendars::target::Target;
+    use crate::time::date::Month;
+    use crate::time::daycounters::actual360::Actual360;
+
+    fn today() -> Date {
+        Date::new(17, Month::May, 1998)
+    }
+
+    #[test]
+    fn flat_curve_reproduces_the_continuous_discounts_european_options_use() {
+        let q = FlatForward::with_rate(
+            today(),
+            0.04,
+            Actual360::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        );
+        let r = FlatForward::with_rate(
+            today(),
+            0.06,
+            Actual360::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        );
+        for days in [90, 180, 360, 720] {
+            let t = Time::from(days) / 360.0;
+            let df_q = q.discount_date(today() + days, false).unwrap();
+            let df_r = r.discount_date(today() + days, false).unwrap();
+            assert!((df_q - (-0.04 * t).exp()).abs() < 1.0e-15);
+            assert!((df_r - (-0.06 * t).exp()).abs() < 1.0e-15);
+        }
+        assert_eq!(q.discount(0.0, false).unwrap(), 1.0);
+    }
+
+    #[test]
+    fn zero_and_forward_rates_are_flat_at_the_quoted_rate() {
+        let curve = FlatForward::with_rate(
+            today(),
+            0.06,
+            Actual360::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        );
+        for t in [0.25, 1.0, 7.5] {
+            let zero = curve
+                .zero_rate(t, Compounding::Continuous, Frequency::Annual, false)
+                .unwrap();
+            assert!((zero.rate() - 0.06).abs() < 1.0e-12);
+        }
+        let forward = curve
+            .forward_rate(0.5, 2.5, Compounding::Continuous, Frequency::Annual, false)
+            .unwrap();
+        assert!((forward.rate() - 0.06).abs() < 1.0e-12);
+        let instantaneous = curve
+            .forward_rate(1.0, 1.0, Compounding::Continuous, Frequency::Annual, false)
+            .unwrap();
+        assert!((instantaneous.rate() - 0.06).abs() < 1.0e-9);
+    }
+
+    #[test]
+    fn compounded_quotes_discount_with_their_own_convention() {
+        let curve = FlatForward::with_rate(
+            today(),
+            0.06,
+            Actual360::new(),
+            Compounding::Compounded,
+            Frequency::Semiannual,
+        );
+        assert_eq!(curve.compounding(), Compounding::Compounded);
+        assert_eq!(curve.compounding_frequency(), Frequency::Semiannual);
+        let df = curve.discount(1.0, false).unwrap();
+        assert!((df - 1.0 / (1.0_f64 + 0.06 / 2.0).powi(2)).abs() < 1.0e-15);
+    }
+
+    #[test]
+    fn quote_change_notifies_observers_and_refreshes_the_rate() {
+        let quote = shared(SimpleQuote::new(0.05));
+        let curve = FlatForward::new(
+            today(),
+            Handle::new(quote.clone() as Shared<dyn Quote>),
+            Actual360::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        );
+        assert!((curve.discount(2.0, false).unwrap() - (-0.10_f64).exp()).abs() < 1.0e-15);
+
+        let flag = Flag::new();
+        curve.observable().register_observer(&as_observer(&flag));
+        quote.set_value(0.07);
+
+        assert!(
+            Flag::is_up(&flag),
+            "quote change must reach curve observers"
+        );
+        assert!((curve.discount(2.0, false).unwrap() - (-0.14_f64).exp()).abs() < 1.0e-15);
+    }
+
+    #[test]
+    fn observers_reading_during_the_notification_see_the_fresh_rate() {
+        struct Reader {
+            curve: Shared<FlatForward>,
+            seen: SharedMut<Option<DiscountFactor>>,
+        }
+        impl Observer for Reader {
+            fn update(&mut self) {
+                *self.seen.borrow_mut() = Some(self.curve.discount(1.0, false).unwrap());
+            }
+        }
+
+        let quote = shared(SimpleQuote::new(0.05));
+        let curve = shared(FlatForward::new(
+            today(),
+            Handle::new(quote.clone() as Shared<dyn Quote>),
+            Actual360::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        ));
+        curve.discount(1.0, false).unwrap();
+
+        let seen = shared_mut(None);
+        let reader = shared_mut(Reader {
+            curve: curve.clone(),
+            seen: SharedMut::clone(&seen),
+        });
+        curve
+            .observable()
+            .register_observer(&(reader.clone() as SharedMut<dyn Observer>));
+
+        quote.set_value(0.07);
+
+        let seen = seen.borrow().expect("reader must have been notified");
+        assert!(
+            (seen - (-0.07_f64).exp()).abs() < 1.0e-15,
+            "mid-notification read returned a stale discount ({seen})"
+        );
+    }
+
+    #[test]
+    fn relinking_the_handle_switches_the_curve_to_the_new_quote() {
+        let relinkable = crate::quotes::make_quote_handle(0.05);
+        let curve = FlatForward::new(
+            today(),
+            relinkable.handle(),
+            Actual360::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        );
+        assert!((curve.discount(1.0, false).unwrap() - (-0.05_f64).exp()).abs() < 1.0e-15);
+
+        let flag = Flag::new();
+        curve.observable().register_observer(&as_observer(&flag));
+        relinkable.link_to(shared(SimpleQuote::new(0.08)));
+
+        assert!(Flag::is_up(&flag), "relink must reach curve observers");
+        assert!((curve.discount(1.0, false).unwrap() - (-0.08_f64).exp()).abs() < 1.0e-15);
+    }
+
+    #[test]
+    fn moving_curve_follows_the_evaluation_date() {
+        let settings = shared_mut(Settings::new());
+        settings
+            .borrow_mut()
+            .set_evaluation_date(Date::new(15, Month::January, 2026));
+        let curve = FlatForward::moving_with_rate(
+            2,
+            Target::new(),
+            0.05,
+            Actual360::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+            settings.clone(),
+        )
+        .unwrap();
+        assert_eq!(
+            curve.reference_date().unwrap(),
+            Date::new(19, Month::January, 2026)
+        );
+
+        let flag = Flag::new();
+        curve.observable().register_observer(&as_observer(&flag));
+        settings
+            .borrow_mut()
+            .set_evaluation_date(Date::new(16, Month::January, 2026));
+
+        assert!(Flag::is_up(&flag));
+        assert_eq!(
+            curve.reference_date().unwrap(),
+            Date::new(20, Month::January, 2026)
+        );
+        let df = curve
+            .discount_date(Date::new(20, Month::January, 2027), false)
+            .unwrap();
+        assert!((df - (-0.05_f64 * 365.0 / 360.0).exp()).abs() < 1.0e-15);
+    }
+
+    #[test]
+    fn empty_or_invalid_quotes_error_instead_of_pricing() {
+        let curve = FlatForward::new(
+            today(),
+            Handle::empty(),
+            Actual360::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        );
+        assert!(curve.discount(1.0, false).is_err());
+
+        let unset = shared(SimpleQuote::default());
+        let curve = FlatForward::new(
+            today(),
+            Handle::new(unset as Shared<dyn Quote>),
+            Actual360::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        );
+        assert!(curve.discount(1.0, false).is_err());
+    }
+}
