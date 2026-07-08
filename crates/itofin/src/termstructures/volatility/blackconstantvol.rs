@@ -15,9 +15,9 @@
 use crate::errors::QlResult;
 use crate::handle::Handle;
 use crate::patterns::observable::{AsObservable, Observable};
-use crate::quotes::{Quote, SimpleQuote};
+use crate::quotes::{Quote, make_quote_handle};
 use crate::settings::Settings;
-use crate::shared::{Shared, SharedMut, shared};
+use crate::shared::SharedMut;
 use crate::termstructures::volatility::VolatilityTermStructure;
 use crate::termstructures::{TermStructure, TermStructureBase};
 use crate::time::businessdayconvention::BusinessDayConvention;
@@ -36,7 +36,7 @@ pub struct BlackConstantVol {
 
 impl BlackConstantVol {
     fn wrap(volatility: Volatility) -> Handle<dyn Quote> {
-        Handle::new(shared(SimpleQuote::new(volatility)) as Shared<dyn Quote>)
+        make_quote_handle(volatility).handle()
     }
 
     fn assemble(
@@ -146,13 +146,17 @@ impl BlackVolTermStructure for BlackConstantVol {
     fn black_vol_impl(&self, _t: Time, _strike: Real) -> QlResult<Volatility> {
         self.volatility.current_link()?.value()
     }
+
+    fn black_variance_impl(&self, t: Time, strike: Real) -> QlResult<Real> {
+        self.variance_from_vol(t, strike)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::quotes::make_quote_handle;
-    use crate::shared::shared_mut;
+    use crate::quotes::SimpleQuote;
+    use crate::shared::{Shared, shared, shared_mut};
     use crate::test_support::{Flag, as_observer};
     use crate::time::calendars::target::Target;
     use crate::time::date::Month;
