@@ -346,4 +346,92 @@ mod tests {
         curve.enable_extrapolation();
         assert!(curve.black_vol(2.5, 100.0, false).is_ok());
     }
+
+    #[test]
+    fn flat_volatility_extrapolation_keeps_the_last_vol() {
+        let curve = sample();
+        let variance = curve.black_variance(3.0, 100.0, true).unwrap();
+        assert!((variance - 0.18 / 2.0 * 3.0).abs() < 1.0e-15);
+        let vol = curve.black_vol(3.0, 100.0, true).unwrap();
+        assert!((vol - 0.30).abs() < 1.0e-15);
+        let by_date = curve
+            .black_vol_date(reference() + 1080, 100.0, true)
+            .unwrap();
+        assert!((by_date - 0.30).abs() < 1.0e-15);
+    }
+
+    fn sample_with(extrapolation: BlackVolTimeExtrapolation) -> BlackVarianceCurve {
+        let r = reference();
+        BlackVarianceCurve::with_interpolator(
+            r,
+            &[r + 180, r + 360, r + 720],
+            &[0.20, 0.25, 0.30],
+            Actual360::new(),
+            true,
+            extrapolation,
+            Linear,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn linear_variance_extrapolation_continues_the_last_segment() {
+        let curve = sample_with(BlackVolTimeExtrapolation::LinearVariance);
+        let variance = curve.black_variance(3.0, 100.0, true).unwrap();
+        let expected = 0.0625 + (3.0 - 1.0) * (0.18 - 0.0625) / (2.0 - 1.0);
+        assert!((variance - expected).abs() < 1.0e-15);
+
+        let inside = curve.black_variance(1.5, 100.0, false).unwrap();
+        assert!((inside - (0.0625 + 0.5 * (0.18 - 0.0625))).abs() < 1.0e-15);
+    }
+
+    #[test]
+    fn use_interpolator_extrapolation_is_an_explicit_error() {
+        let curve = sample_with(BlackVolTimeExtrapolation::UseInterpolator);
+        assert!(curve.black_variance(2.0, 100.0, false).is_ok());
+        let err = curve.black_variance(3.0, 100.0, true).unwrap_err();
+        assert!(err.message().contains("UseInterpolator"));
+    }
+
+    #[test]
+    fn non_monotone_variance_is_rejected_unless_forced_off() {
+        let r = reference();
+        let dates = [r + 180, r + 360];
+        let vols = [0.30, 0.20];
+        let dc = Actual360::new();
+
+        let err = BlackVarianceCurve::new(r, &dates, &vols, dc.clone(), true)
+            .err()
+            .unwrap();
+        assert!(err.message().contains("non-decreasing"));
+
+        let curve = BlackVarianceCurve::new(r, &dates, &vols, dc, false).unwrap();
+        let variance = curve.black_variance(1.0, 100.0, false).unwrap();
+        assert!((variance - 0.04).abs() < 1.0e-15);
+        let between = curve.black_variance(0.75, 100.0, false).unwrap();
+        assert!((between - 0.0425).abs() < 1.0e-15);
+    }
+
+    #[test]
+    fn nan_vols_are_rejected() {
+        let r = reference();
+        let dc = Actual360::new();
+        let err = BlackVarianceCurve::new(r, &[r + 180], &[Volatility::NAN], dc.clone(), true)
+            .err()
+            .unwrap();
+        assert!(err.message().contains("non-decreasing"));
+        assert!(BlackVarianceCurve::new(r, &[r + 180], &[Volatility::NAN], dc, false).is_err());
+    }
+
+    #[test]
+    fn forward_variance_is_additive_between_nodes() {
+        let curve = sample();
+        let fwd = curve
+            .black_forward_variance(0.5, 1.0, 100.0, false)
+            .unwrap();
+        assert!((fwd - (0.0625 - 0.02)).abs() < 1.0e-15);
+
+        let fwd_vol = curve.black_forward_vol(0.5, 1.0, 100.0, false).unwrap();
+        assert!((fwd_vol - (0.0425_f64 / 0.5).sqrt()).abs() < 1.0e-15);
+    }
 }
