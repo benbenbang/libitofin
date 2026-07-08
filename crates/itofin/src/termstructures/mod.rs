@@ -34,6 +34,7 @@
 //!   through the virtuals) must override
 //!   [`reference_date`](TermStructure::reference_date) as well.
 
+pub mod volatility;
 pub mod yields;
 pub mod yieldtermstructure;
 
@@ -43,7 +44,7 @@ use crate::errors::QlResult;
 use crate::math::comparison::close_enough;
 use crate::patterns::observable::{AsObservable, Observable, Observer};
 use crate::settings::Settings;
-use crate::shared::{Shared, SharedMut, shared, shared_mut};
+use crate::shared::{shared, shared_mut, Shared, SharedMut};
 use crate::time::businessdayconvention::BusinessDayConvention;
 use crate::time::calendar::Calendar;
 use crate::time::date::Date;
@@ -373,7 +374,7 @@ pub trait TermStructure: AsObservable {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_support::{Flag, as_observer};
+    use crate::test_support::{as_observer, Flag};
     use crate::time::calendars::target::Target;
     use crate::time::date::Month;
     use crate::time::daycounters::actual360::Actual360;
