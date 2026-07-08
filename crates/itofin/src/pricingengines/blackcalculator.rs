@@ -11,6 +11,12 @@
 //! (`alpha_ == 0` exactly) as a call and hands it in-the-money call greeks.
 //! The port dispatches on the stored option type, implementing the values the
 //! reference's own comments state; tests lock them.
+//!
+//! Faithful NaN artifact carried over from the reference: with `std_dev`
+//! above the epsilon threshold and a strike close to zero, `vega`, `gamma`
+//! and `strike_sensitivity` evaluate the same `0 * inf` and `0 / 0` forms as
+//! the C++ and return `NaN`, while `value` and the ITM probabilities stay
+//! well-defined; a test locks the artifact.
 
 use crate::errors::QlResult;
 use crate::fail;
@@ -147,8 +153,9 @@ impl BlackCalculator {
         )
     }
 
-    /// Zero-volatility sensitivities by moneyness, negated for puts.
-    fn zero_vol_ladder(&self, atm: Real, itm: Real, otm: Real) -> Real {
+    /// Zero-volatility sensitivities by moneyness, negated for puts;
+    /// out of the money they are always zero.
+    fn zero_vol_ladder(&self, atm: Real, itm: Real) -> Real {
         let is_call = self.option_type == OptionType::Call;
         let sign = if is_call { 1.0 } else { -1.0 };
         if close(self.forward, self.strike) {
@@ -156,7 +163,7 @@ impl BlackCalculator {
         } else if (self.forward > self.strike) == is_call {
             sign * itm
         } else {
-            sign * otm
+            0.0
         }
     }
 
@@ -168,7 +175,7 @@ impl BlackCalculator {
     /// Sensitivity to a change in the underlying forward price.
     pub fn delta_forward(&self) -> Real {
         if self.std_dev <= Real::EPSILON {
-            return self.zero_vol_ladder(0.5 * self.discount, self.discount, 0.0);
+            return self.zero_vol_ladder(0.5 * self.discount, self.discount);
         }
 
         let temp = self.std_dev * self.forward;
@@ -191,7 +198,6 @@ impl BlackCalculator {
             return Ok(self.zero_vol_ladder(
                 0.5 * self.discount * dforward_ds,
                 self.discount * dforward_ds,
-                0.0,
             ));
         }
 
@@ -354,7 +360,7 @@ impl BlackCalculator {
     /// Sensitivity to the strike.
     pub fn strike_sensitivity(&self) -> Real {
         if self.std_dev <= Real::EPSILON {
-            return self.zero_vol_ladder(-0.5 * self.discount, -self.discount, 0.0);
+            return self.zero_vol_ladder(-0.5 * self.discount, -self.discount);
         }
 
         let temp = self.std_dev * self.strike;
@@ -395,12 +401,7 @@ mod tests {
     use super::*;
     use crate::pricingengines::blackformula::black_formula;
 
-    const SPOT: Real = 42.0;
-    const STRIKE: Real = 40.0;
-    const MATURITY: Time = 0.5;
-    const FORWARD: Real = 44.15338604779301;
-    const DISCOUNT: Real = 0.951229424500714;
-    const STD_DEV: Real = 0.14142135623730953;
+    use crate::pricingengines::hull_fixture::{DISCOUNT, FORWARD, MATURITY, SPOT, STD_DEV, STRIKE};
 
     fn assert_close(actual: Real, expected: Real, tolerance: Real) {
         assert!(
@@ -574,6 +575,15 @@ mod tests {
         assert_close(calculator.value(), DISCOUNT * FORWARD, 1e-12);
         assert_close(calculator.itm_cash_probability(), 1.0, 0.0);
         assert_close(calculator.itm_asset_probability(), 1.0, 0.0);
+    }
+
+    #[test]
+    fn near_zero_strike_greeks_carry_the_reference_nan() {
+        let calculator = BlackCalculator::new(OptionType::Call, 0.0, FORWARD, STD_DEV, DISCOUNT)
+            .expect("valid inputs");
+        assert!(calculator.vega(MATURITY).expect("valid").is_nan());
+        assert!(calculator.gamma(SPOT).expect("valid").is_nan());
+        assert!(calculator.strike_sensitivity().is_nan());
     }
 
     #[test]
