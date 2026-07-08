@@ -69,6 +69,18 @@ impl Drop for DrainGuard {
     }
 }
 
+/// Delivers one notification with the same re-entrancy discipline as
+/// [`Observable::notify_observers`]: a busy observer is queued for the
+/// outermost round instead of panicking on the live borrow. For observers
+/// that forward to another observer directly, outside any observable's
+/// registry.
+pub(crate) fn deliver(observer: &SharedMut<dyn Observer>) {
+    match observer.try_borrow_mut() {
+        Ok(mut delivered) => delivered.update(),
+        Err(_) => defer(observer),
+    }
+}
+
 /// Queues an undeliverable observer for the outermost round, once.
 fn defer(observer: &SharedMut<dyn Observer>) {
     let weak = SharedMut::downgrade(observer);
