@@ -111,7 +111,6 @@ impl PricingEngine for AnalyticEuropeanEngine {
 
         let rfdc = risk_free.require_day_counter()?;
         let divdc = dividend.require_day_counter()?;
-        let voldc = black_vol.require_day_counter()?;
 
         let t = rfdc.year_fraction(risk_free.reference_date()?, maturity_date);
         let rho = black.rho(t)?;
@@ -119,17 +118,15 @@ impl PricingEngine for AnalyticEuropeanEngine {
         let t = divdc.year_fraction(dividend.reference_date()?, maturity_date);
         let dividend_rho = black.dividend_rho(t)?;
 
-        let t = voldc.year_fraction(black_vol.reference_date()?, maturity_date);
-        let vega = black.vega(t)?;
-        let (theta, theta_per_day) = match black.theta(spot, t) {
+        let time_to_expiry = black_vol.time_from_reference(maturity_date)?;
+        let vega = black.vega(time_to_expiry)?;
+        let (theta, theta_per_day) = match black.theta(spot, time_to_expiry) {
             Ok(theta) => (Some(theta), Some(theta / 365.0)),
             Err(_) => (None, None),
         };
 
         let strike_sensitivity = black.strike_sensitivity();
         let itm_cash_probability = black.itm_cash_probability();
-
-        let time_to_expiry = black_vol.time_from_reference(maturity_date)?;
 
         let results = self.base.results_mut();
         results.instrument.value = Some(value);
@@ -234,7 +231,7 @@ pub(crate) mod test_market {
         }
     }
 
-    fn quote_handle(quote: &Shared<SimpleQuote>) -> Handle<dyn Quote> {
+    pub(crate) fn quote_handle(quote: &Shared<SimpleQuote>) -> Handle<dyn Quote> {
         Handle::new(Shared::clone(quote) as Shared<dyn Quote>)
     }
 
@@ -810,7 +807,7 @@ mod test_greeks {
     //! payoffs are follow-up work and their sweeps come with them.
 
     use super::AnalyticEuropeanEngine;
-    use super::test_market::{time_to_days, today};
+    use super::test_market::{quote_handle, time_to_days, today};
     use crate::exercise::EuropeanExercise;
     use crate::handle::Handle;
     use crate::instrument::Instrument;
@@ -819,7 +816,7 @@ mod test_greeks {
     use crate::option::OptionType;
     use crate::pricingengine::PricingEngine;
     use crate::processes::BlackScholesMertonProcess;
-    use crate::quotes::{Quote, SimpleQuote};
+    use crate::quotes::SimpleQuote;
     use crate::settings::Settings;
     use crate::shared::{Shared, SharedMut, shared, shared_mut};
     use crate::termstructures::volatility::BlackConstantVol;
@@ -841,10 +838,6 @@ mod test_greeks {
         r_rate: Shared<SimpleQuote>,
         vol: Shared<SimpleQuote>,
         process: Shared<BlackScholesMertonProcess>,
-    }
-
-    fn quote_handle(quote: &Shared<SimpleQuote>) -> Handle<dyn Quote> {
-        Handle::new(Shared::clone(quote) as Shared<dyn Quote>)
     }
 
     fn moving_market() -> MovingMarket {
