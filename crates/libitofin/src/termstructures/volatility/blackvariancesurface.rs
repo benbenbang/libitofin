@@ -24,6 +24,10 @@
 //! - The construction checks (`QL_REQUIRE`) become `Err`s per D4, and an
 //!   empty date vector is an explicit error where C++ would read past the
 //!   end.
+//! - A single-strike grid (`strikes.len() == 1`) fails construction with the
+//!   interpolator's own "at least 2 y points" error rather than a
+//!   domain-level check, since `Bilinear`/`Bicubic` cannot span a one-node
+//!   axis (the same limitation as C++'s `Bilinear`).
 
 use crate::errors::QlResult;
 use crate::math::interpolations::bilinear::Bilinear;
