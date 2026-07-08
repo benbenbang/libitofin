@@ -25,6 +25,10 @@
 //!   the traits).
 //! - `QL_ENSURE` on non-decreasing variances becomes an `Err`, per D4.
 
+mod blackconstantvol;
+
+pub use blackconstantvol::BlackConstantVol;
+
 use crate::errors::QlResult;
 use crate::termstructures::TermStructure;
 use crate::time::businessdayconvention::BusinessDayConvention;
@@ -346,5 +350,53 @@ mod tests {
         assert!(curve.black_vol(1.0, 80.0, false).is_ok());
         curve.disable_extrapolation();
         assert!(curve.black_vol(1.0, Rate::NAN, false).is_err());
+    }
+    #[test]
+    fn forward_variance_of_a_flat_curve_is_additive() {
+        let curve = MockVolCurve::flat(0.2);
+        let fwd = curve
+            .black_forward_variance(1.0, 3.0, 100.0, false)
+            .unwrap();
+        assert!((fwd - 0.04 * 2.0).abs() < 1e-15);
+    }
+
+    #[test]
+    fn reversed_times_and_dates_are_errors() {
+        let curve = MockVolCurve::flat(0.2);
+        let err = curve.black_forward_vol(2.0, 1.0, 100.0, false).unwrap_err();
+        assert!(err.message().contains("later than"));
+
+        let reference = Date::new(15, Month::June, 2026);
+        let err = curve
+            .black_forward_variance_dates(reference + 30, reference + 10, 100.0, false)
+            .unwrap_err();
+        assert!(err.message().contains("later than"));
+    }
+
+    #[test]
+    fn range_checks_gate_time_and_date() {
+        let curve = MockVolCurve::flat(0.2);
+        assert!(curve.black_vol(-0.5, 100.0, false).is_err());
+        let before = Date::new(14, Month::June, 2026);
+        assert!(curve.black_vol_date(before, 100.0, false).is_err());
+        assert!(curve.black_variance_date(before, 100.0, false).is_err());
+    }
+
+    #[test]
+    fn option_date_from_tenor_advances_swaption_style() {
+        let curve = MockVolCurve::flat(0.2);
+        let expected = Target::new().advance(
+            Date::new(15, Month::June, 2026),
+            3,
+            TimeUnit::Months,
+            BusinessDayConvention::Following,
+            false,
+        );
+        assert_eq!(
+            curve
+                .option_date_from_tenor(Period::new(3, TimeUnit::Months))
+                .unwrap(),
+            expected
+        );
     }
 }
