@@ -31,6 +31,7 @@ mod blackvariancecurve;
 mod blackvariancesurface;
 mod localconstantvol;
 mod localvolcurve;
+mod localvolsurface;
 mod localvoltermstructure;
 
 pub use blackconstantvol::BlackConstantVol;
@@ -38,6 +39,7 @@ pub use blackvariancecurve::{BlackVarianceCurve, BlackVolTimeExtrapolation};
 pub use blackvariancesurface::{BlackVarianceSurface, Extrapolation};
 pub use localconstantvol::LocalConstantVol;
 pub use localvolcurve::LocalVolCurve;
+pub use localvolsurface::LocalVolSurface;
 pub use localvoltermstructure::LocalVolTermStructure;
 
 use std::any::Any;
