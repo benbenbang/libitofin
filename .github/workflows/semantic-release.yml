@@ -30,7 +30,6 @@ jobs:
   publish-crate:
     name: publish libitofin to crates.io
     needs: semantic-release
-    # only when a release was actually cut this run
     if: ${{ needs.semantic-release.outputs.new_release == 'true' }}
     runs-on: ubuntu-latest
     permissions:
@@ -43,8 +42,6 @@ jobs:
       - name: install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: sync the workspace version to the release tag
-        # semantic-release tags but does not bump Cargo.toml; align it here so
-        # the published version matches the git tag (tagFormat is bare "${version}").
         run: |
           VER="${{ needs.semantic-release.outputs.new_release_tag }}"
           sed -i -E "s/^version = \"[0-9]+\.[0-9]+\.[0-9]+\"/version = \"${VER}\"/" Cargo.toml
