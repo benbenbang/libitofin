@@ -2,7 +2,7 @@
 """Transcribe QuantLib Sobol / lattice static data tables into generated Rust files.
 
 Reads the C++ sources under QuantLib/ql/math/randomnumbers and emits Rust
-statics under crates/itofin/src/math/randomnumbers. Large tables are split
+statics under crates/libitofin/src/math/randomnumbers. Large tables are split
 into multiple data files so every generated file stays under the pre-commit
 large-file limit (1024 KB).
 
@@ -184,7 +184,7 @@ def emit_lattices(out_dir, lattices):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--quantlib", default="QuantLib/ql/math/randomnumbers")
-    parser.add_argument("--out", default="crates/itofin/src/math/randomnumbers")
+    parser.add_argument("--out", default="crates/libitofin/src/math/randomnumbers")
     args = parser.parse_args()
     src = pathlib.Path(args.quantlib)
     out = pathlib.Path(args.out)
