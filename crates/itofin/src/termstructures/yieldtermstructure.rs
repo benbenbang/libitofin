@@ -90,9 +90,7 @@ pub trait YieldTermStructure: TermStructure {
         freq: Frequency,
         extrapolate: bool,
     ) -> QlResult<InterestRate> {
-        let Some(day_counter) = self.day_counter() else {
-            crate::fail!("no day counter provided for this term structure");
-        };
+        let day_counter = self.require_day_counter()?;
         let t = if t == 0.0 { DT } else { t };
         let compound = 1.0 / self.discount(t, extrapolate)?;
         InterestRate::implied_rate(compound, day_counter, comp, freq, t)
@@ -149,9 +147,7 @@ pub trait YieldTermStructure: TermStructure {
         freq: Frequency,
         extrapolate: bool,
     ) -> QlResult<InterestRate> {
-        let Some(day_counter) = self.day_counter() else {
-            crate::fail!("no day counter provided for this term structure");
-        };
+        let day_counter = self.require_day_counter()?;
         let (t1, t2, compound) = if t2 == t1 {
             self.check_range_time(t1, extrapolate)?;
             let t1 = Time::max(t1 - DT / 2.0, 0.0);
