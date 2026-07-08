@@ -8,8 +8,25 @@
 
 use crate::errors::QlResult;
 use crate::fail;
-use crate::math::interpolations::Interpolation;
+use crate::math::interpolations::{Interpolation, Interpolator};
 use crate::types::{Real, Size};
+
+/// Factory for [`BackwardFlatInterpolation`] (QuantLib's `BackwardFlat` traits
+/// class); unlike most interpolations a single node suffices.
+#[derive(Clone, Copy, Default)]
+pub struct BackwardFlat;
+
+impl Interpolator for BackwardFlat {
+    type Output = BackwardFlatInterpolation;
+
+    fn interpolate(&self, x: &[Real], y: &[Real]) -> QlResult<BackwardFlatInterpolation> {
+        BackwardFlatInterpolation::new(x.to_vec(), y.to_vec())
+    }
+
+    fn required_points(&self) -> Size {
+        1
+    }
+}
 
 /// Validate the `(x, y)` nodes: equal length of at least `min_points`, finite,
 /// strictly increasing `x`. QuantLib requires 1 point for backward-flat and 2 for
@@ -298,6 +315,16 @@ mod tests {
         }
         // forward-flat needs at least two points (QuantLib parity)
         assert!(ForwardFlatInterpolation::new(vec![1.0], vec![2.5]).is_err());
+    }
+
+    #[test]
+    fn factory_builds_the_interpolation_and_allows_a_single_node() {
+        let f = BackwardFlat
+            .interpolate(&[0.0, 1.0, 3.0], &[5.0, 4.0, 2.0])
+            .unwrap();
+        assert_eq!(f.value(0.5).unwrap(), 4.0);
+        assert_eq!(BackwardFlat.required_points(), 1);
+        assert!(BackwardFlat.interpolate(&[1.0], &[2.5]).is_ok());
     }
 
     #[test]
