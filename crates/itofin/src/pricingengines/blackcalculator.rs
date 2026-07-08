@@ -389,3 +389,216 @@ fn elasticity_from(value: Real, delta: Real, underlying: Real) -> Real {
         Real::MIN
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::pricingengines::blackformula::black_formula;
+
+    const SPOT: Real = 42.0;
+    const STRIKE: Real = 40.0;
+    const MATURITY: Time = 0.5;
+    const FORWARD: Real = 44.15338604779301;
+    const DISCOUNT: Real = 0.951229424500714;
+    const STD_DEV: Real = 0.14142135623730953;
+
+    fn assert_close(actual: Real, expected: Real, tolerance: Real) {
+        assert!(
+            (actual - expected).abs() <= tolerance,
+            "actual {actual} vs expected {expected} (tolerance {tolerance})"
+        );
+    }
+
+    fn hull(option_type: OptionType) -> BlackCalculator {
+        BlackCalculator::new(option_type, STRIKE, FORWARD, STD_DEV, DISCOUNT).expect("valid inputs")
+    }
+
+    #[test]
+    fn values_and_greeks_match_black_scholes() {
+        let call = hull(OptionType::Call);
+        let put = hull(OptionType::Put);
+
+        assert_close(call.value(), 4.759422392871536, 1e-10);
+        assert_close(put.value(), 0.8085993729000926, 1e-10);
+        assert_close(call.delta(SPOT).expect("valid"), 0.7791312909426689, 1e-10);
+        assert_close(put.delta(SPOT).expect("valid"), -0.22086870905733139, 1e-10);
+        assert_close(call.delta_forward(), 0.7411326094938935, 1e-10);
+        assert_close(call.gamma(SPOT).expect("valid"), 0.04996267040591187, 1e-10);
+        assert_close(put.gamma(SPOT).expect("valid"), 0.04996267040591187, 1e-10);
+        assert_close(
+            call.theta(SPOT, MATURITY).expect("valid"),
+            -4.559092194592632,
+            1e-10,
+        );
+        assert_close(
+            put.theta(SPOT, MATURITY).expect("valid"),
+            -0.754174496589769,
+            1e-10,
+        );
+        assert_close(
+            call.theta_per_day(SPOT, MATURITY).expect("valid"),
+            -0.01249066354682913,
+            1e-10,
+        );
+        assert_close(
+            call.vega(MATURITY).expect("valid"),
+            8.813415059602862,
+            1e-10,
+        );
+        assert_close(put.vega(MATURITY).expect("valid"), 8.813415059602862, 1e-10);
+        assert_close(
+            call.rho(MATURITY).expect("valid"),
+            13.982045913360277,
+            1e-10,
+        );
+        assert_close(put.rho(MATURITY).expect("valid"), -5.042542576653999, 1e-10);
+        assert_close(
+            call.dividend_rho(MATURITY).expect("valid"),
+            -16.361757109796045,
+            1e-10,
+        );
+        assert_close(
+            put.dividend_rho(MATURITY).expect("valid"),
+            4.638242890203953,
+            1e-10,
+        );
+        assert_close(call.strike_sensitivity(), -0.6991022956680139, 1e-10);
+        assert_close(put.strike_sensitivity(), 0.2521271288327002, 1e-10);
+        assert_close(call.itm_cash_probability(), 0.7349460368459086, 1e-10);
+        assert_close(
+            call.elasticity(SPOT).expect("valid"),
+            6.875522178616465,
+            1e-9,
+        );
+    }
+
+    #[test]
+    fn value_agrees_with_black_formula() {
+        for option_type in [OptionType::Call, OptionType::Put] {
+            for strike in [20.0, 40.0, 60.0] {
+                for std_dev in [0.05, 0.5, 2.0] {
+                    let calculator =
+                        BlackCalculator::new(option_type, strike, FORWARD, std_dev, DISCOUNT)
+                            .expect("valid inputs");
+                    let formula =
+                        black_formula(option_type, strike, FORWARD, std_dev, DISCOUNT, 0.0)
+                            .expect("valid inputs");
+                    assert_close(calculator.value(), formula, 1e-12);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn payoff_constructor_matches_explicit_one() {
+        let payoff = PlainVanillaPayoff::new(OptionType::Put, STRIKE);
+        let from_payoff = BlackCalculator::with_payoff(&payoff, FORWARD, STD_DEV, DISCOUNT)
+            .expect("valid inputs");
+        assert_close(from_payoff.value(), hull(OptionType::Put).value(), 0.0);
+    }
+
+    #[test]
+    fn delta_is_forward_delta_scaled_by_forward_over_spot() {
+        for option_type in [OptionType::Call, OptionType::Put] {
+            let calculator = hull(option_type);
+            assert_close(
+                calculator.delta(SPOT).expect("valid"),
+                calculator.delta_forward() * FORWARD / SPOT,
+                1e-12,
+            );
+        }
+    }
+
+    #[test]
+    fn forward_greeks_match_bumped_values() {
+        let bump = 1.0e-4;
+        for option_type in [OptionType::Call, OptionType::Put] {
+            let base = hull(option_type);
+            let up = BlackCalculator::new(option_type, STRIKE, FORWARD + bump, STD_DEV, DISCOUNT)
+                .expect("valid inputs");
+            let down = BlackCalculator::new(option_type, STRIKE, FORWARD - bump, STD_DEV, DISCOUNT)
+                .expect("valid inputs");
+
+            let delta_approx = (up.value() - down.value()) / (2.0 * bump);
+            assert_close(base.delta_forward(), delta_approx, 1e-7);
+
+            let gamma_approx = (up.value() - 2.0 * base.value() + down.value()) / (bump * bump);
+            assert_close(base.gamma_forward(), gamma_approx, 1e-4);
+        }
+    }
+
+    #[test]
+    fn zero_volatility_ladder_matches_stated_intent() {
+        let discount = 0.95;
+        let cases = [
+            (OptionType::Call, 44.0, 40.0, 1.0, -1.0),
+            (OptionType::Call, 36.0, 40.0, 0.0, 0.0),
+            (OptionType::Call, 40.0, 40.0, 0.5, -0.5),
+            (OptionType::Put, 36.0, 40.0, -1.0, 1.0),
+            (OptionType::Put, 44.0, 40.0, 0.0, 0.0),
+            (OptionType::Put, 40.0, 40.0, -0.5, 0.5),
+        ];
+        for (option_type, forward, strike, delta_units, strike_units) in cases {
+            let calculator = BlackCalculator::new(option_type, strike, forward, 0.0, discount)
+                .expect("valid inputs");
+            assert_close(calculator.delta_forward(), delta_units * discount, 1e-15);
+            assert_close(
+                calculator.delta(forward).expect("valid"),
+                delta_units * discount,
+                1e-15,
+            );
+            assert_close(
+                calculator.strike_sensitivity(),
+                strike_units * discount,
+                1e-15,
+            );
+            assert_close(calculator.gamma(forward).expect("valid"), 0.0, 0.0);
+            assert_close(calculator.gamma_forward(), 0.0, 0.0);
+            assert_close(calculator.vega(1.0).expect("valid"), 0.0, 0.0);
+        }
+    }
+
+    #[test]
+    fn zero_volatility_otm_put_gets_put_greeks_not_call_greeks() {
+        let calculator =
+            BlackCalculator::new(OptionType::Put, 40.0, 44.0, 0.0, 0.95).expect("valid inputs");
+        assert_close(calculator.delta_forward(), 0.0, 0.0);
+        assert_close(calculator.delta(44.0).expect("valid"), 0.0, 0.0);
+        assert_close(calculator.strike_sensitivity(), 0.0, 0.0);
+    }
+
+    #[test]
+    fn near_zero_strike_prices_the_discounted_forward() {
+        let calculator = BlackCalculator::new(OptionType::Call, 0.0, FORWARD, STD_DEV, DISCOUNT)
+            .expect("valid inputs");
+        assert_close(calculator.value(), DISCOUNT * FORWARD, 1e-12);
+        assert_close(calculator.itm_cash_probability(), 1.0, 0.0);
+        assert_close(calculator.itm_asset_probability(), 1.0, 0.0);
+    }
+
+    #[test]
+    fn theta_is_zero_at_expiry() {
+        let calculator = hull(OptionType::Call);
+        assert_close(calculator.theta(SPOT, 0.0).expect("valid"), 0.0, 0.0);
+    }
+
+    #[test]
+    fn invalid_inputs_are_rejected() {
+        assert!(BlackCalculator::new(OptionType::Call, -1.0, FORWARD, STD_DEV, DISCOUNT).is_err());
+        assert!(BlackCalculator::new(OptionType::Call, STRIKE, 0.0, STD_DEV, DISCOUNT).is_err());
+        assert!(BlackCalculator::new(OptionType::Call, STRIKE, FORWARD, -0.1, DISCOUNT).is_err());
+        assert!(BlackCalculator::new(OptionType::Call, STRIKE, FORWARD, STD_DEV, 0.0).is_err());
+        assert!(
+            BlackCalculator::new(OptionType::Call, Real::NAN, FORWARD, STD_DEV, DISCOUNT).is_err()
+        );
+
+        let calculator = hull(OptionType::Call);
+        assert!(calculator.delta(0.0).is_err());
+        assert!(calculator.delta(Real::NAN).is_err());
+        assert!(calculator.gamma(-1.0).is_err());
+        assert!(calculator.theta(SPOT, -0.5).is_err());
+        assert!(calculator.vega(-0.5).is_err());
+        assert!(calculator.rho(-0.5).is_err());
+        assert!(calculator.dividend_rho(-0.5).is_err());
+    }
+}
