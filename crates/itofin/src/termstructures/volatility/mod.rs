@@ -27,8 +27,14 @@
 //! - `QL_ENSURE` on non-decreasing variances becomes an `Err`, per D4.
 
 mod blackconstantvol;
+mod localconstantvol;
+mod localvoltermstructure;
 
 pub use blackconstantvol::BlackConstantVol;
+pub use localconstantvol::LocalConstantVol;
+pub use localvoltermstructure::LocalVolTermStructure;
+
+use std::any::Any;
 
 use crate::errors::QlResult;
 use crate::termstructures::TermStructure;
@@ -90,7 +96,11 @@ pub trait VolatilityTermStructure: TermStructure {
 /// perform the range and strike checks and dispatch to the hooks, which may
 /// therefore assume extrapolation is required. Volatilities are expressed on
 /// an annual basis.
-pub trait BlackVolTermStructure: VolatilityTermStructure {
+///
+/// The `Any` supertrait stands in for the C++ `dynamic_pointer_cast`s that
+/// inspect a curve's concrete type (`GeneralizedBlackScholesProcess` probes
+/// for `BlackConstantVol` to pick its local-volatility shortcut).
+pub trait BlackVolTermStructure: VolatilityTermStructure + Any {
     /// Black volatility calculation hook; range checks have already run.
     fn black_vol_impl(&self, t: Time, strike: Real) -> QlResult<Volatility>;
 
