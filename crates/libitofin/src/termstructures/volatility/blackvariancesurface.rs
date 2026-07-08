@@ -233,3 +233,229 @@ impl BlackVolTermStructure for BlackVarianceSurface {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::math::interpolations::bicubic::Bicubic;
+    use crate::test_support::{Flag, as_observer};
+    use crate::time::date::Month;
+    use crate::time::daycounters::actual365fixed::Actual365Fixed;
+
+    // Strikes [90, 100, 110] x dates [ref+365d, ref+730d] (t = 1, 2 under
+    // Actual365Fixed), vols per (strike, date):
+    //   90:  0.20  0.25        variances:  0.0400  0.1250
+    //   100: 0.18  0.22                    0.0324  0.0968
+    //   110: 0.16  0.20                    0.0256  0.0800
+    fn reference() -> Date {
+        Date::new(15, Month::June, 2026)
+    }
+
+    fn vol_matrix() -> Matrix {
+        let vols = [[0.20, 0.25], [0.18, 0.22], [0.16, 0.20]];
+        let mut m = Matrix::with_size(3, 2);
+        for (i, row) in vols.iter().enumerate() {
+            for (j, &vol) in row.iter().enumerate() {
+                m[(i, j)] = vol;
+            }
+        }
+        m
+    }
+
+    fn surface_with(lower: Extrapolation, upper: Extrapolation) -> BlackVarianceSurface {
+        let reference = reference();
+        BlackVarianceSurface::with_strike_extrapolation(
+            reference,
+            None,
+            &[reference + 365, reference + 730],
+            vec![90.0, 100.0, 110.0],
+            &vol_matrix(),
+            Actual365Fixed::new(),
+            lower,
+            upper,
+        )
+        .unwrap()
+    }
+
+    fn surface() -> BlackVarianceSurface {
+        surface_with(
+            Extrapolation::InterpolatorDefaultExtrapolation,
+            Extrapolation::InterpolatorDefaultExtrapolation,
+        )
+    }
+
+    fn assert_close(got: Real, expected: Real) {
+        assert!(
+            (got - expected).abs() < 1e-14,
+            "got {got}, expected {expected}"
+        );
+    }
+
+    #[test]
+    fn nodes_reproduce_variance_and_vol() {
+        let s = surface();
+        assert_close(s.black_variance(1.0, 100.0, false).unwrap(), 0.0324);
+        assert_close(s.black_variance(2.0, 90.0, false).unwrap(), 0.125);
+        assert_close(s.black_vol(1.0, 90.0, false).unwrap(), 0.20);
+        assert_close(s.black_vol(2.0, 110.0, false).unwrap(), 0.20);
+        assert_close(
+            s.black_vol_date(reference() + 365, 100.0, false).unwrap(),
+            0.18,
+        );
+    }
+
+    #[test]
+    fn variance_interpolates_bilinearly_between_nodes() {
+        let s = surface();
+        assert_close(s.black_variance(0.5, 100.0, false).unwrap(), 0.0324 * 0.5);
+        let corners = (0.04 + 0.0324 + 0.125 + 0.0968) / 4.0;
+        assert_close(s.black_variance(1.5, 95.0, false).unwrap(), corners);
+    }
+
+    #[test]
+    fn zero_time_has_zero_variance_and_the_short_end_vol() {
+        let s = surface();
+        assert_close(s.black_variance(0.0, 100.0, false).unwrap(), 0.0);
+        // var is linear from (0, 0) to (1, 0.0324), so sqrt(var(eps)/eps)
+        // recovers the first-node vol exactly.
+        let vol = s.black_vol(0.0, 100.0, false).unwrap();
+        assert!((vol - 0.18).abs() < 1e-12, "got {vol}");
+    }
+
+    #[test]
+    fn variance_extrapolates_linearly_in_time_past_the_last_node() {
+        let s = surface();
+        assert_close(
+            s.black_variance(4.0, 100.0, true).unwrap(),
+            0.0968 * 4.0 / 2.0,
+        );
+        assert!(s.black_variance(4.0, 100.0, false).is_err());
+        s.enable_extrapolation();
+        assert_close(s.black_variance(4.0, 100.0, false).unwrap(), 0.0968 * 2.0);
+    }
+
+    #[test]
+    fn default_strike_extrapolation_extends_the_boundary_cells() {
+        let s = surface();
+        assert_close(s.black_variance(1.0, 120.0, true).unwrap(), 0.0188);
+        assert_close(s.black_variance(1.0, 80.0, true).unwrap(), 0.0476);
+    }
+
+    #[test]
+    fn constant_strike_extrapolation_clamps_to_the_boundary() {
+        let s = surface_with(
+            Extrapolation::ConstantExtrapolation,
+            Extrapolation::ConstantExtrapolation,
+        );
+        assert_close(s.black_variance(1.0, 80.0, true).unwrap(), 0.04);
+        assert_close(s.black_variance(1.0, 120.0, true).unwrap(), 0.0256);
+
+        let mixed = surface_with(
+            Extrapolation::ConstantExtrapolation,
+            Extrapolation::InterpolatorDefaultExtrapolation,
+        );
+        assert_close(mixed.black_variance(1.0, 80.0, true).unwrap(), 0.04);
+        assert_close(mixed.black_variance(1.0, 120.0, true).unwrap(), 0.0188);
+    }
+
+    #[test]
+    fn strike_checks_gate_the_grid_domain() {
+        let s = surface();
+        assert_eq!(s.min_strike(), 90.0);
+        assert_eq!(s.max_strike(), 110.0);
+        assert_eq!(s.max_date(), reference() + 730);
+        let err = s.black_variance(1.0, 120.0, false).unwrap_err();
+        assert!(err.message().contains("outside the curve domain"));
+    }
+
+    #[test]
+    fn vol_and_variance_stay_consistent_off_nodes() {
+        let s = surface();
+        for (t, k) in [(0.7, 93.0), (1.3, 104.5), (2.0, 100.0)] {
+            let vol = s.black_vol(t, k, false).unwrap();
+            let var = s.black_variance(t, k, false).unwrap();
+            assert!((vol * vol * t - var).abs() < 1e-14);
+        }
+    }
+
+    #[test]
+    fn forward_variance_is_additive_across_nodes() {
+        let s = surface();
+        let fwd = s.black_forward_variance(1.0, 2.0, 90.0, false).unwrap();
+        assert_close(fwd, 0.125 - 0.04);
+    }
+
+    #[test]
+    fn set_interpolation_reproduces_nodes_and_notifies() {
+        let mut s = surface();
+        let flag = Flag::new();
+        s.observable().register_observer(&as_observer(&flag));
+        s.set_interpolation(&Bicubic).unwrap();
+        assert!(Flag::is_up(&flag));
+        assert!((s.black_variance(1.0, 100.0, false).unwrap() - 0.0324).abs() < 1e-12);
+        assert!((s.black_vol(2.0, 90.0, false).unwrap() - 0.25).abs() < 1e-12);
+    }
+
+    fn expect_err(result: QlResult<BlackVarianceSurface>) -> String {
+        match result {
+            Ok(_) => panic!("expected a construction error"),
+            Err(err) => err.message().to_string(),
+        }
+    }
+
+    #[test]
+    fn construction_errors_match_the_quantlib_checks() {
+        let reference = reference();
+        let dates = [reference + 365, reference + 730];
+
+        let err = expect_err(BlackVarianceSurface::new(
+            reference,
+            None,
+            &[reference + 730, reference + 365],
+            vec![90.0, 100.0, 110.0],
+            &vol_matrix(),
+            Actual365Fixed::new(),
+        ));
+        assert!(err.contains("sorted unique"));
+
+        let err = expect_err(BlackVarianceSurface::new(
+            reference,
+            None,
+            &[reference - 1, reference + 365],
+            vec![90.0, 100.0, 110.0],
+            &vol_matrix(),
+            Actual365Fixed::new(),
+        ));
+        assert!(err.contains("cannot have dates[0]"));
+
+        let err = expect_err(BlackVarianceSurface::new(
+            reference,
+            None,
+            &dates[..1],
+            vec![90.0, 100.0, 110.0],
+            &vol_matrix(),
+            Actual365Fixed::new(),
+        ));
+        assert!(err.contains("date vector"));
+
+        let err = expect_err(BlackVarianceSurface::new(
+            reference,
+            None,
+            &dates,
+            vec![90.0, 100.0],
+            &vol_matrix(),
+            Actual365Fixed::new(),
+        ));
+        assert!(err.contains("money-strike"));
+
+        let err = expect_err(BlackVarianceSurface::new(
+            reference,
+            None,
+            &[],
+            vec![],
+            &Matrix::new(),
+            Actual365Fixed::new(),
+        ));
+        assert!(err.contains("no dates given"));
+    }
+}
