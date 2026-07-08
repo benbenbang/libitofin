@@ -330,3 +330,302 @@ impl Instrument for OneAssetOption {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cell::Cell;
+
+    use crate::exercise::EuropeanExercise;
+    use crate::instruments::PlainVanillaPayoff;
+    use crate::option::OptionType;
+    use crate::patterns::observable::{AsObservable, Observable};
+    use crate::pricingengine::PricingEngine;
+    use crate::shared::{shared, shared_mut};
+    use crate::time::date::Month;
+
+    const SPOT: Real = 105.0;
+
+    struct StubEngine {
+        base: OneAssetOptionEngine,
+        calculations: Shared<Cell<usize>>,
+        provide_greeks: bool,
+    }
+
+    impl AsObservable for StubEngine {
+        fn observable(&self) -> &Observable {
+            self.base.observable()
+        }
+    }
+
+    impl PricingEngine for StubEngine {
+        fn arguments_mut(&mut self) -> &mut dyn Arguments {
+            self.base.arguments_mut()
+        }
+
+        fn results(&self) -> &dyn Results {
+            self.base.results()
+        }
+
+        fn reset(&mut self) {
+            self.base.reset();
+        }
+
+        fn calculate(&mut self) -> QlResult<()> {
+            self.calculations.set(self.calculations.get() + 1);
+            let payoff = Shared::clone(self.base.arguments().payoff.as_ref().expect("validated"));
+            let provide_greeks = self.provide_greeks;
+            let results = self.base.results_mut();
+            results.instrument.value = Some(payoff.value(SPOT));
+            if provide_greeks {
+                results.greeks = Greeks {
+                    delta: Some(0.1),
+                    gamma: Some(0.2),
+                    theta: Some(0.3),
+                    vega: Some(0.4),
+                    rho: Some(0.5),
+                    dividend_rho: Some(0.6),
+                };
+                results.more_greeks = MoreGreeks {
+                    itm_cash_probability: Some(0.7),
+                    delta_forward: Some(0.8),
+                    elasticity: Some(0.9),
+                    theta_per_day: Some(1.1),
+                    strike_sensitivity: Some(1.2),
+                };
+            }
+            Ok(())
+        }
+    }
+
+    fn stub_engine(provide_greeks: bool) -> (SharedMut<StubEngine>, Shared<Cell<usize>>) {
+        let calculations = shared(Cell::new(0_usize));
+        let engine = shared_mut(StubEngine {
+            base: OneAssetOptionEngine::new(
+                OptionArguments::default(),
+                OneAssetOptionResults::default(),
+            ),
+            calculations: Shared::clone(&calculations),
+            provide_greeks,
+        });
+        (engine, calculations)
+    }
+
+    fn european_call(settings: &SharedMut<Settings<Date>>) -> EuropeanOption {
+        let payoff = shared(PlainVanillaPayoff::new(OptionType::Call, 100.0));
+        let exercise = shared(EuropeanExercise::new(Date::new(7, Month::July, 2027)));
+        EuropeanOption::new(payoff, exercise, SharedMut::clone(settings)).unwrap()
+    }
+
+    fn settings_at(date: Date) -> SharedMut<Settings<Date>> {
+        let settings = shared_mut(Settings::new());
+        settings.borrow_mut().set_evaluation_date(date);
+        settings
+    }
+
+    /// The ticket's oracle: instantiation plus a stub-engine round trip of the
+    /// NPV and every greek.
+    #[test]
+    fn european_option_round_trips_npv_and_greeks_through_a_stub_engine() {
+        let settings = settings_at(Date::new(7, Month::July, 2026));
+        let mut option = european_call(&settings);
+        let (engine, calculations) = stub_engine(true);
+        option.base_mut().set_pricing_engine(engine);
+
+        assert_eq!(option.npv().unwrap(), 5.0);
+        assert_eq!(option.delta().unwrap(), 0.1);
+        assert_eq!(option.gamma().unwrap(), 0.2);
+        assert_eq!(option.theta().unwrap(), 0.3);
+        assert_eq!(option.vega().unwrap(), 0.4);
+        assert_eq!(option.rho().unwrap(), 0.5);
+        assert_eq!(option.dividend_rho().unwrap(), 0.6);
+        assert_eq!(option.itm_cash_probability().unwrap(), 0.7);
+        assert_eq!(option.delta_forward().unwrap(), 0.8);
+        assert_eq!(option.elasticity().unwrap(), 0.9);
+        assert_eq!(option.theta_per_day().unwrap(), 1.1);
+        assert_eq!(option.strike_sensitivity().unwrap(), 1.2);
+        assert_eq!(calculations.get(), 1, "accessors must hit the cache");
+
+        assert_eq!(option.payoff().strike(), 100.0);
+        assert_eq!(
+            option.exercise().last_date(),
+            Date::new(7, Month::July, 2027)
+        );
+    }
+
+    #[test]
+    fn arguments_validation_requires_payoff_and_exercise() {
+        let mut arguments = OptionArguments::default();
+        assert_eq!(
+            arguments.validate().unwrap_err().message(),
+            "no payoff given"
+        );
+
+        arguments.payoff = Some(shared(PlainVanillaPayoff::new(OptionType::Call, 100.0)));
+        assert_eq!(
+            arguments.validate().unwrap_err().message(),
+            "no exercise given"
+        );
+
+        arguments.exercise = Some(shared(EuropeanExercise::new(Date::new(
+            7,
+            Month::July,
+            2027,
+        ))));
+        assert!(arguments.validate().is_ok());
+    }
+
+    #[test]
+    fn setup_arguments_fills_payoff_and_exercise() {
+        let settings = settings_at(Date::new(7, Month::July, 2026));
+        let option = european_call(&settings);
+        let mut arguments = OptionArguments::default();
+        option.setup_arguments(&mut arguments).unwrap();
+
+        let payoff = arguments.payoff.expect("payoff filled");
+        assert_eq!(payoff.option_type(), OptionType::Call);
+        assert_eq!(payoff.strike(), 100.0);
+        let exercise = arguments.exercise.expect("exercise filled");
+        assert_eq!(exercise.last_date(), Date::new(7, Month::July, 2027));
+    }
+
+    #[test]
+    fn wrong_argument_bundle_is_reported() {
+        struct OtherArguments;
+        impl Arguments for OtherArguments {
+            fn validate(&self) -> QlResult<()> {
+                Ok(())
+            }
+        }
+
+        let settings = settings_at(Date::new(7, Month::July, 2026));
+        let option = european_call(&settings);
+        let err = option.setup_arguments(&mut OtherArguments).unwrap_err();
+        assert_eq!(err.message(), "wrong argument type");
+    }
+
+    /// The C++ "slim engine" case: only the value is provided, greek
+    /// accessors report what is missing.
+    #[test]
+    fn slim_engine_prices_but_reports_missing_greeks() {
+        let settings = settings_at(Date::new(7, Month::July, 2026));
+        let mut option = european_call(&settings);
+        let (engine, _) = stub_engine(false);
+        option.base_mut().set_pricing_engine(engine);
+
+        assert_eq!(option.npv().unwrap(), 5.0);
+        assert_eq!(option.delta().unwrap_err().message(), "delta not provided");
+        assert_eq!(
+            option.delta_forward().unwrap_err().message(),
+            "forward delta not provided"
+        );
+        assert_eq!(
+            option.theta_per_day().unwrap_err().message(),
+            "theta per-day not provided"
+        );
+        assert_eq!(
+            option.itm_cash_probability().unwrap_err().message(),
+            "in-the-money cash probability not provided"
+        );
+    }
+
+    struct GreeksFreeEngine {
+        base: GenericEngine<OptionArguments, InstrumentResults>,
+    }
+
+    impl AsObservable for GreeksFreeEngine {
+        fn observable(&self) -> &Observable {
+            self.base.observable()
+        }
+    }
+
+    impl PricingEngine for GreeksFreeEngine {
+        fn arguments_mut(&mut self) -> &mut dyn Arguments {
+            self.base.arguments_mut()
+        }
+
+        fn results(&self) -> &dyn Results {
+            self.base.results()
+        }
+
+        fn reset(&mut self) {
+            self.base.reset();
+        }
+
+        fn calculate(&mut self) -> QlResult<()> {
+            self.base.results_mut().value = Some(1.0);
+            Ok(())
+        }
+    }
+
+    /// The C++ `QL_ENSURE(results != nullptr, "no greeks returned...")`.
+    #[test]
+    fn greeks_free_result_bundle_is_rejected() {
+        let settings = settings_at(Date::new(7, Month::July, 2026));
+        let mut option = european_call(&settings);
+        let engine = shared_mut(GreeksFreeEngine {
+            base: GenericEngine::new(OptionArguments::default(), InstrumentResults::default()),
+        });
+        option.base_mut().set_pricing_engine(engine);
+
+        let err = option.npv().unwrap_err();
+        assert_eq!(err.message(), "no greeks returned from pricing engine");
+    }
+
+    #[test]
+    fn expired_option_zeroes_value_and_greeks_without_pricing() {
+        let settings = settings_at(Date::new(7, Month::July, 2027));
+        let mut option = european_call(&settings);
+        let (engine, calculations) = stub_engine(true);
+        option.base_mut().set_pricing_engine(engine);
+
+        assert!(option.is_expired(), "expiry day counts as expired");
+        assert_eq!(option.npv().unwrap(), 0.0);
+        assert_eq!(option.delta().unwrap(), 0.0);
+        assert_eq!(option.strike_sensitivity().unwrap(), 0.0);
+        assert_eq!(option.itm_cash_probability().unwrap(), 0.0);
+        assert_eq!(calculations.get(), 0, "expired options never price");
+    }
+
+    #[test]
+    fn include_reference_date_events_keeps_expiry_day_alive() {
+        let settings = settings_at(Date::new(7, Month::July, 2027));
+        settings
+            .borrow_mut()
+            .set_include_reference_date_events(true);
+        let mut option = european_call(&settings);
+        let (engine, calculations) = stub_engine(true);
+        option.base_mut().set_pricing_engine(engine);
+
+        assert!(!option.is_expired());
+        assert_eq!(option.npv().unwrap(), 5.0);
+        assert_eq!(calculations.get(), 1);
+    }
+
+    /// QuantLib's singleton always supplies today's date; the port has no
+    /// clock, so a floating evaluation date leaves the option alive.
+    #[test]
+    fn unset_evaluation_date_treats_the_option_as_live() {
+        let settings = shared_mut(Settings::new());
+        let option = european_call(&settings);
+        assert!(!option.is_expired());
+    }
+
+    /// The C++ `Instrument` constructor's `registerWith(evaluation date)`,
+    /// wired through the settings handle the option is built with.
+    #[test]
+    fn evaluation_date_change_invalidates_cached_results() {
+        let settings = settings_at(Date::new(7, Month::July, 2026));
+        let mut option = european_call(&settings);
+        let (engine, calculations) = stub_engine(true);
+        option.base_mut().set_pricing_engine(engine);
+
+        option.npv().unwrap();
+        settings
+            .borrow_mut()
+            .set_evaluation_date(Date::new(8, Month::July, 2026));
+        assert!(!option.base().is_calculated());
+        option.npv().unwrap();
+        assert_eq!(calculations.get(), 2);
+    }
+}
