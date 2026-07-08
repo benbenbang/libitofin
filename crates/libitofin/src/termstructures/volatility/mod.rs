@@ -27,10 +27,12 @@
 //! - `QL_ENSURE` on non-decreasing variances becomes an `Err`, per D4.
 
 mod blackconstantvol;
+mod blackvariancecurve;
 mod localconstantvol;
 mod localvoltermstructure;
 
 pub use blackconstantvol::BlackConstantVol;
+pub use blackvariancecurve::{BlackVarianceCurve, BlackVolTimeExtrapolation};
 pub use localconstantvol::LocalConstantVol;
 pub use localvoltermstructure::LocalVolTermStructure;
 
