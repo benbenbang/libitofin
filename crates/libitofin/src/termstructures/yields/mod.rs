@@ -6,6 +6,7 @@
 
 mod discountcurve;
 mod flatforward;
+mod forwardcurve;
 mod forwardspreadedtermstructure;
 mod forwardstructure;
 mod impliedtermstructure;
@@ -15,6 +16,7 @@ mod zeroyieldstructure;
 
 pub use discountcurve::{DiscountCurve, InterpolatedDiscountCurve};
 pub use flatforward::FlatForward;
+pub use forwardcurve::{ForwardCurve, InterpolatedForwardCurve};
 pub use forwardspreadedtermstructure::ForwardSpreadedTermStructure;
 pub use forwardstructure::ForwardRateStructure;
 pub use impliedtermstructure::ImpliedTermStructure;
