@@ -5,5 +5,7 @@
 //! [`YieldTermStructure`](super::yieldtermstructure::YieldTermStructure).
 
 mod flatforward;
+mod zeroyieldstructure;
 
 pub use flatforward::FlatForward;
+pub use zeroyieldstructure::ZeroYieldStructure;
