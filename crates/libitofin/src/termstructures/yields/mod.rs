@@ -17,3 +17,22 @@ pub use forwardstructure::ForwardRateStructure;
 pub use impliedtermstructure::ImpliedTermStructure;
 pub use zerospreadedtermstructure::ZeroSpreadedTermStructure;
 pub use zeroyieldstructure::ZeroYieldStructure;
+
+use crate::handle::Handle;
+use crate::termstructures::TermStructureBase;
+use crate::termstructures::yieldtermstructure::YieldTermStructure;
+
+/// Re-syncs a spreaded/implied curve's extrapolation flag to its underlying
+/// curve's, shared by the adapters' `update()` observers.
+pub(super) fn sync_extrapolation(
+    base: &TermStructureBase,
+    original: &Handle<dyn YieldTermStructure>,
+) {
+    if let Ok(original) = original.current_link() {
+        if original.allows_extrapolation() {
+            base.enable_extrapolation();
+        } else {
+            base.disable_extrapolation();
+        }
+    }
+}

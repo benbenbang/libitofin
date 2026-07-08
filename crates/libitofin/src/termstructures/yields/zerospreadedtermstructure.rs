@@ -17,6 +17,7 @@
 //!   handle succeeds, matching `testCreateWithNullUnderlying`.
 //! - The deprecated day-counter constructor is not ported.
 
+use super::sync_extrapolation;
 use crate::errors::QlResult;
 use crate::handle::Handle;
 use crate::interestrate::{Compounding, InterestRate};
@@ -45,19 +46,6 @@ impl Observer for ExtrapolationSync {
     fn update(&mut self) {
         sync_extrapolation(&self.base, &self.original);
         deliver(&self.updater);
-    }
-}
-
-pub(super) fn sync_extrapolation(
-    base: &TermStructureBase,
-    original: &Handle<dyn YieldTermStructure>,
-) {
-    if let Ok(original) = original.current_link() {
-        if original.allows_extrapolation() {
-            base.enable_extrapolation();
-        } else {
-            base.disable_extrapolation();
-        }
     }
 }
 
