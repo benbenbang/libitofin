@@ -221,7 +221,12 @@ pub trait Instrument {
     fn base_mut(&mut self) -> &mut InstrumentBase;
 
     /// Whether the instrument might have value greater than zero.
-    fn is_expired(&self) -> bool;
+    ///
+    /// Fallible where C++ is not: the expiry check may need state the core
+    /// cannot silently default (per D10 the evaluation date has no clock
+    /// fallback), and a failure here fails the calculation instead of
+    /// guessing.
+    fn is_expired(&self) -> QlResult<bool>;
 
     /// Fills the engine's argument bundle ahead of a calculation; mandatory
     /// when a pricing engine is used.
@@ -287,7 +292,7 @@ pub trait Instrument {
         if self.base().is_calculated() {
             return Ok(());
         }
-        if self.is_expired() {
+        if self.is_expired()? {
             self.setup_expired();
             self.base().lazy.borrow_mut().mark_calculated();
             return Ok(());
@@ -480,8 +485,8 @@ mod tests {
             &mut self.base
         }
 
-        fn is_expired(&self) -> bool {
-            self.expired
+        fn is_expired(&self) -> QlResult<bool> {
+            Ok(self.expired)
         }
 
         fn setup_arguments(&self, arguments: &mut dyn Arguments) -> QlResult<()> {

@@ -19,7 +19,8 @@
 //!   option is constructed with (per D5 there is no singleton). QuantLib's
 //!   singleton always falls back to today's clock date, which the core lacks:
 //!   with no evaluation date set (or the settings locked mid-notification)
-//!   the option is treated as not expired and downstream pricing decides.
+//!   the check fails with an explicit error instead of guessing (D10 -
+//!   silently treating the option as live could price an expired option).
 //!   The general `Event`/`simple_event` machinery of `ql/event.hpp` is
 //!   follow-up work; its `hasOccurred` date comparison is ported inline.
 
@@ -268,19 +269,19 @@ impl Instrument for OneAssetOption {
 
     /// Whether the last exercise date has occurred relative to the evaluation
     /// date (`detail::simple_event(exercise_->lastDate()).hasOccurred()`).
-    fn is_expired(&self) -> bool {
+    fn is_expired(&self) -> QlResult<bool> {
         let Ok(settings) = self.settings.try_borrow() else {
-            return false;
+            fail!("evaluation-date settings are locked during notification");
         };
         let Some(evaluation_date) = settings.evaluation_date().copied() else {
-            return false;
+            fail!("evaluation date not set");
         };
         let last_date = self.exercise.last_date();
-        if settings.include_reference_date_events() {
+        Ok(if settings.include_reference_date_events() {
             last_date < evaluation_date
         } else {
             last_date <= evaluation_date
-        }
+        })
     }
 
     fn setup_arguments(&self, arguments: &mut dyn Arguments) -> QlResult<()> {
@@ -579,7 +580,7 @@ mod tests {
         let (engine, calculations) = stub_engine(true);
         option.base_mut().set_pricing_engine(engine);
 
-        assert!(option.is_expired(), "expiry day counts as expired");
+        assert!(option.is_expired().unwrap(), "expiry day counts as expired");
         assert_eq!(option.npv().unwrap(), 0.0);
         assert_eq!(option.delta().unwrap(), 0.0);
         assert_eq!(option.strike_sensitivity().unwrap(), 0.0);
@@ -597,18 +598,30 @@ mod tests {
         let (engine, calculations) = stub_engine(true);
         option.base_mut().set_pricing_engine(engine);
 
-        assert!(!option.is_expired());
+        assert!(!option.is_expired().unwrap());
         assert_eq!(option.npv().unwrap(), 5.0);
         assert_eq!(calculations.get(), 1);
     }
 
     /// QuantLib's singleton always supplies today's date; the port has no
-    /// clock, so a floating evaluation date leaves the option alive.
+    /// clock, so a floating evaluation date fails the expiry check and the
+    /// calculation with it (D10: explicit error over silently-live).
     #[test]
-    fn unset_evaluation_date_treats_the_option_as_live() {
+    fn unset_evaluation_date_fails_the_expiry_check_and_pricing() {
         let settings = shared_mut(Settings::new());
-        let option = european_call(&settings);
-        assert!(!option.is_expired());
+        let mut option = european_call(&settings);
+        assert_eq!(
+            option.is_expired().unwrap_err().message(),
+            "evaluation date not set"
+        );
+
+        let (engine, calculations) = stub_engine(true);
+        option.base_mut().set_pricing_engine(engine);
+        assert_eq!(
+            option.npv().unwrap_err().message(),
+            "evaluation date not set"
+        );
+        assert_eq!(calculations.get(), 0, "pricing must not run blind");
     }
 
     /// The C++ `Instrument` constructor's `registerWith(evaluation date)`,
