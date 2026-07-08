@@ -7,6 +7,8 @@
 //! `CashOrNothingPayoff`, `GapPayoff`, `SuperFundPayoff`,
 //! `SuperSharePayoff`) are follow-up work.
 
+use std::any::Any;
+
 use crate::option::OptionType;
 use crate::payoff::Payoff;
 use crate::types::Real;
@@ -19,7 +21,11 @@ pub trait TypePayoff: Payoff {
 
 /// Intermediate contract for payoffs based on a fixed strike (QuantLib's
 /// `StrikedTypePayoff`).
-pub trait StrikedTypePayoff: TypePayoff {
+///
+/// The [`Any`] supertrait ports the C++ engines' `dynamic_pointer_cast`
+/// dispatch on the concrete payoff (visiting by dynamic type); it is
+/// auto-satisfied by every `'static` implementor.
+pub trait StrikedTypePayoff: TypePayoff + Any {
     /// The strike the payoff is based on.
     fn strike(&self) -> Real;
 }
