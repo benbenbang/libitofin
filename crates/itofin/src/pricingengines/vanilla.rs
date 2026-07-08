@@ -632,6 +632,118 @@ mod greek_gate {
 }
 
 #[cfg(test)]
+mod mixed_day_counters {
+    //! Locks the curve-to-greek scaling of the result assembly: with a
+    //! DIFFERENT day counter on each curve, rho must scale by the risk-free
+    //! curve's time, dividendRho by the dividend curve's, and vega/theta by
+    //! the vol curve's - a swap is invisible to the flat-market oracles
+    //! (which share Actual360 across all three) but fails here.
+
+    use super::AnalyticEuropeanEngine;
+    use super::test_market::today;
+    use crate::exercise::EuropeanExercise;
+    use crate::handle::Handle;
+    use crate::instrument::Instrument;
+    use crate::instruments::{EuropeanOption, PlainVanillaPayoff};
+    use crate::interestrate::Compounding;
+    use crate::option::OptionType;
+    use crate::pricingengine::PricingEngine;
+    use crate::pricingengines::BlackCalculator;
+    use crate::processes::BlackScholesMertonProcess;
+    use crate::quotes::SimpleQuote;
+    use crate::settings::Settings;
+    use crate::shared::{Shared, SharedMut, shared, shared_mut};
+    use crate::termstructures::volatility::{BlackConstantVol, BlackVolTermStructure};
+    use crate::termstructures::yields::FlatForward;
+    use crate::termstructures::yieldtermstructure::YieldTermStructure;
+    use crate::time::daycounters::actual360::Actual360;
+    use crate::time::daycounters::actual365fixed::Actual365Fixed;
+    use crate::time::daycounters::thirty360::{Convention, Thirty360};
+    use crate::types::Real;
+
+    #[test]
+    fn each_greek_scales_by_its_own_curve_time() {
+        let spot: Real = 100.0;
+        let strike: Real = 105.0;
+        let (q, r, vol): (Real, Real, Real) = (0.04, 0.06, 0.20);
+        let expiry = today() + 146;
+
+        let rfdc = Actual360::new();
+        let divdc = Actual365Fixed::new();
+        let voldc = Thirty360::with_convention(Convention::BondBasis);
+        let t_rf = rfdc.year_fraction(today(), expiry);
+        let t_div = divdc.year_fraction(today(), expiry);
+        let t_vol = voldc.year_fraction(today(), expiry);
+        assert!(t_rf != t_div && t_div != t_vol && t_rf != t_vol);
+
+        let settings = shared_mut(Settings::new());
+        settings.borrow_mut().set_evaluation_date(today());
+        let process = shared(BlackScholesMertonProcess::new(
+            Handle::new(shared(SimpleQuote::new(spot)) as Shared<dyn crate::quotes::Quote>),
+            Handle::new(shared(FlatForward::with_rate(
+                today(),
+                q,
+                divdc.clone(),
+                Compounding::Continuous,
+                crate::time::frequency::Frequency::Annual,
+            )) as Shared<dyn YieldTermStructure>),
+            Handle::new(shared(FlatForward::with_rate(
+                today(),
+                r,
+                rfdc.clone(),
+                Compounding::Continuous,
+                crate::time::frequency::Frequency::Annual,
+            )) as Shared<dyn YieldTermStructure>),
+            Handle::new(
+                shared(BlackConstantVol::new(today(), None, vol, voldc.clone()))
+                    as Shared<dyn BlackVolTermStructure>,
+            ),
+        ));
+
+        let payoff = PlainVanillaPayoff::new(OptionType::Call, strike);
+        let mut option = EuropeanOption::new(
+            shared(payoff),
+            shared(EuropeanExercise::new(expiry)),
+            SharedMut::clone(&settings),
+        )
+        .unwrap();
+        let engine = shared_mut(AnalyticEuropeanEngine::new(Shared::clone(&process)));
+        option
+            .base_mut()
+            .set_pricing_engine(engine as SharedMut<dyn PricingEngine>);
+
+        let q_discount = (-q * t_div).exp();
+        let r_discount = (-r * t_rf).exp();
+        let forward = spot * q_discount / r_discount;
+        let variance = vol * vol * t_vol;
+        let black =
+            BlackCalculator::with_payoff(&payoff, forward, variance.sqrt(), r_discount).unwrap();
+
+        let check = |name: &str, calculated: Real, expected: Real| {
+            assert!(
+                (calculated - expected).abs() <= 1.0e-12,
+                "{name}: engine {calculated} vs curve-scaled reference {expected}"
+            );
+        };
+        check("value", option.npv().unwrap(), black.value());
+        check("delta", option.delta().unwrap(), black.delta(spot).unwrap());
+        check("gamma", option.gamma().unwrap(), black.gamma(spot).unwrap());
+        check("rho", option.rho().unwrap(), black.rho(t_rf).unwrap());
+        check(
+            "dividendRho",
+            option.dividend_rho().unwrap(),
+            black.dividend_rho(t_div).unwrap(),
+        );
+        check("vega", option.vega().unwrap(), black.vega(t_vol).unwrap());
+        check(
+            "theta",
+            option.theta().unwrap(),
+            black.theta(spot, t_vol).unwrap(),
+        );
+    }
+}
+
+#[cfg(test)]
 mod test_greek_values {
     //! The `testGreekValues` oracle of `test-suite/europeanoption.cpp`:
     //! published Haug greek values, asserted at the C++ tolerance of 1e-4.
