@@ -13,8 +13,25 @@
 use crate::errors::QlResult;
 use crate::fail;
 use crate::math::interpolations::cubic::{CubicInterpolation, CubicNaturalSpline};
-use crate::math::interpolations::{Interpolation, Interpolation2D};
+use crate::math::interpolations::{Interpolation, Interpolation2D, Interpolator2D};
 use crate::types::Real;
+
+/// Factory for [`BicubicSpline`] (QuantLib's `Bicubic` traits class).
+#[derive(Clone, Copy, Default)]
+pub struct Bicubic;
+
+impl Interpolator2D for Bicubic {
+    type Output = BicubicSpline;
+
+    fn interpolate(
+        &self,
+        x: Vec<Real>,
+        y: Vec<Real>,
+        z: Vec<Vec<Real>>,
+    ) -> QlResult<BicubicSpline> {
+        BicubicSpline::new(x, y, z)
+    }
+}
 
 /// Bicubic spline interpolation over strictly increasing `x` and `y` node grids.
 ///
@@ -184,6 +201,10 @@ impl Interpolation2D for BicubicSpline {
     fn is_in_range(&self, x: Real, y: Real) -> bool {
         x >= self.x_min() && x <= self.x_max() && y >= self.y_min() && y <= self.y_max()
     }
+
+    fn set_extrapolation(&mut self, allow: bool) {
+        self.allow_extrapolation = allow;
+    }
 }
 
 #[cfg(test)]
@@ -286,6 +307,23 @@ mod tests {
         let bs = small().with_extrapolation(true);
         assert!(bs.value(Real::NAN, 1.0).is_err());
         assert!(bs.derivative_y(1.0, Real::NAN).is_err());
+    }
+
+    #[test]
+    fn factory_builds_and_extrapolation_toggles_through_the_trait() {
+        let x = vec![0.0, 1.0, 2.0, 3.0];
+        let y = vec![0.0, 1.0, 2.0, 4.0];
+        let g = |x: Real, y: Real| 1.0 + 2.0 * x + 3.0 * y;
+        let z = y
+            .iter()
+            .map(|&yj| x.iter().map(|&xi| g(xi, yj)).collect())
+            .collect();
+        let mut bc = Bicubic.interpolate(x, y, z).unwrap();
+        assert!(bc.value(4.0, 1.0).is_err());
+        bc.set_extrapolation(true);
+        assert_close(bc.value(4.0, 1.0).unwrap(), g(4.0, 1.0), 1e-10);
+        bc.set_extrapolation(false);
+        assert!(bc.value(4.0, 1.0).is_err());
     }
 
     #[test]

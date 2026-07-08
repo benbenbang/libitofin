@@ -80,4 +80,26 @@ pub trait Interpolation2D {
 
     /// Whether `(x, y)` lies within `[x_min, x_max] x [y_min, y_max]`.
     fn is_in_range(&self, x: Real, y: Real) -> bool;
+
+    /// Sets whether evaluation outside the domain is permitted (extending
+    /// the boundary cells) rather than an error.
+    ///
+    /// QuantLib passes the flag on every call (`operator()(x, y, true)`);
+    /// this port carries it on the object, so holders that always
+    /// extrapolate (a variance surface, say) flip it once after building.
+    fn set_extrapolation(&mut self, allow: bool);
+}
+
+/// A factory building an [`Interpolation2D`] over grid nodes.
+///
+/// Mirrors QuantLib's 2-D interpolator traits classes (`Bilinear`,
+/// `Bicubic`): term structures store the factory alongside their grid data
+/// and rebuild the interpolation from it whenever the data changes.
+pub trait Interpolator2D {
+    /// The interpolation type this factory builds.
+    type Output: Interpolation2D;
+
+    /// Builds an interpolation over the grid `(x, y)` with values `z`, where
+    /// `z[j][i]` is the value at `(x[i], y[j])`.
+    fn interpolate(&self, x: Vec<Real>, y: Vec<Real>, z: Vec<Vec<Real>>) -> QlResult<Self::Output>;
 }

@@ -8,8 +8,26 @@
 
 use crate::errors::QlResult;
 use crate::fail;
-use crate::math::interpolations::Interpolation2D;
+use crate::math::interpolations::{Interpolation2D, Interpolator2D};
 use crate::types::{Real, Size};
+
+/// Factory for [`BilinearInterpolation`] (QuantLib's `Bilinear` traits
+/// class).
+#[derive(Clone, Copy, Default)]
+pub struct Bilinear;
+
+impl Interpolator2D for Bilinear {
+    type Output = BilinearInterpolation;
+
+    fn interpolate(
+        &self,
+        x: Vec<Real>,
+        y: Vec<Real>,
+        z: Vec<Vec<Real>>,
+    ) -> QlResult<BilinearInterpolation> {
+        BilinearInterpolation::new(x, y, z)
+    }
+}
 
 /// Bilinear interpolation over strictly increasing `x` and `y` node grids.
 ///
@@ -152,6 +170,10 @@ impl Interpolation2D for BilinearInterpolation {
     fn is_in_range(&self, x: Real, y: Real) -> bool {
         x >= self.x_min() && x <= self.x_max() && y >= self.y_min() && y <= self.y_max()
     }
+
+    fn set_extrapolation(&mut self, allow: bool) {
+        self.allow_extrapolation = allow;
+    }
 }
 
 #[cfg(test)]
@@ -240,6 +262,24 @@ mod tests {
         assert!(bl.allows_extrapolation());
         assert_close(bl.value(-0.5, -0.5).unwrap(), f(-0.5, -0.5));
         assert_close(bl.value(2.5, 3.5).unwrap(), f(2.5, 3.5));
+    }
+
+    #[test]
+    fn factory_builds_and_extrapolation_toggles_through_the_trait() {
+        let mut bl = Bilinear
+            .interpolate(vec![0.0, 1.0, 2.0], vec![0.0, 1.0, 3.0], {
+                let x = [0.0, 1.0, 2.0];
+                [0.0, 1.0, 3.0]
+                    .iter()
+                    .map(|&yj| x.iter().map(|&xi| f(xi, yj)).collect())
+                    .collect()
+            })
+            .unwrap();
+        assert!(bl.value(-0.5, 1.0).is_err());
+        bl.set_extrapolation(true);
+        assert_close(bl.value(-0.5, -0.5).unwrap(), f(-0.5, -0.5));
+        bl.set_extrapolation(false);
+        assert!(bl.value(-0.5, 1.0).is_err());
     }
 
     #[test]
