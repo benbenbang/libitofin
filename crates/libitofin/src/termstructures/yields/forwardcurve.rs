@@ -195,10 +195,134 @@ mod tests {
     use crate::math::interpolations::linear::Linear;
     use crate::time::date::Month;
     use crate::time::daycounters::actual360::Actual360;
+    use crate::time::daycounters::actual365fixed::Actual365Fixed;
     use crate::time::frequency::Frequency;
 
     fn reference() -> Date {
         Date::new(15, Month::June, 2026)
+    }
+
+    // Port of testCompositeZeroYieldStructures (termstructures.cpp): the
+    // composite curve there subtracts the two ForwardCurves' zero yields, so
+    // its expected zero rates equal the difference of the curves' zero rates.
+    #[test]
+    fn composite_oracle_zero_rate_differences_match_cpp() {
+        let curve1 = ForwardCurve::new(
+            vec![
+                Date::new(10, Month::November, 2017),
+                Date::new(13, Month::November, 2017),
+                Date::new(12, Month::February, 2018),
+                Date::new(10, Month::May, 2018),
+                Date::new(10, Month::August, 2018),
+                Date::new(12, Month::November, 2018),
+                Date::new(21, Month::December, 2018),
+                Date::new(15, Month::January, 2020),
+                Date::new(31, Month::March, 2021),
+                Date::new(28, Month::February, 2023),
+                Date::new(21, Month::December, 2026),
+                Date::new(31, Month::January, 2030),
+                Date::new(28, Month::February, 2031),
+                Date::new(31, Month::March, 2036),
+                Date::new(28, Month::February, 2041),
+                Date::new(28, Month::February, 2048),
+                Date::new(31, Month::December, 2141),
+            ],
+            vec![
+                0.0655823213132524,
+                0.0655823213132524,
+                0.0699455024156877,
+                0.0799107139233497,
+                0.0813931951022577,
+                0.0841615820666691,
+                0.0501297919004145,
+                0.0823483583439658,
+                0.0860720030924466,
+                0.0922887604375688,
+                0.10588902278996,
+                0.117021968693922,
+                0.109824660896137,
+                0.109231572878364,
+                0.119218123236241,
+                0.128647300167664,
+                0.0506086995288751,
+            ],
+            Actual365Fixed::new(),
+            BackwardFlat,
+        )
+        .unwrap();
+
+        let curve2 = ForwardCurve::new(
+            vec![
+                Date::new(10, Month::November, 2017),
+                Date::new(13, Month::November, 2017),
+                Date::new(11, Month::December, 2017),
+                Date::new(12, Month::February, 2018),
+                Date::new(10, Month::May, 2018),
+                Date::new(31, Month::January, 2022),
+                Date::new(7, Month::December, 2023),
+                Date::new(31, Month::January, 2025),
+                Date::new(31, Month::March, 2028),
+                Date::new(7, Month::December, 2033),
+                Date::new(1, Month::February, 2038),
+                Date::new(2, Month::April, 2046),
+                Date::new(2, Month::January, 2051),
+                Date::new(31, Month::December, 2141),
+            ],
+            vec![
+                0.056656806197189,
+                0.056656806197189,
+                0.0419541633454473,
+                0.0286681050019797,
+                0.0148840226959593,
+                0.0246680238374363,
+                0.0255349067810599,
+                0.0298907184711927,
+                0.0263943927922053,
+                0.0291924526539802,
+                0.0270049276163556,
+                0.028775807327614,
+                0.0293567711641792,
+                0.010518655099659,
+            ],
+            Actual365Fixed::new(),
+            BackwardFlat,
+        )
+        .unwrap();
+
+        let cases = [
+            (Date::new(10, Month::November, 2017), 0.00892551511527986),
+            (Date::new(15, Month::December, 2017), 0.0278755322562788),
+            (Date::new(15, Month::June, 2018), 0.0512001768603456),
+            (Date::new(15, Month::September, 2029), 0.0729941474263546),
+            (Date::new(15, Month::September, 2038), 0.0778333309498459),
+            (Date::new(15, Month::March, 2046), 0.0828451659139004),
+            (Date::new(15, Month::December, 2141), 0.0503573807521742),
+        ];
+        for (date, expected) in cases {
+            let z1 = curve1
+                .zero_rate_date(
+                    date,
+                    Actual365Fixed::new(),
+                    Compounding::Continuous,
+                    Frequency::Annual,
+                    false,
+                )
+                .unwrap();
+            let z2 = curve2
+                .zero_rate_date(
+                    date,
+                    Actual365Fixed::new(),
+                    Compounding::Continuous,
+                    Frequency::Annual,
+                    false,
+                )
+                .unwrap();
+            assert!(
+                (z1.rate() - z2.rate() - expected).abs() < 1.0e-10,
+                "at {date}: {} vs {expected}",
+                z1.rate() - z2.rate()
+            );
+        }
     }
 
     fn backward_flat_curve() -> ForwardCurve {
