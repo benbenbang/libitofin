@@ -31,9 +31,12 @@ pub trait CashFlow: Event {
     fn amount(&self) -> QlResult<Real>;
 
     /// The date from which the flow trades ex-coupon, when it has one.
-    fn ex_coupon_date(&self) -> Option<Date> {
-        None
-    }
+    ///
+    /// Required rather than defaulted to `None`: a `Coupon` stores this date on
+    /// its base and cannot override a provided method here, so a default would
+    /// let an implementor accrue ex-coupon while reporting
+    /// [`trading_ex_coupon`](CashFlow::trading_ex_coupon) as `false`.
+    fn ex_coupon_date(&self) -> Option<Date>;
 
     /// Whether the flow trades ex-coupon as of `ref_date` (the evaluation date
     /// when `None`).
