@@ -27,6 +27,7 @@
 use std::any::Any;
 
 use crate::errors::QlResult;
+use crate::event::event_has_occurred;
 use crate::exercise::Exercise;
 use crate::fail;
 use crate::instrument::{Instrument, InstrumentBase, InstrumentResults};
@@ -265,15 +266,7 @@ impl Instrument for OneAssetOption {
     /// Whether the last exercise date has occurred relative to the evaluation
     /// date (`detail::simple_event(exercise_->lastDate()).hasOccurred()`).
     fn is_expired(&self) -> QlResult<bool> {
-        let Some(evaluation_date) = self.settings.evaluation_date() else {
-            fail!("evaluation date not set");
-        };
-        let last_date = self.exercise.last_date();
-        Ok(if self.settings.include_reference_date_events() {
-            last_date < evaluation_date
-        } else {
-            last_date <= evaluation_date
-        })
+        event_has_occurred(self.exercise.last_date(), &self.settings, None, None)
     }
 
     fn setup_arguments(&self, arguments: &mut dyn Arguments) -> QlResult<()> {
@@ -602,14 +595,14 @@ mod tests {
         let mut option = european_call(&settings);
         assert_eq!(
             option.is_expired().unwrap_err().message(),
-            "evaluation date not set"
+            "no evaluation date set: an event needs a reference date"
         );
 
         let (engine, calculations) = stub_engine(true);
         option.base_mut().set_pricing_engine(engine);
         assert_eq!(
             option.npv().unwrap_err().message(),
-            "evaluation date not set"
+            "no evaluation date set: an event needs a reference date"
         );
         assert_eq!(calculations.get(), 0, "pricing must not run blind");
     }
