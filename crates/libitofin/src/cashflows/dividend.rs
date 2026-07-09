@@ -68,6 +68,10 @@ impl CashFlow for FixedDividend {
     fn amount(&self) -> QlResult<Real> {
         Ok(self.amount)
     }
+
+    fn ex_coupon_date(&self) -> Option<Date> {
+        None
+    }
 }
 
 impl Dividend for FixedDividend {
@@ -138,6 +142,10 @@ impl CashFlow for FractionalDividend {
             Some(nominal) => Ok(self.rate * nominal),
             None => fail!("no nominal given"),
         }
+    }
+
+    fn ex_coupon_date(&self) -> Option<Date> {
+        None
     }
 }
 
