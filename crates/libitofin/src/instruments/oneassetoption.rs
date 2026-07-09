@@ -18,9 +18,9 @@
 //! - `isExpired` reads the evaluation date from the `Settings` handle the
 //!   option is constructed with (per D5 there is no singleton). QuantLib's
 //!   singleton always falls back to today's clock date, which the core lacks:
-//!   with no evaluation date set (or the settings locked mid-notification)
-//!   the check fails with an explicit error instead of guessing (D10 -
-//!   silently treating the option as live could price an expired option).
+//!   with no evaluation date set the check fails with an explicit error
+//!   instead of guessing (D10 - silently treating the option as live could
+//!   price an expired option).
 //!   The general `Event`/`simple_event` machinery of `ql/event.hpp` is
 //!   follow-up work; its `hasOccurred` date comparison is ported inline.
 
@@ -33,7 +33,7 @@ use crate::instrument::{Instrument, InstrumentBase, InstrumentResults};
 use crate::instruments::StrikedTypePayoff;
 use crate::pricingengine::{Arguments, GenericEngine, Results};
 use crate::settings::Settings;
-use crate::shared::{Shared, SharedMut};
+use crate::shared::Shared;
 use crate::time::date::Date;
 use crate::types::Real;
 
@@ -127,7 +127,7 @@ pub struct OneAssetOption {
     base: InstrumentBase,
     payoff: Shared<dyn StrikedTypePayoff>,
     exercise: Shared<dyn Exercise>,
-    settings: SharedMut<Settings<Date>>,
+    settings: Shared<Settings<Date>>,
     greeks: Greeks,
     more_greeks: MoreGreeks,
 }
@@ -152,23 +152,18 @@ impl OneAssetOption {
     pub fn new(
         payoff: Shared<dyn StrikedTypePayoff>,
         exercise: Shared<dyn Exercise>,
-        settings: SharedMut<Settings<Date>>,
-    ) -> QlResult<OneAssetOption> {
+        settings: Shared<Settings<Date>>,
+    ) -> OneAssetOption {
         let base = InstrumentBase::new();
-        {
-            let Ok(guard) = settings.try_borrow() else {
-                fail!("evaluation-date settings are locked during notification");
-            };
-            guard.register_eval_date_observer(&base.observer());
-        }
-        Ok(OneAssetOption {
+        settings.register_eval_date_observer(&base.observer());
+        OneAssetOption {
             base,
             payoff,
             exercise,
             settings,
             greeks: Greeks::default(),
             more_greeks: MoreGreeks::default(),
-        })
+        }
     }
 
     /// The payoff the option is written on.
@@ -270,14 +265,11 @@ impl Instrument for OneAssetOption {
     /// Whether the last exercise date has occurred relative to the evaluation
     /// date (`detail::simple_event(exercise_->lastDate()).hasOccurred()`).
     fn is_expired(&self) -> QlResult<bool> {
-        let Ok(settings) = self.settings.try_borrow() else {
-            fail!("evaluation-date settings are locked during notification");
-        };
-        let Some(evaluation_date) = settings.evaluation_date().copied() else {
+        let Some(evaluation_date) = self.settings.evaluation_date() else {
             fail!("evaluation date not set");
         };
         let last_date = self.exercise.last_date();
-        Ok(if settings.include_reference_date_events() {
+        Ok(if self.settings.include_reference_date_events() {
             last_date < evaluation_date
         } else {
             last_date <= evaluation_date
@@ -342,7 +334,7 @@ mod tests {
     use crate::option::OptionType;
     use crate::patterns::observable::{AsObservable, Observable};
     use crate::pricingengine::PricingEngine;
-    use crate::shared::{shared, shared_mut};
+    use crate::shared::{Shared, SharedMut, shared, shared_mut};
     use crate::time::date::Month;
 
     const SPOT: Real = 105.0;
@@ -412,15 +404,15 @@ mod tests {
         (engine, calculations)
     }
 
-    fn european_call(settings: &SharedMut<Settings<Date>>) -> EuropeanOption {
+    fn european_call(settings: &Shared<Settings<Date>>) -> EuropeanOption {
         let payoff = shared(PlainVanillaPayoff::new(OptionType::Call, 100.0));
         let exercise = shared(EuropeanExercise::new(Date::new(7, Month::July, 2027)));
-        EuropeanOption::new(payoff, exercise, SharedMut::clone(settings)).unwrap()
+        EuropeanOption::new(payoff, exercise, Shared::clone(settings))
     }
 
-    fn settings_at(date: Date) -> SharedMut<Settings<Date>> {
-        let settings = shared_mut(Settings::new());
-        settings.borrow_mut().set_evaluation_date(date);
+    fn settings_at(date: Date) -> Shared<Settings<Date>> {
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(date);
         settings
     }
 
@@ -591,9 +583,7 @@ mod tests {
     #[test]
     fn include_reference_date_events_keeps_expiry_day_alive() {
         let settings = settings_at(Date::new(7, Month::July, 2027));
-        settings
-            .borrow_mut()
-            .set_include_reference_date_events(true);
+        settings.set_include_reference_date_events(true);
         let mut option = european_call(&settings);
         let (engine, calculations) = stub_engine(true);
         option.base_mut().set_pricing_engine(engine);
@@ -608,7 +598,7 @@ mod tests {
     /// calculation with it (D10: explicit error over silently-live).
     #[test]
     fn unset_evaluation_date_fails_the_expiry_check_and_pricing() {
-        let settings = shared_mut(Settings::new());
+        let settings = shared(Settings::new());
         let mut option = european_call(&settings);
         assert_eq!(
             option.is_expired().unwrap_err().message(),
@@ -634,9 +624,7 @@ mod tests {
         option.base_mut().set_pricing_engine(engine);
 
         option.npv().unwrap();
-        settings
-            .borrow_mut()
-            .set_evaluation_date(Date::new(8, Month::July, 2026));
+        settings.set_evaluation_date(Date::new(8, Month::July, 2026));
         assert!(!option.base().is_calculated());
         option.npv().unwrap();
         assert_eq!(calculations.get(), 2);

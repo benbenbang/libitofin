@@ -671,7 +671,7 @@ mod tests {
         let (engine, calculations) = mock_engine(true);
         instrument.base_mut().set_pricing_engine(engine);
 
-        let mut settings: Settings<Date> = Settings::new();
+        let settings: Settings<Date> = Settings::new();
         settings.set_evaluation_date(Date::new(7, Month::July, 2026));
         settings.register_eval_date_observer(&instrument.base().observer());
 
