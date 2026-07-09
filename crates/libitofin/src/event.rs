@@ -2,6 +2,7 @@
 //!
 //! Port of `ql/event.hpp`: the base class for anything that happens on a date
 //! and can say whether it has already happened.
+//! [`CashFlow`](crate::cashflow::CashFlow) is its main specialization.
 //!
 //! [`has_occurred`](Event::has_occurred) diverges from the C++ base class in
 //! taking the [`Settings`] explicitly (D5) and returning [`QlResult`]: an unset
@@ -34,9 +35,10 @@ pub trait Event: AsObservable {
     /// [`Settings::include_reference_date_events`]; when that flag is set, an
     /// event falling exactly on the reference date has *not* yet occurred.
     ///
-    /// Plain events forward to [`event_has_occurred`]; cash flows follow a
-    /// different rule on the evaluation date, so this is required rather than
-    /// provided.
+    /// Plain events forward to [`event_has_occurred`]. Cash flows narrow the
+    /// rule with [`Settings::include_todays_cash_flows`] and forward to
+    /// [`cash_flow_has_occurred`](crate::cashflow::cash_flow_has_occurred)
+    /// instead, which is why this is required rather than provided.
     fn has_occurred(
         &self,
         settings: &Settings<Date>,

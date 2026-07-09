@@ -195,6 +195,17 @@ oversight) and is documented at the point of divergence in the source.
   return `Err` when it is unset rather than silently pricing a possibly-expired
   instrument as live.
 
+**Cash flows (EPIC-7):**
+
+- **`Event::has_occurred` is a required trait method, not a defaulted one.**
+  C++ gives `Event` a base implementation and lets `CashFlow` override it, so a
+  cash flow on the evaluation date honours `Settings::includeTodaysCashFlows`.
+  Rust has no specialization: an inherited default on the supertrait would hand
+  every cash flow the plain-event rule with no diagnostic, and a competing
+  provided method on `CashFlow` would be ambiguous rather than overriding. Each
+  implementor therefore forwards explicitly to `event_has_occurred` or
+  `cash_flow_has_occurred`, turning a silent wrong answer into a compile error.
+
 ## License
 
 [BSD-3-Clause](LICENSE) — the same license as QuantLib, the ported source.
