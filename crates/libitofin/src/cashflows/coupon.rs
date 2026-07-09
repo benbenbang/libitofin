@@ -385,6 +385,49 @@ mod tests {
         assert!((coupon.accrued_period(payment()) - 181.0 / 360.0).abs() < 1e-15);
     }
 
+    /// `accruedPeriod` flips sign once the coupon trades ex-coupon, while
+    /// `accruedDays` has no such branch and keeps counting forward.
+    #[test]
+    fn the_accrued_period_goes_negative_ex_coupon_while_the_days_keep_counting() {
+        let ex_coupon = Date::new(1, Month::July, 2026);
+        let coupon = coupon(Some(ex_coupon));
+        let after = Date::new(5, Month::July, 2026);
+
+        assert!(coupon.accrued_period(ex_coupon - 1) > 0.0);
+        assert_eq!(coupon.accrued_days(ex_coupon - 1), 166);
+
+        assert!((coupon.accrued_period(ex_coupon) + 14.0 / 360.0).abs() < 1e-15);
+        assert_eq!(coupon.accrued_days(ex_coupon), 167);
+
+        assert!((coupon.accrued_period(after) + 10.0 / 360.0).abs() < 1e-15);
+        assert_eq!(coupon.accrued_days(after), 171);
+
+        assert!(
+            (coupon.accrued_amount(ex_coupon).unwrap() + 100.0 * 0.03 * 14.0 / 360.0).abs() < 1e-13
+        );
+    }
+
+    /// From the accrual end on, `max(d, accrualEndDate)` is `d` itself, so the
+    /// negative branch measures an empty period.
+    #[test]
+    fn the_negative_accrual_returns_to_zero_at_the_accrual_end() {
+        let coupon = coupon(Some(Date::new(1, Month::July, 2026)));
+
+        assert_eq!(coupon.accrued_period(end()), 0.0);
+        assert_eq!(coupon.accrued_period(payment()), 0.0);
+        assert_eq!(coupon.accrued_days(end()), 181);
+        assert_eq!(coupon.accrued_days(payment()), 181);
+    }
+
+    /// An ex-coupon date the accrual never reaches leaves the positive branch
+    /// in charge throughout.
+    #[test]
+    fn an_ex_coupon_date_after_the_payment_date_never_bites() {
+        let coupon = coupon(Some(payment() + 1));
+
+        assert!((coupon.accrued_period(payment()) - 181.0 / 360.0).abs() < 1e-15);
+    }
+
     /// The reference period is passed through to the day counter, so a
     /// convention that reads it sees the coupon's own dates.
     #[test]
