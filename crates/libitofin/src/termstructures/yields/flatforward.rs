@@ -7,11 +7,8 @@
 //! C++'s `LazyObject` half becomes a cached [`InterestRate`] invalidated by
 //! quote notifications: the curve's observer clears the cache *before*
 //! passing the notification on, so observers reading the curve during a
-//! quote-driven notification wave see fresh values. During an
-//! *evaluation-date* wave on a moving curve the settings stay locked (see the
-//! divergence notes in [`crate::termstructures`]), so reads that need the
-//! reference date - including non-extrapolating time-based `discount` calls,
-//! whose range check consults `max_time` - return `Err` until the wave ends.
+//! notification wave see fresh values, whether the wave is quote-driven or
+//! (on a moving curve) evaluation-date-driven.
 //! The value-backed constructors wrap the rate in an unshared [`SimpleQuote`]
 //! like the C++ ones; the subscription they add is inert since nothing else
 //! can change that quote.
@@ -119,11 +116,11 @@ impl FlatForward {
         day_counter: DayCounter,
         compounding: Compounding,
         frequency: Frequency,
-        settings: SharedMut<Settings<Date>>,
-    ) -> QlResult<FlatForward> {
+        settings: Shared<Settings<Date>>,
+    ) -> FlatForward {
         let base =
-            TermStructureBase::moving(settlement_days, calendar, Some(day_counter), settings)?;
-        Ok(Self::assemble(base, forward, compounding, frequency))
+            TermStructureBase::moving(settlement_days, calendar, Some(day_counter), settings);
+        Self::assemble(base, forward, compounding, frequency)
     }
 
     /// Value-backed curve whose reference date moves off the evaluation date.
@@ -134,8 +131,8 @@ impl FlatForward {
         day_counter: DayCounter,
         compounding: Compounding,
         frequency: Frequency,
-        settings: SharedMut<Settings<Date>>,
-    ) -> QlResult<FlatForward> {
+        settings: Shared<Settings<Date>>,
+    ) -> FlatForward {
         Self::moving(
             settlement_days,
             calendar,
@@ -357,10 +354,8 @@ mod tests {
 
     #[test]
     fn moving_curve_follows_the_evaluation_date() {
-        let settings = shared_mut(Settings::new());
-        settings
-            .borrow_mut()
-            .set_evaluation_date(Date::new(15, Month::January, 2026));
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(Date::new(15, Month::January, 2026));
         let curve = FlatForward::moving_with_rate(
             2,
             Target::new(),
@@ -369,8 +364,7 @@ mod tests {
             Compounding::Continuous,
             Frequency::Annual,
             settings.clone(),
-        )
-        .unwrap();
+        );
         assert_eq!(
             curve.reference_date().unwrap(),
             Date::new(19, Month::January, 2026)
@@ -378,9 +372,7 @@ mod tests {
 
         let flag = Flag::new();
         curve.observable().register_observer(&as_observer(&flag));
-        settings
-            .borrow_mut()
-            .set_evaluation_date(Date::new(16, Month::January, 2026));
+        settings.set_evaluation_date(Date::new(16, Month::January, 2026));
 
         assert!(Flag::is_up(&flag));
         assert_eq!(
@@ -410,10 +402,8 @@ mod tests {
             }
         }
 
-        let settings = shared_mut(Settings::new());
-        settings
-            .borrow_mut()
-            .set_evaluation_date(Date::new(15, Month::January, 2026));
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(Date::new(15, Month::January, 2026));
         let quote = shared(SimpleQuote::new(0.05));
         let curve = FlatForward::moving(
             2,
@@ -423,8 +413,7 @@ mod tests {
             Compounding::Continuous,
             Frequency::Annual,
             settings.clone(),
-        )
-        .unwrap();
+        );
         curve.discount(1.0, false).unwrap();
 
         let writer = shared_mut(WriteBack {
@@ -436,9 +425,7 @@ mod tests {
             .observable()
             .register_observer(&(writer.clone() as SharedMut<dyn Observer>));
 
-        settings
-            .borrow_mut()
-            .set_evaluation_date(Date::new(16, Month::January, 2026));
+        settings.set_evaluation_date(Date::new(16, Month::January, 2026));
 
         assert_eq!(
             writer.borrow().notifications,

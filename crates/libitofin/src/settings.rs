@@ -11,6 +11,14 @@
 //! concrete `Date` type belongs to EPIC-2; once `Date` lands, downstream code
 //! uses `Settings<Date>`. Assigning a *different* date notifies observers;
 //! assigning the same date does not, matching `settings.cpp`.
+//!
+//! Mutation goes through `&self` (the state lives in [`Cell`]s), like
+//! [`SimpleQuote`](crate::quotes::SimpleQuote): settings are shared as
+//! [`Shared<Settings<D>>`](crate::shared::Shared) so that an observer may read
+//! the evaluation date while being notified of its change, rather than meeting
+//! a mutable borrow the notifying caller still holds.
+
+use std::cell::Cell;
 
 use crate::patterns::observable::{Observable, Observer};
 use crate::shared::SharedMut;
@@ -19,21 +27,21 @@ use crate::shared::SharedMut;
 ///
 /// `D` is the evaluation-date payload (a `Date` once EPIC-2 is ported).
 pub struct Settings<D> {
-    evaluation_date: Option<D>,
+    evaluation_date: Cell<Option<D>>,
     eval_date_observable: Observable,
-    include_reference_date_events: bool,
-    include_todays_cash_flows: Option<bool>,
-    enforces_todays_historic_fixings: bool,
+    include_reference_date_events: Cell<bool>,
+    include_todays_cash_flows: Cell<Option<bool>>,
+    enforces_todays_historic_fixings: Cell<bool>,
 }
 
 impl<D> Default for Settings<D> {
     fn default() -> Self {
         Settings {
-            evaluation_date: None,
+            evaluation_date: Cell::new(None),
             eval_date_observable: Observable::new(),
-            include_reference_date_events: false,
-            include_todays_cash_flows: None,
-            enforces_todays_historic_fixings: false,
+            include_reference_date_events: Cell::new(false),
+            include_todays_cash_flows: Cell::new(None),
+            enforces_todays_historic_fixings: Cell::new(false),
         }
     }
 }
@@ -49,17 +57,24 @@ impl<D> Settings<D> {
     /// `None` corresponds to QuantLib's "use today's date" default; the
     /// concrete today's-date fallback is resolved by the caller once `Date`
     /// exists.
-    pub fn evaluation_date(&self) -> Option<&D> {
-        self.evaluation_date.as_ref()
+    pub fn evaluation_date(&self) -> Option<D>
+    where
+        D: Copy,
+    {
+        self.evaluation_date.get()
     }
 
     /// Sets the evaluation date, notifying observers only if it actually changed.
-    pub fn set_evaluation_date(&mut self, date: D)
+    ///
+    /// The new date is in place before the notification goes out, so an
+    /// observer reading it back through [`evaluation_date`](Self::evaluation_date)
+    /// sees the value that triggered its update.
+    pub fn set_evaluation_date(&self, date: D)
     where
-        D: PartialEq,
+        D: Copy + PartialEq,
     {
-        if self.evaluation_date.as_ref() != Some(&date) {
-            self.evaluation_date = Some(date);
+        if self.evaluation_date.get() != Some(date) {
+            self.evaluation_date.set(Some(date));
             self.eval_date_observable.notify_observers();
         }
     }
@@ -70,9 +85,8 @@ impl<D> Settings<D> {
     /// Mirrors QuantLib's `resetEvaluationDate()` (which assigns the null
     /// `Date()`). Its companion `anchorEvaluationDate()` is deferred until
     /// EPIC-2 provides a concrete today's-date for the payload type.
-    pub fn reset_evaluation_date(&mut self) {
-        if self.evaluation_date.is_some() {
-            self.evaluation_date = None;
+    pub fn reset_evaluation_date(&self) {
+        if self.evaluation_date.replace(None).is_some() {
             self.eval_date_observable.notify_observers();
         }
     }
@@ -85,39 +99,39 @@ impl<D> Settings<D> {
     /// Whether events on the reference date are, by default, treated as not yet
     /// occurred.
     pub fn include_reference_date_events(&self) -> bool {
-        self.include_reference_date_events
+        self.include_reference_date_events.get()
     }
 
     /// Sets the [`include_reference_date_events`](Self::include_reference_date_events) flag.
-    pub fn set_include_reference_date_events(&mut self, value: bool) {
-        self.include_reference_date_events = value;
+    pub fn set_include_reference_date_events(&self, value: bool) {
+        self.include_reference_date_events.set(value);
     }
 
     /// Whether cash flows on today's date enter the NPV, when set.
     pub fn include_todays_cash_flows(&self) -> Option<bool> {
-        self.include_todays_cash_flows
+        self.include_todays_cash_flows.get()
     }
 
     /// Sets the [`include_todays_cash_flows`](Self::include_todays_cash_flows) flag.
-    pub fn set_include_todays_cash_flows(&mut self, value: Option<bool>) {
-        self.include_todays_cash_flows = value;
+    pub fn set_include_todays_cash_flows(&self, value: Option<bool>) {
+        self.include_todays_cash_flows.set(value);
     }
 
     /// Whether today's historic fixings are enforced.
     pub fn enforces_todays_historic_fixings(&self) -> bool {
-        self.enforces_todays_historic_fixings
+        self.enforces_todays_historic_fixings.get()
     }
 
     /// Sets the [`enforces_todays_historic_fixings`](Self::enforces_todays_historic_fixings) flag.
-    pub fn set_enforces_todays_historic_fixings(&mut self, value: bool) {
-        self.enforces_todays_historic_fixings = value;
+    pub fn set_enforces_todays_historic_fixings(&self, value: bool) {
+        self.enforces_todays_historic_fixings.set(value);
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::shared::{SharedMut, shared_mut};
+    use crate::shared::{Shared, SharedMut, shared, shared_mut};
 
     #[derive(Default)]
     struct Flag {
@@ -134,7 +148,7 @@ mod tests {
     /// serial date in place of the EPIC-2 `Date`.
     #[test]
     fn notifies_only_on_actual_date_change() {
-        let mut settings: Settings<i64> = Settings::new();
+        let settings: Settings<i64> = Settings::new();
         let d1 = 44238_i64; // 11 Feb 2021
         let d2 = 44239_i64; // 12 Feb 2021
 
@@ -150,12 +164,12 @@ mod tests {
         // setting to a different date notifies
         settings.set_evaluation_date(d2);
         assert!(flag.borrow().up);
-        assert_eq!(settings.evaluation_date(), Some(&d2));
+        assert_eq!(settings.evaluation_date(), Some(d2));
     }
 
     #[test]
     fn reset_returns_to_floating_and_notifies_once() {
-        let mut settings: Settings<i64> = Settings::new();
+        let settings: Settings<i64> = Settings::new();
         settings.set_evaluation_date(44238_i64);
 
         let flag = shared_mut(Flag::default());
@@ -174,7 +188,7 @@ mod tests {
 
     #[test]
     fn flags_round_trip() {
-        let mut settings: Settings<i64> = Settings::new();
+        let settings: Settings<i64> = Settings::new();
         assert!(!settings.include_reference_date_events());
         assert_eq!(settings.include_todays_cash_flows(), None);
         assert!(!settings.enforces_todays_historic_fixings());
@@ -186,5 +200,35 @@ mod tests {
         assert!(settings.include_reference_date_events());
         assert_eq!(settings.include_todays_cash_flows(), Some(true));
         assert!(settings.enforces_todays_historic_fixings());
+    }
+
+    /// Observer that reads the settings back while being notified of an
+    /// evaluation-date change, as any structure recomputing off the new date
+    /// does from its `update()`.
+    struct Reader {
+        settings: Shared<Settings<i64>>,
+        seen: Option<i64>,
+    }
+
+    impl Observer for Reader {
+        fn update(&mut self) {
+            self.seen = self.settings.evaluation_date();
+        }
+    }
+
+    #[test]
+    fn observer_may_read_the_evaluation_date_during_notification() {
+        let settings = shared(Settings::<i64>::new());
+        let reader = shared_mut(Reader {
+            settings: Shared::clone(&settings),
+            seen: None,
+        });
+        settings.register_eval_date_observer(&(reader.clone() as SharedMut<dyn Observer>));
+
+        settings.set_evaluation_date(44239_i64);
+        assert_eq!(reader.borrow().seen, Some(44239));
+
+        settings.reset_evaluation_date();
+        assert_eq!(reader.borrow().seen, None);
     }
 }

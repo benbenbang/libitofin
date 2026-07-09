@@ -197,7 +197,7 @@ pub(crate) mod test_market {
     }
 
     pub(crate) struct Market {
-        pub(crate) settings: SharedMut<Settings<Date>>,
+        pub(crate) settings: Shared<Settings<Date>>,
         pub(crate) spot: Shared<SimpleQuote>,
         pub(crate) q_rate: Shared<SimpleQuote>,
         pub(crate) r_rate: Shared<SimpleQuote>,
@@ -221,8 +221,7 @@ pub(crate) mod test_market {
         ) -> EuropeanOption {
             let payoff = shared(PlainVanillaPayoff::new(option_type, strike));
             let exercise = shared(EuropeanExercise::new(expiry));
-            let mut option =
-                EuropeanOption::new(payoff, exercise, SharedMut::clone(&self.settings)).unwrap();
+            let mut option = EuropeanOption::new(payoff, exercise, Shared::clone(&self.settings));
             let engine = shared_mut(AnalyticEuropeanEngine::new(Shared::clone(&self.process)));
             option
                 .base_mut()
@@ -257,8 +256,8 @@ pub(crate) mod test_market {
     /// Fixed-reference flat market as built by `testValues` and
     /// `testGreekValues`.
     pub(crate) fn market() -> Market {
-        let settings = shared_mut(Settings::new());
-        settings.borrow_mut().set_evaluation_date(today());
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(today());
         let spot = shared(SimpleQuote::new(0.0));
         let q_rate = shared(SimpleQuote::new(0.0));
         let r_rate = shared(SimpleQuote::new(0.0));
@@ -372,9 +371,8 @@ mod tests {
         let mut american = crate::instruments::OneAssetOption::new(
             payoff,
             exercise,
-            crate::shared::SharedMut::clone(&market.settings),
-        )
-        .unwrap();
+            crate::shared::Shared::clone(&market.settings),
+        );
         american
             .base_mut()
             .set_pricing_engine(option.base().pricing_engine().unwrap().clone());
@@ -415,9 +413,8 @@ mod tests {
         let mut option = crate::instruments::OneAssetOption::new(
             crate::shared::shared(CashOrNothingStub),
             template.exercise().clone(),
-            crate::shared::SharedMut::clone(&market.settings),
-        )
-        .unwrap();
+            crate::shared::Shared::clone(&market.settings),
+        );
         option
             .base_mut()
             .set_pricing_engine(template.base().pricing_engine().unwrap().clone());
@@ -673,8 +670,8 @@ mod mixed_day_counters {
         let t_vol = voldc.year_fraction(today(), expiry);
         assert!(t_rf != t_div && t_div != t_vol && t_rf != t_vol);
 
-        let settings = shared_mut(Settings::new());
-        settings.borrow_mut().set_evaluation_date(today());
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(today());
         let process = shared(BlackScholesMertonProcess::new(
             Handle::new(shared(SimpleQuote::new(spot)) as Shared<dyn crate::quotes::Quote>),
             Handle::new(shared(FlatForward::with_rate(
@@ -701,9 +698,8 @@ mod mixed_day_counters {
         let mut option = EuropeanOption::new(
             shared(payoff),
             shared(EuropeanExercise::new(expiry)),
-            SharedMut::clone(&settings),
-        )
-        .unwrap();
+            Shared::clone(&settings),
+        );
         let engine = shared_mut(AnalyticEuropeanEngine::new(Shared::clone(&process)));
         option
             .base_mut()
@@ -832,7 +828,7 @@ mod test_greeks {
     const UNDERLYING: Real = 100.0;
 
     struct MovingMarket {
-        settings: SharedMut<Settings<Date>>,
+        settings: Shared<Settings<Date>>,
         spot: Shared<SimpleQuote>,
         q_rate: Shared<SimpleQuote>,
         r_rate: Shared<SimpleQuote>,
@@ -841,40 +837,34 @@ mod test_greeks {
     }
 
     fn moving_market() -> MovingMarket {
-        let settings = shared_mut(Settings::new());
-        settings.borrow_mut().set_evaluation_date(today());
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(today());
         let spot = shared(SimpleQuote::new(0.0));
         let q_rate = shared(SimpleQuote::new(0.0));
         let r_rate = shared(SimpleQuote::new(0.0));
         let vol = shared(SimpleQuote::new(0.0));
         let flat = |quote: &Shared<SimpleQuote>| {
-            shared(
-                FlatForward::moving(
-                    0,
-                    NullCalendar::new(),
-                    quote_handle(quote),
-                    Actual360::new(),
-                    Compounding::Continuous,
-                    Frequency::Annual,
-                    SharedMut::clone(&settings),
-                )
-                .unwrap(),
-            ) as Shared<dyn YieldTermStructure>
+            shared(FlatForward::moving(
+                0,
+                NullCalendar::new(),
+                quote_handle(quote),
+                Actual360::new(),
+                Compounding::Continuous,
+                Frequency::Annual,
+                Shared::clone(&settings),
+            )) as Shared<dyn YieldTermStructure>
         };
         let process = shared(BlackScholesMertonProcess::new(
             quote_handle(&spot),
             Handle::new(flat(&q_rate)),
             Handle::new(flat(&r_rate)),
-            Handle::new(shared(
-                BlackConstantVol::moving_with_quote(
-                    0,
-                    NullCalendar::new(),
-                    quote_handle(&vol),
-                    Actual360::new(),
-                    SharedMut::clone(&settings),
-                )
-                .unwrap(),
-            )
+            Handle::new(shared(BlackConstantVol::moving_with_quote(
+                0,
+                NullCalendar::new(),
+                quote_handle(&vol),
+                Actual360::new(),
+                Shared::clone(&settings),
+            ))
                 as Shared<
                     dyn crate::termstructures::volatility::BlackVolTermStructure,
                 >),
@@ -915,8 +905,7 @@ mod test_greeks {
                     let payoff = shared(PlainVanillaPayoff::new(option_type, strike));
                     let exercise = shared(EuropeanExercise::new(expiry));
                     let mut option =
-                        EuropeanOption::new(payoff, exercise, SharedMut::clone(&market.settings))
-                            .unwrap();
+                        EuropeanOption::new(payoff, exercise, Shared::clone(&market.settings));
                     let engine =
                         shared_mut(AnalyticEuropeanEngine::new(Shared::clone(&market.process)));
                     option
@@ -980,17 +969,11 @@ mod test_greeks {
                                 let expected_vega = (value_p - value_m) / (2.0 * dv);
 
                                 let dt = day_counter.year_fraction(today() - 1, today() + 1);
-                                market
-                                    .settings
-                                    .borrow_mut()
-                                    .set_evaluation_date(today() - 1);
+                                market.settings.set_evaluation_date(today() - 1);
                                 let value_m = option.npv().unwrap();
-                                market
-                                    .settings
-                                    .borrow_mut()
-                                    .set_evaluation_date(today() + 1);
+                                market.settings.set_evaluation_date(today() + 1);
                                 let value_p = option.npv().unwrap();
-                                market.settings.borrow_mut().set_evaluation_date(today());
+                                market.settings.set_evaluation_date(today());
                                 let expected_theta = (value_p - value_m) / dt;
 
                                 let checks = [

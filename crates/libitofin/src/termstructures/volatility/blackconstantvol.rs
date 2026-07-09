@@ -17,7 +17,7 @@ use crate::handle::Handle;
 use crate::patterns::observable::{AsObservable, Observable};
 use crate::quotes::{Quote, make_quote_handle};
 use crate::settings::Settings;
-use crate::shared::SharedMut;
+use crate::shared::Shared;
 use crate::termstructures::volatility::VolatilityTermStructure;
 use crate::termstructures::{TermStructure, TermStructureBase};
 use crate::time::businessdayconvention::BusinessDayConvention;
@@ -86,13 +86,13 @@ impl BlackConstantVol {
         calendar: Calendar,
         volatility: Volatility,
         day_counter: DayCounter,
-        settings: SharedMut<Settings<Date>>,
-    ) -> QlResult<BlackConstantVol> {
-        Ok(Self::assemble(
-            TermStructureBase::moving(settlement_days, calendar, Some(day_counter), settings)?,
+        settings: Shared<Settings<Date>>,
+    ) -> BlackConstantVol {
+        Self::assemble(
+            TermStructureBase::moving(settlement_days, calendar, Some(day_counter), settings),
             Self::wrap(volatility),
             false,
-        ))
+        )
     }
 
     /// Quote-backed structure whose reference date moves off the evaluation
@@ -102,13 +102,13 @@ impl BlackConstantVol {
         calendar: Calendar,
         volatility: Handle<dyn Quote>,
         day_counter: DayCounter,
-        settings: SharedMut<Settings<Date>>,
-    ) -> QlResult<BlackConstantVol> {
-        Ok(Self::assemble(
-            TermStructureBase::moving(settlement_days, calendar, Some(day_counter), settings)?,
+        settings: Shared<Settings<Date>>,
+    ) -> BlackConstantVol {
+        Self::assemble(
+            TermStructureBase::moving(settlement_days, calendar, Some(day_counter), settings),
             volatility,
             true,
-        ))
+        )
     }
 }
 
@@ -156,7 +156,7 @@ impl BlackVolTermStructure for BlackConstantVol {
 mod tests {
     use super::*;
     use crate::quotes::SimpleQuote;
-    use crate::shared::{Shared, shared, shared_mut};
+    use crate::shared::{Shared, shared};
     use crate::test_support::{Flag, as_observer};
     use crate::time::calendars::target::Target;
     use crate::time::date::Month;
@@ -247,22 +247,17 @@ mod tests {
 
     #[test]
     fn moving_reference_date_follows_the_evaluation_date() {
-        let settings = shared_mut(Settings::new());
-        settings
-            .borrow_mut()
-            .set_evaluation_date(Date::new(15, Month::January, 2026));
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(Date::new(15, Month::January, 2026));
         let curve =
-            BlackConstantVol::moving(2, Target::new(), 0.2, Actual360::new(), settings.clone())
-                .unwrap();
+            BlackConstantVol::moving(2, Target::new(), 0.2, Actual360::new(), settings.clone());
         assert_eq!(
             curve.reference_date().unwrap(),
             Date::new(19, Month::January, 2026)
         );
         assert_eq!(curve.black_vol(1.0, 100.0, false).unwrap(), 0.2);
 
-        settings
-            .borrow_mut()
-            .set_evaluation_date(Date::new(16, Month::January, 2026));
+        settings.set_evaluation_date(Date::new(16, Month::January, 2026));
         assert_eq!(
             curve.reference_date().unwrap(),
             Date::new(20, Month::January, 2026)
