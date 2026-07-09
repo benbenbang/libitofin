@@ -4,6 +4,7 @@
 //! via cbindgen) live in sibling crates and depend on this one.
 
 pub mod cashflow;
+pub mod cashflows;
 pub mod errors;
 pub mod event;
 pub mod exercise;
