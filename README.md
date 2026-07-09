@@ -205,6 +205,16 @@ oversight) and is documented at the point of divergence in the source.
   provided method on `CashFlow` would be ambiguous rather than overriding. Each
   implementor therefore forwards explicitly to `event_has_occurred` or
   `cash_flow_has_occurred`, turning a silent wrong answer into a compile error.
+- **`CashFlow::ex_coupon_date` is required, and a coupon holds the date twice.**
+  C++ answers both `Coupon::accruedPeriod`'s ex-coupon test and
+  `CashFlow::exCouponDate()` from one member (`coupon.hpp:57`). In Rust a
+  `Coupon` cannot override a provided method on its `CashFlow` supertrait, so
+  the accrual reads the date off `CouponBase` while `trading_ex_coupon` reads
+  it off the trait method. Defaulting the trait method to `None` would let an
+  implementor accrue ex-coupon while reporting `trading_ex_coupon` as `false`;
+  it is therefore required, so omission is a compile error. The two readers
+  remain distinct, and a concrete coupon must forward `ex_coupon_date` to its
+  `CouponBase` for them to agree.
 
 ## License
 

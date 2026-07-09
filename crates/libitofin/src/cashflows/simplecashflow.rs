@@ -57,6 +57,10 @@ impl CashFlow for SimpleCashFlow {
     fn amount(&self) -> QlResult<Real> {
         Ok(self.amount)
     }
+
+    fn ex_coupon_date(&self) -> Option<Date> {
+        None
+    }
 }
 
 macro_rules! simple_cash_flow_alias {
@@ -95,6 +99,10 @@ macro_rules! simple_cash_flow_alias {
         impl CashFlow for $name {
             fn amount(&self) -> QlResult<Real> {
                 self.0.amount()
+            }
+
+            fn ex_coupon_date(&self) -> Option<Date> {
+                self.0.ex_coupon_date()
             }
         }
     };
