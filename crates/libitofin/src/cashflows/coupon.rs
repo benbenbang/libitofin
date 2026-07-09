@@ -31,8 +31,15 @@
 //! trades ex-coupon at the date it is given. C++ calls
 //! `tradingExCoupon(d)`, which resolves a null date against the evaluation date;
 //! here the date is always explicit, so the check reduces to comparing it with
-//! [`CashFlow::ex_coupon_date`] and no [`Settings`](crate::settings::Settings)
-//! is threaded through.
+//! [`CouponBase`]'s own ex-coupon date, and no
+//! [`Settings`](crate::settings::Settings) is threaded through.
+//!
+//! C++ reads that date and `CashFlow::exCouponDate()` off a single member
+//! (`coupon.hpp:57`). Here the two are distinct: the accrual reads
+//! [`CouponBase`], while [`CashFlow::trading_ex_coupon`] reads
+//! [`CashFlow::ex_coupon_date`]. That method is required rather than defaulted,
+//! so it cannot be forgotten, but a concrete coupon must still forward it to
+//! its [`CouponBase`] for the two to agree.
 //!
 //! [`rate`](Coupon::rate) and [`accrued_amount`](Coupon::accrued_amount) return
 //! [`QlResult`], matching [`CashFlow::amount`]: a floating-rate coupon reads an
@@ -121,8 +128,8 @@ pub trait Coupon: CashFlow {
 
     /// The nominal the coupon accrues on.
     ///
-    /// Virtual in C++, so that amortizing coupons can report the nominal
-    /// outstanding at the accrual start rather than a fixed one.
+    /// Virtual in C++ (`coupon.hpp:61`), though no `Coupon` subclass in
+    /// QuantLib overrides it.
     fn nominal(&self) -> Real {
         self.coupon_base().nominal
     }
