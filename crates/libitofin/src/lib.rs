@@ -3,7 +3,9 @@
 //! The core library (`libitofin`). Language bindings (Python via PyO3, a C ABI
 //! via cbindgen) live in sibling crates and depend on this one.
 
+pub mod cashflow;
 pub mod errors;
+pub mod event;
 pub mod exercise;
 pub mod handle;
 pub mod instrument;
