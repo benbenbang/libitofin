@@ -20,13 +20,11 @@
 use crate::errors::QlResult;
 use crate::handle::Handle;
 use crate::interestrate::Compounding;
-use crate::patterns::observable::{AsObservable, Observable};
+use crate::patterns::observable::{AsObservable, Observable, ResetThenNotify};
 use crate::quotes::Quote;
 use crate::shared::{Shared, SharedMut, shared};
 use crate::termstructures::yields::ZeroYieldStructure;
-use crate::termstructures::yields::zerospreadedtermstructure::{
-    ExtrapolationSync, spawn_extrapolation_sync,
-};
+use crate::termstructures::yields::zerospreadedtermstructure::spawn_extrapolation_sync;
 use crate::termstructures::yieldtermstructure::YieldTermStructure;
 use crate::termstructures::{TermStructure, TermStructureBase};
 use crate::time::calendar::Calendar;
@@ -40,7 +38,7 @@ pub struct ForwardSpreadedTermStructure {
     base: Shared<TermStructureBase>,
     original: Handle<dyn YieldTermStructure>,
     spread: Handle<dyn Quote>,
-    _listener: SharedMut<ExtrapolationSync>,
+    _listener: SharedMut<ResetThenNotify>,
 }
 
 impl ForwardSpreadedTermStructure {

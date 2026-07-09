@@ -147,31 +147,73 @@ pub trait AsObservable {
     fn observable(&self) -> &Observable;
 }
 
-/// Observer that forwards every notification to another observable (the
-/// C++ `update()` of `Link`, `DeltaVolQuote` and friends).
-///
-/// The forwarding target embeds this in front of its own [`Observable`]: the
-/// forwarder registers with the source and passes each notification on to the
-/// target's observers.
-pub(crate) struct Forwarder {
-    pub(crate) observable: Shared<Observable>,
+/// Where a [`ResetThenNotify`] sends the notification once its reset has run.
+enum Target {
+    /// Broadcast to an observable's own observers.
+    Broadcast(Shared<Observable>),
+    /// Hand on to a single observer, with [`deliver`]'s re-entrancy discipline.
+    Deliver(SharedMut<dyn Observer>),
 }
 
-impl Forwarder {
+/// The observer half every cache-holding type embeds: drop the stale state,
+/// then pass the notification on (the C++ `update()` overrides of `Link`,
+/// `DeltaVolQuote`, `FlatForward`, `TermStructure`, the derived quotes and the
+/// Black-Scholes process, which all reset something and call the base
+/// `update()`).
+///
+/// The reset runs *before* the notification, so an observer reading the type
+/// while being notified sees fresh state rather than the value the
+/// notification invalidates.
+pub(crate) struct ResetThenNotify {
+    reset: Box<dyn Fn()>,
+    target: Target,
+}
+
+impl ResetThenNotify {
+    /// Resets, then broadcasts through `observable`.
+    pub(crate) fn broadcasting(
+        observable: Shared<Observable>,
+        reset: impl Fn() + 'static,
+    ) -> SharedMut<ResetThenNotify> {
+        shared_mut(ResetThenNotify {
+            reset: Box::new(reset),
+            target: Target::Broadcast(observable),
+        })
+    }
+
+    /// Resets, then delivers to `observer` - the shape of a type layered on
+    /// another observer half (a curve in front of its term-structure base).
+    pub(crate) fn delivering(
+        observer: SharedMut<dyn Observer>,
+        reset: impl Fn() + 'static,
+    ) -> SharedMut<ResetThenNotify> {
+        shared_mut(ResetThenNotify {
+            reset: Box::new(reset),
+            target: Target::Deliver(observer),
+        })
+    }
+
+    /// Pure forwarding: no state to reset, broadcast through `observable`.
+    pub(crate) fn forwarding(observable: Shared<Observable>) -> SharedMut<ResetThenNotify> {
+        Self::broadcasting(observable, || {})
+    }
+
     /// Builds a fresh observable and the forwarder wired to it, the shared
     /// construction step of every forwarding type.
-    pub(crate) fn new() -> (Shared<Observable>, SharedMut<Forwarder>) {
+    pub(crate) fn forwarder() -> (Shared<Observable>, SharedMut<ResetThenNotify>) {
         let observable = shared(Observable::new());
-        let forwarder = shared_mut(Forwarder {
-            observable: Shared::clone(&observable),
-        });
+        let forwarder = Self::forwarding(Shared::clone(&observable));
         (observable, forwarder)
     }
 }
 
-impl Observer for Forwarder {
+impl Observer for ResetThenNotify {
     fn update(&mut self) {
-        self.observable.notify_observers();
+        (self.reset)();
+        match &self.target {
+            Target::Broadcast(observable) => observable.notify_observers(),
+            Target::Deliver(observer) => deliver(observer),
+        }
     }
 }
 

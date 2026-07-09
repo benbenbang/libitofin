@@ -19,7 +19,7 @@
 use super::sync_extrapolation;
 use crate::errors::QlResult;
 use crate::handle::Handle;
-use crate::patterns::observable::{AsObservable, Observable, Observer, deliver};
+use crate::patterns::observable::{AsObservable, Observable, Observer, ResetThenNotify};
 use crate::shared::{Shared, SharedMut, shared, shared_mut};
 use crate::termstructures::yieldtermstructure::YieldTermStructure;
 use crate::termstructures::{TermStructure, TermStructureBase};
@@ -27,24 +27,6 @@ use crate::time::calendar::Calendar;
 use crate::time::date::Date;
 use crate::time::daycounter::DayCounter;
 use crate::types::{DiscountFactor, Natural, Time};
-
-/// Observer half of an implied curve (the C++ `ImpliedTermStructure::update()`):
-/// drops the cached re-basing factors, re-syncs the extrapolation flag to the
-/// underlying curve, then behaves like the term-structure base updater.
-struct CacheInvalidator {
-    cache: SharedMut<Option<(Time, DiscountFactor)>>,
-    base: Shared<TermStructureBase>,
-    original: Handle<dyn YieldTermStructure>,
-    updater: SharedMut<dyn Observer>,
-}
-
-impl Observer for CacheInvalidator {
-    fn update(&mut self) {
-        self.cache.borrow_mut().take();
-        sync_extrapolation(&self.base, &self.original);
-        deliver(&self.updater);
-    }
-}
 
 /// Implied term structure at a given date in the future.
 ///
@@ -54,7 +36,7 @@ pub struct ImpliedTermStructure {
     base: Shared<TermStructureBase>,
     original: Handle<dyn YieldTermStructure>,
     cache: SharedMut<Option<(Time, DiscountFactor)>>,
-    _listener: SharedMut<CacheInvalidator>,
+    _listener: SharedMut<ResetThenNotify>,
 }
 
 impl ImpliedTermStructure {
@@ -71,11 +53,14 @@ impl ImpliedTermStructure {
         ));
         sync_extrapolation(&base, &original);
         let cache = shared_mut(None);
-        let listener = shared_mut(CacheInvalidator {
-            cache: SharedMut::clone(&cache),
-            base: Shared::clone(&base),
-            original: original.clone(),
-            updater: base.updater(),
+        let listener = ResetThenNotify::delivering(base.updater(), {
+            let cache = SharedMut::clone(&cache);
+            let base = Shared::clone(&base);
+            let original = original.clone();
+            move || {
+                cache.borrow_mut().take();
+                sync_extrapolation(&base, &original);
+            }
         });
         original.register_observer(&(listener.clone() as SharedMut<dyn Observer>));
         ImpliedTermStructure {

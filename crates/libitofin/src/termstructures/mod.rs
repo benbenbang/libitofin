@@ -41,9 +41,9 @@ use std::cell::Cell;
 
 use crate::errors::QlResult;
 use crate::math::comparison::close_enough;
-use crate::patterns::observable::{AsObservable, Observable, Observer};
+use crate::patterns::observable::{AsObservable, Observable, Observer, ResetThenNotify};
 use crate::settings::Settings;
-use crate::shared::{Shared, SharedMut, shared, shared_mut};
+use crate::shared::{Shared, SharedMut, shared};
 use crate::time::businessdayconvention::BusinessDayConvention;
 use crate::time::calendar::Calendar;
 use crate::time::date::Date;
@@ -60,23 +60,6 @@ struct ReferenceState {
     moving: bool,
 }
 
-/// Observer half of a term structure (the C++ `TermStructure::update()`):
-/// drops the cached reference date when the structure is moving and passes
-/// the notification on to the structure's own observers.
-struct Updater {
-    reference: Shared<ReferenceState>,
-    observable: Shared<Observable>,
-}
-
-impl Observer for Updater {
-    fn update(&mut self) {
-        if self.reference.moving {
-            self.reference.date.set(None);
-        }
-        self.observable.notify_observers();
-    }
-}
-
 /// Shared base holder for term structures.
 ///
 /// Concrete curves embed one, delegate the [`TermStructure`] trait's
@@ -90,7 +73,7 @@ pub struct TermStructureBase {
     extrapolation: Cell<bool>,
     reference: Shared<ReferenceState>,
     observable: Shared<Observable>,
-    updater: SharedMut<Updater>,
+    updater: SharedMut<ResetThenNotify>,
 }
 
 impl TermStructureBase {
@@ -107,9 +90,13 @@ impl TermStructureBase {
             moving,
         });
         let observable = shared(Observable::new());
-        let updater = shared_mut(Updater {
-            reference: Shared::clone(&reference),
-            observable: Shared::clone(&observable),
+        let updater = ResetThenNotify::broadcasting(Shared::clone(&observable), {
+            let reference = Shared::clone(&reference);
+            move || {
+                if reference.moving {
+                    reference.date.set(None);
+                }
+            }
         });
         TermStructureBase {
             calendar,

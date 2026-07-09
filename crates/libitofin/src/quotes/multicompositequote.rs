@@ -11,12 +11,12 @@ use crate::ensure;
 use crate::errors::QlResult;
 use crate::handle::{AsObservable, Handle};
 use crate::math::array::Array;
-use crate::patterns::observable::{Observable, Observer};
+use crate::patterns::observable::{Observable, Observer, ResetThenNotify};
 use crate::require;
 use crate::shared::{Shared, SharedMut};
 use crate::types::{Real, Size};
 
-use super::{Invalidator, Quote};
+use super::{Quote, invalidator};
 
 /// Market element whose value depends on any number of other market elements.
 ///
@@ -28,14 +28,14 @@ pub struct MultiCompositeQuote<F> {
     cache: Shared<Cell<Option<Real>>>,
     observable: Shared<Observable>,
     f: F,
-    _listener: SharedMut<Invalidator>,
+    _listener: SharedMut<ResetThenNotify>,
 }
 
 impl<F: Fn(&Array) -> Real> MultiCompositeQuote<F> {
     /// Creates a quote combining `elements` through `f`, registering with
     /// every handle like the C++ constructor's `registerWith` loop.
     pub fn new(elements: Vec<Handle<dyn Quote>>, f: F) -> Self {
-        let (cache, observable, listener) = Invalidator::new();
+        let (cache, observable, listener) = invalidator();
         let observer = listener.clone() as SharedMut<dyn Observer>;
         for element in &elements {
             element.register_observer(&observer);

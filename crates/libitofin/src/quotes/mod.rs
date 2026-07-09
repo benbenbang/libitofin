@@ -32,8 +32,8 @@ pub use simplequote::{SimpleQuote, make_quote_handle};
 use std::cell::Cell;
 
 use crate::errors::QlResult;
-use crate::patterns::observable::{AsObservable, Observable, Observer};
-use crate::shared::{Shared, SharedMut, shared, shared_mut};
+use crate::patterns::observable::{AsObservable, Observable, ResetThenNotify};
+use crate::shared::{Shared, SharedMut, shared};
 use crate::types::Real;
 
 /// Purely virtual base class for market observables.
@@ -50,39 +50,23 @@ pub trait Quote: AsObservable {
     fn is_valid(&self) -> bool;
 }
 
-/// Observer half of a derived quote (the C++ `update()` of `DerivedQuote` and
-/// friends): drops the cached value and passes the notification on to the
-/// quote's own observers.
+/// Builds the empty cache, the quote's observable and the invalidating
+/// listener wired to both - the shared construction step of every derived
+/// quote (the C++ `update()` of `DerivedQuote` and friends drops the cached
+/// value and passes the notification on).
 ///
-/// Derived quotes register one of these with their source handle(s) and hold
+/// Derived quotes register the listener with their source handle(s) and hold
 /// the strong reference; the observer registry keeps only a weak one.
-struct Invalidator {
-    cache: Shared<Cell<Option<Real>>>,
-    observable: Shared<Observable>,
-}
-
-impl Invalidator {
-    /// Builds the empty cache, the quote's observable and the invalidating
-    /// listener wired to both - the shared construction step of every derived
-    /// quote.
-    fn new() -> (
-        Shared<Cell<Option<Real>>>,
-        Shared<Observable>,
-        SharedMut<Invalidator>,
-    ) {
-        let cache = shared(Cell::new(None));
-        let observable = shared(Observable::new());
-        let listener = shared_mut(Invalidator {
-            cache: Shared::clone(&cache),
-            observable: Shared::clone(&observable),
-        });
-        (cache, observable, listener)
-    }
-}
-
-impl Observer for Invalidator {
-    fn update(&mut self) {
-        self.cache.set(None);
-        self.observable.notify_observers();
-    }
+fn invalidator() -> (
+    Shared<Cell<Option<Real>>>,
+    Shared<Observable>,
+    SharedMut<ResetThenNotify>,
+) {
+    let cache = shared(Cell::new(None));
+    let observable = shared(Observable::new());
+    let listener = ResetThenNotify::broadcasting(Shared::clone(&observable), {
+        let cache = Shared::clone(&cache);
+        move || cache.set(None)
+    });
+    (cache, observable, listener)
 }

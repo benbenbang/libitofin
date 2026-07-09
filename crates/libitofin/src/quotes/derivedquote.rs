@@ -10,11 +10,11 @@ use std::cell::Cell;
 use crate::ensure;
 use crate::errors::QlResult;
 use crate::handle::{AsObservable, Handle};
-use crate::patterns::observable::{Observable, Observer};
+use crate::patterns::observable::{Observable, Observer, ResetThenNotify};
 use crate::shared::{Shared, SharedMut};
 use crate::types::Real;
 
-use super::{Invalidator, Quote};
+use super::{Quote, invalidator};
 
 /// Market quote whose value depends on another quote.
 ///
@@ -26,14 +26,14 @@ pub struct DerivedQuote<F> {
     cache: Shared<Cell<Option<Real>>>,
     observable: Shared<Observable>,
     f: F,
-    _listener: SharedMut<Invalidator>,
+    _listener: SharedMut<ResetThenNotify>,
 }
 
 impl<F: Fn(Real) -> Real> DerivedQuote<F> {
     /// Creates a quote deriving its value from `element` through `f`,
     /// registering with the handle like the C++ constructor's `registerWith`.
     pub fn new(element: Handle<dyn Quote>, f: F) -> Self {
-        let (cache, observable, listener) = Invalidator::new();
+        let (cache, observable, listener) = invalidator();
         element.register_observer(&(listener.clone() as SharedMut<dyn Observer>));
         DerivedQuote {
             element,
