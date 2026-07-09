@@ -13,7 +13,7 @@
 
 use crate::errors::QlResult;
 pub use crate::patterns::observable::AsObservable;
-use crate::patterns::observable::{Forwarder, Observable, Observer};
+use crate::patterns::observable::{Observable, Observer, ResetThenNotify};
 use crate::require;
 use crate::shared::{Shared, SharedMut, shared_mut};
 
@@ -22,7 +22,7 @@ use crate::shared::{Shared, SharedMut, shared_mut};
 pub struct Link<T: ?Sized> {
     current: Option<Shared<T>>,
     observable: Shared<Observable>,
-    forwarder: SharedMut<Forwarder>,
+    forwarder: SharedMut<ResetThenNotify>,
 }
 
 impl<T: ?Sized> Link<T> {
@@ -38,9 +38,7 @@ impl<T: AsObservable + ?Sized> Link<T> {
     /// dropped unnotified.
     fn new(pointee: Option<Shared<T>>) -> Self {
         let observable = Shared::new(Observable::new());
-        let forwarder = shared_mut(Forwarder {
-            observable: Shared::clone(&observable),
-        });
+        let forwarder = ResetThenNotify::forwarding(Shared::clone(&observable));
         let mut link = Link {
             current: None,
             observable,

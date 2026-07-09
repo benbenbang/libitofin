@@ -16,7 +16,7 @@
 use crate::errors::QlResult;
 use crate::handle::Handle;
 use crate::interestrate::{Compounding, InterestRate};
-use crate::patterns::observable::{AsObservable, Observable, Observer, deliver};
+use crate::patterns::observable::{AsObservable, Observable, Observer, ResetThenNotify};
 use crate::quotes::{Quote, SimpleQuote};
 use crate::settings::Settings;
 use crate::shared::{Shared, SharedMut, shared, shared_mut};
@@ -28,20 +28,6 @@ use crate::time::daycounter::DayCounter;
 use crate::time::frequency::Frequency;
 use crate::types::{DiscountFactor, Natural, Rate, Time};
 
-/// Observer half of a flat curve (the C++ `FlatForward::update()`): drops the
-/// cached rate, then behaves like the term-structure base updater.
-struct RateInvalidator {
-    rate: SharedMut<Option<InterestRate>>,
-    updater: SharedMut<dyn Observer>,
-}
-
-impl Observer for RateInvalidator {
-    fn update(&mut self) {
-        self.rate.borrow_mut().take();
-        deliver(&self.updater);
-    }
-}
-
 /// Flat interest-rate curve.
 pub struct FlatForward {
     base: TermStructureBase,
@@ -49,7 +35,7 @@ pub struct FlatForward {
     compounding: Compounding,
     frequency: Frequency,
     rate: SharedMut<Option<InterestRate>>,
-    _listener: SharedMut<RateInvalidator>,
+    _listener: SharedMut<ResetThenNotify>,
 }
 
 impl FlatForward {
@@ -60,9 +46,11 @@ impl FlatForward {
         frequency: Frequency,
     ) -> FlatForward {
         let rate = shared_mut(None);
-        let listener = shared_mut(RateInvalidator {
-            rate: SharedMut::clone(&rate),
-            updater: base.updater(),
+        let listener = ResetThenNotify::delivering(base.updater(), {
+            let rate = SharedMut::clone(&rate);
+            move || {
+                rate.borrow_mut().take();
+            }
         });
         forward.register_observer(&(listener.clone() as SharedMut<dyn Observer>));
         FlatForward {

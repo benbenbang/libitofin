@@ -7,8 +7,8 @@
 
 use crate::errors::QlResult;
 use crate::handle::{AsObservable, Handle};
-use crate::patterns::observable::{Forwarder, Observable, Observer};
-use crate::shared::{Shared, SharedMut, shared, shared_mut};
+use crate::patterns::observable::{Observable, Observer, ResetThenNotify};
+use crate::shared::{Shared, SharedMut, shared};
 use crate::types::{Real, Time};
 
 use super::Quote;
@@ -57,7 +57,7 @@ pub struct DeltaVolQuote {
     maturity: Time,
     atm_type: AtmType,
     observable: Shared<Observable>,
-    _listener: SharedMut<Forwarder>,
+    _listener: SharedMut<ResetThenNotify>,
 }
 
 impl DeltaVolQuote {
@@ -87,9 +87,7 @@ impl DeltaVolQuote {
         atm_type: AtmType,
     ) -> Self {
         let observable = shared(Observable::new());
-        let listener = shared_mut(Forwarder {
-            observable: Shared::clone(&observable),
-        });
+        let listener = ResetThenNotify::forwarding(Shared::clone(&observable));
         vol.register_observer(&(listener.clone() as SharedMut<dyn Observer>));
         DeltaVolQuote {
             delta,
