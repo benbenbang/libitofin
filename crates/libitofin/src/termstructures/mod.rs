@@ -13,7 +13,9 @@
 //!
 //! - QuantLib's moving mode reads the global `Settings` singleton; per D5 the
 //!   moving constructor takes the shared [`Settings`] handle explicitly and
-//!   registers with its evaluation-date observable.
+//!   registers with its evaluation-date observable. The date mutates through
+//!   `&self`, so an observer may read the reference date back while the
+//!   evaluation-date notification that invalidated it is still running.
 //! - A base asked for a reference date it does not manage returns an `Err`
 //!   where C++ silently returns the null date.
 //! - C++'s `Extrapolator` base class is folded into the holder as a flag; it
@@ -23,10 +25,6 @@
 //! - No today's-date fallback: C++ resolves an unset evaluation date to
 //!   `Date::todaysDate()`; this port has no system-clock date, so a moving
 //!   structure returns an `Err` until the evaluation date is set explicitly.
-//! - During an evaluation-date notification the settings are mutably
-//!   borrowed, so reading the reference date mid-notification returns an
-//!   `Err` where C++ hands out the fresh date; observers recompute lazily
-//!   after the notification instead.
 //! - The moving recompute reads the constructor-stored calendar and
 //!   settlement days; a curve overriding
 //!   [`calendar`](TermStructure::calendar) or
@@ -88,7 +86,7 @@ pub struct TermStructureBase {
     calendar: Option<Calendar>,
     settlement_days: Option<Natural>,
     day_counter: Option<DayCounter>,
-    settings: Option<SharedMut<Settings<Date>>>,
+    settings: Option<Shared<Settings<Date>>>,
     extrapolation: Cell<bool>,
     reference: Shared<ReferenceState>,
     observable: Shared<Observable>,
@@ -100,7 +98,7 @@ impl TermStructureBase {
         calendar: Option<Calendar>,
         settlement_days: Option<Natural>,
         day_counter: Option<DayCounter>,
-        settings: Option<SharedMut<Settings<Date>>>,
+        settings: Option<Shared<Settings<Date>>>,
         moving: bool,
         reference_date: Option<Date>,
     ) -> TermStructureBase {
@@ -157,22 +155,18 @@ impl TermStructureBase {
         settlement_days: Natural,
         calendar: Calendar,
         day_counter: Option<DayCounter>,
-        settings: SharedMut<Settings<Date>>,
-    ) -> QlResult<TermStructureBase> {
-        let Ok(guard) = settings.try_borrow() else {
-            fail!("evaluation-date settings are locked during notification");
-        };
+        settings: Shared<Settings<Date>>,
+    ) -> TermStructureBase {
         let base = Self::assemble(
             Some(calendar),
             Some(settlement_days),
             day_counter,
-            Some(settings.clone()),
+            Some(Shared::clone(&settings)),
             true,
             None,
         );
-        guard.register_eval_date_observer(&(base.updater.clone() as SharedMut<dyn Observer>));
-        drop(guard);
-        Ok(base)
+        settings.register_eval_date_observer(&(base.updater.clone() as SharedMut<dyn Observer>));
+        base
     }
 
     /// The date at which discount = 1.0 and/or variance = 0.0, recomputing it
@@ -183,10 +177,7 @@ impl TermStructureBase {
                 .settings
                 .as_ref()
                 .expect("a moving term structure holds settings");
-            let Ok(settings) = settings.try_borrow() else {
-                fail!("evaluation-date settings are locked during notification");
-            };
-            let Some(today) = settings.evaluation_date().copied() else {
+            let Some(today) = settings.evaluation_date() else {
                 fail!("no evaluation date set: a moving term structure needs one");
             };
             require!(
@@ -434,18 +425,15 @@ mod tests {
 
     #[test]
     fn moving_reference_date_advances_off_the_evaluation_date() {
-        let settings = shared_mut(Settings::new());
-        settings
-            .borrow_mut()
-            .set_evaluation_date(Date::new(15, Month::January, 2026));
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(Date::new(15, Month::January, 2026));
         let curve = TestCurve {
             base: TermStructureBase::moving(
                 2,
                 Target::new(),
                 Some(Actual360::new()),
                 settings.clone(),
-            )
-            .unwrap(),
+            ),
             max: Date::new(15, Month::January, 2027),
         };
         assert_eq!(
@@ -457,18 +445,15 @@ mod tests {
 
     #[test]
     fn evaluation_date_change_recomputes_reference_and_notifies() {
-        let settings = shared_mut(Settings::new());
-        settings
-            .borrow_mut()
-            .set_evaluation_date(Date::new(15, Month::January, 2026));
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(Date::new(15, Month::January, 2026));
         let curve = TestCurve {
             base: TermStructureBase::moving(
                 0,
                 Target::new(),
                 Some(Actual360::new()),
                 settings.clone(),
-            )
-            .unwrap(),
+            ),
             max: Date::new(15, Month::January, 2027),
         };
         assert_eq!(
@@ -478,9 +463,7 @@ mod tests {
 
         let flag = Flag::new();
         curve.observable().register_observer(&as_observer(&flag));
-        settings
-            .borrow_mut()
-            .set_evaluation_date(Date::new(16, Month::January, 2026));
+        settings.set_evaluation_date(Date::new(16, Month::January, 2026));
 
         assert!(Flag::is_up(&flag));
         assert_eq!(
@@ -491,25 +474,23 @@ mod tests {
 
     #[test]
     fn moving_without_evaluation_date_is_an_error() {
-        let settings = shared_mut(Settings::new());
-        let base =
-            TermStructureBase::moving(2, Target::new(), Some(Actual360::new()), settings).unwrap();
+        let settings = shared(Settings::new());
+        let base = TermStructureBase::moving(2, Target::new(), Some(Actual360::new()), settings);
         let err = base.reference_date().unwrap_err();
         assert!(err.message().contains("no evaluation date set"));
     }
 
     #[test]
     fn null_or_near_max_evaluation_dates_are_errors_not_panics() {
-        let settings = shared_mut(Settings::new());
+        let settings = shared(Settings::new());
         let base =
-            TermStructureBase::moving(2, Target::new(), Some(Actual360::new()), settings.clone())
-                .unwrap();
+            TermStructureBase::moving(2, Target::new(), Some(Actual360::new()), settings.clone());
 
-        settings.borrow_mut().set_evaluation_date(Date::null());
+        settings.set_evaluation_date(Date::null());
         let err = base.reference_date().unwrap_err();
         assert!(err.message().contains("null evaluation date"));
 
-        settings.borrow_mut().set_evaluation_date(Date::max_date());
+        settings.set_evaluation_date(Date::max_date());
         let err = base.reference_date().unwrap_err();
         assert!(err.message().contains("too close to the maximum date"));
     }

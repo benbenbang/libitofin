@@ -17,7 +17,7 @@ use crate::handle::Handle;
 use crate::patterns::observable::{AsObservable, Observable};
 use crate::quotes::{Quote, make_quote_handle};
 use crate::settings::Settings;
-use crate::shared::SharedMut;
+use crate::shared::Shared;
 use crate::termstructures::volatility::VolatilityTermStructure;
 use crate::termstructures::{TermStructure, TermStructureBase};
 use crate::time::businessdayconvention::BusinessDayConvention;
@@ -84,13 +84,13 @@ impl LocalConstantVol {
         calendar: Calendar,
         volatility: Volatility,
         day_counter: DayCounter,
-        settings: SharedMut<Settings<Date>>,
-    ) -> QlResult<LocalConstantVol> {
-        Ok(Self::assemble(
-            TermStructureBase::moving(settlement_days, calendar, Some(day_counter), settings)?,
+        settings: Shared<Settings<Date>>,
+    ) -> LocalConstantVol {
+        Self::assemble(
+            TermStructureBase::moving(settlement_days, calendar, Some(day_counter), settings),
             Self::wrap(volatility),
             false,
-        ))
+        )
     }
 
     /// Quote-backed structure whose reference date moves off the evaluation
@@ -100,13 +100,13 @@ impl LocalConstantVol {
         calendar: Calendar,
         volatility: Handle<dyn Quote>,
         day_counter: DayCounter,
-        settings: SharedMut<Settings<Date>>,
-    ) -> QlResult<LocalConstantVol> {
-        Ok(Self::assemble(
-            TermStructureBase::moving(settlement_days, calendar, Some(day_counter), settings)?,
+        settings: Shared<Settings<Date>>,
+    ) -> LocalConstantVol {
+        Self::assemble(
+            TermStructureBase::moving(settlement_days, calendar, Some(day_counter), settings),
             volatility,
             true,
-        ))
+        )
     }
 }
 
