@@ -18,7 +18,8 @@
 //! construction, registers with each of its inputs an
 //! [`Observer`](crate::patterns::observable::Observer) whose `update`
 //! forwards the notification to that embedded observable. Processes inside
-//! this crate reuse the crate-internal `Forwarder` for that observer, as
+//! this crate reuse the crate-internal `ResetThenNotify` (via its
+//! `forwarding` constructor) for that observer, as
 //! [`Handle`](crate::handle::Handle) and `DeltaVolQuote` already do.
 
 use crate::errors::QlResult;
@@ -96,9 +97,9 @@ pub trait StochasticProcess1D: AsObservable {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::patterns::observable::{Forwarder, Observable, Observer};
+    use crate::patterns::observable::{Observable, Observer, ResetThenNotify};
     use crate::quotes::{Quote, SimpleQuote};
-    use crate::shared::{Shared, SharedMut, shared, shared_mut};
+    use crate::shared::{Shared, SharedMut, shared};
     use crate::test_support::{Flag, as_observer};
     use crate::time::date::Month;
 
@@ -107,16 +108,14 @@ mod tests {
         sigma: Real,
         quote: Shared<SimpleQuote>,
         observable: Shared<Observable>,
-        _listener: SharedMut<Forwarder>,
+        _listener: SharedMut<ResetThenNotify>,
     }
 
     impl ConstantProcess {
         fn new(initial: Real, mu: Real, sigma: Real) -> Self {
             let quote = shared(SimpleQuote::new(initial));
             let observable = shared(Observable::new());
-            let listener = shared_mut(Forwarder {
-                observable: Shared::clone(&observable),
-            });
+            let listener = ResetThenNotify::forwarding(Shared::clone(&observable));
             quote
                 .observable()
                 .register_observer(&(listener.clone() as SharedMut<dyn Observer>));

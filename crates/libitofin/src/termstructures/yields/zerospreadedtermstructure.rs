@@ -21,9 +21,9 @@ use super::sync_extrapolation;
 use crate::errors::QlResult;
 use crate::handle::Handle;
 use crate::interestrate::{Compounding, InterestRate};
-use crate::patterns::observable::{AsObservable, Observable, Observer, deliver};
+use crate::patterns::observable::{AsObservable, Observable, Observer, ResetThenNotify};
 use crate::quotes::Quote;
-use crate::shared::{Shared, SharedMut, shared, shared_mut};
+use crate::shared::{Shared, SharedMut, shared};
 use crate::termstructures::yields::ZeroYieldStructure;
 use crate::termstructures::yieldtermstructure::YieldTermStructure;
 use crate::termstructures::{TermStructure, TermStructureBase};
@@ -33,32 +33,19 @@ use crate::time::daycounter::DayCounter;
 use crate::time::frequency::Frequency;
 use crate::types::{DiscountFactor, Natural, Rate, Time};
 
-/// Observer half of a spreaded curve (the C++ `update()` override): re-syncs
-/// the extrapolation flag to the underlying curve, then behaves like the
-/// term-structure base updater.
-pub(super) struct ExtrapolationSync {
-    base: Shared<TermStructureBase>,
-    original: Handle<dyn YieldTermStructure>,
-    updater: SharedMut<dyn Observer>,
-}
-
-impl Observer for ExtrapolationSync {
-    fn update(&mut self) {
-        sync_extrapolation(&self.base, &self.original);
-        deliver(&self.updater);
-    }
-}
-
+/// Builds the observer half of a spreaded curve (the C++ `update()` override):
+/// re-syncs the extrapolation flag to the underlying curve, then behaves like
+/// the term-structure base updater.
 pub(super) fn spawn_extrapolation_sync(
     base: &Shared<TermStructureBase>,
     original: &Handle<dyn YieldTermStructure>,
     spread: &Handle<dyn Quote>,
-) -> SharedMut<ExtrapolationSync> {
+) -> SharedMut<ResetThenNotify> {
     sync_extrapolation(base, original);
-    let listener = shared_mut(ExtrapolationSync {
-        base: Shared::clone(base),
-        original: original.clone(),
-        updater: base.updater(),
+    let listener = ResetThenNotify::delivering(base.updater(), {
+        let base = Shared::clone(base);
+        let original = original.clone();
+        move || sync_extrapolation(&base, &original)
     });
     original.register_observer(&(listener.clone() as SharedMut<dyn Observer>));
     spread.register_observer(&(listener.clone() as SharedMut<dyn Observer>));
@@ -72,7 +59,7 @@ pub struct ZeroSpreadedTermStructure {
     spread: Handle<dyn Quote>,
     compounding: Compounding,
     frequency: Frequency,
-    _listener: SharedMut<ExtrapolationSync>,
+    _listener: SharedMut<ResetThenNotify>,
 }
 
 impl ZeroSpreadedTermStructure {

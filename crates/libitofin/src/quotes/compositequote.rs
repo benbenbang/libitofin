@@ -10,11 +10,11 @@ use std::cell::Cell;
 use crate::ensure;
 use crate::errors::QlResult;
 use crate::handle::{AsObservable, Handle};
-use crate::patterns::observable::{Observable, Observer};
+use crate::patterns::observable::{Observable, Observer, ResetThenNotify};
 use crate::shared::{Shared, SharedMut};
 use crate::types::Real;
 
-use super::{Invalidator, Quote};
+use super::{Quote, invalidator};
 
 /// Market element whose value depends on two other market elements.
 ///
@@ -27,7 +27,7 @@ pub struct CompositeQuote<F> {
     cache: Shared<Cell<Option<Real>>>,
     observable: Shared<Observable>,
     f: F,
-    _listener: SharedMut<Invalidator>,
+    _listener: SharedMut<ResetThenNotify>,
 }
 
 impl<F: Fn(Real, Real) -> Real> CompositeQuote<F> {
@@ -35,7 +35,7 @@ impl<F: Fn(Real, Real) -> Real> CompositeQuote<F> {
     /// registering with both handles like the C++ constructor's
     /// `registerWith` calls.
     pub fn new(element1: Handle<dyn Quote>, element2: Handle<dyn Quote>, f: F) -> Self {
-        let (cache, observable, listener) = Invalidator::new();
+        let (cache, observable, listener) = invalidator();
         let observer = listener.clone() as SharedMut<dyn Observer>;
         element1.register_observer(&observer);
         element2.register_observer(&observer);

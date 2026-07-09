@@ -14,7 +14,7 @@
 use std::any::Any;
 
 use crate::errors::QlResult;
-use crate::patterns::observable::{AsObservable, Forwarder, Observable, Observer};
+use crate::patterns::observable::{AsObservable, Observable, Observer, ResetThenNotify};
 use crate::shared::{Shared, SharedMut};
 
 /// Input bundle of a pricing engine (the C++ `PricingEngine::arguments`).
@@ -72,13 +72,13 @@ pub struct GenericEngine<A, R> {
     arguments: A,
     results: R,
     observable: Shared<Observable>,
-    forwarder: SharedMut<Forwarder>,
+    forwarder: SharedMut<ResetThenNotify>,
 }
 
 impl<A: Arguments, R: Results> GenericEngine<A, R> {
     /// Creates the engine base around its argument and result bundles.
     pub fn new(arguments: A, results: R) -> Self {
-        let (observable, forwarder) = Forwarder::new();
+        let (observable, forwarder) = ResetThenNotify::forwarder();
         GenericEngine {
             arguments,
             results,

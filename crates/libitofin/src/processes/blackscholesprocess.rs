@@ -32,10 +32,10 @@ use crate::errors::QlResult;
 use crate::fail;
 use crate::handle::{Handle, RelinkableHandle};
 use crate::interestrate::Compounding;
-use crate::patterns::observable::{AsObservable, Observable, Observer};
+use crate::patterns::observable::{AsObservable, Observable, Observer, ResetThenNotify};
 use crate::quotes::Quote;
 use crate::require;
-use crate::shared::{Shared, SharedMut, shared, shared_mut};
+use crate::shared::{Shared, SharedMut, shared};
 use crate::stochasticprocess::StochasticProcess1D;
 use crate::termstructures::TermStructure;
 use crate::termstructures::volatility::{
@@ -45,21 +45,6 @@ use crate::termstructures::yieldtermstructure::YieldTermStructure;
 use crate::time::date::Date;
 use crate::time::frequency::Frequency;
 use crate::types::{Rate, Real, Time};
-
-/// Observer half of the process (the C++
-/// `GeneralizedBlackScholesProcess::update()`): drops the cached local
-/// volatility, then forwards the notification to the process observers.
-struct CacheInvalidator {
-    updated: Shared<Cell<bool>>,
-    observable: Shared<Observable>,
-}
-
-impl Observer for CacheInvalidator {
-    fn update(&mut self) {
-        self.updated.set(false);
-        self.observable.notify_observers();
-    }
-}
 
 /// Generalized Black-Scholes stochastic process.
 pub struct GeneralizedBlackScholesProcess {
@@ -72,7 +57,7 @@ pub struct GeneralizedBlackScholesProcess {
     updated: Shared<Cell<bool>>,
     is_strike_independent: Cell<bool>,
     observable: Shared<Observable>,
-    _listener: SharedMut<CacheInvalidator>,
+    _listener: SharedMut<ResetThenNotify>,
 }
 
 /// Merton (1973) extension to the Black-Scholes stochastic process: a stock
@@ -90,9 +75,9 @@ impl GeneralizedBlackScholesProcess {
     ) -> GeneralizedBlackScholesProcess {
         let updated = shared(Cell::new(false));
         let observable = shared(Observable::new());
-        let listener = shared_mut(CacheInvalidator {
-            updated: Shared::clone(&updated),
-            observable: Shared::clone(&observable),
+        let listener = ResetThenNotify::broadcasting(Shared::clone(&observable), {
+            let updated = Shared::clone(&updated);
+            move || updated.set(false)
         });
         let observer = listener.clone() as SharedMut<dyn Observer>;
         x0.register_observer(&observer);
