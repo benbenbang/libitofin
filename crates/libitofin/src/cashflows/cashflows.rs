@@ -745,30 +745,35 @@ mod analytics_tests {
     }
 
     /// A coupon trading ex-coupon is dropped though it has not been paid: the
-    /// analytics filter on `has_occurred` *and* on `trading_ex_coupon`.
+    /// analytics filter on `has_occurred` *and* on `trading_ex_coupon`. The
+    /// same coupon without an ex-coupon date is the control, without which a
+    /// filter that dropped every flow would pass this.
     #[test]
     fn a_flow_trading_ex_coupon_is_left_out() {
         let (settings, curve) = (settings(), curve(FORWARD));
         let (start, end) = periods()[0];
-        let leg: Leg = vec![shared(FixedRateCoupon::new(
-            end,
-            NOMINAL,
-            simple(RATE),
-            start,
-            end,
-            None,
-            None,
-            Some(today()),
-        )) as Shared<dyn CashFlow>];
+        let leg = |ex_coupon_date| {
+            vec![shared(FixedRateCoupon::new(
+                end,
+                NOMINAL,
+                simple(RATE),
+                start,
+                end,
+                None,
+                None,
+                ex_coupon_date,
+            )) as Shared<dyn CashFlow>]
+        };
+        let npv = |leg: &Leg| CashFlows::npv(leg, &curve, &settings, None, None, None).unwrap();
+        let bps = |leg: &Leg| CashFlows::bps(leg, &curve, &settings, None, None, None).unwrap();
 
-        assert_eq!(
-            CashFlows::npv(&leg, &curve, &settings, None, None, None).unwrap(),
-            0.0
-        );
-        assert_eq!(
-            CashFlows::bps(&leg, &curve, &settings, None, None, None).unwrap(),
-            0.0
-        );
+        let paying = leg(None);
+        assert!((npv(&paying) - NOMINAL * RATE * accrual(start, end) * df(end)).abs() < 1e-13);
+        assert!(bps(&paying) > 0.0);
+
+        let ex_coupon = leg(Some(today()));
+        assert_eq!(npv(&ex_coupon), 0.0);
+        assert_eq!(bps(&ex_coupon), 0.0);
     }
 
     /// The empty-leg short circuit comes before the settlement date is
