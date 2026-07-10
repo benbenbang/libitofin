@@ -70,6 +70,25 @@ impl CalendarImpl for Impl {
         }
     }
 
+    /// The date-aware counterpart of [`is_weekend`](Self::is_weekend), joined
+    /// under the same rule.
+    ///
+    /// `is_weekend_on` is this port's date-aware weekend rule (see the
+    /// "`holiday_list` filters weekends by a date-aware rule" divergence in the
+    /// README). `JointCalendar` overrode only the weekday-keyed `is_weekend`,
+    /// mirroring `jointcalendar.cpp:83`, and inherited the trait default for
+    /// the date-aware one; a joint calendar over a member whose weekend moved
+    /// over time therefore fell back to the weekday-only rule. This restores
+    /// the join for both.
+    fn is_weekend_on(&self, date: Date) -> bool {
+        match self.rule {
+            JointCalendarRule::JoinHolidays => self.calendars.iter().any(|c| c.is_weekend_on(date)),
+            JointCalendarRule::JoinBusinessDays => {
+                self.calendars.iter().all(|c| c.is_weekend_on(date))
+            }
+        }
+    }
+
     fn is_business_day(&self, date: Date) -> bool {
         match self.rule {
             JointCalendarRule::JoinHolidays => {
@@ -85,9 +104,35 @@ impl CalendarImpl for Impl {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::shared::shared;
     use crate::time::calendars::target::Target;
     use crate::time::calendars::weekendsonly::WeekendsOnly;
     use crate::time::date::Month;
+
+    struct SwitchingWeekendCal;
+
+    impl CalendarImpl for SwitchingWeekendCal {
+        fn name(&self) -> String {
+            "switching weekend".to_string()
+        }
+
+        fn is_weekend(&self, weekday: Weekday) -> bool {
+            weekday == Weekday::Friday || weekday == Weekday::Saturday
+        }
+
+        fn is_weekend_on(&self, date: Date) -> bool {
+            let weekday = date.weekday();
+            if date < Date::new(29, Month::June, 2013) {
+                weekday == Weekday::Thursday || weekday == Weekday::Friday
+            } else {
+                weekday == Weekday::Friday || weekday == Weekday::Saturday
+            }
+        }
+
+        fn is_business_day(&self, date: Date) -> bool {
+            !self.is_weekend_on(date)
+        }
+    }
 
     #[test]
     fn join_holidays_is_holiday_if_any_is() {
@@ -123,5 +168,26 @@ mod tests {
             JointCalendarRule::JoinHolidays,
         );
         assert_eq!(joint.name(), "JoinHolidays(TARGET, weekends only)");
+    }
+
+    #[test]
+    fn date_aware_weekends_are_joined() {
+        let switching = Calendar::from_impl(shared(SwitchingWeekendCal));
+        let joint = JointCalendar::of_two(
+            switching,
+            WeekendsOnly::new(),
+            JointCalendarRule::JoinHolidays,
+        );
+
+        let thursday_before_switch = Date::new(27, Month::June, 2013);
+        assert_eq!(thursday_before_switch.weekday(), Weekday::Thursday);
+        assert!(joint.is_holiday(thursday_before_switch));
+        assert!(joint.is_weekend_on(thursday_before_switch));
+        assert!(!joint.is_weekend(thursday_before_switch.weekday()));
+        assert!(
+            joint
+                .holiday_list(thursday_before_switch, thursday_before_switch, false)
+                .is_empty()
+        );
     }
 }
