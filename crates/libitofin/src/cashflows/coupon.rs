@@ -30,16 +30,16 @@
 //! [`accrued_period`](Coupon::accrued_period) needs to know whether the coupon
 //! trades ex-coupon at the date it is given. C++ calls
 //! `tradingExCoupon(d)`, which resolves a null date against the evaluation date;
-//! here the date is always explicit, so the check reduces to comparing it with
-//! [`CouponBase`]'s own ex-coupon date, and no
+//! here the date is always explicit, so the check reduces to
+//! [`trades_ex_coupon_on`](Coupon::trades_ex_coupon_on), and no
 //! [`Settings`](crate::settings::Settings) is threaded through.
 //!
-//! C++ reads that date and `CashFlow::exCouponDate()` off a single member
-//! (`coupon.hpp:57`). Here the two are distinct: the accrual reads
-//! [`CouponBase`], while [`CashFlow::trading_ex_coupon`] reads
-//! [`CashFlow::ex_coupon_date`]. That method is required rather than defaulted,
-//! so it cannot be forgotten, but a concrete coupon must still forward it to
-//! its [`CouponBase`] for the two to agree.
+//! C++ reads the ex-coupon date off a single member (`coupon.hpp:57`), shared
+//! by the accrual and by `CashFlow::exCouponDate()`. The port keeps that single
+//! reader: [`trades_ex_coupon_on`](Coupon::trades_ex_coupon_on) goes through
+//! [`CashFlow::ex_coupon_date`], which a concrete coupon must forward to its
+//! [`CouponBase`]. That method is required rather than defaulted, so the
+//! forwarding cannot be made by omission.
 //!
 //! [`rate`](Coupon::rate) and [`accrued_amount`](Coupon::accrued_amount) return
 //! [`QlResult`], matching [`CashFlow::amount`]: a floating-rate coupon reads an
@@ -172,6 +172,16 @@ pub trait Coupon: CashFlow {
             .day_count(base.accrual_start_date, base.accrual_end_date)
     }
 
+    /// Whether the coupon trades ex-coupon on `date`.
+    ///
+    /// The `tradingExCoupon(d)` of `coupon.hpp` with the date always given.
+    /// [`CashFlow::trading_ex_coupon`] is the counterpart that resolves an
+    /// absent date against the evaluation date.
+    fn trades_ex_coupon_on(&self, date: Date) -> bool {
+        self.ex_coupon_date()
+            .is_some_and(|ex_coupon| ex_coupon <= date)
+    }
+
     /// The period accrued up to `date`, as a fraction of a year.
     ///
     /// Zero outside `(accrual_start_date, payment_date]`. Once the coupon
@@ -185,10 +195,7 @@ pub trait Coupon: CashFlow {
         let base = self.coupon_base();
         if date <= base.accrual_start_date || date > base.payment_date {
             0.0
-        } else if base
-            .ex_coupon_date
-            .is_some_and(|ex_coupon| ex_coupon <= date)
-        {
+        } else if self.trades_ex_coupon_on(date) {
             -self.day_counter().year_fraction_ref(
                 date,
                 date.max(base.accrual_end_date),
