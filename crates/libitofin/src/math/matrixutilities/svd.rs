@@ -449,7 +449,20 @@ impl Svd {
 
     /// The minimum-norm least-squares solution of `M x = b` via the
     /// pseudo-inverse.
+    ///
+    /// Divergence: `SVD::solveFor` (`svd.cpp:528`) has no dimension check; the
+    /// mismatch surfaces deep inside `Matrix * Array`. The assertion names the
+    /// caller's mistake at the boundary instead.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `b` is not as long as the decomposed matrix has rows.
     pub fn solve_for(&self, b: &Array) -> Array {
+        assert_eq!(
+            b.len(),
+            self.u().rows(),
+            "dimensions of SVD input and b don't match"
+        );
         let n = self.n as usize;
         let mut w = Matrix::with_size(n, n);
         for i in 0..self.rank() {
@@ -493,5 +506,14 @@ mod tests {
             let error = norm_matrix(&(&reconstructed - &a));
             assert!(error <= tol, "product does not recover A ({error})");
         }
+    }
+
+    #[test]
+    fn solve_for_rejects_wrong_rhs_dimension() {
+        let svd = Svd::new(&matrices_m1());
+        let result = std::panic::catch_unwind(|| {
+            let _ = svd.solve_for(&Array::from([1.0, 2.0]));
+        });
+        assert!(result.is_err());
     }
 }
