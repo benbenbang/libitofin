@@ -2202,3 +2202,182 @@ mod bonds_tests {
         }
     }
 }
+
+/// `bonds.cpp::testBasisPointValue` (:1759), the only test-suite case that
+/// exercises [`CashFlows::basis_point_value`] and
+/// [`CashFlows::yield_value_basis_point`]. It calls them through
+/// `BondFunctions::`, whose wrappers add a tradability guard and delegate
+/// unchanged (`bondfunctions.cpp:449` and `:474`), so the numbers are ours.
+#[cfg(test)]
+mod basis_point_value_tests {
+    use super::*;
+    use crate::cashflows::fixedrateleg::FixedRateLeg;
+    use crate::cashflows::simplecashflow::Redemption;
+    use crate::shared::shared;
+    use crate::time::businessdayconvention::BusinessDayConvention;
+    use crate::time::calendar::Calendar;
+    use crate::time::calendars::unitedstates::{self, UnitedStates};
+    use crate::time::date::Month;
+    use crate::time::dategenerationrule::DateGeneration;
+    use crate::time::daycounters::thirty360::{Convention, Thirty360};
+    use crate::time::schedule::Schedule;
+
+    /// `CommonVars::faceAmount` of `bonds.cpp:80`.
+    const FACE_AMOUNT: Real = 1_000_000.0;
+    const CLEAN_PRICE: Real = 102.890625;
+
+    fn today() -> Date {
+        Date::new(29, Month::January, 2024)
+    }
+
+    fn maturity() -> Date {
+        Date::new(15, Month::August, 2033)
+    }
+
+    fn calendar() -> Calendar {
+        UnitedStates::new(unitedstates::Market::GovernmentBond)
+    }
+
+    /// The `FixedRateBond` cash flows of the C++ case: a semiannual
+    /// `Thirty360(USA)` leg off the dated date, then the redemption.
+    fn treasury_leg(day_counter: &DayCounter) -> Leg {
+        let unadjusted = BusinessDayConvention::Unadjusted;
+        let schedule = Schedule::new(
+            Date::new(15, Month::November, 2023),
+            maturity(),
+            Period::new(6, TimeUnit::Months),
+            calendar(),
+            unadjusted,
+            unadjusted,
+            DateGeneration::Forward,
+            false,
+            Date::null(),
+            Date::null(),
+        );
+        let mut leg = FixedRateLeg::new(schedule)
+            .with_notional(FACE_AMOUNT)
+            .with_coupon_rate(
+                0.045,
+                day_counter.clone(),
+                Compounding::Simple,
+                Frequency::Annual,
+            )
+            .unwrap()
+            .with_payment_calendar(calendar())
+            .with_payment_adjustment(unadjusted)
+            .build()
+            .unwrap();
+        leg.push(shared(Redemption::new(FACE_AMOUNT, maturity())) as Shared<dyn CashFlow>);
+        leg
+    }
+
+    /// `Bond::settlementDate`: the evaluation date advanced by the bond's one
+    /// settlement day, the issue date being unset (`bond.cpp:162-173`).
+    fn settlement_date() -> Date {
+        calendar().advance(
+            today(),
+            1,
+            TimeUnit::Days,
+            BusinessDayConvention::Following,
+            false,
+        )
+    }
+
+    /// `CashFlows::accruedAmount` (`cashflows.cpp:376-393`), which
+    /// [`CashFlows::solve_yield`] needs to turn the clean price into an NPV and
+    /// which this port does not expose: the coupons paying on the date of the
+    /// next flow, accrued to the settlement date.
+    fn accrued_amount(leg: &Leg, settings: &Settings<Date>, settlement: Date) -> QlResult<Real> {
+        let Some(index) = CashFlows::next_cash_flow(leg, settings, Some(false), Some(settlement))?
+        else {
+            return Ok(0.0);
+        };
+        let payment_date = leg[index].date();
+        let mut accrued = 0.0;
+        for flow in leg[index..]
+            .iter()
+            .take_while(|flow| flow.date() == payment_date)
+        {
+            if let Some(coupon) = flow.as_coupon() {
+                accrued += coupon.accrued_amount(settlement)?;
+            }
+        }
+        Ok(accrued)
+    }
+
+    /// The whole C++ case: solve the yield off the dirty price, then check the
+    /// basis-point value and the yield value of a basis point at both settlement
+    /// dates against the table at `bonds.cpp:1798-1806`, at its own 1e-6.
+    ///
+    /// The yield must be re-solved rather than read off the table: `d(bpv)/dy`
+    /// is of order 1e4 here, so feeding back the rounded `0.041301` would move
+    /// the basis-point value by some 6e-3 and miss the tolerance by four orders
+    /// of magnitude. C++ likewise solves once, at the default settlement date,
+    /// and reuses that yield for both rows.
+    ///
+    /// C++ scales the yield value of a basis point by the face amount before
+    /// comparing, since the leg is written on a notional of a million. Its 1e-6
+    /// tolerance on that scaled value is nearly vacuous - the value itself is
+    /// 1.3e-3 - so this asserts to 1e-9, which the C++ table supports: it quotes
+    /// ten decimals and the port lands 2.4e-11 from them.
+    #[test]
+    fn the_treasury_bond_reproduces_its_basis_point_value_and_yield_value() {
+        let settings = Settings::new();
+        settings.set_evaluation_date(today());
+        let day_counter = Thirty360::with_convention(Convention::USA);
+        let leg = treasury_leg(&day_counter);
+        let (comp, freq) = (Compounding::Compounded, Frequency::Semiannual);
+        let settlement = settlement_date();
+        assert_eq!(settlement, Date::new(30, Month::January, 2024));
+
+        let accrued = accrued_amount(&leg, &settings, settlement).unwrap();
+        let npv = CLEAN_PRICE * FACE_AMOUNT / 100.0 + accrued;
+        assert!((accrued - 9375.0).abs() < 1e-6);
+
+        let irr = CashFlows::solve_yield(
+            &leg,
+            npv,
+            day_counter.clone(),
+            comp,
+            freq,
+            &settings,
+            Some(false),
+            Some(settlement),
+            None,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        assert!((irr - 0.041301).abs() < 1e-6, "yield {irr}");
+
+        let rate = InterestRate::new(irr, day_counter, comp, freq).unwrap();
+        let cases = [
+            (settlement, -795.459834, -0.0012571287),
+            (
+                Date::new(12, Month::February, 2024),
+                -793.149033,
+                -0.0012607913,
+            ),
+        ];
+        for (settlement, expected_bpv, expected_yvbp) in cases {
+            let settlement = Some(settlement);
+            let bpv =
+                CashFlows::basis_point_value(&leg, &rate, &settings, Some(false), settlement, None)
+                    .unwrap();
+            assert!((bpv - expected_bpv).abs() < 1e-6, "bpv {bpv}");
+
+            let yvbp = CashFlows::yield_value_basis_point(
+                &leg,
+                &rate,
+                &settings,
+                Some(false),
+                settlement,
+                None,
+            )
+            .unwrap()
+                * FACE_AMOUNT;
+            assert!((yvbp - expected_yvbp).abs() < 1e-9, "yvbp {yvbp}");
+        }
+    }
+}
