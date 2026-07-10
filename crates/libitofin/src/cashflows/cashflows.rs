@@ -6,12 +6,27 @@
 //!
 //! ## Oracle
 //!
-//! The QuantLib test-suite never calls `bps`, `npvbps` or `atmRate`, in any
-//! overload, and its only calls to the discount-curve [`npv`](CashFlows::npv)
-//! come from the multiple-reset and inflation test files, which need index
-//! machinery this port does not have. No ported test case stands behind those
-//! numbers: they are checked against the definitions in `cashflows.cpp` and
-//! against each other. Each test says which it is.
+//! `bps` and `npvbps` are called nowhere in the QuantLib test-suite, in any
+//! overload, not even through `BondFunctions::`. Nothing stands behind their
+//! numbers here: they are checked against the definitions in `cashflows.cpp`
+//! and against each other. Each test says which it is.
+//!
+//! The discount-curve [`npv`](CashFlows::npv) and [`atm_rate`](CashFlows::atm_rate)
+//! do have oracles, but none this port can reach yet. `bonds.cpp` drives them
+//! through the `BondFunctions::` wrappers: `cleanPrice` and `dirtyPrice` reach
+//! `npv` (`bondfunctions.cpp:259`), and `atmRate` reaches `atm_rate`
+//! (`:301`, from `bonds.cpp:241` and `:257`). Every one of those call sites
+//! takes a `Bond`, for `cashflows()`, `notional(settlement)` and
+//! `settlementDate()`, and no `Bond` is ported. The direct calls to the
+//! discount-curve `npv` all live in the multiple-reset and inflation test
+//! files, which need index machinery this port also does not have.
+//!
+//! So `npv` is pinned here by an *adaptation*: `cashflows.cpp::testSettings`
+//! exercises the `InterestRate` overload with a zero continuous rate, making
+//! every discount factor exactly `1.0`, which a flat 0% curve reproduces. The
+//! expected values carry over unchanged; the overload under test does not.
+//! When the fixed-rate `Bond` lands, pin `npv` and `atm_rate` to the
+//! `bondfunctions.cpp` sites above and delete the adaptation.
 //!
 //! The yield analytics fare better:
 //! [`npv_at_yield`](CashFlows::npv_at_yield) is a direct port of
