@@ -50,7 +50,7 @@ use crate::settings::Settings;
 use crate::shared::Shared;
 use crate::termstructures::yieldtermstructure::YieldTermStructure;
 use crate::time::date::Date;
-use crate::types::{DiscountFactor, Real, Spread};
+use crate::types::{DiscountFactor, Rate, Real, Spread};
 
 /// The `basisPoint_` of `cashflows.cpp`.
 const BASIS_POINT: Spread = 1.0e-4;
@@ -58,14 +58,18 @@ const BASIS_POINT: Spread = 1.0e-4;
 /// The one pass over a leg that the discount-curve analytics share, as `npvbps`
 /// already does in C++.
 ///
-/// Both sums are raw: undivided by the discount factor at the NPV date and
-/// unscaled by [`BASIS_POINT`].
+/// Every sum is raw: undivided by the discount factor at the NPV date and
+/// unscaled by [`BASIS_POINT`], which is how [`CashFlows::atm_rate`] needs them.
 #[derive(Default)]
 struct Totals {
     /// `sum(amount * df)` over every surviving flow.
     npv: Real,
     /// `sum(nominal * accrual_period * df)` over the surviving coupons.
     bps: Real,
+    /// `sum(amount * df)` over the surviving flows that are not coupons. Dead
+    /// weight in `bps`, which is why C++ computes it there too, and load-bearing
+    /// in [`atm_rate`](CashFlows::atm_rate).
+    non_sens_npv: Real,
 }
 
 /// The `CashFlows` namespace of `cashflows.hpp`.
@@ -291,6 +295,79 @@ impl CashFlows {
         Ok(BASIS_POINT * totals.bps / discount)
     }
 
+    /// The [`npv`](Self::npv) and the [`bps`](Self::bps), from one pass over the
+    /// leg.
+    ///
+    /// # Errors
+    ///
+    /// As [`npv`](Self::npv).
+    pub fn npvbps(
+        leg: &Leg,
+        discount_curve: &dyn YieldTermStructure,
+        settings: &Settings<Date>,
+        include_settlement_date_flows: Option<bool>,
+        settlement_date: Option<Date>,
+        npv_date: Option<Date>,
+    ) -> QlResult<(Real, Real)> {
+        if leg.is_empty() {
+            return Ok((0.0, 0.0));
+        }
+        let (totals, discount) = Self::measure(
+            leg,
+            discount_curve,
+            settings,
+            include_settlement_date_flows,
+            settlement_date,
+            npv_date,
+        )?;
+        Ok((totals.npv / discount, BASIS_POINT * totals.bps / discount))
+    }
+
+    /// The fixed rate at which the leg's coupons would reach `target_npv`,
+    /// taking the flows that are not coupons as given.
+    ///
+    /// `target_npv` is measured at `npv_date`, as [`npv`](Self::npv) is, and
+    /// defaults to the leg's own NPV, which makes the result the rate that
+    /// reprices the leg. An empty leg has no rate, and neither has a target of
+    /// zero once the flows that do not accrue have paid for themselves.
+    ///
+    /// # Errors
+    ///
+    /// As [`npv`](Self::npv), and the leg must have some basis-point
+    /// sensitivity for a rate to exist at all.
+    pub fn atm_rate(
+        leg: &Leg,
+        discount_curve: &dyn YieldTermStructure,
+        settings: &Settings<Date>,
+        include_settlement_date_flows: Option<bool>,
+        settlement_date: Option<Date>,
+        npv_date: Option<Date>,
+        target_npv: Option<Real>,
+    ) -> QlResult<Rate> {
+        if leg.is_empty() {
+            return Ok(0.0);
+        }
+        let (totals, discount) = Self::measure(
+            leg,
+            discount_curve,
+            settings,
+            include_settlement_date_flows,
+            settlement_date,
+            npv_date,
+        )?;
+
+        let required = match target_npv {
+            None => totals.npv,
+            Some(target) => target * discount,
+        };
+        let target = required - totals.non_sens_npv;
+        if target == 0.0 {
+            return Ok(0.0);
+        }
+        require!(totals.bps != 0.0, "null bps: impossible atm rate");
+        Ok(target / totals.bps)
+    }
+
     /// The single pass the analytics share, and the discount factor at the NPV
     /// date they all divide by.
     fn measure(
@@ -329,9 +406,11 @@ impl CashFlows {
                 continue;
             }
             let discount = discount_curve.discount_date(flow.date(), false)?;
-            totals.npv += flow.amount()? * discount;
-            if let Some(coupon) = flow.as_coupon() {
-                totals.bps += coupon.nominal() * coupon.accrual_period() * discount;
+            let amount = flow.amount()? * discount;
+            totals.npv += amount;
+            match flow.as_coupon() {
+                Some(coupon) => totals.bps += coupon.nominal() * coupon.accrual_period() * discount,
+                None => totals.non_sens_npv += amount,
             }
         }
         Ok(totals)
@@ -500,7 +579,7 @@ mod analytics_tests {
     use super::*;
     use crate::cashflows::fixedratecoupon::FixedRateCoupon;
     use crate::cashflows::fixedrateleg::FixedRateLeg;
-    use crate::cashflows::simplecashflow::SimpleCashFlow;
+    use crate::cashflows::simplecashflow::{Redemption, SimpleCashFlow};
     use crate::interestrate::{Compounding, InterestRate};
     use crate::shared::shared;
     use crate::termstructures::yields::FlatForward;
@@ -704,6 +783,76 @@ mod analytics_tests {
         );
         assert_eq!(
             CashFlows::bps(&leg, &curve, &settings, None, None, None).unwrap(),
+            0.0
+        );
+    }
+
+    #[test]
+    fn npvbps_returns_the_npv_and_the_bps() {
+        let (settings, curve, leg) = (settings(), curve(FORWARD), fixed_leg(RATE));
+        let at = Some(day(Month::January, 2027));
+
+        let (npv, bps) = CashFlows::npvbps(&leg, &curve, &settings, None, None, at).unwrap();
+        assert_eq!(
+            npv,
+            CashFlows::npv(&leg, &curve, &settings, None, None, at).unwrap()
+        );
+        assert_eq!(
+            bps,
+            CashFlows::bps(&leg, &curve, &settings, None, None, at).unwrap()
+        );
+    }
+
+    /// With no target the ATM rate reprices the leg, so a leg of coupons all
+    /// paying one rate is already at the money. The redemption is not a coupon:
+    /// it lands in `nonSensNPV`, is subtracted from the target, and so leaves
+    /// the rate alone. Passing the leg's own NPV as the target is that same
+    /// computation with the `df(npv_date)` division undone.
+    #[test]
+    fn the_atm_rate_reprices_the_leg_and_ignores_the_flows_that_do_not_accrue() {
+        let (settings, curve) = (settings(), curve(FORWARD));
+        let mut leg = fixed_leg(RATE);
+        let atm = |leg: &Leg, target| {
+            CashFlows::atm_rate(leg, &curve, &settings, None, None, None, target).unwrap()
+        };
+
+        assert!((atm(&leg, None) - RATE).abs() < 1e-14);
+
+        leg.push(shared(Redemption::new(NOMINAL, maturity())) as Shared<dyn CashFlow>);
+        assert!((atm(&leg, None) - RATE).abs() < 1e-14);
+
+        let npv = CashFlows::npv(&leg, &curve, &settings, None, None, None).unwrap();
+        assert!((atm(&leg, Some(npv)) - RATE).abs() < 1e-14);
+    }
+
+    /// A target NPV of zero short-circuits before the sensitivity is consulted;
+    /// a leg with no coupon at all has none to consult.
+    #[test]
+    fn the_atm_rate_needs_a_target_and_a_sensitivity() {
+        let (settings, curve) = (settings(), curve(FORWARD));
+        let leg = fixed_leg(RATE);
+        let bare: Leg = vec![shared(Redemption::new(NOMINAL, maturity())) as Shared<dyn CashFlow>];
+        let atm = |leg: &Leg, target| {
+            CashFlows::atm_rate(leg, &curve, &settings, None, None, None, target)
+        };
+
+        assert_eq!(atm(&leg, Some(0.0)).unwrap(), 0.0);
+        assert_eq!(atm(&bare, None).unwrap(), 0.0);
+        assert!(atm(&bare, Some(0.0)).is_err());
+    }
+
+    /// The empty-leg short circuit comes before the settlement date is
+    /// resolved, so it stands with no evaluation date set.
+    #[test]
+    fn an_empty_leg_has_no_atm_rate() {
+        let (settings, curve, leg) = (Settings::new(), curve(FORWARD), Leg::new());
+
+        assert_eq!(
+            CashFlows::npvbps(&leg, &curve, &settings, None, None, None).unwrap(),
+            (0.0, 0.0)
+        );
+        assert_eq!(
+            CashFlows::atm_rate(&leg, &curve, &settings, None, None, None, None).unwrap(),
             0.0
         );
     }
