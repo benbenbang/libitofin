@@ -53,11 +53,16 @@
 //! where C++ returns a default-constructed `Real`, which no caller can tell
 //! from a genuinely zero flow.
 
+use std::cell::RefCell;
+use std::cmp::Ordering;
+
 use crate::cashflow::{CashFlow, Leg};
 use crate::cashflows::Duration;
-use crate::errors::QlResult;
+use crate::errors::{QlError, QlResult};
 use crate::event::reference_date;
 use crate::interestrate::{Compounding, InterestRate};
+use crate::math::solver1d::{DerivativeSolver, Function1D};
+use crate::math::solvers1d::newtonsafe::NewtonSafe;
 use crate::require;
 use crate::settings::Settings;
 use crate::shared::Shared;
@@ -65,6 +70,7 @@ use crate::termstructures::yields::FlatForward;
 use crate::termstructures::yieldtermstructure::YieldTermStructure;
 use crate::time::date::Date;
 use crate::time::daycounter::DayCounter;
+use crate::time::frequency::Frequency;
 use crate::time::period::Period;
 use crate::time::timeunit::TimeUnit;
 use crate::types::{DiscountFactor, Rate, Real, Spread, Time};
@@ -87,6 +93,91 @@ struct Totals {
     /// weight in `bps`, which is why C++ computes it there too, and load-bearing
     /// in [`atm_rate`](CashFlows::atm_rate).
     non_sens_npv: Real,
+}
+
+/// The objective function of [`CashFlows::solve_yield`]: the leg's NPV at a
+/// trial yield, less the NPV asked for.
+///
+/// [`Function1D`] cannot fail, where [`CashFlows::npv_at_yield`] can. A failed
+/// evaluation is parked in `failure` and reported as a NaN, which no bracket
+/// and no refinement step accepts; `solve_yield` returns the parked error in
+/// place of whatever the solver made of the NaN.
+struct IrrFinder<'a> {
+    leg: &'a Leg,
+    npv: Real,
+    day_counter: DayCounter,
+    compounding: Compounding,
+    frequency: Frequency,
+    settings: &'a Settings<Date>,
+    include_settlement_date_flows: Option<bool>,
+    settlement: Date,
+    npv_date: Date,
+    failure: &'a RefCell<Option<QlError>>,
+}
+
+impl IrrFinder<'_> {
+    /// The leg's NPV at the trial yield `y`, and the rate itself.
+    fn present_value(&self, y: Rate) -> QlResult<(InterestRate, Real)> {
+        let rate = InterestRate::new(
+            y,
+            self.day_counter.clone(),
+            self.compounding,
+            self.frequency,
+        )?;
+        let npv = CashFlows::npv_at_yield(
+            self.leg,
+            &rate,
+            self.settings,
+            self.include_settlement_date_flows,
+            Some(self.settlement),
+            Some(self.npv_date),
+        )?;
+        Ok((rate, npv))
+    }
+
+    /// Park the first failure and hand the solver a NaN.
+    fn park(&self, error: QlError) -> Real {
+        self.failure.borrow_mut().get_or_insert(error);
+        Real::NAN
+    }
+}
+
+impl Function1D for IrrFinder<'_> {
+    fn value(&mut self, y: Rate) -> Real {
+        match self.present_value(y) {
+            Ok((_, npv)) => npv - self.npv,
+            Err(error) => self.park(error),
+        }
+    }
+
+    /// `dP/dy = -D_modified * P`.
+    fn derivative(&mut self, y: Rate) -> Real {
+        let (rate, npv) = match self.present_value(y) {
+            Ok(found) => found,
+            Err(error) => return self.park(error),
+        };
+        match CashFlows::duration(
+            self.leg,
+            &rate,
+            Duration::Modified,
+            self.settings,
+            self.include_settlement_date_flows,
+            Some(self.settlement),
+            Some(self.npv_date),
+        ) {
+            Ok(modified) => -modified * npv,
+            Err(error) => self.park(error),
+        }
+    }
+}
+
+/// The `sign` template of `cashflows.cpp`, over the exact zero it compares to.
+fn sign(x: Real) -> i32 {
+    match x.partial_cmp(&0.0) {
+        Some(Ordering::Greater) => 1,
+        Some(Ordering::Less) => -1,
+        _ => 0,
+    }
 }
 
 /// The `CashFlows` namespace of `cashflows.hpp`.
@@ -476,6 +567,99 @@ impl CashFlows {
             Some(settlement),
             Some(npv_date),
         )
+    }
+
+    /// The internal rate of return: the flat yield at which the leg is worth
+    /// `npv`.
+    ///
+    /// Named for `CashFlows::yield`, which Rust reserves. Solved with
+    /// [`NewtonSafe`] off [`npv_at_yield`](Self::npv_at_yield) and the analytic
+    /// derivative `-D_modified * P`, as C++ does. `accuracy` defaults to `1e-10`,
+    /// `max_iterations` to `100` and `guess` to `0.05`.
+    ///
+    /// # Errors
+    ///
+    /// As [`npv_at_yield`](Self::npv_at_yield). Also when the surviving flows
+    /// never change sign against `-npv`, since then no rate reprices them, and
+    /// when the solver fails to bracket or converge - in which case no rate is
+    /// returned rather than the last iterate.
+    #[allow(clippy::too_many_arguments)]
+    pub fn solve_yield(
+        leg: &Leg,
+        npv: Real,
+        day_counter: DayCounter,
+        compounding: Compounding,
+        frequency: Frequency,
+        settings: &Settings<Date>,
+        include_settlement_date_flows: Option<bool>,
+        settlement_date: Option<Date>,
+        npv_date: Option<Date>,
+        accuracy: Option<Real>,
+        max_iterations: Option<usize>,
+        guess: Option<Rate>,
+    ) -> QlResult<Rate> {
+        let (settlement, npv_date) = Self::yield_dates(settings, settlement_date, npv_date)?;
+        Self::check_sign(
+            leg,
+            npv,
+            settings,
+            include_settlement_date_flows,
+            settlement,
+        )?;
+
+        let failure = RefCell::new(None);
+        let finder = IrrFinder {
+            leg,
+            npv,
+            day_counter,
+            compounding,
+            frequency,
+            settings,
+            include_settlement_date_flows,
+            settlement,
+            npv_date,
+            failure: &failure,
+        };
+        let guess = guess.unwrap_or(0.05);
+        let solver = NewtonSafe::new().with_max_evaluations(max_iterations.unwrap_or(100));
+        let root = solver.solve(finder, accuracy.unwrap_or(1.0e-10), guess, guess / 10.0);
+
+        match failure.into_inner() {
+            Some(error) => Err(error),
+            None => root,
+        }
+    }
+
+    /// The `IrrFinder::checkSign` precondition: an IRR is nonsensical unless
+    /// some surviving flow has the opposite sign to the price paid for them.
+    fn check_sign(
+        leg: &Leg,
+        npv: Real,
+        settings: &Settings<Date>,
+        include_settlement_date_flows: Option<bool>,
+        settlement: Date,
+    ) -> QlResult<()> {
+        let mut last_sign = sign(-npv);
+        let mut sign_changes = 0;
+        for flow in leg {
+            if flow.has_occurred(settings, Some(settlement), include_settlement_date_flows)?
+                || flow.trading_ex_coupon(settings, Some(settlement))?
+            {
+                continue;
+            }
+            let this_sign = sign(flow.amount()?);
+            if last_sign * this_sign < 0 {
+                sign_changes += 1;
+            }
+            if this_sign != 0 {
+                last_sign = this_sign;
+            }
+        }
+        require!(
+            sign_changes > 0,
+            "the given cash flows cannot result in the given market price ({npv}) due to their sign"
+        );
+        Ok(())
     }
 
     /// The duration of the leg under a flat `yield_rate`, in the convention
@@ -1472,6 +1656,88 @@ mod analytics_tests {
 
         assert!(duration(&simple, Duration::Macaulay).is_err());
         assert!(duration(&simple, Duration::Modified).is_ok());
+    }
+
+    /// A leg of coupons and a redemption, whose flows the settlement date does
+    /// not outlive, so an IRR exists against a positive price.
+    fn redeeming_leg() -> Leg {
+        let mut leg = fixed_leg(RATE);
+        leg.push(shared(Redemption::new(NOMINAL, maturity())) as Shared<dyn CashFlow>);
+        leg
+    }
+
+    /// The IRR inverts [`CashFlows::npv_at_yield`]: solving for the NPV the leg
+    /// has at a known yield gives that yield back, and the solved yield reprices
+    /// the leg. The NPV date is a month past the settlement date, so the
+    /// objective and its derivative must agree on where time starts.
+    #[test]
+    fn the_solved_yield_reprices_the_leg() {
+        let (settings, leg) = (settings(), redeeming_leg());
+        let npv_date = Some(today() + 30);
+        let rate = compounded(FORWARD);
+        let target = CashFlows::npv_at_yield(&leg, &rate, &settings, None, None, npv_date).unwrap();
+
+        let irr = CashFlows::solve_yield(
+            &leg,
+            target,
+            Actual365Fixed::new(),
+            Compounding::Compounded,
+            Frequency::Semiannual,
+            &settings,
+            None,
+            None,
+            npv_date,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        assert!((irr - FORWARD).abs() < 1e-10);
+
+        let repriced =
+            CashFlows::npv_at_yield(&leg, &compounded(irr), &settings, None, None, npv_date)
+                .unwrap();
+        assert!((repriced - target).abs() < 1e-9);
+    }
+
+    /// Every way the solve can fail returns an error, never a number: an NPV no
+    /// sign change can reach, an evaluation budget too small to bracket the
+    /// root, and a yield convention [`InterestRate::new`] rejects, whose failure
+    /// is parked mid-solve and reported in place of the solver's own verdict.
+    ///
+    /// Each failure asserts on the message, because each of these legs also
+    /// fails to bracket a root: `is_err()` alone would still hold with the sign
+    /// check and the parked failure both deleted.
+    #[test]
+    fn the_yield_solver_errors_rather_than_returning_a_partial_answer() {
+        let (settings, leg) = (settings(), redeeming_leg());
+        let solve = |npv, frequency, max_iterations| {
+            CashFlows::solve_yield(
+                &leg,
+                npv,
+                Actual365Fixed::new(),
+                Compounding::Compounded,
+                frequency,
+                &settings,
+                None,
+                None,
+                None,
+                None,
+                max_iterations,
+                None,
+            )
+        };
+
+        let message = |npv, frequency, max_iterations| {
+            solve(npv, frequency, max_iterations)
+                .expect_err("the solve was meant to fail")
+                .to_string()
+        };
+
+        assert!(solve(100.0, Frequency::Semiannual, None).is_ok());
+        assert!(message(-100.0, Frequency::Semiannual, None).contains("due to their sign"));
+        assert!(message(100.0, Frequency::Semiannual, Some(1)).contains("unable to bracket"));
+        assert!(message(100.0, Frequency::Once, None).contains("frequency"));
     }
 
     /// The times every flow is discounted over run from the NPV date, not the
