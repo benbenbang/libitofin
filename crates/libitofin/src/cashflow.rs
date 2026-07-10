@@ -44,12 +44,24 @@ pub trait CashFlow: Event {
     ///
     /// The `isCoupon`/`coupon_cast` pair of `cashflow.hpp` and `coupon.hpp`,
     /// which the [`CashFlows`](crate::cashflows::CashFlows) analytics use to
-    /// tell an accruing flow from a plain payment. Defaulted to `None`, so
-    /// every [`Coupon`] implementor must override it with `Some(self)` or it
-    /// contributes nothing to a basis-point sensitivity.
-    fn as_coupon(&self) -> Option<&dyn Coupon> {
-        None
-    }
+    /// tell an accruing flow from a plain payment. Required rather than
+    /// defaulted to `None`, like [`ex_coupon_date`](CashFlow::ex_coupon_date):
+    /// a [`Coupon`] answering `None` contributes nothing to
+    /// [`bps`](crate::cashflows::CashFlows::bps), has its amount subtracted
+    /// from the target of [`atm_rate`](crate::cashflows::CashFlows::atm_rate),
+    /// and reports its payment date to
+    /// [`maturity_date`](crate::cashflows::CashFlows::maturity_date) in place
+    /// of its accrual end. Beside coupons that answer correctly it skews the
+    /// rate; alone in a leg it drives the rate to `0.0`. Neither is an obvious
+    /// failure, so the answer is compulsory.
+    ///
+    /// A [`Coupon`] must answer `Some(self)`, never `Some` of some other
+    /// coupon: `coupon_cast` (`coupon.cpp:88`) can only ever yield the flow it
+    /// was handed, so a wrapper answering with its inner coupon would let
+    /// `bps` read a nominal and an accrual period that `npv` never priced.
+    /// Neither rule is checkable at compile time in this shape, and the
+    /// analytics cannot detect a violation of either.
+    fn as_coupon(&self) -> Option<&dyn Coupon>;
 
     /// Whether the flow trades ex-coupon as of `ref_date` (the evaluation date
     /// when `None`).
@@ -157,6 +169,10 @@ mod tests {
 
         fn ex_coupon_date(&self) -> Option<Date> {
             self.ex_coupon_date
+        }
+
+        fn as_coupon(&self) -> Option<&dyn Coupon> {
+            None
         }
     }
 

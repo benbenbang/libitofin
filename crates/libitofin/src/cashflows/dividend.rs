@@ -10,6 +10,7 @@
 //! [`SimpleQuote`](crate::quotes::SimpleQuote) precedent.
 
 use crate::cashflow::{CashFlow, cash_flow_has_occurred};
+use crate::cashflows::Coupon;
 use crate::errors::QlResult;
 use crate::event::Event;
 use crate::patterns::observable::{AsObservable, Observable};
@@ -70,6 +71,10 @@ impl CashFlow for FixedDividend {
     }
 
     fn ex_coupon_date(&self) -> Option<Date> {
+        None
+    }
+
+    fn as_coupon(&self) -> Option<&dyn Coupon> {
         None
     }
 }
@@ -145,6 +150,10 @@ impl CashFlow for FractionalDividend {
     }
 
     fn ex_coupon_date(&self) -> Option<Date> {
+        None
+    }
+
+    fn as_coupon(&self) -> Option<&dyn Coupon> {
         None
     }
 }
