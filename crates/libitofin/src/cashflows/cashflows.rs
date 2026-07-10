@@ -1768,6 +1768,133 @@ mod analytics_tests {
         assert!((convexity - expected).abs() < 1e-5);
     }
 
+    /// A continuously compounded yield, whose discount factor is `exp(-y t)`.
+    fn continuous(rate: Rate) -> InterestRate {
+        InterestRate::new(
+            rate,
+            Actual365Fixed::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )
+        .unwrap()
+    }
+
+    /// `modified_duration` and `convexity` each branch on the yield's
+    /// compounding convention, and every other test of them quotes a compounded
+    /// yield. A continuous yield differentiates `exp(-y t)`, weighting each flow
+    /// by `t` and by `t * t`; both must still be the finite differences of the
+    /// NPV, which for this convention discounts by the same factor.
+    #[test]
+    fn the_continuous_yield_duration_and_convexity_weight_each_flow_by_its_own_time() {
+        let (settings, leg) = (settings(), fixed_leg(RATE));
+        let h = 1.0e-4;
+        let npv =
+            |y| CashFlows::npv_at_yield(&leg, &continuous(y), &settings, None, None, None).unwrap();
+        let first = -(npv(FORWARD + h) - npv(FORWARD - h)) / (2.0 * h) / npv(FORWARD);
+        let second =
+            (npv(FORWARD + h) - 2.0 * npv(FORWARD) + npv(FORWARD - h)) / (h * h) / npv(FORWARD);
+
+        let modified = CashFlows::duration(
+            &leg,
+            &continuous(FORWARD),
+            Duration::Modified,
+            &settings,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        let convexity =
+            CashFlows::convexity(&leg, &continuous(FORWARD), &settings, None, None, None).unwrap();
+
+        assert!(modified > 0.9);
+        assert!((modified - first).abs() < 1e-8);
+        assert!(convexity > 1.0);
+        assert!((convexity - second).abs() < 1e-5);
+    }
+
+    /// The `Simple` arm of those same two formulas, on a single-flow leg, where
+    /// the chained discount of `npv_at_yield` and the discount at the total time
+    /// `duration` differentiates are the same factor. A simple yield discounts
+    /// by `B = 1 / (1 + y t)`, so `P = c B`, `-dP/dy = c t B^2` and
+    /// `d2P/dy2 = 2 c t^2 B^3`, leaving `D = t B` and `C = 2 t^2 B^2`.
+    #[test]
+    fn the_simple_yield_duration_and_convexity_follow_from_its_own_discount_factor() {
+        let (settings, yield_rate) = (settings(), simple_365(FORWARD));
+        let (start, end) = periods()[0];
+        let leg: Leg = vec![shared(FixedRateCoupon::new(
+            end,
+            NOMINAL,
+            simple(RATE),
+            start,
+            end,
+            None,
+            None,
+            None,
+        )) as Shared<dyn CashFlow>];
+
+        let t = f64::from(end - today()) / 365.0;
+        let discount = 1.0 / (1.0 + FORWARD * t);
+
+        let modified = CashFlows::duration(
+            &leg,
+            &yield_rate,
+            Duration::Modified,
+            &settings,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        let convexity =
+            CashFlows::convexity(&leg, &yield_rate, &settings, None, None, None).unwrap();
+
+        assert!((modified - t * discount).abs() < 1e-14);
+        assert!((convexity - 2.0 * t * t * discount * discount).abs() < 1e-14);
+    }
+
+    /// `check_sign` counts the *strict* sign changes of the flows the settlement
+    /// date and the ex-coupon rule leave, against the sign of the price paid for
+    /// them. A flow already paid cannot supply that sign change, and a flow
+    /// worth nothing can neither supply one nor erase the price's own sign.
+    ///
+    /// Each rejection asserts on the message: a leg that fails the sign check
+    /// also fails to bracket a root, so `is_err()` alone would hold either way.
+    #[test]
+    fn only_the_surviving_flows_of_nonzero_amount_can_change_sign() {
+        let settings = settings();
+        let flow = |amount, date| shared(SimpleCashFlow::new(amount, date)) as Shared<dyn CashFlow>;
+        let solve = |leg: &Leg, npv| {
+            CashFlows::solve_yield(
+                leg,
+                npv,
+                Actual365Fixed::new(),
+                Compounding::Compounded,
+                Frequency::Semiannual,
+                &settings,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+        };
+        let wrong_sign = |leg: &Leg, npv| {
+            solve(leg, npv)
+                .unwrap_err()
+                .to_string()
+                .contains("due to their sign")
+        };
+
+        let with_zero: Leg = vec![flow(0.0, day(Month::July, 2026)), flow(NOMINAL, maturity())];
+        assert!(solve(&with_zero, 90.0).is_ok());
+        assert!(wrong_sign(&with_zero, -90.0));
+
+        let already_paid: Leg = vec![flow(-50.0, today() - 10), flow(NOMINAL, maturity())];
+        assert!(wrong_sign(&already_paid, -90.0));
+    }
+
     /// `D_Macaulay = (1 + y / N) D_modified`, and it is defined for no other
     /// compounding convention.
     #[test]

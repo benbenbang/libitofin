@@ -393,6 +393,39 @@ mod tests {
         assert_eq!(coupons[0].accrued_amount(payment_date).unwrap(), 0.0);
     }
 
+    /// A step-up leg: the `i`-th coupon reads the `i`-th notional and the `i`-th
+    /// rate, and the last element of either list carries over to the coupons
+    /// beyond its end. Every other test gives one notional and one rate, where a
+    /// coupon indexing the list wrongly still reads the same value.
+    #[test]
+    fn each_coupon_reads_its_own_notional_and_rate() {
+        let schedule = crate::time::schedule::MakeSchedule::new()
+            .from(Date::new(15, Month::January, 2026))
+            .to(Date::new(15, Month::January, 2028))
+            .with_frequency(Frequency::Semiannual)
+            .with_calendar(NullCalendar::new())
+            .with_convention(BusinessDayConvention::Unadjusted)
+            .backwards()
+            .build();
+        let rates = [0.01, 0.02, 0.03, 0.04];
+        let coupons = FixedRateLeg::new(schedule)
+            .with_notionals(vec![100.0, 200.0, 300.0])
+            .with_interest_rates(
+                rates
+                    .iter()
+                    .map(|&rate| simple(rate, Actual360::new()))
+                    .collect(),
+            )
+            .coupons()
+            .unwrap();
+
+        assert_eq!(coupons.len(), 4);
+        let borne: Vec<Rate> = coupons.iter().map(|c| c.rate().unwrap()).collect();
+        let nominals: Vec<Real> = coupons.iter().map(|c| c.nominal()).collect();
+        assert_eq!(borne, rates);
+        assert_eq!(nominals, vec![100.0, 200.0, 300.0, 300.0]);
+    }
+
     /// A stub period reads the schedule's end-of-month flag, which a schedule
     /// carrying a tenor and regularity flags may still lack.
     #[test]
