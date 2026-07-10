@@ -12,6 +12,26 @@ use crate::math::integrals::Integrator;
 use crate::types::{Real, Size};
 use crate::{fail, require};
 
+/// Reject non-finite abscissae or ordinates before they enter the quadrature.
+///
+/// Divergence: `discreteintegrals.cpp` guards only `n == x.size()`
+/// (`:28`, `:46`). A NaN or infinite sample propagates through the weighted sum
+/// and the caller receives a NaN integral with no indication of which sample
+/// produced it.
+fn require_finite_samples(x: &[Real], f: &[Real]) -> QlResult<()> {
+    for &xi in x {
+        if !xi.is_finite() {
+            fail!("x values must be finite, got {xi}");
+        }
+    }
+    for &fi in f {
+        if !fi.is_finite() {
+            fail!("function values must be finite, got {fi}");
+        }
+    }
+    Ok(())
+}
+
 /// Trapezoidal integration of samples `(x, f)` on an arbitrary grid.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DiscreteTrapezoidIntegral;
@@ -22,7 +42,8 @@ impl DiscreteTrapezoidIntegral {
     ///
     /// # Errors
     ///
-    /// Returns an error if `x` and `f` have different lengths.
+    /// Returns an error if `x` and `f` have different lengths, or if any sample
+    /// is non-finite.
     pub fn integrate(&self, x: &[Real], f: &[Real]) -> QlResult<Real> {
         require!(
             x.len() == f.len(),
@@ -30,6 +51,7 @@ impl DiscreteTrapezoidIntegral {
             x.len(),
             f.len()
         );
+        require_finite_samples(x, f)?;
         let n = f.len();
         if n < 2 {
             return Ok(0.0);
@@ -51,9 +73,14 @@ impl DiscreteSimpsonIntegral {
     /// generalised to non-uniform spacing, closing an odd final panel with the
     /// trapezoid rule. Fewer than two points integrate to zero.
     ///
+    /// Divergence: the distinct-adjacent-`x` guard has no counterpart in
+    /// `discreteintegrals.cpp`. The panel weight is `dd / (6 * dxjp1 * dxj)`,
+    /// so a repeated abscissa divides by zero and C++ returns NaN silently.
+    ///
     /// # Errors
     ///
-    /// Returns an error if `x` and `f` have different lengths.
+    /// Returns an error if `x` and `f` have different lengths, if any sample is
+    /// non-finite, or if two adjacent abscissae coincide.
     pub fn integrate(&self, x: &[Real], f: &[Real]) -> QlResult<Real> {
         require!(
             x.len() == f.len(),
@@ -61,6 +88,7 @@ impl DiscreteSimpsonIntegral {
             x.len(),
             f.len()
         );
+        require_finite_samples(x, f)?;
         let n = f.len();
         if n < 2 {
             return Ok(0.0);
@@ -70,6 +98,9 @@ impl DiscreteSimpsonIntegral {
         while j + 2 < n {
             let dxj = x[j + 1] - x[j];
             let dxjp1 = x[j + 2] - x[j + 1];
+            if dxj == 0.0 || dxjp1 == 0.0 {
+                fail!("adjacent x values must be distinct");
+            }
 
             let alpha = dxjp1 * (2.0 * dxj - dxjp1);
             let dd = dxj + dxjp1;
@@ -260,6 +291,29 @@ mod tests {
         assert!(
             DiscreteSimpsonIntegral
                 .integrate(&[1.0], &[1.0, 2.0])
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn sampled_formulae_reject_non_finite_values() {
+        assert!(
+            DiscreteTrapezoidIntegral
+                .integrate(&[0.0, Real::NAN], &[1.0, 2.0])
+                .is_err()
+        );
+        assert!(
+            DiscreteSimpsonIntegral
+                .integrate(&[0.0, 1.0, 2.0], &[1.0, Real::INFINITY, 3.0])
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn sampled_simpson_rejects_duplicate_adjacent_x() {
+        assert!(
+            DiscreteSimpsonIntegral
+                .integrate(&[0.0, 1.0, 1.0], &[1.0, 2.0, 3.0])
                 .is_err()
         );
     }

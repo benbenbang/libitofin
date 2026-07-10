@@ -28,8 +28,29 @@ pub trait CostFunction {
     }
 
     /// Computes `grad`, the first derivative of the scalar cost at `x`.
+    ///
+    /// Divergence: `costfunction.cpp` has no `QL_REQUIRE`. An oversized `grad`
+    /// leaves stale entries past `x.size()` that the optimiser then reads as
+    /// real derivatives, and a zero or non-finite epsilon silently returns NaN.
+    /// Both are caller errors this port names rather than absorbs.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the finite-difference epsilon is not finite and positive, or
+    /// if `grad` and `x` differ in size.
     fn gradient(&self, grad: &mut Array, x: &Array) {
         let eps = self.finite_difference_epsilon();
+        assert!(
+            eps.is_finite() && eps > 0.0,
+            "finite-difference epsilon ({eps}) must be finite and positive"
+        );
+        assert_eq!(
+            grad.size(),
+            x.size(),
+            "gradient size ({}) must match x size ({})",
+            grad.size(),
+            x.size()
+        );
         let mut xx = x.clone();
         for i in 0..x.size() {
             xx[i] += eps;
@@ -48,14 +69,58 @@ pub trait CostFunction {
     }
 
     /// Computes `jac`, the Jacobian of the cost function at `x`.
+    ///
+    /// Divergence: as for [`gradient`](Self::gradient).
+    ///
+    /// # Panics
+    ///
+    /// Panics if the finite-difference epsilon is not finite and positive, if
+    /// `jac`'s columns do not match `x`, or if its rows do not match the
+    /// residual vector.
     fn jacobian(&self, jac: &mut Matrix, x: &Array) {
         let eps = self.finite_difference_epsilon();
+        assert!(
+            eps.is_finite() && eps > 0.0,
+            "finite-difference epsilon ({eps}) must be finite and positive"
+        );
+        assert_eq!(
+            jac.columns(),
+            x.size(),
+            "jacobian columns ({}) must match x size ({})",
+            jac.columns(),
+            x.size()
+        );
+        if x.is_empty() {
+            let residuals = self.values(x);
+            assert_eq!(
+                jac.rows(),
+                residuals.size(),
+                "jacobian rows ({}) must match residual size ({})",
+                jac.rows(),
+                residuals.size()
+            );
+            return;
+        }
         let mut xx = x.clone();
         for i in 0..x.size() {
             xx[i] += eps;
             let fp = self.values(&xx);
             xx[i] -= 2.0 * eps;
             let fm = self.values(&xx);
+            assert_eq!(
+                fp.size(),
+                fm.size(),
+                "finite-difference residual size changed from {} to {}",
+                fp.size(),
+                fm.size()
+            );
+            assert_eq!(
+                jac.rows(),
+                fp.size(),
+                "jacobian rows ({}) must match residual size ({})",
+                jac.rows(),
+                fp.size()
+            );
             for j in 0..fp.size() {
                 jac[(j, i)] = 0.5 * (fp[j] - fm[j]) / eps;
             }
@@ -139,5 +204,51 @@ mod tests {
         let mut jac = Matrix::with_size(2, 2);
         let vals = Quadratic.values_and_jacobian(&mut jac, &x);
         assert_eq!(vals, Quadratic.values(&x));
+    }
+
+    #[test]
+    #[should_panic(expected = "finite-difference epsilon")]
+    fn default_gradient_rejects_invalid_finite_difference_epsilon() {
+        struct BadStep;
+        impl CostFunction for BadStep {
+            fn values(&self, x: &Array) -> Array {
+                x.clone()
+            }
+
+            fn finite_difference_epsilon(&self) -> Real {
+                0.0
+            }
+        }
+
+        let mut grad = Array::with_size(1);
+        BadStep.gradient(&mut grad, &Array::from([1.0]));
+    }
+
+    #[test]
+    #[should_panic(expected = "gradient size")]
+    fn default_gradient_rejects_wrong_output_shape() {
+        let mut grad = Array::with_size(1);
+        Quadratic.gradient(&mut grad, &Array::from([2.0, 3.0]));
+    }
+
+    #[test]
+    #[should_panic(expected = "jacobian rows")]
+    fn default_jacobian_rejects_wrong_output_shape() {
+        let mut jac = Matrix::with_size(1, 2);
+        Quadratic.jacobian(&mut jac, &Array::from([2.0, 3.0]));
+    }
+
+    #[test]
+    #[should_panic(expected = "jacobian rows")]
+    fn default_jacobian_rejects_wrong_rows_with_zero_variables() {
+        struct ConstantResiduals;
+        impl CostFunction for ConstantResiduals {
+            fn values(&self, _x: &Array) -> Array {
+                Array::from([1.0, 2.0])
+            }
+        }
+
+        let mut jac = Matrix::with_size(1, 0);
+        ConstantResiduals.jacobian(&mut jac, &Array::new());
     }
 }
