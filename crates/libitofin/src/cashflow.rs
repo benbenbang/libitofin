@@ -28,16 +28,24 @@ use crate::types::Real;
 /// specialization, so a provided method here would collide with the
 /// supertrait's rather than override it; `Event` leaves `has_occurred`
 /// required so that the choice cannot be made by omission.
+///
+/// A [`Coupon`] implements none of this by hand. The blanket
+/// `impl<T: Coupon> CashFlow for T` answers this trait and [`Event`] from the
+/// coupon's [`CouponBase`](crate::cashflows::CouponBase), so the three methods
+/// whose wrong-but-compiling answers below are plausible numbers cannot be
+/// written wrongly, or at all.
 pub trait CashFlow: Event {
     /// The amount paid at [`date`](Event::date), undiscounted.
     fn amount(&self) -> QlResult<Real>;
 
     /// The date from which the flow trades ex-coupon, when it has one.
     ///
-    /// Required rather than defaulted to `None`: a `Coupon` stores this date on
-    /// its base and cannot override a provided method here, so a default would
-    /// let an implementor accrue ex-coupon while reporting
-    /// [`trading_ex_coupon`](CashFlow::trading_ex_coupon) as `false`.
+    /// Required rather than defaulted to `None`, because a default would let an
+    /// implementor accrue ex-coupon while reporting
+    /// [`trading_ex_coupon`](CashFlow::trading_ex_coupon) as `false`. A
+    /// [`Coupon`] never answers it: the blanket reads the one date its
+    /// [`CouponBase`](crate::cashflows::CouponBase) holds, which is also the
+    /// date its accrual tests.
     fn ex_coupon_date(&self) -> Option<Date>;
 
     /// The [`Coupon`] view of this flow, when it is one.
@@ -55,12 +63,12 @@ pub trait CashFlow: Event {
     /// rate; alone in a leg it drives the rate to `0.0`. Neither is an obvious
     /// failure, so the answer is compulsory.
     ///
-    /// A [`Coupon`] must answer `Some(self)`, never `Some` of some other
-    /// coupon: `coupon_cast` (`coupon.cpp:88`) can only ever yield the flow it
-    /// was handed, so a wrapper answering with its inner coupon would let
-    /// `bps` read a nominal and an accrual period that `npv` never priced.
-    /// Neither rule is checkable at compile time in this shape, and the
-    /// analytics cannot detect a violation of either.
+    /// `coupon_cast` (`coupon.cpp:88`) can only ever yield the flow it was
+    /// handed, so a coupon must answer `Some(self)` and never `Some` of some
+    /// other coupon, which would let `bps` read a nominal and an accrual period
+    /// that `npv` never priced. Both rules now hold by construction: the
+    /// blanket is the only `Some` a coupon can produce, and a flow that is not
+    /// a [`Coupon`] has no coupon to answer with.
     fn as_coupon(&self) -> Option<&dyn Coupon>;
 
     /// Whether the flow trades ex-coupon as of `ref_date` (the evaluation date
