@@ -418,7 +418,11 @@ impl DayCounterImpl for AfbImpl {
 mod tests {
     use super::*;
     use crate::time::businessdayconvention::BusinessDayConvention;
+    use crate::time::calendar::Calendar;
     use crate::time::calendars::canada::{Canada, Market as CanadaMarket};
+    use crate::time::calendars::china::{China, Market as ChinaMarket};
+    use crate::time::calendars::unitedstates::{Market as UsMarket, UnitedStates};
+    use crate::time::dategenerationrule::DateGeneration;
     use crate::time::frequency::Frequency;
     use crate::time::schedule::MakeSchedule;
 
@@ -451,6 +455,66 @@ mod tests {
             .with_convention(BusinessDayConvention::Unadjusted)
             .backwards()
             .end_of_month(true)
+            .build()
+    }
+
+    /// The test suite's own `ISMAYearFractionWithReferenceDates`: an
+    /// independent, simpler reading of the ISMA rule, used as a cross-check.
+    fn isma_year_fraction_with_reference_dates(
+        dc: &DayCounter,
+        start: Date,
+        end: Date,
+        ref_start: Date,
+        ref_end: Date,
+    ) -> Time {
+        let reference_day_count = Time::from(dc.day_count(ref_start, ref_end));
+        let coupons_per_year = (365.0 / reference_day_count).round();
+        Time::from(dc.day_count(start, end)) / (reference_day_count * coupons_per_year)
+    }
+
+    /// The test suite's own `actualActualDaycountComputation`: sums the
+    /// cross-check above over the schedule's regular periods.
+    fn actual_actual_daycount_computation(schedule: &Schedule, start: Date, end: Date) -> Time {
+        let dc = ActualActual::with_schedule(Convention::ISMA, schedule.clone());
+        let mut year_fraction = 0.0;
+        for i in 1..schedule.len() - 1 {
+            let reference_start = schedule.date(i);
+            let reference_end = schedule.date(i + 1);
+            if start < reference_end && end > reference_start {
+                year_fraction += isma_year_fraction_with_reference_dates(
+                    &dc,
+                    start.max(reference_start),
+                    end.min(reference_end),
+                    reference_start,
+                    reference_end,
+                );
+            }
+        }
+        year_fraction
+    }
+
+    fn next_day(calendar: &Calendar, d: Date) -> Date {
+        calendar.advance(
+            d,
+            1,
+            TimeUnit::Days,
+            BusinessDayConvention::Following,
+            false,
+        )
+    }
+
+    /// The `testActualActualWithSemiannualSchedule` / `WithAnnualSchedule`
+    /// schedule, whose first period is an undefined (long) stub.
+    fn undefined_first_period_schedule(frequency: Frequency, end_of_month: bool) -> Schedule {
+        MakeSchedule::new()
+            .from(d(10, Month::January, 2017))
+            .with_first_date(d(31, Month::August, 2017))
+            .to(d(28, Month::February, 2026))
+            .with_frequency(frequency)
+            .with_calendar(UnitedStates::new(UsMarket::GovernmentBond))
+            .with_convention(BusinessDayConvention::Unadjusted)
+            .backwards()
+            .end_of_month(end_of_month)
             .build()
     }
 
@@ -625,6 +689,224 @@ mod tests {
                 "{d1} -> {d2}"
             );
         }
+    }
+
+    /// Port of `testActualActualIsma`.
+    #[test]
+    fn isma_with_schedule_and_odd_last_period() {
+        let dc = ActualActual::with_schedule(Convention::ISMA, odd_last_period_schedule());
+        let calculated = dc.year_fraction(d(30, Month::January, 2000), d(30, Month::June, 2000));
+        let expected = 152.0 / (182.0 * 2.0);
+        assert!((calculated - expected).abs() < TOL, "got {calculated}");
+    }
+
+    /// Port of `testActualActualWithSemiannualSchedule`. The half that compares
+    /// the schedule-driven counter with the plain reference-date one is the
+    /// load-bearing check: both must agree over a full reference period.
+    #[test]
+    fn isma_with_undefined_semiannual_reference_periods() {
+        let calendar = UnitedStates::new(UsMarket::GovernmentBond);
+        let from_date = d(10, Month::January, 2017);
+        let first_coupon = d(31, Month::August, 2017);
+        let quasi_coupon = d(28, Month::February, 2017);
+        let quasi_coupon2 = d(31, Month::August, 2016);
+
+        let schedule = undefined_first_period_schedule(Frequency::Semiannual, true);
+        let dc = ActualActual::with_schedule(Convention::ISMA, schedule.clone());
+        let dc_no_schedule = ActualActual::with_convention(Convention::ISMA);
+
+        let reference_period_start = schedule.date(1);
+        let reference_period_end = schedule.date(2);
+
+        assert_eq!(
+            dc.year_fraction(reference_period_start, reference_period_start),
+            0.0
+        );
+        assert_eq!(
+            dc_no_schedule.year_fraction(reference_period_start, reference_period_start),
+            0.0
+        );
+        assert_eq!(
+            dc_no_schedule.year_fraction_ref(
+                reference_period_start,
+                reference_period_start,
+                reference_period_start,
+                reference_period_start,
+            ),
+            0.0
+        );
+        assert_eq!(
+            dc.year_fraction(reference_period_start, reference_period_end),
+            0.5
+        );
+        assert_eq!(
+            dc_no_schedule.year_fraction_ref(
+                reference_period_start,
+                reference_period_end,
+                reference_period_start,
+                reference_period_end,
+            ),
+            0.5
+        );
+
+        let mut test_date = schedule.date(1);
+        while test_date < reference_period_end {
+            let difference = dc.year_fraction_ref(
+                test_date,
+                reference_period_end,
+                reference_period_start,
+                reference_period_end,
+            ) - dc.year_fraction(test_date, reference_period_end);
+            assert!(difference.abs() < TOL, "at {test_date}");
+            test_date = next_day(&calendar, test_date);
+        }
+
+        let calculated = dc.year_fraction(from_date, first_coupon);
+        let expected = 0.5
+            + Time::from(dc.day_count(from_date, quasi_coupon))
+                / (2.0 * Time::from(dc.day_count(quasi_coupon2, quasi_coupon)));
+        assert!((calculated - expected).abs() < TOL, "got {calculated}");
+
+        let schedule = undefined_first_period_schedule(Frequency::Semiannual, false);
+        let dc = ActualActual::with_schedule(Convention::ISMA, schedule.clone());
+        let period_start_date = schedule.date(1);
+        let mut period_end_date = schedule.date(2);
+
+        while period_end_date < schedule.date(schedule.len() - 2) {
+            let expected =
+                actual_actual_daycount_computation(&schedule, period_start_date, period_end_date);
+            let calculated = dc.year_fraction(period_start_date, period_end_date);
+            assert!(
+                (expected - calculated).abs() < 1.0e-8,
+                "{period_start_date} to {period_end_date}"
+            );
+            period_end_date = next_day(&calendar, period_end_date);
+        }
+    }
+
+    /// Port of `testActualActualWithAnnualSchedule`.
+    #[test]
+    fn isma_with_undefined_annual_reference_periods() {
+        let calendar = UnitedStates::new(UsMarket::GovernmentBond);
+        let schedule = undefined_first_period_schedule(Frequency::Annual, false);
+        let dc = ActualActual::with_schedule(Convention::ISMA, schedule.clone());
+
+        let reference_period_start = schedule.date(1);
+        let reference_period_end = schedule.date(2);
+
+        let mut test_date = schedule.date(1);
+        while test_date < reference_period_end {
+            let difference = isma_year_fraction_with_reference_dates(
+                &dc,
+                test_date,
+                reference_period_end,
+                reference_period_start,
+                reference_period_end,
+            ) - dc.year_fraction(test_date, reference_period_end);
+            assert!(difference.abs() < TOL, "at {test_date}");
+            test_date = next_day(&calendar, test_date);
+        }
+    }
+
+    /// Port of `testActualActualWithSchedule`: a long first coupon split across
+    /// two quasi-periods.
+    #[test]
+    fn isma_with_schedule_and_long_first_coupon() {
+        let schedule = long_first_coupon_schedule();
+        let issue_date = schedule.date(0);
+        let first_coupon_date = schedule.date(1);
+        assert_eq!(issue_date, d(17, Month::January, 2017));
+        assert_eq!(first_coupon_date, d(31, Month::August, 2017));
+
+        let quasi_coupon_date2 = advance(&schedule, first_coupon_date, -schedule.tenor());
+        let quasi_coupon_date1 = advance(&schedule, quasi_coupon_date2, -schedule.tenor());
+        assert_eq!(quasi_coupon_date2, d(28, Month::February, 2017));
+        assert_eq!(quasi_coupon_date1, d(31, Month::August, 2016));
+
+        let dc = ActualActual::with_schedule(Convention::ISMA, schedule.clone());
+        let expected = 0.6160220994;
+
+        let t_with_reference = dc.year_fraction_ref(
+            issue_date,
+            first_coupon_date,
+            quasi_coupon_date2,
+            first_coupon_date,
+        );
+        let t_no_reference = dc.year_fraction(issue_date, first_coupon_date);
+        let t_total = isma_year_fraction_with_reference_dates(
+            &dc,
+            issue_date,
+            quasi_coupon_date2,
+            quasi_coupon_date1,
+            quasi_coupon_date2,
+        ) + 0.5;
+
+        assert!((t_total - expected).abs() < TOL, "got {t_total}");
+        assert!(
+            (t_with_reference - expected).abs() < TOL,
+            "got {t_with_reference}"
+        );
+        assert!((t_no_reference - t_with_reference).abs() < TOL);
+
+        // Settlement date in the first quasi-period.
+        let settlement_date = d(29, Month::January, 2017);
+        let t_expected_first_qp = 0.03314917127071823;
+        let t_with_reference = isma_year_fraction_with_reference_dates(
+            &dc,
+            issue_date,
+            settlement_date,
+            quasi_coupon_date1,
+            quasi_coupon_date2,
+        );
+        let t_no_reference = dc.year_fraction(issue_date, settlement_date);
+        assert!((t_with_reference - t_expected_first_qp).abs() < TOL);
+        assert!((t_no_reference - t_with_reference).abs() < TOL);
+
+        let t2 = dc.year_fraction(settlement_date, first_coupon_date);
+        assert!((t_expected_first_qp + t2 - expected).abs() < TOL);
+
+        // Settlement date in the second quasi-period.
+        let settlement_date = d(29, Month::July, 2017);
+        let t_no_reference = dc.year_fraction(issue_date, settlement_date);
+        let t_with_reference = isma_year_fraction_with_reference_dates(
+            &dc,
+            issue_date,
+            quasi_coupon_date2,
+            quasi_coupon_date1,
+            quasi_coupon_date2,
+        ) + isma_year_fraction_with_reference_dates(
+            &dc,
+            quasi_coupon_date2,
+            settlement_date,
+            quasi_coupon_date2,
+            first_coupon_date,
+        );
+        assert!((t_no_reference - t_with_reference).abs() < TOL);
+
+        let t2 = dc.year_fraction(settlement_date, first_coupon_date);
+        assert!((t_total - (t_no_reference + t2)).abs() < TOL);
+    }
+
+    /// Port of `testActualActualOutOfScheduleRange`. QuantLib raises; the
+    /// infallible trait signature makes this a panic here.
+    #[test]
+    #[should_panic(expected = "dates out of range of schedule")]
+    fn isma_with_schedule_rejects_dates_out_of_range() {
+        let schedule = Schedule::new(
+            d(21, Month::May, 2019),
+            d(21, Month::May, 2029),
+            1 * TimeUnit::Years,
+            China::new(ChinaMarket::Ib),
+            BusinessDayConvention::Unadjusted,
+            BusinessDayConvention::Unadjusted,
+            DateGeneration::Backward,
+            false,
+            Date::null(),
+            Date::null(),
+        );
+        let dc = ActualActual::with_schedule(Convention::Bond, schedule);
+        let today = d(10, Month::November, 2020);
+        dc.year_fraction(today, today + 9 * TimeUnit::Years);
     }
 
     #[test]
