@@ -1,20 +1,23 @@
 //! Analytics over a [`Leg`].
 //!
 //! Port of `ql/cashflows/cashflows.{hpp,cpp}`: the [`CashFlows`] namespace of
-//! free functions that inspect a leg's dates and price it off a discount curve.
-//! The `InterestRate` and `(Rate, DayCounter, Compounding, Frequency)`
-//! overloads of the same four analytics are the yield half of the file and are
-//! not ported here.
+//! free functions that inspect a leg's dates, price it off a discount curve,
+//! and price it off a single flat yield.
 //!
 //! ## Oracle
 //!
 //! The QuantLib test-suite never calls `bps`, `npvbps` or `atmRate`, in any
 //! overload, and its only calls to the discount-curve [`npv`](CashFlows::npv)
 //! come from the multiple-reset and inflation test files, which need index
-//! machinery this port does not have. No ported test case stands behind these
-//! numbers: the `npv` test adapts a case written against a different overload,
-//! and the rest are checked against the definitions in `cashflows.cpp` and
+//! machinery this port does not have. No ported test case stands behind those
+//! numbers: they are checked against the definitions in `cashflows.cpp` and
 //! against each other. Each test says which it is.
+//!
+//! The yield analytics fare better:
+//! [`npv_at_yield`](CashFlows::npv_at_yield) is a direct port of
+//! `cashflows.cpp::testSettings`, and `bonds.cpp::testExCouponGilt` pins
+//! [`solve_yield`](CashFlows::solve_yield), [`duration`](CashFlows::duration)
+//! and [`convexity`](CashFlows::convexity) against Bloomberg values.
 //!
 //! ## Divergences from QuantLib
 //!
@@ -26,6 +29,14 @@
 //! not coupons. A coupon whose [`amount`](CashFlow::amount) fails - a floating
 //! one missing its fixing - therefore makes `bps` fail, where C++ returns a
 //! number.
+//!
+//! Each yield analytic has two C++ overloads: one taking an `InterestRate`, one
+//! taking the `(Rate, DayCounter, Compounding, Frequency)` it is built from and
+//! forwarding. Rust has no overloading and the second carries no behaviour, so
+//! only the `InterestRate` form is ported; a caller spells the conversion
+//! [`InterestRate::new`], which is fallible where the C++ constructor throws.
+//! [`solve_yield`](CashFlows::solve_yield) is the exception: it takes the four
+//! pieces, because the rate it would take is the one it is solving for.
 //!
 //! C++ deletes every constructor to make `CashFlows` a namespace; the port uses
 //! an uninhabited type, which cannot be constructed at all.
@@ -45,12 +56,17 @@
 use crate::cashflow::{CashFlow, Leg};
 use crate::errors::QlResult;
 use crate::event::reference_date;
+use crate::interestrate::InterestRate;
 use crate::require;
 use crate::settings::Settings;
 use crate::shared::Shared;
+use crate::termstructures::yields::FlatForward;
 use crate::termstructures::yieldtermstructure::YieldTermStructure;
 use crate::time::date::Date;
-use crate::types::{DiscountFactor, Rate, Real, Spread};
+use crate::time::daycounter::DayCounter;
+use crate::time::period::Period;
+use crate::time::timeunit::TimeUnit;
+use crate::types::{DiscountFactor, Rate, Real, Spread, Time};
 
 /// The `basisPoint_` of `cashflows.cpp`.
 const BASIS_POINT: Spread = 1.0e-4;
@@ -368,6 +384,110 @@ impl CashFlows {
         Ok(target / totals.bps)
     }
 
+    /// The NPV of the leg discounted at one flat `yield_rate`, the internal
+    /// rate of return [`solve_yield`](Self::solve_yield) inverts.
+    ///
+    /// Each surviving flow is discounted by the running product of the yield's
+    /// discount factors over the steps between consecutive flows, rather than by
+    /// its discount factor at the total time - the two agree for a compounded or
+    /// continuous yield and part ways for a simple one. `settlement_date`
+    /// defaults to the evaluation date and `npv_date` to `settlement_date`.
+    ///
+    /// A flow trading ex-coupon is discounted as a zero amount rather than
+    /// dropped, so that it still advances the step the next flow discounts over.
+    ///
+    /// # Errors
+    ///
+    /// Propagates the flow lookups and the yield's compounding domain; without a
+    /// `settlement_date` the evaluation date must be set.
+    pub fn npv_at_yield(
+        leg: &Leg,
+        yield_rate: &InterestRate,
+        settings: &Settings<Date>,
+        include_settlement_date_flows: Option<bool>,
+        settlement_date: Option<Date>,
+        npv_date: Option<Date>,
+    ) -> QlResult<Real> {
+        if leg.is_empty() {
+            return Ok(0.0);
+        }
+        let (settlement, npv_date) = Self::yield_dates(settings, settlement_date, npv_date)?;
+
+        let mut npv = 0.0;
+        let mut discount: DiscountFactor = 1.0;
+        let mut last_date = npv_date;
+        for flow in leg {
+            if flow.has_occurred(settings, Some(settlement), include_settlement_date_flows)? {
+                continue;
+            }
+            let amount = if flow.trading_ex_coupon(settings, Some(settlement))? {
+                0.0
+            } else {
+                flow.amount()?
+            };
+            let step = stepwise_discount_time(
+                flow.as_ref(),
+                yield_rate.day_counter(),
+                npv_date,
+                last_date,
+            );
+            discount *= yield_rate.discount_factor(step)?;
+            last_date = flow.date();
+            npv += amount * discount;
+        }
+        Ok(npv)
+    }
+
+    /// The change in [`npv_at_yield`](Self::npv_at_yield) for a uniform
+    /// one-basis-point change in the rate the coupons pay.
+    ///
+    /// As in C++, this is the discount-curve [`bps`](Self::bps) taken against a
+    /// flat curve built from the yield, which discounts each flow at its own
+    /// time rather than stepwise; the two paths need not agree to the last bit.
+    ///
+    /// # Errors
+    ///
+    /// As [`npv_at_yield`](Self::npv_at_yield).
+    pub fn bps_at_yield(
+        leg: &Leg,
+        yield_rate: &InterestRate,
+        settings: &Settings<Date>,
+        include_settlement_date_flows: Option<bool>,
+        settlement_date: Option<Date>,
+        npv_date: Option<Date>,
+    ) -> QlResult<Real> {
+        if leg.is_empty() {
+            return Ok(0.0);
+        }
+        let (settlement, npv_date) = Self::yield_dates(settings, settlement_date, npv_date)?;
+        let flat_rate = FlatForward::with_rate(
+            settlement,
+            yield_rate.rate(),
+            yield_rate.day_counter().clone(),
+            yield_rate.compounding(),
+            yield_rate.frequency(),
+        );
+        Self::bps(
+            leg,
+            &flat_rate,
+            settings,
+            include_settlement_date_flows,
+            Some(settlement),
+            Some(npv_date),
+        )
+    }
+
+    /// The settlement and NPV dates the yield analytics resolve up front, each
+    /// defaulting to the one before it.
+    fn yield_dates(
+        settings: &Settings<Date>,
+        settlement_date: Option<Date>,
+        npv_date: Option<Date>,
+    ) -> QlResult<(Date, Date)> {
+        let settlement = reference_date(settings, settlement_date)?;
+        Ok((settlement, npv_date.unwrap_or(settlement)))
+    }
+
     /// The single pass the analytics share, and the discount factor at the NPV
     /// date they all divide by.
     fn measure(
@@ -439,6 +559,44 @@ impl CashFlows {
             total += flow.amount()?;
         }
         Ok(total)
+    }
+}
+
+/// The time a flow's own discount step spans, from `last_date` to its payment
+/// date (`getStepwiseDiscountTime` of `cashflows.cpp`).
+///
+/// A coupon measures the step in its own reference period, and as the remainder
+/// of its accrual once `last_date` has moved off its accrual start - the shape
+/// that makes a schedule-driven `ActualActual(ISMA)` come out right. Anything
+/// else has no reference period, so the step gets one: the interval it is
+/// discounted over, faked as the year before it when there is no previous flow
+/// to start from.
+fn stepwise_discount_time(
+    flow: &dyn CashFlow,
+    day_counter: &DayCounter,
+    npv_date: Date,
+    last_date: Date,
+) -> Time {
+    let payment_date = flow.date();
+    let coupon = flow.as_coupon();
+    let (ref_start, ref_end) = match coupon {
+        Some(coupon) => (
+            coupon.reference_period_start(),
+            coupon.reference_period_end(),
+        ),
+        None if last_date == npv_date => {
+            (payment_date - Period::new(1, TimeUnit::Years), payment_date)
+        }
+        None => (last_date, payment_date),
+    };
+
+    match coupon {
+        Some(coupon) if last_date != coupon.accrual_start_date() => {
+            let start = coupon.accrual_start_date();
+            day_counter.year_fraction_ref(start, payment_date, ref_start, ref_end)
+                - day_counter.year_fraction_ref(start, last_date, ref_start, ref_end)
+        }
+        _ => day_counter.year_fraction_ref(last_date, payment_date, ref_start, ref_end),
     }
 }
 
@@ -647,6 +805,17 @@ mod analytics_tests {
         .unwrap()
     }
 
+    /// A simple yield on `Actual365Fixed`, the day counter [`df`] is written in.
+    fn simple_365(rate: Rate) -> InterestRate {
+        InterestRate::new(
+            rate,
+            Actual365Fixed::new(),
+            Compounding::Simple,
+            Frequency::NoFrequency,
+        )
+        .unwrap()
+    }
+
     /// The accrual periods of [`fixed_leg`], which pays on its accrual ends.
     fn periods() -> [(Date, Date); 4] {
         [
@@ -674,18 +843,62 @@ mod analytics_tests {
             .unwrap()
     }
 
-    /// An adaptation of the `CHECK_NPV` block of `cashflows.cpp::testSettings`
-    /// (:157-179) onto the `YieldTermStructure` overload, which C++ does not
-    /// call there. It prices the leg off `InterestRate(0.0, Actual365Fixed(),
-    /// Continuous, Annual)`, whose every discount factor is 1.0; a flat 0%
-    /// `FlatForward` gives the same factors, so the `2.0` and `3.0` expected
-    /// across the `includeTodaysCashFlows` matrix carry over unchanged.
+    /// The three unit flows the `CHECK_NPV` block of
+    /// `cashflows.cpp::testSettings` (:157-179) prices, on today and the two
+    /// days after.
+    fn unit_leg() -> Leg {
+        (0..3)
+            .map(|i| shared(SimpleCashFlow::new(1.0, today() + i)) as Shared<dyn CashFlow>)
+            .collect()
+    }
+
+    /// A direct port of the `CHECK_NPV` block of `cashflows.cpp::testSettings`
+    /// (:157-179), which prices the leg off `InterestRate(0.0,
+    /// Actual365Fixed(), Continuous, Annual)` - "no discount to make
+    /// calculations easier" - and expects 2.0 / 3.0 / 2.0 / 2.0 across the
+    /// `includeTodaysCashFlows` matrix.
+    #[test]
+    fn the_npv_at_yield_counts_the_flows_the_settlement_date_rule_admits() {
+        let settings = settings();
+        let leg = unit_leg();
+        let no_discount = InterestRate::new(
+            0.0,
+            Actual365Fixed::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )
+        .unwrap();
+        let npv = |include| {
+            CashFlows::npv_at_yield(
+                &leg,
+                &no_discount,
+                &settings,
+                Some(include),
+                Some(today()),
+                None,
+            )
+            .unwrap()
+        };
+
+        settings.set_include_todays_cash_flows(None);
+        assert_eq!(npv(false), 2.0);
+        assert_eq!(npv(true), 3.0);
+
+        settings.set_include_todays_cash_flows(Some(false));
+        assert_eq!(npv(false), 2.0);
+        assert_eq!(npv(true), 2.0);
+    }
+
+    /// The same `CHECK_NPV` block of `cashflows.cpp::testSettings` (:157-179),
+    /// adapted onto the `YieldTermStructure` overload, which C++ does not call
+    /// there. Every discount factor of the C++ `InterestRate(0.0, ...,
+    /// Continuous, Annual)` is 1.0, and a flat 0% `FlatForward` gives the same
+    /// factors, so the expected values carry over unchanged. The direct port
+    /// lives in `the_npv_at_yield_counts_the_flows_the_settlement_date_rule_admits`.
     #[test]
     fn the_npv_counts_the_flows_the_settlement_date_rule_admits() {
         let (settings, curve) = (settings(), curve(0.0));
-        let leg: Leg = (0..3)
-            .map(|i| shared(SimpleCashFlow::new(1.0, today() + i)) as Shared<dyn CashFlow>)
-            .collect();
+        let leg = unit_leg();
         let npv = |include| {
             CashFlows::npv(&leg, &curve, &settings, Some(include), Some(today()), None).unwrap()
         };
@@ -871,6 +1084,107 @@ mod analytics_tests {
         assert_eq!(atm(&leg, Some(0.0)).unwrap(), 0.0);
         assert_eq!(atm(&bare, None).unwrap(), 0.0);
         assert!(atm(&bare, Some(0.0)).is_err());
+    }
+
+    /// An `Actual365Fixed` yield on the `Actual360` leg. Every step of
+    /// [`fixed_leg`] runs from one coupon's accrual start to its payment date,
+    /// so the times compound to `A365(npv_date, payment_date)` and the discount
+    /// factors are `exp(-y * t)` by hand. The NPV date is a month past the
+    /// settlement date, where that factor is not 1.0.
+    #[test]
+    fn the_npv_at_yield_discounts_each_flow_over_its_own_step() {
+        let (settings, leg) = (settings(), fixed_leg(RATE));
+        let npv_date = today() + 30;
+        let yield_rate = InterestRate::new(
+            FORWARD,
+            Actual365Fixed::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )
+        .unwrap();
+        let expected: Real = periods()
+            .iter()
+            .map(|&(start, end)| {
+                let t = f64::from(end - npv_date) / 365.0;
+                NOMINAL * RATE * accrual(start, end) * (-FORWARD * t).exp()
+            })
+            .sum();
+
+        let npv = CashFlows::npv_at_yield(&leg, &yield_rate, &settings, None, None, Some(npv_date))
+            .unwrap();
+        assert!((npv - expected).abs() < 1e-12);
+        assert!(
+            (npv - CashFlows::npv_at_yield(&leg, &yield_rate, &settings, None, None, None)
+                .unwrap())
+            .abs()
+                > 1e-3
+        );
+    }
+
+    /// The discount is the running product of the per-step factors, not the
+    /// factor at the total time. A simple yield tells the two apart: chaining
+    /// its factors compounds them, so `prod (1 + y * step_i)` outgrows
+    /// `1 + y * sum(step_i)` and the stepwise NPV comes out the smaller.
+    #[test]
+    fn the_npv_at_yield_compounds_the_steps_rather_than_the_total_time() {
+        let (settings, leg) = (settings(), fixed_leg(RATE));
+        let yield_rate = simple_365(FORWARD);
+        let mut stepwise = 0.0;
+        let mut flat = 0.0;
+        let mut discount = 1.0;
+        let mut last = today();
+        for (start, end) in periods() {
+            let amount = NOMINAL * RATE * accrual(start, end);
+            discount /= 1.0 + FORWARD * f64::from(end - last) / 365.0;
+            stepwise += amount * discount;
+            flat += amount / (1.0 + FORWARD * f64::from(end - today()) / 365.0);
+            last = end;
+        }
+        assert!(flat - stepwise > 1e-3);
+
+        let npv = CashFlows::npv_at_yield(&leg, &yield_rate, &settings, None, None, None).unwrap();
+        assert!((npv - stepwise).abs() < 1e-12);
+    }
+
+    /// C++ routes `bps(leg, InterestRate)` through a `FlatForward` built from
+    /// the yield at the settlement date, so the yield form is the curve form on
+    /// that curve, to the bit.
+    #[test]
+    fn the_bps_at_yield_is_the_bps_off_a_flat_curve_of_the_yield() {
+        let (settings, leg) = (settings(), fixed_leg(RATE));
+        let yield_rate = simple_365(FORWARD);
+        let flat = FlatForward::with_rate(
+            today(),
+            FORWARD,
+            Actual365Fixed::new(),
+            Compounding::Simple,
+            Frequency::NoFrequency,
+        );
+
+        let at_yield =
+            CashFlows::bps_at_yield(&leg, &yield_rate, &settings, None, None, None).unwrap();
+        assert_eq!(
+            at_yield,
+            CashFlows::bps(&leg, &flat, &settings, None, None, None).unwrap()
+        );
+        assert!(at_yield > 0.0);
+    }
+
+    /// Both yield analytics short-circuit an empty leg before resolving the
+    /// settlement date, so they stand with no evaluation date set.
+    #[test]
+    fn an_empty_leg_has_no_yield_analytics() {
+        let (settings, leg) = (Settings::new(), Leg::new());
+        let yield_rate = simple_365(FORWARD);
+
+        assert_eq!(
+            CashFlows::npv_at_yield(&leg, &yield_rate, &settings, None, None, None).unwrap(),
+            0.0
+        );
+        assert_eq!(
+            CashFlows::bps_at_yield(&leg, &yield_rate, &settings, None, None, None).unwrap(),
+            0.0
+        );
     }
 
     /// The empty-leg short circuit comes before the settlement date is

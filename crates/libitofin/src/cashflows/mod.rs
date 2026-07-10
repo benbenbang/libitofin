@@ -8,6 +8,7 @@
 mod cashflows;
 mod coupon;
 mod dividend;
+mod duration;
 mod fixedratecoupon;
 mod fixedrateleg;
 mod simplecashflow;
@@ -15,6 +16,7 @@ mod simplecashflow;
 pub use cashflows::CashFlows;
 pub use coupon::{Coupon, CouponBase};
 pub use dividend::{Dividend, FixedDividend, FractionalDividend, dividend_vector};
+pub use duration::Duration;
 pub use fixedratecoupon::FixedRateCoupon;
 pub use fixedrateleg::FixedRateLeg;
 pub use simplecashflow::{AmortizingPayment, Redemption, SimpleCashFlow};
