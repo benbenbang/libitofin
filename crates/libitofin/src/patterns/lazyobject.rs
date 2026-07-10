@@ -41,6 +41,34 @@ pub struct LazyObject {
     updating: bool,
 }
 
+/// A deferred lazy-object notification that keeps the logical C++ `updating_`
+/// guard set while the caller notifies after releasing its `RefCell` borrow.
+///
+/// This is the RAII `LazyObject::UpdateChecker` of `lazyobject.hpp:134-141`,
+/// which sets `updating_` on entry to `update()` and clears it on scope exit
+/// (`:203`), so that an observer which writes back into an input during
+/// notification re-enters `update()` and returns early at `:191`. The port
+/// splits the C++ single `update()` into a state half and a notify half so the
+/// `RefCell` borrow is released before observers run; the guard carries the
+/// `updating_` flag across that gap.
+pub(crate) struct DeferredUpdate {
+    lazy: SharedMut<LazyObject>,
+    observable: Shared<Observable>,
+}
+
+impl DeferredUpdate {
+    /// Notifies observers while this guard is alive.
+    pub(crate) fn notify_observers(&self) {
+        self.observable.notify_observers();
+    }
+}
+
+impl Drop for DeferredUpdate {
+    fn drop(&mut self) {
+        self.lazy.borrow_mut().updating = false;
+    }
+}
+
 impl LazyObject {
     /// Creates a lazy object.
     ///
@@ -111,20 +139,28 @@ impl LazyObject {
     }
 
     /// The state half of [`on_update`](LazyObject::on_update) for lazy objects
-    /// held in a `SharedMut`: applies the invalidation and hands back the
-    /// observable to notify, so the holder can release its borrow first and a
-    /// notified observer may query the lazy object without a borrow conflict.
-    pub fn deferred_update(&mut self) -> Option<Shared<Observable>> {
-        if self.updating || !(self.calculated || self.failed || self.always_forward) {
-            return None;
-        }
-        self.calculated = false;
-        self.failed = false;
-        if self.frozen {
-            None
-        } else {
-            Some(Shared::clone(&self.observable))
-        }
+    /// held in a `SharedMut`: applies the invalidation and hands back a guard
+    /// that notifies after the borrow is released. The guard keeps `updating`
+    /// set until notification completes, matching the C++ recursion guard.
+    pub(crate) fn deferred_update(lazy: &SharedMut<LazyObject>) -> Option<DeferredUpdate> {
+        let observable = {
+            let mut lazy = lazy.borrow_mut();
+            if lazy.updating || !(lazy.calculated || lazy.failed || lazy.always_forward) {
+                return None;
+            }
+            lazy.updating = true;
+            lazy.calculated = false;
+            lazy.failed = false;
+            if lazy.frozen {
+                lazy.updating = false;
+                return None;
+            }
+            Shared::clone(&lazy.observable)
+        };
+        Some(DeferredUpdate {
+            lazy: SharedMut::clone(lazy),
+            observable,
+        })
     }
 
     /// Marks the results calculated without running a calculation, bypassing
