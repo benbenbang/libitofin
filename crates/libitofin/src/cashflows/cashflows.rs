@@ -1788,3 +1788,224 @@ mod analytics_tests {
         );
     }
 }
+
+/// The two ex-coupon bond cases of `bonds.cpp`, the only test-suite calls to
+/// `CashFlows::yield`, `duration` and `convexity`.
+///
+/// C++ prices a `FixedRateBond`, whose `cashflows_` is exactly the leg built
+/// here (`fixedratebond.cpp:53-63` plus the single `Redemption` that
+/// `bond.cpp:311-323` appends), and reaches the NPV as `testPrice + accrued`.
+/// The tables pin that sum directly, so the port needs neither the instrument
+/// nor `accruedAmount`: it feeds the tabulated NPV to
+/// [`CashFlows::solve_yield`] and checks the yield, duration and convexity that
+/// come back. The C++ round trip back to the price is the same check with the
+/// accrued amount added to both sides.
+#[cfg(test)]
+mod bonds_tests {
+    use super::*;
+    use crate::cashflows::fixedrateleg::FixedRateLeg;
+    use crate::cashflows::simplecashflow::Redemption;
+    use crate::shared::shared;
+    use crate::time::businessdayconvention::BusinessDayConvention;
+    use crate::time::calendar::Calendar;
+    use crate::time::calendars::australia::{self, Australia};
+    use crate::time::calendars::nullcalendar::NullCalendar;
+    use crate::time::calendars::unitedkingdom::{self, UnitedKingdom};
+    use crate::time::date::Month;
+    use crate::time::dategenerationrule::DateGeneration;
+    use crate::time::daycounters::actualactual::{ActualActual, Convention};
+    use crate::time::schedule::Schedule;
+
+    /// One row of a `bonds.cpp` expectation table. The NPV is its `NPV` column,
+    /// which C++ asserts equals `testPrice + accruedAmount`.
+    struct Case {
+        settlement: Date,
+        npv: Real,
+        irr: Rate,
+        duration: Real,
+        convexity: Real,
+    }
+
+    /// The `FixedRateBond` cash flows of `bonds.cpp`: a semiannual `FixedRateLeg`
+    /// on a schedule-driven `ActualActual(ISMA)`, then the redemption.
+    fn ex_coupon_leg(
+        start: Date,
+        first_coupon: Date,
+        maturity: Date,
+        coupon: Rate,
+        ex_coupon_period: Period,
+        payment_calendar: Calendar,
+        ex_coupon_calendar: Calendar,
+    ) -> (Leg, DayCounter) {
+        let unadjusted = BusinessDayConvention::Unadjusted;
+        let schedule = Schedule::new(
+            start,
+            maturity,
+            Period::new(6, TimeUnit::Months),
+            NullCalendar::new(),
+            unadjusted,
+            unadjusted,
+            DateGeneration::Forward,
+            true,
+            first_coupon,
+            Date::null(),
+        );
+        let day_counter = ActualActual::with_schedule(Convention::ISMA, schedule.clone());
+        let mut leg = FixedRateLeg::new(schedule)
+            .with_notional(100.0)
+            .with_coupon_rate(
+                coupon,
+                day_counter.clone(),
+                Compounding::Simple,
+                Frequency::Annual,
+            )
+            .unwrap()
+            .with_payment_calendar(payment_calendar)
+            .with_payment_adjustment(unadjusted)
+            .with_ex_coupon_period(ex_coupon_period, ex_coupon_calendar, unadjusted, false)
+            .build()
+            .unwrap();
+        leg.push(shared(Redemption::new(100.0, maturity)) as Shared<dyn CashFlow>);
+        (leg, day_counter)
+    }
+
+    /// The `yield -> duration -> convexity -> npv` round trip each table row
+    /// drives, at the `(yield and duration, convexity, npv)` tolerances the row
+    /// is asserted to in C++.
+    fn check(leg: &Leg, day_counter: &DayCounter, case: &Case, tolerance: (Real, Real, Real)) {
+        let settings = Settings::new();
+        let settlement = Some(case.settlement);
+        let (comp, freq) = (Compounding::Compounded, Frequency::Semiannual);
+
+        let irr = CashFlows::solve_yield(
+            leg,
+            case.npv,
+            day_counter.clone(),
+            comp,
+            freq,
+            &settings,
+            Some(false),
+            settlement,
+            None,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        assert!((irr - case.irr).abs() < tolerance.0, "yield {irr}");
+
+        let rate = InterestRate::new(irr, day_counter.clone(), comp, freq).unwrap();
+        let duration = CashFlows::duration(
+            leg,
+            &rate,
+            Duration::Modified,
+            &settings,
+            Some(false),
+            settlement,
+            None,
+        )
+        .unwrap();
+        assert!(
+            (duration - case.duration).abs() < tolerance.0,
+            "duration {duration}"
+        );
+
+        let convexity =
+            CashFlows::convexity(leg, &rate, &settings, Some(false), settlement, None).unwrap();
+        assert!(
+            (convexity - case.convexity).abs() < tolerance.1,
+            "convexity {convexity}"
+        );
+
+        let npv =
+            CashFlows::npv_at_yield(leg, &rate, &settings, Some(false), settlement, None).unwrap();
+        assert!((npv - case.npv).abs() < tolerance.2, "npv {npv}");
+    }
+
+    /// `bonds.cpp::testExCouponGilt` (:1155), whose table (:1246-1256) is
+    /// verified against Bloomberg. The gilt's ex-coupon date is six *business*
+    /// days before the coupon, hence the UK calendar on the ex-coupon period.
+    #[test]
+    fn the_uk_gilt_reproduces_its_bloomberg_yield_duration_and_convexity() {
+        let calendar = UnitedKingdom::new(unitedkingdom::Market::Settlement);
+        let (leg, day_counter) = ex_coupon_leg(
+            Date::new(29, Month::February, 1996),
+            Date::new(7, Month::June, 1996),
+            Date::new(7, Month::June, 2021),
+            0.08,
+            Period::new(6, TimeUnit::Days),
+            calendar.clone(),
+            calendar,
+        );
+        let cases = [
+            Case {
+                settlement: Date::new(29, Month::May, 2013),
+                npv: 106.8021978,
+                irr: 0.0749518,
+                duration: 5.6760445,
+                convexity: 42.1531486,
+            },
+            Case {
+                settlement: Date::new(30, Month::May, 2013),
+                npv: 102.8241758,
+                irr: 0.0749618,
+                duration: 5.8928163,
+                convexity: 43.7562186,
+            },
+            Case {
+                settlement: Date::new(31, Month::May, 2013),
+                npv: 102.8461538,
+                irr: 0.0749599,
+                duration: 5.8901860,
+                convexity: 43.7239438,
+            },
+        ];
+
+        for case in &cases {
+            check(&leg, &day_counter, case, (1e-6, 1e-6, 1e-6));
+        }
+    }
+
+    /// `bonds.cpp::testExCouponAustralianBond` (:1283). The ex-coupon date is
+    /// seven *calendar* days before the coupon, so the ex-coupon calendar is the
+    /// null one while the payments follow Australia.
+    #[test]
+    fn the_australian_bond_reproduces_its_bloomberg_yield_duration_and_convexity() {
+        let (leg, day_counter) = ex_coupon_leg(
+            Date::new(15, Month::February, 2004),
+            Date::new(15, Month::August, 2004),
+            Date::new(15, Month::February, 2017),
+            0.06,
+            Period::new(7, TimeUnit::Days),
+            Australia::new(australia::Market::Settlement),
+            NullCalendar::new(),
+        );
+        let cases = [
+            Case {
+                settlement: Date::new(7, Month::August, 2014),
+                npv: 105.867,
+                irr: 0.04723,
+                duration: 2.26276,
+                convexity: 6.54870,
+            },
+            Case {
+                settlement: Date::new(8, Month::August, 2014),
+                npv: 102.884,
+                irr: 0.047235,
+                duration: 2.32536,
+                convexity: 6.72531,
+            },
+            Case {
+                settlement: Date::new(11, Month::August, 2014),
+                npv: 102.934,
+                irr: 0.047190,
+                duration: 2.31732,
+                convexity: 6.68407,
+            },
+        ];
+
+        for case in &cases {
+            check(&leg, &day_counter, case, (1e-5, 1e-4, 1e-3));
+        }
+    }
+}
