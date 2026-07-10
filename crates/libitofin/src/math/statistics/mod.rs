@@ -9,6 +9,7 @@
 //! whole sample set, such as [`GeneralStatistics`].
 
 use crate::errors::QlResult;
+use crate::fail;
 use crate::types::{Real, Size};
 
 mod gaussianstatistics;
@@ -22,6 +23,34 @@ pub use generalstatistics::GeneralStatistics;
 pub use histogram::{Histogram, HistogramAlgorithm};
 pub use incrementalstatistics::IncrementalStatistics;
 pub use riskstatistics::RiskStatistics;
+
+/// Validate one `(value, weight)` sample before it enters an accumulator.
+///
+/// The weight check is the faithful port of QuantLib's
+/// `QL_REQUIRE(weight >= 0.0, "negative weight not allowed")`
+/// (`generalstatistics.hpp:233`, `incrementalstatistics.cpp:127`). It is
+/// written as `!(weight >= 0.0)` rather than `weight < 0.0` because a NaN
+/// weight fails `weight >= 0.0` in C++ and must fail here too; the negated
+/// form preserves that without a separate NaN clause.
+///
+/// Divergence: rejecting a NaN `value` has no counterpart in QuantLib, which
+/// accumulates it and silently poisons every subsequent mean, variance and
+/// percentile. Infinite values are permitted, as in C++: they are meaningful
+/// inputs to `min`, `max` and the risk measures.
+///
+/// # Errors
+///
+/// Errors if `value` is NaN, or if `weight` is negative or NaN.
+pub(crate) fn check_sample(value: Real, weight: Real) -> QlResult<()> {
+    if value.is_nan() {
+        fail!("sample value must not be NaN");
+    }
+    #[allow(clippy::neg_cmp_op_on_partial_ord)]
+    if !(weight >= 0.0) {
+        fail!("negative weight ({weight}) not allowed");
+    }
+    Ok(())
+}
 
 /// Mean and standard deviation of a distribution, the minimal interface
 /// required by the gaussian-assumption risk measures.
@@ -96,7 +125,7 @@ pub trait Statistics: MeanStdDev {
     ///
     /// # Errors
     ///
-    /// Returns an error if `weight` is negative.
+    /// Returns an error if `value` is NaN, or if `weight` is negative or NaN.
     fn add_weighted(&mut self, value: Real, weight: Real) -> QlResult<()>;
 
     /// Resets the accumulator to an empty sample set.
@@ -106,7 +135,7 @@ pub trait Statistics: MeanStdDev {
     ///
     /// # Errors
     ///
-    /// Never fails; kept fallible for uniformity with [`Self::add_weighted`].
+    /// Returns an error if `value` is NaN.
     fn add(&mut self, value: Real) -> QlResult<()> {
         self.add_weighted(value, 1.0)
     }
@@ -115,7 +144,7 @@ pub trait Statistics: MeanStdDev {
     ///
     /// # Errors
     ///
-    /// Never fails; kept fallible for uniformity with [`Self::add_weighted`].
+    /// Returns an error if any value is NaN.
     fn add_sequence<I>(&mut self, values: I) -> QlResult<()>
     where
         I: IntoIterator<Item = Real>,
@@ -130,7 +159,7 @@ pub trait Statistics: MeanStdDev {
     ///
     /// # Errors
     ///
-    /// Returns an error if any weight is negative.
+    /// Returns an error if any value is NaN, or if any weight is negative or NaN.
     fn add_sequence_weighted<I>(&mut self, values: I) -> QlResult<()>
     where
         I: IntoIterator<Item = (Real, Real)>,
