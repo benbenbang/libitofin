@@ -2,8 +2,30 @@
 //!
 //! Port of `ql/cashflows/cashflows.{hpp,cpp}`: the [`CashFlows`] namespace of
 //! free functions that inspect a leg's dates and price it off a discount curve.
+//! The `InterestRate` and `(Rate, DayCounter, Compounding, Frequency)`
+//! overloads of the same four analytics are the yield half of the file and are
+//! not ported here.
+//!
+//! ## Oracle
+//!
+//! The QuantLib test-suite never calls `bps`, `npvbps` or `atmRate`, in any
+//! overload, and its only calls to the discount-curve [`npv`](CashFlows::npv)
+//! come from the multiple-reset and inflation test files, which need index
+//! machinery this port does not have. No ported test case stands behind these
+//! numbers: the `npv` test adapts a case written against a different overload,
+//! and the rest are checked against the definitions in `cashflows.cpp` and
+//! against each other. Each test says which it is.
 //!
 //! ## Divergences from QuantLib
+//!
+//! C++ computes the coupon split twice: `bps` and `atmRate` through a
+//! `BPSCalculator` `AcyclicVisitor`, `npvbps` through `coupon_cast`. The port
+//! keeps only the `coupon_cast` path ([`CashFlow::as_coupon`]) and runs every
+//! analytic off one pass. One consequence: `bps` evaluates the amount of every
+//! surviving flow, where the visitor evaluates it only for the flows that are
+//! not coupons. A coupon whose [`amount`](CashFlow::amount) fails - a floating
+//! one missing its fixing - therefore makes `bps` fail, where C++ returns a
+//! number.
 //!
 //! C++ deletes every constructor to make `CashFlows` a namespace; the port uses
 //! an uninhabited type, which cannot be constructed at all.
@@ -22,11 +44,29 @@
 
 use crate::cashflow::{CashFlow, Leg};
 use crate::errors::QlResult;
+use crate::event::reference_date;
 use crate::require;
 use crate::settings::Settings;
 use crate::shared::Shared;
+use crate::termstructures::yieldtermstructure::YieldTermStructure;
 use crate::time::date::Date;
-use crate::types::Real;
+use crate::types::{DiscountFactor, Real, Spread};
+
+/// The `basisPoint_` of `cashflows.cpp`.
+const BASIS_POINT: Spread = 1.0e-4;
+
+/// The one pass over a leg that the discount-curve analytics share, as `npvbps`
+/// already does in C++.
+///
+/// Both sums are raw: undivided by the discount factor at the NPV date and
+/// unscaled by [`BASIS_POINT`].
+#[derive(Default)]
+struct Totals {
+    /// `sum(amount * df)` over every surviving flow.
+    npv: Real,
+    /// `sum(nominal * accrual_period * df)` over the surviving coupons.
+    bps: Real,
+}
 
 /// The `CashFlows` namespace of `cashflows.hpp`.
 pub enum CashFlows {}
@@ -190,6 +230,113 @@ impl CashFlows {
         Self::amount_on_payment_date(leg[index..].iter(), leg[index].date()).map(Some)
     }
 
+    /// The NPV of the leg: every surviving flow discounted to `npv_date`.
+    ///
+    /// An empty leg is worth nothing. `settlement_date` defaults to the
+    /// evaluation date and `npv_date` to `settlement_date`.
+    ///
+    /// # Errors
+    ///
+    /// Propagates the flow and curve lookups; without a `settlement_date` the
+    /// evaluation date must be set.
+    pub fn npv(
+        leg: &Leg,
+        discount_curve: &dyn YieldTermStructure,
+        settings: &Settings<Date>,
+        include_settlement_date_flows: Option<bool>,
+        settlement_date: Option<Date>,
+        npv_date: Option<Date>,
+    ) -> QlResult<Real> {
+        if leg.is_empty() {
+            return Ok(0.0);
+        }
+        let (totals, discount) = Self::measure(
+            leg,
+            discount_curve,
+            settings,
+            include_settlement_date_flows,
+            settlement_date,
+            npv_date,
+        )?;
+        Ok(totals.npv / discount)
+    }
+
+    /// The change in [`npv`](Self::npv) for a uniform one-basis-point change in
+    /// the rate the coupons pay. Flows that are not coupons contribute nothing.
+    ///
+    /// An empty leg has no sensitivity.
+    ///
+    /// # Errors
+    ///
+    /// As [`npv`](Self::npv).
+    pub fn bps(
+        leg: &Leg,
+        discount_curve: &dyn YieldTermStructure,
+        settings: &Settings<Date>,
+        include_settlement_date_flows: Option<bool>,
+        settlement_date: Option<Date>,
+        npv_date: Option<Date>,
+    ) -> QlResult<Real> {
+        if leg.is_empty() {
+            return Ok(0.0);
+        }
+        let (totals, discount) = Self::measure(
+            leg,
+            discount_curve,
+            settings,
+            include_settlement_date_flows,
+            settlement_date,
+            npv_date,
+        )?;
+        Ok(BASIS_POINT * totals.bps / discount)
+    }
+
+    /// The single pass the analytics share, and the discount factor at the NPV
+    /// date they all divide by.
+    fn measure(
+        leg: &Leg,
+        discount_curve: &dyn YieldTermStructure,
+        settings: &Settings<Date>,
+        include_settlement_date_flows: Option<bool>,
+        settlement_date: Option<Date>,
+        npv_date: Option<Date>,
+    ) -> QlResult<(Totals, DiscountFactor)> {
+        let settlement = reference_date(settings, settlement_date)?;
+        let npv_date = npv_date.unwrap_or(settlement);
+        let totals = Self::totals(
+            leg,
+            discount_curve,
+            settings,
+            include_settlement_date_flows,
+            settlement,
+        )?;
+        Ok((totals, discount_curve.discount_date(npv_date, false)?))
+    }
+
+    fn totals(
+        leg: &Leg,
+        discount_curve: &dyn YieldTermStructure,
+        settings: &Settings<Date>,
+        include_settlement_date_flows: Option<bool>,
+        settlement: Date,
+    ) -> QlResult<Totals> {
+        let settlement = Some(settlement);
+        let mut totals = Totals::default();
+        for flow in leg {
+            if flow.has_occurred(settings, settlement, include_settlement_date_flows)?
+                || flow.trading_ex_coupon(settings, settlement)?
+            {
+                continue;
+            }
+            let discount = discount_curve.discount_date(flow.date(), false)?;
+            totals.npv += flow.amount()? * discount;
+            if let Some(coupon) = flow.as_coupon() {
+                totals.bps += coupon.nominal() * coupon.accrual_period() * discount;
+            }
+        }
+        Ok(totals)
+    }
+
     fn accrual_start_or_payment(flow: &dyn CashFlow) -> Date {
         match flow.as_coupon() {
             Some(coupon) => coupon.accrual_start_date(),
@@ -345,5 +492,219 @@ mod tests {
 
         assert!(CashFlows::previous_cash_flow(&leg, &settings, None, None).is_err());
         assert!(CashFlows::next_cash_flow(&leg, &settings, None, None).is_err());
+    }
+}
+
+#[cfg(test)]
+mod analytics_tests {
+    use super::*;
+    use crate::cashflows::fixedratecoupon::FixedRateCoupon;
+    use crate::cashflows::fixedrateleg::FixedRateLeg;
+    use crate::cashflows::simplecashflow::SimpleCashFlow;
+    use crate::interestrate::{Compounding, InterestRate};
+    use crate::shared::shared;
+    use crate::termstructures::yields::FlatForward;
+    use crate::time::businessdayconvention::BusinessDayConvention;
+    use crate::time::calendars::nullcalendar::NullCalendar;
+    use crate::time::date::{Month, Year};
+    use crate::time::daycounters::actual360::Actual360;
+    use crate::time::daycounters::actual365fixed::Actual365Fixed;
+    use crate::time::frequency::Frequency;
+    use crate::time::schedule::MakeSchedule;
+    use crate::types::Rate;
+
+    const NOMINAL: Real = 100.0;
+    const RATE: Rate = 0.05;
+    const FORWARD: Rate = 0.03;
+
+    fn day(month: Month, year: Year) -> Date {
+        Date::new(15, month, year)
+    }
+
+    fn today() -> Date {
+        day(Month::January, 2026)
+    }
+
+    fn maturity() -> Date {
+        day(Month::January, 2028)
+    }
+
+    fn settings() -> Settings<Date> {
+        let settings = Settings::new();
+        settings.set_evaluation_date(today());
+        settings
+    }
+
+    /// A flat continuously-compounded curve on `Actual365Fixed`, so that
+    /// `df(d) = exp(-FORWARD * (d - today) / 365)` by hand.
+    fn curve(forward: Rate) -> FlatForward {
+        FlatForward::with_rate(
+            today(),
+            forward,
+            Actual365Fixed::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )
+    }
+
+    /// The discount factor of [`curve`], from the definition rather than off
+    /// the curve.
+    fn df(date: Date) -> Real {
+        (-FORWARD * f64::from(date - today()) / 365.0).exp()
+    }
+
+    /// The `Actual360` accrual period of a coupon, by hand.
+    fn accrual(start: Date, end: Date) -> Real {
+        f64::from(end - start) / 360.0
+    }
+
+    fn simple(rate: Rate) -> InterestRate {
+        InterestRate::new(
+            rate,
+            Actual360::new(),
+            Compounding::Simple,
+            Frequency::Annual,
+        )
+        .unwrap()
+    }
+
+    /// The accrual periods of [`fixed_leg`], which pays on its accrual ends.
+    fn periods() -> [(Date, Date); 4] {
+        [
+            (today(), day(Month::July, 2026)),
+            (day(Month::July, 2026), day(Month::January, 2027)),
+            (day(Month::January, 2027), day(Month::July, 2027)),
+            (day(Month::July, 2027), maturity()),
+        ]
+    }
+
+    /// Four semiannual `Actual360` coupons on an unadjusted schedule.
+    fn fixed_leg(rate: Rate) -> Leg {
+        let schedule = MakeSchedule::new()
+            .from(today())
+            .to(maturity())
+            .with_frequency(Frequency::Semiannual)
+            .with_calendar(NullCalendar::new())
+            .with_convention(BusinessDayConvention::Unadjusted)
+            .backwards()
+            .build();
+        FixedRateLeg::new(schedule)
+            .with_notional(NOMINAL)
+            .with_interest_rate(simple(rate))
+            .build()
+            .unwrap()
+    }
+
+    /// An adaptation of the `CHECK_NPV` block of `cashflows.cpp::testSettings`
+    /// (:157-179) onto the `YieldTermStructure` overload, which C++ does not
+    /// call there. It prices the leg off `InterestRate(0.0, Actual365Fixed(),
+    /// Continuous, Annual)`, whose every discount factor is 1.0; a flat 0%
+    /// `FlatForward` gives the same factors, so the `2.0` and `3.0` expected
+    /// across the `includeTodaysCashFlows` matrix carry over unchanged.
+    #[test]
+    fn the_npv_counts_the_flows_the_settlement_date_rule_admits() {
+        let (settings, curve) = (settings(), curve(0.0));
+        let leg: Leg = (0..3)
+            .map(|i| shared(SimpleCashFlow::new(1.0, today() + i)) as Shared<dyn CashFlow>)
+            .collect();
+        let npv = |include| {
+            CashFlows::npv(&leg, &curve, &settings, Some(include), Some(today()), None).unwrap()
+        };
+
+        settings.set_include_todays_cash_flows(None);
+        assert_eq!(npv(false), 2.0);
+        assert_eq!(npv(true), 3.0);
+
+        settings.set_include_todays_cash_flows(Some(false));
+        assert_eq!(npv(false), 2.0);
+        assert_eq!(npv(true), 2.0);
+    }
+
+    /// `npv = sum(amount * df(date)) / df(npv_date)`, with the amounts and the
+    /// discount factors hand-computed from the coupon and curve definitions.
+    #[test]
+    fn the_npv_discounts_every_flow_and_then_the_npv_date() {
+        let (settings, curve, leg) = (settings(), curve(FORWARD), fixed_leg(RATE));
+        let expected: Real = periods()
+            .iter()
+            .map(|&(start, end)| NOMINAL * RATE * accrual(start, end) * df(end))
+            .sum();
+        let npv = |npv_date| CashFlows::npv(&leg, &curve, &settings, None, None, npv_date).unwrap();
+
+        assert!((npv(None) - expected).abs() < 1e-12);
+        assert!((npv(Some(maturity())) - expected / df(maturity())).abs() < 1e-12);
+    }
+
+    /// `bps = 1e-4 * sum(nominal * accrual_period * df(date)) / df(npv_date)`,
+    /// hand-computed from the same definitions.
+    #[test]
+    fn the_bps_sums_the_discounted_accruals_of_the_coupons() {
+        let (settings, curve, leg) = (settings(), curve(FORWARD), fixed_leg(RATE));
+        let expected: Real = 1.0e-4
+            * periods()
+                .iter()
+                .map(|&(start, end)| NOMINAL * accrual(start, end) * df(end))
+                .sum::<Real>();
+
+        let bps = CashFlows::bps(&leg, &curve, &settings, None, None, None).unwrap();
+        assert!((bps - expected).abs() < 1e-14);
+    }
+
+    /// The definition of a basis-point sensitivity: the change in NPV when the
+    /// coupons pay one basis point more. A `Simple` coupon is linear in its
+    /// rate, so the finite difference is exact but for the cancellation in the
+    /// `(1 + rate * accrual) - 1` its compound factor goes through.
+    #[test]
+    fn the_bps_is_the_npv_change_for_a_one_basis_point_coupon_spread() {
+        let (settings, curve) = (settings(), curve(FORWARD));
+        let npv =
+            |rate| CashFlows::npv(&fixed_leg(rate), &curve, &settings, None, None, None).unwrap();
+
+        let bumped = npv(RATE + 1.0e-4) - npv(RATE);
+        let bps = CashFlows::bps(&fixed_leg(RATE), &curve, &settings, None, None, None).unwrap();
+        assert!((bumped - bps).abs() < 1e-12);
+    }
+
+    /// A coupon trading ex-coupon is dropped though it has not been paid: the
+    /// analytics filter on `has_occurred` *and* on `trading_ex_coupon`.
+    #[test]
+    fn a_flow_trading_ex_coupon_is_left_out() {
+        let (settings, curve) = (settings(), curve(FORWARD));
+        let (start, end) = periods()[0];
+        let leg: Leg = vec![shared(FixedRateCoupon::new(
+            end,
+            NOMINAL,
+            simple(RATE),
+            start,
+            end,
+            None,
+            None,
+            Some(today()),
+        )) as Shared<dyn CashFlow>];
+
+        assert_eq!(
+            CashFlows::npv(&leg, &curve, &settings, None, None, None).unwrap(),
+            0.0
+        );
+        assert_eq!(
+            CashFlows::bps(&leg, &curve, &settings, None, None, None).unwrap(),
+            0.0
+        );
+    }
+
+    /// The empty-leg short circuit comes before the settlement date is
+    /// resolved, so it stands with no evaluation date set.
+    #[test]
+    fn an_empty_leg_is_worth_nothing() {
+        let (settings, curve, leg) = (Settings::new(), curve(FORWARD), Leg::new());
+
+        assert_eq!(
+            CashFlows::npv(&leg, &curve, &settings, None, None, None).unwrap(),
+            0.0
+        );
+        assert_eq!(
+            CashFlows::bps(&leg, &curve, &settings, None, None, None).unwrap(),
+            0.0
+        );
     }
 }
