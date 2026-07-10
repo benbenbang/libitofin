@@ -215,6 +215,22 @@ oversight) and is documented at the point of divergence in the source.
   preserved: `Coupon::trades_ex_coupon_on` goes through `ex_coupon_date`, which
   a concrete coupon forwards to its `CouponBase`, and both `accrued_period` and
   `accrued_amount` test the ex-coupon branch through that one helper.
+- **`CashFlow::as_coupon` is a required trait method.**
+  The `isCoupon`/`coupon_cast` pair (`cashflow.hpp:79`, `coupon.hpp:96`), which
+  the `CashFlows` analytics use to tell an accruing flow from a plain payment.
+  C++ needs no default here: its `Coupon` base class overrides `isCoupon()` to
+  `true`, so no coupon can forget. A Rust `Coupon` is a trait and cannot supply
+  its supertrait's method on its implementors' behalf, which is the same
+  no-specialization argument as `ex_coupon_date` above. A coupon answering
+  `None` contributes nothing to `bps`, has its amount subtracted from
+  `atm_rate`'s target, and reports its payment date to `maturity_date` in place
+  of its accrual end: beside coupons that answer correctly this skews the rate,
+  and alone in a leg it drives the rate to `0.0`. The method is therefore
+  required, so omission is a compile error. A deliberate `None` from a `Coupon`
+  remains possible, and the analytics cannot detect it. A blanket
+  `impl<T: Coupon> CashFlow for T` would make that lie a compile error too, at
+  the cost of moving every `CashFlow` body a coupon overrides onto `Coupon`;
+  it is tracked separately.
 
 ## License
 
