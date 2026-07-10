@@ -7,7 +7,7 @@
 use crate::errors::QlResult;
 use crate::fail;
 use crate::math::comparison::close;
-use crate::math::solver1d::{Solver1D, Solver1DState, SolverConfig};
+use crate::math::solver1d::{Solver1D, Solver1DState, SolverConfig, checked_value};
 use crate::types::Real;
 
 /// Secant root finder.
@@ -82,7 +82,7 @@ impl Solver1D for Secant {
             xl = st.root;
             fl = froot;
             st.root += dx;
-            froot = f(st.root);
+            froot = checked_value(f, st.root)?;
             st.evaluation_number += 1;
             if dx.abs() < x_accuracy || close(froot, 0.0) {
                 return Ok(st.root);

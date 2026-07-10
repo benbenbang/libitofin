@@ -7,7 +7,7 @@
 use crate::errors::QlResult;
 use crate::fail;
 use crate::math::comparison::close;
-use crate::math::solver1d::{Solver1D, Solver1DState, SolverConfig};
+use crate::math::solver1d::{Solver1D, Solver1DState, SolverConfig, checked_value};
 use crate::types::Real;
 
 /// Bisection root finder.
@@ -79,14 +79,14 @@ impl Solver1D for Bisection {
         while st.evaluation_number <= self.max_evaluations() {
             dx /= 2.0;
             let x_mid = st.root + dx;
-            let f_mid = f(x_mid);
+            let f_mid = checked_value(f, x_mid)?;
             st.evaluation_number += 1;
             if f_mid <= 0.0 {
                 st.root = x_mid;
             }
             if dx.abs() < x_accuracy || close(f_mid, 0.0) {
                 // Final call at the root so a stateful functor records it.
-                let _ = f(st.root);
+                let _ = checked_value(f, st.root)?;
                 st.evaluation_number += 1;
                 return Ok(st.root);
             }

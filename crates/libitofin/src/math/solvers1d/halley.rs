@@ -12,12 +12,23 @@ use crate::errors::QlResult;
 use crate::fail;
 use crate::math::solver1d::{
     Bracketed, DerivativeSolver, Function2D, Solver1DState, SolverConfig, bracket_by_stepping,
-    bracket_given,
+    bracket_given, check_bracket_args, check_stepping_args, checked_derivative,
+    checked_function_value, checked_second_derivative,
 };
 use crate::math::solvers1d::newtonsafe::NewtonSafe;
 use crate::types::Real;
 
 /// Halley's method root finder.
+///
+/// Structural divergence: QuantLib's `Halley` (`halley.hpp:41`) supplies only
+/// `solveImpl` and inherits both `solve` overloads from the `Solver1D<Halley>`
+/// CRTP base, whose `solve` is a template over the functor type and so serves a
+/// value-only, a first-derivative and a second-derivative functor alike. This
+/// port's [`Solver1D`] and [`DerivativeSolver`] traits are typed on
+/// [`Function1D`], which has no second derivative, so Halley cannot reuse
+/// either driver and carries its own `solve` / `solve_bracketed` entry points.
+/// They share the argument validation of the trait drivers via
+/// [`check_stepping_args`] and [`check_bracket_args`].
 #[derive(Clone, Copy, Debug)]
 pub struct Halley {
     config: SolverConfig,
@@ -62,10 +73,7 @@ impl Halley {
         guess: Real,
         step: Real,
     ) -> QlResult<Real> {
-        if accuracy <= 0.0 {
-            fail!("accuracy ({accuracy}) must be positive");
-        }
-        let accuracy = accuracy.max(Real::EPSILON);
+        let accuracy = check_stepping_args(accuracy, guess, step)?;
         // Bind before matching so the value-closure's borrow of `g` is released
         // before `refine` takes ownership.
         let bracketed = bracket_by_stepping(&self.config, &mut |x| g.value(x), guess, step)?;
@@ -89,10 +97,7 @@ impl Halley {
         x_min: Real,
         x_max: Real,
     ) -> QlResult<Real> {
-        if accuracy <= 0.0 {
-            fail!("accuracy ({accuracy}) must be positive");
-        }
-        let accuracy = accuracy.max(Real::EPSILON);
+        let accuracy = check_bracket_args(accuracy, guess, x_min, x_max)?;
         let bracketed = bracket_given(&self.config, &mut |x| g.value(x), guess, x_min, x_max)?;
         match bracketed {
             Bracketed::Root(x) => Ok(x),
@@ -113,9 +118,10 @@ impl Halley {
             if st.evaluation_number > self.config.max_evaluations {
                 break;
             }
-            let fx = g.value(st.root);
-            let f_prime = g.derivative(st.root);
-            let lf = fx * g.second_derivative(st.root) / (f_prime * f_prime);
+            let fx = checked_function_value(&mut g, st.root)?;
+            let f_prime = checked_derivative(&mut g, st.root)?;
+            let f_second = checked_second_derivative(&mut g, st.root)?;
+            let lf = fx * f_second / (f_prime * f_prime);
             let step = 1.0 / (1.0 - 0.5 * lf) * fx / f_prime;
 
             // A zero or non-finite first derivative (or the degenerate
@@ -142,7 +148,7 @@ impl Halley {
             }
             if step.abs() < x_accuracy {
                 // Final call at the root so a stateful functor records it.
-                let _ = g.value(st.root);
+                let _ = checked_function_value(&mut g, st.root)?;
                 st.evaluation_number += 1;
                 return Ok(st.root);
             }
@@ -288,6 +294,26 @@ mod tests {
         assert!(
             Halley::new()
                 .solve_bracketed(func2d(f1, d1, dd1), 1e-8, 5.0, 0.0, 2.0)
+                .is_err()
+        );
+        let non_finite_after_bracket = |x: Real| {
+            if x == 0.0 {
+                -1.0
+            } else if x == 2.0 {
+                1.0
+            } else {
+                Real::NAN
+            }
+        };
+        assert!(
+            Halley::new()
+                .solve_bracketed(
+                    func2d(non_finite_after_bracket, |_| 1.0, |_| 0.0),
+                    1e-8,
+                    1.0,
+                    0.0,
+                    2.0
+                )
                 .is_err()
         );
     }
