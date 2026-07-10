@@ -170,6 +170,11 @@ impl FixedRateLeg {
     }
 
     /// The ex-coupon period, measured back from each payment date.
+    ///
+    /// A zero-length `period` is honoured, putting each coupon's ex-coupon date
+    /// on its payment date. C++ reads a default-constructed `Period()` as "no
+    /// ex-coupon date" instead (`fixedratecoupon.cpp:191`), a sentinel the
+    /// absence of this call already expresses here.
     pub fn with_ex_coupon_period(
         mut self,
         period: Period,
@@ -189,8 +194,9 @@ impl FixedRateLeg {
     /// # Errors
     ///
     /// Errors if no coupon rate or no notional was given, if the schedule holds
-    /// fewer than two dates, or if a period day-counter override does not
-    /// satisfy the [`InterestRate::new`] precondition.
+    /// fewer than two dates, if a stub period needs the schedule's end-of-month
+    /// flag and the schedule does not carry one, or if a period day-counter
+    /// override does not satisfy the [`InterestRate::new`] precondition.
     pub fn coupons(&self) -> QlResult<Vec<Shared<FixedRateCoupon>>> {
         require!(!self.coupon_rates.is_empty(), "no coupon rates given");
         require!(!self.notionals.is_empty(), "no notional given");
@@ -209,7 +215,7 @@ impl FixedRateLeg {
                 end,
                 -self.schedule.tenor(),
                 self.schedule.business_day_convention(),
-                self.schedule.end_of_month(),
+                self.schedule_end_of_month()?,
             )
         } else {
             start
@@ -241,7 +247,7 @@ impl FixedRateLeg {
                     start,
                     self.schedule.tenor(),
                     self.schedule.business_day_convention(),
-                    self.schedule.end_of_month(),
+                    self.schedule_end_of_month()?,
                 )
             };
             coupons.push(self.coupon(
@@ -268,6 +274,19 @@ impl FixedRateLeg {
             .into_iter()
             .map(|coupon| coupon as Shared<dyn CashFlow>)
             .collect())
+    }
+
+    /// The schedule's end-of-month flag, as an error when it carries none.
+    ///
+    /// Only a stub period reads it. C++ raises here too, through the
+    /// `QL_REQUIRE` in `Schedule::endOfMonth`; the port surfaces it as an error
+    /// rather than a panic, per D4.
+    fn schedule_end_of_month(&self) -> QlResult<bool> {
+        require!(
+            self.schedule.has_end_of_month(),
+            "schedule carries no end-of-month flag, which its stub period needs"
+        );
+        Ok(self.schedule.end_of_month())
     }
 
     fn coupon(
@@ -342,6 +361,64 @@ mod tests {
 
     fn simple(rate: Rate, day_counter: DayCounter) -> InterestRate {
         InterestRate::new(rate, day_counter, Compounding::Simple, Frequency::Annual).unwrap()
+    }
+
+    /// A zero-length ex-coupon period is honoured rather than read as the
+    /// "no ex-coupon" sentinel `Period()` of `fixedratecoupon.cpp:191`, so the
+    /// ex-coupon date lands on the payment date and the coupon trades ex-coupon
+    /// there. C++ would leave the date null and accrue the full amount.
+    #[test]
+    fn a_zero_length_ex_coupon_period_puts_the_date_on_the_payment_date() {
+        let schedule = crate::time::schedule::MakeSchedule::new()
+            .from(Date::new(15, Month::January, 2026))
+            .to(Date::new(15, Month::July, 2026))
+            .with_frequency(Frequency::Semiannual)
+            .with_convention(BusinessDayConvention::Unadjusted)
+            .build();
+        let coupons = FixedRateLeg::new(schedule)
+            .with_notional(100.0)
+            .with_interest_rate(simple(0.03, Actual360::new()))
+            .with_ex_coupon_period(
+                Period::new(0, TimeUnit::Days),
+                NullCalendar::new(),
+                BusinessDayConvention::Unadjusted,
+                false,
+            )
+            .coupons()
+            .unwrap();
+
+        let payment_date = crate::event::Event::date(coupons[0].as_ref());
+        assert_eq!(coupons[0].ex_coupon_date(), Some(payment_date));
+        assert!(coupons[0].trades_ex_coupon_on(payment_date));
+        assert_eq!(coupons[0].accrued_amount(payment_date).unwrap(), 0.0);
+    }
+
+    /// A stub period reads the schedule's end-of-month flag, which a schedule
+    /// carrying a tenor and regularity flags may still lack.
+    #[test]
+    fn a_stub_without_an_end_of_month_flag_is_an_error_not_a_panic() {
+        let schedule = Schedule::with_metadata(
+            vec![
+                Date::new(15, Month::January, 2026),
+                Date::new(1, Month::April, 2026),
+                Date::new(1, Month::October, 2026),
+            ],
+            NullCalendar::new(),
+            BusinessDayConvention::Unadjusted,
+            None,
+            Some(Period::new(6, TimeUnit::Months)),
+            None,
+            None,
+            vec![false, true],
+        );
+
+        assert!(
+            FixedRateLeg::new(schedule)
+                .with_notional(100.0)
+                .with_interest_rate(simple(0.03, Actual360::new()))
+                .coupons()
+                .is_err()
+        );
     }
 
     /// `cashflows.cpp::testDefaultSettlementDate`, which reads the leg's accrual
