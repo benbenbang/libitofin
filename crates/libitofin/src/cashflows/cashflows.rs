@@ -1145,7 +1145,7 @@ mod tests {
     /// redemption sharing the coupon's payment date.
     fn leg() -> Leg {
         vec![
-            shared(SimpleCashFlow::new(5.0, early_payment())) as Shared<dyn CashFlow>,
+            shared(SimpleCashFlow::new(5.0, early_payment()).unwrap()) as Shared<dyn CashFlow>,
             shared(FixedRateCoupon::from_rate(
                 payment(),
                 100.0,
@@ -1157,7 +1157,7 @@ mod tests {
                 None,
                 None,
             )) as Shared<dyn CashFlow>,
-            shared(Redemption::new(100.0, payment())) as Shared<dyn CashFlow>,
+            shared(Redemption::new(100.0, payment()).unwrap()) as Shared<dyn CashFlow>,
         ]
     }
 
@@ -1356,7 +1356,7 @@ mod analytics_tests {
     /// days after.
     fn unit_leg() -> Leg {
         (0..3)
-            .map(|i| shared(SimpleCashFlow::new(1.0, today() + i)) as Shared<dyn CashFlow>)
+            .map(|i| shared(SimpleCashFlow::new(1.0, today() + i).unwrap()) as Shared<dyn CashFlow>)
             .collect()
     }
 
@@ -1544,7 +1544,7 @@ mod analytics_tests {
 
         assert!((atm(&leg, None) - RATE).abs() < 1e-14);
 
-        leg.push(shared(Redemption::new(NOMINAL, maturity())) as Shared<dyn CashFlow>);
+        leg.push(shared(Redemption::new(NOMINAL, maturity()).unwrap()) as Shared<dyn CashFlow>);
         assert!((atm(&leg, None) - RATE).abs() < 1e-14);
 
         let npv = CashFlows::npv(&leg, &curve, &settings, None, None, None).unwrap();
@@ -1584,7 +1584,8 @@ mod analytics_tests {
     fn the_atm_rate_needs_a_target_and_a_sensitivity() {
         let (settings, curve) = (settings(), curve(FORWARD));
         let leg = fixed_leg(RATE);
-        let bare: Leg = vec![shared(Redemption::new(NOMINAL, maturity())) as Shared<dyn CashFlow>];
+        let bare: Leg =
+            vec![shared(Redemption::new(NOMINAL, maturity()).unwrap()) as Shared<dyn CashFlow>];
         let atm = |leg: &Leg, target| {
             CashFlows::atm_rate(leg, &curve, &settings, None, None, None, target)
         };
@@ -1863,7 +1864,9 @@ mod analytics_tests {
     #[test]
     fn only_the_surviving_flows_of_nonzero_amount_can_change_sign() {
         let settings = settings();
-        let flow = |amount, date| shared(SimpleCashFlow::new(amount, date)) as Shared<dyn CashFlow>;
+        let flow = |amount, date| {
+            shared(SimpleCashFlow::new(amount, date).expect("valid flow")) as Shared<dyn CashFlow>
+        };
         let solve = |leg: &Leg, npv| {
             CashFlows::solve_yield(
                 leg,
@@ -1918,7 +1921,7 @@ mod analytics_tests {
     /// not outlive, so an IRR exists against a positive price.
     fn redeeming_leg() -> Leg {
         let mut leg = fixed_leg(RATE);
-        leg.push(shared(Redemption::new(NOMINAL, maturity())) as Shared<dyn CashFlow>);
+        leg.push(shared(Redemption::new(NOMINAL, maturity()).unwrap()) as Shared<dyn CashFlow>);
         leg
     }
 
@@ -2216,7 +2219,7 @@ mod bonds_tests {
             .with_ex_coupon_period(ex_coupon_period, ex_coupon_calendar, unadjusted, false)
             .build()
             .unwrap();
-        leg.push(shared(Redemption::new(100.0, maturity)) as Shared<dyn CashFlow>);
+        leg.push(shared(Redemption::new(100.0, maturity).unwrap()) as Shared<dyn CashFlow>);
         (leg, day_counter)
     }
 
@@ -2425,7 +2428,7 @@ mod basis_point_value_tests {
             .with_payment_adjustment(unadjusted)
             .build()
             .unwrap();
-        leg.push(shared(Redemption::new(FACE_AMOUNT, maturity())) as Shared<dyn CashFlow>);
+        leg.push(shared(Redemption::new(FACE_AMOUNT, maturity()).unwrap()) as Shared<dyn CashFlow>);
         leg
     }
 
