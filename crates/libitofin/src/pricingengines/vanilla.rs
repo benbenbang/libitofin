@@ -530,6 +530,7 @@ mod greek_gate {
 
     use super::test_market::{market, time_to_days, today};
     use crate::instrument::Instrument;
+    use crate::instruments::EuropeanOption;
     use crate::option::OptionType::{self, Call, Put};
     use crate::types::{Rate, Real, Time, Volatility};
 
@@ -622,6 +623,89 @@ mod greek_gate {
                 row.itm_cash,
             );
         }
+    }
+
+    /// The ten quantities the greek gate locks: NPV plus the nine greeks.
+    fn snapshot(option: &mut EuropeanOption) -> [Real; 10] {
+        [
+            option.npv().unwrap(),
+            option.delta().unwrap(),
+            option.gamma().unwrap(),
+            option.theta().unwrap(),
+            option.vega().unwrap(),
+            option.rho().unwrap(),
+            option.dividend_rho().unwrap(),
+            option.strike_sensitivity().unwrap(),
+            option.itm_cash_probability().unwrap(),
+            option.theta_per_day().unwrap(),
+        ]
+    }
+
+    /// The recursive-notification suppression of the D1 lazy-object change,
+    /// exercised on the real Milestone 1 pricing path rather than the unit
+    /// mock in `instrument.rs`.
+    ///
+    /// An observer on the option writes the spot back to its primed value from
+    /// inside the option's own notification, while the option's lazy object is
+    /// mid-update. Without the guard this re-entrant path double-borrows the
+    /// lazy object and panics (the original bug); with it, the write is safe
+    /// and the net input state is unchanged, so every greek must be
+    /// byte-identical to the primed snapshot. A dropped recalculation would
+    /// leave the cache stale, and a recompute against the transient spot would
+    /// perturb the greeks; the exact compare catches both.
+    #[test]
+    fn recursive_input_writeback_leaves_the_m1_greeks_unchanged() {
+        use crate::patterns::observable::Observer;
+        use crate::quotes::SimpleQuote;
+        use crate::shared::{Shared, SharedMut, shared_mut};
+
+        let spot0 = 100.0;
+        let market = market();
+        market.set(spot0, 0.10, 0.10, 0.15);
+        let expiry = today() + time_to_days(0.10);
+        let mut option = market.option(Call, 100.0, expiry);
+
+        let primed = snapshot(&mut option);
+
+        struct Restore {
+            spot: Shared<SimpleQuote>,
+            to: Real,
+            fired: usize,
+        }
+        impl Observer for Restore {
+            fn update(&mut self) {
+                self.fired += 1;
+                if self.fired == 1 {
+                    self.spot.set_value(self.to);
+                }
+            }
+        }
+
+        let restore = shared_mut(Restore {
+            spot: Shared::clone(&market.spot),
+            to: spot0,
+            fired: 0,
+        });
+        option
+            .base()
+            .register_observer(&(SharedMut::clone(&restore) as SharedMut<dyn Observer>));
+
+        market.spot.set_value(105.0);
+
+        assert!(
+            restore.borrow().fired >= 1,
+            "the perturbation must actually reach the option's observers",
+        );
+        assert!(
+            !option.base().is_calculated(),
+            "the perturbation still invalidates the cached greeks",
+        );
+
+        let restored = snapshot(&mut option);
+        assert_eq!(
+            primed, restored,
+            "the suppressed write-back must leave every greek byte-identical",
+        );
     }
 }
 
