@@ -754,6 +754,99 @@ impl CashFlows {
         Ok(second_derivative / present_value)
     }
 
+    /// The change in the leg's value for a one-basis-point rise in the yield,
+    /// from the second-order Taylor expansion `dP = delta dy + gamma dy^2 / 2`.
+    ///
+    /// Negative for a leg that pays: a higher yield is worth less. The gamma
+    /// term takes [`convexity`](Self::convexity) divided by 100, as C++ does -
+    /// which makes it a hundredth of the second-order term the expansion asks
+    /// for, and immaterial at a one-basis-point shift.
+    ///
+    /// # Errors
+    ///
+    /// As [`npv_at_yield`](Self::npv_at_yield).
+    pub fn basis_point_value(
+        leg: &Leg,
+        yield_rate: &InterestRate,
+        settings: &Settings<Date>,
+        include_settlement_date_flows: Option<bool>,
+        settlement_date: Option<Date>,
+        npv_date: Option<Date>,
+    ) -> QlResult<Real> {
+        if leg.is_empty() {
+            return Ok(0.0);
+        }
+        let npv = Self::npv_at_yield(
+            leg,
+            yield_rate,
+            settings,
+            include_settlement_date_flows,
+            settlement_date,
+            npv_date,
+        )?;
+        let modified = Self::duration(
+            leg,
+            yield_rate,
+            Duration::Modified,
+            settings,
+            include_settlement_date_flows,
+            settlement_date,
+            npv_date,
+        )?;
+        let convexity = Self::convexity(
+            leg,
+            yield_rate,
+            settings,
+            include_settlement_date_flows,
+            settlement_date,
+            npv_date,
+        )?;
+
+        let shift = 0.0001;
+        let delta = -modified * npv * shift;
+        let gamma = (convexity / 100.0) * npv * shift * shift;
+        Ok(delta + 0.5 * gamma)
+    }
+
+    /// The yield move a one-cent move in the leg's value implies:
+    /// `(dy / dP) * 0.01`, to first order.
+    ///
+    /// # Errors
+    ///
+    /// As [`npv_at_yield`](Self::npv_at_yield).
+    pub fn yield_value_basis_point(
+        leg: &Leg,
+        yield_rate: &InterestRate,
+        settings: &Settings<Date>,
+        include_settlement_date_flows: Option<bool>,
+        settlement_date: Option<Date>,
+        npv_date: Option<Date>,
+    ) -> QlResult<Real> {
+        if leg.is_empty() {
+            return Ok(0.0);
+        }
+        let npv = Self::npv_at_yield(
+            leg,
+            yield_rate,
+            settings,
+            include_settlement_date_flows,
+            settlement_date,
+            npv_date,
+        )?;
+        let modified = Self::duration(
+            leg,
+            yield_rate,
+            Duration::Modified,
+            settings,
+            include_settlement_date_flows,
+            settlement_date,
+            npv_date,
+        )?;
+
+        let shift = 0.01;
+        Ok(shift / (-npv * modified))
+    }
+
     /// `sum(t c B) / sum(c B)`, the discounted-time average of the flows.
     fn simple_duration(flows: &[(Real, Time, DiscountFactor)]) -> Time {
         let mut present_value = 0.0;
@@ -1740,6 +1833,96 @@ mod analytics_tests {
         assert!(message(100.0, Frequency::Once, None).contains("frequency"));
     }
 
+    /// **Hand-derived, no oracle.** `CashFlows::basisPointValue` is called
+    /// nowhere in the QuantLib test-suite, so every number here comes from the
+    /// definition in `cashflows.cpp:1055-1080` and from the leg itself.
+    ///
+    /// The delta and gamma terms are the ones the doc comment names. The last
+    /// two assertions pin the `convexity / 100.0` that C++ writes into gamma:
+    /// undo the division and the expansion reproduces the leg's actual price
+    /// change to nine decimals; leave it in and the value is short by a
+    /// hundredth of the second-order term.
+    #[test]
+    fn the_basis_point_value_is_the_taylor_expansion_with_a_hundredth_of_the_gamma() {
+        let (settings, leg) = (settings(), redeeming_leg());
+        let rate = compounded(FORWARD);
+        let npv =
+            |y| CashFlows::npv_at_yield(&leg, &compounded(y), &settings, None, None, None).unwrap();
+        let modified =
+            CashFlows::duration(&leg, &rate, Duration::Modified, &settings, None, None, None)
+                .unwrap();
+        let convexity = CashFlows::convexity(&leg, &rate, &settings, None, None, None).unwrap();
+
+        let shift = 1.0e-4;
+        let delta = -modified * npv(FORWARD) * shift;
+        let gamma = 0.5 * (convexity / 100.0) * npv(FORWARD) * shift * shift;
+
+        let bpv = CashFlows::basis_point_value(&leg, &rate, &settings, None, None, None).unwrap();
+        assert!(bpv < -0.01);
+        assert!((bpv - (delta + gamma)).abs() < 1e-16);
+
+        let actual = npv(FORWARD + shift) - npv(FORWARD);
+        assert!(((delta + 100.0 * gamma) - actual).abs() < 1e-9);
+        assert!((bpv - actual).abs() > 1e-6);
+    }
+
+    /// **Hand-derived, no oracle.** `CashFlows::yieldValueBasisPoint` is called
+    /// nowhere in the QuantLib test-suite; this is its definition at
+    /// `cashflows.cpp:1106-1130`, checked against the leg by re-solving.
+    ///
+    /// It is `dy/dP * 0.01`, so moving the target NPV up by one cent must move
+    /// the solved yield down by it.
+    #[test]
+    fn the_yield_value_of_a_basis_point_is_the_yield_move_for_a_one_cent_price_move() {
+        let (settings, leg) = (settings(), redeeming_leg());
+        let rate = compounded(FORWARD);
+        let npv = CashFlows::npv_at_yield(&leg, &rate, &settings, None, None, None).unwrap();
+        let modified =
+            CashFlows::duration(&leg, &rate, Duration::Modified, &settings, None, None, None)
+                .unwrap();
+
+        let yvbp =
+            CashFlows::yield_value_basis_point(&leg, &rate, &settings, None, None, None).unwrap();
+        assert!((yvbp - 0.01 / (-npv * modified)).abs() < 1e-18);
+        assert!(yvbp < 0.0);
+
+        let irr = |target| {
+            CashFlows::solve_yield(
+                &leg,
+                target,
+                Actual365Fixed::new(),
+                Compounding::Compounded,
+                Frequency::Semiannual,
+                &settings,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap()
+        };
+        assert!((irr(npv + 0.01) - irr(npv) - yvbp).abs() < 1e-8);
+    }
+
+    /// Both Taylor-expansion analytics short-circuit an empty leg, which spares
+    /// [`CashFlows::yield_value_basis_point`] a division by zero.
+    #[test]
+    fn an_empty_leg_has_no_basis_point_values() {
+        let (settings, leg) = (Settings::new(), Leg::new());
+        let rate = simple_365(FORWARD);
+
+        assert_eq!(
+            CashFlows::basis_point_value(&leg, &rate, &settings, None, None, None).unwrap(),
+            0.0
+        );
+        assert_eq!(
+            CashFlows::yield_value_basis_point(&leg, &rate, &settings, None, None, None).unwrap(),
+            0.0
+        );
+    }
+
     /// The times every flow is discounted over run from the NPV date, not the
     /// settlement date. Under a continuous yield the discount factors pick up a
     /// common `exp(y * shift)` that cancels out of the weights, so moving the
@@ -1824,6 +2007,16 @@ mod bonds_tests {
         irr: Rate,
         duration: Real,
         convexity: Real,
+        /// The `PV 0.01` line of the Bloomberg output transcribed in the C++
+        /// comment block. No C++ test asserts it - `basisPointValue` is called
+        /// nowhere in the test-suite - and it is quoted as a positive number,
+        /// where [`CashFlows::basis_point_value`] returns the signed change.
+        ///
+        /// Bloomberg reports the delta term alone. The gamma term C++ adds is
+        /// 2.3e-7 here, so dropping it altogether still passes this row - though
+        /// mis-scaling it by the hundred does not. Its presence is pinned by
+        /// `the_basis_point_value_is_the_taylor_expansion_with_a_hundredth_of_the_gamma`.
+        pv01: Option<Real>,
     }
 
     /// The `FixedRateBond` cash flows of `bonds.cpp`: a semiannual `FixedRateLeg`
@@ -1920,6 +2113,13 @@ mod bonds_tests {
         let npv =
             CashFlows::npv_at_yield(leg, &rate, &settings, Some(false), settlement, None).unwrap();
         assert!((npv - case.npv).abs() < tolerance.2, "npv {npv}");
+
+        if let Some(pv01) = case.pv01 {
+            let bpv =
+                CashFlows::basis_point_value(leg, &rate, &settings, Some(false), settlement, None)
+                    .unwrap();
+            assert!((-bpv - pv01).abs() < tolerance.0, "pv01 {bpv}");
+        }
     }
 
     /// `bonds.cpp::testExCouponGilt` (:1155), whose table (:1246-1256) is
@@ -1944,6 +2144,7 @@ mod bonds_tests {
                 irr: 0.0749518,
                 duration: 5.6760445,
                 convexity: 42.1531486,
+                pv01: Some(0.0606214023),
             },
             Case {
                 settlement: Date::new(30, Month::May, 2013),
@@ -1951,6 +2152,7 @@ mod bonds_tests {
                 irr: 0.0749618,
                 duration: 5.8928163,
                 convexity: 43.7562186,
+                pv01: Some(0.06059239822),
             },
             Case {
                 settlement: Date::new(31, Month::May, 2013),
@@ -1958,6 +2160,7 @@ mod bonds_tests {
                 irr: 0.0749599,
                 duration: 5.8901860,
                 convexity: 43.7239438,
+                pv01: Some(0.06057829784),
             },
         ];
 
@@ -1987,6 +2190,7 @@ mod bonds_tests {
                 irr: 0.04723,
                 duration: 2.26276,
                 convexity: 6.54870,
+                pv01: None,
             },
             Case {
                 settlement: Date::new(8, Month::August, 2014),
@@ -1994,6 +2198,7 @@ mod bonds_tests {
                 irr: 0.047235,
                 duration: 2.32536,
                 convexity: 6.72531,
+                pv01: None,
             },
             Case {
                 settlement: Date::new(11, Month::August, 2014),
@@ -2001,6 +2206,7 @@ mod bonds_tests {
                 irr: 0.047190,
                 duration: 2.31732,
                 convexity: 6.68407,
+                pv01: None,
             },
         ];
 
