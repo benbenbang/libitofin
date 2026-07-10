@@ -4,12 +4,15 @@
 //! base. The items are re-exported flat, so a coupon is `cashflows::Coupon`
 //! rather than `cashflows::coupon::Coupon`.
 
+#[allow(clippy::module_inception)]
+mod cashflows;
 mod coupon;
 mod dividend;
 mod fixedratecoupon;
 mod fixedrateleg;
 mod simplecashflow;
 
+pub use cashflows::CashFlows;
 pub use coupon::{Coupon, CouponBase};
 pub use dividend::{Dividend, FixedDividend, FractionalDividend, dividend_vector};
 pub use fixedratecoupon::FixedRateCoupon;
