@@ -18,6 +18,11 @@
 //! `cashflows.cpp::testSettings`, and `bonds.cpp::testExCouponGilt` pins
 //! [`solve_yield`](CashFlows::solve_yield), [`duration`](CashFlows::duration)
 //! and [`convexity`](CashFlows::convexity) against Bloomberg values.
+//! [`basis_point_value`](CashFlows::basis_point_value) and
+//! [`yield_value_basis_point`](CashFlows::yield_value_basis_point) are reached
+//! by `bonds.cpp::testBasisPointValue` through the `BondFunctions::` wrappers
+//! that delegate to them (`bondfunctions.cpp:449` and `:474`), which add a
+//! tradability guard and nothing else.
 //!
 //! ## Divergences from QuantLib
 //!
@@ -1833,9 +1838,12 @@ mod analytics_tests {
         assert!(message(100.0, Frequency::Once, None).contains("frequency"));
     }
 
-    /// **Hand-derived, no oracle.** `CashFlows::basisPointValue` is called
-    /// nowhere in the QuantLib test-suite, so every number here comes from the
-    /// definition in `cashflows.cpp:1055-1080` and from the leg itself.
+    /// **Hand-derived.** The C++ test-suite reaches `CashFlows::basisPointValue`
+    /// only through `BondFunctions::basisPointValue`, which adds a tradability
+    /// guard and delegates at `bondfunctions.cpp:449`;
+    /// `bonds.cpp::testBasisPointValue` (:1759) is the case that calls it. The
+    /// numbers below are not from that case: they come from the definition at
+    /// `cashflows.cpp:1055-1080` and from the leg itself.
     ///
     /// The delta and gamma terms are the ones the doc comment names. The last
     /// two assertions pin the `convexity / 100.0` that C++ writes into gamma:
@@ -1866,8 +1874,10 @@ mod analytics_tests {
         assert!((bpv - actual).abs() > 1e-6);
     }
 
-    /// **Hand-derived, no oracle.** `CashFlows::yieldValueBasisPoint` is called
-    /// nowhere in the QuantLib test-suite; this is its definition at
+    /// **Hand-derived.** As for the basis-point value, the C++ test-suite reaches
+    /// `CashFlows::yieldValueBasisPoint` only through
+    /// `BondFunctions::yieldValueBasisPoint`, which delegates at
+    /// `bondfunctions.cpp:474`. This is the definition at
     /// `cashflows.cpp:1106-1130`, checked against the leg by re-solving.
     ///
     /// It is `dy/dP * 0.01`, so moving the target NPV up by one cent must move
@@ -2007,16 +2017,6 @@ mod bonds_tests {
         irr: Rate,
         duration: Real,
         convexity: Real,
-        /// The `PV 0.01` line of the Bloomberg output transcribed in the C++
-        /// comment block. No C++ test asserts it - `basisPointValue` is called
-        /// nowhere in the test-suite - and it is quoted as a positive number,
-        /// where [`CashFlows::basis_point_value`] returns the signed change.
-        ///
-        /// Bloomberg reports the delta term alone. The gamma term C++ adds is
-        /// 2.3e-7 here, so dropping it altogether still passes this row - though
-        /// mis-scaling it by the hundred does not. Its presence is pinned by
-        /// `the_basis_point_value_is_the_taylor_expansion_with_a_hundredth_of_the_gamma`.
-        pv01: Option<Real>,
     }
 
     /// The `FixedRateBond` cash flows of `bonds.cpp`: a semiannual `FixedRateLeg`
@@ -2113,13 +2113,6 @@ mod bonds_tests {
         let npv =
             CashFlows::npv_at_yield(leg, &rate, &settings, Some(false), settlement, None).unwrap();
         assert!((npv - case.npv).abs() < tolerance.2, "npv {npv}");
-
-        if let Some(pv01) = case.pv01 {
-            let bpv =
-                CashFlows::basis_point_value(leg, &rate, &settings, Some(false), settlement, None)
-                    .unwrap();
-            assert!((-bpv - pv01).abs() < tolerance.0, "pv01 {bpv}");
-        }
     }
 
     /// `bonds.cpp::testExCouponGilt` (:1155), whose table (:1246-1256) is
@@ -2144,7 +2137,6 @@ mod bonds_tests {
                 irr: 0.0749518,
                 duration: 5.6760445,
                 convexity: 42.1531486,
-                pv01: Some(0.0606214023),
             },
             Case {
                 settlement: Date::new(30, Month::May, 2013),
@@ -2152,7 +2144,6 @@ mod bonds_tests {
                 irr: 0.0749618,
                 duration: 5.8928163,
                 convexity: 43.7562186,
-                pv01: Some(0.06059239822),
             },
             Case {
                 settlement: Date::new(31, Month::May, 2013),
@@ -2160,7 +2151,6 @@ mod bonds_tests {
                 irr: 0.0749599,
                 duration: 5.8901860,
                 convexity: 43.7239438,
-                pv01: Some(0.06057829784),
             },
         ];
 
@@ -2190,7 +2180,6 @@ mod bonds_tests {
                 irr: 0.04723,
                 duration: 2.26276,
                 convexity: 6.54870,
-                pv01: None,
             },
             Case {
                 settlement: Date::new(8, Month::August, 2014),
@@ -2198,7 +2187,6 @@ mod bonds_tests {
                 irr: 0.047235,
                 duration: 2.32536,
                 convexity: 6.72531,
-                pv01: None,
             },
             Case {
                 settlement: Date::new(11, Month::August, 2014),
@@ -2206,7 +2194,6 @@ mod bonds_tests {
                 irr: 0.047190,
                 duration: 2.31732,
                 convexity: 6.68407,
-                pv01: None,
             },
         ];
 
