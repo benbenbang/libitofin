@@ -54,9 +54,10 @@
 //! from a genuinely zero flow.
 
 use crate::cashflow::{CashFlow, Leg};
+use crate::cashflows::Duration;
 use crate::errors::QlResult;
 use crate::event::reference_date;
-use crate::interestrate::InterestRate;
+use crate::interestrate::{Compounding, InterestRate};
 use crate::require;
 use crate::settings::Settings;
 use crate::shared::Shared;
@@ -477,6 +478,177 @@ impl CashFlows {
         )
     }
 
+    /// The duration of the leg under a flat `yield_rate`, in the convention
+    /// `duration_type` names.
+    ///
+    /// An empty leg, and a leg whose surviving flows are worth nothing, have a
+    /// duration of zero.
+    ///
+    /// # Errors
+    ///
+    /// As [`npv_at_yield`](Self::npv_at_yield), and a Macaulay duration needs a
+    /// [`Compounded`](Compounding::Compounded) yield to divide the rate by a
+    /// frequency.
+    pub fn duration(
+        leg: &Leg,
+        yield_rate: &InterestRate,
+        duration_type: Duration,
+        settings: &Settings<Date>,
+        include_settlement_date_flows: Option<bool>,
+        settlement_date: Option<Date>,
+        npv_date: Option<Date>,
+    ) -> QlResult<Time> {
+        if leg.is_empty() {
+            return Ok(0.0);
+        }
+        let flows = Self::discounted_flows(
+            leg,
+            yield_rate,
+            settings,
+            include_settlement_date_flows,
+            settlement_date,
+            npv_date,
+        )?;
+
+        match duration_type {
+            Duration::Simple => Ok(Self::simple_duration(&flows)),
+            Duration::Modified => Ok(Self::modified_duration(&flows, yield_rate)),
+            Duration::Macaulay => {
+                require!(
+                    yield_rate.compounding() == Compounding::Compounded,
+                    "compounded rate required for a Macaulay duration"
+                );
+                let n = frequency_of(yield_rate);
+                Ok((1.0 + yield_rate.rate() / n) * Self::modified_duration(&flows, yield_rate))
+            }
+        }
+    }
+
+    /// The convexity of the leg under a flat `yield_rate`: `(1 / P) d2P/dy2`.
+    ///
+    /// An empty leg, and a leg whose surviving flows are worth nothing, have a
+    /// convexity of zero.
+    ///
+    /// # Errors
+    ///
+    /// As [`npv_at_yield`](Self::npv_at_yield).
+    pub fn convexity(
+        leg: &Leg,
+        yield_rate: &InterestRate,
+        settings: &Settings<Date>,
+        include_settlement_date_flows: Option<bool>,
+        settlement_date: Option<Date>,
+        npv_date: Option<Date>,
+    ) -> QlResult<Real> {
+        if leg.is_empty() {
+            return Ok(0.0);
+        }
+        let flows = Self::discounted_flows(
+            leg,
+            yield_rate,
+            settings,
+            include_settlement_date_flows,
+            settlement_date,
+            npv_date,
+        )?;
+
+        let (rate, n) = (yield_rate.rate(), frequency_of(yield_rate));
+        let mut present_value = 0.0;
+        let mut second_derivative = 0.0;
+        for &(amount, t, discount) in &flows {
+            present_value += amount * discount;
+            second_derivative += amount
+                * match effective_compounding(yield_rate.compounding(), t, n) {
+                    Compounding::Simple => 2.0 * discount.powi(3) * t * t,
+                    Compounding::Continuous => discount * t * t,
+                    _ => discount * t * (n * t + 1.0) / (n * (1.0 + rate / n).powi(2)),
+                };
+        }
+        if present_value == 0.0 {
+            return Ok(0.0);
+        }
+        Ok(second_derivative / present_value)
+    }
+
+    /// `sum(t c B) / sum(c B)`, the discounted-time average of the flows.
+    fn simple_duration(flows: &[(Real, Time, DiscountFactor)]) -> Time {
+        let mut present_value = 0.0;
+        let mut derivative = 0.0;
+        for &(amount, t, discount) in flows {
+            present_value += amount * discount;
+            derivative += t * amount * discount;
+        }
+        if present_value == 0.0 {
+            return 0.0;
+        }
+        derivative / present_value
+    }
+
+    /// `-(1 / P) dP/dy`, differentiating each flow's discount factor in the
+    /// yield's own compounding convention.
+    fn modified_duration(
+        flows: &[(Real, Time, DiscountFactor)],
+        yield_rate: &InterestRate,
+    ) -> Time {
+        let (rate, n) = (yield_rate.rate(), frequency_of(yield_rate));
+        let mut present_value = 0.0;
+        let mut derivative = 0.0;
+        for &(amount, t, discount) in flows {
+            present_value += amount * discount;
+            derivative -= amount
+                * match effective_compounding(yield_rate.compounding(), t, n) {
+                    Compounding::Simple => discount * discount * t,
+                    Compounding::Continuous => discount * t,
+                    _ => t * discount / (1.0 + rate / n),
+                };
+        }
+        if present_value == 0.0 {
+            return 0.0;
+        }
+        -derivative / present_value
+    }
+
+    /// Every surviving flow as `(amount, time from the NPV date, discount
+    /// factor)`, the one pass [`duration`](Self::duration) and
+    /// [`convexity`](Self::convexity) differentiate.
+    ///
+    /// The times accumulate the same steps [`npv_at_yield`](Self::npv_at_yield)
+    /// discounts over, but the discount factor is taken at the total time rather
+    /// than chained - which is what C++ does, and what makes the two agree only
+    /// for a compounded or continuous yield.
+    fn discounted_flows(
+        leg: &Leg,
+        yield_rate: &InterestRate,
+        settings: &Settings<Date>,
+        include_settlement_date_flows: Option<bool>,
+        settlement_date: Option<Date>,
+        npv_date: Option<Date>,
+    ) -> QlResult<Vec<(Real, Time, DiscountFactor)>> {
+        let (settlement, npv_date) = Self::yield_dates(settings, settlement_date, npv_date)?;
+        let mut flows = Vec::with_capacity(leg.len());
+        let mut t = 0.0;
+        let mut last_date = npv_date;
+        for flow in leg {
+            if flow.has_occurred(settings, Some(settlement), include_settlement_date_flows)? {
+                continue;
+            }
+            let amount = if flow.trading_ex_coupon(settings, Some(settlement))? {
+                0.0
+            } else {
+                flow.amount()?
+            };
+            t += stepwise_discount_time(
+                flow.as_ref(),
+                yield_rate.day_counter(),
+                npv_date,
+                last_date,
+            );
+            flows.push((amount, t, yield_rate.discount_factor(t)?));
+            last_date = flow.date();
+        }
+        Ok(flows)
+    }
+
     /// The settlement and NPV dates the yield analytics resolve up front, each
     /// defaulting to the one before it.
     fn yield_dates(
@@ -559,6 +731,29 @@ impl CashFlows {
             total += flow.amount()?;
         }
         Ok(total)
+    }
+}
+
+/// The yield's compounding frequency as the `Natural N` the derivative formulas
+/// divide by.
+///
+/// A yield that compounds nothing reports `Frequency::NoFrequency`, whose `-1`
+/// no formula may see; the branches that use `N` are exactly the ones whose
+/// convention carries a frequency, so those never reach it.
+fn frequency_of(yield_rate: &InterestRate) -> Real {
+    yield_rate.frequency() as i16 as Real
+}
+
+/// The convention a hybrid yield actually applies at time `t`, so the
+/// derivative formulas need only the three pure cases.
+fn effective_compounding(compounding: Compounding, t: Time, n: Real) -> Compounding {
+    match compounding {
+        Compounding::SimpleThenCompounded if t <= 1.0 / n => Compounding::Simple,
+        Compounding::CompoundedThenSimple if t > 1.0 / n => Compounding::Simple,
+        Compounding::SimpleThenCompounded | Compounding::CompoundedThenSimple => {
+            Compounding::Compounded
+        }
+        other => other,
     }
 }
 
@@ -1185,6 +1380,130 @@ mod analytics_tests {
             CashFlows::bps_at_yield(&leg, &yield_rate, &settings, None, None, None).unwrap(),
             0.0
         );
+        assert_eq!(
+            CashFlows::duration(
+                &leg,
+                &yield_rate,
+                Duration::Simple,
+                &settings,
+                None,
+                None,
+                None
+            )
+            .unwrap(),
+            0.0
+        );
+        assert_eq!(
+            CashFlows::convexity(&leg, &yield_rate, &settings, None, None, None).unwrap(),
+            0.0
+        );
+    }
+
+    /// A semiannually compounded yield, the convention `bonds.cpp` quotes and
+    /// the only one a Macaulay duration is defined for.
+    fn compounded(rate: Rate) -> InterestRate {
+        InterestRate::new(
+            rate,
+            Actual365Fixed::new(),
+            Compounding::Compounded,
+            Frequency::Semiannual,
+        )
+        .unwrap()
+    }
+
+    /// The modified duration is `-(1 / P) dP/dy` by definition, so it must agree
+    /// with a central finite difference of [`CashFlows::npv_at_yield`] in the
+    /// yield. The two code paths share nothing but the flow times: `npv_at_yield`
+    /// chains per-step discount factors, `duration` differentiates a closed form.
+    #[test]
+    fn the_modified_duration_is_the_finite_difference_of_the_npv() {
+        let (settings, leg) = (settings(), fixed_leg(RATE));
+        let h = 1.0e-6;
+        let npv =
+            |y| CashFlows::npv_at_yield(&leg, &compounded(y), &settings, None, None, None).unwrap();
+        let expected = -(npv(FORWARD + h) - npv(FORWARD - h)) / (2.0 * h) / npv(FORWARD);
+
+        let modified = CashFlows::duration(
+            &leg,
+            &compounded(FORWARD),
+            Duration::Modified,
+            &settings,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        assert!(modified > 0.9);
+        assert!((modified - expected).abs() < 1e-7);
+    }
+
+    /// The convexity is `(1 / P) d2P/dy2`, so it must agree with a central
+    /// second difference of the NPV. The step is loose because that difference
+    /// loses half its digits to cancellation.
+    #[test]
+    fn the_convexity_is_the_second_finite_difference_of_the_npv() {
+        let (settings, leg) = (settings(), fixed_leg(RATE));
+        let h = 1.0e-4;
+        let npv =
+            |y| CashFlows::npv_at_yield(&leg, &compounded(y), &settings, None, None, None).unwrap();
+        let expected =
+            (npv(FORWARD + h) - 2.0 * npv(FORWARD) + npv(FORWARD - h)) / (h * h) / npv(FORWARD);
+
+        let convexity =
+            CashFlows::convexity(&leg, &compounded(FORWARD), &settings, None, None, None).unwrap();
+        assert!(convexity > 1.0);
+        assert!((convexity - expected).abs() < 1e-5);
+    }
+
+    /// `D_Macaulay = (1 + y / N) D_modified`, and it is defined for no other
+    /// compounding convention.
+    #[test]
+    fn the_macaulay_duration_scales_the_modified_one_and_needs_a_compounded_yield() {
+        let (settings, leg) = (settings(), fixed_leg(RATE));
+        let duration = |rate: &InterestRate, kind| {
+            CashFlows::duration(&leg, rate, kind, &settings, None, None, None)
+        };
+        let (compounded, simple) = (compounded(FORWARD), simple_365(FORWARD));
+
+        let modified = duration(&compounded, Duration::Modified).unwrap();
+        let macaulay = duration(&compounded, Duration::Macaulay).unwrap();
+        assert!((macaulay - (1.0 + FORWARD / 2.0) * modified).abs() < 1e-15);
+        assert!(macaulay > modified);
+
+        assert!(duration(&simple, Duration::Macaulay).is_err());
+        assert!(duration(&simple, Duration::Modified).is_ok());
+    }
+
+    /// The times every flow is discounted over run from the NPV date, not the
+    /// settlement date. Under a continuous yield the discount factors pick up a
+    /// common `exp(y * shift)` that cancels out of the weights, so moving the
+    /// NPV date forward moves the simple duration back by exactly the shift.
+    #[test]
+    fn the_durations_measure_time_from_the_npv_date() {
+        let (settings, leg) = (settings(), fixed_leg(RATE));
+        let yield_rate = InterestRate::new(
+            FORWARD,
+            Actual365Fixed::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )
+        .unwrap();
+        let duration = |npv_date| {
+            CashFlows::duration(
+                &leg,
+                &yield_rate,
+                Duration::Simple,
+                &settings,
+                None,
+                None,
+                npv_date,
+            )
+            .unwrap()
+        };
+
+        let shift = 30.0 / 365.0;
+        assert!((duration(Some(today() + 30)) - (duration(None) - shift)).abs() < 1e-14);
+        assert!(duration(None) > 1.0);
     }
 
     /// The empty-leg short circuit comes before the settlement date is
