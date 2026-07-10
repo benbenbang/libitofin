@@ -117,6 +117,20 @@ pub fn check_rejects_invalid_inputs<S: Solver1D>(make: impl Fn() -> S) {
     assert!(make().solve(f1, 0.0, 0.5, 0.1).is_err());
     assert!(make().solve_bracketed(f1, 1e-8, 2.5, 2.0, 3.0).is_err());
     assert!(make().solve_bracketed(f1, 1e-8, 5.0, 0.0, 2.0).is_err());
+    let non_finite_after_bracket = |x: Real| {
+        if x == 0.0 {
+            -1.0
+        } else if x == 2.0 {
+            1.0
+        } else {
+            Real::NAN
+        }
+    };
+    assert!(
+        make()
+            .solve_bracketed(non_finite_after_bracket, 1e-8, 1.0, 0.0, 2.0)
+            .is_err()
+    );
 }
 
 /// Configured domain bounds are honoured: a bracket past the upper bound is
@@ -201,6 +215,13 @@ pub fn check_derivative_last_call<S: DerivativeSolver>(make: impl Fn() -> S) {
 /// The shared driver rejects malformed inputs for a [`DerivativeSolver`] too.
 pub fn check_derivative_rejects<S: DerivativeSolver>(make: impl Fn() -> S) {
     assert!(make().solve(func1d(f1, d1), 0.0, 0.5, 0.1).is_err());
+    assert!(make().solve(func1d(f1, d1), Real::NAN, 0.5, 0.1).is_err());
+    assert!(make().solve(func1d(f1, d1), 1e-8, Real::NAN, 0.1).is_err());
+    assert!(
+        make()
+            .solve(func1d(f1, d1), 1e-8, 0.5, Real::INFINITY)
+            .is_err()
+    );
     assert!(
         make()
             .solve_bracketed(func1d(f1, d1), 1e-8, 2.5, 2.0, 3.0)
@@ -209,6 +230,41 @@ pub fn check_derivative_rejects<S: DerivativeSolver>(make: impl Fn() -> S) {
     assert!(
         make()
             .solve_bracketed(func1d(f1, d1), 1e-8, 5.0, 0.0, 2.0)
+            .is_err()
+    );
+    assert!(
+        make()
+            .solve_bracketed(func1d(f1, d1), Real::INFINITY, 0.5, 0.0, 2.0)
+            .is_err()
+    );
+    assert!(
+        make()
+            .solve_bracketed(func1d(f1, d1), 1e-8, Real::NAN, 0.0, 2.0)
+            .is_err()
+    );
+    assert!(
+        make()
+            .solve_bracketed(func1d(f1, d1), 1e-8, 0.5, 0.0, Real::INFINITY)
+            .is_err()
+    );
+    let non_finite_after_bracket = |x: Real| {
+        if x == 0.0 {
+            -1.0
+        } else if x == 2.0 {
+            1.0
+        } else {
+            Real::NAN
+        }
+    };
+    assert!(
+        make()
+            .solve_bracketed(
+                func1d(non_finite_after_bracket, |_| 1.0),
+                1e-8,
+                1.0,
+                0.0,
+                2.0
+            )
             .is_err()
     );
 }

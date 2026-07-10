@@ -8,7 +8,7 @@
 use crate::errors::QlResult;
 use crate::fail;
 use crate::math::comparison::close;
-use crate::math::solver1d::{Solver1D, Solver1DState, SolverConfig};
+use crate::math::solver1d::{Solver1D, Solver1DState, SolverConfig, checked_value};
 use crate::types::Real;
 
 /// Ridder's method root finder.
@@ -79,11 +79,11 @@ impl Solver1D for Ridder {
         while st.evaluation_number <= self.max_evaluations() {
             let x_mid = 0.5 * (st.x_min + st.x_max);
             // First of two evaluations per iteration.
-            let fx_mid = f(x_mid);
+            let fx_mid = checked_value(f, x_mid)?;
             st.evaluation_number += 1;
             let s = (fx_mid * fx_mid - st.fx_min * st.fx_max).sqrt();
             if close(s, 0.0) {
-                let _ = f(st.root);
+                let _ = checked_value(f, st.root)?;
                 st.evaluation_number += 1;
                 return Ok(st.root);
             }
@@ -91,14 +91,14 @@ impl Solver1D for Ridder {
             let direction = if st.fx_min >= st.fx_max { 1.0 } else { -1.0 };
             let next_root = x_mid + (x_mid - st.x_min) * (direction * fx_mid / s);
             if (next_root - st.root).abs() <= x_accuracy {
-                let _ = f(st.root);
+                let _ = checked_value(f, st.root)?;
                 st.evaluation_number += 1;
                 return Ok(st.root);
             }
 
             st.root = next_root;
             // Second of two evaluations per iteration.
-            let froot = f(st.root);
+            let froot = checked_value(f, st.root)?;
             st.evaluation_number += 1;
             if close(froot, 0.0) {
                 return Ok(st.root);
@@ -121,7 +121,7 @@ impl Solver1D for Ridder {
             }
 
             if (st.x_max - st.x_min).abs() <= x_accuracy {
-                let _ = f(st.root);
+                let _ = checked_value(f, st.root)?;
                 st.evaluation_number += 1;
                 return Ok(st.root);
             }

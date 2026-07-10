@@ -9,7 +9,7 @@
 use crate::errors::QlResult;
 use crate::fail;
 use crate::math::comparison::close_n;
-use crate::math::solver1d::{Solver1D, Solver1DState, SolverConfig};
+use crate::math::solver1d::{Solver1D, Solver1DState, SolverConfig, checked_value};
 use crate::types::Real;
 
 /// Finite-difference Newton-safe root finder.
@@ -76,7 +76,7 @@ impl Solver1D for FiniteDifferenceNewtonSafe {
             (st.x_max, st.x_min)
         };
 
-        let mut froot = f(st.root);
+        let mut froot = checked_value(f, st.root)?;
         st.evaluation_number += 1;
         // First-order finite-difference derivative, taken from the closer end.
         let mut dfroot = if st.x_max - st.root < st.root - st.x_min {
@@ -102,7 +102,7 @@ impl Solver1D for FiniteDifferenceNewtonSafe {
                 // the difference against xh instead so the secant stays defined.
                 if close_n(st.root, rootold, 2500) {
                     rootold = xh;
-                    frootold = f(xh);
+                    frootold = checked_value(f, xh)?;
                 }
             } else {
                 dx = froot / dfroot;
@@ -111,7 +111,7 @@ impl Solver1D for FiniteDifferenceNewtonSafe {
             if dx.abs() < x_accuracy {
                 return Ok(st.root);
             }
-            froot = f(st.root);
+            froot = checked_value(f, st.root)?;
             st.evaluation_number += 1;
             // Secant-style derivative against the previous point.
             dfroot = (frootold - froot) / (rootold - st.root);

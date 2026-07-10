@@ -8,7 +8,7 @@
 use crate::errors::QlResult;
 use crate::fail;
 use crate::math::comparison::close;
-use crate::math::solver1d::{Solver1D, Solver1DState, SolverConfig};
+use crate::math::solver1d::{Solver1D, Solver1DState, SolverConfig, checked_value};
 use crate::types::Real;
 
 /// False-position root finder.
@@ -78,7 +78,7 @@ impl Solver1D for FalsePosition {
         while st.evaluation_number <= self.max_evaluations() {
             // Step to the secant's x-intercept.
             st.root = xl + (xh - xl) * fl / (fl - fh);
-            let froot = f(st.root);
+            let froot = checked_value(f, st.root)?;
             st.evaluation_number += 1;
             // Replace the end whose sign matches the new point.
             let del = if froot < 0.0 {
