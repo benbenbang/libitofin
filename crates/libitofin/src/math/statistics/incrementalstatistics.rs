@@ -11,7 +11,7 @@ use crate::errors::QlResult;
 use crate::types::{Real, Size};
 use crate::{fail, require};
 
-use super::{MeanStdDev, Statistics};
+use super::{MeanStdDev, Statistics, check_sample};
 
 /// Single-pass statistics accumulator; it keeps running moments instead of
 /// the samples themselves.
@@ -143,9 +143,7 @@ impl Statistics for IncrementalStatistics {
     }
 
     fn add_weighted(&mut self, value: Real, weight: Real) -> QlResult<()> {
-        if weight < 0.0 || weight.is_nan() {
-            fail!("negative weight ({weight}) not allowed");
-        }
+        check_sample(value, weight)?;
         self.min = if self.count == 0 {
             value
         } else {
@@ -381,6 +379,8 @@ mod tests {
         assert!(s.min().is_err());
         assert!(s.downside_variance().is_err());
         assert!(s.add_weighted(1.0, -1.0).is_err());
+        assert!(s.add_weighted(Real::NAN, 1.0).is_err());
+        assert!(s.add_weighted(1.0, Real::NAN).is_err());
 
         s.add(1.0).unwrap();
         assert!(s.variance().is_err());
