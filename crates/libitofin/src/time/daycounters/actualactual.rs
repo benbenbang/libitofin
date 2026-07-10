@@ -13,17 +13,21 @@
 //! ## Divergences from QuantLib
 //!
 //! QuantLib's ISMA counter has two implementations: a schedule-driven one
-//! (`ISMA_Impl`) used when a [`Schedule`] is supplied, and a reference-date one
-//! (`Old_ISMA_Impl`) used otherwise. Only the reference-date implementation is
-//! ported here, since `Schedule` (ticket #61) is not yet available; it is
-//! reached through [`year_fraction_ref`](crate::time::daycounter::DayCounter::year_fraction_ref).
-//! The schedule-driven overload will be added when `Schedule` lands.
+//! (`ISMA_Impl`), used when a [`Schedule`] is supplied to
+//! [`ActualActual::with_schedule`], and a reference-date one (`Old_ISMA_Impl`),
+//! used otherwise and reached through
+//! [`year_fraction_ref`](crate::time::daycounter::DayCounter::year_fraction_ref).
+//! Both are ported here and both keep QuantLib's name, `Actual/Actual (ISMA)`.
 //!
-//! [`Schedule`]: https://www.quantlib.org/reference/class_quant_lib_1_1_schedule.html
+//! QuantLib's `ISMA_Impl::yearFraction` raises when the requested period falls
+//! outside the schedule. [`DayCounterImpl::year_fraction`] is infallible, so the
+//! port panics there instead of returning an error; see its `# Panics` section.
 
 use crate::shared::shared;
 use crate::time::date::{Date, Month};
 use crate::time::daycounter::{DayCounter, DayCounterImpl};
+use crate::time::period::Period;
+use crate::time::schedule::Schedule;
 use crate::time::timeunit::TimeUnit;
 use crate::types::{Integer, Time};
 
@@ -65,11 +69,76 @@ impl ActualActual {
             Convention::AFB | Convention::Euro => DayCounter::from_impl(shared(AfbImpl)),
         }
     }
+
+    /// Builds an Actual/Actual counter for the given convention, backed by a
+    /// schedule.
+    ///
+    /// Only the ISMA/Bond conventions consult the schedule: they take the
+    /// reference period for a date range from the schedule's coupon dates
+    /// (extended with quasi-payment dates around irregular stubs) rather than
+    /// from the caller. An empty schedule falls back to the reference-date
+    /// algorithm, as does every other convention.
+    pub fn with_schedule(c: Convention, schedule: Schedule) -> DayCounter {
+        match c {
+            Convention::ISMA | Convention::Bond if !schedule.is_empty() => {
+                DayCounter::from_impl(shared(ScheduleIsmaImpl { schedule }))
+            }
+            _ => ActualActual::with_convention(c),
+        }
+    }
 }
 
 /// `Real(d2 - d1)`, QuantLib's `daysBetween`.
 fn days_between(d1: Date, d2: Date) -> Time {
     Time::from(d2 - d1)
+}
+
+/// `schedule.calendar().advance(d, p, ...)` with the schedule's own convention
+/// and end-of-month flag.
+fn advance(schedule: &Schedule, d: Date, p: Period) -> Date {
+    schedule.calendar().advance_by_period(
+        d,
+        p,
+        schedule.business_day_convention(),
+        schedule.end_of_month(),
+    )
+}
+
+/// The schedule's dates, with the quasi-payment dates that bracket an irregular
+/// first or last period substituted in (and, where the stub spills outside the
+/// schedule, prepended or appended).
+///
+/// Port of `getListOfPeriodDatesIncludingQuasiPayments`. Note that the two
+/// rewrites index the *original* schedule positions: when a prior notional
+/// coupon has been prepended, `size - 1` no longer addresses the final date.
+/// That is QuantLib's behaviour and is reproduced here.
+fn period_dates_including_quasi_payments(schedule: &Schedule) -> Vec<Date> {
+    let issue_date = schedule.date(0);
+    let size = schedule.len();
+    let mut new_dates = schedule.dates().to_vec();
+
+    if !schedule.has_is_regular() || !schedule.is_regular_at(1) {
+        let first_coupon = schedule.date(1);
+        let notional_first_coupon = advance(schedule, first_coupon, -schedule.tenor());
+        new_dates[0] = notional_first_coupon;
+
+        if notional_first_coupon > issue_date {
+            let prior_notional_coupon = advance(schedule, notional_first_coupon, -schedule.tenor());
+            new_dates.insert(0, prior_notional_coupon);
+        }
+    }
+
+    if !schedule.has_is_regular() || !schedule.is_regular_at(size - 1) {
+        let notional_last_coupon = advance(schedule, schedule.date(size - 2), schedule.tenor());
+        new_dates[size - 1] = notional_last_coupon;
+
+        if notional_last_coupon < schedule.end_date() {
+            let next_notional_coupon = advance(schedule, notional_last_coupon, schedule.tenor());
+            new_dates.push(next_notional_coupon);
+        }
+    }
+
+    new_dates
 }
 
 struct IsmaImpl;
@@ -175,6 +244,93 @@ impl DayCounterImpl for IsmaImpl {
     }
 }
 
+/// The number of coupon periods per year implied by a reference period, from
+/// its length in whole months. Port of `findCouponsPerYear`; only correct for
+/// reference periods longer than 15 days.
+fn coupons_per_year(ref_start: Date, ref_end: Date) -> Integer {
+    let months = (12.0 * days_between(ref_start, ref_end) / 365.0).round() as Integer;
+    (12.0 / Time::from(months)).round() as Integer
+}
+
+/// Port of `yearFractionWithReferenceDates`: `[d1, d2]` measured against the
+/// reference period `[d3, d4]`, whose length fixes the coupon frequency.
+///
+/// # Panics
+///
+/// Panics (mirroring QuantLib's `QL_REQUIRE`) if `d1 > d2`.
+fn year_fraction_with_reference_dates(d1: Date, d2: Date, d3: Date, d4: Date) -> Time {
+    assert!(d1 <= d2, "this function is only correct if d1 <= d2");
+
+    let mut reference_day_count = days_between(d3, d4);
+    let coupons = if reference_day_count < 16.0 {
+        reference_day_count = days_between(d1, d1 + 1 * TimeUnit::Years);
+        1
+    } else {
+        coupons_per_year(d3, d4)
+    };
+
+    days_between(d1, d2) / (reference_day_count * Time::from(coupons))
+}
+
+struct ScheduleIsmaImpl {
+    schedule: Schedule,
+}
+
+impl DayCounterImpl for ScheduleIsmaImpl {
+    fn name(&self) -> String {
+        "Actual/Actual (ISMA)".to_string()
+    }
+
+    /// The reference period is taken from the schedule, so the reference-date
+    /// arguments are ignored.
+    ///
+    /// # Panics
+    ///
+    /// Panics (mirroring QuantLib's `QL_REQUIRE`) if `[d1, d2]` is not
+    /// contained in the schedule's date range, extended by any quasi-payment
+    /// dates. The alternative - extrapolating past the last coupon - would
+    /// silently return a wrong accrual, so the port keeps QuantLib's hard stop
+    /// rather than widening [`DayCounterImpl::year_fraction`] to a `Result`.
+    fn year_fraction(&self, d1: Date, d2: Date, _ref_start: Date, _ref_end: Date) -> Time {
+        if d1 == d2 {
+            return 0.0;
+        }
+        if d2 < d1 {
+            return -self.year_fraction(d2, d1, Date::null(), Date::null());
+        }
+
+        let coupon_dates = period_dates_including_quasi_payments(&self.schedule);
+        let first_date = *coupon_dates
+            .iter()
+            .min()
+            .expect("a non-empty schedule has coupon dates");
+        let last_date = *coupon_dates
+            .iter()
+            .max()
+            .expect("a non-empty schedule has coupon dates");
+
+        assert!(
+            d1 >= first_date && d2 <= last_date,
+            "dates out of range of schedule: date 1: {d1}, date 2: {d2}, \
+             first date: {first_date}, last date: {last_date}"
+        );
+
+        let mut sum = 0.0;
+        for pair in coupon_dates.windows(2) {
+            let (start_reference_period, end_reference_period) = (pair[0], pair[1]);
+            if d1 < end_reference_period && d2 > start_reference_period {
+                sum += year_fraction_with_reference_dates(
+                    d1.max(start_reference_period),
+                    d2.min(end_reference_period),
+                    start_reference_period,
+                    end_reference_period,
+                );
+            }
+        }
+        sum
+    }
+}
+
 struct IsdaImpl;
 
 impl DayCounterImpl for IsdaImpl {
@@ -261,12 +417,70 @@ impl DayCounterImpl for AfbImpl {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::time::businessdayconvention::BusinessDayConvention;
+    use crate::time::calendars::canada::{Canada, Market as CanadaMarket};
+    use crate::time::frequency::Frequency;
+    use crate::time::schedule::MakeSchedule;
 
     fn d(day: Integer, m: Month, y: Integer) -> Date {
         Date::new(day, m, y)
     }
 
     const TOL: Time = 1.0e-10;
+
+    /// The `testActualActualIsma` schedule: an odd last period.
+    fn odd_last_period_schedule() -> Schedule {
+        MakeSchedule::new()
+            .from(d(30, Month::January, 1999))
+            .to(d(30, Month::June, 2000))
+            .with_frequency(Frequency::Semiannual)
+            .with_first_date(d(30, Month::July, 1999))
+            .with_next_to_last_date(d(30, Month::January, 2000))
+            .end_of_month(false)
+            .build()
+    }
+
+    /// The `testActualActualWithSchedule` schedule: a long first coupon.
+    fn long_first_coupon_schedule() -> Schedule {
+        MakeSchedule::new()
+            .from(d(17, Month::January, 2017))
+            .with_first_date(d(31, Month::August, 2017))
+            .to(d(28, Month::February, 2026))
+            .with_frequency(Frequency::Semiannual)
+            .with_calendar(Canada::new(CanadaMarket::Settlement))
+            .with_convention(BusinessDayConvention::Unadjusted)
+            .backwards()
+            .end_of_month(true)
+            .build()
+    }
+
+    #[test]
+    fn quasi_payments_extend_an_odd_last_period() {
+        let schedule = odd_last_period_schedule();
+        let dates = period_dates_including_quasi_payments(&schedule);
+        // The 30 Jun 2000 maturity is replaced by the 30 Jul 2000 notional
+        // coupon; it is later than the maturity, so nothing is appended.
+        assert_eq!(
+            dates,
+            vec![
+                d(30, Month::January, 1999),
+                d(30, Month::July, 1999),
+                d(30, Month::January, 2000),
+                d(30, Month::July, 2000),
+            ]
+        );
+    }
+
+    #[test]
+    fn quasi_payments_prepend_before_a_long_first_coupon() {
+        // The two quasi coupon dates asserted by testActualActualWithSchedule.
+        let schedule = long_first_coupon_schedule();
+        let dates = period_dates_including_quasi_payments(&schedule);
+        assert_eq!(dates[0], d(31, Month::August, 2016));
+        assert_eq!(dates[1], d(28, Month::February, 2017));
+        assert_eq!(dates[2], d(31, Month::August, 2017));
+        assert_eq!(dates.len(), schedule.len() + 1);
+    }
 
     #[test]
     fn names_match_quantlib() {
