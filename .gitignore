@@ -153,3 +153,4 @@ QuantLib
 # Added by cargo
 /target
 .zed
+fable*.txt
