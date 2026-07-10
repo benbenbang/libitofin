@@ -7,9 +7,11 @@
 //! `CashFlow` inherits `LazyObject` in C++ purely so that `Coupon` can cache -
 //! `performCalculations()` on the base is empty - so the port leaves the
 //! caching to the concrete flows that need it. The `accept(AcyclicVisitor&)`
-//! override, the `isCoupon`/`coupon_cast` downcast pair and the
-//! `earlier_than<CashFlow>` comparator have no counterpart in the port.
+//! override and the `earlier_than<CashFlow>` comparator have no counterpart in
+//! the port. The `isCoupon`/`coupon_cast` downcast pair does:
+//! [`CashFlow::as_coupon`].
 
+use crate::cashflows::Coupon;
 use crate::errors::QlResult;
 use crate::event::{Event, reference_date};
 use crate::settings::Settings;
@@ -37,6 +39,17 @@ pub trait CashFlow: Event {
     /// let an implementor accrue ex-coupon while reporting
     /// [`trading_ex_coupon`](CashFlow::trading_ex_coupon) as `false`.
     fn ex_coupon_date(&self) -> Option<Date>;
+
+    /// The [`Coupon`] view of this flow, when it is one.
+    ///
+    /// The `isCoupon`/`coupon_cast` pair of `cashflow.hpp` and `coupon.hpp`,
+    /// which the [`CashFlows`](crate::cashflows::CashFlows) analytics use to
+    /// tell an accruing flow from a plain payment. Defaulted to `None`, so
+    /// every [`Coupon`] implementor must override it with `Some(self)` or it
+    /// contributes nothing to a basis-point sensitivity.
+    fn as_coupon(&self) -> Option<&dyn Coupon> {
+        None
+    }
 
     /// Whether the flow trades ex-coupon as of `ref_date` (the evaluation date
     /// when `None`).

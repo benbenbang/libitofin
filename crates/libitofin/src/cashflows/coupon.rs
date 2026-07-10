@@ -43,8 +43,10 @@
 //!
 //! [`rate`](Coupon::rate) and [`accrued_amount`](Coupon::accrued_amount) return
 //! [`QlResult`], matching [`CashFlow::amount`]: a floating-rate coupon reads an
-//! index fixing that may be missing. The `accept(AcyclicVisitor&)` override and
-//! the `coupon_cast` downcast have no counterpart in the port.
+//! index fixing that may be missing. The `accept(AcyclicVisitor&)` override has
+//! no counterpart in the port; `coupon_cast` becomes
+//! [`CashFlow::as_coupon`], which every implementor of this trait must
+//! override.
 
 use crate::cashflow::CashFlow;
 use crate::time::date::{Date, SerialNumber};
@@ -285,6 +287,10 @@ mod tests {
 
         fn ex_coupon_date(&self) -> Option<Date> {
             self.base.ex_coupon_date()
+        }
+
+        fn as_coupon(&self) -> Option<&dyn Coupon> {
+            Some(self)
         }
     }
 

@@ -140,6 +140,10 @@ impl CashFlow for FixedRateCoupon {
     fn ex_coupon_date(&self) -> Option<Date> {
         self.base.ex_coupon_date()
     }
+
+    fn as_coupon(&self) -> Option<&dyn Coupon> {
+        Some(self)
+    }
 }
 
 impl Coupon for FixedRateCoupon {
