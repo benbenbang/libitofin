@@ -205,6 +205,30 @@ impl GeneralizedBlackScholesProcess {
     }
 }
 
+/// Reject a non-finite process argument.
+///
+/// Divergence: `blackscholesprocess.cpp` contains no `QL_REQUIRE` at all. A
+/// non-finite `t` or `x` reaches the volatility curve, whose own range checks
+/// pass it through, and the caller receives a NaN drift or diffusion. Under D10
+/// the port fails at the boundary instead.
+fn check_finite(name: &str, value: Real) -> QlResult<()> {
+    if !value.is_finite() {
+        fail!("{name} ({value}) must be finite");
+    }
+    Ok(())
+}
+
+/// Reject a negative or non-finite evolution step.
+///
+/// Divergence: as for [`check_finite`]. A negative `dt` makes `variance`
+/// negative and `std_deviation` returns NaN from the square root.
+fn check_time_step(dt: Time) -> QlResult<()> {
+    if !dt.is_finite() || dt < 0.0 {
+        fail!("dt ({dt}) must be non-negative");
+    }
+    Ok(())
+}
+
 impl AsObservable for GeneralizedBlackScholesProcess {
     fn observable(&self) -> &Observable {
         &self.observable
@@ -217,6 +241,8 @@ impl StochasticProcess1D for GeneralizedBlackScholesProcess {
     }
 
     fn drift(&self, t: Time, x: Real) -> QlResult<Real> {
+        check_finite("t", t)?;
+        check_finite("x", x)?;
         let sigma = self.diffusion(t, x)?;
         let t1 = t + 0.0001;
         let r = self.forward(&self.risk_free_rate, t, t1)?;
@@ -225,18 +251,26 @@ impl StochasticProcess1D for GeneralizedBlackScholesProcess {
     }
 
     fn diffusion(&self, t: Time, x: Real) -> QlResult<Real> {
+        check_finite("t", t)?;
+        check_finite("x", x)?;
         self.local_volatility()?
             .current_link()?
             .local_vol(t, x, true)
     }
 
     fn expectation(&self, t0: Time, x0: Real, dt: Time) -> QlResult<Real> {
+        check_finite("t0", t0)?;
+        check_finite("x0", x0)?;
+        check_time_step(dt)?;
         self.local_volatility()?;
         require!(self.is_strike_independent.get(), "not implemented");
         Ok(x0 * (dt * self.exact_growth_rate(t0, dt)?).exp())
     }
 
     fn std_deviation(&self, t0: Time, x0: Real, dt: Time) -> QlResult<Real> {
+        check_finite("t0", t0)?;
+        check_finite("x0", x0)?;
+        check_time_step(dt)?;
         self.local_volatility()?;
         if self.is_strike_independent.get() {
             Ok(self.variance(t0, x0, dt)?.sqrt())
@@ -246,6 +280,9 @@ impl StochasticProcess1D for GeneralizedBlackScholesProcess {
     }
 
     fn variance(&self, t0: Time, x0: Real, dt: Time) -> QlResult<Real> {
+        check_finite("t0", t0)?;
+        check_finite("x0", x0)?;
+        check_time_step(dt)?;
         self.local_volatility()?;
         if self.is_strike_independent.get() {
             let vol = self.black_volatility.current_link()?;
@@ -257,6 +294,10 @@ impl StochasticProcess1D for GeneralizedBlackScholesProcess {
     }
 
     fn evolve(&self, t0: Time, x0: Real, dt: Time, dw: Real) -> QlResult<Real> {
+        check_finite("t0", t0)?;
+        check_finite("x0", x0)?;
+        check_time_step(dt)?;
+        check_finite("dw", dw)?;
         self.local_volatility()?;
         if self.is_strike_independent.get() {
             let var = self.variance(t0, x0, dt)?;
@@ -397,6 +438,18 @@ mod tests {
         let evolved = f.process.evolve(t0, x0, dt, dw).unwrap();
         let expected = x0 * ((R - Q) * dt - 0.5 * var + var.sqrt() * dw).exp();
         assert!((evolved - expected).abs() < 1e-12);
+    }
+
+    #[test]
+    fn process_rejects_non_finite_inputs_and_negative_time_steps() {
+        let f = european_option_fixture();
+
+        assert!(f.process.drift(Time::INFINITY, SPOT).is_err());
+        assert!(f.process.diffusion(0.25, Real::NAN).is_err());
+        assert!(f.process.expectation(0.25, SPOT, -0.5).is_err());
+        assert!(f.process.variance(0.25, SPOT, Time::INFINITY).is_err());
+        assert!(f.process.std_deviation(0.25, Real::INFINITY, 0.5).is_err());
+        assert!(f.process.evolve(0.25, SPOT, 0.5, Real::NAN).is_err());
     }
 
     #[test]

@@ -220,6 +220,27 @@ mod tests {
     }
 
     #[test]
+    fn max_time_is_measured_from_the_implied_reference_date() {
+        use crate::termstructures::yields::DiscountCurve;
+
+        let original = shared(
+            DiscountCurve::new(
+                vec![today(), today() + 360, today() + 720],
+                vec![1.0, 0.95, 0.90],
+                Actual360::new(),
+                None,
+            )
+            .unwrap(),
+        ) as Shared<dyn YieldTermStructure>;
+        let implied = ImpliedTermStructure::new(Handle::new(original), today() + 360);
+
+        assert!((implied.max_time().unwrap() - 1.0).abs() < 1.0e-15);
+        assert!(implied.discount(1.0, false).is_ok());
+        assert!(implied.discount(1.5, false).is_err());
+        assert!(implied.discount(1.5, true).is_ok());
+    }
+
+    #[test]
     fn notifications_resync_the_extrapolation_flag() {
         let quote = shared(SimpleQuote::new(0.03));
         let curve = flat_curve(quote.clone());

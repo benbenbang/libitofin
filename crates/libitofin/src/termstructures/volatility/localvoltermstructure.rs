@@ -11,6 +11,7 @@
 //! trait), following the crate convention.
 
 use crate::errors::QlResult;
+use crate::fail;
 use crate::time::date::Date;
 use crate::types::{Real, Time, Volatility};
 
@@ -35,7 +36,9 @@ pub trait LocalVolTermStructure: VolatilityTermStructure {
         self.check_range_date(date, extrapolate)?;
         self.check_strike(underlying_level, extrapolate)?;
         let t = self.time_from_reference(date)?;
-        self.local_vol_impl(t, underlying_level)
+        let vol = self.local_vol_impl(t, underlying_level)?;
+        ensure_finite_volatility(vol)?;
+        Ok(vol)
     }
 
     /// Local volatility at a time and underlying level.
@@ -47,6 +50,20 @@ pub trait LocalVolTermStructure: VolatilityTermStructure {
     ) -> QlResult<Volatility> {
         self.check_range_time(t, extrapolate)?;
         self.check_strike(underlying_level, extrapolate)?;
-        self.local_vol_impl(t, underlying_level)
+        let vol = self.local_vol_impl(t, underlying_level)?;
+        ensure_finite_volatility(vol)?;
+        Ok(vol)
     }
+}
+
+/// Reject a non-finite local volatility.
+///
+/// Divergence: `localvoltermstructure.hpp` checks the time and strike ranges
+/// but never the value `localVolImpl` returns, so a curve built on an infinite
+/// quote silently seeds a NaN into every path of a Monte Carlo evolution.
+fn ensure_finite_volatility(vol: Volatility) -> QlResult<()> {
+    if !vol.is_finite() {
+        fail!("volatility ({vol}) must be finite");
+    }
+    Ok(())
 }
