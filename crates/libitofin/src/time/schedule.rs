@@ -2185,6 +2185,41 @@ mod tests {
     }
 
     #[test]
+    fn truncation_regular_metadata_matches_inserted_or_existing_cut_date() {
+        let s = MakeSchedule::new()
+            .from(d(30, Month::September, 2009))
+            .to(d(30, Month::September, 2011))
+            .with_calendar(NullCalendar::new())
+            .with_tenor(Period::new(6, TimeUnit::Months))
+            .with_convention(BusinessDayConvention::Unadjusted)
+            .forwards()
+            .end_of_month(true)
+            .build();
+
+        let inserted_front = s.after(d(1, Month::January, 2010));
+        assert_eq!(inserted_front.date(0), d(1, Month::January, 2010));
+        assert!(!inserted_front.is_regular_at(1));
+
+        let existing_front = s.after(d(31, Month::March, 2010));
+        assert_eq!(existing_front.date(0), d(31, Month::March, 2010));
+        assert!(existing_front.is_regular_at(1));
+
+        let inserted_back = s.until(d(1, Month::January, 2011));
+        assert_eq!(
+            inserted_back.date(inserted_back.len() - 1),
+            d(1, Month::January, 2011)
+        );
+        assert!(!inserted_back.is_regular_at(inserted_back.len() - 1));
+
+        let existing_back = s.until(d(31, Month::March, 2011));
+        assert_eq!(
+            existing_back.date(existing_back.len() - 1),
+            d(31, Month::March, 2011)
+        );
+        assert!(existing_back.is_regular_at(existing_back.len() - 1));
+    }
+
+    #[test]
     #[should_panic(expected = "null reference date")]
     fn null_reference_date_is_rejected() {
         let s = Schedule::from_dates(vec![d(1, Month::January, 2014)]);

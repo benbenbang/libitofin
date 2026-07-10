@@ -634,6 +634,25 @@ mod tests {
         let next_mon = Date::new(10, Month::January, 2000);
         // (mon, next_mon] excluding first, including last: Tue-Fri + Mon = 5.
         assert_eq!(c.business_days_between(mon, next_mon, false, true), 5);
+        assert_eq!(c.business_days_between(next_mon, mon, true, false), -5);
+        assert_eq!(c.business_days_between(mon, mon, true, true), 1);
+        assert_eq!(c.business_days_between(mon, mon, true, false), 0);
+    }
+
+    #[test]
+    fn advance_unadjusted_end_of_month_uses_calendar_month_end() {
+        let c = cal();
+        let jan31 = Date::new(31, Month::January, 2020);
+        assert_eq!(
+            c.advance(
+                jan31,
+                1,
+                TimeUnit::Months,
+                BusinessDayConvention::Unadjusted,
+                true,
+            ),
+            Date::new(29, Month::February, 2020)
+        );
     }
 
     #[test]
