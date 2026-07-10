@@ -193,6 +193,13 @@ mod tests {
     }
 
     #[test]
+    fn local_vol_rejects_non_finite_quotes() {
+        let (_, curve) = flat_curve(Volatility::INFINITY);
+
+        assert!(curve.local_vol(1.0, 100.0, false).is_err());
+    }
+
+    #[test]
     fn quote_changes_propagate_and_notify() {
         let reference = Date::new(15, Month::June, 2026);
         let handle = make_quote_handle(0.18);

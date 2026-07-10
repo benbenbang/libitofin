@@ -332,10 +332,15 @@ pub trait TermStructure: AsObservable {
         Ok(())
     }
 
-    /// Time-range check: `t` must be non-negative and, unless extrapolation
-    /// applies, within the maximum time.
+    /// Time-range check: `t` must be finite, non-negative and, unless
+    /// extrapolation applies, within the maximum time.
+    ///
+    /// The `t >= 0` requirement is QuantLib's `checkRange`
+    /// (`termstructure.cpp:66`). Divergence: the finiteness clause. `+inf`
+    /// passes `t >= 0` in C++, and an extrapolating curve never compares it
+    /// against `maxTime()`, so it reaches the interpolator unchecked.
     fn check_range_time(&self, t: Time, extrapolate: bool) -> QlResult<()> {
-        if t < 0.0 || t.is_nan() {
+        if !t.is_finite() || t < 0.0 {
             fail!("negative time ({t}) given");
         }
         if extrapolate || self.allows_extrapolation() {
@@ -509,6 +514,16 @@ mod tests {
         assert!(curve.check_range_time(0.5, false).is_ok());
         curve.disable_extrapolation();
         assert!(curve.check_range_time(0.5, false).is_err());
+    }
+
+    #[test]
+    fn range_check_rejects_non_finite_time_even_with_extrapolation() {
+        let curve = TestCurve::fixed(Date::new(15, Month::June, 2026));
+        curve.enable_extrapolation();
+
+        assert!(curve.check_range_time(Time::INFINITY, false).is_err());
+        assert!(curve.check_range_time(Time::NEG_INFINITY, true).is_err());
+        assert!(curve.check_range_time(Time::NAN, true).is_err());
     }
 
     #[test]

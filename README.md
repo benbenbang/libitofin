@@ -232,6 +232,35 @@ oversight) and is documented at the point of divergence in the source.
   the cost of moving every `CashFlow` body a coupon overrides onto `Coupon`;
   it is tracked separately.
 
+**Non-finite inputs (cross-cutting):**
+
+- **Non-finite arguments are rejected at the API boundary.** QuantLib validates
+  signs (`stdDev >= 0`, `forward > 0`, `t >= 0`) and relies on NaN failing every
+  such comparison, so a NaN is already an error wherever a sign is checked. An
+  infinity is not: it passes `>= 0.0` and propagates to a NaN result several
+  layers down, and where a curve extrapolates the range check is skipped
+  entirely. Following D10, this port widens each of those guards from "not NaN"
+  to "finite", and adds finiteness checks where C++ has none at all: solver
+  arguments and functor values (`solver1d.rs`), sampled quadrature abscissae
+  (`discrete.rs`), Black-Scholes process arguments (`blackscholesprocess.rs`),
+  and the volatility and variance an implementation returns
+  (`termstructures/volatility/`). Each site names the C++ guard it extends, or
+  states that none exists. The only behavioural change is for infinities; every
+  finite input QuantLib accepts is still accepted, so no priced number moves.
+- **Statistics accumulators reject a NaN sample value, and accept infinities.**
+  QuantLib's only sample guard is `QL_REQUIRE(weight >= 0.0)`
+  (`generalstatistics.hpp:233`, `incrementalstatistics.cpp:127`), which this
+  port keeps verbatim, written `!(weight >= 0.0)` so a NaN weight fails it as it
+  does in C++. A NaN *value* has no C++ guard: it is accumulated and poisons
+  every subsequent mean, variance and percentile with no diagnostic. Infinite
+  values remain accepted, as in C++, being meaningful to `min`, `max` and the
+  risk measures.
+- **Shape mismatches panic with a named cause.** `SVD::solveFor`
+  (`svd.cpp:528`) and the default `CostFunction::gradient` / `jacobian` have no
+  `QL_REQUIRE`; a wrongly-sized output leaves stale entries the optimiser reads
+  as real derivatives. These are caller errors, not market-data errors, so the
+  port asserts rather than returning `Err`.
+
 ## License
 
 [BSD-3-Clause](LICENSE) — the same license as QuantLib, the ported source.

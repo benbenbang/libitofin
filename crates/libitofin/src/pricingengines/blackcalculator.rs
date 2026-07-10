@@ -6,6 +6,13 @@
 //! visitor dispatch on the other striked payoffs follows those payoffs as a
 //! follow-up, as do `strike_gamma`, `vanna` and `volga`.
 //!
+//! Divergence, throughout: every argument requirement here is QuantLib's own
+//! (`blackcalculator.cpp:66,68,72,74` for the constructor, `:204` and `:316`
+//! for `spot > 0`, `:364,373,392,411` for `maturity >= 0`), but each is
+//! written `!is_finite() || ...` where C++ relies on NaN failing the
+//! comparison. That widens rejection to `+inf` only, which C++ accepts and
+//! propagates as a NaN result.
+//!
 //! One deviation from the C++ reference: its zero-volatility branches detect
 //! the option type with `alpha_ >= 0`, which misreads an out-of-the-money put
 //! (`alpha_ == 0` exactly) as a call and hands it in-the-money call greeks.
@@ -50,6 +57,18 @@ pub struct BlackCalculator {
 
 impl BlackCalculator {
     /// Builds a calculator for the given option type and strike.
+    ///
+    /// The four requirements are QuantLib's, from the `BlackCalculator`
+    /// constructor (`blackcalculator.cpp:66,68,72,74`): `strike >= 0`,
+    /// `forward > 0`, `stdDev >= 0`, `discount > 0`.
+    ///
+    /// Divergence: each is written `!is_finite() || ...` rather than
+    /// `is_nan() || ...`. NaN already fails the C++ comparison, so this widens
+    /// rejection only to `+inf`, which C++ accepts and turns into a NaN price.
+    ///
+    /// # Errors
+    ///
+    /// Errors if any argument is non-finite or violates its sign requirement.
     pub fn new(
         option_type: OptionType,
         strike: Real,
@@ -57,16 +76,16 @@ impl BlackCalculator {
         std_dev: Real,
         discount: Real,
     ) -> QlResult<BlackCalculator> {
-        if strike.is_nan() || strike < 0.0 {
+        if !strike.is_finite() || strike < 0.0 {
             fail!("strike ({strike}) must be non-negative");
         }
-        if forward.is_nan() || forward <= 0.0 {
+        if !forward.is_finite() || forward <= 0.0 {
             fail!("forward ({forward}) must be positive");
         }
-        if std_dev.is_nan() || std_dev < 0.0 {
+        if !std_dev.is_finite() || std_dev < 0.0 {
             fail!("stdDev ({std_dev}) must be non-negative");
         }
-        if discount.is_nan() || discount <= 0.0 {
+        if !discount.is_finite() || discount <= 0.0 {
             fail!("discount ({discount}) must be positive");
         }
 
@@ -188,7 +207,7 @@ impl BlackCalculator {
 
     /// Sensitivity to a change in the underlying spot price.
     pub fn delta(&self, spot: Real) -> QlResult<Real> {
-        if spot.is_nan() || spot <= 0.0 {
+        if !spot.is_finite() || spot <= 0.0 {
             fail!("positive spot value required: {spot} not allowed");
         }
 
@@ -247,7 +266,7 @@ impl BlackCalculator {
 
     /// Second-order sensitivity to a change in the spot price.
     pub fn gamma(&self, spot: Real) -> QlResult<Real> {
-        if spot.is_nan() || spot <= 0.0 {
+        if !spot.is_finite() || spot <= 0.0 {
             fail!("positive spot value required: {spot} not allowed");
         }
 
@@ -274,7 +293,7 @@ impl BlackCalculator {
 
     /// Sensitivity to the passage of time.
     pub fn theta(&self, spot: Real, maturity: Time) -> QlResult<Real> {
-        if maturity.is_nan() || maturity < 0.0 {
+        if !maturity.is_finite() || maturity < 0.0 {
             fail!("maturity ({maturity}) must be non-negative");
         }
         if close(maturity, 0.0) {
@@ -293,7 +312,7 @@ impl BlackCalculator {
 
     /// Sensitivity to volatility.
     pub fn vega(&self, maturity: Time) -> QlResult<Real> {
-        if maturity.is_nan() || maturity < 0.0 {
+        if !maturity.is_finite() || maturity < 0.0 {
             fail!("negative maturity not allowed");
         }
 
@@ -312,7 +331,7 @@ impl BlackCalculator {
 
     /// Sensitivity to the discounting rate.
     pub fn rho(&self, maturity: Time) -> QlResult<Real> {
-        if maturity.is_nan() || maturity < 0.0 {
+        if !maturity.is_finite() || maturity < 0.0 {
             fail!("negative maturity not allowed");
         }
 
@@ -330,7 +349,7 @@ impl BlackCalculator {
 
     /// Sensitivity to the dividend or growth rate.
     pub fn dividend_rho(&self, maturity: Time) -> QlResult<Real> {
-        if maturity.is_nan() || maturity < 0.0 {
+        if !maturity.is_finite() || maturity < 0.0 {
             fail!("negative maturity not allowed");
         }
 
@@ -601,12 +620,30 @@ mod tests {
         assert!(
             BlackCalculator::new(OptionType::Call, Real::NAN, FORWARD, STD_DEV, DISCOUNT).is_err()
         );
+        assert!(
+            BlackCalculator::new(OptionType::Call, Real::INFINITY, FORWARD, STD_DEV, DISCOUNT)
+                .is_err()
+        );
+        assert!(
+            BlackCalculator::new(OptionType::Call, STRIKE, Real::INFINITY, STD_DEV, DISCOUNT)
+                .is_err()
+        );
+        assert!(
+            BlackCalculator::new(OptionType::Call, STRIKE, FORWARD, Real::INFINITY, DISCOUNT)
+                .is_err()
+        );
+        assert!(
+            BlackCalculator::new(OptionType::Call, STRIKE, FORWARD, STD_DEV, Real::INFINITY)
+                .is_err()
+        );
 
         let calculator = hull(OptionType::Call);
         assert!(calculator.delta(0.0).is_err());
         assert!(calculator.delta(Real::NAN).is_err());
+        assert!(calculator.delta(Real::INFINITY).is_err());
         assert!(calculator.gamma(-1.0).is_err());
         assert!(calculator.theta(SPOT, -0.5).is_err());
+        assert!(calculator.theta(SPOT, Time::INFINITY).is_err());
         assert!(calculator.vega(-0.5).is_err());
         assert!(calculator.rho(-0.5).is_err());
         assert!(calculator.dividend_rho(-0.5).is_err());
