@@ -830,6 +830,33 @@ mod analytics_tests {
         assert!((atm(&leg, Some(npv)) - RATE).abs() < 1e-14);
     }
 
+    /// A target NPV is quoted at the NPV date, so `atm_rate` scales it back up
+    /// by `df(npv_date)` before dividing by the sensitivity. Every other test
+    /// leaves `npv_date` at the settlement date, where that factor is 1.0 and a
+    /// missing multiplication would go unseen.
+    #[test]
+    fn a_target_npv_is_scaled_by_the_discount_at_the_npv_date() {
+        let (settings, curve) = (settings(), curve(FORWARD));
+        let leg = fixed_leg(RATE);
+        let npv_date = maturity();
+        let discount = curve.discount_date(npv_date, false).unwrap();
+        assert!((discount - 1.0).abs() > 0.05);
+
+        let npv = CashFlows::npv(&leg, &curve, &settings, None, None, Some(npv_date)).unwrap();
+        let atm = CashFlows::atm_rate(
+            &leg,
+            &curve,
+            &settings,
+            None,
+            None,
+            Some(npv_date),
+            Some(npv),
+        )
+        .unwrap();
+
+        assert!((atm - RATE).abs() < 1e-14);
+    }
+
     /// A target NPV of zero short-circuits before the sensitivity is consulted;
     /// a leg with no coupon at all has none to consult.
     #[test]
