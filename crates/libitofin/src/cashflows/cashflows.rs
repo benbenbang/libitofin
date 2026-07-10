@@ -179,9 +179,9 @@ impl Function1D for IrrFinder<'_> {
 /// The `sign` template of `cashflows.cpp`, over the exact zero it compares to.
 fn sign(x: Real) -> i32 {
     match x.partial_cmp(&0.0) {
+        Some(Ordering::Equal) => 0,
         Some(Ordering::Greater) => 1,
-        Some(Ordering::Less) => -1,
-        _ => 0,
+        _ => -1,
     }
 }
 
@@ -1088,6 +1088,22 @@ mod tests {
 
     fn today() -> Date {
         Date::new(7, Month::July, 2026)
+    }
+
+    /// `cashflows.cpp:557-565` tests `x == zero` then `x > zero` and falls
+    /// through to `-1`. Both comparisons are false for a NaN, so the C++
+    /// template signs it negative; a match arm that folds the unordered case in
+    /// with `Equal` would sign it zero and send
+    /// [`check_sign`](CashFlows::check_sign) down the wrong error path.
+    #[test]
+    fn the_sign_of_a_nan_is_negative_as_the_cpp_template_leaves_it() {
+        assert_eq!(sign(0.0), 0);
+        assert_eq!(sign(-0.0), 0);
+        assert_eq!(sign(1.0), 1);
+        assert_eq!(sign(-1.0), -1);
+        assert_eq!(sign(Real::NAN), -1);
+        assert_eq!(sign(Real::INFINITY), 1);
+        assert_eq!(sign(Real::NEG_INFINITY), -1);
     }
 
     fn accrual_start() -> Date {
