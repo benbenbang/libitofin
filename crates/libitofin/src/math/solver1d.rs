@@ -141,10 +141,7 @@ pub trait Solver1D {
     where
         F: FnMut(Real) -> Real,
     {
-        if accuracy <= 0.0 {
-            fail!("accuracy ({accuracy}) must be positive");
-        }
-        let accuracy = accuracy.max(Real::EPSILON);
+        let accuracy = check_stepping_args(accuracy, guess, step)?;
         match bracket_by_stepping(self.config(), &mut f, guess, step)? {
             Bracketed::Root(x) => Ok(x),
             Bracketed::Ready(mut st) => self.solve_impl(&mut f, accuracy, &mut st),
@@ -170,10 +167,7 @@ pub trait Solver1D {
     where
         F: FnMut(Real) -> Real,
     {
-        if accuracy <= 0.0 {
-            fail!("accuracy ({accuracy}) must be positive");
-        }
-        let accuracy = accuracy.max(Real::EPSILON);
+        let accuracy = check_bracket_args(accuracy, guess, x_min, x_max)?;
         match bracket_given(self.config(), &mut f, guess, x_min, x_max)? {
             Bracketed::Root(x) => Ok(x),
             Bracketed::Ready(mut st) => self.solve_impl(&mut f, accuracy, &mut st),
@@ -187,6 +181,106 @@ pub(crate) enum Bracketed {
     Root(Real),
     /// A valid bracket prepared for refinement by `solve_impl`.
     Ready(Solver1DState),
+}
+
+/// Validate the arguments of a stepping `solve` entry point and return the
+/// accuracy clamped to at least `Real::EPSILON`.
+///
+/// The `accuracy > 0` check is QuantLib's `solver1d.hpp:89`. The finiteness of
+/// `accuracy`, `guess` and `step` is a divergence: QuantLib does not check it,
+/// and a non-finite argument there drives the bracketing loop into a silent
+/// non-convergence rather than an error.
+///
+/// # Errors
+///
+/// Errors if `accuracy` is not finite and positive, or if `guess` or `step` is
+/// not finite.
+pub(crate) fn check_stepping_args(accuracy: Real, guess: Real, step: Real) -> QlResult<Real> {
+    if !accuracy.is_finite() || accuracy <= 0.0 {
+        fail!("accuracy ({accuracy}) must be finite and positive");
+    }
+    if !guess.is_finite() {
+        fail!("guess ({guess}) must be finite");
+    }
+    if !step.is_finite() {
+        fail!("step ({step}) must be finite");
+    }
+    Ok(accuracy.max(Real::EPSILON))
+}
+
+/// Validate the arguments of a bracketed `solve` entry point and return the
+/// accuracy clamped to at least `Real::EPSILON`.
+///
+/// The `accuracy > 0` check is QuantLib's `solver1d.hpp:169`. The finiteness of
+/// `accuracy`, `guess` and the bracket endpoints is a divergence: QuantLib
+/// checks only the ordering `xMin < xMax` (`solver1d.hpp:177`), which a NaN
+/// endpoint passes silently.
+///
+/// # Errors
+///
+/// Errors if `accuracy` is not finite and positive, or if `guess`, `x_min` or
+/// `x_max` is not finite.
+pub(crate) fn check_bracket_args(
+    accuracy: Real,
+    guess: Real,
+    x_min: Real,
+    x_max: Real,
+) -> QlResult<Real> {
+    if !accuracy.is_finite() || accuracy <= 0.0 {
+        fail!("accuracy ({accuracy}) must be finite and positive");
+    }
+    if !guess.is_finite() {
+        fail!("guess ({guess}) must be finite");
+    }
+    if !x_min.is_finite() || !x_max.is_finite() {
+        fail!("bracket endpoints must be finite, got [{x_min}, {x_max}]");
+    }
+    Ok(accuracy.max(Real::EPSILON))
+}
+
+/// Evaluate a solver callback and reject non-finite values before they enter
+/// bracket/refinement arithmetic.
+///
+/// Divergence: QuantLib never inspects the value a solver functor returns. A
+/// NaN there makes every bracket comparison false, so the C++ solver runs to
+/// its evaluation cap and reports "maximum evaluations exceeded" instead of the
+/// real cause. Failing here turns that silent non-convergence into an error.
+pub(crate) fn checked_value<F>(f: &mut F, x: Real) -> QlResult<Real>
+where
+    F: FnMut(Real) -> Real,
+{
+    let value = f(x);
+    ensure_finite_function_value(x, value)?;
+    Ok(value)
+}
+
+pub(crate) fn ensure_finite_function_value(x: Real, value: Real) -> QlResult<()> {
+    if !value.is_finite() {
+        fail!("function value must be finite, got f({x}) = {value}");
+    }
+    Ok(())
+}
+
+pub(crate) fn checked_function_value<G: Function1D>(g: &mut G, x: Real) -> QlResult<Real> {
+    let value = g.value(x);
+    ensure_finite_function_value(x, value)?;
+    Ok(value)
+}
+
+pub(crate) fn checked_derivative<G: Function1D>(g: &mut G, x: Real) -> QlResult<Real> {
+    let derivative = g.derivative(x);
+    if !derivative.is_finite() {
+        fail!("function derivative must be finite, got f'({x}) = {derivative}");
+    }
+    Ok(derivative)
+}
+
+pub(crate) fn checked_second_derivative<G: Function2D>(g: &mut G, x: Real) -> QlResult<Real> {
+    let second_derivative = g.second_derivative(x);
+    if !second_derivative.is_finite() {
+        fail!("function second derivative must be finite, got f''({x}) = {second_derivative}");
+    }
+    Ok(second_derivative)
 }
 
 /// Auto-bracket a root of `f` near `guess` by scanning outward in steps of
@@ -211,20 +305,20 @@ where
         root: config.enforce_bounds(guess),
         ..Default::default()
     };
-    st.fx_max = f(st.root);
+    st.fx_max = checked_value(f, st.root)?;
 
     // monotonically crescent bias, as in optionValue(volatility)
     if close(st.fx_max, 0.0) {
         return Ok(Bracketed::Root(st.root));
     } else if st.fx_max > 0.0 {
         st.x_min = config.enforce_bounds(st.root - step);
-        st.fx_min = f(st.x_min);
+        st.fx_min = checked_value(f, st.x_min)?;
         st.x_max = st.root;
     } else {
         st.x_min = st.root;
         st.fx_min = st.fx_max;
         st.x_max = config.enforce_bounds(st.root + step);
-        st.fx_max = f(st.x_max);
+        st.fx_max = checked_value(f, st.x_max)?;
     }
 
     st.evaluation_number = 2;
@@ -241,18 +335,18 @@ where
         }
         if st.fx_min.abs() < st.fx_max.abs() {
             st.x_min = config.enforce_bounds(st.x_min + growth_factor * (st.x_min - st.x_max));
-            st.fx_min = f(st.x_min);
+            st.fx_min = checked_value(f, st.x_min)?;
         } else if st.fx_min.abs() > st.fx_max.abs() {
             st.x_max = config.enforce_bounds(st.x_max + growth_factor * (st.x_max - st.x_min));
-            st.fx_max = f(st.x_max);
+            st.fx_max = checked_value(f, st.x_max)?;
         } else if flipflop == -1 {
             st.x_min = config.enforce_bounds(st.x_min + growth_factor * (st.x_min - st.x_max));
-            st.fx_min = f(st.x_min);
+            st.fx_min = checked_value(f, st.x_min)?;
             st.evaluation_number += 1;
             flipflop = 1;
         } else if flipflop == 1 {
             st.x_max = config.enforce_bounds(st.x_max + growth_factor * (st.x_max - st.x_min));
-            st.fx_max = f(st.x_max);
+            st.fx_max = checked_value(f, st.x_max)?;
             flipflop = -1;
         }
         st.evaluation_number += 1;
@@ -299,11 +393,11 @@ where
         fail!("x_max ({x_max}) > enforced upper bound ({ub})");
     }
 
-    st.fx_min = f(st.x_min);
+    st.fx_min = checked_value(f, st.x_min)?;
     if close(st.fx_min, 0.0) {
         return Ok(Bracketed::Root(st.x_min));
     }
-    st.fx_max = f(st.x_max);
+    st.fx_max = checked_value(f, st.x_max)?;
     if close(st.fx_max, 0.0) {
         return Ok(Bracketed::Root(st.x_max));
     }
@@ -456,10 +550,7 @@ pub trait DerivativeSolver {
         guess: Real,
         step: Real,
     ) -> QlResult<Real> {
-        if accuracy <= 0.0 {
-            fail!("accuracy ({accuracy}) must be positive");
-        }
-        let accuracy = accuracy.max(Real::EPSILON);
+        let accuracy = check_stepping_args(accuracy, guess, step)?;
         // Bind before matching so the value-closure's borrow of `g` is released
         // before `refine` takes `&mut g`.
         let bracketed = bracket_by_stepping(self.config(), &mut |x| g.value(x), guess, step)?;
@@ -483,10 +574,7 @@ pub trait DerivativeSolver {
         x_min: Real,
         x_max: Real,
     ) -> QlResult<Real> {
-        if accuracy <= 0.0 {
-            fail!("accuracy ({accuracy}) must be positive");
-        }
-        let accuracy = accuracy.max(Real::EPSILON);
+        let accuracy = check_bracket_args(accuracy, guess, x_min, x_max)?;
         let bracketed = bracket_given(self.config(), &mut |x| g.value(x), guess, x_min, x_max)?;
         match bracketed {
             Bracketed::Root(x) => Ok(x),
@@ -530,7 +618,7 @@ mod tests {
         {
             while st.evaluation_number < self.max_evaluations() {
                 let mid = 0.5 * (st.x_min + st.x_max);
-                let fmid = f(mid);
+                let fmid = checked_value(f, mid)?;
                 st.evaluation_number += 1;
                 if 0.5 * (st.x_max - st.x_min).abs() <= accuracy || close(fmid, 0.0) {
                     return Ok(mid);
@@ -597,6 +685,28 @@ mod tests {
         }
         // non-positive accuracy
         assert!(bisection().solve(quadratic, 0.0, 0.5, 0.1).is_err());
+        assert!(bisection().solve(quadratic, Real::NAN, 0.5, 0.1).is_err());
+        assert!(bisection().solve(quadratic, 1e-8, Real::NAN, 0.1).is_err());
+        assert!(
+            bisection()
+                .solve(quadratic, 1e-8, 0.5, Real::INFINITY)
+                .is_err()
+        );
+        assert!(
+            bisection()
+                .solve_bracketed(quadratic, Real::INFINITY, 0.5, 0.0, 2.0)
+                .is_err()
+        );
+        assert!(
+            bisection()
+                .solve_bracketed(quadratic, 1e-8, Real::NAN, 0.0, 2.0)
+                .is_err()
+        );
+        assert!(
+            bisection()
+                .solve_bracketed(quadratic, 1e-8, 0.5, 0.0, Real::INFINITY)
+                .is_err()
+        );
         // bracket outside the enforced bounds (upper, then lower)
         let mut solver = bisection();
         solver.set_upper_bound(2.0);
@@ -610,6 +720,27 @@ mod tests {
         assert!(
             solver
                 .solve_bracketed(quadratic, 1e-8, 0.75, 0.0, 2.0)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn drivers_reject_non_finite_function_values() {
+        let cfg = SolverConfig::new();
+        let mut nan_at_left = |x: Real| if x == 0.0 { Real::NAN } else { x - 1.0 };
+        assert!(bracket_given(&cfg, &mut nan_at_left, 0.5, 0.0, 2.0).is_err());
+
+        let mut inf_at_right = |x: Real| if x == 2.0 { Real::INFINITY } else { x - 1.0 };
+        assert!(bracket_given(&cfg, &mut inf_at_right, 0.5, 0.0, 2.0).is_err());
+
+        assert!(
+            bisection()
+                .solve(
+                    |x: Real| if x == 0.5 { Real::NAN } else { x - 1.0 },
+                    1e-8,
+                    0.5,
+                    0.1
+                )
                 .is_err()
         );
     }

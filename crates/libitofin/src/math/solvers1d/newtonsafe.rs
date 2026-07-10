@@ -12,7 +12,10 @@
 use crate::errors::QlResult;
 use crate::fail;
 use crate::math::comparison::close;
-use crate::math::solver1d::{DerivativeSolver, Function1D, Solver1DState, SolverConfig};
+use crate::math::solver1d::{
+    DerivativeSolver, Function1D, Solver1DState, SolverConfig, checked_derivative,
+    checked_function_value,
+};
 use crate::types::Real;
 
 /// Newton-safe root finder (Newton with a bisection fallback).
@@ -75,13 +78,13 @@ impl DerivativeSolver for NewtonSafe {
         let mut dxold = st.x_max - st.x_min;
         let mut dx = dxold;
 
-        let mut froot = g.value(st.root);
+        let mut froot = checked_function_value(g, st.root)?;
         // A root with a zero (or near-zero) derivative - e.g. the flat inflection
         // of (x-1)^3 - is detected here so the step below never divides 0 by 0.
         if close(froot, 0.0) {
             return Ok(st.root);
         }
-        let mut dfroot = g.derivative(st.root);
+        let mut dfroot = checked_derivative(g, st.root)?;
         st.evaluation_number += 1;
 
         while st.evaluation_number <= self.config.max_evaluations {
@@ -100,15 +103,15 @@ impl DerivativeSolver for NewtonSafe {
             }
             if dx.abs() < x_accuracy {
                 // Final call at the root so a stateful functor records it.
-                let _ = g.value(st.root);
+                let _ = checked_function_value(g, st.root)?;
                 st.evaluation_number += 1;
                 return Ok(st.root);
             }
-            froot = g.value(st.root);
+            froot = checked_function_value(g, st.root)?;
             if close(froot, 0.0) {
                 return Ok(st.root);
             }
-            dfroot = g.derivative(st.root);
+            dfroot = checked_derivative(g, st.root)?;
             st.evaluation_number += 1;
             // Keep the new point as the matching bracket end.
             if froot < 0.0 {

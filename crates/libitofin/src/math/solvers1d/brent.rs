@@ -8,7 +8,7 @@
 use crate::errors::QlResult;
 use crate::fail;
 use crate::math::comparison::close;
-use crate::math::solver1d::{Solver1D, Solver1DState, SolverConfig};
+use crate::math::solver1d::{Solver1D, Solver1DState, SolverConfig, checked_value};
 use crate::types::Real;
 
 /// Brent's method root finder.
@@ -75,7 +75,7 @@ impl Solver1D for Brent {
     {
         // Start with root_ (the guess) on one side of the bracket and both
         // x_min and x_max on the other.
-        let mut froot = f(st.root);
+        let mut froot = checked_value(f, st.root)?;
         st.evaluation_number += 1;
         if froot * st.fx_min < 0.0 {
             st.x_max = st.x_min;
@@ -109,7 +109,7 @@ impl Solver1D for Brent {
             if x_mid.abs() <= x_acc1 || close(froot, 0.0) {
                 // QuantLib makes one last call with the root so a stateful
                 // functor records it; preserve that side effect.
-                let _ = f(st.root);
+                let _ = checked_value(f, st.root)?;
                 st.evaluation_number += 1;
                 return Ok(st.root);
             }
@@ -152,7 +152,7 @@ impl Solver1D for Brent {
             } else {
                 st.root += sign(x_acc1, x_mid);
             }
-            froot = f(st.root);
+            froot = checked_value(f, st.root)?;
             st.evaluation_number += 1;
         }
         fail!(
