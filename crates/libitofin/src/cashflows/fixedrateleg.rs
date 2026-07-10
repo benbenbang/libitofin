@@ -328,3 +328,257 @@ fn at<T: Clone>(values: &[T], index: usize) -> T {
         .unwrap_or_else(|| values.last().expect("non-empty by precondition"))
         .clone()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cashflows::coupon::Coupon;
+    use crate::time::calendars::target::Target;
+    use crate::time::calendars::unitedstates::{Market, UnitedStates};
+    use crate::time::date::Month;
+    use crate::time::daycounters::actual360::Actual360;
+    use crate::time::daycounters::actualactual::{ActualActual, Convention};
+    use crate::time::timeunit::TimeUnit;
+
+    fn simple(rate: Rate, day_counter: DayCounter) -> InterestRate {
+        InterestRate::new(rate, day_counter, Compounding::Simple, Frequency::Annual).unwrap()
+    }
+
+    /// `cashflows.cpp::testDefaultSettlementDate`, which reads the leg's accrual
+    /// at the evaluation date through `CashFlows::accruedPeriod` and friends.
+    /// Those free functions are not ported yet, so the accrual is read off the
+    /// single coupon the schedule produces, which is what they would select.
+    #[test]
+    fn a_leg_spanning_the_evaluation_date_has_a_running_accrual() {
+        let today = Date::new(7, Month::July, 2026);
+        let schedule = crate::time::schedule::MakeSchedule::new()
+            .from(Date::new(7, Month::May, 2026))
+            .to(Date::new(7, Month::November, 2026))
+            .with_frequency(Frequency::Semiannual)
+            .with_calendar(Target::new())
+            .with_convention(BusinessDayConvention::Unadjusted)
+            .backwards()
+            .build();
+        let coupons = FixedRateLeg::new(schedule)
+            .with_notional(100.0)
+            .with_interest_rate(simple(0.03, Actual360::new()))
+            .with_payment_calendar(Target::new())
+            .with_payment_adjustment(BusinessDayConvention::Following)
+            .coupons()
+            .unwrap();
+
+        assert_eq!(coupons.len(), 1);
+        assert!(coupons[0].accrued_period(today) > 0.0);
+        assert!(coupons[0].accrued_days(today) > 0);
+        assert!(coupons[0].accrued_amount(today).unwrap() > 0.0);
+    }
+
+    /// The `FixedRateLeg` half of `cashflows.cpp::testExCouponDates` (`l1`, `l5`
+    /// and `l7`); the `IborLeg` half is deferred to the floating-coupon epic.
+    #[test]
+    fn the_ex_coupon_dates_are_measured_back_from_each_payment_date() {
+        let today = Date::new(15, Month::June, 2026);
+        let schedule = crate::time::schedule::MakeSchedule::new()
+            .from(today)
+            .to(Date::new(15, Month::June, 2031))
+            .with_frequency(Frequency::Monthly)
+            .with_calendar(Target::new())
+            .with_convention(BusinessDayConvention::Following)
+            .build();
+        let leg = |schedule| {
+            FixedRateLeg::new(schedule)
+                .with_notional(100.0)
+                .with_interest_rate(simple(0.03, Actual360::new()))
+        };
+
+        for coupon in leg(schedule.clone()).coupons().unwrap() {
+            assert_eq!(coupon.ex_coupon_date(), None);
+        }
+
+        let calendar_days = leg(schedule.clone())
+            .with_ex_coupon_period(
+                Period::new(2, TimeUnit::Days),
+                NullCalendar::new(),
+                BusinessDayConvention::Unadjusted,
+                false,
+            )
+            .coupons()
+            .unwrap();
+        assert!(!calendar_days.is_empty());
+        for coupon in calendar_days {
+            assert_eq!(coupon.ex_coupon_date(), Some(coupon.accrual_end_date() - 2));
+        }
+
+        let business_days = leg(schedule)
+            .with_ex_coupon_period(
+                Period::new(2, TimeUnit::Days),
+                Target::new(),
+                BusinessDayConvention::Preceding,
+                false,
+            )
+            .coupons()
+            .unwrap();
+        for coupon in business_days {
+            let expected = Target::new().advance(
+                coupon.accrual_end_date(),
+                -2,
+                TimeUnit::Days,
+                BusinessDayConvention::Following,
+                false,
+            );
+            assert_eq!(coupon.ex_coupon_date(), Some(expected));
+        }
+    }
+
+    /// `cashflows.cpp::testIrregularFirstCouponReferenceDatesAtEndOfMonth`.
+    #[test]
+    fn an_irregular_first_coupon_references_the_end_of_the_month() {
+        let schedule = crate::time::schedule::MakeSchedule::new()
+            .from(Date::new(17, Month::January, 2017))
+            .to(Date::new(28, Month::February, 2018))
+            .with_frequency(Frequency::Semiannual)
+            .with_convention(BusinessDayConvention::Unadjusted)
+            .end_of_month(true)
+            .backwards()
+            .build();
+        let coupons = FixedRateLeg::new(schedule)
+            .with_notional(100.0)
+            .with_interest_rate(simple(0.01, Actual360::new()))
+            .coupons()
+            .unwrap();
+
+        assert_eq!(
+            coupons[0].reference_period_start(),
+            Date::new(31, Month::August, 2016)
+        );
+    }
+
+    /// `cashflows.cpp::testIrregularFirstCouponReferenceDatesAtEndOfCalendarMonth`,
+    /// the one ported case that pins `amount()` against a C++ number.
+    #[test]
+    fn an_irregular_first_coupon_references_the_end_of_the_calendar_month() {
+        let schedule = crate::time::schedule::MakeSchedule::new()
+            .with_calendar(UnitedStates::new(Market::GovernmentBond))
+            .from(Date::new(30, Month::September, 2017))
+            .to(Date::new(30, Month::September, 2022))
+            .with_tenor(Period::new(6, TimeUnit::Months))
+            .with_convention(BusinessDayConvention::Unadjusted)
+            .with_termination_date_convention(BusinessDayConvention::Unadjusted)
+            .with_first_date(Date::new(31, Month::March, 2018))
+            .with_next_to_last_date(Date::new(31, Month::March, 2022))
+            .end_of_month(true)
+            .backwards()
+            .build();
+        let coupons = FixedRateLeg::new(schedule)
+            .with_notional(100.0)
+            .with_interest_rate(simple(
+                0.01875,
+                ActualActual::with_convention(Convention::ISMA),
+            ))
+            .coupons()
+            .unwrap();
+
+        assert_eq!(
+            coupons[0].reference_period_start(),
+            Date::new(30, Month::September, 2017)
+        );
+        assert!((coupons[0].amount().unwrap() - 0.9375).abs() < 1e-4);
+    }
+
+    /// `cashflows.cpp::testIrregularLastCouponReferenceDatesAtEndOfMonth`.
+    #[test]
+    fn an_irregular_last_coupon_references_the_end_of_the_month() {
+        let schedule = crate::time::schedule::MakeSchedule::new()
+            .from(Date::new(17, Month::January, 2017))
+            .to(Date::new(15, Month::September, 2018))
+            .with_next_to_last_date(Date::new(28, Month::February, 2018))
+            .with_frequency(Frequency::Semiannual)
+            .with_convention(BusinessDayConvention::Unadjusted)
+            .end_of_month(true)
+            .backwards()
+            .build();
+        let coupons = FixedRateLeg::new(schedule)
+            .with_notional(100.0)
+            .with_interest_rate(simple(0.01, Actual360::new()))
+            .coupons()
+            .unwrap();
+
+        assert_eq!(
+            coupons.last().unwrap().reference_period_end(),
+            Date::new(31, Month::August, 2018)
+        );
+    }
+
+    /// The `FixedRateLeg` half of `cashflows.cpp::testPartialScheduleLegConstruction`;
+    /// the `IborLeg` half is deferred to the floating-coupon epic. A schedule
+    /// stripped of its meta information cannot reconstruct the stubs' reference
+    /// periods, so those fall back to the schedule periods themselves.
+    #[test]
+    fn a_date_based_schedule_reconstructs_the_reference_periods_only_with_its_metadata() {
+        let schedule = crate::time::schedule::MakeSchedule::new()
+            .from(Date::new(15, Month::September, 2017))
+            .to(Date::new(30, Month::September, 2020))
+            .with_next_to_last_date(Date::new(25, Month::September, 2020))
+            .with_frequency(Frequency::Semiannual)
+            .backwards()
+            .build();
+        let with_metadata = Schedule::with_metadata(
+            schedule.dates().to_vec(),
+            NullCalendar::new(),
+            BusinessDayConvention::Unadjusted,
+            Some(BusinessDayConvention::Unadjusted),
+            Some(Period::new(6, TimeUnit::Months)),
+            None,
+            Some(schedule.end_of_month()),
+            schedule.is_regular().to_vec(),
+        );
+        let without_metadata = Schedule::from_dates(schedule.dates().to_vec());
+        let coupons = |schedule| {
+            FixedRateLeg::new(schedule)
+                .with_notional(100.0)
+                .with_interest_rate(simple(
+                    0.01,
+                    ActualActual::with_convention(Convention::ISMA),
+                ))
+                .coupons()
+                .unwrap()
+        };
+
+        for leg in [coupons(schedule), coupons(with_metadata)] {
+            assert_eq!(
+                leg[0].reference_period_start(),
+                Date::new(25, Month::March, 2017)
+            );
+            assert_eq!(
+                leg[0].reference_period_end(),
+                Date::new(25, Month::September, 2017)
+            );
+            assert_eq!(
+                leg.last().unwrap().reference_period_start(),
+                Date::new(25, Month::September, 2020)
+            );
+            assert_eq!(
+                leg.last().unwrap().reference_period_end(),
+                Date::new(25, Month::March, 2021)
+            );
+        }
+
+        let leg = coupons(without_metadata);
+        assert_eq!(
+            leg[0].reference_period_start(),
+            Date::new(15, Month::September, 2017)
+        );
+        assert_eq!(
+            leg[0].reference_period_end(),
+            Date::new(25, Month::September, 2017)
+        );
+        assert_eq!(
+            leg.last().unwrap().reference_period_start(),
+            Date::new(25, Month::September, 2020)
+        );
+        assert_eq!(
+            leg.last().unwrap().reference_period_end(),
+            Date::new(30, Month::September, 2020)
+        );
+    }
+}
