@@ -192,6 +192,13 @@ impl Coupon for FixedRateCoupon {
 
 #[cfg(test)]
 mod tests {
+    //! No test-suite case exercises `FixedRateCoupon::amount` or
+    //! `accruedAmount` directly: `cashflows.cpp` reaches them only through
+    //! `CashFlows::accruedAmount`, and the six cases it does cover are ported
+    //! against the leg, in `fixedrateleg.rs`. Every constant asserted below is
+    //! therefore derived from `fixedratecoupon.cpp` rather than read off a
+    //! QuantLib test.
+
     use super::*;
     use crate::time::date::Month;
     use crate::time::daycounters::actual360::Actual360;
