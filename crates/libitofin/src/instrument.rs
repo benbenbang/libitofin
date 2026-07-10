@@ -65,10 +65,13 @@ struct Updater {
 
 impl Observer for Updater {
     fn update(&mut self) {
-        let notify = self.lazy.borrow_mut().deferred_update();
-        if let Some(observable) = notify {
-            observable.notify_observers();
+        if let Some(update) = LazyObject::deferred_update(&self.lazy) {
+            update.notify_observers();
         }
+    }
+
+    fn defer_reentrant_update(&self) -> bool {
+        false
     }
 }
 
@@ -133,9 +136,8 @@ impl InstrumentBase {
             new.borrow().observable().register_observer(&observer);
         }
         self.engine = engine;
-        let notify = self.lazy.borrow_mut().deferred_update();
-        if let Some(observable) = notify {
-            observable.notify_observers();
+        if let Some(update) = LazyObject::deferred_update(&self.lazy) {
+            update.notify_observers();
         }
     }
 
@@ -779,6 +781,50 @@ mod tests {
             Some(10.0),
             "a notified observer must be able to reprice the instrument"
         );
+    }
+
+    struct WriteBackObserver {
+        market: Shared<SimpleQuote>,
+        updates: usize,
+    }
+
+    impl Observer for WriteBackObserver {
+        fn update(&mut self) {
+            self.updates += 1;
+            if self.updates == 1 {
+                self.market.set_value(6.0);
+            }
+        }
+    }
+
+    #[test]
+    fn recursive_input_change_during_instrument_notification_is_suppressed() {
+        let market = shared(SimpleQuote::new(2.0));
+        let mut instrument = MockInstrument::new(Shared::clone(&market));
+        let (engine, _) = mock_engine(true);
+        instrument.base_mut().set_pricing_engine(engine);
+        instrument.npv().unwrap();
+
+        let writer = shared_mut(WriteBackObserver {
+            market: Shared::clone(&market),
+            updates: 0,
+        });
+        instrument
+            .base()
+            .register_observer(&(SharedMut::clone(&writer) as SharedMut<dyn Observer>));
+
+        market.set_value(5.0);
+
+        assert_eq!(
+            writer.borrow().updates,
+            1,
+            "LazyObject::update must suppress recursive notifications"
+        );
+        assert!(
+            !instrument.base().is_calculated(),
+            "the first input change still invalidates the cache"
+        );
+        assert_eq!(instrument.npv().unwrap(), 12.0);
     }
 
     #[test]

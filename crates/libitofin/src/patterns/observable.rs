@@ -34,6 +34,23 @@ thread_local! {
     static PENDING: RefCell<Vec<WeakMut<dyn Observer>>> = const { RefCell::new(Vec::new()) };
 }
 
+struct ObserverEntry {
+    observer: WeakMut<dyn Observer>,
+    defer_reentrant: bool,
+}
+
+impl ObserverEntry {
+    fn new(observer: &SharedMut<dyn Observer>) -> Self {
+        let defer_reentrant = observer
+            .try_borrow()
+            .map_or(true, |observer| observer.defer_reentrant_update());
+        ObserverEntry {
+            observer: SharedMut::downgrade(observer),
+            defer_reentrant,
+        }
+    }
+}
+
 /// RAII depth counter for [`DEPTH`], panic-safe like `LazyObject`'s guard.
 struct DepthGuard;
 
@@ -135,6 +152,19 @@ fn drain_pending() {
 pub trait Observer {
     /// Called by the observables this instance registered with on a change.
     fn update(&mut self);
+
+    /// Whether a reentrant notification that finds this observer already
+    /// updating should be replayed after the borrow releases.
+    ///
+    /// Divergence: C++ has no such hook. It exists because this port detects
+    /// re-entrancy as a failed `RefCell::try_borrow_mut`, where C++ simply
+    /// re-enters `update()` and lets the callee decide. An observer whose
+    /// `update` already implements C++'s own recursion guard - a lazy object,
+    /// via `updating_` - must return `false` here, or the port would replay a
+    /// notification that C++ discards.
+    fn defer_reentrant_update(&self) -> bool {
+        true
+    }
 }
 
 /// Contract for types that embed an [`Observable`] and broadcast through it.
@@ -228,7 +258,7 @@ impl Observer for ResetThenNotify {
 /// or otherwise touch this observable while being notified.
 #[derive(Default)]
 pub struct Observable {
-    observers: RefCell<Vec<WeakMut<dyn Observer>>>,
+    observers: RefCell<Vec<ObserverEntry>>,
 }
 
 impl Observable {
@@ -244,11 +274,11 @@ impl Observable {
     pub fn register_observer(&self, observer: &SharedMut<dyn Observer>) -> bool {
         let weak = SharedMut::downgrade(observer);
         let mut observers = self.observers.borrow_mut();
-        observers.retain(|w| w.strong_count() > 0);
-        if observers.iter().any(|w| w.ptr_eq(&weak)) {
+        observers.retain(|entry| entry.observer.strong_count() > 0);
+        if observers.iter().any(|entry| entry.observer.ptr_eq(&weak)) {
             return false;
         }
-        observers.push(weak);
+        observers.push(ObserverEntry::new(observer));
         true
     }
 
@@ -257,12 +287,12 @@ impl Observable {
         let target = SharedMut::downgrade(observer);
         let mut observers = self.observers.borrow_mut();
         let mut removed = false;
-        observers.retain(|w| {
-            if w.ptr_eq(&target) {
+        observers.retain(|entry| {
+            if entry.observer.ptr_eq(&target) {
                 removed = true;
                 return false;
             }
-            w.strong_count() > 0
+            entry.observer.strong_count() > 0
         });
         removed
     }
@@ -292,17 +322,29 @@ impl Observable {
     /// the notification): it stays queued and is delivered at the end of the
     /// next outermost notification on the thread.
     pub fn notify_observers(&self) {
-        let snapshot: Vec<SharedMut<dyn Observer>> = {
+        let snapshot: Vec<(SharedMut<dyn Observer>, bool)> = {
             let mut observers = self.observers.borrow_mut();
-            observers.retain(|w| w.strong_count() > 0);
-            observers.iter().filter_map(WeakMut::upgrade).collect()
+            observers.retain(|entry| entry.observer.strong_count() > 0);
+            observers
+                .iter()
+                .filter_map(|entry| {
+                    entry
+                        .observer
+                        .upgrade()
+                        .map(|observer| (observer, entry.defer_reentrant))
+                })
+                .collect()
         };
         {
             let _depth = DepthGuard::enter();
-            for observer in snapshot {
+            for (observer, defer_reentrant) in snapshot {
                 match observer.try_borrow_mut() {
                     Ok(mut observer) => observer.update(),
-                    Err(_) => defer(&observer),
+                    Err(_) => {
+                        if defer_reentrant {
+                            defer(&observer);
+                        }
+                    }
                 }
             }
         }
