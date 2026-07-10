@@ -14,6 +14,8 @@ use crate::patterns::observable::{AsObservable, Observable};
 use crate::settings::Settings;
 use crate::time::date::Date;
 use crate::types::Real;
+use crate::utilities::null::Null;
+use crate::{fail, require};
 
 /// A payment of a predetermined amount on a given date.
 pub struct SimpleCashFlow {
@@ -24,12 +26,24 @@ pub struct SimpleCashFlow {
 
 impl SimpleCashFlow {
     /// Creates a flow paying `amount` on `date`.
-    pub fn new(amount: Real, date: Date) -> Self {
-        SimpleCashFlow {
+    ///
+    /// Both guards are QuantLib's, verbatim, from the `SimpleCashFlow`
+    /// constructor body (`simplecashflow.cpp:29` and `:31`), error strings
+    /// included. They were omitted when this type was first ported.
+    ///
+    /// # Errors
+    ///
+    /// Errors if `date` is the null date or `amount` is the null `Real`.
+    pub fn new(amount: Real, date: Date) -> QlResult<Self> {
+        require!(date != Date::null(), "null date SimpleCashFlow");
+        if amount.is_null() {
+            fail!("null amount SimpleCashFlow");
+        }
+        Ok(SimpleCashFlow {
             amount,
             date,
             observable: Observable::new(),
-        }
+        })
     }
 }
 
@@ -75,8 +89,12 @@ macro_rules! simple_cash_flow_alias {
 
         impl $name {
             /// Creates a flow paying `amount` on `date`.
-            pub fn new(amount: Real, date: Date) -> Self {
-                $name(SimpleCashFlow::new(amount, date))
+            ///
+            /// # Errors
+            ///
+            /// As for [`SimpleCashFlow::new`].
+            pub fn new(amount: Real, date: Date) -> QlResult<Self> {
+                Ok($name(SimpleCashFlow::new(amount, date)?))
             }
         }
 
@@ -144,7 +162,7 @@ mod tests {
     fn leg(settings: &Settings<Date>) -> Leg {
         settings.set_evaluation_date(today());
         (0..3)
-            .map(|i| shared(SimpleCashFlow::new(1.0, today() + i)) as Shared<dyn CashFlow>)
+            .map(|i| shared(SimpleCashFlow::new(1.0, today() + i).unwrap()) as Shared<dyn CashFlow>)
             .collect()
     }
 
@@ -157,11 +175,29 @@ mod tests {
 
     #[test]
     fn a_simple_cash_flow_pays_its_amount_on_its_date() {
-        let flow = SimpleCashFlow::new(105.0, today());
+        let flow = SimpleCashFlow::new(105.0, today()).unwrap();
 
         assert_eq!(flow.date(), today());
         assert_eq!(flow.amount().unwrap(), 105.0);
         assert_eq!(flow.ex_coupon_date(), None);
+    }
+
+    #[test]
+    fn a_simple_cash_flow_rejects_quantlib_null_inputs() {
+        assert_eq!(
+            SimpleCashFlow::new(105.0, Date::null())
+                .err()
+                .unwrap()
+                .message(),
+            "null date SimpleCashFlow"
+        );
+        assert_eq!(
+            SimpleCashFlow::new(Real::null(), today())
+                .err()
+                .unwrap()
+                .message(),
+            "null amount SimpleCashFlow"
+        );
     }
 
     /// `cashflows.cpp::testSettings`, cases 1 and 2: reference-date payments
@@ -236,8 +272,8 @@ mod tests {
         settings.set_include_reference_date_events(true);
         settings.set_include_todays_cash_flows(Some(false));
 
-        let redemption = Redemption::new(100.0, today());
-        let amortizing = AmortizingPayment::new(2.5, today());
+        let redemption = Redemption::new(100.0, today()).unwrap();
+        let amortizing = AmortizingPayment::new(2.5, today()).unwrap();
 
         assert_eq!(redemption.date(), today());
         assert_eq!(redemption.amount().unwrap(), 100.0);
