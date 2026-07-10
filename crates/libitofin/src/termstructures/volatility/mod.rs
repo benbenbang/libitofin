@@ -83,7 +83,15 @@ pub trait VolatilityTermStructure: TermStructure {
 
     /// Strike-range check: `strike` must sit inside the curve domain unless
     /// extrapolation applies.
+    ///
+    /// Divergence: the finiteness clause. QuantLib's `checkStrike` compares
+    /// against `minStrike()` / `maxStrike()` only, and an extrapolating curve
+    /// short-circuits that comparison entirely, so `+inf` reaches the
+    /// interpolator.
     fn check_strike(&self, strike: Rate, extrapolate: bool) -> QlResult<()> {
+        if !strike.is_finite() {
+            fail!("strike ({strike}) must be finite");
+        }
         require!(
             extrapolate
                 || self.allows_extrapolation()
@@ -122,6 +130,7 @@ pub trait BlackVolTermStructure: VolatilityTermStructure + Any {
     /// `BlackVolatilityTermStructure` adapter).
     fn variance_from_vol(&self, t: Time, strike: Real) -> QlResult<Real> {
         let vol = self.black_vol_impl(t, strike)?;
+        ensure_finite_volatility(vol)?;
         Ok(vol * vol * t)
     }
 
@@ -135,14 +144,18 @@ pub trait BlackVolTermStructure: VolatilityTermStructure + Any {
         self.check_range_date(maturity, extrapolate)?;
         self.check_strike(strike, extrapolate)?;
         let t = self.time_from_reference(maturity)?;
-        self.black_vol_impl(t, strike)
+        let vol = self.black_vol_impl(t, strike)?;
+        ensure_finite_volatility(vol)?;
+        Ok(vol)
     }
 
     /// Spot volatility at a time.
     fn black_vol(&self, maturity: Time, strike: Real, extrapolate: bool) -> QlResult<Volatility> {
         self.check_range_time(maturity, extrapolate)?;
         self.check_strike(strike, extrapolate)?;
-        self.black_vol_impl(maturity, strike)
+        let vol = self.black_vol_impl(maturity, strike)?;
+        ensure_finite_volatility(vol)?;
+        Ok(vol)
     }
 
     /// Spot variance at a date.
@@ -155,14 +168,18 @@ pub trait BlackVolTermStructure: VolatilityTermStructure + Any {
         self.check_range_date(maturity, extrapolate)?;
         self.check_strike(strike, extrapolate)?;
         let t = self.time_from_reference(maturity)?;
-        self.black_variance_impl(t, strike)
+        let var = self.black_variance_impl(t, strike)?;
+        ensure_valid_variance(var)?;
+        Ok(var)
     }
 
     /// Spot variance at a time.
     fn black_variance(&self, maturity: Time, strike: Real, extrapolate: bool) -> QlResult<Real> {
         self.check_range_time(maturity, extrapolate)?;
         self.check_strike(strike, extrapolate)?;
-        self.black_variance_impl(maturity, strike)
+        let var = self.black_variance_impl(maturity, strike)?;
+        ensure_valid_variance(var)?;
+        Ok(var)
     }
 
     /// Forward (at-the-money) volatility between two dates.
@@ -188,7 +205,7 @@ pub trait BlackVolTermStructure: VolatilityTermStructure + Any {
         strike: Real,
         extrapolate: bool,
     ) -> QlResult<Volatility> {
-        if time1 > time2 || time1.is_nan() || time2.is_nan() {
+        if time1 > time2 || !time1.is_finite() || !time2.is_finite() {
             fail!("{time1} later than {time2}");
         }
         self.check_range_time(time2, extrapolate)?;
@@ -197,6 +214,7 @@ pub trait BlackVolTermStructure: VolatilityTermStructure + Any {
             if time1 == 0.0 {
                 let epsilon = 1.0e-5;
                 let var = self.black_variance_impl(epsilon, strike)?;
+                ensure_valid_variance(var)?;
                 Ok((var / epsilon).sqrt())
             } else {
                 let epsilon = Time::min(1.0e-5, time1);
@@ -236,7 +254,7 @@ pub trait BlackVolTermStructure: VolatilityTermStructure + Any {
         strike: Real,
         extrapolate: bool,
     ) -> QlResult<Real> {
-        if time1 > time2 || time1.is_nan() || time2.is_nan() {
+        if time1 > time2 || !time1.is_finite() || !time2.is_finite() {
             fail!("{time1} later than {time2}");
         }
         self.check_range_time(time2, extrapolate)?;
@@ -249,8 +267,31 @@ pub trait BlackVolTermStructure: VolatilityTermStructure + Any {
 }
 
 fn ensure_non_decreasing(var1: Real, var2: Real) -> QlResult<()> {
-    if var2 < var1 || var1.is_nan() || var2.is_nan() {
+    ensure_valid_variance(var1)?;
+    ensure_valid_variance(var2)?;
+    if var2 < var1 {
         fail!("variances must be non-decreasing");
+    }
+    Ok(())
+}
+
+/// Reject a variance that is negative or non-finite.
+///
+/// Divergence: `voltermstructure.hpp` / `blackvoltermstructure.cpp` validate
+/// only the time and strike ranges, never the value an implementation returns.
+/// A curve whose `blackVarianceImpl` yields a negative variance hands C++ a NaN
+/// volatility from `std::sqrt`; this port fails at the source instead.
+fn ensure_valid_variance(var: Real) -> QlResult<()> {
+    if !var.is_finite() || var < 0.0 {
+        fail!("variance ({var}) must be finite and non-negative");
+    }
+    Ok(())
+}
+
+/// Reject a non-finite volatility. Divergence: as for [`ensure_valid_variance`].
+fn ensure_finite_volatility(vol: Volatility) -> QlResult<()> {
+    if !vol.is_finite() {
+        fail!("volatility ({vol}) must be finite");
     }
     Ok(())
 }
@@ -338,6 +379,19 @@ mod tests {
     }
 
     #[test]
+    fn spot_variance_rejects_invalid_variance() {
+        let mut curve = MockVolCurve::flat(0.2);
+        curve.variance_override = Some(|_| Real::INFINITY);
+        assert!(curve.black_variance(1.0, 100.0, false).is_err());
+
+        curve.variance_override = Some(|_| -1.0);
+        assert!(curve.black_variance(1.0, 100.0, false).is_err());
+
+        let maturity = curve.reference_date().unwrap() + 30;
+        assert!(curve.black_variance_date(maturity, 100.0, false).is_err());
+    }
+
+    #[test]
     fn forward_vol_of_a_flat_curve_is_the_flat_vol() {
         let curve = MockVolCurve::flat(0.2);
         for (t1, t2) in [(0.5, 1.5), (0.0, 0.0), (1.0, 1.0), (0.0, 2.0)] {
@@ -359,6 +413,16 @@ mod tests {
     }
 
     #[test]
+    fn zero_time_forward_vol_rejects_invalid_variance() {
+        let mut curve = MockVolCurve::flat(0.2);
+        curve.variance_override = Some(|_| Real::INFINITY);
+        assert!(curve.black_forward_vol(0.0, 0.0, 100.0, false).is_err());
+
+        curve.variance_override = Some(|_| -1.0);
+        assert!(curve.black_forward_vol(0.0, 0.0, 100.0, false).is_err());
+    }
+
+    #[test]
     fn strike_checks_gate_the_curve_domain() {
         let mut curve = MockVolCurve::flat(0.2);
         curve.strike_domain = (90.0, 110.0);
@@ -372,6 +436,34 @@ mod tests {
         curve.disable_extrapolation();
         assert!(curve.black_vol(1.0, Rate::NAN, false).is_err());
     }
+
+    #[test]
+    fn non_finite_times_and_strikes_are_rejected_even_when_extrapolating() {
+        let curve = MockVolCurve::flat(0.2);
+
+        assert!(curve.black_vol(Time::INFINITY, 100.0, true).is_err());
+        assert!(
+            curve
+                .black_forward_vol(0.5, Time::INFINITY, 100.0, true)
+                .is_err()
+        );
+        assert!(
+            curve
+                .black_forward_variance(0.5, Time::INFINITY, 100.0, true)
+                .is_err()
+        );
+        assert!(curve.black_vol(1.0, Real::INFINITY, true).is_err());
+        assert!(curve.black_vol(1.0, Real::NAN, true).is_err());
+    }
+
+    #[test]
+    fn variance_from_vol_rejects_non_finite_volatility() {
+        let curve = MockVolCurve::flat(Volatility::INFINITY);
+
+        assert!(curve.black_vol(1.0, 100.0, false).is_err());
+        assert!(curve.black_variance(1.0, 100.0, false).is_err());
+    }
+
     #[test]
     fn forward_variance_of_a_flat_curve_is_additive() {
         let curve = MockVolCurve::flat(0.2);

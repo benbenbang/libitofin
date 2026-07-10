@@ -26,27 +26,54 @@ use crate::math::distributions::normal::{CumulativeNormalDistribution, NormalDis
 use crate::option::OptionType;
 use crate::types::Real;
 
+/// QuantLib's `checkParameters` (`blackformula.cpp:44,47,50`): the
+/// `displacement >= 0`, `strike + displacement >= 0` and
+/// `forward + displacement > 0` requirements, kept intact.
+///
+/// Divergence: the standalone finiteness checks on `strike` and `forward`, and
+/// the `!is_finite()` clauses replacing C++'s implicit NaN handling. In C++ a
+/// NaN argument fails every comparison, so `QL_REQUIRE(x >= 0.0)` already
+/// throws; an infinite one does not, and `+inf - inf` in the shifted sums then
+/// yields NaN downstream. Rejecting both here keeps the failure at the boundary.
 fn check_parameters(strike: Real, forward: Real, displacement: Real) -> QlResult<()> {
-    if displacement.is_nan() || displacement < 0.0 {
+    if !displacement.is_finite() || displacement < 0.0 {
         fail!("displacement ({displacement}) must be non-negative");
     }
+    if !strike.is_finite() {
+        fail!("strike ({strike}) must be finite");
+    }
+    if !forward.is_finite() {
+        fail!("forward ({forward}) must be finite");
+    }
     let shifted_strike = strike + displacement;
-    if shifted_strike.is_nan() || shifted_strike < 0.0 {
+    if !shifted_strike.is_finite() || shifted_strike < 0.0 {
         fail!("strike + displacement ({strike} + {displacement}) must be non-negative");
     }
     let shifted_forward = forward + displacement;
-    if shifted_forward.is_nan() || shifted_forward <= 0.0 {
+    if !shifted_forward.is_finite() || shifted_forward <= 0.0 {
         fail!("forward + displacement ({forward} + {displacement}) must be positive");
     }
     Ok(())
 }
 
 fn check_std_dev_and_discount(std_dev: Real, discount: Real) -> QlResult<()> {
-    if std_dev.is_nan() || std_dev < 0.0 {
-        fail!("stdDev ({std_dev}) must be non-negative");
-    }
-    if discount.is_nan() || discount <= 0.0 {
+    check_std_dev(std_dev)?;
+    if !discount.is_finite() || discount <= 0.0 {
         fail!("discount ({discount}) must be positive");
+    }
+    Ok(())
+}
+
+/// QuantLib's `QL_REQUIRE(stdDev >= 0.0)` (`blackformula.cpp:67`), extended to
+/// reject `+inf`.
+///
+/// Divergence: `blackFormulaCashItmProbability` and
+/// `blackFormulaAssetItmProbability` call only `checkParameters` and never
+/// validate `stdDev`, so a negative one silently flips the sign of `d2`. This
+/// port applies the same check there as in `black_formula`.
+fn check_std_dev(std_dev: Real) -> QlResult<()> {
+    if !std_dev.is_finite() || std_dev < 0.0 {
+        fail!("stdDev ({std_dev}) must be non-negative");
     }
     Ok(())
 }
@@ -147,6 +174,7 @@ pub fn black_formula_cash_itm_probability(
     displacement: Real,
 ) -> QlResult<Real> {
     check_parameters(strike, forward, displacement)?;
+    check_std_dev(std_dev)?;
 
     let sign = sign_of(option_type);
 
@@ -180,6 +208,7 @@ pub fn black_formula_asset_itm_probability(
     displacement: Real,
 ) -> QlResult<Real> {
     check_parameters(strike, forward, displacement)?;
+    check_std_dev(std_dev)?;
 
     let sign = sign_of(option_type);
 
@@ -559,5 +588,35 @@ mod tests {
                 .expect("valid inputs");
             assert_close(cash, 0.0, 0.0);
         }
+    }
+
+    #[test]
+    fn itm_probabilities_reject_invalid_standard_deviation() {
+        assert!(
+            black_formula_cash_itm_probability(OptionType::Call, 40.0, 44.0, -0.1, 0.0).is_err()
+        );
+        assert!(
+            black_formula_asset_itm_probability(OptionType::Call, 40.0, 44.0, -0.1, 0.0).is_err()
+        );
+        assert!(
+            black_formula_cash_itm_probability(OptionType::Call, 40.0, 44.0, Real::NAN, 0.0)
+                .is_err()
+        );
+        assert!(
+            black_formula_asset_itm_probability(OptionType::Call, 40.0, 44.0, Real::NAN, 0.0)
+                .is_err()
+        );
+        assert!(
+            black_formula_cash_itm_probability(OptionType::Call, 40.0, 44.0, Real::INFINITY, 0.0)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn black_formula_rejects_non_finite_inputs() {
+        assert!(black_formula(OptionType::Call, Real::INFINITY, 44.0, 0.2, 0.95, 0.0).is_err());
+        assert!(black_formula(OptionType::Call, 40.0, Real::INFINITY, 0.2, 0.95, 0.0).is_err());
+        assert!(black_formula(OptionType::Call, 40.0, 44.0, 0.2, Real::INFINITY, 0.0).is_err());
+        assert!(black_formula(OptionType::Call, 40.0, 44.0, 0.2, 0.95, Real::INFINITY).is_err());
     }
 }
