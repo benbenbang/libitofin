@@ -362,6 +362,74 @@ impl CashFlows {
         Self::amount_on_payment_date(leg[index..].iter(), leg[index].date()).map(Some)
     }
 
+    /// Whether every flow in the leg has already occurred as of the settlement
+    /// date.
+    ///
+    /// Port of `CashFlows::isExpired` (`cashflows.cpp`): an empty leg is expired,
+    /// and a non-empty one is expired once its last surviving flow has occurred.
+    /// Walking from the back returns as soon as a live flow is found.
+    ///
+    /// # Errors
+    ///
+    /// Propagates [`CashFlow::has_occurred`]; without a `settlement_date` the
+    /// evaluation date must be set.
+    pub fn is_expired(
+        leg: &Leg,
+        settings: &Settings<Date>,
+        include_settlement_date_flows: Option<bool>,
+        settlement_date: Option<Date>,
+    ) -> QlResult<bool> {
+        if leg.is_empty() {
+            return Ok(true);
+        }
+        for flow in leg.iter().rev() {
+            if !flow.has_occurred(settings, settlement_date, include_settlement_date_flows)? {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+
+    /// The interest accrued on the current coupon period as of the settlement
+    /// date, summed over every coupon paying on the next cash-flow date.
+    ///
+    /// Port of `CashFlows::accruedAmount` (`cashflows.cpp`): zero when no flow
+    /// remains, otherwise the accrual of each [`Coupon`](crate::cashflows::Coupon)
+    /// sharing the next payment date. Plain payments contribute nothing.
+    ///
+    /// # Errors
+    ///
+    /// Propagates [`CashFlow::has_occurred`] and the coupon accrual; without a
+    /// `settlement_date` the evaluation date must be set.
+    pub fn accrued_amount(
+        leg: &Leg,
+        settings: &Settings<Date>,
+        include_settlement_date_flows: Option<bool>,
+        settlement_date: Option<Date>,
+    ) -> QlResult<Real> {
+        let Some(index) = Self::next_cash_flow(
+            leg,
+            settings,
+            include_settlement_date_flows,
+            settlement_date,
+        )?
+        else {
+            return Ok(0.0);
+        };
+        let settlement = reference_date(settings, settlement_date)?;
+        let payment_date = leg[index].date();
+        let mut accrued = 0.0;
+        for flow in leg[index..]
+            .iter()
+            .take_while(|flow| flow.date() == payment_date)
+        {
+            if let Some(coupon) = flow.as_coupon() {
+                accrued += coupon.accrued_amount(settlement)?;
+            }
+        }
+        Ok(accrued)
+    }
+
     /// The NPV of the leg: every surviving flow discounted to `npv_date`.
     ///
     /// An empty leg is worth nothing. `settlement_date` defaults to the
@@ -2445,25 +2513,11 @@ mod basis_point_value_tests {
     }
 
     /// `CashFlows::accruedAmount` (`cashflows.cpp:376-393`), which
-    /// [`CashFlows::solve_yield`] needs to turn the clean price into an NPV and
-    /// which this port does not expose: the coupons paying on the date of the
-    /// next flow, accrued to the settlement date.
+    /// [`CashFlows::solve_yield`] needs to turn the clean price into an NPV: the
+    /// coupons paying on the date of the next flow, accrued to the settlement
+    /// date. Pins the public method to the treasury table's 9375.0.
     fn accrued_amount(leg: &Leg, settings: &Settings<Date>, settlement: Date) -> QlResult<Real> {
-        let Some(index) = CashFlows::next_cash_flow(leg, settings, Some(false), Some(settlement))?
-        else {
-            return Ok(0.0);
-        };
-        let payment_date = leg[index].date();
-        let mut accrued = 0.0;
-        for flow in leg[index..]
-            .iter()
-            .take_while(|flow| flow.date() == payment_date)
-        {
-            if let Some(coupon) = flow.as_coupon() {
-                accrued += coupon.accrued_amount(settlement)?;
-            }
-        }
-        Ok(accrued)
+        CashFlows::accrued_amount(leg, settings, Some(false), Some(settlement))
     }
 
     /// The whole C++ case: solve the yield off the dirty price, then check the
@@ -2540,5 +2594,51 @@ mod basis_point_value_tests {
                 * FACE_AMOUNT;
             assert!((yvbp - expected_yvbp).abs() < 1e-9, "yvbp {yvbp}");
         }
+    }
+}
+
+#[cfg(test)]
+mod expiry_tests {
+    use super::*;
+    use crate::cashflows::SimpleCashFlow;
+    use crate::shared::shared;
+    use crate::time::date::Month;
+
+    fn today() -> Date {
+        Date::new(7, Month::July, 2026)
+    }
+
+    fn flow(date: Date) -> Shared<dyn CashFlow> {
+        shared(SimpleCashFlow::new(1.0, date).unwrap()) as Shared<dyn CashFlow>
+    }
+
+    #[test]
+    fn an_empty_leg_is_expired() {
+        let settings = Settings::new();
+        settings.set_evaluation_date(today());
+        assert!(CashFlows::is_expired(&Vec::new(), &settings, None, None).unwrap());
+    }
+
+    #[test]
+    fn a_leg_is_expired_only_once_its_last_flow_has_occurred() {
+        let settings = Settings::new();
+        settings.set_evaluation_date(today());
+        let leg: Leg = vec![flow(today() - 10), flow(today() + 10)];
+
+        assert!(!CashFlows::is_expired(&leg, &settings, None, None).unwrap());
+
+        let past: Leg = vec![flow(today() - 20), flow(today() - 10)];
+        assert!(CashFlows::is_expired(&past, &settings, None, None).unwrap());
+    }
+
+    #[test]
+    fn plain_payments_accrue_nothing() {
+        let settings = Settings::new();
+        settings.set_evaluation_date(today());
+        let leg: Leg = vec![flow(today() + 10), flow(today() + 20)];
+        assert_eq!(
+            CashFlows::accrued_amount(&leg, &settings, None, None).unwrap(),
+            0.0
+        );
     }
 }
