@@ -4,10 +4,12 @@
 //! instruments needed by the European-option slice.
 
 mod bond;
+mod bonds;
 mod oneassetoption;
 mod payoffs;
 
 pub use bond::{Bond, BondArguments, BondEngine, BondResults};
+pub use bonds::FixedRateBond;
 pub use oneassetoption::{
     EuropeanOption, Greeks, MoreGreeks, OneAssetOption, OneAssetOptionEngine,
     OneAssetOptionResults, OptionArguments, VanillaOption,

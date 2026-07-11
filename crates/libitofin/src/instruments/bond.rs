@@ -258,6 +258,12 @@ impl Bond {
         }
     }
 
+    /// Overrides the maturity date with an explicit one (the C++ protected
+    /// `maturityDate_` assignment a derived bond such as `FixedRateBond` makes).
+    pub(crate) fn set_maturity_date(&mut self, date: Date) {
+        self.maturity_date = Some(date);
+    }
+
     /// The settlement date for a given date (the evaluation date when `None`).
     ///
     /// The date advanced by the settlement days, never earlier than the issue
