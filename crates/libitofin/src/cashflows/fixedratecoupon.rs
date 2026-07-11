@@ -14,14 +14,18 @@
 //! [`FixedRateCoupon::new`] (an explicit [`InterestRate`]) and
 //! [`FixedRateCoupon::from_rate`] (a rate plus a day counter, taken as simple
 //! and annual). The `accept(AcyclicVisitor&)` override has no counterpart.
+//!
+//! The [`CashFlow`](crate::cashflow::CashFlow) and
+//! [`Event`](crate::event::Event) faces come from the blanket impls on
+//! [`Coupon`], so this file implements [`Coupon`] and nothing else. `amount()`
+//! is the one C++ body that survives the sever, and it lives on [`Coupon`]
+//! precisely so that it can: a blanket impl that provided it would forbid this
+//! override.
 
-use crate::cashflow::{CashFlow, cash_flow_has_occurred};
 use crate::cashflows::coupon::{Coupon, CouponBase};
 use crate::errors::QlResult;
-use crate::event::Event;
 use crate::interestrate::{Compounding, InterestRate};
 use crate::patterns::observable::{AsObservable, Observable};
-use crate::settings::Settings;
 use crate::time::date::Date;
 use crate::time::daycounter::DayCounter;
 use crate::time::frequency::Frequency;
@@ -107,22 +111,11 @@ impl AsObservable for FixedRateCoupon {
     }
 }
 
-impl Event for FixedRateCoupon {
-    fn date(&self) -> Date {
-        self.base.payment_date()
+impl Coupon for FixedRateCoupon {
+    fn coupon_base(&self) -> &CouponBase {
+        &self.base
     }
 
-    fn has_occurred(
-        &self,
-        settings: &Settings<Date>,
-        ref_date: Option<Date>,
-        include_ref_date: Option<bool>,
-    ) -> QlResult<bool> {
-        cash_flow_has_occurred(self.date(), settings, ref_date, include_ref_date)
-    }
-}
-
-impl CashFlow for FixedRateCoupon {
     /// # Errors
     ///
     /// Propagates the [`InterestRate::compound_factor_between_ref`] domain
@@ -135,20 +128,6 @@ impl CashFlow for FixedRateCoupon {
             self.reference_period_end(),
         )?;
         Ok(self.nominal() * (factor - 1.0))
-    }
-
-    fn ex_coupon_date(&self) -> Option<Date> {
-        self.base.ex_coupon_date()
-    }
-
-    fn as_coupon(&self) -> Option<&dyn Coupon> {
-        Some(self)
-    }
-}
-
-impl Coupon for FixedRateCoupon {
-    fn coupon_base(&self) -> &CouponBase {
-        &self.base
     }
 
     fn rate(&self) -> QlResult<Rate> {
@@ -204,9 +183,21 @@ mod tests {
     //! QuantLib test.
 
     use super::*;
+    use crate::cashflow::CashFlow;
+    use crate::event::Event;
+    use crate::settings::Settings;
     use crate::time::date::Month;
     use crate::time::daycounters::actual360::Actual360;
     use crate::time::daycounters::thirty360::{Convention, Thirty360};
+
+    /// The coupon's [`amount`](Coupon::amount) as the blanket
+    /// `impl<T: Coupon> CashFlow for T` reports it. Both traits carry an
+    /// `amount`, so an unqualified call is ambiguous; going through
+    /// [`CashFlow`] is the assertion that the blanket forwards to the coupon's
+    /// own compounded body rather than supplying one of its own.
+    fn amount(coupon: &FixedRateCoupon) -> Real {
+        CashFlow::amount(coupon).unwrap()
+    }
 
     fn start() -> Date {
         Date::new(15, Month::January, 2026)
@@ -240,7 +231,7 @@ mod tests {
 
         assert_eq!(coupon.rate().unwrap(), 0.03);
         assert_eq!(coupon.date(), payment());
-        assert!((coupon.amount().unwrap() - 100.0 * 0.03 * 181.0 / 360.0).abs() < 1e-13);
+        assert!((amount(&coupon) - 100.0 * 0.03 * 181.0 / 360.0).abs() < 1e-13);
     }
 
     /// `performCalculations` compounds the rate over the accrual period rather
@@ -261,8 +252,8 @@ mod tests {
             FixedRateCoupon::new(one_year, 100.0, rate, start(), one_year, None, None, None);
 
         assert!((coupon.accrual_period() - 1.0).abs() < 1e-15);
-        assert!((coupon.amount().unwrap() - 6.09).abs() < 1e-12);
-        assert!((coupon.amount().unwrap() - 100.0 * 0.06 * 1.0).abs() > 0.08);
+        assert!((amount(&coupon) - 6.09).abs() < 1e-12);
+        assert!((amount(&coupon) - 100.0 * 0.06 * 1.0).abs() > 0.08);
     }
 
     /// The accrued amount compounds too: half a year of a semiannual 6% rate is
@@ -298,9 +289,7 @@ mod tests {
         let mid = Date::new(15, Month::April, 2026);
 
         assert!((coupon.accrued_amount(mid).unwrap() - 100.0 * 0.03 * 90.0 / 360.0).abs() < 1e-13);
-        assert!(
-            (coupon.accrued_amount(payment()).unwrap() - coupon.amount().unwrap()).abs() < 1e-13
-        );
+        assert!((coupon.accrued_amount(payment()).unwrap() - amount(&coupon)).abs() < 1e-13);
     }
 
     /// `accruedAmount` flips sign from the ex-coupon date on, and returns to
