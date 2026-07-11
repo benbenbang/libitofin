@@ -191,6 +191,11 @@ impl Bond {
         &self.calendar
     }
 
+    /// The settings the bond reads its evaluation date from.
+    pub fn settings(&self) -> &Settings<Date> {
+        &self.settings
+    }
+
     /// The notionals the bond has carried, most recent last.
     pub fn notionals(&self) -> &[Real] {
         &self.notionals
