@@ -592,7 +592,7 @@ mod tests {
             coupons[0].reference_period_start(),
             Date::new(30, Month::September, 2017)
         );
-        assert!((coupons[0].amount().unwrap() - 0.9375).abs() < 1e-4);
+        assert!((CashFlow::amount(coupons[0].as_ref()).unwrap() - 0.9375).abs() < 1e-4);
     }
 
     /// `cashflows.cpp::testIrregularLastCouponReferenceDatesAtEndOfMonth`.

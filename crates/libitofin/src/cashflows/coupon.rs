@@ -15,10 +15,28 @@
 //! provided methods read the dates from there. Both are public, so a concrete
 //! coupon can be written outside this crate.
 //!
-//! [`Event::date`] and [`CashFlow::ex_coupon_date`] live on the supertraits and
-//! must be implemented by the concrete type, forwarding to
-//! [`CouponBase::payment_date`] and [`CouponBase::ex_coupon_date`]. Rust has no
-//! specialization, so this trait cannot supply them.
+//! [`Coupon`] is *not* a subtrait of [`CashFlow`], though C++ derives one from
+//! the other. It restates the surface it needs and the blanket
+//! `impl<T: Coupon> CashFlow for T` below gives every coupon its
+//! [`CashFlow`] and [`Event`] faces, deriving them from [`CouponBase`] and from
+//! [`Coupon::amount`]. A coupon therefore cannot forget - or get wrong -
+//! [`Event::has_occurred`], [`CashFlow::ex_coupon_date`] or
+//! [`CashFlow::as_coupon`], the three whose wrong-but-compiling answers are
+//! plausible numbers rather than diagnostics.
+//!
+//! The subtrait shape cannot do this. A blanket impl for `Coupon: CashFlow`
+//! *provides* [`CashFlow::amount`], so [`FixedRateCoupon`] would silently
+//! inherit a generic body in place of its compounded one, and could not
+//! override it: a competing `impl CashFlow for FixedRateCoupon` is a
+//! conflicting implementation. Hence the sever, and hence `amount` moves onto
+//! [`Coupon`].
+//!
+//! The blanket takes an implicitly [`Sized`] `T`, because the `Some(self)` of
+//! [`CashFlow::as_coupon`] is an unsizing coercion. So `dyn Coupon` does not
+//! itself implement [`CashFlow`]; `+ ?Sized` would restore that and forbid
+//! `Some(self)`, and nothing needs it. The analytics of
+//! [`CashFlows`](crate::cashflows::CashFlows) hold a `&dyn CashFlow` already and
+//! read only this trait's own methods through the coupon view.
 //!
 //! ## Divergences from QuantLib
 //!
@@ -36,19 +54,22 @@
 //!
 //! C++ reads the ex-coupon date off a single member (`coupon.hpp:57`), shared
 //! by the accrual and by `CashFlow::exCouponDate()`. The port keeps that single
-//! reader: [`trades_ex_coupon_on`](Coupon::trades_ex_coupon_on) goes through
-//! [`CashFlow::ex_coupon_date`], which a concrete coupon must forward to its
-//! [`CouponBase`]. That method is required rather than defaulted, so the
-//! forwarding cannot be made by omission.
+//! reader: [`trades_ex_coupon_on`](Coupon::trades_ex_coupon_on) and the blanket
+//! [`CashFlow::ex_coupon_date`] both go through
+//! [`CouponBase::ex_coupon_date`], and neither is an implementor's to write.
 //!
-//! [`rate`](Coupon::rate) and [`accrued_amount`](Coupon::accrued_amount) return
-//! [`QlResult`], matching [`CashFlow::amount`]: a floating-rate coupon reads an
-//! index fixing that may be missing. The `accept(AcyclicVisitor&)` override has
-//! no counterpart in the port; `coupon_cast` becomes
-//! [`CashFlow::as_coupon`], which every implementor of this trait must
-//! override.
+//! [`amount`](Coupon::amount), [`rate`](Coupon::rate) and
+//! [`accrued_amount`](Coupon::accrued_amount) return [`QlResult`]: a
+//! floating-rate coupon reads an index fixing that may be missing. The
+//! `accept(AcyclicVisitor&)` override has no counterpart in the port;
+//! `coupon_cast` becomes [`CashFlow::as_coupon`], which the blanket answers.
+//!
+//! [`FixedRateCoupon`]: crate::cashflows::FixedRateCoupon
 
-use crate::cashflow::CashFlow;
+use crate::cashflow::{CashFlow, cash_flow_has_occurred};
+use crate::event::Event;
+use crate::patterns::observable::AsObservable;
+use crate::settings::Settings;
 use crate::time::date::{Date, SerialNumber};
 use crate::time::daycounter::DayCounter;
 use crate::types::{Rate, Real, Time};
@@ -112,12 +133,22 @@ impl CouponBase {
 ///
 /// Mirrors QuantLib's `Coupon`: still abstract, but it gives implementors the
 /// accrual-date algebra. Implementors supply the state through
-/// [`coupon_base`](Self::coupon_base), the [`rate`](Self::rate) and
-/// [`day_counter`](Self::day_counter) the accrual is measured with, and the
+/// [`coupon_base`](Self::coupon_base), the [`amount`](Self::amount) the coupon
+/// pays, the [`rate`](Self::rate) and [`day_counter`](Self::day_counter) the
+/// accrual is measured with, and the
 /// [`accrued_amount`](Self::accrued_amount) that rate implies.
-pub trait Coupon: CashFlow {
+///
+/// Implementing it is enough to be a [`CashFlow`]: the blanket impl below
+/// supplies that face, so nothing else here is an implementor's to get wrong.
+pub trait Coupon: AsObservable {
     /// The coupon's dates and nominal.
     fn coupon_base(&self) -> &CouponBase;
+
+    /// The amount paid at the [`payment_date`](CouponBase::payment_date),
+    /// undiscounted.
+    ///
+    /// The body behind [`CashFlow::amount`] for every coupon.
+    fn amount(&self) -> QlResult<Real>;
 
     /// The rate the coupon accrues at.
     fn rate(&self) -> QlResult<Rate>;
@@ -178,9 +209,11 @@ pub trait Coupon: CashFlow {
     ///
     /// The `tradingExCoupon(d)` of `coupon.hpp` with the date always given.
     /// [`CashFlow::trading_ex_coupon`] is the counterpart that resolves an
-    /// absent date against the evaluation date.
+    /// absent date against the evaluation date, and reads the same
+    /// [`CouponBase::ex_coupon_date`].
     fn trades_ex_coupon_on(&self, date: Date) -> bool {
-        self.ex_coupon_date()
+        self.coupon_base()
+            .ex_coupon_date()
             .is_some_and(|ex_coupon| ex_coupon <= date)
     }
 
@@ -230,13 +263,47 @@ pub trait Coupon: CashFlow {
     }
 }
 
+/// Every [`Coupon`] is an [`Event`] on its payment date, under the cash-flow
+/// occurrence rule rather than the plain-event one.
+impl<T: Coupon> Event for T {
+    fn date(&self) -> Date {
+        self.coupon_base().payment_date()
+    }
+
+    fn has_occurred(
+        &self,
+        settings: &Settings<Date>,
+        ref_date: Option<Date>,
+        include_ref_date: Option<bool>,
+    ) -> QlResult<bool> {
+        cash_flow_has_occurred(
+            self.coupon_base().payment_date(),
+            settings,
+            ref_date,
+            include_ref_date,
+        )
+    }
+}
+
+/// Every [`Coupon`] is a [`CashFlow`] paying what it accrues.
+impl<T: Coupon> CashFlow for T {
+    fn amount(&self) -> QlResult<Real> {
+        Coupon::amount(self)
+    }
+
+    fn ex_coupon_date(&self) -> Option<Date> {
+        self.coupon_base().ex_coupon_date()
+    }
+
+    fn as_coupon(&self) -> Option<&dyn Coupon> {
+        Some(self)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cashflow::cash_flow_has_occurred;
-    use crate::event::Event;
-    use crate::patterns::observable::{AsObservable, Observable};
-    use crate::settings::Settings;
+    use crate::patterns::observable::Observable;
     use crate::time::date::Month;
     use crate::time::daycounters::actual360::Actual360;
     use crate::time::daycounters::thirty360::{Convention, Thirty360};
@@ -265,38 +332,13 @@ mod tests {
         }
     }
 
-    impl Event for TestCoupon {
-        fn date(&self) -> Date {
-            self.base.payment_date()
-        }
-
-        fn has_occurred(
-            &self,
-            settings: &Settings<Date>,
-            ref_date: Option<Date>,
-            include_ref_date: Option<bool>,
-        ) -> QlResult<bool> {
-            cash_flow_has_occurred(self.date(), settings, ref_date, include_ref_date)
-        }
-    }
-
-    impl CashFlow for TestCoupon {
-        fn amount(&self) -> QlResult<Real> {
-            Ok(self.nominal() * self.rate * self.accrual_period())
-        }
-
-        fn ex_coupon_date(&self) -> Option<Date> {
-            self.base.ex_coupon_date()
-        }
-
-        fn as_coupon(&self) -> Option<&dyn Coupon> {
-            Some(self)
-        }
-    }
-
     impl Coupon for TestCoupon {
         fn coupon_base(&self) -> &CouponBase {
             &self.base
+        }
+
+        fn amount(&self) -> QlResult<Real> {
+            Ok(self.nominal() * self.rate * self.accrual_period())
         }
 
         fn rate(&self) -> QlResult<Rate> {

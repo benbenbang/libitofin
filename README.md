@@ -197,40 +197,37 @@ oversight) and is documented at the point of divergence in the source.
 
 **Cash flows (EPIC-7):**
 
-- **`Event::has_occurred` is a required trait method, not a defaulted one.**
-  C++ gives `Event` a base implementation and lets `CashFlow` override it, so a
-  cash flow on the evaluation date honours `Settings::includeTodaysCashFlows`.
-  Rust has no specialization: an inherited default on the supertrait would hand
-  every cash flow the plain-event rule with no diagnostic, and a competing
-  provided method on `CashFlow` would be ambiguous rather than overriding. Each
-  implementor therefore forwards explicitly to `event_has_occurred` or
-  `cash_flow_has_occurred`, turning a silent wrong answer into a compile error.
-- **`CashFlow::ex_coupon_date` is a required trait method.**
-  C++ answers both `Coupon::accruedPeriod`'s ex-coupon test and
-  `CashFlow::exCouponDate()` from one member (`coupon.hpp:57`). Rust has no
-  specialization, so a `Coupon` cannot override a provided method on its
-  `CashFlow` supertrait, and defaulting that method to `None` would let an
-  implementor accrue ex-coupon while reporting `trading_ex_coupon` as `false`.
-  It is therefore required, so omission is a compile error. The single reader is
-  preserved: `Coupon::trades_ex_coupon_on` goes through `ex_coupon_date`, which
-  a concrete coupon forwards to its `CouponBase`, and both `accrued_period` and
-  `accrued_amount` test the ex-coupon branch through that one helper.
-- **`CashFlow::as_coupon` is a required trait method.**
-  The `isCoupon`/`coupon_cast` pair (`cashflow.hpp:79`, `coupon.hpp:96`), which
-  the `CashFlows` analytics use to tell an accruing flow from a plain payment.
-  C++ needs no default here: its `Coupon` base class overrides `isCoupon()` to
-  `true`, so no coupon can forget. A Rust `Coupon` is a trait and cannot supply
-  its supertrait's method on its implementors' behalf, which is the same
-  no-specialization argument as `ex_coupon_date` above. A coupon answering
-  `None` contributes nothing to `bps`, has its amount subtracted from
-  `atm_rate`'s target, and reports its payment date to `maturity_date` in place
-  of its accrual end: beside coupons that answer correctly this skews the rate,
-  and alone in a leg it drives the rate to `0.0`. The method is therefore
-  required, so omission is a compile error. A deliberate `None` from a `Coupon`
-  remains possible, and the analytics cannot detect it. A blanket
-  `impl<T: Coupon> CashFlow for T` would make that lie a compile error too, at
-  the cost of moving every `CashFlow` body a coupon overrides onto `Coupon`;
-  it is tracked separately.
+- **`Coupon` is not a subtrait of `CashFlow`; one blanket impl derives the
+  cash-flow face from the coupon.**
+  C++ derives `Coupon` from `CashFlow`, and its base class supplies
+  `hasOccurred`, `exCouponDate()` and `isCoupon()` so that no coupon can forget
+  them. Rust has no specialization, so under the subtrait shape a `Coupon`
+  cannot supply its supertrait's methods on its implementors' behalf. All three
+  wrong answers compile and are plausible numbers rather than diagnostics: the
+  plain-event `has_occurred` ignores `Settings::includeTodaysCashFlows` on the
+  evaluation date; a `None` `ex_coupon_date` accrues ex-coupon while reporting
+  `trading_ex_coupon` as `false`; a `None` `as_coupon` contributes nothing to
+  `bps`, has its amount subtracted from `atm_rate`'s target, and reports its
+  payment date to `maturity_date` in place of its accrual end.
+
+  So `Coupon` restates its own surface (`coupon_base`, `amount`, `rate`,
+  `day_counter`, `accrued_amount`, and `AsObservable`), and
+  `impl<T: Coupon> CashFlow for T` writes the three exactly once, reading
+  `CouponBase`. A coupon cannot get them wrong because it cannot supply them.
+  `amount` moves onto `Coupon` for the same reason it must: a blanket that
+  *provided* `amount` would give `FixedRateCoupon` a generic body in place of
+  its compounded one, and a competing `impl CashFlow for FixedRateCoupon`
+  restoring it is a conflicting implementation. The three methods stay required
+  on `CashFlow` and `Event` for the flows that are not coupons, which still
+  forward explicitly to `event_has_occurred` or `cash_flow_has_occurred`.
+
+  Two costs. `dyn Coupon` does not implement `CashFlow`: the `Some(self)` of
+  `as_coupon` is an unsizing coercion, so the blanket takes a `Sized` `T`, and
+  `+ ?Sized` would restore the impl and forbid the `Some(self)`. Nothing needs
+  it - the `CashFlows` analytics hold a `&dyn CashFlow` already and read only
+  `Coupon`'s own methods through the coupon view. And `amount` now sits on both
+  traits, so on a concrete coupon with both in scope an unqualified
+  `coupon.amount()` is ambiguous; name the trait.
 
 **Pricing engines (Milestone 1):**
 
