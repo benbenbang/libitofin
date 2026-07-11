@@ -232,6 +232,27 @@ oversight) and is documented at the point of divergence in the source.
   the cost of moving every `CashFlow` body a coupon overrides onto `Coupon`;
   it is tracked separately.
 
+**Pricing engines (Milestone 1):**
+
+- **Zero-volatility Black greeks dispatch on the stored option type, not on the
+  sign of `alpha_`.** This is a deliberate divergence where the oracle is
+  wrong, and the only place in the port where a *finite* priced number
+  intentionally disagrees with QuantLib. Upstream (tree `v1.42.1-266-g9863b578a`,
+  from commit `17f1a1bed` "Fixing zero vol for Black") detects the option type
+  in its zero-vol branches with `if (alpha_ >= 0) // Call`, at nine sites
+  (`blackcalculator.cpp:215,222,229,257,264,271,439,446,453`). For a
+  plain-vanilla put, `alpha_ = -1.0 + cum_d1_` (`blackcalculator.cpp:137`), and
+  at zero volatility an out-of-the-money put has `cum_d1_ == 1.0` exactly, so
+  `alpha_ == 0.0` exactly and `0.0 >= 0` takes the Call branch: the OTM put is
+  handed a delta of `+1.0` where the correct value is `0.0`. This port instead
+  dispatches on the option type stored in the calculator, implementing the
+  values the reference's own comments state, so the OTM-put delta is `0.0`. The
+  full zero-vol ladder is pinned by `zero_volatility_ladder_matches_stated_intent`
+  and `zero_volatility_otm_put_gets_put_greeks_not_call_greeks` in
+  `blackcalculator.rs`, which assert the corrected numbers (OTM `0.0`, ATM
+  `-0.5`, ITM `-1.0` for the put, and the call mirror), so a regression to the
+  `alpha_ >= 0` form is a test failure.
+
 **Non-finite inputs (cross-cutting):**
 
 - **Non-finite arguments are rejected at the API boundary.** QuantLib validates
