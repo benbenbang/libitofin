@@ -10,7 +10,7 @@ pub mod bond;
 pub mod vanilla;
 
 pub use blackcalculator::BlackCalculator;
-pub use bond::BondFunctions;
+pub use bond::{BondFunctions, DiscountingBondEngine};
 pub use vanilla::AnalyticEuropeanEngine;
 
 pub use blackformula::{

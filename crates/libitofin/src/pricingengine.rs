@@ -118,6 +118,12 @@ impl<A: Arguments, R: Results> GenericEngine<A, R> {
     pub fn register_with(&self, source: &Observable) -> bool {
         source.register_observer(&(SharedMut::clone(&self.forwarder) as SharedMut<dyn Observer>))
     }
+
+    /// The engine as an observer, for registering with an input that exposes
+    /// only observer registration (the C++ `registerWith` on a `Handle`).
+    pub fn observer(&self) -> SharedMut<dyn Observer> {
+        SharedMut::clone(&self.forwarder) as SharedMut<dyn Observer>
+    }
 }
 
 impl<A, R> AsObservable for GenericEngine<A, R> {

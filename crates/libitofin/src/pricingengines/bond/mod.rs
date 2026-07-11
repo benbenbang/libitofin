@@ -6,5 +6,7 @@
 //! [`Bond`]: crate::instruments::Bond
 
 mod bondfunctions;
+mod discountingbondengine;
 
 pub use bondfunctions::BondFunctions;
+pub use discountingbondengine::DiscountingBondEngine;
