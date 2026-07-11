@@ -6,9 +6,11 @@
 
 pub mod blackcalculator;
 pub mod blackformula;
+pub mod bond;
 pub mod vanilla;
 
 pub use blackcalculator::BlackCalculator;
+pub use bond::BondFunctions;
 pub use vanilla::AnalyticEuropeanEngine;
 
 pub use blackformula::{
