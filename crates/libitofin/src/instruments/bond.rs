@@ -22,11 +22,12 @@
 //!   [`is_expired`](Instrument::is_expired) and
 //!   [`accrued_amount`](Bond::accrued_amount) - call [`CashFlows`] directly, the
 //!   port's home for those analytics.
-//! - The yield/price-from-yield overloads, the coupon-rate and cash-flow-date
-//!   inspectors, `setSingleRedemption`, the `faceAmount` constructor and
-//!   `Bond::Price` are follow-up work: they need the solver-backed
-//!   `BondFunctions` surface and are not exercised by the derived-bond tickets
-//!   that build on this base.
+//! - The price-fed [`Bond::yield_rate`] and [`BondPrice`] land here (#290),
+//!   solver-backed through `BondFunctions`. The engine-priced
+//!   `Bond::yield(dayCounter, ...)` overload, the price-from-yield
+//!   `cleanPrice`/`dirtyPrice`, the coupon-rate and cash-flow-date inspectors,
+//!   `setSingleRedemption` and the `faceAmount` constructor remain follow-up
+//!   work.
 
 use std::any::Any;
 
@@ -34,15 +35,19 @@ use crate::cashflow::{CashFlow, Leg};
 use crate::cashflows::{AmortizingPayment, CashFlows, Redemption};
 use crate::errors::QlResult;
 use crate::instrument::{Instrument, InstrumentBase, InstrumentResults};
+use crate::interestrate::Compounding;
 use crate::math::comparison::close;
 use crate::pricingengine::{Arguments, GenericEngine, Results};
+use crate::pricingengines::bond::BondFunctions;
 use crate::settings::Settings;
 use crate::shared::{Shared, shared};
 use crate::time::businessdayconvention::BusinessDayConvention;
 use crate::time::calendar::Calendar;
 use crate::time::date::Date;
+use crate::time::daycounter::DayCounter;
+use crate::time::frequency::Frequency;
 use crate::time::timeunit::TimeUnit;
-use crate::types::{Integer, Natural, Real};
+use crate::types::{Integer, Natural, Rate, Real};
 use crate::{fail, require};
 
 /// Arguments passed to a bond pricing engine (the C++ `Bond::arguments`).
@@ -107,6 +112,26 @@ pub struct Bond {
     maturity_date: Option<Date>,
     issue_date: Option<Date>,
     settlement_value: Option<Real>,
+}
+
+/// A bond price quote, per 100 of notional (the C++ `Bond::Price`): either the
+/// [`Clean`](Self::Clean) price or the [`Dirty`](Self::Dirty) price that folds
+/// in the accrued interest.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum BondPrice {
+    /// The quoted price, net of accrued interest.
+    Clean(Real),
+    /// The settlement price, accrued interest included.
+    Dirty(Real),
+}
+
+impl BondPrice {
+    /// The quoted amount, whichever convention it carries.
+    pub fn amount(&self) -> Real {
+        match self {
+            BondPrice::Clean(amount) | BondPrice::Dirty(amount) => *amount,
+        }
+    }
 }
 
 impl Bond {
@@ -359,6 +384,47 @@ impl Bond {
             Some(settlement),
         )?;
         Ok(accrued * 100.0 / current_notional)
+    }
+
+    /// The yield (internal rate of return) that reprices the bond at `price`
+    /// (the C++ `Bond::yield(Bond::Price, ...)`, `bond.cpp:239`).
+    ///
+    /// `settlement` defaults to the bond's settlement date, `accuracy` to
+    /// `1e-8` (the distinct `Bond::yield` default of `bond.hpp:211`, tighter
+    /// than the `1e-10` of the `BondFunctions`/`CashFlows` layers),
+    /// `max_evaluations` to `100` and `guess` to `0.05`. A redeemed bond has a
+    /// zero yield.
+    ///
+    /// # Errors
+    ///
+    /// The bond must be tradable at the settlement date, and the solve must
+    /// converge (as [`BondFunctions::yield_rate`]).
+    #[allow(clippy::too_many_arguments)]
+    pub fn yield_rate(
+        &self,
+        price: BondPrice,
+        day_counter: DayCounter,
+        compounding: Compounding,
+        frequency: Frequency,
+        settlement: Option<Date>,
+        accuracy: Option<Real>,
+        max_evaluations: Option<usize>,
+        guess: Option<Rate>,
+    ) -> QlResult<Rate> {
+        if self.notional(settlement)? == 0.0 {
+            return Ok(0.0);
+        }
+        BondFunctions::yield_rate(
+            self,
+            price,
+            day_counter,
+            compounding,
+            frequency,
+            settlement,
+            Some(accuracy.unwrap_or(1.0e-8)),
+            max_evaluations,
+            guess,
+        )
     }
 
     /// Builds the redemption flows from the notional schedule and appends them
