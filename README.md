@@ -194,6 +194,19 @@ oversight) and is documented at the point of divergence in the source.
   no clock (for determinism and FFI), so operations that need the evaluation date
   return `Err` when it is unset rather than silently pricing a possibly-expired
   instrument as live.
+- **Past index fixings live on `Settings`, not in a global `IndexManager`
+  singleton (D11).** QuantLib stores fixing history in `IndexManager::instance()`,
+  a global-singleton `map<string, TimeSeries<Real>>`; D5 forbids that singleton,
+  so the history moves onto `Settings` as a `fixing_store`, exactly like the
+  evaluation date. It stays shared across every handle to an index (a `Settings`
+  is shared, and the store is keyed by the case-insensitive index name), so two
+  handles to "the same" Euribor observe one history, as C++'s global map
+  guarantees. Each index name owns an `Observable`, so adding or clearing a
+  fixing notifies exactly that index's observers, and those notifiers outlive a
+  `clear_fixings`. A conflicting fixing on an existing date returns `Err` (D4)
+  where QuantLib notifies and then throws. The `enforces_todays_historic_fixings`
+  flag's today's-fixing rule is applied by the index layer that reads the store,
+  as `InterestRateIndex::fixing` does in C++, not by the store itself.
 
 **Cash flows (EPIC-7):**
 
