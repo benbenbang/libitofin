@@ -283,3 +283,274 @@ impl Coupon for FloatingRateCoupon {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::currency::Currency;
+    use crate::fail;
+    use crate::handle::Handle;
+    use crate::indexes::iborindex::IborIndex;
+    use crate::patterns::observable::Observable;
+    use crate::settings::Settings;
+    use crate::shared::{shared, shared_mut};
+    use crate::termstructures::yieldtermstructure::YieldTermStructure;
+    use crate::time::calendars::target::Target;
+    use crate::time::date::Month;
+    use crate::time::daycounters::actual360::Actual360;
+    use crate::time::period::Period;
+    use crate::time::timeunit::TimeUnit;
+
+    fn start() -> Date {
+        Date::new(15, Month::January, 2026)
+    }
+
+    fn end() -> Date {
+        Date::new(15, Month::July, 2026)
+    }
+
+    fn payment() -> Date {
+        Date::new(17, Month::July, 2026)
+    }
+
+    fn ibor(settings: Shared<Settings<Date>>) -> Shared<IborIndex> {
+        shared(IborIndex::new(
+            "foo".into(),
+            Period::new(6, TimeUnit::Months),
+            2,
+            Currency::eur(),
+            Target::new(),
+            BusinessDayConvention::Following,
+            false,
+            Actual360::new(),
+            Handle::<dyn YieldTermStructure>::empty(),
+            settings,
+        ))
+    }
+
+    fn coupon_on(
+        index: Shared<IborIndex>,
+        fixing_days: Option<Natural>,
+        gearing: Real,
+        spread: Spread,
+        is_in_arrears: bool,
+    ) -> FloatingRateCoupon {
+        FloatingRateCoupon::new(
+            payment(),
+            100.0,
+            start(),
+            end(),
+            fixing_days,
+            index,
+            gearing,
+            spread,
+            None,
+            None,
+            None,
+            is_in_arrears,
+            None,
+            BusinessDayConvention::Preceding,
+        )
+        .unwrap()
+    }
+
+    fn coupon(fixing_days: Option<Natural>, gearing: Real, spread: Spread) -> FloatingRateCoupon {
+        coupon_on(
+            ibor(shared(Settings::new())),
+            fixing_days,
+            gearing,
+            spread,
+            false,
+        )
+    }
+
+    /// Records that `initialize` ran and with which coupon, and returns a fixed
+    /// swaplet rate. Stands in for the (unported) real pricers.
+    struct RecordingPricer {
+        swaplet: Rate,
+        calls: SharedMut<usize>,
+        seen_gearing: SharedMut<Option<Real>>,
+        observable: Observable,
+    }
+
+    impl RecordingPricer {
+        fn new(
+            swaplet: Rate,
+        ) -> (
+            SharedMut<RecordingPricer>,
+            SharedMut<usize>,
+            SharedMut<Option<Real>>,
+        ) {
+            let calls = shared_mut(0usize);
+            let seen_gearing = shared_mut(None);
+            let pricer = shared_mut(RecordingPricer {
+                swaplet,
+                calls: calls.clone(),
+                seen_gearing: seen_gearing.clone(),
+                observable: Observable::new(),
+            });
+            (pricer, calls, seen_gearing)
+        }
+    }
+
+    impl AsObservable for RecordingPricer {
+        fn observable(&self) -> &Observable {
+            &self.observable
+        }
+    }
+
+    impl FloatingRateCouponPricer for RecordingPricer {
+        fn initialize(&mut self, coupon: &FloatingRateCoupon) {
+            *self.calls.borrow_mut() += 1;
+            *self.seen_gearing.borrow_mut() = Some(coupon.gearing());
+        }
+
+        fn swaplet_rate(&self) -> QlResult<Rate> {
+            Ok(self.swaplet)
+        }
+
+        fn caplet_rate(&self, _effective_cap: Rate) -> QlResult<Rate> {
+            fail!("caplet rate not ported: cap/floor slice")
+        }
+
+        fn floorlet_rate(&self, _effective_floor: Rate) -> QlResult<Rate> {
+            fail!("floorlet rate not ported: cap/floor slice")
+        }
+    }
+
+    #[derive(Default)]
+    struct Flag {
+        up: bool,
+    }
+
+    impl Observer for Flag {
+        fn update(&mut self) {
+            self.up = true;
+        }
+    }
+
+    #[test]
+    fn rate_without_a_pricer_is_an_error() {
+        let coupon = coupon(None, 1.0, 0.0);
+        let err = coupon.rate().unwrap_err();
+        assert!(err.message().contains("pricer not set"));
+    }
+
+    #[test]
+    fn rate_and_amount_route_through_the_pricer() {
+        let coupon = coupon(None, 2.0, 0.0);
+        let (pricer, calls, seen_gearing) = RecordingPricer::new(0.05);
+        coupon.set_pricer(pricer as SharedMut<dyn FloatingRateCouponPricer>);
+
+        assert_eq!(coupon.rate().unwrap(), 0.05);
+        assert_eq!(*calls.borrow(), 1, "initialize ran once per rate query");
+        assert_eq!(
+            *seen_gearing.borrow(),
+            Some(2.0),
+            "initialize received the coupon"
+        );
+
+        let expected = 0.05 * coupon.accrual_period() * coupon.nominal();
+        assert!((coupon.amount().unwrap() - expected).abs() < 1e-15);
+    }
+
+    #[test]
+    fn adjusted_fixing_strips_the_spread_and_gearing() {
+        let coupon = coupon(None, 2.0, 0.01);
+        let (pricer, ..) = RecordingPricer::new(0.05);
+        coupon.set_pricer(pricer as SharedMut<dyn FloatingRateCouponPricer>);
+
+        assert!((coupon.adjusted_fixing().unwrap() - 0.02).abs() < 1e-15);
+    }
+
+    #[test]
+    fn the_cap_floor_slice_refuses() {
+        let (pricer, ..) = RecordingPricer::new(0.05);
+        let pricer = pricer.borrow();
+        assert!(
+            pricer
+                .caplet_rate(0.03)
+                .unwrap_err()
+                .message()
+                .contains("not ported")
+        );
+        assert!(pricer.floorlet_rate(0.01).is_err());
+    }
+
+    #[test]
+    fn set_pricer_swaps_which_pricer_is_observed() {
+        let coupon = coupon(None, 1.0, 0.0);
+        let flag = shared_mut(Flag::default());
+        coupon
+            .observable()
+            .register_observer(&(flag.clone() as SharedMut<dyn Observer>));
+
+        let (p1, ..) = RecordingPricer::new(0.01);
+        let p1 = p1 as SharedMut<dyn FloatingRateCouponPricer>;
+        coupon.set_pricer(p1.clone());
+        flag.borrow_mut().up = false;
+        p1.borrow().observable().notify_observers();
+        assert!(flag.borrow().up, "the attached pricer is observed");
+
+        let (p2, ..) = RecordingPricer::new(0.02);
+        let p2 = p2 as SharedMut<dyn FloatingRateCouponPricer>;
+        coupon.set_pricer(p2.clone());
+        flag.borrow_mut().up = false;
+
+        p1.borrow().observable().notify_observers();
+        assert!(
+            !flag.borrow().up,
+            "the replaced pricer is no longer observed"
+        );
+        p2.borrow().observable().notify_observers();
+        assert!(flag.borrow().up, "the new pricer is observed");
+    }
+
+    #[test]
+    fn the_fixing_date_moves_back_from_the_accrual_start_or_end() {
+        let calendar = Target::new();
+
+        let normal = coupon(Some(2), 1.0, 0.0);
+        assert_eq!(
+            normal.fixing_date(),
+            calendar.advance(
+                start(),
+                -2,
+                TimeUnit::Days,
+                BusinessDayConvention::Preceding,
+                false
+            )
+        );
+
+        let in_arrears = coupon_on(ibor(shared(Settings::new())), Some(2), 1.0, 0.0, true);
+        assert_eq!(
+            in_arrears.fixing_date(),
+            calendar.advance(
+                end(),
+                -2,
+                TimeUnit::Days,
+                BusinessDayConvention::Preceding,
+                false
+            )
+        );
+    }
+
+    #[test]
+    fn fixing_days_defaults_to_the_index() {
+        assert_eq!(coupon(None, 1.0, 0.0).fixing_days(), 2);
+        assert_eq!(coupon(Some(0), 1.0, 0.0).fixing_days(), 0);
+    }
+
+    #[test]
+    fn index_fixing_reads_the_store_through_the_index() {
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(Date::new(20, Month::January, 2026));
+        let index = ibor(settings);
+        let coupon = coupon_on(index.clone(), Some(2), 1.0, 0.0, false);
+
+        let fixing_date = coupon.fixing_date();
+        index.add_fixing(fixing_date, 0.025).unwrap();
+
+        assert_eq!(coupon.index_fixing().unwrap(), 0.025);
+    }
+}
