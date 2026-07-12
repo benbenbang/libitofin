@@ -49,7 +49,6 @@ pub struct InterestRateIndexBase {
     name: String,
     settings: Shared<Settings<Date>>,
     observable: Shared<Observable>,
-    #[allow(dead_code)]
     forwarder: SharedMut<ResetThenNotify>,
 }
 
@@ -95,6 +94,17 @@ impl InterestRateIndexBase {
     /// The observable the index broadcasts its changes through.
     pub fn observable(&self) -> &Observable {
         &self.observable
+    }
+
+    /// The forwarding observer the index registers with its dependencies.
+    ///
+    /// Construction wires it to the evaluation date and the fixing history; a
+    /// concrete index additionally registers it with its forwarding-curve
+    /// handle, so that relinking or changing the curve re-broadcasts through
+    /// [`observable`](InterestRateIndexBase::observable) - the port of
+    /// `IborIndex`'s `registerWith(termStructure_)`.
+    pub(crate) fn observer(&self) -> SharedMut<dyn Observer> {
+        self.forwarder.clone() as SharedMut<dyn Observer>
     }
 }
 
