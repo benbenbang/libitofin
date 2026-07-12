@@ -242,6 +242,21 @@ oversight) and is documented at the point of divergence in the source.
   traits, so on a concrete coupon with both in scope an unqualified
   `coupon.amount()` is ambiguous; name the trait.
 
+**Indexes (EPIC-6):**
+
+- **`Currency` is always valid; there is no empty placeholder.** QuantLib's
+  default-constructed `Currency` holds a null `data_` and `QL_REQUIRE`s a
+  non-null one on every inspector; its `operator==` treats two empty currencies
+  as equal and `operator<<` prints `"null currency"`. This port omits the empty
+  state, so a `Currency` always holds a concrete specification: accessors never
+  trip that null check, equality is purely by name (QuantLib's non-empty
+  branch), and `Display` always prints the ISO code. The "not yet set"
+  placeholder is an `Option<Currency>` at higher call sites, mirroring the
+  `DayCounter` decision above. The `rounding` convention, `triangulationCurrency`
+  and `minorUnitCodes` fields are dropped as unused by the index slice; rounding
+  returns with the money layer. Only EUR is provided; the `ql/currencies/*`
+  catalogue is deferred.
+
 **Pricing engines (Milestone 1):**
 
 - **Zero-volatility Black greeks dispatch on the stored option type, not on the
