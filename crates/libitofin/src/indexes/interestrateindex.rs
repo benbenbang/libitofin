@@ -256,3 +256,240 @@ impl<T: InterestRateIndex> Index for T {
         self.forecast_fixing(fixing_date)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shared::{SharedMut, shared, shared_mut};
+    use crate::time::calendars::target::Target;
+    use crate::time::date::Month;
+    use crate::time::daycounters::actual360::Actual360;
+
+    fn settings_on(today: Date) -> Shared<Settings<Date>> {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(today);
+        settings
+    }
+
+    /// A concrete interest-rate index whose forecast is a fixed constant, so a
+    /// test can tell a forecast (`FORECAST`) from a stored fixing by value.
+    const FORECAST: Rate = 0.05;
+
+    struct TestRateIndex {
+        base: InterestRateIndexBase,
+    }
+
+    impl TestRateIndex {
+        fn euribor(fixing_days: Natural, settings: Shared<Settings<Date>>) -> Self {
+            TestRateIndex {
+                base: InterestRateIndexBase::new(
+                    "Euribor".into(),
+                    Period::new(6, TimeUnit::Months),
+                    fixing_days,
+                    Currency::eur(),
+                    Target::new(),
+                    Actual360::new(),
+                    settings,
+                ),
+            }
+        }
+    }
+
+    impl InterestRateIndex for TestRateIndex {
+        fn base(&self) -> &InterestRateIndexBase {
+            &self.base
+        }
+        fn maturity_date(&self, value_date: Date) -> QlResult<Date> {
+            Ok(self.base.fixing_calendar.advance_by_period(
+                value_date,
+                self.base.tenor,
+                BusinessDayConvention::Following,
+                false,
+            ))
+        }
+        fn forecast_fixing(&self, _fixing_date: Date) -> QlResult<Rate> {
+            Ok(FORECAST)
+        }
+    }
+
+    #[test]
+    fn tenor_normalizes_and_name_is_composed() {
+        let settings = shared(Settings::<Date>::new());
+        let base = InterestRateIndexBase::new(
+            "Euribor".into(),
+            Period::new(12, TimeUnit::Months),
+            2,
+            Currency::eur(),
+            Target::new(),
+            Actual360::new(),
+            settings,
+        );
+        // 12 Months collapses to 1 Year; name is family + short period + dc name.
+        assert_eq!(base.tenor, Period::new(1, TimeUnit::Years));
+        assert_eq!(base.name, "Euribor1Y Actual/360");
+    }
+
+    #[test]
+    fn one_day_tenor_names_on_tn_sn_by_fixing_days() {
+        let day = Period::new(1, TimeUnit::Days);
+        let dc = Actual360::new();
+        assert_eq!(compose_name("Eonia", day, 0, &dc), "EoniaON Actual/360");
+        assert_eq!(compose_name("Eonia", day, 1, &dc), "EoniaTN Actual/360");
+        assert_eq!(compose_name("Eonia", day, 2, &dc), "EoniaSN Actual/360");
+        assert_eq!(compose_name("Eonia", day, 3, &dc), "Eonia1D Actual/360");
+    }
+
+    #[test]
+    fn fixing_and_value_date_round_trip_across_a_weekend() {
+        let settings = shared(Settings::<Date>::new());
+        let index = TestRateIndex::euribor(2, settings);
+        // Monday 15 June 2026; two business days back crosses the weekend to
+        // Thursday 11 June, and forward again returns to the Monday.
+        let value_date = Date::new(15, Month::June, 2026);
+        let fixing_date = index.fixing_date(value_date);
+        assert_eq!(fixing_date, Date::new(11, Month::June, 2026));
+        assert_eq!(index.value_date(fixing_date).unwrap(), value_date);
+    }
+
+    #[test]
+    fn value_date_rejects_an_invalid_fixing_date() {
+        let settings = shared(Settings::<Date>::new());
+        let index = TestRateIndex::euribor(2, settings);
+        // Saturday 13 June 2026 is not a business day.
+        assert!(index.value_date(Date::new(13, Month::June, 2026)).is_err());
+    }
+
+    #[test]
+    fn fixing_on_an_invalid_date_is_an_error() {
+        let today = Date::new(15, Month::June, 2026);
+        let index = TestRateIndex::euribor(2, settings_on(today));
+        assert!(
+            index
+                .fixing(Date::new(13, Month::June, 2026), false)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn fixing_without_an_evaluation_date_is_an_error() {
+        let settings = shared(Settings::<Date>::new());
+        let index = TestRateIndex::euribor(2, settings);
+        assert!(
+            index
+                .fixing(Date::new(15, Month::June, 2026), false)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn future_date_forecasts() {
+        let today = Date::new(15, Month::June, 2026);
+        let index = TestRateIndex::euribor(2, settings_on(today));
+        let tomorrow = Date::new(16, Month::June, 2026);
+        assert_eq!(index.fixing(tomorrow, false).unwrap(), FORECAST);
+    }
+
+    #[test]
+    fn today_forecasts_when_asked_even_with_a_stored_fixing() {
+        let today = Date::new(15, Month::June, 2026);
+        let settings = settings_on(today);
+        let index = TestRateIndex::euribor(2, settings.clone());
+        settings.add_fixing(&index.base.name, today, 0.01).unwrap();
+        assert_eq!(index.fixing(today, true).unwrap(), FORECAST);
+    }
+
+    #[test]
+    fn today_reads_a_stored_fixing_when_not_forecasting() {
+        let today = Date::new(15, Month::June, 2026);
+        let settings = settings_on(today);
+        let index = TestRateIndex::euribor(2, settings.clone());
+        settings.add_fixing(&index.base.name, today, 0.01).unwrap();
+        assert_eq!(index.fixing(today, false).unwrap(), 0.01);
+    }
+
+    #[test]
+    fn today_forecasts_when_no_stored_fixing_and_not_enforced() {
+        let today = Date::new(15, Month::June, 2026);
+        let index = TestRateIndex::euribor(2, settings_on(today));
+        assert_eq!(index.fixing(today, false).unwrap(), FORECAST);
+    }
+
+    #[test]
+    fn today_missing_fixing_is_an_error_when_enforced() {
+        let today = Date::new(15, Month::June, 2026);
+        let settings = settings_on(today);
+        settings.set_enforces_todays_historic_fixings(true);
+        let index = TestRateIndex::euribor(2, settings);
+        assert!(index.fixing(today, false).is_err());
+    }
+
+    #[test]
+    fn today_reads_a_stored_fixing_when_enforced() {
+        let today = Date::new(15, Month::June, 2026);
+        let settings = settings_on(today);
+        settings.set_enforces_todays_historic_fixings(true);
+        let index = TestRateIndex::euribor(2, settings.clone());
+        settings.add_fixing(&index.base.name, today, 0.01).unwrap();
+        assert_eq!(index.fixing(today, false).unwrap(), 0.01);
+    }
+
+    #[test]
+    fn past_stored_fixing_is_returned() {
+        let today = Date::new(15, Month::June, 2026);
+        let settings = settings_on(today);
+        let index = TestRateIndex::euribor(2, settings.clone());
+        let past = Date::new(12, Month::June, 2026);
+        settings.add_fixing(&index.base.name, past, 0.01).unwrap();
+        assert_eq!(index.fixing(past, false).unwrap(), 0.01);
+    }
+
+    #[test]
+    fn past_missing_fixing_is_an_error() {
+        let today = Date::new(15, Month::June, 2026);
+        let index = TestRateIndex::euribor(2, settings_on(today));
+        let past = Date::new(12, Month::June, 2026);
+        assert!(index.fixing(past, false).is_err());
+    }
+
+    struct Flag {
+        up: bool,
+    }
+
+    impl Observer for Flag {
+        fn update(&mut self) {
+            self.up = true;
+        }
+    }
+
+    #[test]
+    fn adding_a_fixing_notifies_the_index() {
+        let today = Date::new(15, Month::June, 2026);
+        let settings = settings_on(today);
+        let index = TestRateIndex::euribor(2, settings.clone());
+        let flag = shared_mut(Flag { up: false });
+        index
+            .base
+            .observable()
+            .register_observer(&(flag.clone() as SharedMut<dyn Observer>));
+
+        settings
+            .add_fixing(&index.base.name, Date::new(12, Month::June, 2026), 0.01)
+            .unwrap();
+        assert!(flag.borrow().up);
+    }
+
+    #[test]
+    fn changing_the_evaluation_date_notifies_the_index() {
+        let today = Date::new(15, Month::June, 2026);
+        let settings = settings_on(today);
+        let index = TestRateIndex::euribor(2, settings.clone());
+        let flag = shared_mut(Flag { up: false });
+        index
+            .base
+            .observable()
+            .register_observer(&(flag.clone() as SharedMut<dyn Observer>));
+
+        settings.set_evaluation_date(Date::new(16, Month::June, 2026));
+        assert!(flag.borrow().up);
+    }
+}
