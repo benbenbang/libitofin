@@ -500,3 +500,469 @@ mod tests {
         );
     }
 }
+
+/// The yield-side wrappers reproduced at the bond-instrument level, oracling the
+/// leg analytics of #251 through `BondFunctions`.
+///
+/// The cases chosen to oracle the wrappers at the bond level: the gilt and
+/// Australian ex-coupon bonds (`bonds.cpp::testExCouponGilt` :1155,
+/// `testExCouponAustralianBond` :1283), `testBasisPointValue` (:1759) and
+/// `testThirty360BondWithSettlementOn31st` (:1715). In C++ only the last two
+/// call the `BondFunctions` wrappers directly; the ex-coupon tests call
+/// `CashFlows::` on the bare leg (`:1265`, `:1393`). The Rust cases route every
+/// number through the bond wrappers regardless, which is the bond-level oracle
+/// this ticket wants. Each builds the `FixedRateBond` cash flows, feeds the
+/// tabulated price to [`BondFunctions::yield_rate`] (or [`Bond::yield_rate`]),
+/// and checks the analytics that come back; the redemption is the one
+/// `Bond::from_coupons` appends, so the leg matches #251's exactly.
+#[cfg(test)]
+mod yield_tests {
+    use super::*;
+    use crate::cashflows::FixedRateLeg;
+    use crate::instruments::BondPrice;
+    use crate::interestrate::{Compounding, InterestRate};
+    use crate::settings::Settings;
+    use crate::shared::{Shared, shared};
+    use crate::time::businessdayconvention::BusinessDayConvention;
+    use crate::time::calendar::Calendar;
+    use crate::time::calendars::australia::{self, Australia};
+    use crate::time::calendars::nullcalendar::NullCalendar;
+    use crate::time::calendars::unitedkingdom::{self, UnitedKingdom};
+    use crate::time::calendars::unitedstates::{self, UnitedStates};
+    use crate::time::date::Month;
+    use crate::time::dategenerationrule::DateGeneration;
+    use crate::time::daycounters::actualactual::{ActualActual, Convention};
+    use crate::time::daycounters::thirty360::{Convention as Thirty360Convention, Thirty360};
+    use crate::time::frequency::Frequency;
+    use crate::time::period::Period;
+    use crate::time::schedule::Schedule;
+    use crate::time::timeunit::TimeUnit;
+
+    const FACE_AMOUNT: Real = 1_000_000.0;
+
+    /// One row of a `bonds.cpp` expectation table: the settlement date, the
+    /// dirty price (`testPrice + accrued`, per 100 of notional) and the
+    /// Bloomberg yield, duration and convexity it drives.
+    struct Case {
+        settlement: Date,
+        dirty_price: Real,
+        irr: Rate,
+        duration: Real,
+        convexity: Real,
+    }
+
+    fn us_gov() -> Calendar {
+        UnitedStates::new(unitedstates::Market::GovernmentBond)
+    }
+
+    /// The `FixedRateBond` of the ex-coupon cases: a semiannual `ActualActual
+    /// (ISMA)` leg on a 100 notional with an ex-coupon period, wrapped in a
+    /// `Bond` whose appended par redemption completes the leg.
+    fn ex_coupon_bond(
+        start: Date,
+        first_coupon: Date,
+        maturity: Date,
+        coupon: Rate,
+        ex_coupon_period: Period,
+        payment_calendar: Calendar,
+        ex_coupon_calendar: Calendar,
+    ) -> (Bond, DayCounter) {
+        let unadjusted = BusinessDayConvention::Unadjusted;
+        let schedule = Schedule::new(
+            start,
+            maturity,
+            Period::new(6, TimeUnit::Months),
+            NullCalendar::new(),
+            unadjusted,
+            unadjusted,
+            DateGeneration::Forward,
+            true,
+            first_coupon,
+            Date::null(),
+        );
+        let day_counter = ActualActual::with_schedule(Convention::ISMA, schedule.clone());
+        let leg = FixedRateLeg::new(schedule)
+            .with_notional(100.0)
+            .with_coupon_rate(
+                coupon,
+                day_counter.clone(),
+                Compounding::Simple,
+                Frequency::Annual,
+            )
+            .unwrap()
+            .with_payment_calendar(payment_calendar.clone())
+            .with_payment_adjustment(unadjusted)
+            .with_ex_coupon_period(ex_coupon_period, ex_coupon_calendar, unadjusted, false)
+            .build()
+            .unwrap();
+        let bond =
+            Bond::from_coupons(1, payment_calendar, None, leg, shared(Settings::new())).unwrap();
+        (bond, day_counter)
+    }
+
+    /// The `yield -> duration -> convexity` round trip each table row drives
+    /// through `BondFunctions`, at the row's C++ tolerances.
+    fn check(bond: &Bond, day_counter: &DayCounter, case: &Case, tolerance: (Real, Real, Real)) {
+        let (comp, freq) = (Compounding::Compounded, Frequency::Semiannual);
+        let settlement = Some(case.settlement);
+
+        let irr = BondFunctions::yield_rate(
+            bond,
+            BondPrice::Dirty(case.dirty_price),
+            day_counter.clone(),
+            comp,
+            freq,
+            settlement,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        assert!((irr - case.irr).abs() < tolerance.0, "yield {irr}");
+
+        let rate = InterestRate::new(irr, day_counter.clone(), comp, freq).unwrap();
+        let duration =
+            BondFunctions::duration(bond, &rate, Duration::Modified, settlement).unwrap();
+        assert!(
+            (duration - case.duration).abs() < tolerance.0,
+            "duration {duration}"
+        );
+
+        let convexity = BondFunctions::convexity(bond, &rate, settlement).unwrap();
+        assert!(
+            (convexity - case.convexity).abs() < tolerance.1,
+            "convexity {convexity}"
+        );
+    }
+
+    /// `bonds.cpp::testExCouponGilt` (:1155), verified against Bloomberg.
+    #[test]
+    fn the_uk_gilt_reproduces_its_yield_duration_and_convexity_through_the_bond() {
+        let calendar = UnitedKingdom::new(unitedkingdom::Market::Settlement);
+        let (bond, day_counter) = ex_coupon_bond(
+            Date::new(29, Month::February, 1996),
+            Date::new(7, Month::June, 1996),
+            Date::new(7, Month::June, 2021),
+            0.08,
+            Period::new(6, TimeUnit::Days),
+            calendar.clone(),
+            calendar,
+        );
+        let cases = [
+            Case {
+                settlement: Date::new(29, Month::May, 2013),
+                dirty_price: 106.8021978,
+                irr: 0.0749518,
+                duration: 5.6760445,
+                convexity: 42.1531486,
+            },
+            Case {
+                settlement: Date::new(30, Month::May, 2013),
+                dirty_price: 102.8241758,
+                irr: 0.0749618,
+                duration: 5.8928163,
+                convexity: 43.7562186,
+            },
+            Case {
+                settlement: Date::new(31, Month::May, 2013),
+                dirty_price: 102.8461538,
+                irr: 0.0749599,
+                duration: 5.8901860,
+                convexity: 43.7239438,
+            },
+        ];
+        for case in &cases {
+            check(&bond, &day_counter, case, (1e-6, 1e-6, 1e-6));
+        }
+    }
+
+    /// `bonds.cpp::testExCouponAustralianBond` (:1283), Bloomberg-verified.
+    #[test]
+    fn the_australian_bond_reproduces_its_yield_duration_and_convexity_through_the_bond() {
+        let (bond, day_counter) = ex_coupon_bond(
+            Date::new(15, Month::February, 2004),
+            Date::new(15, Month::August, 2004),
+            Date::new(15, Month::February, 2017),
+            0.06,
+            Period::new(7, TimeUnit::Days),
+            Australia::new(australia::Market::Settlement),
+            NullCalendar::new(),
+        );
+        let cases = [
+            Case {
+                settlement: Date::new(7, Month::August, 2014),
+                dirty_price: 105.867,
+                irr: 0.04723,
+                duration: 2.26276,
+                convexity: 6.54870,
+            },
+            Case {
+                settlement: Date::new(8, Month::August, 2014),
+                dirty_price: 102.884,
+                irr: 0.047235,
+                duration: 2.32536,
+                convexity: 6.72531,
+            },
+            Case {
+                settlement: Date::new(11, Month::August, 2014),
+                dirty_price: 102.934,
+                irr: 0.047190,
+                duration: 2.31732,
+                convexity: 6.68407,
+            },
+        ];
+        for case in &cases {
+            check(&bond, &day_counter, case, (1e-5, 1e-4, 1e-3));
+        }
+    }
+
+    fn treasury_today() -> Date {
+        Date::new(29, Month::January, 2024)
+    }
+
+    /// The `FixedRateBond` cash flows of `testBasisPointValue`: a semiannual
+    /// `Thirty360(USA)` leg on the million-face notional at `coupon`, with the
+    /// par redemption `Bond::from_coupons` appends.
+    fn treasury_bond(coupon: Rate, settings: Shared<Settings<Date>>) -> (Bond, DayCounter) {
+        let unadjusted = BusinessDayConvention::Unadjusted;
+        let day_counter = Thirty360::with_convention(Thirty360Convention::USA);
+        let schedule = Schedule::new(
+            Date::new(15, Month::November, 2023),
+            Date::new(15, Month::August, 2033),
+            Period::new(6, TimeUnit::Months),
+            us_gov(),
+            unadjusted,
+            unadjusted,
+            DateGeneration::Forward,
+            false,
+            Date::null(),
+            Date::null(),
+        );
+        let leg = FixedRateLeg::new(schedule)
+            .with_notional(FACE_AMOUNT)
+            .with_coupon_rate(
+                coupon,
+                day_counter.clone(),
+                Compounding::Simple,
+                Frequency::Annual,
+            )
+            .unwrap()
+            .with_payment_calendar(us_gov())
+            .with_payment_adjustment(unadjusted)
+            .build()
+            .unwrap();
+        let bond = Bond::from_coupons(1, us_gov(), None, leg, settings).unwrap();
+        (bond, day_counter)
+    }
+
+    /// `bonds.cpp::testBasisPointValue` (:1759): the clean price yields
+    /// 0.041301, and the basis-point value and yield value reproduce the table
+    /// at `:1798-1806` at both settlement dates. The yield is solved once and
+    /// reused, as C++ does, since `d(bpv)/dy` here is of order 1e4.
+    #[test]
+    fn the_treasury_bond_reproduces_its_basis_point_value_through_the_bond() {
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(treasury_today());
+        let (bond, day_counter) = treasury_bond(0.045, settings);
+        let (comp, freq) = (Compounding::Compounded, Frequency::Semiannual);
+        let settlement = Date::new(30, Month::January, 2024);
+
+        let irr = BondFunctions::yield_rate(
+            &bond,
+            BondPrice::Clean(102.890625),
+            day_counter.clone(),
+            comp,
+            freq,
+            Some(settlement),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        assert!((irr - 0.041301).abs() < 1e-6, "yield {irr}");
+
+        let rate = InterestRate::new(irr, day_counter, comp, freq).unwrap();
+        let cases = [
+            (settlement, -795.459834, -0.0012571287),
+            (
+                Date::new(12, Month::February, 2024),
+                -793.149033,
+                -0.0012607913,
+            ),
+        ];
+        for (settlement, expected_bpv, expected_yvbp) in cases {
+            let settlement = Some(settlement);
+            let bpv = BondFunctions::basis_point_value(&bond, &rate, settlement).unwrap();
+            assert!((bpv - expected_bpv).abs() < 1e-6, "bpv {bpv}");
+
+            let yvbp = BondFunctions::yield_value_basis_point(&bond, &rate, settlement).unwrap()
+                * FACE_AMOUNT;
+            assert!((yvbp - expected_yvbp).abs() < 1e-9, "yvbp {yvbp}");
+        }
+    }
+
+    /// [`Bond::yield_rate`] resolves the default settlement date off the
+    /// evaluation date and reproduces the treasury yield, closing the instrument
+    /// round trip.
+    #[test]
+    fn the_bond_yield_method_reproduces_the_treasury_yield() {
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(treasury_today());
+        let (bond, day_counter) = treasury_bond(0.045, settings);
+        let irr = bond
+            .yield_rate(
+                BondPrice::Clean(102.890625),
+                day_counter,
+                Compounding::Compounded,
+                Frequency::Semiannual,
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+        assert!((irr - 0.041301).abs() < 1e-6, "yield {irr}");
+    }
+
+    /// The basis-point value per 100 of notional is the change in the leg's
+    /// present value for a one-basis-point bump in the coupon at the same flat
+    /// yield: an independent finite difference of the analytic `bps_at_yield`.
+    #[test]
+    fn the_bps_at_yield_matches_a_one_basis_point_coupon_bump() {
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(treasury_today());
+        let settlement = Some(Date::new(30, Month::January, 2024));
+        let rate = InterestRate::new(
+            0.041301,
+            Thirty360::with_convention(Thirty360Convention::USA),
+            Compounding::Compounded,
+            Frequency::Semiannual,
+        )
+        .unwrap();
+
+        let (base, _) = treasury_bond(0.045, settings.clone());
+        let (bumped, _) = treasury_bond(0.045 + 1.0e-4, settings.clone());
+        let base_npv = CashFlows::npv_at_yield(
+            base.cashflows(),
+            &rate,
+            settings.as_ref(),
+            Some(false),
+            settlement,
+            None,
+        )
+        .unwrap();
+        let bumped_npv = CashFlows::npv_at_yield(
+            bumped.cashflows(),
+            &rate,
+            settings.as_ref(),
+            Some(false),
+            settlement,
+            None,
+        )
+        .unwrap();
+
+        let bps = BondFunctions::bps_at_yield(&base, &rate, settlement).unwrap();
+        let bump = (bumped_npv - base_npv) * 100.0 / FACE_AMOUNT;
+        assert!((bps - bump).abs() < 1e-6, "bps {bps} vs bump {bump}");
+    }
+
+    /// A redeemed bond is not tradable, so the yield wrappers guard, while
+    /// [`Bond::yield_rate`] short-circuits to a zero yield.
+    #[test]
+    fn a_redeemed_bond_has_no_yield_analytics() {
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(treasury_today());
+        let (bond, day_counter) = treasury_bond(0.045, settings);
+        let after = Date::new(16, Month::August, 2033);
+        let rate = InterestRate::new(
+            0.041301,
+            day_counter.clone(),
+            Compounding::Compounded,
+            Frequency::Semiannual,
+        )
+        .unwrap();
+
+        let err =
+            BondFunctions::duration(&bond, &rate, Duration::Modified, Some(after)).unwrap_err();
+        assert!(err.message().contains("non tradable"));
+        let zero = bond
+            .yield_rate(
+                BondPrice::Clean(100.0),
+                day_counter,
+                Compounding::Compounded,
+                Frequency::Semiannual,
+                Some(after),
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+        assert_eq!(zero, 0.0);
+    }
+
+    /// `bonds.cpp::testThirty360BondWithSettlementOn31st` (:1715): a real bond
+    /// (CUSIP 3130A0X70, Bloomberg data) whose settlement falls on the 31st,
+    /// driving yield, Macaulay duration, convexity and accrued straight through
+    /// the `BondFunctions` wrappers at the C++ tolerances.
+    #[test]
+    fn the_thirty360_bond_reproduces_its_yield_macaulay_duration_and_convexity() {
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(Date::new(28, Month::July, 2017));
+        let unadjusted = BusinessDayConvention::Unadjusted;
+        let day_counter = Thirty360::with_convention(Thirty360Convention::USA);
+        let schedule = Schedule::new(
+            Date::new(13, Month::February, 2014),
+            Date::new(13, Month::August, 2018),
+            Period::new(6, TimeUnit::Months),
+            us_gov(),
+            unadjusted,
+            unadjusted,
+            DateGeneration::Forward,
+            false,
+            Date::null(),
+            Date::null(),
+        );
+        let leg = FixedRateLeg::new(schedule)
+            .with_notional(100.0)
+            .with_coupon_rate(
+                0.015,
+                day_counter.clone(),
+                Compounding::Simple,
+                Frequency::Annual,
+            )
+            .unwrap()
+            .with_payment_calendar(us_gov())
+            .with_payment_adjustment(unadjusted)
+            .build()
+            .unwrap();
+        let bond = Bond::from_coupons(1, us_gov(), None, leg, settings).unwrap();
+
+        let (comp, freq) = (Compounding::Compounded, Frequency::Semiannual);
+        let settlement = Some(Date::new(31, Month::July, 2017));
+
+        let irr = BondFunctions::yield_rate(
+            &bond,
+            BondPrice::Clean(100.0),
+            day_counter.clone(),
+            comp,
+            freq,
+            settlement,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        assert!((irr - 0.015).abs() < 1e-4, "yield {irr}");
+
+        let rate = InterestRate::new(irr, day_counter, comp, freq).unwrap();
+        let duration =
+            BondFunctions::duration(&bond, &rate, Duration::Macaulay, settlement).unwrap();
+        assert!((duration - 1.022).abs() < 1e-3, "duration {duration}");
+
+        let convexity = BondFunctions::convexity(&bond, &rate, settlement).unwrap() / 100.0;
+        assert!((convexity - 0.015).abs() < 1e-3, "convexity {convexity}");
+
+        let accrued = BondFunctions::accrued_amount(&bond, settlement).unwrap();
+        assert!((accrued - 0.7).abs() < 1e-6, "accrued {accrued}");
+    }
+}
