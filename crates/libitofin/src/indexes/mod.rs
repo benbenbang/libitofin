@@ -5,10 +5,12 @@
 //! indexes (an `IborIndex`) follow. Items are re-exported flat, so the base is
 //! `indexes::Index` rather than `indexes::index::Index`.
 
+pub mod ibor;
 pub mod iborindex;
 pub mod index;
 pub mod interestrateindex;
 
+pub use ibor::Euribor;
 pub use iborindex::IborIndex;
 pub use index::Index;
 pub use interestrateindex::{InterestRateIndex, InterestRateIndexBase};
