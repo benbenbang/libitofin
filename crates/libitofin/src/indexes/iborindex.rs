@@ -140,3 +140,214 @@ impl InterestRateIndex for IborIndex {
         self.forecast_fixing_between(d1, d2, t)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    //! Oracles for the plain single-calendar `IborIndex`.
+    //!
+    //! `indexes.cpp testCustomIborIndex` (:152) exercises `CustomIborIndex`, a
+    //! three-calendar variant (separate fixing/value/maturity calendars) that is
+    //! not ported here; its hard-coded bespoke-holiday date assertions (e.g.
+    //! `valueDate(7 Jan 2025) == 9 Jan 2025`) apply when that subclass lands.
+    //! Plain `IborIndex` has one calendar, so these tests cover only the
+    //! single-calendar subset.
+
+    use super::*;
+    use crate::handle::RelinkableHandle;
+    use crate::interestrate::Compounding;
+    use crate::patterns::observable::Observer;
+    use crate::shared::{SharedMut, shared, shared_mut};
+    use crate::termstructures::yields::FlatForward;
+    use crate::time::calendars::target::Target;
+    use crate::time::date::Month;
+    use crate::time::daycounters::actual360::Actual360;
+    use crate::time::frequency::Frequency;
+    use crate::time::timeunit::TimeUnit;
+
+    fn settings_on(today: Date) -> Shared<Settings<Date>> {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(today);
+        settings
+    }
+
+    /// A `foo` index on TARGET, Actual/360, two settlement days - the shape
+    /// `indexes.cpp`'s `IborIndex("foo", ...)` cases use.
+    fn ibor(
+        tenor: Period,
+        forwarding: Handle<dyn YieldTermStructure>,
+        settings: Shared<Settings<Date>>,
+    ) -> IborIndex {
+        IborIndex::new(
+            "foo".into(),
+            tenor,
+            2,
+            Currency::eur(),
+            Target::new(),
+            BusinessDayConvention::Following,
+            false,
+            Actual360::new(),
+            forwarding,
+            settings,
+        )
+    }
+
+    fn flat_curve(reference: Date, rate: Rate) -> Handle<dyn YieldTermStructure> {
+        Handle::new(shared(FlatForward::with_rate(
+            reference,
+            rate,
+            Actual360::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>)
+    }
+
+    /// `testTenorNormalization` (indexes.cpp:124): a 12-month index and a
+    /// 1-year index normalize to the same name.
+    #[test]
+    fn twelve_months_and_one_year_yield_the_same_name() {
+        let settings = shared(Settings::<Date>::new());
+        let i12m = ibor(
+            Period::new(12, TimeUnit::Months),
+            Handle::empty(),
+            settings.clone(),
+        );
+        let i1y = ibor(Period::new(1, TimeUnit::Years), Handle::empty(), settings);
+        assert_eq!(i12m.name(), i1y.name());
+    }
+
+    /// `testTenorNormalization` (indexes.cpp:124): the 6-day index matures
+    /// before the 7-day index off the same date.
+    #[test]
+    fn six_day_index_matures_before_seven_day_index() {
+        let settings = shared(Settings::<Date>::new());
+        let i6d = ibor(
+            Period::new(6, TimeUnit::Days),
+            Handle::empty(),
+            settings.clone(),
+        );
+        let i7d = ibor(Period::new(7, TimeUnit::Days), Handle::empty(), settings);
+        let test_date = Date::new(28, Month::April, 2023);
+        assert!(i6d.maturity_date(test_date).unwrap() < i7d.maturity_date(test_date).unwrap());
+    }
+
+    /// `testFixingHasHistoricalFixing` (indexes.cpp:83) through the index: a
+    /// fixing added on one index is seen by another instance of the same name
+    /// (the store keys on name), not by a differently-tenored index, and clears.
+    #[test]
+    fn historical_fixing_is_shared_by_name_and_cleared() {
+        let today = Date::new(15, Month::June, 2026);
+        let settings = settings_on(today);
+        let ibor6m = ibor(
+            Period::new(6, TimeUnit::Months),
+            Handle::empty(),
+            settings.clone(),
+        );
+        let ibor3m = ibor(
+            Period::new(3, TimeUnit::Months),
+            Handle::empty(),
+            settings.clone(),
+        );
+        let ibor6m_a = ibor(Period::new(6, TimeUnit::Months), Handle::empty(), settings);
+
+        let mut day = today;
+        while !ibor6m.is_valid_fixing_date(day) {
+            day -= 1;
+        }
+        ibor6m.add_fixing(day, 0.01).unwrap();
+
+        assert!(!ibor3m.has_historical_fixing(day));
+        assert!(ibor6m.has_historical_fixing(day));
+        assert!(ibor6m_a.has_historical_fixing(day));
+
+        ibor6m.clear_fixings();
+        assert!(!ibor6m.has_historical_fixing(day));
+        assert!(!ibor6m_a.has_historical_fixing(day));
+    }
+
+    /// `forecastFixing` (iborindex.cpp:44) reads the simple forward
+    /// `(disc1/disc2 - 1)/t` off the curve between the value and maturity dates.
+    ///
+    /// The simple-forward formula is `iborindex.hpp`'s private `forecastFixing`
+    /// overload (:112-120); no C++ suite test pins it directly for a plain
+    /// `IborIndex` (`testCdiIndex` :206 asserts a Brazil CDI *compounded*
+    /// forecast, a different formula on a different index). So this checks two
+    /// independent things: the implementation matches the discount-factor
+    /// formula (a plumbing pin), and it matches the closed form of a simple
+    /// forward on a continuously-compounded flat curve, `(exp(r*t) - 1)/t`,
+    /// computed here without touching the curve.
+    #[test]
+    fn forecast_fixing_reads_the_simple_forward_off_the_curve() {
+        let today = Date::new(15, Month::June, 2026);
+        let settings = settings_on(today);
+        let rate = 0.05;
+        let curve = flat_curve(today, rate);
+        let index = ibor(Period::new(6, TimeUnit::Months), curve.clone(), settings);
+
+        let fixing_date = Date::new(15, Month::July, 2026);
+        let d1 = index.value_date(fixing_date).unwrap();
+        let d2 = index.maturity_date(d1).unwrap();
+        let t = Actual360::new().year_fraction(d1, d2);
+        let forecast = index.forecast_fixing(fixing_date).unwrap();
+
+        let link = curve.current_link().unwrap();
+        let disc1 = link.discount_date(d1, false).unwrap();
+        let disc2 = link.discount_date(d2, false).unwrap();
+        assert!((forecast - (disc1 / disc2 - 1.0) / t).abs() < 1e-12);
+
+        let analytic = ((rate * t).exp() - 1.0) / t;
+        assert!((forecast - analytic).abs() < 1e-12);
+        assert!(forecast > 0.0);
+    }
+
+    /// The `iborindex.hpp` private-overload guard: forecasting off an empty
+    /// forwarding handle is an error carrying the C++ message, not a panic.
+    #[test]
+    fn forecast_on_an_empty_curve_is_an_error() {
+        let today = Date::new(15, Month::June, 2026);
+        let settings = settings_on(today);
+        let index = ibor(Period::new(6, TimeUnit::Months), Handle::empty(), settings);
+        let err = index
+            .forecast_fixing(Date::new(15, Month::July, 2026))
+            .unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("null term structure set to this instance of")
+        );
+    }
+
+    struct Flag {
+        up: bool,
+    }
+
+    impl Observer for Flag {
+        fn update(&mut self) {
+            self.up = true;
+        }
+    }
+
+    /// `registerWith(termStructure_)` (iborindex.cpp:39): relinking the
+    /// forwarding curve notifies the index's observers.
+    #[test]
+    fn relinking_the_forwarding_curve_notifies_the_index() {
+        let today = Date::new(15, Month::June, 2026);
+        let settings = settings_on(today);
+        let handle: RelinkableHandle<dyn YieldTermStructure> = RelinkableHandle::empty();
+        let index = ibor(Period::new(6, TimeUnit::Months), handle.handle(), settings);
+
+        let flag = shared_mut(Flag { up: false });
+        index
+            .base()
+            .observable()
+            .register_observer(&(flag.clone() as SharedMut<dyn Observer>));
+
+        handle.link_to(shared(FlatForward::with_rate(
+            today,
+            0.05,
+            Actual360::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>);
+
+        assert!(flag.borrow().up);
+    }
+}
