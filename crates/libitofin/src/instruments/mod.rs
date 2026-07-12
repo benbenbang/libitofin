@@ -8,7 +8,7 @@ mod bonds;
 mod oneassetoption;
 mod payoffs;
 
-pub use bond::{Bond, BondArguments, BondEngine, BondResults};
+pub use bond::{Bond, BondArguments, BondEngine, BondPrice, BondResults};
 pub use bonds::FixedRateBond;
 pub use oneassetoption::{
     EuropeanOption, Greeks, MoreGreeks, OneAssetOption, OneAssetOptionEngine,

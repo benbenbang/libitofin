@@ -1,31 +1,35 @@
-//! Discount-curve bond analytics.
+//! Discount-curve and yield bond analytics.
 //!
-//! Port of the `YieldTermStructure` subset of `ql/pricingengines/bond/
-//! bondfunctions.{hpp,cpp}`: the price, accrued and rate wrappers that add a
-//! tradability guard and delegate to the matching [`CashFlows`] overload
-//! (`bondfunctions.cpp:224-302`). Each reads the bond's own cash flows and
-//! settings rather than a global evaluation date (D5).
+//! Port of the `YieldTermStructure` and yield (IRR) subsets of
+//! `ql/pricingengines/bond/bondfunctions.{hpp,cpp}`: the price, accrued, rate
+//! and yield/duration/convexity wrappers that add a tradability guard and
+//! delegate to the matching [`CashFlows`] overload (`bondfunctions.cpp:224-486`).
+//! Each reads the bond's own cash flows and settings rather than a global
+//! evaluation date (D5).
 //!
 //! Deviations, all by existing design decisions:
 //! - `accruedAmount` is the port's [`Bond::accrued_amount`], which already
 //!   carries the tradability guard and the `100 / notional` scaling
 //!   (`bond.cpp` delegates the same call to `BondFunctions` in reverse); the
 //!   wrapper here is the free-function surface over it.
-//! - `atmRate` takes no `Bond::Price`: that type and the price-to-NPV
-//!   conversion belong with the yield wrappers deferred to #290, so the
-//!   price-fed curve round trip of `bonds.cpp:241` is unreachable here. The
+//! - `atmRate` takes no [`BondPrice`]: the type lands with the yield wrappers
+//!   below (#290), but the price-fed curve round trip of `bonds.cpp:241` stays
+//!   a discount-curve follow-up and is unreachable here. The
 //!   port ports the discount-curve `atmRate` at its `price = {}` default,
 //!   whose target NPV is the leg's own; with one coupon rate that recovers the
 //!   coupon exactly for any curve (a curve-independent invariant, not a curve
 //!   oracle - the clean-price tests are the curve oracles).
 
-use crate::cashflows::CashFlows;
+use crate::cashflows::{CashFlows, Duration};
 use crate::errors::QlResult;
-use crate::instruments::Bond;
+use crate::instruments::{Bond, BondPrice};
+use crate::interestrate::{Compounding, InterestRate};
 use crate::require;
 use crate::termstructures::yieldtermstructure::YieldTermStructure;
 use crate::time::date::Date;
-use crate::types::{Rate, Real};
+use crate::time::daycounter::DayCounter;
+use crate::time::frequency::Frequency;
+use crate::types::{Rate, Real, Time};
 
 /// Free-function bond analytics over a discount curve.
 pub struct BondFunctions;
@@ -139,6 +143,169 @@ impl BondFunctions {
             Some(settlement),
             None,
         )
+    }
+
+    /// The yield (internal rate of return) that reprices the bond at `price`,
+    /// solved off its own cash flows (`bondfunctions.hpp:167`).
+    ///
+    /// `settlement` defaults to the bond's settlement date, `accuracy` to
+    /// `1e-10`, `max_evaluations` to `100` and `guess` to `0.05`. As C++, a
+    /// clean price is grossed up by the accrued amount and the quote is scaled
+    /// from per-100 to the bond's notional before the solve.
+    ///
+    /// # Errors
+    ///
+    /// The bond must be tradable at the settlement date, and the solve must
+    /// converge (as [`CashFlows::solve_yield`]).
+    #[allow(clippy::too_many_arguments)]
+    pub fn yield_rate(
+        bond: &Bond,
+        price: BondPrice,
+        day_counter: DayCounter,
+        compounding: Compounding,
+        frequency: Frequency,
+        settlement: Option<Date>,
+        accuracy: Option<Real>,
+        max_evaluations: Option<usize>,
+        guess: Option<Rate>,
+    ) -> QlResult<Rate> {
+        let settlement = Self::settlement_or_eval(bond, settlement)?;
+        let notional = Self::require_tradable(bond, settlement)?;
+        let mut amount = price.amount();
+        if matches!(price, BondPrice::Clean(_)) {
+            amount += bond.accrued_amount(Some(settlement))?;
+        }
+        amount *= notional / 100.0;
+        CashFlows::solve_yield(
+            bond.cashflows(),
+            amount,
+            day_counter,
+            compounding,
+            frequency,
+            bond.settings(),
+            Some(false),
+            Some(settlement),
+            Some(settlement),
+            accuracy,
+            max_evaluations,
+            guess,
+        )
+    }
+
+    /// The bond's [`Duration`] under a flat `yield_rate` (`bondfunctions.cpp:389`).
+    ///
+    /// # Errors
+    ///
+    /// The bond must be tradable at the settlement date.
+    pub fn duration(
+        bond: &Bond,
+        yield_rate: &InterestRate,
+        duration_type: Duration,
+        settlement: Option<Date>,
+    ) -> QlResult<Time> {
+        let settlement = Self::settlement_or_eval(bond, settlement)?;
+        Self::require_tradable(bond, settlement)?;
+        CashFlows::duration(
+            bond.cashflows(),
+            yield_rate,
+            duration_type,
+            bond.settings(),
+            Some(false),
+            Some(settlement),
+            None,
+        )
+    }
+
+    /// The bond's convexity under a flat `yield_rate` (`bondfunctions.cpp:416`).
+    ///
+    /// # Errors
+    ///
+    /// The bond must be tradable at the settlement date.
+    pub fn convexity(
+        bond: &Bond,
+        yield_rate: &InterestRate,
+        settlement: Option<Date>,
+    ) -> QlResult<Real> {
+        let settlement = Self::settlement_or_eval(bond, settlement)?;
+        Self::require_tradable(bond, settlement)?;
+        CashFlows::convexity(
+            bond.cashflows(),
+            yield_rate,
+            bond.settings(),
+            Some(false),
+            Some(settlement),
+            None,
+        )
+    }
+
+    /// The bond's basis-point value under a flat `yield_rate`, in the leg's own
+    /// currency (unscaled, as C++, `bondfunctions.cpp:440`).
+    ///
+    /// # Errors
+    ///
+    /// The bond must be tradable at the settlement date.
+    pub fn basis_point_value(
+        bond: &Bond,
+        yield_rate: &InterestRate,
+        settlement: Option<Date>,
+    ) -> QlResult<Real> {
+        let settlement = Self::settlement_or_eval(bond, settlement)?;
+        Self::require_tradable(bond, settlement)?;
+        CashFlows::basis_point_value(
+            bond.cashflows(),
+            yield_rate,
+            bond.settings(),
+            Some(false),
+            Some(settlement),
+            None,
+        )
+    }
+
+    /// The yield move a one-cent change in the bond's value implies, under a
+    /// flat `yield_rate` (unscaled, as C++, `bondfunctions.cpp:464`).
+    ///
+    /// # Errors
+    ///
+    /// The bond must be tradable at the settlement date.
+    pub fn yield_value_basis_point(
+        bond: &Bond,
+        yield_rate: &InterestRate,
+        settlement: Option<Date>,
+    ) -> QlResult<Real> {
+        let settlement = Self::settlement_or_eval(bond, settlement)?;
+        Self::require_tradable(bond, settlement)?;
+        CashFlows::yield_value_basis_point(
+            bond.cashflows(),
+            yield_rate,
+            bond.settings(),
+            Some(false),
+            Some(settlement),
+            None,
+        )
+    }
+
+    /// The basis-point value per 100 of notional under a flat `yield_rate`
+    /// (`CashFlows::bps * 100 / notional`, `bondfunctions.cpp:348`).
+    ///
+    /// # Errors
+    ///
+    /// The bond must be tradable at the settlement date.
+    pub fn bps_at_yield(
+        bond: &Bond,
+        yield_rate: &InterestRate,
+        settlement: Option<Date>,
+    ) -> QlResult<Real> {
+        let settlement = Self::settlement_or_eval(bond, settlement)?;
+        let notional = Self::require_tradable(bond, settlement)?;
+        let bps = CashFlows::bps_at_yield(
+            bond.cashflows(),
+            yield_rate,
+            bond.settings(),
+            Some(false),
+            Some(settlement),
+            None,
+        )?;
+        Ok(bps * 100.0 / notional)
     }
 
     fn settlement_or_eval(bond: &Bond, settlement: Option<Date>) -> QlResult<Date> {
