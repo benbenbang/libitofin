@@ -10,6 +10,7 @@ pub mod errors;
 pub mod event;
 pub mod exercise;
 pub mod handle;
+pub mod indexes;
 pub mod instrument;
 pub mod instruments;
 pub mod interestrate;
