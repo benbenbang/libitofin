@@ -7,16 +7,20 @@
 #[allow(clippy::module_inception)]
 mod cashflows;
 mod coupon;
+mod couponpricer;
 mod dividend;
 mod duration;
 mod fixedratecoupon;
 mod fixedrateleg;
+mod floatingratecoupon;
 mod simplecashflow;
 
 pub use cashflows::CashFlows;
 pub use coupon::{Coupon, CouponBase};
+pub use couponpricer::FloatingRateCouponPricer;
 pub use dividend::{Dividend, FixedDividend, FractionalDividend, dividend_vector};
 pub use duration::Duration;
 pub use fixedratecoupon::FixedRateCoupon;
 pub use fixedrateleg::FixedRateLeg;
+pub use floatingratecoupon::{FloatingIndex, FloatingRateCoupon};
 pub use simplecashflow::{AmortizingPayment, Redemption, SimpleCashFlow};
