@@ -106,6 +106,15 @@ impl InterestRateIndexBase {
     pub(crate) fn observer(&self) -> SharedMut<dyn Observer> {
         self.forwarder.clone() as SharedMut<dyn Observer>
     }
+
+    /// The evaluation-date and fixing-history settings this index reads.
+    ///
+    /// Shared so a re-curved clone (`IborIndex::clone_with`) can key on the
+    /// same D11 fixing store (by name) and the same evaluation date as the
+    /// original index.
+    pub(crate) fn settings(&self) -> &Shared<Settings<Date>> {
+        &self.settings
+    }
 }
 
 /// A whole number of months becomes years, mirroring the C++ constructor's
