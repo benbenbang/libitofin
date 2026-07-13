@@ -299,3 +299,168 @@ fn broadcast<T: Clone>(values: &[T], index: usize, default: T) -> T {
         Some(last) => values.get(index).unwrap_or(last).clone(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    //! The `OvernightLeg` cases of `test-suite/overnightindexedcoupon.cpp` that the
+    //! ported (plain compound) scope can express:
+    //! `testOvernightLegBasicFunctionality` (:920),
+    //! `testOvernightLegWithGearingsAndSpreads` (:999) and
+    //! `testOvernightLegErrorConditions` (:1094).
+    //!
+    //! Two of them read surfaces this stack has not ported, so they are reproduced
+    //! through equivalent ported observables rather than copied assertion for
+    //! assertion:
+    //!
+    //! - The basic case asserts `lockoutDays() == 0` and
+    //!   `applyObservationShift() == false`; [`OvernightIndexedCoupon`] ships
+    //!   neither inspector (both knobs are deferred and constant), so those two
+    //!   assertions are dropped and the structural rest kept.
+    //! - The gearings/spreads case asserts `gearing()` and `spread()` per coupon;
+    //!   the coupon exposes neither accessor, so the broadcast is proved instead
+    //!   through `rate()`: against a plain leg, a per-coupon gearing scales the rate
+    //!   and a per-coupon spread shifts it, both exactly, over an all-forecast leg.
+    //!
+    //! `testOvernightLegNPV` (:1022) is not reproduced here: its fixture uses
+    //! `makeLeg(Null, 3, false, true, ...)`, i.e. three lockout days and telescopic
+    //! value dates (both deferred), over an `InterpolatedZeroCurve<Cubic>` (the
+    //! stack's zero curve is linear-only), so its published number cannot be
+    //! reproduced with the ported surface. The leg's discount-and-sum over
+    //! already-oracle'd coupon amounts lands with the OIS swap (#8.10), as the
+    //! issue body notes.
+
+    use super::*;
+    use crate::cashflows::coupon::Coupon;
+    use crate::handle::RelinkableHandle;
+    use crate::indexes::ibor::Sofr;
+    use crate::interestrate::Compounding;
+    use crate::settings::Settings;
+    use crate::termstructures::yields::FlatForward;
+    use crate::termstructures::yieldtermstructure::YieldTermStructure;
+    use crate::time::calendars::unitedstates::{Market, UnitedStates};
+    use crate::time::date::{Date, Month};
+    use crate::time::daycounters::actual360::Actual360;
+    use crate::time::frequency::Frequency;
+    use crate::time::schedule::MakeSchedule;
+    use crate::types::Rate;
+
+    const NOTIONAL: Real = 1_000_000.0;
+
+    /// The C++ `CommonVarsONLeg` reduced to the ported surface: an evaluation date,
+    /// a SOFR index over a relinkable forecast curve, and a quarterly schedule from
+    /// 1 July 2025 to 1 July 2026 (four regular periods, no stub). The fixing
+    /// history is omitted: every test here builds an all-forecast leg.
+    fn common_vars(
+        today: Date,
+    ) -> (
+        Shared<Settings<Date>>,
+        RelinkableHandle<dyn YieldTermStructure>,
+        Shared<OvernightIndex>,
+        Schedule,
+    ) {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(today);
+        let curve: RelinkableHandle<dyn YieldTermStructure> = RelinkableHandle::empty();
+        let sofr = shared(Sofr::new(curve.handle(), settings.clone()));
+        let schedule = MakeSchedule::new()
+            .from(Date::new(1, Month::July, 2025))
+            .to(Date::new(1, Month::July, 2026))
+            .with_frequency(Frequency::Quarterly)
+            .with_calendar(UnitedStates::new(Market::GovernmentBond))
+            .with_convention(BusinessDayConvention::ModifiedFollowing)
+            .forwards()
+            .build();
+        (settings, curve, sofr, schedule)
+    }
+
+    /// The C++ `flatRate(rate, Actual360())`: a flat continuously-compounded
+    /// forward curve anchored at the evaluation date.
+    fn flat_rate(reference: Date, rate: Rate) -> Shared<dyn YieldTermStructure> {
+        shared(FlatForward::with_rate(
+            reference,
+            rate,
+            Actual360::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>
+    }
+
+    fn base_leg(schedule: Schedule, sofr: Shared<OvernightIndex>) -> OvernightLeg {
+        OvernightLeg::new(schedule, sofr)
+            .with_notional(NOTIONAL)
+            .with_payment_day_counter(Actual360::new())
+    }
+
+    /// `testOvernightLegBasicFunctionality` (:920): the quarterly schedule builds
+    /// four overnight coupons, each on the leg notional and compound-averaged.
+    #[test]
+    fn a_quarterly_schedule_builds_four_compound_coupons() {
+        let (_settings, _curve, sofr, schedule) = common_vars(Date::new(1, Month::June, 2025));
+        let leg = base_leg(schedule, sofr);
+
+        assert_eq!(leg.build().unwrap().len(), 4);
+
+        let coupons = leg.coupons().unwrap();
+        assert_eq!(coupons.len(), 4);
+        for coupon in coupons {
+            assert_eq!(coupon.nominal(), NOTIONAL);
+            assert_eq!(coupon.averaging_method(), RateAveraging::Compound);
+        }
+    }
+
+    /// `testOvernightLegWithGearingsAndSpreads` (:999): four coupons, each carrying
+    /// its own gearing and spread. The coupon exposes no `gearing()`/`spread()`, so
+    /// the broadcast is proved through the rate against a plain (gearing 1, spread
+    /// 0) leg: a gearing scales the compounded rate and a spread shifts it, both
+    /// exactly, over an all-forecast leg.
+    #[test]
+    fn gearings_and_spreads_broadcast_to_every_coupon() {
+        let (settings, curve, sofr, schedule) = common_vars(Date::new(1, Month::June, 2025));
+        curve.link_to(flat_rate(settings.evaluation_date().unwrap(), 0.0434));
+
+        let gearings = [1.0, 1.25, 2.0, 0.5];
+        let spreads = [0.0001, 0.0001, 0.0002, 0.0002];
+
+        let plain = base_leg(schedule.clone(), sofr.clone()).coupons().unwrap();
+        let geared = base_leg(schedule.clone(), sofr.clone())
+            .with_gearings(gearings.to_vec())
+            .coupons()
+            .unwrap();
+        let spreaded = base_leg(schedule, sofr)
+            .with_spreads(spreads.to_vec())
+            .coupons()
+            .unwrap();
+
+        assert_eq!(plain.len(), 4);
+        assert_eq!(geared.len(), 4);
+        assert_eq!(spreaded.len(), 4);
+
+        for i in 0..4 {
+            let plain_rate = plain[i].rate().unwrap();
+            assert!((geared[i].rate().unwrap() - gearings[i] * plain_rate).abs() < 1e-12);
+            assert!((spreaded[i].rate().unwrap() - (plain_rate + spreads[i])).abs() < 1e-12);
+        }
+    }
+
+    /// `testOvernightLegErrorConditions` (:1094) and the `operator Leg()` guard: a
+    /// leg with no notional, one asking for simple averaging (the coupon ports only
+    /// compound), and one with a zero gearing (the coupon rejects it rather than
+    /// collapsing to a fixed coupon) all surface an error at build.
+    #[test]
+    fn invalid_legs_surface_errors_at_build() {
+        let (_settings, _curve, sofr, schedule) = common_vars(Date::new(1, Month::June, 2025));
+
+        assert!(
+            OvernightLeg::new(schedule.clone(), sofr.clone())
+                .build()
+                .is_err()
+        );
+        assert!(
+            base_leg(schedule.clone(), sofr.clone())
+                .with_averaging_method(RateAveraging::Simple)
+                .build()
+                .is_err()
+        );
+        assert!(base_leg(schedule, sofr).with_gearing(0.0).build().is_err());
+    }
+}
