@@ -58,9 +58,10 @@
 //! C++ dispatches the default settlement days by dynamic type
 //! (`makeois.cpp:59-69`): `Sonia` 0, `Corra` 1, else 2. The port's
 //! [`OvernightIndex`] is a newtype with no subtype, so the dispatch keys on the
-//! index family name instead: `"SONIA"` 0, `"CORRA"` 1, else 2. Only `Estr`
-//! (family `"ESTR"`, so 2) is ported today; the mapping is future-proof for when
-//! the other overnight indexes land.
+//! index family name instead, case-insensitively: QuantLib's `Sonia` family
+//! name is mixed case (`sonia.cpp:28`) while `CORRA` is uppercase
+//! (`corra.cpp:26`). Only `Estr` (family `"ESTR"`, so 2) is ported today; the
+//! mapping is future-proof for when the other overnight indexes land.
 
 use crate::cashflows::RateAveraging;
 use crate::errors::QlResult;
@@ -313,12 +314,16 @@ impl MakeOis {
 }
 
 /// The default settlement days for an overnight index, keyed on family name
-/// (`makeois.cpp:59-69`): `"SONIA"` 0, `"CORRA"` 1, else 2.
+/// (`makeois.cpp:59-69`): Sonia 0, Corra 1, else 2. The comparison is
+/// case-insensitive because QuantLib's family names vary in casing: `Sonia`
+/// is mixed case (`sonia.cpp:28`) while `CORRA` is uppercase (`corra.cpp:26`).
 fn default_settlement_days(family_name: &str) -> Natural {
-    match family_name {
-        "SONIA" => 0,
-        "CORRA" => 1,
-        _ => 2,
+    if family_name.eq_ignore_ascii_case("sonia") {
+        0
+    } else if family_name.eq_ignore_ascii_case("corra") {
+        1
+    } else {
+        2
     }
 }
 
@@ -543,12 +548,17 @@ mod tests {
     }
 
     /// The family-name settlement-days dispatch (`makeois.cpp:59-69`): `Sonia` 0,
-    /// `Corra` 1, else 2.
+    /// `Corra` 1, else 2 - against the VERBATIM family names the C++ concretes
+    /// carry: mixed-case `"Sonia"` (`sonia.cpp:28`) and uppercase `"CORRA"`
+    /// (`corra.cpp:26`).
     #[test]
     fn settlement_days_dispatch_by_family() {
+        assert_eq!(default_settlement_days("Sonia"), 0);
         assert_eq!(default_settlement_days("SONIA"), 0);
         assert_eq!(default_settlement_days("CORRA"), 1);
+        assert_eq!(default_settlement_days("Corra"), 1);
         assert_eq!(default_settlement_days("ESTR"), 2);
+        assert_eq!(default_settlement_days("SOFR"), 2);
         assert_eq!(default_settlement_days("anything else"), 2);
     }
 
