@@ -155,3 +155,5 @@ QuantLib
 .zed
 fable*.txt
 mutants*
+.mcp.json
+graphify-out/
