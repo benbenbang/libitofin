@@ -188,6 +188,13 @@ impl OvernightIndexedCoupon {
         self.compound_spread_daily
     }
 
+    /// The spread over the compounded index (`spread()`), delegating to the
+    /// embedded [`FloatingRateCoupon`] whose private field would otherwise hide
+    /// it. Read per coupon by the OIS `setupFloatingArguments` port.
+    pub fn spread(&self) -> Spread {
+        self.base.spread()
+    }
+
     /// The date the coupon is fully determined: the last fixing date
     /// (`fixingDate`, overriding the base).
     pub fn fixing_date(&self) -> Date {
