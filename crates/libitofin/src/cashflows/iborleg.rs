@@ -334,3 +334,197 @@ fn broadcast<T: Clone>(values: &[T], index: usize, default: T) -> T {
         Some(last) => values.get(index).unwrap_or(last).clone(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    //! The floating-leg cases of `cashflows.cpp`: `testNullFixingDays`, the
+    //! `IborLeg` parts of `testExCouponDates` (`l2`, `l6`, `l8`) and of
+    //! `testPartialScheduleLegConstruction` (`legf`, `legf2`, `legf3`). The
+    //! oracles build `USDLibor` and `Euribor3M`; the port uses [`Euribor`]
+    //! throughout, the assertions turning only on the schedule and the fixing-days
+    //! default, neither of which the index currency or calendar touches.
+
+    use super::*;
+    use crate::cashflows::coupon::Coupon;
+    use crate::handle::Handle;
+    use crate::indexes::ibor::Euribor;
+    use crate::settings::Settings;
+    use crate::termstructures::yieldtermstructure::YieldTermStructure;
+    use crate::time::calendars::target::Target;
+    use crate::time::date::{Date, Month};
+    use crate::time::daycounters::actualactual::{ActualActual, Convention};
+    use crate::time::frequency::Frequency;
+    use crate::time::schedule::{MakeSchedule, Schedule};
+
+    fn euribor3m() -> Shared<IborIndex> {
+        let settings = shared(Settings::<Date>::new());
+        shared(Euribor::three_months(
+            Handle::<dyn YieldTermStructure>::empty(),
+            settings,
+        ))
+    }
+
+    fn monthly_schedule() -> Schedule {
+        let today = Date::new(15, Month::June, 2026);
+        MakeSchedule::new()
+            .from(today)
+            .to(Date::new(15, Month::June, 2031))
+            .with_frequency(Frequency::Monthly)
+            .with_calendar(Target::new())
+            .with_convention(BusinessDayConvention::Following)
+            .build()
+    }
+
+    /// `testNullFixingDays`: a leg left without fixing days builds without error,
+    /// its coupons falling back to the index's fixing days. C++ passes the
+    /// `Null<Natural>` sentinel through the fixing-days vector; the port has no
+    /// in-band null, so an unset builder is its analogue. A leg pinned to the
+    /// index's own fixing days must then produce identical fixing dates.
+    #[test]
+    fn unset_fixing_days_fall_back_to_the_index() {
+        let index = euribor3m();
+        let schedule = monthly_schedule();
+        let unset = IborLeg::new(schedule.clone(), index.clone())
+            .with_notional(100.0)
+            .coupons()
+            .unwrap();
+        let pinned = IborLeg::new(schedule, index.clone())
+            .with_notional(100.0)
+            .with_fixing_days(index.fixing_days())
+            .coupons()
+            .unwrap();
+
+        assert!(!unset.is_empty());
+        assert_eq!(unset.len(), pinned.len());
+        for (u, p) in unset.iter().zip(pinned.iter()) {
+            assert_eq!(u.fixing_date(), p.fixing_date());
+        }
+    }
+
+    /// `testExCouponDates`, `l2`: an ibor leg with no ex-coupon period gives every
+    /// coupon a null ex-coupon date.
+    #[test]
+    fn an_ibor_leg_without_an_ex_coupon_period_has_no_ex_coupon_dates() {
+        let coupons = IborLeg::new(monthly_schedule(), euribor3m())
+            .with_notional(100.0)
+            .coupons()
+            .unwrap();
+
+        assert!(!coupons.is_empty());
+        for coupon in coupons {
+            assert_eq!(coupon.ex_coupon_date(), None);
+        }
+    }
+
+    /// `testExCouponDates`, `l6` and `l8`: the ex-coupon date is measured back
+    /// from each payment date, in calendar days off a [`NullCalendar`] and in
+    /// business days off [`Target`].
+    #[test]
+    fn an_ibor_leg_measures_ex_coupon_dates_back_from_the_payment_date() {
+        let leg = || IborLeg::new(monthly_schedule(), euribor3m()).with_notional(100.0);
+
+        let calendar_days = leg()
+            .with_ex_coupon_period(
+                Period::new(2, TimeUnit::Days),
+                NullCalendar::new(),
+                BusinessDayConvention::Unadjusted,
+                false,
+            )
+            .coupons()
+            .unwrap();
+        assert!(!calendar_days.is_empty());
+        for coupon in calendar_days {
+            assert_eq!(coupon.ex_coupon_date(), Some(coupon.accrual_end_date() - 2));
+        }
+
+        let business_days = leg()
+            .with_ex_coupon_period(
+                Period::new(2, TimeUnit::Days),
+                Target::new(),
+                BusinessDayConvention::Preceding,
+                false,
+            )
+            .coupons()
+            .unwrap();
+        for coupon in business_days {
+            let expected = Target::new().advance(
+                coupon.accrual_end_date(),
+                -2,
+                TimeUnit::Days,
+                BusinessDayConvention::Following,
+                false,
+            );
+            assert_eq!(coupon.ex_coupon_date(), Some(expected));
+        }
+    }
+
+    /// The `IborLeg` half of `testPartialScheduleLegConstruction`: the first and
+    /// last coupons' reference periods span a full tenor when the schedule keeps
+    /// its metadata, and fall back to the schedule period when a date-based
+    /// schedule has none.
+    #[test]
+    fn a_date_based_schedule_reconstructs_the_reference_periods_only_with_its_metadata() {
+        let schedule = MakeSchedule::new()
+            .from(Date::new(15, Month::September, 2017))
+            .to(Date::new(30, Month::September, 2020))
+            .with_next_to_last_date(Date::new(25, Month::September, 2020))
+            .with_frequency(Frequency::Semiannual)
+            .backwards()
+            .build();
+        let with_metadata = Schedule::with_metadata(
+            schedule.dates().to_vec(),
+            NullCalendar::new(),
+            BusinessDayConvention::Unadjusted,
+            Some(BusinessDayConvention::Unadjusted),
+            Some(Period::new(6, TimeUnit::Months)),
+            None,
+            Some(schedule.end_of_month()),
+            schedule.is_regular().to_vec(),
+        );
+        let without_metadata = Schedule::from_dates(schedule.dates().to_vec());
+        let coupons = |schedule| {
+            IborLeg::new(schedule, euribor3m())
+                .with_notional(100.0)
+                .with_payment_day_counter(ActualActual::with_convention(Convention::ISMA))
+                .coupons()
+                .unwrap()
+        };
+
+        for leg in [coupons(schedule), coupons(with_metadata)] {
+            assert_eq!(
+                leg[0].reference_period_start(),
+                Date::new(25, Month::March, 2017)
+            );
+            assert_eq!(
+                leg[0].reference_period_end(),
+                Date::new(25, Month::September, 2017)
+            );
+            assert_eq!(
+                leg.last().unwrap().reference_period_start(),
+                Date::new(25, Month::September, 2020)
+            );
+            assert_eq!(
+                leg.last().unwrap().reference_period_end(),
+                Date::new(25, Month::March, 2021)
+            );
+        }
+
+        let leg = coupons(without_metadata);
+        assert_eq!(
+            leg[0].reference_period_start(),
+            Date::new(15, Month::September, 2017)
+        );
+        assert_eq!(
+            leg[0].reference_period_end(),
+            Date::new(25, Month::September, 2017)
+        );
+        assert_eq!(
+            leg.last().unwrap().reference_period_start(),
+            Date::new(25, Month::September, 2020)
+        );
+        assert_eq!(
+            leg.last().unwrap().reference_period_end(),
+            Date::new(30, Month::September, 2020)
+        );
+    }
+}
