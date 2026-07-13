@@ -9,6 +9,7 @@ mod fixedvsfloatingswap;
 mod oneassetoption;
 mod payoffs;
 mod swap;
+mod vanillaswap;
 
 pub use bond::{Bond, BondArguments, BondEngine, BondPrice, BondResults};
 pub use bonds::FixedRateBond;
@@ -22,3 +23,4 @@ pub use oneassetoption::{
 };
 pub use payoffs::{PlainVanillaPayoff, StrikedTypePayoff, TypePayoff};
 pub use swap::{Swap, SwapArguments, SwapEngine, SwapResults, SwapType};
+pub use vanillaswap::VanillaSwap;
