@@ -17,6 +17,7 @@ mod iborcoupon;
 mod iborleg;
 mod overnightindexedcoupon;
 mod overnightindexedcouponpricer;
+mod overnightleg;
 mod rateaveraging;
 mod simplecashflow;
 
@@ -34,5 +35,6 @@ pub use overnightindexedcoupon::OvernightIndexedCoupon;
 pub use overnightindexedcouponpricer::{
     CompoundingOvernightIndexedCouponPricer, OvernightSchedule,
 };
+pub use overnightleg::OvernightLeg;
 pub use rateaveraging::RateAveraging;
 pub use simplecashflow::{AmortizingPayment, Redemption, SimpleCashFlow};
