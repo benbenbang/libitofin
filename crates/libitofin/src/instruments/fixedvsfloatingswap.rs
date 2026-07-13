@@ -534,3 +534,383 @@ impl Instrument for FixedVsFloatingSwap {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    //! `FixedVsFloatingSwap` is abstract: its numeric oracle (`swap.cpp`
+    //! `testFairRate`, `:107`) runs through the concrete `VanillaSwap` (#322).
+    //! These unit tests pin the base's own behaviour with stub legs and stub
+    //! engines: the staging inversion (base built fixed-then-floating with the
+    //! payer flags `swap_type` implies), the `fetchResults` fair-rate/spread
+    //! fallback arithmetic and its guards, the specialised-engine path, the
+    //! `setupArguments` split with the floating hook, and the argument
+    //! validation.
+
+    use super::*;
+    use crate::cashflow::CashFlow;
+    use crate::cashflows::SimpleCashFlow;
+    use crate::handle::Handle;
+    use crate::indexes::ibor::Euribor;
+    use crate::instruments::swap::SwapEngine;
+    use crate::patterns::observable::{AsObservable, Observable};
+    use crate::pricingengine::PricingEngine;
+    use crate::shared::{SharedMut, shared, shared_mut};
+    use crate::termstructures::yieldtermstructure::YieldTermStructure;
+    use crate::time::calendars::target::Target;
+    use crate::time::date::Month;
+    use crate::time::daycounters::actual360::Actual360;
+    use crate::time::schedule::MakeSchedule;
+
+    fn settings_today() -> Shared<Settings<Date>> {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(Date::new(7, Month::July, 2026));
+        settings
+    }
+
+    fn euribor(settings: &Shared<Settings<Date>>) -> Shared<IborIndex> {
+        shared(Euribor::three_months(
+            Handle::<dyn YieldTermStructure>::empty(),
+            Shared::clone(settings),
+        ))
+    }
+
+    /// An annual schedule spanning two coupon periods.
+    fn fixed_schedule() -> Schedule {
+        MakeSchedule::new()
+            .from(Date::new(7, Month::July, 2027))
+            .to(Date::new(7, Month::July, 2029))
+            .with_frequency(Frequency::Annual)
+            .with_calendar(Target::new())
+            .with_convention(BusinessDayConvention::Following)
+            .build()
+    }
+
+    /// A one-flow stub standing in for the derived swap's floating leg.
+    fn floating_stub_leg() -> Leg {
+        vec![
+            shared(SimpleCashFlow::new(1.0, Date::new(7, Month::July, 2028)).unwrap())
+                as Shared<dyn CashFlow>,
+        ]
+    }
+
+    fn make_swap(swap_type: SwapType, floating_nominals: Vec<Real>) -> FixedVsFloatingSwap {
+        make_swap_with_hook(swap_type, floating_nominals, Box::new(|_, _| Ok(())))
+    }
+
+    fn make_swap_with_hook(
+        swap_type: SwapType,
+        floating_nominals: Vec<Real>,
+        floating_arguments: FloatingArgumentsFn,
+    ) -> FixedVsFloatingSwap {
+        let settings = settings_today();
+        let index = euribor(&settings);
+        FixedVsFloatingSwap::new(
+            swap_type,
+            vec![100.0],
+            fixed_schedule(),
+            0.05,
+            Some(Actual360::new()),
+            floating_nominals,
+            fixed_schedule(),
+            index,
+            0.001,
+            Actual360::new(),
+            None,
+            0,
+            None,
+            floating_stub_leg(),
+            floating_arguments,
+            settings,
+        )
+        .unwrap()
+    }
+
+    /// An engine standing in for a generic `Swap` engine: it returns a
+    /// [`SwapResults`] bundle with no fair values, so the swap must fall back.
+    struct StubSwapEngine {
+        base: SwapEngine,
+        npv: Real,
+        leg_npv: Vec<Real>,
+        leg_bps: Vec<Real>,
+    }
+
+    impl AsObservable for StubSwapEngine {
+        fn observable(&self) -> &Observable {
+            self.base.observable()
+        }
+    }
+
+    impl PricingEngine for StubSwapEngine {
+        fn arguments_mut(&mut self) -> &mut dyn Arguments {
+            self.base.arguments_mut()
+        }
+
+        fn results(&self) -> &dyn Results {
+            self.base.results()
+        }
+
+        fn reset(&mut self) {
+            self.base.reset();
+        }
+
+        fn calculate(&mut self) -> QlResult<()> {
+            let results = self.base.results_mut();
+            results.instrument.value = Some(self.npv);
+            results.leg_npv = self.leg_npv.clone();
+            results.leg_bps = self.leg_bps.clone();
+            Ok(())
+        }
+    }
+
+    fn swap_engine(npv: Real, leg_npv: Vec<Real>, leg_bps: Vec<Real>) -> SharedMut<StubSwapEngine> {
+        shared_mut(StubSwapEngine {
+            base: SwapEngine::new(SwapArguments::default(), SwapResults::default()),
+            npv,
+            leg_npv,
+            leg_bps,
+        })
+    }
+
+    /// An engine standing in for a specialised `FixedVsFloatingSwap` engine: it
+    /// returns fair values directly, so no fallback is taken.
+    struct StubFvfEngine {
+        base: FixedVsFloatingSwapEngine,
+        npv: Real,
+        leg_bps: Vec<Real>,
+        fair_rate: Rate,
+        fair_spread: Spread,
+    }
+
+    impl AsObservable for StubFvfEngine {
+        fn observable(&self) -> &Observable {
+            self.base.observable()
+        }
+    }
+
+    impl PricingEngine for StubFvfEngine {
+        fn arguments_mut(&mut self) -> &mut dyn Arguments {
+            self.base.arguments_mut()
+        }
+
+        fn results(&self) -> &dyn Results {
+            self.base.results()
+        }
+
+        fn reset(&mut self) {
+            self.base.reset();
+        }
+
+        fn calculate(&mut self) -> QlResult<()> {
+            let results = self.base.results_mut();
+            results.swap.instrument.value = Some(self.npv);
+            results.swap.leg_bps = self.leg_bps.clone();
+            results.fair_rate = Some(self.fair_rate);
+            results.fair_spread = Some(self.fair_spread);
+            Ok(())
+        }
+    }
+
+    /// The base is built fixed-leg first, floating-leg second, and the fixed
+    /// leg carries one coupon per annual schedule period.
+    #[test]
+    fn the_base_is_built_fixed_then_floating() {
+        let swap = make_swap(SwapType::Receiver, vec![100.0]);
+
+        assert_eq!(swap.fixed_leg().len(), 2, "two annual fixed coupons");
+        assert_eq!(swap.floating_leg().len(), 1, "the supplied floating stub");
+        assert_eq!(
+            swap.floating_leg()[0].date(),
+            Date::new(7, Month::July, 2028)
+        );
+    }
+
+    /// A `Receiver` receives the fixed leg (+1) and pays the floating (-1); a
+    /// `Payer` is the mirror. The multipliers reach the swap-level arguments.
+    #[test]
+    fn payer_type_maps_the_two_leg_multipliers() {
+        let mut receiver = SwapArguments::default();
+        make_swap(SwapType::Receiver, vec![100.0])
+            .setup_arguments(&mut receiver)
+            .unwrap();
+        assert_eq!(
+            receiver.payer,
+            vec![1.0, -1.0],
+            "receiver: +fixed, -floating"
+        );
+
+        let mut payer = SwapArguments::default();
+        make_swap(SwapType::Payer, vec![100.0])
+            .setup_arguments(&mut payer)
+            .unwrap();
+        assert_eq!(payer.payer, vec![-1.0, 1.0], "payer: -fixed, +floating");
+    }
+
+    /// A generic `Swap` engine sets no fair values, so `fetchResults` computes
+    /// `fairRate = fixedRate - NPV / (legBPS[0] / bp)` and
+    /// `fairSpread = spread - NPV / (legBPS[1] / bp)`.
+    #[test]
+    fn fair_values_fall_back_from_npv_and_leg_bps() {
+        let mut swap = make_swap(SwapType::Receiver, vec![100.0]);
+        swap.base_mut()
+            .set_pricing_engine(swap_engine(2.0, vec![-98.0, 100.0], vec![-1.0, 2.0]));
+
+        assert_eq!(swap.fair_rate().unwrap(), 0.05 - 2.0 / (-1.0 / BASIS_POINT));
+        assert_eq!(
+            swap.fair_spread().unwrap(),
+            0.001 - 2.0 / (2.0 / BASIS_POINT)
+        );
+    }
+
+    /// When the engine leaves the leg BPS empty, the fallback guard skips and
+    /// the fair values stay unavailable (the C++ `legBPS_[i] != Null` check).
+    #[test]
+    fn absent_leg_bps_leaves_fair_values_unavailable() {
+        let mut swap = make_swap(SwapType::Receiver, vec![100.0]);
+        swap.base_mut()
+            .set_pricing_engine(swap_engine(2.0, vec![], vec![]));
+
+        assert_eq!(
+            swap.fair_rate().unwrap_err().message(),
+            "result not available"
+        );
+        assert_eq!(
+            swap.fair_spread().unwrap_err().message(),
+            "result not available"
+        );
+    }
+
+    /// A specialised engine's fair values are used as-is; the fallback is not
+    /// taken even though the leg BPS would yield a different number.
+    #[test]
+    fn specialised_engine_fair_values_are_used_directly() {
+        let mut swap = make_swap(SwapType::Receiver, vec![100.0]);
+        swap.base_mut()
+            .set_pricing_engine(shared_mut(StubFvfEngine {
+                base: FixedVsFloatingSwapEngine::new(
+                    FixedVsFloatingSwapArguments::default(),
+                    FixedVsFloatingSwapResults::default(),
+                ),
+                npv: 2.0,
+                leg_bps: vec![-1.0, 2.0],
+                fair_rate: 0.09,
+                fair_spread: 0.007,
+            }));
+
+        assert_eq!(swap.fair_rate().unwrap(), 0.09);
+        assert_eq!(swap.fair_spread().unwrap(), 0.007);
+    }
+
+    /// The fixed-vs-floating argument branch fills the type, nominal and fixed
+    /// coupon vectors, then defers to the floating hook the derived swap
+    /// supplies (#321 iterates the floating `IborCoupon`s here).
+    #[test]
+    fn setup_arguments_fills_fixed_vectors_and_calls_the_floating_hook() {
+        let marker = Date::new(1, Month::January, 2030);
+        let swap = make_swap_with_hook(
+            SwapType::Receiver,
+            vec![100.0],
+            Box::new(move |_swap, args| {
+                args.floating_pay_dates.push(marker);
+                Ok(())
+            }),
+        );
+
+        let mut args = FixedVsFloatingSwapArguments::default();
+        swap.setup_arguments(&mut args).unwrap();
+
+        assert_eq!(args.swap_type, Some(SwapType::Receiver));
+        assert_eq!(args.nominal, Some(100.0));
+        assert_eq!(args.swap.legs.len(), 2);
+        assert_eq!(args.fixed_pay_dates.len(), 2);
+        assert_eq!(args.fixed_reset_dates.len(), 2);
+        assert_eq!(args.fixed_coupons.len(), 2);
+        assert_eq!(args.fixed_nominals, vec![100.0, 100.0]);
+        assert_eq!(args.floating_pay_dates, vec![marker], "the hook ran");
+    }
+
+    /// `nominal()` needs a constant nominal and `nominals()` the same nominals
+    /// on both legs; differing legs make both fail.
+    #[test]
+    fn nominal_accessors_gate_on_constant_and_matching_nominals() {
+        let same = make_swap(SwapType::Receiver, vec![100.0]);
+        assert_eq!(same.nominal().unwrap(), 100.0);
+        assert_eq!(same.nominals().unwrap(), &[100.0]);
+
+        let different = make_swap(SwapType::Receiver, vec![200.0]);
+        assert_eq!(
+            different.nominal().unwrap_err().message(),
+            "nominal is not constant"
+        );
+        assert_eq!(
+            different.nominals().unwrap_err().message(),
+            "different nominals on fixed and floating leg"
+        );
+    }
+
+    /// The per-leg BPS/NPV accessors read the swap's leg results by index.
+    #[test]
+    fn leg_bps_and_npv_accessors_read_the_swap_results() {
+        let mut swap = make_swap(SwapType::Receiver, vec![100.0]);
+        swap.base_mut()
+            .set_pricing_engine(swap_engine(2.0, vec![-98.0, 100.0], vec![-1.0, 2.0]));
+
+        assert_eq!(swap.fixed_leg_npv().unwrap(), -98.0);
+        assert_eq!(swap.floating_leg_npv().unwrap(), 100.0);
+        assert_eq!(swap.fixed_leg_bps().unwrap(), -1.0);
+        assert_eq!(swap.floating_leg_bps().unwrap(), 2.0);
+    }
+
+    /// An expired swap reports no fair values (the C++ `setupExpired` nulls
+    /// them), and never consults the engine.
+    #[test]
+    fn an_expired_swap_has_no_fair_values() {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(Date::new(8, Month::July, 2030));
+        let index = euribor(&settings);
+        let mut swap = FixedVsFloatingSwap::new(
+            SwapType::Receiver,
+            vec![100.0],
+            fixed_schedule(),
+            0.05,
+            Some(Actual360::new()),
+            vec![100.0],
+            fixed_schedule(),
+            index,
+            0.001,
+            Actual360::new(),
+            None,
+            0,
+            None,
+            floating_stub_leg(),
+            Box::new(|_, _| Ok(())),
+            settings,
+        )
+        .unwrap();
+
+        assert_eq!(swap.npv().unwrap(), 0.0);
+        assert_eq!(
+            swap.fair_rate().unwrap_err().message(),
+            "result not available"
+        );
+    }
+
+    /// The argument validation inherits the swap-level check and adds the
+    /// fixed/floating vector-length checks.
+    #[test]
+    fn arguments_validate_rejects_vector_length_mismatches() {
+        let mut args = FixedVsFloatingSwapArguments {
+            fixed_nominals: vec![100.0],
+            fixed_pay_dates: vec![Date::new(7, Month::July, 2028)],
+            fixed_reset_dates: vec![Date::new(7, Month::July, 2027)],
+            fixed_coupons: vec![],
+            ..FixedVsFloatingSwapArguments::default()
+        };
+        assert_eq!(
+            args.validate().unwrap_err().message(),
+            "number of fixed payment dates different from number of fixed coupon amounts"
+        );
+
+        args.fixed_coupons = vec![5.0];
+        assert!(args.validate().is_ok(), "matched lengths validate");
+    }
+}
