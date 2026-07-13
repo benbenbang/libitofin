@@ -13,6 +13,10 @@
 //! forward rate from the curve's discount factors between the value and
 //! maturity dates. The index registers its forwarding observer with the curve
 //! handle, so a relinked or changed curve notifies the index's observers.
+//!
+//! [`OvernightIndex`] lives here too, as it does in `iborindex.hpp`: an
+//! [`IborIndex`] pinned to the overnight configuration (one-day tenor,
+//! `Following`, no end-of-month).
 
 use crate::errors::QlResult;
 use crate::handle::Handle;
@@ -26,6 +30,7 @@ use crate::time::calendar::Calendar;
 use crate::time::date::Date;
 use crate::time::daycounter::DayCounter;
 use crate::time::period::Period;
+use crate::time::timeunit::TimeUnit;
 use crate::types::{Natural, Rate, Time};
 use crate::{currency::Currency, require};
 
@@ -142,6 +147,85 @@ impl InterestRateIndex for IborIndex {
             self.day_counter().name()
         );
         self.forecast_fixing_between(d1, d2, t)
+    }
+}
+
+/// An overnight index (e.g. SOFR, ESTR): an [`IborIndex`] fixed on a one-day
+/// tenor.
+///
+/// Port of `OvernightIndex` (`ql/indexes/iborindex.hpp:88`), which subclasses
+/// [`IborIndex`] and forwards a fixed overnight configuration: a `1*Days`
+/// tenor, a [`Following`](BusinessDayConvention::Following) roll, and no
+/// end-of-month adjustment. The port keeps that "is-an-`IborIndex`" relation as
+/// a newtype embedding the configured [`IborIndex`], re-exposed through
+/// [`InterestRateIndex`] (and hence the whole [`Index`] surface) so a
+/// downstream overnight coupon can hold a concrete `OvernightIndex` rather than
+/// an indistinguishable [`IborIndex`].
+///
+/// The C++ `clone()` override (`iborindex.cpp:85`) re-curves the index onto a
+/// different forwarding handle; it is not ported, matching [`IborIndex`], which
+/// does not port `clone()` either (it is exercised only by rate-helper
+/// bootstrapping, a later layer).
+pub struct OvernightIndex(IborIndex);
+
+impl OvernightIndex {
+    /// Builds an overnight index over `forwarding`.
+    ///
+    /// Mirrors the C++ constructor (`iborindex.cpp:76`): an [`IborIndex`] with a
+    /// `1*Days` tenor, a [`Following`](BusinessDayConvention::Following) roll,
+    /// and `end_of_month = false`, leaving family name, settlement days,
+    /// currency, fixing calendar, and day counter to the caller.
+    pub fn new(
+        family_name: String,
+        settlement_days: Natural,
+        currency: Currency,
+        fixing_calendar: Calendar,
+        day_counter: DayCounter,
+        forwarding: Handle<dyn YieldTermStructure>,
+        settings: Shared<Settings<Date>>,
+    ) -> OvernightIndex {
+        OvernightIndex(IborIndex::new(
+            family_name,
+            Period::new(1, TimeUnit::Days),
+            settlement_days,
+            currency,
+            fixing_calendar,
+            BusinessDayConvention::Following,
+            false,
+            day_counter,
+            forwarding,
+            settings,
+        ))
+    }
+
+    /// The convention applied when rolling the value date to maturity (always
+    /// [`Following`](BusinessDayConvention::Following)).
+    pub fn business_day_convention(&self) -> BusinessDayConvention {
+        self.0.business_day_convention()
+    }
+
+    /// Whether the maturity roll keeps to month ends (always `false`).
+    pub fn end_of_month(&self) -> bool {
+        self.0.end_of_month()
+    }
+
+    /// The curve used to forecast fixings (`forwardingTermStructure`).
+    pub fn forwarding_term_structure(&self) -> &Handle<dyn YieldTermStructure> {
+        self.0.forwarding_term_structure()
+    }
+}
+
+impl InterestRateIndex for OvernightIndex {
+    fn base(&self) -> &InterestRateIndexBase {
+        self.0.base()
+    }
+
+    fn maturity_date(&self, value_date: Date) -> QlResult<Date> {
+        self.0.maturity_date(value_date)
+    }
+
+    fn forecast_fixing(&self, fixing_date: Date) -> QlResult<Rate> {
+        self.0.forecast_fixing(fixing_date)
     }
 }
 
