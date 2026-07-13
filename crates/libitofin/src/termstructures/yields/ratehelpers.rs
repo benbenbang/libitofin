@@ -651,4 +651,235 @@ mod tests {
             "date change must rerun initialize_dates"
         );
     }
+
+    fn swap_setup() -> (Shared<Settings<Date>>, IborIndex) {
+        let settings = settings_on(today());
+        let source = euribor(
+            Period::new(6, TimeUnit::Months),
+            Handle::empty(),
+            settings.clone(),
+        );
+        (settings, source)
+    }
+
+    /// Builds the same spot-starting swap the helper builds, directly on `curve`,
+    /// for a cross-implementation identity: a separate [`MakeVanillaSwap`]
+    /// instance priced by its own [`DiscountingSwapEngine`].
+    fn independent_swap(
+        source: &IborIndex,
+        tenor: Period,
+        calendar: Calendar,
+        convention: BusinessDayConvention,
+        curve: &Shared<dyn YieldTermStructure>,
+        settings: Shared<Settings<Date>>,
+    ) -> VanillaSwap {
+        let curve_handle = Handle::new(Shared::clone(curve));
+        let index = shared(source.clone_with(curve_handle.clone()));
+        MakeVanillaSwap::new(
+            tenor,
+            index,
+            Some(0.0),
+            Period::new(0, TimeUnit::Days),
+            settings,
+        )
+        .with_discounting_term_structure(curve_handle)
+        .with_fixed_leg_day_count(Actual360::new())
+        .with_fixed_leg_tenor(Period::try_from(Frequency::Annual).unwrap())
+        .with_fixed_leg_convention(convention)
+        .with_fixed_leg_termination_date_convention(convention)
+        .with_fixed_leg_calendar(calendar.clone())
+        .with_fixed_leg_end_of_month(false)
+        .with_floating_leg_calendar(calendar)
+        .with_floating_leg_end_of_month(false)
+        .build()
+        .unwrap()
+    }
+
+    /// With no spread, the reconstructed `implied_quote` equals the fair rate of
+    /// the same swap computed independently - the par-rate formula reduces to the
+    /// fair rate exactly.
+    #[test]
+    fn implied_quote_matches_fair_rate_of_the_same_swap() {
+        let (settings, source) = swap_setup();
+        let tenor = Period::new(5, TimeUnit::Years);
+        let calendar = Target::new();
+        let convention = BusinessDayConvention::ModifiedFollowing;
+        let helper = SwapRateHelper::from_rate(
+            0.02,
+            tenor,
+            calendar.clone(),
+            Frequency::Annual,
+            convention,
+            Actual360::new(),
+            &source,
+        );
+        let curve = flat_curve(today(), 0.03);
+        helper.set_term_structure(&curve);
+
+        let implied = helper.implied_quote().unwrap();
+        let mut independent =
+            independent_swap(&source, tenor, calendar, convention, &curve, settings);
+        let fair = independent.fixed_vs_floating_mut().fair_rate().unwrap();
+        assert!(
+            (implied - fair).abs() < 1e-12,
+            "implied {implied} vs fair {fair}"
+        );
+    }
+
+    /// A nonzero spread shifts the implied quote off the fair rate by exactly
+    /// `spread * floatingLegBPS / fixedLegBPS` (BPS from an independent swap) -
+    /// the term a bare `fair_rate()` would drop.
+    #[test]
+    fn nonzero_spread_shifts_the_implied_quote_by_the_bps_ratio() {
+        let (settings, source) = swap_setup();
+        let tenor = Period::new(5, TimeUnit::Years);
+        let calendar = Target::new();
+        let convention = BusinessDayConvention::ModifiedFollowing;
+        let curve = flat_curve(today(), 0.03);
+
+        let helper0 = SwapRateHelper::from_rate(
+            0.02,
+            tenor,
+            calendar.clone(),
+            Frequency::Annual,
+            convention,
+            Actual360::new(),
+            &source,
+        );
+        helper0.set_term_structure(&curve);
+        let implied0 = helper0.implied_quote().unwrap();
+
+        let spread = 0.001;
+        let spread_handle = Handle::new(shared(SimpleQuote::new(spread)) as Shared<dyn Quote>);
+        let helper_s = SwapRateHelper::with_details(
+            Handle::new(shared(SimpleQuote::new(0.02)) as Shared<dyn Quote>),
+            tenor,
+            calendar.clone(),
+            Frequency::Annual,
+            convention,
+            Actual360::new(),
+            &source,
+            spread_handle,
+            Period::new(0, TimeUnit::Days),
+            None,
+            Pillar::LastRelevantDate,
+        );
+        helper_s.set_term_structure(&curve);
+        let implied_s = helper_s.implied_quote().unwrap();
+
+        assert!(
+            (implied_s - implied0).abs() > 1e-8,
+            "the spread must move the implied quote"
+        );
+
+        let mut independent =
+            independent_swap(&source, tenor, calendar, convention, &curve, settings);
+        let floating_bps = independent
+            .fixed_vs_floating_mut()
+            .floating_leg_bps()
+            .unwrap();
+        let fixed_bps = independent.fixed_vs_floating_mut().fixed_leg_bps().unwrap();
+        let expected = implied0 - spread * floating_bps / fixed_bps;
+        assert!(
+            (implied_s - expected).abs() < 1e-12,
+            "implied_s {implied_s} vs expected {expected}"
+        );
+    }
+
+    /// The forced recalculation: moving the curve (mutating its underlying quote,
+    /// not relinking) changes the implied quote even though the helper never
+    /// observes the curve and receives no notification - proving `implied_quote`
+    /// forces a fresh calculation rather than reading a stale cache.
+    #[test]
+    fn moving_the_curve_updates_the_quote_without_notifying_the_helper() {
+        let (_settings, source) = swap_setup();
+        let tenor = Period::new(5, TimeUnit::Years);
+        let helper = SwapRateHelper::from_rate(
+            0.02,
+            tenor,
+            Target::new(),
+            Frequency::Annual,
+            BusinessDayConvention::ModifiedFollowing,
+            Actual360::new(),
+            &source,
+        );
+
+        let quote = shared(SimpleQuote::new(0.03));
+        let curve: Shared<dyn YieldTermStructure> = shared(FlatForward::new(
+            today(),
+            Handle::new(Shared::clone(&quote) as Shared<dyn Quote>),
+            Actual360::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        ));
+        helper.set_term_structure(&curve);
+        let implied_before = helper.implied_quote().unwrap();
+
+        let flag = Flag::new();
+        helper.observable().register_observer(&as_observer(&flag));
+
+        quote.set_value(0.05);
+        assert!(
+            !Flag::is_up(&flag),
+            "the helper must not observe the bootstrapping curve"
+        );
+
+        let implied_after = helper.implied_quote().unwrap();
+        assert!(
+            (implied_after - implied_before).abs() > 1e-6,
+            "the forced recalculation must surface the curve move without a notification"
+        );
+    }
+
+    /// `initialize_dates` builds a spot-starting swap and the pillar follows the
+    /// [`Pillar`] choice.
+    #[test]
+    fn initialize_dates_spot_starts_and_pillar_follows_the_choice() {
+        let (_settings, source) = swap_setup();
+        let tenor = Period::new(5, TimeUnit::Years);
+        let helper = SwapRateHelper::with_details(
+            Handle::new(shared(SimpleQuote::new(0.02)) as Shared<dyn Quote>),
+            tenor,
+            Target::new(),
+            Frequency::Annual,
+            BusinessDayConvention::ModifiedFollowing,
+            Actual360::new(),
+            &source,
+            Handle::empty(),
+            Period::new(0, TimeUnit::Days),
+            None,
+            Pillar::MaturityDate,
+        );
+        assert!(
+            helper.earliest_date() > today(),
+            "the swap starts spot, past today"
+        );
+        assert!(helper.maturity_date() > helper.earliest_date());
+        assert_eq!(
+            helper.pillar_date(),
+            helper.maturity_date(),
+            "the MaturityDate pillar equals the maturity"
+        );
+    }
+
+    /// `quote_error` is market minus implied.
+    #[test]
+    fn swap_quote_error_is_market_minus_implied() {
+        let (_settings, source) = swap_setup();
+        let tenor = Period::new(5, TimeUnit::Years);
+        let helper = SwapRateHelper::from_rate(
+            0.05,
+            tenor,
+            Target::new(),
+            Frequency::Annual,
+            BusinessDayConvention::ModifiedFollowing,
+            Actual360::new(),
+            &source,
+        );
+        let curve = flat_curve(today(), 0.03);
+        helper.set_term_structure(&curve);
+
+        let implied = helper.implied_quote().unwrap();
+        assert!((helper.quote_error().unwrap() - (0.05 - implied)).abs() < 1e-15);
+    }
 }
