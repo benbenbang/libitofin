@@ -11,6 +11,8 @@
 //! [`AsObservable`] bound on handle pointees and forwards every pointee
 //! notification to the link's own observers.
 
+use std::rc::Weak;
+
 use crate::errors::QlResult;
 pub use crate::patterns::observable::AsObservable;
 use crate::patterns::observable::{Observable, Observer, ResetThenNotify};
@@ -19,15 +21,31 @@ use crate::shared::{Shared, SharedMut, shared_mut};
 
 /// Inner shared cell of a [`Handle`]: the current pointee plus the link's own
 /// observable, through which relinks and pointee changes are broadcast.
+///
+/// The pointee lives in one of two slots. [`current`](Self::current) is the
+/// owning slot every ordinary handle uses. [`weak`](Self::weak) is the
+/// non-owning slot a bootstrap helper links to the curve it prices against (the
+/// `null_deleter` analogue, see [`Link::link_weak`]); it is resolved by
+/// upgrading and never keeps the pointee alive. At most one slot is ever set.
 pub struct Link<T: ?Sized> {
     current: Option<Shared<T>>,
+    weak: Option<Weak<T>>,
     observable: Shared<Observable>,
     forwarder: SharedMut<ResetThenNotify>,
 }
 
 impl<T: ?Sized> Link<T> {
+    /// The pointee the link resolves to: the owning slot if set, otherwise the
+    /// non-owning slot upgraded, or `None` if neither yields a live pointee.
+    fn resolved(&self) -> Option<Shared<T>> {
+        match &self.current {
+            Some(strong) => Some(strong.clone()),
+            None => self.weak.as_ref().and_then(Weak::upgrade),
+        }
+    }
+
     fn is_empty(&self) -> bool {
-        self.current.is_none()
+        self.resolved().is_none()
     }
 }
 
@@ -41,6 +59,7 @@ impl<T: AsObservable + ?Sized> Link<T> {
         let forwarder = ResetThenNotify::forwarding(Shared::clone(&observable));
         let mut link = Link {
             current: None,
+            weak: None,
             observable,
             forwarder,
         };
@@ -62,6 +81,25 @@ impl<T: AsObservable + ?Sized> Link<T> {
             new.observable().register_observer(&forwarder);
         }
         self.current = pointee;
+        self.weak = None;
+        self.observable.clone()
+    }
+
+    /// Repoints the link at a non-owning [`Weak`] pointee, dropping any owning
+    /// pointee's subscription and registering none on the weak one.
+    ///
+    /// The port of C++ `linkTo(shared_ptr(t, null_deleter()), observer=false)`
+    /// (`ratehelpers.cpp:217`): a bootstrap helper links its pricing handle to
+    /// the curve being built this way. The curve owns the helper, so an owning
+    /// link would close a reference cycle; and the helper must not observe the
+    /// curve it is moved through during the solve, so no observer is registered.
+    fn link_weak(&mut self, pointee: Weak<T>) -> Shared<Observable> {
+        let forwarder = self.forwarder.clone() as SharedMut<dyn Observer>;
+        if let Some(old) = &self.current {
+            old.observable().unregister_observer(&forwarder);
+        }
+        self.current = None;
+        self.weak = Some(pointee);
         self.observable.clone()
     }
 }
@@ -96,8 +134,9 @@ impl<T: ?Sized> Handle<T> {
     /// Mirrors QuantLib's `currentLink`/`operator*`, which require a non-empty
     /// handle.
     pub fn current_link(&self) -> QlResult<Shared<T>> {
-        require!(!self.is_empty(), "empty Handle cannot be dereferenced");
-        Ok(self.link.borrow().current.clone().unwrap())
+        let link = self.link.borrow();
+        require!(!link.is_empty(), "empty Handle cannot be dereferenced");
+        Ok(link.resolved().unwrap())
     }
 
     /// Whether the contained pointer points at anything.
@@ -151,6 +190,18 @@ impl<T: AsObservable + ?Sized> RelinkableHandle<T> {
     /// and notifying observers.
     pub fn link_to(&self, pointee: Shared<T>) {
         let observable = self.handle.link.borrow_mut().link_to(Some(pointee));
+        observable.notify_observers();
+    }
+
+    /// Points the shared link at a non-owning [`Weak`] pointee, notifying
+    /// observers.
+    ///
+    /// The link resolves the pointee by upgrading the weak reference and never
+    /// keeps it alive (the `null_deleter` analogue, [`Link::link_weak`]); a
+    /// bootstrap helper links its pricing handle to the curve it prices against
+    /// this way, so no reference cycle forms and the curve is not observed.
+    pub fn link_to_weak(&self, pointee: Weak<T>) {
+        let observable = self.handle.link.borrow_mut().link_weak(pointee);
         observable.notify_observers();
     }
 
@@ -428,6 +479,32 @@ mod tests {
             cacher.borrow().seen,
             Some(1.0),
             "handle observers must see the written-back value, not the stale one"
+        );
+    }
+
+    /// The `null_deleter`/`observer=false` analogue: a weak-linked handle
+    /// resolves its pointee by upgrade, does not observe it, and does not keep
+    /// it alive past its owner.
+    #[test]
+    fn weak_link_resolves_without_owning_or_observing() {
+        let quote = shared(SimpleQuote::new(1.0));
+        let rh: RelinkableHandle<dyn Quote> = RelinkableHandle::empty();
+        rh.link_to_weak(Shared::downgrade(&(quote.clone() as Shared<dyn Quote>)));
+        assert_eq!(rh.handle().current_link().unwrap().value().unwrap(), 1.0);
+
+        let flag = shared_mut(Flag::default());
+        rh.handle()
+            .register_observer(&(flag.clone() as SharedMut<dyn Observer>));
+        quote.set_value(2.0);
+        assert!(
+            !flag.borrow().up,
+            "a weak link must not observe its pointee"
+        );
+
+        drop(quote);
+        assert!(
+            rh.handle().is_empty(),
+            "a weak link must not keep the pointee alive"
         );
     }
 
