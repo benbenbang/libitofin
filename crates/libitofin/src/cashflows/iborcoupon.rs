@@ -201,3 +201,278 @@ impl Coupon for IborCoupon {
         self.base.accrued_amount(date)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    //! Oracles from `cashflows.cpp`, reproducing the two tests that build the
+    //! actual `IborCoupon` + `BlackIborCouponPricer` type.
+    //!
+    //! `USDLibor` and `Euribor3M` construction differs only in currency,
+    //! calendar and convention, none of which the assertions depend on: the
+    //! amount check is self-consistent (past fixing times the coupon's own
+    //! accrual period), and the has-fixed check turns only on the fixing date
+    //! against today. `testFixedIborCouponWithoutForecastCurve` uses a hand-built
+    //! TARGET/Actual/360 6M index in place of `USDLibor(6M)`, and
+    //! `testIborCouponKnowsWhenitHasFixed` uses the ported [`Euribor`] 3M.
+
+    use super::*;
+    use crate::currency::Currency;
+    use crate::handle::Handle;
+    use crate::indexes::ibor::Euribor;
+    use crate::indexes::interestrateindex::InterestRateIndex;
+    use crate::interestrate::Compounding;
+    use crate::settings::Settings;
+    use crate::shared::{SharedMut, shared, shared_mut};
+    use crate::termstructures::yields::FlatForward;
+    use crate::termstructures::yieldtermstructure::YieldTermStructure;
+    use crate::time::calendars::target::Target;
+    use crate::time::date::Month;
+    use crate::time::daycounters::actual360::Actual360;
+    use crate::time::frequency::Frequency;
+    use crate::time::period::Period;
+    use crate::time::timeunit::TimeUnit;
+
+    use super::super::couponpricer::BlackIborCouponPricer;
+
+    fn settings_on(today: Date) -> Shared<Settings<Date>> {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(today);
+        settings
+    }
+
+    fn ibor6m(settings: Shared<Settings<Date>>) -> Shared<IborIndex> {
+        shared(IborIndex::new(
+            "foo".into(),
+            Period::new(6, TimeUnit::Months),
+            2,
+            Currency::eur(),
+            Target::new(),
+            BusinessDayConvention::Following,
+            false,
+            Actual360::new(),
+            Handle::<dyn YieldTermStructure>::empty(),
+            settings,
+        ))
+    }
+
+    fn pricer() -> SharedMut<dyn FloatingRateCouponPricer> {
+        shared_mut(BlackIborCouponPricer::new()) as SharedMut<dyn FloatingRateCouponPricer>
+    }
+
+    fn flat_curve(reference: Date, rate: Rate) -> Handle<dyn YieldTermStructure> {
+        Handle::new(shared(FlatForward::with_rate(
+            reference,
+            rate,
+            Actual360::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>)
+    }
+
+    /// Builds an ibor coupon spanning the value-to-maturity period of
+    /// `fixing_date`, as the C++ `iborCouponForFixingDate` helper does.
+    fn coupon_for_fixing_date(index: Shared<IborIndex>, fixing_date: Date) -> IborCoupon {
+        let start_date = index.value_date(fixing_date).unwrap();
+        let end_date = index.maturity_date(fixing_date).unwrap();
+        let coupon = IborCoupon::new(
+            end_date,
+            100.0,
+            start_date,
+            end_date,
+            Some(index.fixing_days()),
+            index,
+            1.0,
+            0.0,
+            None,
+            None,
+            None,
+            false,
+            None,
+            BusinessDayConvention::Preceding,
+        )
+        .unwrap();
+        coupon.set_pricer(pricer());
+        coupon
+    }
+
+    /// `testFixedIborCouponWithoutForecastCurve` (cashflows.cpp:536): a coupon
+    /// whose fixing has already been recorded prices off the store with no
+    /// forecast curve linked, and its amount is `pastFixing * nominal *
+    /// accrualPeriod` to 1e-8.
+    #[test]
+    fn a_past_ibor_coupon_prices_off_the_store() {
+        let today = Date::new(15, Month::June, 2026);
+        let settings = settings_on(today);
+        let index = ibor6m(settings);
+        let calendar = index.fixing_calendar();
+
+        let fixing_date = calendar.advance(
+            today,
+            -2,
+            TimeUnit::Months,
+            BusinessDayConvention::Following,
+            false,
+        );
+        let past_fixing = 0.01;
+        index.add_fixing(fixing_date, past_fixing).unwrap();
+
+        let coupon = coupon_for_fixing_date(index, fixing_date);
+
+        let amount = coupon.amount().unwrap();
+        let expected = past_fixing * coupon.nominal() * coupon.accrual_period();
+        assert!(
+            (amount - expected).abs() < 1e-8,
+            "amount {amount} vs expected {expected}"
+        );
+    }
+
+    /// `testIborCouponKnowsWhenitHasFixed` (cashflows.cpp:576): `has_fixed`
+    /// tracks the fixing date against today (and the enforce/historical rules on
+    /// today), and `rate` errors when a determined fixing is missing from the
+    /// store.
+    #[test]
+    fn an_ibor_coupon_knows_when_it_has_fixed() {
+        let today = Date::new(15, Month::June, 2026);
+        let settings = settings_on(today);
+        let index = Euribor::three_months(Handle::empty(), settings.clone());
+        let index = shared(index);
+        let calendar = index.fixing_calendar();
+
+        let yesterday = calendar.advance(
+            today,
+            -1,
+            TimeUnit::Days,
+            BusinessDayConvention::Following,
+            false,
+        );
+        let tomorrow = calendar.advance(
+            today,
+            1,
+            TimeUnit::Days,
+            BusinessDayConvention::Following,
+            false,
+        );
+
+        {
+            let coupon = coupon_for_fixing_date(index.clone(), yesterday);
+            index.clear_fixings();
+            assert!(coupon.has_fixed().unwrap());
+            assert!(coupon.rate().is_err());
+        }
+
+        {
+            let coupon = coupon_for_fixing_date(index.clone(), today);
+            settings.set_enforces_todays_historic_fixings(false);
+            index.clear_fixings();
+            assert!(!coupon.has_fixed().unwrap());
+        }
+
+        {
+            let coupon = coupon_for_fixing_date(index.clone(), today);
+            settings.set_enforces_todays_historic_fixings(false);
+            index.add_fixing(coupon.fixing_date(), 0.01).unwrap();
+            assert!(coupon.has_fixed().unwrap());
+        }
+
+        {
+            let coupon = coupon_for_fixing_date(index.clone(), today);
+            settings.set_enforces_todays_historic_fixings(true);
+            index.clear_fixings();
+            assert!(coupon.has_fixed().unwrap());
+            assert!(coupon.rate().is_err());
+        }
+
+        {
+            let coupon = coupon_for_fixing_date(index.clone(), tomorrow);
+            assert!(!coupon.has_fixed().unwrap());
+        }
+    }
+
+    /// The in-arrears swaplet path is refused (the convexity adjustment needs the
+    /// unported optionlet volatility), rather than returning a silent wrong
+    /// number.
+    #[test]
+    fn an_in_arrears_coupon_refuses_to_price() {
+        let today = Date::new(15, Month::June, 2026);
+        let settings = settings_on(today);
+        let index = ibor6m(settings);
+
+        let start = Date::new(15, Month::January, 2026);
+        let end = Date::new(15, Month::July, 2026);
+        let coupon = IborCoupon::new(
+            end,
+            100.0,
+            start,
+            end,
+            Some(2),
+            index,
+            1.0,
+            0.0,
+            None,
+            None,
+            None,
+            true,
+            None,
+            BusinessDayConvention::Preceding,
+        )
+        .unwrap();
+        coupon.set_pricer(pricer());
+
+        assert!(coupon.rate().is_err());
+    }
+
+    /// Pins the documented forecast divergence. The forecast branch through the
+    /// coupon is live: an unfixed coupon over a linked curve prices off the
+    /// index's own forecast fixing, which follows the indexed-coupon convention
+    /// (the index's natural maturity), not this tree's compile-time-default par
+    /// approximation. `rate()` is exactly `gearing * forecastFixing + spread`,
+    /// so if the deferred par mode ever silently replaced it the number would
+    /// move and this test would catch it.
+    #[test]
+    fn an_unfixed_coupon_forecasts_in_indexed_mode_not_par() {
+        let today = Date::new(15, Month::June, 2026);
+        let settings = settings_on(today);
+        let index = shared(IborIndex::new(
+            "foo".into(),
+            Period::new(6, TimeUnit::Months),
+            2,
+            Currency::eur(),
+            Target::new(),
+            BusinessDayConvention::Following,
+            false,
+            Actual360::new(),
+            flat_curve(today, 0.03),
+            settings,
+        ));
+
+        let fixing_date = Date::new(15, Month::July, 2026);
+        let start_date = index.value_date(fixing_date).unwrap();
+        let end_date = index.maturity_date(start_date).unwrap();
+        let gearing = 2.0;
+        let spread = 0.01;
+        let coupon = IborCoupon::new(
+            end_date,
+            100.0,
+            start_date,
+            end_date,
+            Some(index.fixing_days()),
+            index.clone(),
+            gearing,
+            spread,
+            None,
+            None,
+            None,
+            false,
+            None,
+            BusinessDayConvention::Preceding,
+        )
+        .unwrap();
+        coupon.set_pricer(pricer());
+
+        assert!(!coupon.has_fixed().unwrap());
+        assert_eq!(coupon.fixing_date(), fixing_date);
+        let forecast = index.forecast_fixing(fixing_date).unwrap();
+        let expected = gearing * forecast + spread;
+        assert!((coupon.rate().unwrap() - expected).abs() < 1e-14);
+    }
+}
