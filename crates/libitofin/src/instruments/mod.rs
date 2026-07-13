@@ -7,6 +7,7 @@ mod bond;
 mod bonds;
 mod fixedvsfloatingswap;
 mod oneassetoption;
+mod overnightindexedswap;
 mod payoffs;
 mod swap;
 mod vanillaswap;
@@ -21,6 +22,7 @@ pub use oneassetoption::{
     EuropeanOption, Greeks, MoreGreeks, OneAssetOption, OneAssetOptionEngine,
     OneAssetOptionResults, OptionArguments, VanillaOption,
 };
+pub use overnightindexedswap::OvernightIndexedSwap;
 pub use payoffs::{PlainVanillaPayoff, StrikedTypePayoff, TypePayoff};
 pub use swap::{Swap, SwapArguments, SwapEngine, SwapResults, SwapType};
 pub use vanillaswap::VanillaSwap;
