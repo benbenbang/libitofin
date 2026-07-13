@@ -21,7 +21,7 @@ pub use forwardcurve::{ForwardCurve, InterpolatedForwardCurve};
 pub use forwardspreadedtermstructure::ForwardSpreadedTermStructure;
 pub use forwardstructure::ForwardRateStructure;
 pub use impliedtermstructure::ImpliedTermStructure;
-pub use ratehelpers::DepositRateHelper;
+pub use ratehelpers::{DepositRateHelper, Pillar, SwapRateHelper};
 pub use zerocurve::{InterpolatedZeroCurve, ZeroCurve};
 pub use zerospreadedtermstructure::ZeroSpreadedTermStructure;
 pub use zeroyieldstructure::ZeroYieldStructure;
