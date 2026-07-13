@@ -192,3 +192,217 @@ impl PricingEngine for DiscountingSwapEngine {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    //! The swap's numeric oracle: `swap.cpp` `testCachedValue` (:289), the first
+    //! swap priced end to end against a hardcoded C++ NPV, plus the mode-agnostic
+    //! `testFairRate` (:107) and `testFairSpread` (:131) self-consistency checks.
+    //! The fixture reproduces `swap.cpp` `CommonVars` (:52-104): a Payer swap on a
+    //! nominal of 100, fixed 10Y annual Thirty360(BondBasis) versus floating
+    //! semiannual Euribor 6M / Actual360, discounted on a flat 5% Actual365Fixed
+    //! curve the index also forecasts off.
+
+    use super::*;
+    use crate::indexes::IborIndex;
+    use crate::indexes::ibor::Euribor;
+    use crate::instrument::Instrument;
+    use crate::instruments::{SwapType, VanillaSwap};
+    use crate::interestrate::Compounding;
+    use crate::shared::{SharedMut, shared, shared_mut};
+    use crate::termstructures::yields::FlatForward;
+    use crate::time::businessdayconvention::BusinessDayConvention;
+    use crate::time::calendar::Calendar;
+    use crate::time::calendars::target::Target;
+    use crate::time::date::Month;
+    use crate::time::daycounters::actual360::Actual360;
+    use crate::time::daycounters::actual365fixed::Actual365Fixed;
+    use crate::time::daycounters::thirty360::{Convention, Thirty360};
+    use crate::time::frequency::Frequency;
+    use crate::time::schedule::MakeSchedule;
+    use crate::time::timeunit::TimeUnit;
+    use crate::types::{Integer, Rate, Real, Spread};
+
+    const NOMINAL: Real = 100.0;
+
+    /// The `swap.cpp` `CommonVars` fixture (:87-104): a TARGET calendar, a
+    /// two-day settlement, a flat 5% Actual365Fixed curve fixed at settlement,
+    /// and a Euribor 6M index forecasting off that same curve.
+    struct Vars {
+        settings: Shared<Settings<Date>>,
+        calendar: Calendar,
+        settlement: Date,
+        curve: Handle<dyn YieldTermStructure>,
+        index: Shared<IborIndex>,
+    }
+
+    impl Vars {
+        fn new(today: Date, using_at_par: bool) -> Vars {
+            let settings = shared(Settings::new());
+            settings.set_evaluation_date(today);
+            settings.set_using_at_par_coupons(using_at_par);
+            let calendar = Target::new();
+            let settlement = calendar.advance(
+                today,
+                2,
+                TimeUnit::Days,
+                BusinessDayConvention::Following,
+                false,
+            );
+            let curve: Handle<dyn YieldTermStructure> = Handle::new(shared(FlatForward::with_rate(
+                settlement,
+                0.05,
+                Actual365Fixed::new(),
+                Compounding::Continuous,
+                Frequency::Annual,
+            ))
+                as Shared<dyn YieldTermStructure>);
+            let index = shared(Euribor::six_months(curve.clone(), Shared::clone(&settings)));
+            Vars {
+                settings,
+                calendar,
+                settlement,
+                curve,
+                index,
+            }
+        }
+
+        /// The `swap.cpp` `makeSwap` (:65-83): a `length`-year Payer swap priced
+        /// through the discounting engine over the fixture's curve.
+        fn make_swap(&self, length: Integer, fixed_rate: Rate, spread: Spread) -> VanillaSwap {
+            let maturity = self.calendar.advance(
+                self.settlement,
+                length,
+                TimeUnit::Years,
+                BusinessDayConvention::ModifiedFollowing,
+                false,
+            );
+            let fixed_schedule = MakeSchedule::new()
+                .from(self.settlement)
+                .to(maturity)
+                .with_frequency(Frequency::Annual)
+                .with_calendar(self.calendar.clone())
+                .with_convention(BusinessDayConvention::Unadjusted)
+                .with_termination_date_convention(BusinessDayConvention::Unadjusted)
+                .forwards()
+                .end_of_month(false)
+                .build();
+            let float_schedule = MakeSchedule::new()
+                .from(self.settlement)
+                .to(maturity)
+                .with_frequency(Frequency::Semiannual)
+                .with_calendar(self.calendar.clone())
+                .with_convention(BusinessDayConvention::ModifiedFollowing)
+                .with_termination_date_convention(BusinessDayConvention::ModifiedFollowing)
+                .forwards()
+                .end_of_month(false)
+                .build();
+            let mut swap = VanillaSwap::new(
+                SwapType::Payer,
+                NOMINAL,
+                fixed_schedule,
+                fixed_rate,
+                Thirty360::with_convention(Convention::BondBasis),
+                float_schedule,
+                Shared::clone(&self.index),
+                spread,
+                Actual360::new(),
+                None,
+                Shared::clone(&self.settings),
+            )
+            .unwrap();
+            let engine = shared_mut(DiscountingSwapEngine::new(
+                self.curve.clone(),
+                None,
+                None,
+                None,
+                Shared::clone(&self.settings),
+            ));
+            swap.base_mut()
+                .set_pricing_engine(engine as SharedMut<dyn PricingEngine>);
+            swap
+        }
+    }
+
+    /// `swap.cpp` `testCachedValue` (:289): a 10Y Payer swap at fixed 6% and a
+    /// 0.001 floating spread reproduces the cached NPV at 1e-11. The value splits
+    /// on the par/indexed mode (`swap.cpp:311`): the PAR arm (default Settings)
+    /// is `-5.872863313209`, the INDEXED arm `-5.872342992212`. Parameterising on
+    /// the flag pins the mode split end to end.
+    #[test]
+    fn cached_value_reproduces_the_par_and_indexed_arms() {
+        for (using_at_par, expected) in [(true, -5.872863313209), (false, -5.872342992212)] {
+            let vars = Vars::new(Date::new(17, Month::June, 2002), using_at_par);
+            let mut swap = vars.make_swap(10, 0.06, 0.001);
+
+            let npv = swap.npv().unwrap();
+            assert!(
+                (npv - expected).abs() <= 1.0e-11,
+                "par={using_at_par}: npv {npv} vs cached {expected} (error {})",
+                (npv - expected).abs()
+            );
+        }
+    }
+
+    /// `swap.cpp` `testFairRate` (:107): a swap rebuilt at its own `fairRate()`
+    /// prices to zero. Mode-agnostic self-consistency across lengths and spreads.
+    #[test]
+    fn a_swap_rebuilt_at_its_fair_rate_prices_to_zero() {
+        let vars = Vars::new(Date::new(17, Month::June, 2002), true);
+        let lengths: [Integer; 5] = [1, 2, 5, 10, 20];
+        let spreads: [Spread; 5] = [-0.001, -0.01, 0.0, 0.01, 0.001];
+
+        for length in lengths {
+            for spread in spreads {
+                let fair = vars
+                    .make_swap(length, 0.0, spread)
+                    .fixed_vs_floating_mut()
+                    .fair_rate()
+                    .unwrap();
+                let npv = vars.make_swap(length, fair, spread).npv().unwrap();
+                assert!(
+                    npv.abs() <= 1.0e-10,
+                    "length {length}y spread {spread}: npv {npv} not zero"
+                );
+            }
+        }
+    }
+
+    /// `swap.cpp` `testFairSpread` (:131): a swap rebuilt at its own
+    /// `fairSpread()` prices to zero. This is the only coverage of the
+    /// floating-leg-BPS branch of the fair-value fallback.
+    #[test]
+    fn a_swap_rebuilt_at_its_fair_spread_prices_to_zero() {
+        let vars = Vars::new(Date::new(17, Month::June, 2002), true);
+        let lengths: [Integer; 5] = [1, 2, 5, 10, 20];
+        let rates: [Rate; 4] = [0.04, 0.05, 0.06, 0.07];
+
+        for length in lengths {
+            for rate in rates {
+                let fair = vars
+                    .make_swap(length, rate, 0.0)
+                    .fixed_vs_floating_mut()
+                    .fair_spread()
+                    .unwrap();
+                let npv = vars.make_swap(length, rate, fair).npv().unwrap();
+                assert!(
+                    npv.abs() <= 1.0e-10,
+                    "length {length}y rate {rate}: npv {npv} not zero"
+                );
+            }
+        }
+    }
+
+    /// An empty discount-curve handle is rejected before any discounting, as the
+    /// C++ `QL_REQUIRE(!discountCurve_.empty(), ...)` (`discountingswapengine.cpp:41`).
+    #[test]
+    fn an_empty_discount_curve_is_rejected() {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(Date::new(17, Month::June, 2002));
+        let mut engine = DiscountingSwapEngine::new(Handle::empty(), None, None, None, settings);
+        assert_eq!(
+            engine.calculate().unwrap_err().message(),
+            "discounting term structure handle is empty"
+        );
+    }
+}
