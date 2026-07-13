@@ -40,6 +40,7 @@ use crate::settings::Settings;
 use crate::shared::Shared;
 use crate::time::date::Date;
 use crate::types::{DiscountFactor, Real};
+use crate::utilities::null::Null;
 use crate::{fail, require};
 
 /// Whether a two-leg swap is seen from the receiver or the payer of the leg it
@@ -391,7 +392,11 @@ impl Instrument for Swap {
                 results.leg_npv.len() == self.leg_npv.len(),
                 "wrong number of leg NPV returned"
             );
-            self.leg_npv = results.leg_npv.iter().map(|&v| Some(v)).collect();
+            self.leg_npv = results
+                .leg_npv
+                .iter()
+                .map(|&v| (!v.is_null()).then_some(v))
+                .collect();
         }
 
         if results.leg_bps.is_empty() {
@@ -401,7 +406,11 @@ impl Instrument for Swap {
                 results.leg_bps.len() == self.leg_bps.len(),
                 "wrong number of leg BPS returned"
             );
-            self.leg_bps = results.leg_bps.iter().map(|&v| Some(v)).collect();
+            self.leg_bps = results
+                .leg_bps
+                .iter()
+                .map(|&v| (!v.is_null()).then_some(v))
+                .collect();
         }
 
         if results.start_discounts.is_empty() {
@@ -411,7 +420,11 @@ impl Instrument for Swap {
                 results.start_discounts.len() == self.start_discounts.len(),
                 "wrong number of leg start discounts returned"
             );
-            self.start_discounts = results.start_discounts.iter().map(|&v| Some(v)).collect();
+            self.start_discounts = results
+                .start_discounts
+                .iter()
+                .map(|&v| (!v.is_null()).then_some(v))
+                .collect();
         }
 
         if results.end_discounts.is_empty() {
@@ -421,10 +434,14 @@ impl Instrument for Swap {
                 results.end_discounts.len() == self.end_discounts.len(),
                 "wrong number of leg end discounts returned"
             );
-            self.end_discounts = results.end_discounts.iter().map(|&v| Some(v)).collect();
+            self.end_discounts = results
+                .end_discounts
+                .iter()
+                .map(|&v| (!v.is_null()).then_some(v))
+                .collect();
         }
 
-        self.npv_date_discount = results.npv_date_discount;
+        self.npv_date_discount = results.npv_date_discount.filter(|v| !v.is_null());
         Ok(())
     }
 }
@@ -643,6 +660,37 @@ mod tests {
         assert_eq!(swap.start_discounts(0).unwrap(), 1.0);
         assert_eq!(swap.end_discounts(1).unwrap(), 0.90);
         assert_eq!(swap.npv_date_discount().unwrap(), 0.99);
+    }
+
+    /// A sentinel value INSIDE a non-empty vector is also "result not
+    /// available": each C++ accessor checks its element against `Null<Real>`
+    /// (`swap.hpp:94-110`), and the engine writes that sentinel for a leg
+    /// whose start date precedes the curve reference date (a seasoned leg,
+    /// `discountingswapengine.cpp:90-105`).
+    #[test]
+    fn a_null_sentinel_inside_leg_results_is_not_available() {
+        let mut swap = two_leg_swap();
+        swap.base_mut().set_pricing_engine(engine(
+            vec![Real::null(), 99.0],
+            vec![-1.0, 1.0],
+            vec![DiscountFactor::null(), 1.0],
+            vec![0.95, DiscountFactor::null()],
+            Some(DiscountFactor::null()),
+        ));
+
+        let err = swap.leg_npv(0).unwrap_err();
+        assert!(err.message().contains("result not available"));
+        assert_eq!(swap.leg_npv(1).unwrap(), 99.0);
+
+        let err = swap.start_discounts(0).unwrap_err();
+        assert!(err.message().contains("result not available"));
+        assert_eq!(swap.start_discounts(1).unwrap(), 1.0);
+
+        assert_eq!(swap.end_discounts(0).unwrap(), 0.95);
+        assert!(swap.end_discounts(1).is_err());
+
+        assert!(swap.npv_date_discount().is_err());
+        assert_eq!(swap.leg_bps(0).unwrap(), -1.0);
     }
 
     /// An engine that leaves the leg results empty leaves each accessor with
