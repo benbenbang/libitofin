@@ -512,3 +512,319 @@ fn default_fixed_day_count(currency: &Currency) -> QlResult<DayCounter> {
         crate::fail!("unknown fixed leg day counter for {}", currency.code());
     }
 }
+
+#[cfg(test)]
+mod tests {
+    //! No external oracle number exists for the maker itself (its consumers'
+    //! numbers land with `SwapRateHelper`, #340/#341). The load-bearing test is
+    //! the internal oracle: the same swap built through [`MakeVanillaSwap`] and
+    //! through [`VanillaSwap::new`] with schedules hand-built to
+    //! `makevanillaswap.cpp`'s derivation rules must agree on every leg date and
+    //! on NPV to 1e-14. The rest pin the derivation pieces (index spot date,
+    //! currency-default fixed tenor, the maturity end-of-month roll, the
+    //! fair-rate fill) and the D5 indexed-coupon refusal.
+
+    use super::*;
+    use crate::indexes::ibor::Euribor;
+    use crate::instrument::Instrument;
+    use crate::interestrate::Compounding;
+    use crate::shared::shared;
+    use crate::termstructures::yields::FlatForward;
+    use crate::time::date::Month;
+    use crate::time::daycounters::actual360::Actual360;
+    use crate::time::frequency::Frequency;
+
+    fn today() -> Date {
+        Date::new(7, Month::July, 2026)
+    }
+
+    fn settings_today() -> Shared<Settings<Date>> {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(today());
+        settings
+    }
+
+    /// A six-month Euribor (`EUR`) forecasting off a flat 2% curve, so the
+    /// floating coupons are unfixed and the swap prices.
+    fn euribor6m(settings: &Shared<Settings<Date>>) -> Shared<IborIndex> {
+        let curve = Handle::new(shared(FlatForward::with_rate(
+            today(),
+            0.02,
+            Actual360::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>);
+        shared(Euribor::six_months(curve, Shared::clone(settings)))
+    }
+
+    fn null() -> Date {
+        Date::null()
+    }
+
+    /// The internal oracle: `MakeVanillaSwap` and a hand-built `VanillaSwap`
+    /// following `makevanillaswap.cpp`'s derivation (start = effective date, end =
+    /// start + tenor, EUR-default `1Y`/`Thirty360(BondBasis)` fixed leg, index
+    /// float tenor/convention/day-count, both schedules `Backward`
+    /// `ModifiedFollowing`) produce identical leg dates and NPV.
+    #[test]
+    fn maker_matches_hand_built_swap() {
+        let settings = settings_today();
+        let index = euribor6m(&settings);
+        let effective = Date::new(9, Month::July, 2026);
+        let tenor = Period::new(5, TimeUnit::Years);
+        let fixed_rate = 0.03;
+
+        let mut made = MakeVanillaSwap::new(
+            tenor,
+            Shared::clone(&index),
+            Some(fixed_rate),
+            Period::new(0, TimeUnit::Days),
+            Shared::clone(&settings),
+        )
+        .with_effective_date(effective)
+        .build()
+        .unwrap();
+
+        let calendar = index.fixing_calendar();
+        let end = effective + tenor;
+        let fixed_schedule = Schedule::new(
+            effective,
+            end,
+            Period::new(1, TimeUnit::Years),
+            calendar.clone(),
+            BusinessDayConvention::ModifiedFollowing,
+            BusinessDayConvention::ModifiedFollowing,
+            DateGeneration::Backward,
+            false,
+            null(),
+            null(),
+        );
+        let float_schedule = Schedule::new(
+            effective,
+            end,
+            index.tenor(),
+            calendar,
+            index.business_day_convention(),
+            index.business_day_convention(),
+            DateGeneration::Backward,
+            false,
+            null(),
+            null(),
+        );
+        let mut hand = VanillaSwap::new(
+            SwapType::Payer,
+            1.0,
+            fixed_schedule,
+            fixed_rate,
+            Thirty360::with_convention(Convention::BondBasis),
+            float_schedule,
+            Shared::clone(&index),
+            0.0,
+            index.day_counter().clone(),
+            None,
+            Shared::clone(&settings),
+        )
+        .unwrap();
+        let engine = shared_mut(DiscountingSwapEngine::new(
+            index.forwarding_term_structure().clone(),
+            Some(false),
+            None,
+            None,
+            Shared::clone(&settings),
+        ));
+        hand.base_mut()
+            .set_pricing_engine(engine as SharedMut<dyn PricingEngine>);
+
+        let made_fixed: Vec<Date> = made
+            .fixed_vs_floating()
+            .fixed_leg()
+            .iter()
+            .map(|f| f.date())
+            .collect();
+        let hand_fixed: Vec<Date> = hand
+            .fixed_vs_floating()
+            .fixed_leg()
+            .iter()
+            .map(|f| f.date())
+            .collect();
+        assert_eq!(made_fixed, hand_fixed, "fixed leg payment dates");
+
+        let made_float: Vec<Date> = made
+            .fixed_vs_floating()
+            .floating_leg()
+            .iter()
+            .map(|f| f.date())
+            .collect();
+        let hand_float: Vec<Date> = hand
+            .fixed_vs_floating()
+            .floating_leg()
+            .iter()
+            .map(|f| f.date())
+            .collect();
+        assert_eq!(made_float, hand_float, "floating leg payment dates");
+
+        assert!(
+            (made.npv().unwrap() - hand.npv().unwrap()).abs() < 1.0e-14,
+            "maker NPV {} vs hand-built NPV {}",
+            made.npv().unwrap(),
+            hand.npv().unwrap()
+        );
+    }
+
+    /// Without an effective date or settlement-days override, the derived start is
+    /// the index spot date: `valueDate(fixingCalendar.adjust(today))`
+    /// (`makevanillaswap.cpp:76-77`).
+    #[test]
+    fn derived_start_is_the_index_spot_date() {
+        let settings = settings_today();
+        let index = euribor6m(&settings);
+        let swap = MakeVanillaSwap::new(
+            Period::new(1, TimeUnit::Years),
+            Shared::clone(&index),
+            Some(0.03),
+            Period::new(0, TimeUnit::Days),
+            Shared::clone(&settings),
+        )
+        .build()
+        .unwrap();
+
+        let adjusted = index
+            .fixing_calendar()
+            .adjust(today(), BusinessDayConvention::Following);
+        let expected_spot = index.value_date(adjusted).unwrap();
+
+        let first_start = swap.fixed_vs_floating().fixed_leg()[0]
+            .as_coupon()
+            .unwrap()
+            .accrual_start_date();
+        assert_eq!(first_start, expected_spot);
+    }
+
+    /// The EUR fixed-leg default tenor is `1Y` (`makevanillaswap.cpp:122`): a 2Y
+    /// swap has two annual fixed coupons, while the Euribor6M float leg has four.
+    #[test]
+    fn eur_default_fixed_tenor_is_annual() {
+        let settings = settings_today();
+        let index = euribor6m(&settings);
+        let swap = MakeVanillaSwap::new(
+            Period::new(2, TimeUnit::Years),
+            index,
+            Some(0.03),
+            Period::new(0, TimeUnit::Days),
+            Shared::clone(&settings),
+        )
+        .with_effective_date(Date::new(9, Month::July, 2026))
+        .build()
+        .unwrap();
+
+        assert_eq!(swap.fixed_vs_floating().fixed_leg().len(), 2);
+        assert_eq!(swap.fixed_vs_floating().floating_leg().len(), 4);
+    }
+
+    /// With the maturity end-of-month roll on and a month-end start, the end date
+    /// is rolled to the end of month (`makevanillaswap.cpp:97-101`), so the last
+    /// payment falls on a month-end business day.
+    #[test]
+    fn end_of_month_rolls_the_maturity() {
+        let settings = settings_today();
+        let index = euribor6m(&settings);
+        let calendar = index.fixing_calendar();
+        let effective = calendar.end_of_month(Date::new(15, Month::April, 2027));
+        assert!(calendar.is_end_of_month(effective), "start is month-end");
+
+        let swap = MakeVanillaSwap::new(
+            Period::new(2, TimeUnit::Years),
+            Shared::clone(&index),
+            Some(0.03),
+            Period::new(0, TimeUnit::Days),
+            Shared::clone(&settings),
+        )
+        .with_effective_date(effective)
+        .with_floating_leg_end_of_month(true)
+        .build()
+        .unwrap();
+
+        let maturity = swap
+            .fixed_vs_floating()
+            .floating_leg()
+            .last()
+            .unwrap()
+            .date();
+        assert!(
+            calendar.is_end_of_month(maturity),
+            "maturity {maturity:?} is a month-end business day"
+        );
+    }
+
+    /// An unset (`None`) fixed rate is filled with the fair rate, so the swap
+    /// prices to par (`makevanillaswap.cpp:165-185`).
+    #[test]
+    fn unset_fixed_rate_fills_the_fair_rate() {
+        let settings = settings_today();
+        let index = euribor6m(&settings);
+        let mut swap = MakeVanillaSwap::new(
+            Period::new(5, TimeUnit::Years),
+            index,
+            None,
+            Period::new(0, TimeUnit::Days),
+            Shared::clone(&settings),
+        )
+        .with_effective_date(Date::new(9, Month::July, 2026))
+        .build()
+        .unwrap();
+
+        assert!(
+            swap.npv().unwrap().abs() < 1.0e-8,
+            "fair-rate swap prices to par, got {}",
+            swap.npv().unwrap()
+        );
+    }
+
+    /// D5: with the default at-par [`Settings`] mode, requesting indexed coupons
+    /// (`Some(true)`) is refused, while requesting at-par (`Some(false)`) or
+    /// leaving it unset (`None`) is accepted.
+    #[test]
+    fn indexed_coupon_request_is_checked_against_settings() {
+        let settings = settings_today();
+        let index = euribor6m(&settings);
+        let effective = Date::new(9, Month::July, 2026);
+        let make = |flag: Option<bool>| {
+            MakeVanillaSwap::new(
+                Period::new(1, TimeUnit::Years),
+                Shared::clone(&index),
+                Some(0.03),
+                Period::new(0, TimeUnit::Days),
+                Shared::clone(&settings),
+            )
+            .with_effective_date(effective)
+            .with_indexed_coupons(flag)
+            .build()
+        };
+
+        assert!(
+            make(Some(true)).is_err(),
+            "indexed conflicts with at-par default"
+        );
+        assert!(make(Some(false)).is_ok(), "at-par agrees with the default");
+        assert!(make(None).is_ok(), "unset defers to Settings");
+    }
+
+    /// Setting both an explicit effective date and settlement days is refused
+    /// (`makevanillaswap.cpp:59-61`).
+    #[test]
+    fn effective_date_and_settlement_days_conflict() {
+        let settings = settings_today();
+        let index = euribor6m(&settings);
+        let result = MakeVanillaSwap::new(
+            Period::new(1, TimeUnit::Years),
+            index,
+            Some(0.03),
+            Period::new(0, TimeUnit::Days),
+            Shared::clone(&settings),
+        )
+        .with_effective_date(Date::new(9, Month::July, 2026))
+        .with_settlement_days(2)
+        .build();
+        assert!(result.is_err());
+    }
+}
