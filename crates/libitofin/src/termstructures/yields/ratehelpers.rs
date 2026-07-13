@@ -1,11 +1,14 @@
 //! Rate helpers for the yield-curve bootstrap.
 //!
 //! Port of `ql/termstructures/yield/ratehelpers.{hpp,cpp}`. This module holds
-//! [`DepositRateHelper`], the short end of the curve; the FRA and futures
-//! helpers (`FraRateHelper`, `FuturesRateHelper`) are deferred to a later
-//! ticket.
+//! [`DepositRateHelper`], the short end of the curve, and [`SwapRateHelper`],
+//! the long end. The FRA and futures helpers (`FraRateHelper`,
+//! `FuturesRateHelper`) and `BMASwapRateHelper` are deferred to a later ticket
+//! (#343); the `SwapIndex`-based and explicit-start/end-date `SwapRateHelper`
+//! constructors are deferred with the swap-index port.
 
 use std::cell::Cell;
+use std::cell::RefCell;
 use std::rc::Weak;
 
 use crate::errors::QlResult;
@@ -13,15 +16,23 @@ use crate::handle::{Handle, RelinkableHandle};
 use crate::indexes::iborindex::IborIndex;
 use crate::indexes::index::Index;
 use crate::indexes::interestrateindex::InterestRateIndex;
+use crate::instrument::Instrument;
+use crate::instruments::{MakeVanillaSwap, VanillaSwap};
 use crate::patterns::observable::{AsObservable, Observable};
 use crate::quotes::{Quote, SimpleQuote};
+use crate::settings::Settings;
 use crate::shared::{Shared, shared};
 use crate::termstructures::bootstraphelper::{
     BootstrapHelperBase, RateHelper, RelativeDateRateHelper,
 };
 use crate::termstructures::yieldtermstructure::YieldTermStructure;
 use crate::time::businessdayconvention::BusinessDayConvention;
+use crate::time::calendar::Calendar;
 use crate::time::date::Date;
+use crate::time::daycounter::DayCounter;
+use crate::time::frequency::Frequency;
+use crate::time::period::Period;
+use crate::time::timeunit::TimeUnit;
 use crate::types::Real;
 
 /// Bootstrap helper over a deposit rate (`DepositRateHelper`).
@@ -149,6 +160,332 @@ impl RelativeDateRateHelper for DepositRateHelper {
         self.base.set_pillar_date(maturity);
         self.base.set_latest_date(maturity);
         self.base.set_latest_relevant_date(maturity);
+    }
+}
+
+/// The date the curve node a helper fits sits at (`Pillar::Choice`).
+///
+/// Only the two schedule-derived choices are ported: [`LastRelevantDate`] (the
+/// C++ default) and [`MaturityDate`]. `Pillar::CustomDate`, which needs an
+/// explicit pillar date threaded through construction plus its bounds check, is
+/// deferred to #343 with the constructors that pass one.
+///
+/// [`LastRelevantDate`]: Pillar::LastRelevantDate
+/// [`MaturityDate`]: Pillar::MaturityDate
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Pillar {
+    /// The instrument's maturity date.
+    MaturityDate,
+    /// The latest date the instrument needs data at.
+    LastRelevantDate,
+}
+
+/// Bootstrap helper over a par swap rate (`SwapRateHelper`).
+///
+/// The helper fits the fixed rate at which a spot-starting vanilla swap of the
+/// quoted tenor is worth par on the bootstrapping curve. Its own swap is built
+/// through [`MakeVanillaSwap`] (`ratehelpers.cpp:557`) off a cloned index and a
+/// relinkable discounting handle, so the helper prices against the curve it is
+/// being bootstrapped against.
+///
+/// [`implied_quote`](RateHelper::implied_quote) is **not** the swap's fair rate:
+/// it is the par-rate reconstruction of `ratehelpers.cpp:633-646`, over the
+/// floating- and fixed-leg NPV and BPS, carrying the spread term that a bare
+/// `fair_rate()` would drop. Because the helper deliberately does not observe
+/// the curve (its pricing handles are weak-linked, unobserved), the swap's
+/// cached results go stale when the bootstrap moves the curve; the C++
+/// `swap_->deepUpdate()` forces a fresh calculation each call, and this port
+/// reproduces that with [`Instrument::recalculate`] before reading the legs.
+///
+/// The indexed-vs-at-par coupon mode is not read from a global singleton: the
+/// helper carries the C++ `useIndexedCoupons_` `optional<bool>` (default `None`)
+/// and forwards it to [`MakeVanillaSwap::with_indexed_coupons`], which resolves
+/// `None` against [`Settings::using_at_par_coupons`] (D5, #315/#342).
+pub struct SwapRateHelper {
+    base: BootstrapHelperBase,
+    swap: RefCell<Option<VanillaSwap>>,
+    ibor_index: Shared<IborIndex>,
+    term_structure_handle: RelinkableHandle<dyn YieldTermStructure>,
+    discount_relinkable_handle: RelinkableHandle<dyn YieldTermStructure>,
+    discount_handle: Option<Handle<dyn YieldTermStructure>>,
+    spread: Handle<dyn Quote>,
+    settings: Shared<Settings<Date>>,
+    tenor: Period,
+    forward_start: Period,
+    calendar: Calendar,
+    fixed_frequency: Frequency,
+    fixed_convention: BusinessDayConvention,
+    fixed_day_count: DayCounter,
+    end_of_month: bool,
+    use_indexed_coupons: Option<bool>,
+    pillar: Pillar,
+}
+
+impl SwapRateHelper {
+    /// A swap helper fitting `quote` with the schedule of a spot-starting swap
+    /// of `tenor`, the form the curve-consistency oracle builds
+    /// (`piecewiseyieldcurve.cpp:293`): no spread, no forward start, no exogenous
+    /// discounting curve, and the default [`Pillar::LastRelevantDate`].
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        quote: Handle<dyn Quote>,
+        tenor: Period,
+        calendar: Calendar,
+        fixed_frequency: Frequency,
+        fixed_convention: BusinessDayConvention,
+        fixed_day_count: DayCounter,
+        ibor_index: &IborIndex,
+    ) -> Shared<SwapRateHelper> {
+        Self::build(
+            quote,
+            tenor,
+            calendar,
+            fixed_frequency,
+            fixed_convention,
+            fixed_day_count,
+            ibor_index,
+            Handle::empty(),
+            Period::new(0, TimeUnit::Days),
+            None,
+            Pillar::LastRelevantDate,
+        )
+    }
+
+    /// A swap helper fitting a fixed `rate`, wrapped in a [`SimpleQuote`].
+    #[allow(clippy::too_many_arguments)]
+    pub fn from_rate(
+        rate: Real,
+        tenor: Period,
+        calendar: Calendar,
+        fixed_frequency: Frequency,
+        fixed_convention: BusinessDayConvention,
+        fixed_day_count: DayCounter,
+        ibor_index: &IborIndex,
+    ) -> Shared<SwapRateHelper> {
+        let quote = Handle::new(shared(SimpleQuote::new(rate)) as Shared<dyn Quote>);
+        Self::new(
+            quote,
+            tenor,
+            calendar,
+            fixed_frequency,
+            fixed_convention,
+            fixed_day_count,
+            ibor_index,
+        )
+    }
+
+    /// The full constructor of the ported (tenor-based) form: a market `spread`
+    /// handle (empty for none), a `forward_start`, an optional exogenous
+    /// `discounting_curve`, and the [`Pillar`] choice.
+    #[allow(clippy::too_many_arguments)]
+    pub fn with_details(
+        quote: Handle<dyn Quote>,
+        tenor: Period,
+        calendar: Calendar,
+        fixed_frequency: Frequency,
+        fixed_convention: BusinessDayConvention,
+        fixed_day_count: DayCounter,
+        ibor_index: &IborIndex,
+        spread: Handle<dyn Quote>,
+        forward_start: Period,
+        discounting_curve: Option<Handle<dyn YieldTermStructure>>,
+        pillar: Pillar,
+    ) -> Shared<SwapRateHelper> {
+        Self::build(
+            quote,
+            tenor,
+            calendar,
+            fixed_frequency,
+            fixed_convention,
+            fixed_day_count,
+            ibor_index,
+            spread,
+            forward_start,
+            discounting_curve,
+            pillar,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn build(
+        quote: Handle<dyn Quote>,
+        tenor: Period,
+        calendar: Calendar,
+        fixed_frequency: Frequency,
+        fixed_convention: BusinessDayConvention,
+        fixed_day_count: DayCounter,
+        source_index: &IborIndex,
+        spread: Handle<dyn Quote>,
+        forward_start: Period,
+        discounting_curve: Option<Handle<dyn YieldTermStructure>>,
+        pillar: Pillar,
+    ) -> Shared<SwapRateHelper> {
+        let settings = source_index.base().settings().clone();
+        Shared::new_cyclic(|weak: &Weak<SwapRateHelper>| {
+            let weak = weak.clone();
+            let on_eval_change = Box::new(move || {
+                if let Some(helper) = weak.upgrade() {
+                    helper.initialize_dates();
+                }
+            });
+            let term_structure_handle = RelinkableHandle::<dyn YieldTermStructure>::empty();
+            let ibor_index = shared(source_index.clone_with(term_structure_handle.handle()));
+            let base = BootstrapHelperBase::new_relative(
+                quote,
+                Shared::clone(&settings),
+                true,
+                on_eval_change,
+            );
+            let helper = SwapRateHelper {
+                base,
+                swap: RefCell::new(None),
+                ibor_index,
+                term_structure_handle,
+                discount_relinkable_handle: RelinkableHandle::<dyn YieldTermStructure>::empty(),
+                discount_handle: discounting_curve,
+                spread,
+                settings,
+                tenor,
+                forward_start,
+                calendar,
+                fixed_frequency,
+                fixed_convention,
+                fixed_day_count,
+                end_of_month: false,
+                use_indexed_coupons: None,
+                pillar,
+            };
+            helper.initialize_dates();
+            helper
+        })
+    }
+}
+
+impl AsObservable for SwapRateHelper {
+    fn observable(&self) -> &Observable {
+        self.base.observable()
+    }
+}
+
+impl RateHelper for SwapRateHelper {
+    fn base(&self) -> &BootstrapHelperBase {
+        &self.base
+    }
+
+    /// The par swap rate implied by the current curve
+    /// (`ratehelpers.cpp:633-646`).
+    ///
+    /// The swap is force-recalculated first (the C++ `swap_->deepUpdate()`,
+    /// forced because the helper does not observe the curve); then the rate is
+    /// reconstructed from the floating-leg NPV, the spread carried on the
+    /// floating-leg BPS, and the fixed-leg BPS, rather than read from
+    /// `fair_rate()`.
+    fn implied_quote(&self) -> QlResult<Real> {
+        self.base.term_structure()?;
+        let mut guard = self.swap.borrow_mut();
+        let swap = guard
+            .as_mut()
+            .expect("initialize_dates populates the swap at construction");
+        swap.recalculate()?;
+
+        const BASIS_POINT: Real = 1.0e-4;
+        let floating_leg_npv = swap.fixed_vs_floating_mut().floating_leg_npv()?;
+        let spread = if self.spread.is_empty() {
+            0.0
+        } else {
+            self.spread.current_link()?.value()?
+        };
+        let spread_npv = swap.fixed_vs_floating_mut().floating_leg_bps()? / BASIS_POINT * spread;
+        let total_npv = -(floating_leg_npv + spread_npv);
+        let fixed_leg_bps = swap.fixed_vs_floating_mut().fixed_leg_bps()?;
+        Ok(total_npv / (fixed_leg_bps / BASIS_POINT))
+    }
+
+    /// Weak-links both the forecasting handle (used by the cloned index) and the
+    /// discounting handle to the bootstrapping curve - or, when an exogenous
+    /// discounting curve was supplied, links the discounting handle to that
+    /// instead - then records the curve on the base (`ratehelpers.cpp:614`). All
+    /// links are non-owning and unobserved.
+    fn set_term_structure(&self, term_structure: &Shared<dyn YieldTermStructure>) {
+        self.term_structure_handle
+            .link_to_weak(Shared::downgrade(term_structure));
+        match &self.discount_handle {
+            Some(discount) if !discount.is_empty() => {
+                let curve = discount
+                    .current_link()
+                    .expect("a non-empty discount handle resolves");
+                self.discount_relinkable_handle
+                    .link_to_weak(Shared::downgrade(&curve));
+            }
+            _ => self
+                .discount_relinkable_handle
+                .link_to_weak(Shared::downgrade(term_structure)),
+        }
+        self.base.set_term_structure(term_structure);
+    }
+}
+
+impl RelativeDateRateHelper for SwapRateHelper {
+    /// Rebuilds the swap and its schedule off the current evaluation date
+    /// (`initializeDates`, `ratehelpers.cpp:530`): a spot-starting swap of the
+    /// helper's tenor, built through [`MakeVanillaSwap`] with a 0% fixed rate so
+    /// it does not price at construction. Earliest and maturity come from the
+    /// leg schedules; the pillar follows the [`Pillar`] choice.
+    ///
+    /// The `latest_relevant_date` is set to the maturity. C++ takes the maximum
+    /// of the maturity and the last floating coupon's `fixingEndDate`; that
+    /// refinement needs an `IborCoupon` fixing-end-date accessor the cash-flow
+    /// surface does not yet expose, so it is deferred to the bootstrap ticket
+    /// (#341) that exercises pillar ordering.
+    fn initialize_dates(&self) {
+        let fixed_tenor = if self.fixed_frequency == Frequency::Once {
+            self.tenor
+        } else {
+            Period::try_from(self.fixed_frequency)
+                .expect("a swap's fixed frequency maps to a valid period")
+        };
+        let swap = MakeVanillaSwap::new(
+            self.tenor,
+            Shared::clone(&self.ibor_index),
+            Some(0.0),
+            self.forward_start,
+            Shared::clone(&self.settings),
+        )
+        .with_discounting_term_structure(self.discount_relinkable_handle.handle())
+        .with_fixed_leg_day_count(self.fixed_day_count.clone())
+        .with_fixed_leg_tenor(fixed_tenor)
+        .with_fixed_leg_convention(self.fixed_convention)
+        .with_fixed_leg_termination_date_convention(self.fixed_convention)
+        .with_fixed_leg_calendar(self.calendar.clone())
+        .with_fixed_leg_end_of_month(self.end_of_month)
+        .with_floating_leg_calendar(self.calendar.clone())
+        .with_floating_leg_end_of_month(self.end_of_month)
+        .with_indexed_coupons(self.use_indexed_coupons)
+        .build()
+        .expect("a 0% fixed-rate swap with a valid evaluation date builds without pricing");
+
+        let base = swap.fixed_vs_floating();
+        let earliest = base
+            .fixed_schedule()
+            .start_date()
+            .min(base.floating_schedule().start_date());
+        let maturity = base
+            .fixed_schedule()
+            .end_date()
+            .max(base.floating_schedule().end_date());
+
+        let latest_relevant = maturity;
+        self.base.set_earliest_date(earliest);
+        self.base.set_maturity_date(maturity);
+        self.base.set_latest_relevant_date(latest_relevant);
+        let pillar = match self.pillar {
+            Pillar::MaturityDate => maturity,
+            Pillar::LastRelevantDate => latest_relevant,
+        };
+        self.base.set_pillar_date(pillar);
+        self.base.set_latest_date(pillar);
+
+        *self.swap.borrow_mut() = Some(swap);
     }
 }
 
