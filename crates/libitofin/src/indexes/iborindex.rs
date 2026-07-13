@@ -23,7 +23,7 @@ use crate::handle::Handle;
 use crate::indexes::index::Index;
 use crate::indexes::interestrateindex::{InterestRateIndex, InterestRateIndexBase};
 use crate::settings::Settings;
-use crate::shared::Shared;
+use crate::shared::{Shared, shared};
 use crate::termstructures::yieldtermstructure::YieldTermStructure;
 use crate::time::businessdayconvention::BusinessDayConvention;
 use crate::time::calendar::Calendar;
@@ -162,11 +162,18 @@ impl InterestRateIndex for IborIndex {
 /// downstream overnight coupon can hold a concrete `OvernightIndex` rather than
 /// an indistinguishable [`IborIndex`].
 ///
+/// The inner [`IborIndex`] is held behind a [`Shared`] so its identity can be
+/// re-exposed through [`ibor_index`](Self::ibor_index). C++ upcasts a single
+/// `shared_ptr<OvernightIndex>` into a `shared_ptr<IborIndex>` wherever an
+/// overnight index is used as its base (an OIS handing itself to
+/// `FixedVsFloatingSwap`, say); the owned newtype cannot project an [`Rc`], so
+/// wrapping the inner index restores that single-identity relation.
+///
 /// The C++ `clone()` override (`iborindex.cpp:85`) re-curves the index onto a
 /// different forwarding handle; it is not ported, matching [`IborIndex`], which
 /// does not port `clone()` either (it is exercised only by rate-helper
 /// bootstrapping, a later layer).
-pub struct OvernightIndex(IborIndex);
+pub struct OvernightIndex(Shared<IborIndex>);
 
 impl OvernightIndex {
     /// Builds an overnight index over `forwarding`.
@@ -184,7 +191,7 @@ impl OvernightIndex {
         forwarding: Handle<dyn YieldTermStructure>,
         settings: Shared<Settings<Date>>,
     ) -> OvernightIndex {
-        OvernightIndex(IborIndex::new(
+        OvernightIndex(shared(IborIndex::new(
             family_name,
             Period::new(1, TimeUnit::Days),
             settlement_days,
@@ -195,7 +202,13 @@ impl OvernightIndex {
             day_counter,
             forwarding,
             settings,
-        ))
+        )))
+    }
+
+    /// The inner [`IborIndex`] this overnight index is a `1*Days` configuration
+    /// of, sharing its identity (the C++ upcast of the same `shared_ptr`).
+    pub fn ibor_index(&self) -> Shared<IborIndex> {
+        self.0.clone()
     }
 
     /// The convention applied when rolling the value date to maturity (always
