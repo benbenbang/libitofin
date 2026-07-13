@@ -100,6 +100,30 @@ impl IborIndex {
         &self.term_structure
     }
 
+    /// Rebuilds this index onto a different forwarding curve, copying every
+    /// other configuration field verbatim (`clone`, `iborindex.cpp:85-93`).
+    ///
+    /// A `DepositRateHelper` clones its index onto its own relinkable handle so
+    /// it prices off the curve being bootstrapped rather than the curve the
+    /// index was handed (`ratehelpers.cpp:206`). The clone keeps the same family
+    /// name and tenor, hence the same D11 fixing-store key, and reuses the same
+    /// [`Settings`], so it shares the original's fixing history (keyed on name)
+    /// and evaluation date.
+    pub fn clone_with(&self, forwarding: Handle<dyn YieldTermStructure>) -> IborIndex {
+        IborIndex::new(
+            self.family_name().to_string(),
+            self.tenor(),
+            self.fixing_days(),
+            self.currency().clone(),
+            self.fixing_calendar(),
+            self.convention,
+            self.end_of_month,
+            self.day_counter().clone(),
+            forwarding,
+            self.base.settings().clone(),
+        )
+    }
+
     /// The simple forward rate over `[d1, d2]` with year fraction `t`, read off
     /// the forwarding curve (the C++ `forecastFixing(d1, d2, t)`).
     ///
@@ -170,9 +194,10 @@ impl InterestRateIndex for IborIndex {
 /// wrapping the inner index restores that single-identity relation.
 ///
 /// The C++ `clone()` override (`iborindex.cpp:85`) re-curves the index onto a
-/// different forwarding handle; it is not ported, matching [`IborIndex`], which
-/// does not port `clone()` either (it is exercised only by rate-helper
-/// bootstrapping, a later layer).
+/// different forwarding handle. [`IborIndex`] ports it as
+/// [`clone_with`](IborIndex::clone_with) for rate-helper bootstrapping;
+/// `OvernightIndex` does not override it, as no overnight helper needs the
+/// overnight-typed clone yet.
 pub struct OvernightIndex(Shared<IborIndex>);
 
 impl OvernightIndex {
@@ -451,6 +476,67 @@ mod tests {
         )) as Shared<dyn YieldTermStructure>);
 
         assert!(flag.borrow().up);
+    }
+
+    /// `clone` (`iborindex.cpp:85`) re-curves onto a new handle while copying
+    /// every other field verbatim: the clone forecasts off its own curve (the
+    /// original untouched), and - keyed on the same name - shares the
+    /// original's fixing history.
+    #[test]
+    fn clone_with_recurves_and_shares_fixing_history() {
+        let today = Date::new(15, Month::June, 2026);
+        let settings = settings_on(today);
+        let original = ibor(
+            Period::new(6, TimeUnit::Months),
+            flat_curve(today, 0.05),
+            settings,
+        );
+
+        let cloned_handle: RelinkableHandle<dyn YieldTermStructure> = RelinkableHandle::empty();
+        let clone = original.clone_with(cloned_handle.handle());
+
+        assert_eq!(clone.name(), original.name());
+        assert_eq!(clone.tenor(), original.tenor());
+        assert_eq!(clone.fixing_days(), original.fixing_days());
+        assert_eq!(
+            clone.business_day_convention(),
+            original.business_day_convention()
+        );
+        assert_eq!(clone.end_of_month(), original.end_of_month());
+
+        let fixing_date = Date::new(15, Month::July, 2026);
+        assert!(
+            clone.forecast_fixing(fixing_date).is_err(),
+            "clone starts on its own empty handle"
+        );
+        cloned_handle.link_to(shared(FlatForward::with_rate(
+            today,
+            0.02,
+            Actual360::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>);
+
+        let d1 = clone.value_date(fixing_date).unwrap();
+        let d2 = clone.maturity_date(d1).unwrap();
+        let t = Actual360::new().year_fraction(d1, d2);
+        let clone_forecast = clone.forecast_fixing(fixing_date).unwrap();
+        assert!((clone_forecast - ((0.02 * t).exp() - 1.0) / t).abs() < 1e-12);
+        let original_forecast = original.forecast_fixing(fixing_date).unwrap();
+        assert!(
+            (original_forecast - ((0.05 * t).exp() - 1.0) / t).abs() < 1e-12,
+            "the original still forecasts off its own curve"
+        );
+
+        let mut day = today;
+        while !original.is_valid_fixing_date(day) {
+            day -= 1;
+        }
+        original.add_fixing(day, 0.01).unwrap();
+        assert!(
+            clone.has_historical_fixing(day),
+            "a clone shares the original's fixing history by name"
+        );
     }
 
     /// `OvernightIndex` (`iborindex.cpp:76`) pins the overnight configuration:
