@@ -321,3 +321,256 @@ fn default_settlement_days(family_name: &str) -> Natural {
         _ => 2,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    //! The `MakeOIS` oracles from `test-suite/overnightindexedswap.cpp`, whose
+    //! `CommonVars` fixture is transcribed from source (`:180-206`):
+    //! `today = 5 February 2009`, `settlementDays = 2`, `nominal = 100`, an
+    //! [`Estr`] index on the flat `estrTermStructure`, `settlement =
+    //! TARGET.advance(today, 2 Days, Following)`, and the swap built through
+    //! `MakeOIS(length, estrIndex, fixedRate, 0*Days)` with an explicit effective
+    //! date of `settlement` (`makeSwap`, `:154-165`). No Estr fixings are
+    //! pre-loaded: every overnight fixing is on or after `settlement >= today`, so
+    //! all are forecast from the curve.
+    //!
+    //! The telescopic-value-dates assertions (each oracle asserts the identical
+    //! number for a telescopic `swap2`) are omitted because telescopic value dates
+    //! are deferred with the [`OvernightLeg`](crate::cashflows::OvernightLeg)
+    //! (#328/#329); only the non-telescopic swap is reproduced.
+
+    use super::*;
+    use crate::indexes::ibor::Estr;
+    use crate::interestrate::Compounding;
+    use crate::shared::shared;
+    use crate::termstructures::yields::FlatForward;
+    use crate::time::calendars::target::Target;
+    use crate::time::date::Month;
+    use crate::time::daycounters::actual360::Actual360;
+    use crate::time::daycounters::actual365fixed::Actual365Fixed;
+    use crate::time::frequency::Frequency;
+
+    const NOMINAL: Real = 100.0;
+    const SETTLEMENT_DAYS: Integer = 2;
+
+    fn today() -> Date {
+        Date::new(5, Month::February, 2009)
+    }
+
+    fn settings_at(today: Date) -> Shared<Settings<Date>> {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(today);
+        settings
+    }
+
+    fn settlement(settings: &Shared<Settings<Date>>) -> Date {
+        Target::new().advance(
+            settings.evaluation_date().unwrap(),
+            SETTLEMENT_DAYS,
+            TimeUnit::Days,
+            BusinessDayConvention::Following,
+            false,
+        )
+    }
+
+    /// A flat curve wrapped in a handle, and an [`Estr`] index forecasting off it.
+    fn estr_on(
+        curve: Handle<dyn YieldTermStructure>,
+        settings: &Shared<Settings<Date>>,
+    ) -> Shared<OvernightIndex> {
+        shared(Estr::new(curve, Shared::clone(settings)))
+    }
+
+    /// `makeSwap(length, fixedRate, spread, false)` (`overnightindexedswap.cpp:154`):
+    /// the effective date is `settlement`, the discounting curve is the index's.
+    fn make_swap(
+        length: Period,
+        fixed_rate: Rate,
+        spread: Spread,
+        curve: Handle<dyn YieldTermStructure>,
+        index: Shared<OvernightIndex>,
+        settlement: Date,
+        settings: &Shared<Settings<Date>>,
+    ) -> OvernightIndexedSwap {
+        MakeOis::new(
+            length,
+            index,
+            Some(fixed_rate),
+            Period::new(0, TimeUnit::Days),
+            Shared::clone(settings),
+        )
+        .with_effective_date(settlement)
+        .with_overnight_leg_spread(spread)
+        .with_nominal(NOMINAL)
+        .with_payment_lag(0)
+        .with_discounting_term_structure(curve)
+        .with_averaging_method(RateAveraging::Compound)
+        .build()
+        .unwrap()
+    }
+
+    /// `testCachedValue` (`:367`): a one-year Estr swap on a flat 5% curve struck
+    /// at `exp(0.05) - 1` reproduces the cached NPV within 1e-11.
+    #[test]
+    fn cached_value() {
+        let settings = settings_at(today());
+        let settlement = settlement(&settings);
+        let flat = 0.05;
+        let curve: Handle<dyn YieldTermStructure> = Handle::new(shared(FlatForward::with_rate(
+            settlement,
+            flat,
+            Actual360::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        ))
+            as Shared<dyn YieldTermStructure>);
+        let index = estr_on(curve.clone(), &settings);
+        let fixed_rate = flat.exp() - 1.0;
+
+        let mut swap = make_swap(
+            Period::new(1, TimeUnit::Years),
+            fixed_rate,
+            0.0,
+            curve,
+            index,
+            settlement,
+            &settings,
+        );
+
+        let cached_npv = 0.001730450147;
+        assert!(
+            (swap.npv().unwrap() - cached_npv).abs() < 1.0e-11,
+            "cached NPV: got {}, expected {cached_npv}",
+            swap.npv().unwrap()
+        );
+    }
+
+    /// The `CommonVars` discounting curve (`overnightindexedswap.cpp:204`): flat
+    /// 5% anchored at `today` on Actual/365 Fixed, both forecasting and
+    /// discounting the same handle.
+    fn common_curve() -> Handle<dyn YieldTermStructure> {
+        Handle::new(shared(FlatForward::with_rate(
+            today(),
+            0.05,
+            Actual365Fixed::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>)
+    }
+
+    const LENGTHS_YEARS: [Integer; 5] = [1, 2, 5, 10, 20];
+
+    /// `testFairRate` (`:284`), non-telescopic branch: for each length and spread
+    /// the swap rebuilt at its own fair rate prices to zero (`:305-311`). The
+    /// telescopic `swap2` and its equality assertion are omitted (deferred leg).
+    #[test]
+    fn fair_rate() {
+        let settings = settings_at(today());
+        let settlement = settlement(&settings);
+        let spreads = [-0.001, -0.01, 0.0, 0.01, 0.001];
+
+        for years in LENGTHS_YEARS {
+            for spread in spreads {
+                let length = Period::new(years, TimeUnit::Years);
+                let mut priced = make_swap(
+                    length,
+                    0.0,
+                    spread,
+                    common_curve(),
+                    estr_on(common_curve(), &settings),
+                    settlement,
+                    &settings,
+                );
+                let fair = priced.fixed_vs_floating_mut().fair_rate().unwrap();
+
+                let mut at_fair = make_swap(
+                    length,
+                    fair,
+                    spread,
+                    common_curve(),
+                    estr_on(common_curve(), &settings),
+                    settlement,
+                    &settings,
+                );
+                assert!(
+                    at_fair.npv().unwrap().abs() < 1.0e-10,
+                    "{years}Y spread {spread}: NPV at fair rate {fair} is {}",
+                    at_fair.npv().unwrap()
+                );
+            }
+        }
+    }
+
+    /// `testFairSpread` (`:325`), non-telescopic branch: for each length and fixed
+    /// rate the swap rebuilt at its own fair spread prices to zero (`:346-352`).
+    /// The telescopic `swap2` and its equality assertion are omitted.
+    #[test]
+    fn fair_spread() {
+        let settings = settings_at(today());
+        let settlement = settlement(&settings);
+        let rates = [0.04, 0.05, 0.06, 0.07];
+
+        for years in LENGTHS_YEARS {
+            for rate in rates {
+                let length = Period::new(years, TimeUnit::Years);
+                let mut priced = make_swap(
+                    length,
+                    rate,
+                    0.0,
+                    common_curve(),
+                    estr_on(common_curve(), &settings),
+                    settlement,
+                    &settings,
+                );
+                let fair = priced.fixed_vs_floating_mut().fair_spread().unwrap();
+
+                let mut at_fair = make_swap(
+                    length,
+                    rate,
+                    fair,
+                    common_curve(),
+                    estr_on(common_curve(), &settings),
+                    settlement,
+                    &settings,
+                );
+                assert!(
+                    at_fair.npv().unwrap().abs() < 1.0e-10,
+                    "{years}Y rate {rate}: NPV at fair spread {fair} is {}",
+                    at_fair.npv().unwrap()
+                );
+            }
+        }
+    }
+
+    /// The family-name settlement-days dispatch (`makeois.cpp:59-69`): `Sonia` 0,
+    /// `Corra` 1, else 2.
+    #[test]
+    fn settlement_days_dispatch_by_family() {
+        assert_eq!(default_settlement_days("SONIA"), 0);
+        assert_eq!(default_settlement_days("CORRA"), 1);
+        assert_eq!(default_settlement_days("ESTR"), 2);
+        assert_eq!(default_settlement_days("anything else"), 2);
+    }
+
+    /// Without an explicit effective date, the start date is derived by the
+    /// dispatch (`makeois.cpp:57-82`): for `Estr` (family `"ESTR"`, so 2 days) the
+    /// derived start equals `settlement = TARGET.advance(today, 2 Days,
+    /// Following)`, the same date the oracles set explicitly.
+    #[test]
+    fn derived_start_date_matches_settlement() {
+        let settings = settings_at(today());
+        let settlement = settlement(&settings);
+        let swap = MakeOis::new(
+            Period::new(1, TimeUnit::Years),
+            estr_on(common_curve(), &settings),
+            Some(0.03),
+            Period::new(0, TimeUnit::Days),
+            Shared::clone(&settings),
+        )
+        .with_nominal(NOMINAL)
+        .build()
+        .unwrap();
+
+        assert_eq!(swap.overnight_schedule().start_date(), settlement);
+    }
+}
