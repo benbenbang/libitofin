@@ -543,4 +543,131 @@ mod tests {
         let expected = gearing * forecast + spread;
         assert!((coupon.rate().unwrap() - expected).abs() < 1e-14);
     }
+
+    /// Builds a 6M index on a flat continuous `Actual/360` curve at `rate` and a
+    /// short-stub coupon whose accrual end (3M) genuinely mismatches the index
+    /// tenor, so the par and indexed forecasts differ. Returns the index, the
+    /// coupon, its gearing and spread.
+    fn stub_coupon(rate: Rate) -> (Shared<IborIndex>, IborCoupon, Real, Spread) {
+        let today = Date::new(15, Month::June, 2026);
+        let settings = settings_on(today);
+        let index = shared(IborIndex::new(
+            "foo".into(),
+            Period::new(6, TimeUnit::Months),
+            2,
+            Currency::eur(),
+            Target::new(),
+            BusinessDayConvention::Following,
+            false,
+            Actual360::new(),
+            flat_curve(today, rate),
+            settings,
+        ));
+
+        let fixing_date = Date::new(15, Month::July, 2026);
+        let start_date = index.value_date(fixing_date).unwrap();
+        let end_date = index.fixing_calendar().advance_by_period(
+            start_date,
+            Period::new(3, TimeUnit::Months),
+            BusinessDayConvention::Following,
+            false,
+        );
+        let gearing = 2.0;
+        let spread = 0.01;
+        let coupon = IborCoupon::new(
+            end_date,
+            100.0,
+            start_date,
+            end_date,
+            Some(index.fixing_days()),
+            index.clone(),
+            gearing,
+            spread,
+            None,
+            None,
+            None,
+            false,
+            None,
+            BusinessDayConvention::Preceding,
+        )
+        .unwrap();
+        coupon.set_pricer(pricer());
+        (index, coupon, gearing, spread)
+    }
+
+    /// The default (par) forecast rolls `fixingEndDate` off the coupon's own
+    /// accrual end, not the index maturity. On the flat continuous `Actual/360`
+    /// curve the simple forward over `[fixingValueDate, parFixingEndDate]` is
+    /// analytically `(exp(rate * t) - 1) / t` with `t` the day-count fraction of
+    /// that span; the par dates are reconstructed here from the calendar, not
+    /// read back from the coupon. `rate()` is `gearing * forecast + spread`.
+    #[test]
+    fn a_par_coupon_forecasts_over_its_own_accrual_end() {
+        let rate = 0.03;
+        let (index, coupon, gearing, spread) = stub_coupon(rate);
+        let day_counter = Actual360::new();
+
+        let fixing_value_date = index.value_date(coupon.fixing_date()).unwrap();
+        let calendar = index.fixing_calendar();
+        let next_fixing_date = calendar.advance(
+            coupon.accrual_end_date(),
+            -(index.fixing_days() as i32),
+            TimeUnit::Days,
+            BusinessDayConvention::Following,
+            false,
+        );
+        let par_fixing_end_date = calendar
+            .advance(
+                next_fixing_date,
+                index.fixing_days() as i32,
+                TimeUnit::Days,
+                BusinessDayConvention::Following,
+                false,
+            )
+            .max(fixing_value_date + 1);
+
+        let t = day_counter.year_fraction(fixing_value_date, par_fixing_end_date);
+        let forecast = ((rate * t).exp() - 1.0) / t;
+        let expected = gearing * forecast + spread;
+
+        assert!(!coupon.has_fixed().unwrap());
+        assert!((coupon.rate().unwrap() - expected).abs() < 1e-14);
+    }
+
+    /// On the stub the par default and the indexed convention genuinely diverge:
+    /// par prices over the coupon's 3M accrual end, indexed over the index's 6M
+    /// natural maturity. The default par `rate()` must differ from the indexed
+    /// `gearing * index.forecast_fixing + spread` by well more than tolerance.
+    #[test]
+    fn par_and_indexed_forecasts_differ_on_a_stub() {
+        let (index, coupon, gearing, spread) = stub_coupon(0.03);
+        let par_rate = coupon.rate().unwrap();
+        let indexed = gearing * index.forecast_fixing(coupon.fixing_date()).unwrap() + spread;
+        assert!(
+            (par_rate - indexed).abs() > 1e-6,
+            "par {par_rate} vs indexed {indexed} should differ on a stub"
+        );
+    }
+
+    /// `amount()` and `accrued_amount()` route through the mode-aware
+    /// [`rate`](Coupon::rate), not the base's natural indexed forecast. C++ gets
+    /// this from the virtual `rate()`; the port's embedded-base composition does
+    /// not dispatch back down, so the override is explicit. On the stub, where
+    /// par and indexed diverge, an unfixed coupon's amount would carry the
+    /// indexed fixing without the routing - here it must equal
+    /// `rate() * accrual_period * nominal`, and `accrued_amount` must share the
+    /// same rate.
+    #[test]
+    fn amount_routes_through_the_mode_aware_rate() {
+        let (_index, coupon, _gearing, _spread) = stub_coupon(0.03);
+        assert!(!coupon.has_fixed().unwrap());
+        let rate = coupon.rate().unwrap();
+
+        let expected_amount = rate * coupon.accrual_period() * coupon.nominal();
+        assert!((coupon.amount().unwrap() - expected_amount).abs() < 1e-14);
+
+        let payment_date = coupon.coupon_base().payment_date();
+        let expected_accrued = coupon.nominal() * rate * coupon.accrued_period(payment_date);
+        assert!((coupon.accrued_amount(payment_date).unwrap() - expected_accrued).abs() < 1e-14);
+    }
 }
