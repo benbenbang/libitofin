@@ -143,6 +143,17 @@ mod tests {
     }
 
     #[test]
+    fn usd_fields_match_quantlib() {
+        let usd = Currency::usd();
+        assert_eq!(usd.name(), "U.S. dollar");
+        assert_eq!(usd.code(), "USD");
+        assert_eq!(usd.numeric_code(), 840);
+        assert_eq!(usd.symbol(), "$");
+        assert_eq!(usd.fraction_symbol(), "\u{a2}");
+        assert_eq!(usd.fractions_per_unit(), 100);
+    }
+
+    #[test]
     fn accessors_round_trip_construction() {
         let c = Currency::new("British pound sterling", "GBP", 826, "\u{a3}", "p", 100);
         assert_eq!(c.name(), "British pound sterling");

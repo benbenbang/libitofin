@@ -43,3 +43,37 @@ impl Estr {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    //! `estr.cpp` construction table, the swap oracle's index (#330).
+
+    use super::*;
+    use crate::indexes::index::Index;
+    use crate::indexes::interestrateindex::InterestRateIndex;
+    use crate::shared::shared;
+    use crate::time::businessdayconvention::BusinessDayConvention;
+    use crate::time::period::Period;
+    use crate::time::timeunit::TimeUnit;
+
+    /// `Estr::Estr` (`estr.cpp:27`): "ESTR", zero fixing days, EUR, TARGET,
+    /// Actual/360, and the overnight configuration (one-day tenor, `Following`,
+    /// no end-of-month) inherited from `OvernightIndex`.
+    #[test]
+    fn estr_matches_the_quantlib_construction_table() {
+        let settings = shared(Settings::<Date>::new());
+        let index = Estr::new(Handle::empty(), settings);
+
+        assert_eq!(index.name(), "ESTRON Actual/360");
+        assert_eq!(index.fixing_days(), 0);
+        assert_eq!(*index.currency(), Currency::eur());
+        assert_eq!(index.fixing_calendar().name(), "TARGET");
+        assert_eq!(index.day_counter().name(), "Actual/360");
+        assert_eq!(index.tenor(), Period::new(1, TimeUnit::Days));
+        assert_eq!(
+            index.business_day_convention(),
+            BusinessDayConvention::Following
+        );
+        assert!(!index.end_of_month());
+    }
+}
