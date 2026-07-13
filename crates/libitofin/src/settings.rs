@@ -51,6 +51,7 @@ pub struct Settings<D> {
     include_reference_date_events: Cell<bool>,
     include_todays_cash_flows: Cell<Option<bool>>,
     enforces_todays_historic_fixings: Cell<bool>,
+    using_at_par_coupons: Cell<bool>,
     fixing_store: RefCell<HashMap<String, BTreeMap<Date, Rate>>>,
     fixing_notifiers: RefCell<HashMap<String, Shared<Observable>>>,
 }
@@ -63,6 +64,7 @@ impl<D> Default for Settings<D> {
             include_reference_date_events: Cell::new(false),
             include_todays_cash_flows: Cell::new(None),
             enforces_todays_historic_fixings: Cell::new(false),
+            using_at_par_coupons: Cell::new(true),
             fixing_store: RefCell::new(HashMap::new()),
             fixing_notifiers: RefCell::new(HashMap::new()),
         }
@@ -154,6 +156,25 @@ impl<D> Settings<D> {
     /// consults the flag.
     pub fn set_enforces_todays_historic_fixings(&self, value: bool) {
         self.enforces_todays_historic_fixings.set(value);
+    }
+
+    /// Whether ibor coupons forecast as par coupons rather than indexed coupons.
+    ///
+    /// The explicit, per-`Settings` port of QuantLib's `IborCoupon::Settings`
+    /// singleton (`iborcoupon.hpp:110`), which D5 forbids: the mode lives here
+    /// alongside the evaluation date and the D11 fixing store rather than in
+    /// global state. The default is `true` (par), matching this tree's
+    /// compile-time default (`usingAtParCoupons_ = true`), so forecast-over-curve
+    /// oracles reproduce out of the box. The par/indexed split governs only the
+    /// forecast branch of [`IborCoupon`](crate::cashflows::iborcoupon::IborCoupon);
+    /// a determined fixing is mode-independent.
+    pub fn using_at_par_coupons(&self) -> bool {
+        self.using_at_par_coupons.get()
+    }
+
+    /// Sets the [`using_at_par_coupons`](Self::using_at_par_coupons) flag.
+    pub fn set_using_at_par_coupons(&self, value: bool) {
+        self.using_at_par_coupons.set(value);
     }
 
     /// Case-insensitive lookup key for an index name (`IndexManager` semantics).

@@ -409,6 +409,10 @@ mod tests {
             Ok(self.swaplet)
         }
 
+        fn swaplet_rate_for(&self, _index_fixing: QlResult<Rate>) -> QlResult<Rate> {
+            Ok(self.swaplet)
+        }
+
         fn caplet_rate(&self, _effective_cap: Rate) -> QlResult<Rate> {
             fail!("caplet rate not ported: cap/floor slice")
         }
