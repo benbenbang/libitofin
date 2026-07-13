@@ -7,10 +7,12 @@
 pub mod blackcalculator;
 pub mod blackformula;
 pub mod bond;
+pub mod swap;
 pub mod vanilla;
 
 pub use blackcalculator::BlackCalculator;
 pub use bond::{BondFunctions, DiscountingBondEngine};
+pub use swap::DiscountingSwapEngine;
 pub use vanilla::AnalyticEuropeanEngine;
 
 pub use blackformula::{
