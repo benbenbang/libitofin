@@ -247,6 +247,7 @@ mod tests {
     use crate::shared::{SharedMut, shared, shared_mut};
     use crate::termstructures::yields::FlatForward;
     use crate::time::calendars::target::Target;
+    use crate::time::calendars::unitedstates::{Market, UnitedStates};
     use crate::time::date::Month;
     use crate::time::daycounters::actual360::Actual360;
     use crate::time::frequency::Frequency;
@@ -437,5 +438,59 @@ mod tests {
         )) as Shared<dyn YieldTermStructure>);
 
         assert!(flag.borrow().up);
+    }
+
+    /// `OvernightIndex` (`iborindex.cpp:76`) pins the overnight configuration:
+    /// a one-day tenor named `ON` at zero fixing days, a `Following` roll, and
+    /// no end-of-month adjustment.
+    #[test]
+    fn overnight_index_carries_the_overnight_configuration() {
+        let settings = shared(Settings::<Date>::new());
+        let index = OvernightIndex::new(
+            "SOFR".into(),
+            0,
+            Currency::usd(),
+            UnitedStates::new(Market::Sofr),
+            Actual360::new(),
+            Handle::empty(),
+            settings,
+        );
+
+        assert_eq!(index.tenor(), Period::new(1, TimeUnit::Days));
+        assert_eq!(index.fixing_days(), 0);
+        assert_eq!(
+            index.business_day_convention(),
+            BusinessDayConvention::Following
+        );
+        assert!(!index.end_of_month());
+        assert_eq!(index.name(), "SOFRON Actual/360");
+        assert_eq!(index.fixing_calendar().name(), "SOFR fixing calendar");
+    }
+
+    /// The overnight index forecasts through the inherited [`IborIndex`]
+    /// machinery: over a flat continuously-compounded curve its one-day forward
+    /// matches the closed form `(exp(r*t) - 1)/t`.
+    #[test]
+    fn overnight_index_forecasts_through_the_ibor_machinery() {
+        let today = Date::new(15, Month::June, 2026);
+        let settings = settings_on(today);
+        let rate = 0.05;
+        let index = OvernightIndex::new(
+            "ESTR".into(),
+            0,
+            Currency::eur(),
+            Target::new(),
+            Actual360::new(),
+            flat_curve(today, rate),
+            settings,
+        );
+
+        let fixing_date = Date::new(15, Month::July, 2026);
+        let d1 = index.value_date(fixing_date).unwrap();
+        let d2 = index.maturity_date(d1).unwrap();
+        let t = Actual360::new().year_fraction(d1, d2);
+        let forecast = index.forecast_fixing(fixing_date).unwrap();
+        let analytic = ((rate * t).exp() - 1.0) / t;
+        assert!((forecast - analytic).abs() < 1e-12);
     }
 }
