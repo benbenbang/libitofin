@@ -6,6 +6,7 @@
 mod bond;
 mod bonds;
 mod fixedvsfloatingswap;
+mod makeois;
 mod oneassetoption;
 mod overnightindexedswap;
 mod payoffs;
@@ -18,6 +19,7 @@ pub use fixedvsfloatingswap::{
     FixedVsFloatingSwap, FixedVsFloatingSwapArguments, FixedVsFloatingSwapEngine,
     FixedVsFloatingSwapResults, FloatingArgumentsFn,
 };
+pub use makeois::MakeOis;
 pub use oneassetoption::{
     EuropeanOption, Greeks, MoreGreeks, OneAssetOption, OneAssetOptionEngine,
     OneAssetOptionResults, OptionArguments, VanillaOption,
