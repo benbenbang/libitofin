@@ -262,3 +262,312 @@ impl Coupon for OvernightIndexedCoupon {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    //! Oracles from `test-suite/overnightindexedcoupon.cpp`, the six cases that
+    //! build a plain compounding SOFR coupon: `testPastCouponRate`,
+    //! `testPastSpreadedCouponRate`, `testCurrentCouponRate`,
+    //! `testFutureCouponRate`, `testRateWhenTodayIsHoliday` and
+    //! `testAccruedAmountInThePast`. The lookback/lockout/observation-shift,
+    //! telescopic-value-date, Black cap/floor and `OvernightLeg` cases exercise
+    //! surfaces this ticket does not port.
+    //!
+    //! The fixture pre-loads the C++ `CommonVars` history (the SOFR fixings at
+    //! `overnightindexedcoupon.cpp:95-140`) on the default evaluation date of
+    //! 23 November 2021.
+
+    use super::*;
+    use crate::handle::RelinkableHandle;
+    use crate::indexes::ibor::Sofr;
+    use crate::indexes::index::Index;
+    use crate::interestrate::Compounding;
+    use crate::settings::Settings;
+    use crate::shared::shared;
+    use crate::termstructures::yields::FlatForward;
+    use crate::termstructures::yieldtermstructure::YieldTermStructure;
+    use crate::time::date::Month::{August, December, January, July, June, November, October};
+    use crate::time::daycounters::actual360::Actual360;
+    use crate::time::frequency::Frequency;
+
+    const NOTIONAL: Real = 10000.0;
+
+    /// The C++ `CommonVars`: an evaluation date, a SOFR index over a relinkable
+    /// forecast curve, and the pre-loaded fixing history. The handle is returned
+    /// so a test can link a forecast curve after construction.
+    fn common_vars(
+        today: Date,
+    ) -> (
+        Shared<Settings<Date>>,
+        RelinkableHandle<dyn YieldTermStructure>,
+        Shared<OvernightIndex>,
+    ) {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(today);
+        let curve: RelinkableHandle<dyn YieldTermStructure> = RelinkableHandle::empty();
+        let sofr = shared(Sofr::new(curve.handle(), settings.clone()));
+
+        let past_dates = [
+            Date::new(21, June, 2019),
+            Date::new(24, June, 2019),
+            Date::new(25, June, 2019),
+            Date::new(26, June, 2019),
+            Date::new(27, June, 2019),
+            Date::new(28, June, 2019),
+            Date::new(1, July, 2019),
+            Date::new(2, July, 2019),
+            Date::new(3, July, 2019),
+            Date::new(5, July, 2019),
+            Date::new(8, July, 2019),
+            Date::new(9, July, 2019),
+            Date::new(10, July, 2019),
+            Date::new(11, July, 2019),
+            Date::new(12, July, 2019),
+            Date::new(15, July, 2019),
+            Date::new(16, July, 2019),
+            Date::new(17, July, 2019),
+            Date::new(18, July, 2019),
+            Date::new(19, July, 2019),
+            Date::new(22, July, 2019),
+            Date::new(23, July, 2019),
+            Date::new(24, July, 2019),
+            Date::new(25, July, 2019),
+            Date::new(26, July, 2019),
+            Date::new(29, July, 2019),
+            Date::new(30, July, 2019),
+            Date::new(31, July, 2019),
+            Date::new(1, August, 2019),
+            Date::new(2, August, 2019),
+            Date::new(5, August, 2019),
+            Date::new(18, October, 2021),
+            Date::new(19, October, 2021),
+            Date::new(20, October, 2021),
+            Date::new(21, October, 2021),
+            Date::new(22, October, 2021),
+            Date::new(25, October, 2021),
+            Date::new(26, October, 2021),
+            Date::new(27, October, 2021),
+            Date::new(28, October, 2021),
+            Date::new(29, October, 2021),
+            Date::new(1, November, 2021),
+            Date::new(2, November, 2021),
+            Date::new(3, November, 2021),
+            Date::new(4, November, 2021),
+            Date::new(5, November, 2021),
+            Date::new(8, November, 2021),
+            Date::new(9, November, 2021),
+            Date::new(10, November, 2021),
+            Date::new(12, November, 2021),
+            Date::new(15, November, 2021),
+            Date::new(16, November, 2021),
+            Date::new(17, November, 2021),
+            Date::new(18, November, 2021),
+            Date::new(19, November, 2021),
+            Date::new(22, November, 2021),
+        ];
+        let past_rates = [
+            0.0237, 0.0239, 0.0241, 0.0243, 0.0242, 0.025, 0.0242, 0.0251, 0.0256, 0.0259, 0.0248,
+            0.0245, 0.0246, 0.0241, 0.0236, 0.0246, 0.0247, 0.0247, 0.0246, 0.0241, 0.024, 0.024,
+            0.0241, 0.0242, 0.0241, 0.024, 0.0239, 0.0255, 0.0219, 0.0219, 0.0213, 0.0008, 0.0009,
+            0.0008, 0.0010, 0.0012, 0.0011, 0.0013, 0.0012, 0.0012, 0.0008, 0.0009, 0.0010, 0.0011,
+            0.0014, 0.0013, 0.0011, 0.0009, 0.0008, 0.0007, 0.0008, 0.0008, 0.0007, 0.0009, 0.0010,
+            0.0009,
+        ];
+        sofr.add_fixings(past_dates.into_iter().zip(past_rates))
+            .unwrap();
+
+        (settings, curve, sofr)
+    }
+
+    /// The C++ `flatRate(rate, Actual360())`: a flat continuously-compounded
+    /// forward curve anchored at the evaluation date.
+    fn flat_rate(reference: Date, rate: Rate) -> Shared<dyn YieldTermStructure> {
+        shared(FlatForward::with_rate(
+            reference,
+            rate,
+            Actual360::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>
+    }
+
+    /// The C++ `CommonVars::makeCoupon`: a plain compounding SOFR coupon paid on
+    /// its accrual end.
+    fn make_coupon(sofr: Shared<OvernightIndex>, start: Date, end: Date) -> OvernightIndexedCoupon {
+        OvernightIndexedCoupon::new(
+            end,
+            NOTIONAL,
+            start,
+            end,
+            sofr,
+            1.0,
+            0.0,
+            None,
+            None,
+            None,
+            RateAveraging::Compound,
+            false,
+            None,
+        )
+        .unwrap()
+    }
+
+    /// The C++ `CommonVars::makeSpreadedCoupon`.
+    fn make_spreaded_coupon(
+        sofr: Shared<OvernightIndex>,
+        start: Date,
+        end: Date,
+        spread: Spread,
+        compound_spread_daily: bool,
+    ) -> OvernightIndexedCoupon {
+        OvernightIndexedCoupon::new(
+            end,
+            NOTIONAL,
+            start,
+            end,
+            sofr,
+            1.0,
+            spread,
+            None,
+            None,
+            None,
+            RateAveraging::Compound,
+            compound_spread_daily,
+            None,
+        )
+        .unwrap()
+    }
+
+    /// `testPastCouponRate` (overnightindexedcoupon.cpp:339): a coupon entirely
+    /// in the past compounds its recorded fixings to 0.000987136104, and its
+    /// amount is `notional * rate * 31/360`.
+    #[test]
+    fn a_past_coupon_compounds_its_recorded_fixings() {
+        let (_settings, _curve, sofr) = common_vars(Date::new(23, November, 2021));
+        let coupon = make_coupon(
+            sofr,
+            Date::new(18, October, 2021),
+            Date::new(18, November, 2021),
+        );
+
+        let expected_rate = 0.000987136104;
+        assert!((coupon.rate().unwrap() - expected_rate).abs() < 1e-12);
+
+        let expected_amount = NOTIONAL * expected_rate * 31.0 / 360.0;
+        assert!((coupon.amount().unwrap() - expected_amount).abs() < 1e-8);
+    }
+
+    /// `testPastSpreadedCouponRate` (:356): the spread compounded daily gives
+    /// 0.0010871445057780704; added after compounding, 0.0010871361040194164.
+    #[test]
+    fn a_past_spreaded_coupon_prices_both_spread_modes() {
+        let (_settings, _curve, sofr) = common_vars(Date::new(23, November, 2021));
+
+        let compounded_daily = make_spreaded_coupon(
+            sofr.clone(),
+            Date::new(18, October, 2021),
+            Date::new(18, November, 2021),
+            0.0001,
+            true,
+        );
+        let expected_rate = 0.0010871445057780704;
+        assert!((compounded_daily.rate().unwrap() - expected_rate).abs() < 1e-12);
+        let expected_amount = NOTIONAL * expected_rate * 31.0 / 360.0;
+        assert!((compounded_daily.amount().unwrap() - expected_amount).abs() < 1e-8);
+
+        let added_after = make_spreaded_coupon(
+            sofr,
+            Date::new(18, October, 2021),
+            Date::new(18, November, 2021),
+            0.0001,
+            false,
+        );
+        assert!((added_after.rate().unwrap() - 0.0010871361040194164).abs() < 1e-12);
+    }
+
+    /// `testCurrentCouponRate` (:379): a coupon spanning today forecasts today's
+    /// missing fixing (0.000926701551), then reads it once recorded
+    /// (0.000916700760). This is the D11 today-border fallthrough.
+    #[test]
+    fn a_current_coupon_forecasts_then_reads_todays_fixing() {
+        let (settings, curve, sofr) = common_vars(Date::new(23, November, 2021));
+        curve.link_to(flat_rate(settings.evaluation_date().unwrap(), 0.0010));
+
+        let coupon = make_coupon(
+            sofr.clone(),
+            Date::new(10, November, 2021),
+            Date::new(10, December, 2021),
+        );
+
+        let expected_rate = 0.000926701551;
+        assert!((coupon.rate().unwrap() - expected_rate).abs() < 1e-12);
+        let expected_amount = NOTIONAL * expected_rate * 30.0 / 360.0;
+        assert!((coupon.amount().unwrap() - expected_amount).abs() < 1e-8);
+
+        sofr.add_fixing(Date::new(23, November, 2021), 0.0007)
+            .unwrap();
+
+        let expected_rate = 0.000916700760;
+        assert!((coupon.rate().unwrap() - expected_rate).abs() < 1e-12);
+        let expected_amount = NOTIONAL * expected_rate * 30.0 / 360.0;
+        assert!((coupon.amount().unwrap() - expected_amount).abs() < 1e-8);
+    }
+
+    /// `testFutureCouponRate` (:406): a coupon entirely in the future forecasts
+    /// every fixing off the flat curve to 0.001000043057.
+    #[test]
+    fn a_future_coupon_forecasts_every_fixing() {
+        let (settings, curve, sofr) = common_vars(Date::new(23, November, 2021));
+        curve.link_to(flat_rate(settings.evaluation_date().unwrap(), 0.0010));
+
+        let coupon = make_coupon(
+            sofr,
+            Date::new(10, December, 2021),
+            Date::new(10, January, 2022),
+        );
+
+        let expected_rate = 0.001000043057;
+        assert!((coupon.rate().unwrap() - expected_rate).abs() < 1e-12);
+        let expected_amount = NOTIONAL * expected_rate * 31.0 / 360.0;
+        assert!((coupon.amount().unwrap() - expected_amount).abs() < 1e-8);
+    }
+
+    /// `testRateWhenTodayIsHoliday` (:424): with the evaluation date on a
+    /// weekend, the coupon spanning it prices to 0.000930035180.
+    #[test]
+    fn a_coupon_prices_when_today_is_a_holiday() {
+        let (settings, curve, sofr) = common_vars(Date::new(23, November, 2021));
+        settings.set_evaluation_date(Date::new(20, November, 2021));
+        curve.link_to(flat_rate(Date::new(20, November, 2021), 0.0010));
+
+        let coupon = make_coupon(
+            sofr,
+            Date::new(10, November, 2021),
+            Date::new(10, December, 2021),
+        );
+
+        let expected_rate = 0.000930035180;
+        assert!((coupon.rate().unwrap() - expected_rate).abs() < 1e-12);
+        let expected_amount = NOTIONAL * expected_rate * 30.0 / 360.0;
+        assert!((coupon.amount().unwrap() - expected_amount).abs() < 1e-8);
+    }
+
+    /// `testAccruedAmountInThePast` (:442): the accrued amount at an interior
+    /// past date compounds only up to that date - here reproducing the
+    /// 18-Oct-to-18-Nov past-coupon rate over `notional * rate * 31/360`.
+    #[test]
+    fn accrued_amount_in_the_past_compounds_up_to_the_date() {
+        let (_settings, _curve, sofr) = common_vars(Date::new(23, November, 2021));
+        let coupon = make_coupon(
+            sofr,
+            Date::new(18, October, 2021),
+            Date::new(18, January, 2022),
+        );
+
+        let expected_amount = NOTIONAL * 0.000987136104 * 31.0 / 360.0;
+        let accrued = coupon
+            .accrued_amount(Date::new(18, November, 2021))
+            .unwrap();
+        assert!((accrued - expected_amount).abs() < 1e-8);
+    }
+}
