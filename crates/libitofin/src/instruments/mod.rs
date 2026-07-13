@@ -7,6 +7,7 @@ mod bond;
 mod bonds;
 mod oneassetoption;
 mod payoffs;
+mod swap;
 
 pub use bond::{Bond, BondArguments, BondEngine, BondPrice, BondResults};
 pub use bonds::FixedRateBond;
@@ -15,3 +16,4 @@ pub use oneassetoption::{
     OneAssetOptionResults, OptionArguments, VanillaOption,
 };
 pub use payoffs::{PlainVanillaPayoff, StrikedTypePayoff, TypePayoff};
+pub use swap::{Swap, SwapArguments, SwapEngine, SwapResults, SwapType};
