@@ -263,6 +263,23 @@ oversight) and is documented at the point of divergence in the source.
   belong to the cap/floor slice; an in-arrears coupon is refused with an `Err`
   rather than priced with a missing convexity term.
 
+- **`IborLeg` builds the plain-vanilla coupons only; caps, floors and the
+  in-arrears feature are omitted, not silently dropped.** QuantLib's `IborLeg`
+  carries `withCaps`/`withFloors`/`inArrears` builder methods that route the leg
+  through `CappedFlooredIborCoupon` and the optionlet pricer. Those belong to the
+  cap/floor slice, so this port omits the methods entirely rather than accepting
+  the vectors and building plain coupons. The default `BlackIborCouponPricer` is
+  attached in `coupons()` (C++ attaches it in `operator Leg()` under the same
+  no-cap/no-floor/no-arrears condition, which here always holds); `build()` only
+  erases the concrete coupons into a `Leg`, and the free `set_coupon_pricer`
+  overrides the default on the concrete coupons, the erased `Leg` carrying no
+  downcast. The stub reference dates follow the `FloatingLeg` template
+  (`calendar.adjust(end - tenor, bdc)`, no end-of-month flag), which agrees with
+  the fixed leg on every multi-coupon schedule. A zero gearing, which the C++
+  template collapses to a `FixedRateCoupon`, is not special-cased: `IborCoupon`
+  rejects it, so `with_gearing(0.0)` surfaces that `Err` rather than a silent
+  fixed coupon.
+
 **Indexes (EPIC-6):**
 
 - **`Currency` is always valid; there is no empty placeholder.** QuantLib's
