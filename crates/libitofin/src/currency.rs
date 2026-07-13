@@ -73,6 +73,15 @@ impl Currency {
         Currency::new("European Euro", "EUR", 978, "", "", 100)
     }
 
+    /// The U.S. dollar (ISO code `USD`, numeric `840`, 100 cents per unit).
+    ///
+    /// Values match `USDCurrency` in QuantLib's `ql/currencies/america.cpp`. Its
+    /// default `Rounding()` convention is dropped along with the `rounding`
+    /// field (see the module divergences).
+    pub fn usd() -> Self {
+        Currency::new("U.S. dollar", "USD", 840, "$", "\u{a2}", 100)
+    }
+
     /// Currency name, e.g. `"European Euro"`.
     pub fn name(&self) -> &str {
         &self.name
