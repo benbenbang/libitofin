@@ -32,10 +32,16 @@
 //!   through the virtuals) must override
 //!   [`reference_date`](TermStructure::reference_date) as well.
 
+pub mod bootstraphelper;
 pub mod interpolatedcurve;
 pub mod volatility;
 pub mod yields;
 pub mod yieldtermstructure;
+
+pub use bootstraphelper::{
+    BootstrapHelperBase, RateHelper, RelativeDateRateHelper, compare_by_pillar_date,
+    sort_by_pillar_date,
+};
 
 use std::cell::Cell;
 
