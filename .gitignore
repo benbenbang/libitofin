@@ -157,3 +157,7 @@ fable*.txt
 mutants*
 .mcp.json
 graphify-out/
+graphify-out-ql/
+PORT_COVERAGE.md
+graphify*.md
+GRAPHIFY*.md
