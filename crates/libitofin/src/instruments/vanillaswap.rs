@@ -204,3 +204,174 @@ impl Instrument for VanillaSwap {
         self.base.fetch_results(results)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    //! `VanillaSwap`'s numeric oracle (`swap.cpp` `testFairRate` and friends)
+    //! lands with the discounting engine (#322). These unit tests pin the
+    //! construction `swap.cpp` `makeSwap` (:68-79) implies - the two legs it
+    //! builds, the payer flags, the fixed/spread/nominal accessors - and the one
+    //! real override: the floating hook filling the argument vectors from the
+    //! swap's `IborCoupon`s, hand-checked against the erased floating leg.
+
+    use super::*;
+    use crate::handle::Handle;
+    use crate::indexes::ibor::Euribor;
+    use crate::instruments::swap::SwapArguments;
+    use crate::interestrate::Compounding;
+    use crate::shared::shared;
+    use crate::termstructures::yields::FlatForward;
+    use crate::termstructures::yieldtermstructure::YieldTermStructure;
+    use crate::time::calendars::target::Target;
+    use crate::time::date::Month;
+    use crate::time::daycounters::actual360::Actual360;
+    use crate::time::frequency::Frequency;
+    use crate::time::schedule::MakeSchedule;
+
+    const NOMINAL: Real = 1_000_000.0;
+    const FIXED_RATE: Rate = 0.05;
+    const SPREAD: Spread = 0.001;
+
+    fn today() -> Date {
+        Date::new(7, Month::July, 2026)
+    }
+
+    fn settings_today() -> Shared<Settings<Date>> {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(today());
+        settings
+    }
+
+    /// A three-month Euribor forecasting off a flat 2% curve, so the floating
+    /// coupons are unfixed and `amount()` succeeds.
+    fn euribor(settings: &Shared<Settings<Date>>) -> Shared<IborIndex> {
+        let curve = Handle::new(shared(FlatForward::with_rate(
+            today(),
+            0.02,
+            Actual360::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>);
+        shared(Euribor::three_months(curve, Shared::clone(settings)))
+    }
+
+    /// An annual schedule spanning two coupon periods.
+    fn schedule() -> Schedule {
+        MakeSchedule::new()
+            .from(Date::new(7, Month::July, 2027))
+            .to(Date::new(7, Month::July, 2029))
+            .with_frequency(Frequency::Annual)
+            .with_calendar(Target::new())
+            .with_convention(BusinessDayConvention::Following)
+            .build()
+    }
+
+    fn make_swap(swap_type: SwapType) -> VanillaSwap {
+        let settings = settings_today();
+        let index = euribor(&settings);
+        VanillaSwap::new(
+            swap_type,
+            NOMINAL,
+            schedule(),
+            FIXED_RATE,
+            Actual360::new(),
+            schedule(),
+            index,
+            SPREAD,
+            Actual360::new(),
+            None,
+            settings,
+        )
+        .unwrap()
+    }
+
+    /// `makeSwap` builds a fixed leg and an ibor leg over the two-period
+    /// schedules; the base carries the type, rate, spread and single nominal.
+    #[test]
+    fn it_builds_both_legs_and_exposes_the_base() {
+        let swap = make_swap(SwapType::Payer);
+        let base = swap.fixed_vs_floating();
+
+        assert_eq!(base.fixed_leg().len(), 2, "two annual fixed coupons");
+        assert_eq!(base.floating_leg().len(), 2, "two annual ibor coupons");
+        assert_eq!(base.swap_type(), SwapType::Payer);
+        assert_eq!(base.fixed_rate(), FIXED_RATE);
+        assert_eq!(base.spread(), SPREAD);
+        assert_eq!(base.nominal().unwrap(), NOMINAL);
+    }
+
+    /// The payer flags reach the swap-level arguments through the delegated
+    /// [`Instrument`] face: a payer pays the fixed leg, a receiver receives it.
+    #[test]
+    fn payer_type_maps_the_leg_multipliers_through_delegation() {
+        let mut payer = SwapArguments::default();
+        make_swap(SwapType::Payer)
+            .setup_arguments(&mut payer)
+            .unwrap();
+        assert_eq!(payer.payer, vec![-1.0, 1.0], "payer: -fixed, +floating");
+
+        let mut receiver = SwapArguments::default();
+        make_swap(SwapType::Receiver)
+            .setup_arguments(&mut receiver)
+            .unwrap();
+        assert_eq!(
+            receiver.payer,
+            vec![1.0, -1.0],
+            "receiver: +fixed, -floating"
+        );
+    }
+
+    /// The floating hook fills every argument vector from the swap's ibor
+    /// coupons, matching the erased floating leg coupon for coupon.
+    #[test]
+    fn the_floating_hook_fills_the_argument_vectors() {
+        let swap = make_swap(SwapType::Payer);
+
+        let mut args = FixedVsFloatingSwapArguments::default();
+        swap.setup_arguments(&mut args).unwrap();
+
+        let leg = swap.fixed_vs_floating().floating_leg();
+        let n = leg.len();
+        assert_eq!(n, 2);
+
+        let coupons: Vec<&dyn Coupon> = leg.iter().map(|f| f.as_coupon().unwrap()).collect();
+
+        let expected_resets: Vec<Date> = coupons.iter().map(|c| c.accrual_start_date()).collect();
+        assert_eq!(args.floating_reset_dates, expected_resets);
+
+        let expected_pays: Vec<Date> = leg.iter().map(|f| f.date()).collect();
+        assert_eq!(args.floating_pay_dates, expected_pays);
+
+        assert_eq!(args.floating_nominals, vec![NOMINAL; n]);
+
+        let expected_accruals: Vec<_> = coupons.iter().map(|c| c.accrual_period()).collect();
+        assert_eq!(args.floating_accrual_times, expected_accruals);
+
+        assert_eq!(
+            args.floating_spreads,
+            vec![SPREAD; n],
+            "one spread per coupon"
+        );
+
+        let expected_amounts: Vec<Real> = leg.iter().map(|f| f.amount().unwrap()).collect();
+        assert_eq!(args.floating_coupons, expected_amounts);
+        assert!(
+            args.floating_coupons.iter().all(|&a| a > 0.0),
+            "forecast coupon amounts are positive"
+        );
+
+        assert_eq!(args.floating_fixing_dates.len(), n);
+        for (fixing, reset) in args.floating_fixing_dates.iter().zip(&expected_resets) {
+            assert!(fixing <= reset, "fixing precedes accrual start");
+        }
+    }
+
+    /// The fair-rate and fair-spread accessors are reachable through the mutable
+    /// base, and report unavailable before an engine has priced the swap.
+    #[test]
+    fn fair_values_are_unavailable_before_pricing() {
+        let mut swap = make_swap(SwapType::Payer);
+        assert!(swap.fixed_vs_floating_mut().fair_rate().is_err());
+        assert!(swap.fixed_vs_floating_mut().fair_spread().is_err());
+    }
+}
