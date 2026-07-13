@@ -51,6 +51,18 @@ pub trait FloatingRateCouponPricer: AsObservable {
     /// (`swapletRate`).
     fn swaplet_rate(&self) -> QlResult<Rate>;
 
+    /// The swaplet rate for a caller-supplied `index_fixing`, gearing and spread
+    /// folded in.
+    ///
+    /// The mode-aware entry: an [`IborCoupon`] threads its par or indexed
+    /// forecast in here rather than let the pricer read the base coupon's
+    /// natural forecast, which cannot see the par-coupon dates. Gearing, spread
+    /// and the in-arrears refusal are the pricer's, as in
+    /// [`swaplet_rate`](Self::swaplet_rate).
+    ///
+    /// [`IborCoupon`]: super::iborcoupon::IborCoupon
+    fn swaplet_rate_for(&self, index_fixing: QlResult<Rate>) -> QlResult<Rate>;
+
     /// The rate of a caplet struck at `effective_cap` (`capletRate`).
     ///
     /// The cap/floor slice is not ported; a base-slice pricer returns `Err`.
@@ -126,14 +138,18 @@ impl FloatingRateCouponPricer for BlackIborCouponPricer {
     }
 
     fn swaplet_rate(&self) -> QlResult<Rate> {
+        let Some(index_fixing) = &self.index_fixing else {
+            fail!("pricer not initialized: no coupon captured");
+        };
+        self.swaplet_rate_for(index_fixing.clone())
+    }
+
+    fn swaplet_rate_for(&self, index_fixing: QlResult<Rate>) -> QlResult<Rate> {
         require!(
             !self.is_in_arrears,
             "in-arrears convexity adjustment not ported: cap/floor slice"
         );
-        let Some(index_fixing) = &self.index_fixing else {
-            fail!("pricer not initialized: no coupon captured");
-        };
-        Ok(self.gearing * index_fixing.clone()? + self.spread)
+        Ok(self.gearing * index_fixing? + self.spread)
     }
 
     fn caplet_rate(&self, _effective_cap: Rate) -> QlResult<Rate> {

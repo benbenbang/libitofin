@@ -242,20 +242,20 @@ oversight) and is documented at the point of divergence in the source.
   traits, so on a concrete coupon with both in scope an unqualified
   `coupon.amount()` is ambiguous; name the trait.
 
-- **`IborCoupon` ports the swaplet path only; the par/indexed forecast switch
-  (a global singleton) is not ported.** QuantLib's `IborCoupon::indexFixing()`
-  forecast branch selects between a par-coupon approximation and an indexed
-  coupon through the `IborCoupon::Settings` singleton (`usingAtParCoupons`,
-  default `true` in this tree). That is a process-global switch, which D5
-  forbids, and its whole effect is confined to the forecast branch. This port
-  keeps `index_fixing` delegating to `FloatingRateCoupon`, which forecasts off
-  the index's natural maturity (the indexed-coupon convention); for every
-  *determined* fixing - the only case the swaplet path reaches - it returns the
-  same required past fixing as the C++ override. The par-coupon approximation
-  and the per-coupon cached dates (`fixingValueDate`/`fixingEndDate`/
-  `spanningTime`) that feed it are deferred to the cap/floor slice, where the
-  mode will be threaded explicitly rather than read from a global.
-  `BlackIborCouponPricer` ports `swapletRate = gearing * indexFixing + spread`;
+- **The `IborCoupon` par/indexed forecast switch is threaded on `Settings`, not
+  a global singleton.** QuantLib's `IborCoupon::indexFixing()` forecast branch
+  selects between a par-coupon approximation (rolls `fixingEndDate` off the
+  coupon's own accrual end) and an indexed coupon (the index's natural maturity)
+  through the `IborCoupon::Settings` singleton (`usingAtParCoupons`, default
+  `true`). That process-global switch is what D5 forbids, so the port drops the
+  singleton and threads the flag explicitly on `Settings`
+  (`using_at_par_coupons`, default `true`) beside the evaluation date and the
+  D11 fixing store. The behaviour it governs is fully reproduced: `index_fixing`
+  computes the cached `fixingValueDate`/`fixingEndDate`/`spanningTime`
+  (`couponpricer.cpp:56-88`) and reads the specialized 3-arg `forecastFixing`
+  off the curve; a *determined* fixing is mode-independent and returns the same
+  required past fixing as the C++ override. `BlackIborCouponPricer` ports
+  `swapletRate = gearing * indexFixing + spread`;
   since a non-in-arrears `Black76` coupon needs no convexity adjustment it needs
   no volatility, and since only `swapletPrice` (not `swapletRate`) reads the
   forwarding-curve discount, the pricer captures no curve. The caplet/floorlet

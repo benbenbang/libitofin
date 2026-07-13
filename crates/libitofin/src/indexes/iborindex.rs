@@ -96,11 +96,15 @@ impl IborIndex {
     }
 
     /// The simple forward rate over `[d1, d2]` with year fraction `t`, read off
-    /// the forwarding curve (the C++ private `forecastFixing(d1, d2, t)`).
+    /// the forwarding curve (the C++ `forecastFixing(d1, d2, t)`).
     ///
-    /// Kept private, as in C++, so a caller cannot pass mismatched dates and ask
-    /// a 6-month index for a 1-year fixing.
-    fn forecast_fixing_between(&self, d1: Date, d2: Date, t: Time) -> QlResult<Rate> {
+    /// C++ keeps this overload private and declares `IborCoupon` a `friend`
+    /// (`iborindex.hpp:81`), so only the coupon may pass cached dates and no
+    /// arbitrary caller can ask a 6-month index for a 1-year fixing. The port
+    /// mirrors that trust boundary with crate visibility: reachable by
+    /// [`IborCoupon`](crate::cashflows::iborcoupon::IborCoupon)'s par/indexed
+    /// forecast, closed to the public API.
+    pub(crate) fn forecast_fixing_between(&self, d1: Date, d2: Date, t: Time) -> QlResult<Rate> {
         require!(
             !self.term_structure.is_empty(),
             "null term structure set to this instance of {}",

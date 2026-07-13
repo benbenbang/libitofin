@@ -12,54 +12,51 @@
 //! ## The index fixing
 //!
 //! C++ overrides `indexFixing()` to branch on `hasFixed()`: a determined coupon
-//! returns the required past fixing, an undetermined one forecasts. That branch
-//! is the same one [`Index::fixing`](crate::indexes::index::Index::fixing)
-//! already makes: for a fixing date strictly before today (or on today under
-//! `enforcesTodaysHistoricFixings`) it requires the stored fixing, otherwise it
-//! forecasts. So [`index_fixing`](IborCoupon::index_fixing) delegates to the
-//! base [`FloatingRateCoupon::index_fixing`], which yields the identical value
-//! for every determined case - the only cases this slice's C++ oracles reach.
-//! The forecast branch is nonetheless live: `rate()` on an unfixed coupon over a
-//! linked curve returns the index's natural forecast, i.e. the indexed-coupon
-//! convention, not the par approximation. That behaviour is deliberate and
-//! pinned by `an_unfixed_coupon_forecasts_in_indexed_mode_not_par`, and holds
-//! until the par mode is threaded explicitly (see the divergence below).
+//! returns the required past fixing, an undetermined one forecasts. The
+//! determined branch is the same one
+//! [`Index::fixing`](crate::indexes::index::Index::fixing) already makes, so
+//! [`index_fixing`](IborCoupon::index_fixing) delegates it to the base
+//! [`FloatingRateCoupon::index_fixing`], yielding the identical value for every
+//! determined case. The forecast branch is mode-aware: it computes the cached
+//! `fixingValueDate`/`fixingEndDate`/`spanningTime` (`couponpricer.cpp:56-88`)
+//! and reads the specialized 3-arg
+//! [`forecast_fixing_between`](IborIndex::forecast_fixing_between)
+//! (`iborcoupon.cpp:126`) rather than the index's natural forecast.
 //!
-//! ## Divergences from QuantLib
+//! ## Par vs indexed coupons (`usingAtParCoupons`)
 //!
-//! The C++ `indexFixing()` forecast branch uses a specialized per-coupon
-//! `forecastFixing(valueDate, endDate, spanningTime)` whose dates depend on the
-//! `IborCoupon::Settings` singleton (`usingAtParCoupons`): par coupons roll the
-//! estimation end off the next fixing date, indexed coupons use the index
-//! maturity. That flag is a global singleton, which D5 forbids, and its whole
-//! effect is confined to the forecast branch. The base
-//! [`FloatingRateCoupon::index_fixing`] forecast follows the index's natural
-//! maturity, i.e. the indexed-coupon convention (`QL_USE_INDEXED_COUPON`). The
-//! par-coupon approximation - the C++ compile-time default in this tree - and
-//! the cached-data machinery it needs are deferred to the cap/floor slice, where
-//! the mode is threaded explicitly per D5 rather than read from a global. The
-//! C++ oracles reach only determined fixings, so the deferral changes no number
-//! they pin; the indexed-mode forecast the base takes is itself pinned by a
-//! test, so this divergence is a deliberate, locked behaviour rather than a
-//! latent one.
+//! The forecast estimation end depends on the coupon convention. A **par**
+//! coupon rolls `fixingEndDate` off the next fixing date derived from the
+//! coupon's own accrual end (the approximation that lets a vanilla floater
+//! telescope to par); an **indexed** coupon uses the index's natural maturity,
+//! so its forecast equals `index.forecast_fixing(fixingDate)`. The two coincide
+//! only when the coupon spans exactly the index tenor; on a stub they diverge.
 //!
-//! `fixingValueDate`/`fixingMaturityDate`/`fixingEndDate`/`spanningTime` and the
-//! `IborLeg` builder are omitted for the same reason: they exist to feed the
-//! deferred par/indexed forecast and the leg (#7.10).
+//! C++ toggles the convention through the `IborCoupon::Settings` singleton
+//! (`iborcoupon.hpp:110`, `usingAtParCoupons_ = true` by default), which D5
+//! forbids. The port threads the flag explicitly on
+//! [`Settings`](crate::settings::Settings::using_at_par_coupons) - alongside the
+//! evaluation date and the D11 fixing store - defaulting to par to match the
+//! tree's compile-time default. Only the forecast branch reads it; a determined
+//! fixing is mode-independent. The `IborCoupon::Settings` singleton itself is
+//! the sole divergence: the behaviour it governs is reproduced, the global is
+//! not.
 
 use super::coupon::{Coupon, CouponBase};
 use super::couponpricer::FloatingRateCouponPricer;
 use super::floatingratecoupon::FloatingRateCoupon;
 use crate::errors::QlResult;
-use crate::fail;
 use crate::indexes::iborindex::IborIndex;
 use crate::indexes::index::Index;
+use crate::indexes::interestrateindex::InterestRateIndex;
 use crate::patterns::observable::{AsObservable, Observable};
 use crate::shared::{Shared, SharedMut};
 use crate::time::businessdayconvention::BusinessDayConvention;
 use crate::time::date::Date;
 use crate::time::daycounter::DayCounter;
-use crate::types::{Natural, Rate, Real, Spread};
+use crate::time::timeunit::TimeUnit;
+use crate::types::{Integer, Natural, Rate, Real, Spread, Time};
+use crate::{fail, require};
 
 /// A coupon paying a Libor-type index (`ql/cashflows/iborcoupon.hpp`).
 ///
@@ -129,14 +126,77 @@ impl IborCoupon {
         self.base.fixing_date()
     }
 
-    /// The index fixing at the coupon's [`fixing_date`](Self::fixing_date).
+    /// The index fixing at the coupon's [`fixing_date`](Self::fixing_date)
+    /// (`IborCoupon::indexFixing`).
     ///
-    /// Delegates to the base: for every determined case this is the required
-    /// past fixing the C++ `indexFixing()` returns; an unfixed coupon forecasts
-    /// in the indexed-coupon convention rather than the deferred par
-    /// approximation (see the module docs).
+    /// A determined coupon returns the required past fixing, delegated to the
+    /// base and mode-independent. An undetermined coupon forecasts through the
+    /// specialized 3-arg [`forecast_fixing_between`](IborIndex::forecast_fixing_between)
+    /// over the cached par or indexed dates (see [`forecast_fixing_dates`]),
+    /// replacing the base's natural forecast.
+    ///
+    /// [`forecast_fixing_dates`]: Self::forecast_fixing_dates
     pub fn index_fixing(&self) -> QlResult<Rate> {
-        self.base.index_fixing()
+        if self.has_fixed()? {
+            self.base.index_fixing()
+        } else {
+            let (value_date, end_date, spanning_time) = self.forecast_fixing_dates()?;
+            self.ibor_index
+                .forecast_fixing_between(value_date, end_date, spanning_time)
+        }
+    }
+
+    /// The cached forecast dates `(fixingValueDate, fixingEndDate, spanningTime)`
+    /// the 3-arg forecast reads (`IborCouponPricer::initializeCachedData`,
+    /// `couponpricer.cpp:56-88`).
+    ///
+    /// `fixingValueDate` moves the fixing date forward the index's fixing days
+    /// (identical to [`value_date`](InterestRateIndex::value_date)) and
+    /// `fixingMaturityDate` is the index maturity off it. Under the par
+    /// convention a non-in-arrears coupon rolls `fixingEndDate` off its own
+    /// accrual end - back the *coupon's* fixing days to the next fixing date,
+    /// then forward the *index's* fixing days, floored at `fixingValueDate + 1`
+    /// so the estimation period spans at least a day; an indexed coupon (or any
+    /// in-arrears coupon) uses `fixingMaturityDate`. The convention is read
+    /// explicitly from [`Settings`](crate::settings::Settings::using_at_par_coupons),
+    /// not a global singleton.
+    fn forecast_fixing_dates(&self) -> QlResult<(Date, Date, Time)> {
+        let index = &self.ibor_index;
+        let calendar = index.fixing_calendar();
+        let fixing_value_date = index.value_date(self.fixing_date())?;
+        let fixing_maturity_date = index.maturity_date(fixing_value_date)?;
+
+        let using_at_par = index.settings().using_at_par_coupons();
+        let fixing_end_date = if !using_at_par || self.base.is_in_arrears() {
+            fixing_maturity_date
+        } else {
+            let next_fixing_date = calendar.advance(
+                self.accrual_end_date(),
+                -(self.base.fixing_days() as Integer),
+                TimeUnit::Days,
+                BusinessDayConvention::Following,
+                false,
+            );
+            let end_date = calendar.advance(
+                next_fixing_date,
+                index.fixing_days() as Integer,
+                TimeUnit::Days,
+                BusinessDayConvention::Following,
+                false,
+            );
+            end_date.max(fixing_value_date + 1)
+        };
+
+        let spanning_time = index
+            .day_counter()
+            .year_fraction(fixing_value_date, fixing_end_date);
+        let positive_time = spanning_time > 0.0;
+        require!(
+            positive_time,
+            "cannot calculate forward rate between {fixing_value_date:?} and {fixing_end_date:?}: non positive time ({spanning_time}) using {} daycounter",
+            index.day_counter().name()
+        );
+        Ok((fixing_value_date, fixing_end_date, spanning_time))
     }
 
     /// Whether the coupon's fixing is already determined (`hasFixed`).
@@ -186,11 +246,16 @@ impl Coupon for IborCoupon {
     }
 
     fn amount(&self) -> QlResult<Real> {
-        self.base.amount()
+        Ok(self.rate()? * self.accrual_period() * self.nominal())
     }
 
     fn rate(&self) -> QlResult<Rate> {
-        self.base.rate()
+        let Some(pricer) = self.base.pricer() else {
+            fail!("pricer not set");
+        };
+        pricer.borrow_mut().initialize(&self.base);
+        let index_fixing = self.index_fixing();
+        pricer.borrow().swaplet_rate_for(index_fixing)
     }
 
     fn day_counter(&self) -> DayCounter {
@@ -198,7 +263,11 @@ impl Coupon for IborCoupon {
     }
 
     fn accrued_amount(&self, date: Date) -> QlResult<Real> {
-        self.base.accrued_amount(date)
+        if date <= self.accrual_start_date() || date > self.coupon_base().payment_date() {
+            Ok(0.0)
+        } else {
+            Ok(self.nominal() * self.rate()? * self.accrued_period(date))
+        }
     }
 }
 
@@ -421,17 +490,16 @@ mod tests {
         assert!(coupon.rate().is_err());
     }
 
-    /// Pins the documented forecast divergence. The forecast branch through the
-    /// coupon is live: an unfixed coupon over a linked curve prices off the
-    /// index's own forecast fixing, which follows the indexed-coupon convention
-    /// (the index's natural maturity), not this tree's compile-time-default par
-    /// approximation. `rate()` is exactly `gearing * forecastFixing + spread`,
-    /// so if the deferred par mode ever silently replaced it the number would
-    /// move and this test would catch it.
+    /// Behind the explicit `using_at_par_coupons = false` flag an unfixed coupon
+    /// forecasts in the indexed-coupon convention: `fixingEndDate` is the index's
+    /// natural maturity, so the forecast is exactly `index.forecast_fixing`. This
+    /// is the flag-gated half of the mode switch; the default (par) is pinned by
+    /// `a_par_coupon_forecasts_over_its_own_accrual_end`.
     #[test]
-    fn an_unfixed_coupon_forecasts_in_indexed_mode_not_par() {
+    fn an_unfixed_coupon_forecasts_in_indexed_mode_behind_the_flag() {
         let today = Date::new(15, Month::June, 2026);
         let settings = settings_on(today);
+        settings.set_using_at_par_coupons(false);
         let index = shared(IborIndex::new(
             "foo".into(),
             Period::new(6, TimeUnit::Months),
