@@ -242,6 +242,27 @@ oversight) and is documented at the point of divergence in the source.
   traits, so on a concrete coupon with both in scope an unqualified
   `coupon.amount()` is ambiguous; name the trait.
 
+- **`IborCoupon` ports the swaplet path only; the par/indexed forecast switch
+  (a global singleton) is not ported.** QuantLib's `IborCoupon::indexFixing()`
+  forecast branch selects between a par-coupon approximation and an indexed
+  coupon through the `IborCoupon::Settings` singleton (`usingAtParCoupons`,
+  default `true` in this tree). That is a process-global switch, which D5
+  forbids, and its whole effect is confined to the forecast branch. This port
+  keeps `index_fixing` delegating to `FloatingRateCoupon`, which forecasts off
+  the index's natural maturity (the indexed-coupon convention); for every
+  *determined* fixing - the only case the swaplet path reaches - it returns the
+  same required past fixing as the C++ override. The par-coupon approximation
+  and the per-coupon cached dates (`fixingValueDate`/`fixingEndDate`/
+  `spanningTime`) that feed it are deferred to the cap/floor slice, where the
+  mode will be threaded explicitly rather than read from a global.
+  `BlackIborCouponPricer` ports `swapletRate = gearing * indexFixing + spread`;
+  since a non-in-arrears `Black76` coupon needs no convexity adjustment it needs
+  no volatility, and since only `swapletPrice` (not `swapletRate`) reads the
+  forwarding-curve discount, the pricer captures no curve. The caplet/floorlet
+  optionlet path, the `*Price` methods, and the in-arrears convexity adjustment
+  belong to the cap/floor slice; an in-arrears coupon is refused with an `Err`
+  rather than priced with a missing convexity term.
+
 **Indexes (EPIC-6):**
 
 - **`Currency` is always valid; there is no empty placeholder.** QuantLib's
