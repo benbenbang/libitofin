@@ -13,6 +13,7 @@ mod duration;
 mod fixedratecoupon;
 mod fixedrateleg;
 mod floatingratecoupon;
+mod iborcoupon;
 mod simplecashflow;
 
 pub use cashflows::CashFlows;
@@ -23,4 +24,5 @@ pub use duration::Duration;
 pub use fixedratecoupon::FixedRateCoupon;
 pub use fixedrateleg::FixedRateLeg;
 pub use floatingratecoupon::{FloatingIndex, FloatingRateCoupon};
+pub use iborcoupon::IborCoupon;
 pub use simplecashflow::{AmortizingPayment, Redemption, SimpleCashFlow};
