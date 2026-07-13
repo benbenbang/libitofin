@@ -381,3 +381,250 @@ pub fn compare_by_pillar_date(
 ) -> Ordering {
     left.pillar_date().cmp(&right.pillar_date())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::interestrate::Compounding;
+    use crate::quotes::SimpleQuote;
+    use crate::shared::shared;
+    use crate::termstructures::yields::FlatForward;
+    use crate::test_support::{Flag, as_observer};
+    use crate::time::date::Month;
+    use crate::time::daycounters::actual360::Actual360;
+    use crate::time::frequency::Frequency;
+
+    fn quote_handle(value: Real) -> (Shared<SimpleQuote>, Handle<dyn Quote>) {
+        let quote = shared(SimpleQuote::new(value));
+        let handle = Handle::new(Shared::clone(&quote) as Shared<dyn Quote>);
+        (quote, handle)
+    }
+
+    /// Minimal fixed-schedule helper: a fixed implied quote and settable dates.
+    struct StubHelper {
+        base: BootstrapHelperBase,
+        implied: Cell<Real>,
+    }
+
+    impl StubHelper {
+        fn new(quote: Handle<dyn Quote>, implied: Real) -> StubHelper {
+            StubHelper {
+                base: BootstrapHelperBase::new(quote),
+                implied: Cell::new(implied),
+            }
+        }
+    }
+
+    impl AsObservable for StubHelper {
+        fn observable(&self) -> &Observable {
+            self.base.observable()
+        }
+    }
+
+    impl RateHelper for StubHelper {
+        fn base(&self) -> &BootstrapHelperBase {
+            &self.base
+        }
+
+        fn implied_quote(&self) -> QlResult<Real> {
+            Ok(self.implied.get())
+        }
+    }
+
+    fn a_date() -> Date {
+        Date::new(15, Month::June, 2026)
+    }
+
+    fn a_curve() -> Shared<dyn YieldTermStructure> {
+        shared(FlatForward::with_rate(
+            a_date(),
+            0.03,
+            Actual360::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>
+    }
+
+    #[test]
+    fn quote_error_is_market_minus_implied() {
+        let (_quote, handle) = quote_handle(0.05);
+        let helper = StubHelper::new(handle, 0.02);
+        assert_eq!(helper.quote_error().unwrap(), 0.05 - 0.02);
+    }
+
+    #[test]
+    fn quote_change_notifies_helper_observers() {
+        let (quote, handle) = quote_handle(0.05);
+        let helper = StubHelper::new(handle, 0.0);
+        let flag = Flag::new();
+        helper.observable().register_observer(&as_observer(&flag));
+
+        quote.set_value(0.06);
+        assert!(Flag::is_up(&flag));
+    }
+
+    #[test]
+    fn set_term_structure_does_not_own_the_curve() {
+        let (_quote, handle) = quote_handle(0.05);
+        let helper = StubHelper::new(handle, 0.0);
+
+        let curve = a_curve();
+        helper.set_term_structure(&curve);
+        assert!(helper.base().term_structure().is_ok());
+
+        drop(curve);
+        let result = helper.base().term_structure();
+        assert!(
+            result.is_err(),
+            "the weak back-pointer must not keep the curve alive"
+        );
+        assert!(
+            result
+                .err()
+                .is_some_and(|err| err.message().contains("term structure not set"))
+        );
+    }
+
+    #[test]
+    fn curve_change_does_not_notify_the_helper() {
+        let (_quote, helper_handle) = quote_handle(0.05);
+        let helper = StubHelper::new(helper_handle, 0.0);
+
+        let curve_quote = shared(SimpleQuote::new(0.03));
+        let curve: Shared<dyn YieldTermStructure> = shared(FlatForward::new(
+            a_date(),
+            Handle::new(Shared::clone(&curve_quote) as Shared<dyn Quote>),
+            Actual360::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        ));
+        helper.set_term_structure(&curve);
+
+        let flag = Flag::new();
+        helper.observable().register_observer(&as_observer(&flag));
+
+        curve_quote.set_value(0.04);
+        assert!(
+            !Flag::is_up(&flag),
+            "helper must not observe the bootstrapping curve"
+        );
+    }
+
+    #[test]
+    fn date_accessors_follow_the_fallback_chain() {
+        let (_quote, handle) = quote_handle(0.05);
+        let helper = StubHelper::new(handle, 0.0);
+        let base = helper.base();
+
+        assert_eq!(base.pillar_date(), Date::null());
+
+        let pillar = a_date();
+        base.set_pillar_date(pillar);
+        assert_eq!(base.latest_date(), pillar);
+        assert_eq!(base.latest_relevant_date(), pillar);
+        assert_eq!(base.maturity_date(), pillar);
+
+        let maturity = pillar + 30;
+        base.set_maturity_date(maturity);
+        assert_eq!(base.maturity_date(), maturity);
+        assert_eq!(base.latest_relevant_date(), pillar);
+    }
+
+    #[test]
+    fn sorter_orders_by_pillar_date() {
+        let make = |pillar: Date| -> Shared<dyn RateHelper> {
+            let (_quote, handle) = quote_handle(0.0);
+            let helper = StubHelper::new(handle, 0.0);
+            helper.base().set_pillar_date(pillar);
+            shared(helper) as Shared<dyn RateHelper>
+        };
+        let mut helpers = vec![make(a_date() + 90), make(a_date()), make(a_date() + 30)];
+
+        sort_by_pillar_date(&mut helpers);
+
+        assert_eq!(helpers[0].pillar_date(), a_date());
+        assert_eq!(helpers[1].pillar_date(), a_date() + 30);
+        assert_eq!(helpers[2].pillar_date(), a_date() + 90);
+    }
+
+    /// Relative-date stub: `initialize_dates` sets the earliest date from the
+    /// evaluation date, so a date change is visible through the accessor.
+    struct RelativeStub {
+        base: BootstrapHelperBase,
+    }
+
+    impl RelativeStub {
+        fn new(quote: Handle<dyn Quote>, settings: Shared<Settings<Date>>) -> Shared<RelativeStub> {
+            Shared::new_cyclic(|weak: &Weak<RelativeStub>| {
+                let weak = weak.clone();
+                let on_eval_change = Box::new(move || {
+                    if let Some(helper) = weak.upgrade() {
+                        helper.initialize_dates();
+                    }
+                });
+                RelativeStub {
+                    base: BootstrapHelperBase::new_relative(quote, settings, true, on_eval_change),
+                }
+            })
+        }
+    }
+
+    impl AsObservable for RelativeStub {
+        fn observable(&self) -> &Observable {
+            self.base.observable()
+        }
+    }
+
+    impl RateHelper for RelativeStub {
+        fn base(&self) -> &BootstrapHelperBase {
+            &self.base
+        }
+
+        fn implied_quote(&self) -> QlResult<Real> {
+            Ok(0.0)
+        }
+    }
+
+    impl RelativeDateRateHelper for RelativeStub {
+        fn initialize_dates(&self) {
+            if let Some(date) = self.base.evaluation_date() {
+                self.base.set_earliest_date(date);
+            }
+        }
+    }
+
+    #[test]
+    fn evaluation_date_change_reinitializes_a_relative_helper() {
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(Date::new(15, Month::January, 2026));
+        let helper = RelativeStub::new(quote_handle(0.05).1, Shared::clone(&settings));
+
+        let flag = Flag::new();
+        helper.observable().register_observer(&as_observer(&flag));
+
+        let moved = Date::new(16, Month::January, 2026);
+        settings.set_evaluation_date(moved);
+
+        assert!(Flag::is_up(&flag), "date change must notify observers");
+        assert_eq!(
+            helper.earliest_date(),
+            moved,
+            "date change must rerun initialize_dates"
+        );
+    }
+
+    #[test]
+    fn unchanged_evaluation_date_leaves_the_schedule_alone() {
+        let settings = shared(Settings::new());
+        let start = Date::new(15, Month::January, 2026);
+        settings.set_evaluation_date(start);
+        let helper = RelativeStub::new(quote_handle(0.05).1, Shared::clone(&settings));
+
+        settings.set_evaluation_date(start);
+        assert_eq!(
+            helper.earliest_date(),
+            Date::null(),
+            "an unchanged date must not rebuild the schedule"
+        );
+    }
+}
