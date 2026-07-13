@@ -428,3 +428,300 @@ impl Instrument for Swap {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cashflow::CashFlow;
+    use crate::cashflows::SimpleCashFlow;
+    use crate::patterns::observable::{AsObservable, Observable};
+    use crate::pricingengine::PricingEngine;
+    use crate::shared::{SharedMut, shared, shared_mut};
+    use crate::time::date::Month;
+
+    fn today() -> Date {
+        Date::new(7, Month::July, 2026)
+    }
+
+    fn settings_today() -> Shared<Settings<Date>> {
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(today());
+        settings
+    }
+
+    /// A one-flow leg paying `amount` on `date`.
+    fn leg(amount: Real, date: Date) -> Leg {
+        vec![shared(SimpleCashFlow::new(amount, date).unwrap()) as Shared<dyn CashFlow>]
+    }
+
+    /// A receiver/payer swap: pays 100 in a year, receives 100 in two.
+    fn two_leg_swap() -> Swap {
+        Swap::two_leg(
+            leg(100.0, Date::new(7, Month::July, 2027)),
+            leg(100.0, Date::new(7, Month::July, 2028)),
+            settings_today(),
+        )
+    }
+
+    struct StubEngine {
+        base: SwapEngine,
+        npv: Real,
+        leg_npv: Vec<Real>,
+        leg_bps: Vec<Real>,
+        start_discounts: Vec<DiscountFactor>,
+        end_discounts: Vec<DiscountFactor>,
+        npv_date_discount: Option<DiscountFactor>,
+    }
+
+    impl AsObservable for StubEngine {
+        fn observable(&self) -> &Observable {
+            self.base.observable()
+        }
+    }
+
+    impl PricingEngine for StubEngine {
+        fn arguments_mut(&mut self) -> &mut dyn Arguments {
+            self.base.arguments_mut()
+        }
+
+        fn results(&self) -> &dyn Results {
+            self.base.results()
+        }
+
+        fn reset(&mut self) {
+            self.base.reset();
+        }
+
+        fn calculate(&mut self) -> QlResult<()> {
+            let results = self.base.results_mut();
+            results.instrument.value = Some(self.npv);
+            results.leg_npv = self.leg_npv.clone();
+            results.leg_bps = self.leg_bps.clone();
+            results.start_discounts = self.start_discounts.clone();
+            results.end_discounts = self.end_discounts.clone();
+            results.npv_date_discount = self.npv_date_discount;
+            Ok(())
+        }
+    }
+
+    fn engine(
+        leg_npv: Vec<Real>,
+        leg_bps: Vec<Real>,
+        start_discounts: Vec<DiscountFactor>,
+        end_discounts: Vec<DiscountFactor>,
+        npv_date_discount: Option<DiscountFactor>,
+    ) -> SharedMut<StubEngine> {
+        shared_mut(StubEngine {
+            base: SwapEngine::new(SwapArguments::default(), SwapResults::default()),
+            npv: 2.0,
+            leg_npv,
+            leg_bps,
+            start_discounts,
+            end_discounts,
+            npv_date_discount,
+        })
+    }
+
+    /// The first leg is paid (multiplier -1) and the second received (+1), the
+    /// sign convention `Swap::Swap(firstLeg, secondLeg)` stores.
+    #[test]
+    fn the_two_leg_ctor_pays_the_first_leg_and_receives_the_second() {
+        let swap = two_leg_swap();
+
+        assert_eq!(swap.number_of_legs(), 2);
+        assert!(swap.payer(0).unwrap(), "the first leg is paid");
+        assert!(!swap.payer(1).unwrap(), "the second leg is received");
+    }
+
+    /// A `true` payer flag becomes the multiplier -1 and a `false` one +1.
+    #[test]
+    fn the_multi_leg_ctor_maps_payer_flags_to_multipliers() {
+        let swap = Swap::new(
+            vec![
+                leg(1.0, today() + 100),
+                leg(1.0, today() + 200),
+                leg(1.0, today() + 300),
+            ],
+            vec![false, true, false],
+            settings_today(),
+        )
+        .unwrap();
+
+        assert_eq!(swap.number_of_legs(), 3);
+        assert!(!swap.payer(0).unwrap());
+        assert!(swap.payer(1).unwrap());
+        assert!(!swap.payer(2).unwrap());
+    }
+
+    #[test]
+    fn a_payer_legs_size_mismatch_is_rejected() {
+        let error = Swap::new(
+            vec![leg(1.0, today() + 100), leg(1.0, today() + 200)],
+            vec![true],
+            settings_today(),
+        )
+        .map(|_| ())
+        .unwrap_err();
+        assert_eq!(
+            error.message(),
+            "size mismatch between payer (1) and legs (2)"
+        );
+    }
+
+    #[test]
+    fn out_of_range_leg_indices_are_rejected() {
+        let mut swap = two_leg_swap();
+
+        assert_eq!(
+            swap.leg(2).map(|_| ()).unwrap_err().message(),
+            "leg #2 doesn't exist!"
+        );
+        assert_eq!(
+            swap.payer(2).unwrap_err().message(),
+            "leg #2 doesn't exist!"
+        );
+        assert_eq!(
+            swap.leg_npv(2).unwrap_err().message(),
+            "leg #2 doesn't exist!"
+        );
+        assert_eq!(
+            swap.start_discounts(2).unwrap_err().message(),
+            "leg #2 doesn't exist!"
+        );
+    }
+
+    /// `startDate` is the earliest and `maturityDate` the latest date over the
+    /// legs (plain payments report their payment date).
+    #[test]
+    fn start_and_maturity_span_the_legs() {
+        let swap = two_leg_swap();
+
+        assert_eq!(swap.start_date().unwrap(), Date::new(7, Month::July, 2027));
+        assert_eq!(
+            swap.maturity_date().unwrap(),
+            Date::new(7, Month::July, 2028)
+        );
+    }
+
+    /// A swap is expired once every flow of every leg has occurred, and live
+    /// while any flow is still to pay.
+    #[test]
+    fn is_expired_tracks_the_legs_flows() {
+        let future = two_leg_swap();
+        assert!(
+            !future.is_expired().unwrap(),
+            "both flows are in the future"
+        );
+
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(Date::new(8, Month::July, 2028));
+        let past = Swap::two_leg(
+            leg(100.0, Date::new(7, Month::July, 2027)),
+            leg(100.0, Date::new(7, Month::July, 2028)),
+            settings,
+        );
+        assert!(past.is_expired().unwrap(), "both flows have paid");
+    }
+
+    /// With an engine that fills every leg result, the accessors return the
+    /// provided values and `payer` still reflects the sign convention.
+    #[test]
+    fn the_accessors_read_the_engine_leg_results() {
+        let mut swap = two_leg_swap();
+        swap.base_mut().set_pricing_engine(engine(
+            vec![-98.0, 99.0],
+            vec![-1.0, 1.0],
+            vec![1.0, 1.0],
+            vec![0.95, 0.90],
+            Some(0.99),
+        ));
+
+        assert_eq!(swap.npv().unwrap(), 2.0);
+        assert_eq!(swap.leg_npv(0).unwrap(), -98.0);
+        assert_eq!(swap.leg_npv(1).unwrap(), 99.0);
+        assert_eq!(swap.leg_bps(1).unwrap(), 1.0);
+        assert_eq!(swap.start_discounts(0).unwrap(), 1.0);
+        assert_eq!(swap.end_discounts(1).unwrap(), 0.90);
+        assert_eq!(swap.npv_date_discount().unwrap(), 0.99);
+    }
+
+    /// An engine that leaves the leg results empty leaves each accessor with
+    /// nothing to return: the C++ `Null<Real>` "result not available".
+    #[test]
+    fn unprovided_leg_results_are_not_available() {
+        let mut swap = two_leg_swap();
+        swap.base_mut()
+            .set_pricing_engine(engine(vec![], vec![], vec![], vec![], None));
+
+        assert_eq!(swap.npv().unwrap(), 2.0);
+        assert_eq!(
+            swap.leg_npv(0).unwrap_err().message(),
+            "result not available"
+        );
+        assert_eq!(
+            swap.leg_bps(0).unwrap_err().message(),
+            "result not available"
+        );
+        assert_eq!(
+            swap.npv_date_discount().unwrap_err().message(),
+            "result not available"
+        );
+    }
+
+    /// A leg-count mismatch between the engine's results and the swap's legs is
+    /// an error (the C++ `wrong number of leg NPV returned`).
+    #[test]
+    fn a_wrong_leg_result_count_is_rejected() {
+        let mut swap = two_leg_swap();
+        swap.base_mut().set_pricing_engine(engine(
+            vec![1.0],
+            vec![1.0, 1.0],
+            vec![1.0, 1.0],
+            vec![1.0, 1.0],
+            Some(1.0),
+        ));
+
+        assert_eq!(
+            swap.leg_npv(0).unwrap_err().message(),
+            "wrong number of leg NPV returned"
+        );
+    }
+
+    /// An expired swap short-circuits to a zero value and zero leg results
+    /// without consulting an engine (`Swap::setupExpired`).
+    #[test]
+    fn an_expired_swap_reports_zero() {
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(Date::new(8, Month::July, 2028));
+        let mut swap = Swap::two_leg(
+            leg(100.0, Date::new(7, Month::July, 2027)),
+            leg(100.0, Date::new(7, Month::July, 2028)),
+            settings,
+        );
+
+        assert_eq!(swap.npv().unwrap(), 0.0);
+        assert_eq!(swap.leg_npv(0).unwrap(), 0.0);
+        assert_eq!(swap.leg_bps(1).unwrap(), 0.0);
+        assert_eq!(swap.npv_date_discount().unwrap(), 0.0);
+    }
+
+    #[test]
+    fn the_arguments_reject_a_legs_payer_mismatch() {
+        let mut arguments = SwapArguments {
+            legs: vec![leg(1.0, today() + 100)],
+            payer: vec![-1.0, 1.0],
+        };
+        assert_eq!(
+            arguments.validate().unwrap_err().message(),
+            "number of legs and multipliers differ"
+        );
+        arguments.payer = vec![-1.0];
+        assert!(arguments.validate().is_ok());
+    }
+
+    #[test]
+    fn swap_type_displays_payer_and_receiver() {
+        assert_eq!(SwapType::Payer.to_string(), "Payer");
+        assert_eq!(SwapType::Receiver.to_string(), "Receiver");
+    }
+}
