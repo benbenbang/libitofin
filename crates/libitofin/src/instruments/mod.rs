@@ -5,12 +5,17 @@
 
 mod bond;
 mod bonds;
+mod fixedvsfloatingswap;
 mod oneassetoption;
 mod payoffs;
 mod swap;
 
 pub use bond::{Bond, BondArguments, BondEngine, BondPrice, BondResults};
 pub use bonds::FixedRateBond;
+pub use fixedvsfloatingswap::{
+    FixedVsFloatingSwap, FixedVsFloatingSwapArguments, FixedVsFloatingSwapEngine,
+    FixedVsFloatingSwapResults, FloatingArgumentsFn,
+};
 pub use oneassetoption::{
     EuropeanOption, Greeks, MoreGreeks, OneAssetOption, OneAssetOptionEngine,
     OneAssetOptionResults, OptionArguments, VanillaOption,
