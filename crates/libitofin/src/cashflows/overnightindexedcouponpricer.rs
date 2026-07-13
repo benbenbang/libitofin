@@ -317,3 +317,72 @@ impl FloatingRateCouponPricer for CompoundingOvernightIndexedCouponPricer {
         fail!("floorlet rate not ported: overnight cap/floor slice")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::handle::Handle;
+    use crate::indexes::ibor::Sofr;
+    use crate::settings::Settings;
+    use crate::shared::{shared, shared_mut};
+    use crate::time::date::Month;
+
+    fn sofr() -> Shared<OvernightIndex> {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(Date::new(23, Month::November, 2021));
+        shared(Sofr::new(Handle::empty(), settings))
+    }
+
+    fn schedule(index: &OvernightIndex) -> Shared<OvernightSchedule> {
+        shared(
+            OvernightSchedule::new(
+                index,
+                Date::new(18, Month::October, 2021),
+                Date::new(18, Month::November, 2021),
+            )
+            .unwrap(),
+        )
+    }
+
+    /// `OvernightSchedule::new` (overnightindexedcoupon.cpp:92-179, default path):
+    /// one more value date than fixing date, the true accrual start and end pinned
+    /// at the interest-date ends, and one accrual fraction per fixing.
+    #[test]
+    fn the_schedule_has_consistent_lengths_and_endpoints() {
+        let index = sofr();
+        let start = Date::new(18, Month::October, 2021);
+        let end = Date::new(18, Month::November, 2021);
+        let schedule = OvernightSchedule::new(&index, start, end).unwrap();
+
+        assert!(schedule.value_dates.len() >= 2);
+        assert_eq!(schedule.fixing_dates.len(), schedule.value_dates.len() - 1);
+        assert_eq!(schedule.dt.len(), schedule.fixing_dates.len());
+        assert_eq!(schedule.interest_dates.len(), schedule.value_dates.len());
+        assert_eq!(*schedule.interest_dates.first().unwrap(), start);
+        assert_eq!(*schedule.interest_dates.last().unwrap(), end);
+    }
+
+    /// A start date after the end date has no business days between: a degenerate
+    /// schedule is refused.
+    #[test]
+    fn a_degenerate_schedule_is_refused() {
+        let index = sofr();
+        let day = Date::new(18, Month::October, 2021);
+        assert!(OvernightSchedule::new(&index, day, day).is_err());
+    }
+
+    /// The compounding pricer prices only the swaplet path; the caplet, floorlet
+    /// and per-fixing entry points refuse (the cap/floor slice is not ported).
+    #[test]
+    fn the_pricer_refuses_the_unported_entry_points() {
+        let index = sofr();
+        let schedule = schedule(&index);
+        let pricer = shared_mut(CompoundingOvernightIndexedCouponPricer::new(
+            index, schedule, 1.0, 0.0, false,
+        ));
+        let pricer = pricer.borrow();
+        assert!(pricer.caplet_rate(0.03).is_err());
+        assert!(pricer.floorlet_rate(0.01).is_err());
+        assert!(pricer.swaplet_rate_for(Ok(0.01)).is_err());
+    }
+}
