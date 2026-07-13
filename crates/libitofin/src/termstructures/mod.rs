@@ -33,6 +33,7 @@
 //!   [`reference_date`](TermStructure::reference_date) as well.
 
 pub mod bootstraphelper;
+pub mod bootstraptraits;
 pub mod interpolatedcurve;
 pub mod volatility;
 pub mod yields;
