@@ -33,6 +33,8 @@ mod localconstantvol;
 mod localvolcurve;
 mod localvolsurface;
 mod localvoltermstructure;
+mod optionlet;
+mod volatilitytype;
 
 pub use blackconstantvol::BlackConstantVol;
 pub use blackvariancecurve::{BlackVarianceCurve, BlackVolTimeExtrapolation};
@@ -41,6 +43,8 @@ pub use localconstantvol::LocalConstantVol;
 pub use localvolcurve::LocalVolCurve;
 pub use localvolsurface::LocalVolSurface;
 pub use localvoltermstructure::LocalVolTermStructure;
+pub use optionlet::{ConstantOptionletVolatility, OptionletVolatilityStructure};
+pub use volatilitytype::VolatilityType;
 
 use std::any::Any;
 
