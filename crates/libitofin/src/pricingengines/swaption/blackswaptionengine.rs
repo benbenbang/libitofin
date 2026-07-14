@@ -108,6 +108,11 @@ impl BlackSwaptionEngine {
     /// Builds the engine over a discount curve and a swaption volatility surface
     /// (the C++ `Handle<SwaptionVolatilityStructure>` constructor,
     /// `blackswaptionengine.hpp:149`).
+    ///
+    /// C++ refuses a non-lognormal surface at construction
+    /// (`blackswaptionengine.cpp:52`); here the handle is relinkable and the
+    /// constructor is infallible, so the same requirement is enforced as an
+    /// `Err` when the engine prices.
     pub fn new(
         discount_curve: Handle<dyn YieldTermStructure>,
         vol: Handle<dyn SwaptionVolatilityStructure>,
@@ -202,6 +207,10 @@ impl PricingEngine for BlackSwaptionEngine {
 
         let discount = self.discount_curve.current_link()?;
         let vol = self.vol.current_link()?;
+        require!(
+            vol.volatility_type() == VolatilityType::ShiftedLognormal,
+            "BlackSwaptionEngine requires (shifted) lognormal input volatility"
+        );
 
         // Install a discounting engine on the swap and price it. The install is
         // silent so the swaption observing this swap is not invalidated
@@ -856,6 +865,64 @@ mod tests {
         assert!(
             swaption.base().is_calculated(),
             "the Black engine must leave the swaption calculated after NPV"
+        );
+    }
+
+    /// The C++ constructor refuses a non-lognormal surface
+    /// (`blackswaptionengine.cpp:52`); the Rust engine enforces the same
+    /// requirement when pricing. Without it, a `Normal`-quoted surface would be
+    /// priced with the lognormal Black formula and misprice silently.
+    #[test]
+    fn a_normal_volatility_surface_is_refused() {
+        let vars = Vars::new(Date::new(13, Month::March, 2002), true);
+        let exercise_date = vars.years(vars.today, 1);
+        let start_date = vars.spot(exercise_date);
+        let swap = MakeVanillaSwap::new(
+            Period::new(1, TimeUnit::Years),
+            Shared::clone(&vars.index),
+            Some(0.03),
+            Period::new(0, TimeUnit::Days),
+            Shared::clone(&vars.settings),
+        )
+        .with_effective_date(start_date)
+        .with_fixed_leg_tenor(Period::new(1, TimeUnit::Years))
+        .with_fixed_leg_day_count(Vars::fixed_day_count())
+        .build()
+        .unwrap()
+        .into_fixed_vs_floating();
+
+        let normal_surface = ConstantSwaptionVolatility::moving(
+            0,
+            NullCalendar::new(),
+            BusinessDayConvention::Following,
+            0.12,
+            Actual365Fixed::new(),
+            VolatilityType::Normal,
+            0.0,
+            Shared::clone(&vars.settings),
+        );
+        let vol: Handle<dyn SwaptionVolatilityStructure> =
+            Handle::new(shared(normal_surface) as Shared<dyn SwaptionVolatilityStructure>);
+        let engine = shared_mut(BlackSwaptionEngine::new(
+            vars.curve.clone(),
+            vol,
+            CashAnnuityModel::SwapRate,
+            Shared::clone(&vars.settings),
+        )) as SharedMut<dyn PricingEngine>;
+
+        let mut swaption = Swaption::new(
+            shared_mut(swap),
+            shared(EuropeanExercise::new(exercise_date)) as Shared<dyn crate::exercise::Exercise>,
+            SettlementType::Physical,
+            SettlementMethod::PhysicalOTC,
+            Shared::clone(&vars.settings),
+        );
+        swaption.base_mut().set_pricing_engine(engine);
+
+        let error = swaption.npv().unwrap_err();
+        assert!(
+            error.to_string().contains("lognormal input volatility"),
+            "expected the lognormal-input refusal, got: {error}"
         );
     }
 
