@@ -32,7 +32,7 @@ pub use fixedratecoupon::FixedRateCoupon;
 pub use fixedrateleg::FixedRateLeg;
 pub use floatingratecoupon::{FloatingIndex, FloatingRateCoupon};
 pub use iborcoupon::IborCoupon;
-pub use iborleg::{IborLeg, set_coupon_pricer};
+pub use iborleg::{AttachPricer, IborLeg, set_coupon_pricer};
 pub use overnightindexedcoupon::OvernightIndexedCoupon;
 pub use overnightindexedcouponpricer::{
     CompoundingOvernightIndexedCouponPricer, OvernightSchedule,
