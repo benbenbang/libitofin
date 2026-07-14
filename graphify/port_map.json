@@ -114,6 +114,46 @@
       "confidence": 0.95,
       "match": "exact-path",
       "note": "",
+      "oracle": "overnightindexedcoupon",
+      "oracle_match": "stem",
+      "quantlib": "cashflows/overnightindexedcoupon",
+      "rust": "cashflows/overnightindexedcoupon",
+      "verified": false
+    },
+    {
+      "confidence": 0.95,
+      "match": "exact-path",
+      "note": "",
+      "oracle": "cashflows",
+      "oracle_match": "dir-stem",
+      "quantlib": "cashflows/overnightindexedcouponpricer",
+      "rust": "cashflows/overnightindexedcouponpricer",
+      "verified": false
+    },
+    {
+      "confidence": 0.0,
+      "match": "none",
+      "note": "no QuantLib module matched by path or stem",
+      "oracle": null,
+      "oracle_match": null,
+      "quantlib": null,
+      "rust": "cashflows/overnightleg",
+      "verified": false
+    },
+    {
+      "confidence": 0.95,
+      "match": "exact-path",
+      "note": "",
+      "oracle": "cashflows",
+      "oracle_match": "dir-stem",
+      "quantlib": "cashflows/rateaveraging",
+      "rust": "cashflows/rateaveraging",
+      "verified": false
+    },
+    {
+      "confidence": 0.95,
+      "match": "exact-path",
+      "note": "",
       "oracle": "cashflows",
       "oracle_match": "dir-stem",
       "quantlib": "cashflows/simplecashflow",
@@ -176,8 +216,28 @@
       "note": "",
       "oracle": null,
       "oracle_match": null,
+      "quantlib": "indexes/ibor/estr",
+      "rust": "indexes/ibor/estr",
+      "verified": false
+    },
+    {
+      "confidence": 0.95,
+      "match": "exact-path",
+      "note": "",
+      "oracle": null,
+      "oracle_match": null,
       "quantlib": "indexes/ibor/euribor",
       "rust": "indexes/ibor/euribor",
+      "verified": false
+    },
+    {
+      "confidence": 0.95,
+      "match": "exact-path",
+      "note": "",
+      "oracle": null,
+      "oracle_match": null,
+      "quantlib": "indexes/ibor/sofr",
+      "rust": "indexes/ibor/sofr",
       "verified": false
     },
     {
@@ -246,8 +306,38 @@
       "note": "",
       "oracle": "instruments",
       "oracle_match": "dir-stem",
+      "quantlib": "instruments/fixedvsfloatingswap",
+      "rust": "instruments/fixedvsfloatingswap",
+      "verified": false
+    },
+    {
+      "confidence": 0.95,
+      "match": "exact-path",
+      "note": "",
+      "oracle": "instruments",
+      "oracle_match": "dir-stem",
+      "quantlib": "instruments/makeois",
+      "rust": "instruments/makeois",
+      "verified": false
+    },
+    {
+      "confidence": 0.95,
+      "match": "exact-path",
+      "note": "",
+      "oracle": "instruments",
+      "oracle_match": "dir-stem",
       "quantlib": "instruments/oneassetoption",
       "rust": "instruments/oneassetoption",
+      "verified": false
+    },
+    {
+      "confidence": 0.95,
+      "match": "exact-path",
+      "note": "",
+      "oracle": "overnightindexedswap",
+      "oracle_match": "stem",
+      "quantlib": "instruments/overnightindexedswap",
+      "rust": "instruments/overnightindexedswap",
       "verified": false
     },
     {
@@ -258,6 +348,26 @@
       "oracle_match": "dir-stem",
       "quantlib": "instruments/payoffs",
       "rust": "instruments/payoffs",
+      "verified": false
+    },
+    {
+      "confidence": 0.95,
+      "match": "exact-path",
+      "note": "",
+      "oracle": "swap",
+      "oracle_match": "stem",
+      "quantlib": "instruments/swap",
+      "rust": "instruments/swap",
+      "verified": false
+    },
+    {
+      "confidence": 0.95,
+      "match": "exact-path",
+      "note": "",
+      "oracle": "instruments",
+      "oracle_match": "dir-stem",
+      "quantlib": "instruments/vanillaswap",
+      "rust": "instruments/vanillaswap",
       "verified": false
     },
     {
@@ -1451,6 +1561,16 @@
       "verified": false
     },
     {
+      "confidence": 0.95,
+      "match": "exact-path",
+      "note": "",
+      "oracle": "swap",
+      "oracle_match": "dir-stem",
+      "quantlib": "pricingengines/swap/discountingswapengine",
+      "rust": "pricingengines/swap/discountingswapengine",
+      "verified": false
+    },
+    {
       "confidence": 0.0,
       "match": "none",
       "note": "no QuantLib module matched by path or stem",
@@ -2571,7 +2691,7 @@
       "verified": false
     }
   ],
-  "generated": "2026-07-13T04:48:00.636680+00:00",
+  "generated": "2026-07-14T00:07:45.631079+00:00",
   "graphs": {
     "quantlib": "graphify-out-ql/graph.json  (query with GRAPHIFY_OUT=graphify-out-ql)",
     "rust": "graphify-out/graph.json"
@@ -2590,7 +2710,7 @@
         "modules": 45
       },
       "cashflows": {
-        "mapped": 9,
+        "mapped": 12,
         "modules": 35
       },
       "currencies": {
@@ -2602,11 +2722,11 @@
         "modules": 225
       },
       "indexes": {
-        "mapped": 3,
+        "mapped": 5,
         "modules": 65
       },
       "instruments": {
-        "mapped": 4,
+        "mapped": 9,
         "modules": 89
       },
       "legacy": {
@@ -2630,7 +2750,7 @@
         "modules": 5
       },
       "pricingengines": {
-        "mapped": 4,
+        "mapped": 5,
         "modules": 156
       },
       "processes": {
@@ -2654,11 +2774,11 @@
         "modules": 10
       }
     },
-    "mapped": 196,
+    "mapped": 207,
     "quantlib_modules": 1327,
-    "rust_modules": 257,
+    "rust_modules": 269,
     "test_suite_files": 189,
-    "unported_quantlib_modules": 1131,
+    "unported_quantlib_modules": 1120,
     "verified": 1
   },
   "unported": [
@@ -2682,10 +2802,7 @@
     "cashflows/inflationcouponpricer",
     "cashflows/lineartsrpricer",
     "cashflows/multipleresetscoupon",
-    "cashflows/overnightindexedcoupon",
-    "cashflows/overnightindexedcouponpricer",
     "cashflows/rangeaccrual",
-    "cashflows/rateaveraging",
     "cashflows/replication",
     "cashflows/timebasket",
     "cashflows/yoyinflationcoupon",
@@ -2947,7 +3064,6 @@
     "indexes/ibor/destr",
     "indexes/ibor/dkklibor",
     "indexes/ibor/eonia",
-    "indexes/ibor/estr",
     "indexes/ibor/eurlibor",
     "indexes/ibor/fedfunds",
     "indexes/ibor/gbplibor",
@@ -2965,7 +3081,6 @@
     "indexes/ibor/seklibor",
     "indexes/ibor/shibor",
     "indexes/ibor/shir",
-    "indexes/ibor/sofr",
     "indexes/ibor/sonia",
     "indexes/ibor/swestr",
     "indexes/ibor/thbfix",
@@ -3028,7 +3143,6 @@
     "instruments/doublebarriertype",
     "instruments/equitytotalreturnswap",
     "instruments/europeanoption",
-    "instruments/fixedvsfloatingswap",
     "instruments/floatfloatswap",
     "instruments/floatfloatswaption",
     "instruments/forward",
@@ -3044,7 +3158,6 @@
     "instruments/makecds",
     "instruments/makecms",
     "instruments/makemultipleresetsswap",
-    "instruments/makeois",
     "instruments/makeswaption",
     "instruments/makevanillaswap",
     "instruments/makeyoyinflationcapfloor",
@@ -3053,7 +3166,6 @@
     "instruments/multipleresetsswap",
     "instruments/nonstandardswap",
     "instruments/nonstandardswaption",
-    "instruments/overnightindexedswap",
     "instruments/overnightindexfuture",
     "instruments/partialtimebarrieroption",
     "instruments/perpetualfutures",
@@ -3065,13 +3177,11 @@
     "instruments/softbarrieroption",
     "instruments/stickyratchet",
     "instruments/stock",
-    "instruments/swap",
     "instruments/swaption",
     "instruments/twoassetbarrieroption",
     "instruments/twoassetcorrelationoption",
     "instruments/vanillaoption",
     "instruments/vanillastorageoption",
-    "instruments/vanillaswap",
     "instruments/vanillaswingoption",
     "instruments/varianceswap",
     "instruments/writerextensibleoption",
@@ -3588,7 +3698,6 @@
     "pricingengines/quanto/quantoengine",
     "pricingengines/swap/cvaswapengine",
     "pricingengines/swap/discountingconstnotionalcrosscurrencyswapengine",
-    "pricingengines/swap/discountingswapengine",
     "pricingengines/swap/discretizedswap",
     "pricingengines/swap/treeswapengine",
     "pricingengines/swaption/basketgeneratingengine",

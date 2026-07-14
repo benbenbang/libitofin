@@ -1,6 +1,6 @@
 # QuantLib -> libitofin port coverage
 
-Generated 2026-07-13 from `port_map.json`.
+Generated 2026-07-14 from `port_map.json`.
 
 > **This is a hypothesis layer, not an audit.** Every mapping below comes from matching *names*
 > and *paths* between the two trees - never from reading behaviour. It tells you which file to
@@ -14,28 +14,28 @@ Generated 2026-07-13 from `port_map.json`.
 | --- | ---: | ---: | ---: |
 | experimental | 225 | 1 | 0% |
 | math | 167 | 50 | 30% |
-| pricingengines | 156 | 4 | 3% |
+| pricingengines | 156 | 5 | 3% |
 | methods | 138 | 1 | 1% |
 | models | 138 | 0 | 0% |
 | termstructures | 122 | 18 | 15% |
-| instruments | 89 | 4 | 4% |
+| instruments | 89 | 9 | 10% |
 | time | 78 | 78 | 100% |
-| indexes | 65 | 3 | 5% |
+| indexes | 65 | 5 | 8% |
 | (root) | 45 | 15 | 33% |
-| cashflows | 35 | 9 | 26% |
+| cashflows | 35 | 12 | 34% |
 | processes | 21 | 1 | 5% |
 | legacy | 15 | 0 | 0% |
 | quotes | 11 | 5 | 45% |
 | utilities | 10 | 4 | 40% |
 | currencies | 7 | 0 | 0% |
 | patterns | 5 | 3 | 60% |
-| **TOTAL** | **1327** | **196** | **15%** |
+| **TOTAL** | **1327** | **207** | **16%** |
 
 ## Map quality
 
-- Rust modules: **257** - of which **60** have no QuantLib counterpart by name (internal helpers, or a port under a different name).
-- QuantLib modules with no Rust counterpart: **1131** (the `unported` list in `port_map.json` - a candidate backlog, not a validated one).
-- Entries verified against source by a human: **1** of 257.
+- Rust modules: **269** - of which **61** have no QuantLib counterpart by name (internal helpers, or a port under a different name).
+- QuantLib modules with no Rust counterpart: **1120** (the `unported` list in `port_map.json` - a candidate backlog, not a validated one).
+- Entries verified against source by a human: **1** of 269.
 
 ## Oracle tests
 
@@ -45,9 +45,9 @@ link is coarser than the module link:
 
 | how the oracle was matched | entries | trust |
 | --- | ---: | --- |
-| `stem` / `stem-plural` (module name == test name) | 20 | good |
-| `dir-stem` (parent directory == test name) | 97 | coarse - the test file covers a whole family |
-| none found | 140 | no oracle identified; find it by hand |
+| `stem` / `stem-plural` (module name == test name) | 23 | good |
+| `dir-stem` (parent directory == test name) | 103 | coarse - the test file covers a whole family |
+| none found | 143 | no oracle identified; find it by hand |
 
 ## Known false positives this map cannot see
 
