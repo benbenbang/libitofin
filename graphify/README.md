@@ -133,29 +133,45 @@ are disposable and gitignored.
 
 ## How to update
 
-Run these from the repo root. All of it is AST-only: **no LLM, no API key, no token cost.** The
-extraction cache means only changed files are re-read.
+**Mostly you do not.** A `post-commit` hook keeps the Rust graph and the port map current
+automatically. All of it is AST-only: **no LLM, no API key, no token cost.**
 
-### After you change Rust code (the common case)
+### The automatic path (post-commit hook)
+
+Installed in `.git/hooks/post-commit`. After any commit that touches `crates/**/*.rs` it rebuilds, in
+the background, so `git commit` returns immediately:
+
+1. `build_rust.py` -> `graphify-out/` (~10s warm)
+2. `port_map.py` -> `graphify/port_map.json`
+3. `coverage.py` -> `graphify/COVERAGE.md`
+
+Log: `~/.cache/graphify-rebuild.log`. Skip once with `GRAPHIFY_SKIP_HOOK=1 git commit ...`.
+
+It stays silent on doc-only commits, during rebase/merge/cherry-pick, and in a worktree that has no
+`graphify-out/` yet (it refreshes an existing graph; it never builds one from cold).
+
+**Consequence you will notice:** the commit that triggers a rebuild does not contain the refreshed
+`port_map.json` / `COVERAGE.md` - they land in your **next** commit. That is intended; staging them
+mid-commit would fight the `prek` pre-commit hooks.
+
+> **Do NOT run `graphify hook install`.** The stock hook resolves its root from
+> `graphify-out/.graphify_root` (which is `crates/`), so it rebuilds into **`crates/graphify-out/`** -
+> a directory nothing queries - while the graph you actually query goes stale, and it never touches
+> `port_map.json` or `COVERAGE.md`. This was live in the repo and had been quietly doing it for a day.
+> The hook in `.git/hooks/post-commit` now replaces it. Same reason: do not run `graphify claude
+> install` (it overwrites the `## graphify` section of `CLAUDE.md`).
+
+### The manual path
 
 ```bash
-python graphify/scripts/build_rust.py    # ~9s warm; re-extracts only changed files
+python graphify/scripts/build_rust.py    # graph only
+python graphify/scripts/port_map.py      # re-derive the Rust <-> QuantLib mapping
+python graphify/scripts/coverage.py      # regenerate COVERAGE.md from it
 ```
-
-That is the whole loop. Do it when you have added or moved types, modules, or call sites; skip it for
-edits that do not change structure (a formula body, a test assertion).
 
 **Do not run `graphify update .` from the repo root.** It would rescan the whole repo, pull the 271
 markdown files under `.agents/` into the Rust graph, and stop it being language-pure. The scripts
 here are the supported path.
-
-### After you port a module (also update the map)
-
-```bash
-python graphify/scripts/build_rust.py
-python graphify/scripts/port_map.py      # re-derives the Rust <-> QuantLib mapping
-python graphify/scripts/coverage.py      # regenerates COVERAGE.md from it
-```
 
 ### After you verify a mapping against source
 
