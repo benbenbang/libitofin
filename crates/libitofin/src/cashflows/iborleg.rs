@@ -22,12 +22,14 @@
 //! [`IborLeg::coupons`], which keeps the concrete [`IborCoupon`] type, and
 //! [`IborLeg::build`], which erases it into a [`Leg`]; C++ recovers the concrete
 //! type with `dynamic_pointer_cast`, which the port has no counterpart for. The
-//! default [`BlackIborCouponPricer`] that `operator Leg()` attaches when no
+//! default [`BlackIborCouponPricer`] that `operator Leg()` attaches only when no
 //! caps, floors or in-arrears feature is present is attached in
-//! [`coupons`](IborLeg::coupons); since those features are deferred the condition
-//! always holds. C++ attaches it through the free `setCouponPricer(leg, pricer)`,
-//! which downcasts each flow; the port's [`set_coupon_pricer`] takes the concrete
-//! coupons instead, the erased [`Leg`] carrying no downcast.
+//! [`coupons`](IborLeg::coupons) under the same guard; with a cap or floor set
+//! the coupons come from [`capped_floored_coupons`](IborLeg::capped_floored_coupons)
+//! and the caller installs a volatility-carrying pricer instead. C++ attaches it
+//! through the free `setCouponPricer(leg, pricer)`, which downcasts each flow;
+//! the port's [`set_coupon_pricer`] takes the concrete coupons instead, the
+//! erased [`Leg`] carrying no downcast.
 //!
 //! The stub reference date uses `calendar.adjust(end - tenor, bdc)` as the
 //! `FloatingLeg` template does, ignoring the schedule's end-of-month flag; the
@@ -36,16 +38,19 @@
 //!
 //! ## Deferred (later sub-tickets of #69)
 //!
-//! Caps and floors (`withCaps`/`withFloors`, which yield `CappedFlooredIborCoupon`
-//! through a `BlackIborCouponPricer` optionlet path), the in-arrears convexity
-//! adjustment (`inArrears`), zero and indexed-coupon modes, digital and CMS
-//! coupons and the overnight-indexed leg. Their builder methods are omitted
-//! entirely rather than accepted and ignored. A zero gearing, which the template
-//! collapses to a `FixedRateCoupon`, is likewise not special-cased: the port's
-//! [`IborCoupon`] rejects it, so `with_gearing(0.0)` surfaces that error rather
-//! than a silent fixed coupon.
+//! The in-arrears convexity adjustment (`inArrears`), zero and indexed-coupon
+//! modes, digital and CMS coupons and the overnight-indexed leg. Their builder
+//! methods are omitted entirely rather than accepted and ignored. A zero
+//! gearing, which the template collapses to a `FixedRateCoupon`, is likewise not
+//! special-cased: the port's [`IborCoupon`] rejects it, so `with_gearing(0.0)`
+//! surfaces that error rather than a silent fixed coupon.
+//!
+//! Caps and floors (`withCaps`/`withFloors`) are ported: they yield
+//! [`CappedFlooredCoupon`](crate::cashflows::CappedFlooredCoupon)s over the
+//! [`BlackIborCouponPricer`] optionlet path.
 
 use crate::cashflow::{CashFlow, Leg};
+use crate::cashflows::capflooredcoupon::CappedFlooredCoupon;
 use crate::cashflows::couponpricer::{BlackIborCouponPricer, FloatingRateCouponPricer};
 use crate::cashflows::iborcoupon::IborCoupon;
 use crate::errors::QlResult;
@@ -60,7 +65,7 @@ use crate::time::daycounter::DayCounter;
 use crate::time::period::Period;
 use crate::time::schedule::Schedule;
 use crate::time::timeunit::TimeUnit;
-use crate::types::{Integer, Natural, Real, Spread};
+use crate::types::{Integer, Natural, Rate, Real, Spread};
 
 /// Builds a sequence of [`IborCoupon`]s from a [`Schedule`].
 #[must_use]
@@ -75,6 +80,8 @@ pub struct IborLeg {
     fixing_days: Vec<Natural>,
     gearings: Vec<Real>,
     spreads: Vec<Spread>,
+    caps: Vec<Rate>,
+    floors: Vec<Rate>,
     fixing_convention: BusinessDayConvention,
     ex_coupon_period: Option<Period>,
     ex_coupon_calendar: Calendar,
@@ -99,6 +106,8 @@ impl IborLeg {
             fixing_days: Vec::new(),
             gearings: Vec::new(),
             spreads: Vec::new(),
+            caps: Vec::new(),
+            floors: Vec::new(),
             fixing_convention: BusinessDayConvention::Preceding,
             ex_coupon_period: None,
             ex_coupon_calendar: NullCalendar::new(),
@@ -177,6 +186,25 @@ impl IborLeg {
         self
     }
 
+    /// A cap per coupon; the last one carries over. An empty list, the default,
+    /// leaves the coupons uncapped.
+    ///
+    /// Setting a cap or a floor makes [`build`](Self::build) and
+    /// [`capped_floored_coupons`](Self::capped_floored_coupons) produce
+    /// [`CappedFlooredCoupon`]s, and stops the plain-path default pricer being
+    /// attached: the caller installs a volatility-carrying pricer instead.
+    pub fn with_caps(mut self, caps: Vec<Rate>) -> IborLeg {
+        self.caps = caps;
+        self
+    }
+
+    /// A floor per coupon; the last one carries over. An empty list, the
+    /// default, leaves the coupons unfloored. See [`with_caps`](Self::with_caps).
+    pub fn with_floors(mut self, floors: Vec<Rate>) -> IborLeg {
+        self.floors = floors;
+        self
+    }
+
     /// The convention the fixing dates are computed with.
     pub fn with_fixing_convention(mut self, convention: BusinessDayConvention) -> IborLeg {
         self.fixing_convention = convention;
@@ -198,16 +226,10 @@ impl IborLeg {
         self
     }
 
-    /// The coupons the leg is made of, each carrying the default
-    /// [`BlackIborCouponPricer`].
-    ///
-    /// # Errors
-    ///
-    /// Errors if no notional was given, if the schedule holds fewer than two
-    /// dates, if more notionals, gearings or spreads were given than the schedule
-    /// has periods, or if a coupon fails its [`IborCoupon::new`] preconditions (a
-    /// zero gearing among them).
-    pub fn coupons(&self) -> QlResult<Vec<Shared<IborCoupon>>> {
+    /// The bare underlying coupons, no pricer attached: the loop shared by the
+    /// plain [`coupons`](Self::coupons) and the capped
+    /// [`capped_floored_coupons`](Self::capped_floored_coupons) paths.
+    fn raw_coupons(&self) -> QlResult<Vec<Shared<IborCoupon>>> {
         require!(!self.notionals.is_empty(), "no notional given");
         let size = self.schedule.len();
         require!(size >= 2, "schedule with {size} date(s) spans no period");
@@ -226,6 +248,16 @@ impl IborLeg {
             self.spreads.len() <= periods,
             "too many spreads ({}), only {periods} required",
             self.spreads.len()
+        );
+        require!(
+            self.caps.len() <= periods,
+            "too many caps ({}), only {periods} required",
+            self.caps.len()
+        );
+        require!(
+            self.floors.len() <= periods,
+            "too many floors ({}), only {periods} required",
+            self.floors.len()
         );
 
         let calendar = self.schedule.calendar();
@@ -286,24 +318,109 @@ impl IborLeg {
                 ex_coupon_date,
                 self.fixing_convention,
             )?;
-            let coupon = shared(coupon);
-            coupon.set_pricer(default_pricer());
-            coupons.push(coupon);
+            coupons.push(shared(coupon));
+        }
+        Ok(coupons)
+    }
+
+    /// The coupons the leg is made of.
+    ///
+    /// Each carries the default [`BlackIborCouponPricer`] on the plain path.
+    /// With a cap or floor set the plain coupons are returned unpriced, the C++
+    /// `operator Leg()` guard withholding the default pricer;
+    /// [`capped_floored_coupons`](Self::capped_floored_coupons) is then the
+    /// intended entry.
+    ///
+    /// # Errors
+    ///
+    /// Errors if no notional was given, if the schedule holds fewer than two
+    /// dates, if more notionals, gearings, spreads, caps or floors were given
+    /// than the schedule has periods, or if a coupon fails its
+    /// [`IborCoupon::new`] preconditions (a zero gearing among them).
+    pub fn coupons(&self) -> QlResult<Vec<Shared<IborCoupon>>> {
+        let coupons = self.raw_coupons()?;
+        if self.caps.is_empty() && self.floors.is_empty() {
+            for coupon in &coupons {
+                coupon.set_pricer(default_pricer());
+            }
+        }
+        Ok(coupons)
+    }
+
+    /// The coupons wrapped in their per-coupon cap and floor, no pricer
+    /// attached: the caller installs a volatility-carrying pricer through
+    /// [`set_coupon_pricer`].
+    ///
+    /// # Errors
+    ///
+    /// As [`coupons`](Self::coupons), plus any [`CappedFlooredCoupon::new`]
+    /// precondition (a cap below its floor).
+    pub fn capped_floored_coupons(&self) -> QlResult<Vec<Shared<CappedFlooredCoupon>>> {
+        let raw = self.raw_coupons()?;
+        let mut coupons = Vec::with_capacity(raw.len());
+        for (i, underlying) in raw.into_iter().enumerate() {
+            let cap = pick(&self.caps, i);
+            let floor = pick(&self.floors, i);
+            coupons.push(shared(CappedFlooredCoupon::new(underlying, cap, floor)?));
         }
         Ok(coupons)
     }
 
     /// The coupons as a [`Leg`], with their concrete type erased.
     ///
+    /// The plain path erases [`coupons`](Self::coupons); with a cap or floor set
+    /// it erases [`capped_floored_coupons`](Self::capped_floored_coupons), whose
+    /// coupons carry no pricer, so the caller must install one on the concrete
+    /// coupons through [`set_coupon_pricer`] before erasing rather than through
+    /// this method.
+    ///
     /// # Errors
     ///
-    /// As [`coupons`](Self::coupons).
+    /// As [`coupons`](Self::coupons) or
+    /// [`capped_floored_coupons`](Self::capped_floored_coupons).
     pub fn build(&self) -> QlResult<Leg> {
-        Ok(self
-            .coupons()?
-            .into_iter()
-            .map(|coupon| coupon as Shared<dyn CashFlow>)
-            .collect())
+        if self.caps.is_empty() && self.floors.is_empty() {
+            Ok(self
+                .coupons()?
+                .into_iter()
+                .map(|coupon| coupon as Shared<dyn CashFlow>)
+                .collect())
+        } else {
+            Ok(self
+                .capped_floored_coupons()?
+                .into_iter()
+                .map(|coupon| coupon as Shared<dyn CashFlow>)
+                .collect())
+        }
+    }
+}
+
+/// The `index`-th rate as a cap/floor, or `None` when the list is empty
+/// (an uncapped or unfloored coupon).
+fn pick(rates: &[Rate], index: usize) -> Option<Rate> {
+    if rates.is_empty() {
+        None
+    } else {
+        Some(broadcast(rates, index, 0.0))
+    }
+}
+
+/// A coupon a pricer can be attached to (an [`IborCoupon`] or a
+/// [`CappedFlooredCoupon`]), so [`set_coupon_pricer`] spans both.
+pub trait AttachPricer {
+    /// Attaches `pricer` to the coupon.
+    fn attach_pricer(&self, pricer: SharedMut<dyn FloatingRateCouponPricer>);
+}
+
+impl AttachPricer for IborCoupon {
+    fn attach_pricer(&self, pricer: SharedMut<dyn FloatingRateCouponPricer>) {
+        self.set_pricer(pricer);
+    }
+}
+
+impl AttachPricer for CappedFlooredCoupon {
+    fn attach_pricer(&self, pricer: SharedMut<dyn FloatingRateCouponPricer>) {
+        self.set_pricer(pricer);
     }
 }
 
@@ -311,13 +428,14 @@ impl IborLeg {
 ///
 /// The free `setCouponPricer(Leg&, pricer)` of `couponpricer.cpp`, taking the
 /// concrete coupons rather than an erased [`Leg`] since the port cannot downcast
-/// a [`CashFlow`](crate::cashflow::CashFlow) back to a coupon.
-pub fn set_coupon_pricer(
-    coupons: &[Shared<IborCoupon>],
+/// a [`CashFlow`](crate::cashflow::CashFlow) back to a coupon. Generic over the
+/// coupon type so a plain or a capped/floored leg can be priced the same way.
+pub fn set_coupon_pricer<C: AttachPricer>(
+    coupons: &[Shared<C>],
     pricer: SharedMut<dyn FloatingRateCouponPricer>,
 ) {
     for coupon in coupons {
-        coupon.set_pricer(pricer.clone());
+        coupon.attach_pricer(pricer.clone());
     }
 }
 
@@ -526,5 +644,23 @@ mod tests {
             leg.last().unwrap().reference_period_end(),
             Date::new(30, Month::September, 2020)
         );
+    }
+
+    /// With a cap set the builder yields [`CappedFlooredCoupon`]s over one coupon
+    /// per period, and the guard withholds the default pricer: the underlyings
+    /// carry none until [`set_coupon_pricer`] installs a volatility-carrying one,
+    /// so a rate query errors rather than pricing with a wrong pricer.
+    #[test]
+    fn a_capped_leg_withholds_the_default_pricer() {
+        let periods = monthly_schedule().len() - 1;
+        let leg = IborLeg::new(monthly_schedule(), euribor3m())
+            .with_notional(100.0)
+            .with_caps(vec![0.05]);
+
+        let capped = leg.capped_floored_coupons().unwrap();
+        assert_eq!(capped.len(), periods);
+        assert!(capped[0].is_capped() && !capped[0].is_floored());
+        assert!(capped[0].underlying().pricer().is_none());
+        assert!(capped[0].rate().is_err());
     }
 }
