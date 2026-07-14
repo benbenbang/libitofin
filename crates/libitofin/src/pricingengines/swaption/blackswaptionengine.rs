@@ -428,18 +428,20 @@ mod tests {
     use crate::indexes::IborIndex;
     use crate::indexes::ibor::Euribor;
     use crate::instrument::Instrument;
-    use crate::instruments::{FixedVsFloatingSwap, MakeVanillaSwap, Swaption};
+    use crate::instruments::{FixedVsFloatingSwap, MakeVanillaSwap, Swaption, VanillaSwap};
     use crate::quotes::make_quote_handle;
     use crate::shared::shared;
     use crate::termstructures::yields::FlatForward;
     use crate::time::calendar::Calendar;
     use crate::time::calendars::target::Target;
     use crate::time::date::Month;
+    use crate::time::daycounters::actual360::Actual360;
     use crate::time::daycounters::actual365fixed::Actual365Fixed;
     use crate::time::daycounters::thirty360::{Convention, Thirty360};
     use crate::time::period::Period;
+    use crate::time::schedule::MakeSchedule;
     use crate::time::timeunit::TimeUnit;
-    use crate::types::{Integer, Volatility};
+    use crate::types::{Integer, Rate, Spread, Volatility};
 
     const SETTLEMENT_DAYS: Integer = 2;
 
@@ -538,6 +540,238 @@ mod tests {
             );
             swaption.base_mut().set_pricing_engine(engine);
             swaption
+        }
+
+        /// A vanilla swap with an explicit type and floating-leg spread, the
+        /// shape the monotonicity tests need (`MakeVanillaSwap` cannot yet set
+        /// either). The fixed leg is annual Thirty360 BondBasis, the floating
+        /// leg semiannual Euribor 6M, both on the TARGET calendar - the same
+        /// conventions `MakeVanillaSwap` derives in the fixture. The nominal is
+        /// one, matching the fixture's `MakeVanillaSwap` default.
+        fn make_vanilla(
+            &self,
+            start: Date,
+            length: Integer,
+            fixed_rate: Rate,
+            spread: Spread,
+            swap_type: SwapType,
+        ) -> VanillaSwap {
+            let maturity = start + Period::new(length, TimeUnit::Years);
+            let schedule = |frequency| {
+                MakeSchedule::new()
+                    .from(start)
+                    .to(maturity)
+                    .with_frequency(frequency)
+                    .with_calendar(self.calendar.clone())
+                    .with_convention(BusinessDayConvention::ModifiedFollowing)
+                    .with_termination_date_convention(BusinessDayConvention::ModifiedFollowing)
+                    .forwards()
+                    .end_of_month(false)
+                    .build()
+            };
+            VanillaSwap::new(
+                swap_type,
+                1.0,
+                schedule(Frequency::Annual),
+                fixed_rate,
+                Thirty360::with_convention(Convention::BondBasis),
+                schedule(Frequency::Semiannual),
+                Shared::clone(&self.index),
+                spread,
+                Actual360::new(),
+                None,
+                Shared::clone(&self.settings),
+            )
+            .unwrap()
+        }
+
+        /// The signed `floatingLegBPS / fixedLegBPS` a swap reports once priced
+        /// on the fixture curve - the ratio `testSpreadTreatment` uses to build
+        /// the equivalent zero-spread swap (`swaption.cpp:373`). Priced with the
+        /// same `includeSettlementDateFlows = false` the Black engine's internal
+        /// discounting engine uses.
+        fn leg_bps_ratio(
+            &self,
+            start: Date,
+            length: Integer,
+            fixed_rate: Rate,
+            spread: Spread,
+            swap_type: SwapType,
+        ) -> Real {
+            let mut swap = self.make_vanilla(start, length, fixed_rate, spread, swap_type);
+            let engine = shared_mut(DiscountingSwapEngine::new(
+                self.curve.clone(),
+                Some(false),
+                None,
+                None,
+                Shared::clone(&self.settings),
+            )) as SharedMut<dyn PricingEngine>;
+            swap.base_mut().set_pricing_engine(engine);
+            let base = swap.fixed_vs_floating_mut();
+            base.floating_leg_bps().unwrap() / base.fixed_leg_bps().unwrap()
+        }
+    }
+
+    const EXERCISES: [Integer; 3] = [1, 5, 10];
+    const LENGTHS: [Integer; 4] = [1, 5, 10, 20];
+
+    /// `testStrikeDependency` (`swaption.cpp:171-262`): a payer swaption's NPV
+    /// falls with the strike, a receiver's rises, for both physical and cash
+    /// (par-yield) settlement.
+    #[test]
+    fn npv_is_monotone_in_the_strike() {
+        let strikes = [0.03, 0.04, 0.05, 0.06, 0.07];
+        let vars = Vars::new(Date::new(13, Month::March, 2002), true);
+        for exercise in EXERCISES {
+            let exercise_date = vars.years(vars.today, exercise);
+            let start_date = vars.spot(exercise_date);
+            for length in LENGTHS {
+                for swap_type in [SwapType::Payer, SwapType::Receiver] {
+                    for (settlement_type, settlement_method) in [
+                        (SettlementType::Physical, SettlementMethod::PhysicalOTC),
+                        (SettlementType::Cash, SettlementMethod::ParYieldCurve),
+                    ] {
+                        let values: Vec<Real> = strikes
+                            .iter()
+                            .map(|&strike| {
+                                let swap = vars
+                                    .make_vanilla(start_date, length, strike, 0.0, swap_type)
+                                    .into_fixed_vs_floating();
+                                vars.make_swaption(
+                                    swap,
+                                    exercise_date,
+                                    0.20,
+                                    settlement_type,
+                                    settlement_method,
+                                )
+                                .npv()
+                                .unwrap()
+                            })
+                            .collect();
+                        for pair in values.windows(2) {
+                            match swap_type {
+                                SwapType::Payer => assert!(
+                                    pair[0] >= pair[1],
+                                    "payer NPV rose with strike ({exercise}y/{length}y): {pair:?}"
+                                ),
+                                SwapType::Receiver => assert!(
+                                    pair[0] <= pair[1],
+                                    "receiver NPV fell with strike ({exercise}y/{length}y): {pair:?}"
+                                ),
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// `testSpreadDependency` (`swaption.cpp:264-348`): a payer swaption's NPV
+    /// rises with the floating-leg spread, a receiver's falls, for both physical
+    /// and cash settlement.
+    #[test]
+    fn npv_is_monotone_in_the_spread() {
+        let spreads = [-0.002, -0.001, 0.0, 0.001, 0.002];
+        let vars = Vars::new(Date::new(13, Month::March, 2002), true);
+        for exercise in EXERCISES {
+            let exercise_date = vars.years(vars.today, exercise);
+            let start_date = vars.spot(exercise_date);
+            for length in LENGTHS {
+                for swap_type in [SwapType::Payer, SwapType::Receiver] {
+                    for (settlement_type, settlement_method) in [
+                        (SettlementType::Physical, SettlementMethod::PhysicalOTC),
+                        (SettlementType::Cash, SettlementMethod::ParYieldCurve),
+                    ] {
+                        let values: Vec<Real> = spreads
+                            .iter()
+                            .map(|&spread| {
+                                let swap = vars
+                                    .make_vanilla(start_date, length, 0.06, spread, swap_type)
+                                    .into_fixed_vs_floating();
+                                vars.make_swaption(
+                                    swap,
+                                    exercise_date,
+                                    0.20,
+                                    settlement_type,
+                                    settlement_method,
+                                )
+                                .npv()
+                                .unwrap()
+                            })
+                            .collect();
+                        for pair in values.windows(2) {
+                            match swap_type {
+                                SwapType::Payer => assert!(
+                                    pair[0] <= pair[1],
+                                    "payer NPV fell with spread ({exercise}y/{length}y): {pair:?}"
+                                ),
+                                SwapType::Receiver => assert!(
+                                    pair[0] >= pair[1],
+                                    "receiver NPV rose with spread ({exercise}y/{length}y): {pair:?}"
+                                ),
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// `testSpreadTreatment` (`swaption.cpp:350-409`): a swaption on a swap with
+    /// a floating-leg spread equals a swaption on a zero-spread swap whose fixed
+    /// rate is shifted by `spread * floatingLegBPS / fixedLegBPS`, to 1e-6, for
+    /// both physical and cash settlement.
+    #[test]
+    fn a_spread_swaption_equals_its_zero_spread_equivalent() {
+        let spreads = [-0.002, -0.001, 0.0, 0.001, 0.002];
+        let vars = Vars::new(Date::new(13, Month::March, 2002), true);
+        for exercise in EXERCISES {
+            let exercise_date = vars.years(vars.today, exercise);
+            let start_date = vars.spot(exercise_date);
+            for length in LENGTHS {
+                for swap_type in [SwapType::Payer, SwapType::Receiver] {
+                    for spread in spreads {
+                        let correction = spread
+                            * vars.leg_bps_ratio(start_date, length, 0.06, spread, swap_type);
+                        for (settlement_type, settlement_method) in [
+                            (SettlementType::Physical, SettlementMethod::PhysicalOTC),
+                            (SettlementType::Cash, SettlementMethod::ParYieldCurve),
+                        ] {
+                            let original = vars
+                                .make_vanilla(start_date, length, 0.06, spread, swap_type)
+                                .into_fixed_vs_floating();
+                            let equivalent = vars
+                                .make_vanilla(start_date, length, 0.06 + correction, 0.0, swap_type)
+                                .into_fixed_vs_floating();
+                            let original_npv = vars
+                                .make_swaption(
+                                    original,
+                                    exercise_date,
+                                    0.20,
+                                    settlement_type,
+                                    settlement_method,
+                                )
+                                .npv()
+                                .unwrap();
+                            let equivalent_npv = vars
+                                .make_swaption(
+                                    equivalent,
+                                    exercise_date,
+                                    0.20,
+                                    settlement_type,
+                                    settlement_method,
+                                )
+                                .npv()
+                                .unwrap();
+                            assert!(
+                                (original_npv - equivalent_npv).abs() <= 1.0e-6,
+                                "spread treatment ({exercise}y/{length}y spread {spread}): \
+                                 {original_npv} vs {equivalent_npv}"
+                            );
+                        }
+                    }
+                }
+            }
         }
     }
 
