@@ -426,12 +426,14 @@ mod tests {
     use super::*;
     use crate::exercise::EuropeanExercise;
     use crate::indexes::IborIndex;
-    use crate::indexes::ibor::Euribor;
+    use crate::indexes::ibor::{Eonia, Euribor};
     use crate::instrument::Instrument;
-    use crate::instruments::{FixedVsFloatingSwap, MakeVanillaSwap, Swaption, VanillaSwap};
+    use crate::instruments::{
+        FixedVsFloatingSwap, MakeOis, MakeVanillaSwap, Swaption, VanillaSwap,
+    };
     use crate::quotes::make_quote_handle;
     use crate::shared::shared;
-    use crate::termstructures::yields::FlatForward;
+    use crate::termstructures::yields::{FlatForward, ZeroSpreadedTermStructure};
     use crate::time::calendar::Calendar;
     use crate::time::calendars::target::Target;
     use crate::time::date::Month;
@@ -854,6 +856,54 @@ mod tests {
         assert!(
             swaption.base().is_calculated(),
             "the Black engine must leave the swaption calculated after NPV"
+        );
+    }
+
+    /// `testCachedValue` Arm B (`swaption.cpp:443-458`): a 10Y OIS payer swaption
+    /// on an Eonia index reproduces the cached NPV `0.014101075767` at 1e-12, a
+    /// flat literal (no par/indexed split, the overnight leg has none). The Eonia
+    /// forecasts off the flat 5% curve spread by -0.01
+    /// (`ZeroSpreadedTermStructure`, `:131-135`), while the swaption discounts on
+    /// the flat 5% curve; the OIS fixed leg is Thirty360 BondBasis (the fixture's
+    /// `withFixedLegDayCount`, which the index default cannot express).
+    #[test]
+    fn cached_value_reproduces_the_ois_swaption_arm() {
+        let vars = Vars::new(Date::new(13, Month::March, 2002), true);
+        let spreaded: Handle<dyn YieldTermStructure> = Handle::new(shared(
+            ZeroSpreadedTermStructure::new(vars.curve.clone(), make_quote_handle(-0.01).handle()),
+        )
+            as Shared<dyn YieldTermStructure>);
+        let ois_index = shared(Eonia::new(spreaded, Shared::clone(&vars.settings)));
+
+        let exercise_date = vars.years(vars.settlement, 5);
+        let start_date = vars.spot(exercise_date);
+        let ois_swap = MakeOis::new(
+            Period::new(10, TimeUnit::Years),
+            ois_index,
+            Some(0.06),
+            Period::new(0, TimeUnit::Days),
+            Shared::clone(&vars.settings),
+        )
+        .with_effective_date(start_date)
+        .with_fixed_leg_day_count(Vars::fixed_day_count())
+        .build()
+        .unwrap()
+        .into_fixed_vs_floating();
+
+        let mut swaption = vars.make_swaption(
+            ois_swap,
+            exercise_date,
+            0.20,
+            SettlementType::Physical,
+            SettlementMethod::PhysicalOTC,
+        );
+
+        let expected = 0.014101075767;
+        let npv = swaption.npv().unwrap();
+        assert!(
+            (npv - expected).abs() <= 1.0e-12,
+            "OIS swaption npv {npv} vs cached {expected} (error {})",
+            (npv - expected).abs()
         );
     }
 
