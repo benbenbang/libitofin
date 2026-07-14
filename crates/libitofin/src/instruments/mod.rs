@@ -5,6 +5,7 @@
 
 mod bond;
 mod bonds;
+mod capfloor;
 mod fixedvsfloatingswap;
 mod makeois;
 mod makevanillaswap;
@@ -16,6 +17,7 @@ mod vanillaswap;
 
 pub use bond::{Bond, BondArguments, BondEngine, BondPrice, BondResults};
 pub use bonds::FixedRateBond;
+pub use capfloor::{CapFloor, CapFloorArguments, CapFloorType};
 pub use fixedvsfloatingswap::{
     FixedVsFloatingSwap, FixedVsFloatingSwapArguments, FixedVsFloatingSwapEngine,
     FixedVsFloatingSwapResults, FloatingArgumentsFn,
