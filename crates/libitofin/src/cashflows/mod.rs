@@ -5,6 +5,8 @@
 //! rather than `cashflows::coupon::Coupon`.
 
 mod capflooredcoupon;
+#[cfg(test)]
+mod capflooredcoupon_oracle;
 #[allow(clippy::module_inception)]
 mod cashflows;
 mod coupon;
