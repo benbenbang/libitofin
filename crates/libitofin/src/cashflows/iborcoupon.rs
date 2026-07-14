@@ -121,6 +121,18 @@ impl IborCoupon {
         &self.ibor_index
     }
 
+    /// The spread paid over the index fixing (`spread`), delegated to the base
+    /// [`FloatingRateCoupon`].
+    pub fn spread(&self) -> Spread {
+        self.base.spread()
+    }
+
+    /// The multiplicative coefficient applied to the index (`gearing`),
+    /// delegated to the base [`FloatingRateCoupon`].
+    pub fn gearing(&self) -> Real {
+        self.base.gearing()
+    }
+
     /// The coupon's fixing date (`fixingDate`).
     pub fn fixing_date(&self) -> Date {
         self.base.fixing_date()
