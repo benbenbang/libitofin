@@ -4,6 +4,7 @@
 //! base. The items are re-exported flat, so a coupon is `cashflows::Coupon`
 //! rather than `cashflows::coupon::Coupon`.
 
+mod capflooredcoupon;
 #[allow(clippy::module_inception)]
 mod cashflows;
 mod coupon;
@@ -21,6 +22,7 @@ mod overnightleg;
 mod rateaveraging;
 mod simplecashflow;
 
+pub use capflooredcoupon::{CappedFlooredCoupon, CappedFlooredIborCoupon};
 pub use cashflows::CashFlows;
 pub use coupon::{Coupon, CouponBase};
 pub use couponpricer::{BlackIborCouponPricer, FloatingRateCouponPricer};
