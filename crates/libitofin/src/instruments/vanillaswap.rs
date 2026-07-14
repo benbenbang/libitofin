@@ -148,6 +148,18 @@ impl VanillaSwap {
     pub fn fixed_vs_floating_mut(&mut self) -> &mut FixedVsFloatingSwap {
         &mut self.base
     }
+
+    /// Consumes the wrapper and yields its [`FixedVsFloatingSwap`] base.
+    ///
+    /// The Rust counterpart of C++'s `shared_ptr<VanillaSwap>` upcast to
+    /// `shared_ptr<FixedVsFloatingSwap>` when a swaption takes ownership of its
+    /// underlying: an `Rc` cannot project a field, so the base is moved out
+    /// wholesale. Behaviour is preserved because `VanillaSwap` adds no data over
+    /// the base and its one override, `setupFloatingArguments`, lives in the
+    /// base as a [`FloatingArgumentsFn`] closure rather than a vtable method.
+    pub fn into_fixed_vs_floating(self) -> FixedVsFloatingSwap {
+        self.base
+    }
 }
 
 /// Fills the floating-leg argument vectors from the swap's `IborCoupon`s (the
@@ -364,6 +376,18 @@ mod tests {
         for (fixing, reset) in args.floating_fixing_dates.iter().zip(&expected_resets) {
             assert!(fixing <= reset, "fixing precedes accrual start");
         }
+    }
+
+    /// `into_fixed_vs_floating` moves the base out intact: the extracted swap
+    /// keeps both legs, the type, rate and spread the wrapper built.
+    #[test]
+    fn into_fixed_vs_floating_yields_the_intact_base() {
+        let base = make_swap(SwapType::Receiver).into_fixed_vs_floating();
+        assert_eq!(base.swap_type(), SwapType::Receiver);
+        assert_eq!(base.fixed_rate(), FIXED_RATE);
+        assert_eq!(base.spread(), SPREAD);
+        assert_eq!(base.fixed_leg().len(), 2);
+        assert_eq!(base.floating_leg().len(), 2);
     }
 
     /// The fair-rate and fair-spread accessors are reachable through the mutable
