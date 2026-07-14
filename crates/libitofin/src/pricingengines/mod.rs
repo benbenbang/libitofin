@@ -9,12 +9,14 @@ pub mod blackformula;
 pub mod bond;
 pub mod capfloor;
 pub mod swap;
+pub mod swaption;
 pub mod vanilla;
 
 pub use blackcalculator::BlackCalculator;
 pub use bond::{BondFunctions, DiscountingBondEngine};
 pub use capfloor::BlackCapFloorEngine;
 pub use swap::DiscountingSwapEngine;
+pub use swaption::{BlackSwaptionEngine, CashAnnuityModel};
 pub use vanilla::AnalyticEuropeanEngine;
 
 pub use blackformula::{
