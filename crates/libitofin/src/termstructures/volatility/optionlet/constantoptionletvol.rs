@@ -200,3 +200,154 @@ impl OptionletVolatilityStructure for ConstantOptionletVolatility {
         self.displacement
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::quotes::SimpleQuote;
+    use crate::shared::{Shared, shared};
+    use crate::test_support::{Flag, as_observer};
+    use crate::time::calendars::target::Target;
+    use crate::time::date::Month;
+    use crate::time::daycounters::actual360::Actual360;
+
+    fn flat_surface(vol: Volatility) -> (Date, ConstantOptionletVolatility) {
+        let reference = Date::new(15, Month::June, 2026);
+        let surface = ConstantOptionletVolatility::new(
+            reference,
+            Target::new(),
+            BusinessDayConvention::Following,
+            vol,
+            Actual360::new(),
+            VolatilityType::ShiftedLognormal,
+            0.0,
+        );
+        (reference, surface)
+    }
+
+    #[test]
+    fn volatility_is_constant_across_times_and_strikes() {
+        let (reference, surface) = flat_surface(0.2);
+        for t in [0.0, 0.25, 1.0, 10.0] {
+            for strike in [-0.01, 0.0, 0.03, 1.0e6] {
+                assert_eq!(surface.volatility(t, strike, false).unwrap(), 0.2);
+            }
+        }
+        assert_eq!(
+            surface
+                .volatility_date(reference + 180, 0.03, false)
+                .unwrap(),
+            0.2
+        );
+    }
+
+    #[test]
+    fn black_variance_is_vol_squared_times_time_in_every_form() {
+        let (reference, surface) = flat_surface(0.25);
+        let var = surface.black_variance(2.0, 0.03, false).unwrap();
+        assert!((var - 0.125).abs() < 1e-15);
+
+        let date = reference + 180;
+        let t = surface.time_from_reference(date).unwrap();
+        assert_eq!(t, 0.5);
+        let by_date = surface.black_variance_date(date, 0.03, false).unwrap();
+        let by_time = surface.black_variance(t, 0.03, false).unwrap();
+        assert_eq!(by_date, by_time);
+        assert!((by_date - 0.25 * 0.25 * 0.5).abs() < 1e-15);
+    }
+
+    #[test]
+    fn tenor_queries_advance_on_the_calendar() {
+        use crate::time::period::Period;
+        use crate::time::timeunit::TimeUnit;
+        let (_, surface) = flat_surface(0.2);
+        let tenor = Period::new(6, TimeUnit::Months);
+        let by_tenor = surface.volatility_tenor(tenor, 0.03, false).unwrap();
+        assert_eq!(by_tenor, 0.2);
+        let var = surface.black_variance_tenor(tenor, 0.03, false).unwrap();
+        assert!(var > 0.0);
+    }
+
+    #[test]
+    fn type_and_displacement_are_reported() {
+        let reference = Date::new(15, Month::June, 2026);
+        let surface = ConstantOptionletVolatility::new(
+            reference,
+            Target::new(),
+            BusinessDayConvention::Following,
+            0.2,
+            Actual360::new(),
+            VolatilityType::Normal,
+            0.01,
+        );
+        assert_eq!(surface.volatility_type(), VolatilityType::Normal);
+        assert_eq!(surface.displacement(), 0.01);
+    }
+
+    #[test]
+    fn defaults_report_shifted_lognormal_without_displacement() {
+        let (_, surface) = flat_surface(0.2);
+        assert_eq!(surface.volatility_type(), VolatilityType::ShiftedLognormal);
+        assert_eq!(surface.displacement(), 0.0);
+    }
+
+    #[test]
+    fn every_strike_is_inside_the_domain() {
+        let (_, surface) = flat_surface(0.2);
+        assert!(surface.volatility(1.0, Real::MAX, false).is_ok());
+        assert!(surface.volatility(1.0, Real::MIN, false).is_ok());
+        assert_eq!(surface.min_strike(), Real::MIN);
+        assert_eq!(surface.max_strike(), Real::MAX);
+    }
+
+    #[test]
+    fn quote_changes_propagate_and_notify() {
+        let reference = Date::new(15, Month::June, 2026);
+        let handle = make_quote_handle(0.18);
+        let surface = ConstantOptionletVolatility::with_quote(
+            reference,
+            Target::new(),
+            BusinessDayConvention::Following,
+            handle.handle(),
+            Actual360::new(),
+            VolatilityType::ShiftedLognormal,
+            0.0,
+        );
+        assert_eq!(surface.volatility(1.0, 0.03, false).unwrap(), 0.18);
+
+        let flag = Flag::new();
+        surface.observable().register_observer(&as_observer(&flag));
+
+        let quote = shared(SimpleQuote::new(0.23));
+        handle.link_to(quote.clone() as Shared<dyn Quote>);
+        assert!(Flag::is_up(&flag));
+        assert_eq!(surface.volatility(1.0, 0.03, false).unwrap(), 0.23);
+    }
+
+    #[test]
+    fn moving_reference_date_follows_the_evaluation_date() {
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(Date::new(15, Month::January, 2026));
+        let surface = ConstantOptionletVolatility::moving(
+            2,
+            Target::new(),
+            BusinessDayConvention::Following,
+            0.2,
+            Actual360::new(),
+            VolatilityType::ShiftedLognormal,
+            0.0,
+            settings.clone(),
+        );
+        assert_eq!(
+            surface.reference_date().unwrap(),
+            Date::new(19, Month::January, 2026)
+        );
+        assert_eq!(surface.volatility(1.0, 0.03, false).unwrap(), 0.2);
+
+        settings.set_evaluation_date(Date::new(16, Month::January, 2026));
+        assert_eq!(
+            surface.reference_date().unwrap(),
+            Date::new(20, Month::January, 2026)
+        );
+    }
+}
