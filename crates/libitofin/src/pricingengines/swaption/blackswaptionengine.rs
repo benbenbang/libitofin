@@ -413,3 +413,213 @@ impl PricingEngine for BlackSwaptionEngine {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    //! `test-suite/swaption.cpp`'s Black-engine oracle. The fixture reproduces
+    //! `CommonVars` (`:60-143`): settlement two TARGET days out, a flat 5%
+    //! Actual365Fixed curve fixed at settlement that both forecasts the Euribor
+    //! 6M index and discounts the swaptions, a nominal of one million and an
+    //! annual Thirty360 BondBasis fixed leg. `makeSwaption` (`:79`) builds the
+    //! Black engine over a flat vol quote with the `SwapRate` cash-annuity model.
+
+    use super::*;
+    use crate::exercise::EuropeanExercise;
+    use crate::indexes::IborIndex;
+    use crate::indexes::ibor::Euribor;
+    use crate::instrument::Instrument;
+    use crate::instruments::{FixedVsFloatingSwap, MakeVanillaSwap, Swaption};
+    use crate::quotes::make_quote_handle;
+    use crate::shared::shared;
+    use crate::termstructures::yields::FlatForward;
+    use crate::time::calendar::Calendar;
+    use crate::time::calendars::target::Target;
+    use crate::time::date::Month;
+    use crate::time::daycounters::actual365fixed::Actual365Fixed;
+    use crate::time::daycounters::thirty360::{Convention, Thirty360};
+    use crate::time::period::Period;
+    use crate::time::timeunit::TimeUnit;
+    use crate::types::{Integer, Volatility};
+
+    const SETTLEMENT_DAYS: Integer = 2;
+
+    /// The `swaption.cpp` `CommonVars` fixture, parameterised on the evaluation
+    /// date and the par/indexed coupon flag.
+    struct Vars {
+        settings: Shared<Settings<Date>>,
+        calendar: Calendar,
+        curve: Handle<dyn YieldTermStructure>,
+        index: Shared<IborIndex>,
+        today: Date,
+        settlement: Date,
+    }
+
+    impl Vars {
+        fn new(today: Date, using_at_par: bool) -> Vars {
+            let settings = shared(Settings::new());
+            settings.set_evaluation_date(today);
+            settings.set_using_at_par_coupons(using_at_par);
+            let calendar = Target::new();
+            let settlement = calendar.advance(
+                today,
+                SETTLEMENT_DAYS,
+                TimeUnit::Days,
+                BusinessDayConvention::Following,
+                false,
+            );
+            let curve: Handle<dyn YieldTermStructure> = Handle::new(shared(FlatForward::with_rate(
+                settlement,
+                0.05,
+                Actual365Fixed::new(),
+                Compounding::Continuous,
+                Frequency::Annual,
+            ))
+                as Shared<dyn YieldTermStructure>);
+            let index = shared(Euribor::six_months(curve.clone(), Shared::clone(&settings)));
+            Vars {
+                settings,
+                calendar,
+                curve,
+                index,
+                today,
+                settlement,
+            }
+        }
+
+        fn fixed_day_count() -> DayCounter {
+            Thirty360::with_convention(Convention::BondBasis)
+        }
+
+        fn years(&self, from: Date, n: Integer) -> Date {
+            self.calendar.advance(
+                from,
+                n,
+                TimeUnit::Years,
+                BusinessDayConvention::Following,
+                false,
+            )
+        }
+
+        fn spot(&self, from: Date) -> Date {
+            self.calendar.advance(
+                from,
+                SETTLEMENT_DAYS,
+                TimeUnit::Days,
+                BusinessDayConvention::Following,
+                false,
+            )
+        }
+
+        /// `makeSwaption` (`swaption.cpp:79`): the Black engine over a flat vol
+        /// quote on the fixture curve, with the `SwapRate` annuity model.
+        fn make_swaption(
+            &self,
+            swap: FixedVsFloatingSwap,
+            exercise_date: Date,
+            volatility: Volatility,
+            settlement_type: SettlementType,
+            settlement_method: SettlementMethod,
+        ) -> Swaption {
+            let engine = shared_mut(BlackSwaptionEngine::with_flat_vol(
+                self.curve.clone(),
+                make_quote_handle(volatility).handle(),
+                Actual365Fixed::new(),
+                0.0,
+                CashAnnuityModel::SwapRate,
+                Shared::clone(&self.settings),
+            )) as SharedMut<dyn PricingEngine>;
+            let mut swaption = Swaption::new(
+                shared_mut(swap),
+                shared(EuropeanExercise::new(exercise_date))
+                    as Shared<dyn crate::exercise::Exercise>,
+                settlement_type,
+                settlement_method,
+                Shared::clone(&self.settings),
+            );
+            swaption.base_mut().set_pricing_engine(engine);
+            swaption
+        }
+    }
+
+    /// `testCachedValue` Arm A (`swaption.cpp:411-441`): a 10Y Euribor 6M payer
+    /// swaption struck at 6%, exercise 5Y out, vol 0.20, reproduces the cached
+    /// NPV at 1e-12. The value splits on the par/indexed convention (`:435`): the
+    /// par arm (default `Settings`) is `0.036418158579`, the indexed arm
+    /// `0.036421429684`. Parameterising on the flag pins both.
+    #[test]
+    fn cached_value_reproduces_the_par_and_indexed_arms() {
+        for (using_at_par, expected) in [(true, 0.036418158579), (false, 0.036421429684)] {
+            let vars = Vars::new(Date::new(13, Month::March, 2002), using_at_par);
+            let exercise_date = vars.years(vars.settlement, 5);
+            let start_date = vars.spot(exercise_date);
+            let swap = MakeVanillaSwap::new(
+                Period::new(10, TimeUnit::Years),
+                Shared::clone(&vars.index),
+                Some(0.06),
+                Period::new(0, TimeUnit::Days),
+                Shared::clone(&vars.settings),
+            )
+            .with_effective_date(start_date)
+            .with_fixed_leg_tenor(Period::new(1, TimeUnit::Years))
+            .with_fixed_leg_day_count(Vars::fixed_day_count())
+            .build()
+            .unwrap()
+            .into_fixed_vs_floating();
+
+            let mut swaption = vars.make_swaption(
+                swap,
+                exercise_date,
+                0.20,
+                SettlementType::Physical,
+                SettlementMethod::PhysicalOTC,
+            );
+
+            let npv = swaption.npv().unwrap();
+            assert!(
+                (npv - expected).abs() <= 1.0e-12,
+                "par={using_at_par}: npv {npv} vs cached {expected} (error {})",
+                (npv - expected).abs()
+            );
+        }
+    }
+
+    /// `testBlackEngineCaching` (`swaption.cpp:147-169`): the swaption is not
+    /// calculated before `NPV()` and is calculated after. This pins the D5
+    /// re-entrancy fix: the engine installs a discounting engine on the swap the
+    /// swaption observes, and that internal mutation must not invalidate the
+    /// swaption mid-calculation.
+    #[test]
+    fn black_engine_leaves_the_swaption_calculated_after_npv() {
+        let vars = Vars::new(Date::new(13, Month::March, 2002), true);
+        let exercise_date = vars.years(vars.today, 1);
+        let start_date = vars.spot(exercise_date);
+        let swap = MakeVanillaSwap::new(
+            Period::new(1, TimeUnit::Years),
+            Shared::clone(&vars.index),
+            Some(0.03),
+            Period::new(0, TimeUnit::Days),
+            Shared::clone(&vars.settings),
+        )
+        .with_effective_date(start_date)
+        .with_fixed_leg_tenor(Period::new(1, TimeUnit::Years))
+        .with_fixed_leg_day_count(Vars::fixed_day_count())
+        .build()
+        .unwrap()
+        .into_fixed_vs_floating();
+
+        let mut swaption = vars.make_swaption(
+            swap,
+            exercise_date,
+            0.12,
+            SettlementType::Physical,
+            SettlementMethod::PhysicalOTC,
+        );
+
+        assert!(!swaption.base().is_calculated());
+        swaption.npv().unwrap();
+        assert!(
+            swaption.base().is_calculated(),
+            "the Black engine must leave the swaption calculated after NPV"
+        );
+    }
+}
