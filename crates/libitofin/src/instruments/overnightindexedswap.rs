@@ -242,6 +242,20 @@ impl OvernightIndexedSwap {
         &mut self.base
     }
 
+    /// Consumes the wrapper and yields its [`FixedVsFloatingSwap`] base.
+    ///
+    /// The Rust counterpart of C++'s `shared_ptr<OvernightIndexedSwap>` upcast
+    /// to `shared_ptr<FixedVsFloatingSwap>` when a swaption takes ownership of
+    /// its underlying (`blackswaptionengine`). The OIS-specific members
+    /// (overnight index, payment lag, calendar, averaging) drive construction
+    /// only and are not read on the swaption engine's pricing path, and the one
+    /// override, `setupFloatingArguments`, lives in the base as a
+    /// [`FloatingArgumentsFn`](crate::instruments::fixedvsfloatingswap::FloatingArgumentsFn)
+    /// closure, so moving the base out preserves behaviour.
+    pub fn into_fixed_vs_floating(self) -> FixedVsFloatingSwap {
+        self.base
+    }
+
     /// The overnight index the floating leg pays (`overnightIndex()`).
     pub fn overnight_index(&self) -> &Shared<OvernightIndex> {
         &self.overnight_index

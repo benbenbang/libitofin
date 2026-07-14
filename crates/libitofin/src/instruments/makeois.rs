@@ -21,8 +21,9 @@
 //! [`with_overnight_leg_spread`](MakeOis::with_overnight_leg_spread),
 //! [`with_nominal`](MakeOis::with_nominal),
 //! [`with_payment_lag`](MakeOis::with_payment_lag),
-//! [`with_discounting_term_structure`](MakeOis::with_discounting_term_structure)
-//! and [`with_averaging_method`](MakeOis::with_averaging_method). The swap tenor,
+//! [`with_discounting_term_structure`](MakeOis::with_discounting_term_structure),
+//! [`with_averaging_method`](MakeOis::with_averaging_method) and
+//! [`with_fixed_leg_day_count`](MakeOis::with_fixed_leg_day_count). The swap tenor,
 //! overnight index, optional fixed rate and forward start are the constructor
 //! arguments (`makeois.hpp:40`).
 //!
@@ -38,9 +39,10 @@
 //! - `withTerminationDate`, `withRule` / leg variants, `withPaymentFrequency` /
 //!   leg variants, `withPaymentAdjustment`, `withPaymentCalendar` / `withCalendar`
 //!   / leg variants, `withConvention` / termination / leg variants,
-//!   `withEndOfMonth` / leg / maturity variants, `withFixedLegDayCount`: the
-//!   schedules use the C++ defaults (annual `Backward`, `ModifiedFollowing`,
-//!   default end-of-month, fixed day count from the index);
+//!   `withEndOfMonth` / leg / maturity variants: the schedules use the C++
+//!   defaults (annual `Backward`, `ModifiedFollowing`, default end-of-month).
+//!   The fixed day count defaults to the index's own but is overridable through
+//!   [`with_fixed_leg_day_count`](MakeOis::with_fixed_leg_day_count);
 //! - `withTelescopicValueDates`: telescopic value dates are deferred with the
 //!   [`OvernightLeg`](crate::cashflows::OvernightLeg) (#328/#329), so the knob is
 //!   omitted rather than accepted and ignored. The cached NPV is identical for
@@ -105,6 +107,7 @@ pub struct MakeOis {
     payment_lag: Integer,
     payment_adjustment: BusinessDayConvention,
     averaging_method: RateAveraging,
+    fixed_day_count: Option<DayCounter>,
     discounting_curve: Option<Handle<dyn YieldTermStructure>>,
 }
 
@@ -136,8 +139,16 @@ impl MakeOis {
             payment_lag: 0,
             payment_adjustment: BusinessDayConvention::Following,
             averaging_method: RateAveraging::Compound,
+            fixed_day_count: None,
             discounting_curve: None,
         }
+    }
+
+    /// Sets the fixed-leg day count, overriding the default (the overnight
+    /// index's own day count) (`makeois.hpp` `withFixedLegDayCount`).
+    pub fn with_fixed_leg_day_count(mut self, day_count: DayCounter) -> MakeOis {
+        self.fixed_day_count = Some(day_count);
+        self
     }
 
     /// Sets the swap's start date explicitly, bypassing the settlement-days
@@ -247,7 +258,10 @@ impl MakeOis {
                 Date::null(),
             )
         };
-        let fixed_day_count = self.overnight_index.day_counter().clone();
+        let fixed_day_count = self
+            .fixed_day_count
+            .clone()
+            .unwrap_or_else(|| self.overnight_index.day_counter().clone());
 
         let used_fixed_rate = match self.fixed_rate {
             Some(fixed_rate) => fixed_rate,
@@ -545,6 +559,54 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// `withFixedLegDayCount` overrides the index-derived default: an OIS whose
+    /// fixed leg accrues on Thirty360 rather than the Estr Actual360 prices to a
+    /// different fair rate, since the fixed annuity changes with the day count.
+    #[test]
+    fn with_fixed_leg_day_count_changes_the_fixed_accrual() {
+        use crate::time::daycounters::thirty360::{Convention, Thirty360};
+
+        let settings = settings_at(today());
+        let settlement = settlement(&settings);
+        let length = Period::new(5, TimeUnit::Years);
+
+        let default_day_count = MakeOis::new(
+            length,
+            estr_on(common_curve(), &settings),
+            None,
+            Period::new(0, TimeUnit::Days),
+            Shared::clone(&settings),
+        )
+        .with_effective_date(settlement)
+        .with_nominal(NOMINAL)
+        .build()
+        .unwrap()
+        .fixed_vs_floating_mut()
+        .fair_rate()
+        .unwrap();
+
+        let thirty360 = MakeOis::new(
+            length,
+            estr_on(common_curve(), &settings),
+            None,
+            Period::new(0, TimeUnit::Days),
+            Shared::clone(&settings),
+        )
+        .with_effective_date(settlement)
+        .with_nominal(NOMINAL)
+        .with_fixed_leg_day_count(Thirty360::with_convention(Convention::BondBasis))
+        .build()
+        .unwrap()
+        .fixed_vs_floating_mut()
+        .fair_rate()
+        .unwrap();
+
+        assert!(
+            (default_day_count - thirty360).abs() > 1.0e-6,
+            "fixed-leg day count must change the fair rate: {default_day_count} vs {thirty360}"
+        );
     }
 
     /// The family-name settlement-days dispatch (`makeois.cpp:59-69`): `Sonia` 0,

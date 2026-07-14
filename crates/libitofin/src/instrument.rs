@@ -127,6 +127,28 @@ impl InstrumentBase {
         self.swap_engine(None);
     }
 
+    /// Installs a pricing engine and invalidates the cached results *without
+    /// notifying observers*.
+    ///
+    /// The faithful, non-singleton analog of the C++ Black swaption engine
+    /// wrapping `swap->setPricingEngine(engine)` in
+    /// `ObservableSettings::instance().disableUpdates()` /
+    /// `enableUpdates()` (`blackswaptionengine.hpp:247-249`): the engine prices
+    /// the swaption's own underlying swap and installs a discounting engine on
+    /// it, an internal mutation that must not invalidate the swaption observing
+    /// the swap. `ObservableSettings` is deliberately not ported (D5), so the
+    /// suppression is expressed here as a targeted non-broadcasting install
+    /// rather than a global update-suppression switch.
+    pub fn set_pricing_engine_silent(&mut self, engine: SharedMut<dyn PricingEngine>) {
+        let observer = self.observer();
+        if let Some(old) = &self.engine {
+            old.borrow().observable().unregister_observer(&observer);
+        }
+        engine.borrow().observable().register_observer(&observer);
+        self.engine = Some(engine);
+        self.lazy.borrow_mut().invalidate_silently();
+    }
+
     fn swap_engine(&mut self, engine: Option<SharedMut<dyn PricingEngine>>) {
         let observer = self.observer();
         if let Some(old) = &self.engine {
@@ -584,6 +606,37 @@ mod tests {
     }
 
     /// The C++ chain: quote -> engine (GenericEngine forwarder) -> instrument.
+    #[test]
+    fn set_pricing_engine_silent_installs_without_notifying_but_reprices() {
+        let market = shared(SimpleQuote::new(2.0));
+        let mut instrument = MockInstrument::new(Shared::clone(&market));
+        let (first, _) = mock_engine(true);
+        instrument.base_mut().set_pricing_engine(first);
+        instrument.npv().unwrap();
+        assert!(instrument.base().is_calculated());
+
+        let flag = Flag::new();
+        instrument.base().register_observer(&as_observer(&flag));
+
+        let (second, second_calls) = mock_engine(true);
+        instrument.base_mut().set_pricing_engine_silent(second);
+        assert!(
+            !Flag::is_up(&flag),
+            "a silent install must not notify observers"
+        );
+        assert!(
+            !instrument.base().is_calculated(),
+            "a silent install still invalidates the cache locally"
+        );
+
+        instrument.npv().unwrap();
+        assert_eq!(
+            second_calls.get(),
+            1,
+            "the silently installed engine prices"
+        );
+    }
+
     #[test]
     fn quote_change_reaches_instrument_through_the_engine() {
         let market = shared(SimpleQuote::new(2.0));

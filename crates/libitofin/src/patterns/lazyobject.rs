@@ -171,6 +171,19 @@ impl LazyObject {
         self.failed = false;
     }
 
+    /// Invalidates the cached results without notifying observers.
+    ///
+    /// The local half of a C++ notification received under
+    /// `ObservableSettings::disableUpdates()`: the state is reset so the next
+    /// [`calculate`](LazyObject::calculate) reruns, but no forwarding happens.
+    /// Used when a holder mutates the object internally and must not broadcast
+    /// that mutation (the Black swaption engine installing a discounting engine
+    /// on the swap it prices).
+    pub fn invalidate_silently(&mut self) {
+        self.calculated = false;
+        self.failed = false;
+    }
+
     /// First half of [`calculate`](LazyObject::calculate) for callers that
     /// cannot hold a borrow across the computation: applies the cache and
     /// frozen guards and marks the object calculated (the C++ pre-set that
