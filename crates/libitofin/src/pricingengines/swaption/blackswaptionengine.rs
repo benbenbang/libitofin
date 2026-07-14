@@ -856,4 +856,70 @@ mod tests {
             "the Black engine must leave the swaption calculated after NPV"
         );
     }
+
+    /// `testVega` (`swaption.cpp:462-527`): the analytical `"vega"` additional
+    /// result matches a central finite difference of the NPV in the volatility,
+    /// to 1.5% relative, on the two settlement shapes the parallel-indexed loop
+    /// visits - `(Receiver, Physical, PhysicalOTC)` at `h=0` and
+    /// `(Payer, Cash, ParYieldCurve)` at `h=1` - so both the plain and the
+    /// par-yield annuity branches are vega-checked.
+    #[test]
+    fn analytical_vega_matches_a_finite_difference() {
+        let strikes = [0.03, 0.04, 0.05, 0.06, 0.07];
+        let vols = [0.01, 0.20, 0.30, 0.70, 0.90];
+        let shift = 1.0e-8;
+        let cases = [
+            (
+                SwapType::Receiver,
+                SettlementType::Physical,
+                SettlementMethod::PhysicalOTC,
+            ),
+            (
+                SwapType::Payer,
+                SettlementType::Cash,
+                SettlementMethod::ParYieldCurve,
+            ),
+        ];
+        let vars = Vars::new(Date::new(13, Month::March, 2002), true);
+        for exercise in EXERCISES {
+            let exercise_date = vars.years(vars.today, exercise);
+            let start_date = vars.spot(exercise_date);
+            for length in LENGTHS {
+                for strike in strikes {
+                    for (swap_type, settlement_type, settlement_method) in cases {
+                        let priced = |volatility: Volatility| {
+                            let swap = vars
+                                .make_vanilla(start_date, length, strike, 0.0, swap_type)
+                                .into_fixed_vs_floating();
+                            vars.make_swaption(
+                                swap,
+                                exercise_date,
+                                volatility,
+                                settlement_type,
+                                settlement_method,
+                            )
+                        };
+                        for vol in vols {
+                            let mut swaption = priced(vol);
+                            let swaption_npv = swaption.npv().unwrap();
+                            let numerical = (priced(vol + shift).npv().unwrap()
+                                - priced(vol - shift).npv().unwrap())
+                                / (200.0 * shift);
+                            // Only the relevant vega is checked (`swaption.cpp:499`).
+                            if numerical / swaption_npv > 1.0e-7 {
+                                let analytical = swaption.result::<Real>("vega").unwrap() / 100.0;
+                                let discrepancy = (analytical - numerical).abs() / numerical;
+                                assert!(
+                                    discrepancy <= 0.015,
+                                    "vega {exercise}y/{length}y strike {strike} vol {vol}: \
+                                     analytical {analytical} vs numerical {numerical} \
+                                     (discrepancy {discrepancy})"
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
