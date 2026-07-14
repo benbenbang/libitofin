@@ -177,12 +177,15 @@ impl Coupon for CappedFlooredCoupon {
         let Some(pricer) = self.underlying.pricer() else {
             fail!("pricer not set");
         };
+        let forward = self.underlying.index_fixing();
         let mut rate = swaplet;
         if self.is_floored {
-            rate += pricer.borrow().floorlet_rate(self.effective_floor())?;
+            rate += pricer
+                .borrow()
+                .floorlet_rate(self.effective_floor(), forward.clone())?;
         }
         if self.is_capped {
-            rate -= pricer.borrow().caplet_rate(self.effective_cap())?;
+            rate -= pricer.borrow().caplet_rate(self.effective_cap(), forward)?;
         }
         Ok(rate)
     }

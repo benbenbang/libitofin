@@ -309,11 +309,11 @@ impl FloatingRateCouponPricer for CompoundingOvernightIndexedCouponPricer {
         )
     }
 
-    fn caplet_rate(&self, _effective_cap: Rate) -> QlResult<Rate> {
+    fn caplet_rate(&self, _effective_cap: Rate, _forward: QlResult<Rate>) -> QlResult<Rate> {
         fail!("caplet rate not ported: overnight cap/floor slice")
     }
 
-    fn floorlet_rate(&self, _effective_floor: Rate) -> QlResult<Rate> {
+    fn floorlet_rate(&self, _effective_floor: Rate, _forward: QlResult<Rate>) -> QlResult<Rate> {
         fail!("floorlet rate not ported: overnight cap/floor slice")
     }
 }
@@ -381,8 +381,8 @@ mod tests {
             index, schedule, 1.0, 0.0, false,
         ));
         let pricer = pricer.borrow();
-        assert!(pricer.caplet_rate(0.03).is_err());
-        assert!(pricer.floorlet_rate(0.01).is_err());
+        assert!(pricer.caplet_rate(0.03, Ok(0.01)).is_err());
+        assert!(pricer.floorlet_rate(0.01, Ok(0.01)).is_err());
         assert!(pricer.swaplet_rate_for(Ok(0.01)).is_err());
     }
 }
