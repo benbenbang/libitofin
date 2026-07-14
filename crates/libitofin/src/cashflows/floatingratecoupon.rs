@@ -413,12 +413,16 @@ mod tests {
             Ok(self.swaplet)
         }
 
-        fn caplet_rate(&self, _effective_cap: Rate) -> QlResult<Rate> {
-            fail!("caplet rate not ported: cap/floor slice")
+        fn caplet_rate(&self, _effective_cap: Rate, _forward: QlResult<Rate>) -> QlResult<Rate> {
+            fail!("caplet rate not priced by the recording stub")
         }
 
-        fn floorlet_rate(&self, _effective_floor: Rate) -> QlResult<Rate> {
-            fail!("floorlet rate not ported: cap/floor slice")
+        fn floorlet_rate(
+            &self,
+            _effective_floor: Rate,
+            _forward: QlResult<Rate>,
+        ) -> QlResult<Rate> {
+            fail!("floorlet rate not priced by the recording stub")
         }
     }
 
@@ -468,17 +472,17 @@ mod tests {
     }
 
     #[test]
-    fn the_cap_floor_slice_refuses() {
+    fn the_recording_stub_does_not_price_optionlets() {
         let (pricer, ..) = RecordingPricer::new(0.05);
         let pricer = pricer.borrow();
         assert!(
             pricer
-                .caplet_rate(0.03)
+                .caplet_rate(0.03, Ok(0.05))
                 .unwrap_err()
                 .message()
-                .contains("not ported")
+                .contains("recording stub")
         );
-        assert!(pricer.floorlet_rate(0.01).is_err());
+        assert!(pricer.floorlet_rate(0.01, Ok(0.05)).is_err());
     }
 
     #[test]

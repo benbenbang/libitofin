@@ -72,15 +72,20 @@ pub trait FloatingRateCouponPricer: AsObservable {
 
     /// The rate of a caplet struck at `effective_cap` (`capletRate`).
     ///
-    /// `gearing * optionletRate(Call, effective_cap)`. A pricer with no
-    /// optionlet volatility refuses.
-    fn caplet_rate(&self, effective_cap: Rate) -> QlResult<Rate>;
+    /// `gearing * optionletRate(Call, effective_cap)`. `forward` is the coupon's
+    /// adjusted forward, threaded in as [`swaplet_rate_for`](Self::swaplet_rate_for)
+    /// threads the swaplet fixing: the pricer captures the base coupon's natural
+    /// forecast, which on a stub differs from the mode-aware par forecast the
+    /// caplet must be struck against. A pricer with no optionlet volatility
+    /// refuses.
+    fn caplet_rate(&self, effective_cap: Rate, forward: QlResult<Rate>) -> QlResult<Rate>;
 
     /// The rate of a floorlet struck at `effective_floor` (`floorletRate`).
     ///
-    /// `gearing * optionletRate(Put, effective_floor)`. A pricer with no
-    /// optionlet volatility refuses.
-    fn floorlet_rate(&self, effective_floor: Rate) -> QlResult<Rate>;
+    /// `gearing * optionletRate(Put, effective_floor)`, with `forward` threaded
+    /// as in [`caplet_rate`](Self::caplet_rate). A pricer with no optionlet
+    /// volatility refuses.
+    fn floorlet_rate(&self, effective_floor: Rate, forward: QlResult<Rate>) -> QlResult<Rate>;
 }
 
 /// Black-formula pricer for ibor coupons (`BlackIborCouponPricer` over the
@@ -97,22 +102,20 @@ pub trait FloatingRateCouponPricer: AsObservable {
 ///
 /// It captures the coupon's gearing, spread, in-arrears flag, index fixing,
 /// fixing date and the evaluation date when [`initialize`](Self::initialize)
-/// runs, mirroring the C++ pricer caching them off the coupon.
+/// runs, mirroring the C++ pricer caching them off the coupon. The optionlet
+/// forward is not read from that captured fixing but threaded in by the coupon
+/// through [`caplet_rate`](FloatingRateCouponPricer::caplet_rate) and
+/// [`floorlet_rate`](FloatingRateCouponPricer::floorlet_rate), so the caplet is
+/// struck against the mode-aware par forecast the swaplet uses rather than the
+/// base coupon's natural forecast (the two diverge on a stub); the captured
+/// fixing only serves the plain [`swaplet_rate`](Self::swaplet_rate).
 ///
 /// ## Divergences from QuantLib
 ///
-/// The captured index fixing is the base coupon's natural (indexed) forecast,
-/// the one [`FloatingRateCoupon::index_fixing`] reads. It equals the mode-aware
-/// par/indexed forecast [`IborCoupon`] threads through
-/// [`swaplet_rate_for`](FloatingRateCouponPricer::swaplet_rate_for) whenever the
-/// coupon spans the index tenor - the whole capped/floored oracle - and diverges
-/// only on a stub, where threading the mode into the caplet path is deferred with
-/// the same par/indexed split.
-///
-/// `adjustedFixing()` reduces to the index fixing here: the in-arrears convexity
-/// adjustment is refused (as in the swaplet path) and only the `Black76` timing
-/// is modelled, so no convexity term applies. The C++ `discount_` and
-/// `accrualPeriod_` feed only the omitted `*Price` methods.
+/// `adjustedFixing()` reduces to the threaded forward here: the in-arrears
+/// convexity adjustment is refused (as in the swaplet path) and only the
+/// `Black76` timing is modelled, so no convexity term applies. The C++
+/// `discount_` and `accrualPeriod_` feed only the omitted `*Price` methods.
 ///
 /// [`IborCoupon`]: super::iborcoupon::IborCoupon
 pub struct BlackIborCouponPricer {
@@ -173,20 +176,23 @@ impl BlackIborCouponPricer {
         self.observable.notify_observers();
     }
 
-    /// The optionlet rate of `option_type` struck at `eff_strike`
-    /// (`BlackIborCouponPricer::optionletRate`).
+    /// The optionlet rate of `option_type` struck at `eff_strike` against
+    /// `forward`, the coupon's adjusted forward
+    /// (`BlackIborCouponPricer::optionletRate`, whose `adjustedFixing()` the
+    /// coupon threads in).
     ///
     /// A determined coupon returns the intrinsic `max`; an undetermined one the
     /// Black (shifted-lognormal) or Bachelier (normal) optionlet value, refusing
     /// when the surface is missing.
-    fn optionlet_rate(&self, option_type: OptionType, eff_strike: Rate) -> QlResult<Rate> {
+    fn optionlet_rate(
+        &self,
+        option_type: OptionType,
+        eff_strike: Rate,
+        forward: Rate,
+    ) -> QlResult<Rate> {
         let Some(fixing_date) = self.fixing_date else {
             fail!("pricer not initialized: no coupon captured");
         };
-        let Some(index_fixing) = &self.index_fixing else {
-            fail!("pricer not initialized: no coupon captured");
-        };
-        let forward = index_fixing.clone()?;
         let Some(eval_date) = self.eval_date else {
             fail!("no evaluation date set: a caplet needs a reference date");
         };
@@ -247,12 +253,12 @@ impl FloatingRateCouponPricer for BlackIborCouponPricer {
         Ok(self.gearing * index_fixing? + self.spread)
     }
 
-    fn caplet_rate(&self, effective_cap: Rate) -> QlResult<Rate> {
-        Ok(self.gearing * self.optionlet_rate(OptionType::Call, effective_cap)?)
+    fn caplet_rate(&self, effective_cap: Rate, forward: QlResult<Rate>) -> QlResult<Rate> {
+        Ok(self.gearing * self.optionlet_rate(OptionType::Call, effective_cap, forward?)?)
     }
 
-    fn floorlet_rate(&self, effective_floor: Rate) -> QlResult<Rate> {
-        Ok(self.gearing * self.optionlet_rate(OptionType::Put, effective_floor)?)
+    fn floorlet_rate(&self, effective_floor: Rate, forward: QlResult<Rate>) -> QlResult<Rate> {
+        Ok(self.gearing * self.optionlet_rate(OptionType::Put, effective_floor, forward?)?)
     }
 }
 
@@ -341,11 +347,12 @@ mod tests {
 
         let mut pricer = BlackIborCouponPricer::new();
         pricer.initialize(&coupon);
+        let forward = || coupon.index_fixing();
 
-        assert!((pricer.caplet_rate(0.03).unwrap() - 0.02).abs() < 1e-15);
-        assert_eq!(pricer.caplet_rate(0.06).unwrap(), 0.0);
-        assert!((pricer.floorlet_rate(0.06).unwrap() - 0.01).abs() < 1e-15);
-        assert_eq!(pricer.floorlet_rate(0.03).unwrap(), 0.0);
+        assert!((pricer.caplet_rate(0.03, forward()).unwrap() - 0.02).abs() < 1e-15);
+        assert_eq!(pricer.caplet_rate(0.06, forward()).unwrap(), 0.0);
+        assert!((pricer.floorlet_rate(0.06, forward()).unwrap() - 0.01).abs() < 1e-15);
+        assert_eq!(pricer.floorlet_rate(0.03, forward()).unwrap(), 0.0);
     }
 
     /// An undetermined coupon with no optionlet volatility surface refuses,
@@ -380,7 +387,7 @@ mod tests {
         let mut pricer = BlackIborCouponPricer::new();
         pricer.initialize(&coupon);
 
-        let err = pricer.caplet_rate(0.03).unwrap_err();
+        let err = pricer.caplet_rate(0.03, coupon.index_fixing()).unwrap_err();
         assert!(err.message().contains("missing optionlet volatility"));
     }
 
@@ -390,7 +397,7 @@ mod tests {
         let pricer = BlackIborCouponPricer::new();
         assert!(
             pricer
-                .caplet_rate(0.03)
+                .caplet_rate(0.03, Ok(0.05))
                 .unwrap_err()
                 .message()
                 .contains("not initialized")
