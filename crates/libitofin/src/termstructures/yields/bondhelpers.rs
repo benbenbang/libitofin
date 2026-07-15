@@ -445,4 +445,150 @@ mod tests {
             "with no pillar set, the pillar falls back to the latest date"
         );
     }
+
+    /// `piecewiseyieldcurve.cpp testCurveConsistency` bonds section (`:405-439`):
+    /// a discount curve bootstrapped purely from [`FixedRateBondHelper`]s
+    /// reprices every bond to its quoted clean price. This is a round-trip - the
+    /// helpers solve the curve to fit the quotes, and repricing recovers them -
+    /// so it holds for any evaluation date; a fixed one is chosen for
+    /// determinism, standing in for the C++ `Date::todaysDate()`.
+    ///
+    /// The three date bases are kept distinct, as in `CommonVars`: `today =
+    /// TARGET.adjust(evalDate)`, the curve reference `settlement = today + 2`
+    /// business days, and `bondSettlementDays = 3`. Each bond is seasoned -
+    /// `maturity = today + n`, `issue = maturity - length years` - so its
+    /// schedule starts in the past. The curve traits and interpolation are the
+    /// `<Discount, LogLinear, IterativeBootstrap>` of `piecewiseyieldcurve.cpp:683`.
+    ///
+    /// This is one of the seven `testCurveConsistency` checks; the deposits and
+    /// swaps sections landed with their helpers, and the FRA / futures / BMA
+    /// sections stay deferred (#343).
+    #[test]
+    fn bond_bootstrap_reprices_the_quotes() {
+        use crate::math::interpolations::loglinear::LogLinear;
+        use crate::termstructures::bootstraptraits::Discount;
+        use crate::termstructures::yields::PiecewiseYieldCurve;
+        use crate::time::timeunit::TimeUnit;
+
+        const BOND_DATA: [(i32, TimeUnit, i32, Real, Real); 5] = [
+            (6, TimeUnit::Months, 5, 4.75, 101.320),
+            (1, TimeUnit::Years, 3, 2.75, 100.590),
+            (2, TimeUnit::Years, 5, 5.00, 105.650),
+            (5, TimeUnit::Years, 11, 5.50, 113.610),
+            (10, TimeUnit::Years, 11, 3.75, 104.070),
+        ];
+        const BOND_SETTLEMENT_DAYS: Natural = 3;
+        const TOLERANCE: Real = 1.0e-9;
+
+        let calendar = Target::new();
+        let today = calendar.adjust(
+            Date::new(15, Month::June, 2026),
+            BusinessDayConvention::Following,
+        );
+        let settings = settings_on(today);
+        let settlement = calendar.advance(
+            today,
+            2,
+            TimeUnit::Days,
+            BusinessDayConvention::Following,
+            false,
+        );
+        let bond_day_counter = ActualActual::with_convention(Convention::ISDA);
+
+        let schedule_for = |n: i32, unit: TimeUnit, length: i32| -> (Schedule, Date) {
+            let maturity =
+                calendar.advance(today, n, unit, BusinessDayConvention::Following, false);
+            let issue = calendar.advance(
+                maturity,
+                -length,
+                TimeUnit::Years,
+                BusinessDayConvention::Following,
+                false,
+            );
+            let schedule = Schedule::new(
+                issue,
+                maturity,
+                Period::try_from(Frequency::Semiannual).unwrap(),
+                calendar.clone(),
+                BusinessDayConvention::Following,
+                BusinessDayConvention::Following,
+                DateGeneration::Backward,
+                false,
+                Date::null(),
+                Date::null(),
+            );
+            (schedule, issue)
+        };
+
+        let mut helpers: Vec<Shared<dyn RateHelper>> = Vec::new();
+        for (n, unit, length, coupon, price) in BOND_DATA {
+            let (schedule, issue) = schedule_for(n, unit, length);
+            let quote = Handle::new(shared(SimpleQuote::new(price)) as Shared<dyn Quote>);
+            let helper = FixedRateBondHelper::new(
+                quote,
+                BOND_SETTLEMENT_DAYS,
+                100.0,
+                schedule,
+                vec![coupon / 100.0],
+                bond_day_counter.clone(),
+                BusinessDayConvention::Following,
+                100.0,
+                Some(issue),
+                None,
+                None,
+                NullCalendar::new(),
+                BusinessDayConvention::Unadjusted,
+                false,
+                BondPriceType::Clean,
+                settings.clone(),
+            )
+            .unwrap();
+            helpers.push(helper as Shared<dyn RateHelper>);
+        }
+
+        let curve = PiecewiseYieldCurve::<Discount, LogLinear>::new(
+            settlement,
+            helpers,
+            Actual360::new(),
+            LogLinear,
+        )
+        .unwrap();
+        let handle: Handle<dyn YieldTermStructure> =
+            Handle::new(Shared::clone(&curve) as Shared<dyn YieldTermStructure>);
+
+        for (n, unit, length, coupon, price) in BOND_DATA {
+            let (schedule, issue) = schedule_for(n, unit, length);
+            let mut bond = FixedRateBond::new(
+                BOND_SETTLEMENT_DAYS,
+                100.0,
+                schedule,
+                vec![coupon / 100.0],
+                bond_day_counter.clone(),
+                BusinessDayConvention::Following,
+                100.0,
+                Some(issue),
+                None,
+                None,
+                NullCalendar::new(),
+                BusinessDayConvention::Unadjusted,
+                false,
+                None,
+                settings.clone(),
+            )
+            .unwrap();
+            let engine = shared_mut(DiscountingBondEngine::new(
+                handle.clone(),
+                None,
+                settings.clone(),
+            )) as SharedMut<dyn PricingEngine>;
+            bond.bond_mut().base_mut().set_pricing_engine(engine);
+
+            let estimated = bond.bond_mut().clean_price().unwrap();
+            assert!(
+                (estimated - price).abs() < TOLERANCE,
+                "{n} {unit:?} bond: estimated {estimated} vs expected {price} (error {})",
+                (estimated - price).abs()
+            );
+        }
+    }
 }
