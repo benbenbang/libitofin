@@ -236,6 +236,17 @@ impl OvernightIndex {
         self.0.clone()
     }
 
+    /// Re-curves the overnight index onto a different forwarding handle,
+    /// preserving its configuration (the C++ `clone(h)` override that
+    /// `OISRateHelper::initialize` calls, `oisratehelper.cpp:114`). The result
+    /// stays overnight-typed, so it can be handed back to [`MakeOis`], mirroring
+    /// C++'s `dynamic_pointer_cast<OvernightIndex>(clone(...))`.
+    ///
+    /// [`MakeOis`]: crate::instruments::MakeOis
+    pub fn clone_with(&self, forwarding: Handle<dyn YieldTermStructure>) -> Shared<OvernightIndex> {
+        shared(OvernightIndex(shared(self.0.clone_with(forwarding))))
+    }
+
     /// The convention applied when rolling the value date to maturity (always
     /// [`Following`](BusinessDayConvention::Following)).
     pub fn business_day_convention(&self) -> BusinessDayConvention {
