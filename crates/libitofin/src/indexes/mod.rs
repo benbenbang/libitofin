@@ -9,8 +9,10 @@ pub mod ibor;
 pub mod iborindex;
 pub mod index;
 pub mod interestrateindex;
+pub mod swapindex;
 
 pub use ibor::{Estr, Euribor, Sofr};
 pub use iborindex::{IborIndex, OvernightIndex};
 pub use index::Index;
 pub use interestrateindex::{InterestRateIndex, InterestRateIndexBase};
+pub use swapindex::SwapIndex;

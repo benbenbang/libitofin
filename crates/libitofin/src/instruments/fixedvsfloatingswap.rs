@@ -374,6 +374,11 @@ impl FixedVsFloatingSwap {
         self.payment_convention
     }
 
+    /// The latest payment date across both legs (`Swap::maturityDate()`).
+    pub fn maturity_date(&self) -> QlResult<Date> {
+        self.swap.maturity_date()
+    }
+
     /// The fixed leg (`fixedLeg()`, `legs_[0]`).
     pub fn fixed_leg(&self) -> &Leg {
         &self.swap.legs()[0]
