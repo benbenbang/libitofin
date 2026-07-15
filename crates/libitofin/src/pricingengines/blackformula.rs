@@ -379,6 +379,31 @@ pub fn bachelier_black_formula_forward_derivative(
     Ok(sign * phi.value(h) * discount)
 }
 
+/// Derivative of [`bachelier_black_formula`] with respect to the standard
+/// deviation.
+///
+/// Port of `bachelierBlackFormulaStdDevDerivative` (`blackformula.cpp:923`),
+/// which equals `discount * phi((forward - strike) / std_dev)` where `phi` is
+/// the standard normal density. The normal model prices negative forwards and
+/// strikes, so only `std_dev` and `discount` are validated. Multiplying by
+/// `sqrt(exercise_time)` turns this into the Bachelier vega.
+pub fn bachelier_black_formula_std_dev_derivative(
+    strike: Real,
+    forward: Real,
+    std_dev: Real,
+    discount: Real,
+) -> QlResult<Real> {
+    check_std_dev_and_discount(std_dev, discount)?;
+
+    if std_dev == 0.0 {
+        return Ok(0.0);
+    }
+
+    let d1 = (forward - strike) / std_dev;
+    let phi = CumulativeNormalDistribution::standard();
+    Ok(discount * phi.derivative(d1))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -835,5 +860,45 @@ mod tests {
         let strikes = [-3.0, -2.0, -1.0, -0.5, 0.0, 0.5, 1.0, 2.0, 3.0];
         assert_bachelier_forward_derivative(OptionType::Call, &strikes, 0.0);
         assert_bachelier_forward_derivative(OptionType::Put, &strikes, 0.0);
+    }
+
+    #[test]
+    fn bachelier_std_dev_derivative_matches_bumped_value() {
+        let forward = 1.0;
+        let std_dev = 0.001 * 10.0_f64.sqrt();
+        let discount = 0.95;
+        let bump = 1.0e-6;
+        for strike in [-1.0, 0.0, 0.9, 1.0, 1.1, 2.0] {
+            let up = bachelier_black_formula(
+                OptionType::Call,
+                strike,
+                forward,
+                std_dev + bump,
+                discount,
+            )
+            .expect("valid inputs");
+            let down = bachelier_black_formula(
+                OptionType::Call,
+                strike,
+                forward,
+                std_dev - bump,
+                discount,
+            )
+            .expect("valid inputs");
+            let analytical =
+                bachelier_black_formula_std_dev_derivative(strike, forward, std_dev, discount)
+                    .expect("valid inputs");
+            assert_close((up - down) / (2.0 * bump), analytical, 1e-6);
+        }
+    }
+
+    #[test]
+    fn bachelier_std_dev_derivative_edge_cases() {
+        assert_eq!(
+            bachelier_black_formula_std_dev_derivative(1.0, 1.0, 0.0, 0.95).expect("zero std dev"),
+            0.0
+        );
+        assert!(bachelier_black_formula_std_dev_derivative(1.0, 1.0, -0.1, 0.95).is_err());
+        assert!(bachelier_black_formula_std_dev_derivative(1.0, 1.0, 0.1, 0.0).is_err());
     }
 }

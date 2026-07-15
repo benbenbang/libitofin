@@ -1,8 +1,13 @@
 //! Swaption pricing engines.
 //!
-//! Port of `ql/pricingengines/swaption/`. Only the shifted-lognormal
-//! [`BlackSwaptionEngine`] is ported here; the Bachelier engine lands with #365.
+//! Port of `ql/pricingengines/swaption/`: the shared
+//! [`BlackStyleSwaptionEngine`] template with its shifted-lognormal
+//! ([`BlackSwaptionEngine`]) and normal ([`BachelierSwaptionEngine`])
+//! instantiations.
 
 mod blackswaptionengine;
 
-pub use blackswaptionengine::{BlackSwaptionEngine, CashAnnuityModel};
+pub use blackswaptionengine::{
+    BachelierSpec, BachelierSwaptionEngine, Black76Spec, BlackStyleSpec, BlackStyleSwaptionEngine,
+    BlackSwaptionEngine, CashAnnuityModel,
+};
