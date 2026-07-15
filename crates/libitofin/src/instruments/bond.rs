@@ -134,6 +134,19 @@ impl BondPrice {
     }
 }
 
+/// Which price convention a quote is expressed in (the C++ `Bond::Price::Type`):
+/// either the [`Clean`](Self::Clean) price, net of accrued interest, or the
+/// [`Dirty`](Self::Dirty) price that folds it in. Unlike [`BondPrice`] this is a
+/// bare discriminant, carried where only the convention matters (a bond helper's
+/// `priceType_`), not the amount.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BondPriceType {
+    /// The quoted price, net of accrued interest.
+    Clean,
+    /// The settlement price, accrued interest included.
+    Dirty,
+}
+
 impl Bond {
     /// Builds the base of a bond from its coupons, before its redemptions are
     /// appended.
@@ -221,6 +234,12 @@ impl Bond {
         &self.settings
     }
 
+    /// A shared handle to the settings the bond was built with, for wiring a
+    /// pricing engine onto the same evaluation-date source (D5).
+    pub fn settings_handle(&self) -> Shared<Settings<Date>> {
+        Shared::clone(&self.settings)
+    }
+
     /// The notionals the bond has carried, most recent last.
     pub fn notionals(&self) -> &[Real] {
         &self.notionals
@@ -287,6 +306,29 @@ impl Bond {
     /// `maturityDate_` assignment a derived bond such as `FixedRateBond` makes).
     pub(crate) fn set_maturity_date(&mut self, date: Date) {
         self.maturity_date = Some(date);
+    }
+
+    /// The payment date of the next cash flow after `settlement` (the evaluation
+    /// date's settlement date when `None`), or `None` once all flows have paid.
+    ///
+    /// The thin `Bond::nextCashFlowDate` wrapper (`bond.cpp:272`), delegating to
+    /// [`CashFlows::next_cash_flow_date`] with settlement-date flows excluded
+    /// (`bondfunctions.cpp:80`).
+    ///
+    /// # Errors
+    ///
+    /// Propagates the settlement-date resolution and the flow scan.
+    pub fn next_cash_flow_date(&self, settlement: Option<Date>) -> QlResult<Option<Date>> {
+        let settlement = match settlement {
+            Some(date) => date,
+            None => self.settlement_date(None)?,
+        };
+        CashFlows::next_cash_flow_date(
+            &self.cashflows,
+            &self.settings,
+            Some(false),
+            Some(settlement),
+        )
     }
 
     /// The settlement date for a given date (the evaluation date when `None`).
