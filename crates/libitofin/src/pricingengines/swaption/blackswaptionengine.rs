@@ -1,16 +1,21 @@
-//! Black-formula swaption engine.
+//! Black-style swaption engines.
 //!
-//! Port of `ql/pricingengines/swaption/blackswaptionengine.{hpp}`:
-//! [`BlackSwaptionEngine`] prices a [`Swaption`](crate::instruments::Swaption)
-//! as a Black 1976 option on the underlying swap's fair rate, using a
-//! [`SwaptionVolatilityStructure`] for the variance and shift and the swap's
-//! annuity for the discounting (`blackswaptionengine.hpp:220-327`). It installs
-//! a [`DiscountingSwapEngine`] on the swap, reads its `valuationDate`,
-//! `fairRate` and leg BPS, and feeds those into [`black_formula`].
+//! Port of `ql/pricingengines/swaption/blackswaptionengine.{hpp}`. The shared
+//! [`BlackStyleSwaptionEngine<S>`] template prices a
+//! [`Swaption`](crate::instruments::Swaption) as an option on the underlying
+//! swap's fair rate, using a [`SwaptionVolatilityStructure`] for the variance
+//! and shift and the swap's annuity for the discounting
+//! (`blackswaptionengine.hpp:220-327`). It installs a [`DiscountingSwapEngine`]
+//! on the swap, reads its `valuationDate`, `fairRate` and leg BPS, and feeds
+//! those into the pricing formula chosen by the [`BlackStyleSpec`].
 //!
-//! Only the shifted-lognormal (`Black76`) instantiation of the C++ `Spec`
-//! template is ported here; the Bachelier (`Normal`) engine and the swaption
-//! delta oracle land with #365.
+//! Two specs instantiate the template, matching C++ (`:136`, `:161`):
+//! [`BlackSwaptionEngine`] = `BlackStyleSwaptionEngine<Black76Spec>` prices
+//! under shifted-lognormal vol via [`black_formula`]; [`BachelierSwaptionEngine`]
+//! = `BlackStyleSwaptionEngine<BachelierSpec>` prices under normal (Bachelier)
+//! vol via [`bachelier_black_formula`]. Each spec carries the volatility type it
+//! requires, so the input-surface guard is per-spec (C++ enforces it per-engine
+//! at construction, `blackswaptionengine.cpp:52`/`:75`).
 //!
 //! ## Divergences from QuantLib
 //!
@@ -45,6 +50,7 @@
 //!   taking a quote handle, matching how the tests build the engine.
 
 use std::any::Any;
+use std::marker::PhantomData;
 
 use crate::cashflow::Leg;
 use crate::cashflows::CashFlows;
@@ -61,7 +67,9 @@ use crate::patterns::observable::{AsObservable, Observable};
 use crate::pricingengine::{Arguments, PricingEngine, Results};
 use crate::pricingengines::DiscountingSwapEngine;
 use crate::pricingengines::blackformula::{
-    black_formula, black_formula_forward_derivative, black_formula_std_dev_derivative,
+    bachelier_black_formula, bachelier_black_formula_forward_derivative,
+    bachelier_black_formula_std_dev_derivative, black_formula, black_formula_forward_derivative,
+    black_formula_std_dev_derivative,
 };
 use crate::quotes::Quote;
 use crate::settings::Settings;
@@ -94,46 +102,217 @@ pub enum CashAnnuityModel {
     DiscountCurve,
 }
 
+/// The pricing formula the shared engine template dispatches on
+/// (`blackswaptionengine.hpp:80-125`). Each spec pins the volatility type its
+/// engine accepts and routes `value`/`vega`/`delta` to the matching Black or
+/// Bachelier closed form. The methods are stateless (the C++ `Spec()` is a
+/// value type with no members), so they are associated functions.
+pub trait BlackStyleSpec {
+    /// The volatility type the engine requires (`blackswaptionengine.cpp:52`
+    /// for Black, `:75` for Bachelier).
+    const VOL_TYPE: VolatilityType;
+    /// The message raised when the input surface has the wrong type, matching
+    /// the C++ `QL_REQUIRE` text.
+    const VOL_REQUIREMENT: &'static str;
+
+    /// The option premium (`Spec::value`).
+    fn value(
+        option_type: OptionType,
+        strike: Real,
+        atm_forward: Real,
+        std_dev: Real,
+        annuity: Real,
+        displacement: Real,
+    ) -> QlResult<Real>;
+
+    /// The vega additional result, already scaled by `sqrt(exercise_time)`
+    /// (`Spec::vega`).
+    fn vega(
+        strike: Real,
+        atm_forward: Real,
+        std_dev: Real,
+        exercise_time: Real,
+        annuity: Real,
+        displacement: Real,
+    ) -> QlResult<Real>;
+
+    /// The delta additional result (`Spec::delta`).
+    fn delta(
+        option_type: OptionType,
+        strike: Real,
+        atm_forward: Real,
+        std_dev: Real,
+        annuity: Real,
+        displacement: Real,
+    ) -> QlResult<Real>;
+}
+
+/// Shifted-lognormal spec (`Black76Spec`, `blackswaptionengine.hpp:81`).
+pub struct Black76Spec;
+
+impl BlackStyleSpec for Black76Spec {
+    const VOL_TYPE: VolatilityType = VolatilityType::ShiftedLognormal;
+    const VOL_REQUIREMENT: &'static str =
+        "BlackSwaptionEngine requires (shifted) lognormal input volatility";
+
+    fn value(
+        option_type: OptionType,
+        strike: Real,
+        atm_forward: Real,
+        std_dev: Real,
+        annuity: Real,
+        displacement: Real,
+    ) -> QlResult<Real> {
+        black_formula(
+            option_type,
+            strike,
+            atm_forward,
+            std_dev,
+            annuity,
+            displacement,
+        )
+    }
+
+    fn vega(
+        strike: Real,
+        atm_forward: Real,
+        std_dev: Real,
+        exercise_time: Real,
+        annuity: Real,
+        displacement: Real,
+    ) -> QlResult<Real> {
+        Ok(exercise_time.sqrt()
+            * black_formula_std_dev_derivative(
+                strike,
+                atm_forward,
+                std_dev,
+                annuity,
+                displacement,
+            )?)
+    }
+
+    fn delta(
+        option_type: OptionType,
+        strike: Real,
+        atm_forward: Real,
+        std_dev: Real,
+        annuity: Real,
+        displacement: Real,
+    ) -> QlResult<Real> {
+        black_formula_forward_derivative(
+            option_type,
+            strike,
+            atm_forward,
+            std_dev,
+            annuity,
+            displacement,
+        )
+    }
+}
+
+/// Normal (Bachelier) spec (`BachelierSpec`, `blackswaptionengine.hpp:105`).
+/// The normal model has no displacement, so the `displacement` argument is
+/// ignored (matching the unnamed `const Real` parameters in C++).
+pub struct BachelierSpec;
+
+impl BlackStyleSpec for BachelierSpec {
+    const VOL_TYPE: VolatilityType = VolatilityType::Normal;
+    const VOL_REQUIREMENT: &'static str =
+        "BachelierSwaptionEngine requires normal input volatility";
+
+    fn value(
+        option_type: OptionType,
+        strike: Real,
+        atm_forward: Real,
+        std_dev: Real,
+        annuity: Real,
+        _displacement: Real,
+    ) -> QlResult<Real> {
+        bachelier_black_formula(option_type, strike, atm_forward, std_dev, annuity)
+    }
+
+    fn vega(
+        strike: Real,
+        atm_forward: Real,
+        std_dev: Real,
+        exercise_time: Real,
+        annuity: Real,
+        _displacement: Real,
+    ) -> QlResult<Real> {
+        Ok(exercise_time.sqrt()
+            * bachelier_black_formula_std_dev_derivative(strike, atm_forward, std_dev, annuity)?)
+    }
+
+    fn delta(
+        option_type: OptionType,
+        strike: Real,
+        atm_forward: Real,
+        std_dev: Real,
+        annuity: Real,
+        _displacement: Real,
+    ) -> QlResult<Real> {
+        bachelier_black_formula_forward_derivative(
+            option_type,
+            strike,
+            atm_forward,
+            std_dev,
+            annuity,
+        )
+    }
+}
+
 /// Shifted-lognormal Black-formula swaption engine
 /// (`blackswaptionengine.hpp:136`).
-pub struct BlackSwaptionEngine {
+pub type BlackSwaptionEngine = BlackStyleSwaptionEngine<Black76Spec>;
+
+/// Normal Bachelier-formula swaption engine
+/// (`blackswaptionengine.hpp:161`).
+pub type BachelierSwaptionEngine = BlackStyleSwaptionEngine<BachelierSpec>;
+
+/// Shared Black-style swaption engine template
+/// (`detail::BlackStyleSwaptionEngine<Spec>`, `blackswaptionengine.hpp:60`).
+pub struct BlackStyleSwaptionEngine<S: BlackStyleSpec> {
     base: SwaptionEngine,
     discount_curve: Handle<dyn YieldTermStructure>,
     vol: Handle<dyn SwaptionVolatilityStructure>,
     model: CashAnnuityModel,
     settings: Shared<Settings<Date>>,
+    _spec: PhantomData<S>,
 }
 
-impl BlackSwaptionEngine {
+impl<S: BlackStyleSpec> BlackStyleSwaptionEngine<S> {
     /// Builds the engine over a discount curve and a swaption volatility surface
     /// (the C++ `Handle<SwaptionVolatilityStructure>` constructor,
     /// `blackswaptionengine.hpp:149`).
     ///
-    /// C++ refuses a non-lognormal surface at construction
-    /// (`blackswaptionengine.cpp:52`); here the handle is relinkable and the
-    /// constructor is infallible, so the same requirement is enforced as an
-    /// `Err` when the engine prices.
+    /// C++ refuses a surface of the wrong volatility type at construction
+    /// (`blackswaptionengine.cpp:52` for Black, `:75` for Bachelier); here the
+    /// handle is relinkable and the constructor is infallible, so the same
+    /// per-spec requirement is enforced as an `Err` when the engine prices.
     pub fn new(
         discount_curve: Handle<dyn YieldTermStructure>,
         vol: Handle<dyn SwaptionVolatilityStructure>,
         model: CashAnnuityModel,
         settings: Shared<Settings<Date>>,
-    ) -> BlackSwaptionEngine {
+    ) -> BlackStyleSwaptionEngine<S> {
         let base = SwaptionEngine::new(SwaptionArguments::default(), InstrumentResults::default());
         discount_curve.register_observer(&base.observer());
         vol.register_observer(&base.observer());
-        BlackSwaptionEngine {
+        BlackStyleSwaptionEngine {
             base,
             discount_curve,
             vol,
             model,
             settings,
+            _spec: PhantomData,
         }
     }
 
     /// Builds the engine over a flat volatility quote, wrapping it in a moving
     /// [`ConstantSwaptionVolatility`] on a null calendar (the C++ `Handle<Quote>`
-    /// constructor, `blackswaptionengine.hpp:144` / `:189`).
+    /// constructor, `blackswaptionengine.hpp:144` / `:189`). The surface is
+    /// tagged with the spec's volatility type; the Bachelier spec ignores
+    /// `displacement` (the normal model has none).
     pub fn with_flat_vol(
         discount_curve: Handle<dyn YieldTermStructure>,
         vol: Handle<dyn Quote>,
@@ -141,19 +320,19 @@ impl BlackSwaptionEngine {
         displacement: Real,
         model: CashAnnuityModel,
         settings: Shared<Settings<Date>>,
-    ) -> BlackSwaptionEngine {
+    ) -> BlackStyleSwaptionEngine<S> {
         let surface = ConstantSwaptionVolatility::moving_with_quote(
             0,
             NullCalendar::new(),
             BusinessDayConvention::Following,
             vol,
             day_counter,
-            VolatilityType::ShiftedLognormal,
+            S::VOL_TYPE,
             displacement,
             Shared::clone(&settings),
         );
         let vol = Handle::new(shared(surface) as Shared<dyn SwaptionVolatilityStructure>);
-        BlackSwaptionEngine::new(discount_curve, vol, model, settings)
+        BlackStyleSwaptionEngine::<S>::new(discount_curve, vol, model, settings)
     }
 
     /// The discount-curve handle the engine prices over.
@@ -162,13 +341,13 @@ impl BlackSwaptionEngine {
     }
 }
 
-impl AsObservable for BlackSwaptionEngine {
+impl<S: BlackStyleSpec> AsObservable for BlackStyleSwaptionEngine<S> {
     fn observable(&self) -> &Observable {
         self.base.observable()
     }
 }
 
-impl PricingEngine for BlackSwaptionEngine {
+impl<S: BlackStyleSpec> PricingEngine for BlackStyleSwaptionEngine<S> {
     fn arguments_mut(&mut self) -> &mut dyn Arguments {
         self.base.arguments_mut()
     }
@@ -208,8 +387,9 @@ impl PricingEngine for BlackSwaptionEngine {
         let discount = self.discount_curve.current_link()?;
         let vol = self.vol.current_link()?;
         require!(
-            vol.volatility_type() == VolatilityType::ShiftedLognormal,
-            "BlackSwaptionEngine requires (shifted) lognormal input volatility"
+            vol.volatility_type() == S::VOL_TYPE,
+            "{}",
+            S::VOL_REQUIREMENT
         );
 
         // Install a discounting engine on the swap and price it. The install is
@@ -359,7 +539,7 @@ impl PricingEngine for BlackSwaptionEngine {
         } else {
             OptionType::Put
         };
-        let value = black_formula(
+        let value = S::value(
             option_type,
             strike,
             atm_forward,
@@ -369,15 +549,15 @@ impl PricingEngine for BlackSwaptionEngine {
         )?;
 
         let exercise_time = vol.time_from_reference(exercise_date)?;
-        let vega = exercise_time.sqrt()
-            * black_formula_std_dev_derivative(
-                strike,
-                atm_forward,
-                std_dev,
-                annuity,
-                displacement,
-            )?;
-        let delta = black_formula_forward_derivative(
+        let vega = S::vega(
+            strike,
+            atm_forward,
+            std_dev,
+            exercise_time,
+            annuity,
+            displacement,
+        )?;
+        let delta = S::delta(
             option_type,
             strike,
             atm_forward,
