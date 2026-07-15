@@ -16,44 +16,60 @@
 //!
 //! ## Ported knobs
 //!
-//! The builder exposes only the overrides the oracles use:
+//! The builder exposes the overrides [`OISRateHelper::initialize_dates`] and the
+//! swap oracles use:
 //! [`with_effective_date`](MakeOis::with_effective_date),
 //! [`with_overnight_leg_spread`](MakeOis::with_overnight_leg_spread),
 //! [`with_nominal`](MakeOis::with_nominal),
 //! [`with_payment_lag`](MakeOis::with_payment_lag),
 //! [`with_discounting_term_structure`](MakeOis::with_discounting_term_structure),
-//! [`with_averaging_method`](MakeOis::with_averaging_method) and
-//! [`with_fixed_leg_day_count`](MakeOis::with_fixed_leg_day_count). The swap tenor,
-//! overnight index, optional fixed rate and forward start are the constructor
-//! arguments (`makeois.hpp:40`).
+//! [`with_averaging_method`](MakeOis::with_averaging_method),
+//! [`with_fixed_leg_day_count`](MakeOis::with_fixed_leg_day_count),
+//! [`with_settlement_days`](MakeOis::with_settlement_days),
+//! [`with_termination_date`](MakeOis::with_termination_date),
+//! [`with_payment_frequency`](MakeOis::with_payment_frequency),
+//! [`with_payment_adjustment`](MakeOis::with_payment_adjustment),
+//! [`with_payment_calendar`](MakeOis::with_payment_calendar),
+//! [`with_rule`](MakeOis::with_rule),
+//! [`with_convention`](MakeOis::with_convention),
+//! [`with_termination_date_convention`](MakeOis::with_termination_date_convention) and
+//! [`with_end_of_month`](MakeOis::with_end_of_month). The swap tenor, overnight
+//! index, optional fixed rate and forward start are the constructor arguments
+//! (`makeois.hpp:40`).
+//!
+//! ## #262-safe guards on unported knobs
+//!
+//! Four knobs whose machinery is unported are exposed but accept only their
+//! benign default, rejecting any other value at [`build`](MakeOis::build) rather
+//! than accepting and silently ignoring it (verified defaults, `oisratehelper.hpp:47/60/61/62`):
+//! [`with_telescopic_value_dates`](MakeOis::with_telescopic_value_dates) (default
+//! `false`), [`with_lookback_days`](MakeOis::with_lookback_days) (default unset
+//! `None`), [`with_lockout_days`](MakeOis::with_lockout_days) (default `0`) and
+//! [`with_observation_shift`](MakeOis::with_observation_shift) (default `false`).
+//! Telescopic value dates, lookback, lockout and observation shift are all
+//! deferred with the [`OvernightLeg`](crate::cashflows::OvernightLeg) (#328/#329),
+//! and arithmetic averaging is rejected at the coupon.
 //!
 //! ## Deferred knobs
 //!
-//! Every other `with*` on `makeois.hpp` is deferred, defaulting to the C++
-//! default (`makeois.hpp:96-137`):
+//! Still deferred, defaulting to the C++ default (`makeois.hpp:96-137`):
 //!
 //! - swap type (`receiveFixed` / `withType`): defaults to `Payer`;
-//! - `withSettlementDays`: the settlement-days dispatch feeds the start date only
-//!   when no effective date is set (which the oracles always set); it defaults by
-//!   index family (see below) and cannot be overridden;
-//! - `withTerminationDate`, `withRule` / leg variants, `withPaymentFrequency` /
-//!   leg variants, `withPaymentAdjustment`, `withPaymentCalendar` / `withCalendar`
-//!   / leg variants, `withConvention` / termination / leg variants,
-//!   `withEndOfMonth` / leg / maturity variants: the schedules use the C++
-//!   defaults (annual `Backward`, `ModifiedFollowing`, default end-of-month).
-//!   The fixed day count defaults to the index's own but is overridable through
-//!   [`with_fixed_leg_day_count`](MakeOis::with_fixed_leg_day_count);
-//! - `withTelescopicValueDates`: telescopic value dates are deferred with the
-//!   [`OvernightLeg`](crate::cashflows::OvernightLeg) (#328/#329), so the knob is
-//!   omitted rather than accepted and ignored. The cached NPV is identical for
-//!   telescopic and non-telescopic value dates by construction (C++ asserts the
-//!   same number for both, `overnightindexedswap.cpp:382/386`), so only the
-//!   non-telescopic swap is reproduced;
-//! - `withLookbackDays`, `withLockoutDays`, `withObservationShift`: deferred with
-//!   the leg;
+//! - the per-leg schedule variants (`withFixedLegCalendar` /
+//!   `withOvernightLegCalendar`, `withFixedLegPaymentFrequency`, the `*LegRule` /
+//!   `*LegConvention` / `*LegEndOfMonth` splits, `withMaturityEndOfMonth`): the
+//!   ported knobs set both legs together, so both schedules share one calendar
+//!   (the index fixing calendar), frequency, rule, convention and end-of-month
+//!   flag. The [`OISRateHelper`] oracle never sets a per-leg override (its
+//!   `fixedCalendar_` / `overnightCalendar_` are empty and `fixedPaymentFrequency_`
+//!   is unset, so `initializeDates`' conditional per-leg calls do not fire), so
+//!   the two-schedule split is not built;
 //! - `withPricingEngine`: the engine is always the
 //!   [`DiscountingSwapEngine`] over the discounting curve (set) or the index's
 //!   forwarding curve (default), matching `makeois.cpp:145-156/172-180`.
+//!
+//! [`OISRateHelper`]: crate::termstructures::yields::ratehelpers::OISRateHelper
+//! [`OISRateHelper::initialize_dates`]: crate::termstructures::yields::ratehelpers::OISRateHelper
 //!
 //! ## Settlement-days dispatch onto the newtype
 //!
@@ -79,9 +95,11 @@ use crate::settings::Settings;
 use crate::shared::{Shared, SharedMut, shared_mut};
 use crate::termstructures::yieldtermstructure::YieldTermStructure;
 use crate::time::businessdayconvention::BusinessDayConvention;
+use crate::time::calendar::Calendar;
 use crate::time::date::Date;
 use crate::time::dategenerationrule::DateGeneration;
 use crate::time::daycounter::DayCounter;
+use crate::time::frequency::Frequency;
 use crate::time::period::Period;
 use crate::time::schedule::{Schedule, allows_end_of_month};
 use crate::time::timeunit::TimeUnit;
@@ -109,6 +127,20 @@ pub struct MakeOis {
     averaging_method: RateAveraging,
     fixed_day_count: Option<DayCounter>,
     discounting_curve: Option<Handle<dyn YieldTermStructure>>,
+
+    settlement_days: Option<Natural>,
+    termination_date: Option<Date>,
+    payment_frequency: Frequency,
+    payment_calendar: Option<Calendar>,
+    schedule_convention: BusinessDayConvention,
+    termination_date_convention: BusinessDayConvention,
+    rule: DateGeneration,
+    end_of_month: Option<bool>,
+
+    telescopic_value_dates: bool,
+    lookback_days: Option<Natural>,
+    lockout_days: Natural,
+    observation_shift: bool,
 }
 
 impl MakeOis {
@@ -141,6 +173,18 @@ impl MakeOis {
             averaging_method: RateAveraging::Compound,
             fixed_day_count: None,
             discounting_curve: None,
+            settlement_days: None,
+            termination_date: None,
+            payment_frequency: Frequency::Annual,
+            payment_calendar: None,
+            schedule_convention: BusinessDayConvention::ModifiedFollowing,
+            termination_date_convention: BusinessDayConvention::ModifiedFollowing,
+            rule: DateGeneration::Backward,
+            end_of_month: None,
+            telescopic_value_dates: false,
+            lookback_days: None,
+            lockout_days: 0,
+            observation_shift: false,
         }
     }
 
@@ -194,6 +238,115 @@ impl MakeOis {
         self
     }
 
+    /// Sets the settlement days used to derive the start date, overriding the
+    /// index-family default (`makeois.cpp:213`). Ignored when an explicit
+    /// effective date is set.
+    pub fn with_settlement_days(mut self, settlement_days: Natural) -> MakeOis {
+        self.settlement_days = Some(settlement_days);
+        self
+    }
+
+    /// Sets the swap's termination date explicitly, overriding the tenor-derived
+    /// end date (`makeois.cpp:401`).
+    pub fn with_termination_date(mut self, termination_date: Date) -> MakeOis {
+        self.termination_date = Some(termination_date);
+        self
+    }
+
+    /// Sets the schedule frequency shared by both legs (`makeois.cpp:203`, which
+    /// dispatches `withPaymentFrequency` onto both leg frequencies).
+    pub fn with_payment_frequency(mut self, payment_frequency: Frequency) -> MakeOis {
+        self.payment_frequency = payment_frequency;
+        self
+    }
+
+    /// Sets the business-day convention applied when adjusting the coupon
+    /// payment dates (`makeois.cpp:230`).
+    pub fn with_payment_adjustment(mut self, payment_adjustment: BusinessDayConvention) -> MakeOis {
+        self.payment_adjustment = payment_adjustment;
+        self
+    }
+
+    /// Sets the calendar the coupon payment dates are adjusted on
+    /// (`makeois.cpp:239`); empty (`None`) falls back to the schedule calendar.
+    pub fn with_payment_calendar(mut self, payment_calendar: Calendar) -> MakeOis {
+        self.payment_calendar = Some(payment_calendar);
+        self
+    }
+
+    /// Sets the date-generation rule shared by both legs (`makeois.cpp:258`,
+    /// which dispatches `withRule` onto both leg rules).
+    pub fn with_rule(mut self, rule: DateGeneration) -> MakeOis {
+        self.rule = rule;
+        self
+    }
+
+    /// Sets the schedule roll convention shared by both legs (`makeois.cpp:290`,
+    /// which dispatches `withConvention` onto both leg conventions).
+    pub fn with_convention(mut self, convention: BusinessDayConvention) -> MakeOis {
+        self.schedule_convention = convention;
+        self
+    }
+
+    /// Sets the termination-date convention shared by both legs
+    /// (`makeois.cpp:303`, which dispatches onto both leg termination
+    /// conventions).
+    pub fn with_termination_date_convention(
+        mut self,
+        convention: BusinessDayConvention,
+    ) -> MakeOis {
+        self.termination_date_convention = convention;
+        self
+    }
+
+    /// Sets the end-of-month flag shared by both legs, overriding the default
+    /// (derived from the start date) (`makeois.cpp:319`).
+    pub fn with_end_of_month(mut self, end_of_month: bool) -> MakeOis {
+        self.end_of_month = Some(end_of_month);
+        self
+    }
+
+    /// Sets whether the overnight leg uses telescopic value dates
+    /// (`makeois.cpp:347`).
+    ///
+    /// Telescopic value dates are unported (deferred with the
+    /// [`OvernightLeg`](crate::cashflows::OvernightLeg), #328/#329), so this knob
+    /// accepts only the benign default `false`. A `true` value is rejected at
+    /// [`build`](Self::build) rather than accepted and silently ignored.
+    pub fn with_telescopic_value_dates(mut self, telescopic_value_dates: bool) -> MakeOis {
+        self.telescopic_value_dates = telescopic_value_dates;
+        self
+    }
+
+    /// Sets the overnight-leg lookback days (`makeois.cpp:363`).
+    ///
+    /// Lookback is unported (the machinery is deferred with the overnight leg),
+    /// so this knob accepts only the benign unset default `None`; a `Some`
+    /// value is rejected at [`build`](Self::build). The C++ default is the unset
+    /// sentinel `Null<Natural>()`, represented here as `None`.
+    pub fn with_lookback_days(mut self, lookback_days: Option<Natural>) -> MakeOis {
+        self.lookback_days = lookback_days;
+        self
+    }
+
+    /// Sets the overnight-leg lockout days (`makeois.cpp:368`).
+    ///
+    /// Lockout is unported, so this knob accepts only the benign default `0`; a
+    /// nonzero value is rejected at [`build`](Self::build).
+    pub fn with_lockout_days(mut self, lockout_days: Natural) -> MakeOis {
+        self.lockout_days = lockout_days;
+        self
+    }
+
+    /// Sets the overnight-leg observation-shift flag (`makeois.cpp:373`).
+    ///
+    /// Observation shift is unported, so this knob accepts only the benign
+    /// default `false`; a `true` value is rejected at [`build`](Self::build).
+    pub fn with_observation_shift(mut self, observation_shift: bool) -> MakeOis {
+        self.observation_shift = observation_shift;
+        self
+    }
+
     /// Builds the priced swap (C++ `operator OvernightIndexedSwap()` /
     /// `operator shared_ptr<OvernightIndexedSwap>()`, `makeois.cpp:42/47`).
     ///
@@ -208,12 +361,39 @@ impl MakeOis {
     /// date is set, and propagates the swap construction and (for a fair-rate
     /// fill) the pricing.
     pub fn build(self) -> QlResult<OvernightIndexedSwap> {
+        if self.telescopic_value_dates {
+            crate::fail!(
+                "MakeOIS: telescopic value dates are not ported (deferred with the overnight leg); \
+                 only the default false is accepted"
+            );
+        }
+        if self.lookback_days.is_some() {
+            crate::fail!(
+                "MakeOIS: lookback days are not ported (deferred with the overnight leg); \
+                 only the unset default is accepted"
+            );
+        }
+        if self.lockout_days != 0 {
+            crate::fail!(
+                "MakeOIS: lockout days are not ported (deferred with the overnight leg); \
+                 only the default 0 is accepted"
+            );
+        }
+        if self.observation_shift {
+            crate::fail!(
+                "MakeOIS: observation shift is not ported (deferred with the overnight leg); \
+                 only the default false is accepted"
+            );
+        }
+
         let calendar = self.overnight_index.fixing_calendar();
 
         let start_date = match self.effective_date {
             Some(effective_date) => effective_date,
             None => {
-                let settlement_days = default_settlement_days(self.overnight_index.family_name());
+                let settlement_days = self
+                    .settlement_days
+                    .unwrap_or_else(|| default_settlement_days(self.overnight_index.family_name()));
                 let ref_date = match self.settings.evaluation_date() {
                     Some(today) => calendar.adjust(today, BusinessDayConvention::Following),
                     None => crate::fail!(
@@ -236,23 +416,35 @@ impl MakeOis {
             }
         };
 
-        let end_of_month = calendar.is_end_of_month(start_date);
+        let start_is_end_of_month = calendar.is_end_of_month(start_date);
+        let end_of_month = self.end_of_month.unwrap_or(start_is_end_of_month);
 
-        let mut end_date = start_date + self.swap_tenor;
-        if end_of_month && allows_end_of_month(self.swap_tenor) {
-            end_date = calendar.end_of_month(end_date);
-        }
+        let end_date = match self.termination_date {
+            Some(termination_date) => termination_date,
+            None => {
+                let mut end = start_date + self.swap_tenor;
+                if end_of_month && allows_end_of_month(self.swap_tenor) && start_is_end_of_month {
+                    end = calendar.end_of_month(end);
+                }
+                end
+            }
+        };
 
-        let schedule_tenor = Period::new(1, TimeUnit::Years);
+        let schedule_tenor = Period::try_from(self.payment_frequency)
+            .expect("a swap's payment frequency maps to a valid period");
+        let schedule_calendar = calendar.clone();
+        let schedule_convention = self.schedule_convention;
+        let termination_date_convention = self.termination_date_convention;
+        let rule = self.rule;
         let make_schedule = || {
             Schedule::new(
                 start_date,
                 end_date,
                 schedule_tenor,
-                calendar.clone(),
-                BusinessDayConvention::ModifiedFollowing,
-                BusinessDayConvention::ModifiedFollowing,
-                DateGeneration::Backward,
+                schedule_calendar.clone(),
+                schedule_convention,
+                termination_date_convention,
+                rule,
                 end_of_month,
                 Date::null(),
                 Date::null(),
@@ -304,7 +496,7 @@ impl MakeOis {
             self.overnight_spread,
             self.payment_lag,
             self.payment_adjustment,
-            None,
+            self.payment_calendar.clone(),
             self.averaging_method,
             Shared::clone(&self.settings),
         )?;
@@ -644,5 +836,98 @@ mod tests {
         .unwrap();
 
         assert_eq!(swap.overnight_schedule().start_date(), settlement);
+    }
+
+    /// The four #262-safe guards reject a non-default value at build time rather
+    /// than accepting and silently ignoring the unported feature. The benign
+    /// default of each still builds (the `initialize_dates` chain passes them).
+    #[test]
+    fn unported_knobs_reject_non_default_values() {
+        let settings = settings_at(today());
+        let settlement = settlement(&settings);
+
+        let base = |settings: &Shared<Settings<Date>>| {
+            MakeOis::new(
+                Period::new(1, TimeUnit::Years),
+                estr_on(common_curve(), settings),
+                Some(0.03),
+                Period::new(0, TimeUnit::Days),
+                Shared::clone(settings),
+            )
+            .with_effective_date(settlement)
+            .with_nominal(NOMINAL)
+        };
+
+        assert!(
+            base(&settings)
+                .with_telescopic_value_dates(true)
+                .build()
+                .is_err(),
+            "telescopic value dates must be rejected"
+        );
+        assert!(
+            base(&settings).with_lookback_days(Some(5)).build().is_err(),
+            "a set lookback must be rejected"
+        );
+        assert!(
+            base(&settings).with_lockout_days(5).build().is_err(),
+            "nonzero lockout must be rejected"
+        );
+        assert!(
+            base(&settings)
+                .with_observation_shift(true)
+                .build()
+                .is_err(),
+            "observation shift must be rejected"
+        );
+
+        assert!(
+            base(&settings)
+                .with_telescopic_value_dates(false)
+                .with_lookback_days(None)
+                .with_lockout_days(0)
+                .with_observation_shift(false)
+                .build()
+                .is_ok(),
+            "the benign defaults must still build"
+        );
+    }
+
+    /// `with_settlement_days` overrides the family default: setting 5 days moves
+    /// the derived start date past the 2-day `Estr` dispatch default.
+    #[test]
+    fn settlement_days_override_moves_the_start_date() {
+        let settings = settings_at(today());
+        let default_start = MakeOis::new(
+            Period::new(1, TimeUnit::Years),
+            estr_on(common_curve(), &settings),
+            Some(0.03),
+            Period::new(0, TimeUnit::Days),
+            Shared::clone(&settings),
+        )
+        .with_nominal(NOMINAL)
+        .build()
+        .unwrap()
+        .overnight_schedule()
+        .start_date();
+
+        let overridden_start = MakeOis::new(
+            Period::new(1, TimeUnit::Years),
+            estr_on(common_curve(), &settings),
+            Some(0.03),
+            Period::new(0, TimeUnit::Days),
+            Shared::clone(&settings),
+        )
+        .with_nominal(NOMINAL)
+        .with_settlement_days(5)
+        .build()
+        .unwrap()
+        .overnight_schedule()
+        .start_date();
+
+        assert!(
+            overridden_start > default_start,
+            "a larger settlement-days override starts later: {overridden_start} vs {default_start}"
+        );
     }
 }
