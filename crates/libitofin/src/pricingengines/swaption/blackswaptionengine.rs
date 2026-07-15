@@ -803,6 +803,119 @@ mod tests {
             let base = swap.fixed_vs_floating_mut();
             base.floating_leg_bps().unwrap() / base.fixed_leg_bps().unwrap()
         }
+
+        /// The cash-settled annuity ratio identity of `testCashSettledSwaptions`
+        /// (`swaption.cpp:640-683`). Prices a Receiver swap of the given fixed-leg
+        /// convention on the fixture discount curve, hand-sums the par-yield cash
+        /// annuity from the fixed-leg amounts discounted on a `FlatForward` at the
+        /// swap's fair rate (`:598-667`), then returns the physical/cash swaption
+        /// NPV ratio alongside the hand cash/physical annuity ratio. The Black
+        /// price and the physical annuity cancel in the NPV ratio, so the two
+        /// ratios agree only if the engine's `ParYieldCurve` annuity reproduces
+        /// the hand sum. The nominal is the fixture's one million (`:125`); it
+        /// cancels in both ratios.
+        fn cash_settled_ratio(
+            &self,
+            start: Date,
+            maturity: Date,
+            exercise_date: Date,
+            strike: Rate,
+            fixed_convention: BusinessDayConvention,
+            fixed_day_count: DayCounter,
+        ) -> (Real, Real) {
+            let build = || {
+                let fixed_schedule = MakeSchedule::new()
+                    .from(start)
+                    .to(maturity)
+                    .with_frequency(Frequency::Annual)
+                    .with_calendar(self.calendar.clone())
+                    .with_convention(fixed_convention)
+                    .with_termination_date_convention(fixed_convention)
+                    .forwards()
+                    .end_of_month(true)
+                    .build();
+                let float_schedule = MakeSchedule::new()
+                    .from(start)
+                    .to(maturity)
+                    .with_frequency(Frequency::Semiannual)
+                    .with_calendar(self.calendar.clone())
+                    .with_convention(BusinessDayConvention::ModifiedFollowing)
+                    .with_termination_date_convention(BusinessDayConvention::ModifiedFollowing)
+                    .forwards()
+                    .end_of_month(false)
+                    .build();
+                VanillaSwap::new(
+                    SwapType::Receiver,
+                    1_000_000.0,
+                    fixed_schedule,
+                    strike,
+                    fixed_day_count.clone(),
+                    float_schedule,
+                    Shared::clone(&self.index),
+                    0.0,
+                    Actual360::new(),
+                    None,
+                    Shared::clone(&self.settings),
+                )
+                .unwrap()
+                .into_fixed_vs_floating()
+            };
+
+            let mut swap = build();
+            let swap_engine = shared_mut(DiscountingSwapEngine::new(
+                self.curve.clone(),
+                Some(false),
+                None,
+                None,
+                Shared::clone(&self.settings),
+            )) as SharedMut<dyn PricingEngine>;
+            swap.base_mut().set_pricing_engine(swap_engine);
+            let fair_rate = swap.fair_rate().unwrap();
+            let fixed_leg_bps = swap.fixed_leg_bps().unwrap();
+            let signed_bps = if swap.swap_type() == SwapType::Payer {
+                -fixed_leg_bps
+            } else {
+                fixed_leg_bps
+            };
+            let annuity = signed_bps / BASIS_POINT;
+
+            let curve: Shared<dyn YieldTermStructure> = shared(FlatForward::with_rate(
+                self.settlement,
+                fair_rate,
+                fixed_day_count.clone(),
+                Compounding::Compounded,
+                Frequency::Annual,
+            ))
+                as Shared<dyn YieldTermStructure>;
+            let mut cash_annuity = 0.0;
+            for cash_flow in swap.fixed_leg() {
+                cash_annuity += cash_flow.amount().unwrap() / strike
+                    * curve.discount_date(cash_flow.date(), false).unwrap();
+            }
+
+            let value_p = self
+                .make_swaption(
+                    build(),
+                    exercise_date,
+                    0.20,
+                    SettlementType::Physical,
+                    SettlementMethod::PhysicalOTC,
+                )
+                .npv()
+                .unwrap();
+            let value_c = self
+                .make_swaption(
+                    build(),
+                    exercise_date,
+                    0.20,
+                    SettlementType::Cash,
+                    SettlementMethod::ParYieldCurve,
+                )
+                .npv()
+                .unwrap();
+
+            (value_c / value_p, cash_annuity / annuity)
+        }
     }
 
     const EXERCISES: [Integer; 3] = [1, 5, 10];
@@ -1493,5 +1606,73 @@ mod tests {
                 Shared::clone(settings),
             )) as SharedMut<dyn PricingEngine>
         });
+    }
+
+    /// `testCashSettledSwaptions` (`swaption.cpp:529-823`): a fixed-leg CONVENTION
+    /// sweep. For 30/360 BondBasis and Act/365 fixed day counts under Unadjusted
+    /// and ModifiedFollowing schedule conventions (`:549-583`), the engine's
+    /// `ParYieldCurve` cash annuity - read through the physical/cash swaption NPV
+    /// ratio - must equal a par-yield annuity summed by hand from the fixed-leg
+    /// amounts discounted on a `FlatForward` at the swap's fair rate (`:640-683`),
+    /// to 1e-10. This is a pure self-consistency identity within the Rust engine
+    /// (no cached C++ number, matching the C++ case), so the fixed evaluation date
+    /// is immaterial. Exercise and length reuse this file's `[1,5,10]` /
+    /// `[1,5,10,20]` subset; the four fixed-leg conventions are swept in full.
+    #[test]
+    fn cash_settled_annuity_ratio_matches_the_hand_summed_annuity() {
+        let vars = Vars::new(Date::new(13, Month::March, 2002), true);
+        let strike = 0.05;
+        let conventions = [
+            (
+                "u360",
+                BusinessDayConvention::Unadjusted,
+                Thirty360::with_convention(Convention::BondBasis),
+            ),
+            (
+                "u365",
+                BusinessDayConvention::Unadjusted,
+                Actual365Fixed::new(),
+            ),
+            (
+                "a360",
+                BusinessDayConvention::ModifiedFollowing,
+                Thirty360::with_convention(Convention::BondBasis),
+            ),
+            (
+                "a365",
+                BusinessDayConvention::ModifiedFollowing,
+                Actual365Fixed::new(),
+            ),
+        ];
+        for exercise in EXERCISES {
+            let exercise_date = vars.years(vars.today, exercise);
+            let start_date = vars.spot(exercise_date);
+            for length in LENGTHS {
+                let maturity = vars.calendar.advance(
+                    start_date,
+                    length,
+                    TimeUnit::Years,
+                    BusinessDayConvention::ModifiedFollowing,
+                    false,
+                );
+                for (label, fixed_convention, fixed_day_count) in &conventions {
+                    let (npv_ratio, annuity_ratio) = vars.cash_settled_ratio(
+                        start_date,
+                        maturity,
+                        exercise_date,
+                        strike,
+                        *fixed_convention,
+                        fixed_day_count.clone(),
+                    );
+                    let difference = (annuity_ratio - npv_ratio).abs();
+                    assert!(
+                        difference <= 1.0e-10,
+                        "cash-settled annuity ratio {exercise}y/{length}y {label}: \
+                         npv ratio {npv_ratio} vs annuity ratio {annuity_ratio} \
+                         (difference {difference})"
+                    );
+                }
+            }
+        }
     }
 }
