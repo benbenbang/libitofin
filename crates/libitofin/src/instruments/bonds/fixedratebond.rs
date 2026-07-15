@@ -151,6 +151,13 @@ impl FixedRateBond {
     pub fn bond_mut(&mut self) -> &mut Bond {
         &mut self.bond
     }
+
+    /// Consumes the wrapper and yields its [`Bond`] base, for a consumer that
+    /// needs sole ownership of it (a bond helper takes the base this way, the
+    /// move standing in for the C++ `ext::make_shared<Bond>(*bond)` clone).
+    pub fn into_bond(self) -> Bond {
+        self.bond
+    }
 }
 
 #[cfg(test)]

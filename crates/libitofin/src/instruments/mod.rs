@@ -17,7 +17,7 @@ mod swap;
 mod swaption;
 mod vanillaswap;
 
-pub use bond::{Bond, BondArguments, BondEngine, BondPrice, BondResults};
+pub use bond::{Bond, BondArguments, BondEngine, BondPrice, BondPriceType, BondResults};
 pub use bonds::FixedRateBond;
 pub use capfloor::{CapFloor, CapFloorArguments, CapFloorType};
 pub use fixedvsfloatingswap::{
