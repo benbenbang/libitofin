@@ -41,9 +41,11 @@
 //!   (`swaption.cpp:85`), so every test takes the `valuation_date` branch and
 //!   the `DiscountCurve` branch (first coupon accrual start) is UNPINNED by the
 //!   oracle. It is ported but untested.
-//! - **The `Cash && CollateralizedCashPrice` annuity arm** has no oracle in the
-//!   swaption test file (only the delta helper at `:1057`, pinned by #365). It
-//!   is ported but unexercised here.
+//! - **The `Cash && CollateralizedCashPrice` annuity arm** takes the same
+//!   `|fixedLegBPS| / basisPoint` path as `Physical` (`:270-274`), so the code
+//!   path is exercised by every physical test. The specific `(Cash,
+//!   CollateralizedCashPrice)` enum pair reaching it is pinned by
+//!   `check_swaption_delta` (`swaption.cpp:1057`), ported below.
 //! - Only the `Handle<Quote>` and `Handle<SwaptionVolatilityStructure>`
 //!   constructors are ported; the flat-`Volatility` convenience constructor
 //!   (`:57`) is subsumed by [`with_flat_vol`](BlackSwaptionEngine::with_flat_vol)
@@ -620,7 +622,7 @@ mod tests {
     use crate::instruments::{
         FixedVsFloatingSwap, MakeOis, MakeVanillaSwap, Swaption, VanillaSwap,
     };
-    use crate::quotes::make_quote_handle;
+    use crate::quotes::{SimpleQuote, make_quote_handle};
     use crate::shared::shared;
     use crate::termstructures::yields::{FlatForward, ZeroSpreadedTermStructure};
     use crate::time::calendar::Calendar;
@@ -1218,5 +1220,278 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// Mirror of [`a_normal_volatility_surface_is_refused`] for the Bachelier
+    /// engine: the C++ constructor refuses a non-normal surface
+    /// (`blackswaptionengine.cpp:75`), so the Rust engine returns the matching
+    /// per-spec `Err` when a shifted-lognormal surface is priced under normal
+    /// vol. The assert keys on `requires normal input volatility`, which the
+    /// Black message ("(shifted) log*normal*...") does not contain.
+    #[test]
+    fn a_lognormal_volatility_surface_is_refused_by_the_bachelier_engine() {
+        let vars = Vars::new(Date::new(13, Month::March, 2002), true);
+        let exercise_date = vars.years(vars.today, 1);
+        let start_date = vars.spot(exercise_date);
+        let swap = MakeVanillaSwap::new(
+            Period::new(1, TimeUnit::Years),
+            Shared::clone(&vars.index),
+            Some(0.03),
+            Period::new(0, TimeUnit::Days),
+            Shared::clone(&vars.settings),
+        )
+        .with_effective_date(start_date)
+        .with_fixed_leg_tenor(Period::new(1, TimeUnit::Years))
+        .with_fixed_leg_day_count(Vars::fixed_day_count())
+        .build()
+        .unwrap()
+        .into_fixed_vs_floating();
+
+        let lognormal_surface = ConstantSwaptionVolatility::moving(
+            0,
+            NullCalendar::new(),
+            BusinessDayConvention::Following,
+            0.12,
+            Actual365Fixed::new(),
+            VolatilityType::ShiftedLognormal,
+            0.0,
+            Shared::clone(&vars.settings),
+        );
+        let vol: Handle<dyn SwaptionVolatilityStructure> =
+            Handle::new(shared(lognormal_surface) as Shared<dyn SwaptionVolatilityStructure>);
+        let engine = shared_mut(BachelierSwaptionEngine::new(
+            vars.curve.clone(),
+            vol,
+            CashAnnuityModel::SwapRate,
+            Shared::clone(&vars.settings),
+        )) as SharedMut<dyn PricingEngine>;
+
+        let mut swaption = Swaption::new(
+            shared_mut(swap),
+            shared(EuropeanExercise::new(exercise_date)) as Shared<dyn crate::exercise::Exercise>,
+            SettlementType::Physical,
+            SettlementMethod::PhysicalOTC,
+            Shared::clone(&vars.settings),
+        );
+        swaption.base_mut().set_pricing_engine(engine);
+
+        let error = swaption.npv().unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("requires normal input volatility"),
+            "expected the normal-input refusal, got: {error}"
+        );
+    }
+
+    /// `checkSwaptionDelta` (`swaption.cpp:1029-1132`): a bump-and-revalue
+    /// self-consistency check with no cached number. The swaption forecasts its
+    /// underlying off a projection curve (a bumpable flat quote) and discounts
+    /// on a separate flat 0.85% curve. Bumping the projection quote by one basis
+    /// point moves the swap's fair rate; by the mean value theorem the analytical
+    /// `"delta"` (times the bump) must bracket the finite-difference NPV change.
+    /// Parameterised over the two engines rather than duplicated (the C++ helper
+    /// is generic).
+    ///
+    /// `h` indexes three arrays in lockstep (`swaption.cpp:56-58`, `:1066`):
+    /// `h=0` is `(Receiver, Physical, PhysicalOTC)`, `h=1` is
+    /// `(Payer, Cash, CollateralizedCashPrice)` - the pair that reaches the
+    /// `(Cash, CollateralizedCashPrice)` annuity branch. Exercises and lengths
+    /// reuse this file's `[1, 5, 10]` / `[1, 5, 10, 20]` subset of the C++ full
+    /// arrays, the established convention across the swaption oracle here.
+    fn check_swaption_delta(
+        use_bachelier_vol: bool,
+        make_engine: impl Fn(
+            &Handle<dyn YieldTermStructure>,
+            Handle<dyn Quote>,
+            &Shared<Settings<Date>>,
+        ) -> SharedMut<dyn PricingEngine>,
+    ) {
+        let vars = Vars::new(Date::new(13, Month::March, 2002), true);
+        let today = vars.today;
+        let calendar = vars.calendar.clone();
+        let settings = Shared::clone(&vars.settings);
+
+        let bump = 1.0e-4;
+        let epsilon = 1.0e-10;
+        let projection_rate = 0.01;
+
+        let proj_quote = shared(SimpleQuote::new(projection_rate));
+        let proj_handle: Handle<dyn Quote> =
+            Handle::new(Shared::clone(&proj_quote) as Shared<dyn Quote>);
+        let projection: Handle<dyn YieldTermStructure> = Handle::new(shared(FlatForward::new(
+            today,
+            proj_handle,
+            Actual365Fixed::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        ))
+            as Shared<dyn YieldTermStructure>);
+        let discount: Handle<dyn YieldTermStructure> = Handle::new(shared(FlatForward::with_rate(
+            today,
+            0.0085,
+            Actual365Fixed::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        ))
+            as Shared<dyn YieldTermStructure>);
+        let index = shared(Euribor::six_months(
+            projection.clone(),
+            Shared::clone(&settings),
+        ));
+
+        let strikes = [0.03, 0.04, 0.05, 0.06, 0.07];
+        let vols = [0.0, 0.10, 0.20, 0.30, 0.70, 0.90];
+        let cases = [
+            (
+                SwapType::Receiver,
+                SettlementType::Physical,
+                SettlementMethod::PhysicalOTC,
+            ),
+            (
+                SwapType::Payer,
+                SettlementType::Cash,
+                SettlementMethod::CollateralizedCashPrice,
+            ),
+        ];
+
+        let make_underlying = |start: Date,
+                               length: Integer,
+                               strike: Rate,
+                               swap_type: SwapType|
+         -> FixedVsFloatingSwap {
+            let maturity = start + Period::new(length, TimeUnit::Years);
+            let schedule = |frequency| {
+                MakeSchedule::new()
+                    .from(start)
+                    .to(maturity)
+                    .with_frequency(frequency)
+                    .with_calendar(calendar.clone())
+                    .with_convention(BusinessDayConvention::ModifiedFollowing)
+                    .with_termination_date_convention(BusinessDayConvention::ModifiedFollowing)
+                    .forwards()
+                    .end_of_month(false)
+                    .build()
+            };
+            VanillaSwap::new(
+                swap_type,
+                1.0,
+                schedule(Frequency::Annual),
+                strike,
+                Thirty360::with_convention(Convention::BondBasis),
+                schedule(Frequency::Semiannual),
+                Shared::clone(&index),
+                0.0,
+                Actual360::new(),
+                None,
+                Shared::clone(&settings),
+            )
+            .unwrap()
+            .into_fixed_vs_floating()
+        };
+
+        for vol in vols {
+            for exercise in EXERCISES {
+                let exercise_date = calendar.advance(
+                    today,
+                    exercise,
+                    TimeUnit::Years,
+                    BusinessDayConvention::Following,
+                    false,
+                );
+                let start_date = calendar.advance(
+                    exercise_date,
+                    SETTLEMENT_DAYS,
+                    TimeUnit::Days,
+                    BusinessDayConvention::Following,
+                    false,
+                );
+                for length in LENGTHS {
+                    for strike in strikes {
+                        for (swap_type, settlement_type, settlement_method) in cases {
+                            let volatility = if use_bachelier_vol { vol / 100.0 } else { vol };
+                            let engine = make_engine(
+                                &discount,
+                                make_quote_handle(volatility).handle(),
+                                &settings,
+                            );
+
+                            proj_quote.set_value(projection_rate);
+                            let swap =
+                                shared_mut(make_underlying(start_date, length, strike, swap_type));
+                            let swap_engine = shared_mut(DiscountingSwapEngine::new(
+                                discount.clone(),
+                                Some(false),
+                                None,
+                                None,
+                                Shared::clone(&settings),
+                            ))
+                                as SharedMut<dyn PricingEngine>;
+                            swap.borrow_mut().base_mut().set_pricing_engine(swap_engine);
+                            let fair_rate = swap.borrow_mut().fair_rate().unwrap();
+
+                            let mut swaption = Swaption::new(
+                                SharedMut::clone(&swap),
+                                shared(EuropeanExercise::new(exercise_date))
+                                    as Shared<dyn crate::exercise::Exercise>,
+                                settlement_type,
+                                settlement_method,
+                                Shared::clone(&settings),
+                            );
+                            swaption.base_mut().set_pricing_engine(engine);
+
+                            let value = swaption.npv().unwrap();
+                            let delta = swaption.result::<Real>("delta").unwrap() * bump;
+
+                            proj_quote.set_value(projection_rate + bump);
+                            let bumped_fair_rate = swap.borrow_mut().fair_rate().unwrap();
+                            let bumped_value = swaption.npv().unwrap();
+                            let bumped_delta = swaption.result::<Real>("delta").unwrap() * bump;
+
+                            let delta_bump = bumped_fair_rate - fair_rate;
+                            let approx_delta = (bumped_value - value) / delta_bump * bump;
+                            let lower = delta.min(bumped_delta) - epsilon;
+                            let upper = delta.max(bumped_delta) + epsilon;
+                            assert!(
+                                lower < approx_delta && approx_delta < upper,
+                                "swaption delta {exercise}y/{length}y strike {strike} vol \
+                                 {volatility} {swap_type:?}/{settlement_type:?}: analytical bracket \
+                                 [{lower}, {upper}] does not contain finite difference {approx_delta}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// `testSwaptionDeltaInBlackModel` (`swaption.cpp:1134`).
+    #[test]
+    fn swaption_delta_in_the_black_model() {
+        check_swaption_delta(false, |discount, vol, settings| {
+            shared_mut(BlackSwaptionEngine::with_flat_vol(
+                discount.clone(),
+                vol,
+                Actual365Fixed::new(),
+                0.0,
+                CashAnnuityModel::DiscountCurve,
+                Shared::clone(settings),
+            )) as SharedMut<dyn PricingEngine>
+        });
+    }
+
+    /// `testSwaptionDeltaInBachelierModel` (`swaption.cpp:1141`).
+    #[test]
+    fn swaption_delta_in_the_bachelier_model() {
+        check_swaption_delta(true, |discount, vol, settings| {
+            shared_mut(BachelierSwaptionEngine::with_flat_vol(
+                discount.clone(),
+                vol,
+                Actual365Fixed::new(),
+                0.0,
+                CashAnnuityModel::DiscountCurve,
+                Shared::clone(settings),
+            )) as SharedMut<dyn PricingEngine>
+        });
     }
 }
