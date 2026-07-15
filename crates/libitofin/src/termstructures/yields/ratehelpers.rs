@@ -1,23 +1,28 @@
 //! Rate helpers for the yield-curve bootstrap.
 //!
-//! Port of `ql/termstructures/yield/ratehelpers.{hpp,cpp}`. This module holds
-//! [`DepositRateHelper`], the short end of the curve, and [`SwapRateHelper`],
-//! the long end. The FRA and futures helpers (`FraRateHelper`,
+//! Port of `ql/termstructures/yield/ratehelpers.{hpp,cpp}` plus the overnight
+//! helper of `ql/termstructures/yield/oisratehelper.{hpp,cpp}`. This module holds
+//! [`DepositRateHelper`], the short end of the curve, [`SwapRateHelper`], the
+//! long end over vanilla swaps, and [`OISRateHelper`], the long end over
+//! overnight-indexed swaps. The FRA and futures helpers (`FraRateHelper`,
 //! `FuturesRateHelper`) and `BMASwapRateHelper` are deferred to a later ticket
 //! (#343); the `SwapIndex`-based and explicit-start/end-date `SwapRateHelper`
-//! constructors are deferred with the swap-index port.
+//! constructors are deferred with the swap-index port. The `OISRateHelper`
+//! explicit-start/end-date constructor is deferred likewise.
 
 use std::cell::Cell;
 use std::cell::RefCell;
 use std::rc::Weak;
 
+use crate::cashflows::RateAveraging;
 use crate::errors::QlResult;
 use crate::handle::{Handle, RelinkableHandle};
+use crate::indexes::OvernightIndex;
 use crate::indexes::iborindex::IborIndex;
 use crate::indexes::index::Index;
 use crate::indexes::interestrateindex::InterestRateIndex;
 use crate::instrument::Instrument;
-use crate::instruments::{MakeVanillaSwap, VanillaSwap};
+use crate::instruments::{MakeOis, MakeVanillaSwap, OvernightIndexedSwap, VanillaSwap};
 use crate::patterns::observable::{AsObservable, Observable};
 use crate::quotes::{Quote, SimpleQuote};
 use crate::settings::Settings;
@@ -29,11 +34,12 @@ use crate::termstructures::yieldtermstructure::YieldTermStructure;
 use crate::time::businessdayconvention::BusinessDayConvention;
 use crate::time::calendar::Calendar;
 use crate::time::date::Date;
+use crate::time::dategenerationrule::DateGeneration;
 use crate::time::daycounter::DayCounter;
 use crate::time::frequency::Frequency;
 use crate::time::period::Period;
 use crate::time::timeunit::TimeUnit;
-use crate::types::Real;
+use crate::types::{Integer, Natural, Real};
 
 /// Bootstrap helper over a deposit rate (`DepositRateHelper`).
 ///
@@ -489,6 +495,238 @@ impl RelativeDateRateHelper for SwapRateHelper {
     }
 }
 
+/// Bootstrap helper over an overnight-indexed-swap (OIS) rate (`OISRateHelper`).
+///
+/// The helper fits the fixed rate at which an OIS of the quoted tenor is worth
+/// par on the bootstrapping curve. Its own swap is built through [`MakeOis`]
+/// (`oisratehelper.cpp:130`) off a cloned overnight index and a relinkable
+/// discounting handle, so it prices against the curve it is being bootstrapped
+/// against.
+///
+/// [`implied_quote`](RateHelper::implied_quote) is the par-rate reconstruction
+/// of `oisratehelper.cpp:220-232` (the same shape as [`SwapRateHelper`]'s, not
+/// `fair_rate()`): over the overnight-leg NPV and BPS and the fixed-leg BPS,
+/// carrying the spread term. Because the helper deliberately does not observe
+/// the curve (its pricing handles are weak-linked, unobserved), the swap's
+/// cached results go stale when the bootstrap moves the curve; the C++
+/// `swap_->deepUpdate()` forces a fresh calculation each call, reproduced here
+/// with [`Instrument::recalculate`] before reading the legs.
+pub struct OISRateHelper {
+    base: BootstrapHelperBase,
+    swap: RefCell<Option<OvernightIndexedSwap>>,
+    overnight_index: Shared<OvernightIndex>,
+    term_structure_handle: RelinkableHandle<dyn YieldTermStructure>,
+    discount_relinkable_handle: RelinkableHandle<dyn YieldTermStructure>,
+    discount_handle: Option<Handle<dyn YieldTermStructure>>,
+    overnight_spread: Handle<dyn Quote>,
+    settings: Shared<Settings<Date>>,
+    settlement_days: Natural,
+    tenor: Period,
+    forward_start: Period,
+    payment_lag: Integer,
+    payment_convention: BusinessDayConvention,
+    payment_frequency: Frequency,
+    averaging_method: RateAveraging,
+    pillar: Pillar,
+}
+
+impl OISRateHelper {
+    /// An OIS helper fitting `quote` with the schedule of a swap of `tenor`
+    /// starting `settlement_days` after the evaluation date, the form the
+    /// bootstrap oracle builds (`overnightindexedswap.cpp:236-256`).
+    ///
+    /// `discounting_curve` is the exogenous discounting curve (empty `None` to
+    /// discount off the bootstrapping curve). `overnight_spread` is the market
+    /// spread handle (empty for none). The deferred knobs the C++ constructor
+    /// carries past `averaging_method` (telescopic value dates, lookback,
+    /// lockout, observation shift, custom pillar, per-leg calendars) take their
+    /// benign defaults, mirroring the oracle's positional construction.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        settlement_days: Natural,
+        tenor: Period,
+        quote: Handle<dyn Quote>,
+        overnight_index: &OvernightIndex,
+        discounting_curve: Option<Handle<dyn YieldTermStructure>>,
+        payment_lag: Integer,
+        payment_convention: BusinessDayConvention,
+        payment_frequency: Frequency,
+        forward_start: Period,
+        overnight_spread: Handle<dyn Quote>,
+        pillar: Pillar,
+        averaging_method: RateAveraging,
+        settings: Shared<Settings<Date>>,
+    ) -> Shared<OISRateHelper> {
+        Shared::new_cyclic(|weak: &Weak<OISRateHelper>| {
+            let weak = weak.clone();
+            let on_eval_change = Box::new(move || {
+                if let Some(helper) = weak.upgrade() {
+                    helper.initialize_dates();
+                }
+            });
+            let term_structure_handle = RelinkableHandle::<dyn YieldTermStructure>::empty();
+            let cloned_index = overnight_index.clone_with(term_structure_handle.handle());
+            let base = BootstrapHelperBase::new_relative(
+                quote,
+                Shared::clone(&settings),
+                true,
+                on_eval_change,
+            );
+            let helper = OISRateHelper {
+                base,
+                swap: RefCell::new(None),
+                overnight_index: cloned_index,
+                term_structure_handle,
+                discount_relinkable_handle: RelinkableHandle::<dyn YieldTermStructure>::empty(),
+                discount_handle: discounting_curve,
+                overnight_spread,
+                settings,
+                settlement_days,
+                tenor,
+                forward_start,
+                payment_lag,
+                payment_convention,
+                payment_frequency,
+                averaging_method,
+                pillar,
+            };
+            helper.initialize_dates();
+            helper
+        })
+    }
+}
+
+impl AsObservable for OISRateHelper {
+    fn observable(&self) -> &Observable {
+        self.base.observable()
+    }
+}
+
+impl RateHelper for OISRateHelper {
+    fn base(&self) -> &BootstrapHelperBase {
+        &self.base
+    }
+
+    /// The par OIS rate implied by the current curve (`oisratehelper.cpp:220-232`).
+    ///
+    /// The swap is force-recalculated first (the C++ `swap_->deepUpdate()`,
+    /// forced because the helper does not observe the curve); then the rate is
+    /// reconstructed from the overnight-leg NPV, the spread carried on the
+    /// overnight-leg BPS, and the fixed-leg BPS, rather than read from
+    /// `fair_rate()`.
+    fn implied_quote(&self) -> QlResult<Real> {
+        self.base.term_structure()?;
+        let mut guard = self.swap.borrow_mut();
+        let swap = guard
+            .as_mut()
+            .expect("initialize_dates populates the swap at construction");
+        swap.recalculate()?;
+
+        const BASIS_POINT: Real = 1.0e-4;
+        let overnight_leg_npv = swap.overnight_leg_npv()?;
+        let spread = if self.overnight_spread.is_empty() {
+            0.0
+        } else {
+            self.overnight_spread.current_link()?.value()?
+        };
+        let spread_npv = swap.overnight_leg_bps()? / BASIS_POINT * spread;
+        let total_npv = -(overnight_leg_npv + spread_npv);
+        let fixed_leg_bps = swap.fixed_vs_floating_mut().fixed_leg_bps()?;
+        Ok(total_npv / (fixed_leg_bps / BASIS_POINT))
+    }
+
+    /// Weak-links the forecasting handle (used by the cloned overnight index) and
+    /// the discounting handle to the bootstrapping curve - or, when an exogenous
+    /// discounting curve was supplied, links the discounting handle to that
+    /// instead - then records the curve on the base (`oisratehelper.cpp:198-210`).
+    /// All links are non-owning and unobserved.
+    fn set_term_structure(&self, term_structure: &Shared<dyn YieldTermStructure>) {
+        self.term_structure_handle
+            .link_to_weak(Shared::downgrade(term_structure));
+        match &self.discount_handle {
+            Some(discount) if !discount.is_empty() => {
+                let curve = discount
+                    .current_link()
+                    .expect("a non-empty discount handle resolves");
+                self.discount_relinkable_handle
+                    .link_to_weak(Shared::downgrade(&curve));
+            }
+            _ => self
+                .discount_relinkable_handle
+                .link_to_weak(Shared::downgrade(term_structure)),
+        }
+        self.base.set_term_structure(term_structure);
+    }
+}
+
+impl RelativeDateRateHelper for OISRateHelper {
+    /// Rebuilds the OIS and its schedule off the current evaluation date
+    /// (`initializeDates`, `oisratehelper.cpp:128-193`): a swap of the helper's
+    /// tenor built through [`MakeOis`]' whole builder chain with a 0% fixed rate
+    /// so it does not price at construction.
+    ///
+    /// The `latest_relevant_date` is `max(maturity, lastPaymentDate)`.  C++ also
+    /// maxes in `fixingEndDate = overnightIndex.maturityDate(valueDate(
+    /// lastFixingDate))` (`oisratehelper.cpp:170-172`); that term is dominated by
+    /// `lastPaymentDate` whenever the payment lag is at least one business day
+    /// (the bootstrap oracle uses lag 2), and reaching the last coupon's fixing
+    /// date needs a typed accessor the `dyn CashFlow` leg does not expose, so it
+    /// is deferred with the arithmetic-averaging leg.
+    fn initialize_dates(&self) {
+        let swap = MakeOis::new(
+            self.tenor,
+            Shared::clone(&self.overnight_index),
+            Some(0.0),
+            self.forward_start,
+            Shared::clone(&self.settings),
+        )
+        .with_discounting_term_structure(self.discount_relinkable_handle.handle())
+        .with_telescopic_value_dates(false)
+        .with_payment_lag(self.payment_lag)
+        .with_payment_adjustment(self.payment_convention)
+        .with_payment_frequency(self.payment_frequency)
+        .with_averaging_method(self.averaging_method)
+        .with_lookback_days(None)
+        .with_lockout_days(0)
+        .with_rule(DateGeneration::Backward)
+        .with_convention(BusinessDayConvention::ModifiedFollowing)
+        .with_termination_date_convention(BusinessDayConvention::ModifiedFollowing)
+        .with_observation_shift(false)
+        .with_settlement_days(self.settlement_days)
+        .build()
+        .expect("a 0% fixed-rate OIS with benign deferred knobs builds without pricing");
+
+        let base_swap = swap.fixed_vs_floating();
+        let earliest = swap
+            .overnight_schedule()
+            .start_date()
+            .min(base_swap.fixed_schedule().start_date());
+        let maturity = swap
+            .overnight_schedule()
+            .end_date()
+            .max(base_swap.fixed_schedule().end_date());
+
+        let last_overnight_payment = swap.overnight_leg().last().map_or(maturity, |cf| cf.date());
+        let last_fixed_payment = base_swap
+            .fixed_leg()
+            .last()
+            .map_or(maturity, |cf| cf.date());
+        let latest_relevant = maturity.max(last_overnight_payment).max(last_fixed_payment);
+
+        self.base.set_earliest_date(earliest);
+        self.base.set_maturity_date(maturity);
+        self.base.set_latest_relevant_date(latest_relevant);
+        self.base.set_latest_date(latest_relevant);
+        let pillar = match self.pillar {
+            Pillar::MaturityDate => maturity,
+            Pillar::LastRelevantDate => latest_relevant,
+        };
+        self.base.set_pillar_date(pillar);
+
+        *self.swap.borrow_mut() = Some(swap);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -881,5 +1119,137 @@ mod tests {
 
         let implied = helper.implied_quote().unwrap();
         assert!((helper.quote_error().unwrap() - (0.05 - implied)).abs() < 1e-15);
+    }
+
+    /// `overnightindexedswap.cpp estrSwapData` (`:92-125`): the OIS quotes the
+    /// bootstrap oracle fits, `(tenor length, unit, rate %)`; all use two
+    /// settlement days.
+    const ESTR_SWAP_DATA: [(i32, TimeUnit, Real); 33] = [
+        (1, TimeUnit::Weeks, 1.245),
+        (2, TimeUnit::Weeks, 1.269),
+        (3, TimeUnit::Weeks, 1.277),
+        (1, TimeUnit::Months, 1.281),
+        (2, TimeUnit::Months, 1.18),
+        (3, TimeUnit::Months, 1.143),
+        (4, TimeUnit::Months, 1.125),
+        (5, TimeUnit::Months, 1.116),
+        (6, TimeUnit::Months, 1.111),
+        (7, TimeUnit::Months, 1.109),
+        (8, TimeUnit::Months, 1.111),
+        (9, TimeUnit::Months, 1.117),
+        (10, TimeUnit::Months, 1.129),
+        (11, TimeUnit::Months, 1.141),
+        (12, TimeUnit::Months, 1.153),
+        (15, TimeUnit::Months, 1.218),
+        (18, TimeUnit::Months, 1.308),
+        (21, TimeUnit::Months, 1.407),
+        (2, TimeUnit::Years, 1.510),
+        (3, TimeUnit::Years, 1.916),
+        (4, TimeUnit::Years, 2.254),
+        (5, TimeUnit::Years, 2.523),
+        (6, TimeUnit::Years, 2.746),
+        (7, TimeUnit::Years, 2.934),
+        (8, TimeUnit::Years, 3.092),
+        (9, TimeUnit::Years, 3.231),
+        (10, TimeUnit::Years, 3.380),
+        (11, TimeUnit::Years, 3.457),
+        (12, TimeUnit::Years, 3.544),
+        (15, TimeUnit::Years, 3.702),
+        (20, TimeUnit::Years, 3.703),
+        (25, TimeUnit::Years, 3.541),
+        (30, TimeUnit::Years, 3.369),
+    ];
+
+    /// `overnightindexedswap.cpp testBaseBootstrap` (`:397` ->
+    /// `testBootstrap(false, RateAveraging::Compound)`, `:208`): an Estr
+    /// discounting curve bootstrapped purely from [`OISRateHelper`]s reprices
+    /// every OIS quote to 1e-8.
+    ///
+    /// The deposit helpers of the C++ setup are omitted deliberately: for a zero
+    /// spread `implied_quote == fair_rate`, and each swap tenor is self-pinned by
+    /// its own OIS node solved so `implied_quote_i == quote_i`, so
+    /// `fair_rate_i == quote_i` to solver accuracy independent of the sub-week
+    /// short end the deposits shape. `paymentLag = 2` and `today = 5 Feb 2009`
+    /// are transcribed from `CommonVars` / `testBootstrap` (`:180-215`).
+    ///
+    /// The three sibling cases stay deferred: `testBootstrapWithArithmeticAverage`
+    /// (`:402`) needs the arithmetic-averaging pricer, and the two telescopic
+    /// cases (`:407`/`:413`) need telescopic value dates - neither on main.
+    #[test]
+    fn ois_bootstrap_reprices_the_quotes() {
+        use crate::indexes::ibor::Estr;
+        use crate::math::interpolations::loglinear::LogLinear;
+        use crate::termstructures::bootstraptraits::Discount;
+        use crate::termstructures::yields::PiecewiseYieldCurve;
+        use crate::time::daycounters::actual365fixed::Actual365Fixed;
+
+        const PAYMENT_LAG: Integer = 2;
+        let today = Date::new(5, Month::February, 2009);
+        let settings = settings_on(today);
+        let calendar = Target::new();
+        let settlement = calendar.advance(
+            today,
+            2,
+            TimeUnit::Days,
+            BusinessDayConvention::Following,
+            false,
+        );
+
+        let estr = Estr::new(Handle::empty(), settings.clone());
+        let mut instruments: Vec<Shared<dyn RateHelper>> = Vec::new();
+        for (n, unit, rate) in ESTR_SWAP_DATA {
+            let quote = Handle::new(shared(SimpleQuote::new(rate / 100.0)) as Shared<dyn Quote>);
+            let helper = OISRateHelper::new(
+                2,
+                Period::new(n, unit),
+                quote,
+                &estr,
+                None,
+                PAYMENT_LAG,
+                BusinessDayConvention::Following,
+                Frequency::Annual,
+                Period::new(0, TimeUnit::Days),
+                Handle::empty(),
+                Pillar::LastRelevantDate,
+                RateAveraging::Compound,
+                settings.clone(),
+            );
+            instruments.push(helper as Shared<dyn RateHelper>);
+        }
+
+        let curve = PiecewiseYieldCurve::<Discount, LogLinear>::new(
+            today,
+            instruments,
+            Actual365Fixed::new(),
+            LogLinear,
+        )
+        .unwrap();
+        let handle: Handle<dyn YieldTermStructure> =
+            Handle::new(Shared::clone(&curve) as Shared<dyn YieldTermStructure>);
+
+        for (n, unit, rate) in ESTR_SWAP_DATA {
+            let priced_estr = shared(Estr::new(handle.clone(), settings.clone()));
+            let mut swap = MakeOis::new(
+                Period::new(n, unit),
+                priced_estr,
+                Some(0.0),
+                Period::new(0, TimeUnit::Days),
+                settings.clone(),
+            )
+            .with_effective_date(settlement)
+            .with_nominal(100.0)
+            .with_payment_lag(PAYMENT_LAG)
+            .with_discounting_term_structure(handle.clone())
+            .with_averaging_method(RateAveraging::Compound)
+            .build()
+            .unwrap();
+
+            let calculated = swap.fixed_vs_floating_mut().fair_rate().unwrap();
+            let expected = rate / 100.0;
+            assert!(
+                (calculated - expected).abs() < 1.0e-8,
+                "{n} {unit:?} OIS: calculated {calculated} vs expected {expected}"
+            );
+        }
     }
 }
