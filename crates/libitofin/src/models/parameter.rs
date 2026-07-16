@@ -11,10 +11,13 @@
 //!
 //! ## Deferred
 //!
-//! - `PiecewiseConstantParameter` (`parameter.hpp:119`) and
-//!   `TermStructureFittingParameter` (`parameter.hpp:145`) are time-dependent /
-//!   tree-fitting only and unused by the closed-form `discountBond` path; both
-//!   land with the numerical (tree/lattice) tickets.
+//! - `PiecewiseConstantParameter` (`parameter.hpp:119`) is time-dependent and
+//!   used only by the numerical tree/lattice path; it lands with those tickets.
+//! - `TermStructureFittingParameter::NumericalImpl` (`parameter.hpp:147`), the
+//!   tree-fitting value law read back by `tree()`, stays deferred with the
+//!   lattice machinery. The analytic seam (the generic `Impl` constructor,
+//!   `parameter.hpp:178`) is ported here as [`TermStructureFittingParameter`];
+//!   concrete fitting laws (Extended CIR's `phi(t)`) are supplied by each model.
 //!
 //! ## Divergences from QuantLib
 //!
@@ -40,20 +43,44 @@ use crate::math::optimization::constraint::{Constraint, NoConstraint};
 use crate::require;
 use crate::types::{Real, Size, Time};
 
+/// A state-capturing, possibly time-dependent value law for a [`Parameter`]
+/// (C++'s polymorphic `Parameter::Impl`, `parameter.hpp:40`).
+///
+/// The stateless [`ConstantParameter`] / [`NullParameter`] laws collapse to
+/// [`ParameterImpl`] variants; a law that captures state - a term-structure
+/// fitting `phi(t)` holding a `Handle<YieldTermStructure>` - implements this
+/// trait instead and is wrapped by [`TermStructureFittingParameter`]. The method
+/// returns a plain [`Real`], so a law reading a fallible source (a curve's
+/// forward rate) collapses that `Result` internally with a documented `expect`
+/// rather than bubbling it through [`Parameter::value`].
+pub trait ParameterValue {
+    /// The value at time `t` (C++'s `Impl::value(const Array&, Time)`).
+    ///
+    /// Takes both the stored `params` and `t` for C++ signature parity, though a
+    /// fitting law typically ignores `params` and reads only `t`.
+    fn value(&self, params: &Array, t: Time) -> Real;
+}
+
 /// The value law of a [`Parameter`] (C++'s `Parameter::Impl` hierarchy).
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 enum ParameterImpl {
     /// `ConstantParameter::Impl` (`parameter.hpp:73`): returns `params[0]`.
     Constant,
     /// `NullParameter::Impl` (`parameter.hpp:101`): always `0.0`.
     Null,
+    /// A user-supplied [`ParameterValue`] (C++'s generic `Parameter::Impl`): the
+    /// state-capturing, time-dependent law behind
+    /// [`TermStructureFittingParameter`]. Held via [`Rc`] so [`Parameter`] stays
+    /// [`Clone`] (`PrivateConstraint` clones the arguments).
+    Custom(Rc<dyn ParameterValue>),
 }
 
 impl ParameterImpl {
-    fn value(self, params: &Array, _t: Time) -> Real {
+    fn value(&self, params: &Array, t: Time) -> Real {
         match self {
             ParameterImpl::Constant => params[0],
             ParameterImpl::Null => 0.0,
+            ParameterImpl::Custom(impl_) => impl_.value(params, t),
         }
     }
 }
@@ -162,10 +189,42 @@ impl NullParameter {
     }
 }
 
+/// Deterministic time-dependent parameter used for yield-curve fitting
+/// (`parameter.hpp:145`).
+///
+/// C++'s `TermStructureFittingParameter` is a size-0, `NoConstraint`
+/// [`Parameter`] wrapping an arbitrary `Parameter::Impl`
+/// (`Parameter(0, impl, NoConstraint())`, `parameter.hpp:178`). The port mirrors
+/// the other parameter factories: [`new`](Self::new) returns the base
+/// [`Parameter`] carrying the supplied [`ParameterValue`] law. C++'s second
+/// constructor (from a `Handle<YieldTermStructure>`, building the tree-fitting
+/// `NumericalImpl`) is deferred with the lattice machinery.
+pub struct TermStructureFittingParameter;
+
+impl TermStructureFittingParameter {
+    /// `TermStructureFittingParameter(const shared_ptr<Parameter::Impl>&)`
+    /// (`parameter.hpp:178`): size 0, `NoConstraint`, value computed by `impl_`.
+    pub fn new(impl_: Rc<dyn ParameterValue>) -> Parameter {
+        Parameter {
+            params: Array::new(),
+            constraint: Rc::new(NoConstraint),
+            impl_: ParameterImpl::Custom(impl_),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::handle::Handle;
+    use crate::interestrate::Compounding;
     use crate::math::optimization::constraint::PositiveConstraint;
+    use crate::shared::{Shared, shared};
+    use crate::termstructures::yields::FlatForward;
+    use crate::termstructures::yieldtermstructure::YieldTermStructure;
+    use crate::time::date::{Date, Month};
+    use crate::time::daycounters::actual360::Actual360;
+    use crate::time::frequency::Frequency;
 
     #[test]
     fn constant_parameter_returns_its_value_at_any_time() {
@@ -211,5 +270,70 @@ mod tests {
         let p = ConstantParameter::unset(Rc::new(PositiveConstraint));
         assert!(p.test_params(&Array::from([1.0])));
         assert!(!p.test_params(&Array::from([-1.0])));
+    }
+
+    /// A stateless-but-time-dependent stand-in for a fitting law: it captures a
+    /// slope and returns `slope * t`, ignoring `params`.
+    struct LinearLaw {
+        slope: Real,
+    }
+
+    impl ParameterValue for LinearLaw {
+        fn value(&self, _params: &Array, t: Time) -> Real {
+            self.slope * t
+        }
+    }
+
+    #[test]
+    fn fitting_parameter_wraps_a_time_dependent_state_capturing_law() {
+        let p = TermStructureFittingParameter::new(Rc::new(LinearLaw { slope: 0.02 }));
+        assert_eq!(p.size(), 0);
+        assert_eq!(p.value(0.0), 0.0);
+        assert!((p.value(3.0) - 0.06).abs() < 1e-15);
+    }
+
+    /// A fitting law that captures a term-structure handle and reads it *live*
+    /// on every evaluation, exactly as Extended CIR's `phi(t)` does. The curve's
+    /// `forward_rate` is fallible, but [`Parameter::value`] is not, so the law
+    /// collapses the `Result` internally with a documented `expect` (the crate's
+    /// eval-infallible convention); the production law itself lands in #382.
+    struct ForwardPlusSlope {
+        term_structure: Handle<dyn YieldTermStructure>,
+        slope: Real,
+    }
+
+    impl ParameterValue for ForwardPlusSlope {
+        fn value(&self, _params: &Array, t: Time) -> Real {
+            let curve = self
+                .term_structure
+                .current_link()
+                .expect("a fitting parameter requires a non-empty term-structure handle");
+            let forward = curve
+                .forward_rate(t, t, Compounding::Continuous, Frequency::NoFrequency, false)
+                .expect("a fitting parameter's forward rate is well-defined on its curve")
+                .rate();
+            forward + self.slope * t
+        }
+    }
+
+    #[test]
+    fn fitting_parameter_reads_its_captured_term_structure_live() {
+        let curve = FlatForward::with_rate(
+            Date::new(17, Month::May, 1998),
+            0.05,
+            Actual360::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        );
+        let handle: Handle<dyn YieldTermStructure> =
+            Handle::new(shared(curve) as Shared<dyn YieldTermStructure>);
+        let phi = TermStructureFittingParameter::new(Rc::new(ForwardPlusSlope {
+            term_structure: handle,
+            slope: 0.01,
+        }));
+
+        assert_eq!(phi.size(), 0);
+        assert!((phi.value(2.0) - (0.05 + 0.01 * 2.0)).abs() < 1e-9);
+        assert!((phi.value(0.5) - (0.05 + 0.01 * 0.5)).abs() < 1e-9);
     }
 }
