@@ -17,10 +17,11 @@
 //!   optimization stack it would drive (`Constraint`, `Problem`,
 //!   `LevenbergMarquardt`) is already on main, so this is a later ticket, not a
 //!   missing dependency.
-//! - `generate_arguments()` is a no-op here (as it is for Vasicek); a model
-//!   that rebuilds derived state from its parameters (e.g. Hull-White) overrides
-//!   it, and active registration with observed market data arrives with the
-//!   term-structure-consistent models.
+//! - C++'s virtual `generateArguments()` is a no-op for the ported models
+//!   (Vasicek does not override it), so it is not modelled here; a model that
+//!   rebuilds derived state from its parameters (e.g. Hull-White) will need a
+//!   regeneration seam added, alongside active registration with observed
+//!   market data, when the term-structure-consistent models land.
 //!
 //! ## Divergences from QuantLib
 //!
