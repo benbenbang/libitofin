@@ -1,0 +1,6 @@
+# Branches protected by scripts/install_branch_guards.sh
+# One branch name per line (as it appears in `git branch`, e.g. feat/foo).
+# Lines starting with # and blank lines are ignored.
+# The pre-push and reference-transaction hooks read this file at runtime,
+# so edits here take effect immediately - no reinstall needed.
+feat/graph_analysis
