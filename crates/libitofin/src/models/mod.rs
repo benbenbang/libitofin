@@ -17,4 +17,6 @@ pub use model::{
 pub use parameter::{
     ConstantParameter, NullParameter, Parameter, ParameterValue, TermStructureFittingParameter,
 };
-pub use shortrate::{AffineModel, OneFactorAffineModel, Vasicek};
+pub use shortrate::{
+    AffineModel, CoxIngersollRoss, OneFactorAffineModel, Vasicek, VolatilityConstraint,
+};
