@@ -15,6 +15,7 @@ pub mod instrument;
 pub mod instruments;
 pub mod interestrate;
 pub mod math;
+pub mod models;
 pub mod option;
 pub mod patterns;
 pub mod payoff;
