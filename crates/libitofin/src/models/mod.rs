@@ -12,5 +12,7 @@ pub mod parameter;
 pub mod shortrate;
 
 pub use model::{CalibratedModel, PrivateConstraint};
-pub use parameter::{ConstantParameter, NullParameter, Parameter};
+pub use parameter::{
+    ConstantParameter, NullParameter, Parameter, ParameterValue, TermStructureFittingParameter,
+};
 pub use shortrate::{AffineModel, OneFactorAffineModel, Vasicek};
