@@ -204,6 +204,14 @@ impl HullWhite {
         self.base.r0()
     }
 
+    /// The fitted-curve handle (`termStructure()`, `model.hpp:77`), from which the
+    /// [`JamshidianSwaptionEngine`](crate::pricingengines::swaption::JamshidianSwaptionEngine)
+    /// (#392) reads the reference date and day counter it turns the swaption's
+    /// dates into year fractions with.
+    pub fn term_structure(&self) -> &Handle<dyn YieldTermStructure> {
+        self.ts_model.term_structure()
+    }
+
     /// The fitted curve's discount factor `P(t)`
     /// (`termStructure()->discount(t)`), read live for the bond-option payoffs.
     fn discount(&self, t: Time) -> QlResult<Real> {
