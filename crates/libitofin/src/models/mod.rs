@@ -7,10 +7,14 @@
 //! dynamics are deferred to later tickets; each deferral is noted at the type it
 //! belongs to.
 
+pub mod calibrationhelper;
 pub mod model;
 pub mod parameter;
 pub mod shortrate;
 
+pub use calibrationhelper::{
+    BlackCalibrationHelper, BlackCalibrationHelperBase, CalibrationErrorType, CalibrationHelper,
+};
 pub use model::{
     CalibratedModel, CalibratedModelHolder, PrivateConstraint, TermStructureConsistentModel,
     register_with_term_structure,
