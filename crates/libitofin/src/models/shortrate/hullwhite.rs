@@ -32,10 +32,13 @@
 //!   fitting law are deferred with the dynamics/tree path (#377). Consequently
 //!   [`generate_arguments`](crate::models::CalibratedModelHolder::generate_arguments)
 //!   here refreshes only the cached `r0`; the `phi_` rebuild lands with `dynamics()`.
-//! - `HullWhite::Dynamics` (`hullwhite.hpp:107`), `tree` (`hullwhite.cpp:43`),
-//!   `FixedReversion` (`hullwhite.hpp:80`) and the `JamshidianSwaptionEngine`
-//!   swaption oracles (`testCachedHullWhite*`) are the simulation/lattice and
-//!   calibration paths, deferred with the short-rate dynamics per #377.
+//! - `HullWhite::Dynamics` (`hullwhite.hpp:107`), `tree` (`hullwhite.cpp:43`) and
+//!   `FixedReversion` (`hullwhite.hpp:80`) are the simulation/lattice paths,
+//!   deferred with the short-rate dynamics per #377. The analytic
+//!   `testCachedHullWhite` calibration oracle (`shortratemodels.cpp:83`) is ported
+//!   in `hull_white_calibrates_to_the_cached_swaption_values` below (#399), on the
+//!   Jamshidian-engine path (#392); `testCachedHullWhiteFixedReversion` and
+//!   `testCachedHullWhite2` are deferred to #400.
 //!
 //! ## Divergences from QuantLib
 //!
@@ -372,12 +375,31 @@ impl OneFactorAffineModel for HullWhite {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cashflows::RateAveraging;
     use crate::handle::RelinkableHandle;
+    use crate::indexes::ibor::Euribor;
+    use crate::math::array::Array;
     use crate::math::interpolations::linear::Linear;
+    use crate::math::optimization::endcriteria::{EndCriteria, EndCriteriaType};
+    use crate::math::optimization::levenbergmarquardt::LevenbergMarquardt;
+    use crate::models::calibrationhelper::{
+        BlackCalibrationHelper, CalibrationErrorType, CalibrationHelper,
+    };
+    use crate::models::model::{calibrate, calibration_value};
+    use crate::models::shortrate::SwaptionHelper;
+    use crate::pricingengine::PricingEngine;
+    use crate::pricingengines::JamshidianSwaptionEngine;
+    use crate::quotes::{Quote, SimpleQuote};
+    use crate::settings::Settings;
     use crate::shared::{Shared, shared};
+    use crate::termstructures::volatility::VolatilityType;
     use crate::termstructures::yields::{FlatForward, ZeroCurve};
     use crate::time::date::{Date, Month};
+    use crate::time::daycounters::actual360::Actual360;
     use crate::time::daycounters::actual365fixed::Actual365Fixed;
+    use crate::time::daycounters::thirty360::{Convention, Thirty360};
+    use crate::time::period::Period;
+    use crate::time::timeunit::TimeUnit;
 
     /// The sloped fixture shared with the C++ generator (scratchpad `hwgen.cpp`):
     /// an `InterpolatedZeroCurve<Linear>` through continuous zeros on
@@ -637,5 +659,129 @@ mod tests {
                 .message(),
             "negative a (-0.03) not allowed"
         );
+    }
+
+    /// Calibrates Hull-White to the five cached swaptions for one coupon
+    /// convention, returning the fitted `[a, sigma]`, the end criterion and the
+    /// residual `f(a)` (`shortratemodels.cpp:108-135`).
+    fn calibrate_cached_hull_white(using_at_par: bool) -> (Array, EndCriteriaType, Real) {
+        let today = Date::new(15, Month::February, 2002);
+        let settlement = Date::new(19, Month::February, 2002);
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(today);
+        settings.set_using_at_par_coupons(using_at_par);
+
+        let term_structure: Handle<dyn YieldTermStructure> =
+            Handle::new(shared(FlatForward::with_rate(
+                settlement,
+                0.04875825,
+                Actual365Fixed::new(),
+                Compounding::Continuous,
+                Frequency::Annual,
+            )) as Shared<dyn YieldTermStructure>);
+
+        let model = HullWhite::new(term_structure.clone(), 0.1, 0.01).unwrap();
+        let index = shared(Euribor::six_months(
+            term_structure.clone(),
+            Shared::clone(&settings),
+        ));
+        let engine = shared_mut(JamshidianSwaptionEngine::new(SharedMut::clone(&model)))
+            as SharedMut<dyn PricingEngine>;
+
+        let data = [
+            (1, 5, 0.1148),
+            (2, 4, 0.1108),
+            (3, 3, 0.1070),
+            (4, 2, 0.1021),
+            (5, 1, 0.1000),
+        ];
+        let helpers: Vec<SharedMut<dyn CalibrationHelper>> = data
+            .into_iter()
+            .map(|(start, length, volatility)| {
+                let vol: Handle<dyn Quote> =
+                    Handle::new(shared(SimpleQuote::new(volatility)) as Shared<dyn Quote>);
+                let mut helper = SwaptionHelper::new(
+                    Period::new(start, TimeUnit::Years),
+                    Period::new(length, TimeUnit::Years),
+                    vol,
+                    Shared::clone(&index),
+                    Period::new(1, TimeUnit::Years),
+                    Thirty360::with_convention(Convention::BondBasis),
+                    Actual360::new(),
+                    term_structure.clone(),
+                    CalibrationErrorType::RelativePriceError,
+                    None,
+                    1.0,
+                    VolatilityType::ShiftedLognormal,
+                    0.0,
+                    None,
+                    RateAveraging::Compound,
+                );
+                helper
+                    .base_mut()
+                    .set_pricing_engine(SharedMut::clone(&engine));
+                shared_mut(helper) as SharedMut<dyn CalibrationHelper>
+            })
+            .collect();
+
+        let mut method = LevenbergMarquardt::new(1e-8, 1e-8, 1e-8, false);
+        let end_criteria = EndCriteria::new(10000, Some(100), 1e-6, 1e-8, Some(1e-8)).unwrap();
+        calibrate(
+            &model,
+            &helpers,
+            &mut method,
+            &end_criteria,
+            None,
+            Vec::new(),
+            Vec::new(),
+        )
+        .unwrap();
+
+        let params = model.borrow().calibrated_model().params();
+        let ec_type = model.borrow().calibrated_model().end_criteria();
+        let residual = calibration_value(&model, &params, &helpers).unwrap();
+        (params, ec_type, residual)
+    }
+
+    #[test]
+    fn hull_white_calibrates_to_the_cached_swaption_values() {
+        // testCachedHullWhite (shortratemodels.cpp:83-153): calibrate Hull-White
+        // to five co-terminal swaptions through the analytic Jamshidian engine via
+        // Levenberg-Marquardt and reproduce the cached a/sigma to 1.3e-5
+        // (shortratemodels.cpp:129-132). usingAtParCoupons (shortratemodels.cpp:86,
+        // 126-130) gates the cached values; both arms are pinned, as the
+        // discountingswapengine / blackcapfloorengine oracles do. The residual
+        // bound is a Rust-side strengthening (C++ prints f(a) but does not assert
+        // it): a 2-parameter fit to 5 swaptions cannot be exact, so the observed
+        // relative-price-error RSS is ~0.1158, bounded below 0.2 with margin -
+        // this pins that the fit converged rather than diverged, not a tight fit.
+        let tolerance = 1.3e-5;
+        for (using_at_par, cached_a, cached_sigma) in [
+            (true, 0.0464041, 0.00579912),
+            (false, 0.0463679, 0.00579831),
+        ] {
+            let (params, ec_type, residual) = calibrate_cached_hull_white(using_at_par);
+
+            assert!(
+                (params[0] - cached_a).abs() < tolerance,
+                "par={using_at_par}: a = {} vs cached {cached_a} (error {})",
+                params[0],
+                (params[0] - cached_a).abs()
+            );
+            assert!(
+                (params[1] - cached_sigma).abs() < tolerance,
+                "par={using_at_par}: sigma = {} vs cached {cached_sigma} (error {})",
+                params[1],
+                (params[1] - cached_sigma).abs()
+            );
+            assert!(
+                ec_type.succeeded(),
+                "par={using_at_par}: end criteria {ec_type} did not converge"
+            );
+            assert!(
+                residual.is_finite() && residual < 0.2,
+                "par={using_at_par}: residual f(a) = {residual} not finite/bounded"
+            );
+        }
     }
 }
