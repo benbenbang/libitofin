@@ -447,4 +447,77 @@ mod tests {
             "a payer swaption on this fixture should be positive: {npv}"
         );
     }
+
+    /// Fixture parity below the option level: the fixed-leg coupon amounts, the
+    /// maturity / value-time year fractions and every `P(t)` the decomposition
+    /// reads match the C++ generator (`jamgen.cpp`, `setprecision(17)`). If the
+    /// cached NPV ever misses, these pins localise a schedule / curve mismatch
+    /// before the option-level assert.
+    #[test]
+    fn fixture_parity_pins_the_fixed_leg_and_curve_against_cpp() {
+        use crate::instruments::FixedVsFloatingSwapArguments;
+
+        let settings = settings();
+        let swap = fixture_swap(&settings, SwapType::Payer, 0.0);
+        let mut args = FixedVsFloatingSwapArguments::default();
+        swap.setup_arguments(&mut args).unwrap();
+
+        let dc = Actual365Fixed::new();
+        let ref_date = Date::new(15, Month::January, 2026);
+        let curve = flat_curve().current_link().unwrap();
+
+        // Coupon amounts: 100 * 0.03 * 1.0 (Thirty360 BondBasis annual).
+        assert_eq!(args.fixed_coupons.len(), 5);
+        for amount in &args.fixed_coupons {
+            assert!((amount - 3.0).abs() < 1.0e-12, "coupon amount {amount}");
+        }
+
+        // maturity = yf(ref, exercise 2027-01-15) = 1; value_time = yf(ref, first
+        // reset 2028-01-15) = 2.
+        let maturity = dc.year_fraction(ref_date, Date::new(15, Month::January, 2027));
+        let value_time = dc.year_fraction(ref_date, args.fixed_reset_dates[0]);
+        assert!((maturity - 1.0).abs() < 1.0e-12);
+        assert!((value_time - 2.0).abs() < 1.0e-12);
+        assert!((curve.discount(1.0, false).unwrap() - 0.970_445_533_549).abs() < 1.0e-10);
+        assert!((curve.discount(2.0, false).unwrap() - 0.941_764_533_584).abs() < 1.0e-10);
+
+        // Fixed pay times and their discounts, coupon by coupon.
+        let expected: [(Time, Real); 5] = [
+            (3.002_739_726_027, 0.913_856_070_727),
+            (4.002_739_726_027, 0.886_847_542_143),
+            (5.002_739_726_027, 0.860_637_236_211),
+            (6.002_739_726_027, 0.835_201_561_887),
+            (7.005_479_452_055, 0.810_451_010_196),
+        ];
+        for (i, &pay_date) in args.fixed_pay_dates.iter().enumerate() {
+            let t = dc.year_fraction(ref_date, pay_date);
+            assert!((t - expected[i].0).abs() < 1.0e-10, "pay time[{i}] {t}");
+            assert!(
+                (curve.discount(t, false).unwrap() - expected[i].1).abs() < 1.0e-10,
+                "P(payTime[{i}])"
+            );
+        }
+    }
+
+    /// The cached-NPV oracle: the fixture payer and receiver swaptions reproduce
+    /// the C++ `JamshidianSwaptionEngine` NPVs (`jamgen.cpp`, `setprecision(17)`)
+    /// to 1e-8. A payer is a put on the coupon bond, a receiver a call, so the
+    /// two exercise both option-type branches. The one-year start delay (exercise
+    /// 2027, swap start 2028) makes `bondStart != maturity`, so the 5-arg
+    /// `discountBondOption` genuinely differs from the 4-arg overload here.
+    #[test]
+    fn cached_value_reproduces_the_payer_and_receiver_arms() {
+        for (swap_type, expected) in [
+            (SwapType::Payer, 1.566_610_395_575_041_4),
+            (SwapType::Receiver, 1.356_238_320_232_561_2),
+        ] {
+            let mut swaption = fixture_swaption(swap_type, 0.0);
+            let npv = swaption.npv().unwrap();
+            assert!(
+                (npv - expected).abs() <= 1.0e-8,
+                "{swap_type:?}: npv {npv} vs cached {expected} (error {})",
+                (npv - expected).abs()
+            );
+        }
+    }
 }
