@@ -13,6 +13,7 @@ pub mod shortrate;
 
 pub use model::{
     CalibratedModel, CalibratedModelHolder, PrivateConstraint, TermStructureConsistentModel,
+    register_with_term_structure,
 };
 pub use parameter::{
     ConstantParameter, NullParameter, Parameter, ParameterValue, TermStructureFittingParameter,

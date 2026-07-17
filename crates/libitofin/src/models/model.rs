@@ -8,6 +8,14 @@
 //! its parameter machinery, and exposes the shared [`Observable`] through
 //! [`AsObservable`].
 //!
+//! The observer-driven regeneration C++ runs in `update()` =
+//! `generateArguments()` + `notifyObservers()` (`model.hpp:87`) is wired by
+//! [`register_with_term_structure`]: it registers a concrete model as an
+//! observer of its term-structure handle so a relink re-runs
+//! [`generate_arguments`](CalibratedModelHolder::generate_arguments) and then
+//! re-broadcasts. It is opt-in per model, matching C++, where Hull-White / G2
+//! `registerWith(termStructure)` but ExtendedCoxIngersollRoss does not.
+//!
 //! ## Deferred
 //!
 //! - `calibrate()` against the `CalibrationHelper` family (`model.hpp:99`) and
@@ -17,16 +25,6 @@
 //!   optimization stack it would drive (`Constraint`, `Problem`,
 //!   `LevenbergMarquardt`) is already on main, so this is a later ticket, not a
 //!   missing dependency.
-//! - Observer-driven regeneration when observed market data changes. C++'s
-//!   `update()` = `generateArguments()` + `notifyObservers()` (`model.hpp:88`)
-//!   runs when a registered observable notifies; wiring an observer half that
-//!   re-runs [`generate_arguments`](CalibratedModelHolder::generate_arguments)
-//!   needs the concrete model to register itself, which the affine oracle does
-//!   not exercise (ExtendedCoxIngersollRoss reads its curve live on every
-//!   evaluation and does not `registerWith(termStructure)`, unlike Hull-White /
-//!   G2). The [`set_params`](CalibratedModelHolder::set_params) regeneration
-//!   path is ported; the observer-driven path is deferred to the model that
-//!   first needs it.
 //!
 //! ## Divergences from QuantLib
 //!
@@ -160,10 +158,24 @@ impl CalibratedModel {
 
     /// This model's observer half, wired to its observable (C++'s
     /// `CalibratedModel` publicly *is* an `Observer`). Register it with an
-    /// observed observable so a change regenerates and re-broadcasts; the
-    /// term-structure-consistent models are the first to do so.
+    /// observed observable so a change re-broadcasts.
+    ///
+    /// This is the pure-forwarding half: it re-broadcasts but does not re-run a
+    /// concrete model's `generate_arguments()`. A term-structure-consistent
+    /// model that must regenerate curve-derived state on a relink registers
+    /// through [`register_with_term_structure`] instead.
     pub fn as_observer(&self) -> SharedMut<dyn Observer> {
         self.updater.clone() as SharedMut<dyn Observer>
+    }
+
+    /// The embedded observable as a shared handle, so the relink observer can
+    /// notify after releasing its `borrow_mut` on the model (D1: no borrow is
+    /// held across the notification). Mirrors the way [`Link::link_to`] hands
+    /// its observable back for a notify outside the link borrow.
+    ///
+    /// [`Link::link_to`]: crate::handle::Handle
+    fn shared_observable(&self) -> Shared<Observable> {
+        self.observable.clone()
     }
 }
 
@@ -239,6 +251,44 @@ impl TermStructureConsistentModel {
     }
 }
 
+/// Registers `model` as an observer of its term-structure `handle`, so a relink
+/// or a change inside the linked curve re-runs the concrete model's
+/// [`generate_arguments`](CalibratedModelHolder::generate_arguments) and then
+/// re-broadcasts - the observation half C++ wires with
+/// `registerWith(termStructure)` (`hullwhite.cpp:41`), whose inherited
+/// `CalibratedModel::update()` is `generateArguments()` + `notifyObservers()`
+/// (`model.hpp:87`). `handle` must be the same handle the model reads in
+/// `generate_arguments` (handle clones share one link), or the model would
+/// regenerate off a stale curve.
+///
+/// Opt-in per model, matching C++: a term-structure-consistent model that reads
+/// its curve live on every evaluation (`ExtendedCoxIngersollRoss`, which does
+/// not `registerWith` the curve) never calls this, so a relink does not
+/// regenerate; a model caching curve-derived scalars (Hull-White's `r0`/`phi`)
+/// does.
+///
+/// Returns the observer, which the model must keep alive: the handle holds only
+/// a weak back-reference to it, and it holds only a weak reference to the model,
+/// so a dropped model or a dropped observer prunes cleanly and no reference
+/// cycle forms. On notification the regeneration takes the model's `borrow_mut`
+/// and releases it before notifying, so an observer that reads the model back
+/// during the notification (a pricing engine calling `discount_bond`, a cached
+/// scalar) sees the regenerated state (D1: no borrow held across the notify).
+pub fn register_with_term_structure<M: CalibratedModelHolder + 'static>(
+    model: &SharedMut<M>,
+    handle: &Handle<dyn YieldTermStructure>,
+) -> SharedMut<dyn Observer> {
+    let observable = model.borrow().calibrated_model().shared_observable();
+    let weak = SharedMut::downgrade(model);
+    let observer = ResetThenNotify::broadcasting(observable, move || {
+        if let Some(model) = weak.upgrade() {
+            model.borrow_mut().generate_arguments();
+        }
+    }) as SharedMut<dyn Observer>;
+    handle.register_observer(&observer);
+    observer
+}
+
 /// Constraint imposed on a [`CalibratedModel`]'s arguments (`model.hpp:164`).
 ///
 /// Owns a snapshot of the arguments (see the module divergence note) and, for
@@ -304,15 +354,17 @@ impl Constraint for PrivateConstraint {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::handle::RelinkableHandle;
     use crate::interestrate::Compounding;
     use crate::math::optimization::constraint::{NoConstraint, PositiveConstraint};
     use crate::models::parameter::ConstantParameter;
     use crate::patterns::observable::Observer;
-    use crate::shared::{Shared, SharedMut, shared, shared_mut};
+    use crate::shared::{Shared, SharedMut, WeakMut, shared, shared_mut};
     use crate::termstructures::yields::FlatForward;
     use crate::time::date::{Date, Month};
     use crate::time::daycounters::actual360::Actual360;
     use crate::time::frequency::Frequency;
+    use crate::types::Real;
     use std::rc::Rc;
 
     struct UpdateCounter {
@@ -392,15 +444,17 @@ mod tests {
     }
 
     #[test]
-    fn updater_regenerates_and_rebroadcasts_to_the_models_observers() {
+    fn as_observer_rebroadcasts_to_the_models_observers() {
         let model = CalibratedModel::new(0);
         let counter = shared_mut(UpdateCounter { count: 0 });
         model
             .observable()
             .register_observer(&(counter.clone() as SharedMut<dyn Observer>));
 
-        // driving the observer half (as an observed observable would) forwards
-        // the notification to the model's own observers
+        // driving the pure-forwarding observer half (as an observed observable
+        // would) re-broadcasts to the model's own observers; it does NOT re-run
+        // a concrete model's generate_arguments (that is the opt-in
+        // register_with_term_structure path, covered below)
         model.as_observer().borrow_mut().update();
         assert_eq!(counter.borrow().count, 1);
     }
@@ -481,5 +535,136 @@ mod tests {
             Handle::new(shared(curve) as Shared<dyn YieldTermStructure>);
         let consistent = TermStructureConsistentModel::new(handle.clone());
         assert!(consistent.term_structure().points_to_same_link(&handle));
+    }
+
+    /// A flat continuously-compounded curve at `rate`, as a yield-curve handle
+    /// pointee. Two different rates give two different `discount(1.0)`.
+    fn flat_curve(rate: Real) -> Shared<dyn YieldTermStructure> {
+        shared(FlatForward::with_rate(
+            Date::new(17, Month::May, 1998),
+            rate,
+            Actual360::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>
+    }
+
+    /// A minimal term-structure-consistent fitted model: it caches one
+    /// curve-derived scalar (its discount to `t = 1`, standing in for
+    /// Hull-White's `r0 = zeroRate(0)`) and recomputes it whenever
+    /// `generate_arguments` runs. Zero calibrated arguments - the point is the
+    /// cached scalar, not a `Parameter`.
+    struct FittedScalarModel {
+        model: CalibratedModel,
+        term_structure: Handle<dyn YieldTermStructure>,
+        discount_at_one: Real,
+    }
+
+    impl FittedScalarModel {
+        /// Mirrors `HullWhite::HullWhite` calling `generateArguments()` in its
+        /// constructor: the cached scalar starts at `f(curve)`, not a default.
+        fn new(term_structure: Handle<dyn YieldTermStructure>) -> FittedScalarModel {
+            let mut fitted = FittedScalarModel {
+                model: CalibratedModel::new(0),
+                term_structure,
+                discount_at_one: 0.0,
+            };
+            fitted.generate_arguments();
+            fitted
+        }
+    }
+
+    impl CalibratedModelHolder for FittedScalarModel {
+        fn calibrated_model(&self) -> &CalibratedModel {
+            &self.model
+        }
+        fn calibrated_model_mut(&mut self) -> &mut CalibratedModel {
+            &mut self.model
+        }
+        fn generate_arguments(&mut self) {
+            self.discount_at_one = self
+                .term_structure
+                .current_link()
+                .unwrap()
+                .discount(1.0, true)
+                .unwrap();
+        }
+    }
+
+    #[test]
+    fn registered_model_regenerates_on_relink() {
+        let curve2 = flat_curve(0.10);
+        let rh: RelinkableHandle<dyn YieldTermStructure> = RelinkableHandle::new(flat_curve(0.05));
+        let model = shared_mut(FittedScalarModel::new(rh.handle()));
+        let before = model.borrow().discount_at_one;
+
+        let _observer = register_with_term_structure(&model, &rh.handle());
+        rh.link_to(curve2.clone());
+
+        let after = model.borrow().discount_at_one;
+        assert_ne!(before, after, "relink must regenerate the cached scalar");
+        assert_eq!(
+            after,
+            curve2.discount(1.0, true).unwrap(),
+            "the regenerated scalar must reflect the newly linked curve"
+        );
+    }
+
+    #[test]
+    fn unregistered_model_does_not_regenerate_on_relink() {
+        let rh: RelinkableHandle<dyn YieldTermStructure> = RelinkableHandle::new(flat_curve(0.05));
+        let model = shared_mut(FittedScalarModel::new(rh.handle()));
+        let before = model.borrow().discount_at_one;
+
+        // opt-in default: no register_with_term_structure call
+        rh.link_to(flat_curve(0.10));
+
+        assert_eq!(
+            model.borrow().discount_at_one,
+            before,
+            "an unregistered model must not regenerate on relink"
+        );
+    }
+
+    /// Reads the model's cached scalar during its own `update`, with a plain
+    /// `borrow()`: if a regeneration ever held the model's `borrow_mut` across
+    /// the notify, this would panic instead of silently passing.
+    struct ScalarReader {
+        model: WeakMut<FittedScalarModel>,
+        seen: Option<Real>,
+    }
+
+    impl Observer for ScalarReader {
+        fn update(&mut self) {
+            self.seen = self.model.upgrade().map(|m| m.borrow().discount_at_one);
+        }
+    }
+
+    #[test]
+    fn model_observers_see_the_regenerated_value_during_notification() {
+        let curve2 = flat_curve(0.10);
+        let rh: RelinkableHandle<dyn YieldTermStructure> = RelinkableHandle::new(flat_curve(0.05));
+        let model = shared_mut(FittedScalarModel::new(rh.handle()));
+        let _observer = register_with_term_structure(&model, &rh.handle());
+
+        let reader = shared_mut(ScalarReader {
+            model: SharedMut::downgrade(&model),
+            seen: None,
+        });
+        model
+            .borrow()
+            .calibrated_model()
+            .observable()
+            .register_observer(&(reader.clone() as SharedMut<dyn Observer>));
+
+        rh.link_to(curve2.clone());
+
+        // the model observer ran after regeneration and read the model back
+        // without hitting a live borrow: it sees curve2's discount, the proof
+        // that the borrow_mut was released before the notify (D1)
+        assert_eq!(
+            reader.borrow().seen,
+            Some(curve2.discount(1.0, true).unwrap())
+        );
     }
 }
