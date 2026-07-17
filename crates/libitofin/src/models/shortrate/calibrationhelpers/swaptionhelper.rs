@@ -424,7 +424,13 @@ mod tests {
     use crate::time::daycounters::thirty360::{Convention, Thirty360};
     use crate::time::frequency::Frequency;
 
+    use crate::models::calibrationhelper::CalibrationHelper;
+    use crate::models::shortrate::HullWhite;
+    use crate::pricingengines::JamshidianSwaptionEngine;
+
     const VOL: Real = 0.20;
+    const A: Real = 0.05;
+    const SIGMA: Real = 0.01;
 
     fn today() -> Date {
         Date::new(15, Month::January, 2026)
@@ -463,6 +469,15 @@ mod tests {
         }
 
         fn helper(&self, strike: Option<Real>) -> SwaptionHelper {
+            self.helper_with(strike, Period::new(1, TimeUnit::Years), 1.0)
+        }
+
+        fn helper_with(
+            &self,
+            strike: Option<Real>,
+            fixed_leg_tenor: Period,
+            nominal: Real,
+        ) -> SwaptionHelper {
             let vol: Handle<dyn Quote> =
                 Handle::new(shared(SimpleQuote::new(VOL)) as Shared<dyn Quote>);
             SwaptionHelper::new(
@@ -470,13 +485,13 @@ mod tests {
                 Period::new(5, TimeUnit::Years),
                 vol,
                 Shared::clone(&self.index),
-                Period::new(1, TimeUnit::Years),
+                fixed_leg_tenor,
                 Thirty360::with_convention(Convention::BondBasis),
                 Actual360::new(),
                 self.curve.clone(),
                 CalibrationErrorType::RelativePriceError,
                 strike,
-                1.0,
+                nominal,
                 VolatilityType::ShiftedLognormal,
                 0.0,
                 None,
@@ -608,6 +623,27 @@ mod tests {
             swaption.borrow_mut().base_mut().set_pricing_engine(engine);
             swaption.borrow_mut().npv().unwrap()
         }
+
+        fn hw_model(&self) -> SharedMut<HullWhite> {
+            HullWhite::new(self.curve.clone(), A, SIGMA).unwrap()
+        }
+
+        /// A standalone Jamshidian engine over the fixture's Hull-White model,
+        /// the model engine a calibration installs on the helper (#392).
+        fn jamshidian_engine(&self) -> SharedMut<dyn PricingEngine> {
+            shared_mut(JamshidianSwaptionEngine::new(self.hw_model()))
+                as SharedMut<dyn PricingEngine>
+        }
+
+        /// Prices a swaption on the given engine.
+        fn price_on(
+            &self,
+            swaption: &SharedMut<Swaption>,
+            engine: SharedMut<dyn PricingEngine>,
+        ) -> Real {
+            swaption.borrow_mut().base_mut().set_pricing_engine(engine);
+            swaption.borrow_mut().npv().unwrap()
+        }
     }
 
     /// The helper's `market_value` equals a swaption built independently to the
@@ -643,6 +679,108 @@ mod tests {
             (market - reference).abs() <= 1.0e-12,
             "market {market} vs independently-built black price {reference} (error {})",
             (market - reference).abs()
+        );
+    }
+
+    /// The helper's `model_value` equals the same swaption priced through a
+    /// standalone Jamshidian engine on the fixture Hull-White model (#392) - the
+    /// model-side pin. The strike is explicit, so both sides build an identical
+    /// swaption and the two prices agree to machine precision.
+    #[test]
+    fn model_value_matches_a_standalone_jamshidian_swaption() {
+        let fixture = Fixture::new();
+        let mut helper = fixture.helper(Some(0.03));
+        helper
+            .base_mut()
+            .set_pricing_engine(fixture.jamshidian_engine());
+
+        let model = helper.model_value().unwrap();
+        let reference = fixture.price_on(
+            &fixture.reference_swaption(Some(0.03)),
+            fixture.jamshidian_engine(),
+        );
+
+        assert!(
+            (model - reference).abs() <= 1.0e-12,
+            "model {model} vs standalone jamshidian price {reference} (error {})",
+            (model - reference).abs()
+        );
+    }
+
+    /// `RelativePriceError` calibration error is `|market - model| / market` of
+    /// the two prices the helper reports.
+    #[test]
+    fn relative_calibration_error_is_the_market_model_gap() {
+        let fixture = Fixture::new();
+        let mut helper = fixture.helper(Some(0.03));
+        helper
+            .base_mut()
+            .set_pricing_engine(fixture.jamshidian_engine());
+
+        let market = helper.market_value().unwrap();
+        let model = helper.model_value().unwrap();
+        let expected = (market - model).abs() / market;
+
+        let error = helper.calibration_error().unwrap();
+        assert!(
+            (error - expected).abs() <= 1.0e-12,
+            "calibration error {error} vs |{market} - {model}| / {market} = {expected}"
+        );
+    }
+
+    /// Perturbing a construction input moves `market_value`: doubling the nominal
+    /// reports a different market value, so the value genuinely reflects the
+    /// built instrument rather than a constant. The independently built reference
+    /// (unchanged inputs) still matches the base helper - pinned by
+    /// [`market_value_matches_an_independently_built_black_swaption_at_a_fixed_strike`].
+    #[test]
+    fn market_value_moves_when_a_construction_input_is_perturbed() {
+        let fixture = Fixture::new();
+        let mut base = fixture.helper(Some(0.03));
+        let mut perturbed = fixture.helper_with(Some(0.03), Period::new(1, TimeUnit::Years), 2.0);
+
+        let base_value = base.market_value().unwrap();
+        let perturbed_value = perturbed.market_value().unwrap();
+
+        assert!(
+            (perturbed_value - base_value).abs() > 1.0e-8,
+            "market value did not move when the nominal was perturbed: \
+             base {base_value} vs perturbed {perturbed_value}"
+        );
+    }
+
+    /// The engine restore at `swaptionhelper.cpp:148`: after `market_value` runs
+    /// `black_price` internally, the cached swaption is left on the model engine,
+    /// not the temporary Black engine. Pricing it on its currently-installed
+    /// engine gives the model price (not the Black market price). Removing the
+    /// restore leaves the Black engine installed, so the price would equal
+    /// `market` and this assertion would fail - which pins the restore.
+    #[test]
+    fn black_price_restores_the_model_engine_on_the_swaption() {
+        let fixture = Fixture::new();
+        let mut helper = fixture.helper(Some(0.03));
+        helper
+            .base_mut()
+            .set_pricing_engine(fixture.jamshidian_engine());
+
+        let market = helper.market_value().unwrap();
+        let model = fixture.price_on(
+            &fixture.reference_swaption(Some(0.03)),
+            fixture.jamshidian_engine(),
+        );
+
+        let swaption = helper.swaption().unwrap();
+        let priced_on_installed_engine = swaption.borrow_mut().npv().unwrap();
+
+        assert!(
+            (priced_on_installed_engine - model).abs() <= 1.0e-12,
+            "the restored engine priced {priced_on_installed_engine}, expected the model \
+             price {model}"
+        );
+        assert!(
+            (priced_on_installed_engine - market).abs() > 1.0e-8,
+            "the restored price {priced_on_installed_engine} must differ from the black \
+             market price {market}"
         );
     }
 }
