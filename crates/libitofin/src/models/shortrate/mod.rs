@@ -11,6 +11,6 @@ pub mod vasicek;
 
 pub use coxingersollross::{CoxIngersollRoss, VolatilityConstraint};
 pub use extendedcoxingersollross::ExtendedCoxIngersollRoss;
-pub use hullwhite::convexity_bias;
+pub use hullwhite::{HullWhite, convexity_bias};
 pub use onefactormodel::{AffineModel, OneFactorAffineModel};
 pub use vasicek::Vasicek;
