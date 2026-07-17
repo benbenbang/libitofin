@@ -191,8 +191,9 @@ impl OneFactorAffineModel for ExtendedCoxIngersollRoss {
 mod tests {
     use super::*;
     use crate::math::array::Array;
+    use crate::math::interpolations::linear::Linear;
     use crate::shared::{Shared, shared};
-    use crate::termstructures::yields::FlatForward;
+    use crate::termstructures::yields::{FlatForward, ZeroCurve};
     use crate::time::date::{Date, Month};
     use crate::time::daycounters::actual365fixed::Actual365Fixed;
 
@@ -204,6 +205,23 @@ mod tests {
             Compounding::Continuous,
             Frequency::Annual,
         );
+        Handle::new(shared(curve) as Shared<dyn YieldTermStructure>)
+    }
+
+    /// A sloped `ZeroCurve` (linear interpolation of continuous zero rates):
+    /// reference 15 Jan 2026, Actual365Fixed, nodes at t = 0, 1, 2, 3 with
+    /// continuous zero rates 0.03, 0.04, 0.05, 0.055 (so f(0) = 0.03). This is
+    /// the exact curve the C++ oracle below was generated on.
+    fn sloped_curve() -> Handle<dyn YieldTermStructure> {
+        let reference = Date::new(15, Month::January, 2026);
+        let dates = vec![
+            reference,
+            reference + 365,
+            reference + 730,
+            reference + 1095,
+        ];
+        let zeros = vec![0.03, 0.04, 0.05, 0.055];
+        let curve = ZeroCurve::new(dates, zeros, Actual365Fixed::new(), Linear).unwrap();
         Handle::new(shared(curve) as Shared<dyn YieldTermStructure>)
     }
 
@@ -222,6 +240,63 @@ mod tests {
         let calculated = model.discount_bond(1.5, 2.5, rate);
 
         assert!((expected - calculated).abs() < 1e-6);
+    }
+
+    #[test]
+    fn discount_bond_matches_cpp_on_a_sloped_curve() {
+        // Discriminating oracle for the term-structure fitting (#385): the #382
+        // testExtendedCoxIngersollRossDiscountFactor oracle is degenerate (flat
+        // curve, sigma=1e-4, x0=rate) and a mis-wire that returns base-CIR
+        // discountBond still passes it. Here the numbers come from C++ QuantLib
+        // 1.43.0 ExtendedCoxIngersollRoss on the sloped ZeroCurve above, at
+        // non-degenerate params theta=0.05, k=0.5, sigma=0.03, x0=0.05 (x0 !=
+        // f(0)=0.03). Generator params and full-precision output are cached below;
+        // the base-vs-fitted gap at these points is O(1e-2), so a mis-wire fails
+        // the 1e-8 oracle by six orders of magnitude.
+        let handle = sloped_curve();
+        let curve = handle.current_link().unwrap();
+        let model =
+            ExtendedCoxIngersollRoss::new(handle.clone(), 0.05, 0.5, 0.03, 0.05, true).unwrap();
+        let base = CoxIngersollRoss::new(0.05, 0.05, 0.5, 0.03, true).unwrap();
+
+        // C++ forwardRate(0,0,Continuous,NoFrequency): the dt=0.0001 shift makes
+        // this 0.030001..., not exactly 0.03; the fitting reprices at r = f(0).
+        let f0_cpp = 0.030_001_000_000_790_656;
+        let f0 = curve
+            .forward_rate(
+                0.0,
+                0.0,
+                Compounding::Continuous,
+                Frequency::NoFrequency,
+                false,
+            )
+            .unwrap()
+            .rate();
+        assert!((f0 - f0_cpp).abs() < 1e-12);
+
+        // (maturity, C++ P(maturity)) - the reprice targets. discountBond(0,T,f0)
+        // == P(T) for the fitted model but not for base CIR.
+        let reprice = [
+            (0.5, 0.982_652_235_665_073_2),
+            (1.0, 0.960_789_439_152_323_2),
+            (1.5, 0.934_727_720_616_027_5),
+            (2.0, 0.904_837_418_035_959_5),
+            (3.0, 0.847_893_704_087_915_9),
+        ];
+        for (t, p_cpp) in reprice {
+            // Fixture-parity guard: the Rust curve must be the C++ curve.
+            assert!((curve.discount(t, false).unwrap() - p_cpp).abs() < 1e-14);
+            // Oracle: the fitted model reprices the curve.
+            assert!((model.discount_bond(0.0, t, f0) - p_cpp).abs() < 1e-8);
+            // A base-CIR mis-wire would land here instead - O(1e-2) off.
+            assert!((base.discount_bond(0.0, t, f0) - p_cpp).abs() > 1e-3);
+        }
+
+        // A t>0 point pins the phi(t) term-structure interaction that a t=0-only
+        // reprice leaves free. C++ discountBond(0.5, 2.5, f0).
+        let ext_t_cpp = 0.903_817_675_549_668_5;
+        assert!((model.discount_bond(0.5, 2.5, f0) - ext_t_cpp).abs() < 1e-8);
+        assert!((base.discount_bond(0.5, 2.5, f0) - ext_t_cpp).abs() > 1e-3);
     }
 
     #[test]
