@@ -137,6 +137,24 @@ impl<C1: Constraint, C2: Constraint> Constraint for CompositeConstraint<C1, C2> 
     }
 }
 
+impl Constraint for Box<dyn Constraint> {
+    fn test(&self, params: &Array) -> bool {
+        (**self).test(params)
+    }
+
+    fn upper_bound(&self, params: &Array) -> Array {
+        (**self).upper_bound(params)
+    }
+
+    fn lower_bound(&self, params: &Array) -> Array {
+        (**self).lower_bound(params)
+    }
+
+    fn update(&self, params: &mut Array, direction: &Array, beta: Real) -> QlResult<Real> {
+        (**self).update(params, direction, beta)
+    }
+}
+
 fn assert_bound_size(bound: usize, params: usize, which: &str) {
     assert_eq!(
         bound, params,
@@ -205,6 +223,24 @@ mod tests {
         }
         let c = CompositeConstraint::new(WrongSize, NoConstraint);
         let _ = c.upper_bound(&Array::with_size(2));
+    }
+
+    #[test]
+    fn boxed_constraint_delegates_through_deref() {
+        let c: Box<dyn Constraint> = Box::new(PositiveConstraint);
+        assert!(c.test(&Array::from([1.0, 2.0])));
+        assert!(!c.test(&Array::from([1.0, 0.0])));
+        assert_eq!(c.lower_bound(&Array::with_size(2)), Array::filled(2, 0.0));
+        assert_eq!(
+            c.upper_bound(&Array::with_size(2)),
+            Array::filled(2, Real::MAX)
+        );
+        let composite = CompositeConstraint::new(
+            Box::new(PositiveConstraint) as Box<dyn Constraint>,
+            BoundaryConstraint::new(-1.0, 2.0),
+        );
+        assert!(composite.test(&Array::from([0.5, 1.0])));
+        assert!(!composite.test(&Array::from([-0.5])));
     }
 
     #[test]
