@@ -1,9 +1,12 @@
 [workspace]
 resolver = "3"
 members = ["crates/*"]
-# `crates/worktrees` is a tooling-created directory for git worktrees, not a
-# crate; exclude it so the `crates/*` glob does not try to load it as a member.
-exclude = ["crates/worktrees"]
+# `crates/worktrees` is a tooling-created directory for git worktrees and
+# `crates/graphify-out` is where a buggy graphify watcher drops its rebuild
+# (the scan root is `crates/`, so `<root>/graphify-out` lands inside the
+# member glob) - neither is a crate; exclude both so `crates/*` does not try
+# to load them as members and break every cargo command.
+exclude = ["crates/worktrees", "crates/graphify-out"]
 
 [workspace.package]
 version = "0.1.0"
