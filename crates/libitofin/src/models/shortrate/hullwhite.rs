@@ -32,9 +32,6 @@
 //!   fitting law are deferred with the dynamics/tree path (#377). Consequently
 //!   [`generate_arguments`](crate::models::CalibratedModelHolder::generate_arguments)
 //!   here refreshes only the cached `r0`; the `phi_` rebuild lands with `dynamics()`.
-//! - `discountBondOption` (`hullwhite.hpp:55`/`:60`, `hullwhite.cpp:90`/`:108`),
-//!   the Jamshidian bond option, needs `blackFormula` and has no oracle in this
-//!   batch; porting it now ships unpinned code (#262 rule).
 //! - `HullWhite::Dynamics` (`hullwhite.hpp:107`), `tree` (`hullwhite.cpp:43`),
 //!   `FixedReversion` (`hullwhite.hpp:80`) and the `JamshidianSwaptionEngine`
 //!   swaption oracles (`testCachedHullWhite*`) are the simulation/lattice and
@@ -65,7 +62,9 @@ use crate::models::model::{
 use crate::models::parameter::NullParameter;
 use crate::models::shortrate::onefactormodel::OneFactorAffineModel;
 use crate::models::shortrate::vasicek::Vasicek;
+use crate::option::OptionType;
 use crate::patterns::observable::Observer;
+use crate::pricingengines::blackformula::black_formula;
 use crate::require;
 use crate::shared::{SharedMut, shared_mut};
 use crate::termstructures::yieldtermstructure::YieldTermStructure;
@@ -204,6 +203,103 @@ impl HullWhite {
     pub fn r0(&self) -> Rate {
         self.base.r0()
     }
+
+    /// The fitted curve's discount factor `P(t)`
+    /// (`termStructure()->discount(t)`), read live for the bond-option payoffs.
+    fn discount(&self, t: Time) -> QlResult<Real> {
+        self.ts_model
+            .term_structure()
+            .current_link()?
+            .discount(t, false)
+    }
+
+    /// `discountBondOption(Option::Type, Real strike, Time maturity, Time
+    /// bondMaturity)` (`hullwhite.cpp:90`): the price of a European option, with
+    /// exercise at `maturity`, on a zero-coupon bond maturing at `bondMaturity`.
+    ///
+    /// The Jamshidian decomposition prices it as a [`black_formula`] on the
+    /// forward bond price `f = P(bondMaturity)` struck at `k =
+    /// P(maturity)*strike`, with volatility `v = sigma B(maturity, bondMaturity)
+    /// sqrt(0.5 (1 - e^{-2 a maturity}) / a)` (`hullwhite.cpp:96-101`; the
+    /// `a < sqrt(QL_EPSILON)` branch replaces the last factor with `sqrt(maturity)`,
+    /// the same small-mean-reversion guard as `B`). Because `k` and `f` already
+    /// fold in the curve discounts, `black_formula` is called with `discount = 1.0`
+    /// and `displacement = 0.0` (C++'s 4-argument `blackFormula` defaults).
+    ///
+    /// # Errors
+    ///
+    /// Fails if the fitted curve is unlinked or its discount is undefined, or if
+    /// `black_formula` rejects its arguments.
+    pub fn discount_bond_option(
+        &self,
+        option_type: OptionType,
+        strike: Real,
+        maturity: Time,
+        bond_maturity: Time,
+    ) -> QlResult<Real> {
+        let a = self.base.a();
+        let sigma = self.base.sigma();
+        let b = OneFactorAffineModel::b(self, maturity, bond_maturity);
+        let v = if a < Real::EPSILON.sqrt() {
+            sigma * b * maturity.sqrt()
+        } else {
+            sigma * b * (0.5 * (1.0 - (-2.0 * a * maturity).exp()) / a).sqrt()
+        };
+        let f = self.discount(bond_maturity)?;
+        let k = self.discount(maturity)? * strike;
+        black_formula(option_type, k, f, v, 1.0, 0.0)
+    }
+
+    /// `discountBondOption(Option::Type, Real strike, Time maturity, Time
+    /// bondStart, Time bondMaturity)` (`hullwhite.cpp:108`): the option on a
+    /// forward-starting zero-coupon bond spanning `[bondStart, bondMaturity]`,
+    /// exercised at `maturity`. This is the overload the
+    /// `JamshidianSwaptionEngine` (#392) calls.
+    ///
+    /// It is *not* the 4-argument overload with `bondStart` dropped: C++'s base
+    /// `AffineModel::discountBondOption` (`model.hpp:151`) delegates to the 4-arg
+    /// and ignores `bondStart`, but Hull-White overrides that default with a
+    /// distinct volatility (`hullwhite.cpp:114-127`),
+    /// `v = sigma / (a sqrt(2 a)) * sqrt(max(c, 0))`, where
+    /// `c = e^{-2a(bondStart-maturity)} - e^{-2a bondStart}
+    ///      - 2 (e^{-a(bondStart+bondMaturity-2 maturity)} - e^{-a(bondStart+bondMaturity)})
+    ///      + e^{-2a(bondMaturity-maturity)} - e^{-2a bondMaturity}`.
+    /// `c` is analytically non-negative but is floored at `0` to guard the `sqrt`
+    /// against tiny negative rounding (`hullwhite.cpp:123-126`). The
+    /// `a < sqrt(QL_EPSILON)` branch uses `sigma B(bondStart, bondMaturity)
+    /// sqrt(maturity)`. The forward price is `f = P(bondMaturity)` struck at
+    /// `k = P(bondStart)*strike` (note `bondStart`, not `maturity`).
+    ///
+    /// # Errors
+    ///
+    /// Fails if the fitted curve is unlinked or its discount is undefined, or if
+    /// `black_formula` rejects its arguments.
+    pub fn discount_bond_option_with_start(
+        &self,
+        option_type: OptionType,
+        strike: Real,
+        maturity: Time,
+        bond_start: Time,
+        bond_maturity: Time,
+    ) -> QlResult<Real> {
+        let a = self.base.a();
+        let sigma = self.base.sigma();
+        let v = if a < Real::EPSILON.sqrt() {
+            sigma * OneFactorAffineModel::b(self, bond_start, bond_maturity) * maturity.sqrt()
+        } else {
+            let c = (-2.0 * a * (bond_start - maturity)).exp()
+                - (-2.0 * a * bond_start).exp()
+                - 2.0
+                    * ((-a * (bond_start + bond_maturity - 2.0 * maturity)).exp()
+                        - (-a * (bond_start + bond_maturity)).exp())
+                + (-2.0 * a * (bond_maturity - maturity)).exp()
+                - (-2.0 * a * bond_maturity).exp();
+            sigma / (a * (2.0 * a).sqrt()) * c.max(0.0).sqrt()
+        };
+        let f = self.discount(bond_maturity)?;
+        let k = self.discount(bond_start)? * strike;
+        black_formula(option_type, k, f, v, 1.0, 0.0)
+    }
 }
 
 /// `HullWhite::generateArguments()` (`hullwhite.cpp:85`): refreshes the cached
@@ -313,6 +409,114 @@ mod tests {
         assert!((m.discount_bond(0.0, 2.0, 0.03) - 0.924_010_757_799_029_2).abs() < 1e-10);
         assert!((m.discount_bond(1.0, 3.0, 0.03) - 0.928_534_477_203_476).abs() < 1e-10);
         assert!((m.discount_bond(2.0, 5.0, 0.025) - 0.900_808_567_926_092_5).abs() < 1e-10);
+    }
+
+    #[test]
+    fn discount_bond_option_matches_cpp_hull_white() {
+        // No standalone C++ HW discountBondOption test exists, so these are cached
+        // from QuantLib 1.43.0-dev on the sloped fixture (scratchpad hwdbo.cpp,
+        // std::setprecision(17)). Both overloads are pinned: a 4-arg-only oracle
+        // would let a wrong 5-arg (or one that drops bondStart and delegates to the
+        // 4-arg, C++'s base default) pass. Strikes straddle the forward bond price
+        // so both the Call and Put ITM/OTM branches of black_formula are exercised.
+        let handle = sloped_curve();
+        let curve = handle.current_link().unwrap();
+
+        // Fixture parity: pin every P(t) the option payoffs read against C++.
+        assert!((curve.discount(1.0, false).unwrap() - 0.975_309_912_028_332_6).abs() < 1e-14);
+        assert!((curve.discount(2.0, false).unwrap() - 0.941_764_533_584_248_7).abs() < 1e-14);
+        assert!((curve.discount(3.0, false).unwrap() - 0.905_764_980_659_064).abs() < 1e-14);
+        assert!((curve.discount(5.0, false).unwrap() - 0.818_770_008_233_211_2).abs() < 1e-14);
+
+        let model = HullWhite::new(handle, 0.05, 0.01).unwrap();
+        let m = model.borrow();
+
+        // 4-arg (maturity=1, bondMaturity=3): forward bond price P(3)/P(1) = 0.9287.
+        // K=0.9 is ITM for the call / OTM for the put; K=0.95 the reverse.
+        assert!(
+            (m.discount_bond_option(OptionType::Call, 0.9, 1.0, 3.0)
+                .unwrap()
+                - 0.028_295_945_329_515_248)
+                .abs()
+                < 1e-10
+        );
+        assert!(
+            (m.discount_bond_option(OptionType::Call, 0.95, 1.0, 3.0)
+                .unwrap()
+                - 0.000_912_556_023_061_549_3)
+                .abs()
+                < 1e-10
+        );
+        assert!(
+            (m.discount_bond_option(OptionType::Put, 0.9, 1.0, 3.0)
+                .unwrap()
+                - 0.000_309_885_495_950_584_07)
+                .abs()
+                < 1e-10
+        );
+        assert!(
+            (m.discount_bond_option(OptionType::Put, 0.95, 1.0, 3.0)
+                .unwrap()
+                - 0.021_691_991_790_913_523)
+                .abs()
+                < 1e-10
+        );
+
+        // 5-arg (maturity=1, bondStart=2, bondMaturity=5): the engine-realistic
+        // geometry maturity < bondStart < bondMaturity. Forward price P(5)/P(2) =
+        // 0.8694; K=0.85 ITM call / OTM put, K=0.9 the reverse.
+        assert!(
+            (m.discount_bond_option_with_start(OptionType::Call, 0.85, 1.0, 2.0, 5.0)
+                .unwrap()
+                - 0.020_478_099_685_837_1)
+                .abs()
+                < 1e-10
+        );
+        assert!(
+            (m.discount_bond_option_with_start(OptionType::Call, 0.9, 1.0, 2.0, 5.0)
+                .unwrap()
+                - 0.000_903_569_724_417_981_9)
+                .abs()
+                < 1e-10
+        );
+        assert!(
+            (m.discount_bond_option_with_start(OptionType::Put, 0.85, 1.0, 2.0, 5.0)
+                .unwrap()
+                - 0.002_207_944_999_237_256_6)
+                .abs()
+                < 1e-10
+        );
+        assert!(
+            (m.discount_bond_option_with_start(OptionType::Put, 0.9, 1.0, 2.0, 5.0)
+                .unwrap()
+                - 0.029_721_641_717_030_61)
+                .abs()
+                < 1e-10
+        );
+    }
+
+    #[test]
+    fn discount_bond_option_small_mean_reversion_matches_cpp() {
+        // a = 1e-13 < sqrt(QL_EPSILON) drives the small-mean-reversion branch of
+        // BOTH overloads (v uses sqrt(maturity), not the general variance term).
+        // Cached from hwdbo.cpp with HullWhite(h, 1e-13, 0.01).
+        let model = HullWhite::new(sloped_curve(), 1e-13, 0.01).unwrap();
+        let m = model.borrow();
+
+        assert!(
+            (m.discount_bond_option(OptionType::Call, 0.9, 1.0, 3.0)
+                .unwrap()
+                - 0.028_431_518_729_836_437)
+                .abs()
+                < 1e-10
+        );
+        assert!(
+            (m.discount_bond_option_with_start(OptionType::Call, 0.85, 1.0, 2.0, 5.0)
+                .unwrap()
+                - 0.021_443_413_387_680_313)
+                .abs()
+                < 1e-10
+        );
     }
 
     #[test]
