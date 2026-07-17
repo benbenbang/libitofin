@@ -17,7 +17,7 @@ pub use calibrationhelper::{
 };
 pub use model::{
     CalibratedModel, CalibratedModelHolder, PrivateConstraint, TermStructureConsistentModel,
-    register_with_term_structure,
+    calibrate, calibration_value, register_with_term_structure,
 };
 pub use parameter::{
     ConstantParameter, NullParameter, Parameter, ParameterValue, TermStructureFittingParameter,

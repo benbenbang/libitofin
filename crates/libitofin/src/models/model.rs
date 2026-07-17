@@ -16,16 +16,6 @@
 //! re-broadcasts. It is opt-in per model, matching C++, where Hull-White / G2
 //! `registerWith(termStructure)` but ExtendedCoxIngersollRoss does not.
 //!
-//! ## Deferred
-//!
-//! - `calibrate()` against the `CalibrationHelper` family (`model.hpp:99`) and
-//!   the `CalibrationFunction` cost function (`model.cpp:35`): calibration needs
-//!   the (not-yet-ported) helper family; the affine `discountBond` oracle
-//!   constructs a model with explicit parameters and never calibrates. The
-//!   optimization stack it would drive (`Constraint`, `Problem`,
-//!   `LevenbergMarquardt`) is already on main, so this is a later ticket, not a
-//!   missing dependency.
-//!
 //! ## Divergences from QuantLib
 //!
 //! - C++'s `PrivateConstraint::Impl` holds `const std::vector<Parameter>&`
@@ -42,18 +32,41 @@
 //!   only writes and notifies (the base's `generateArguments()` is a no-op).
 //!   Writing through the embedded model directly therefore bypasses
 //!   regeneration - a fitted model must route parameter changes through its
-//!   holder [`set_params`](CalibratedModelHolder::set_params).
+//!   holder [`set_params`](CalibratedModelHolder::set_params). The
+//!   [`CalibrationFunction`] wired by [`calibrate`] does exactly that, so a
+//!   fitted model regenerates its curve-derived state on every parameter move.
+//! - C++'s `CalibrationFunction::value`/`values` propagate a `calibrationError`
+//!   throw (`model.cpp:50,60`); the [`CostFunction`] trait here is infallible,
+//!   so a failed [`calibration_error`](CalibrationHelper::calibration_error) (or
+//!   a rejected `set_params`) maps to a non-finite residual the optimizer's
+//!   penalty path steers away from (the same guard the Levenberg-Marquardt
+//!   adapter applies). [`calibration_value`] therefore returns `Ok(NAN)` where
+//!   C++ would throw.
+//! - The holder [`set_params`](CalibratedModelHolder::set_params) notifies while
+//!   the model's `borrow_mut` is still live, so a model observer that reads the
+//!   model back during the notification would panic. Calibration engines are
+//!   `LazyObject`s that only defer on notification (they read the model later,
+//!   inside `calibration_error`, after the borrow is dropped), so the affine
+//!   path is safe; the per-instrument loop drops the `borrow_mut` before pricing
+//!   for exactly that reason (D1).
 
 use crate::errors::QlResult;
 use crate::handle::Handle;
 use crate::math::array::Array;
-use crate::math::optimization::constraint::Constraint;
+use crate::math::optimization::constraint::{CompositeConstraint, Constraint};
+use crate::math::optimization::costfunction::CostFunction;
+use crate::math::optimization::endcriteria::{EndCriteria, EndCriteriaType};
+use crate::math::optimization::method::OptimizationMethod;
+use crate::math::optimization::problem::Problem;
+use crate::math::optimization::projectedconstraint::ProjectedConstraint;
+use crate::math::optimization::projection::Projection;
+use crate::models::calibrationhelper::CalibrationHelper;
 use crate::models::parameter::Parameter;
 use crate::patterns::observable::{AsObservable, Observable, Observer, ResetThenNotify};
 use crate::require;
 use crate::shared::{Shared, SharedMut, shared};
 use crate::termstructures::yieldtermstructure::YieldTermStructure;
-use crate::types::Size;
+use crate::types::{Integer, Real, Size};
 
 /// Calibrated model class (`model.hpp:86`).
 ///
@@ -65,6 +78,9 @@ pub struct CalibratedModel {
     arguments: Vec<Parameter>,
     observable: Shared<Observable>,
     updater: SharedMut<ResetThenNotify>,
+    end_criteria: EndCriteriaType,
+    problem_values: Array,
+    function_evaluation: Integer,
 }
 
 impl CalibratedModel {
@@ -77,6 +93,9 @@ impl CalibratedModel {
             arguments: vec![Parameter::default(); n_arguments],
             observable,
             updater,
+            end_criteria: EndCriteriaType::None,
+            problem_values: Array::new(),
+            function_evaluation: 0,
         }
     }
 
@@ -154,6 +173,24 @@ impl CalibratedModel {
         PrivateConstraint {
             arguments: self.arguments.clone(),
         }
+    }
+
+    /// `endCriteria()` (`model.hpp:112`): the criterion the last
+    /// [`calibrate`] run ended on, or [`EndCriteriaType::None`] if never run.
+    pub fn end_criteria(&self) -> EndCriteriaType {
+        self.end_criteria
+    }
+
+    /// `problemValues()` (`model.hpp:115`): the per-instrument residuals at the
+    /// calibrated point, empty until [`calibrate`] runs.
+    pub fn problem_values(&self) -> &Array {
+        &self.problem_values
+    }
+
+    /// `functionEvaluation()` (`model.hpp:121`): the cost-function evaluation
+    /// count of the last [`calibrate`] run.
+    pub fn function_evaluation(&self) -> Integer {
+        self.function_evaluation
     }
 
     /// This model's observer half, wired to its observable (C++'s
@@ -287,6 +324,190 @@ pub fn register_with_term_structure<M: CalibratedModelHolder + 'static>(
     }) as SharedMut<dyn Observer>;
     handle.register_observer(&observer);
     observer
+}
+
+/// The calibration cost function (`model.cpp:35`): on each evaluation it writes
+/// the projected parameters back into the model and returns the (weighted)
+/// per-instrument [`calibration_error`](CalibrationHelper::calibration_error)s.
+///
+/// C++ holds a non-owning `CalibratedModel*` (`model.cpp:41`, `null_deleter`)
+/// and mutates the model on every cost call while `Problem`/`minimize` also
+/// borrow the function; here it holds a [`SharedMut`] clone of the same model
+/// handle (no second ownership path) and interior-mutates through it, so a
+/// `&dyn CostFunction` can drive the model. It routes through the holder
+/// [`set_params`](CalibratedModelHolder::set_params) so a fitted model
+/// regenerates its derived state on every parameter move.
+struct CalibrationFunction<M: CalibratedModelHolder> {
+    model: SharedMut<M>,
+    instruments: Vec<SharedMut<dyn CalibrationHelper>>,
+    weights: Vec<Real>,
+    projection: Projection,
+}
+
+impl<M: CalibratedModelHolder> CalibrationFunction<M> {
+    /// Writes `full` into the model through the holder seam, dropping the
+    /// `borrow_mut` before returning so the caller's per-instrument loop can
+    /// price without a live model borrow. Returns whether the write succeeded.
+    fn set_params(&self, full: &Array) -> bool {
+        self.model.borrow_mut().set_params(full).is_ok()
+    }
+}
+
+impl<M: CalibratedModelHolder> CostFunction for CalibrationFunction<M> {
+    /// `values` (`model.cpp:56`): each entry is
+    /// `calibration_error() * sqrt(weight)`. A failed write or
+    /// [`calibration_error`](CalibrationHelper::calibration_error) becomes a
+    /// non-finite residual the optimizer's penalty path rejects (the trait is
+    /// infallible; see the module divergence note).
+    fn values(&self, params: &Array) -> Array {
+        let full = self.projection.include(params);
+        let n = self.instruments.len();
+        if !self.set_params(&full) {
+            return Array::filled(n, Real::NAN);
+        }
+        let mut values = Array::with_size(n);
+        for (i, instrument) in self.instruments.iter().enumerate() {
+            values[i] = match instrument.borrow_mut().calibration_error() {
+                Ok(error) => error * self.weights[i].sqrt(),
+                Err(_) => Real::NAN,
+            };
+        }
+        values
+    }
+
+    /// `value` (`model.cpp:46`): `sqrt(sum_i diff_i^2 * w_i)`. Overrides the
+    /// default root-*mean*-square (which divides by the residual count) to match
+    /// C++'s plain root-sum-of-squares.
+    fn value(&self, params: &Array) -> Real {
+        let full = self.projection.include(params);
+        if !self.set_params(&full) {
+            return Real::NAN;
+        }
+        let mut value = 0.0;
+        for (i, instrument) in self.instruments.iter().enumerate() {
+            let diff = match instrument.borrow_mut().calibration_error() {
+                Ok(error) => error,
+                Err(_) => return Real::NAN,
+            };
+            value += diff * diff * self.weights[i];
+        }
+        value.sqrt()
+    }
+
+    /// `finiteDifferenceEpsilon` (`model.cpp:66`). Consulted only when the
+    /// method uses the cost function's own Jacobian; the Levenberg-Marquardt
+    /// default uses its own forward-difference step.
+    fn finite_difference_epsilon(&self) -> Real {
+        1e-6
+    }
+}
+
+/// `CalibratedModel::calibrate` (`model.cpp:75`): fits `model`'s free arguments
+/// to `instruments` with `method`, then writes the fitted parameters, the end
+/// criterion, the residuals and the evaluation count back onto the model and
+/// notifies its observers.
+///
+/// Shaped as a free function over a [`SharedMut`] model, mirroring
+/// [`register_with_term_structure`]: the [`CalibrationFunction`] must interior-
+/// mutate the model while [`Problem`] borrows it as a `&dyn CostFunction`, which
+/// a `&mut self` method on the holder could not express.
+///
+/// `additional_constraint` is `None` for C++'s default empty `Constraint()`, or
+/// `Some(c)` to intersect `c` with the model's own private constraint.
+///
+/// # Errors
+///
+/// Fails on empty `instruments`, a `weights` or `fix_parameters` length that
+/// does not match, an all-fixed projection, or a failure of `method.minimize`.
+pub fn calibrate<M: CalibratedModelHolder>(
+    model: &SharedMut<M>,
+    instruments: &[SharedMut<dyn CalibrationHelper>],
+    method: &mut dyn OptimizationMethod,
+    end_criteria: &EndCriteria,
+    additional_constraint: Option<Box<dyn Constraint>>,
+    weights: Vec<Real>,
+    fix_parameters: Vec<bool>,
+) -> QlResult<()> {
+    require!(!instruments.is_empty(), "no instruments provided");
+
+    let private = model.borrow().calibrated_model().constraint();
+    let constraint: Box<dyn Constraint> = match additional_constraint {
+        None => Box::new(private),
+        Some(additional) => Box::new(CompositeConstraint::new(private, additional)),
+    };
+
+    require!(
+        weights.is_empty() || weights.len() == instruments.len(),
+        "mismatch between number of instruments ({}) and weights ({})",
+        instruments.len(),
+        weights.len()
+    );
+    let weights = if weights.is_empty() {
+        vec![1.0; instruments.len()]
+    } else {
+        weights
+    };
+
+    let prms = model.borrow().calibrated_model().params();
+    require!(
+        fix_parameters.is_empty() || fix_parameters.len() == prms.size(),
+        "mismatch between number of parameters ({}) and fixed-parameter specs ({})",
+        prms.size(),
+        fix_parameters.len()
+    );
+    let projection = Projection::new(&prms, fix_parameters)?;
+    let projected_constraint = ProjectedConstraint::new(constraint, projection.clone());
+    let function = CalibrationFunction {
+        model: SharedMut::clone(model),
+        instruments: instruments.to_vec(),
+        weights,
+        projection: projection.clone(),
+    };
+    let mut problem = Problem::new(&function, &projected_constraint, projection.project(&prms));
+    let end_criteria_result = method.minimize(&mut problem, end_criteria)?;
+    let result = problem.current_value().clone();
+    model
+        .borrow_mut()
+        .set_params(&projection.include(&result))?;
+    let problem_values = problem.values(&result);
+    let function_evaluation = problem.function_evaluation();
+
+    {
+        let mut borrowed = model.borrow_mut();
+        let calibrated = borrowed.calibrated_model_mut();
+        calibrated.end_criteria = end_criteria_result;
+        calibrated.problem_values = problem_values;
+        calibrated.function_evaluation = function_evaluation;
+    }
+    model
+        .borrow()
+        .calibrated_model()
+        .observable()
+        .notify_observers();
+    Ok(())
+}
+
+/// `CalibratedModel::value` (`model.cpp:117`): the calibration cost of `params`
+/// against `instruments` under unit weights and an identity projection. Like
+/// C++ it writes `params` into the model as a side effect.
+///
+/// # Errors
+///
+/// Fails if `params` is empty (no free parameters for the identity projection).
+pub fn calibration_value<M: CalibratedModelHolder>(
+    model: &SharedMut<M>,
+    params: &Array,
+    instruments: &[SharedMut<dyn CalibrationHelper>],
+) -> QlResult<Real> {
+    let weights = vec![1.0; instruments.len()];
+    let projection = Projection::new(params, Vec::new())?;
+    let function = CalibrationFunction {
+        model: SharedMut::clone(model),
+        instruments: instruments.to_vec(),
+        weights,
+        projection,
+    };
+    Ok(function.value(params))
 }
 
 /// Constraint imposed on a [`CalibratedModel`]'s arguments (`model.hpp:164`).
