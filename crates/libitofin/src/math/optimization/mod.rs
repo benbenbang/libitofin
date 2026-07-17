@@ -10,6 +10,8 @@ pub mod linesearchbasedmethod;
 pub mod lmdif;
 pub mod method;
 pub mod problem;
+pub mod projectedconstraint;
+pub mod projection;
 pub mod simplex;
 pub mod steepestdescent;
 
