@@ -578,6 +578,8 @@ mod tests {
     use crate::handle::RelinkableHandle;
     use crate::interestrate::Compounding;
     use crate::math::optimization::constraint::{NoConstraint, PositiveConstraint};
+    use crate::math::optimization::levenbergmarquardt::LevenbergMarquardt;
+    use crate::models::calibrationhelper::CalibrationHelper;
     use crate::models::parameter::ConstantParameter;
     use crate::patterns::observable::Observer;
     use crate::shared::{Shared, SharedMut, WeakMut, shared, shared_mut};
@@ -586,6 +588,7 @@ mod tests {
     use crate::time::daycounters::actual360::Actual360;
     use crate::time::frequency::Frequency;
     use crate::types::Real;
+    use std::cell::Cell;
     use std::rc::Rc;
 
     struct UpdateCounter {
@@ -887,5 +890,198 @@ mod tests {
             reader.borrow().seen,
             Some(curve2.discount(1.0, true).unwrap())
         );
+    }
+
+    /// A one-parameter fitted model whose only derived state is
+    /// `derived = 2 * param`, rebuilt ONLY in `generate_arguments` and shared
+    /// with the helper through an `Rc<Cell>`. Writing parameters through the
+    /// embedded `CalibratedModel::set_params` (bypassing `generate_arguments`)
+    /// leaves the cell stale, so a helper reading the cell detects wrong
+    /// routing (the de-degeneration the gate requires).
+    struct DerivedModel {
+        model: CalibratedModel,
+        derived: Rc<Cell<Real>>,
+    }
+
+    impl DerivedModel {
+        fn new(seed: Real, derived: Rc<Cell<Real>>) -> SharedMut<DerivedModel> {
+            let mut model = CalibratedModel::new(1);
+            model.arguments_mut()[0] = ConstantParameter::new(seed, Rc::new(NoConstraint)).unwrap();
+            let mut fitted = DerivedModel { model, derived };
+            fitted.generate_arguments();
+            shared_mut(fitted)
+        }
+    }
+
+    impl CalibratedModelHolder for DerivedModel {
+        fn calibrated_model(&self) -> &CalibratedModel {
+            &self.model
+        }
+        fn calibrated_model_mut(&mut self) -> &mut CalibratedModel {
+            &mut self.model
+        }
+        fn generate_arguments(&mut self) {
+            self.derived.set(2.0 * self.model.params()[0]);
+        }
+    }
+
+    /// A helper reading the model's CACHED derived value: its calibration error
+    /// is `derived - target`, so its minimum is at `2 * param == target`.
+    struct DerivedHelper {
+        derived: Rc<Cell<Real>>,
+        target: Real,
+    }
+
+    impl CalibrationHelper for DerivedHelper {
+        fn calibration_error(&mut self) -> QlResult<Real> {
+            Ok(self.derived.get() - self.target)
+        }
+    }
+
+    fn helper(derived: &Rc<Cell<Real>>, target: Real) -> SharedMut<dyn CalibrationHelper> {
+        shared_mut(DerivedHelper {
+            derived: Rc::clone(derived),
+            target,
+        }) as SharedMut<dyn CalibrationHelper>
+    }
+
+    fn criteria() -> EndCriteria {
+        EndCriteria::new(1000, Some(100), 1e-10, 1e-10, None).unwrap()
+    }
+
+    #[test]
+    fn calibrate_drives_the_free_parameter_to_the_analytic_minimum() {
+        let derived = Rc::new(Cell::new(0.0));
+        let model = DerivedModel::new(1.0, Rc::clone(&derived));
+        let instruments = vec![helper(&derived, 6.0)];
+        let mut method = LevenbergMarquardt::default();
+
+        calibrate(
+            &model,
+            &instruments,
+            &mut method,
+            &criteria(),
+            None,
+            Vec::new(),
+            Vec::new(),
+        )
+        .unwrap();
+
+        assert!((model.borrow().calibrated_model().params()[0] - 3.0).abs() < 1e-4);
+        // derived == 2 * 3 == 6 proves generate_arguments ran on the final
+        // set_params too (had calibrate bypassed the holder seam it would be
+        // stale at 2 * seed).
+        assert!((derived.get() - 6.0).abs() < 1e-4);
+        assert!(model.borrow().calibrated_model().end_criteria().succeeded());
+    }
+
+    #[test]
+    fn calibrate_finds_the_least_squares_point_of_two_helpers() {
+        let derived = Rc::new(Cell::new(0.0));
+        let model = DerivedModel::new(1.0, Rc::clone(&derived));
+        // minima at 2*param == 6 (param 3) and 2*param == 10 (param 5); the
+        // least-squares compromise is param 4.
+        let instruments = vec![helper(&derived, 6.0), helper(&derived, 10.0)];
+        let mut method = LevenbergMarquardt::default();
+
+        calibrate(
+            &model,
+            &instruments,
+            &mut method,
+            &criteria(),
+            None,
+            Vec::new(),
+            Vec::new(),
+        )
+        .unwrap();
+
+        assert!((model.borrow().calibrated_model().params()[0] - 4.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn calibrate_rejects_an_all_fixed_projection() {
+        let derived = Rc::new(Cell::new(0.0));
+        let model = DerivedModel::new(1.0, Rc::clone(&derived));
+        let instruments = vec![helper(&derived, 6.0)];
+        let mut method = LevenbergMarquardt::default();
+
+        let err = calibrate(
+            &model,
+            &instruments,
+            &mut method,
+            &criteria(),
+            None,
+            Vec::new(),
+            vec![true],
+        )
+        .unwrap_err();
+        assert_eq!(err.message(), "numberOfFreeParameters==0");
+    }
+
+    #[test]
+    fn calibrate_guards_reject_bad_inputs() {
+        let derived = Rc::new(Cell::new(0.0));
+        let model = DerivedModel::new(1.0, Rc::clone(&derived));
+        let mut method = LevenbergMarquardt::default();
+
+        let err = calibrate(
+            &model,
+            &[],
+            &mut method,
+            &criteria(),
+            None,
+            Vec::new(),
+            Vec::new(),
+        )
+        .unwrap_err();
+        assert_eq!(err.message(), "no instruments provided");
+
+        let instruments = vec![helper(&derived, 6.0)];
+        let err = calibrate(
+            &model,
+            &instruments,
+            &mut method,
+            &criteria(),
+            None,
+            vec![1.0, 1.0],
+            Vec::new(),
+        )
+        .unwrap_err();
+        assert_eq!(
+            err.message(),
+            "mismatch between number of instruments (1) and weights (2)"
+        );
+
+        let err = calibrate(
+            &model,
+            &instruments,
+            &mut method,
+            &criteria(),
+            None,
+            Vec::new(),
+            vec![false, false],
+        )
+        .unwrap_err();
+        assert_eq!(
+            err.message(),
+            "mismatch between number of parameters (1) and fixed-parameter specs (2)"
+        );
+    }
+
+    #[test]
+    fn calibration_value_is_the_root_sum_of_squares_and_writes_params() {
+        let derived = Rc::new(Cell::new(0.0));
+        let model = DerivedModel::new(1.0, Rc::clone(&derived));
+        let instruments = vec![helper(&derived, 6.0), helper(&derived, 10.0)];
+
+        let value = calibration_value(&model, &Array::from([2.0]), &instruments).unwrap();
+        // derived = 2 * 2 = 4; diffs -2 and -6; the C++ value is the plain
+        // root-sum-of-squares sqrt(4 + 36) = sqrt(40), NOT the default
+        // root-MEAN-square sqrt(40 / 2) = sqrt(20).
+        assert!((value - 40.0_f64.sqrt()).abs() < 1e-12);
+        // value() writes params into the model as a side effect (faithful to
+        // C++'s setParams inside value()).
+        assert_eq!(model.borrow().calibrated_model().params()[0], 2.0);
+        assert!((derived.get() - 4.0).abs() < 1e-12);
     }
 }
