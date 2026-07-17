@@ -3,7 +3,7 @@
 //! Port of `ql/models/shortrate/onefactormodels/hullwhite.{hpp,cpp}`: the
 //! extended-Vasicek short rate `dr_t = (theta(t) - a r_t) dt + sigma dW_t`,
 //! whose deterministic drift `theta(t)` is fitted so the model reprices the
-//! input [`YieldTermStructure`](crate::termstructures::yieldtermstructure::YieldTermStructure)
+//! input [`YieldTermStructure`]
 //! exactly. This slice ports the static futures convexity bias, the closed-form
 //! curve-fit [`HullWhite`] model (the `A(t,T)` override and the cached, curve-fed
 //! `r0`), and their non-engine oracles.
@@ -268,9 +268,10 @@ impl OneFactorAffineModel for HullWhite {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::handle::RelinkableHandle;
     use crate::math::interpolations::linear::Linear;
     use crate::shared::{Shared, shared};
-    use crate::termstructures::yields::ZeroCurve;
+    use crate::termstructures::yields::{FlatForward, ZeroCurve};
     use crate::time::date::{Date, Month};
     use crate::time::daycounters::actual365fixed::Actual365Fixed;
 
@@ -323,13 +324,53 @@ mod tests {
         assert!((model.borrow().r0() - 0.020_000_499_999_160_704).abs() < 1e-12);
     }
 
+    /// A flat continuously-compounded curve at `rate` on `Actual365Fixed`,
+    /// reference date 19 May 2026, as a yield-curve pointee.
+    fn flat(rate: Rate) -> Shared<dyn YieldTermStructure> {
+        shared(FlatForward::with_rate(
+            Date::new(19, Month::May, 2026),
+            rate,
+            Actual365Fixed::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>
+    }
+
+    #[test]
+    fn r0_updates_when_the_term_structure_relinks() {
+        // testHullWhiteUpdatesR0WhenTermStructureRelinks (shortratemodels.cpp:58).
+        // The model observes its curve handle (register_with_term_structure, #387);
+        // a relink re-runs generate_arguments so the cached r0 tracks the new
+        // curve. Confirmed by stubbing that dropping the registration makes this
+        // assertion fail (r0 stays at the 0.02 curve's zero rate). D5: explicit
+        // reference dates, no Settings.
+        let rh: RelinkableHandle<dyn YieldTermStructure> = RelinkableHandle::new(flat(0.02));
+        let model = HullWhite::new(rh.handle(), 0.1, 0.01).unwrap();
+
+        let new_curve = flat(0.05);
+        rh.link_to(new_curve.clone());
+
+        let expected = new_curve
+            .forward_rate(
+                0.0,
+                0.0,
+                Compounding::Continuous,
+                Frequency::NoFrequency,
+                false,
+            )
+            .unwrap()
+            .rate();
+        assert!((model.borrow().r0() - expected).abs() < 1e-12);
+    }
+
     #[test]
     fn futures_convexity_bias_reproduces_the_kirikos_novak_table() {
         // testFuturesConvexityBias (shortratemodels.cpp:407-438). G. Kirikos, D.
         // Novak, "Convexity Conundrums", Risk Magazine, March 1997. The five rows
-        // exercise all three branches of the body: general a (0.03), the
-        // small-a threshold (1e-4, below QL_EPSILON only where 2t makes it bite),
-        // a == 0, and deltaT -> 0 (T = 5.001 and T = t = 5.0).
+        // exercise all three branches of the body: the general temp branch (a =
+        // 0.03 and a = 1e-4, both far above QL_EPSILON), the small-a temp branch
+        // temp(x) = x (a = 0.0 < QL_EPSILON), and the deltaT < QL_EPSILON return
+        // branch (T = t = 5.0; T = 5.001 stays on the general return).
         let future_quote = 94.0;
         let sigma = 0.015;
         let t = 5.0;
