@@ -37,7 +37,7 @@ use std::rc::Rc;
 
 use crate::errors::QlResult;
 use crate::math::optimization::constraint::{NoConstraint, PositiveConstraint};
-use crate::models::model::CalibratedModel;
+use crate::models::model::{CalibratedModel, CalibratedModelHolder};
 use crate::models::parameter::ConstantParameter;
 use crate::models::shortrate::onefactormodel::OneFactorAffineModel;
 use crate::types::{Rate, Real, Time};
@@ -88,6 +88,33 @@ impl Vasicek {
     /// The initial short rate `r0` (`vasicek.hpp:58`).
     pub fn r0(&self) -> Rate {
         self.r0
+    }
+
+    /// Refreshes the cached `r0` field (C++'s protected `r0_`, `vasicek.hpp:69`).
+    ///
+    /// The base model never rewrites `r0` (it is a constructor input), so this is
+    /// the seam a term-structure-fitted subclass ([`HullWhite`], whose
+    /// `generateArguments` sets `r0_ = zeroRate(0)`, `hullwhite.cpp:86`) uses to
+    /// keep the inherited `r0()` reporting the current curve.
+    ///
+    /// [`HullWhite`]: super::hullwhite::HullWhite
+    pub(crate) fn set_r0(&mut self, r0: Rate) {
+        self.r0 = r0;
+    }
+}
+
+/// Base Vasicek's `generateArguments()` is the no-op default (C++ does not
+/// override it); the holder is implemented so a composing model
+/// ([`HullWhite`](super::hullwhite::HullWhite)) reaches the embedded
+/// [`CalibratedModel`] through the #381 seam - both to install its
+/// `NullParameter` arguments and to read them back.
+impl CalibratedModelHolder for Vasicek {
+    fn calibrated_model(&self) -> &CalibratedModel {
+        &self.model
+    }
+
+    fn calibrated_model_mut(&mut self) -> &mut CalibratedModel {
+        &mut self.model
     }
 }
 
