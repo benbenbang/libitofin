@@ -20,5 +20,5 @@ pub use parameter::{
 };
 pub use shortrate::{
     AffineModel, CoxIngersollRoss, ExtendedCoxIngersollRoss, OneFactorAffineModel, Vasicek,
-    VolatilityConstraint,
+    VolatilityConstraint, convexity_bias,
 };
