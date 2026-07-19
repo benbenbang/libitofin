@@ -8,6 +8,7 @@
 //! belongs to.
 
 pub mod calibrationhelper;
+pub mod equity;
 pub mod model;
 pub mod parameter;
 pub mod shortrate;
@@ -15,6 +16,7 @@ pub mod shortrate;
 pub use calibrationhelper::{
     BlackCalibrationHelper, BlackCalibrationHelperBase, CalibrationErrorType, CalibrationHelper,
 };
+pub use equity::{FellerConstraint, HestonModel};
 pub use model::{
     CalibratedModel, CalibratedModelHolder, PrivateConstraint, TermStructureConsistentModel,
     calibrate, calibration_value, register_with_term_structure,
