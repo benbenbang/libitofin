@@ -316,6 +316,24 @@ oversight) and is documented at the point of divergence in the source.
   `-0.5`, ITM `-1.0` for the put, and the call mirror), so a regression to the
   `alpha_ >= 0` form is a test failure.
 
+**Processes (L5):**
+
+- **`HestonProcess` ports the analytic surface only; `evolve` is deferred and
+  fails.** QuantLib's `HestonProcess` overrides `evolve`
+  (`hestonprocess.cpp:396`) with a QE/BroadieKaya exact-sampling scheme, while
+  its ctor installs `EulerDiscretization` (`hestonprocess.cpp:46`) so its
+  `expectation`/`std_deviation`/`covariance` are the plain Euler defaults. This
+  port keeps those three inherited Euler defaults (they match QuantLib), ports
+  `drift`/`diffusion`/`apply`/`initial_values` (everything the
+  `AnalyticHestonEngine` reads), and overrides `evolve` to return `Err`
+  referencing the deferral (#410) rather than silently returning the base
+  Euler `evolve`, which `HestonProcess` never produces under any
+  configuration. The C++ `Discretization` enum is omitted entirely: only the
+  default vol branch (`sqrt(max(v, 0))`, with the `1e-8` diffusion floor) is
+  ported, so the analytic surface is unambiguous without it. The Monte Carlo
+  surface (`pdf`, `varianceDistribution`, `Phi`, the QE/BroadieKaya `evolve`)
+  lands with #410.
+
 **Non-finite inputs (cross-cutting):**
 
 - **Non-finite arguments are rejected at the API boundary.** QuantLib validates

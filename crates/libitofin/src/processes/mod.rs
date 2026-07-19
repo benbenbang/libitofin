@@ -9,5 +9,7 @@
 //! [`GeneralizedBlackScholesProcess`].
 
 mod blackscholesprocess;
+mod hestonprocess;
 
 pub use blackscholesprocess::{BlackScholesMertonProcess, GeneralizedBlackScholesProcess};
+pub use hestonprocess::HestonProcess;
