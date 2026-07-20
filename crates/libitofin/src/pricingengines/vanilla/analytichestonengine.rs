@@ -11,8 +11,6 @@
 //! engine (#417) both build a [`HestonChf`] from the five params and call it.
 //!
 //! Deferrals (see the type docs):
-//! - the small-`sigma` series expansion branch of `chF`
-//!   (`analytichestonengine.cpp:584-617`), off the calibrated oracle path;
 //! - the `addOnTerm` virtual hook (`analytichestonengine.hpp:179-181`, base
 //!   returns 0), the Bates jump-diffusion extension point.
 
@@ -130,29 +128,75 @@ impl HestonChf {
     }
 
     /// `chF(z, t)` (`analytichestonengine.cpp:578-619`): the characteristic
-    /// function itself.
+    /// function itself, total over both branches.
     ///
     /// The calibrated path (`sigma > 1e-6 || kappa < 1e-8`, `cpp:580`) returns
-    /// `exp(lnChF(z, t))`.
+    /// `exp(lnChF(z, t))`. The complementary small-`sigma` path
+    /// (`sigma <= 1e-6 && kappa >= 1e-8`) returns the [`chf_small_sigma`] series
+    /// expansion (`cpp:584-617`), where `exp(lnChF)` loses precision as
+    /// `sigma -> 0`; a flat-vol calibration drives `sigma` into this branch
+    /// (issue #425).
     ///
-    /// # Errors
-    ///
-    /// The small-`sigma` series expansion (`cpp:584-617`), reached only when
-    /// `sigma <= 1e-6 && kappa >= 1e-8`, is deferred (issue #415): it is off the
-    /// calibrated oracle path, so this returns `Err` rather than silently
-    /// falling through to `exp(lnChF)`.
-    pub fn chf(&self, z: Complex, t: Time) -> QlResult<Complex> {
+    /// [`chf_small_sigma`]: HestonChf::chf_small_sigma
+    pub fn chf(&self, z: Complex, t: Time) -> Complex {
         if self.sigma > 1e-6 || self.kappa < 1e-8 {
-            Ok(self.ln_chf(z, t).exp())
+            self.ln_chf(z, t).exp()
         } else {
-            fail!(
-                "Heston chF small-sigma series expansion (analytichestonengine.cpp:584-617) is \
-                 deferred: only the exp(lnChF) branch (sigma > 1e-6 || kappa < 1e-8) is ported \
-                 (issue #415); got sigma={} kappa={}",
-                self.sigma,
-                self.kappa
-            )
+            self.chf_small_sigma(z, t)
         }
+    }
+
+    /// The small-`sigma` series expansion of `chF`
+    /// (`analytichestonengine.cpp:584-617`): the sigma-Taylor expansion of
+    /// `exp(lnChF)` to order `sigma^2`, taken when `sigma <= 1e-6 &&
+    /// kappa >= 1e-8` where the closed form suffers catastrophic cancellation.
+    ///
+    /// Transcribed term-by-term as `sigma^0 + sigma^1*rho-term + sigma^2-term`.
+    /// `a1`/`a2` name the two real subexpressions C++ repeats inline (identical
+    /// value, computed once), and `squared(squared(kappa)) = kappa^4`.
+    fn chf_small_sigma(&self, z: Complex, t: Time) -> Complex {
+        let kappa = self.kappa;
+        let sigma = self.sigma;
+        let theta = self.theta;
+        let rho = self.rho;
+        let v0 = self.v0;
+
+        let sigma2 = sigma * sigma;
+        let kappa2 = kappa * kappa;
+        let kt = kappa * t;
+        let ekt = kt.exp();
+        let e2kt = (2.0 * kt).exp();
+        let rho2 = rho * rho;
+        let zpi = z + Complex::new(0.0, 1.0);
+        let one_minus_iz = Complex::new(1.0, 0.0) - Complex::new(-z.im, z.re);
+
+        let a1 = theta - v0 + ekt * ((-1.0 + kt) * theta + v0);
+        let a2 = 2.0 * theta + kt * theta - v0 - kt * v0 + ekt * ((-2.0 + kt) * theta + v0);
+
+        let term0 = (-(a1 * z * zpi / ekt) / (2.0 * kappa)).exp();
+
+        let term1 =
+            (-kt - a1 * z * zpi / (2.0 * ekt * kappa)).exp() * rho * a2 * one_minus_iz * z * z
+                / (2.0 * kappa2)
+                * sigma;
+
+        let s1 = -2.0 * rho2 * (a2 * a2) * z * z * zpi;
+        let s2 = 2.0
+            * kappa
+            * v0
+            * (-zpi + e2kt * (zpi + 4.0 * rho2 * z)
+                - 2.0 * ekt * (2.0 * rho2 * z + kt * (zpi + rho2 * (2.0 + kt) * z)));
+        let s3 = kappa
+            * theta
+            * (zpi
+                + e2kt * (-5.0 * zpi - 24.0 * rho2 * z + 2.0 * kt * (zpi + 4.0 * rho2 * z))
+                + 4.0 * ekt * (zpi + 6.0 * rho2 * z + kt * (zpi + rho2 * (4.0 + kt) * z)));
+        let term2 =
+            (-2.0 * kt - a1 * z * zpi / (2.0 * ekt * kappa)).exp() * z * z * zpi * (s1 + s2 + s3)
+                / (16.0 * kappa2 * kappa2)
+                * sigma2;
+
+        term0 + term1 + term2
     }
 }
 
@@ -339,16 +383,8 @@ impl ApHelper {
     ///
     /// The complex `phiBS - chF` is reduced to a `Real` by `.real()`
     /// (`cpp:528-532`) inside the integrand, so the quadrature integrates a
-    /// real function.
-    ///
-    /// # Panics
-    ///
-    /// Panics if [`HestonChf::chf`] returns `Err`, i.e. only on the deferred
-    /// small-`sigma` series branch (`sigma <= 1e-6 && kappa >= 1e-8`, issue
-    /// #415). `AP_Helper` is used only on the calibrated path (`sigma > 1e-6`),
-    /// where `chf` is total, mirroring C++ `chF` which is infallible. The
-    /// quadrature's `FnMut(Real) -> Real` contract forces a `Real` return, so
-    /// the fallibility cannot be propagated through the integrand.
+    /// real function. [`HestonChf::chf`] is total (both branches ported, issue
+    /// #425), mirroring C++ `chF` which is infallible.
     pub fn evaluate(&self, u: Real) -> Real {
         let i = Complex::new(0.0, 1.0);
         let h_u = Complex::new(u, u * self.tan_phi - self.alpha);
@@ -360,11 +396,7 @@ impl ApHelper {
             * (h_prime * h_prime + Complex::new(-h_prime.im, h_prime.re)))
         .exp();
 
-        let chf_val = self.chf.chf(h_prime, self.term).expect(
-            "AP_Helper is used only on the calibrated Heston path (sigma > 1e-6) where \
-             HestonChf::chf is total; the deferred small-sigma branch (issue #415) is \
-             unreachable here",
-        );
+        let chf_val = self.chf.chf(h_prime, self.term);
 
         (-u * self.tan_phi * self.freq).exp()
             * (Complex::new(0.0, u * self.freq).exp()
@@ -689,7 +721,7 @@ mod tests {
     fn chf_at_zero_is_one() {
         let chf = fixture();
         for &t in &[0.1, 0.5, 2.0] {
-            let value = chf.chf(Complex::new(0.0, 0.0), t).unwrap();
+            let value = chf.chf(Complex::new(0.0, 0.0), t);
             assert!(
                 (value.re - 1.0).abs() < 1e-14,
                 "Re chF(0,{t}) = {}",
@@ -699,14 +731,70 @@ mod tests {
         }
     }
 
-    /// The deferred small-`sigma` expansion branch returns `Err` (visible
-    /// omission), not a silent fall-through to `exp(lnChF)`. Reached only when
-    /// `sigma <= 1e-6 && kappa >= 1e-8` (`analytichestonengine.cpp:580,584`).
+    /// The small-`sigma` fixture from the branch-continuity pins: `kappa = 1`
+    /// keeps `kappa >= 1e-8` so the series branch is genuinely reachable.
+    fn small_sigma_fixture(sigma: Real) -> HestonChf {
+        HestonChf::new(1.0, 0.02, sigma, -0.75, 0.01)
+    }
+
+    /// BRANCH-CONTINUITY PIN (transcription, independent of the calibration):
+    /// at `sigma = 1e-6` the series branch (`cpp:584-617`) is taken, and the
+    /// `sigma^0 + sigma^1 + sigma^2` truncation of `exp(lnChF)` agrees with the
+    /// closed form `exp(lnChF)` to `O(sigma^3) ~ 1e-18` relative. This pins
+    /// branch routing plus term0/term1 (a term0/term1 error shows as `~1e-6`).
     #[test]
-    fn chf_small_sigma_branch_is_deferred_error() {
-        let chf = HestonChf::new(1.0, 0.04, 1e-8, -0.5, 0.04);
-        let err = chf.chf(Complex::new(1.0, 0.0), 0.5).unwrap_err();
-        assert!(err.to_string().contains("deferred"));
+    fn chf_small_sigma_series_matches_exp_lnchf() {
+        let chf = small_sigma_fixture(1e-6);
+        let t = 0.5;
+        for &z in &[Complex::new(1.5, -0.5), Complex::new(3.0, 0.0)] {
+            let series = chf.chf(z, t);
+            let closed = chf.ln_chf(z, t).exp();
+            let err = (series - closed).norm();
+            assert!(
+                err < 1e-12,
+                "series vs exp(lnChF) at z={z:?}: series={series:?} closed={closed:?} err={err:e}"
+            );
+        }
+    }
+
+    /// BRANCH-CONTINUITY PIN (term2 discriminator): at `sigma = 1e-3` the
+    /// series lands `~O(sigma^3) ~ 1e-9` from `exp(lnChF)` while a wrong
+    /// `sigma^2` term shifts it by `~O(sigma^2) ~ 1e-6`, so the `~1e-8` tolerance
+    /// discriminates a term2 transcription error that the `sigma=1e-6` pin (and
+    /// the calibration, which kills sigma to `~1e-7`) cannot see. Calls
+    /// [`HestonChf::chf_small_sigma`] directly because at `sigma = 1e-3` the
+    /// public `chf` would route to the `exp(lnChF)` branch.
+    #[test]
+    fn chf_small_sigma_series_term2_matches_exp_lnchf() {
+        let chf = small_sigma_fixture(1e-3);
+        let t = 0.5;
+        for &z in &[Complex::new(1.5, -0.5), Complex::new(3.0, 0.0)] {
+            let series = chf.chf_small_sigma(z, t);
+            let closed = chf.ln_chf(z, t).exp();
+            let err = (series - closed).norm();
+            assert!(
+                err < 1e-8,
+                "term2 pin at z={z:?}: series={series:?} closed={closed:?} err={err:e}"
+            );
+        }
+    }
+
+    /// INVARIANT PIN through the series branch: `chF(0, t) == 1`. At `z = 0`
+    /// term0's exponent is 0 (`exp(0) = 1`) and terms 1/2 carry a `z*z` factor
+    /// (`= 0`), so the series is exactly 1 - the discriminating check for a
+    /// stray additive constant in term0.
+    #[test]
+    fn chf_small_sigma_at_zero_is_one() {
+        let chf = small_sigma_fixture(1e-6);
+        for &t in &[0.1, 0.5, 2.0] {
+            let value = chf.chf(Complex::new(0.0, 0.0), t);
+            assert!(
+                (value.re - 1.0).abs() < 1e-14,
+                "Re chF(0,{t}) = {}",
+                value.re
+            );
+            assert!(value.im.abs() < 1e-14, "Im chF(0,{t}) = {}", value.im);
+        }
     }
 
     /// CONFIRM-BY-STUBBING: the [`expm1`]/[`log1p`] helpers are load-bearing in
@@ -877,7 +965,7 @@ mod tests {
         let phi_bs =
             (-0.5 * v_avg() * TERM * (h_prime * h_prime + Complex::new(-h_prime.im, h_prime.re)))
                 .exp();
-        let chf_val = fixture().chf(h_prime, TERM).unwrap();
+        let chf_val = fixture().chf(h_prime, TERM);
         let expected = (-u * tan_phi * freq).exp()
             * (Complex::new(0.0, u * freq).exp() * Complex::new(1.0, tan_phi) * (phi_bs - chf_val)
                 / (h_u * h_prime))
