@@ -20,6 +20,8 @@ use crate::errors::QlResult;
 use crate::fail;
 use crate::math::expm1::{expm1, log1p};
 use crate::math::integrals::gaussianquadratures::GaussianQuadrature;
+use crate::option::OptionType;
+use crate::pricingengines::BlackCalculator;
 use crate::types::{Complex, Real, Size, Time};
 
 /// The Heston characteristic function, carrying the five model parameters.
@@ -50,6 +52,31 @@ impl HestonChf {
             rho,
             v0,
         }
+    }
+
+    /// Mean-reversion speed `kappa`.
+    pub fn kappa(&self) -> Real {
+        self.kappa
+    }
+
+    /// Long-run variance `theta`.
+    pub fn theta(&self) -> Real {
+        self.theta
+    }
+
+    /// Vol-of-vol `sigma`.
+    pub fn sigma(&self) -> Real {
+        self.sigma
+    }
+
+    /// Spot/variance correlation `rho`.
+    pub fn rho(&self) -> Real {
+        self.rho
+    }
+
+    /// Initial variance `v0`.
+    pub fn v0(&self) -> Real {
+        self.v0
     }
 
     /// `lnChF(z, t)` (`analytichestonengine.cpp:621-657`): the log
@@ -182,6 +209,180 @@ impl Integration {
     /// integrand over `[0, inf)` (i.e. it computes `int_0^inf f(x) dx`).
     pub fn calculate<F: FnMut(Real) -> Real>(&self, _c_inf: Real, f: F) -> Real {
         self.quadrature.integrate(f)
+    }
+}
+
+/// The control-variate formula selecting `AP_Helper`'s integrand
+/// (`analytichestonengine.hpp:100-118`, the `AP_Helper`-relevant subset).
+///
+/// Only [`AngledContour`](ComplexLogFormula::AngledContour) is ported (issue
+/// #416, the calibrated oracle path). The other four variants are deferred to
+/// issue #418 and fail loud in [`ApHelper::new`] (they are NOT stubbed to
+/// `AngledContour`: `optimalControlVariate` can flip to `AsymptoticChF`, so a
+/// silent stub would mis-price; #262-class visible omission).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ComplexLogFormula {
+    /// Gatheral form with Andersen-Piterbarg control variate (deferred).
+    AndersenPiterbarg,
+    /// A slightly better Andersen-Piterbarg control variate (deferred).
+    AndersenPiterbargOptCV,
+    /// Asymptotic expansion of the characteristic function as control variate
+    /// (deferred: needs `ExponentialIntegral::Ci/Si`).
+    AsymptoticChF,
+    /// Angled-contour integration with control variate (ported).
+    AngledContour,
+    /// Angled-contour integration without control variate (deferred).
+    AngledContourNoCV,
+}
+
+/// The Andersen-Piterbarg `AP_Helper` control-variate integrand
+/// (`analytichestonengine.cpp:448-576`), AngledContour branch.
+///
+/// In C++ `AP_Helper` holds an `AnalyticHestonEngine*` and reads the five
+/// Heston parameters plus the characteristic function `chF` off it. There is no
+/// engine yet (issue #417), so this carries a [`HestonChf`] (from issue #415)
+/// directly and reads the parameters through its accessors.
+///
+/// The `addOnTerm` zero-guard at the top of `operator()` (`cpp:508-512`) is the
+/// Bates jump-diffusion hook (base returns 0); it is deferred with `chF` per
+/// issue #415 and not ported.
+#[derive(Clone, Copy, Debug)]
+pub struct ApHelper {
+    term: Time,
+    fwd: Real,
+    strike: Real,
+    freq: Real,
+    alpha: Real,
+    s_alpha: Real,
+    v_avg: Real,
+    tan_phi: Real,
+    chf: HestonChf,
+}
+
+impl ApHelper {
+    /// `AP_Helper` constructor (`analytichestonengine.cpp:448-505`), Angled
+    /// contour branch.
+    ///
+    /// Computes `vAvg` (`cpp:490-492`) and `tanPhi` (`cpp:497-501`). The
+    /// `boost::math::sign(freq)` in `tanPhi` (`cpp:499`) is [`Real::signum`]
+    /// here; they differ only at `freq == 0`, which the `r*freq < 0.0` guard
+    /// excludes (the product is `0`, not `< 0`, so the branch is not taken).
+    ///
+    /// # Errors
+    ///
+    /// Errors for any `cpx_log` other than
+    /// [`AngledContour`](ComplexLogFormula::AngledContour): the
+    /// `AndersenPiterbarg`/`AndersenPiterbargOptCV`/`AsymptoticChF`/
+    /// `AngledContourNoCV` branches are deferred to issue #418.
+    pub fn new(
+        term: Time,
+        fwd: Real,
+        strike: Real,
+        cpx_log: ComplexLogFormula,
+        chf: HestonChf,
+        alpha: Real,
+    ) -> QlResult<Self> {
+        if cpx_log != ComplexLogFormula::AngledContour {
+            fail!(
+                "AP_Helper control variate {cpx_log:?} is deferred (issue #418): only \
+                 AngledContour is ported (issue #416); it is not stubbed to AngledContour \
+                 because optimalControlVariate may select AsymptoticChF"
+            );
+        }
+
+        let kappa = chf.kappa();
+        let theta = chf.theta();
+        let sigma = chf.sigma();
+        let rho = chf.rho();
+        let v0 = chf.v0();
+
+        let freq = (fwd / strike).ln();
+        let s_alpha = (alpha * freq).exp();
+        let v_avg = (1.0 - (-kappa * term).exp()) * (v0 - theta) / (kappa * term) + theta;
+
+        let r = rho - sigma * freq / (v0 + kappa * theta * term);
+        let phi = if r * freq < 0.0 {
+            std::f64::consts::PI / 12.0 * freq.signum()
+        } else {
+            0.0
+        };
+        let tan_phi = phi.tan();
+
+        Ok(ApHelper {
+            term,
+            fwd,
+            strike,
+            freq,
+            alpha,
+            s_alpha,
+            v_avg,
+            tan_phi,
+            chf,
+        })
+    }
+
+    /// `operator()(u)` (`analytichestonengine.cpp:507-533`), AngledContour
+    /// branch: the real-valued integrand fed to Gauss-Laguerre.
+    ///
+    /// The complex `phiBS - chF` is reduced to a `Real` by `.real()`
+    /// (`cpp:528-532`) inside the integrand, so the quadrature integrates a
+    /// real function.
+    ///
+    /// # Panics
+    ///
+    /// Panics if [`HestonChf::chf`] returns `Err`, i.e. only on the deferred
+    /// small-`sigma` series branch (`sigma <= 1e-6 && kappa >= 1e-8`, issue
+    /// #415). `AP_Helper` is used only on the calibrated path (`sigma > 1e-6`),
+    /// where `chf` is total, mirroring C++ `chF` which is infallible. The
+    /// quadrature's `FnMut(Real) -> Real` contract forces a `Real` return, so
+    /// the fallibility cannot be propagated through the integrand.
+    pub fn evaluate(&self, u: Real) -> Real {
+        let i = Complex::new(0.0, 1.0);
+        let h_u = Complex::new(u, u * self.tan_phi - self.alpha);
+        let h_prime = h_u - i;
+
+        let phi_bs = (-0.5
+            * self.v_avg
+            * self.term
+            * (h_prime * h_prime + Complex::new(-h_prime.im, h_prime.re)))
+        .exp();
+
+        let chf_val = self.chf.chf(h_prime, self.term).expect(
+            "AP_Helper is used only on the calibrated Heston path (sigma > 1e-6) where \
+             HestonChf::chf is total; the deferred small-sigma branch (issue #415) is \
+             unreachable here",
+        );
+
+        (-u * self.tan_phi * self.freq).exp()
+            * (Complex::new(0.0, u * self.freq).exp()
+                * Complex::new(1.0, self.tan_phi)
+                * (phi_bs - chf_val)
+                / (h_u * h_prime))
+                .re
+            * self.s_alpha
+    }
+
+    /// `controlVariateValue` (`analytichestonengine.cpp:550-555`), AngledContour
+    /// branch: `BlackCalculator(Call, strike, fwd, sqrt(vAvg*term)).value()`.
+    ///
+    /// The discount is `1.0` (C++ uses the 4-arg `BlackCalculator` overload
+    /// with default `discount = 1.0`); the price assembly in issue #417
+    /// multiplies by the risk-free discount, so discounting here would
+    /// double-discount.
+    ///
+    /// # Errors
+    ///
+    /// Errors if [`BlackCalculator::new`] rejects its arguments (e.g. a
+    /// non-positive forward).
+    pub fn control_variate_value(&self) -> QlResult<Real> {
+        Ok(BlackCalculator::new(
+            OptionType::Call,
+            self.strike,
+            self.fwd,
+            (self.v_avg * self.term).sqrt(),
+            1.0,
+        )?
+        .value())
     }
 }
 
@@ -356,6 +557,134 @@ mod tests {
         a + v0 * b
     }
 
+    // ---- Integration (Gauss-Laguerre) + AP_Helper (AngledContour) ----
+
+    const TERM: Time = 0.5;
+    const FWD: Real = 1.0;
+    const STRIKE: Real = 1.05;
+    const ALPHA: Real = -0.5;
+
+    /// The closed-form `vAvg` (`analytichestonengine.cpp:490-492`) written out
+    /// independently of `ApHelper`, for the oracle-fixture parameters.
+    fn v_avg() -> Real {
+        (1.0 - (-KAPPA * TERM).exp()) * (V0 - THETA) / (KAPPA * TERM) + THETA
+    }
+
+    fn helper() -> ApHelper {
+        ApHelper::new(
+            TERM,
+            FWD,
+            STRIKE,
+            ComplexLogFormula::AngledContour,
+            fixture(),
+            ALPHA,
+        )
+        .unwrap()
+    }
+
+    /// PIN (Y2, load-bearing): `controlVariateValue` equals a directly
+    /// constructed `BlackCalculator(Call, strike, fwd, sqrt(vAvg*term))` with
+    /// discount `1.0` (`analytichestonengine.cpp:553-555`), to machine
+    /// precision.
+    #[test]
+    fn control_variate_value_matches_black_calculator() {
+        let reference =
+            BlackCalculator::new(OptionType::Call, STRIKE, FWD, (v_avg() * TERM).sqrt(), 1.0)
+                .unwrap()
+                .value();
+        let got = helper().control_variate_value().unwrap();
+        assert!(
+            (got - reference).abs() < 1e-12,
+            "controlVariateValue={got} reference={reference}"
+        );
+    }
+
+    /// CONFIRM-BY-STUBBING (gate amendment 1): the `discount = 1.0` choice is
+    /// load-bearing. The same `BlackCalculator` discounted at `exp(-r*term)`
+    /// does NOT equal `controlVariateValue`, so passing the risk-free discount
+    /// here (double-discounting) would be caught.
+    #[test]
+    fn control_variate_value_discount_is_one_not_risk_free() {
+        let discounted = BlackCalculator::new(
+            OptionType::Call,
+            STRIKE,
+            FWD,
+            (v_avg() * TERM).sqrt(),
+            (-0.0225 * TERM).exp(),
+        )
+        .unwrap()
+        .value();
+        let got = helper().control_variate_value().unwrap();
+        assert!(
+            (got - discounted).abs() > 1e-6,
+            "discount=1.0 must differ from risk-free-discounted: got={got} discounted={discounted}"
+        );
+    }
+
+    /// CONFIRM-BY-STUBBING: `controlVariateValue` moves with `vAvg`. A helper
+    /// built at a different `term` has a different `vAvg` and thus a different
+    /// control-variate value.
+    #[test]
+    fn control_variate_value_moves_with_v_avg() {
+        let other = ApHelper::new(
+            2.0,
+            FWD,
+            STRIKE,
+            ComplexLogFormula::AngledContour,
+            fixture(),
+            ALPHA,
+        )
+        .unwrap();
+        let a = helper().control_variate_value().unwrap();
+        let b = other.control_variate_value().unwrap();
+        assert!(
+            (a - b).abs() > 1e-6,
+            "controlVariateValue should move with vAvg: {a} vs {b}"
+        );
+    }
+
+    /// PIN (Y2, smoke - near-tautological per gate amendment 3): `operator()(u)`
+    /// equals a hand-composition of the full AngledContour expression
+    /// (`analytichestonengine.cpp:519-532`) built from [`HestonChf::chf`].
+    #[test]
+    fn evaluate_matches_hand_composition() {
+        let h = helper();
+        let u = 1.0;
+        let tan_phi = h.tan_phi;
+        let freq = h.freq;
+        let i = Complex::new(0.0, 1.0);
+
+        let h_u = Complex::new(u, u * tan_phi - ALPHA);
+        let h_prime = h_u - i;
+        let phi_bs =
+            (-0.5 * v_avg() * TERM * (h_prime * h_prime + Complex::new(-h_prime.im, h_prime.re)))
+                .exp();
+        let chf_val = fixture().chf(h_prime, TERM).unwrap();
+        let expected = (-u * tan_phi * freq).exp()
+            * (Complex::new(0.0, u * freq).exp() * Complex::new(1.0, tan_phi) * (phi_bs - chf_val)
+                / (h_u * h_prime))
+                .re
+            * h.s_alpha;
+
+        let got = h.evaluate(u);
+        assert!(
+            (got - expected).abs() < 1e-14,
+            "operator()(1.0)={got} expected={expected}"
+        );
+    }
+
+    /// CONFIRM-BY-STUBBING: `operator()(u)` moves materially with `u`.
+    #[test]
+    fn evaluate_moves_with_u() {
+        let h = helper();
+        let a = h.evaluate(0.5);
+        let b = h.evaluate(2.5);
+        assert!(
+            (a - b).abs() > 1e-6,
+            "operator() should move with u: {a} vs {b}"
+        );
+    }
+
     /// PIN (Integration): Gauss-Laguerre `calculate` on `f(x) = x*e^{-x}`
     /// reproduces `int_0^inf x e^{-x} dx = 1`. The Rust `laguerre` rule folds
     /// the `e^{-x}` weight into its nodes (`f` is the raw integrand over
@@ -386,5 +715,20 @@ mod tests {
     #[test]
     fn integration_gauss_laguerre_rejects_high_order() {
         assert!(Integration::gauss_laguerre(193).is_err());
+    }
+
+    /// Deferred `AP_Helper` control variates fail loud (issue #418), naming the
+    /// deferral rather than stubbing to AngledContour.
+    #[test]
+    fn ap_helper_deferred_variants_error() {
+        for cpx in [
+            ComplexLogFormula::AndersenPiterbarg,
+            ComplexLogFormula::AndersenPiterbargOptCV,
+            ComplexLogFormula::AsymptoticChF,
+            ComplexLogFormula::AngledContourNoCV,
+        ] {
+            let err = ApHelper::new(TERM, FWD, STRIKE, cpx, fixture(), ALPHA).unwrap_err();
+            assert!(err.to_string().contains("deferred"), "{cpx:?}: {err}");
+        }
     }
 }
