@@ -482,26 +482,19 @@ mod tests {
     /// confirms the put branch is genuinely exercised (7 puts at moneyness +1,
     /// 14 calls at moneyness <= 0).
     ///
-    /// STILL BLOCKED after #425 - by a DIFFERENT deferral than #415 assumed.
-    ///
     /// #425 ported the small-`sigma` chF series expansion
-    /// (`analytichestonengine.cpp:584-617`), so the sigma=0.1 start now converges
-    /// (sigma -> ~1e-7 through the series, no panic) and passes all three
-    /// assertions. But this oracle also drives the sigma=0.3 and sigma=0.5 starts,
-    /// and at their INITIAL cost - params `(kappa=0.2, theta=0.02, sigma>=0.3,
-    /// rho=-0.75, v0=0.01)` - `optimalControlVariate`
-    /// (`analytichestonengine.cpp:707-719`) selects `AsymptoticChF` for every
-    /// maturity >= 2 months (the 1-month helper stays `AngledContour` as
-    /// `tau ~ 0.086 < 0.15` fails condition 1). C++ prices `AsymptoticChF`
-    /// (it implements the `Ci`/`Si` branch); the Rust port defers it to issue
-    /// #418, where [`ApHelper::new`] fails loud, so those 18 helpers return NaN
-    /// residuals and Levenberg-Marquardt aborts at the initial point. C++
-    /// `testBlackCalibration` (`hestonmodel.cpp:280-283`) builds
-    /// `AnalyticHestonEngine(model, 96)`, whose `cpxLog_` is `OptimalCV`
-    /// (`analytichestonengine.cpp:666`), confirming the `AsymptoticChF` path is on
-    /// this oracle. Un-ignore once #418 lands.
+    /// (`analytichestonengine.cpp:584-617`), which unblocks the sigma=0.1 start
+    /// (sigma -> ~1e-7 through the series, no panic). This oracle also drives the
+    /// sigma=0.3 and sigma=0.5 starts, and at their INITIAL cost - params
+    /// `(kappa=0.2, theta=0.02, sigma>=0.3, rho=-0.75, v0=0.01)` -
+    /// `optimalControlVariate` (`analytichestonengine.cpp:707-719`) selects
+    /// `AsymptoticChF` for every maturity >= 2 months (the 1-month helper stays
+    /// `AngledContour` as `tau ~ 0.086 < 0.15` fails condition 1). Issue #426
+    /// ported the `AsymptoticChF` control variate (`phi`/`psi` + `Ci`/`Si`), so
+    /// all three starts now converge. C++ `testBlackCalibration`
+    /// (`hestonmodel.cpp:280-283`) builds `AnalyticHestonEngine(model, 96)`,
+    /// whose `cpxLog_` is `OptimalCV` (`analytichestonengine.cpp:666`).
     #[test]
-    #[ignore = "blocked on AsymptoticChF (issue #418): the sigma=0.3/0.5 starts select it at the initial cost (analytichestonengine.cpp:707-719); #425 ported the small-sigma chF but that only unblocks the sigma=0.1 start"]
     fn heston_calibrates_to_a_flat_vol_surface() {
         let fixture = Fixture::new();
         let maturities = [
