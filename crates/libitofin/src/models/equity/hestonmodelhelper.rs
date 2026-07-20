@@ -279,6 +279,7 @@ impl BlackCalibrationHelper for HestonModelHelper {
 mod tests {
     use super::*;
     use crate::interestrate::Compounding;
+    use crate::math::interpolations::linear::Linear;
     use crate::math::optimization::endcriteria::EndCriteria;
     use crate::math::optimization::levenbergmarquardt::LevenbergMarquardt;
     use crate::models::calibrationhelper::CalibrationHelper;
@@ -286,12 +287,15 @@ mod tests {
     use crate::pricingengine::PricingEngine;
     use crate::pricingengines::vanilla::analytichestonengine::AnalyticHestonEngine;
     use crate::processes::HestonProcess;
-    use crate::termstructures::yields::FlatForward;
+    use crate::termstructures::yields::{FlatForward, ZeroCurve};
     use crate::time::calendars::nullcalendar::NullCalendar;
+    use crate::time::calendars::target::Target;
     use crate::time::date::Month;
     use crate::time::daycounters::actual360::Actual360;
+    use crate::time::daycounters::actual365fixed::Actual365Fixed;
     use crate::time::frequency::Frequency;
     use crate::time::timeunit::TimeUnit;
+    use crate::types::Integer;
 
     const VOL: Real = 0.1;
 
@@ -593,5 +597,203 @@ mod tests {
                 model.v0()
             );
         }
+    }
+
+    /// The DAX calibration market data (`hestonmodel.cpp:76-146`,
+    /// `getDAXCalibrationMarketData`): the A. Sepp DAX implied-vol example -
+    /// settlement 5 July 2002, [`Actual365Fixed`] over the [`Target`] calendar. The
+    /// risk-free curve is a 9-point [`ZeroCurve`] (settlement anchor 0.0357 then
+    /// the eight `r[]` points at `settlement + t[i]`, cpp:88-100) interpolated
+    /// linearly; the dividend is a flat-zero [`FlatForward`] (`flatRate(..., 0.0)`,
+    /// cpp:103); spot is 4468.17 (cpp:120). The 13-strike x 8-expiry implied-vol
+    /// matrix `v[]` (104 values, laid out row-per-strike as in C++) builds 104
+    /// [`HestonModelHelper`]s indexed `vol = v[s*8+m]` with maturity
+    /// `(t[m]+3)/7` weeks (cpp:126-137), each using
+    /// [`CalibrationErrorType::ImpliedVolError`] (cpp:137) - the implied-vol
+    /// residual is the quantity A. Sepp's sse = 177.2 measures.
+    struct DaxMarketData {
+        risk_free: Handle<dyn YieldTermStructure>,
+        dividend: Handle<dyn YieldTermStructure>,
+        s0: Handle<dyn Quote>,
+        options: Vec<SharedMut<HestonModelHelper>>,
+    }
+
+    fn dax_market_data() -> DaxMarketData {
+        let settlement = Date::new(5, Month::July, 2002);
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(settlement);
+
+        let day_counter = Actual365Fixed::new();
+        let calendar = Target::new();
+
+        let t: [Integer; 8] = [13, 41, 75, 165, 256, 345, 524, 703];
+        let r: [Real; 8] = [
+            0.0357, 0.0349, 0.0341, 0.0355, 0.0359, 0.0368, 0.0386, 0.0401,
+        ];
+
+        let mut dates = vec![settlement];
+        let mut rates = vec![0.0357];
+        for i in 0..8 {
+            dates.push(settlement + t[i]);
+            rates.push(r[i]);
+        }
+        let risk_free: Handle<dyn YieldTermStructure> = Handle::new(shared(
+            ZeroCurve::new(dates, rates, day_counter.clone(), Linear).unwrap(),
+        )
+            as Shared<dyn YieldTermStructure>);
+
+        let dividend: Handle<dyn YieldTermStructure> = Handle::new(shared(FlatForward::with_rate(
+            settlement,
+            0.0,
+            day_counter.clone(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        ))
+            as Shared<dyn YieldTermStructure>);
+
+        let s0: Handle<dyn Quote> =
+            Handle::new(shared(SimpleQuote::new(4468.17)) as Shared<dyn Quote>);
+
+        let v: [[Real; 8]; 13] = [
+            [
+                0.6625, 0.4875, 0.4204, 0.3667, 0.3431, 0.3267, 0.3121, 0.3121,
+            ],
+            [
+                0.6007, 0.4543, 0.3967, 0.3511, 0.3279, 0.3154, 0.2984, 0.2921,
+            ],
+            [
+                0.5084, 0.4221, 0.3718, 0.3327, 0.3155, 0.3027, 0.2919, 0.2889,
+            ],
+            [
+                0.4541, 0.3869, 0.3492, 0.3149, 0.2963, 0.2926, 0.2819, 0.2800,
+            ],
+            [
+                0.4060, 0.3607, 0.3330, 0.2999, 0.2887, 0.2811, 0.2751, 0.2775,
+            ],
+            [
+                0.3726, 0.3396, 0.3108, 0.2781, 0.2788, 0.2722, 0.2661, 0.2686,
+            ],
+            [
+                0.3550, 0.3277, 0.3012, 0.2781, 0.2781, 0.2661, 0.2661, 0.2681,
+            ],
+            [
+                0.3428, 0.3209, 0.2958, 0.2740, 0.2688, 0.2627, 0.2580, 0.2620,
+            ],
+            [
+                0.3302, 0.3062, 0.2799, 0.2631, 0.2573, 0.2533, 0.2504, 0.2544,
+            ],
+            [
+                0.3343, 0.2959, 0.2705, 0.2540, 0.2504, 0.2464, 0.2448, 0.2462,
+            ],
+            [
+                0.3460, 0.2845, 0.2624, 0.2463, 0.2425, 0.2385, 0.2373, 0.2422,
+            ],
+            [
+                0.3857, 0.2860, 0.2578, 0.2399, 0.2357, 0.2327, 0.2312, 0.2351,
+            ],
+            [
+                0.3976, 0.2860, 0.2607, 0.2356, 0.2297, 0.2268, 0.2241, 0.2320,
+            ],
+        ];
+        let strike: [Real; 13] = [
+            3400.0, 3600.0, 3800.0, 4000.0, 4200.0, 4400.0, 4500.0, 4600.0, 4800.0, 5000.0, 5200.0,
+            5400.0, 5600.0,
+        ];
+
+        let mut options = Vec::with_capacity(13 * 8);
+        for s in 0..13 {
+            for m in 0..8 {
+                let vol: Handle<dyn Quote> =
+                    Handle::new(shared(SimpleQuote::new(v[s][m])) as Shared<dyn Quote>);
+                let maturity = Period::new((t[m] + 3) / 7, TimeUnit::Weeks);
+                options.push(shared_mut(HestonModelHelper::with_spot_handle(
+                    maturity,
+                    calendar.clone(),
+                    s0.clone(),
+                    strike[s],
+                    vol,
+                    risk_free.clone(),
+                    dividend.clone(),
+                    CalibrationErrorType::ImpliedVolError,
+                    Shared::clone(&settings),
+                )));
+            }
+        }
+
+        DaxMarketData {
+            risk_free,
+            dividend,
+            s0,
+            options,
+        }
+    }
+
+    /// ORACLE `testDAXCalibration` (`hestonmodel.cpp:313-370`), the
+    /// [`AnalyticHestonEngine`] arm only. Calibrate the Heston model to the A. Sepp
+    /// DAX implied-vol matrix (104 helpers) from the seed (v0=0.1, kappa=1.0,
+    /// theta=0.1, sigma=0.5, rho=-0.5, cpp:329-333) with `AnalyticHestonEngine(model, 64)`
+    /// and a [`LevenbergMarquardt`] fit, then reproduce the sum of squared
+    /// calibration errors sse ~= 177.2 (`|sse - 177.2| < 1.0`, cpp:358-364).
+    ///
+    /// DEFERRAL (#262-class, visible): C++ loops THREE engines (cpp:342-346) -
+    /// `AnalyticHestonEngine(model, 64)`, `COSHestonEngine(model, 12, 75)` and
+    /// `ExponentialFittingHestonEngine(model)` - asserting sse ~= 177.2 for each.
+    /// The latter two are separate, unported Heston engines (tracked by issue
+    /// #424); only the Analytic arm is ported here. Because the single arm
+    /// calibrates straight from the seed, the `model.setParams(params)` reset the
+    /// C++ multi-engine loop needs between arms (cpp:348-350) is not required.
+    #[test]
+    fn heston_calibrates_to_dax_vol_data() {
+        let market = dax_market_data();
+
+        let process = shared(HestonProcess::new(
+            market.risk_free.clone(),
+            market.dividend.clone(),
+            market.s0.clone(),
+            0.1,
+            1.0,
+            0.1,
+            0.5,
+            -0.5,
+        ));
+        let model = HestonModel::new(process).unwrap();
+        let engine = shared_mut(AnalyticHestonEngine::new(SharedMut::clone(&model), 64).unwrap())
+            as SharedMut<dyn PricingEngine>;
+
+        for helper in &market.options {
+            helper
+                .borrow_mut()
+                .base_mut()
+                .set_pricing_engine(SharedMut::clone(&engine));
+        }
+        let dyn_helpers: Vec<SharedMut<dyn CalibrationHelper>> = market
+            .options
+            .iter()
+            .map(|helper| SharedMut::clone(helper) as SharedMut<dyn CalibrationHelper>)
+            .collect();
+
+        let mut method = LevenbergMarquardt::new(1e-8, 1e-8, 1e-8, false);
+        let end_criteria = EndCriteria::new(400, Some(40), 1e-8, 1e-8, Some(1e-8)).unwrap();
+        calibrate(
+            &model,
+            &dyn_helpers,
+            &mut method,
+            &end_criteria,
+            None,
+            Vec::new(),
+            Vec::new(),
+        )
+        .unwrap();
+
+        let mut sse = 0.0;
+        for helper in &market.options {
+            let diff = helper.borrow_mut().calibration_error().unwrap() * 100.0;
+            sse += diff * diff;
+        }
+        assert!(
+            (sse - 177.2).abs() < 1.0,
+            "sse {sse} vs expected 177.2 (error {})",
+            (sse - 177.2).abs()
+        );
     }
 }
