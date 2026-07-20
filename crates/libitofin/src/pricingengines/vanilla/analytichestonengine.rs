@@ -19,7 +19,8 @@
 use crate::errors::QlResult;
 use crate::fail;
 use crate::math::expm1::{expm1, log1p};
-use crate::types::{Complex, Real, Time};
+use crate::math::integrals::gaussianquadratures::GaussianQuadrature;
+use crate::types::{Complex, Real, Size, Time};
 
 /// The Heston characteristic function, carrying the five model parameters.
 ///
@@ -112,6 +113,75 @@ impl HestonChf {
                 self.kappa
             )
         }
+    }
+}
+
+/// The Gauss-Laguerre `Integration` wrapper
+/// (`analytichestonengine.cpp:878-884, 924-930, 974-1035`), reduced to the
+/// Gauss-Laguerre algorithm.
+///
+/// In C++ `Integration` dispatches over 11 quadrature/adaptive algorithms
+/// (`cpp:886-972`) selected by an `Algorithm` enum. Only Gauss-Laguerre is on
+/// the calibrated oracle path (issue #416); the other ten factories
+/// (`gaussLegendre`/`gaussChebyshev`/`gaussChebyshev2nd`/`gaussLobatto`/
+/// `gaussKronrod`/`simpson`/`trapezoid`/`discreteSimpson`/`discreteTrapezoid`/
+/// `expSinh`) and the `c_inf` `integrand1/2/3` domain transforms
+/// (`cpp:54-91`) are deferred to issue #418.
+///
+/// Divergences from C++:
+/// - QuantLib names the Gauss-Laguerre rule `GaussLaguerreIntegration`; the
+///   Rust port exposes it as [`GaussianQuadrature::laguerre`] with generalized
+///   exponent `s`, so this wraps `laguerre(n, 0.0)` (the plain rule).
+/// - [`Integration::calculate`] keeps `c_inf` for interface fidelity with the
+///   deferred non-Laguerre paths and issue #417's call site, but the
+///   Gauss-Laguerre branch ignores it (`cpp:1001-1003`): the integrand is
+///   passed straight to the quadrature. The `maxBound`/`scaling` parameters
+///   and the second `calculate` overload (`cpp:1037-1044`), used only by the
+///   adaptive/exp-sinh branches, are omitted.
+pub struct Integration {
+    quadrature: GaussianQuadrature,
+}
+
+impl Integration {
+    /// `gaussLaguerre` factory (`analytichestonengine.cpp:924-930`): wraps an
+    /// order-`int_order` Gauss-Laguerre rule.
+    ///
+    /// # Errors
+    ///
+    /// Errors if `int_order > 192` (QuantLib's `QL_REQUIRE`, `cpp:926`) or if
+    /// the underlying quadrature construction fails.
+    pub fn gauss_laguerre(int_order: Size) -> QlResult<Self> {
+        if int_order > 192 {
+            fail!("maximum integration order (192) exceeded: got {int_order}");
+        }
+        Ok(Integration {
+            quadrature: GaussianQuadrature::laguerre(int_order, 0.0)?,
+        })
+    }
+
+    /// `numberOfEvaluations` (`analytichestonengine.cpp:974-982`): the
+    /// quadrature order for the Gauss-Laguerre case.
+    pub fn number_of_evaluations(&self) -> Size {
+        self.quadrature.order()
+    }
+
+    /// `isAdaptiveIntegration` (`analytichestonengine.cpp:984-990`): always
+    /// `false` for Gauss-Laguerre (only Lobatto/Kronrod/Simpson/Trapezoid/
+    /// ExpSinh are adaptive).
+    pub fn is_adaptive_integration(&self) -> bool {
+        false
+    }
+
+    /// `calculate` reduced to the Gauss-Laguerre case
+    /// (`analytichestonengine.cpp:992-1035`): `(*gaussianQuadrature_)(f)`.
+    ///
+    /// `c_inf` is unused for Gauss-Laguerre (it drives the `integrand1/2/3`
+    /// domain transforms of the deferred non-Laguerre branches only); it is
+    /// retained for interface fidelity. The Rust [`GaussianQuadrature::laguerre`]
+    /// rule folds the `e^{-x}` weight into its nodes so `f` is the raw
+    /// integrand over `[0, inf)` (i.e. it computes `int_0^inf f(x) dx`).
+    pub fn calculate<F: FnMut(Real) -> Real>(&self, _c_inf: Real, f: F) -> Real {
+        self.quadrature.integrate(f)
     }
 }
 
@@ -284,5 +354,37 @@ mod tests {
         let b = z * Complex::new(z.re, z.im + 1.0) * y / (Complex::new(1.0, 0.0) - r * y);
 
         a + v0 * b
+    }
+
+    /// PIN (Integration): Gauss-Laguerre `calculate` on `f(x) = x*e^{-x}`
+    /// reproduces `int_0^inf x e^{-x} dx = 1`. The Rust `laguerre` rule folds
+    /// the `e^{-x}` weight into its nodes (`f` is the raw integrand over
+    /// `[0, inf)`), so the integrand that yields `1` is `x*e^{-x}`, a degree-1
+    /// polynomial against the weight - integrated exactly (this diverges for the
+    /// ticket's literal `f(x)=x`; see the report). `c_inf` is ignored.
+    #[test]
+    fn integration_gauss_laguerre_integrates_x_exp() {
+        let integration = Integration::gauss_laguerre(64).unwrap();
+        let got = integration.calculate(1.0, |x| x * (-x).exp());
+        assert!(
+            (got - 1.0).abs() < 1e-13,
+            "int x e^-x dx = {got}, expected 1"
+        );
+    }
+
+    /// `numberOfEvaluations` equals the quadrature order for Gauss-Laguerre
+    /// (`analytichestonengine.cpp:976-978`); `isAdaptiveIntegration` is `false`.
+    #[test]
+    fn integration_evaluations_and_adaptivity() {
+        let integration = Integration::gauss_laguerre(48).unwrap();
+        assert_eq!(integration.number_of_evaluations(), 48);
+        assert!(!integration.is_adaptive_integration());
+    }
+
+    /// `gaussLaguerre` rejects `int_order > 192`
+    /// (`analytichestonengine.cpp:926`).
+    #[test]
+    fn integration_gauss_laguerre_rejects_high_order() {
+        assert!(Integration::gauss_laguerre(193).is_err());
     }
 }
