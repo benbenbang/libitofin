@@ -274,3 +274,323 @@ impl BlackCalibrationHelper for HestonModelHelper {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::interestrate::Compounding;
+    use crate::math::optimization::endcriteria::EndCriteria;
+    use crate::math::optimization::levenbergmarquardt::LevenbergMarquardt;
+    use crate::models::calibrationhelper::CalibrationHelper;
+    use crate::models::{HestonModel, calibrate};
+    use crate::pricingengine::PricingEngine;
+    use crate::pricingengines::vanilla::analytichestonengine::AnalyticHestonEngine;
+    use crate::processes::HestonProcess;
+    use crate::termstructures::yields::FlatForward;
+    use crate::time::calendars::nullcalendar::NullCalendar;
+    use crate::time::date::Month;
+    use crate::time::daycounters::actual360::Actual360;
+    use crate::time::frequency::Frequency;
+    use crate::time::timeunit::TimeUnit;
+
+    const VOL: Real = 0.1;
+
+    fn today() -> Date {
+        Date::new(15, Month::January, 2026)
+    }
+
+    /// The `testBlackCalibration` market data (`hestonmodel.cpp:239-251`):
+    /// Actual360 flat curves at 4% risk-free / 50% dividend referenced at the
+    /// evaluation date, unit spot and a flat 10% volatility, on a
+    /// [`NullCalendar`]. The 50% dividend yield drives forwards well below spot,
+    /// so the out-of-the-money (positive-moneyness) helpers become puts.
+    struct Fixture {
+        settings: Shared<Settings<Date>>,
+        risk_free: Handle<dyn YieldTermStructure>,
+        dividend: Handle<dyn YieldTermStructure>,
+        s0: Handle<dyn Quote>,
+        vol: Handle<dyn Quote>,
+        calendar: Calendar,
+    }
+
+    impl Fixture {
+        fn new() -> Fixture {
+            let settings = shared(Settings::new());
+            settings.set_evaluation_date(today());
+            let flat = |rate: Real| -> Handle<dyn YieldTermStructure> {
+                Handle::new(shared(FlatForward::with_rate(
+                    today(),
+                    rate,
+                    Actual360::new(),
+                    Compounding::Continuous,
+                    Frequency::Annual,
+                )) as Shared<dyn YieldTermStructure>)
+            };
+            Fixture {
+                settings,
+                risk_free: flat(0.04),
+                dividend: flat(0.50),
+                s0: Handle::new(shared(SimpleQuote::new(1.0)) as Shared<dyn Quote>),
+                vol: Handle::new(shared(SimpleQuote::new(VOL)) as Shared<dyn Quote>),
+                calendar: NullCalendar::new(),
+            }
+        }
+
+        /// `tau` exactly as the helper derives it (`hestonmodelhelper.cpp:65-66`):
+        /// the risk-free curve's time to the maturity-advanced reference date.
+        fn tau(&self, maturity: Period) -> Time {
+            let risk_free = self.risk_free.current_link().unwrap();
+            let reference = risk_free.reference_date().unwrap();
+            let exercise = self.calendar.advance_by_period(
+                reference,
+                maturity,
+                BusinessDayConvention::Following,
+                false,
+            );
+            risk_free.time_from_reference(exercise).unwrap()
+        }
+
+        /// The forward `s0 * dividendDiscount / riskFreeDiscount`
+        /// (`hestonmodel.cpp:257-258`).
+        fn forward(&self, tau: Time) -> Real {
+            let risk_free = self.risk_free.current_link().unwrap();
+            let dividend = self.dividend.current_link().unwrap();
+            let s0 = self.s0.current_link().unwrap().value().unwrap();
+            s0 * dividend.discount(tau, false).unwrap() / risk_free.discount(tau, false).unwrap()
+        }
+
+        fn helper(&self, maturity: Period, strike: Real) -> HestonModelHelper {
+            HestonModelHelper::with_spot_handle(
+                maturity,
+                self.calendar.clone(),
+                self.s0.clone(),
+                strike,
+                self.vol.clone(),
+                self.risk_free.clone(),
+                self.dividend.clone(),
+                CalibrationErrorType::RelativePriceError,
+                Shared::clone(&self.settings),
+            )
+        }
+
+        /// A Black price computed independently of the helper, with the strike
+        /// and forward discounted and a forced option type - the reference the
+        /// standalone pins compare against (`hestonmodelhelper.cpp:89-91`).
+        fn direct_black(
+            &self,
+            maturity: Period,
+            strike: Real,
+            option_type: OptionType,
+            vol: Real,
+        ) -> Real {
+            let tau = self.tau(maturity);
+            let risk_free = self.risk_free.current_link().unwrap();
+            let dividend = self.dividend.current_link().unwrap();
+            let s0 = self.s0.current_link().unwrap().value().unwrap();
+            black_formula(
+                option_type,
+                strike * risk_free.discount(tau, false).unwrap(),
+                s0 * dividend.discount(tau, false).unwrap(),
+                vol * tau.sqrt(),
+                1.0,
+                0.0,
+            )
+            .unwrap()
+        }
+    }
+
+    /// STANDALONE PIN: `black_price` equals a directly computed
+    /// [`black_formula`] with the discounted strike/forward, and `market_value`
+    /// equals `black_price` at the quoted volatility (the base-class contract).
+    /// A 6-arg wiring, discounting or `tau` bug diverges this off the optimizer.
+    /// The 6M at-the-forward helper (moneyness 0) has strike equal to the
+    /// forward, so its `strike * rf_discount == s0 * div_discount` and the type
+    /// is a call.
+    #[test]
+    fn black_price_matches_a_direct_black_formula_and_market_value() {
+        let fixture = Fixture::new();
+        let maturity = Period::new(6, TimeUnit::Months);
+        let strike = fixture.forward(fixture.tau(maturity));
+        let mut helper = fixture.helper(maturity, strike);
+
+        let expected = fixture.direct_black(maturity, strike, OptionType::Call, VOL);
+        let black = helper.black_price(VOL).unwrap();
+        assert!(
+            (black - expected).abs() <= 1.0e-12,
+            "black_price {black} vs direct black_formula {expected} (error {})",
+            (black - expected).abs()
+        );
+
+        let market = helper.market_value().unwrap();
+        assert!(
+            (market - black).abs() <= 1.0e-12,
+            "market_value {market} vs black_price {black} (error {})",
+            (market - black).abs()
+        );
+    }
+
+    /// CONFIRM-BY-STUBBING: the `type_` decision (`hestonmodelhelper.cpp:68-71`)
+    /// is live inside `black_price`. A strike far below the forward prices as a
+    /// put (matches a forced-put `black_formula`, differs from a forced call);
+    /// a strike far above prices as a call. Removing the moneyness branch would
+    /// break one side of each pair.
+    #[test]
+    fn black_price_tracks_the_option_type_decision() {
+        let fixture = Fixture::new();
+        let maturity = Period::new(1, TimeUnit::Years);
+        let forward = fixture.forward(fixture.tau(maturity));
+
+        let put_strike = forward * 0.5;
+        let put_black = fixture
+            .helper(maturity, put_strike)
+            .black_price(VOL)
+            .unwrap();
+        let forced_put = fixture.direct_black(maturity, put_strike, OptionType::Put, VOL);
+        let forced_call = fixture.direct_black(maturity, put_strike, OptionType::Call, VOL);
+        assert!(
+            (put_black - forced_put).abs() <= 1.0e-12,
+            "a strike below the forward must price as a put: {put_black} vs {forced_put}"
+        );
+        assert!(
+            (put_black - forced_call).abs() > 1.0e-8,
+            "the type decision is dead: the put priced as a forced call ({put_black})"
+        );
+
+        let call_strike = forward * 2.0;
+        let call_black = fixture
+            .helper(maturity, call_strike)
+            .black_price(VOL)
+            .unwrap();
+        let forced_call = fixture.direct_black(maturity, call_strike, OptionType::Call, VOL);
+        let forced_put = fixture.direct_black(maturity, call_strike, OptionType::Put, VOL);
+        assert!(
+            (call_black - forced_call).abs() <= 1.0e-12,
+            "a strike above the forward must price as a call: {call_black} vs {forced_call}"
+        );
+        assert!(
+            (call_black - forced_put).abs() > 1.0e-8,
+            "the type decision is dead: the call priced as a forced put ({call_black})"
+        );
+    }
+
+    /// ORACLE `testBlackCalibration` (`hestonmodel.cpp:232-311`): calibrate the
+    /// Heston model to a flat 10% vol surface (21 helpers over 7 maturities x 3
+    /// moneyness) for three starting vol-of-vols. A flat surface has no smile, so
+    /// the fit drives sigma to zero and theta/v0 to the constant variance. The
+    /// theta pin is C++'s deliberately weak `|kappa * (theta - vol^2)|` (a small
+    /// kappa lets theta drift), ported faithfully. The distribution check
+    /// confirms the put branch is genuinely exercised (7 puts at moneyness +1,
+    /// 14 calls at moneyness <= 0).
+    ///
+    /// BLOCKED: this oracle drives sigma below `1e-6`, where the
+    /// [`AnalyticHestonEngine`] enters the small-`sigma` chF series-expansion
+    /// branch (`analytichestonengine.cpp:584-617`) that #415/#419 deferred (that
+    /// deferral assumed only the sigma=0.4 Y3 oracle, not this calibration to a
+    /// flat surface). The engine currently `.expect()`-panics there; replacing
+    /// the panic with a `NaN` return does NOT unblock it - Levenberg-Marquardt
+    /// then rejects the non-finite residuals - so the series expansion must be
+    /// ported before this test can pass. The helper itself is proven by the two
+    /// standalone pins above and by the finite, near-market `model_value`s all 21
+    /// helpers produce at the sigma=0.1 start. Flip live once the expansion lands.
+    #[test]
+    #[ignore = "blocked on the deferred small-sigma Heston chF expansion (analytichestonengine.cpp:584-617, #415/#419); the fit converges sigma<1e-6 into that branch"]
+    fn heston_calibrates_to_a_flat_vol_surface() {
+        let fixture = Fixture::new();
+        let maturities = [
+            Period::new(1, TimeUnit::Months),
+            Period::new(2, TimeUnit::Months),
+            Period::new(3, TimeUnit::Months),
+            Period::new(6, TimeUnit::Months),
+            Period::new(9, TimeUnit::Months),
+            Period::new(1, TimeUnit::Years),
+            Period::new(2, TimeUnit::Years),
+        ];
+        let moneynesses = [-1.0, 0.0, 1.0];
+
+        let mut helpers: Vec<SharedMut<HestonModelHelper>> = Vec::new();
+        let mut puts = 0usize;
+        let mut calls = 0usize;
+        for &maturity in &maturities {
+            for &moneyness in &moneynesses {
+                let tau = fixture.tau(maturity);
+                let strike = fixture.forward(tau) * (-moneyness * VOL * tau.sqrt()).exp();
+                let helper = fixture.helper(maturity, strike);
+
+                let black = helper.black_price(VOL).unwrap();
+                let call = fixture.direct_black(maturity, strike, OptionType::Call, VOL);
+                let put = fixture.direct_black(maturity, strike, OptionType::Put, VOL);
+                if (black - put).abs() < (black - call).abs() {
+                    puts += 1;
+                } else {
+                    calls += 1;
+                }
+                helpers.push(shared_mut(helper));
+            }
+        }
+        assert_eq!(helpers.len(), 21);
+        assert_eq!(
+            puts, 7,
+            "the 50% dividend fixture must exercise the put branch (moneyness +1)"
+        );
+        assert_eq!(calls, 14);
+
+        let tolerance = 3.0e-3;
+        let expected_variance = VOL * VOL;
+        for &sigma in &[0.1, 0.3, 0.5] {
+            let process = shared(HestonProcess::new(
+                fixture.risk_free.clone(),
+                fixture.dividend.clone(),
+                fixture.s0.clone(),
+                0.01,
+                0.2,
+                0.02,
+                sigma,
+                -0.75,
+            ));
+            let model = HestonModel::new(process).unwrap();
+            let engine =
+                shared_mut(AnalyticHestonEngine::new(SharedMut::clone(&model), 96).unwrap())
+                    as SharedMut<dyn PricingEngine>;
+            for helper in &helpers {
+                helper
+                    .borrow_mut()
+                    .base_mut()
+                    .set_pricing_engine(SharedMut::clone(&engine));
+            }
+            let dyn_helpers: Vec<SharedMut<dyn CalibrationHelper>> = helpers
+                .iter()
+                .map(|helper| SharedMut::clone(helper) as SharedMut<dyn CalibrationHelper>)
+                .collect();
+
+            let mut method = LevenbergMarquardt::new(1e-8, 1e-8, 1e-8, false);
+            let end_criteria = EndCriteria::new(400, Some(40), 1e-8, 1e-8, Some(1e-8)).unwrap();
+            calibrate(
+                &model,
+                &dyn_helpers,
+                &mut method,
+                &end_criteria,
+                None,
+                Vec::new(),
+                Vec::new(),
+            )
+            .unwrap();
+
+            let model = model.borrow();
+            assert!(
+                model.sigma() < tolerance,
+                "sigma {} exceeds {tolerance} (start {sigma})",
+                model.sigma()
+            );
+            let theta_residual = model.kappa() * (model.theta() - expected_variance);
+            assert!(
+                theta_residual.abs() < tolerance,
+                "kappa*(theta - vol^2) = {theta_residual} exceeds {tolerance} (start {sigma})"
+            );
+            assert!(
+                (model.v0() - expected_variance).abs() < tolerance,
+                "v0 {} vs vol^2 {expected_variance} exceeds {tolerance} (start {sigma})",
+                model.v0()
+            );
+        }
+    }
+}
