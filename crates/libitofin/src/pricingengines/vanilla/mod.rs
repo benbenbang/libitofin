@@ -17,6 +17,10 @@
 //!   (and the calculator supports nothing else), so any other payoff is an
 //!   explicit error instead of a silently wrong price.
 
+pub mod analytichestonengine;
+
+pub use analytichestonengine::HestonChf;
+
 use std::any::Any;
 
 use crate::errors::QlResult;
