@@ -16,13 +16,26 @@
 //! - the `addOnTerm` virtual hook (`analytichestonengine.hpp:179-181`, base
 //!   returns 0), the Bates jump-diffusion extension point.
 
+use std::any::Any;
+
 use crate::errors::QlResult;
-use crate::fail;
+use crate::exercise::ExerciseType;
+use crate::instruments::{
+    OneAssetOptionEngine, OneAssetOptionResults, OptionArguments, PlainVanillaPayoff,
+    StrikedTypePayoff, TypePayoff,
+};
 use crate::math::expm1::{expm1, log1p};
 use crate::math::integrals::gaussianquadratures::GaussianQuadrature;
+use crate::models::HestonModel;
+use crate::models::model::CalibratedModelHolder;
 use crate::option::OptionType;
+use crate::patterns::observable::{AsObservable, Observable};
+use crate::pricingengine::{Arguments, PricingEngine, Results};
 use crate::pricingengines::BlackCalculator;
+use crate::shared::SharedMut;
+use crate::stochasticprocess::StochasticProcess;
 use crate::types::{Complex, Real, Size, Time};
+use crate::{fail, require};
 
 /// The Heston characteristic function, carrying the five model parameters.
 ///
@@ -386,6 +399,211 @@ impl ApHelper {
     }
 }
 
+/// The analytic Heston pricing engine (`analytichestonengine.{hpp,cpp}`),
+/// `integrationOrder` constructor / `OptimalCV` path.
+///
+/// Ports `AnalyticHestonEngine(model, integrationOrder)`
+/// (`analytichestonengine.cpp:659-671`): a Gauss-Laguerre [`Integration`] of the
+/// requested order, `cpxLog_ = OptimalCV`, and `alpha_ = -0.5`. It prices a
+/// European [`VanillaOption`](crate::instruments::VanillaOption) carrying a
+/// [`PlainVanillaPayoff`] through the Andersen-Piterbarg control-variate integral
+/// (`priceVanillaPayoff`, `cpp:748-859`, the `OptimalCV` case only).
+///
+/// Follows the [`GenericModelEngine`] precedent (`jamshidianswaptionengine.rs`):
+/// the engine holds the model by [`SharedMut`] and registers as an observer of
+/// its [`CalibratedModel`](crate::models::model::CalibratedModel) observable, so
+/// a parameter or curve change invalidates a priced option.
+///
+/// ## Ported vs deferred (visible omissions)
+///
+/// - Only the `integrationOrder` constructor is ported. The Gauss-Lobatto
+///   `(model, relTolerance, maxEvaluations)` constructor (`cpp:673-685`) and the
+///   explicit `(model, cpxLog, integration, epsilon, alpha)` constructor
+///   (`cpp:687-705`) are deferred with their integration algorithms (issue #418).
+/// - `cpxLog_` is fixed to `OptimalCV`, so [`calculate`](Self::calculate) always
+///   routes through
+///   [`optimal_control_variate`](AnalyticHestonEngine::optimal_control_variate).
+///   The `Gatheral` / `BranchCorrection` `Fj_Helper` case (`cpp:772-802`) is
+///   deferred; only the Andersen-Piterbarg case (`cpp:808-852`) is ported.
+/// - `andersenPiterbargEpsilon_` and the `uM` / `epsilon` integration-limit
+///   machinery (`cpp:812-818`, `1046-1065`) are dead for Gauss-Laguerre (its
+///   `calculate` never calls `maxBound`), so they are omitted (issue #418).
+/// - `evaluations_` / `numberOfEvaluations` (`cpp:721-723`) counts quadrature
+///   evaluations; it feeds no result the oracle reads, so it is deferred (the
+///   count is available on [`Integration::number_of_evaluations`]).
+pub struct AnalyticHestonEngine {
+    base: OneAssetOptionEngine,
+    model: SharedMut<HestonModel>,
+    integration: Integration,
+    alpha: Real,
+}
+
+impl AnalyticHestonEngine {
+    /// `AnalyticHestonEngine(model, Size integrationOrder)`
+    /// (`analytichestonengine.cpp:659-671`): a Gauss-Laguerre integration of the
+    /// given order, `cpxLog = OptimalCV`, `alpha = -0.5`.
+    ///
+    /// # Errors
+    ///
+    /// Propagates [`Integration::gauss_laguerre`] failure (`integration_order >
+    /// 192`).
+    pub fn new(
+        model: SharedMut<HestonModel>,
+        integration_order: Size,
+    ) -> QlResult<AnalyticHestonEngine> {
+        let integration = Integration::gauss_laguerre(integration_order)?;
+        let base =
+            OneAssetOptionEngine::new(OptionArguments::default(), OneAssetOptionResults::default());
+        base.register_with(model.borrow().calibrated_model().observable());
+        Ok(AnalyticHestonEngine {
+            base,
+            model,
+            integration,
+            alpha: -0.5,
+        })
+    }
+
+    /// `AnalyticHestonEngine(model)` with the default integration order 144
+    /// (`analytichestonengine.hpp:131`).
+    ///
+    /// # Errors
+    ///
+    /// Propagates [`Integration::gauss_laguerre`] failure (does not occur for
+    /// order 144).
+    pub fn with_default_order(model: SharedMut<HestonModel>) -> QlResult<AnalyticHestonEngine> {
+        AnalyticHestonEngine::new(model, 144)
+    }
+
+    /// `optimalControlVariate` (`analytichestonengine.cpp:707-719`): selects
+    /// [`AsymptoticChF`](ComplexLogFormula::AsymptoticChF) when all three
+    /// asymptotic-regime conditions hold, else
+    /// [`AngledContour`](ComplexLogFormula::AngledContour).
+    ///
+    /// Ported exactly, including the C++ operator precedence
+    /// `((v0 + t*kappa*theta) / sigma) * sqrt(1 - rho^2)` (division by `sigma`
+    /// first, then the product) and the natural logarithm in the third
+    /// condition. It is deliberately not stubbed to `AngledContour`: on a
+    /// parameter set that flips to `AsymptoticChF`, [`ApHelper::new`] fails loud
+    /// (issue #418), the intended #262-safe behaviour rather than a silent
+    /// mis-price.
+    pub fn optimal_control_variate(
+        t: Time,
+        v0: Real,
+        kappa: Real,
+        theta: Real,
+        sigma: Real,
+        rho: Real,
+    ) -> ComplexLogFormula {
+        if t > 0.15
+            && (v0 + t * kappa * theta) / sigma * (1.0 - rho * rho).sqrt() < 0.15
+            && ((kappa - 0.5 * rho * sigma) * (v0 + t * kappa * theta)
+                + kappa * theta * (4.0 * (1.0 - rho * rho)).ln())
+                / (sigma * sigma)
+                < 0.1
+        {
+            ComplexLogFormula::AsymptoticChF
+        } else {
+            ComplexLogFormula::AngledContour
+        }
+    }
+}
+
+impl AsObservable for AnalyticHestonEngine {
+    fn observable(&self) -> &Observable {
+        self.base.observable()
+    }
+}
+
+impl PricingEngine for AnalyticHestonEngine {
+    fn arguments_mut(&mut self) -> &mut dyn Arguments {
+        self.base.arguments_mut()
+    }
+
+    fn results(&self) -> &dyn Results {
+        self.base.results()
+    }
+
+    fn reset(&mut self) {
+        self.base.reset();
+    }
+
+    /// `calculate` (`analytichestonengine.cpp:861-875`): guards a European
+    /// [`PlainVanillaPayoff`], then `priceVanillaPayoff(payoff, exerciseDate)`
+    /// (`cpp:725-735`, `748-859`) - the forward at the exercise date, the
+    /// maturity time and the risk-free discount, then the OptimalCV assembly.
+    fn calculate(&mut self) -> QlResult<()> {
+        let arguments = self.base.arguments();
+        let Some(exercise) = &arguments.exercise else {
+            fail!("no exercise given");
+        };
+        require!(
+            exercise.exercise_type() == ExerciseType::European,
+            "not an European option"
+        );
+        let Some(payoff) = &arguments.payoff else {
+            fail!("no payoff given");
+        };
+        let payoff: &dyn StrikedTypePayoff = &**payoff;
+        let Some(payoff) = (payoff as &dyn Any).downcast_ref::<PlainVanillaPayoff>() else {
+            fail!("non plain vanilla payoff given");
+        };
+        let payoff = *payoff;
+        let maturity_date = exercise.last_date();
+
+        let model = self.model.borrow();
+        let process = model.process();
+        let kappa = model.kappa();
+        let sigma = model.sigma();
+        let theta = model.theta();
+        let rho = model.rho();
+        let v0 = model.v0();
+        drop(model);
+
+        let spot = process.s0().current_link()?.value()?;
+        if spot.is_nan() || spot <= 0.0 {
+            fail!("negative or null underlying given");
+        }
+
+        // fwd at the exercise DATE (`cpp:730-732`): s0 * qDiscount / rDiscount.
+        let dividend_discount = process
+            .dividend_yield()
+            .current_link()?
+            .discount_date(maturity_date, false)?;
+        let risk_free_discount_date = process
+            .risk_free_rate()
+            .current_link()?
+            .discount_date(maturity_date, false)?;
+        let fwd = spot * dividend_discount / risk_free_discount_date;
+
+        // maturity as a TIME and the discount over it (`cpp:734, 755`).
+        let time = process.time(&maturity_date)?;
+        let dr = process
+            .risk_free_rate()
+            .current_link()?
+            .discount(time, false)?;
+
+        let strike = payoff.strike();
+        let c_inf = (1.0 - rho * rho).sqrt() * (v0 + kappa * theta * time) / sigma;
+
+        let final_log =
+            AnalyticHestonEngine::optimal_control_variate(time, v0, kappa, theta, sigma, rho);
+        let chf = HestonChf::new(kappa, theta, sigma, rho, v0);
+        let cv_helper = ApHelper::new(time, fwd, strike, final_log, chf, self.alpha)?;
+
+        let cv_value = cv_helper.control_variate_value()?;
+        let h_cv = fwd / std::f64::consts::PI
+            * self.integration.calculate(c_inf, |u| cv_helper.evaluate(u));
+
+        let value = match payoff.option_type() {
+            OptionType::Call => (cv_value + h_cv) * dr,
+            OptionType::Put => (cv_value + h_cv - (fwd - strike)) * dr,
+        };
+
+        self.base.results_mut().instrument.value = Some(value);
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -730,5 +948,107 @@ mod tests {
             let err = ApHelper::new(TERM, FWD, STRIKE, cpx, fixture(), ALPHA).unwrap_err();
             assert!(err.to_string().contains("deferred"), "{cpx:?}: {err}");
         }
+    }
+}
+
+#[cfg(test)]
+mod engine_tests {
+    use super::*;
+
+    use crate::exercise::{EuropeanExercise, Exercise};
+    use crate::handle::Handle;
+    use crate::instrument::Instrument;
+    use crate::instruments::VanillaOption;
+    use crate::interestrate::Compounding;
+    use crate::processes::HestonProcess;
+    use crate::quotes::make_quote_handle;
+    use crate::settings::Settings;
+    use crate::shared::{Shared, SharedMut, shared, shared_mut};
+    use crate::termstructures::yields::FlatForward;
+    use crate::termstructures::yieldtermstructure::YieldTermStructure;
+    use crate::time::date::{Date, Month};
+    use crate::time::daycounters::actualactual::{ActualActual, Convention};
+    use crate::time::frequency::Frequency;
+
+    /// `optimalControlVariate` (`analytichestonengine.cpp:711-718`) selects
+    /// `AngledContour` for BOTH testAnalyticVsCached parameter sets - the branch
+    /// the ported [`ApHelper`] integrand implements. Arm 1 fails condition 2
+    /// (`~0.419 >= 0.15`); Arm 2 passes condition 2 (`~0.078`) but fails
+    /// condition 3 (`~0.112 >= 0.1`) - so it is condition 3 that keeps Arm 2 on
+    /// the ported branch, transcribed exactly (natural log, exact coefficients).
+    #[test]
+    fn optimal_control_variate_selects_angled_contour_for_both_oracle_arms() {
+        assert_eq!(
+            AnalyticHestonEngine::optimal_control_variate(0.2492776, 0.1, 3.16, 0.09, 0.4, -0.2),
+            ComplexLogFormula::AngledContour
+        );
+        assert_eq!(
+            AnalyticHestonEngine::optimal_control_variate(0.6986002, 0.09, 1.2, 0.08, 1.8, -0.45),
+            ComplexLogFormula::AngledContour
+        );
+    }
+
+    /// CONFIRM-BY-STUBBING (selector is live): a parameter set satisfying all
+    /// three conditions (`t = 1`, `v0 = 0.01`, `kappa = 0.5`, `theta = 0.01`,
+    /// `sigma = 2`, `rho = 0`: condition 2 `~0.0075`, condition 3 `~0.0036`)
+    /// flips the selector to `AsymptoticChF`, proving it is not hard-wired to
+    /// `AngledContour`.
+    #[test]
+    fn optimal_control_variate_flips_to_asymptotic_chf_in_the_asymptotic_regime() {
+        assert_eq!(
+            AnalyticHestonEngine::optimal_control_variate(1.0, 0.01, 0.5, 0.01, 2.0, 0.0),
+            ComplexLogFormula::AsymptoticChF
+        );
+    }
+
+    fn flat(rate: Real, reference: Date) -> Handle<dyn YieldTermStructure> {
+        Handle::new(shared(FlatForward::with_rate(
+            reference,
+            rate,
+            ActualActual::with_convention(Convention::ISDA),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>)
+    }
+
+    /// CONFIRM-BY-STUBBING (fail loud, not silent - #262 class): pricing a
+    /// parameter set whose maturity puts it in the asymptotic regime selects
+    /// `AsymptoticChF`, whose integrand is deferred (issue #418), so
+    /// [`ApHelper::new`] errors and the error propagates out of `NPV()`. A silent
+    /// fall-through to `AngledContour` would mis-price a set 12% from the flip;
+    /// this test proves the engine refuses rather than guesses.
+    #[test]
+    fn asymptotic_regime_pricing_fails_loud_not_silent() {
+        let reference = Date::new(27, Month::December, 2004);
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(reference);
+
+        let process = shared(HestonProcess::new(
+            flat(0.05, reference),
+            flat(0.02, reference),
+            make_quote_handle(1.0).handle(),
+            0.01,
+            0.5,
+            0.01,
+            2.0,
+            0.0,
+        ));
+        let model = HestonModel::new(process).unwrap();
+
+        let payoff =
+            shared(PlainVanillaPayoff::new(OptionType::Call, 1.0)) as Shared<dyn StrikedTypePayoff>;
+        let exercise = shared(EuropeanExercise::new(Date::new(27, Month::December, 2005)))
+            as Shared<dyn Exercise>;
+        let mut option = VanillaOption::new(payoff, exercise, Shared::clone(&settings));
+        let engine = shared_mut(AnalyticHestonEngine::new(model, 64).unwrap())
+            as SharedMut<dyn PricingEngine>;
+        option.base_mut().set_pricing_engine(engine);
+
+        let err = option.npv().unwrap_err();
+        assert!(
+            err.message().contains("#418") || err.message().contains("deferred"),
+            "asymptotic regime must fail loud (issue #418), got: {}",
+            err.message()
+        );
     }
 }
