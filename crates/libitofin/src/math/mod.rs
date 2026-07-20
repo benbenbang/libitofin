@@ -6,6 +6,7 @@ pub mod comparison;
 pub mod copulas;
 pub mod distributions;
 pub mod errorfunction;
+pub mod expm1;
 pub mod gammafunction;
 pub mod incompletegamma;
 pub mod integrals;
