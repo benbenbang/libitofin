@@ -23,6 +23,7 @@ use crate::instruments::{
     StrikedTypePayoff, TypePayoff,
 };
 use crate::math::expm1::{expm1, log1p};
+use crate::math::integrals::exponential_integrals::{ci_complex, si_complex};
 use crate::math::integrals::gaussianquadratures::GaussianQuadrature;
 use crate::models::HestonModel;
 use crate::models::model::CalibratedModelHolder;
@@ -272,11 +273,12 @@ impl Integration {
 /// The control-variate formula selecting `AP_Helper`'s integrand
 /// (`analytichestonengine.hpp:100-118`, the `AP_Helper`-relevant subset).
 ///
-/// Only [`AngledContour`](ComplexLogFormula::AngledContour) is ported (issue
-/// #416, the calibrated oracle path). The other four variants are deferred to
-/// issue #418 and fail loud in [`ApHelper::new`] (they are NOT stubbed to
-/// `AngledContour`: `optimalControlVariate` can flip to `AsymptoticChF`, so a
-/// silent stub would mis-price; #262-class visible omission).
+/// [`AngledContour`](ComplexLogFormula::AngledContour) (issue #416) and
+/// [`AsymptoticChF`](ComplexLogFormula::AsymptoticChF) (issue #426) are ported:
+/// `optimalControlVariate` selects between exactly these two, so both are on the
+/// calibrated oracle path. The remaining three variants are deferred to issue
+/// #418 and fail loud in [`ApHelper::new`] (they are NOT stubbed to a ported
+/// branch: a silent stub would mis-price; #262-class visible omission).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ComplexLogFormula {
     /// Gatheral form with Andersen-Piterbarg control variate (deferred).
@@ -284,7 +286,7 @@ pub enum ComplexLogFormula {
     /// A slightly better Andersen-Piterbarg control variate (deferred).
     AndersenPiterbargOptCV,
     /// Asymptotic expansion of the characteristic function as control variate
-    /// (deferred: needs `ExponentialIntegral::Ci/Si`).
+    /// (ported, issue #426).
     AsymptoticChF,
     /// Angled-contour integration with control variate (ported).
     AngledContour,
@@ -293,12 +295,17 @@ pub enum ComplexLogFormula {
 }
 
 /// The Andersen-Piterbarg `AP_Helper` control-variate integrand
-/// (`analytichestonengine.cpp:448-576`), AngledContour branch.
+/// (`analytichestonengine.cpp:448-576`), AngledContour and AsymptoticChF
+/// branches.
 ///
 /// In C++ `AP_Helper` holds an `AnalyticHestonEngine*` and reads the five
 /// Heston parameters plus the characteristic function `chF` off it. There is no
 /// engine yet (issue #417), so this carries a [`HestonChf`] (from issue #415)
 /// directly and reads the parameters through its accessors.
+///
+/// `phi`/`psi` (`cpp:479-488`) are the asymptotic control-variate coefficients;
+/// they are computed only for [`AsymptoticChF`](ComplexLogFormula::AsymptoticChF)
+/// and left zero on the AngledContour branch, which never reads them.
 ///
 /// The `addOnTerm` zero-guard at the top of `operator()` (`cpp:508-512`) is the
 /// Bates jump-diffusion hook (base returns 0); it is deferred with `chF` per
@@ -313,24 +320,32 @@ pub struct ApHelper {
     s_alpha: Real,
     v_avg: Real,
     tan_phi: Real,
+    phi: Complex,
+    psi: Complex,
+    cpx_log: ComplexLogFormula,
     chf: HestonChf,
 }
 
 impl ApHelper {
-    /// `AP_Helper` constructor (`analytichestonengine.cpp:448-505`), Angled
-    /// contour branch.
+    /// `AP_Helper` constructor (`analytichestonengine.cpp:448-505`),
+    /// AngledContour and AsymptoticChF branches.
     ///
-    /// Computes `vAvg` (`cpp:490-492`) and `tanPhi` (`cpp:497-501`). The
-    /// `boost::math::sign(freq)` in `tanPhi` (`cpp:499`) is [`Real::signum`]
+    /// For AsymptoticChF the C++ `switch` computes `phi_`/`psi_` (`cpp:479-488`),
+    /// then `[[fallthrough]]` through the AngledContour `vAvg` (`cpp:490-492`)
+    /// and the AngledContourNoCV `tanPhi` block (`cpp:496-500`), so the helper
+    /// carries `phi`, `psi`, `vAvg` AND `tanPhi`; AngledContour computes only
+    /// `vAvg` and `tanPhi`. The whole `psi_` complex is divided by `sigma^2`
+    /// (`cpp:488`), and the imaginary part carries an overall leading minus sign
+    /// (`cpp:485`), both transcribed exactly.
+    ///
+    /// The `boost::math::sign(freq)` in `tanPhi` (`cpp:498`) is [`Real::signum`]
     /// here; they differ only at `freq == 0`, which the `r*freq < 0.0` guard
     /// excludes (the product is `0`, not `< 0`, so the branch is not taken).
     ///
     /// # Errors
     ///
-    /// Errors for any `cpx_log` other than
-    /// [`AngledContour`](ComplexLogFormula::AngledContour): the
-    /// `AndersenPiterbarg`/`AndersenPiterbargOptCV`/`AsymptoticChF`/
-    /// `AngledContourNoCV` branches are deferred to issue #418.
+    /// Errors for `AndersenPiterbarg`/`AndersenPiterbargOptCV`/`AngledContourNoCV`:
+    /// those branches are deferred to issue #418.
     pub fn new(
         term: Time,
         fwd: Real,
@@ -339,14 +354,6 @@ impl ApHelper {
         chf: HestonChf,
         alpha: Real,
     ) -> QlResult<Self> {
-        if cpx_log != ComplexLogFormula::AngledContour {
-            fail!(
-                "AP_Helper control variate {cpx_log:?} is deferred (issue #418): only \
-                 AngledContour is ported (issue #416); it is not stubbed to AngledContour \
-                 because optimalControlVariate may select AsymptoticChF"
-            );
-        }
-
         let kappa = chf.kappa();
         let theta = chf.theta();
         let sigma = chf.sigma();
@@ -355,15 +362,38 @@ impl ApHelper {
 
         let freq = (fwd / strike).ln();
         let s_alpha = (alpha * freq).exp();
+
+        let (phi, psi) = match cpx_log {
+            ComplexLogFormula::AngledContour => (Complex::new(0.0, 0.0), Complex::new(0.0, 0.0)),
+            ComplexLogFormula::AsymptoticChF => {
+                let sqrt_1mrho2 = (1.0 - rho * rho).sqrt();
+                let phi = -(v0 + term * kappa * theta) / sigma * Complex::new(sqrt_1mrho2, rho);
+                let psi = Complex::new(
+                    (kappa - 0.5 * rho * sigma) * (v0 + term * kappa * theta)
+                        + kappa * theta * (4.0 * (1.0 - rho * rho)).ln(),
+                    -((0.5 * rho * rho * sigma - kappa * rho) / sqrt_1mrho2
+                        * (v0 + kappa * theta * term)
+                        - 2.0 * kappa * theta * (rho / sqrt_1mrho2).atan()),
+                ) / (sigma * sigma);
+                (phi, psi)
+            }
+            other => fail!(
+                "AP_Helper control variate {other:?} is deferred (issue #418): only \
+                 AngledContour (issue #416) and AsymptoticChF (issue #426) are ported; the \
+                 deferred branches are not stubbed to a ported one because optimalControlVariate \
+                 selects between exactly those two"
+            ),
+        };
+
         let v_avg = (1.0 - (-kappa * term).exp()) * (v0 - theta) / (kappa * term) + theta;
 
         let r = rho - sigma * freq / (v0 + kappa * theta * term);
-        let phi = if r * freq < 0.0 {
+        let contour_angle = if r * freq < 0.0 {
             std::f64::consts::PI / 12.0 * freq.signum()
         } else {
             0.0
         };
-        let tan_phi = phi.tan();
+        let tan_phi = contour_angle.tan();
 
         Ok(ApHelper {
             term,
@@ -374,27 +404,39 @@ impl ApHelper {
             s_alpha,
             v_avg,
             tan_phi,
+            phi,
+            psi,
+            cpx_log,
             chf,
         })
     }
 
-    /// `operator()(u)` (`analytichestonengine.cpp:507-533`), AngledContour
-    /// branch: the real-valued integrand fed to Gauss-Laguerre.
+    /// `operator()(u)` (`analytichestonengine.cpp:507-533`), the shared
+    /// AngledContour/AsymptoticChF contour: the real-valued integrand fed to
+    /// Gauss-Laguerre.
     ///
-    /// The complex `phiBS - chF` is reduced to a `Real` by `.real()`
-    /// (`cpp:528-532`) inside the integrand, so the quadrature integrates a
-    /// real function. [`HestonChf::chf`] is total (both branches ported, issue
-    /// #425), mirroring C++ `chF` which is infallible.
+    /// The contour (`h_u`/`hPrime`, the `exp(-u*tanPhi*freq)` outer factor, the
+    /// `/(h_u*hPrime)` and `.real()*s_alpha`) is identical for both branches;
+    /// only `phiBS` differs (`cpp:521-526`): AngledContour uses the `vAvg` Black
+    /// form, AsymptoticChF uses `exp(u*(1, tanPhi)*phi + psi)`. The complex
+    /// `phiBS - chF` is reduced to a `Real` by `.real()` (`cpp:528-532`) inside
+    /// the integrand, so the quadrature integrates a real function.
+    /// [`HestonChf::chf`] is total (both branches ported, issue #425), mirroring
+    /// C++ `chF` which is infallible.
     pub fn evaluate(&self, u: Real) -> Real {
         let i = Complex::new(0.0, 1.0);
         let h_u = Complex::new(u, u * self.tan_phi - self.alpha);
         let h_prime = h_u - i;
 
-        let phi_bs = (-0.5
-            * self.v_avg
-            * self.term
-            * (h_prime * h_prime + Complex::new(-h_prime.im, h_prime.re)))
-        .exp();
+        let phi_bs = if self.cpx_log == ComplexLogFormula::AsymptoticChF {
+            (u * Complex::new(1.0, self.tan_phi) * self.phi + self.psi).exp()
+        } else {
+            (-0.5
+                * self.v_avg
+                * self.term
+                * (h_prime * h_prime + Complex::new(-h_prime.im, h_prime.re)))
+            .exp()
+        };
 
         let chf_val = self.chf.chf(h_prime, self.term);
 
@@ -407,19 +449,43 @@ impl ApHelper {
             * self.s_alpha
     }
 
-    /// `controlVariateValue` (`analytichestonengine.cpp:550-555`), AngledContour
-    /// branch: `BlackCalculator(Call, strike, fwd, sqrt(vAvg*term)).value()`.
+    /// `controlVariateValue` (`analytichestonengine.cpp:550-567`), AngledContour
+    /// and AsymptoticChF branches.
     ///
-    /// The discount is `1.0` (C++ uses the 4-arg `BlackCalculator` overload
-    /// with default `discount = 1.0`); the price assembly in issue #417
-    /// multiplies by the risk-free discount, so discounting here would
-    /// double-discount.
+    /// AngledContour (`cpp:551-556`): `BlackCalculator(Call, strike, fwd,
+    /// sqrt(vAvg*term)).value()`. The discount is `1.0` (C++ uses the 4-arg
+    /// `BlackCalculator` overload with default `discount = 1.0`); the price
+    /// assembly in issue #417 multiplies by the risk-free discount, so
+    /// discounting here would double-discount.
+    ///
+    /// AsymptoticChF (`cpp:557-567`): the closed-form asymptotic control-variate
+    /// value `fwd - sqrt(strike*fwd)/PI * (exp(psi) * (-2*Ci(-0.5*phiFreq)*
+    /// sin(0.5*phiFreq) + cos(0.5*phiFreq)*(PI + 2*Si(0.5*phiFreq)))).real()`,
+    /// with `phiFreq = (phi.re, phi.im + freq)` and complex `Ci`/`Si`. The
+    /// `alpha == -0.5` requirement (`cpp:558`) holds on the engine path (the
+    /// constructor fixes `alpha_ = -0.5`).
     ///
     /// # Errors
     ///
-    /// Errors if [`BlackCalculator::new`] rejects its arguments (e.g. a
-    /// non-positive forward).
+    /// Errors if [`BlackCalculator::new`] rejects its arguments (AngledContour),
+    /// if `alpha != -0.5` (AsymptoticChF, `cpp:558`), or if the complex `Ci`/`Si`
+    /// series fail to converge.
     pub fn control_variate_value(&self) -> QlResult<Real> {
+        if self.cpx_log == ComplexLogFormula::AsymptoticChF {
+            require!(self.alpha == -0.5, "alpha must be equal to -0.5");
+
+            let phi_freq = Complex::new(self.phi.re, self.phi.im + self.freq);
+            let ci = ci_complex(-0.5 * phi_freq)?;
+            let si = si_complex(0.5 * phi_freq)?;
+
+            let bracket = -2.0 * ci * (0.5 * phi_freq).sin()
+                + (0.5 * phi_freq).cos() * (Complex::new(std::f64::consts::PI, 0.0) + 2.0 * si);
+
+            return Ok(self.fwd
+                - (self.strike * self.fwd).sqrt() / std::f64::consts::PI
+                    * (self.psi.exp() * bracket).re);
+        }
+
         Ok(BlackCalculator::new(
             OptionType::Call,
             self.strike,
@@ -1024,18 +1090,77 @@ mod tests {
     }
 
     /// Deferred `AP_Helper` control variates fail loud (issue #418), naming the
-    /// deferral rather than stubbing to AngledContour.
+    /// deferral rather than stubbing to a ported branch. `AsymptoticChF` is now
+    /// ported (issue #426) and dropped from the deferred list.
     #[test]
     fn ap_helper_deferred_variants_error() {
         for cpx in [
             ComplexLogFormula::AndersenPiterbarg,
             ComplexLogFormula::AndersenPiterbargOptCV,
-            ComplexLogFormula::AsymptoticChF,
             ComplexLogFormula::AngledContourNoCV,
         ] {
             let err = ApHelper::new(TERM, FWD, STRIKE, cpx, fixture(), ALPHA).unwrap_err();
             assert!(err.to_string().contains("deferred"), "{cpx:?}: {err}");
         }
+    }
+
+    /// The AsymptoticChF small-vol fixture from the #422/#426 calibration oracle:
+    /// `(v0=0.01, kappa=0.2, theta=0.02, sigma=0.3, rho=-0.75)`. At `term > 0.15`
+    /// `optimalControlVariate` selects AsymptoticChF for this set.
+    fn asymptotic_fixture() -> HestonChf {
+        HestonChf::new(0.2, 0.02, 0.3, -0.75, 0.01)
+    }
+
+    /// DIRECT PIN (the load-bearing transcription check): the ctor `phi_`/`psi_`
+    /// (`analytichestonengine.cpp:479-488`) at `term = 0.50555555555555554`
+    /// against C++-computed values (built QuantLib 1.43, the same
+    /// `std::complex` expression, `setprecision(17)`). This pins the ctor
+    /// coefficients WITHOUT the control-variate cancellation: an AsymptoticChF
+    /// price is invariant to a consistent `phi`/`psi` error (the CV is exact for
+    /// any valid control variate), so the NPV pin below cannot see a `psi`
+    /// imaginary-sign flip or a dropped inner factor - this pin can.
+    #[test]
+    fn asymptotic_phi_psi_match_cpp() {
+        let term: Time = 0.505_555_555_555_555_5;
+        let helper = ApHelper::new(
+            term,
+            1.0,
+            0.9,
+            ComplexLogFormula::AsymptoticChF,
+            asymptotic_fixture(),
+            ALPHA,
+        )
+        .unwrap();
+
+        let expected_phi = Complex::new(-0.026_506_508_505_295_25, 0.030055555555555558);
+        let expected_psi = Complex::new(0.066_615_639_957_623_73, -0.12271634681177794);
+        assert!(
+            (helper.phi - expected_phi).norm() < 1e-12,
+            "phi {:?} vs C++ {expected_phi:?}",
+            helper.phi
+        );
+        assert!(
+            (helper.psi - expected_psi).norm() < 1e-12,
+            "psi {:?} vs C++ {expected_psi:?}",
+            helper.psi
+        );
+    }
+
+    /// CONFIRM-BY-STUBBING (`alpha == -0.5` guard, `cpp:558`): the AsymptoticChF
+    /// `controlVariateValue` requires `alpha == -0.5` and errors otherwise. The
+    /// engine path fixes `alpha_ = -0.5`, so this only fires on misuse.
+    #[test]
+    fn asymptotic_control_variate_requires_alpha_minus_half() {
+        let helper = ApHelper::new(
+            0.5,
+            1.0,
+            0.9,
+            ComplexLogFormula::AsymptoticChF,
+            asymptotic_fixture(),
+            -0.4,
+        )
+        .unwrap();
+        assert!(helper.control_variate_value().is_err());
     }
 }
 
@@ -1055,7 +1180,7 @@ mod engine_tests {
     use crate::termstructures::yields::FlatForward;
     use crate::termstructures::yieldtermstructure::YieldTermStructure;
     use crate::time::date::{Date, Month};
-    use crate::time::daycounters::actualactual::{ActualActual, Convention};
+    use crate::time::daycounters::actual360::Actual360;
     use crate::time::frequency::Frequency;
 
     /// `optimalControlVariate` (`analytichestonengine.cpp:711-718`) selects
@@ -1089,54 +1214,66 @@ mod engine_tests {
         );
     }
 
-    fn flat(rate: Real, reference: Date) -> Handle<dyn YieldTermStructure> {
+    fn flat360(rate: Real, reference: Date) -> Handle<dyn YieldTermStructure> {
         Handle::new(shared(FlatForward::with_rate(
             reference,
             rate,
-            ActualActual::with_convention(Convention::ISDA),
+            Actual360::new(),
             Compounding::Continuous,
             Frequency::Annual,
         )) as Shared<dyn YieldTermStructure>)
     }
 
-    /// CONFIRM-BY-STUBBING (fail loud, not silent - #262 class): pricing a
-    /// parameter set whose maturity puts it in the asymptotic regime selects
-    /// `AsymptoticChF`, whose integrand is deferred (issue #418), so
-    /// [`ApHelper::new`] errors and the error propagates out of `NPV()`. A silent
-    /// fall-through to `AngledContour` would mis-price a set 12% from the flip;
-    /// this test proves the engine refuses rather than guesses.
+    /// CACHED-NPV PIN (independent of the LM loop): an end-to-end
+    /// `AnalyticHestonEngine` price in the AsymptoticChF regime against a
+    /// C++-generated value (built QuantLib 1.43, `AnalyticHestonEngine(model,
+    /// 96)`, `setprecision(17)`).
+    ///
+    /// Fixture: evaluation date 27 Dec 2004, Actual360, flat `r = 0.04`,
+    /// `q = 0.50`, `s0 = 1.0`, `HestonProcess(v0=0.01, kappa=0.2, theta=0.02,
+    /// sigma=0.3, rho=-0.75)`, one European `Call(0.9)` expiring 27 Jun 2005
+    /// (`tau = 0.50555555555555554`). At that `tau`+params
+    /// `optimalControlVariate` returns `AsymptoticChF` (C++ `cpxLog == 4`; all
+    /// three conditions hold: `~0.0265 < 0.15`, `~0.0665 < 0.1`), so this
+    /// exercises the ported `phi`/`psi` phiBS arm and the `Ci`/`Si` control
+    /// variate. C++ prints `NPV = 0.00010317795851725543`; pinned at `1e-10`.
+    /// This catches a gross ctor error and any inconsistency between the phiBS
+    /// and `Ci`/`Si` arms; the direct `phi`/`psi` pin
+    /// (`asymptotic_phi_psi_match_cpp`) catches a consistent transcription error
+    /// the CV cancellation hides here.
     #[test]
-    fn asymptotic_regime_pricing_fails_loud_not_silent() {
+    fn asymptotic_chf_cached_npv_order_96() {
         let reference = Date::new(27, Month::December, 2004);
         let settings = shared(Settings::new());
         settings.set_evaluation_date(reference);
 
         let process = shared(HestonProcess::new(
-            flat(0.05, reference),
-            flat(0.02, reference),
+            flat360(0.04, reference),
+            flat360(0.50, reference),
             make_quote_handle(1.0).handle(),
             0.01,
-            0.5,
-            0.01,
-            2.0,
-            0.0,
+            0.2,
+            0.02,
+            0.3,
+            -0.75,
         ));
         let model = HestonModel::new(process).unwrap();
 
         let payoff =
-            shared(PlainVanillaPayoff::new(OptionType::Call, 1.0)) as Shared<dyn StrikedTypePayoff>;
-        let exercise = shared(EuropeanExercise::new(Date::new(27, Month::December, 2005)))
-            as Shared<dyn Exercise>;
+            shared(PlainVanillaPayoff::new(OptionType::Call, 0.9)) as Shared<dyn StrikedTypePayoff>;
+        let exercise =
+            shared(EuropeanExercise::new(Date::new(27, Month::June, 2005))) as Shared<dyn Exercise>;
         let mut option = VanillaOption::new(payoff, exercise, Shared::clone(&settings));
-        let engine = shared_mut(AnalyticHestonEngine::new(model, 64).unwrap())
+        let engine = shared_mut(AnalyticHestonEngine::new(model, 96).unwrap())
             as SharedMut<dyn PricingEngine>;
         option.base_mut().set_pricing_engine(engine);
 
-        let err = option.npv().unwrap_err();
+        let npv = option.npv().unwrap();
+        let expected = 0.00010317795851725543;
         assert!(
-            err.message().contains("#418") || err.message().contains("deferred"),
-            "asymptotic regime must fail loud (issue #418), got: {}",
-            err.message()
+            (npv - expected).abs() < 1e-10,
+            "AsymptoticChF npv {npv} vs C++ cached {expected} (error {})",
+            (npv - expected).abs()
         );
     }
 }
