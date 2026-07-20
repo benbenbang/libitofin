@@ -10,6 +10,8 @@
 
 mod blackscholesprocess;
 mod hestonprocess;
+mod ornsteinuhlenbeckprocess;
 
 pub use blackscholesprocess::{BlackScholesMertonProcess, GeneralizedBlackScholesProcess};
 pub use hestonprocess::HestonProcess;
+pub use ornsteinuhlenbeckprocess::OrnsteinUhlenbeckProcess;
