@@ -1052,3 +1052,155 @@ mod engine_tests {
         );
     }
 }
+
+/// The `testAnalyticVsCached` oracle (`test-suite/hestonmodel.cpp:439-534`): the
+/// `AnalyticHestonEngine` reproduces QuantLib's cached analytic Heston prices.
+#[cfg(test)]
+mod engine_oracle {
+    use super::*;
+
+    use crate::exercise::{EuropeanExercise, Exercise};
+    use crate::handle::Handle;
+    use crate::instrument::Instrument;
+    use crate::instruments::VanillaOption;
+    use crate::interestrate::Compounding;
+    use crate::processes::HestonProcess;
+    use crate::quotes::make_quote_handle;
+    use crate::settings::Settings;
+    use crate::shared::{Shared, SharedMut, shared, shared_mut};
+    use crate::termstructures::yields::FlatForward;
+    use crate::termstructures::yieldtermstructure::YieldTermStructure;
+    use crate::time::date::{Date, Day, Month};
+    use crate::time::daycounter::DayCounter;
+    use crate::time::daycounters::actualactual::{ActualActual, Convention};
+    use crate::time::frequency::Frequency;
+
+    fn settlement() -> Date {
+        Date::new(27, Month::December, 2004)
+    }
+
+    fn isda() -> DayCounter {
+        ActualActual::with_convention(Convention::ISDA)
+    }
+
+    /// `flatRate(rate, dc)` (`test-suite/utilities.hpp`): a continuous, annual
+    /// [`FlatForward`] on ISDA Actual/Actual anchored at the settlement date.
+    /// The evaluation date never moves, so the fixed-reference curve is exactly
+    /// equivalent to QuantLib's `FlatForward(0, NullCalendar, ...)`.
+    fn flat(rate: Real) -> Shared<FlatForward> {
+        shared(FlatForward::with_rate(
+            settlement(),
+            rate,
+            isda(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        ))
+    }
+
+    fn handle(curve: &Shared<FlatForward>) -> Handle<dyn YieldTermStructure> {
+        Handle::new(Shared::clone(curve) as Shared<dyn YieldTermStructure>)
+    }
+
+    /// Arm 1 (`hestonmodel.cpp:441-481`): a single order-64 price against the
+    /// cached `0.0404774515` at `1e-8`. Settlement 27 Dec 2004, exercise 28 Mar
+    /// 2005 (ISDA year fraction `~0.2492776`), `Call(1.05)`, flat `r = 0.0225` /
+    /// `q = 0.02`, `s0 = 1`, `v0 = 0.1`, `kappa = 3.16`, `theta = 0.09`,
+    /// `sigma = 0.4`, `rho = -0.2`.
+    #[test]
+    fn arm1_cached_analytic_price_order_64() {
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(settlement());
+
+        let rf = flat(0.0225);
+        let div = flat(0.02);
+        let process = shared(HestonProcess::new(
+            handle(&rf),
+            handle(&div),
+            make_quote_handle(1.0).handle(),
+            0.1,
+            3.16,
+            0.09,
+            0.4,
+            -0.2,
+        ));
+        let model = HestonModel::new(process).unwrap();
+
+        let payoff = shared(PlainVanillaPayoff::new(OptionType::Call, 1.05))
+            as Shared<dyn StrikedTypePayoff>;
+        let exercise = shared(EuropeanExercise::new(Date::new(28, Month::March, 2005)))
+            as Shared<dyn Exercise>;
+        let mut option = VanillaOption::new(payoff, exercise, Shared::clone(&settings));
+        let engine = shared_mut(AnalyticHestonEngine::new(model, 64).unwrap())
+            as SharedMut<dyn PricingEngine>;
+        option.base_mut().set_pricing_engine(engine);
+
+        let npv = option.npv().unwrap();
+        let expected = 0.0404774515;
+        assert!(
+            (npv - expected).abs() < 1e-8,
+            "Arm 1: npv {npv} vs cached {expected} (error {})",
+            (npv - expected).abs()
+        );
+    }
+
+    /// Arm 2 (`hestonmodel.cpp:484-533`): the wilmott.com reference set at the
+    /// DEFAULT order 144. Six NPVs across exercise dates 8-Sep and 9-Sep 2005
+    /// (`8 + i/3`, integer division), strikes `{0.9, 1.0, 1.1}[i % 3]`, flat
+    /// `r = 0.05` / `q = 0.02`, per-iteration `s0 = r.discount(0.7) /
+    /// q.discount(0.7)` (NOT 1.0), `v0 = 0.09`, `kappa = 1.2`, `theta = 0.08`,
+    /// `sigma = 1.8`, `rho = -0.45`. The three T=0.7 values are LINEARLY
+    /// INTERPOLATED between the 8-Sep and 9-Sep maturities; the cached numbers
+    /// carry that interpolation error, so the tolerance is `100 * 1e-8 = 1e-6`
+    /// and a single-point 0.7 NPV would miss.
+    #[test]
+    fn arm2_wilmott_interpolated_prices_default_order() {
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(settlement());
+
+        let strikes = [0.9, 1.0, 1.1];
+        let mut calculated = [0.0; 6];
+        for (i, calc) in calculated.iter_mut().enumerate() {
+            let exercise_date = Date::new((8 + i / 3) as Day, Month::September, 2005);
+
+            let rf = flat(0.05);
+            let div = flat(0.02);
+            let s = rf.discount(0.7, false).unwrap() / div.discount(0.7, false).unwrap();
+            let process = shared(HestonProcess::new(
+                handle(&rf),
+                handle(&div),
+                make_quote_handle(s).handle(),
+                0.09,
+                1.2,
+                0.08,
+                1.8,
+                -0.45,
+            ));
+            let model = HestonModel::new(process).unwrap();
+
+            let payoff = shared(PlainVanillaPayoff::new(OptionType::Call, strikes[i % 3]))
+                as Shared<dyn StrikedTypePayoff>;
+            let exercise = shared(EuropeanExercise::new(exercise_date)) as Shared<dyn Exercise>;
+            let mut option = VanillaOption::new(payoff, exercise, Shared::clone(&settings));
+            let engine = shared_mut(AnalyticHestonEngine::with_default_order(model).unwrap())
+                as SharedMut<dyn PricingEngine>;
+            option.base_mut().set_pricing_engine(engine);
+
+            *calc = option.npv().unwrap();
+        }
+
+        let t1 = isda().year_fraction(settlement(), Date::new(8, Month::September, 2005));
+        let t2 = isda().year_fraction(settlement(), Date::new(9, Month::September, 2005));
+        let expected = [0.1330371, 0.0641016, 0.0270645];
+        for i in 0..3 {
+            let interpolated =
+                calculated[i] + (calculated[i + 3] - calculated[i]) / (t2 - t1) * (0.7 - t1);
+            assert!(
+                (interpolated - expected[i]).abs() < 100.0 * 1e-8,
+                "Arm 2 strike {}: interpolated {interpolated} vs cached {} (error {})",
+                strikes[i],
+                expected[i],
+                (interpolated - expected[i]).abs()
+            );
+        }
+    }
+}
