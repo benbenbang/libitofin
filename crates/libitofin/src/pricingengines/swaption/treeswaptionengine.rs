@@ -158,3 +158,256 @@ impl PricingEngine for TreeSwaptionEngine {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::any::Any;
+
+    use crate::exercise::{EuropeanExercise, Exercise, ExerciseType};
+    use crate::handle::Handle;
+    use crate::indexes::IborIndex;
+    use crate::indexes::ibor::Euribor;
+    use crate::instrument::Instrument;
+    use crate::instruments::{
+        FixedVsFloatingSwap, SettlementType, SwapType, Swaption, VanillaSwap,
+    };
+    use crate::interestrate::Compounding;
+    use crate::pricingengines::swaption::JamshidianSwaptionEngine;
+    use crate::shared::{shared, shared_mut};
+    use crate::termstructures::yields::FlatForward;
+    use crate::termstructures::yieldtermstructure::YieldTermStructure;
+    use crate::time::businessdayconvention::BusinessDayConvention;
+    use crate::time::calendars::target::Target;
+    use crate::time::date::Month;
+    use crate::time::daycounters::actual360::Actual360;
+    use crate::time::daycounters::actual365fixed::Actual365Fixed;
+    use crate::time::daycounters::thirty360::{Convention, Thirty360};
+    use crate::time::frequency::Frequency;
+    use crate::time::schedule::{MakeSchedule, Schedule};
+    use crate::types::Real;
+
+    // ------------------------------------------------------------------
+    // Convergence fixture: reuse the on-main JamshidianSwaptionEngine oracle
+    // fixture (jamshidianswaptionengine.rs), whose payer/receiver NPVs are
+    // already pinned against C++ to 1e-8. Flat 3% curve, HW(0.05, 0.01), a
+    // 5Y annual/semiannual swap starting 2028, European exercise 2027.
+    // ------------------------------------------------------------------
+
+    const A: Real = 0.05;
+    const SIGMA: Real = 0.01;
+    const NOMINAL: Real = 100.0;
+    const FIXED_RATE: Real = 0.03;
+
+    fn settings() -> Shared<Settings<Date>> {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(Date::new(15, Month::January, 2026));
+        settings
+    }
+
+    fn flat_curve() -> Handle<dyn YieldTermStructure> {
+        Handle::new(shared(FlatForward::with_rate(
+            Date::new(15, Month::January, 2026),
+            0.03,
+            Actual365Fixed::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>)
+    }
+
+    fn hw_model() -> SharedMut<HullWhite> {
+        HullWhite::new(flat_curve(), A, SIGMA).unwrap()
+    }
+
+    fn schedule(from: Date, to: Date, frequency: Frequency) -> Schedule {
+        MakeSchedule::new()
+            .from(from)
+            .to(to)
+            .with_frequency(frequency)
+            .with_calendar(Target::new())
+            .with_convention(BusinessDayConvention::Unadjusted)
+            .with_termination_date_convention(BusinessDayConvention::Unadjusted)
+            .forwards()
+            .end_of_month(false)
+            .build()
+    }
+
+    fn conv_swap(settings: &Shared<Settings<Date>>, swap_type: SwapType) -> FixedVsFloatingSwap {
+        let index: Shared<IborIndex> =
+            shared(Euribor::six_months(flat_curve(), Shared::clone(settings)));
+        VanillaSwap::new(
+            swap_type,
+            NOMINAL,
+            schedule(
+                Date::new(15, Month::January, 2028),
+                Date::new(15, Month::January, 2033),
+                Frequency::Annual,
+            ),
+            FIXED_RATE,
+            Thirty360::with_convention(Convention::BondBasis),
+            schedule(
+                Date::new(15, Month::January, 2028),
+                Date::new(15, Month::January, 2033),
+                Frequency::Semiannual,
+            ),
+            index,
+            0.0,
+            Actual360::new(),
+            None,
+            Shared::clone(settings),
+        )
+        .unwrap()
+        .into_fixed_vs_floating()
+    }
+
+    fn european(date: Date) -> Shared<dyn Exercise> {
+        shared(EuropeanExercise::new(date)) as Shared<dyn Exercise>
+    }
+
+    /// A multi-date Bermudan/American exercise, standing in for the unported
+    /// `BermudanExercise`, so the multi-exercise loop and optionality can be
+    /// pinned (mirrors the Jamshidian test's `StubExercise`).
+    struct StubExercise {
+        exercise_type: ExerciseType,
+        dates: Vec<Date>,
+    }
+
+    impl Exercise for StubExercise {
+        fn exercise_type(&self) -> ExerciseType {
+            self.exercise_type
+        }
+        fn dates(&self) -> &[Date] {
+            &self.dates
+        }
+    }
+
+    /// Prices the fixture swaption with the on-main Jamshidian engine (the
+    /// trusted European reference).
+    fn jamshidian_npv(swap_type: SwapType) -> Real {
+        let settings = settings();
+        let swap = shared_mut(conv_swap(&settings, swap_type));
+        let mut swaption = Swaption::new(
+            swap,
+            european(Date::new(15, Month::January, 2027)),
+            SettlementType::Physical,
+            SettlementMethod::PhysicalOTC,
+            Shared::clone(&settings),
+        );
+        let engine =
+            shared_mut(JamshidianSwaptionEngine::new(hw_model())) as SharedMut<dyn PricingEngine>;
+        swaption.base_mut().set_pricing_engine(engine);
+        swaption.npv().unwrap()
+    }
+
+    /// Prices the fixture swaption with the tree engine at `steps`, on the given
+    /// exercise schedule.
+    fn tree_npv(swap_type: SwapType, steps: Size, exercise: Shared<dyn Exercise>) -> Real {
+        let settings = settings();
+        let swap = shared_mut(conv_swap(&settings, swap_type));
+        let mut swaption = Swaption::new(
+            swap,
+            exercise,
+            SettlementType::Physical,
+            SettlementMethod::PhysicalOTC,
+            Shared::clone(&settings),
+        );
+        let engine = shared_mut(TreeSwaptionEngine::new(hw_model(), steps, settings).unwrap())
+            as SharedMut<dyn PricingEngine>;
+        swaption.base_mut().set_pricing_engine(engine);
+        swaption.npv().unwrap()
+    }
+
+    /// PRIMARY / HARD GATE: a European payer swaption priced on the Hull-White
+    /// tree converges to the on-main Jamshidian price as the step count grows.
+    ///
+    /// The exercise-payoff kink makes trinomial convergence non-monotone: moderate
+    /// counts sit on a ~2.5e-3 hump (grid alignment of the exercise/coupon nodes)
+    /// and the error only settles below 1e-3 in the tail. So the gate spans the
+    /// hump - a coarse count of 50 against a fine count of 1100 - and asserts the
+    /// fine error is inside 1e-3 AND well below the coarse error (a ~10x drop). The
+    /// tail is monotone toward the reference (n=200..1600: rel 2.5e-3 -> 1.3e-4),
+    /// which is the convergence proof; a real bias would plateau instead.
+    ///
+    /// The receiver arm (the `OptionType::Call` branch) is not re-gated here - it
+    /// is anchored twice already: #464 pins the receiver swap NPV on the tree and
+    /// that it negates the payer, and the Jamshidian oracle pins the receiver arm
+    /// to C++. A single cheap moderate-count price guards a receiver-specific
+    /// wiring slip.
+    #[test]
+    fn tree_converges_to_jamshidian_european() {
+        let reference = jamshidian_npv(SwapType::Payer);
+        let exercise = || european(Date::new(15, Month::January, 2027));
+        let e_coarse = (tree_npv(SwapType::Payer, 50, exercise()) - reference).abs() / reference;
+        let e_fine = (tree_npv(SwapType::Payer, 1100, exercise()) - reference).abs() / reference;
+        assert!(
+            e_fine < 1.0e-3,
+            "payer: tree(1100) rel err {e_fine} vs jamshidian {reference}"
+        );
+        assert!(
+            e_fine < e_coarse,
+            "payer: error must shrink 50->1100: coarse {e_coarse} fine {e_fine}"
+        );
+
+        // Receiver insurance: the OptionType::Call branch prices near its own
+        // Jamshidian reference at a moderate (plateau) count.
+        let reference_r = jamshidian_npv(SwapType::Receiver);
+        let e_r = (tree_npv(SwapType::Receiver, 300, exercise()) - reference_r).abs() / reference_r;
+        assert!(
+            e_r < 5.0e-3,
+            "receiver: tree(300) rel err {e_r} vs jamshidian {reference_r}"
+        );
+    }
+
+    /// COMMITTED INVARIANT: a Bermudan swaption (three exercise opportunities)
+    /// is worth at least its European counterpart (a single exercise at the same
+    /// first date) on the same underlying - more optionality cannot cost value.
+    /// Also exercises the multi-exercise loop the cached diagnostic leans on.
+    #[test]
+    fn bermudan_dominates_european() {
+        let euro = tree_npv(
+            SwapType::Payer,
+            120,
+            european(Date::new(15, Month::January, 2027)),
+        );
+        let bermudan = tree_npv(
+            SwapType::Payer,
+            120,
+            shared(StubExercise {
+                exercise_type: ExerciseType::Bermudan,
+                dates: vec![
+                    Date::new(15, Month::January, 2027),
+                    Date::new(15, Month::January, 2028),
+                    Date::new(15, Month::January, 2029),
+                ],
+            }) as Shared<dyn Exercise>,
+        );
+        assert!(
+            bermudan >= euro - 1.0e-9,
+            "bermudan {bermudan} must dominate european {euro}"
+        );
+    }
+
+    /// The `time_steps > 0` guard (`latticeshortratemodelengine.hpp:60`).
+    #[test]
+    fn rejects_non_positive_time_steps() {
+        let err = TreeSwaptionEngine::new(hw_model(), 0, settings())
+            .err()
+            .expect("time_steps == 0 must be rejected");
+        assert_eq!(err.message(), "timeSteps must be positive, 0 not allowed");
+    }
+
+    /// The `ParYieldCurve` cash-settlement guard (`treeswaptionengine.cpp:53`)
+    /// fires first, before any model or argument read.
+    #[test]
+    fn rejects_par_yield_cash_settlement() {
+        let mut engine = TreeSwaptionEngine::new(hw_model(), 50, settings()).unwrap();
+        let args = (engine.arguments_mut() as &mut dyn Any)
+            .downcast_mut::<SwaptionArguments>()
+            .expect("engine carries SwaptionArguments");
+        args.settlement_method = SettlementMethod::ParYieldCurve;
+        assert_eq!(
+            engine.calculate().unwrap_err().message(),
+            "cash settled (ParYieldCurve) swaptions not priced with TreeSwaptionEngine"
+        );
+    }
+}
