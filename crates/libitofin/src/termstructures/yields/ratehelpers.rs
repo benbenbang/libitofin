@@ -1227,8 +1227,11 @@ impl RelativeDateRateHelper for OISRateHelper {
 mod tests {
     use super::*;
     use crate::interestrate::Compounding;
+    use crate::math::interpolations::loglinear::LogLinear;
     use crate::settings::Settings;
+    use crate::termstructures::bootstraptraits::Discount;
     use crate::termstructures::yields::FlatForward;
+    use crate::termstructures::yields::PiecewiseYieldCurve;
     use crate::test_support::{Flag, as_observer};
     use crate::time::calendars::target::Target;
     use crate::time::date::{Date, Month};
@@ -1955,5 +1958,233 @@ mod tests {
         );
         assert_eq!(helper.earliest_date(), imm_start);
         assert_eq!(helper.maturity_date(), expected_maturity);
+    }
+
+    /// `FraRateHelper::initializeDates` (`ratehelpers.cpp:393`): the earliest
+    /// date is `period_to_start` past spot and the maturity is the *combined*
+    /// `period_to_start + tenor` past spot. The degeneracy guard asserts that on
+    /// this evaluation date the faithful (advance-from-spot) maturity really
+    /// differs from the plausible-wrong chained reading `advance(earliest,
+    /// tenor)`; without the difference the pin would not discriminate the trap.
+    #[test]
+    fn fra_initialize_dates_advances_maturity_from_spot_not_chained() {
+        let eval = Date::new(13, Month::May, 2026);
+        let settings = settings_on(eval);
+        let index = euribor(Period::new(3, TimeUnit::Months), Handle::empty(), settings);
+        let period_to_start = Period::new(3, TimeUnit::Months);
+        let helper = FraRateHelper::from_rate(
+            0.03,
+            period_to_start,
+            &index,
+            true,
+            Pillar::LastRelevantDate,
+        );
+
+        let calendar = index.fixing_calendar();
+        let reference = calendar.adjust(eval, BusinessDayConvention::Following);
+        let spot = index.value_date(reference).unwrap();
+        let convention = index.business_day_convention();
+        let eom = index.end_of_month();
+        let earliest = calendar.advance_by_period(spot, period_to_start, convention, eom);
+        let maturity_from_spot =
+            calendar.advance_by_period(spot, period_to_start + index.tenor(), convention, eom);
+        let maturity_chained = calendar.advance_by_period(earliest, index.tenor(), convention, eom);
+        assert_ne!(
+            maturity_from_spot, maturity_chained,
+            "degenerate fixture: pick an evaluation date where the roll separates the two maturities"
+        );
+
+        assert_eq!(helper.earliest_date(), earliest);
+        assert_eq!(helper.maturity_date(), maturity_from_spot);
+        let latest_relevant = index.maturity_date(earliest).unwrap();
+        assert_eq!(helper.latest_relevant_date(), latest_relevant);
+        assert_eq!(helper.pillar_date(), latest_relevant);
+        assert_eq!(helper.latest_date(), latest_relevant);
+    }
+
+    /// The explicit-date constructor (`ratehelpers.cpp:341`, built on
+    /// `RelativeDateRateHelper(rate, false)`): its window is fixed at
+    /// construction and, unlike the relative constructors, does not shift when
+    /// the evaluation date moves. Par mode with the `MaturityDate` pillar pins
+    /// the latest-relevant date and pillar at the explicit end date.
+    #[test]
+    fn fra_from_dates_pins_explicit_window_and_ignores_eval_change() {
+        let settings = settings_on(today());
+        let index = euribor(
+            Period::new(3, TimeUnit::Months),
+            Handle::empty(),
+            settings.clone(),
+        );
+        let start = Date::new(15, Month::September, 2026);
+        let end = Date::new(15, Month::December, 2026);
+        let helper = FraRateHelper::from_dates(
+            Handle::new(shared(SimpleQuote::new(0.03)) as Shared<dyn Quote>),
+            start,
+            end,
+            &index,
+            false,
+            Pillar::MaturityDate,
+        );
+
+        assert_eq!(helper.earliest_date(), start);
+        assert_eq!(helper.maturity_date(), end);
+        assert_eq!(helper.latest_relevant_date(), end);
+        assert_eq!(helper.pillar_date(), end);
+
+        settings.set_evaluation_date(today() + 90);
+        assert_eq!(
+            helper.earliest_date(),
+            start,
+            "an explicit-date FRA must not shift on an evaluation-date change"
+        );
+        assert_eq!(helper.maturity_date(), end);
+    }
+
+    /// The bootstrap fixture: a short deposit anchor plus one FRA node built by
+    /// `factory`, bootstrapped into a `Discount`/`LogLinear` curve. Returns the
+    /// curve handle, the evaluation date and the shared settings so the caller
+    /// can reprice the FRA arm off independently-reconstructed dates.
+    fn bootstrap_with_fra(
+        fra: Shared<dyn RateHelper>,
+        settings: Shared<Settings<Date>>,
+        today: Date,
+    ) -> Handle<dyn YieldTermStructure> {
+        let calendar = Target::new();
+        let settlement = calendar.advance(
+            today,
+            2,
+            TimeUnit::Days,
+            BusinessDayConvention::Following,
+            false,
+        );
+        let deposit_index = euribor(
+            Period::new(3, TimeUnit::Months),
+            Handle::empty(),
+            settings.clone(),
+        );
+        let deposit = DepositRateHelper::from_rate(0.02, &deposit_index);
+        let curve = PiecewiseYieldCurve::<Discount, LogLinear>::new(
+            settlement,
+            vec![deposit as Shared<dyn RateHelper>, fra],
+            Actual360::new(),
+            LogLinear,
+        )
+        .unwrap();
+        Handle::new(Shared::clone(&curve) as Shared<dyn YieldTermStructure>)
+    }
+
+    /// Independently reconstructs the FRA `[start, end]` window off `index`'s
+    /// conventions for the given evaluation date, so the reprice arms do not
+    /// reuse the helper's own (possibly wrong) dates - the discrimination lives
+    /// in this from-scratch reconstruction, not in crossing modes.
+    fn reconstruct_window(index: &IborIndex, eval: Date, period_to_start: Period) -> (Date, Date) {
+        let calendar = index.fixing_calendar();
+        let reference = calendar.adjust(eval, BusinessDayConvention::Following);
+        let spot = index.value_date(reference).unwrap();
+        let convention = index.business_day_convention();
+        let eom = index.end_of_month();
+        let start = calendar.advance_by_period(spot, period_to_start, convention, eom);
+        let end =
+            calendar.advance_by_period(spot, period_to_start + index.tenor(), convention, eom);
+        (start, end)
+    }
+
+    /// Indexed arm (`ratehelpers.cpp:363`): bootstrap through an indexed FRA,
+    /// then forecast the fixing off the curve through a fresh index over an
+    /// independently reconstructed window and assert it reproduces the input
+    /// rate. Passing proves bootstrap convergence; the confirm-by-stubbing gate
+    /// (perturbing `fixing_date`) is what proves the date math discriminates.
+    #[test]
+    fn fra_indexed_bootstrap_reprices_the_input_rate() {
+        let eval = Date::new(13, Month::May, 2026);
+        let settings = settings_on(eval);
+        let period_to_start = Period::new(3, TimeUnit::Months);
+        let fra_rate = 0.03;
+        let fra_index = euribor(
+            Period::new(3, TimeUnit::Months),
+            Handle::empty(),
+            settings.clone(),
+        );
+        let fra = FraRateHelper::from_rate(
+            fra_rate,
+            period_to_start,
+            &fra_index,
+            true,
+            Pillar::LastRelevantDate,
+        );
+        let handle = bootstrap_with_fra(
+            Shared::clone(&fra) as Shared<dyn RateHelper>,
+            settings.clone(),
+            eval,
+        );
+
+        let reprice_index = euribor(
+            Period::new(3, TimeUnit::Months),
+            handle.clone(),
+            settings.clone(),
+        );
+        let (start, _end) = reconstruct_window(&reprice_index, eval, period_to_start);
+        let fixing_date = reprice_index.fixing_date(start);
+        let estimated = reprice_index.fixing(fixing_date, true).unwrap();
+        assert!(
+            (estimated - fra_rate).abs() <= 1.0e-9,
+            "indexed reprice {estimated} vs input {fra_rate}"
+        );
+    }
+
+    /// Par arm (`ratehelpers.cpp:365`): bootstrap through a par FRA, then
+    /// recompute the simple forward `(disc(start)/disc(end) - 1)/tau` off the
+    /// curve over an independently reconstructed window and assert it reproduces
+    /// the input rate. The confirm-by-stubbing gate (perturbing the maturity)
+    /// proves the date math discriminates.
+    #[test]
+    fn fra_par_bootstrap_reprices_the_input_rate() {
+        let eval = Date::new(13, Month::May, 2026);
+        let settings = settings_on(eval);
+        let period_to_start = Period::new(3, TimeUnit::Months);
+        let fra_rate = 0.03;
+        let fra_index = euribor(
+            Period::new(3, TimeUnit::Months),
+            Handle::empty(),
+            settings.clone(),
+        );
+        let fra = FraRateHelper::from_rate(
+            fra_rate,
+            period_to_start,
+            &fra_index,
+            false,
+            Pillar::LastRelevantDate,
+        );
+        let handle = bootstrap_with_fra(
+            Shared::clone(&fra) as Shared<dyn RateHelper>,
+            settings.clone(),
+            eval,
+        );
+
+        let reprice_index = euribor(
+            Period::new(3, TimeUnit::Months),
+            handle.clone(),
+            settings.clone(),
+        );
+        let (start, end) = reconstruct_window(&reprice_index, eval, period_to_start);
+        let chained_end = reprice_index.fixing_calendar().advance_by_period(
+            start,
+            reprice_index.tenor(),
+            reprice_index.business_day_convention(),
+            reprice_index.end_of_month(),
+        );
+        assert_ne!(
+            end, chained_end,
+            "degenerate fixture: the maturity trap does not bite on this window, so the par reprice would not discriminate it"
+        );
+        let curve = handle.current_link().unwrap();
+        let discount_start = curve.discount_date(start, false).unwrap();
+        let discount_end = curve.discount_date(end, false).unwrap();
+        let tau = reprice_index.day_counter().year_fraction(start, end);
+        let estimated = (discount_start / discount_end - 1.0) / tau;
+        assert!(
+            (estimated - fra_rate).abs() <= 1.0e-9,
+            "par reprice {estimated} vs input {fra_rate}"
+        );
     }
 }
