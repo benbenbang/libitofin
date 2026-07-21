@@ -395,3 +395,127 @@ mod builder_tests {
         );
     }
 }
+
+#[cfg(test)]
+mod oracle {
+    //! MC-vs-analytic oracle, the Batch MC capstone.
+    //!
+    //! Provenance: `test-suite/europeanoption.cpp:1269` `testMcEngines` prices a
+    //! European option with `MakeMCEuropeanEngine<PseudoRandom>().withSteps(1)
+    //! .withSamples(40000).withSeed(42)` and checks it against
+    //! `AnalyticEuropeanEngine` (`europeanoption.cpp:168-171`). QuantLib uses a
+    //! loose `0.01 * underlying` relative band (`europeanoption.cpp:1278`); this
+    //! oracle INTENTIONALLY STRENGTHENS that into the `|mc - analytic| <
+    //! 3 * error_estimate()` convergence pin, tying the tolerance to the
+    //! computed standard error. The OTM leg is kept MODERATE (K=110, near the
+    //! money): the `3 * se` Gaussian band is skew-fragile for deep-OTM payoffs
+    //! at a fixed seed, which is why QuantLib uses a relative band across
+    //! moneyness.
+    //!
+    //! The `testQmcEngines` low-discrepancy variant (`europeanoption.cpp:1288`)
+    //! is deferred with the Sobol RNG policy (tracked in #454).
+
+    use super::MakeMcEuropeanEngine;
+    use crate::exercise::EuropeanExercise;
+    use crate::instrument::Instrument;
+    use crate::instruments::{EuropeanOption, PlainVanillaPayoff};
+    use crate::math::randomnumbers::rngtraits::PseudoRandom;
+    use crate::option::OptionType;
+    use crate::pricingengine::PricingEngine;
+    use crate::pricingengines::vanilla::test_market::{Market, market, time_to_days, today};
+    use crate::shared::{Shared, SharedMut, shared, shared_mut};
+    use crate::time::date::Date;
+    use crate::types::Real;
+
+    fn mc_option(market: &Market, strike: Real, expiry: Date, seed: u32) -> EuropeanOption {
+        let payoff = shared(PlainVanillaPayoff::new(OptionType::Call, strike));
+        let exercise = shared(EuropeanExercise::new(expiry));
+        let mut option = EuropeanOption::new(payoff, exercise, Shared::clone(&market.settings));
+        let engine = shared_mut(
+            MakeMcEuropeanEngine::<PseudoRandom>::new(Shared::clone(&market.process))
+                .with_steps(1)
+                .with_samples(40_000)
+                .with_seed(seed)
+                .build()
+                .unwrap(),
+        );
+        option
+            .base_mut()
+            .set_pricing_engine(engine as SharedMut<dyn PricingEngine>);
+        option
+    }
+
+    #[test]
+    fn mc_matches_analytic_across_moneyness() {
+        let market = market();
+        market.set(100.0, 0.02, 0.05, 0.20);
+        let expiry = today() + time_to_days(1.0);
+
+        for &strike in &[90.0, 100.0, 110.0] {
+            let analytic = market
+                .option(OptionType::Call, strike, expiry)
+                .npv()
+                .unwrap();
+            let mut mc = mc_option(&market, strike, expiry, 42);
+            let mc_npv = mc.npv().unwrap();
+            let se = mc.error_estimate().unwrap();
+
+            assert!(se > 0.0, "K={strike}: error estimate must be positive");
+            let diff = (mc_npv - analytic).abs();
+            assert!(
+                diff < 3.0 * se,
+                "K={strike}: |mc - analytic|={diff} not within 3*se={}",
+                3.0 * se
+            );
+        }
+    }
+
+    #[test]
+    fn same_seed_is_bitwise_deterministic() {
+        let market = market();
+        market.set(100.0, 0.02, 0.05, 0.20);
+        let expiry = today() + time_to_days(1.0);
+
+        let first = mc_option(&market, 100.0, expiry, 42).npv().unwrap();
+        let second = mc_option(&market, 100.0, expiry, 42).npv().unwrap();
+        assert_eq!(first, second, "seed 42 must reproduce the NPV bitwise");
+
+        let other = mc_option(&market, 100.0, expiry, 43).npv().unwrap();
+        assert_ne!(first, other, "a different seed must change the NPV");
+    }
+
+    #[test]
+    fn tolerance_path_converges() {
+        let market = market();
+        market.set(100.0, 0.02, 0.05, 0.20);
+        let expiry = today() + time_to_days(1.0);
+
+        let payoff = shared(PlainVanillaPayoff::new(OptionType::Call, 100.0));
+        let exercise = shared(EuropeanExercise::new(expiry));
+        let mut option = EuropeanOption::new(payoff, exercise, Shared::clone(&market.settings));
+        let engine = shared_mut(
+            MakeMcEuropeanEngine::<PseudoRandom>::new(Shared::clone(&market.process))
+                .with_steps(1)
+                .with_absolute_tolerance(0.05)
+                .with_seed(42)
+                .build()
+                .unwrap(),
+        );
+        option
+            .base_mut()
+            .set_pricing_engine(engine as SharedMut<dyn PricingEngine>);
+
+        let mc_npv = option.npv().unwrap();
+        let se = option.error_estimate().unwrap();
+        let analytic = market
+            .option(OptionType::Call, 100.0, expiry)
+            .npv()
+            .unwrap();
+
+        assert!(se <= 0.05, "tolerance mode must drive se={se} below 0.05");
+        assert!(
+            (mc_npv - analytic).abs() < 3.0 * se,
+            "tolerance run must land within 3*se of analytic"
+        );
+    }
+}
