@@ -302,11 +302,12 @@ impl<I: TreeLatticeImpl> Lattice for TreeLattice1D<I> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::discretizedasset::DiscretizedDiscountBond;
+    use crate::discretizedasset::{DiscretizedAssetBase, DiscretizedDiscountBond};
     use crate::methods::lattices::trinomialtree::TrinomialTree;
     use crate::processes::OrnsteinUhlenbeckProcess;
     use crate::shared::{Shared, shared};
     use crate::stochasticprocess::StochasticProcess1D;
+    use std::cell::Cell;
 
     // Ornstein-Uhlenbeck fixture with x0 != level so the drift is nonzero and
     // the per-node probabilities are asymmetric (p0 != p2) - required for the
@@ -410,6 +411,37 @@ mod tests {
             } else {
                 self.inner.descendant(i, index, branch)
             }
+        }
+    }
+
+    /// Counts how often `post_adjust_values_impl` actually fires, to pin the
+    /// partial-rollback skip-then-final-adjust order.
+    #[derive(Default)]
+    struct AdjustCountingAsset {
+        base: DiscretizedAssetBase,
+        post_adjusts: Cell<u32>,
+    }
+
+    impl DiscretizedAsset for AdjustCountingAsset {
+        fn base(&self) -> &DiscretizedAssetBase {
+            &self.base
+        }
+        fn base_mut(&mut self) -> &mut DiscretizedAssetBase {
+            &mut self.base
+        }
+        fn as_asset_mut(&mut self) -> &mut dyn DiscretizedAsset {
+            self
+        }
+        fn reset(&mut self, size: Size) -> QlResult<()> {
+            *self.values_mut() = Array::filled(size, 0.0);
+            Ok(())
+        }
+        fn mandatory_times(&self) -> Vec<Time> {
+            Vec::new()
+        }
+        fn post_adjust_values_impl(&mut self) -> QlResult<()> {
+            self.post_adjusts.set(self.post_adjusts.get() + 1);
+            Ok(())
         }
     }
 
@@ -620,6 +652,120 @@ mod tests {
             assert!(
                 (sum - bond).abs() > 1e-6,
                 "the sum-identity must FAIL without the discount (sum {sum} vs bond {bond})"
+            );
+        }
+    }
+
+    #[test]
+    fn constant_payoff_rolls_back_to_payoff_times_bond() {
+        // lattice.hpp:166 (stepback): a constant terminal payoff k rolls back to
+        // k * exp(-r*T) (== k * the zero bond), pinning the discount*probability
+        // magnitude in the backward step.
+        let steps = 4;
+        let end = 1.0;
+        let k = 5.0;
+        let lattice: Shared<dyn Lattice> = shared(flat_lattice(steps, end));
+        let mut bond = DiscretizedDiscountBond::new();
+        bond.initialize(Shared::clone(&lattice), end).unwrap();
+        let size = bond.values().size();
+        *bond.values_mut() = Array::filled(size, k);
+        bond.rollback(0.0).unwrap();
+        let expected = k * (-R * end).exp();
+        assert!(
+            (bond.values()[0] - expected).abs() < 1e-13,
+            "rolled back to {} != {expected}",
+            bond.values()[0]
+        );
+    }
+
+    #[test]
+    fn partial_rollback_skips_the_destination_adjust_and_rollback_supplies_it() {
+        // lattice.hpp:139-163: partialRollback adjusts every intermediate node but
+        // skips the destination ("skip the very last adjustment"); rollback then
+        // supplies exactly that one final adjust.
+        let steps = 4;
+        let end = 1.0;
+        let lattice: Shared<dyn Lattice> = shared(flat_lattice(steps, end));
+
+        let mut full_asset = AdjustCountingAsset::default();
+        full_asset.initialize(Shared::clone(&lattice), end).unwrap();
+        full_asset.rollback(0.0).unwrap();
+        let full = full_asset.post_adjusts.get();
+
+        let mut partial_asset = AdjustCountingAsset::default();
+        partial_asset
+            .initialize(Shared::clone(&lattice), end)
+            .unwrap();
+        partial_asset.partial_rollback(0.0).unwrap();
+        let partial = partial_asset.post_adjusts.get();
+
+        assert_eq!(
+            partial,
+            steps as u32 - 1,
+            "partial_rollback should adjust every intermediate node, skipping the destination"
+        );
+        assert_eq!(
+            full, steps as u32,
+            "rollback should add exactly the destination adjust"
+        );
+        assert_eq!(
+            full,
+            partial + 1,
+            "the skipped destination adjust is supplied once by rollback"
+        );
+    }
+
+    #[test]
+    fn stepback_gathers_each_branch_from_its_descendant() {
+        // lattice.hpp:166: pin the BACKWARD gather routing. A constant payoff is
+        // routing-invariant (sum_l prob == 1), so roll a DISTINCT-per-node payoff
+        // back one step and assert element-wise against a hand-gather off the
+        // tree's own descendants - the backward analog of the forward
+        // element-wise pin, covering the separate stepback (gather) code path.
+        let steps = 4;
+        let end = 1.0;
+        let i = 3;
+        let (tree, grid) = trinomial(steps, end);
+        let lattice: Shared<dyn Lattice> = shared(flat_lattice(steps, end));
+
+        let mut bond = DiscretizedDiscountBond::new();
+        bond.initialize(Shared::clone(&lattice), grid[i]).unwrap();
+        let terminal: Vec<Real> = (0..tree.size(i)).map(|j| 1.0 + j as Real).collect();
+        *bond.values_mut() = Array::from(terminal.clone());
+        bond.rollback(grid[i - 1]).unwrap();
+
+        let disc = (-R * grid.dt(i - 1)).exp();
+        for j in 0..tree.size(i - 1) {
+            let mut expected = 0.0;
+            for l in 0..3 {
+                expected += tree.probability(i - 1, j, l) * terminal[tree.descendant(i - 1, j, l)];
+            }
+            expected *= disc;
+            assert!(
+                (bond.values()[j] - expected).abs() < 1e-13,
+                "stepback[{j}] = {} != {expected}",
+                bond.values()[j]
+            );
+        }
+    }
+
+    #[test]
+    fn grid_returns_the_underlying_state_nodes() {
+        // lattice1d.hpp:43: grid(t) is the underlying value at each node of slice
+        // index(t).
+        let steps = 3;
+        let end = 1.0;
+        let i = 2;
+        let (tree, grid) = trinomial(steps, end);
+        let lattice = flat_lattice(steps, end);
+        let g = lattice.grid(grid[i]).unwrap();
+        assert_eq!(g.size(), tree.size(i));
+        for j in 0..tree.size(i) {
+            assert!(
+                (g[j] - tree.underlying(i, j)).abs() < 1e-15,
+                "grid[{j}] = {} != {}",
+                g[j],
+                tree.underlying(i, j)
             );
         }
     }
