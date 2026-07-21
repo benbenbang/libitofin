@@ -1490,4 +1490,212 @@ mod tests {
             );
         }
     }
+
+    fn quote_handle(value: Real) -> Handle<dyn Quote> {
+        Handle::new(shared(SimpleQuote::new(value)) as Shared<dyn Quote>)
+    }
+
+    /// The convexity-shift pin (`ratehelpers.cpp:157`): two curves bootstrapped
+    /// through a single [`FuturesRateHelper`] at the same price, one with zero
+    /// convexity and one with `c`, produce forwards that differ by exactly `c`.
+    ///
+    /// Non-circular: the bootstrap only pins `implied_quote == price` at the
+    /// pillar, which fixes `forward = (100 - price)/100 - conv_adj` per curve, so
+    /// `forward_c == forward_0 - c` is a property of the convexity term itself,
+    /// independent of the discount interpolation. Stubbing
+    /// `convexity_adjustment()` to zero collapses both curves onto the same
+    /// forward and this assertion fails.
+    #[test]
+    fn convexity_adjustment_shifts_the_bootstrapped_forward() {
+        use crate::math::interpolations::loglinear::LogLinear;
+        use crate::termstructures::bootstraptraits::Discount;
+        use crate::termstructures::yields::PiecewiseYieldCurve;
+        use crate::time::daycounters::actual365fixed::Actual365Fixed;
+
+        let reference = today();
+        let imm_start = imm::next_date(reference, false);
+        let price = 96.0;
+        let c = 0.001;
+
+        let forward_from = |conv_adj: Handle<dyn Quote>| -> Real {
+            let helper = FuturesRateHelper::from_end_date(
+                quote_handle(price),
+                imm_start,
+                None,
+                Actual360::new(),
+                conv_adj,
+                FuturesType::Imm,
+            )
+            .unwrap();
+            let earliest = helper.earliest_date();
+            let maturity = helper.maturity_date();
+            let instruments: Vec<Shared<dyn RateHelper>> = vec![helper as Shared<dyn RateHelper>];
+            let curve = PiecewiseYieldCurve::<Discount, LogLinear>::new(
+                reference,
+                instruments,
+                Actual365Fixed::new(),
+                LogLinear,
+            )
+            .unwrap();
+            let disc_e = curve.discount_date(earliest, false).unwrap();
+            let disc_m = curve.discount_date(maturity, false).unwrap();
+            let yf = Actual360::new().year_fraction_ref(earliest, maturity, earliest, maturity);
+            (disc_e / disc_m - 1.0) / yf
+        };
+
+        let forward_0 = forward_from(Handle::empty());
+        let forward_c = forward_from(quote_handle(c));
+        assert!(
+            (forward_c - (forward_0 - c)).abs() < 1e-10,
+            "forward_c {forward_c} vs forward_0 - c {}",
+            forward_0 - c
+        );
+    }
+
+    /// The bootstrap reprices the futures quote (`ratehelpers.cpp:157`): the
+    /// forward recomputed from the bootstrapped discounts reproduces the quoted
+    /// price through `100 * (1 - forward - conv_adj)`, and [`implied_quote`] on
+    /// the fitted curve returns the price to solver accuracy.
+    ///
+    /// [`implied_quote`]: RateHelper::implied_quote
+    #[test]
+    fn bootstrap_reprices_the_futures_quote() {
+        use crate::math::interpolations::loglinear::LogLinear;
+        use crate::termstructures::bootstraptraits::Discount;
+        use crate::termstructures::yields::PiecewiseYieldCurve;
+        use crate::time::daycounters::actual365fixed::Actual365Fixed;
+
+        let reference = today();
+        let imm_start = imm::next_date(reference, false);
+        let price = 96.0;
+        let c = 0.001;
+        let helper = FuturesRateHelper::from_end_date(
+            quote_handle(price),
+            imm_start,
+            None,
+            Actual360::new(),
+            quote_handle(c),
+            FuturesType::Imm,
+        )
+        .unwrap();
+        let earliest = helper.earliest_date();
+        let maturity = helper.maturity_date();
+        let instruments: Vec<Shared<dyn RateHelper>> =
+            vec![Shared::clone(&helper) as Shared<dyn RateHelper>];
+        let curve = PiecewiseYieldCurve::<Discount, LogLinear>::new(
+            reference,
+            instruments,
+            Actual365Fixed::new(),
+            LogLinear,
+        )
+        .unwrap();
+
+        let disc_e = curve.discount_date(earliest, false).unwrap();
+        let disc_m = curve.discount_date(maturity, false).unwrap();
+        let yf = Actual360::new().year_fraction_ref(earliest, maturity, earliest, maturity);
+        let forward = (disc_e / disc_m - 1.0) / yf;
+        let repriced = 100.0 * (1.0 - forward - c);
+        assert!(
+            (repriced - price).abs() < 1e-9,
+            "repriced {repriced} vs {price}"
+        );
+
+        let implied = helper.implied_quote().unwrap();
+        assert!(
+            (implied - price).abs() < 1e-9,
+            "implied {implied} vs {price}"
+        );
+    }
+
+    /// The explicit-date constructor with no end date advances three IMM periods
+    /// and pins every schedule date to that window (`ratehelpers.cpp:91`).
+    /// Stubbing the three-period advance to a single one makes the expected
+    /// maturity disagree and this assertion fails.
+    #[test]
+    fn from_end_date_advances_three_imm_periods_and_pins_the_schedule() {
+        let imm_start = imm::next_date(today(), false);
+        assert!(imm::is_imm_date(imm_start, false));
+        let helper = FuturesRateHelper::from_end_date(
+            quote_handle(96.0),
+            imm_start,
+            None,
+            Actual360::new(),
+            Handle::empty(),
+            FuturesType::Imm,
+        )
+        .unwrap();
+
+        let expected_maturity = imm::next_date(
+            imm::next_date(imm::next_date(imm_start, false), false),
+            false,
+        );
+        assert_eq!(helper.earliest_date(), imm_start);
+        assert_eq!(helper.maturity_date(), expected_maturity);
+        assert_eq!(helper.pillar_date(), expected_maturity);
+        assert_eq!(helper.latest_date(), expected_maturity);
+        assert_eq!(helper.latest_relevant_date(), expected_maturity);
+    }
+
+    /// A start that is not a valid IMM date is rejected under the IMM convention
+    /// (`CheckDate`, `ratehelpers.cpp:46`).
+    #[test]
+    fn a_non_imm_start_is_rejected_under_the_imm_convention() {
+        let start = today();
+        assert!(
+            !imm::is_imm_date(start, false),
+            "the fixture start must not be an IMM date"
+        );
+        let result = FuturesRateHelper::from_end_date(
+            quote_handle(96.0),
+            start,
+            None,
+            Actual360::new(),
+            Handle::empty(),
+            FuturesType::Imm,
+        );
+        assert!(result.is_err());
+    }
+
+    /// A Custom helper needs an explicit end date; the C++ null-maturity path is
+    /// an error here (divergence documented on [`FuturesRateHelper::from_end_date`]).
+    #[test]
+    fn a_custom_helper_requires_an_explicit_end_date() {
+        let start = today();
+        let result = FuturesRateHelper::from_end_date(
+            quote_handle(96.0),
+            start,
+            None,
+            Actual360::new(),
+            Handle::empty(),
+            FuturesType::Custom,
+        );
+        assert!(result.is_err());
+    }
+
+    /// The index constructor takes its window from the index conventions: the
+    /// maturity is the start advanced by the index tenor on its fixing calendar
+    /// (`ratehelpers.cpp:139`).
+    #[test]
+    fn from_index_takes_the_window_from_the_index_conventions() {
+        let settings = settings_on(today());
+        let index = euribor(Period::new(3, TimeUnit::Months), Handle::empty(), settings);
+        let imm_start = imm::next_date(today(), false);
+        let helper = FuturesRateHelper::from_index(
+            quote_handle(96.0),
+            imm_start,
+            &index,
+            Handle::empty(),
+            FuturesType::Imm,
+        )
+        .unwrap();
+
+        let expected_maturity = index.fixing_calendar().advance_by_period(
+            imm_start,
+            index.tenor(),
+            index.business_day_convention(),
+            false,
+        );
+        assert_eq!(helper.earliest_date(), imm_start);
+        assert_eq!(helper.maturity_date(), expected_maturity);
+    }
 }
