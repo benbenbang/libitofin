@@ -369,3 +369,210 @@ impl DiscretizedAsset for DiscretizedOption {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::math::timegrid::TimeGrid;
+    use crate::shared::{shared, shared_mut};
+    use std::cell::{Cell, RefCell};
+
+    /// A single-state test lattice: each backward step scales the asset values
+    /// by a constant `discount`, threading values through the asset (never
+    /// short-circuiting) so rollback delegation is genuinely exercised. It logs
+    /// each step so a test can observe the underlying being rolled before an
+    /// exercise. The real tree lattice lands in a follow-up ticket.
+    struct FlatLattice {
+        grid: TimeGrid,
+        discount: Real,
+        log: RefCell<Vec<Time>>,
+    }
+
+    impl FlatLattice {
+        fn new(end: Time, steps: Size, discount: Real) -> Self {
+            FlatLattice {
+                grid: TimeGrid::new(end, steps).unwrap(),
+                discount,
+                log: RefCell::new(Vec::new()),
+            }
+        }
+
+        fn index_of(&self, t: Time) -> Size {
+            let times = self.grid.times();
+            let mut best = 0;
+            for i in 1..times.len() {
+                if (times[i] - t).abs() < (times[best] - t).abs() {
+                    best = i;
+                }
+            }
+            best
+        }
+    }
+
+    impl Lattice for FlatLattice {
+        fn time_grid(&self) -> &TimeGrid {
+            &self.grid
+        }
+
+        fn initialize(&self, asset: &mut dyn DiscretizedAsset, time: Time) -> QlResult<()> {
+            asset.set_time(time);
+            asset.reset(1)
+        }
+
+        fn partial_rollback(&self, asset: &mut dyn DiscretizedAsset, to: Time) -> QlResult<()> {
+            let target = self.index_of(to);
+            let mut i = self.index_of(asset.time());
+            while i > target {
+                i -= 1;
+                asset.set_time(self.grid[i]);
+                for v in asset.values_mut().iter_mut() {
+                    *v *= self.discount;
+                }
+                self.log.borrow_mut().push(self.grid[i]);
+                if i > target {
+                    asset.adjust_values()?;
+                }
+            }
+            Ok(())
+        }
+
+        fn rollback(&self, asset: &mut dyn DiscretizedAsset, to: Time) -> QlResult<()> {
+            self.partial_rollback(asset, to)?;
+            asset.adjust_values()
+        }
+
+        fn present_value(&self, asset: &mut dyn DiscretizedAsset) -> QlResult<Real> {
+            self.rollback(asset, self.grid[0])?;
+            Ok(asset.values()[0])
+        }
+
+        fn grid(&self, _time: Time) -> QlResult<Array> {
+            Ok(Array::filled(1, 0.0))
+        }
+    }
+
+    /// Counts how often `pre_adjust_values_impl` actually fires, to pin the
+    /// `close_enough` dedup guard.
+    #[derive(Default)]
+    struct CountingAsset {
+        base: DiscretizedAssetBase,
+        pre_calls: Cell<u32>,
+    }
+
+    impl DiscretizedAsset for CountingAsset {
+        fn base(&self) -> &DiscretizedAssetBase {
+            &self.base
+        }
+        fn base_mut(&mut self) -> &mut DiscretizedAssetBase {
+            &mut self.base
+        }
+        fn as_asset_mut(&mut self) -> &mut dyn DiscretizedAsset {
+            self
+        }
+        fn reset(&mut self, size: Size) -> QlResult<()> {
+            self.base.values = Array::filled(size, 0.0);
+            Ok(())
+        }
+        fn mandatory_times(&self) -> Vec<Time> {
+            Vec::new()
+        }
+        fn pre_adjust_values_impl(&mut self) -> QlResult<()> {
+            self.pre_calls.set(self.pre_calls.get() + 1);
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn discount_bond_resets_to_ones() {
+        // discretizedasset.hpp:150: reset(size) -> Array(size, 1.0).
+        let mut bond = DiscretizedDiscountBond::new();
+        bond.reset(3).unwrap();
+        assert_eq!(bond.values().to_vec(), vec![1.0, 1.0, 1.0]);
+        assert!(bond.mandatory_times().is_empty());
+    }
+
+    #[test]
+    fn discount_bond_present_value_is_product_of_step_discounts() {
+        // Oracle: a bond worth 1 at T=1.0, rolled back over 4 steps at d=0.9,
+        // is worth 0.9^4. Exercises rollback delegation through the lattice.
+        let lattice: Shared<dyn Lattice> = shared(FlatLattice::new(1.0, 4, 0.9));
+        let mut bond = DiscretizedDiscountBond::new();
+        bond.initialize(Shared::clone(&lattice), 1.0).unwrap();
+        assert_eq!(bond.values().to_vec(), vec![1.0]);
+        let pv = bond.present_value().unwrap();
+        assert!((pv - 0.9_f64.powi(4)).abs() < 1e-12, "pv = {pv}");
+    }
+
+    #[test]
+    fn pre_adjust_guard_fires_impl_once_per_time() {
+        // discretizedasset.hpp:200: the close_enough dedup fires the impl once
+        // per distinct time_, and a new time_ re-arms it.
+        let mut asset = CountingAsset::default();
+        asset.pre_adjust_values().unwrap();
+        asset.pre_adjust_values().unwrap();
+        assert_eq!(asset.pre_calls.get(), 1, "same time must dedup");
+        asset.set_time(1.0);
+        asset.pre_adjust_values().unwrap();
+        assert_eq!(asset.pre_calls.get(), 2, "new time re-arms");
+    }
+
+    #[test]
+    fn is_on_time_matches_grid_node() {
+        // discretizedasset.hpp:211: true iff the asset sits on t's grid node.
+        let lattice: Shared<dyn Lattice> = shared(FlatLattice::new(1.0, 4, 0.9));
+        let mut asset = CountingAsset::default();
+        asset.initialize(Shared::clone(&lattice), 1.0).unwrap();
+        asset.set_time(0.5);
+        assert!(asset.is_on_time(0.5));
+        assert!(!asset.is_on_time(0.75));
+    }
+
+    #[test]
+    fn apply_exercise_condition_is_elementwise_max() {
+        // discretizedasset.hpp:225: values[i] = max(underlying[i], values[i]).
+        // Both directions live in one array: idx0 continuation wins, idx1
+        // underlying wins, idx2 ties - so a min() stub is detectable.
+        let bond = shared_mut(DiscretizedDiscountBond::new());
+        *bond.borrow_mut().values_mut() = Array::from([1.0, 5.0, 2.0]);
+        let underlying: SharedMut<dyn DiscretizedAsset> = bond;
+        let mut option = DiscretizedOption::new(
+            SharedMut::clone(&underlying),
+            ExerciseType::Bermudan,
+            vec![],
+        );
+        *option.values_mut() = Array::from([3.0, 4.0, 2.0]);
+        option.apply_exercise_condition();
+        assert_eq!(option.values().to_vec(), vec![3.0, 5.0, 2.0]);
+    }
+
+    #[test]
+    fn option_post_adjust_rolls_underlying_back_before_exercising() {
+        // Bermudan exercise at the on-grid time 0.5: the continuation value is 0
+        // but the underlying, rolled back to 0.5 first, is worth 0.9^2, so the
+        // exercise condition lifts the option to the underlying value.
+        let lattice: Shared<dyn Lattice> = shared(FlatLattice::new(1.0, 4, 0.9));
+        let bond = shared_mut(DiscretizedDiscountBond::new());
+        bond.borrow_mut()
+            .initialize(Shared::clone(&lattice), 1.0)
+            .unwrap();
+        let underlying: SharedMut<dyn DiscretizedAsset> = bond;
+        let mut option = DiscretizedOption::new(
+            SharedMut::clone(&underlying),
+            ExerciseType::Bermudan,
+            vec![0.5],
+        );
+        option.initialize(Shared::clone(&lattice), 1.0).unwrap();
+        assert_eq!(option.values().to_vec(), vec![0.0]);
+
+        option.rollback(0.5).unwrap();
+
+        let expected = 0.9_f64.powi(2);
+        assert!(
+            (option.values()[0] - expected).abs() < 1e-12,
+            "option = {}",
+            option.values()[0]
+        );
+        assert!((underlying.borrow().time() - 0.5).abs() < 1e-12);
+        assert!((underlying.borrow().values()[0] - expected).abs() < 1e-12);
+    }
+}
