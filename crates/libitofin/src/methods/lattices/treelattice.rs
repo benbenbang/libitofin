@@ -298,3 +298,329 @@ impl<I: TreeLatticeImpl> Lattice for TreeLattice1D<I> {
         Ok(grid)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::discretizedasset::DiscretizedDiscountBond;
+    use crate::methods::lattices::trinomialtree::TrinomialTree;
+    use crate::processes::OrnsteinUhlenbeckProcess;
+    use crate::shared::{Shared, shared};
+    use crate::stochasticprocess::StochasticProcess1D;
+
+    // Ornstein-Uhlenbeck fixture with x0 != level so the drift is nonzero and
+    // the per-node probabilities are asymmetric (p0 != p2) - required for the
+    // descendant-swap perturbation to actually shift the distribution.
+    const SPEED: Real = 0.1;
+    const VOL: Real = 0.01;
+    const X0: Real = 0.10;
+    const LEVEL: Real = 0.05;
+    const R: Real = 0.05;
+
+    fn process() -> Shared<dyn StochasticProcess1D> {
+        shared(OrnsteinUhlenbeckProcess::new(SPEED, VOL, X0, LEVEL).unwrap())
+    }
+
+    fn trinomial(steps: Size, end: Time) -> (TrinomialTree, TimeGrid) {
+        let grid = TimeGrid::new(end, steps).unwrap();
+        let tree = TrinomialTree::new(process(), grid.clone(), false).unwrap();
+        (tree, grid)
+    }
+
+    /// Flat constant-short-rate lattice impl: `discount(i, index) = exp(-r*dt_i)`,
+    /// independent of the node (the trivial oracle the ticket prescribes).
+    struct FlatRate<T: Tree> {
+        tree: T,
+        grid: TimeGrid,
+        rate: Real,
+    }
+
+    impl<T: Tree> TreeLatticeImpl for FlatRate<T> {
+        type Tree = T;
+        fn tree(&self) -> &T {
+            &self.tree
+        }
+        fn discount(&self, i: Size, _index: Size) -> Real {
+            (-self.rate * self.grid.dt(i)).exp()
+        }
+    }
+
+    fn flat_lattice(steps: Size, end: Time) -> TreeLattice1D<FlatRate<TrinomialTree>> {
+        let (tree, grid) = trinomial(steps, end);
+        TreeLattice1D::new(
+            FlatRate {
+                tree,
+                grid: grid.clone(),
+                rate: R,
+            },
+            grid,
+        )
+        .unwrap()
+    }
+
+    /// Lattice impl with no discounting (`discount == 1`): a committed proxy for
+    /// the "drop the discount" confirm-by-stub. Its state prices sum to `1` at
+    /// every slice, so the discount-sum identity fails.
+    struct NoDiscount<T: Tree> {
+        tree: T,
+    }
+
+    impl<T: Tree> TreeLatticeImpl for NoDiscount<T> {
+        type Tree = T;
+        fn tree(&self) -> &T {
+            &self.tree
+        }
+        fn discount(&self, _i: Size, _index: Size) -> Real {
+            1.0
+        }
+    }
+
+    /// A tree that swaps the branch-0 and branch-2 destinations at one node,
+    /// leaving every probability, size, and underlying untouched. The total
+    /// probability leaving the node is conserved (so the discount-sum identity
+    /// is blind to it), but the per-node Arrow-Debreu distribution shifts.
+    struct SwapDescTree {
+        inner: TrinomialTree,
+        swap_slice: Size,
+        swap_node: Size,
+    }
+
+    impl Tree for SwapDescTree {
+        const BRANCHES: Size = 3;
+        fn columns(&self) -> Size {
+            self.inner.columns()
+        }
+        fn size(&self, i: Size) -> Size {
+            self.inner.size(i)
+        }
+        fn underlying(&self, i: Size, index: Size) -> Real {
+            self.inner.underlying(i, index)
+        }
+        fn probability(&self, i: Size, index: Size, branch: Size) -> Real {
+            self.inner.probability(i, index, branch)
+        }
+        fn descendant(&self, i: Size, index: Size, branch: Size) -> Size {
+            if i == self.swap_slice && index == self.swap_node {
+                let swapped = match branch {
+                    0 => 2,
+                    2 => 0,
+                    b => b,
+                };
+                self.inner.descendant(i, index, swapped)
+            } else {
+                self.inner.descendant(i, index, branch)
+            }
+        }
+    }
+
+    #[test]
+    fn zeronomial_lattice_is_rejected() {
+        // lattice.hpp:63: a tree with no branches has no lattice.
+        struct NoBranch;
+        impl Tree for NoBranch {
+            const BRANCHES: Size = 0;
+            fn columns(&self) -> Size {
+                1
+            }
+            fn size(&self, _i: Size) -> Size {
+                1
+            }
+            fn underlying(&self, _i: Size, _index: Size) -> Real {
+                0.0
+            }
+            fn descendant(&self, _i: Size, _index: Size, _branch: Size) -> Size {
+                0
+            }
+            fn probability(&self, _i: Size, _index: Size, _branch: Size) -> Real {
+                0.0
+            }
+        }
+        let grid = TimeGrid::new(1.0, 2).unwrap();
+        let err = TreeLattice::new(NoDiscount { tree: NoBranch }, grid)
+            .err()
+            .expect("a zeronomial lattice must be rejected");
+        assert_eq!(err.message(), "there is no zeronomial lattice!");
+    }
+
+    #[test]
+    fn state_prices_discount_sum_to_the_zero_bond() {
+        // lattice.hpp:97: sum_j state_prices(i)[j] == exp(-r*t_i), the
+        // Arrow-Debreu discount-sum. Catches discount/probability-magnitude bugs
+        // (but NOT descendant routing - see the perturbation test).
+        let steps = 5;
+        let lattice = flat_lattice(steps, 1.0);
+        let grid = lattice.time_grid().clone();
+        for i in 0..=steps {
+            let sum: Real = lattice.state_prices(i).iter().sum();
+            let bond = (-R * grid[i]).exp();
+            assert!((sum - bond).abs() < 1e-13, "sum(sp[{i}]) = {sum} != {bond}");
+        }
+    }
+
+    #[test]
+    fn present_value_of_a_unit_bond_is_the_discount_sum() {
+        // lattice.hpp:120: presentValue = DotProduct(values, statePrices(i)).
+        // A discount bond initialized at t_i has values all 1, so its present
+        // value is exactly the discount-sum. Exercises the ported Lattice method.
+        let steps = 5;
+        let i = 3;
+        let lattice: Shared<dyn Lattice> = shared(flat_lattice(steps, 1.0));
+        let grid = lattice.time_grid().clone();
+        let mut bond = DiscretizedDiscountBond::new();
+        bond.initialize(Shared::clone(&lattice), grid[i]).unwrap();
+        let pv = bond.present_value().unwrap();
+        assert!(
+            (pv - (-R * grid[i]).exp()).abs() < 1e-13,
+            "pv = {pv} != {}",
+            (-R * grid[i]).exp()
+        );
+    }
+
+    #[test]
+    #[allow(clippy::needless_range_loop)]
+    fn state_prices_match_an_independent_forward_recursion_elementwise() {
+        // GATE AMENDMENT (distribution-sensitive pin): assert the state prices
+        // ELEMENT-WISE against an independent Arrow-Debreu recursion written out
+        // here from the tree's OWN descendants/probabilities plus the flat
+        // discount. This re-derivation routes through tree.descendant, so a
+        // routing bug in compute_state_prices (which the sum-identity cannot see)
+        // makes the two diverge.
+        let steps = 4;
+        let (tree, grid) = trinomial(steps, 1.0);
+        let disc: Vec<Real> = (0..steps).map(|i| (-R * grid.dt(i)).exp()).collect();
+
+        let mut expected: Vec<Vec<Real>> = vec![vec![1.0]];
+        for i in 0..steps {
+            let mut next = vec![0.0; tree.size(i + 1)];
+            for j in 0..tree.size(i) {
+                let sp = expected[i][j];
+                for l in 0..3 {
+                    let d = tree.descendant(i, j, l);
+                    next[d] += sp * disc[i] * tree.probability(i, j, l);
+                }
+            }
+            expected.push(next);
+        }
+
+        let lattice = TreeLattice1D::new(
+            FlatRate {
+                tree,
+                grid: grid.clone(),
+                rate: R,
+            },
+            grid,
+        )
+        .unwrap();
+        for i in 0..=steps {
+            let sp = lattice.state_prices(i);
+            assert_eq!(sp.size(), expected[i].len(), "slice {i} size mismatch");
+            for j in 0..sp.size() {
+                assert!(
+                    (sp[j] - expected[i][j]).abs() < 1e-14,
+                    "sp[{i}][{j}] = {} != {}",
+                    sp[j],
+                    expected[i][j]
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn descendant_perturbation_evades_sum_identity_but_the_elementwise_pin_catches_it() {
+        // GATE AMENDMENT (confirm-by-stub, both outcomes recorded): a descendant
+        // swap that conserves total transition probability is INVISIBLE to the
+        // discount-sum identity yet shifts the per-node distribution. This test
+        // demonstrates BOTH: the sum-identity still passes on the perturbed
+        // lattice, while the element-wise pin and the exact fit quantity #463
+        // consumes both catch it. This is why the element-wise pin earns its keep.
+        let steps = 3;
+        let end = 1.0;
+        let i = 2;
+
+        let (correct_tree, grid) = trinomial(steps, end);
+        let correct = TreeLattice1D::new(
+            FlatRate {
+                tree: correct_tree,
+                grid: grid.clone(),
+                rate: R,
+            },
+            grid.clone(),
+        )
+        .unwrap();
+
+        let (inner, _g) = trinomial(steps, end);
+        let perturbed = TreeLattice1D::new(
+            FlatRate {
+                tree: SwapDescTree {
+                    inner,
+                    swap_slice: 1,
+                    swap_node: 0,
+                },
+                grid: grid.clone(),
+                rate: R,
+            },
+            grid.clone(),
+        )
+        .unwrap();
+
+        let sp_correct = correct.state_prices(i);
+        let sp_perturbed = perturbed.state_prices(i);
+        let bond = (-R * grid[i]).exp();
+
+        // (a) The discount-sum identity is BLIND to the swap: both still hit the bond.
+        let sum_correct: Real = sp_correct.iter().sum();
+        let sum_perturbed: Real = sp_perturbed.iter().sum();
+        assert!(
+            (sum_correct - bond).abs() < 1e-13,
+            "correct sum {sum_correct} != {bond}"
+        );
+        assert!(
+            (sum_perturbed - bond).abs() < 1e-13,
+            "perturbed sum {sum_perturbed} != {bond}: the sum-identity must stay blind"
+        );
+
+        // (b) The element-wise pin CATCHES it: some node differs materially.
+        let max_elt_diff = (0..sp_correct.size())
+            .map(|j| (sp_correct[j] - sp_perturbed[j]).abs())
+            .fold(0.0_f64, Real::max);
+        assert!(
+            max_elt_diff > 1e-6,
+            "element-wise pin failed to distinguish the perturbation (max diff {max_elt_diff})"
+        );
+
+        // (c) The fit quantity #463 consumes (sum_j sp[j]*exp(-underlying(i,j)*dt))
+        // also differs; underlying is unchanged by the swap, so the gap isolates
+        // the distribution shift.
+        let dt = grid.dt(i);
+        let fit_correct: Real = (0..sp_correct.size())
+            .map(|j| sp_correct[j] * (-correct.underlying(i, j) * dt).exp())
+            .sum();
+        let fit_perturbed: Real = (0..sp_perturbed.size())
+            .map(|j| sp_perturbed[j] * (-perturbed.underlying(i, j) * dt).exp())
+            .sum();
+        assert!(
+            (fit_correct - fit_perturbed).abs() > 1e-6,
+            "fit quantity failed to distinguish the perturbation: {fit_correct} vs {fit_perturbed}"
+        );
+    }
+
+    #[test]
+    fn dropping_the_discount_breaks_the_sum_identity() {
+        // GATE AMENDMENT (confirm-by-stub, discount direction): with discount==1
+        // the state prices sum to 1 at every slice, NOT exp(-r*t_i), so the
+        // discount-sum identity fails - a committed proxy proving the pin is
+        // sensitive to the discount factor.
+        let steps = 3;
+        let (tree, grid) = trinomial(steps, 1.0);
+        let lattice = TreeLattice1D::new(NoDiscount { tree }, grid.clone()).unwrap();
+        for i in 1..=steps {
+            let sum: Real = lattice.state_prices(i).iter().sum();
+            assert!((sum - 1.0).abs() < 1e-13, "undiscounted sum {sum} != 1");
+            let bond = (-R * grid[i]).exp();
+            assert!(
+                (sum - bond).abs() > 1e-6,
+                "the sum-identity must FAIL without the discount (sum {sum} vs bond {bond})"
+            );
+        }
+    }
+}
