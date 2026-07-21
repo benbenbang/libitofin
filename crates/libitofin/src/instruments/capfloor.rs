@@ -26,9 +26,10 @@
 //! - `MakeCapFloor` is not ported (the fixture constructs `Cap`/`Floor`
 //!   directly); nor are `optionlet`, `lastFloatingRateCoupon`, `impliedVolatility`
 //!   or `deepUpdate`, none of which the ported tests reach.
-//! - The `CapFloor::arguments` bundle keeps only the fields the Black engine
-//!   reads: the C++ `startDates`, `spreads` and `indexes` are filled but unread,
-//!   so they are omitted here.
+//! - The `CapFloor::arguments` bundle carries `start_dates` (read by the analytic
+//!   Hull-White engine to form each optionlet's exercise maturity, #438); the C++
+//!   `spreads` and `indexes` are filled but unread by any ported engine, so they
+//!   remain omitted.
 //! - The D5 `Settings` handle replaces `Settings::instance()` for the evaluation
 //!   date the expiry check and the forward guard read.
 
@@ -70,6 +71,9 @@ pub enum CapFloorType {
 pub struct CapFloorArguments {
     /// The instrument type, set by `setup_arguments`.
     pub cap_floor_type: Option<CapFloorType>,
+    /// Each coupon's accrual start date (the C++ `startDates`), the exercise
+    /// maturity the analytic Hull-White engine forms its bond option from.
+    pub start_dates: Vec<Date>,
     /// Each coupon's fixing date.
     pub fixing_dates: Vec<Date>,
     /// Each coupon's payment date (the C++ `endDates`).
@@ -92,6 +96,7 @@ impl Arguments for CapFloorArguments {
     fn validate(&self) -> QlResult<()> {
         let n = self.end_dates.len();
         require!(self.cap_floor_type.is_some(), "cap/floor type not set");
+        require!(self.start_dates.len() == n, "start-date count mismatch");
         require!(self.fixing_dates.len() == n, "fixing-date count mismatch");
         require!(self.accrual_times.len() == n, "accrual-time count mismatch");
         require!(self.cap_rates.len() == n, "cap-rate count mismatch");
@@ -275,6 +280,7 @@ impl Instrument for CapFloor {
 
         let n = self.coupons.len();
         args.cap_floor_type = Some(self.cap_floor_type);
+        args.start_dates = Vec::with_capacity(n);
         args.fixing_dates = Vec::with_capacity(n);
         args.end_dates = Vec::with_capacity(n);
         args.accrual_times = Vec::with_capacity(n);
@@ -298,6 +304,7 @@ impl Instrument for CapFloor {
             let gearing = coupon.gearing();
             let end_date = coupon.date();
 
+            args.start_dates.push(coupon.accrual_start_date());
             args.fixing_dates.push(coupon.fixing_date());
             args.end_dates.push(end_date);
             args.accrual_times.push(coupon.accrual_period());
@@ -407,6 +414,42 @@ mod tests {
             .err()
             .unwrap();
         assert_eq!(err.message(), "no floor rates given");
+    }
+
+    /// `setup_arguments` fills `start_dates` with each coupon's accrual start
+    /// (`capfloor.cpp:237`), the maturity the analytic engine forms its bond
+    /// option from.
+    #[test]
+    fn setup_arguments_fills_start_dates_with_the_accrual_starts() {
+        // Evaluation date past the whole leg: every forward is `None`, so
+        // `setup_arguments` never forecasts off the (unlinked) index curve, yet
+        // `start_dates` is still populated unconditionally.
+        let settings = settings_on(Date::new(2, Month::January, 2028));
+        let coupons = leg(settings.clone());
+        let expected: Vec<Date> = coupons.iter().map(|c| c.accrual_start_date()).collect();
+        let cap = CapFloor::cap(coupons, vec![0.03], settings).unwrap();
+
+        let mut args = CapFloorArguments::default();
+        cap.setup_arguments(&mut args).unwrap();
+        assert_eq!(args.start_dates, expected);
+        assert_eq!(args.start_dates.len(), args.end_dates.len());
+    }
+
+    /// `CapFloor::arguments::validate` rejects a `start_dates` length that has
+    /// desynced from `end_dates` (`capfloor.cpp:279`).
+    #[test]
+    fn validate_rejects_a_desynced_start_date_count() {
+        let settings = settings_on(Date::new(2, Month::January, 2028));
+        let coupons = leg(settings.clone());
+        let cap = CapFloor::cap(coupons, vec![0.03], settings).unwrap();
+
+        let mut args = CapFloorArguments::default();
+        cap.setup_arguments(&mut args).unwrap();
+        args.start_dates.pop();
+        assert_eq!(
+            args.validate().err().unwrap().message(),
+            "start-date count mismatch"
+        );
     }
 
     /// `CapFloor::isExpired`: expired once every coupon has paid.

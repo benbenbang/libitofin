@@ -11,8 +11,9 @@
 //! (Array/Matrix interface) lives alongside it below; the two traits are
 //! deliberately independent (C++ derives 1D from the base through private
 //! bridges, a unification nothing in this crate needs). Out of scope, noted as
-//! follow-up (#411): the pluggable `discretization` strategy objects and
-//! `StochasticProcessArray`.
+//! follow-up (#411): the pluggable `discretization` strategy objects.
+//! `StochasticProcessArray` has since landed at
+//! [`processes::stochasticprocessarray`](crate::processes::StochasticProcessArray).
 //!
 //! C++ `StochasticProcess` inherits `Observer` and `Observable`, with
 //! `update()` forwarding every input notification to its own observers. The
@@ -115,8 +116,9 @@ pub trait StochasticProcess1D: AsObservable {
 /// typically read quotes and term structures whose lookups can fail (D4:
 /// `QL_REQUIRE` maps to `Err`).
 ///
-/// Deferred (#411): the pluggable `discretization` strategy object and
-/// `StochasticProcessArray`.
+/// Deferred (#411): the pluggable `discretization` strategy object.
+/// `StochasticProcessArray` has since landed at
+/// [`processes::stochasticprocessarray`](crate::processes::StochasticProcessArray).
 pub trait StochasticProcess: AsObservable {
     /// Returns the number of dimensions of the process.
     fn size(&self) -> Size;
