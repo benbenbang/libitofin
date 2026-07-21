@@ -18,8 +18,10 @@
 //!   explicit error instead of a silently wrong price.
 
 pub mod analytichestonengine;
+pub mod mcvanillaengine;
 
 pub use analytichestonengine::HestonChf;
+pub use mcvanillaengine::McVanillaEngineBase;
 
 use std::any::Any;
 
