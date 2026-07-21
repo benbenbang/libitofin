@@ -5,7 +5,9 @@
 //! stack on top in later tickets.
 
 mod path;
+mod pathgenerator;
 mod sample;
 
 pub use path::Path;
+pub use pathgenerator::PathGenerator;
 pub use sample::Sample;
