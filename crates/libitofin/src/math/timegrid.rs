@@ -23,8 +23,9 @@
 use std::ops::Index;
 
 use crate::errors::QlResult;
-use crate::require;
+use crate::math::comparison::close_enough;
 use crate::types::{Real, Size, Time};
+use crate::{fail, require};
 
 /// A discrete, regularly spaced grid of times starting at zero.
 #[derive(Clone, Debug, PartialEq, Default)]
@@ -91,6 +92,48 @@ impl TimeGrid {
     /// (`timegrid.hpp:168`), but returning `None` rather than throwing.
     pub fn at(&self, i: Size) -> Option<Time> {
         self.times.get(i).copied()
+    }
+
+    /// The index `i` such that `grid[i]` is closest to `t` (`timegrid.cpp:80`).
+    ///
+    /// Mirrors C++'s `std::lower_bound` walk: find the first node `>= t`, then
+    /// return whichever of it and its predecessor is nearer, clamping at the
+    /// ends. On an empty grid this returns `0`, matching C++'s
+    /// `begin == end` short-circuit (there `size()-1` underflows, so callers of
+    /// [`index`](TimeGrid::index) never reach it on an empty grid).
+    pub fn closest_index(&self, t: Time) -> Size {
+        let result = self.times.partition_point(|&x| x < t);
+        if result == 0 {
+            0
+        } else if result == self.times.len() {
+            self.times.len() - 1
+        } else {
+            let dt1 = self.times[result] - t;
+            let dt2 = t - self.times[result - 1];
+            if dt1 < dt2 { result } else { result - 1 }
+        }
+    }
+
+    /// The index `i` such that `grid[i] == t` (`timegrid.cpp:43`).
+    ///
+    /// Finds the [`closest_index`](TimeGrid::closest_index) and requires it to
+    /// coincide with `t` under [`close_enough`]; otherwise the grid cannot
+    /// resolve `t` to a node and this returns `Err` (C++ `QL_FAIL`, split into
+    /// three messages there, folded into one here per D4).
+    ///
+    /// # Errors
+    /// Returns `Err` when no grid node is [`close_enough`] to `t`.
+    pub fn index(&self, t: Time) -> QlResult<Size> {
+        let i = self.closest_index(t);
+        if close_enough(t, self.times[i]) {
+            Ok(i)
+        } else {
+            fail!(
+                "using inadequate time grid: no node is close enough to the \
+                 required time t = {t} (closest node is t1 = {})",
+                self.times[i]
+            );
+        }
     }
 
     /// The first grid point (`timegrid.hpp:175`), or `None` if empty.
@@ -163,5 +206,36 @@ mod tests {
         // Divergence from C++: guard the inf/NaN grid at the boundary.
         let err = TimeGrid::new(1.0, 0).unwrap_err();
         assert_eq!(err.message(), "at least one step required");
+    }
+
+    #[test]
+    fn index_resolves_grid_aligned_times() {
+        // timegrid.cpp:43: index(t) returns i with grid[i] == t.
+        let grid = TimeGrid::new(1.0, 4).unwrap();
+        assert_eq!(grid.index(0.0).unwrap(), 0);
+        assert_eq!(grid.index(0.25).unwrap(), 1);
+        assert_eq!(grid.index(0.5).unwrap(), 2);
+        assert_eq!(grid.index(1.0).unwrap(), 4);
+    }
+
+    #[test]
+    fn index_rejects_off_grid_times() {
+        // timegrid.cpp:47: a t between nodes resolves to no index.
+        let grid = TimeGrid::new(1.0, 4).unwrap();
+        assert!(grid.index(0.3).is_err());
+        assert!(grid.index(1.5).is_err());
+        assert!(grid.index(-0.1).is_err());
+    }
+
+    #[test]
+    fn closest_index_snaps_to_nearest_node() {
+        // timegrid.cpp:80: nearest node, ends clamped, ties to the lower node.
+        let grid = TimeGrid::new(1.0, 4).unwrap();
+        assert_eq!(grid.closest_index(0.3), 1);
+        assert_eq!(grid.closest_index(0.4), 2);
+        assert_eq!(grid.closest_index(2.0), 4);
+        assert_eq!(grid.closest_index(-1.0), 0);
+        // A midpoint tie: dt1 (0.25 - 0.125) == dt2, so the lower node wins.
+        assert_eq!(grid.closest_index(0.125), 0);
     }
 }
