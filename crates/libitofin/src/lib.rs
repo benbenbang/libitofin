@@ -6,6 +6,7 @@
 pub mod cashflow;
 pub mod cashflows;
 pub mod currency;
+pub mod discretizedasset;
 pub mod errors;
 pub mod event;
 pub mod exercise;
