@@ -170,14 +170,17 @@ mod tests {
     use crate::indexes::ibor::Euribor;
     use crate::instrument::Instrument;
     use crate::instruments::{
-        FixedVsFloatingSwap, SettlementType, SwapType, Swaption, VanillaSwap,
+        FixedVsFloatingSwap, FixedVsFloatingSwapArguments, SettlementType, SwapType, Swaption,
+        VanillaSwap,
     };
     use crate::interestrate::Compounding;
+    use crate::pricingengines::DiscountingSwapEngine;
     use crate::pricingengines::swaption::JamshidianSwaptionEngine;
     use crate::shared::{shared, shared_mut};
     use crate::termstructures::yields::FlatForward;
     use crate::termstructures::yieldtermstructure::YieldTermStructure;
     use crate::time::businessdayconvention::BusinessDayConvention;
+    use crate::time::calendar::Calendar;
     use crate::time::calendars::target::Target;
     use crate::time::date::Month;
     use crate::time::daycounters::actual360::Actual360;
@@ -185,7 +188,8 @@ mod tests {
     use crate::time::daycounters::thirty360::{Convention, Thirty360};
     use crate::time::frequency::Frequency;
     use crate::time::schedule::{MakeSchedule, Schedule};
-    use crate::types::Real;
+    use crate::time::timeunit::TimeUnit;
+    use crate::types::{Rate, Real};
 
     // ------------------------------------------------------------------
     // Convergence fixture: reuse the on-main JamshidianSwaptionEngine oracle
@@ -409,5 +413,176 @@ mod tests {
             engine.calculate().unwrap_err().message(),
             "cash settled (ParYieldCurve) swaptions not priced with TreeSwaptionEngine"
         );
+    }
+
+    // ------------------------------------------------------------------
+    // DIAGNOSTIC (NOT a merge gate): QuantLib's only tree-swaption test,
+    // bermudanswaption.cpp:112 testCachedValues. HW(0.048696, 0.0058904),
+    // a 1y-into-5y payer Bermudan on a nominal of 1000, exercisable on each
+    // fixed accrual-start date, TreeSwaptionEngine(model, 50). Cached ITM/
+    // ATM/OTM = 42.2402 / 12.9032 / 2.49758 (the non-par / indexed arm;
+    // usingAtParCoupons = false). Reproduced to a LOOSE band only: the exact
+    // 1e-4 gate needs the deferred date-snapping (which shifts the semiannual
+    // floating resets that fall within a week of the annual exercise dates)
+    // plus near-bit-exact tree detail. A miss here is not a bug (see the
+    // discretizedswaption.rs deferral note); the deltas are printed.
+    // ------------------------------------------------------------------
+
+    const BERM_A: Real = 0.048696;
+    const BERM_SIGMA: Real = 0.0058904;
+    const BERM_NOMINAL: Real = 1000.0;
+
+    fn berm_curve(settlement: Date) -> Handle<dyn YieldTermStructure> {
+        Handle::new(shared(FlatForward::with_rate(
+            settlement,
+            0.04875825,
+            Actual365Fixed::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>)
+    }
+
+    /// `CommonVars::makeSwap` (`bermudanswaption.cpp:81`): a 1y-into-5y payer
+    /// swap, annual/unadjusted fixed vs semiannual/modified-following float, on a
+    /// nominal of 1000, priced by a discounting engine so `fair_rate` resolves.
+    fn berm_swap(
+        settings: &Shared<Settings<Date>>,
+        calendar: &Calendar,
+        settlement: Date,
+        curve: &Handle<dyn YieldTermStructure>,
+        fixed_rate: Rate,
+    ) -> SharedMut<FixedVsFloatingSwap> {
+        let start = calendar.advance(
+            settlement,
+            1,
+            TimeUnit::Years,
+            BusinessDayConvention::Following,
+            false,
+        );
+        let maturity = calendar.advance(
+            start,
+            5,
+            TimeUnit::Years,
+            BusinessDayConvention::Following,
+            false,
+        );
+        let fixed_schedule = MakeSchedule::new()
+            .from(start)
+            .to(maturity)
+            .with_frequency(Frequency::Annual)
+            .with_calendar(calendar.clone())
+            .with_convention(BusinessDayConvention::Unadjusted)
+            .with_termination_date_convention(BusinessDayConvention::Unadjusted)
+            .forwards()
+            .end_of_month(false)
+            .build();
+        let float_schedule = MakeSchedule::new()
+            .from(start)
+            .to(maturity)
+            .with_frequency(Frequency::Semiannual)
+            .with_calendar(calendar.clone())
+            .with_convention(BusinessDayConvention::ModifiedFollowing)
+            .with_termination_date_convention(BusinessDayConvention::ModifiedFollowing)
+            .forwards()
+            .end_of_month(false)
+            .build();
+        let index: Shared<IborIndex> =
+            shared(Euribor::six_months(curve.clone(), Shared::clone(settings)));
+        let swap = shared_mut(
+            VanillaSwap::new(
+                SwapType::Payer,
+                BERM_NOMINAL,
+                fixed_schedule,
+                fixed_rate,
+                Thirty360::with_convention(Convention::BondBasis),
+                float_schedule,
+                index,
+                0.0,
+                Actual360::new(),
+                None,
+                Shared::clone(settings),
+            )
+            .unwrap()
+            .into_fixed_vs_floating(),
+        );
+        let engine = shared_mut(DiscountingSwapEngine::new(
+            curve.clone(),
+            None,
+            None,
+            None,
+            Shared::clone(settings),
+        )) as SharedMut<dyn PricingEngine>;
+        swap.borrow_mut().base_mut().set_pricing_engine(engine);
+        swap
+    }
+
+    fn berm_swaption_npv(
+        swap: SharedMut<FixedVsFloatingSwap>,
+        exercise_dates: Vec<Date>,
+        model: SharedMut<HullWhite>,
+        settings: &Shared<Settings<Date>>,
+    ) -> Real {
+        let mut swaption = Swaption::new(
+            swap,
+            shared(StubExercise {
+                exercise_type: ExerciseType::Bermudan,
+                dates: exercise_dates,
+            }) as Shared<dyn Exercise>,
+            SettlementType::Physical,
+            SettlementMethod::PhysicalOTC,
+            Shared::clone(settings),
+        );
+        let engine =
+            shared_mut(TreeSwaptionEngine::new(model, 50, Shared::clone(settings)).unwrap())
+                as SharedMut<dyn PricingEngine>;
+        swaption.base_mut().set_pricing_engine(engine);
+        swaption.npv().unwrap()
+    }
+
+    #[test]
+    fn cached_bermudan_diagnostic() {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(Date::new(15, Month::February, 2002));
+        settings.set_using_at_par_coupons(false);
+        let calendar = Target::new();
+        let settlement = calendar.advance(
+            Date::new(15, Month::February, 2002),
+            2,
+            TimeUnit::Days,
+            BusinessDayConvention::Following,
+            false,
+        );
+        let curve = berm_curve(settlement);
+
+        let atm_rate = berm_swap(&settings, &calendar, settlement, &curve, 0.0)
+            .borrow_mut()
+            .fair_rate()
+            .unwrap();
+
+        // Exercise on each fixed-coupon accrual-start date (bermudanswaption.cpp:141).
+        let atm_swap = berm_swap(&settings, &calendar, settlement, &curve, atm_rate);
+        let mut atm_args = FixedVsFloatingSwapArguments::default();
+        atm_swap.borrow().setup_arguments(&mut atm_args).unwrap();
+        let exercise_dates = atm_args.fixed_reset_dates.clone();
+        assert_eq!(exercise_dates.len(), 5, "five annual fixed accrual starts");
+
+        let cases = [
+            ("ITM", 0.8 * atm_rate, 42.2402_f64),
+            ("ATM", atm_rate, 12.9032),
+            ("OTM", 1.2 * atm_rate, 2.49758),
+        ];
+        for (label, rate, cached) in cases {
+            let swap = berm_swap(&settings, &calendar, settlement, &curve, rate);
+            let model = HullWhite::new(curve.clone(), BERM_A, BERM_SIGMA).unwrap();
+            let npv = berm_swaption_npv(swap, exercise_dates.clone(), model, &settings);
+            let rel = (npv - cached).abs() / cached;
+            eprintln!(
+                "[cached-bermudan diagnostic] {label}: tree {npv:.6} vs cached {cached} (rel {rel:.3e})"
+            );
+            assert!(
+                rel < 1.0e-2,
+                "{label}: tree {npv} vs cached {cached} (rel {rel}) outside the loose diagnostic band"
+            );
+        }
     }
 }
