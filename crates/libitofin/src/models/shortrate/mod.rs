@@ -14,5 +14,5 @@ pub use calibrationhelpers::SwaptionHelper;
 pub use coxingersollross::{CoxIngersollRoss, VolatilityConstraint};
 pub use extendedcoxingersollross::ExtendedCoxIngersollRoss;
 pub use hullwhite::{HullWhite, convexity_bias};
-pub use onefactormodel::{AffineModel, OneFactorAffineModel};
+pub use onefactormodel::{AffineModel, OneFactorAffineModel, ShortRateDynamics, ShortRateTree};
 pub use vasicek::Vasicek;
