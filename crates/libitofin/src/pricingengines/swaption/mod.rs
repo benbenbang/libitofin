@@ -7,10 +7,12 @@
 //! swaption pricing under Hull-White via the Jamshidian decomposition).
 
 mod blackswaptionengine;
+mod discretizedswap;
 mod jamshidianswaptionengine;
 
 pub use blackswaptionengine::{
     BachelierSpec, BachelierSwaptionEngine, Black76Spec, BlackStyleSpec, BlackStyleSwaptionEngine,
     BlackSwaptionEngine, CashAnnuityModel,
 };
+pub use discretizedswap::DiscretizedSwap;
 pub use jamshidianswaptionengine::JamshidianSwaptionEngine;
