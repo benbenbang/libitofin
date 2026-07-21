@@ -18,9 +18,11 @@
 //!   explicit error instead of a silently wrong price.
 
 pub mod analytichestonengine;
+pub mod mceuropeanengine;
 pub mod mcvanillaengine;
 
 pub use analytichestonengine::HestonChf;
+pub use mceuropeanengine::{EuropeanPathPricer, MCEuropeanEngine, MakeMcEuropeanEngine};
 pub use mcvanillaengine::McVanillaEngineBase;
 
 use std::any::Any;
