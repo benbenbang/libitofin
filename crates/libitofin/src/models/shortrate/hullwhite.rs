@@ -37,8 +37,13 @@
 //!   deferred with the short-rate dynamics per #377. The analytic
 //!   `testCachedHullWhite` calibration oracle (`shortratemodels.cpp:83`) is ported
 //!   in `hull_white_calibrates_to_the_cached_swaption_values` below (#399), on the
-//!   Jamshidian-engine path (#392); `testCachedHullWhiteFixedReversion` and
-//!   `testCachedHullWhite2` are deferred to #400.
+//!   Jamshidian-engine path (#392); `testCachedHullWhiteFixedReversion`
+//!   (`shortratemodels.cpp:155`) and `testCachedHullWhite2`
+//!   (`shortratemodels.cpp:229`) are ported below in
+//!   `hull_white_calibrates_with_fixed_reversion` and
+//!   `hull_white_calibrates_without_start_delay` (#400). The `FixedReversion`
+//!   fixed/free mask reaches `calibrate` as the inlined `vec![true, false]`
+//!   (the static `hullwhite.hpp:80` helper itself is not ported).
 //!
 //! ## Divergences from QuantLib
 //!
@@ -377,7 +382,10 @@ mod tests {
     use super::*;
     use crate::cashflows::RateAveraging;
     use crate::handle::RelinkableHandle;
+    use crate::indexes::IborIndex;
     use crate::indexes::ibor::Euribor;
+    use crate::indexes::index::Index;
+    use crate::indexes::interestrateindex::InterestRateIndex;
     use crate::math::array::Array;
     use crate::math::interpolations::linear::Linear;
     use crate::math::optimization::endcriteria::{EndCriteria, EndCriteriaType};
@@ -761,6 +769,209 @@ mod tests {
             (false, 0.0463679, 0.00579831),
         ] {
             let (params, ec_type, residual) = calibrate_cached_hull_white(using_at_par);
+
+            assert!(
+                (params[0] - cached_a).abs() < tolerance,
+                "par={using_at_par}: a = {} vs cached {cached_a} (error {})",
+                params[0],
+                (params[0] - cached_a).abs()
+            );
+            assert!(
+                (params[1] - cached_sigma).abs() < tolerance,
+                "par={using_at_par}: sigma = {} vs cached {cached_sigma} (error {})",
+                params[1],
+                (params[1] - cached_sigma).abs()
+            );
+            assert!(
+                ec_type.succeeded(),
+                "par={using_at_par}: end criteria {ec_type} did not converge"
+            );
+            assert!(
+                residual.is_finite() && residual < 0.2,
+                "par={using_at_par}: residual f(a) = {residual} not finite/bounded"
+            );
+        }
+    }
+
+    /// Calibrates Hull-White to the five cached swaptions under a chosen initial
+    /// reversion `a0`, index fixing-day count, end criterion and fixed-parameter
+    /// mask, returning the fitted `[a, sigma]`, the end criterion and the
+    /// residual `f(a)`. Generalises [`calibrate_cached_hull_white`] for the
+    /// fixed-reversion (`shortratemodels.cpp:155-227`) and no-start-delay
+    /// (`shortratemodels.cpp:229-306`) fixtures, whose only fixture deltas are
+    /// `a0`, the index fixing days, the end criterion and the fix-parameters
+    /// vector.
+    fn calibrate_cached_hull_white_variant(
+        using_at_par: bool,
+        a0: Real,
+        zero_fixing_days: bool,
+        end_criteria: EndCriteria,
+        fix_parameters: Vec<bool>,
+    ) -> (Array, EndCriteriaType, Real) {
+        let today = Date::new(15, Month::February, 2002);
+        let settlement = Date::new(19, Month::February, 2002);
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(today);
+        settings.set_using_at_par_coupons(using_at_par);
+
+        let term_structure: Handle<dyn YieldTermStructure> =
+            Handle::new(shared(FlatForward::with_rate(
+                settlement,
+                0.04875825,
+                Actual365Fixed::new(),
+                Compounding::Continuous,
+                Frequency::Annual,
+            )) as Shared<dyn YieldTermStructure>);
+
+        let model = HullWhite::new(term_structure.clone(), a0, 0.01).unwrap();
+        // testCachedHullWhite2 (shortratemodels.cpp:246-249) rebuilds Euribor6M
+        // with zero fixing days ("Euribor 6m with zero fixing days"), so the
+        // swaptions carry no start delay; the fixed-reversion case keeps the
+        // standard two-day index.
+        let euribor = Euribor::six_months(term_structure.clone(), Shared::clone(&settings));
+        let index = if zero_fixing_days {
+            shared(IborIndex::new(
+                euribor.family_name().to_string(),
+                euribor.tenor(),
+                0,
+                euribor.currency().clone(),
+                euribor.fixing_calendar(),
+                euribor.business_day_convention(),
+                euribor.end_of_month(),
+                euribor.day_counter().clone(),
+                term_structure.clone(),
+                Shared::clone(&settings),
+            ))
+        } else {
+            shared(euribor)
+        };
+        let engine = shared_mut(JamshidianSwaptionEngine::new(SharedMut::clone(&model)))
+            as SharedMut<dyn PricingEngine>;
+
+        let data = [
+            (1, 5, 0.1148),
+            (2, 4, 0.1108),
+            (3, 3, 0.1070),
+            (4, 2, 0.1021),
+            (5, 1, 0.1000),
+        ];
+        let helpers: Vec<SharedMut<dyn CalibrationHelper>> = data
+            .into_iter()
+            .map(|(start, length, volatility)| {
+                let vol: Handle<dyn Quote> =
+                    Handle::new(shared(SimpleQuote::new(volatility)) as Shared<dyn Quote>);
+                let mut helper = SwaptionHelper::new(
+                    Period::new(start, TimeUnit::Years),
+                    Period::new(length, TimeUnit::Years),
+                    vol,
+                    Shared::clone(&index),
+                    Period::new(1, TimeUnit::Years),
+                    Thirty360::with_convention(Convention::BondBasis),
+                    Actual360::new(),
+                    term_structure.clone(),
+                    CalibrationErrorType::RelativePriceError,
+                    None,
+                    1.0,
+                    VolatilityType::ShiftedLognormal,
+                    0.0,
+                    None,
+                    RateAveraging::Compound,
+                );
+                helper
+                    .base_mut()
+                    .set_pricing_engine(SharedMut::clone(&engine));
+                shared_mut(helper) as SharedMut<dyn CalibrationHelper>
+            })
+            .collect();
+
+        let mut method = LevenbergMarquardt::new(1e-8, 1e-8, 1e-8, false);
+        calibrate(
+            &model,
+            &helpers,
+            &mut method,
+            &end_criteria,
+            None,
+            Vec::new(),
+            fix_parameters,
+        )
+        .unwrap();
+
+        let params = model.borrow().calibrated_model().params();
+        let ec_type = model.borrow().calibrated_model().end_criteria();
+        let residual = calibration_value(&model, &params, &helpers).unwrap();
+        (params, ec_type, residual)
+    }
+
+    #[test]
+    fn hull_white_calibrates_with_fixed_reversion() {
+        // testCachedHullWhiteFixedReversion (shortratemodels.cpp:155-227):
+        // calibrate Hull-White starting from a = 0.05 with the reversion FIXED
+        // (HullWhite::FixedReversion() == {true, false}, hullwhite.hpp:80-84,
+        // passed at shortratemodels.cpp:195) so only sigma is fit, through
+        // calibrate()'s Projection/ProjectedConstraint path (Batch W1). This is
+        // the real end-to-end oracle for that fixed/free projection: a must stay
+        // pinned at 0.05 (Projection::include reinstates the fixed seed), and
+        // sigma reproduce the cached value to 1.0e-5 (shortratemodels.cpp:206).
+        // usingAtParCoupons (shortratemodels.cpp:200-204) gates sigma: PAR
+        // 0.00585858 (:203), INDEXED 0.00585835 (:201). Both coupon arms pinned.
+        let tolerance = 1.0e-5;
+        for (using_at_par, cached_sigma) in [(true, 0.00585858), (false, 0.00585835)] {
+            let end_criteria = EndCriteria::new(1000, Some(500), 1e-8, 1e-8, Some(1e-8)).unwrap();
+            let (params, ec_type, residual) = calibrate_cached_hull_white_variant(
+                using_at_par,
+                0.05,
+                false,
+                end_criteria,
+                vec![true, false],
+            );
+
+            assert!(
+                (params[0] - 0.05).abs() < 1e-15,
+                "par={using_at_par}: reversion must stay fixed at 0.05, got {}",
+                params[0]
+            );
+            assert!(
+                (params[1] - cached_sigma).abs() < tolerance,
+                "par={using_at_par}: sigma = {} vs cached {cached_sigma} (error {})",
+                params[1],
+                (params[1] - cached_sigma).abs()
+            );
+            assert!(
+                ec_type.succeeded(),
+                "par={using_at_par}: end criteria {ec_type} did not converge"
+            );
+            assert!(
+                residual.is_finite() && residual < 0.2,
+                "par={using_at_par}: residual f(a) = {residual} not finite/bounded"
+            );
+        }
+    }
+
+    #[test]
+    fn hull_white_calibrates_without_start_delay() {
+        // testCachedHullWhite2 (shortratemodels.cpp:229-306): the
+        // testCachedHullWhite fixture rebuilt with a zero-fixing-days Euribor6M
+        // (shortratemodels.cpp:246-249), so the swaptions carry no start delay.
+        // Default HullWhite (a = 0.1, sigma = 0.01). Cached a/sigma reproduce to
+        // 1.0e-5 (shortratemodels.cpp:285); usingAtParCoupons
+        // (shortratemodels.cpp:280-284) gates both arms: PAR a = 0.0482063,
+        // sigma = 0.00582687 (:283); INDEXED a = 0.0481608, sigma = 0.00582493
+        // (:281). The cached values predate the Jamshidian engine's expiry/start
+        // delay accounting (shortratemodels.cpp:276-279), which the zero-delay
+        // index sidesteps. The residual bound mirrors testCachedHullWhite.
+        let tolerance = 1.0e-5;
+        for (using_at_par, cached_a, cached_sigma) in [
+            (true, 0.0482063, 0.00582687),
+            (false, 0.0481608, 0.00582493),
+        ] {
+            let end_criteria = EndCriteria::new(10000, Some(100), 1e-6, 1e-8, Some(1e-8)).unwrap();
+            let (params, ec_type, residual) = calibrate_cached_hull_white_variant(
+                using_at_par,
+                0.1,
+                true,
+                end_criteria,
+                Vec::new(),
+            );
 
             assert!(
                 (params[0] - cached_a).abs() < tolerance,
