@@ -26,7 +26,7 @@ pub use forwardstructure::ForwardRateStructure;
 pub use impliedtermstructure::ImpliedTermStructure;
 pub use piecewiseyieldcurve::PiecewiseYieldCurve;
 pub use ratehelpers::{
-    DepositRateHelper, FuturesRateHelper, OISRateHelper, Pillar, SwapRateHelper,
+    DepositRateHelper, FraRateHelper, FuturesRateHelper, OISRateHelper, Pillar, SwapRateHelper,
 };
 pub use zerocurve::{InterpolatedZeroCurve, ZeroCurve};
 pub use zerospreadedtermstructure::ZeroSpreadedTermStructure;

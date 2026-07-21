@@ -4,12 +4,23 @@
 //! helper of `ql/termstructures/yield/oisratehelper.{hpp,cpp}`. This module holds
 //! [`DepositRateHelper`], the short end of the curve, [`SwapRateHelper`], the
 //! long end over vanilla swaps, [`OISRateHelper`], the long end over
-//! overnight-indexed swaps, and [`FuturesRateHelper`], the short-to-mid end over
-//! exchange-traded IMM/ASX futures. The FRA helper (`FraRateHelper`) and
-//! `BMASwapRateHelper` are deferred to a later ticket
+//! overnight-indexed swaps, [`FuturesRateHelper`], the short-to-mid end over
+//! exchange-traded IMM/ASX futures, and [`FraRateHelper`], the mid end over
+//! forward-rate agreements. `BMASwapRateHelper` is deferred to a later ticket
 //! (#343); the `SwapIndex`-based and explicit-start/end-date `SwapRateHelper`
 //! constructors are deferred with the swap-index port. The `OISRateHelper`
 //! explicit-start/end-date constructor is deferred likewise.
+//!
+//! [`FraRateHelper`] defers three `FraRateHelper` constructor paths visibly: the
+//! `Pillar::CustomDate` variants (that enum arm is not ported, see [`Pillar`]),
+//! the from-scratch constructors that build a synthetic `"no-fix"` [`IborIndex`]
+//! (`ratehelpers.cpp:263,293`), and the IMM-offset constructors
+//! (`ratehelpers.cpp:322`, with the `nthImmDate` helper). None sit on the
+//! bootstrap oracle path. Unlike C++, which registers the helper with its cloned
+//! index (`registerWith(iborIndex_)`) and so must unregister that index from the
+//! forwarding handle to keep relink notifications out of the bootstrap, the Rust
+//! helper never observes the cloned index (matching [`DepositRateHelper`]), so
+//! the relink-notification loop is already broken and no unregister is needed.
 
 use std::cell::Cell;
 use std::cell::RefCell;
@@ -422,6 +433,253 @@ pub enum Pillar {
     MaturityDate,
     /// The latest date the instrument needs data at.
     LastRelevantDate,
+}
+
+/// Bootstrap helper over a forward-rate-agreement rate (`FraRateHelper`).
+///
+/// The helper fits the rate of a FRA that starts `period_to_start` after spot
+/// and spans the index tenor. Like [`DepositRateHelper`] it clones the supplied
+/// index onto its own [`RelinkableHandle`] with [`IborIndex::clone_with`]
+/// (`ratehelpers.cpp:315`) so it forecasts off the curve being bootstrapped, and
+/// [`set_term_structure`](RateHelper::set_term_structure) weak-links that handle
+/// to the bootstrapping curve, non-owning and unobserved.
+///
+/// It runs in one of two modes (`use_indexed_coupon`, C++ default `true`):
+/// **indexed**, where [`implied_quote`](RateHelper::implied_quote) is the index
+/// fixing forecast off the curve (`ibor_index.fixing(fixing_date, true)`), the
+/// node pinned at `index.maturity_date(earliest)`; and **par**, where the quote
+/// is the simple forward `(discount(earliest)/discount(maturity) - 1)/tau` over
+/// the raw schedule window with `tau` the index day-count fraction, the node
+/// pinned at the maturity (`ratehelpers.cpp:361`).
+pub struct FraRateHelper {
+    base: BootstrapHelperBase,
+    index: IborIndex,
+    term_structure_handle: RelinkableHandle<dyn YieldTermStructure>,
+    period_to_start: Option<Period>,
+    use_indexed_coupon: bool,
+    pillar: Pillar,
+    fixing_date: Cell<Date>,
+    spanning_time: Cell<Real>,
+}
+
+impl FraRateHelper {
+    /// A FRA helper fitting `quote` over the window starting `period_to_start`
+    /// after spot and spanning `index`'s tenor (the index-based `Period`
+    /// constructor, `ratehelpers.cpp:305`).
+    pub fn new(
+        quote: Handle<dyn Quote>,
+        period_to_start: Period,
+        index: &IborIndex,
+        use_indexed_coupon: bool,
+        pillar: Pillar,
+    ) -> Shared<FraRateHelper> {
+        Self::build(
+            quote,
+            Some(period_to_start),
+            index,
+            use_indexed_coupon,
+            pillar,
+            None,
+        )
+    }
+
+    /// A FRA helper fitting a fixed `rate`, wrapped in a [`SimpleQuote`] (the
+    /// `Rate` arm of the C++ `variant<Rate, Handle<Quote>>` constructor).
+    pub fn from_rate(
+        rate: Real,
+        period_to_start: Period,
+        index: &IborIndex,
+        use_indexed_coupon: bool,
+        pillar: Pillar,
+    ) -> Shared<FraRateHelper> {
+        let quote = Handle::new(shared(SimpleQuote::new(rate)) as Shared<dyn Quote>);
+        Self::new(quote, period_to_start, index, use_indexed_coupon, pillar)
+    }
+
+    /// A FRA helper whose start is `months_to_start` months after spot (the
+    /// index-based `Natural monthsToStart` constructor, `ratehelpers.cpp:271`,
+    /// which delegates to the `Period` form via `months_to_start * Months`).
+    pub fn from_months(
+        quote: Handle<dyn Quote>,
+        months_to_start: Natural,
+        index: &IborIndex,
+        use_indexed_coupon: bool,
+        pillar: Pillar,
+    ) -> Shared<FraRateHelper> {
+        Self::new(
+            quote,
+            Period::new(months_to_start as Integer, TimeUnit::Months),
+            index,
+            use_indexed_coupon,
+            pillar,
+        )
+    }
+
+    /// A FRA helper over an explicit `[start_date, end_date]` window (the
+    /// non-relative date constructor, `ratehelpers.cpp:341`). Its schedule is
+    /// fixed at construction and, mirroring the C++ `RelativeDateRateHelper(rate,
+    /// false)`, does not shift when the evaluation date moves.
+    pub fn from_dates(
+        quote: Handle<dyn Quote>,
+        start_date: Date,
+        end_date: Date,
+        index: &IborIndex,
+        use_indexed_coupon: bool,
+        pillar: Pillar,
+    ) -> Shared<FraRateHelper> {
+        Self::build(
+            quote,
+            None,
+            index,
+            use_indexed_coupon,
+            pillar,
+            Some((start_date, end_date)),
+        )
+    }
+
+    fn build(
+        quote: Handle<dyn Quote>,
+        period_to_start: Option<Period>,
+        source_index: &IborIndex,
+        use_indexed_coupon: bool,
+        pillar: Pillar,
+        explicit_dates: Option<(Date, Date)>,
+    ) -> Shared<FraRateHelper> {
+        let settings = source_index.base().settings().clone();
+        let update_dates = explicit_dates.is_none();
+        Shared::new_cyclic(|weak: &Weak<FraRateHelper>| {
+            let weak = weak.clone();
+            let on_eval_change = Box::new(move || {
+                if let Some(helper) = weak.upgrade() {
+                    helper.initialize_dates();
+                }
+            });
+            let term_structure_handle = RelinkableHandle::<dyn YieldTermStructure>::empty();
+            let index = source_index.clone_with(term_structure_handle.handle());
+            let base =
+                BootstrapHelperBase::new_relative(quote, settings, update_dates, on_eval_change);
+            let helper = FraRateHelper {
+                base,
+                index,
+                term_structure_handle,
+                period_to_start,
+                use_indexed_coupon,
+                pillar,
+                fixing_date: Cell::new(Date::null()),
+                spanning_time: Cell::new(0.0),
+            };
+            if let Some((start, end)) = explicit_dates {
+                helper.base.set_earliest_date(start);
+                helper.base.set_maturity_date(end);
+            }
+            helper.initialize_dates();
+            helper
+        })
+    }
+}
+
+impl AsObservable for FraRateHelper {
+    fn observable(&self) -> &Observable {
+        self.base.observable()
+    }
+}
+
+impl RateHelper for FraRateHelper {
+    fn base(&self) -> &BootstrapHelperBase {
+        &self.base
+    }
+
+    /// The FRA rate implied by the current curve (`ratehelpers.cpp:361`).
+    ///
+    /// In indexed mode this is the index fixing forecast off the curve, forced
+    /// on (`ibor_index.fixing(fixing_date, true)`); in par mode it is the simple
+    /// forward `(discount(earliest)/discount(maturity) - 1)/spanning_time` read
+    /// straight from the curve's discount factors.
+    fn implied_quote(&self) -> QlResult<Real> {
+        let term_structure = self.base.term_structure()?;
+        if self.use_indexed_coupon {
+            self.index.fixing(self.fixing_date.get(), true)
+        } else {
+            let discount_earliest =
+                term_structure.discount_date(self.base.earliest_date(), false)?;
+            let discount_maturity =
+                term_structure.discount_date(self.base.maturity_date(), false)?;
+            Ok((discount_earliest / discount_maturity - 1.0) / self.spanning_time.get())
+        }
+    }
+
+    /// Weak-links the helper's own pricing handle to the bootstrapping curve,
+    /// then records the curve on the base - both non-owning and unobserved
+    /// (`ratehelpers.cpp:372`, `observer = false`).
+    fn set_term_structure(&self, term_structure: &Shared<dyn YieldTermStructure>) {
+        self.term_structure_handle
+            .link_to_weak(Shared::downgrade(term_structure));
+        self.base.set_term_structure(term_structure);
+    }
+}
+
+impl RelativeDateRateHelper for FraRateHelper {
+    /// Rebuilds the schedule off the current evaluation date (`initializeDates`,
+    /// `ratehelpers.cpp:393`).
+    ///
+    /// When the helper tracks the evaluation date (the relative constructors),
+    /// the earliest date is `period_to_start` past spot and the maturity is the
+    /// combined `period_to_start + tenor` past spot - both advanced from spot,
+    /// not chained, so a business-day roll on the intermediate date cannot leak
+    /// into the maturity. The explicit-date constructor sets those two dates at
+    /// construction and skips this block. Either way the latest-relevant date,
+    /// pillar, latest date and fixing date follow: indexed mode pins the node at
+    /// `index.maturity_date(earliest)`, par mode at the maturity and caches the
+    /// spanning year fraction.
+    fn initialize_dates(&self) {
+        if self.base.update_dates() {
+            let evaluation_date = self
+                .base
+                .evaluation_date()
+                .expect("a relative-date helper always tracks an evaluation date");
+            let calendar = self.index.fixing_calendar();
+            let reference = calendar.adjust(evaluation_date, BusinessDayConvention::Following);
+            let spot = self
+                .index
+                .value_date(reference)
+                .expect("spot date of an adjusted business day is valid");
+            let period_to_start = self
+                .period_to_start
+                .expect("a relative-date FRA helper carries a period to start");
+            let convention = self.index.business_day_convention();
+            let end_of_month = self.index.end_of_month();
+            let earliest =
+                calendar.advance_by_period(spot, period_to_start, convention, end_of_month);
+            let maturity = calendar.advance_by_period(
+                spot,
+                period_to_start + self.index.tenor(),
+                convention,
+                end_of_month,
+            );
+            self.base.set_earliest_date(earliest);
+            self.base.set_maturity_date(maturity);
+        }
+
+        let earliest = self.base.earliest_date();
+        let maturity = self.base.maturity_date();
+        let latest_relevant = if self.use_indexed_coupon {
+            self.index
+                .maturity_date(earliest)
+                .expect("maturity date of a value date is valid")
+        } else {
+            self.spanning_time
+                .set(self.index.day_counter().year_fraction(earliest, maturity));
+            maturity
+        };
+        self.base.set_latest_relevant_date(latest_relevant);
+        let pillar = match self.pillar {
+            Pillar::MaturityDate => maturity,
+            Pillar::LastRelevantDate => latest_relevant,
+        };
+        self.base.set_pillar_date(pillar);
+        self.base.set_latest_date(pillar);
+        self.fixing_date.set(self.index.fixing_date(earliest));
+    }
 }
 
 /// Bootstrap helper over a par swap rate (`SwapRateHelper`).
