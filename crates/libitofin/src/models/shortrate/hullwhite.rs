@@ -1113,4 +1113,169 @@ mod tests {
             );
         }
     }
+
+    // ------------------------------------------------------------------
+    // #463: ShortRateDynamics / ShortRateTree / HullWhite::tree oracle
+    // ------------------------------------------------------------------
+
+    use crate::math::timegrid::TimeGrid;
+    use crate::methods::lattices::TreeLatticeImpl;
+
+    /// The WIRING-PIN quantity at slice `i`: `sum_j statePrices(i)[j] *
+    /// discount(i, j)`, where `discount(i, j) = exp(-shortRate(t_i, x_j) * dt_i)`
+    /// reads `phi(t_i)` back through the tree's dynamics. Paired with the curve's
+    /// `P(t_{i+1})`, this is the identity the closed-form fit enforces.
+    fn pin_at(
+        lattice: &TreeLattice1D<ShortRateTree>,
+        curve: &Shared<dyn YieldTermStructure>,
+        grid: &TimeGrid,
+        i: usize,
+    ) -> (Real, Real) {
+        let sp = lattice.state_prices(i);
+        let sum: Real = (0..sp.size())
+            .map(|j| sp[j] * lattice.implementation().discount(i, j))
+            .sum();
+        let bond = curve.discount(grid[i + 1], false).unwrap();
+        (sum, bond)
+    }
+
+    /// Builds the numerical lattice exactly as [`HullWhite::tree`] does, but stops
+    /// before the fit and hands back the retained `phi` impl and the trinomial, so
+    /// a stub test can drive (or mis-wire) the fit itself. Mirrors the ctor half of
+    /// `hullwhite.cpp:45-51`.
+    fn build_unfitted(
+        curve: Handle<dyn YieldTermStructure>,
+        a: Real,
+        sigma: Real,
+        grid: &TimeGrid,
+    ) -> (
+        Rc<NumericalImpl>,
+        Shared<TrinomialTree>,
+        TreeLattice1D<ShortRateTree>,
+    ) {
+        let phi_impl = NumericalImpl::new(curve);
+        let phi = TermStructureFittingParameter::new(phi_impl.clone() as Rc<dyn ParameterValue>);
+        let dynamics: Shared<dyn ShortRateDynamics> =
+            shared(HullWhiteDynamics::new(phi, a, sigma).unwrap());
+        let trinomial =
+            shared(TrinomialTree::new(dynamics.process(), grid.clone(), false).unwrap());
+        let short_rate_tree = ShortRateTree::new(
+            Shared::clone(&trinomial),
+            Shared::clone(&dynamics),
+            grid.clone(),
+        );
+        let lattice = TreeLattice1D::new(short_rate_tree, grid.clone()).unwrap();
+        (phi_impl, trinomial, lattice)
+    }
+
+    #[test]
+    fn dynamics_variable_and_short_rate_are_inverse_through_phi() {
+        // hullwhite.hpp:114-115: shortRate(t,x) = x + phi(t), variable(t,r) =
+        // r - phi(t), so shortRate(t, variable(t,r)) == r. process() is the
+        // zero-mean OU (x0 = 0), kept distinct from the model's r0.
+        let curve = flat(0.05);
+        let phi_impl = NumericalImpl::new(Handle::new(curve.clone()));
+        phi_impl.set(1.0, 0.02);
+        let phi = TermStructureFittingParameter::new(phi_impl.clone() as Rc<dyn ParameterValue>);
+        let dynamics = HullWhiteDynamics::new(phi, 0.1, 0.01).unwrap();
+
+        let r = 0.05;
+        let x = dynamics.variable(1.0, r);
+        assert!((x - (r - 0.02)).abs() < 1e-15);
+        assert!((dynamics.short_rate(1.0, x) - r).abs() < 1e-15);
+        assert_eq!(dynamics.process().x0().unwrap(), 0.0);
+    }
+
+    #[test]
+    fn tree_reprices_the_flat_curve_wiring_pin() {
+        // WIRING PIN (tautological in the state-price VALUES - #462 owns those; see
+        // the GATE AMENDMENT). It validates set/get + EXACT-time lookup +
+        // shortRate = x + phi composition + the same-impl wiring: after tree(), the
+        // fitted tree reprices the curve's discount bonds. Asserted at several
+        // i >= 1 up to size-2 (i=0 is one-node and degenerate).
+        let curve = flat(0.05);
+        let model = HullWhite::new(Handle::new(curve.clone()), 0.1, 0.01).unwrap();
+        let grid = TimeGrid::new(3.0, 12).unwrap();
+        let lattice = model.borrow().tree(grid.clone()).unwrap();
+
+        for i in [1usize, 4, 7, 11] {
+            let (sum, bond) = pin_at(&lattice, &curve, &grid, i);
+            assert!(
+                (sum - bond).abs() < 1e-10,
+                "flat pin slice {i}: {sum} vs {bond}"
+            );
+        }
+    }
+
+    #[test]
+    fn tree_reprices_the_sloped_curve_wiring_pin() {
+        // The sloped arm: phi_i genuinely varies across slices, so a constant-phi
+        // or off-by-one (wrong-time) lookup passes flat but fails here. Same pin,
+        // on the ZeroCurve fixture shared with the C++ generator.
+        let handle = sloped_curve();
+        let curve = handle.current_link().unwrap();
+        let model = HullWhite::new(handle, 0.1, 0.01).unwrap();
+        let grid = TimeGrid::new(3.0, 12).unwrap();
+        let lattice = model.borrow().tree(grid.clone()).unwrap();
+
+        for i in [1usize, 4, 7, 11] {
+            let (sum, bond) = pin_at(&lattice, &curve, &grid, i);
+            assert!(
+                (sum - bond).abs() < 1e-10,
+                "sloped pin slice {i}: {sum} vs {bond}"
+            );
+        }
+    }
+
+    #[test]
+    fn unfitted_tree_misprices_the_curve_confirm_by_stub() {
+        // CONFIRM-BY-STUB (a): with phi = 0 at every node instead of the fit, the
+        // tree discounts at the raw OU state (~0), NOT the curve, so the wiring pin
+        // FAILS with margin. Proves the fit is load-bearing (a numeric failure, so
+        // it fails informatively rather than via the unset-lookup panic).
+        let curve = flat(0.05);
+        let grid = TimeGrid::new(3.0, 12).unwrap();
+        let (phi_impl, _trinomial, lattice) =
+            build_unfitted(Handle::new(curve.clone()), 0.1, 0.01, &grid);
+        for i in 0..(grid.size() - 1) {
+            phi_impl.set(grid[i], 0.0);
+        }
+        let (sum, bond) = pin_at(&lattice, &curve, &grid, 6);
+        assert!(
+            (sum - bond).abs() > 1e-6,
+            "phi=0 must misprice the curve: {sum} vs {bond}"
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "fitting parameter not set!")]
+    fn breaking_the_same_impl_wiring_panics_confirm_by_stub() {
+        // CONFIRM-BY-STUB (b): the fit sets a DIFFERENT NumericalImpl than the
+        // dynamics reads (the gate-amendment hazard). The dynamics' phi stays
+        // empty, so the first state-price slice that discounts through it (slice 1
+        // -> discount(0, .)) hits the unset EXACT-time lookup and panics. This
+        // pins that the fit and the dynamics MUST share one impl.
+        let curve = flat(0.05);
+        let handle = Handle::new(curve.clone());
+        let grid = TimeGrid::new(3.0, 12).unwrap();
+        let (_dynamics_phi, trinomial, lattice) = build_unfitted(handle.clone(), 0.1, 0.01, &grid);
+
+        let fit_phi = NumericalImpl::new(handle);
+        fit_phi.reset();
+        for i in 0..(grid.size() - 1) {
+            let bond = curve.discount(grid[i + 1], false).unwrap();
+            let sp = lattice.state_prices(i);
+            let size = trinomial.size(i);
+            let dt = grid.dt(i);
+            let dx = trinomial.dx(i);
+            let mut x = trinomial.underlying(i, 0);
+            let mut value = 0.0;
+            for j in 0..size {
+                value += sp[j] * (-x * dt).exp();
+                x += dx;
+            }
+            value = (value / bond).ln() / dt;
+            fit_phi.set(grid[i], value);
+        }
+    }
 }
