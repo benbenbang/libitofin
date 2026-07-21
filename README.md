@@ -12,10 +12,11 @@ first, then a C ABI for everything else).
 > The name nods to [Kiyosi Itô](https://en.wikipedia.org/wiki/Kiyosi_It%C5%8D),
 > whose stochastic calculus underpins modern derivatives pricing.
 
-> ⚠️ **Pre-1.0, under active development.** The core prices a European option
-> end-to-end today, but the API will change until 1.0 and large parts of the
-> pricing surface (processes, cashflows, most instruments and engines) are still
-> being filled in. See [Status](#status).
+> ⚠️ **Pre-1.0, under active development.** The core already prices European
+> options, Hull-White swaptions (with model calibration), and Heston options
+> end-to-end, but the API will change until 1.0 and parts of the pricing surface
+> — the numerical methods (lattices, Monte Carlo, finite differences) and the
+> language bindings — are still being filled in. See [Status](#status).
 
 ```sh
 cargo add libitofin
@@ -23,8 +24,9 @@ cargo add libitofin
 
 ```rust
 use libitofin::time::Date;
-// dates, calendars, day counters, curves, vol surfaces, quotes, and an
-// analytic European-option engine are available today - see docs.rs.
+// dates, calendars, day counters, curves, vol surfaces, quotes, indexes,
+// cashflows, swaps/swaptions, short-rate + Heston models with calibration,
+// and analytic option engines are available today - see docs.rs.
 ```
 
 ## Why
@@ -59,13 +61,27 @@ repository's issues (the board is the source of truth, not a checked-in file).
 | **L2** | time | `Date`, `Period`, `Calendar`, `DayCounter`, `Schedule`, IMM/ASX/ECB | ✅ done |
 | **L3** | quotes | `Quote`, `SimpleQuote`, derived quotes, `InterestRate`, compounding | ✅ done |
 | **L4** | term structures | interpolated yield curves, Black-vol curves/surfaces, local vol | ✅ done |
-| L5 | processes | `StochasticProcess`, Black-Scholes, Heston, … | 🚧 in progress |
-| L6–L11 | indexes, cashflows, instruments, methods, models, engines | ⬜ planned |
+| **L5** | processes | multi-factor `StochasticProcess` / `StochasticProcess1D`, Black-Scholes, Heston (analytic surface), Ornstein-Uhlenbeck, correlated process array | 🚧 in progress |
+| **L6** | indexes | `InterestRateIndex`, Ibor family (Euribor / Eonia / €STR / SOFR), `SwapIndex` | 🚧 in progress |
+| **L7** | cashflows | fixed / floating / Ibor / overnight coupons and legs, coupon pricers, duration, capped-floored coupons | 🚧 in progress |
+| **L8** | instruments | fixed-rate bonds, vanilla / OIS swaps, swaptions, caps & floors, vanilla options | 🚧 in progress |
+| **L9** | methods | lattices, trees, Monte Carlo, finite differences | ⬜ planned |
+| **L10** | models | `CalibratedModel` + `calibrate()`, short-rate (Vasicek, CIR, Hull-White), Heston, calibration helpers | 🚧 in progress |
+| **L11** | engines | analytic European & Heston (Fourier), swaption (Black / Bachelier / Jamshidian), discounting swap / bond, Black cap/floor | 🚧 in progress |
 
 **Milestone 1 (done):** a European option prices end-to-end — quote → flat
 yield/vol curves → generalized Black-Scholes process → analytic engine → lazy
 instrument greeks — matching QuantLib's `europeanoption.cpp` value and greeks to
 double-rounding precision, with the full observer/invalidation graph exercised.
+
+Verified end-to-end since then, each against the matching `test-suite/` oracle:
+
+- **Hull-White calibration** — a Hull-White model calibrates to a swaption strip
+  (Jamshidian decomposition + Levenberg-Marquardt), reproducing
+  `shortratemodels.cpp`'s cached mean-reversion and volatility.
+- **Heston analytic + calibration** — the Fourier `AnalyticHestonEngine` prices
+  European options to `hestonmodel.cpp`'s cached values, and a Heston model
+  calibrates to a DAX volatility surface (reproducing the reference SSE).
 
 ### What's usable today
 
@@ -81,9 +97,20 @@ double-rounding precision, with the full observer/invalidation graph exercised.
   compounding conversions.
 - **`termstructures`** — flat and interpolated yield curves (zero/discount/
   forward), implied and spreaded curves, Black-variance curves/surfaces, local vol.
-- **`processes` / `instruments` / `pricingengines`** — the generalized
-  Black-Scholes process, vanilla payoffs and exercise, `EuropeanOption`, and the
-  analytic European engine.
+- **`indexes`** — `InterestRateIndex`, the Ibor family (Euribor / Eonia / €STR /
+  SOFR) and `SwapIndex`, with fixings threaded through `Settings` (D11).
+- **`cashflows`** — fixed, floating, Ibor and overnight coupons and legs, coupon
+  pricers, duration, and capped-floored coupons.
+- **`processes`** — the multi-factor `StochasticProcess` base, generalized
+  Black-Scholes, Heston (analytic surface), Ornstein-Uhlenbeck, and a correlated
+  process array.
+- **`models`** — `CalibratedModel` with `calibrate()`, the short-rate family
+  (Vasicek, CIR, Hull-White), the Heston model, and calibration helpers
+  (swaption, Heston).
+- **`instruments` / `pricingengines`** — vanilla payoffs and exercise,
+  `EuropeanOption`, fixed-rate bonds, vanilla / OIS swaps, swaptions, caps &
+  floors; the analytic European and Heston (Fourier) engines, the swaption
+  engines (Black / Bachelier / Jamshidian), and discounting swap / bond engines.
 
 ## Getting started (development)
 
