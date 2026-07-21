@@ -13,11 +13,10 @@
 //!
 //! - `PiecewiseConstantParameter` (`parameter.hpp:119`) is time-dependent and
 //!   used only by the numerical tree/lattice path; it lands with those tickets.
-//! - `TermStructureFittingParameter::NumericalImpl` (`parameter.hpp:147`), the
-//!   tree-fitting value law read back by `tree()`, stays deferred with the
-//!   lattice machinery. The analytic seam (the generic `Impl` constructor,
-//!   `parameter.hpp:178`) is ported here as [`TermStructureFittingParameter`];
-//!   concrete fitting laws (Extended CIR's `phi(t)`) are supplied by each model.
+//! - `NumericalImpl::change` (`parameter.hpp:156`) rewrites the last-set value in
+//!   place; it is used only by the generic Brent-fitting `ShortRateTree` ctor
+//!   (`onefactormodel.cpp:56`), which is deferred (#463 ports Hull-White's
+//!   closed-form `tree()`, which only `reset`s and `set`s). Omitted, not stubbed.
 //!
 //! ## Divergences from QuantLib
 //!
@@ -35,12 +34,15 @@
 
 #![allow(clippy::new_ret_no_self)]
 
+use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::errors::QlResult;
+use crate::handle::Handle;
 use crate::math::array::Array;
 use crate::math::optimization::constraint::{Constraint, NoConstraint};
 use crate::require;
+use crate::termstructures::yieldtermstructure::YieldTermStructure;
 use crate::types::{Real, Size, Time};
 
 /// A state-capturing, possibly time-dependent value law for a [`Parameter`]
@@ -213,6 +215,83 @@ impl TermStructureFittingParameter {
     }
 }
 
+/// The runtime-settable fitting law behind a [`TermStructureFittingParameter`]
+/// (C++'s `TermStructureFittingParameter::NumericalImpl`, `parameter.hpp:147`).
+///
+/// A short-rate model's numerical `tree()` fits `phi(t)` node by node: it
+/// [`reset`](Self::reset)s the law, then [`set`](Self::set)s the fitted value at
+/// each grid time as it walks forward. The tree's dynamics read those values
+/// back through [`value`](ParameterValue::value) while the fit is still in flight
+/// (an earlier grid node's discount feeds the next node's state prices), so the
+/// values live behind interior mutability ([`RefCell`]) and the fit must
+/// [`set`](Self::set) on the *same* instance the dynamics reads. C++ shares one
+/// `NumericalImpl` between the fit and the dynamics via
+/// `dynamic_pointer_cast`; here the caller retains a concrete [`Rc<NumericalImpl>`](Rc)
+/// and clones it into the [`Parameter`] as an [`Rc<dyn ParameterValue>`](ParameterValue)
+/// before type-erasing, so both ends share the one [`RefCell`].
+///
+/// ## Divergences from QuantLib
+///
+/// - [`value`](ParameterValue::value) matches C++'s `std::find(times, t)`
+///   semantics exactly: an **exact** `Time` equality, not a tolerance compare
+///   (`parameter.hpp:164`). The fit `set`s at `grid[i]` and the dynamics read at
+///   `timeGrid()[i]` - the same `f64` from the same [`TimeGrid`], so exact
+///   equality is the right and faithful lookup.
+/// - C++'s `QL_REQUIRE` on a missing time surfaces here as a documented `expect`
+///   panic, not a `Result`: [`ParameterValue::value`] is infallible by design
+///   (the eval boundary), and a lookup at an unset time is a programming error -
+///   the fit always `set`s every grid node before the dynamics read it.
+pub struct NumericalImpl {
+    nodes: RefCell<Vec<(Time, Real)>>,
+    term_structure: Handle<dyn YieldTermStructure>,
+}
+
+impl NumericalImpl {
+    /// `NumericalImpl(Handle<YieldTermStructure>)` (`parameter.hpp:149`): an empty
+    /// law over `term_structure`. Returns an [`Rc`] so the caller can retain a
+    /// concrete handle for the fit and clone a type-erased one into a
+    /// [`Parameter`] (both sharing the interior [`RefCell`]).
+    pub fn new(term_structure: Handle<dyn YieldTermStructure>) -> Rc<Self> {
+        Rc::new(NumericalImpl {
+            nodes: RefCell::new(Vec::new()),
+            term_structure,
+        })
+    }
+
+    /// `set(Time t, Real x)` (`parameter.hpp:152`): appends the fitted value `x`
+    /// at time `t`.
+    pub fn set(&self, t: Time, x: Real) {
+        self.nodes.borrow_mut().push((t, x));
+    }
+
+    /// `reset()` (`parameter.hpp:159`): clears all fitted nodes, readying the law
+    /// for a fresh forward fit.
+    pub fn reset(&self) {
+        self.nodes.borrow_mut().clear();
+    }
+
+    /// `termStructure()` (`parameter.hpp:169`): the curve the fit reprices. Read
+    /// by the deferred Brent-fitting `ShortRateTree` ctor (`onefactormodel.cpp:69`);
+    /// Hull-White's closed-form `tree()` reads the curve off the model instead.
+    pub fn term_structure(&self) -> &Handle<dyn YieldTermStructure> {
+        &self.term_structure
+    }
+}
+
+impl ParameterValue for NumericalImpl {
+    /// `value(const Array&, Time t)` (`parameter.hpp:163`): the fitted value at
+    /// the grid node whose time equals `t` exactly. Panics if `t` was never
+    /// `set` (C++'s `QL_REQUIRE(..., "fitting parameter not set!")`).
+    fn value(&self, _params: &Array, t: Time) -> Real {
+        let nodes = self.nodes.borrow();
+        nodes
+            .iter()
+            .find(|(time, _)| *time == t)
+            .map(|(_, x)| *x)
+            .expect("fitting parameter not set!")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -335,5 +414,71 @@ mod tests {
         assert_eq!(phi.size(), 0);
         assert!((phi.value(2.0) - (0.05 + 0.01 * 2.0)).abs() < 1e-9);
         assert!((phi.value(0.5) - (0.05 + 0.01 * 0.5)).abs() < 1e-9);
+    }
+
+    fn flat_handle() -> Handle<dyn YieldTermStructure> {
+        let curve = FlatForward::with_rate(
+            Date::new(17, Month::May, 1998),
+            0.05,
+            Actual360::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        );
+        Handle::new(shared(curve) as Shared<dyn YieldTermStructure>)
+    }
+
+    #[test]
+    fn numerical_impl_set_then_value_round_trips_per_node() {
+        // parameter.hpp:152-167: set appends (t, x); value(t) returns the x set at
+        // that exact t. reset clears back to empty.
+        let impl_ = NumericalImpl::new(flat_handle());
+        impl_.set(1.0, 0.031);
+        impl_.set(2.0, 0.042);
+        impl_.set(3.0, 0.055);
+        assert_eq!(impl_.value(&Array::new(), 1.0), 0.031);
+        assert_eq!(impl_.value(&Array::new(), 2.0), 0.042);
+        assert_eq!(impl_.value(&Array::new(), 3.0), 0.055);
+    }
+
+    #[test]
+    #[should_panic(expected = "fitting parameter not set!")]
+    fn numerical_impl_value_at_an_unset_time_panics_with_the_cpp_message() {
+        // parameter.hpp:165: QL_REQUIRE(found, "fitting parameter not set!"). Here
+        // the infallible eval boundary surfaces it as a documented panic.
+        let impl_ = NumericalImpl::new(flat_handle());
+        impl_.set(1.0, 0.03);
+        impl_.value(&Array::new(), 2.0);
+    }
+
+    #[test]
+    #[should_panic(expected = "fitting parameter not set!")]
+    fn numerical_impl_lookup_is_exact_not_tolerant() {
+        // parameter.hpp:164: std::find is operator==, an EXACT Time match. A time a
+        // hair off a set node is "not set", never a nearest-node fallback. This is
+        // safe because the fit and the dynamics share the identical grid f64s.
+        let impl_ = NumericalImpl::new(flat_handle());
+        impl_.set(1.0, 0.03);
+        impl_.value(&Array::new(), 1.0 + 1e-12);
+    }
+
+    #[test]
+    fn numerical_impl_reset_clears_every_node() {
+        let impl_ = NumericalImpl::new(flat_handle());
+        impl_.set(1.0, 0.03);
+        impl_.reset();
+        impl_.set(2.0, 0.07);
+        assert_eq!(impl_.value(&Array::new(), 2.0), 0.07);
+    }
+
+    #[test]
+    fn set_through_the_retained_rc_is_visible_through_the_type_erased_parameter() {
+        // The gate-amendment same-impl wiring at the parameter level: the fit
+        // retains a concrete Rc<NumericalImpl> and clones a type-erased copy into
+        // the Parameter; a set() through the retained handle must be seen by
+        // Parameter::value (they share the one RefCell).
+        let impl_ = NumericalImpl::new(flat_handle());
+        let phi = TermStructureFittingParameter::new(impl_.clone() as Rc<dyn ParameterValue>);
+        impl_.set(2.5, 0.037);
+        assert_eq!(phi.value(2.5), 0.037);
     }
 }
