@@ -275,3 +275,134 @@ impl Branching {
         self.j_max = self.k_max + 1;
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::processes::OrnsteinUhlenbeckProcess;
+    use crate::shared::shared;
+
+    // Oracle process: Hull-White-like Ornstein-Uhlenbeck (speed=0.1, vol=0.01),
+    // whose variance depends only on dt, so a regular grid gives a constant
+    // spacing and the floor stays inactive everywhere (dt == dtMax).
+    const SPEED: Real = 0.1;
+    const VOL: Real = 0.01;
+    const X0: Real = 0.05;
+    const LEVEL: Real = 0.05;
+    const STEPS: Size = 12;
+    const END: Time = 3.0;
+
+    fn ou() -> Shared<dyn StochasticProcess1D> {
+        shared(OrnsteinUhlenbeckProcess::new(SPEED, VOL, X0, LEVEL).unwrap())
+    }
+
+    fn regular_tree() -> (TrinomialTree, Shared<dyn StochasticProcess1D>, TimeGrid) {
+        let process = ou();
+        let grid = TimeGrid::new(END, STEPS).unwrap();
+        let tree = TrinomialTree::new(Shared::clone(&process), grid.clone(), false).unwrap();
+        (tree, process, grid)
+    }
+
+    #[test]
+    fn structure_columns_branches_and_first_slice() {
+        let (tree, _p, _g) = regular_tree();
+        assert_eq!(TrinomialTree::BRANCHES, 3);
+        assert_eq!(tree.columns(), STEPS + 1);
+        assert_eq!(tree.size(0), 1);
+        assert_eq!(tree.underlying(0, 0), X0);
+        // A single root node branches to exactly three children (kMin==kMax).
+        assert_eq!(tree.size(1), 3);
+    }
+
+    #[test]
+    fn probabilities_sum_to_one_and_are_nonnegative() {
+        let (tree, _p, _g) = regular_tree();
+        for i in 0..STEPS {
+            for index in 0..tree.size(i) {
+                let (p0, p1, p2) = (
+                    tree.probability(i, index, 0),
+                    tree.probability(i, index, 1),
+                    tree.probability(i, index, 2),
+                );
+                assert!(
+                    p0 >= 0.0 && p1 >= 0.0 && p2 >= 0.0,
+                    "negative probability at slice {i}, node {index}: {p0}, {p1}, {p2}"
+                );
+                let sum = p0 + p1 + p2;
+                assert!(
+                    (sum - 1.0).abs() < 1e-14,
+                    "probabilities at slice {i}, node {index} sum to {sum}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn dx_matches_ported_natural_spacing_floor_inactive() {
+        // GATE AMENDMENT 1 (integration side): assert dx(i) against the PORTED
+        // formula v*sqrt(3), reproducing the C++ sqrt-then-multiply order
+        // exactly (==), which also proves the floor never widened it.
+        let (tree, process, grid) = regular_tree();
+        for i in 1..=STEPS {
+            let v2 = process.variance(grid[i - 1], 0.0, grid.dt(i - 1)).unwrap();
+            let expected = v2.sqrt() * 3.0_f64.sqrt();
+            assert_eq!(tree.dx(i), expected, "dx({i}) diverged from v*sqrt(3)");
+        }
+        assert_eq!(tree.dx(0), 0.0);
+    }
+
+    #[test]
+    fn dx_schedule_floor_widens_only_the_tiny_step() {
+        // GATE AMENDMENT 1 (floor side): the floored branch is unreachable
+        // through TimeGrid's regular-only ctor, so drive it on the real helper.
+        // A step far shorter than dtMax (0.001 < 0.01 * 1.0) carrying a small
+        // variance gets widened to sqrt(3 * max_variance); the others keep
+        // their natural spacing.
+        let dts = [1.0, 1.0, 0.001, 1.0];
+        let v2s = [0.04, 0.04, 0.0001, 0.04];
+        let (dx, floored) = dx_schedule(&dts, &v2s);
+
+        assert_eq!(dx.len(), 5);
+        assert_eq!(dx[0], 0.0);
+        assert_eq!(floored, vec![false, false, true, false]);
+
+        let natural = 0.04_f64.sqrt() * 3.0_f64.sqrt();
+        let floor = (3.0 * 0.04_f64).sqrt();
+        assert_eq!(dx[1], natural);
+        assert_eq!(dx[2], natural);
+        assert_eq!(dx[3], floor);
+        assert_eq!(dx[4], natural);
+        // The floor genuinely widened the tiny step beyond its natural value.
+        assert!(floor > 0.0001_f64.sqrt() * 3.0_f64.sqrt());
+    }
+
+    #[test]
+    fn per_branch_routing_brackets_the_conditional_mean() {
+        // GATE AMENDMENT 2: the three descendants of a mid node land at
+        // {-1, 0, +1} * dx(i+1) around x0 + temp*dx(i+1). temp is recomputed
+        // here by hand (is_positive = false, so no bump).
+        let (tree, process, grid) = regular_tree();
+        let i = 3;
+        let index = tree.size(i) / 2;
+        let x = tree.underlying(i, index);
+        let m = process.expectation(grid[i], x, grid.dt(i)).unwrap();
+        let dx_next = tree.dx(i + 1);
+        let temp = ((m - X0) / dx_next + 0.5).floor() as Integer;
+        let central = X0 + temp as Real * dx_next;
+
+        for branch in 0..3 {
+            let child = tree.descendant(i, index, branch);
+            assert!(
+                child < tree.size(i + 1),
+                "descendant {child} out of range at slice {}",
+                i + 1
+            );
+            let expected = central + (branch as Real - 1.0) * dx_next;
+            let actual = tree.underlying(i + 1, child);
+            assert!(
+                (actual - expected).abs() < 1e-12,
+                "branch {branch}: underlying {actual} != {expected}"
+            );
+        }
+    }
+}
