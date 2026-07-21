@@ -35,10 +35,11 @@
 //!   see its doc comment for the exact behavioural consequence.
 
 use crate::errors::QlResult;
+use crate::exercise::ExerciseType;
 use crate::math::array::Array;
 use crate::math::comparison::close_enough;
 use crate::methods::lattices::lattice::Lattice;
-use crate::shared::Shared;
+use crate::shared::{Shared, SharedMut};
 use crate::types::{Real, Size, Time};
 
 /// The state every [`DiscretizedAsset`] embeds (QuantLib's protected/private
@@ -255,5 +256,116 @@ impl DiscretizedAsset for DiscretizedDiscountBond {
     /// Empty (`discretizedasset.hpp:151`).
     fn mandatory_times(&self) -> Vec<Time> {
         Vec::new()
+    }
+}
+/// A discretized option on an underlying asset (`discretizedasset.hpp:160`).
+///
+/// Holds the underlying as a [`SharedMut`] so an exercise can roll it back and
+/// read its values (the asset-to-asset coupling flagged in the module docs).
+/// The clone-out-before-borrow discipline applies to that handle too.
+pub struct DiscretizedOption {
+    base: DiscretizedAssetBase,
+    underlying: SharedMut<dyn DiscretizedAsset>,
+    exercise_type: ExerciseType,
+    exercise_times: Vec<Time>,
+}
+
+impl DiscretizedOption {
+    /// An option on `underlying` exercisable in `exercise_type` style at
+    /// `exercise_times` (`discretizedasset.hpp:164`).
+    pub fn new(
+        underlying: SharedMut<dyn DiscretizedAsset>,
+        exercise_type: ExerciseType,
+        exercise_times: Vec<Time>,
+    ) -> Self {
+        DiscretizedOption {
+            base: DiscretizedAssetBase::default(),
+            underlying,
+            exercise_type,
+            exercise_times,
+        }
+    }
+
+    /// The underlying asset handle.
+    pub fn underlying(&self) -> &SharedMut<dyn DiscretizedAsset> {
+        &self.underlying
+    }
+
+    /// `values_[i] = max(underlying_->values()[i], values_[i])`
+    /// (`discretizedasset.hpp:225`).
+    fn apply_exercise_condition(&mut self) {
+        let underlying = self.underlying.borrow();
+        for i in 0..self.base.values.size() {
+            self.base.values[i] = self.base.values[i].max(underlying.values()[i]);
+        }
+    }
+}
+
+impl DiscretizedAsset for DiscretizedOption {
+    fn base(&self) -> &DiscretizedAssetBase {
+        &self.base
+    }
+
+    fn base_mut(&mut self) -> &mut DiscretizedAssetBase {
+        &mut self.base
+    }
+
+    fn as_asset_mut(&mut self) -> &mut dyn DiscretizedAsset {
+        self
+    }
+
+    /// `reset` (`discretizedasset.hpp:218`): require the option and its
+    /// underlying share one method, zero the values, then adjust.
+    fn reset(&mut self, size: Size) -> QlResult<()> {
+        let same = match (self.method(), self.underlying.borrow().method()) {
+            (Some(a), Some(b)) => Shared::ptr_eq(a, b),
+            _ => false,
+        };
+        crate::require!(
+            same,
+            "option and underlying were initialized on different methods"
+        );
+        self.base.values = Array::filled(size, 0.0);
+        self.adjust_values()
+    }
+
+    /// `mandatoryTimes` (`discretizedasset.hpp:231`): the underlying's times plus
+    /// the exercise times from the first non-negative one onward.
+    fn mandatory_times(&self) -> Vec<Time> {
+        let mut times = self.underlying.borrow().mandatory_times();
+        if let Some(start) = self.exercise_times.iter().position(|&t| t >= 0.0) {
+            times.extend_from_slice(&self.exercise_times[start..]);
+        }
+        times
+    }
+
+    /// `postAdjustValuesImpl` (`discretizedasset.cpp:25`). Time flows backward,
+    /// so the underlying is rolled to this time and pre-adjusted, the exercise
+    /// condition is applied, then the underlying is post-adjusted. The exact
+    /// ordering matters and mirrors the C++ line-for-line.
+    fn post_adjust_values_impl(&mut self) -> QlResult<()> {
+        let underlying = SharedMut::clone(&self.underlying);
+        let t = self.time();
+        underlying.borrow_mut().partial_rollback(t)?;
+        underlying.borrow_mut().pre_adjust_values()?;
+        match self.exercise_type {
+            ExerciseType::American => {
+                if self.base.time >= self.exercise_times[0]
+                    && self.base.time <= self.exercise_times[1]
+                {
+                    self.apply_exercise_condition();
+                }
+            }
+            ExerciseType::Bermudan | ExerciseType::European => {
+                for i in 0..self.exercise_times.len() {
+                    let et = self.exercise_times[i];
+                    if et >= 0.0 && self.is_on_time(et) {
+                        self.apply_exercise_condition();
+                    }
+                }
+            }
+        }
+        underlying.borrow_mut().post_adjust_values()?;
+        Ok(())
     }
 }
