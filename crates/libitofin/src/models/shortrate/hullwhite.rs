@@ -32,9 +32,13 @@
 //!   fitting law are deferred with the dynamics/tree path (#377). Consequently
 //!   [`generate_arguments`](crate::models::CalibratedModelHolder::generate_arguments)
 //!   here refreshes only the cached `r0`; the `phi_` rebuild lands with `dynamics()`.
-//! - `HullWhite::Dynamics` (`hullwhite.hpp:107`), `tree` (`hullwhite.cpp:43`) and
-//!   `FixedReversion` (`hullwhite.hpp:80`) are the simulation/lattice paths,
-//!   deferred with the short-rate dynamics per #377. The analytic
+//! - `HullWhite::Dynamics` (`hullwhite.hpp:107`) and `tree` (`hullwhite.cpp:43`)
+//!   are ported here (#463): [`HullWhite::tree`] builds a numerical short-rate
+//!   lattice whose deterministic drift is fitted in closed form. The public
+//!   analytic-`phi` `dynamics()` accessor (`hullwhite.hpp:159`) stays deferred
+//!   with the analytic `FittingParameter`; `tree()` builds its own numerical
+//!   `phi` and never reads `phi_`. `FixedReversion` (`hullwhite.hpp:80`) is the
+//!   calibration mask, deferred. The analytic
 //!   `testCachedHullWhite` calibration oracle (`shortratemodels.cpp:83`) is ported
 //!   in `hull_white_calibrates_to_the_cached_swaption_values` below (#399), on the
 //!   Jamshidian-engine path (#392); `testCachedHullWhiteFixedReversion`
@@ -60,21 +64,31 @@
 //!   observer holds a weak back-reference to the model and must be stashed after
 //!   the model is shared (C++ registers `this` inside the constructor).
 
+use std::rc::Rc;
+
 use crate::errors::QlResult;
 use crate::handle::Handle;
 use crate::interestrate::Compounding;
+use crate::math::timegrid::TimeGrid;
+use crate::methods::lattices::{Tree, TreeLattice1D, TrinomialTree};
 use crate::models::model::{
     CalibratedModel, CalibratedModelHolder, TermStructureConsistentModel,
     register_with_term_structure,
 };
-use crate::models::parameter::NullParameter;
-use crate::models::shortrate::onefactormodel::OneFactorAffineModel;
+use crate::models::parameter::{
+    NullParameter, NumericalImpl, Parameter, ParameterValue, TermStructureFittingParameter,
+};
+use crate::models::shortrate::onefactormodel::{
+    OneFactorAffineModel, ShortRateDynamics, ShortRateTree,
+};
 use crate::models::shortrate::vasicek::Vasicek;
 use crate::option::OptionType;
 use crate::patterns::observable::Observer;
 use crate::pricingengines::blackformula::black_formula;
+use crate::processes::OrnsteinUhlenbeckProcess;
 use crate::require;
-use crate::shared::{SharedMut, shared_mut};
+use crate::shared::{Shared, SharedMut, shared, shared_mut};
+use crate::stochasticprocess::StochasticProcess1D;
 use crate::termstructures::yieldtermstructure::YieldTermStructure;
 use crate::time::frequency::Frequency;
 use crate::types::{Rate, Real, Time};
@@ -315,6 +329,110 @@ impl HullWhite {
         let f = self.discount(bond_maturity)?;
         let k = self.discount(bond_start)? * strike;
         black_formula(option_type, k, f, v, 1.0, 0.0)
+    }
+
+    /// `HullWhite::tree(const TimeGrid&)` (`hullwhite.cpp:43`): the numerical
+    /// short-rate lattice, with the deterministic drift `phi` fitted node by node
+    /// so the tree reprices the model's term structure.
+    ///
+    /// This OVERRIDES the base `OneFactorModel::tree` (`onefactormodel.cpp:89`,
+    /// Brent-fitting, deferred) with a closed-form state-price fit
+    /// (`hullwhite.cpp:57-71`): the fit and the tree's dynamics share one
+    /// [`NumericalImpl`] (the concrete `phi_impl` retained here, cloned type-erased
+    /// into the dynamics' [`Parameter`]), so a `phi_i` set at step `i` is read back
+    /// when step `i+1`'s state prices discount through it. At each step `i`,
+    /// `phi_i = ln( (sum_j statePrices(i)[j] e^{-x_j dt}) / P(t_{i+1}) ) / dt`
+    /// (`x_j` the RAW node value, since `phi_i` is exactly what the fit solves for).
+    ///
+    /// Returns the concrete [`TreeLattice1D`] so the #465 engine (and this ticket's
+    /// oracle) can reach `state_prices`/`underlying`/`implementation`; it coerces
+    /// to `Shared<dyn Lattice>` for the discretized-asset rollback an engine drives.
+    ///
+    /// # Errors
+    ///
+    /// Fails if the fitted curve is unlinked or its discount undefined, if the
+    /// trinomial tree rejects the process/grid, or if `a`/`sigma` violate the
+    /// Ornstein-Uhlenbeck constraints.
+    pub fn tree(&self, grid: TimeGrid) -> QlResult<TreeLattice1D<ShortRateTree>> {
+        let a = self.base.a();
+        let sigma = self.base.sigma();
+
+        let phi_impl = NumericalImpl::new(self.term_structure().clone());
+        let phi = TermStructureFittingParameter::new(phi_impl.clone() as Rc<dyn ParameterValue>);
+        let dynamics: Shared<dyn ShortRateDynamics> =
+            shared(HullWhiteDynamics::new(phi, a, sigma)?);
+
+        let trinomial = shared(TrinomialTree::new(dynamics.process(), grid.clone(), false)?);
+        let short_rate_tree = ShortRateTree::new(
+            Shared::clone(&trinomial),
+            Shared::clone(&dynamics),
+            grid.clone(),
+        );
+        let lattice = TreeLattice1D::new(short_rate_tree, grid.clone())?;
+
+        phi_impl.reset();
+        for i in 0..(grid.size() - 1) {
+            let discount_bond = self
+                .term_structure()
+                .current_link()?
+                .discount(grid[i + 1], false)?;
+            let state_prices = lattice.state_prices(i);
+            let size = trinomial.size(i);
+            let dt = grid.dt(i);
+            let dx = trinomial.dx(i);
+            let mut x = trinomial.underlying(i, 0);
+            let mut value = 0.0;
+            for j in 0..size {
+                value += state_prices[j] * (-x * dt).exp();
+                x += dx;
+            }
+            value = (value / discount_bond).ln() / dt;
+            phi_impl.set(grid[i], value);
+        }
+        Ok(lattice)
+    }
+}
+
+/// `HullWhite::Dynamics` (`hullwhite.hpp:107`): the short rate is
+/// `r_t = phi(t) + x_t`, where `x_t` follows an Ornstein-Uhlenbeck process with
+/// zero mean level and `phi(t)` is the term-structure fitting drift. Built by
+/// [`HullWhite::tree`] with the numerical (tree-fitted) `phi`.
+struct HullWhiteDynamics {
+    process: Shared<dyn StochasticProcess1D>,
+    fitting: Parameter,
+}
+
+impl HullWhiteDynamics {
+    /// `Dynamics(Parameter fitting, Real a, Real sigma)` (`hullwhite.hpp:109`):
+    /// wraps `OrnsteinUhlenbeckProcess(a, sigma)`, whose `x0` and `level` take the
+    /// C++ ctor defaults of `0.0` (`ornsteinuhlenbeckprocess.hpp:45-46`) - the
+    /// zero-mean state the fitting drift is added to, kept distinct from the
+    /// model's `r0`.
+    ///
+    /// # Errors
+    ///
+    /// Fails if `sigma` is negative (the Ornstein-Uhlenbeck volatility
+    /// constraint).
+    fn new(fitting: Parameter, a: Real, sigma: Real) -> QlResult<Self> {
+        Ok(HullWhiteDynamics {
+            process: shared(OrnsteinUhlenbeckProcess::new(a, sigma, 0.0, 0.0)?)
+                as Shared<dyn StochasticProcess1D>,
+            fitting,
+        })
+    }
+}
+
+impl ShortRateDynamics for HullWhiteDynamics {
+    fn variable(&self, t: Time, r: Rate) -> Real {
+        r - self.fitting.value(t)
+    }
+
+    fn short_rate(&self, t: Time, x: Real) -> Rate {
+        x + self.fitting.value(t)
+    }
+
+    fn process(&self) -> Shared<dyn StochasticProcess1D> {
+        Shared::clone(&self.process)
     }
 }
 

@@ -33,8 +33,16 @@
 //! concrete affine model embeds a `CalibratedModel` and implements
 //! [`OneFactorAffineModel`] directly.
 
+use std::cell::Cell;
+
 use crate::math::array::Array;
-use crate::types::{Rate, Real, Time};
+use crate::math::timegrid::TimeGrid;
+use crate::methods::lattices::tree::Tree;
+use crate::methods::lattices::treelattice::TreeLatticeImpl;
+use crate::methods::lattices::trinomialtree::TrinomialTree;
+use crate::shared::Shared;
+use crate::stochasticprocess::StochasticProcess1D;
+use crate::types::{Rate, Real, Size, Time};
 
 /// Analytically tractable model (`ql/models/model.hpp:45`), reduced to its one
 /// non-deferred method: the zero-coupon bond price as a function of the state
@@ -76,6 +84,92 @@ pub trait OneFactorAffineModel {
 impl<M: OneFactorAffineModel> AffineModel for M {
     fn discount_bond_factors(&self, now: Time, maturity: Time, factors: &Array) -> Real {
         self.discount_bond(now, maturity, factors[0])
+    }
+}
+
+/// Base description of a one-factor short-rate's dynamics
+/// (`OneFactorModel::ShortRateDynamics`, `onefactormodel.hpp:54`).
+///
+/// A model maps between its Markov state variable `x` and the short rate `r`, and
+/// exposes the risk-neutral process the state follows. The numerical tree
+/// discretizes [`process`](Self::process) and reads [`short_rate`](Self::short_rate)
+/// off each node to discount.
+pub trait ShortRateDynamics {
+    /// `variable(Time t, Rate r)` (`onefactormodel.hpp:61`): the state variable
+    /// implied by the short rate `r` at `t`.
+    fn variable(&self, t: Time, r: Rate) -> Real;
+
+    /// `shortRate(Time t, Real variable)` (`onefactormodel.hpp:64`): the short
+    /// rate implied by the state `variable` at `t`.
+    fn short_rate(&self, t: Time, variable: Real) -> Rate;
+
+    /// `process()` (`onefactormodel.hpp:67`): the risk-neutral dynamics of the
+    /// state variable, the tree discretizes.
+    fn process(&self) -> Shared<dyn StochasticProcess1D>;
+}
+
+/// Recombining trinomial tree discretizing a short-rate model's state variable
+/// (`OneFactorModel::ShortRateTree`, `onefactormodel.hpp:75`).
+///
+/// C++'s `ShortRateTree` *is-a* `TreeLattice1D<ShortRateTree>` (CRTP self-
+/// inheritance) and supplies the per-node discount off the model's dynamics.
+/// Here it is instead the [`TreeLatticeImpl`] callback surface a
+/// [`TreeLattice1D`](crate::methods::lattices::TreeLattice1D) induces over: it
+/// embeds the [`TrinomialTree`] (which serves `size`/`descendant`/`probability`/
+/// `underlying`) and the [`ShortRateDynamics`], and computes
+/// [`discount`](TreeLatticeImpl::discount)`(i, index) =
+/// exp(-(short_rate(t_i, x) + spread) * dt_i)` (`onefactormodel.hpp:91`). It
+/// carries its own [`TimeGrid`] clone because the discount callback needs
+/// `t_i`/`dt_i`, and the impl is nested inside - not above - the lattice that
+/// owns the grid (the [`TreeLattice1D`](crate::methods::lattices::TreeLattice1D)
+/// test fixtures do the same).
+///
+/// Only the plain build-up is ported; the Brent-fitting ctor and its `Helper`
+/// (`onefactormodel.cpp:28,56`) belong to the deferred generic `tree()` path
+/// (Hull-White's `tree()` fits `phi` in closed form instead).
+pub struct ShortRateTree {
+    tree: Shared<TrinomialTree>,
+    dynamics: Shared<dyn ShortRateDynamics>,
+    time_grid: TimeGrid,
+    spread: Cell<Real>,
+}
+
+impl ShortRateTree {
+    /// Plain build-up from a trinomial `tree` and short-rate `dynamics` over
+    /// `time_grid` (`onefactormodel.cpp:80`); the spread starts at `0`.
+    pub fn new(
+        tree: Shared<TrinomialTree>,
+        dynamics: Shared<dyn ShortRateDynamics>,
+        time_grid: TimeGrid,
+    ) -> Self {
+        ShortRateTree {
+            tree,
+            dynamics,
+            time_grid,
+            spread: Cell::new(0.0),
+        }
+    }
+
+    /// `setSpread(Spread)` (`onefactormodel.hpp:105`): an additive spread on the
+    /// short rate, used by spread-adjusted engines (e.g. callable bonds). Held
+    /// behind a [`Cell`] so it is settable through the shared, immutable impl the
+    /// lattice exposes via `implementation()`.
+    pub fn set_spread(&self, spread: Real) {
+        self.spread.set(spread);
+    }
+}
+
+impl TreeLatticeImpl for ShortRateTree {
+    type Tree = TrinomialTree;
+
+    fn tree(&self) -> &TrinomialTree {
+        &self.tree
+    }
+
+    fn discount(&self, i: Size, index: Size) -> Real {
+        let x = self.tree.underlying(i, index);
+        let r = self.dynamics.short_rate(self.time_grid[i], x) + self.spread.get();
+        (-r * self.time_grid.dt(i)).exp()
     }
 }
 
