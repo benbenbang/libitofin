@@ -6,6 +6,8 @@
 //! price a short-rate model produces, so a calibration cost function can drive
 //! the model onto the market.
 
+pub mod caphelper;
 pub mod swaptionhelper;
 
+pub use caphelper::CapHelper;
 pub use swaptionhelper::SwaptionHelper;
