@@ -42,6 +42,20 @@ use crate::methods::lattices::lattice::Lattice;
 use crate::shared::{Shared, SharedMut};
 use crate::types::{Real, Size, Time};
 
+/// Whether a coupon is applied in the pre- or post-adjustment pass
+/// (`discretizedasset.hpp:128`, `enum class CouponAdjustment { pre, post }`).
+///
+/// Used by [`DiscretizedSwap`](crate::pricingengines::swaption::DiscretizedSwap)
+/// to route each leg's coupons: a normal coupon adjusts in the pre pass, while a
+/// coupon whose reset is already in the past flips to the post pass.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CouponAdjustment {
+    /// Applied in `pre_adjust_values` (`CouponAdjustment::pre`).
+    Pre,
+    /// Applied in `post_adjust_values` (`CouponAdjustment::post`).
+    Post,
+}
+
 /// The state every [`DiscretizedAsset`] embeds (QuantLib's protected/private
 /// data members of `DiscretizedAsset`).
 ///
