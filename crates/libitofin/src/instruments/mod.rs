@@ -7,6 +7,7 @@ mod bond;
 mod bonds;
 mod capfloor;
 mod fixedvsfloatingswap;
+mod futures;
 mod makeois;
 mod makeswaption;
 mod makevanillaswap;
@@ -24,6 +25,7 @@ pub use fixedvsfloatingswap::{
     FixedVsFloatingSwap, FixedVsFloatingSwapArguments, FixedVsFloatingSwapEngine,
     FixedVsFloatingSwapResults, FloatingArgumentsFn,
 };
+pub use futures::FuturesType;
 pub use makeois::MakeOis;
 pub use makeswaption::MakeSwaption;
 pub use makevanillaswap::MakeVanillaSwap;

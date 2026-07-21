@@ -3,9 +3,10 @@
 //! Port of `ql/termstructures/yield/ratehelpers.{hpp,cpp}` plus the overnight
 //! helper of `ql/termstructures/yield/oisratehelper.{hpp,cpp}`. This module holds
 //! [`DepositRateHelper`], the short end of the curve, [`SwapRateHelper`], the
-//! long end over vanilla swaps, and [`OISRateHelper`], the long end over
-//! overnight-indexed swaps. The FRA and futures helpers (`FraRateHelper`,
-//! `FuturesRateHelper`) and `BMASwapRateHelper` are deferred to a later ticket
+//! long end over vanilla swaps, [`OISRateHelper`], the long end over
+//! overnight-indexed swaps, and [`FuturesRateHelper`], the short-to-mid end over
+//! exchange-traded IMM/ASX futures. The FRA helper (`FraRateHelper`) and
+//! `BMASwapRateHelper` are deferred to a later ticket
 //! (#343); the `SwapIndex`-based and explicit-start/end-date `SwapRateHelper`
 //! constructors are deferred with the swap-index port. The `OISRateHelper`
 //! explicit-start/end-date constructor is deferred likewise.
@@ -22,7 +23,9 @@ use crate::indexes::iborindex::IborIndex;
 use crate::indexes::index::Index;
 use crate::indexes::interestrateindex::InterestRateIndex;
 use crate::instrument::Instrument;
-use crate::instruments::{MakeOis, MakeVanillaSwap, OvernightIndexedSwap, VanillaSwap};
+use crate::instruments::{
+    FuturesType, MakeOis, MakeVanillaSwap, OvernightIndexedSwap, VanillaSwap,
+};
 use crate::patterns::observable::{AsObservable, Observable};
 use crate::quotes::{Quote, SimpleQuote};
 use crate::settings::Settings;
@@ -39,6 +42,7 @@ use crate::time::daycounter::DayCounter;
 use crate::time::frequency::Frequency;
 use crate::time::period::Period;
 use crate::time::timeunit::TimeUnit;
+use crate::time::{asx, imm};
 use crate::types::{Integer, Natural, Real};
 
 /// Bootstrap helper over a deposit rate (`DepositRateHelper`).
@@ -166,6 +170,240 @@ impl RelativeDateRateHelper for DepositRateHelper {
         self.base.set_pillar_date(maturity);
         self.base.set_latest_date(maturity);
         self.base.set_latest_relevant_date(maturity);
+    }
+}
+
+/// Validates that `date` is a legal settlement date for the futures convention
+/// (`CheckDate`, `ratehelpers.cpp:46`): IMM and ASX require a valid cycle date,
+/// while [`FuturesType::Custom`] imposes no constraint.
+fn check_futures_date(date: Date, futures_type: FuturesType) -> QlResult<()> {
+    match futures_type {
+        FuturesType::Imm => {
+            crate::require!(
+                imm::is_imm_date(date, false),
+                "{date} is not a valid IMM date"
+            )
+        }
+        FuturesType::Asx => {
+            crate::require!(
+                asx::is_asx_date(date, false),
+                "{date} is not a valid ASX date"
+            )
+        }
+        FuturesType::Custom => {}
+    }
+    Ok(())
+}
+
+/// Resolves the maturity of an explicit-date futures helper (the C++
+/// `determineMaturityDate` lambda, `ratehelpers.cpp:100`): with no end date,
+/// advance three futures periods off `next_date`; with one, take it after
+/// checking it is past the start.
+fn determine_maturity(
+    start: Date,
+    end: Option<Date>,
+    next_date: impl Fn(Date) -> Date,
+) -> QlResult<Date> {
+    match end {
+        None => Ok(next_date(next_date(next_date(start)))),
+        Some(end) => {
+            crate::require!(
+                end > start,
+                "end date ({end}) must be greater than start date ({start})"
+            );
+            Ok(end)
+        }
+    }
+}
+
+/// Bootstrap helper over an exchange-traded interest-rate future
+/// (`FuturesRateHelper`).
+///
+/// The helper fits the quoted futures price `P` (e.g. `96.0` for a 4% implied
+/// rate) at a fixed IMM/ASX window. Unlike the deposit, swap and OIS helpers it
+/// derives from the **plain** [`RateHelper`], not [`RelativeDateRateHelper`]:
+/// the earliest and maturity dates are absolute, computed once at construction
+/// from the supplied dates, and never rebuilt on an evaluation-date change
+/// (there is no `initialize_dates`). It therefore holds the bootstrapping curve
+/// directly through [`base`](RateHelper::base) rather than forecasting off a
+/// cloned index on its own relinkable handle.
+///
+/// [`implied_quote`](RateHelper::implied_quote) re-derives the price from the
+/// curve (`ratehelpers.cpp:157`): the simple forward over the window is
+/// `(discount(earliest)/discount(maturity) - 1)/year_fraction`, and the price is
+/// `100 * (1 - (forward + convexity_adjustment))`. The convexity adjustment is a
+/// plain [`Handle<Quote>`](Handle) value with no convexity model (the C++
+/// `FuturesConvAdjustmentQuote` is not ported); it may be negative, as futures
+/// margining can push the futures rate either side of the forward.
+pub struct FuturesRateHelper {
+    base: BootstrapHelperBase,
+    year_fraction: Real,
+    conv_adj: Handle<dyn Quote>,
+}
+
+impl FuturesRateHelper {
+    /// A futures helper over a length-in-months window off `ibor_start_date`
+    /// (`ratehelpers.cpp:70`): the maturity is the start advanced
+    /// `length_in_months` months on `calendar` under `convention`/`end_of_month`.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        price: Handle<dyn Quote>,
+        ibor_start_date: Date,
+        length_in_months: Natural,
+        calendar: Calendar,
+        convention: BusinessDayConvention,
+        end_of_month: bool,
+        day_counter: DayCounter,
+        conv_adj: Handle<dyn Quote>,
+        futures_type: FuturesType,
+    ) -> QlResult<Shared<FuturesRateHelper>> {
+        check_futures_date(ibor_start_date, futures_type)?;
+        let earliest = ibor_start_date;
+        let maturity = calendar.advance(
+            ibor_start_date,
+            length_in_months as Integer,
+            TimeUnit::Months,
+            convention,
+            end_of_month,
+        );
+        let year_fraction = day_counter.year_fraction_ref(earliest, maturity, earliest, maturity);
+        Ok(Self::assemble(
+            price,
+            conv_adj,
+            earliest,
+            maturity,
+            year_fraction,
+        ))
+    }
+
+    /// A futures helper over an explicit window (`ratehelpers.cpp:91`). With
+    /// `ibor_end_date` `None` the maturity is three [`imm`]/[`asx`] periods past
+    /// the start; with `Some`, that date (which must be past the start for the
+    /// IMM/ASX conventions). [`FuturesType::Custom`] requires an explicit end
+    /// date - the C++ null-maturity path is an error here.
+    pub fn from_end_date(
+        price: Handle<dyn Quote>,
+        ibor_start_date: Date,
+        ibor_end_date: Option<Date>,
+        day_counter: DayCounter,
+        conv_adj: Handle<dyn Quote>,
+        futures_type: FuturesType,
+    ) -> QlResult<Shared<FuturesRateHelper>> {
+        check_futures_date(ibor_start_date, futures_type)?;
+        let maturity = match futures_type {
+            FuturesType::Imm => {
+                determine_maturity(ibor_start_date, ibor_end_date, |d| imm::next_date(d, false))?
+            }
+            FuturesType::Asx => {
+                determine_maturity(ibor_start_date, ibor_end_date, |d| asx::next_date(d, false))?
+            }
+            FuturesType::Custom => match ibor_end_date {
+                Some(end) => end,
+                None => crate::fail!("a Custom futures helper requires an explicit end date"),
+            },
+        };
+        let earliest = ibor_start_date;
+        let year_fraction = day_counter.year_fraction_ref(earliest, maturity, earliest, maturity);
+        Ok(Self::assemble(
+            price,
+            conv_adj,
+            earliest,
+            maturity,
+            year_fraction,
+        ))
+    }
+
+    /// A futures helper whose window follows `index`'s conventions
+    /// (`ratehelpers.cpp:139`): the maturity is the start advanced by the index
+    /// tenor on the index's fixing calendar under its business-day convention (no
+    /// end-of-month), and the year fraction uses the index day counter.
+    pub fn from_index(
+        price: Handle<dyn Quote>,
+        ibor_start_date: Date,
+        index: &IborIndex,
+        conv_adj: Handle<dyn Quote>,
+        futures_type: FuturesType,
+    ) -> QlResult<Shared<FuturesRateHelper>> {
+        check_futures_date(ibor_start_date, futures_type)?;
+        let earliest = ibor_start_date;
+        let maturity = index.fixing_calendar().advance_by_period(
+            ibor_start_date,
+            index.tenor(),
+            index.business_day_convention(),
+            false,
+        );
+        let year_fraction = index
+            .day_counter()
+            .year_fraction_ref(earliest, maturity, earliest, maturity);
+        Ok(Self::assemble(
+            price,
+            conv_adj,
+            earliest,
+            maturity,
+            year_fraction,
+        ))
+    }
+
+    /// Builds the plain-date base shared by the three constructors: observes the
+    /// price (via the base) and the convexity quote (the C++
+    /// `registerWith(convAdj_)`), then pins every schedule date to the fixed
+    /// window - `pillar = latest = latest_relevant = maturity`.
+    fn assemble(
+        price: Handle<dyn Quote>,
+        conv_adj: Handle<dyn Quote>,
+        earliest: Date,
+        maturity: Date,
+        year_fraction: Real,
+    ) -> Shared<FuturesRateHelper> {
+        let base = BootstrapHelperBase::new(price);
+        conv_adj.register_observer(&base.observer());
+        base.set_earliest_date(earliest);
+        base.set_maturity_date(maturity);
+        base.set_pillar_date(maturity);
+        base.set_latest_date(maturity);
+        base.set_latest_relevant_date(maturity);
+        shared(FuturesRateHelper {
+            base,
+            year_fraction,
+            conv_adj,
+        })
+    }
+
+    /// The convexity adjustment applied to the forward (`ratehelpers.cpp:168`):
+    /// the convexity quote's value, or zero when no quote was supplied.
+    pub fn convexity_adjustment(&self) -> QlResult<Real> {
+        if self.conv_adj.is_empty() {
+            Ok(0.0)
+        } else {
+            self.conv_adj.current_link()?.value()
+        }
+    }
+}
+
+impl AsObservable for FuturesRateHelper {
+    fn observable(&self) -> &Observable {
+        self.base.observable()
+    }
+}
+
+impl RateHelper for FuturesRateHelper {
+    fn base(&self) -> &BootstrapHelperBase {
+        &self.base
+    }
+
+    /// The futures price implied by the current curve (`ratehelpers.cpp:157`).
+    ///
+    /// The simple forward over the fixed window comes straight off the curve's
+    /// discount factors; the price adds the convexity adjustment to that forward
+    /// and quotes `100 * (1 - future_rate)`.
+    fn implied_quote(&self) -> QlResult<Real> {
+        let term_structure = self.base.term_structure()?;
+        let forward = (term_structure.discount_date(self.base.earliest_date(), false)?
+            / term_structure.discount_date(self.base.maturity_date(), false)?
+            - 1.0)
+            / self.year_fraction;
+        let future_rate = forward + self.convexity_adjustment()?;
+        Ok(100.0 * (1.0 - future_rate))
     }
 }
 
