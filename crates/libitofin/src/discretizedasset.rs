@@ -343,6 +343,13 @@ impl DiscretizedAsset for DiscretizedOption {
     /// so the underlying is rolled to this time and pre-adjusted, the exercise
     /// condition is applied, then the underlying is post-adjusted. The exact
     /// ordering matters and mirrors the C++ line-for-line.
+    ///
+    /// # Panics
+    /// The American branch reads `exercise_times[0]` and `[1]` as the exercise
+    /// window bounds, faithful to C++ (`discretizedasset.cpp:38`), so it panics
+    /// if fewer than two exercise times were supplied. QuantLib's unchecked
+    /// `std::vector::operator[]` is equally undefined there; callers building an
+    /// American option must pass the two-element window.
     fn post_adjust_values_impl(&mut self) -> QlResult<()> {
         let underlying = SharedMut::clone(&self.underlying);
         let t = self.time();
