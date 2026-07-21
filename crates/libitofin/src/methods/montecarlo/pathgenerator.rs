@@ -251,4 +251,50 @@ mod tests {
             Ok(_) => panic!("brownian_bridge = true must be rejected as deferred"),
         }
     }
+
+    /// Terminal-moment pin (issue #450, gate #1): the batch's load-bearing
+    /// oracle. For a `GeneralizedBlackScholesProcess` with flat continuous
+    /// r = 5%, q = 2%, sigma = 20% over `[0, T = 1]`, the exact log scheme makes
+    /// `ln(S_T / S_0)` normal with mean `(r - q - 0.5 sigma^2) T` and variance
+    /// `sigma^2 T`. Both are step-count-invariant because `sum(dt_i) = T`, so
+    /// running 12 steps (not one) exercises the accumulation loop for free. Over
+    /// N fixed-seed paths the sample mean has standard error
+    /// `se = sigma sqrt(T / N)` and the sample variance has
+    /// `se_var = sqrt(2) sigma^2 T / sqrt(N - 1)` (the variance of a normal
+    /// sample variance). The mean bound is 4 se, the variance bound 5 se_var;
+    /// the confirm-by-stubbing edits below move the moments by tens of se, far
+    /// outside either bound.
+    #[test]
+    fn terminal_moments_match_the_gbm_law() {
+        const N: usize = 50_000;
+        const STEPS: usize = 12;
+        const T: Time = 1.0;
+
+        let mut pg =
+            PathGenerator::new(gbs_process(), T, STEPS, generator(STEPS, 42), false).unwrap();
+        let mut logs = Vec::with_capacity(N);
+        for _ in 0..N {
+            let path = pg.next().unwrap().value;
+            logs.push((path.back() / path.front()).ln());
+        }
+
+        let mean = logs.iter().sum::<Real>() / N as Real;
+        let variance = logs.iter().map(|x| (x - mean).powi(2)).sum::<Real>() / (N as Real - 1.0);
+
+        let mean_target = (R - Q - 0.5 * VOL * VOL) * T;
+        let var_target = VOL * VOL * T;
+        let se = VOL * (T / N as Real).sqrt();
+        let se_var = 2.0_f64.sqrt() * var_target / (N as Real - 1.0).sqrt();
+
+        assert!(
+            (mean - mean_target).abs() < 4.0 * se,
+            "mean {mean} vs target {mean_target}: {:.2} se (bound 4.0)",
+            (mean - mean_target).abs() / se
+        );
+        assert!(
+            (variance - var_target).abs() < 5.0 * se_var,
+            "variance {variance} vs target {var_target}: {:.2} se_var (bound 5.0)",
+            (variance - var_target).abs() / se_var
+        );
+    }
 }
