@@ -16,9 +16,14 @@
 //! - **storage**: `Vec<Time>` rather than `Array`; the grid needs no
 //!   element-wise math, only sequence access.
 //!
-//! Deferred (not needed by the MC path): the two mandatory-times template ctors
-//! (`timegrid.hpp:54,85`) and the initializer-list ctors (`:141,143`), plus
-//! `index`/`closest_index`/`closest_time` (`timegrid.hpp:149-153`).
+//! The mandatory-times ctor (`timegrid.hpp:87`, [`with_mandatory_times`]) places a
+//! caller-supplied set of times on the grid verbatim and fills regularly spaced
+//! interior points between them; the lattice engines need it so swap reset/pay
+//! times land on exact grid nodes.
+//!
+//! Deferred (not needed yet): the value-semantics mandatory-times ctor
+//! (`timegrid.hpp:54`) and the initializer-list ctors (`:141,143`), plus
+//! `closest_time` (`timegrid.hpp:153`).
 
 use std::ops::Index;
 
@@ -57,6 +62,81 @@ impl TimeGrid {
             times,
             dt: vec![dt; steps],
             mandatory_times: vec![end],
+        })
+    }
+
+    /// Grid through a set of mandatory times, with regularly spaced interior
+    /// points (`timegrid.hpp:87`, the `(begin, end, steps)` ctor).
+    ///
+    /// The sorted, `close_enough`-deduped `times` become grid nodes *verbatim*
+    /// (so a later `index`/`initialize` resolves them exactly); between each
+    /// consecutive pair the grid inserts `round((gap)/dt_max)` (at least one)
+    /// evenly spaced points, and a leading `0.0` is prepended when the first
+    /// mandatory time is positive. `dt_` is the adjacent differences of the
+    /// resulting nodes (unlike the regular [`new`](TimeGrid::new) grid, whose
+    /// `dt` is uniform).
+    ///
+    /// `dt_max` is `last / steps` when `steps > 0`; when `steps == 0` it is the
+    /// smallest gap between distinct mandatory times (the C++ auto-spacing
+    /// branch). Note the semantic split from [`new`](TimeGrid::new), where
+    /// `steps == 0` is an error: here it selects auto-spacing, faithful to the
+    /// C++ overload that takes `steps` and special-cases `0`.
+    ///
+    /// # Errors
+    /// Returns `Err` on an empty `times`, a negative first time, or (in the
+    /// `steps == 0` branch) fewer than two distinct points to infer a spacing
+    /// from.
+    #[allow(clippy::float_cmp, clippy::neg_cmp_op_on_partial_ord)]
+    pub fn with_mandatory_times(times: &[Time], steps: Size) -> QlResult<Self> {
+        require!(!times.is_empty(), "empty time sequence");
+        let mut mandatory = times.to_vec();
+        mandatory.sort_by(|a, b| {
+            a.partial_cmp(b)
+                .expect("time-grid mandatory times must be totally ordered")
+        });
+        require!(mandatory[0] >= 0.0, "negative times not allowed");
+        mandatory.dedup_by(|a, b| close_enough(*a, *b));
+
+        let last = *mandatory
+            .last()
+            .expect("mandatory is non-empty after the guard");
+        let dt_max = if steps == 0 {
+            let mut diff = Vec::with_capacity(mandatory.len());
+            diff.push(mandatory[0]);
+            for pair in mandatory.windows(2) {
+                diff.push(pair[1] - pair[0]);
+            }
+            require!(
+                !diff.is_empty(),
+                "at least two distinct points required in time grid"
+            );
+            if diff.first() == Some(&0.0) {
+                diff.remove(0);
+            }
+            require!(!diff.is_empty(), "not enough distinct points in time grid");
+            diff.into_iter().fold(Real::INFINITY, Real::min)
+        } else {
+            last / steps as Real
+        };
+
+        let mut grid_times = vec![0.0];
+        let mut period_begin = 0.0;
+        for &period_end in &mandatory {
+            if period_end != 0.0 {
+                let n_steps = (((period_end - period_begin) / dt_max).round()).max(1.0) as Size;
+                let dt = (period_end - period_begin) / n_steps as Real;
+                for n in 1..=n_steps {
+                    grid_times.push(period_begin + n as Real * dt);
+                }
+            }
+            period_begin = period_end;
+        }
+
+        let dt = grid_times.windows(2).map(|w| w[1] - w[0]).collect();
+        Ok(TimeGrid {
+            times: grid_times,
+            dt,
+            mandatory_times: mandatory,
         })
     }
 
@@ -225,6 +305,62 @@ mod tests {
         assert!(grid.index(0.3).is_err());
         assert!(grid.index(1.5).is_err());
         assert!(grid.index(-0.1).is_err());
+    }
+
+    #[test]
+    fn with_mandatory_times_places_every_time_on_an_exact_node() {
+        // timegrid.hpp:87: the mandatory times are grid nodes verbatim, so
+        // index() resolves each one exactly. Unsorted, duplicated input is
+        // sorted and close_enough-deduped first.
+        let grid = TimeGrid::with_mandatory_times(&[1.0, 0.5, 1.0], 2).unwrap();
+        assert_eq!(grid.times(), &[0.0, 0.5, 1.0]);
+        assert_eq!(grid.mandatory_times(), &[0.5, 1.0]);
+        // Each mandatory time is an EXACT node (==), not merely close.
+        assert_eq!(grid[grid.index(0.5).unwrap()], 0.5);
+        assert_eq!(grid[grid.index(1.0).unwrap()], 1.0);
+    }
+
+    #[test]
+    fn with_mandatory_times_inserts_regular_interior_points() {
+        // Between 1.0 and 3.0 with dt_max = 3/4 = 0.75, round(2/0.75) = 3 evenly
+        // spaced points are inserted; the mandatory times stay exact nodes.
+        let grid = TimeGrid::with_mandatory_times(&[1.0, 3.0], 4).unwrap();
+        assert_eq!(grid.size(), 5);
+        assert_eq!(grid[1], 1.0, "first mandatory time is a verbatim node");
+        assert_eq!(
+            grid.back(),
+            Some(3.0),
+            "last mandatory time is the final node"
+        );
+        assert_eq!(grid.mandatory_times(), &[1.0, 3.0]);
+        // dt_ is the adjacent differences of the nodes, not a uniform spacing.
+        assert!((grid.dt(1) - 2.0 / 3.0).abs() < 1e-15);
+    }
+
+    #[test]
+    fn with_mandatory_times_auto_spaces_when_steps_is_zero() {
+        // Divergence from `new`, where steps == 0 is an error: here it selects
+        // the C++ auto-spacing branch, dt_max = the smallest gap between distinct
+        // mandatory times (min(1, 1, 2) = 1 here).
+        let grid = TimeGrid::with_mandatory_times(&[1.0, 2.0, 4.0], 0).unwrap();
+        assert_eq!(grid.times(), &[0.0, 1.0, 2.0, 3.0, 4.0]);
+        assert_eq!(grid.mandatory_times(), &[1.0, 2.0, 4.0]);
+    }
+
+    #[test]
+    fn with_mandatory_times_rejects_empty_and_negative() {
+        assert_eq!(
+            TimeGrid::with_mandatory_times(&[], 4)
+                .unwrap_err()
+                .message(),
+            "empty time sequence"
+        );
+        assert_eq!(
+            TimeGrid::with_mandatory_times(&[-1.0, 2.0], 4)
+                .unwrap_err()
+                .message(),
+            "negative times not allowed"
+        );
     }
 
     #[test]
