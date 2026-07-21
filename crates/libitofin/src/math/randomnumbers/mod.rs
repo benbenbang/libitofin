@@ -15,6 +15,7 @@
 use crate::types::Real;
 
 pub mod boxmullergaussianrng;
+pub mod inversecumulativersg;
 pub mod knuthuniformrng;
 pub mod lattice;
 mod lattice_tables;
@@ -28,11 +29,12 @@ pub mod xoshiro256starstaruniformrng;
 pub mod zigguratgaussianrng;
 
 pub use boxmullergaussianrng::BoxMullerGaussianRng;
+pub use inversecumulativersg::InverseCumulativeRsg;
 pub use knuthuniformrng::KnuthUniformRng;
 pub use mt19937uniformrng::MersenneTwisterUniformRng;
 pub use randomsequencegenerator::RandomSequenceGenerator;
 pub use ranluxuniformrng::{Ranlux3UniformRng, Ranlux4UniformRng, Ranlux64UniformRng};
-pub use rngtraits::{InverseCumulative, SequenceGenerator};
+pub use rngtraits::{InverseCumulative, McRngTraits, PseudoRandom, SequenceGenerator};
 pub use xoshiro256starstaruniformrng::Xoshiro256StarStarUniformRng;
 pub use zigguratgaussianrng::ZigguratGaussianRng;
 
