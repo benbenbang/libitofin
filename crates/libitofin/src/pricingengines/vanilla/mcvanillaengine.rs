@@ -39,7 +39,7 @@ use crate::instruments::{OneAssetOptionEngine, OneAssetOptionResults, OptionArgu
 use crate::math::randomnumbers::rngtraits::McRngTraits;
 use crate::math::statistics::MeanStdDev;
 use crate::math::timegrid::TimeGrid;
-use crate::methods::montecarlo::{McSimulation, PathGenerator, PathPricer};
+use crate::methods::montecarlo::{McSimulation, Path, PathGen, PathGenerator, PathPricer};
 use crate::patterns::observable::{AsObservable, Observable};
 use crate::pricingengine::{Arguments, Results};
 use crate::shared::Shared;
@@ -196,17 +196,37 @@ impl<RNG: McRngTraits> McVanillaEngineBase<RNG> {
         )
     }
 
-    /// Runs the simulation with the supplied path pricer and writes the mean
-    /// (and, when `RNG::ALLOWS_ERROR_ESTIMATE`, the error estimate) into the
-    /// results (`mcvanillaengine.hpp:40`).
+    /// Runs the single-factor simulation: builds the [`PathGenerator`] from the
+    /// RNG policy and prices each [`Path`] with `path_pricer`
+    /// (`mcvanillaengine.hpp:40,72`).
     ///
     /// # Errors
     ///
     /// Propagates a generator, simulation, or accumulation failure.
-    pub fn run<P: PathPricer>(&mut self, path_pricer: P) -> QlResult<()> {
+    pub fn run<P: PathPricer<Path>>(&mut self, path_pricer: P) -> QlResult<()> {
         let generator = self.path_generator()?;
+        self.run_with(generator, path_pricer)
+    }
+
+    /// Runs the simulation with a caller-supplied generator and pricer, then
+    /// writes the mean (and, when `RNG::ALLOWS_ERROR_ESTIMATE`, the error
+    /// estimate) into the results (`mcvanillaengine.hpp:40`).
+    ///
+    /// This is the generalization seam over the path type: [`run`](Self::run)
+    /// drives it with the single-factor [`PathGenerator`], and a multi-factor
+    /// engine drives it with a [`MultiPathGenerator`](crate::methods::montecarlo::MultiPathGenerator).
+    /// The mean/error result plumbing is path-type-agnostic.
+    ///
+    /// # Errors
+    ///
+    /// Propagates a simulation or accumulation failure.
+    pub fn run_with<PG, P>(&mut self, generator: PG, path_pricer: P) -> QlResult<()>
+    where
+        PG: PathGen,
+        P: PathPricer<PG::PathType>,
+    {
         let mut simulation =
-            McSimulation::<RNG::RsgType, P>::new(self.antithetic_variate, self.control_variate);
+            McSimulation::<PG, P>::new(self.antithetic_variate, self.control_variate);
         simulation.calculate(
             generator,
             path_pricer,

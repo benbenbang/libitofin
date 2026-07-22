@@ -87,7 +87,7 @@ impl EuropeanPathPricer {
     }
 }
 
-impl PathPricer for EuropeanPathPricer {
+impl PathPricer<Path> for EuropeanPathPricer {
     /// The discounted terminal payoff (`mceuropeanengine.hpp:254-257`). The C++
     /// `QL_REQUIRE(!path.empty())` guard is unnecessary: the base always builds
     /// a non-empty path from a grid with at least one step.

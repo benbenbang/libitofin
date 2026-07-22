@@ -26,8 +26,10 @@
 //! - **control variate** (`mcsimulation.hpp:167-188`): [`new`] keeps the
 //!   `control_variate` flag but [`calculate`](McSimulation::calculate) returns
 //!   `Err` when it is `true`; the CV model-construction branch is omitted.
-//! - **antithetic variate**: threaded to [`MonteCarloModel::new`], which rejects
-//!   it as deferred.
+//! - **antithetic variate**: threaded to [`MonteCarloModel::new`], which averages
+//!   the forward path with its antithetic partner when the generator supports it
+//!   (the multi-factor path); the single-factor generator's antithetic draw is a
+//!   fail-loud `Err`.
 //! - **`maxError` over a sequence** (`mcsimulation.hpp:89-95`): the multi-variate
 //!   `max_element` reduction is dropped; the single-variate `result_type = Real`
 //!   is its own error.
@@ -35,9 +37,8 @@
 //! [`new`]: McSimulation::new
 
 use crate::errors::QlResult;
-use crate::math::randomnumbers::rngtraits::SequenceGenerator;
 use crate::math::statistics::{GeneralStatistics, Statistics};
-use crate::methods::montecarlo::{MonteCarloModel, PathGenerator, PathPricer};
+use crate::methods::montecarlo::{MonteCarloModel, PathGen, PathPricer};
 use crate::types::{Real, Size};
 use crate::{fail, require};
 
@@ -47,16 +48,16 @@ pub const DEFAULT_MIN_SAMPLES: Size = 1023;
 /// Owns the Monte Carlo model and runs the sampling loops.
 ///
 /// `S` defaults to [`GeneralStatistics`], QuantLib's default `Statistics` tool.
-pub struct McSimulation<GSG, P, S = GeneralStatistics> {
-    model: Option<MonteCarloModel<GSG, P, S>>,
+pub struct McSimulation<PG, P, S = GeneralStatistics> {
+    model: Option<MonteCarloModel<PG, P, S>>,
     antithetic_variate: bool,
     control_variate: bool,
 }
 
-impl<GSG, P, S> McSimulation<GSG, P, S>
+impl<PG, P, S> McSimulation<PG, P, S>
 where
-    GSG: SequenceGenerator,
-    P: PathPricer,
+    PG: PathGen,
+    P: PathPricer<PG::PathType>,
     S: Statistics + Default,
 {
     /// A simulation with no model yet built (`mcsimulation.hpp:68`); call
@@ -166,11 +167,11 @@ where
     /// # Errors
     ///
     /// Errors if neither `required_tolerance` nor `required_samples` is set, if
-    /// control variate is requested (deferred), on antithetic rejection, or on
-    /// an accumulation failure.
+    /// control variate is requested (deferred), or on an accumulation failure
+    /// (including a single-factor antithetic draw, deferred).
     pub fn calculate(
         &mut self,
-        path_generator: PathGenerator<GSG>,
+        path_generator: PG,
         path_pricer: P,
         required_tolerance: Option<Real>,
         required_samples: Option<Size>,
@@ -213,7 +214,7 @@ mod tests {
     use crate::interestrate::Compounding;
     use crate::math::randomnumbers::rngtraits::{McRngTraits, PseudoRandom};
     use crate::math::statistics::MeanStdDev;
-    use crate::methods::montecarlo::Path;
+    use crate::methods::montecarlo::{Path, PathGenerator};
     use crate::processes::BlackScholesMertonProcess;
     use crate::quotes::make_quote_handle;
     use crate::shared::{Shared, shared};
@@ -276,7 +277,7 @@ mod tests {
 
     #[test]
     fn value_with_samples_equals_the_accumulator_mean() {
-        let mut sim = McSimulation::<Rsg, fn(&Path) -> Real>::new(false, false);
+        let mut sim = McSimulation::<PathGenerator<Rsg>, fn(&Path) -> Real>::new(false, false);
         sim.calculate(path_generator(42), terminal, None, Some(5_000), None)
             .unwrap();
 
@@ -287,7 +288,7 @@ mod tests {
 
     #[test]
     fn value_with_fewer_samples_than_simulated_is_rejected() {
-        let mut sim = McSimulation::<Rsg, fn(&Path) -> Real>::new(false, false);
+        let mut sim = McSimulation::<PathGenerator<Rsg>, fn(&Path) -> Real>::new(false, false);
         sim.calculate(path_generator(42), terminal, None, Some(5_000), None)
             .unwrap();
         assert!(sim.value_with_samples(4_999).is_err());
@@ -296,7 +297,7 @@ mod tests {
     #[test]
     fn tolerance_path_converges_below_the_tolerance() {
         const TOL: Real = 1.0;
-        let mut sim = McSimulation::<Rsg, fn(&Path) -> Real>::new(false, false);
+        let mut sim = McSimulation::<PathGenerator<Rsg>, fn(&Path) -> Real>::new(false, false);
         sim.calculate(path_generator(42), terminal, Some(TOL), None, Some(100_000))
             .unwrap();
         assert!(sim.error_estimate().unwrap() <= TOL);
@@ -304,21 +305,21 @@ mod tests {
 
     #[test]
     fn tolerance_path_errors_when_max_samples_is_exhausted() {
-        let mut sim = McSimulation::<Rsg, fn(&Path) -> Real>::new(false, false);
+        let mut sim = McSimulation::<PathGenerator<Rsg>, fn(&Path) -> Real>::new(false, false);
         let result = sim.calculate(path_generator(42), terminal, Some(1e-4), None, Some(1_500));
         assert!(result.is_err());
     }
 
     #[test]
     fn calculate_without_tolerance_or_samples_is_rejected() {
-        let mut sim = McSimulation::<Rsg, fn(&Path) -> Real>::new(false, false);
+        let mut sim = McSimulation::<PathGenerator<Rsg>, fn(&Path) -> Real>::new(false, false);
         let result = sim.calculate(path_generator(42), terminal, None, None, None);
         assert!(result.is_err());
     }
 
     #[test]
     fn control_variate_is_rejected_as_deferred() {
-        let mut sim = McSimulation::<Rsg, fn(&Path) -> Real>::new(false, true);
+        let mut sim = McSimulation::<PathGenerator<Rsg>, fn(&Path) -> Real>::new(false, true);
         match sim.calculate(path_generator(42), terminal, None, Some(2_000), None) {
             Err(e) => assert!(e.message().contains("control variate")),
             Ok(()) => panic!("control_variate = true must be rejected as deferred"),

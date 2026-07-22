@@ -33,10 +33,11 @@ use crate::errors::QlResult;
 use crate::math::array::Array;
 use crate::math::randomnumbers::rngtraits::SequenceGenerator;
 use crate::math::timegrid::TimeGrid;
-use crate::methods::montecarlo::{MultiPath, Sample};
+use crate::methods::montecarlo::{MultiPath, PathGen, Sample};
 use crate::require;
 use crate::shared::Shared;
 use crate::stochasticprocess::StochasticProcess;
+use crate::types::Size;
 
 /// Generates correlated multi-asset paths from a Gaussian sequence generator.
 pub struct MultiPathGenerator<GSG> {
@@ -148,6 +149,22 @@ impl<GSG: SequenceGenerator> MultiPathGenerator<GSG> {
         }
 
         Ok(Sample::new(path, weight))
+    }
+}
+
+impl<GSG: SequenceGenerator> PathGen for MultiPathGenerator<GSG> {
+    type PathType = MultiPath;
+
+    fn next(&mut self) -> QlResult<Sample<MultiPath>> {
+        self.generate(false)
+    }
+
+    fn antithetic(&mut self) -> QlResult<Sample<MultiPath>> {
+        self.generate(true)
+    }
+
+    fn dimension(&self) -> Size {
+        self.generator.dimension()
     }
 }
 
