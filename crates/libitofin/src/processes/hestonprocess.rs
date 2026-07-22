@@ -360,6 +360,8 @@ impl StochasticProcess for HestonProcess {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::math::distributions::normal::InverseCumulativeNormal;
+    use crate::math::randomnumbers::{MersenneTwisterUniformRng, UniformRng};
     use crate::quotes::{SimpleQuote, make_quote_handle};
     use crate::termstructures::yields::FlatForward;
     use crate::test_support::{Flag, as_observer};
@@ -581,6 +583,29 @@ mod tests {
         );
     }
 
+    /// N standard-normal draws from a fixed-seed Mersenne twister pushed
+    /// through the inverse cumulative normal (deterministic).
+    fn standard_normals(n: usize, seed: u32) -> Vec<Real> {
+        let mut rng = MersenneTwisterUniformRng::new(seed);
+        (0..n)
+            .map(|_| InverseCumulativeNormal::standard_value(rng.next_real()).unwrap())
+            .collect()
+    }
+
+    /// Sample mean and unbiased variance, with the standard error of each: the
+    /// mean's `sqrt(var/N)` and the variance's `sqrt((mu4 - var^2)/N)` computed
+    /// from the sample's own fourth central moment (robust to non-normal tails,
+    /// unlike the Gaussian `sqrt(2) var / sqrt(N)`).
+    fn sample_moments(xs: &[Real]) -> (Real, Real, Real, Real) {
+        let n = xs.len() as Real;
+        let mean = xs.iter().sum::<Real>() / n;
+        let var = xs.iter().map(|x| (x - mean).powi(2)).sum::<Real>() / (n - 1.0);
+        let mu4 = xs.iter().map(|x| (x - mean).powi(4)).sum::<Real>() / n;
+        let se_mean = (var / n).sqrt();
+        let se_var = ((mu4 - var * var) / n).max(0.0).sqrt();
+        (mean, var, se_mean, se_var)
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn heston(
         v0: Real,
@@ -601,6 +626,150 @@ mod tests {
             rho,
             disc,
         )
+    }
+
+    /// The QE variance leg (`retVal[1]`) is a moment-matched draw of the CIR
+    /// conditional law: over many fixed-seed `dw[1]` its sample mean converges
+    /// to `m` and its sample variance to `s2` (`hestonprocess.cpp:469-471`).
+    /// `m` / `s2` here are an INDEPENDENT transcription of the formula (never
+    /// read back from the implementation), so the `s2` confirm-by-stubbing edit
+    /// can actually make this fail. `retVal[1]` ignores `dw[0]`, so the spot
+    /// draw is fixed at 0. This fixture exercises the `psi < 1.5` branch.
+    #[test]
+    fn qe_variance_leg_matches_cir_moments_psi_below_one_and_a_half() {
+        const V0F: Real = 0.09;
+        const KAPPAF: Real = 1.0;
+        const THETAF: Real = 0.09;
+        const SIGMAF: Real = 0.3;
+        const DT: Time = 0.1;
+        const N: usize = 40_000;
+
+        let ex = (-KAPPAF * DT).exp();
+        let m = THETAF + (V0F - THETAF) * ex;
+        let s2 = V0F * SIGMAF * SIGMAF * ex / KAPPAF * (1.0 - ex)
+            + THETAF * SIGMAF * SIGMAF / (2.0 * KAPPAF) * (1.0 - ex) * (1.0 - ex);
+        let psi = s2 / (m * m);
+        assert!(psi < 1.5, "fixture must hit the psi<1.5 branch: psi={psi}");
+
+        let p = heston(
+            V0F,
+            KAPPAF,
+            THETAF,
+            SIGMAF,
+            RHO,
+            Discretization::QuadraticExponential,
+        );
+        let x0 = Array::from([S0, V0F]);
+        let vs: Vec<Real> = standard_normals(N, 0x51E9_0001)
+            .into_iter()
+            .map(|z| p.evolve(0.0, &x0, DT, &Array::from([0.0, z])).unwrap()[1])
+            .collect();
+
+        let (mean, var, se_mean, se_var) = sample_moments(&vs);
+        assert!(
+            (mean - m).abs() < 4.0 * se_mean,
+            "mean {mean} vs m {m}: {:.2} se (bound 4.0), psi={psi}",
+            (mean - m).abs() / se_mean
+        );
+        assert!(
+            (var - s2).abs() < 5.0 * se_var,
+            "var {var} vs s2 {s2}: {:.2} se (bound 5.0), psi={psi}",
+            (var - s2).abs() / se_var
+        );
+    }
+
+    /// The `psi >= 1.5` branch of the same CIR moment pin: `retVal[1]` is the
+    /// point-mass / exponential mixture (`hestonprocess.cpp:496-508`), whose
+    /// mean is `m` and variance `s2`. The empirical `se` (from the sample's own
+    /// fourth moment) absorbs the mixture's heavy tail.
+    #[test]
+    fn qe_variance_leg_matches_cir_moments_psi_above_one_and_a_half() {
+        const V0F: Real = 0.01;
+        const KAPPAF: Real = 0.5;
+        const THETAF: Real = 0.01;
+        const SIGMAF: Real = 1.0;
+        const DT: Time = 1.0;
+        const N: usize = 40_000;
+
+        let ex = (-KAPPAF * DT).exp();
+        let m = THETAF + (V0F - THETAF) * ex;
+        let s2 = V0F * SIGMAF * SIGMAF * ex / KAPPAF * (1.0 - ex)
+            + THETAF * SIGMAF * SIGMAF / (2.0 * KAPPAF) * (1.0 - ex) * (1.0 - ex);
+        let psi = s2 / (m * m);
+        assert!(
+            psi >= 1.5,
+            "fixture must hit the psi>=1.5 branch: psi={psi}"
+        );
+
+        let p = heston(
+            V0F,
+            KAPPAF,
+            THETAF,
+            SIGMAF,
+            RHO,
+            Discretization::QuadraticExponential,
+        );
+        let x0 = Array::from([S0, V0F]);
+        let vs: Vec<Real> = standard_normals(N, 0x51E9_0002)
+            .into_iter()
+            .map(|z| p.evolve(0.0, &x0, DT, &Array::from([0.0, z])).unwrap()[1])
+            .collect();
+
+        let (mean, var, se_mean, se_var) = sample_moments(&vs);
+        assert!(
+            (mean - m).abs() < 4.0 * se_mean,
+            "mean {mean} vs m {m}: {:.2} se (bound 4.0), psi={psi}",
+            (mean - m).abs() / se_mean
+        );
+        assert!(
+            (var - s2).abs() < 5.0 * se_var,
+            "var {var} vs s2 {s2}: {:.2} se (bound 5.0), psi={psi}",
+            (var - s2).abs() / se_var
+        );
+    }
+
+    /// The reason the ctor default is *Martingale*: over many draws the
+    /// discounted spot is a martingale, `mean(retVal[0]) == x0[0] exp((r-q) dt)`
+    /// (`hestonprocess.cpp:513-514` with the QEM `k0` correction). `dw[0]` and
+    /// `dw[1]` are INDEPENDENT standard normals (the `rho = -0.8` correlation is
+    /// carried by `k1..k4`, not the draws); the identity holds only for that.
+    /// The fixture is chosen so the `k0` martingale correction is load-bearing:
+    /// dropping it (confirm-by-stubbing) throws the mean tens of `se` off.
+    #[test]
+    fn qem_discounted_spot_is_a_martingale() {
+        const V0F: Real = 0.3;
+        const KAPPAF: Real = 1.5;
+        const THETAF: Real = 0.1;
+        const SIGMAF: Real = 0.6;
+        const RHOF: Real = -0.8;
+        const DT: Time = 1.0;
+        const N: usize = 50_000;
+
+        let p = heston(
+            V0F,
+            KAPPAF,
+            THETAF,
+            SIGMAF,
+            RHOF,
+            Discretization::QuadraticExponentialMartingale,
+        );
+        let x0 = Array::from([S0, V0F]);
+        let mut rng = MersenneTwisterUniformRng::new(0x51E9_0003);
+        let spots: Vec<Real> = (0..N)
+            .map(|_| {
+                let z0 = InverseCumulativeNormal::standard_value(rng.next_real()).unwrap();
+                let z1 = InverseCumulativeNormal::standard_value(rng.next_real()).unwrap();
+                p.evolve(0.0, &x0, DT, &Array::from([z0, z1])).unwrap()[0]
+            })
+            .collect();
+
+        let (mean, _var, se_mean, _se_var) = sample_moments(&spots);
+        let target = S0 * ((R - Q) * DT).exp();
+        assert!(
+            (mean - target).abs() < 5.0 * se_mean,
+            "discounted-spot mean {mean} vs target {target}: {:.2} se (bound 5.0)",
+            (mean - target).abs() / se_mean
+        );
     }
 
     /// A deferred variance scheme must fail loudly (naming #410), never silently
