@@ -138,13 +138,17 @@ mod tests {
     use super::*;
     use crate::handle::{Handle, RelinkableHandle};
     use crate::interestrate::Compounding;
+    use crate::math::array::Array;
+    use crate::math::matrix::Matrix;
     use crate::math::randomnumbers::rngtraits::{McRngTraits, PseudoRandom};
     use crate::math::statistics::MeanStdDev;
-    use crate::methods::montecarlo::{Path, PathGenerator, Sample};
-    use crate::processes::BlackScholesMertonProcess;
+    use crate::math::timegrid::TimeGrid;
+    use crate::methods::montecarlo::{MultiPath, MultiPathGenerator, Path, PathGenerator, Sample};
+    use crate::patterns::observable::{AsObservable, Observable};
+    use crate::processes::{BlackScholesMertonProcess, StochasticProcessArray};
     use crate::quotes::make_quote_handle;
     use crate::shared::{Shared, shared};
-    use crate::stochasticprocess::StochasticProcess1D;
+    use crate::stochasticprocess::{StochasticProcess, StochasticProcess1D};
     use crate::termstructures::volatility::{BlackConstantVol, BlackVolTermStructure};
     use crate::termstructures::yields::FlatForward;
     use crate::termstructures::yieldtermstructure::YieldTermStructure;
@@ -152,7 +156,7 @@ mod tests {
     use crate::time::date::{Date, Month};
     use crate::time::daycounters::actual360::Actual360;
     use crate::time::frequency::Frequency;
-    use crate::types::{Rate, Volatility};
+    use crate::types::{Rate, Time, Volatility};
 
     const SPOT: Real = 100.0;
     const R: Rate = 0.05;
@@ -185,6 +189,22 @@ mod tests {
             spot.handle(),
             flat_yield(Q),
             flat_yield(R),
+            vol.handle(),
+        )) as Shared<dyn StochasticProcess1D>
+    }
+
+    fn gbs_1d(spot: Real, r: Rate, q: Rate, sigma: Volatility) -> Shared<dyn StochasticProcess1D> {
+        let quote = make_quote_handle(spot);
+        let vol = RelinkableHandle::new(shared(BlackConstantVol::new(
+            reference(),
+            Some(Target::new()),
+            sigma,
+            Actual360::new(),
+        )) as Shared<dyn BlackVolTermStructure>);
+        shared(BlackScholesMertonProcess::new(
+            quote.handle(),
+            flat_yield(q),
+            flat_yield(r),
             vol.handle(),
         )) as Shared<dyn StochasticProcess1D>
     }
@@ -297,6 +317,161 @@ mod tests {
             acc.weight_sum(),
             N as Real * W1,
             "must accumulate the forward weight, not the antithetic weight"
+        );
+    }
+
+    /// Oracle 2: the generalized model driven end-to-end over [`MultiPath`]. A
+    /// [`MonteCarloModel`] over a two-factor [`MultiPathGenerator`] with a
+    /// `PathPricer<MultiPath>` reading asset 0's terminal reproduces the GBM
+    /// forward `E[S_0(T)] = S_0 exp((r - q) T)` to a `k/sqrt(N)` band. This is
+    /// the integration pin that the same spine drives a multi-factor generator,
+    /// not only the hand-built `Path`/`Real` stubs.
+    #[test]
+    fn multipath_model_reproduces_the_forward_mean() {
+        const N: Size = 40_000;
+        const STEPS: Size = 4;
+        const T: Time = 1.0;
+        const S0: Real = 100.0;
+        const RR: Rate = 0.05;
+        const QQ: Rate = 0.02;
+        const SIG: Volatility = 0.20;
+
+        let array = StochasticProcessArray::new(
+            vec![gbs_1d(S0, RR, QQ, SIG), gbs_1d(S0, RR, QQ, SIG)],
+            &Matrix::from([[1.0, 0.0], [0.0, 1.0]]),
+        )
+        .unwrap();
+        let process = shared(array) as Shared<dyn StochasticProcess>;
+        let grid = TimeGrid::new(T, STEPS).unwrap();
+        let generator = PseudoRandom::make_sequence_generator(2 * STEPS, 42).unwrap();
+        let mpg = MultiPathGenerator::new(process, grid, generator, false).unwrap();
+
+        let mut m = MonteCarloModel::new(
+            mpg,
+            |mp: &MultiPath| mp[0].back(),
+            GeneralStatistics::new(),
+            false,
+        )
+        .unwrap();
+        m.add_samples(N).unwrap();
+
+        let mean = m.sample_accumulator().mean().unwrap();
+        let target = S0 * ((RR - QQ) * T).exp();
+        let var = S0 * S0 * (2.0 * (RR - QQ) * T).exp() * ((SIG * SIG * T).exp() - 1.0);
+        let se = (var / N as Real).sqrt();
+        assert!(
+            (mean - target).abs() < 5.0 * se,
+            "E[S0(T)] {mean} vs {target}: {:.2} se",
+            (mean - target).abs() / se
+        );
+    }
+
+    /// A process affine in the Brownian increment: `evolve = x + a*dt + b*dw`,
+    /// elementwise. From `x0 = 0` the terminal asset `j` is `a*T + b*sum_i(dw)`,
+    /// so a pricer linear in the terminal is linear in the draws: the property
+    /// the antithetic variance-collapse pin needs. Raw draws reach `evolve`
+    /// directly (this process, not a `StochasticProcessArray`, sits at the
+    /// generator boundary), so the antithetic partner negates `dw` block for
+    /// block.
+    struct ArithmeticProcess {
+        a: Real,
+        b: Real,
+        observable: Shared<Observable>,
+    }
+
+    impl ArithmeticProcess {
+        fn new(a: Real, b: Real) -> Self {
+            ArithmeticProcess {
+                a,
+                b,
+                observable: shared(Observable::new()),
+            }
+        }
+    }
+
+    impl AsObservable for ArithmeticProcess {
+        fn observable(&self) -> &Observable {
+            &self.observable
+        }
+    }
+
+    impl StochasticProcess for ArithmeticProcess {
+        fn size(&self) -> Size {
+            2
+        }
+
+        fn factors(&self) -> Size {
+            2
+        }
+
+        fn initial_values(&self) -> QlResult<Array> {
+            Ok(Array::with_size(2))
+        }
+
+        fn drift(&self, _t: Time, _x: &Array) -> QlResult<Array> {
+            Ok(Array::from([self.a, self.a]))
+        }
+
+        fn diffusion(&self, _t: Time, _x: &Array) -> QlResult<Matrix> {
+            Ok(Matrix::from([[self.b, 0.0], [0.0, self.b]]))
+        }
+
+        fn evolve(&self, _t0: Time, x0: &Array, dt: Time, dw: &Array) -> QlResult<Array> {
+            let mut out = x0.clone();
+            for i in 0..2 {
+                out[i] = x0[i] + self.a * dt + self.b * dw[i];
+            }
+            Ok(out)
+        }
+    }
+
+    /// Oracle 3b: antithetic variance collapse. For a process affine in `dw` and
+    /// a pricer linear in the terminal, the forward and antithetic terminals are
+    /// `a*T +/- b*sum(z)`, so `(price + price2)/2 = a*T` exactly for every pair:
+    /// the antithetic estimator's sample variance collapses to machine zero. The
+    /// non-antithetic run over the same seed keeps the full draw variance. This
+    /// proves the averaging negates real increments (`montecarlomodel.hpp:109`),
+    /// not a stub returning the forward value.
+    #[test]
+    fn antithetic_collapses_a_linear_pricer_variance() {
+        const N: Size = 2_000;
+        const STEPS: Size = 4;
+        const T: Time = 1.0;
+
+        let build = || {
+            let process = shared(ArithmeticProcess::new(0.3, 1.0)) as Shared<dyn StochasticProcess>;
+            let grid = TimeGrid::new(T, STEPS).unwrap();
+            let generator = PseudoRandom::make_sequence_generator(2 * STEPS, 7).unwrap();
+            MultiPathGenerator::new(process, grid, generator, false).unwrap()
+        };
+
+        let mut anti = MonteCarloModel::new(
+            build(),
+            |mp: &MultiPath| mp[0].back(),
+            GeneralStatistics::new(),
+            true,
+        )
+        .unwrap();
+        anti.add_samples(N).unwrap();
+        let se_anti = anti.sample_accumulator().error_estimate().unwrap();
+
+        let mut plain = MonteCarloModel::new(
+            build(),
+            |mp: &MultiPath| mp[0].back(),
+            GeneralStatistics::new(),
+            false,
+        )
+        .unwrap();
+        plain.add_samples(N).unwrap();
+        let se_plain = plain.sample_accumulator().error_estimate().unwrap();
+
+        assert!(
+            se_anti < 1e-9,
+            "antithetic linear estimator variance must collapse: se={se_anti}"
+        );
+        assert!(
+            se_plain > 0.01,
+            "non-antithetic run must retain material variance: se={se_plain}"
         );
     }
 
