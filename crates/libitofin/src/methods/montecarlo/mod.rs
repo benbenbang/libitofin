@@ -6,12 +6,14 @@
 
 mod mcsimulation;
 mod montecarlomodel;
+mod multipath;
 mod path;
 mod pathgenerator;
 mod sample;
 
 pub use mcsimulation::{DEFAULT_MIN_SAMPLES, McSimulation};
 pub use montecarlomodel::{MonteCarloModel, PathPricer};
+pub use multipath::MultiPath;
 pub use path::Path;
 pub use pathgenerator::PathGenerator;
 pub use sample::Sample;
