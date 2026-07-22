@@ -24,7 +24,9 @@ pub mod mcvanillaengine;
 
 pub use analytichestonengine::HestonChf;
 pub use mceuropeanengine::{EuropeanPathPricer, MCEuropeanEngine, MakeMcEuropeanEngine};
-pub use mceuropeanhestonengine::{EuropeanHestonPathPricer, MCEuropeanHestonEngine};
+pub use mceuropeanhestonengine::{
+    EuropeanHestonPathPricer, MCEuropeanHestonEngine, MakeMcEuropeanHestonEngine,
+};
 pub use mcvanillaengine::McVanillaEngineBase;
 
 use std::any::Any;

@@ -287,3 +287,220 @@ impl<RNG: McRngTraits> PricingEngine for MCEuropeanHestonEngine<RNG> {
         Ok(())
     }
 }
+
+/// Factory for [`MCEuropeanHestonEngine`] (`mceuropeanhestonengine.hpp:62`),
+/// generic over the RNG policy `RNG`.
+///
+/// Validation the C++ builder splits across its setters is deferred to
+/// [`build`](MakeMcEuropeanHestonEngine::build) so the setters stay infallible
+/// and chainable.
+pub struct MakeMcEuropeanHestonEngine<RNG> {
+    process: Shared<HestonProcess>,
+    steps: Option<Size>,
+    steps_per_year: Option<Size>,
+    samples: Option<Size>,
+    max_samples: Option<Size>,
+    tolerance: Option<Real>,
+    antithetic: bool,
+    seed: u32,
+    _rng: PhantomData<RNG>,
+}
+
+impl<RNG: McRngTraits> MakeMcEuropeanHestonEngine<RNG> {
+    /// Starts a builder on the given Heston process
+    /// (`mceuropeanhestonengine.hpp:136-139`).
+    pub fn new(process: Shared<HestonProcess>) -> MakeMcEuropeanHestonEngine<RNG> {
+        MakeMcEuropeanHestonEngine {
+            process,
+            steps: None,
+            steps_per_year: None,
+            samples: None,
+            max_samples: None,
+            tolerance: None,
+            antithetic: false,
+            seed: 0,
+            _rng: PhantomData,
+        }
+    }
+
+    /// Sets the fixed number of time steps (`mceuropeanhestonengine.hpp:143`).
+    #[must_use]
+    pub fn with_steps(mut self, steps: Size) -> Self {
+        self.steps = Some(steps);
+        self
+    }
+
+    /// Sets the number of time steps per year
+    /// (`mceuropeanhestonengine.hpp:152`).
+    #[must_use]
+    pub fn with_steps_per_year(mut self, steps: Size) -> Self {
+        self.steps_per_year = Some(steps);
+        self
+    }
+
+    /// Sets the required number of samples (`mceuropeanhestonengine.hpp:161`).
+    #[must_use]
+    pub fn with_samples(mut self, samples: Size) -> Self {
+        self.samples = Some(samples);
+        self
+    }
+
+    /// Sets the required absolute tolerance
+    /// (`mceuropeanhestonengine.hpp:170`).
+    #[must_use]
+    pub fn with_absolute_tolerance(mut self, tolerance: Real) -> Self {
+        self.tolerance = Some(tolerance);
+        self
+    }
+
+    /// Sets the maximum number of samples (`mceuropeanhestonengine.hpp:182`).
+    #[must_use]
+    pub fn with_max_samples(mut self, samples: Size) -> Self {
+        self.max_samples = Some(samples);
+        self
+    }
+
+    /// Sets the RNG seed (`mceuropeanhestonengine.hpp:189`).
+    #[must_use]
+    pub fn with_seed(mut self, seed: u32) -> Self {
+        self.seed = seed;
+        self
+    }
+
+    /// Requests the antithetic-variate variance reduction
+    /// (`mceuropeanhestonengine.hpp:196`). Supported: the multi-factor generator
+    /// wires the antithetic negation.
+    #[must_use]
+    pub fn with_antithetic_variate(mut self, antithetic: bool) -> Self {
+        self.antithetic = antithetic;
+        self
+    }
+
+    /// Builds the configured [`MCEuropeanHestonEngine`]
+    /// (`mceuropeanhestonengine.hpp:204-215`).
+    ///
+    /// # Errors
+    ///
+    /// Errors if neither or both of `steps`/`steps_per_year` are set
+    /// (`mceuropeanhestonengine.hpp:144,153,205`), if both `samples` and
+    /// `tolerance` are set (`mceuropeanhestonengine.hpp:162,171`), or if a
+    /// tolerance is set on an RNG policy without an error estimate
+    /// (`mceuropeanhestonengine.hpp:173`).
+    pub fn build(self) -> QlResult<MCEuropeanHestonEngine<RNG>> {
+        require!(
+            self.steps.is_some() || self.steps_per_year.is_some(),
+            "number of steps not given"
+        );
+        require!(
+            self.steps.is_none() || self.steps_per_year.is_none(),
+            "number of steps overspecified"
+        );
+        require!(
+            !(self.samples.is_some() && self.tolerance.is_some()),
+            "number of samples already set"
+        );
+        if self.tolerance.is_some() {
+            require!(
+                RNG::ALLOWS_ERROR_ESTIMATE,
+                "chosen random generator policy does not allow an error estimate"
+            );
+        }
+
+        MCEuropeanHestonEngine::new(
+            self.process,
+            self.steps,
+            self.steps_per_year,
+            self.antithetic,
+            self.samples,
+            self.tolerance,
+            self.max_samples,
+            self.seed,
+        )
+    }
+}
+
+#[cfg(test)]
+mod builder_tests {
+    //! Guards on [`MakeMcEuropeanHestonEngine::build`] validation
+    //! (`mceuropeanhestonengine.hpp:144,153,162,171,205`).
+
+    use super::MakeMcEuropeanHestonEngine;
+    use crate::handle::Handle;
+    use crate::interestrate::Compounding;
+    use crate::math::randomnumbers::rngtraits::PseudoRandom;
+    use crate::processes::HestonProcess;
+    use crate::quotes::make_quote_handle;
+    use crate::shared::{Shared, shared};
+    use crate::termstructures::yields::FlatForward;
+    use crate::termstructures::yieldtermstructure::YieldTermStructure;
+    use crate::time::date::{Date, Month};
+    use crate::time::daycounters::actual360::Actual360;
+    use crate::time::frequency::Frequency;
+    use crate::types::Rate;
+
+    fn flat(rate: Rate) -> Handle<dyn YieldTermStructure> {
+        Handle::new(shared(FlatForward::with_rate(
+            Date::new(15, Month::June, 2026),
+            rate,
+            Actual360::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>)
+    }
+
+    fn maker() -> MakeMcEuropeanHestonEngine<PseudoRandom> {
+        let process = shared(HestonProcess::new(
+            flat(0.05),
+            flat(0.02),
+            make_quote_handle(100.0).handle(),
+            0.04,
+            1.2,
+            0.06,
+            0.3,
+            -0.5,
+        ));
+        MakeMcEuropeanHestonEngine::new(process)
+    }
+
+    #[test]
+    fn missing_steps_is_rejected() {
+        assert!(maker().with_samples(1_000).build().is_err());
+    }
+
+    #[test]
+    fn overspecified_steps_is_rejected() {
+        assert!(
+            maker()
+                .with_steps(1)
+                .with_steps_per_year(50)
+                .with_samples(1_000)
+                .build()
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn samples_and_tolerance_together_are_rejected() {
+        assert!(
+            maker()
+                .with_steps(1)
+                .with_samples(1_000)
+                .with_absolute_tolerance(0.02)
+                .build()
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn antithetic_config_builds() {
+        assert!(
+            maker()
+                .with_steps_per_year(11)
+                .with_samples(1_000)
+                .with_antithetic_variate(true)
+                .with_seed(1234)
+                .build()
+                .is_ok()
+        );
+    }
+}
