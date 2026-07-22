@@ -17,27 +17,31 @@
 //! everything the (next batch) `AnalyticHestonEngine` reads, and that engine
 //! never evolves the process.
 //!
+//! `evolve` ports the ctor-default Andersen Quadratic-Exponential scheme
+//! ([`Discretization::QuadraticExponential`] /
+//! [`Discretization::QuadraticExponentialMartingale`],
+//! `hestonprocess.cpp:461-516`), reading the two Gaussian factors `dw[0]`
+//! (spot) and `dw[1]` (variance).
+//!
 //! Deferred, visibly (tracked by #410):
-//! - The C++ `Discretization` enum (PartialTruncation / Reflection /
-//!   QuadraticExponential* / BroadieKaya*) is omitted entirely. Only the
-//!   default path is ported: `drift`/`diffusion` hard-code the branch used by
-//!   every scheme except Reflection and PartialTruncation, so the analytic
-//!   surface is unambiguous without the enum.
-//! - The Monte Carlo exact-sampling surface (`evolve`'s QE/BroadieKaya
-//!   scheme, `pdf`, `varianceDistribution`, `Phi`) needs the modified Bessel
-//!   function and complex exact sampling. QuantLib overrides `evolve`
-//!   (`hestonprocess.cpp:396`) with that scheme, so the [`StochasticProcess`]
-//!   base's Euler `evolve` would return numbers QuantLib's `HestonProcess`
-//!   never produces. This port therefore overrides `evolve` to fail rather
-//!   than silently diverge. The base `expectation` / `std_deviation` /
-//!   `covariance` are kept: QuantLib's own ctor installs `EulerDiscretization`
-//!   (`hestonprocess.cpp:46`), so those three genuinely are the Euler defaults.
+//! - The remaining seven [`Discretization`] variants (PartialTruncation,
+//!   FullTruncation, Reflection, NonCentralChiSquareVariance, and the three
+//!   BroadieKaya exact schemes) make `evolve` fail loudly rather than silently
+//!   misprice; the BroadieKaya schemes additionally need the modified Bessel
+//!   function and complex exact sampling. `drift` / `diffusion` are scheme
+//!   independent (they hard-code the branch every scheme except Reflection and
+//!   PartialTruncation shares), so the analytic surface stays unambiguous.
+//! - `pdf` and `varianceDistribution` (the Fokker-Planck density) are not
+//!   ported. The base `expectation` / `std_deviation` / `covariance` are kept:
+//!   QuantLib's own ctor installs `EulerDiscretization` (`hestonprocess.cpp:46`),
+//!   so those three genuinely are the Euler defaults.
 
 use crate::errors::QlResult;
 use crate::fail;
 use crate::handle::Handle;
 use crate::interestrate::Compounding;
 use crate::math::array::Array;
+use crate::math::distributions::normal::CumulativeNormalDistribution;
 use crate::math::matrix::Matrix;
 use crate::patterns::observable::{AsObservable, Observable, Observer, ResetThenNotify};
 use crate::quotes::Quote;
@@ -47,6 +51,36 @@ use crate::termstructures::yieldtermstructure::YieldTermStructure;
 use crate::time::date::Date;
 use crate::time::frequency::Frequency;
 use crate::types::{Rate, Real, Size, Time};
+
+/// Variance-discretization scheme for the Monte Carlo `evolve`.
+///
+/// Mirrors `HestonProcess::Discretization` (`hestonprocess.hpp:47-55`). Only
+/// the ctor-default [`QuadraticExponential`](Discretization::QuadraticExponential)
+/// and
+/// [`QuadraticExponentialMartingale`](Discretization::QuadraticExponentialMartingale)
+/// are ported; every other variant makes `evolve` fail loudly (deferred, #410).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Discretization {
+    /// Lord-Koekkoek-van Dijk partial truncation (deferred, #410).
+    PartialTruncation,
+    /// Lord-Koekkoek-van Dijk full truncation (deferred, #410).
+    FullTruncation,
+    /// Lord-Koekkoek-van Dijk reflection (deferred, #410).
+    Reflection,
+    /// Alan Lewis exact non-central chi-square variance (deferred, #410).
+    NonCentralChiSquareVariance,
+    /// Andersen quadratic-exponential scheme.
+    QuadraticExponential,
+    /// Andersen quadratic-exponential scheme with the martingale correction
+    /// (the ctor default).
+    QuadraticExponentialMartingale,
+    /// Broadie-Kaya exact scheme, Gauss-Lobatto quadrature (deferred, #410).
+    BroadieKayaExactSchemeLobatto,
+    /// Broadie-Kaya exact scheme, Gauss-Laguerre quadrature (deferred, #410).
+    BroadieKayaExactSchemeLaguerre,
+    /// Broadie-Kaya exact scheme, trapezoidal quadrature (deferred, #410).
+    BroadieKayaExactSchemeTrapezoidal,
+}
 
 /// Square-root stochastic-volatility Heston process (analytic surface).
 pub struct HestonProcess {
@@ -58,12 +92,15 @@ pub struct HestonProcess {
     theta: Real,
     sigma: Real,
     rho: Real,
+    discretization: Discretization,
     observable: Shared<Observable>,
     _listener: SharedMut<ResetThenNotify>,
 }
 
 impl HestonProcess {
-    /// Builds a Heston process registered with its three market inputs.
+    /// Builds a Heston process registered with its three market inputs, using
+    /// the ctor-default [`Discretization::QuadraticExponentialMartingale`]
+    /// (`hestonprocess.hpp:65`).
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         risk_free_rate: Handle<dyn YieldTermStructure>,
@@ -74,6 +111,32 @@ impl HestonProcess {
         theta: Real,
         sigma: Real,
         rho: Real,
+    ) -> HestonProcess {
+        Self::with_discretization(
+            risk_free_rate,
+            dividend_yield,
+            s0,
+            v0,
+            kappa,
+            theta,
+            sigma,
+            rho,
+            Discretization::QuadraticExponentialMartingale,
+        )
+    }
+
+    /// Builds a Heston process with an explicit variance-discretization scheme.
+    #[allow(clippy::too_many_arguments)]
+    pub fn with_discretization(
+        risk_free_rate: Handle<dyn YieldTermStructure>,
+        dividend_yield: Handle<dyn YieldTermStructure>,
+        s0: Handle<dyn Quote>,
+        v0: Real,
+        kappa: Real,
+        theta: Real,
+        sigma: Real,
+        rho: Real,
+        discretization: Discretization,
     ) -> HestonProcess {
         let observable = shared(Observable::new());
         let listener = ResetThenNotify::forwarding(Shared::clone(&observable));
@@ -90,6 +153,7 @@ impl HestonProcess {
             theta,
             sigma,
             rho,
+            discretization,
             observable,
             _listener: listener,
         }
@@ -146,6 +210,31 @@ impl HestonProcess {
             .forward_rate(t, t, Compounding::Continuous, Frequency::NoFrequency, false)?
             .rate())
     }
+
+    /// The interval forward `forwardRate(t0, t0+dt, Continuous)` of a curve.
+    ///
+    /// The QE scheme drifts the spot by the INTERVAL forward over `[t0, t0+dt]`
+    /// (`hestonprocess.cpp:510-511`), NOT the instantaneous forward
+    /// `forwardRate(t, t)` that [`drift`](Self::drift) uses. On the flat curves
+    /// exercised here the two coincide, but the interval form is the faithful
+    /// port of the C++.
+    fn forward_interval(
+        &self,
+        curve: &Handle<dyn YieldTermStructure>,
+        t0: Time,
+        dt: Time,
+    ) -> QlResult<Rate> {
+        Ok(curve
+            .current_link()?
+            .forward_rate(
+                t0,
+                t0 + dt,
+                Compounding::Continuous,
+                Frequency::NoFrequency,
+                false,
+            )?
+            .rate())
+    }
 }
 
 impl AsObservable for HestonProcess {
@@ -191,12 +280,74 @@ impl StochasticProcess for HestonProcess {
         Array::from([x0[0] * dx[0].exp(), x0[1] + dx[1]])
     }
 
-    fn evolve(&self, _t0: Time, _x0: &Array, _dt: Time, _dw: &Array) -> QlResult<Array> {
-        fail!(
-            "HestonProcess::evolve requires the QE/BroadieKaya exact-sampling scheme, deferred to \
-             the Monte Carlo batch (#410); only the analytic surface (drift, diffusion, apply, \
-             initial_values) is ported"
-        );
+    fn evolve(&self, t0: Time, x0: &Array, dt: Time, dw: &Array) -> QlResult<Array> {
+        let martingale = match self.discretization {
+            Discretization::QuadraticExponential => false,
+            Discretization::QuadraticExponentialMartingale => true,
+            other => fail!(
+                "HestonProcess::evolve: the {other:?} variance scheme is deferred (#410); only \
+                 QuadraticExponential and QuadraticExponentialMartingale are ported"
+            ),
+        };
+
+        let ex = (-self.kappa * dt).exp();
+        let m = self.theta + (x0[1] - self.theta) * ex;
+        let s2 = x0[1] * self.sigma * self.sigma * ex / self.kappa * (1.0 - ex)
+            + self.theta * self.sigma * self.sigma / (2.0 * self.kappa) * (1.0 - ex) * (1.0 - ex);
+        let psi = s2 / (m * m);
+
+        let g1 = 0.5;
+        let g2 = 0.5;
+        let mut k0 = -self.rho * self.kappa * self.theta * dt / self.sigma;
+        let k1 = g1 * dt * (self.kappa * self.rho / self.sigma - 0.5) - self.rho / self.sigma;
+        let k2 = g2 * dt * (self.kappa * self.rho / self.sigma - 0.5) + self.rho / self.sigma;
+        let k3 = g1 * dt * (1.0 - self.rho * self.rho);
+        let k4 = g2 * dt * (1.0 - self.rho * self.rho);
+        let a = k2 + 0.5 * k4;
+
+        let next_v = if psi < 1.5 {
+            let b2 = 2.0 / psi - 1.0 + (2.0 / psi * (2.0 / psi - 1.0)).sqrt();
+            let b = b2.sqrt();
+            let a_qe = m / (1.0 + b2);
+            if martingale {
+                if a >= 1.0 / (2.0 * a_qe) {
+                    fail!(
+                        "HestonProcess::evolve QEM martingale correction: illegal value \
+                         (A >= 1/(2a))"
+                    );
+                }
+                k0 = -a * b2 * a_qe / (1.0 - 2.0 * a * a_qe) + 0.5 * (1.0 - 2.0 * a * a_qe).ln()
+                    - (k1 + 0.5 * k3) * x0[1];
+            }
+            a_qe * (b + dw[1]) * (b + dw[1])
+        } else {
+            let p = (psi - 1.0) / (psi + 1.0);
+            let beta = (1.0 - p) / m;
+            let u = CumulativeNormalDistribution::standard().value(dw[1]);
+            if martingale {
+                if a >= beta {
+                    fail!(
+                        "HestonProcess::evolve QEM martingale correction: illegal value \
+                         (A >= beta)"
+                    );
+                }
+                k0 = -(p + beta * (1.0 - p) / (beta - a)).ln() - (k1 + 0.5 * k3) * x0[1];
+            }
+            if u <= p {
+                0.0
+            } else {
+                ((1.0 - p) / (1.0 - u)).ln() / beta
+            }
+        };
+
+        let mu = self.forward_interval(&self.risk_free_rate, t0, dt)?
+            - self.forward_interval(&self.dividend_yield, t0, dt)?;
+
+        let next_s = x0[0]
+            * (mu * dt + k0 + k1 * x0[1] + k2 * next_v + (k3 * x0[1] + k4 * next_v).sqrt() * dw[0])
+                .exp();
+
+        Ok(Array::from([next_s, next_v]))
     }
 
     fn time(&self, date: &Date) -> QlResult<Time> {
@@ -430,15 +581,70 @@ mod tests {
         );
     }
 
+    #[allow(clippy::too_many_arguments)]
+    fn heston(
+        v0: Real,
+        kappa: Real,
+        theta: Real,
+        sigma: Real,
+        rho: Real,
+        disc: Discretization,
+    ) -> HestonProcess {
+        HestonProcess::with_discretization(
+            flat_yield(R),
+            flat_yield(Q),
+            make_quote_handle(S0).handle(),
+            v0,
+            kappa,
+            theta,
+            sigma,
+            rho,
+            disc,
+        )
+    }
+
+    /// A deferred variance scheme must fail loudly (naming #410), never silently
+    /// misprice via a wrong branch.
     #[test]
-    fn evolve_is_deferred_to_the_monte_carlo_batch() {
-        let p = make_process();
-        let x0 = Array::from([S0, V0]);
-        let dw = Array::from([0.5, -0.5]);
-        let err = p.evolve(0.0, &x0, 0.5, &dw).unwrap_err();
+    fn deferred_variance_scheme_evolve_errs_naming_410() {
+        let p = heston(
+            V0,
+            KAPPA,
+            THETA,
+            SIGMA,
+            RHO,
+            Discretization::PartialTruncation,
+        );
+        let err = p
+            .evolve(0.0, &Array::from([S0, V0]), 0.5, &Array::from([0.1, 0.2]))
+            .unwrap_err();
         assert!(
             err.message().contains("#410"),
-            "evolve error must reference the #410 deferral: {}",
+            "deferred scheme must name the #410 deferral: {}",
+            err.message()
+        );
+    }
+
+    /// The QEM martingale correction requires `A < beta` on the `psi >= 1.5`
+    /// branch (`hestonprocess.cpp:503`); an extreme fixture (`v0=8, kappa=0.8,
+    /// theta=1, sigma=2.5, rho=0.9, dt=1.5` gives `psi~=1.56`, `A~=0.272 >=
+    /// beta~=0.251`) trips it, and evolve fails with "illegal value".
+    #[test]
+    fn qem_martingale_require_violation_errs() {
+        let p = heston(
+            8.0,
+            0.8,
+            1.0,
+            2.5,
+            0.9,
+            Discretization::QuadraticExponentialMartingale,
+        );
+        let err = p
+            .evolve(0.0, &Array::from([S0, 8.0]), 1.5, &Array::from([0.0, 0.0]))
+            .unwrap_err();
+        assert!(
+            err.message().contains("illegal value"),
+            "QEM require violation must report the illegal value: {}",
             err.message()
         );
     }
