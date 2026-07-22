@@ -345,21 +345,22 @@ oversight) and is documented at the point of divergence in the source.
 
 **Processes (L5):**
 
-- **`HestonProcess` ports the analytic surface only; `evolve` is deferred and
-  fails.** QuantLib's `HestonProcess` overrides `evolve`
-  (`hestonprocess.cpp:396`) with a QE/BroadieKaya exact-sampling scheme, while
-  its ctor installs `EulerDiscretization` (`hestonprocess.cpp:46`) so its
-  `expectation`/`std_deviation`/`covariance` are the plain Euler defaults. This
-  port keeps those three inherited Euler defaults (they match QuantLib), ports
-  `drift`/`diffusion`/`apply`/`initial_values` (everything the
-  `AnalyticHestonEngine` reads), and overrides `evolve` to return `Err`
-  referencing the deferral (#410) rather than silently returning the base
-  Euler `evolve`, which `HestonProcess` never produces under any
-  configuration. The C++ `Discretization` enum is omitted entirely: only the
-  default vol branch (`sqrt(max(v, 0))`, with the `1e-8` diffusion floor) is
-  ported, so the analytic surface is unambiguous without it. The Monte Carlo
-  surface (`pdf`, `varianceDistribution`, `Phi`, the QE/BroadieKaya `evolve`)
-  lands with #410.
+- **`HestonProcess::evolve` ports the ctor-default Andersen QE scheme; the
+  other seven schemes and `pdf` are deferred.** QuantLib's `HestonProcess`
+  overrides `evolve` (`hestonprocess.cpp:396`) with a nine-way `Discretization`
+  switch, defaulting to `QuadraticExponentialMartingale`
+  (`hestonprocess.hpp:65`). This port implements the shared
+  `QuadraticExponential`/`QuadraticExponentialMartingale` body
+  (`hestonprocess.cpp:461-516`) and exposes the full `Discretization` enum; the
+  remaining seven variants (PartialTruncation, FullTruncation, Reflection,
+  NonCentralChiSquareVariance, and the three BroadieKaya exact schemes) return
+  `Err` referencing the deferral (#410) rather than silently mispricing via a
+  wrong branch. The QE `evolve` drifts the spot by the INTERVAL forward
+  `forwardRate(t0, t0+dt, Continuous)`, not the instantaneous forward that
+  `drift` uses. The ctor still installs the base Euler
+  `expectation`/`std_deviation`/`covariance` (`hestonprocess.cpp:46`), which
+  match QuantLib. `pdf`, `varianceDistribution`, and the modified-Bessel /
+  complex machinery the BroadieKaya schemes need remain with #410.
 
 **Non-finite inputs (cross-cutting):**
 
