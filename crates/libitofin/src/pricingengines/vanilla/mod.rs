@@ -19,10 +19,12 @@
 
 pub mod analytichestonengine;
 pub mod mceuropeanengine;
+pub mod mceuropeanhestonengine;
 pub mod mcvanillaengine;
 
 pub use analytichestonengine::HestonChf;
 pub use mceuropeanengine::{EuropeanPathPricer, MCEuropeanEngine, MakeMcEuropeanEngine};
+pub use mceuropeanhestonengine::{EuropeanHestonPathPricer, MCEuropeanHestonEngine};
 pub use mcvanillaengine::McVanillaEngineBase;
 
 use std::any::Any;
