@@ -156,10 +156,53 @@ mod tests {
     use std::cell::RefCell;
 
     use super::*;
+    use crate::handle::{Handle, RelinkableHandle};
+    use crate::interestrate::Compounding;
     use crate::math::matrix::Matrix;
+    use crate::math::randomnumbers::rngtraits::{McRngTraits, PseudoRandom};
     use crate::patterns::observable::{AsObservable, Observable};
+    use crate::processes::{BlackScholesMertonProcess, StochasticProcessArray};
+    use crate::quotes::make_quote_handle;
     use crate::shared::shared;
-    use crate::types::{Real, Size, Time};
+    use crate::stochasticprocess::StochasticProcess1D;
+    use crate::termstructures::volatility::{BlackConstantVol, BlackVolTermStructure};
+    use crate::termstructures::yields::FlatForward;
+    use crate::termstructures::yieldtermstructure::YieldTermStructure;
+    use crate::time::calendars::target::Target;
+    use crate::time::date::{Date, Month};
+    use crate::time::daycounters::actual360::Actual360;
+    use crate::time::frequency::Frequency;
+    use crate::types::{Rate, Real, Size, Time, Volatility};
+
+    fn reference() -> Date {
+        Date::new(15, Month::June, 2026)
+    }
+
+    fn flat_yield(rate: Rate) -> Handle<dyn YieldTermStructure> {
+        Handle::new(shared(FlatForward::with_rate(
+            reference(),
+            rate,
+            Actual360::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>)
+    }
+
+    fn gbs_1d(spot: Real, r: Rate, q: Rate, sigma: Volatility) -> Shared<dyn StochasticProcess1D> {
+        let quote = make_quote_handle(spot);
+        let vol = RelinkableHandle::new(shared(BlackConstantVol::new(
+            reference(),
+            Some(Target::new()),
+            sigma,
+            Actual360::new(),
+        )) as Shared<dyn BlackVolTermStructure>);
+        shared(BlackScholesMertonProcess::new(
+            quote.handle(),
+            flat_yield(q),
+            flat_yield(r),
+            vol.handle(),
+        )) as Shared<dyn StochasticProcess1D>
+    }
 
     /// A deterministic sequence generator returning a fixed, known vector on
     /// every draw. Both `next_sequence` and `last_sequence` yield the same
@@ -345,5 +388,107 @@ mod tests {
             Err(e) => assert!(e.message().contains("brownian bridge")),
             Ok(_) => panic!("brownian_bridge = true must be rejected as deferred"),
         }
+    }
+
+    #[test]
+    fn path_is_seeded_with_initial_values() {
+        let array = StochasticProcessArray::new(
+            vec![
+                gbs_1d(100.0, 0.05, 0.02, 0.20),
+                gbs_1d(80.0, 0.05, 0.02, 0.30),
+            ],
+            &Matrix::from([[1.0, 0.5], [0.5, 1.0]]),
+        )
+        .unwrap();
+        let process = shared(array) as Shared<dyn StochasticProcess>;
+        let grid = TimeGrid::new(1.0, 8).unwrap();
+        let generator = PseudoRandom::make_sequence_generator(16, 7).unwrap();
+        let mut mpg = MultiPathGenerator::new(process, grid.clone(), generator, false).unwrap();
+
+        let mp = mpg.next().unwrap().value;
+        assert_eq!(mp.asset_number(), 2);
+        assert_eq!(mp.path_size(), grid.size());
+        assert_eq!(mp[0].front(), 100.0);
+        assert_eq!(mp[1].front(), 80.0);
+    }
+
+    /// Oracle 1 (joint-law sanity, routing-invariant): two correlated GBM legs
+    /// (`GeneralizedBlackScholesProcess`) driven through a
+    /// `StochasticProcessArray` with correlation `rho`. Over N multi-step paths
+    /// the per-asset terminal `ln(S_j(T)/S_j(0))` is normal with mean
+    /// `(r - q - 0.5 sigma_j^2) T` and variance `sigma_j^2 T`, and the
+    /// cross-asset sample correlation of the log-returns is `rho`. Multi-step
+    /// (8 steps) exercises the accumulation loop. This pins the joint law but
+    /// NOT the absolute draw offset (that is oracle 4); it is invariant to any
+    /// measure-preserving permutation of the draw->step assignment.
+    #[test]
+    fn correlated_gbm_terminal_law() {
+        const N: usize = 40_000;
+        const STEPS: usize = 8;
+        const T: Time = 1.0;
+        const R: Rate = 0.05;
+        const Q: Rate = 0.02;
+        const SIG0: Volatility = 0.20;
+        const SIG1: Volatility = 0.30;
+        const RHO: Real = 0.5;
+
+        let array = StochasticProcessArray::new(
+            vec![gbs_1d(100.0, R, Q, SIG0), gbs_1d(100.0, R, Q, SIG1)],
+            &Matrix::from([[1.0, RHO], [RHO, 1.0]]),
+        )
+        .unwrap();
+        let process = shared(array) as Shared<dyn StochasticProcess>;
+        let grid = TimeGrid::new(T, STEPS).unwrap();
+        let generator = PseudoRandom::make_sequence_generator(2 * STEPS, 42).unwrap();
+        let mut mpg = MultiPathGenerator::new(process, grid, generator, false).unwrap();
+
+        let mut ln0 = Vec::with_capacity(N);
+        let mut ln1 = Vec::with_capacity(N);
+        for _ in 0..N {
+            let mp = mpg.next().unwrap().value;
+            ln0.push((mp[0].back() / mp[0].front()).ln());
+            ln1.push((mp[1].back() / mp[1].front()).ln());
+        }
+
+        let stats = |xs: &[Real]| -> (Real, Real) {
+            let mean = xs.iter().sum::<Real>() / N as Real;
+            let var = xs.iter().map(|x| (x - mean).powi(2)).sum::<Real>() / (N as Real - 1.0);
+            (mean, var)
+        };
+        let (mean0, var0) = stats(&ln0);
+        let (mean1, var1) = stats(&ln1);
+
+        let assert_moments = |mean: Real, var: Real, sig: Volatility| {
+            let mean_target = (R - Q - 0.5 * sig * sig) * T;
+            let var_target = sig * sig * T;
+            let se = sig * (T / N as Real).sqrt();
+            let se_var = 2.0_f64.sqrt() * var_target / (N as Real - 1.0).sqrt();
+            assert!(
+                (mean - mean_target).abs() < 4.0 * se,
+                "mean {mean} vs {mean_target}: {:.2} se",
+                (mean - mean_target).abs() / se
+            );
+            assert!(
+                (var - var_target).abs() < 5.0 * se_var,
+                "var {var} vs {var_target}: {:.2} se_var",
+                (var - var_target).abs() / se_var
+            );
+        };
+        assert_moments(mean0, var0, SIG0);
+        assert_moments(mean1, var1, SIG1);
+
+        let cov = ln0
+            .iter()
+            .zip(ln1.iter())
+            .map(|(a, b)| (a - mean0) * (b - mean1))
+            .sum::<Real>()
+            / (N as Real - 1.0);
+        let corr = cov / (var0 * var1).sqrt();
+        let se_corr = (1.0 - RHO * RHO) / (N as Real).sqrt();
+        assert!(
+            (corr - RHO).abs() < 5.0 * se_corr,
+            "cross correlation {corr} vs {RHO}: {:.2} se",
+            (corr - RHO).abs() / se_corr
+        );
     }
 }
