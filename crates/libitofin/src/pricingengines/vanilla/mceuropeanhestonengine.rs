@@ -22,7 +22,7 @@
 //!   this engine embeds [`OneAssetOptionEngine`] directly and drives
 //!   [`McSimulation`]/[`MonteCarloModel`](crate::methods::montecarlo::MonteCarloModel)/[`MultiPathGenerator`]
 //!   itself. The C++ `run_with` body it replaces is ten lines; the accumulation
-//!   machinery is reused untouched. Follow-up #479 unifies the base on the
+//!   machinery is reused untouched. Follow-up #482 unifies the base on the
 //!   multi-factor process (the C++-faithful direction).
 //! - **concrete Heston process**: C++ holds a generic `StochasticProcess` and
 //!   `dynamic_pointer_cast`s to `P = HestonProcess` in `pathPricer()`
@@ -680,11 +680,23 @@ mod oracle {
 
     /// HARD GATE - `testMcVsCached` (`test-suite/hestonmodel.cpp:536-589`).
     ///
-    /// The first bit-exact QuantLib-cached Monte Carlo value in this repo. The
-    /// fixed-seed stream reproduces to ~1e-12 given the four DO-NOT-TOUCH
-    /// bit-exact links (MT19937, Acklam InverseCumulativeNormal, fdlibm erf/CDF,
-    /// GeneralStatistics composition); the `2.34 * error_estimate` band is FP
-    /// slack, not a statistical tolerance. Fixture: settlement 27-Dec-2004,
+    /// The first QuantLib-cached Monte Carlo value reproduced in this repo,
+    /// resting on the four DO-NOT-TOUCH bit-exact links (MT19937, Acklam
+    /// InverseCumulativeNormal, fdlibm erf/CDF, GeneralStatistics composition).
+    ///
+    /// This engine reproduces the locally-built C++ QuantLib 1.43.0 NPV
+    /// BIT-FOR-BIT on this platform: Rust `0.0632327393488322`, C++
+    /// `0.063232739348832237` (agree to ~1e-16), error estimate identical to
+    /// `1.824725e-4`. The cached literal `0.0632851308977151` is a stale
+    /// upstream-platform artifact: current C++ QuantLib ALSO misses it, by the
+    /// same `5.24e-5` (`0.29 * error_estimate`). The QEM scheme's variance
+    /// branch (`u <= p` / `psi < 1.5`, `hestonprocess.cpp:496-508`) flips on a
+    /// few paths under last-ULP transcendental differences across QuantLib
+    /// versions/platforms, which is why the cache went stale and why QuantLib's
+    /// own test uses a `2.34 * error_estimate` band (~2.3 sigma), NOT a
+    /// bit-exact tolerance. That band is load-bearing here: it absorbs the
+    /// `0.29 * se` cache gap while the Rust-vs-C++ agreement stays bit-exact.
+    /// Fixture: settlement 27-Dec-2004,
     /// exercise 28-Mar-2005, ActualActual(ISDA), `Put(1.05)`, flat `r = 0.70` /
     /// `q = 0.40`, `s0 = 1.05`, `HestonProcess(v0=0.3, kappa=1.16, theta=0.2,
     /// sigma=0.8, rho=0.8, QEM default)`, `stepsPerYear = 11`, antithetic,
