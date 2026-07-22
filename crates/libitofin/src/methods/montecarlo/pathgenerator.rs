@@ -36,11 +36,11 @@ use crate::errors::QlResult;
 use crate::math::array::Array;
 use crate::math::randomnumbers::rngtraits::SequenceGenerator;
 use crate::math::timegrid::TimeGrid;
-use crate::methods::montecarlo::{Path, Sample};
-use crate::require;
+use crate::methods::montecarlo::{Path, PathGen, Sample};
 use crate::shared::Shared;
 use crate::stochasticprocess::StochasticProcess1D;
 use crate::types::{Size, Time};
+use crate::{fail, require};
 
 /// Generates random single-factor paths from a Gaussian sequence generator.
 pub struct PathGenerator<GSG> {
@@ -147,6 +147,28 @@ impl<GSG: SequenceGenerator> PathGenerator<GSG> {
     }
 }
 
+impl<GSG: SequenceGenerator> PathGen for PathGenerator<GSG> {
+    type PathType = Path;
+
+    fn next(&mut self) -> QlResult<Sample<Path>> {
+        PathGenerator::next(self)
+    }
+
+    /// Antithetic sampling is deferred for the single-factor generator
+    /// (`pathgenerator.hpp:117,127`): only [`next`](PathGenerator::next) is
+    /// ported, so this fails loudly rather than returning an unnegated draw.
+    fn antithetic(&mut self) -> QlResult<Sample<Path>> {
+        fail!(
+            "antithetic single-factor path generation is not yet ported; only \
+             the forward draw is available"
+        )
+    }
+
+    fn dimension(&self) -> Size {
+        self.dimension
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -249,6 +271,17 @@ mod tests {
         match PathGenerator::new(gbs_process(), 1.0, 12, generator(12, 42), true) {
             Err(e) => assert!(e.message().contains("brownian bridge")),
             Ok(_) => panic!("brownian_bridge = true must be rejected as deferred"),
+        }
+    }
+
+    #[test]
+    fn pathgen_antithetic_is_rejected_as_deferred() {
+        // pathgenerator.hpp:117,127: single-factor antithetic is not ported;
+        // the PathGen impl must fail loudly rather than reuse the forward draw.
+        let mut pg = PathGenerator::new(gbs_process(), 1.0, 12, generator(12, 42), false).unwrap();
+        match PathGen::antithetic(&mut pg) {
+            Err(e) => assert!(e.message().contains("antithetic")),
+            Ok(_) => panic!("single-factor antithetic must be rejected as deferred"),
         }
     }
 

@@ -9,6 +9,7 @@ mod montecarlomodel;
 mod multipath;
 mod multipathgenerator;
 mod path;
+mod pathgen;
 mod pathgenerator;
 mod sample;
 
@@ -17,5 +18,6 @@ pub use montecarlomodel::{MonteCarloModel, PathPricer};
 pub use multipath::MultiPath;
 pub use multipathgenerator::MultiPathGenerator;
 pub use path::Path;
+pub use pathgen::PathGen;
 pub use pathgenerator::PathGenerator;
 pub use sample::Sample;
