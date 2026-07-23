@@ -206,7 +206,6 @@ impl PyPeriod {
 
 impl PyPeriod {
     /// The wrapped core [`Period`] (cheaply `Copy`).
-    #[allow(dead_code)]
     pub(crate) fn inner(&self) -> Period {
         self.inner
     }
@@ -241,7 +240,6 @@ impl PyCalendar {
 
 impl PyCalendar {
     /// The wrapped core [`Calendar`] (cheap `Rc` clone).
-    #[allow(dead_code)]
     pub(crate) fn inner(&self) -> Calendar {
         self.inner.clone()
     }
