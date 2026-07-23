@@ -17,7 +17,7 @@ mod time;
 use calibration::{PyCalibrationErrorType, PyEndCriteria, PyLevenbergMarquardt};
 use curve::PyFlatForward;
 use heston::{PyHestonModel, PyHestonModelHelper, PyHestonProcess};
-use hullwhite::{PyEuribor, PyHullWhite};
+use hullwhite::{PyEuribor, PyHullWhite, PySwaptionHelper};
 use libitofin::errors::QlError;
 use market::{PyBlackScholesProcess, PySimpleQuote};
 use option::{PyOptionType, PyVanillaOption};
@@ -70,6 +70,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyHestonModelHelper>()?;
     m.add_class::<PyHullWhite>()?;
     m.add_class::<PyEuribor>()?;
+    m.add_class::<PySwaptionHelper>()?;
     m.add_class::<PyLevenbergMarquardt>()?;
     m.add_class::<PyEndCriteria>()?;
     m.add_class::<PyCalibrationErrorType>()?;
