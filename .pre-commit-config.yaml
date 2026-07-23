@@ -33,7 +33,7 @@ repos:
         name: commit message is valid
         args:
           - --negate
-        entry: ^(build|ci|docs|feat|fix|perf|refactor|style|test|revert|hotfix|ops|chore)\([\w,\.,\-,\(,\),\/,\#]+\)(!?)(:)\s{1}([\w,\W,:]+)$
+        entry: ^(build|ci|docs|feat|fix|perf|refactor|style|test|revert|hotfix|ops|chore|incompat)\([\w,\.,\-,\(,\),\/,\#]+\)(!?)(:)\s{1}([\w,\W,:]+)$
         language: pygrep
         stages:
           - commit-msg
