@@ -130,7 +130,6 @@ impl PyHullWhite {
 impl PyHullWhite {
     /// A clone of the inner model handle for the calibration (W2) and
     /// Jamshidian-engine (X3) facades, which consume `SharedMut<HullWhite>`.
-    #[allow(dead_code)]
     pub(crate) fn inner(&self) -> SharedMut<HullWhite> {
         SharedMut::clone(&self.inner)
     }
