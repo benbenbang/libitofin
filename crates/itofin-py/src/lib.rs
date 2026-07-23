@@ -13,6 +13,7 @@ mod market;
 mod option;
 mod settings;
 mod swap;
+mod swaption;
 mod time;
 
 use calibration::{PyCalibrationErrorType, PyEndCriteria, PyLevenbergMarquardt};
@@ -27,6 +28,7 @@ use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 use settings::PySettings;
 use swap::{PySwapType, PyVanillaSwap};
+use swaption::{PyEuropeanExercise, PySettlementMethod, PySettlementType, PySwaption};
 use time::{
     PyBusinessDayConvention, PyCalendar, PyDate, PyDayCounter, PyFrequency, PyPeriod, PySchedule,
 };
@@ -83,5 +85,9 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyCalibrationErrorType>()?;
     m.add_class::<PySwapType>()?;
     m.add_class::<PyVanillaSwap>()?;
+    m.add_class::<PyEuropeanExercise>()?;
+    m.add_class::<PySettlementType>()?;
+    m.add_class::<PySettlementMethod>()?;
+    m.add_class::<PySwaption>()?;
     Ok(())
 }

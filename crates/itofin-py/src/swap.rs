@@ -142,7 +142,6 @@ impl PyVanillaSwap {
 impl PyVanillaSwap {
     /// A clone of the inner swap for the swaption facade (X3), which takes the
     /// underlying as a `SharedMut<FixedVsFloatingSwap>`.
-    #[allow(dead_code)]
     pub(crate) fn inner(&self) -> SharedMut<FixedVsFloatingSwap> {
         SharedMut::clone(&self.inner)
     }
