@@ -5,10 +5,12 @@
 //! [`struct@ItofinError`] exception. The pricing facades land in follow-up
 //! tickets (#485-#487).
 
+mod market;
 mod settings;
 mod time;
 
 use libitofin::errors::QlError;
+use market::{PyBlackScholesProcess, PySimpleQuote};
 use pyo3::create_exception;
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
@@ -25,7 +27,6 @@ create_exception!(itofin, ItofinError, PyException);
 /// `Result<T, PyQlError>` and use `?` on any `QlResult`. The Python-visible
 /// contract is unchanged: the error surfaces as an [`struct@ItofinError`]
 /// carrying the located `Display` form (`"file:line: message"`).
-#[allow(dead_code)]
 pub struct PyQlError(QlError);
 
 impl From<QlError> for PyQlError {
@@ -48,5 +49,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyDate>()?;
     m.add_class::<PyDayCounter>()?;
     m.add_class::<PyCalendar>()?;
+    m.add_class::<PySimpleQuote>()?;
+    m.add_class::<PyBlackScholesProcess>()?;
     Ok(())
 }
