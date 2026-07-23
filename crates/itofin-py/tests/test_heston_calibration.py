@@ -1,7 +1,13 @@
 import math
 
-import itofin
 import pytest
+
+from itofin import ItofinError, Settings
+from itofin.models import CalibrationErrorType, HestonModel, HestonModelHelper
+from itofin.optimization import EndCriteria, LevenbergMarquardt
+from itofin.processes import HestonProcess
+from itofin.termstructures import FlatForward
+from itofin.time import Calendar, Date, DayCounter, Period
 
 VOL = 0.1
 EXPECTED_VARIANCE = VOL * VOL
@@ -37,8 +43,8 @@ MONEYNESSES = [-1.0, 0.0, 1.0]
 
 
 def _fixture_settings():
-    settings = itofin.Settings()
-    settings.set_evaluation_date(itofin.Date(*REFERENCE))
+    settings = Settings()
+    settings.set_evaluation_date(Date(*REFERENCE))
     return settings
 
 
@@ -51,11 +57,11 @@ def _build_helpers(settings):
     # discounts are read from FlatForward curves that match the helper's own
     # curves exactly, so the mechanism stays live rather than pasting opaque
     # strike constants.
-    ref = itofin.Date(*REFERENCE)
-    dc = itofin.DayCounter.actual360()
-    calendar = itofin.Calendar.null_calendar()
-    risk_free = itofin.FlatForward(ref, 0.04, dc)
-    dividend = itofin.FlatForward(ref, 0.50, dc)
+    ref = Date(*REFERENCE)
+    dc = DayCounter.actual360()
+    calendar = Calendar.null_calendar()
+    risk_free = FlatForward(ref, 0.04, dc)
+    dividend = FlatForward(ref, 0.50, dc)
 
     helpers = []
     for (n, unit), tau in zip(MATURITIES, TAUS):
@@ -63,15 +69,15 @@ def _build_helpers(settings):
         for moneyness in MONEYNESSES:
             strike = forward * math.exp(-moneyness * VOL * math.sqrt(tau))
             helpers.append(
-                itofin.HestonModelHelper(
-                    itofin.Period(n, unit),
+                HestonModelHelper(
+                    Period(n, unit),
                     calendar,
                     1.0,
                     strike,
                     VOL,
                     0.04,
                     0.50,
-                    itofin.CalibrationErrorType.RelativePriceError,
+                    CalibrationErrorType.RelativePriceError,
                     ref,
                     dc,
                     settings,
@@ -87,7 +93,7 @@ def _seed_model():
     # internally with the identical reference date and day counter, so the
     # engine and the helpers price on the same market.
     def build(sigma):
-        process = itofin.HestonProcess(
+        process = HestonProcess(
             0.04,
             0.50,
             1.0,
@@ -96,10 +102,10 @@ def _seed_model():
             0.02,
             sigma,
             -0.75,
-            itofin.Date(*REFERENCE),
-            itofin.DayCounter.actual360(),
+            Date(*REFERENCE),
+            DayCounter.actual360(),
         )
-        return itofin.HestonModel(process)
+        return HestonModel(process)
 
     return build
 
@@ -119,8 +125,8 @@ def test_heston_calibrates_to_a_flat_vol_surface():
 
     for sigma in (0.1, 0.3, 0.5):
         model = build(sigma)
-        method = itofin.LevenbergMarquardt(1e-8, 1e-8, 1e-8, False)
-        end_criteria = itofin.EndCriteria(400, 40, 1e-8, 1e-8, 1e-8)
+        method = LevenbergMarquardt(1e-8, 1e-8, 1e-8, False)
+        end_criteria = EndCriteria(400, 40, 1e-8, 1e-8, 1e-8)
         model.calibrate(helpers, method, end_criteria, 96)
 
         assert model.sigma() < 3e-3, f"sigma {model.sigma()} (start {sigma})"
@@ -134,7 +140,7 @@ def test_heston_calibrates_to_a_flat_vol_surface():
 
 def test_calibrate_with_no_helpers_raises():
     model = _seed_model()(0.5)
-    method = itofin.LevenbergMarquardt(1e-8, 1e-8, 1e-8, False)
-    end_criteria = itofin.EndCriteria(400, 40, 1e-8, 1e-8, 1e-8)
-    with pytest.raises(itofin.ItofinError):
+    method = LevenbergMarquardt(1e-8, 1e-8, 1e-8, False)
+    end_criteria = EndCriteria(400, 40, 1e-8, 1e-8, 1e-8)
+    with pytest.raises(ItofinError):
         model.calibrate([], method, end_criteria, 96)

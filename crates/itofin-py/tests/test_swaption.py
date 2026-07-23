@@ -24,24 +24,25 @@ fixture (``jamshidianswaptionengine.rs:344``, which never attaches a swap engine
 
 import pytest
 
-from itofin import (
+from itofin import ItofinError, Settings
+from itofin.indexes import Euribor
+from itofin.instruments import (
+    EuropeanExercise,
+    SettlementMethod,
+    SettlementType,
+    Swaption,
+    SwapType,
+    VanillaSwap,
+)
+from itofin.models import HullWhite
+from itofin.termstructures import FlatForward
+from itofin.time import (
     BusinessDayConvention,
     Calendar,
     Date,
     DayCounter,
-    EuropeanExercise,
-    Euribor,
-    FlatForward,
     Frequency,
-    HullWhite,
-    ItofinError,
     Schedule,
-    SettlementMethod,
-    SettlementType,
-    Settings,
-    Swaption,
-    SwapType,
-    VanillaSwap,
 )
 
 PAYER_NPV = 1.5666103955750414
