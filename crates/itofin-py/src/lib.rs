@@ -5,10 +5,15 @@
 //! [`struct@ItofinError`] exception. The pricing facades land in follow-up
 //! tickets (#485-#487).
 
+mod settings;
+mod time;
+
 use libitofin::errors::QlError;
 use pyo3::create_exception;
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
+use settings::PySettings;
+use time::{PyCalendar, PyDate, PyDayCounter};
 
 create_exception!(itofin, ItofinError, PyException);
 
@@ -39,5 +44,9 @@ impl From<PyQlError> for PyErr {
 fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     m.add("ItofinError", m.py().get_type::<ItofinError>())?;
+    m.add_class::<PySettings>()?;
+    m.add_class::<PyDate>()?;
+    m.add_class::<PyDayCounter>()?;
+    m.add_class::<PyCalendar>()?;
     Ok(())
 }
