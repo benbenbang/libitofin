@@ -34,7 +34,6 @@ impl PySettings {
 impl PySettings {
     /// Clones the inner `Shared` so downstream facades can thread the same
     /// settings object into their constructions.
-    #[allow(dead_code)]
     pub(crate) fn inner(&self) -> Shared<Settings<Date>> {
         Shared::clone(&self.inner)
     }
