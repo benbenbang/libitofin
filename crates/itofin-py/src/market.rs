@@ -45,6 +45,17 @@ impl PySimpleQuote {
     }
 }
 
+impl PySimpleQuote {
+    /// A `Handle` wrapping the retained quote, for the rate-helper facades
+    /// (#528) whose ctors take `Handle<dyn Quote>`. The handle clones the same
+    /// inner `Shared`, so a later `set_value` on this `PySimpleQuote` is
+    /// observed by any helper built from it (the laziness contract T5 checks).
+    #[allow(dead_code)]
+    pub(crate) fn handle(&self) -> Handle<dyn Quote> {
+        Handle::new(Shared::clone(&self.inner) as Shared<dyn Quote>)
+    }
+}
+
 /// Python `BlackScholesProcess`: a flat-market generalized Black-Scholes
 /// process (processes/blackscholesprocess.rs).
 ///

@@ -6,10 +6,10 @@ use crate::calibration::{PyCalibrationErrorType, PyEndCriteria, PyLevenbergMarqu
 use crate::curve::PyYieldTermStructure;
 use crate::option::PyOptionType;
 use crate::settings::PySettings;
-use crate::time::{PyDayCounter, PyPeriod};
+use crate::time::{PyDate, PyDayCounter, PyPeriod};
 use libitofin::cashflows::RateAveraging;
 use libitofin::handle::Handle;
-use libitofin::indexes::{Euribor, IborIndex};
+use libitofin::indexes::{Euribor, IborIndex, Index};
 use libitofin::models::calibrationhelper::{BlackCalibrationHelper, CalibrationHelper};
 use libitofin::models::shortrate::SwaptionHelper;
 use libitofin::models::{CalibratedModelHolder, HullWhite, calibrate};
@@ -137,10 +137,13 @@ impl PyHullWhite {
 
 /// Python `Euribor`: the Euribor IBOR index family (`indexes::Euribor`).
 ///
-/// Only the 6-month tenor is wired (`Euribor6M`), the tenor the swap/swaption
-/// facades need. `Euribor::six_months` (`euribor.rs:98`) returns an `IborIndex`
-/// by value; it is wrapped in `shared()` so downstream ctors that take a
-/// `Shared<IborIndex>` (VanillaSwap/SwaptionHelper) can hold the same object.
+/// The general constructor takes a tenor, an optional forwarding curve, and the
+/// settings; passing `None` for the curve builds the index over an empty
+/// handle, the form the bootstrap rate helpers need (#528). The `six_months`
+/// and `three_months` staticmethods keep the curve-required convenience
+/// constructors. `Euribor::new` returns an `IborIndex` by value; it is wrapped
+/// in `shared()` so downstream ctors that take a `Shared<IborIndex>`
+/// (VanillaSwap/SwaptionHelper/rate helpers) can hold the same object.
 #[pyclass(name = "Euribor", unsendable)]
 pub struct PyEuribor {
     inner: Shared<IborIndex>,
@@ -148,11 +151,51 @@ pub struct PyEuribor {
 
 #[pymethods]
 impl PyEuribor {
+    /// A Euribor index of `tenor` forwarding off `curve`, or off an empty
+    /// handle when `curve` is `None`. Fallible: the core rejects daily tenors
+    /// (`euribor.rs:65`), which need the dedicated `DailyTenor` constructor.
+    #[new]
+    #[pyo3(signature = (tenor, curve, settings))]
+    fn new(
+        tenor: &PyPeriod,
+        curve: Option<&PyYieldTermStructure>,
+        settings: &PySettings,
+    ) -> PyResult<Self> {
+        let forwarding = match curve {
+            Some(curve) => curve.handle(),
+            None => Handle::empty(),
+        };
+        let index =
+            Euribor::new(tenor.inner(), forwarding, settings.inner()).map_err(PyQlError::from)?;
+        Ok(PyEuribor {
+            inner: shared(index),
+        })
+    }
+
+    /// The 3-month Euribor index (`Euribor3M`) forwarding off `curve`.
+    #[staticmethod]
+    fn three_months(curve: &PyYieldTermStructure, settings: &PySettings) -> Self {
+        PyEuribor {
+            inner: shared(Euribor::three_months(curve.handle(), settings.inner())),
+        }
+    }
+
+    /// The 6-month Euribor index (`Euribor6M`) forwarding off `curve`.
     #[staticmethod]
     fn six_months(curve: &PyYieldTermStructure, settings: &PySettings) -> Self {
         PyEuribor {
             inner: shared(Euribor::six_months(curve.handle(), settings.inner())),
         }
+    }
+
+    /// The index's fixing for `fixing_date`, forecast off the forwarding curve
+    /// for a future date or read from stored fixings for a past one. Fallible:
+    /// an empty forwarding handle or an unset evaluation date is an error.
+    fn fixing(&self, fixing_date: &PyDate, forecast_todays_fixing: bool) -> PyResult<f64> {
+        Ok(self
+            .inner
+            .fixing(fixing_date.inner(), forecast_todays_fixing)
+            .map_err(PyQlError::from)?)
     }
 }
 
