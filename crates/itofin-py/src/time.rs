@@ -7,6 +7,8 @@ use libitofin::time::date::{Date, Month};
 use libitofin::time::daycounter::DayCounter;
 use libitofin::time::daycounters::actual360::Actual360;
 use libitofin::time::daycounters::actual365fixed::Actual365Fixed;
+use libitofin::time::period::Period;
+use libitofin::time::timeunit::TimeUnit;
 use pyo3::prelude::*;
 
 const MIN_SERIAL: i64 = 367;
@@ -154,6 +156,49 @@ impl PyDayCounter {
     #[allow(dead_code)]
     pub(crate) fn inner(&self) -> DayCounter {
         self.inner.clone()
+    }
+}
+
+/// Python `Period`: a signed length in one calendar unit.
+///
+/// The unit is taken as a string in {"Days", "Weeks", "Months", "Years"} and
+/// mapped to the core [`TimeUnit`]; an unknown unit returns
+/// [`struct@ItofinError`] rather than reaching the core.
+#[pyclass(name = "Period", unsendable)]
+pub struct PyPeriod {
+    inner: Period,
+}
+
+#[pymethods]
+impl PyPeriod {
+    #[new]
+    fn new(n: i32, unit: &str) -> PyResult<Self> {
+        let units = match unit {
+            "Days" => TimeUnit::Days,
+            "Weeks" => TimeUnit::Weeks,
+            "Months" => TimeUnit::Months,
+            "Years" => TimeUnit::Years,
+            other => {
+                return Err(ItofinError::new_err(format!(
+                    "unknown time unit {other:?}, expected one of Days, Weeks, Months, Years"
+                )));
+            }
+        };
+        Ok(PyPeriod {
+            inner: Period::new(n, units),
+        })
+    }
+
+    fn __repr__(&self) -> String {
+        format!("Period({}, {:?})", self.inner.length(), self.inner.units())
+    }
+}
+
+impl PyPeriod {
+    /// The wrapped core [`Period`] (cheaply `Copy`).
+    #[allow(dead_code)]
+    pub(crate) fn inner(&self) -> Period {
+        self.inner
     }
 }
 
