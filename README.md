@@ -140,7 +140,7 @@ pre-commit run --all-files
 ```
 crates/libitofin/       the core library — FFI-agnostic, idiomatic Rust
 crates/libitofin-ffi/   extern "C" + cbindgen → C header          (planned)
-crates/libitofin-py/    PyO3 + maturin → pip-installable wheel     (planned)
+crates/itofin-py/       PyO3 + maturin → pip-installable wheel     (in progress)
 QuantLib/               reference C++ tree + test oracle           (git-ignored symlink)
 ```
 
