@@ -96,9 +96,9 @@ impl PyVanillaSwap {
     /// (`include_settlement_date_flows`, `settlement_date`, `npv_date` all
     /// unset) and installed on the swap's [`InstrumentBase`] via
     /// `set_pricing_engine`.
-    fn set_engine(&mut self, curve: &PyFlatForward, settings: &PySettings) {
+    fn set_engine(&mut self, curve: PyRef<'_, PyFlatForward>, settings: &PySettings) {
         let engine = shared_mut(DiscountingSwapEngine::new(
-            curve.handle(),
+            curve.as_super().handle(),
             None,
             None,
             None,
