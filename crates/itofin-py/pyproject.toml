@@ -28,4 +28,5 @@ Issues = "https://github.com/benbenbang/libitofin/issues"
 
 [tool.maturin]
 module-name = "itofin"
+python-source = "python"
 features = ["itofin-py/extension-module"]
