@@ -23,6 +23,36 @@ jobs:
       packages: read
     secrets: inherit
 
+  python-bindings:
+    name: python bindings
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v5
+
+      - name: install rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: set up python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: install maturin and pytest
+        run: pip install maturin pytest
+
+      - name: build and install the itofin extension module
+        run: |
+          python -m venv .venv
+          . .venv/bin/activate
+          pip install pytest
+          maturin develop -m crates/itofin-py/Cargo.toml
+
+      - name: run the pytest oracle
+        run: |
+          . .venv/bin/activate
+          pytest crates/itofin-py/tests -v
+
   pr-labeler:
     name: pr labeler
     runs-on: ubuntu-latest

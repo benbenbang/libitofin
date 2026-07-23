@@ -1,0 +1,43 @@
+//! Python bindings for `libitofin`, published as the `itofin` extension module.
+//!
+//! This crate is the walking skeleton (issue #484): it builds an `abi3-py313`
+//! wheel, imports as `itofin`, and bridges [`QlError`] to the Python-visible
+//! [`struct@ItofinError`] exception. The pricing facades land in follow-up
+//! tickets (#485-#487).
+
+use libitofin::errors::QlError;
+use pyo3::create_exception;
+use pyo3::exceptions::PyException;
+use pyo3::prelude::*;
+
+create_exception!(itofin, ItofinError, PyException);
+
+/// Newtype bridging [`QlError`] to [`PyErr`] across the crate boundary.
+///
+/// A direct `impl From<QlError> for PyErr` is an orphan-rule violation
+/// (E0117): both types are foreign to this crate. This wrapper carries the
+/// two conversions instead, so fallible facades can return
+/// `Result<T, PyQlError>` and use `?` on any `QlResult`. The Python-visible
+/// contract is unchanged: the error surfaces as an [`struct@ItofinError`]
+/// carrying the located `Display` form (`"file:line: message"`).
+#[allow(dead_code)]
+pub struct PyQlError(QlError);
+
+impl From<QlError> for PyQlError {
+    fn from(err: QlError) -> Self {
+        PyQlError(err)
+    }
+}
+
+impl From<PyQlError> for PyErr {
+    fn from(err: PyQlError) -> Self {
+        ItofinError::new_err(err.0.to_string())
+    }
+}
+
+#[pymodule]
+fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add("__version__", env!("CARGO_PKG_VERSION"))?;
+    m.add("ItofinError", m.py().get_type::<ItofinError>())?;
+    Ok(())
+}

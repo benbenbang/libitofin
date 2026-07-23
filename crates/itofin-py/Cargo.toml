@@ -1,0 +1,15 @@
+[package]
+name = "itofin-py"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+name = "itofin"
+crate-type = ["cdylib"]
+
+[features]
+extension-module = ["pyo3/extension-module"]
+
+[dependencies]
+libitofin = { path = "../libitofin" }
+pyo3 = { version = "0.29", features = ["abi3-py313"] }
