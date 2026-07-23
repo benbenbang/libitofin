@@ -1,6 +1,7 @@
 //! Facades for the time primitives: [`PyDate`], [`PyDayCounter`], [`PyCalendar`].
 
 use crate::ItofinError;
+use libitofin::time::businessdayconvention::BusinessDayConvention;
 use libitofin::time::calendar::Calendar;
 use libitofin::time::calendars::{NullCalendar, Target};
 use libitofin::time::date::{Date, Month};
@@ -9,7 +10,9 @@ use libitofin::time::daycounters::actual360::Actual360;
 use libitofin::time::daycounters::actual365fixed::Actual365Fixed;
 use libitofin::time::daycounters::actualactual::{ActualActual, Convention};
 use libitofin::time::daycounters::thirty360::{Convention as Thirty360Convention, Thirty360};
+use libitofin::time::frequency::Frequency;
 use libitofin::time::period::Period;
+use libitofin::time::schedule::{MakeSchedule, Schedule};
 use libitofin::time::timeunit::TimeUnit;
 use pyo3::prelude::*;
 
@@ -251,6 +254,131 @@ impl PyCalendar {
 impl PyCalendar {
     /// The wrapped core [`Calendar`] (cheap `Rc` clone).
     pub(crate) fn inner(&self) -> Calendar {
+        self.inner.clone()
+    }
+}
+
+/// Python `Frequency`: the coupon frequencies the swaption fixture needs.
+///
+/// A fieldless pyo3 enum exposing `Frequency.Annual` / `Frequency.Semiannual`;
+/// only the variants the Jamshidian fixture uses are surfaced.
+#[pyclass(name = "Frequency", eq, eq_int, from_py_object)]
+#[derive(Clone, Copy, PartialEq)]
+pub enum PyFrequency {
+    Annual,
+    Semiannual,
+}
+
+impl PyFrequency {
+    /// The core [`Frequency`] this variant stands for.
+    fn inner(&self) -> Frequency {
+        match self {
+            PyFrequency::Annual => Frequency::Annual,
+            PyFrequency::Semiannual => Frequency::Semiannual,
+        }
+    }
+}
+
+/// Python `BusinessDayConvention`: the holiday-rolling rules the fixture needs.
+///
+/// A fieldless pyo3 enum exposing the `Following`, `ModifiedFollowing` and
+/// `Unadjusted` variants; the adjustment logic itself lives in the core
+/// calendar.
+#[pyclass(name = "BusinessDayConvention", eq, eq_int, from_py_object)]
+#[derive(Clone, Copy, PartialEq)]
+pub enum PyBusinessDayConvention {
+    ModifiedFollowing,
+    Following,
+    Unadjusted,
+}
+
+impl PyBusinessDayConvention {
+    /// The core [`BusinessDayConvention`] this variant stands for.
+    fn inner(&self) -> BusinessDayConvention {
+        match self {
+            PyBusinessDayConvention::ModifiedFollowing => BusinessDayConvention::ModifiedFollowing,
+            PyBusinessDayConvention::Following => BusinessDayConvention::Following,
+            PyBusinessDayConvention::Unadjusted => BusinessDayConvention::Unadjusted,
+        }
+    }
+}
+
+/// Python `Schedule`: a sequence of coupon dates built through `MakeSchedule`.
+///
+/// The core `Schedule::new` (via `MakeSchedule::build`) `panic!`s on degenerate
+/// input - a null date or an effective date not strictly before the termination
+/// date - and a panic unwinding across the PyO3 boundary is an abort/UB hazard.
+/// The constructor supplies every builder input, so the `build`-level checks are
+/// unreachable; the date ordering is the one piece of user input, so it is
+/// validated first and returns [`struct@ItofinError`] before the core is
+/// touched. `date` likewise bounds-checks the index the core would otherwise
+/// panic on.
+#[pyclass(name = "Schedule", unsendable)]
+pub struct PySchedule {
+    inner: Schedule,
+}
+
+#[pymethods]
+impl PySchedule {
+    #[new]
+    fn new(
+        start: &PyDate,
+        end: &PyDate,
+        frequency: &PyFrequency,
+        calendar: &PyCalendar,
+        convention: &PyBusinessDayConvention,
+    ) -> PyResult<Self> {
+        if start.inner() >= end.inner() {
+            return Err(ItofinError::new_err(format!(
+                "schedule start ({}) is not strictly before end ({})",
+                start.inner(),
+                end.inner()
+            )));
+        }
+        let convention = convention.inner();
+        let inner = MakeSchedule::new()
+            .from(start.inner())
+            .to(end.inner())
+            .with_frequency(frequency.inner())
+            .with_calendar(calendar.inner())
+            .with_convention(convention)
+            .with_termination_date_convention(convention)
+            .forwards()
+            .build();
+        Ok(PySchedule { inner })
+    }
+
+    /// The number of dates in the schedule (one more than the period count).
+    fn size(&self) -> usize {
+        self.inner.dates().len()
+    }
+
+    /// The `i`-th date, erroring when `i` is out of range.
+    fn date(&self, i: usize) -> PyResult<PyDate> {
+        let dates = self.inner.dates();
+        if i >= dates.len() {
+            return Err(ItofinError::new_err(format!(
+                "schedule date index {i} out of range [0, {})",
+                dates.len()
+            )));
+        }
+        Ok(PyDate { inner: dates[i] })
+    }
+
+    /// All the schedule dates, as a Python list.
+    fn dates(&self) -> Vec<PyDate> {
+        self.inner
+            .dates()
+            .iter()
+            .map(|&inner| PyDate { inner })
+            .collect()
+    }
+}
+
+impl PySchedule {
+    /// The wrapped core [`Schedule`] (clone), for the swap facades in X2.
+    #[allow(dead_code)]
+    pub(crate) fn inner(&self) -> Schedule {
         self.inner.clone()
     }
 }
