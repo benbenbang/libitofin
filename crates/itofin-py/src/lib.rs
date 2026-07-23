@@ -12,6 +12,7 @@ mod hullwhite;
 mod market;
 mod option;
 mod settings;
+mod swap;
 mod time;
 
 use calibration::{PyCalibrationErrorType, PyEndCriteria, PyLevenbergMarquardt};
@@ -25,6 +26,7 @@ use pyo3::create_exception;
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 use settings::PySettings;
+use swap::{PySwapType, PyVanillaSwap};
 use time::{
     PyBusinessDayConvention, PyCalendar, PyDate, PyDayCounter, PyFrequency, PyPeriod, PySchedule,
 };
@@ -79,5 +81,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyLevenbergMarquardt>()?;
     m.add_class::<PyEndCriteria>()?;
     m.add_class::<PyCalibrationErrorType>()?;
+    m.add_class::<PySwapType>()?;
+    m.add_class::<PyVanillaSwap>()?;
     Ok(())
 }
