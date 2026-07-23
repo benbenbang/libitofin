@@ -1,6 +1,6 @@
 # Hand-written stubs for itofin.termstructures; sync manually with src/curve.rs and src/vol.rs (#517).
 
-from itofin.time import Date, DayCounter
+from itofin.time import Calendar, Date, DayCounter
 
 class YieldTermStructure:
     """Shared base for every yield curve: discount factors, zero and forward rates."""
@@ -35,3 +35,41 @@ class FlatForward(YieldTermStructure):
     """A flat continuously-compounded yield curve behind a Handle."""
 
     def __init__(self, reference_date: Date, rate: float, day_counter: DayCounter) -> None: ...
+
+class BlackConstantVol(BlackVolTermStructure):
+    """A flat Black volatility, constant in strike and time."""
+
+    def __init__(
+        self,
+        reference_date: Date,
+        volatility: float,
+        day_counter: DayCounter,
+        calendar: Calendar | None = None,
+    ) -> None: ...
+
+class BlackVarianceCurve(BlackVolTermStructure):
+    """A term structure of Black volatility (no strike dimension), interpolating
+    linearly on variance. Finite in time: enable extrapolation past the last date."""
+
+    def __init__(
+        self,
+        reference_date: Date,
+        dates: list[Date],
+        black_vol_curve: list[float],
+        day_counter: DayCounter,
+        force_monotone_variance: bool,
+    ) -> None: ...
+
+class BlackVarianceSurface(BlackVolTermStructure):
+    """A Black volatility surface in strike and expiry, interpolating bilinearly
+    on variance. black_vol_matrix has one row per strike and one column per date."""
+
+    def __init__(
+        self,
+        reference_date: Date,
+        dates: list[Date],
+        strikes: list[float],
+        black_vol_matrix: list[list[float]],
+        day_counter: DayCounter,
+        calendar: Calendar | None = None,
+    ) -> None: ...
