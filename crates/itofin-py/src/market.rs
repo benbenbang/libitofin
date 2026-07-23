@@ -116,7 +116,6 @@ impl PyBlackScholesProcess {
 impl PyBlackScholesProcess {
     /// Clones the inner `Shared` so the pricing-engine facade (#487) can thread
     /// the same process into an `AnalyticEuropeanEngine`.
-    #[allow(dead_code)]
     pub(crate) fn inner(&self) -> Shared<GeneralizedBlackScholesProcess> {
         Shared::clone(&self.inner)
     }

@@ -6,11 +6,13 @@
 //! tickets (#485-#487).
 
 mod market;
+mod option;
 mod settings;
 mod time;
 
 use libitofin::errors::QlError;
 use market::{PyBlackScholesProcess, PySimpleQuote};
+use option::{PyOptionType, PyVanillaOption};
 use pyo3::create_exception;
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
@@ -51,5 +53,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyCalendar>()?;
     m.add_class::<PySimpleQuote>()?;
     m.add_class::<PyBlackScholesProcess>()?;
+    m.add_class::<PyOptionType>()?;
+    m.add_class::<PyVanillaOption>()?;
     Ok(())
 }
