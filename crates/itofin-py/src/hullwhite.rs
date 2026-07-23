@@ -3,7 +3,7 @@
 
 use crate::PyQlError;
 use crate::calibration::{PyCalibrationErrorType, PyEndCriteria, PyLevenbergMarquardt};
-use crate::curve::PyFlatForward;
+use crate::curve::PyYieldTermStructure;
 use crate::option::PyOptionType;
 use crate::settings::PySettings;
 use crate::time::{PyDayCounter, PyPeriod};
@@ -34,8 +34,8 @@ pub struct PyHullWhite {
 #[pymethods]
 impl PyHullWhite {
     #[new]
-    fn new(curve: PyRef<'_, PyFlatForward>, a: f64, sigma: f64) -> PyResult<Self> {
-        let inner = HullWhite::new(curve.as_super().handle(), a, sigma).map_err(PyQlError::from)?;
+    fn new(curve: &PyYieldTermStructure, a: f64, sigma: f64) -> PyResult<Self> {
+        let inner = HullWhite::new(curve.handle(), a, sigma).map_err(PyQlError::from)?;
         Ok(PyHullWhite { inner })
     }
 
@@ -149,12 +149,9 @@ pub struct PyEuribor {
 #[pymethods]
 impl PyEuribor {
     #[staticmethod]
-    fn six_months(curve: PyRef<'_, PyFlatForward>, settings: &PySettings) -> Self {
+    fn six_months(curve: &PyYieldTermStructure, settings: &PySettings) -> Self {
         PyEuribor {
-            inner: shared(Euribor::six_months(
-                curve.as_super().handle(),
-                settings.inner(),
-            )),
+            inner: shared(Euribor::six_months(curve.handle(), settings.inner())),
         }
     }
 }
@@ -194,7 +191,7 @@ impl PySwaptionHelper {
         fixed_leg_tenor: &PyPeriod,
         fixed_leg_day_counter: &PyDayCounter,
         floating_leg_day_counter: &PyDayCounter,
-        curve: PyRef<'_, PyFlatForward>,
+        curve: &PyYieldTermStructure,
         error_type: &PyCalibrationErrorType,
         nominal: f64,
     ) -> Self {
@@ -208,7 +205,7 @@ impl PySwaptionHelper {
                 fixed_leg_tenor.inner(),
                 fixed_leg_day_counter.inner(),
                 floating_leg_day_counter.inner(),
-                curve.as_super().handle(),
+                curve.handle(),
                 error_type.inner(),
                 None,
                 nominal,
