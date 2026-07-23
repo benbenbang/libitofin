@@ -1,6 +1,15 @@
-# Hand-written stubs for itofin.termstructures; sync manually with src/curve.rs and src/vol.rs (#517).
+# Hand-written stubs for itofin.termstructures; sync manually with src/curve.rs, src/vol.rs and src/helpers.rs (#517).
 
-from itofin.time import Calendar, Date, DayCounter
+from itofin.indexes import Euribor
+from itofin.quotes import SimpleQuote
+from itofin.time import (
+    BusinessDayConvention,
+    Calendar,
+    Date,
+    DayCounter,
+    Frequency,
+    Period,
+)
 
 class YieldTermStructure:
     """Shared base for every yield curve: discount factors, zero and forward rates."""
@@ -106,4 +115,34 @@ class BlackVarianceSurface(BlackVolTermStructure):
         black_vol_matrix: list[list[float]],
         day_counter: DayCounter,
         calendar: Calendar | None = None,
+    ) -> None: ...
+
+class RateHelper:
+    """Shared base for every bootstrap helper: implied/market quotes and dates."""
+
+    def implied_quote(self) -> float: ...
+    def quote_error(self) -> float: ...
+    def quote_value(self) -> float: ...
+    def maturity_date(self) -> Date: ...
+    def pillar_date(self) -> Date: ...
+
+class DepositRateHelper(RateHelper):
+    """A helper fitting a deposit rate."""
+
+    def __init__(self, quote: SimpleQuote, index: Euribor) -> None: ...
+    @staticmethod
+    def from_rate(rate: float, index: Euribor) -> DepositRateHelper: ...
+
+class SwapRateHelper(RateHelper):
+    """A helper fitting a par swap rate (spot-starting, no spread)."""
+
+    def __init__(
+        self,
+        quote: SimpleQuote,
+        tenor: Period,
+        calendar: Calendar,
+        fixed_frequency: Frequency,
+        fixed_convention: BusinessDayConvention,
+        fixed_day_count: DayCounter,
+        ibor_index: Euribor,
     ) -> None: ...

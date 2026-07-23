@@ -7,6 +7,7 @@
 
 mod calibration;
 mod curve;
+mod helpers;
 mod heston;
 mod hullwhite;
 mod market;
@@ -19,6 +20,7 @@ mod vol;
 
 use calibration::{PyCalibrationErrorType, PyEndCriteria, PyLevenbergMarquardt};
 use curve::{PyDiscountCurve, PyFlatForward, PyForwardCurve, PyYieldTermStructure, PyZeroCurve};
+use helpers::{PyDepositRateHelper, PyRateHelper, PySwapRateHelper};
 use heston::{PyHestonModel, PyHestonModelHelper, PyHestonProcess};
 use hullwhite::{PyEuribor, PyHullWhite, PySwaptionHelper};
 use libitofin::errors::QlError;
@@ -99,6 +101,9 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     termstructures.add_class::<PyBlackConstantVol>()?;
     termstructures.add_class::<PyBlackVarianceCurve>()?;
     termstructures.add_class::<PyBlackVarianceSurface>()?;
+    termstructures.add_class::<PyRateHelper>()?;
+    termstructures.add_class::<PyDepositRateHelper>()?;
+    termstructures.add_class::<PySwapRateHelper>()?;
 
     let processes = PyModule::new(py, "processes")?;
     processes.add_class::<PyBlackScholesProcess>()?;
