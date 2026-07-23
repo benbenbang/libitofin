@@ -25,7 +25,9 @@ use pyo3::create_exception;
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 use settings::PySettings;
-use time::{PyCalendar, PyDate, PyDayCounter, PyPeriod};
+use time::{
+    PyBusinessDayConvention, PyCalendar, PyDate, PyDayCounter, PyFrequency, PyPeriod, PySchedule,
+};
 
 create_exception!(itofin, ItofinError, PyException);
 
@@ -60,6 +62,9 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyDayCounter>()?;
     m.add_class::<PyCalendar>()?;
     m.add_class::<PyPeriod>()?;
+    m.add_class::<PyFrequency>()?;
+    m.add_class::<PyBusinessDayConvention>()?;
+    m.add_class::<PySchedule>()?;
     m.add_class::<PySimpleQuote>()?;
     m.add_class::<PyBlackScholesProcess>()?;
     m.add_class::<PyFlatForward>()?;
