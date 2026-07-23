@@ -1,14 +1,20 @@
-import itofin
 import pytest
+
+from itofin import ItofinError, Settings
+from itofin.indexes import Euribor
+from itofin.instruments import OptionType
+from itofin.models import HullWhite
+from itofin.termstructures import FlatForward
+from itofin.time import Date, DayCounter
 
 
 def _flat_curve():
-    dc = itofin.DayCounter.actual365_fixed()
-    return itofin.FlatForward(itofin.Date(15, 1, 2026), 0.03, dc)
+    dc = DayCounter.actual365_fixed()
+    return FlatForward(Date(15, 1, 2026), 0.03, dc)
 
 
 def _hull_white():
-    return itofin.HullWhite(_flat_curve(), 0.05, 0.01)
+    return HullWhite(_flat_curve(), 0.05, 0.01)
 
 
 def test_ctor_round_trips_params():
@@ -24,25 +30,25 @@ def test_r0_matches_flat_zero_rate():
 
 def test_discount_bond_option_finite_nonnegative():
     hw = _hull_white()
-    value = hw.discount_bond_option(itofin.OptionType.Call, 0.9, 1.0, 3.0)
+    value = hw.discount_bond_option(OptionType.Call, 0.9, 1.0, 3.0)
     assert value >= 0.0
     assert value == value
 
 
 def test_discount_bond_option_monotone_in_strike():
     hw = _hull_white()
-    itm = hw.discount_bond_option(itofin.OptionType.Call, 0.8, 1.0, 3.0)
-    otm = hw.discount_bond_option(itofin.OptionType.Call, 1.1, 1.0, 3.0)
+    itm = hw.discount_bond_option(OptionType.Call, 0.8, 1.0, 3.0)
+    otm = hw.discount_bond_option(OptionType.Call, 1.1, 1.0, 3.0)
     assert itm > otm
 
 
 def test_constraint_violation_raises():
-    with pytest.raises(itofin.ItofinError):
-        itofin.HullWhite(_flat_curve(), 0.05, -0.01)
+    with pytest.raises(ItofinError):
+        HullWhite(_flat_curve(), 0.05, -0.01)
 
 
 def test_euribor_six_months_builds():
-    settings = itofin.Settings()
-    settings.set_evaluation_date(itofin.Date(15, 1, 2026))
-    index = itofin.Euribor.six_months(_flat_curve(), settings)
+    settings = Settings()
+    settings.set_evaluation_date(Date(15, 1, 2026))
+    index = Euribor.six_months(_flat_curve(), settings)
     assert index is not None

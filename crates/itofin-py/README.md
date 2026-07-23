@@ -2,6 +2,8 @@
 
 Idiomatic Python bindings over the [`libitofin`](https://github.com/benbenbang/libitofin) Rust core, a ground-up port of [QuantLib](https://github.com/lballabio/QuantLib) for pricing, risk, and calibration. The heavy numerics run in Rust; Python drives them. The pricing snippets below reproduce the cached Rust test oracles exactly; the abbreviated calibration snippets converge to the same targets within the tests' calibration tolerance (the full matrices live in `tests/`).
 
+The API mirrors QuantLib's `ql/` layout: types live in submodules (`itofin.time`, `itofin.instruments`, `itofin.models`, ...), while `Settings` and `ItofinError` stay at the top level.
+
 ## Install
 
 ```bash
@@ -13,14 +15,17 @@ Requires Python >= 3.13.
 ## Price a European option and its greeks
 
 ```python
-import itofin
+from itofin import Settings
+from itofin.instruments import OptionType, VanillaOption
+from itofin.processes import BlackScholesProcess
+from itofin.time import Date, DayCounter
 
-s = itofin.Settings()
-s.set_evaluation_date(itofin.Date(15, 6, 2026))
-dc = itofin.DayCounter.actual360()
+s = Settings()
+s.set_evaluation_date(Date(15, 6, 2026))
+dc = DayCounter.actual360()
 
-process = itofin.BlackScholesProcess(60.0, 0.08, 0.0, 0.30, itofin.Date(15, 6, 2026), dc)
-option = itofin.VanillaOption(itofin.OptionType.Call, 65.0, itofin.Date(15, 6, 2026) + 90, s)
+process = BlackScholesProcess(60.0, 0.08, 0.0, 0.30, Date(15, 6, 2026), dc)
+option = VanillaOption(OptionType.Call, 65.0, Date(15, 6, 2026) + 90, s)
 option.set_engine(process)
 
 print(f"NPV   {option.npv():.10f}")
@@ -41,18 +46,22 @@ rho   5.0538998582
 Semi-analytic Heston pricing:
 
 ```python
-import itofin
+from itofin import Settings
+from itofin.instruments import OptionType, VanillaOption
+from itofin.models import HestonModel
+from itofin.processes import HestonProcess
+from itofin.time import Date, DayCounter
 
-s = itofin.Settings()
-s.set_evaluation_date(itofin.Date(27, 12, 2004))
-dc = itofin.DayCounter.actual_actual_isda()
+s = Settings()
+s.set_evaluation_date(Date(27, 12, 2004))
+dc = DayCounter.actual_actual_isda()
 
 # HestonProcess(risk_free, dividend, spot, v0, kappa, theta, sigma, rho, reference_date, day_counter)
-process = itofin.HestonProcess(
-    0.0225, 0.02, 1.0, 0.1, 3.16, 0.09, 0.4, -0.2, itofin.Date(27, 12, 2004), dc
+process = HestonProcess(
+    0.0225, 0.02, 1.0, 0.1, 3.16, 0.09, 0.4, -0.2, Date(27, 12, 2004), dc
 )
-model = itofin.HestonModel(process)
-option = itofin.VanillaOption(itofin.OptionType.Call, 1.05, itofin.Date(28, 3, 2005), s)
+model = HestonModel(process)
+option = VanillaOption(OptionType.Call, 1.05, Date(28, 3, 2005), s)
 option.set_heston_engine(model, 64)
 
 print(f"Heston NPV {option.npv():.10f}")
@@ -66,14 +75,20 @@ Calibrating the model to a flat 10% vol surface drives the vol-of-vol `sigma` to
 
 ```python
 import math
-import itofin
 
-s = itofin.Settings()
-s.set_evaluation_date(itofin.Date(15, 1, 2026))
-dc = itofin.DayCounter.actual360()
-ref = itofin.Date(15, 1, 2026)
-risk_free = itofin.FlatForward(ref, 0.04, dc)
-dividend = itofin.FlatForward(ref, 0.50, dc)
+from itofin import Settings
+from itofin.models import CalibrationErrorType, HestonModel, HestonModelHelper
+from itofin.optimization import EndCriteria, LevenbergMarquardt
+from itofin.processes import HestonProcess
+from itofin.termstructures import FlatForward
+from itofin.time import Calendar, Date, DayCounter, Period
+
+s = Settings()
+s.set_evaluation_date(Date(15, 1, 2026))
+dc = DayCounter.actual360()
+ref = Date(15, 1, 2026)
+risk_free = FlatForward(ref, 0.04, dc)
+dividend = FlatForward(ref, 0.50, dc)
 VOL = 0.10
 
 helpers = []
@@ -82,24 +97,24 @@ for n in (1, 2, 3):
     forward = dividend.discount(tau) / risk_free.discount(tau)  # spot = 1.0
     for moneyness in (-1.0, 0.0, 1.0):
         strike = forward * math.exp(-moneyness * VOL * math.sqrt(tau))
-        helpers.append(itofin.HestonModelHelper(
-            itofin.Period(n, "Years"),
-            itofin.Calendar.null_calendar(),
+        helpers.append(HestonModelHelper(
+            Period(n, "Years"),
+            Calendar.null_calendar(),
             1.0,        # spot
             strike,
             VOL,        # 10% flat vol
             0.04,       # risk-free
             0.50,       # dividend yield
-            itofin.CalibrationErrorType.RelativePriceError,
+            CalibrationErrorType.RelativePriceError,
             ref,
             dc,
             s,
         ))
 
-process = itofin.HestonProcess(0.04, 0.50, 1.0, 0.01, 0.2, 0.02, 0.5, -0.75, ref, dc)
-model = itofin.HestonModel(process)
-method = itofin.LevenbergMarquardt(1e-8, 1e-8, 1e-8, False)
-end_criteria = itofin.EndCriteria(400, 40, 1e-8, 1e-8, 1e-8)
+process = HestonProcess(0.04, 0.50, 1.0, 0.01, 0.2, 0.02, 0.5, -0.75, ref, dc)
+model = HestonModel(process)
+method = LevenbergMarquardt(1e-8, 1e-8, 1e-8, False)
+end_criteria = EndCriteria(400, 40, 1e-8, 1e-8, 1e-8)
 model.calibrate(helpers, method, end_criteria, 96)
 
 print(f"sigma {model.sigma():.6f}")
@@ -116,35 +131,40 @@ theta 0.010000
 ## Calibrate Hull-White to a swaption matrix
 
 ```python
-import itofin
+from itofin import Settings
+from itofin.indexes import Euribor
+from itofin.models import CalibrationErrorType, HullWhite, SwaptionHelper
+from itofin.optimization import EndCriteria, LevenbergMarquardt
+from itofin.termstructures import FlatForward
+from itofin.time import Date, DayCounter, Period
 
-s = itofin.Settings()
-s.set_evaluation_date(itofin.Date(15, 2, 2002))
-curve = itofin.FlatForward(itofin.Date(19, 2, 2002), 0.04875825, itofin.DayCounter.actual365_fixed())
+s = Settings()
+s.set_evaluation_date(Date(15, 2, 2002))
+curve = FlatForward(Date(19, 2, 2002), 0.04875825, DayCounter.actual365_fixed())
 
-model = itofin.HullWhite(curve, 0.1, 0.01)
-index = itofin.Euribor.six_months(curve, s)
+model = HullWhite(curve, 0.1, 0.01)
+index = Euribor.six_months(curve, s)
 
 # (option tenor, swap tenor, Black vol); the full co-terminal matrix is in the tests.
 swaptions = [(1, 5, 0.1148), (2, 4, 0.1108), (3, 3, 0.1070), (4, 2, 0.1021), (5, 1, 0.1000)]
 helpers = [
-    itofin.SwaptionHelper(
-        itofin.Period(maturity, "Years"),
-        itofin.Period(length, "Years"),
+    SwaptionHelper(
+        Period(maturity, "Years"),
+        Period(length, "Years"),
         vol,
         index,
-        itofin.Period(1, "Years"),
-        itofin.DayCounter.thirty360_bond_basis(),
-        itofin.DayCounter.actual360(),
+        Period(1, "Years"),
+        DayCounter.thirty360_bond_basis(),
+        DayCounter.actual360(),
         curve,
-        itofin.CalibrationErrorType.RelativePriceError,
+        CalibrationErrorType.RelativePriceError,
         1.0,
     )
     for maturity, length, vol in swaptions
 ]
 
-method = itofin.LevenbergMarquardt(1e-8, 1e-8, 1e-8, False)
-end_criteria = itofin.EndCriteria(10000, 100, 1e-6, 1e-8, 1e-8)
+method = LevenbergMarquardt(1e-8, 1e-8, 1e-8, False)
+end_criteria = EndCriteria(10000, 100, 1e-6, 1e-8, 1e-8)
 model.calibrate(helpers, method, end_criteria, False)  # fix_reversion=False, fit a and sigma
 
 print(f"a     {model.a():.7f}")
@@ -159,34 +179,46 @@ sigma 0.0057992
 ## Price a European swaption with the Jamshidian engine
 
 ```python
-import itofin
+from itofin import Settings
+from itofin.indexes import Euribor
+from itofin.instruments import (
+    EuropeanExercise,
+    SettlementMethod,
+    SettlementType,
+    Swaption,
+    SwapType,
+    VanillaSwap,
+)
+from itofin.models import HullWhite
+from itofin.termstructures import FlatForward
+from itofin.time import BusinessDayConvention, Calendar, Date, DayCounter, Frequency, Schedule
 
-s = itofin.Settings()
-s.set_evaluation_date(itofin.Date(15, 1, 2026))
-curve = itofin.FlatForward(itofin.Date(15, 1, 2026), 0.03, itofin.DayCounter.actual365_fixed())
+s = Settings()
+s.set_evaluation_date(Date(15, 1, 2026))
+curve = FlatForward(Date(15, 1, 2026), 0.03, DayCounter.actual365_fixed())
 
-fixed = itofin.Schedule(
-    itofin.Date(15, 1, 2028), itofin.Date(15, 1, 2033),
-    itofin.Frequency.Annual, itofin.Calendar.target(),
-    itofin.BusinessDayConvention.Unadjusted,
+fixed = Schedule(
+    Date(15, 1, 2028), Date(15, 1, 2033),
+    Frequency.Annual, Calendar.target(),
+    BusinessDayConvention.Unadjusted,
 )
-floating = itofin.Schedule(
-    itofin.Date(15, 1, 2028), itofin.Date(15, 1, 2033),
-    itofin.Frequency.Semiannual, itofin.Calendar.target(),
-    itofin.BusinessDayConvention.Unadjusted,
+floating = Schedule(
+    Date(15, 1, 2028), Date(15, 1, 2033),
+    Frequency.Semiannual, Calendar.target(),
+    BusinessDayConvention.Unadjusted,
 )
-index = itofin.Euribor.six_months(curve, s)
+index = Euribor.six_months(curve, s)
 
-swap = itofin.VanillaSwap(
-    itofin.SwapType.Payer, 100.0,
-    fixed, 0.03, itofin.DayCounter.thirty360_bond_basis(),
-    floating, index, 0.0, itofin.DayCounter.actual360(), s,
+swap = VanillaSwap(
+    SwapType.Payer, 100.0,
+    fixed, 0.03, DayCounter.thirty360_bond_basis(),
+    floating, index, 0.0, DayCounter.actual360(), s,
 )
-swaption = itofin.Swaption(
-    swap, itofin.EuropeanExercise(itofin.Date(15, 1, 2027)),
-    itofin.SettlementType.Physical, itofin.SettlementMethod.PhysicalOTC, s,
+swaption = Swaption(
+    swap, EuropeanExercise(Date(15, 1, 2027)),
+    SettlementType.Physical, SettlementMethod.PhysicalOTC, s,
 )
-swaption.set_jamshidian_engine(itofin.HullWhite(curve, 0.05, 0.01))
+swaption.set_jamshidian_engine(HullWhite(curve, 0.05, 0.01))
 
 print(f"payer swaption NPV {swaption.npv():.10f}")
 ```
