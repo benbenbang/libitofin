@@ -33,7 +33,6 @@ impl PyLevenbergMarquardt {
 
 impl PyLevenbergMarquardt {
     /// The wrapped core method, mutably, for the `calibrate` free function.
-    #[allow(dead_code)]
     pub(crate) fn inner_mut(&mut self) -> &mut LevenbergMarquardt {
         &mut self.inner
     }
@@ -82,7 +81,6 @@ impl PyEndCriteria {
 
 impl PyEndCriteria {
     /// The wrapped core criteria; `calibrate` borrows it as `&EndCriteria`.
-    #[allow(dead_code)]
     pub(crate) fn inner(&self) -> &EndCriteria {
         &self.inner
     }
@@ -104,7 +102,6 @@ pub enum PyCalibrationErrorType {
 
 impl PyCalibrationErrorType {
     /// The core [`CalibrationErrorType`] this variant stands for.
-    #[allow(dead_code)]
     pub(crate) fn inner(self) -> CalibrationErrorType {
         match self {
             PyCalibrationErrorType::RelativePriceError => CalibrationErrorType::RelativePriceError,
