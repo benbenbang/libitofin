@@ -8,6 +8,7 @@ use libitofin::time::daycounter::DayCounter;
 use libitofin::time::daycounters::actual360::Actual360;
 use libitofin::time::daycounters::actual365fixed::Actual365Fixed;
 use libitofin::time::daycounters::actualactual::{ActualActual, Convention};
+use libitofin::time::daycounters::thirty360::{Convention as Thirty360Convention, Thirty360};
 use libitofin::time::period::Period;
 use libitofin::time::timeunit::TimeUnit;
 use pyo3::prelude::*;
@@ -153,6 +154,15 @@ impl PyDayCounter {
     fn actual_actual_isda() -> Self {
         PyDayCounter {
             inner: ActualActual::with_convention(Convention::ISDA),
+        }
+    }
+
+    /// `Thirty360(Thirty360::BondBasis)`: the fixed-leg day count the Hull-White
+    /// swaption-calibration oracle anchors on (`hullwhite.rs:835`).
+    #[staticmethod]
+    fn thirty360_bond_basis() -> Self {
+        PyDayCounter {
+            inner: Thirty360::with_convention(Thirty360Convention::BondBasis),
         }
     }
 
