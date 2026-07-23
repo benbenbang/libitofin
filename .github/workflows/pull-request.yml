@@ -32,6 +32,8 @@ jobs:
 
       - name: install rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
 
       - name: set up python
         uses: actions/setup-python@v5
@@ -39,7 +41,7 @@ jobs:
           python-version: "3.13"
 
       - name: install maturin and pytest
-        run: pip install maturin pytest
+        run: pip install --no-cache-dir maturin pytest
 
       - name: build and install the itofin extension module
         run: |
