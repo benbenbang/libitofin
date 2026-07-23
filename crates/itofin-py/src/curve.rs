@@ -2,11 +2,13 @@
 //! base and the concrete [`PyFlatForward`] curve.
 
 use crate::PyQlError;
-use crate::time::{PyDate, PyDayCounter};
+use crate::time::{PyCalendar, PyDate, PyDayCounter};
 use libitofin::handle::Handle;
 use libitofin::interestrate::Compounding;
+use libitofin::math::interpolations::flat::BackwardFlat;
+use libitofin::math::interpolations::linear::Linear;
 use libitofin::shared::{Shared, shared};
-use libitofin::termstructures::yields::FlatForward;
+use libitofin::termstructures::yields::{DiscountCurve, FlatForward, ForwardCurve, ZeroCurve};
 use libitofin::termstructures::yieldtermstructure::YieldTermStructure;
 use libitofin::time::frequency::Frequency;
 use pyo3::prelude::*;
@@ -167,5 +169,102 @@ impl PyFlatForward {
             inner: Handle::new(curve),
         })
         .add_subclass(PyFlatForward)
+    }
+}
+
+/// Python `ZeroCurve`: a yield curve built from (date, continuously-compounded
+/// zero-rate) nodes, interpolating linearly in zero-rate space
+/// (`termstructures::yields::ZeroCurve = InterpolatedZeroCurve<Linear>`).
+///
+/// Extends [`PyYieldTermStructure`]; the first date is the reference date and
+/// the query surface is inherited. Finite in time: queries past the last node
+/// require `enable_extrapolation()` or `extrapolate=True`.
+#[pyclass(name = "ZeroCurve", extends = PyYieldTermStructure, unsendable)]
+pub struct PyZeroCurve;
+
+#[pymethods]
+impl PyZeroCurve {
+    #[new]
+    fn new(
+        dates: Vec<PyRef<PyDate>>,
+        yields: Vec<f64>,
+        day_counter: &PyDayCounter,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        let dates: Vec<_> = dates.iter().map(|d| d.inner()).collect();
+        let curve = shared(
+            ZeroCurve::new(dates, yields, day_counter.inner(), Linear).map_err(PyQlError::from)?,
+        ) as Shared<dyn YieldTermStructure>;
+        Ok(PyClassInitializer::from(PyYieldTermStructure {
+            inner: Handle::new(curve),
+        })
+        .add_subclass(PyZeroCurve))
+    }
+}
+
+/// Python `DiscountCurve`: a yield curve built from (date, discount-factor)
+/// nodes, interpolating log-linearly for piecewise-constant forwards
+/// (`termstructures::yields::DiscountCurve = InterpolatedDiscountCurve<LogLinear>`).
+///
+/// Extends [`PyYieldTermStructure`]; the first date is the reference date and
+/// its discount must be 1.0. Unlike the other two curves this constructor
+/// accepts an optional calendar. Finite in time: queries past the last node
+/// require `enable_extrapolation()` or `extrapolate=True`.
+#[pyclass(name = "DiscountCurve", extends = PyYieldTermStructure, unsendable)]
+pub struct PyDiscountCurve;
+
+#[pymethods]
+impl PyDiscountCurve {
+    #[new]
+    #[pyo3(signature = (dates, discounts, day_counter, calendar = None))]
+    fn new(
+        dates: Vec<PyRef<PyDate>>,
+        discounts: Vec<f64>,
+        day_counter: &PyDayCounter,
+        calendar: Option<&PyCalendar>,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        let dates: Vec<_> = dates.iter().map(|d| d.inner()).collect();
+        let curve = shared(
+            DiscountCurve::new(
+                dates,
+                discounts,
+                day_counter.inner(),
+                calendar.map(PyCalendar::inner),
+            )
+            .map_err(PyQlError::from)?,
+        ) as Shared<dyn YieldTermStructure>;
+        Ok(PyClassInitializer::from(PyYieldTermStructure {
+            inner: Handle::new(curve),
+        })
+        .add_subclass(PyDiscountCurve))
+    }
+}
+
+/// Python `ForwardCurve`: a yield curve built from (date, instantaneous
+/// forward-rate) nodes, interpolating backward-flat
+/// (`termstructures::yields::ForwardCurve = InterpolatedForwardCurve<BackwardFlat>`).
+///
+/// Extends [`PyYieldTermStructure`]; the first date is the reference date and
+/// the query surface is inherited. Finite in time: queries past the last node
+/// require `enable_extrapolation()` or `extrapolate=True`.
+#[pyclass(name = "ForwardCurve", extends = PyYieldTermStructure, unsendable)]
+pub struct PyForwardCurve;
+
+#[pymethods]
+impl PyForwardCurve {
+    #[new]
+    fn new(
+        dates: Vec<PyRef<PyDate>>,
+        forwards: Vec<f64>,
+        day_counter: &PyDayCounter,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        let dates: Vec<_> = dates.iter().map(|d| d.inner()).collect();
+        let curve = shared(
+            ForwardCurve::new(dates, forwards, day_counter.inner(), BackwardFlat)
+                .map_err(PyQlError::from)?,
+        ) as Shared<dyn YieldTermStructure>;
+        Ok(PyClassInitializer::from(PyYieldTermStructure {
+            inner: Handle::new(curve),
+        })
+        .add_subclass(PyForwardCurve))
     }
 }
