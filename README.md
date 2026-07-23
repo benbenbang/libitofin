@@ -1,7 +1,9 @@
 # Lib-Itô-Fin
 
 [![Crates.io](https://img.shields.io/crates/v/libitofin)](https://crates.io/crates/libitofin)
+[![PyPI](https://img.shields.io/pypi/v/itofin)](https://pypi.org/project/itofin/)
 [![docs.rs](https://img.shields.io/docsrs/libitofin)](https://docs.rs/libitofin)
+[![Python](https://img.shields.io/pypi/pyversions/itofin)](https://pypi.org/project/itofin/)
 [![License: BSD-3-Clause](https://img.shields.io/crates/l/libitofin)](LICENSE)
 
 A ground-up port of [QuantLib](https://github.com/lballabio/QuantLib) — the
@@ -15,8 +17,9 @@ first, then a C ABI for everything else).
 > ⚠️ **Pre-1.0, under active development.** The core already prices European
 > options, Hull-White swaptions (with model calibration), and Heston options
 > end-to-end, but the API will change until 1.0 and parts of the pricing surface
-> — the numerical methods (lattices, Monte Carlo, finite differences) and the
-> language bindings — are still being filled in. See [Status](#status).
+> are still being filled in. The **Python bindings** (`itofin`) are published on
+> [PyPI](https://pypi.org/project/itofin/); a C ABI is planned. See
+> [Status](#status).
 
 ```sh
 cargo add libitofin
@@ -140,7 +143,7 @@ pre-commit run --all-files
 ```
 crates/libitofin/       the core library — FFI-agnostic, idiomatic Rust
 crates/libitofin-ffi/   extern "C" + cbindgen → C header          (planned)
-crates/itofin-py/       PyO3 + maturin → pip-installable wheel     (in progress)
+crates/itofin-py/       PyO3 + maturin → the `itofin` package       (on PyPI)
 QuantLib/               reference C++ tree + test oracle           (git-ignored symlink)
 ```
 
