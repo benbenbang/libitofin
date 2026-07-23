@@ -32,6 +32,35 @@ use libitofin::time::Date;
 // and analytic option engines are available today - see docs.rs.
 ```
 
+### Python
+
+The same engine is reachable from Python via [`itofin`](https://pypi.org/project/itofin/)
+(Python 3.13+). The API mirrors QuantLib's `ql/` layout: types live in submodules
+(`itofin.time`, `itofin.instruments`, `itofin.processes`, ...), while `Settings`
+and `ItofinError` stay at the top level.
+
+```sh
+pip install itofin
+```
+
+```python
+from itofin import Settings
+from itofin.instruments import OptionType, VanillaOption
+from itofin.processes import BlackScholesProcess
+from itofin.time import Date, DayCounter
+
+s = Settings()
+s.set_evaluation_date(Date(15, 6, 2026))
+dc = DayCounter.actual360()
+
+process = BlackScholesProcess(60.0, 0.08, 0.0, 0.30, Date(15, 6, 2026), dc)
+option = VanillaOption(OptionType.Call, 65.0, Date(15, 6, 2026) + 90, s)
+option.set_engine(process)
+
+print(f"NPV   {option.npv():.10f}")   # 2.1333684449
+print(f"delta {option.delta():.10f}")  # 0.3724827980
+```
+
 ## Why
 
 QuantLib is ~470k lines of mature, battle-tested C++ across 16 modules. This

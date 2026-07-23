@@ -9,12 +9,12 @@ therefore pins 17-Jan, not the naive 15th quoted in the issue body.
 
 import pytest
 
-from itofin import (
+from itofin import ItofinError
+from itofin.time import (
     BusinessDayConvention,
     Calendar,
     Date,
     Frequency,
-    ItofinError,
     Schedule,
 )
 

@@ -23,19 +23,17 @@ reproduces the core exactly, so the fixture stays apples-to-apples.
 
 import pytest
 
-from itofin import (
+from itofin import ItofinError, Settings
+from itofin.indexes import Euribor
+from itofin.instruments import SwapType, VanillaSwap
+from itofin.termstructures import FlatForward
+from itofin.time import (
     BusinessDayConvention,
     Calendar,
     Date,
     DayCounter,
-    Euribor,
-    FlatForward,
     Frequency,
-    ItofinError,
     Schedule,
-    Settings,
-    SwapType,
-    VanillaSwap,
 )
 
 PROBE_FAIR = 0.03048844643136293
