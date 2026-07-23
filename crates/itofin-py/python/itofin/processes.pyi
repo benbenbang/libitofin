@@ -1,10 +1,11 @@
 # Hand-written stubs for itofin.processes; sync manually with src/market.rs and
 # src/heston.rs (#517).
 
+from itofin.termstructures import BlackVolTermStructure, YieldTermStructure
 from itofin.time import Date, DayCounter
 
 class BlackScholesProcess:
-    """A flat-market generalized Black-Scholes process."""
+    """A generalized Black-Scholes process, built from scalars or curve objects."""
 
     def __init__(
         self,
@@ -15,6 +16,13 @@ class BlackScholesProcess:
         reference_date: Date,
         day_counter: DayCounter,
     ) -> None: ...
+    @staticmethod
+    def from_curves(
+        spot: float,
+        risk_free: YieldTermStructure,
+        dividend: YieldTermStructure,
+        vol: BlackVolTermStructure,
+    ) -> BlackScholesProcess: ...
     def risk_free_rate(self) -> float: ...
     def dividend_yield(self) -> float: ...
 

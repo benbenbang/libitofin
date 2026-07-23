@@ -34,7 +34,9 @@ use swaption::{PyEuropeanExercise, PySettlementMethod, PySettlementType, PySwapt
 use time::{
     PyBusinessDayConvention, PyCalendar, PyDate, PyDayCounter, PyFrequency, PyPeriod, PySchedule,
 };
-use vol::PyBlackVolTermStructure;
+use vol::{
+    PyBlackConstantVol, PyBlackVarianceCurve, PyBlackVarianceSurface, PyBlackVolTermStructure,
+};
 
 create_exception!(itofin, ItofinError, PyException);
 
@@ -91,6 +93,9 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     termstructures.add_class::<PyYieldTermStructure>()?;
     termstructures.add_class::<PyBlackVolTermStructure>()?;
     termstructures.add_class::<PyFlatForward>()?;
+    termstructures.add_class::<PyBlackConstantVol>()?;
+    termstructures.add_class::<PyBlackVarianceCurve>()?;
+    termstructures.add_class::<PyBlackVarianceSurface>()?;
 
     let processes = PyModule::new(py, "processes")?;
     processes.add_class::<PyBlackScholesProcess>()?;

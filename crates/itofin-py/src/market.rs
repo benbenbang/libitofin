@@ -1,7 +1,9 @@
 //! Facades for the market inputs: [`PySimpleQuote`] and [`PyBlackScholesProcess`].
 
 use crate::PyQlError;
+use crate::curve::PyYieldTermStructure;
 use crate::time::{PyDate, PyDayCounter};
+use crate::vol::PyBlackVolTermStructure;
 use libitofin::handle::Handle;
 use libitofin::interestrate::Compounding;
 use libitofin::processes::GeneralizedBlackScholesProcess;
@@ -96,6 +98,30 @@ impl PyBlackScholesProcess {
                 dividend_curve,
                 risk_free_curve,
                 vol,
+            )),
+        }
+    }
+
+    /// Builds a process from term-structure objects instead of scalars: a spot
+    /// level plus the risk-free curve, dividend curve, and Black vol surface.
+    ///
+    /// The three legs are bound by name and placed in the core's
+    /// `(x0, dividend, risk_free, vol)` order at the single call site, the same
+    /// r/q footgun the scalar constructor guards against.
+    #[staticmethod]
+    fn from_curves(
+        spot: f64,
+        risk_free: &PyYieldTermStructure,
+        dividend: &PyYieldTermStructure,
+        vol: &PyBlackVolTermStructure,
+    ) -> Self {
+        let x0 = Handle::new(shared(SimpleQuote::new(spot)) as Shared<dyn Quote>);
+        PyBlackScholesProcess {
+            inner: shared(GeneralizedBlackScholesProcess::new(
+                x0,
+                dividend.handle(),
+                risk_free.handle(),
+                vol.handle(),
             )),
         }
     }
