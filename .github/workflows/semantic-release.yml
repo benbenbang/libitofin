@@ -54,3 +54,65 @@ jobs:
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
         run: cargo publish -p libitofin --allow-dirty
+
+  build-python-wheels:
+    name: build itofin wheels (${{ matrix.os }})
+    needs: semantic-release
+    if: ${{ needs.semantic-release.outputs.new_release == 'true' }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: checkout the released tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.semantic-release.outputs.new_release_tag }}
+      - name: sync the workspace version to the release tag
+        shell: bash
+        env:
+          VER: ${{ needs.semantic-release.outputs.new_release_tag }}
+        run: |
+          python3 -c "import re,pathlib,os; v=os.environ['VER']; p=pathlib.Path('Cargo.toml'); p.write_text(re.sub(r'(?m)^version = \"[0-9]+\.[0-9]+\.[0-9]+\"', f'version = \"{v}\"', p.read_text()))"
+          grep -qF "version = \"${VER}\"" Cargo.toml || { echo "version sync failed: workspace version does not match ${VER}"; exit 1; }
+          grep -E "^version" Cargo.toml
+      - name: build wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          command: build
+          args: --release --out dist -m crates/itofin-py/Cargo.toml
+          manylinux: auto
+      - name: build sdist
+        if: matrix.os == 'ubuntu-latest'
+        uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist -m crates/itofin-py/Cargo.toml
+      - name: upload the built distributions
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}
+          path: dist
+
+  publish-pypi:
+    name: publish itofin to PyPI
+    needs: [semantic-release, build-python-wheels]
+    if: ${{ needs.semantic-release.outputs.new_release == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # mint the OIDC token PyPI trusted publishing verifies
+    environment: pypi
+    steps:
+      - name: download all built distributions
+        uses: actions/download-artifact@v4
+        with:
+          pattern: wheels-*
+          merge-multiple: true
+          path: dist
+      - name: publish to PyPI via OIDC trusted publishing
+        uses: pypa/gh-action-pypi-publish@release/v1
+        # For a TestPyPI dry-run, register a separate TestPyPI trusted publisher,
+        # then uncomment the override below (and remove it for the real publish):
+        # with:
+        #   repository-url: https://test.pypi.org/legacy/
