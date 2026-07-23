@@ -15,9 +15,10 @@ mod settings;
 mod swap;
 mod swaption;
 mod time;
+mod vol;
 
 use calibration::{PyCalibrationErrorType, PyEndCriteria, PyLevenbergMarquardt};
-use curve::PyFlatForward;
+use curve::{PyFlatForward, PyYieldTermStructure};
 use heston::{PyHestonModel, PyHestonModelHelper, PyHestonProcess};
 use hullwhite::{PyEuribor, PyHullWhite, PySwaptionHelper};
 use libitofin::errors::QlError;
@@ -33,6 +34,7 @@ use swaption::{PyEuropeanExercise, PySettlementMethod, PySettlementType, PySwapt
 use time::{
     PyBusinessDayConvention, PyCalendar, PyDate, PyDayCounter, PyFrequency, PyPeriod, PySchedule,
 };
+use vol::PyBlackVolTermStructure;
 
 create_exception!(itofin, ItofinError, PyException);
 
@@ -86,6 +88,8 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     quotes.add_class::<PySimpleQuote>()?;
 
     let termstructures = PyModule::new(py, "termstructures")?;
+    termstructures.add_class::<PyYieldTermStructure>()?;
+    termstructures.add_class::<PyBlackVolTermStructure>()?;
     termstructures.add_class::<PyFlatForward>()?;
 
     let processes = PyModule::new(py, "processes")?;

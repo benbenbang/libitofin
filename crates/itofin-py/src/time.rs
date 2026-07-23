@@ -113,6 +113,11 @@ impl PyDate {
         self.inner
     }
 
+    /// Wraps a core [`Date`] returned from a term-structure query.
+    pub(crate) fn from_inner(inner: Date) -> Self {
+        PyDate { inner }
+    }
+
     /// Shifts the date by `days`, guarding the serial range in `i64` so the
     /// core's `from_serial` never sees an out-of-range value or an `i32`
     /// overflow.
