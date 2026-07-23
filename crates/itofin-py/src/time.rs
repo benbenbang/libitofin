@@ -7,6 +7,7 @@ use libitofin::time::date::{Date, Month};
 use libitofin::time::daycounter::DayCounter;
 use libitofin::time::daycounters::actual360::Actual360;
 use libitofin::time::daycounters::actual365fixed::Actual365Fixed;
+use libitofin::time::daycounters::actualactual::{ActualActual, Convention};
 use libitofin::time::period::Period;
 use libitofin::time::timeunit::TimeUnit;
 use pyo3::prelude::*;
@@ -143,6 +144,15 @@ impl PyDayCounter {
     fn actual365_fixed() -> Self {
         PyDayCounter {
             inner: Actual365Fixed::new(),
+        }
+    }
+
+    /// `ActualActual(ActualActual::ISDA)`: the day count the Heston/Hull-White
+    /// flat-curve oracles anchor on (`test-suite` `flatRate`).
+    #[staticmethod]
+    fn actual_actual_isda() -> Self {
+        PyDayCounter {
+            inner: ActualActual::with_convention(Convention::ISDA),
         }
     }
 
