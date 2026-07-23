@@ -26,6 +26,7 @@ use option::{PyOptionType, PyVanillaOption};
 use pyo3::create_exception;
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
+use pyo3::types::PyDict;
 use settings::PySettings;
 use swap::{PySwapType, PyVanillaSwap};
 use swaption::{PyEuropeanExercise, PySettlementMethod, PySettlementType, PySwaption};
@@ -57,37 +58,81 @@ impl From<PyQlError> for PyErr {
     }
 }
 
+/// Registers the eight `ql/`-faithful submodules on `itofin`.
+///
+/// Nested PyO3 modules give attribute access (`itofin.time.Date`) but do not
+/// form a Python package, so `import itofin.time` / `from itofin.time import
+/// Date` fail unless each submodule is also inserted into `sys.modules` under
+/// its dotted name. The loop below does both: `add_submodule` for attribute
+/// access and `sys.modules["itofin.<name>"]` for real imports.
 #[pymodule]
 fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    let py = m.py();
+
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
-    m.add("ItofinError", m.py().get_type::<ItofinError>())?;
+    m.add("ItofinError", py.get_type::<ItofinError>())?;
     m.add_class::<PySettings>()?;
-    m.add_class::<PyDate>()?;
-    m.add_class::<PyDayCounter>()?;
-    m.add_class::<PyCalendar>()?;
-    m.add_class::<PyPeriod>()?;
-    m.add_class::<PyFrequency>()?;
-    m.add_class::<PyBusinessDayConvention>()?;
-    m.add_class::<PySchedule>()?;
-    m.add_class::<PySimpleQuote>()?;
-    m.add_class::<PyBlackScholesProcess>()?;
-    m.add_class::<PyFlatForward>()?;
-    m.add_class::<PyOptionType>()?;
-    m.add_class::<PyVanillaOption>()?;
-    m.add_class::<PyHestonProcess>()?;
-    m.add_class::<PyHestonModel>()?;
-    m.add_class::<PyHestonModelHelper>()?;
-    m.add_class::<PyHullWhite>()?;
-    m.add_class::<PyEuribor>()?;
-    m.add_class::<PySwaptionHelper>()?;
-    m.add_class::<PyLevenbergMarquardt>()?;
-    m.add_class::<PyEndCriteria>()?;
-    m.add_class::<PyCalibrationErrorType>()?;
-    m.add_class::<PySwapType>()?;
-    m.add_class::<PyVanillaSwap>()?;
-    m.add_class::<PyEuropeanExercise>()?;
-    m.add_class::<PySettlementType>()?;
-    m.add_class::<PySettlementMethod>()?;
-    m.add_class::<PySwaption>()?;
+
+    let time = PyModule::new(py, "time")?;
+    time.add_class::<PyDate>()?;
+    time.add_class::<PyPeriod>()?;
+    time.add_class::<PyCalendar>()?;
+    time.add_class::<PyDayCounter>()?;
+    time.add_class::<PyFrequency>()?;
+    time.add_class::<PyBusinessDayConvention>()?;
+    time.add_class::<PySchedule>()?;
+
+    let quotes = PyModule::new(py, "quotes")?;
+    quotes.add_class::<PySimpleQuote>()?;
+
+    let termstructures = PyModule::new(py, "termstructures")?;
+    termstructures.add_class::<PyFlatForward>()?;
+
+    let processes = PyModule::new(py, "processes")?;
+    processes.add_class::<PyBlackScholesProcess>()?;
+    processes.add_class::<PyHestonProcess>()?;
+
+    let indexes = PyModule::new(py, "indexes")?;
+    indexes.add_class::<PyEuribor>()?;
+
+    let instruments = PyModule::new(py, "instruments")?;
+    instruments.add_class::<PyOptionType>()?;
+    instruments.add_class::<PyVanillaOption>()?;
+    instruments.add_class::<PySwapType>()?;
+    instruments.add_class::<PyVanillaSwap>()?;
+    instruments.add_class::<PyEuropeanExercise>()?;
+    instruments.add_class::<PySettlementType>()?;
+    instruments.add_class::<PySettlementMethod>()?;
+    instruments.add_class::<PySwaption>()?;
+
+    let models = PyModule::new(py, "models")?;
+    models.add_class::<PyHestonModel>()?;
+    models.add_class::<PyHullWhite>()?;
+    models.add_class::<PyHestonModelHelper>()?;
+    models.add_class::<PySwaptionHelper>()?;
+    models.add_class::<PyCalibrationErrorType>()?;
+
+    let optimization = PyModule::new(py, "optimization")?;
+    optimization.add_class::<PyLevenbergMarquardt>()?;
+    optimization.add_class::<PyEndCriteria>()?;
+
+    let submodules = [
+        ("time", &time),
+        ("quotes", &quotes),
+        ("termstructures", &termstructures),
+        ("processes", &processes),
+        ("indexes", &indexes),
+        ("instruments", &instruments),
+        ("models", &models),
+        ("optimization", &optimization),
+    ];
+
+    let sys_modules = PyModule::import(py, "sys")?.getattr("modules")?;
+    let sys_modules = sys_modules.cast::<PyDict>()?;
+    for (name, submodule) in submodules {
+        m.add_submodule(submodule)?;
+        sys_modules.set_item(format!("itofin.{name}"), submodule)?;
+    }
+
     Ok(())
 }
