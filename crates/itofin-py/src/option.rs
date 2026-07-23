@@ -1,6 +1,7 @@
 //! Facades for the option instrument: [`PyOptionType`] and [`PyVanillaOption`].
 
 use crate::PyQlError;
+use crate::heston::PyHestonModel;
 use crate::market::PyBlackScholesProcess;
 use crate::settings::PySettings;
 use crate::time::PyDate;
@@ -10,6 +11,7 @@ use libitofin::instruments::{PlainVanillaPayoff, StrikedTypePayoff, VanillaOptio
 use libitofin::option::OptionType;
 use libitofin::pricingengine::PricingEngine;
 use libitofin::pricingengines::AnalyticEuropeanEngine;
+use libitofin::pricingengines::vanilla::analytichestonengine::AnalyticHestonEngine;
 use libitofin::shared::{Shared, SharedMut, shared, shared_mut};
 use pyo3::prelude::*;
 
@@ -65,6 +67,25 @@ impl PyVanillaOption {
         self.inner
             .base_mut()
             .set_pricing_engine(engine as SharedMut<dyn PricingEngine>);
+    }
+
+    /// Attaches an analytic Heston engine built on `model` with a Gauss-Laguerre
+    /// integration of `integration_order` (fallible: order > 192 errors).
+    ///
+    /// The analytic Heston engine fills only `results.value`, so `npv()` works
+    /// but the greeks (`delta()`, `gamma()`, ...) raise `ItofinError` ("not
+    /// provided") on this path.
+    fn set_heston_engine(
+        &mut self,
+        model: &PyHestonModel,
+        integration_order: usize,
+    ) -> PyResult<()> {
+        let engine =
+            AnalyticHestonEngine::new(model.inner(), integration_order).map_err(PyQlError::from)?;
+        self.inner
+            .base_mut()
+            .set_pricing_engine(shared_mut(engine) as SharedMut<dyn PricingEngine>);
+        Ok(())
     }
 
     /// The present value, erroring when no evaluation date or engine is set.

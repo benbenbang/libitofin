@@ -7,6 +7,7 @@
 
 mod calibration;
 mod curve;
+mod heston;
 mod market;
 mod option;
 mod settings;
@@ -14,6 +15,7 @@ mod time;
 
 use calibration::{PyCalibrationErrorType, PyEndCriteria, PyLevenbergMarquardt};
 use curve::PyFlatForward;
+use heston::{PyHestonModel, PyHestonProcess};
 use libitofin::errors::QlError;
 use market::{PyBlackScholesProcess, PySimpleQuote};
 use option::{PyOptionType, PyVanillaOption};
@@ -61,6 +63,8 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyFlatForward>()?;
     m.add_class::<PyOptionType>()?;
     m.add_class::<PyVanillaOption>()?;
+    m.add_class::<PyHestonProcess>()?;
+    m.add_class::<PyHestonModel>()?;
     m.add_class::<PyLevenbergMarquardt>()?;
     m.add_class::<PyEndCriteria>()?;
     m.add_class::<PyCalibrationErrorType>()?;
