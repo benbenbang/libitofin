@@ -29,7 +29,7 @@ pub enum PyOptionType {
 
 impl PyOptionType {
     /// The core [`OptionType`] this variant stands for.
-    fn inner(self) -> OptionType {
+    pub(crate) fn inner(self) -> OptionType {
         match self {
             PyOptionType::Call => OptionType::Call,
             PyOptionType::Put => OptionType::Put,
