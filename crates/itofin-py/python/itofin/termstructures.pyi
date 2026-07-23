@@ -79,6 +79,19 @@ class ForwardCurve(YieldTermStructure):
         day_counter: DayCounter,
     ) -> None: ...
 
+class PiecewiseYieldCurve(YieldTermStructure):
+    """A yield curve bootstrapped from a strip of rate helpers, one node per
+    helper maturity. The bootstrap is lazy: it runs on the first query, not at
+    construction. interpolation is "LogLinear" (default) or "Linear"."""
+
+    def __init__(
+        self,
+        reference_date: Date,
+        helpers: list[RateHelper],
+        day_counter: DayCounter,
+        interpolation: str = "LogLinear",
+    ) -> None: ...
+
 class BlackConstantVol(BlackVolTermStructure):
     """A flat Black volatility, constant in strike and time."""
 
