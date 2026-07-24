@@ -19,9 +19,9 @@
 //!
 //! ## Scope
 //!
-//! The `Discount` and `ZeroYield` traits are ported. `SimpleZeroYield`
-//! (`bootstraptraits.hpp:312`) is a documented deferral: it adds a `-1/t`
-//! rate floor and exp/log transforms this port does not need yet.
+//! The `Discount`, `ZeroYield` and `ForwardRate` traits are ported.
+//! `SimpleZeroYield` (`bootstraptraits.hpp:312`) is a documented deferral: it
+//! adds a `-1/t` rate floor and exp/log transforms this port does not need yet.
 
 use crate::errors::QlResult;
 use crate::math::interpolations::{Interpolation, Interpolator};
@@ -243,6 +243,60 @@ impl BootstrapTraits for ZeroYield {
             (z_max * t_max + inst_fwd_max * (t - t_max)) / t
         };
         Ok((-z * t).exp())
+    }
+}
+
+/// Forward-rate bootstrap traits (`struct ForwardRate`,
+/// `bootstraptraits.hpp:220`). The curve nodes are instantaneous forward rates;
+/// the guess, bracket and update are identical to [`ZeroYield`] (both store
+/// rates), and only the node-to-discount conversion differs - it integrates the
+/// forward instead of scaling a zero rate.
+pub struct ForwardRate;
+
+impl BootstrapTraits for ForwardRate {
+    fn initial_value() -> Real {
+        AVG_RATE
+    }
+
+    fn guess(i: Size, _times: &[Time], data: &[Real], valid_data: bool) -> Real {
+        rate_guess(i, data, valid_data)
+    }
+
+    fn min_value_after(_i: Size, _times: &[Time], data: &[Real], valid_data: bool) -> Real {
+        rate_min_value_after(data, valid_data)
+    }
+
+    fn max_value_after(_i: Size, _times: &[Time], data: &[Real], valid_data: bool) -> Real {
+        rate_max_value_after(data, valid_data)
+    }
+
+    fn update_guess(data: &mut [Real], value: Real, i: Size) {
+        rate_update_guess(data, value, i);
+    }
+
+    fn max_iterations() -> Size {
+        100
+    }
+
+    /// The node is an instantaneous forward `f(t)`, so the discount factor is
+    /// `exp(-int_0^t f)`. The interpolation's antiderivative gives the integral
+    /// in range; past the last solved node the forward continues flat, mirroring
+    /// `InterpolatedForwardCurve::zeroYieldImpl` (`forwardcurve.rs:169-183`).
+    /// At `t = 0` the antiderivative is zero, so the factor is 1 with no special
+    /// case. `LogLinear` has no closed-form primitive and errors here, which is
+    /// why `ForwardRate` is only wired with `Linear`/`BackwardFlat`.
+    fn discount_from_nodes<I: Interpolation>(
+        interpolation: &I,
+        t: Time,
+    ) -> QlResult<DiscountFactor> {
+        let t_max = interpolation.x_max();
+        let integral = if t <= t_max {
+            interpolation.primitive(t)?
+        } else {
+            let last_forward = interpolation.value(t_max)?;
+            interpolation.primitive(t_max)? + last_forward * (t - t_max)
+        };
+        Ok((-integral).exp())
     }
 }
 

@@ -276,12 +276,13 @@ mod tests {
     use crate::indexes::iborindex::IborIndex;
     use crate::indexes::index::Index;
     use crate::instruments::MakeVanillaSwap;
+    use crate::math::interpolations::flat::BackwardFlat;
     use crate::math::interpolations::linear::Linear;
     use crate::math::interpolations::loglinear::LogLinear;
     use crate::quotes::{Quote, SimpleQuote};
     use crate::settings::Settings;
     use crate::shared::shared;
-    use crate::termstructures::bootstraptraits::{Discount, ZeroYield};
+    use crate::termstructures::bootstraptraits::{Discount, ForwardRate, ZeroYield};
     use crate::termstructures::yields::{DepositRateHelper, SwapRateHelper};
     use crate::time::businessdayconvention::BusinessDayConvention;
     use crate::time::calendars::target::Target;
@@ -475,6 +476,34 @@ mod tests {
         assert_eq!(
             data[0], data[1],
             "the reference zero rate must mirror the first solved pillar"
+        );
+    }
+
+    /// `testLinearForwardConsistency` -> `<ForwardRate, Linear>`
+    /// (`piecewiseyieldcurve.cpp:728,735`). The BMA half (`:736`) is skipped.
+    /// The node `[0]` assertion has the same rationale as
+    /// [`linear_zero_consistency`]: `ForwardRate::update_guess` mirrors the
+    /// first solved forward into the reference node and no repriced instrument
+    /// covers `(0, t1)` to catch a missing mirror.
+    #[test]
+    fn linear_forward_consistency() {
+        let curve = check_curve_consistency::<ForwardRate, Linear>();
+        let data = curve.data().unwrap();
+        assert_eq!(
+            data[0], data[1],
+            "the reference forward must mirror the first solved pillar"
+        );
+    }
+
+    /// `testFlatForwardConsistency` -> `<ForwardRate, BackwardFlat>`
+    /// (`piecewiseyieldcurve.cpp:747,754`). The BMA half (`:755`) is skipped.
+    #[test]
+    fn flat_forward_consistency() {
+        let curve = check_curve_consistency::<ForwardRate, BackwardFlat>();
+        let data = curve.data().unwrap();
+        assert_eq!(
+            data[0], data[1],
+            "the reference forward must mirror the first solved pillar"
         );
     }
 
