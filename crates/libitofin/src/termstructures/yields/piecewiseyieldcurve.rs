@@ -216,7 +216,8 @@ impl<T: BootstrapTraits + 'static, I: Interpolator + 'static> YieldTermStructure
     }
 
     fn discount_impl(&self, t: Time) -> QlResult<DiscountFactor> {
-        self.data.borrow().discount(t)
+        let data = self.data.borrow();
+        T::discount_from_nodes(data.interpolation()?, t)
     }
 }
 
