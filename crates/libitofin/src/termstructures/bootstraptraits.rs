@@ -19,11 +19,9 @@
 //!
 //! ## Scope
 //!
-//! Only the `Discount` traits are ported (`Discount` + `LogLinear`/`Linear`
-//! interpolation is the ticket's scope). `ZeroYield`, `ForwardRate` and
-//! `SimpleZeroYield` are a documented deferral: their `guess`/`initialValue`
-//! differ (they store rates, not discount factors) and need the zero/forward
-//! curve types this layer does not build yet.
+//! The `Discount` and `ZeroYield` traits are ported. `SimpleZeroYield`
+//! (`bootstraptraits.hpp:312`) is a documented deferral: it adds a `-1/t`
+//! rate floor and exp/log transforms this port does not need yet.
 
 use crate::errors::QlResult;
 use crate::math::interpolations::{Interpolation, Interpolator};
@@ -143,6 +141,108 @@ impl BootstrapTraits for Discount {
         let d_max = interpolation.value(t_max)?;
         let inst_fwd_max = -interpolation.derivative(t_max)? / d_max;
         Ok(d_max * (-inst_fwd_max * (t - t_max)).exp())
+    }
+}
+
+/// The per-node guess the rate-storing conventions share (`ZeroYield`/
+/// `ForwardRate` `guess`, `bootstraptraits.hpp:147-163`/`:246-256`). The C++
+/// extrapolation branch reprices the partial curve's own `zeroRate`/
+/// `forwardRate`; the Rust trait only receives the node slices, so this returns
+/// the last solved node instead. That is benign by construction: the guess only
+/// seeds a bracketed solver whose converged root is independent of it, and the
+/// caller already clamps the guess into `[min, max]`
+/// (`iterativebootstrap.rs:182-186`).
+fn rate_guess(i: Size, data: &[Real], valid_data: bool) -> Real {
+    if valid_data {
+        return data[i];
+    }
+    if i == 1 {
+        return AVG_RATE;
+    }
+    data[i - 1]
+}
+
+/// The lower bracket the rate-storing conventions share (`minValueAfter`,
+/// `:167-179`/`:266-278`): half a positive minimum, double a negative one, or
+/// an unconstrained `-maxRate` on a fresh curve.
+fn rate_min_value_after(data: &[Real], valid_data: bool) -> Real {
+    if valid_data {
+        let r = data.iter().copied().fold(Real::INFINITY, Real::min);
+        return if r < 0.0 { r * 2.0 } else { r / 2.0 };
+    }
+    -MAX_RATE
+}
+
+/// The upper bracket the rate-storing conventions share (`maxValueAfter`,
+/// `:180-193`/`:279-292`): double a positive maximum, half a negative one, or
+/// an unconstrained `+maxRate` on a fresh curve.
+fn rate_max_value_after(data: &[Real], valid_data: bool) -> Real {
+    if valid_data {
+        let r = data.iter().copied().fold(Real::NEG_INFINITY, Real::max);
+        return if r < 0.0 { r / 2.0 } else { r * 2.0 };
+    }
+    MAX_RATE
+}
+
+/// The solved-value write the rate-storing conventions share (`updateGuess`,
+/// `:207-214`/`:306-313`): node `i` takes the rate, and the reference node
+/// mirrors the first pillar so the `(0, t1)` segment is not left at
+/// `initial_value`.
+fn rate_update_guess(data: &mut [Real], value: Real, i: Size) {
+    data[i] = value;
+    if i == 1 {
+        data[0] = value;
+    }
+}
+
+/// Zero-yield bootstrap traits (`struct ZeroYield`, `bootstraptraits.hpp:127`).
+/// The curve nodes are continuously compounded zero rates; the reference node
+/// starts at the average rate and the bracket keeps each rate within
+/// `[-maxRate, maxRate]` on a fresh pass.
+pub struct ZeroYield;
+
+impl BootstrapTraits for ZeroYield {
+    fn initial_value() -> Real {
+        AVG_RATE
+    }
+
+    fn guess(i: Size, _times: &[Time], data: &[Real], valid_data: bool) -> Real {
+        rate_guess(i, data, valid_data)
+    }
+
+    fn min_value_after(_i: Size, _times: &[Time], data: &[Real], valid_data: bool) -> Real {
+        rate_min_value_after(data, valid_data)
+    }
+
+    fn max_value_after(_i: Size, _times: &[Time], data: &[Real], valid_data: bool) -> Real {
+        rate_max_value_after(data, valid_data)
+    }
+
+    fn update_guess(data: &mut [Real], value: Real, i: Size) {
+        rate_update_guess(data, value, i);
+    }
+
+    fn max_iterations() -> Size {
+        100
+    }
+
+    /// The node is a zero rate `z(t)`, so the discount factor is `exp(-z*t)`.
+    /// In range the rate is the interpolated value; past the last solved node
+    /// the last instantaneous forward continues flat, mirroring
+    /// `InterpolatedZeroCurve::zeroYieldImpl` (`zerocurve.rs:164-182`).
+    fn discount_from_nodes<I: Interpolation>(
+        interpolation: &I,
+        t: Time,
+    ) -> QlResult<DiscountFactor> {
+        let t_max = interpolation.x_max();
+        let z = if t <= t_max {
+            interpolation.value(t)?
+        } else {
+            let z_max = interpolation.value(t_max)?;
+            let inst_fwd_max = z_max + t_max * interpolation.derivative(t_max)?;
+            (z_max * t_max + inst_fwd_max * (t - t_max)) / t
+        };
+        Ok((-z * t).exp())
     }
 }
 

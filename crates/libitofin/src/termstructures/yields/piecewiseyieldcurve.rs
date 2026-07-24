@@ -25,9 +25,10 @@
 //!
 //! ## Scope and deferrals
 //!
-//! - Generic over the interpolator; the traits are a type parameter. This
-//!   ticket ports `Discount` with `LogLinear`/`Linear`; `ZeroYield`/`ForwardRate`
-//!   and the spline interpolators are deferred with their traits.
+//! - Generic over the interpolator; the traits are a type parameter. The
+//!   `Discount` (`LogLinear`/`Linear`) and `ZeroYield` (`Linear`) conventions
+//!   are wired; the spline interpolators are deferred (they need the global
+//!   convergence loop, unported).
 //! - `MultiCurveBootstrapProvider` (`ql/termstructures/multicurve.hpp:36`), a
 //!   marker base used only for a `dynamic_pointer_cast`, is dropped.
 //! - Jump quotes (`jumps`/`jumpDates`) are not ported, following the
@@ -280,7 +281,7 @@ mod tests {
     use crate::quotes::{Quote, SimpleQuote};
     use crate::settings::Settings;
     use crate::shared::shared;
-    use crate::termstructures::bootstraptraits::Discount;
+    use crate::termstructures::bootstraptraits::{Discount, ZeroYield};
     use crate::termstructures::yields::{DepositRateHelper, SwapRateHelper};
     use crate::time::businessdayconvention::BusinessDayConvention;
     use crate::time::calendars::target::Target;
@@ -381,11 +382,17 @@ mod tests {
         shared(Euribor::six_months(handle, settings))
     }
 
-    /// The port of `testCurveConsistency<Discount, I, IterativeBootstrap>`,
-    /// deposits + swaps only.
-    fn check_curve_consistency<I: Interpolator + Default + 'static>() {
+    /// The port of `testCurveConsistency<Traits, I, IterativeBootstrap>`,
+    /// deposits + swaps only. Generic over the traits so the same round-trip
+    /// checks the `Discount`, `ZeroYield` and `ForwardRate` conventions; the
+    /// bootstrapped curve is returned so a convention that stores rates can
+    /// additionally assert on its solved nodes.
+    fn check_curve_consistency<
+        T: BootstrapTraits + 'static,
+        I: Interpolator + Default + 'static,
+    >() -> Shared<PiecewiseYieldCurve<T, I>> {
         let vars = common_vars();
-        let curve = PiecewiseYieldCurve::<Discount, I>::new(
+        let curve = PiecewiseYieldCurve::<T, I>::new(
             vars.settlement,
             vars.instruments.clone(),
             Actual360::new(),
@@ -433,6 +440,8 @@ mod tests {
                 "{n} {units:?} swap: estimated {estimated} vs expected {expected}"
             );
         }
+
+        curve
     }
 
     /// `testLogLinearDiscountConsistency` -> `<Discount, LogLinear>`
@@ -440,14 +449,33 @@ mod tests {
     /// (`:684`) needs `BMASwapRateHelper` (#343) and is skipped.
     #[test]
     fn log_linear_discount_consistency() {
-        check_curve_consistency::<LogLinear>();
+        check_curve_consistency::<Discount, LogLinear>();
     }
 
     /// `testLinearDiscountConsistency` -> `<Discount, Linear>`
     /// (`piecewiseyieldcurve.cpp:687,694`). The BMA half (`:695`) is skipped.
     #[test]
     fn linear_discount_consistency() {
-        check_curve_consistency::<Linear>();
+        check_curve_consistency::<Discount, Linear>();
+    }
+
+    /// `testLinearZeroConsistency` -> `<ZeroYield, Linear>`
+    /// (`piecewiseyieldcurve.cpp:698,705`). The BMA half (`:706`) is skipped.
+    ///
+    /// The consistency round-trip only prices instruments at exact solved
+    /// nodes, so it cannot see the reference node: `ZeroYield::update_guess`
+    /// mirrors the first solved rate into node `[0]` (the C++ `i==1 -> data[0]`
+    /// write), and no repriced instrument covers the `(0, t1)` segment where
+    /// that node shapes the curve. Assert it directly, or a missing mirror would
+    /// leave node `[0]` at `initial_value` and still pass green.
+    #[test]
+    fn linear_zero_consistency() {
+        let curve = check_curve_consistency::<ZeroYield, Linear>();
+        let data = curve.data().unwrap();
+        assert_eq!(
+            data[0], data[1],
+            "the reference zero rate must mirror the first solved pillar"
+        );
     }
 
     /// Laziness: constructing the curve runs no bootstrap; the first discount
