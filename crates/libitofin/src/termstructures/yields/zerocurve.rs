@@ -329,4 +329,26 @@ mod tests {
         let err = build_err(dates, sample_zeros());
         assert!(err.contains("dates not sorted"));
     }
+
+    #[test]
+    fn cubic_factory_backs_a_standalone_zero_curve() {
+        // Smoke test for the Cubic interpolator factory on a standalone curve:
+        // it constructs, reproduces its node zero rates (the interpolant passes
+        // through the nodes), and evaluates finite between them.
+        use crate::math::interpolations::cubic::Cubic;
+
+        let curve =
+            InterpolatedZeroCurve::new(sample_dates(), sample_zeros(), Actual360::new(), Cubic)
+                .unwrap();
+        for (t, z) in [(0.5, 0.03), (1.0, 0.04), (2.0, 0.045)] {
+            let zero = curve
+                .zero_rate(t, Compounding::Continuous, Frequency::Annual, false)
+                .unwrap();
+            assert!((zero.rate() - z).abs() < 1.0e-12);
+        }
+        let mid = curve
+            .zero_rate(0.75, Compounding::Continuous, Frequency::Annual, false)
+            .unwrap();
+        assert!(mid.rate().is_finite());
+    }
 }

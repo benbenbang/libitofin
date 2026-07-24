@@ -12,7 +12,7 @@
 
 use crate::errors::QlResult;
 use crate::fail;
-use crate::math::interpolations::Interpolation;
+use crate::math::interpolations::{Interpolation, Interpolator};
 use crate::types::{Real, Size};
 
 /// First-derivative approximation scheme. Variants are added as they are ported,
@@ -705,6 +705,33 @@ impl Interpolation for CubicInterpolation {
 
     fn is_in_range(&self, x: Real) -> bool {
         x >= self.x_min() && x <= self.x_max()
+    }
+}
+
+/// Factory for [`CubicInterpolation`] (QuantLib's `Cubic` traits class),
+/// carrying its defaults: the Kruger derivative scheme, non-monotonic (no Hyman
+/// filter), with natural `SecondDerivative` boundaries of value 0.
+///
+/// This backs *standalone* interpolated curves ([`InterpolatedZeroCurve<Cubic>`],
+/// [`InterpolatedDiscountCurve<Cubic>`], ...). It is deliberately NOT usable for
+/// bootstrapping `PiecewiseYieldCurve<_, Cubic>`: `Cubic` is a *global*
+/// interpolator (every node depends on all others), but the ported
+/// `IterativeBootstrap` is single-pass - the global convergence loop is unported
+/// (documented at `termstructures::iterativebootstrap`, module docs). Bootstrapping
+/// against it would silently run one incorrect pass, so `Cubic` is not wired into
+/// any `PiecewiseYieldCurve` instantiation; the convergence loop is tracked
+/// separately (#543).
+///
+/// [`InterpolatedZeroCurve<Cubic>`]: crate::termstructures::yields::InterpolatedZeroCurve
+/// [`InterpolatedDiscountCurve<Cubic>`]: crate::termstructures::yields::InterpolatedDiscountCurve
+#[derive(Clone, Copy, Default)]
+pub struct Cubic;
+
+impl Interpolator for Cubic {
+    type Output = CubicInterpolation;
+
+    fn interpolate(&self, x: &[Real], y: &[Real]) -> QlResult<CubicInterpolation> {
+        CubicInterpolation::new(x.to_vec(), y.to_vec(), CubicDerivativeApprox::Kruger)
     }
 }
 
@@ -1427,5 +1454,25 @@ mod tests {
         for f in [not_a_knot, clamped, second] {
             assert!(f.value(0.0).unwrap().abs() < 1e-14);
         }
+    }
+
+    #[test]
+    fn factory_builds_a_kruger_interpolation() {
+        // Same fixture as kruger_node_derivatives: x=[0,1,2], y=[0,0.5,2] has
+        // same-sign secants S=[0.5,1.5], so the interior Kruger derivative is the
+        // harmonic mean 2/(1/0.5 + 1/1.5) = 0.75 - a number only Kruger produces.
+        let x = [0.0, 1.0, 2.0];
+        let y = [0.0, 0.5, 2.0];
+        let f = Cubic.interpolate(&x, &y).unwrap();
+        assert_close(f.value(1.0).unwrap(), 0.5);
+        assert_close(f.derivative(1.0).unwrap(), 0.75);
+        assert_eq!(Cubic.required_points(), 2);
+        assert!(Cubic.interpolate(&[0.0], &[0.0]).is_err());
+
+        // The default is Kruger, not a natural spline: the two schemes disagree
+        // at an interior point on this fixture.
+        let spline =
+            CubicInterpolation::new(x.to_vec(), y.to_vec(), CubicDerivativeApprox::Spline).unwrap();
+        assert_ne!(f.value(0.5).unwrap(), spline.value(0.5).unwrap());
     }
 }
