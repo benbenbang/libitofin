@@ -63,6 +63,24 @@ pub trait BootstrapTraits {
 
     /// The convergence-loop iteration cap (`Traits::maxIterations`).
     fn max_iterations() -> Size;
+
+    /// Converts an interpolated node at time `t` into a discount factor,
+    /// applying this convention's node meaning (a discount factor for
+    /// `Discount`, `exp(-z*t)` for a zero rate, `exp(-primitive)` for an
+    /// instantaneous forward). This is the seam that lets one `CurveData`
+    /// holder serve every convention: the holder stays convention-agnostic and
+    /// the traits interpret its nodes.
+    ///
+    /// Everything a conversion needs - the last solved node time, its value,
+    /// the derivative and the antiderivative - is carried by the
+    /// [`Interpolation`] the bootstrap rebuilt over the solved prefix
+    /// `[0, upto]`, so `interpolation.x_max()` is that last node's time and
+    /// `value(x_max)` its value; past it every convention extends the last
+    /// instantaneous forward flat.
+    fn discount_from_nodes<I: Interpolation>(
+        interpolation: &I,
+        t: Time,
+    ) -> QlResult<DiscountFactor>;
 }
 
 /// Discount-factor bootstrap traits (`struct Discount`,
@@ -108,6 +126,23 @@ impl BootstrapTraits for Discount {
 
     fn max_iterations() -> Size {
         100
+    }
+
+    /// The nodes are already discount factors, so the value is the discount
+    /// factor directly (in range), and past the last solved node the last
+    /// instantaneous forward continues flat (the port of
+    /// `InterpolatedDiscountCurve::discountImpl`).
+    fn discount_from_nodes<I: Interpolation>(
+        interpolation: &I,
+        t: Time,
+    ) -> QlResult<DiscountFactor> {
+        let t_max = interpolation.x_max();
+        if t <= t_max {
+            return interpolation.value(t);
+        }
+        let d_max = interpolation.value(t_max)?;
+        let inst_fwd_max = -interpolation.derivative(t_max)? / d_max;
+        Ok(d_max * (-inst_fwd_max * (t - t_max)).exp())
     }
 }
 
@@ -231,20 +266,15 @@ impl<I: Interpolator> CurveData<I> {
         Ok(())
     }
 
-    /// The discount factor at time `t`, reading the interpolation and, past its
-    /// last node, extending the last instantaneous forward flat (the port of
-    /// `InterpolatedDiscountCurve::discountImpl`).
-    pub fn discount(&self, t: Time) -> QlResult<DiscountFactor> {
-        let Some(interpolation) = self.interpolation.as_ref() else {
-            fail!("curve not bootstrapped: no interpolation available");
-        };
-        let t_max = interpolation.x_max();
-        if t <= t_max {
-            return interpolation.value(t);
+    /// The interpolation rebuilt over the solved prefix, for a trait's
+    /// [`discount_from_nodes`](BootstrapTraits::discount_from_nodes) to read the
+    /// node value, derivative or antiderivative at a time. Errors before the
+    /// bootstrap has laid one down.
+    pub fn interpolation(&self) -> QlResult<&I::Output> {
+        match self.interpolation.as_ref() {
+            Some(interpolation) => Ok(interpolation),
+            None => fail!("curve not bootstrapped: no interpolation available"),
         }
-        let d_max = interpolation.value(t_max)?;
-        let inst_fwd_max = -interpolation.derivative(t_max)? / d_max;
-        Ok(d_max * (-inst_fwd_max * (t - t_max)).exp())
     }
 
     /// Asserts the holder has been bootstrapped, for inspectors that must not
@@ -331,19 +361,19 @@ mod tests {
         cd.rebuild(&LogLinear, 2).unwrap();
 
         // in range: geometric interpolation of log-linear discounts
-        let mid = cd.discount(1.5).unwrap();
+        let mid = Discount::discount_from_nodes(cd.interpolation().unwrap(), 1.5).unwrap();
         assert!((mid - (0.95_f64 * 0.88).sqrt()).abs() < 1e-12);
 
         // past the last node: flat instantaneous forward continues
         let last_forward = (0.95_f64 / 0.88).ln();
-        let beyond = cd.discount(3.0).unwrap();
+        let beyond = Discount::discount_from_nodes(cd.interpolation().unwrap(), 3.0).unwrap();
         assert!((beyond - 0.88 * (-last_forward * 1.0).exp()).abs() < 1e-12);
     }
 
     #[test]
-    fn curve_data_discount_before_bootstrap_is_an_error() {
+    fn curve_data_interpolation_before_bootstrap_is_an_error() {
         let cd = CurveData::<LogLinear>::new();
-        assert!(cd.discount(1.0).is_err());
+        assert!(cd.interpolation().is_err());
         assert!(cd.require_initialized().is_err());
     }
 }
