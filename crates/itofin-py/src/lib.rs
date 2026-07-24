@@ -20,10 +20,13 @@ mod vol;
 
 use calibration::{PyCalibrationErrorType, PyEndCriteria, PyLevenbergMarquardt};
 use curve::{
-    PyDiscountCurve, PyFlatForward, PyForwardCurve, PyPiecewiseYieldCurve, PyYieldTermStructure,
-    PyZeroCurve,
+    PyDiscountCurve, PyFlatForward, PyForwardCurve, PyPiecewiseFlatForward,
+    PyPiecewiseLinearForward, PyPiecewiseLinearZero, PyPiecewiseLogLinearDiscount,
+    PyPiecewiseYieldCurve, PyYieldTermStructure, PyZeroCurve,
 };
-use helpers::{PyDepositRateHelper, PyRateHelper, PySwapRateHelper};
+use helpers::{
+    PyDepositRateHelper, PyFuturesRateHelper, PyFuturesType, PyRateHelper, PySwapRateHelper,
+};
 use heston::{PyHestonModel, PyHestonModelHelper, PyHestonProcess};
 use hullwhite::{PyEuribor, PyHullWhite, PySwaptionHelper};
 use libitofin::errors::QlError;
@@ -90,6 +93,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     time.add_class::<PyFrequency>()?;
     time.add_class::<PyBusinessDayConvention>()?;
     time.add_class::<PySchedule>()?;
+    crate::time::add_functions(&time)?;
 
     let quotes = PyModule::new(py, "quotes")?;
     quotes.add_class::<PySimpleQuote>()?;
@@ -107,7 +111,13 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     termstructures.add_class::<PyRateHelper>()?;
     termstructures.add_class::<PyDepositRateHelper>()?;
     termstructures.add_class::<PySwapRateHelper>()?;
+    termstructures.add_class::<PyFuturesType>()?;
+    termstructures.add_class::<PyFuturesRateHelper>()?;
     termstructures.add_class::<PyPiecewiseYieldCurve>()?;
+    termstructures.add_class::<PyPiecewiseLogLinearDiscount>()?;
+    termstructures.add_class::<PyPiecewiseLinearZero>()?;
+    termstructures.add_class::<PyPiecewiseLinearForward>()?;
+    termstructures.add_class::<PyPiecewiseFlatForward>()?;
 
     let processes = PyModule::new(py, "processes")?;
     processes.add_class::<PyBlackScholesProcess>()?;
