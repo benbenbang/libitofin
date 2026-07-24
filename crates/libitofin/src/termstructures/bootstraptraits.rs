@@ -306,12 +306,13 @@ impl BootstrapTraits for ForwardRate {
 ///
 /// This is the curve-side half of the mutation decision. The bootstrap holds
 /// it through a `RefCell` on the curve and drives it a node at a time; the
-/// curve's `discount` reads it back. During a bootstrap the interpolation only
-/// spans the solved prefix `[0, upto]`, so [`discount`](Self::discount)
-/// extrapolates past the last solved node with a flat instantaneous forward,
-/// exactly as `InterpolatedDiscountCurve::discountImpl` does past its last
-/// node - which is also why a helper for pillar `i` (whose latest relevant
-/// date is at most `times[i]`) only ever reads in-range values.
+/// curve's discount lookup reads it back through
+/// [`interpolation`](Self::interpolation), handing that to the convention's
+/// [`discount_from_nodes`](BootstrapTraits::discount_from_nodes). During a
+/// bootstrap the interpolation only spans the solved prefix `[0, upto]`, so
+/// that conversion extrapolates past the last solved node with a flat
+/// instantaneous forward - which is also why a helper for pillar `i` (whose
+/// latest relevant date is at most `times[i]`) only ever reads in-range values.
 pub struct CurveData<I: Interpolator> {
     dates: Vec<Date>,
     times: Vec<Time>,
