@@ -37,7 +37,10 @@ use libitofin::time::Date;
 The same engine is reachable from Python via [`itofin`](https://pypi.org/project/itofin/)
 (Python 3.13+). The API mirrors QuantLib's `ql/` layout: types live in submodules
 (`itofin.time`, `itofin.instruments`, `itofin.processes`, ...), while `Settings`
-and `ItofinError` stay at the top level.
+and `ItofinError` stay at the top level. Real market data is first-class - yield
+curves (bootstrapped from a deposit/swap strip via `PiecewiseYieldCurve`, or
+interpolated) and Black-vol surfaces - so you price against a market snapshot, not
+just flat inputs. Type stubs ship in the wheel, so editors and `mypy` see the full API.
 
 ```sh
 pip install itofin
@@ -59,6 +62,25 @@ option.set_engine(process)
 
 print(f"NPV   {option.npv():.10f}")   # 2.1333684449
 print(f"delta {option.delta():.10f}")  # 0.3724827980
+```
+
+…or build a real vol surface (strike x expiry) and query it:
+
+```python
+from itofin.termstructures import BlackVarianceSurface
+from itofin.time import Date, DayCounter
+
+ref = Date(15, 6, 2026)
+vols = BlackVarianceSurface(
+    ref,
+    [ref + 365, ref + 730],   # expiries
+    [90.0, 100.0, 110.0],     # strikes
+    [[0.20, 0.25],            # one row per strike,
+     [0.18, 0.22],            # one column per expiry
+     [0.16, 0.20]],
+    DayCounter.actual365_fixed(),
+)
+print(f"{vols.black_vol(1.0, 100.0):.2f}")  # 0.18
 ```
 
 ## Why
@@ -97,7 +119,7 @@ repository's issues (the board is the source of truth, not a checked-in file).
 | **L6** | indexes | `InterestRateIndex`, Ibor family (Euribor / Eonia / €STR / SOFR), `SwapIndex` | 🚧 in progress |
 | **L7** | cashflows | fixed / floating / Ibor / overnight coupons and legs, coupon pricers, duration, capped-floored coupons | 🚧 in progress |
 | **L8** | instruments | fixed-rate bonds, vanilla / OIS swaps, swaptions, caps & floors, vanilla options | 🚧 in progress |
-| **L9** | methods | lattices, trees, Monte Carlo, finite differences | ⬜ planned |
+| **L9** | methods | lattices, trees (trinomial + Hull-White), Monte Carlo (path generators + antithetic); finite differences pending | 🚧 in progress |
 | **L10** | models | `CalibratedModel` + `calibrate()`, short-rate (Vasicek, CIR, Hull-White), Heston, calibration helpers | 🚧 in progress |
 | **L11** | engines | analytic European & Heston (Fourier), swaption (Black / Bachelier / Jamshidian), discounting swap / bond, Black cap/floor | 🚧 in progress |
 
