@@ -285,6 +285,10 @@ impl PyDiscountCurve {
 /// Extends [`PyYieldTermStructure`]; the first date is the reference date and
 /// the query surface is inherited. Finite in time: queries past the last node
 /// require `enable_extrapolation()` or `extrapolate=True`.
+///
+/// Unlike [`PyZeroCurve`] and [`PyDiscountCurve`], this curve offers no `Cubic`
+/// interpolation option: QuantLib-SWIG exposes its cubic curve on the zero and
+/// discount curves only, so the forward curve is intentionally left alone.
 #[pyclass(name = "ForwardCurve", extends = PyYieldTermStructure, unsendable)]
 pub struct PyForwardCurve;
 
@@ -320,6 +324,8 @@ impl PyForwardCurve {
 /// bootstrap conventions (`ZeroYield`, `ForwardRate`) are reached through the
 /// named [`PyPiecewiseLinearZero`], [`PyPiecewiseLinearForward`] and
 /// [`PyPiecewiseFlatForward`] classes, which also expose node introspection.
+/// `(Discount, Linear)` deliberately gets no named class - QuantLib-SWIG has no
+/// equivalent - so it stays reachable only through this alias's `"Linear"` arm.
 ///
 /// The bootstrap is lazy: construction only rejects an empty helper list, and
 /// the solver runs on the first query (a `discount`/`zero_rate`), re-running
