@@ -1,5 +1,15 @@
 # Hand-written stubs for itofin.time; sync manually with src/time.rs (#517).
 
+def is_imm_date(date: Date, main_cycle: bool = False) -> bool:
+    """Whether date is an IMM date: the third Wednesday of the month, and of
+    March, June, September or December only when main_cycle is set."""
+    ...
+
+def next_imm_date(date: Date, main_cycle: bool = False) -> Date:
+    """The next IMM date strictly following date, restricted to the March/June/
+    September/December cycle when main_cycle is set."""
+    ...
+
 class Date:
     """A calendar date with a validation guard."""
 
