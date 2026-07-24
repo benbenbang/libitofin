@@ -7,9 +7,9 @@
 //!
 //! ## What is ported, and what is provably dead for this path
 //!
-//! The ticket's scope is `Discount` traits with `LogLinear`/`Linear`
-//! interpolation, both of which are *local* interpolators (their value at a
-//! point depends only on the bracketing nodes). Several branches of the C++
+//! The wired conventions (`Discount`, `ZeroYield`, `ForwardRate`) all run on
+//! *local* interpolators - `LogLinear`, `Linear`, `BackwardFlat` - whose value
+//! at a point depends only on the bracketing nodes. Several branches of the C++
 //! algorithm exist only for *global* interpolators (splines) and are dead here:
 //!
 //! - **The outer convergence loop** (`iterativebootstrap.hpp:363-387`). It
