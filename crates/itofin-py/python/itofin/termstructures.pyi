@@ -271,3 +271,54 @@ class FuturesRateHelper(RateHelper):
         futures_type: FuturesType,
     ) -> FuturesRateHelper: ...
     def convexity_adjustment(self) -> float: ...
+
+class Pillar:
+    """The date the curve node a helper fits sits at.
+
+    MaturityDate and LastRelevantDate (the default) are the two schedule-derived
+    choices. Pillar.CustomDate is deferred in the core (#343), so its omission
+    here is deliberate, not an oversight."""
+
+    MaturityDate: Pillar
+    LastRelevantDate: Pillar
+
+class FraRateHelper(RateHelper):
+    """A helper fitting a forward-rate-agreement rate over the window starting
+    period_to_start after spot and spanning the index tenor. use_indexed_coupon
+    (default True) selects the indexed implied-quote mode; False is the par simple
+    forward. from_dates fixes the window at construction (it does not shift on an
+    evaluation-date change)."""
+
+    def __init__(
+        self,
+        quote: SimpleQuote,
+        period_to_start: Period,
+        index: Euribor,
+        use_indexed_coupon: bool = True,
+        pillar: Pillar = ...,
+    ) -> None: ...
+    @staticmethod
+    def from_rate(
+        rate: float,
+        period_to_start: Period,
+        index: Euribor,
+        use_indexed_coupon: bool = True,
+        pillar: Pillar = ...,
+    ) -> FraRateHelper: ...
+    @staticmethod
+    def from_months(
+        quote: SimpleQuote,
+        months_to_start: int,
+        index: Euribor,
+        use_indexed_coupon: bool = True,
+        pillar: Pillar = ...,
+    ) -> FraRateHelper: ...
+    @staticmethod
+    def from_dates(
+        quote: SimpleQuote,
+        start_date: Date,
+        end_date: Date,
+        index: Euribor,
+        use_indexed_coupon: bool = True,
+        pillar: Pillar = ...,
+    ) -> FraRateHelper: ...

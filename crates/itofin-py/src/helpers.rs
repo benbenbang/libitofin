@@ -8,9 +8,9 @@
 //! the concrete subclasses supply only their constructors, mirroring the
 //! [`crate::curve::PyYieldTermStructure`] base/subclass idiom.
 //!
-//! The `Futures`, `Fra`, `OIS`, and `Bond`/`FixedRateBond` helpers each need
-//! enum or index facades that do not exist yet and are deferred to their own
-//! follow-up ticket (#530); they are omitted here rather than stubbed.
+//! The `OIS` and `Bond`/`FixedRateBond` helpers each need enum or index facades
+//! that do not exist yet and are deferred to their own follow-up ticket (#530);
+//! they are omitted here rather than stubbed.
 
 use crate::PyQlError;
 use crate::hullwhite::PyEuribor;
@@ -23,7 +23,9 @@ use libitofin::instruments::FuturesType;
 use libitofin::quotes::Quote;
 use libitofin::shared::Shared;
 use libitofin::termstructures::RateHelper;
-use libitofin::termstructures::yields::{DepositRateHelper, FuturesRateHelper, SwapRateHelper};
+use libitofin::termstructures::yields::{
+    DepositRateHelper, FraRateHelper, FuturesRateHelper, Pillar, SwapRateHelper,
+};
 use libitofin::types::Natural;
 use pyo3::prelude::*;
 
@@ -349,4 +351,174 @@ fn init(helper: Shared<FuturesRateHelper>) -> PyClassInitializer<PyFuturesRateHe
         inner: Shared::clone(&helper) as Shared<dyn RateHelper>,
     };
     PyClassInitializer::from(base).add_subclass(PyFuturesRateHelper { futures: helper })
+}
+
+/// Python `Pillar`: the date the curve node a helper fits sits at
+/// (`termstructures::yields::Pillar`).
+///
+/// A fieldless pyo3 enum exposing the two schedule-derived choices `MaturityDate`
+/// and `LastRelevantDate` (the C++ default). `Pillar::CustomDate` is deferred in
+/// the core (#343) - it needs an explicit pillar date threaded through
+/// construction plus its bounds check - so its omission here is deliberate, not
+/// an oversight.
+#[pyclass(name = "Pillar", eq, eq_int, from_py_object)]
+#[derive(Clone, Copy, PartialEq)]
+pub enum PyPillar {
+    MaturityDate,
+    LastRelevantDate,
+}
+
+impl PyPillar {
+    /// The core [`Pillar`] this variant stands for.
+    pub(crate) fn inner(&self) -> Pillar {
+        match self {
+            PyPillar::MaturityDate => Pillar::MaturityDate,
+            PyPillar::LastRelevantDate => Pillar::LastRelevantDate,
+        }
+    }
+}
+
+/// Python `FraRateHelper`: a helper fitting a forward-rate-agreement rate over the
+/// window starting `period_to_start` after spot and spanning the index tenor
+/// (`termstructures::yields::ratehelpers::FraRateHelper`).
+///
+/// All four constructors are infallible, so `__init__` and the staticmethods hand
+/// back the initializer directly. `use_indexed_coupon` selects the implied-quote
+/// mode (C++ default `True`, the index fixing forecast off the curve; `False` is
+/// the par simple-forward over the raw window); it and `pillar` (default
+/// `Pillar.LastRelevantDate`) are exposed explicitly. Like the other relative
+/// helpers the quote-form constructors retain the caller's [`PySimpleQuote`] so a
+/// later `set_value` re-drives the bootstrap; `from_rate` wraps a fixed rate in a
+/// fresh, un-retained quote. `from_dates` fixes the window at construction, and it
+/// does not shift when the evaluation date changes.
+#[pyclass(name = "FraRateHelper", extends = PyRateHelper, unsendable)]
+pub struct PyFraRateHelper;
+
+#[pymethods]
+impl PyFraRateHelper {
+    /// A FRA helper fitting `quote` over the window `period_to_start` past spot
+    /// spanning `index`'s tenor. The constructor the mixed strip uses.
+    #[new]
+    #[pyo3(signature = (
+        quote,
+        period_to_start,
+        index,
+        use_indexed_coupon = true,
+        pillar = PyPillar::LastRelevantDate,
+    ))]
+    fn new(
+        quote: &PySimpleQuote,
+        period_to_start: &PyPeriod,
+        index: &PyEuribor,
+        use_indexed_coupon: bool,
+        pillar: PyPillar,
+    ) -> PyClassInitializer<Self> {
+        let idx = index.inner();
+        let helper = FraRateHelper::new(
+            quote.handle(),
+            period_to_start.inner(),
+            &idx,
+            use_indexed_coupon,
+            pillar.inner(),
+        ) as Shared<dyn RateHelper>;
+        PyClassInitializer::from(PyRateHelper { inner: helper }).add_subclass(PyFraRateHelper)
+    }
+
+    /// A FRA helper fitting a fixed `rate`, wrapped in an internal quote the caller
+    /// cannot later mutate.
+    #[staticmethod]
+    #[pyo3(signature = (
+        rate,
+        period_to_start,
+        index,
+        use_indexed_coupon = true,
+        pillar = PyPillar::LastRelevantDate,
+    ))]
+    fn from_rate(
+        py: Python<'_>,
+        rate: f64,
+        period_to_start: &PyPeriod,
+        index: &PyEuribor,
+        use_indexed_coupon: bool,
+        pillar: PyPillar,
+    ) -> PyResult<Py<Self>> {
+        let idx = index.inner();
+        let helper = FraRateHelper::from_rate(
+            rate,
+            period_to_start.inner(),
+            &idx,
+            use_indexed_coupon,
+            pillar.inner(),
+        ) as Shared<dyn RateHelper>;
+        Py::new(
+            py,
+            PyClassInitializer::from(PyRateHelper { inner: helper }).add_subclass(PyFraRateHelper),
+        )
+    }
+
+    /// A FRA helper whose start is `months_to_start` months after spot.
+    #[staticmethod]
+    #[pyo3(signature = (
+        quote,
+        months_to_start,
+        index,
+        use_indexed_coupon = true,
+        pillar = PyPillar::LastRelevantDate,
+    ))]
+    fn from_months(
+        py: Python<'_>,
+        quote: &PySimpleQuote,
+        months_to_start: Natural,
+        index: &PyEuribor,
+        use_indexed_coupon: bool,
+        pillar: PyPillar,
+    ) -> PyResult<Py<Self>> {
+        let idx = index.inner();
+        let helper = FraRateHelper::from_months(
+            quote.handle(),
+            months_to_start,
+            &idx,
+            use_indexed_coupon,
+            pillar.inner(),
+        ) as Shared<dyn RateHelper>;
+        Py::new(
+            py,
+            PyClassInitializer::from(PyRateHelper { inner: helper }).add_subclass(PyFraRateHelper),
+        )
+    }
+
+    /// A FRA helper over the explicit `[start_date, end_date]` window. Its schedule
+    /// is fixed at construction and does not shift on an evaluation-date change.
+    #[staticmethod]
+    #[pyo3(signature = (
+        quote,
+        start_date,
+        end_date,
+        index,
+        use_indexed_coupon = true,
+        pillar = PyPillar::LastRelevantDate,
+    ))]
+    fn from_dates(
+        py: Python<'_>,
+        quote: &PySimpleQuote,
+        start_date: &PyDate,
+        end_date: &PyDate,
+        index: &PyEuribor,
+        use_indexed_coupon: bool,
+        pillar: PyPillar,
+    ) -> PyResult<Py<Self>> {
+        let idx = index.inner();
+        let helper = FraRateHelper::from_dates(
+            quote.handle(),
+            start_date.inner(),
+            end_date.inner(),
+            &idx,
+            use_indexed_coupon,
+            pillar.inner(),
+        ) as Shared<dyn RateHelper>;
+        Py::new(
+            py,
+            PyClassInitializer::from(PyRateHelper { inner: helper }).add_subclass(PyFraRateHelper),
+        )
+    }
 }
