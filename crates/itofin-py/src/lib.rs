@@ -18,7 +18,7 @@ mod time;
 mod vol;
 
 use calibration::{PyCalibrationErrorType, PyEndCriteria, PyLevenbergMarquardt};
-use curve::{PyFlatForward, PyYieldTermStructure};
+use curve::{PyDiscountCurve, PyFlatForward, PyForwardCurve, PyYieldTermStructure, PyZeroCurve};
 use heston::{PyHestonModel, PyHestonModelHelper, PyHestonProcess};
 use hullwhite::{PyEuribor, PyHullWhite, PySwaptionHelper};
 use libitofin::errors::QlError;
@@ -93,6 +93,9 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     termstructures.add_class::<PyYieldTermStructure>()?;
     termstructures.add_class::<PyBlackVolTermStructure>()?;
     termstructures.add_class::<PyFlatForward>()?;
+    termstructures.add_class::<PyZeroCurve>()?;
+    termstructures.add_class::<PyDiscountCurve>()?;
+    termstructures.add_class::<PyForwardCurve>()?;
     termstructures.add_class::<PyBlackConstantVol>()?;
     termstructures.add_class::<PyBlackVarianceCurve>()?;
     termstructures.add_class::<PyBlackVarianceSurface>()?;

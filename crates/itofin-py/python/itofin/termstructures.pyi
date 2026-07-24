@@ -36,6 +36,40 @@ class FlatForward(YieldTermStructure):
 
     def __init__(self, reference_date: Date, rate: float, day_counter: DayCounter) -> None: ...
 
+class ZeroCurve(YieldTermStructure):
+    """A yield curve interpolating continuously-compounded zero rates linearly
+    between nodes. The first date is the reference date; finite in time."""
+
+    def __init__(
+        self,
+        dates: list[Date],
+        yields: list[float],
+        day_counter: DayCounter,
+    ) -> None: ...
+
+class DiscountCurve(YieldTermStructure):
+    """A yield curve interpolating discount factors log-linearly (piecewise-constant
+    forwards). The first date is the reference date and its discount must be 1.0."""
+
+    def __init__(
+        self,
+        dates: list[Date],
+        discounts: list[float],
+        day_counter: DayCounter,
+        calendar: Calendar | None = None,
+    ) -> None: ...
+
+class ForwardCurve(YieldTermStructure):
+    """A yield curve interpolating instantaneous forward rates backward-flat.
+    The first date is the reference date; finite in time."""
+
+    def __init__(
+        self,
+        dates: list[Date],
+        forwards: list[float],
+        day_counter: DayCounter,
+    ) -> None: ...
+
 class BlackConstantVol(BlackVolTermStructure):
     """A flat Black volatility, constant in strike and time."""
 
