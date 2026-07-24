@@ -141,3 +141,42 @@ def test_forward_curve_constructor_rejects_bad_inputs():
         ForwardCurve([REF, REF + 360], [0.03], dc)
     with pytest.raises(ItofinError):
         ForwardCurve([REF + 360, REF], [0.03, 0.04], dc)
+
+
+# --- Cubic on standalone curves (#547) ---------------------------------------
+#
+# Mirrors the core smoke test zerocurve.rs:334-354
+# (cubic_factory_backs_a_standalone_zero_curve): the Cubic (Kruger) interpolant
+# passes through its nodes and evaluates finite between them. Cubic is
+# non-monotonic (no Hyman filter, cubic.rs:712-713), so we assert node
+# reproduction + finiteness ONLY - never "between neighbours".
+
+
+def test_zero_curve_accepts_cubic_and_reproduces_nodes():
+    """PyZeroCurve gains interpolation="Cubic". The zero rates round-trip at the
+    node times to 1e-12 and an interior point is finite (not bounded)."""
+    curve = ZeroCurve(_dates(), [0.02, 0.03, 0.04, 0.045], DayCounter.actual360(), "Cubic")
+    for t, zero in [(0.5, 0.03), (1.0, 0.04), (2.0, 0.045)]:
+        assert curve.zero_rate(t) == pytest.approx(zero, abs=1e-12)
+    assert math.isfinite(curve.zero_rate(0.75))
+
+
+def test_discount_curve_accepts_cubic_and_reproduces_nodes():
+    """PyDiscountCurve gains interpolation="Cubic" (trailing after calendar). The
+    node discounts round-trip to 1e-12 and an interior point is finite."""
+    curve = DiscountCurve(
+        _dates(), [1.0, 0.97, 0.94, 0.88], DayCounter.actual360(), None, "Cubic"
+    )
+    for t, discount in [(0.5, 0.97), (1.0, 0.94), (2.0, 0.88)]:
+        assert curve.discount(t) == pytest.approx(discount, abs=1e-12)
+    assert math.isfinite(curve.discount(1.5))
+
+
+def test_standalone_curves_reject_unknown_interpolation():
+    """The new string arms name their valid interpolators: ZeroCurve is
+    Linear|Cubic, DiscountCurve is LogLinear|Cubic."""
+    dc = DayCounter.actual360()
+    with pytest.raises(ItofinError):
+        ZeroCurve(_dates(), [0.02, 0.03, 0.04, 0.045], dc, "LogLinear")
+    with pytest.raises(ItofinError):
+        DiscountCurve(_dates(), [1.0, 0.97, 0.94, 0.88], dc, None, "Linear")

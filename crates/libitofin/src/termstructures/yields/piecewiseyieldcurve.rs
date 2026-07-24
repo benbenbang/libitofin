@@ -26,9 +26,9 @@
 //! ## Scope and deferrals
 //!
 //! - Generic over the interpolator; the traits are a type parameter. The
-//!   `Discount` (`LogLinear`/`Linear`) and `ZeroYield` (`Linear`) conventions
-//!   are wired; the spline interpolators are deferred (they need the global
-//!   convergence loop, unported).
+//!   `Discount` (`LogLinear`/`Linear`), `ZeroYield` (`Linear`) and `ForwardRate`
+//!   (`Linear`/`BackwardFlat`) conventions are wired; the spline interpolators
+//!   are deferred (they need the global convergence loop, unported).
 //! - `MultiCurveBootstrapProvider` (`ql/termstructures/multicurve.hpp:36`), a
 //!   marker base used only for a `dynamic_pointer_cast`, is dropped.
 //! - Jump quotes (`jumps`/`jumpDates`) are not ported, following the
@@ -70,9 +70,10 @@ impl Observer for CurveUpdater {
 
 /// Yield term structure bootstrapped from rate helpers.
 ///
-/// `T` is the curve-shape traits (`Discount`); `I` is the interpolation factory
-/// (`LogLinear`, `Linear`). The node data lives in a `RefCell` the bootstrap
-/// mutates and the discount lookup reads back.
+/// `T` is the curve-shape traits (`Discount`, `ZeroYield`, `ForwardRate`); `I`
+/// is the interpolation factory (`LogLinear`, `Linear`, `BackwardFlat`). The
+/// node data lives in a `RefCell` the bootstrap mutates and the discount lookup
+/// reads back.
 pub struct PiecewiseYieldCurve<T: BootstrapTraits, I: Interpolator> {
     base: TermStructureBase,
     instruments: Vec<Shared<dyn RateHelper>>,
