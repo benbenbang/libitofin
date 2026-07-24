@@ -507,6 +507,176 @@ mod tests {
         );
     }
 
+    /// A valid mixed market strip - deposits (1W/1M/3M), a 3-month IMM future,
+    /// a 9x15 FRA and swaps (2Y/3Y/5Y) - bootstraps cleanly and every
+    /// instrument reprices its own quote off the solved curve to 1e-9. The strip
+    /// is arranged so pillar dates are distinct and latest-relevant dates are
+    /// strictly monotone (the two ordering invariants `IterativeBootstrap`
+    /// enforces, `iterativebootstrap.rs:136-145`); the futures window overlaps
+    /// the 3M deposit in time but its pillar still sorts after, which the
+    /// bootstrap accepts. The reprice is the bootstrap's own self-consistency
+    /// residual: its value here is confirming the single-forward-pass property
+    /// holds across a mixed strip, that solving the later swap nodes does not
+    /// disturb the deposit/futures/FRA repricing.
+    #[test]
+    fn mixed_strip_bootstraps() {
+        use crate::instruments::FuturesType;
+        use crate::termstructures::yields::{FraRateHelper, FuturesRateHelper, Pillar};
+        use crate::time::imm;
+
+        let calendar = Target::new();
+        let today = calendar.adjust(
+            Date::new(15, Month::June, 2026),
+            BusinessDayConvention::Following,
+        );
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(today);
+        let settlement = calendar.advance(
+            today,
+            2,
+            TimeUnit::Days,
+            BusinessDayConvention::Following,
+            false,
+        );
+
+        let mut helpers: Vec<Shared<dyn RateHelper>> = Vec::new();
+        for (n, units, rate) in [
+            (1, TimeUnit::Weeks, 0.04559),
+            (1, TimeUnit::Months, 0.04581),
+            (3, TimeUnit::Months, 0.04557),
+        ] {
+            let quote = Handle::new(shared(SimpleQuote::new(rate)) as Shared<dyn Quote>);
+            let index = Euribor::new(Period::new(n, units), Handle::empty(), settings.clone())
+                .expect("deposit tenor is valid");
+            helpers.push(DepositRateHelper::new(quote, &index) as Shared<dyn RateHelper>);
+        }
+
+        let imm_start = imm::next_date(settlement, false);
+        let price = Handle::new(shared(SimpleQuote::new(95.5)) as Shared<dyn Quote>);
+        let futures = FuturesRateHelper::new(
+            price,
+            imm_start,
+            3,
+            calendar.clone(),
+            BusinessDayConvention::ModifiedFollowing,
+            false,
+            Actual360::new(),
+            Handle::empty(),
+            FuturesType::Imm,
+        )
+        .expect("the next IMM date is a valid futures start");
+        helpers.push(futures as Shared<dyn RateHelper>);
+
+        let fra_index = Euribor::six_months(Handle::empty(), settings.clone());
+        let fra_quote = Handle::new(shared(SimpleQuote::new(0.046)) as Shared<dyn Quote>);
+        let fra = FraRateHelper::new(
+            fra_quote,
+            Period::new(9, TimeUnit::Months),
+            &fra_index,
+            true,
+            Pillar::LastRelevantDate,
+        );
+        helpers.push(fra as Shared<dyn RateHelper>);
+
+        for (n, units, rate) in [
+            (2, TimeUnit::Years, 0.0463),
+            (3, TimeUnit::Years, 0.0475),
+            (5, TimeUnit::Years, 0.0499),
+        ] {
+            let quote = Handle::new(shared(SimpleQuote::new(rate)) as Shared<dyn Quote>);
+            let euribor6m = Euribor::six_months(Handle::empty(), settings.clone());
+            helpers.push(SwapRateHelper::new(
+                quote,
+                Period::new(n, units),
+                calendar.clone(),
+                Frequency::Annual,
+                BusinessDayConvention::Unadjusted,
+                Thirty360::with_convention(Convention::BondBasis),
+                &euribor6m,
+            ) as Shared<dyn RateHelper>);
+        }
+
+        let curve = PiecewiseYieldCurve::<Discount, LogLinear>::new(
+            settlement,
+            helpers.clone(),
+            Actual360::new(),
+            LogLinear,
+        )
+        .unwrap();
+
+        // Force the bootstrap before repricing: each helper is linked to the
+        // curve during the solve, so implied_quote reads the solved curve only
+        // after calculate has run.
+        let nodes = curve.dates().unwrap();
+        assert_eq!(
+            nodes.len(),
+            helpers.len() + 1,
+            "one curve node per helper plus the reference"
+        );
+
+        let mut worst = 0.0_f64;
+        for helper in &helpers {
+            let implied = helper.implied_quote().unwrap();
+            let quote = helper.base().quote_value().unwrap();
+            let error = (implied - quote).abs();
+            worst = worst.max(error);
+            assert!(
+                error <= TOLERANCE,
+                "mixed strip reprice: implied {implied} vs quote {quote} (err {error})"
+            );
+        }
+        assert!(
+            worst <= TOLERANCE,
+            "worst mixed-strip reprice error {worst}"
+        );
+    }
+
+    /// A genuine duplicate pillar - two 3M deposits on the same index reduce to
+    /// one pillar date - is rejected at bootstrap (query) time with the ported
+    /// message, matching QuantLib's `QL_REQUIRE` throw
+    /// (`iterativebootstrap.hpp:190-191`, `iterativebootstrap.rs:136-139`). This
+    /// documents that the throw is faithful, not a defect: the only dedup in
+    /// QuantLib lives in the separate, unported `GlobalBootstrap`.
+    #[test]
+    fn duplicate_pillar_is_rejected() {
+        let calendar = Target::new();
+        let today = calendar.adjust(
+            Date::new(15, Month::June, 2026),
+            BusinessDayConvention::Following,
+        );
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(today);
+        let settlement = calendar.advance(
+            today,
+            2,
+            TimeUnit::Days,
+            BusinessDayConvention::Following,
+            false,
+        );
+
+        let index = Euribor::new(Period::new(3, TimeUnit::Months), Handle::empty(), settings)
+            .expect("deposit tenor is valid");
+        let helpers: Vec<Shared<dyn RateHelper>> = vec![
+            DepositRateHelper::from_rate(0.04557, &index) as Shared<dyn RateHelper>,
+            DepositRateHelper::from_rate(0.04600, &index) as Shared<dyn RateHelper>,
+        ];
+        let curve = PiecewiseYieldCurve::<Discount, LogLinear>::new(
+            settlement,
+            helpers,
+            Actual360::new(),
+            LogLinear,
+        )
+        .unwrap();
+
+        let err = curve.dates().unwrap_err();
+        assert!(
+            err.message()
+                .contains("more than one instrument with pillar"),
+            "expected the ported duplicate-pillar message, got: {}",
+            err.message()
+        );
+    }
+
     /// Laziness: constructing the curve runs no bootstrap; the first discount
     /// does; a quote change invalidates and the next read re-bootstraps (the
     /// `testObservability` contract that forbids bootstrapping in the ctor).
