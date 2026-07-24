@@ -6,7 +6,7 @@ from itofin.indexes import Euribor
 from itofin.instruments import OptionType
 from itofin.optimization import EndCriteria, LevenbergMarquardt
 from itofin.processes import HestonProcess
-from itofin.termstructures import FlatForward
+from itofin.termstructures import YieldTermStructure
 from itofin.time import Calendar, Date, DayCounter, Period
 
 class HestonModel:
@@ -29,7 +29,7 @@ class HestonModel:
 class HullWhite:
     """The one-factor Hull-White short-rate model."""
 
-    def __init__(self, curve: FlatForward, a: float, sigma: float) -> None: ...
+    def __init__(self, curve: YieldTermStructure, a: float, sigma: float) -> None: ...
     def a(self) -> float: ...
     def sigma(self) -> float: ...
     def r0(self) -> float: ...
@@ -75,7 +75,7 @@ class SwaptionHelper:
         fixed_leg_tenor: Period,
         fixed_leg_day_counter: DayCounter,
         floating_leg_day_counter: DayCounter,
-        curve: FlatForward,
+        curve: YieldTermStructure,
         error_type: CalibrationErrorType,
         nominal: float,
     ) -> None: ...

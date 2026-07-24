@@ -7,7 +7,7 @@
 //! pins a real number rather than a construction-only object.
 
 use crate::PyQlError;
-use crate::curve::PyFlatForward;
+use crate::curve::PyYieldTermStructure;
 use crate::hullwhite::PyEuribor;
 use crate::settings::PySettings;
 use crate::time::{PyDayCounter, PySchedule};
@@ -96,9 +96,9 @@ impl PyVanillaSwap {
     /// (`include_settlement_date_flows`, `settlement_date`, `npv_date` all
     /// unset) and installed on the swap's [`InstrumentBase`] via
     /// `set_pricing_engine`.
-    fn set_engine(&mut self, curve: PyRef<'_, PyFlatForward>, settings: &PySettings) {
+    fn set_engine(&mut self, curve: &PyYieldTermStructure, settings: &PySettings) {
         let engine = shared_mut(DiscountingSwapEngine::new(
-            curve.as_super().handle(),
+            curve.handle(),
             None,
             None,
             None,
