@@ -32,6 +32,22 @@
 //! Both solvers the C++ uses are wired: `Brent` runs the first (fresh) pass and
 //! `FiniteDifferenceNewtonSafe` runs a re-bootstrap seeded from a still-valid
 //! previous curve (`:318-322`), the path a quote change takes.
+//!
+//! ## Duplicate pillars are rejected, not pruned (matching QuantLib)
+//!
+//! `IterativeBootstrap` hard-throws on two ordering violations: a duplicate
+//! pillar date (`iterativebootstrap.hpp:190-191`) and a `latestRelevantDate`
+//! that does not strictly advance (`:194-201`). This port reproduces both as the
+//! two `require!` checks below (a duplicate pillar, then a non-monotone
+//! latest-relevant date). That is faithful, not a defect: `IterativeBootstrap`
+//! has **no** redundant-helper pruning upstream. The only dedup in QuantLib
+//! lives in the separate, unported `GlobalBootstrap` (`globalbootstrap.hpp:288`),
+//! and even there it dedups a date grid for a least-squares solve rather than
+//! dropping a helper. So there is nothing to port. This corrects the original
+//! #532 premise that the bootstrap "should prune redundant helpers"; the correct
+//! behaviour for a genuine duplicate is the error, and callers must supply a
+//! strip with distinct pillars. The `GlobalBootstrap` convergence loop is
+//! deferred to #543.
 
 use std::cell::RefCell;
 
