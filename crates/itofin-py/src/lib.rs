@@ -19,7 +19,10 @@ mod time;
 mod vol;
 
 use calibration::{PyCalibrationErrorType, PyEndCriteria, PyLevenbergMarquardt};
-use curve::{PyDiscountCurve, PyFlatForward, PyForwardCurve, PyYieldTermStructure, PyZeroCurve};
+use curve::{
+    PyDiscountCurve, PyFlatForward, PyForwardCurve, PyPiecewiseYieldCurve, PyYieldTermStructure,
+    PyZeroCurve,
+};
 use helpers::{PyDepositRateHelper, PyRateHelper, PySwapRateHelper};
 use heston::{PyHestonModel, PyHestonModelHelper, PyHestonProcess};
 use hullwhite::{PyEuribor, PyHullWhite, PySwaptionHelper};
@@ -104,6 +107,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     termstructures.add_class::<PyRateHelper>()?;
     termstructures.add_class::<PyDepositRateHelper>()?;
     termstructures.add_class::<PySwapRateHelper>()?;
+    termstructures.add_class::<PyPiecewiseYieldCurve>()?;
 
     let processes = PyModule::new(py, "processes")?;
     processes.add_class::<PyBlackScholesProcess>()?;

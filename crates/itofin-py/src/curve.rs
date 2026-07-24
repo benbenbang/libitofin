@@ -1,14 +1,20 @@
 //! Facades for the yield term-structure hierarchy: the [`PyYieldTermStructure`]
 //! base and the concrete [`PyFlatForward`] curve.
 
-use crate::PyQlError;
+use crate::helpers::PyRateHelper;
 use crate::time::{PyCalendar, PyDate, PyDayCounter};
+use crate::{ItofinError, PyQlError};
 use libitofin::handle::Handle;
 use libitofin::interestrate::Compounding;
 use libitofin::math::interpolations::flat::BackwardFlat;
 use libitofin::math::interpolations::linear::Linear;
+use libitofin::math::interpolations::loglinear::LogLinear;
 use libitofin::shared::{Shared, shared};
-use libitofin::termstructures::yields::{DiscountCurve, FlatForward, ForwardCurve, ZeroCurve};
+use libitofin::termstructures::RateHelper;
+use libitofin::termstructures::bootstraptraits::Discount;
+use libitofin::termstructures::yields::{
+    DiscountCurve, FlatForward, ForwardCurve, PiecewiseYieldCurve, ZeroCurve,
+};
 use libitofin::termstructures::yieldtermstructure::YieldTermStructure;
 use libitofin::time::frequency::Frequency;
 use pyo3::prelude::*;
@@ -266,5 +272,68 @@ impl PyForwardCurve {
             inner: Handle::new(curve),
         })
         .add_subclass(PyForwardCurve))
+    }
+}
+
+/// Python `PiecewiseYieldCurve`: a yield curve bootstrapped from a strip of
+/// rate helpers, one curve node per helper maturity
+/// (`termstructures::yields::PiecewiseYieldCurve<Discount, I>`).
+///
+/// Extends [`PyYieldTermStructure`]; every helper is solved so it reprices its
+/// own market quote off the curve. Only `Discount` traits are ported (the sole
+/// `BootstrapTraits` implementor), over the `LogLinear` (default) or `Linear`
+/// interpolator selected by the `interpolation` string; both erase to the same
+/// `Handle<dyn YieldTermStructure>`, so no discriminant is stored.
+///
+/// The bootstrap is lazy: construction only rejects an empty helper list, and
+/// the solver runs on the first query (a `discount`/`zero_rate`), re-running
+/// after a helper-quote or evaluation-date change. A bootstrap failure surfaces
+/// from those query methods (the inherited base maps them), not the
+/// constructor; `max_date` swallows it and falls back to the reference date.
+#[pyclass(name = "PiecewiseYieldCurve", extends = PyYieldTermStructure, unsendable)]
+pub struct PyPiecewiseYieldCurve;
+
+#[pymethods]
+impl PyPiecewiseYieldCurve {
+    /// A curve over `helpers` with a fixed `reference_date` (typically the
+    /// settlement date the caller computed via `Calendar.advance`). `helpers`
+    /// accepts any [`RateHelper`](PyRateHelper) subclass; `interpolation` is
+    /// `"LogLinear"` or `"Linear"`. Fallible: an empty helper list is rejected
+    /// here, an unknown interpolation name too.
+    #[new]
+    #[pyo3(signature = (reference_date, helpers, day_counter, interpolation = "LogLinear"))]
+    fn new(
+        reference_date: &PyDate,
+        helpers: Vec<PyRef<PyRateHelper>>,
+        day_counter: &PyDayCounter,
+        interpolation: &str,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        let instruments: Vec<Shared<dyn RateHelper>> =
+            helpers.iter().map(|helper| helper.inner()).collect();
+        let curve: Shared<dyn YieldTermStructure> = match interpolation {
+            "LogLinear" => PiecewiseYieldCurve::<Discount, LogLinear>::new(
+                reference_date.inner(),
+                instruments,
+                day_counter.inner(),
+                LogLinear,
+            )
+            .map_err(PyQlError::from)?,
+            "Linear" => PiecewiseYieldCurve::<Discount, Linear>::new(
+                reference_date.inner(),
+                instruments,
+                day_counter.inner(),
+                Linear,
+            )
+            .map_err(PyQlError::from)?,
+            other => {
+                return Err(ItofinError::new_err(format!(
+                    "unknown interpolation {other:?}, expected LogLinear or Linear"
+                )));
+            }
+        };
+        Ok(PyClassInitializer::from(PyYieldTermStructure {
+            inner: Handle::new(curve),
+        })
+        .add_subclass(PyPiecewiseYieldCurve))
     }
 }
