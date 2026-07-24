@@ -229,6 +229,21 @@ impl PyPeriod {
     }
 }
 
+/// Maps a `{"Days", "Weeks", "Months", "Years"}` string to a [`TimeUnit`],
+/// the same set [`PyPeriod`] accepts; an unknown unit returns
+/// [`struct@ItofinError`] rather than reaching the core.
+fn parse_time_unit(unit: &str) -> PyResult<TimeUnit> {
+    match unit {
+        "Days" => Ok(TimeUnit::Days),
+        "Weeks" => Ok(TimeUnit::Weeks),
+        "Months" => Ok(TimeUnit::Months),
+        "Years" => Ok(TimeUnit::Years),
+        other => Err(ItofinError::new_err(format!(
+            "unknown time unit {other:?}, expected one of Days, Weeks, Months, Years"
+        ))),
+    }
+}
+
 /// Python `Calendar`: the business-calendar factories.
 #[pyclass(name = "Calendar", unsendable)]
 pub struct PyCalendar {
@@ -249,6 +264,46 @@ impl PyCalendar {
         PyCalendar {
             inner: NullCalendar::new(),
         }
+    }
+
+    /// Rolls `date` to the nearest business day per `convention`.
+    ///
+    /// The core `Calendar::adjust` `assert!`s on the null date (calendar.rs:248);
+    /// `PyDate` cannot build one today, but the guard mirrors the `PySchedule`
+    /// precedent so no input reaches a core `assert!` across the PyO3 boundary.
+    fn adjust(&self, date: &PyDate, convention: &PyBusinessDayConvention) -> PyResult<PyDate> {
+        if date.inner() == Date::null() {
+            return Err(ItofinError::new_err("cannot adjust the null date"));
+        }
+        Ok(PyDate::from_inner(
+            self.inner.adjust(date.inner(), convention.inner()),
+        ))
+    }
+
+    /// Advances `date` by `n` `unit`s, adjusting the result per `convention`.
+    ///
+    /// `unit` is a string in {"Days", "Weeks", "Months", "Years"} mapped to the
+    /// core [`TimeUnit`]; an unknown unit returns [`struct@ItofinError`] rather
+    /// than reaching the core. The null-date guard mirrors [`Self::adjust`].
+    fn advance(
+        &self,
+        date: &PyDate,
+        n: i32,
+        unit: &str,
+        convention: &PyBusinessDayConvention,
+        end_of_month: bool,
+    ) -> PyResult<PyDate> {
+        let unit = parse_time_unit(unit)?;
+        if date.inner() == Date::null() {
+            return Err(ItofinError::new_err("cannot advance the null date"));
+        }
+        Ok(PyDate::from_inner(self.inner.advance(
+            date.inner(),
+            n,
+            unit,
+            convention.inner(),
+            end_of_month,
+        )))
     }
 
     fn __repr__(&self) -> String {
@@ -276,7 +331,7 @@ pub enum PyFrequency {
 
 impl PyFrequency {
     /// The core [`Frequency`] this variant stands for.
-    fn inner(&self) -> Frequency {
+    pub(crate) fn inner(&self) -> Frequency {
         match self {
             PyFrequency::Annual => Frequency::Annual,
             PyFrequency::Semiannual => Frequency::Semiannual,
@@ -299,7 +354,7 @@ pub enum PyBusinessDayConvention {
 
 impl PyBusinessDayConvention {
     /// The core [`BusinessDayConvention`] this variant stands for.
-    fn inner(&self) -> BusinessDayConvention {
+    pub(crate) fn inner(&self) -> BusinessDayConvention {
         match self {
             PyBusinessDayConvention::ModifiedFollowing => BusinessDayConvention::ModifiedFollowing,
             PyBusinessDayConvention::Following => BusinessDayConvention::Following,
