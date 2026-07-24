@@ -1,6 +1,7 @@
 # Hand-written stubs for itofin.termstructures; sync manually with src/curve.rs, src/vol.rs and src/helpers.rs (#517).
 
-from itofin.indexes import Euribor
+from itofin import Settings
+from itofin.indexes import Estr, Euribor
 from itofin.quotes import SimpleQuote
 from itofin.time import (
     BusinessDayConvention,
@@ -322,3 +323,40 @@ class FraRateHelper(RateHelper):
         use_indexed_coupon: bool = True,
         pillar: Pillar = ...,
     ) -> FraRateHelper: ...
+
+class RateAveraging:
+    """How an overnight coupon combines its daily fixings.
+
+    Simple is the arithmetic average; Compound (daily compounding) is the coupon
+    default the OIS conventions use."""
+
+    Simple: RateAveraging
+    Compound: RateAveraging
+
+class OISRateHelper(RateHelper):
+    """A helper fitting an overnight-indexed swap rate (spot-starting, floating
+    off an overnight index).
+
+    The required knobs come first so settings can sit among them; the four
+    optional knobs trail with defaults. discounting_curve=None discounts off the
+    bootstrapping curve; overnight_spread=None is an empty (zero) spread. The
+    deferred core knobs past averaging_method (telescopic value dates, lookback,
+    lockout, observation shift, custom pillar, per-leg calendars) take benign
+    defaults."""
+
+    def __init__(
+        self,
+        settlement_days: int,
+        tenor: Period,
+        quote: SimpleQuote,
+        overnight_index: Estr,
+        payment_lag: int,
+        payment_convention: BusinessDayConvention,
+        payment_frequency: Frequency,
+        forward_start: Period,
+        settings: Settings,
+        discounting_curve: YieldTermStructure | None = None,
+        overnight_spread: SimpleQuote | None = None,
+        pillar: Pillar = ...,
+        averaging_method: RateAveraging = ...,
+    ) -> None: ...

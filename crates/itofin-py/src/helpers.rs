@@ -8,25 +8,31 @@
 //! the concrete subclasses supply only their constructors, mirroring the
 //! [`crate::curve::PyYieldTermStructure`] base/subclass idiom.
 //!
-//! The `OIS` and `Bond`/`FixedRateBond` helpers each need enum or index facades
-//! that do not exist yet and are deferred to their own follow-up ticket (#530);
-//! they are omitted here rather than stubbed.
+//! The `Bond`/`FixedRateBond` helpers still need instrument facades that do not
+//! exist yet and are deferred to their own follow-up ticket (#530); they are
+//! omitted here rather than stubbed. The `OIS` helper, with its [`PyEstr`]
+//! overnight index and [`PyRateAveraging`] convention, lands in this module
+//! (#551).
 
 use crate::PyQlError;
+use crate::curve::PyYieldTermStructure;
 use crate::hullwhite::PyEuribor;
 use crate::market::PySimpleQuote;
+use crate::settings::PySettings;
 use crate::time::{
     PyBusinessDayConvention, PyCalendar, PyDate, PyDayCounter, PyFrequency, PyPeriod,
 };
+use libitofin::cashflows::RateAveraging;
 use libitofin::handle::Handle;
+use libitofin::indexes::{Estr, Index, OvernightIndex};
 use libitofin::instruments::FuturesType;
 use libitofin::quotes::Quote;
-use libitofin::shared::Shared;
+use libitofin::shared::{Shared, shared};
 use libitofin::termstructures::RateHelper;
 use libitofin::termstructures::yields::{
-    DepositRateHelper, FraRateHelper, FuturesRateHelper, Pillar, SwapRateHelper,
+    DepositRateHelper, FraRateHelper, FuturesRateHelper, OISRateHelper, Pillar, SwapRateHelper,
 };
-use libitofin::types::Natural;
+use libitofin::types::{Integer, Natural};
 use pyo3::prelude::*;
 
 /// Python `RateHelper`: the shared base for every bootstrap helper
@@ -520,5 +526,151 @@ impl PyFraRateHelper {
             py,
             PyClassInitializer::from(PyRateHelper { inner: helper }).add_subclass(PyFraRateHelper),
         )
+    }
+}
+
+/// Python `Estr`: the Euro Short-Term Rate overnight index (`indexes::Estr`).
+///
+/// `Estr::new` returns an `OvernightIndex` by value (it adds no behaviour over
+/// the base, so the C++ subclass is pure configuration, `estr.rs:7`); it is
+/// wrapped in `shared()` so [`PyOISRateHelper`] can hold the same object and
+/// hand the core ctor the `&OvernightIndex` it takes. Passing `None` for the
+/// curve builds the index over an empty forwarding handle, the form the OIS
+/// bootstrap needs. Infallible (unlike `Euribor::new`, which rejects daily
+/// tenors): the overnight tenor is fixed to `1*Days` by the base.
+#[pyclass(name = "Estr", unsendable)]
+pub struct PyEstr {
+    inner: Shared<OvernightIndex>,
+}
+
+#[pymethods]
+impl PyEstr {
+    /// An ESTR index forwarding off `curve`, or off an empty handle when `curve`
+    /// is `None`.
+    #[new]
+    #[pyo3(signature = (curve, settings))]
+    fn new(curve: Option<&PyYieldTermStructure>, settings: &PySettings) -> Self {
+        let forwarding = match curve {
+            Some(curve) => curve.handle(),
+            None => Handle::empty(),
+        };
+        PyEstr {
+            inner: shared(Estr::new(forwarding, settings.inner())),
+        }
+    }
+
+    /// The index's fixing for `fixing_date`, forecast off the forwarding curve
+    /// for a future date or read from stored fixings for a past one. Fallible:
+    /// an empty forwarding handle or an unset evaluation date is an error.
+    fn fixing(&self, fixing_date: &PyDate, forecast_todays_fixing: bool) -> PyResult<f64> {
+        Ok(self
+            .inner
+            .fixing(fixing_date.inner(), forecast_todays_fixing)
+            .map_err(PyQlError::from)?)
+    }
+}
+
+impl PyEstr {
+    /// A clone of the inner overnight index for the OIS helper facade, which
+    /// takes a `&OvernightIndex`.
+    pub(crate) fn inner(&self) -> Shared<OvernightIndex> {
+        Shared::clone(&self.inner)
+    }
+}
+
+/// Python `RateAveraging`: how an overnight coupon combines its daily fixings
+/// (`cashflows::RateAveraging`).
+///
+/// A fieldless pyo3 enum exposing `Simple` (arithmetic average) and `Compound`
+/// (daily compounding, the coupon default the OIS oracle uses).
+#[pyclass(name = "RateAveraging", eq, eq_int, from_py_object)]
+#[derive(Clone, Copy, PartialEq)]
+pub enum PyRateAveraging {
+    Simple,
+    Compound,
+}
+
+impl PyRateAveraging {
+    /// The core [`RateAveraging`] this variant stands for.
+    pub(crate) fn inner(&self) -> RateAveraging {
+        match self {
+            PyRateAveraging::Simple => RateAveraging::Simple,
+            PyRateAveraging::Compound => RateAveraging::Compound,
+        }
+    }
+}
+
+/// Python `OISRateHelper`: a helper fitting an overnight-indexed swap rate
+/// (`termstructures::yields::ratehelpers::OISRateHelper`).
+///
+/// The spot-starting OIS the bootstrap oracle builds: a swap of `tenor` starting
+/// `settlement_days` after the evaluation date, floating off `overnight_index`.
+/// The Python signature lists the required knobs first (so `settings` can sit
+/// among them rather than illegally after the defaulted trailing ones), then the
+/// four optional knobs the issue defaults; the body reorders these into the core
+/// ctor's 13-argument positional order. `discounting_curve` `None` discounts off
+/// the bootstrapping curve; `overnight_spread` `None` becomes an empty (zero)
+/// spread handle. The deferred core knobs past `averaging_method` (telescopic
+/// value dates, lookback, lockout, observation shift, custom pillar, per-leg
+/// calendars, `ratehelpers.rs:1036-1039`) take their benign defaults.
+#[pyclass(name = "OISRateHelper", extends = PyRateHelper, unsendable)]
+pub struct PyOISRateHelper;
+
+#[pymethods]
+impl PyOISRateHelper {
+    /// An OIS helper fitting `quote` with the schedule of a spot-starting OIS of
+    /// `tenor` floating off `overnight_index`. The caller keeps `quote` (and
+    /// `overnight_spread`); mutating either later re-drives the bootstrap.
+    #[new]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (
+        settlement_days,
+        tenor,
+        quote,
+        overnight_index,
+        payment_lag,
+        payment_convention,
+        payment_frequency,
+        forward_start,
+        settings,
+        discounting_curve = None,
+        overnight_spread = None,
+        pillar = PyPillar::LastRelevantDate,
+        averaging_method = PyRateAveraging::Compound,
+    ))]
+    fn new(
+        settlement_days: Natural,
+        tenor: &PyPeriod,
+        quote: &PySimpleQuote,
+        overnight_index: &PyEstr,
+        payment_lag: Integer,
+        payment_convention: &PyBusinessDayConvention,
+        payment_frequency: &PyFrequency,
+        forward_start: &PyPeriod,
+        settings: &PySettings,
+        discounting_curve: Option<&PyYieldTermStructure>,
+        overnight_spread: Option<&PySimpleQuote>,
+        pillar: PyPillar,
+        averaging_method: PyRateAveraging,
+    ) -> PyClassInitializer<Self> {
+        let idx = overnight_index.inner();
+        let helper = OISRateHelper::new(
+            settlement_days,
+            tenor.inner(),
+            quote.handle(),
+            &idx,
+            discounting_curve.map(|curve| curve.handle()),
+            payment_lag,
+            payment_convention.inner(),
+            payment_frequency.inner(),
+            forward_start.inner(),
+            overnight_spread
+                .map(|spread| spread.handle())
+                .unwrap_or_else(Handle::empty),
+            pillar.inner(),
+            averaging_method.inner(),
+            settings.inner(),
+        ) as Shared<dyn RateHelper>;
+        PyClassInitializer::from(PyRateHelper { inner: helper }).add_subclass(PyOISRateHelper)
     }
 }
