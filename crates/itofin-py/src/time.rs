@@ -11,10 +11,12 @@ use libitofin::time::daycounters::actual365fixed::Actual365Fixed;
 use libitofin::time::daycounters::actualactual::{ActualActual, Convention};
 use libitofin::time::daycounters::thirty360::{Convention as Thirty360Convention, Thirty360};
 use libitofin::time::frequency::Frequency;
+use libitofin::time::imm;
 use libitofin::time::period::Period;
 use libitofin::time::schedule::{MakeSchedule, Schedule};
 use libitofin::time::timeunit::TimeUnit;
 use pyo3::prelude::*;
+use pyo3::wrap_pyfunction;
 
 const MIN_SERIAL: i64 = 367;
 const MAX_SERIAL: i64 = 109_574;
@@ -441,4 +443,30 @@ impl PySchedule {
     pub(crate) fn inner(&self) -> Schedule {
         self.inner.clone()
     }
+}
+
+/// Whether `date` is an IMM date: the third Wednesday of the month, and of
+/// March, June, September or December only when `main_cycle` is set.
+///
+/// The free-function form QuantLib-SWIG exposes for `IMM::isIMMdate`; it is the
+/// way to build a valid IMM start date for the futures rate helper from Python.
+#[pyfunction]
+#[pyo3(signature = (date, main_cycle = false))]
+fn is_imm_date(date: &PyDate, main_cycle: bool) -> bool {
+    imm::is_imm_date(date.inner(), main_cycle)
+}
+
+/// The next IMM date strictly following `date`, restricted to the March/June/
+/// September/December cycle when `main_cycle` is set (`IMM::nextDate`).
+#[pyfunction]
+#[pyo3(signature = (date, main_cycle = false))]
+fn next_imm_date(date: &PyDate, main_cycle: bool) -> PyDate {
+    PyDate::from_inner(imm::next_date(date.inner(), main_cycle))
+}
+
+/// Registers the module-level IMM free functions on the `time` submodule.
+pub(crate) fn add_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.add_function(wrap_pyfunction!(is_imm_date, module)?)?;
+    module.add_function(wrap_pyfunction!(next_imm_date, module)?)?;
+    Ok(())
 }
