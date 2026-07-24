@@ -198,6 +198,9 @@ class RateHelper:
     def quote_value(self) -> float: ...
     def maturity_date(self) -> Date: ...
     def pillar_date(self) -> Date: ...
+    def earliest_date(self) -> Date: ...
+    def latest_date(self) -> Date: ...
+    def latest_relevant_date(self) -> Date: ...
 
 class DepositRateHelper(RateHelper):
     """A helper fitting a deposit rate."""
@@ -219,3 +222,52 @@ class SwapRateHelper(RateHelper):
         fixed_day_count: DayCounter,
         ibor_index: Euribor,
     ) -> None: ...
+
+class FuturesType:
+    """The date convention an interest-rate future settles on.
+
+    Imm and Custom are fully usable from Python. Asx validates and prices against
+    an explicitly supplied ASX start date, but the ASX date navigators (the
+    analogues of itofin.time.is_imm_date / next_imm_date) are deferred, so there
+    is no helper to derive the next ASX date from Python yet."""
+
+    Imm: FuturesType
+    Asx: FuturesType
+    Custom: FuturesType
+
+class FuturesRateHelper(RateHelper):
+    """A helper fitting an exchange-traded interest-rate future's quoted price at
+    a fixed IMM/ASX window. The window is absolute (never rebuilt on an
+    evaluation-date change). Pass conv_adj=None for an empty (zero) convexity
+    adjustment."""
+
+    def __init__(
+        self,
+        price: SimpleQuote,
+        ibor_start_date: Date,
+        length_in_months: int,
+        calendar: Calendar,
+        convention: BusinessDayConvention,
+        end_of_month: bool,
+        day_counter: DayCounter,
+        conv_adj: SimpleQuote | None,
+        futures_type: FuturesType,
+    ) -> None: ...
+    @staticmethod
+    def from_end_date(
+        price: SimpleQuote,
+        ibor_start_date: Date,
+        ibor_end_date: Date | None,
+        day_counter: DayCounter,
+        conv_adj: SimpleQuote | None,
+        futures_type: FuturesType,
+    ) -> FuturesRateHelper: ...
+    @staticmethod
+    def from_index(
+        price: SimpleQuote,
+        ibor_start_date: Date,
+        index: Euribor,
+        conv_adj: SimpleQuote | None,
+        futures_type: FuturesType,
+    ) -> FuturesRateHelper: ...
+    def convexity_adjustment(self) -> float: ...
