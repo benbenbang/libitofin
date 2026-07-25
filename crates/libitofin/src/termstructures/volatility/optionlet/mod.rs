@@ -19,8 +19,12 @@
 //!   The stripped and interpolated optionlet surfaces are deferred.
 
 mod constantoptionletvol;
+mod optionletstripper;
+mod strippedoptionletbase;
 
 pub use constantoptionletvol::ConstantOptionletVolatility;
+pub use optionletstripper::{OptionletStripper, OptionletStripperCaches};
+pub use strippedoptionletbase::StrippedOptionletBase;
 
 use crate::errors::QlResult;
 use crate::termstructures::volatility::{VolatilityTermStructure, VolatilityType};
