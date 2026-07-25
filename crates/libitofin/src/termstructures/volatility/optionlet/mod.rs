@@ -20,10 +20,12 @@
 
 mod constantoptionletvol;
 mod optionletstripper;
+mod optionletstripper1;
 mod strippedoptionletbase;
 
 pub use constantoptionletvol::ConstantOptionletVolatility;
 pub use optionletstripper::{OptionletStripper, OptionletStripperCaches};
+pub use optionletstripper1::OptionletStripper1;
 pub use strippedoptionletbase::StrippedOptionletBase;
 
 use crate::errors::QlResult;
