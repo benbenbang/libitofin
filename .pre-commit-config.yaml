@@ -29,6 +29,12 @@ repos:
           - --indent=2
   - repo: local
     hooks:
+      - id: itofin-submodule-shims
+        name: itofin submodule .py shims in sync with .pyi
+        entry: python3 crates/itofin-py/scripts/gen_submodule_shims.py
+        language: system
+        files: ^crates/itofin-py/python/itofin/.*\.pyi$
+        pass_filenames: false
       - id: validate-commit-msg
         name: commit message is valid
         args:
