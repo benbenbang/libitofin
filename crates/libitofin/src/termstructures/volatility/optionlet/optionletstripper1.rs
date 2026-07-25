@@ -363,3 +363,152 @@ impl StrippedOptionletBase for OptionletStripper1 {
         self.base.displacement()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::interestrate::Compounding;
+    use crate::settings::Settings;
+    use crate::termstructures::yields::FlatForward;
+    use crate::time::calendars::target::Target;
+    use crate::time::date::Month;
+    use crate::time::daycounters::actual365fixed::Actual365Fixed;
+    use crate::time::frequency::Frequency;
+
+    const BDC: BusinessDayConvention = BusinessDayConvention::ModifiedFollowing;
+
+    fn eval_date() -> Date {
+        Date::new(15, Month::June, 2026)
+    }
+
+    fn settings() -> Shared<Settings<Date>> {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(eval_date());
+        settings
+    }
+
+    fn flat_curve() -> Handle<dyn YieldTermStructure> {
+        Handle::new(shared(FlatForward::with_rate(
+            eval_date(),
+            0.04,
+            Actual365Fixed::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>)
+    }
+
+    fn euribor6m(
+        curve: Handle<dyn YieldTermStructure>,
+        settings: Shared<Settings<Date>>,
+    ) -> Shared<IborIndex> {
+        shared(crate::indexes::ibor::Euribor::six_months(curve, settings))
+    }
+
+    fn strikes() -> Vec<Rate> {
+        vec![0.02, 0.03, 0.04, 0.05, 0.06]
+    }
+
+    fn flat_surface() -> Shared<CapFloorTermVolSurface> {
+        let option_tenors: Vec<Period> = (1..=5).map(|n| Period::new(n, TimeUnit::Years)).collect();
+        let vols: Vec<Vec<Handle<dyn Quote>>> = option_tenors
+            .iter()
+            .map(|_| {
+                strikes()
+                    .iter()
+                    .map(|_| Handle::new(shared(SimpleQuote::new(Some(0.20))) as Shared<dyn Quote>))
+                    .collect()
+            })
+            .collect();
+        shared(
+            CapFloorTermVolSurface::with_reference_date(
+                eval_date(),
+                Target::new(),
+                BDC,
+                option_tenors,
+                strikes(),
+                vols,
+                Actual365Fixed::new(),
+            )
+            .unwrap(),
+        )
+    }
+
+    fn stripper(vol_type: VolatilityType) -> OptionletStripper1 {
+        let settings = settings();
+        let index = euribor6m(flat_curve(), settings);
+        OptionletStripper1::new(
+            flat_surface(),
+            index,
+            Handle::<dyn YieldTermStructure>::empty(),
+            1e-6,
+            100,
+            vol_type,
+            0.0,
+            None,
+        )
+        .unwrap()
+    }
+
+    /// Stripping the flat surface yields a full grid of finite, positive
+    /// optionlet volatilities whose fixing times strictly increase, matching the
+    /// base tenor/strike grid.
+    #[test]
+    fn strips_a_flat_surface_to_a_finite_positive_grid() {
+        let stripper = stripper(VolatilityType::ShiftedLognormal);
+        let n = stripper.optionlet_maturities();
+        assert!(n > 1);
+
+        let times = stripper.optionlet_fixing_times().unwrap();
+        assert_eq!(times.len(), n);
+        for pair in times.windows(2) {
+            assert!(pair[1] > pair[0], "fixing times not increasing: {times:?}");
+        }
+
+        for i in 0..n {
+            let vols = stripper.optionlet_volatilities(i).unwrap();
+            assert_eq!(vols.len(), strikes().len());
+            for v in vols {
+                assert!(
+                    v.is_finite() && v > 0.0,
+                    "optionlet vol {v} at maturity {i}"
+                );
+            }
+        }
+    }
+
+    /// A flat 20% cap/floor term-vol surface strips to optionlet volatilities
+    /// near 20%: a flat term vol is the average of flat optionlet vols. This is a
+    /// sanity band; the exact reprice identity is the discriminating oracle #576.
+    #[test]
+    fn stripped_vols_of_a_flat_surface_are_near_the_flat_input() {
+        let stripper = stripper(VolatilityType::ShiftedLognormal);
+        for i in 0..stripper.optionlet_maturities() {
+            for v in stripper.optionlet_volatilities(i).unwrap() {
+                assert!(
+                    (v - 0.20).abs() < 0.02,
+                    "stripped optionlet vol {v} at maturity {i} is not near 0.20"
+                );
+            }
+        }
+    }
+
+    /// The floating switch strike is the mean at-the-money optionlet rate; on a
+    /// flat 4% forward curve it sits near 4% (`optionletstripper1.cpp:86-92`).
+    #[test]
+    fn switch_strike_is_the_mean_atm_rate() {
+        let stripper = stripper(VolatilityType::ShiftedLognormal);
+        let switch = stripper.switch_strike().unwrap();
+        let atm = stripper.atm_optionlet_rates().unwrap();
+        let mean = atm.iter().sum::<Rate>() / atm.len() as Real;
+        assert!((switch - mean).abs() < 1e-12);
+        assert!((0.035..0.045).contains(&switch), "switch strike {switch}");
+    }
+
+    /// The normal (Bachelier) stripping path is deferred (#440/#577): an accessor
+    /// that triggers the strip errors instead of stripping.
+    #[test]
+    fn normal_volatility_type_is_rejected() {
+        let stripper = stripper(VolatilityType::Normal);
+        assert!(stripper.optionlet_volatilities(0).is_err());
+    }
+}
