@@ -254,3 +254,189 @@ impl OptionletStripper {
         &self.caches
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::quotes::SimpleQuote;
+    use crate::settings::Settings;
+    use crate::shared::shared;
+    use crate::termstructures::yieldtermstructure::YieldTermStructure;
+    use crate::time::businessdayconvention::BusinessDayConvention;
+    use crate::time::calendars::target::Target;
+    use crate::time::date::Month;
+    use crate::time::daycounters::actual365fixed::Actual365Fixed;
+    use crate::time::timeunit::TimeUnit;
+    use crate::types::Real;
+
+    const BDC: BusinessDayConvention = BusinessDayConvention::ModifiedFollowing;
+
+    fn settings_on(today: Date) -> Shared<Settings<Date>> {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(today);
+        settings
+    }
+
+    fn euribor6m(settings: Shared<Settings<Date>>) -> Shared<IborIndex> {
+        shared(crate::indexes::ibor::Euribor::six_months(
+            Handle::<dyn YieldTermStructure>::empty(),
+            settings,
+        ))
+    }
+
+    fn months(n: i64) -> Period {
+        Period::new(n as crate::types::Integer, TimeUnit::Months)
+    }
+
+    /// Builds a fixed-reference surface over `option_tenors` with a flat 20%
+    /// vol grid across `n_strikes` strikes.
+    fn surface(option_tenors: Vec<Period>, n_strikes: usize) -> Shared<CapFloorTermVolSurface> {
+        let strikes: Vec<Rate> = (0..n_strikes).map(|j| 0.01 + 0.01 * j as Real).collect();
+        let vols: Vec<Vec<Handle<dyn crate::quotes::Quote>>> = option_tenors
+            .iter()
+            .map(|_| {
+                (0..n_strikes)
+                    .map(|_| {
+                        let quote: Shared<dyn crate::quotes::Quote> =
+                            shared(SimpleQuote::new(Some(0.20)));
+                        Handle::new(quote)
+                    })
+                    .collect()
+            })
+            .collect();
+        shared(
+            CapFloorTermVolSurface::with_reference_date(
+                Date::new(15, Month::June, 2026),
+                Target::new(),
+                BDC,
+                option_tenors,
+                strikes,
+                vols,
+                Actual365Fixed::new(),
+            )
+            .unwrap(),
+        )
+    }
+
+    /// `commonSetup` for a 6M index over a surface reaching 4Y yields optionlet
+    /// tenors `6M..42M` and cap/floor lengths `12M..48M`, each length one index
+    /// tenor longer than its optionlet tenor (`optionletstripper.cpp:58-84`).
+    #[test]
+    fn common_setup_builds_the_optionlet_and_capfloor_tenors() {
+        let settings = settings_on(Date::new(15, Month::June, 2026));
+        let index = euribor6m(settings.clone());
+        let option_tenors = (1..=4)
+            .map(|n| Period::new(n, TimeUnit::Years))
+            .collect::<Vec<_>>();
+        let surface = surface(option_tenors, 5);
+
+        let stripper = OptionletStripper::new(
+            surface,
+            index,
+            Handle::<dyn YieldTermStructure>::empty(),
+            VolatilityType::ShiftedLognormal,
+            0.0,
+            None,
+        )
+        .unwrap();
+
+        let expected_optionlets: Vec<Period> = [6, 12, 18, 24, 30, 36, 42]
+            .iter()
+            .map(|&m| months(m))
+            .collect();
+        let expected_lengths: Vec<Period> = [12, 18, 24, 30, 36, 42, 48]
+            .iter()
+            .map(|&m| months(m))
+            .collect();
+        assert_eq!(
+            stripper.optionlet_fixing_tenors(),
+            expected_optionlets.as_slice()
+        );
+        assert_eq!(stripper.cap_floor_lengths(), expected_lengths.as_slice());
+        assert_eq!(stripper.optionlet_maturities(), 7);
+        assert_eq!(stripper.n_strikes(), 5);
+    }
+
+    /// The result caches are allocated to the optionlet-tenor count, strikes
+    /// seeded from the surface, volatilities zeroed at `n_tenors x n_strikes`.
+    #[test]
+    fn common_setup_allocates_the_result_caches() {
+        let settings = settings_on(Date::new(15, Month::June, 2026));
+        let index = euribor6m(settings.clone());
+        let surface = surface(
+            (1..=4).map(|n| Period::new(n, TimeUnit::Years)).collect(),
+            5,
+        );
+
+        let stripper = OptionletStripper::new(
+            surface,
+            index,
+            Handle::<dyn YieldTermStructure>::empty(),
+            VolatilityType::ShiftedLognormal,
+            0.0,
+            None,
+        )
+        .unwrap();
+
+        let caches = stripper.caches().borrow();
+        assert_eq!(caches.optionlet_strikes.len(), 7);
+        assert_eq!(
+            caches.optionlet_strikes[0],
+            vec![0.01, 0.02, 0.03, 0.04, 0.05]
+        );
+        assert_eq!(caches.optionlet_volatilities.len(), 7);
+        assert!(
+            caches
+                .optionlet_volatilities
+                .iter()
+                .all(|row| row.len() == 5)
+        );
+        assert_eq!(caches.optionlet_dates.len(), 7);
+        assert_eq!(caches.atm_optionlet_rate.len(), 7);
+    }
+
+    /// A surface whose longest tenor is shorter than the first cap/floor length
+    /// (`indexTenor + indexTenor`) is rejected (`optionletstripper.cpp:64-66`).
+    #[test]
+    fn a_too_short_surface_is_rejected() {
+        let settings = settings_on(Date::new(15, Month::June, 2026));
+        let index = euribor6m(settings.clone());
+        let surface = surface(vec![months(3), months(6), months(9), months(11)], 5);
+
+        let err = OptionletStripper::new(
+            surface,
+            index,
+            Handle::<dyn YieldTermStructure>::empty(),
+            VolatilityType::ShiftedLognormal,
+            0.0,
+            None,
+        )
+        .err()
+        .unwrap();
+        assert!(err.message().contains("too short"));
+    }
+
+    /// A non-zero displacement under the Normal model is rejected
+    /// (`optionletstripper.cpp:44-46`).
+    #[test]
+    fn normal_model_forbids_a_displacement() {
+        let settings = settings_on(Date::new(15, Month::June, 2026));
+        let index = euribor6m(settings.clone());
+        let surface = surface(
+            (1..=4).map(|n| Period::new(n, TimeUnit::Years)).collect(),
+            5,
+        );
+
+        let err = OptionletStripper::new(
+            surface,
+            index,
+            Handle::<dyn YieldTermStructure>::empty(),
+            VolatilityType::Normal,
+            0.01,
+            None,
+        )
+        .err()
+        .unwrap();
+        assert!(err.message().contains("Normal model"));
+    }
+}
