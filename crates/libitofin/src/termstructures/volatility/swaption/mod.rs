@@ -33,8 +33,10 @@
 //!   swaption vol surfaces are deferred.
 
 mod constantswaptionvol;
+mod swaptionvoldiscrete;
 
 pub use constantswaptionvol::ConstantSwaptionVolatility;
+pub use swaptionvoldiscrete::SwaptionVolatilityDiscrete;
 
 use crate::errors::QlResult;
 use crate::termstructures::volatility::{VolatilityTermStructure, VolatilityType};
