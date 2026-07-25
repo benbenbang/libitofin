@@ -25,8 +25,8 @@ use curve::{
     PyPiecewiseYieldCurve, PyYieldTermStructure, PyZeroCurve,
 };
 use helpers::{
-    PyDepositRateHelper, PyFraRateHelper, PyFuturesRateHelper, PyFuturesType, PyPillar,
-    PyRateHelper, PySwapRateHelper,
+    PyDepositRateHelper, PyEstr, PyFraRateHelper, PyFuturesRateHelper, PyFuturesType,
+    PyOISRateHelper, PyPillar, PyRateAveraging, PyRateHelper, PySwapRateHelper,
 };
 use heston::{PyHestonModel, PyHestonModelHelper, PyHestonProcess};
 use hullwhite::{PyEuribor, PyHullWhite, PySwaptionHelper};
@@ -116,6 +116,8 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     termstructures.add_class::<PyFuturesRateHelper>()?;
     termstructures.add_class::<PyPillar>()?;
     termstructures.add_class::<PyFraRateHelper>()?;
+    termstructures.add_class::<PyRateAveraging>()?;
+    termstructures.add_class::<PyOISRateHelper>()?;
     termstructures.add_class::<PyPiecewiseYieldCurve>()?;
     termstructures.add_class::<PyPiecewiseLogLinearDiscount>()?;
     termstructures.add_class::<PyPiecewiseLinearZero>()?;
@@ -128,6 +130,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     let indexes = PyModule::new(py, "indexes")?;
     indexes.add_class::<PyEuribor>()?;
+    indexes.add_class::<PyEstr>()?;
 
     let instruments = PyModule::new(py, "instruments")?;
     instruments.add_class::<PyOptionType>()?;
