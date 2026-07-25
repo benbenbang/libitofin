@@ -46,7 +46,8 @@ pub use localvolsurface::LocalVolSurface;
 pub use localvoltermstructure::LocalVolTermStructure;
 pub use optionlet::{ConstantOptionletVolatility, OptionletVolatilityStructure};
 pub use swaption::{
-    ConstantSwaptionVolatility, SwaptionVolatilityDiscrete, SwaptionVolatilityStructure,
+    ConstantSwaptionVolatility, SwaptionVolatilityDiscrete, SwaptionVolatilityMatrix,
+    SwaptionVolatilityStructure,
 };
 pub use volatilitytype::VolatilityType;
 

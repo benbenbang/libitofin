@@ -28,15 +28,17 @@
 //! - QuantLib exposes the lognormal shift through `shift()`, not the optionlet's
 //!   `displacement()`; this port follows the swaption source and names it
 //!   [`shift`](SwaptionVolatilityStructure::shift).
-//! - Only the constant surface is ported here
-//!   ([`ConstantSwaptionVolatility`]). The stripped, interpolated and cube
-//!   swaption vol surfaces are deferred.
+//! - The constant surface ([`ConstantSwaptionVolatility`]) and the
+//!   bilinear-interpolated at-the-money matrix ([`SwaptionVolatilityMatrix`])
+//!   are ported here. The stripped and cube swaption vol surfaces are deferred.
 
 mod constantswaptionvol;
 mod swaptionvoldiscrete;
+mod swaptionvolmatrix;
 
 pub use constantswaptionvol::ConstantSwaptionVolatility;
 pub use swaptionvoldiscrete::SwaptionVolatilityDiscrete;
+pub use swaptionvolmatrix::SwaptionVolatilityMatrix;
 
 use crate::errors::QlResult;
 use crate::termstructures::volatility::{VolatilityTermStructure, VolatilityType};
