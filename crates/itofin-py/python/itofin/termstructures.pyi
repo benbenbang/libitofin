@@ -46,19 +46,22 @@ class FlatForward(YieldTermStructure):
     def __init__(self, reference_date: Date, rate: float, day_counter: DayCounter) -> None: ...
 
 class ZeroCurve(YieldTermStructure):
-    """A yield curve interpolating continuously-compounded zero rates linearly
-    between nodes. The first date is the reference date; finite in time."""
+    """A yield curve interpolating continuously-compounded zero rates between
+    nodes. The first date is the reference date; finite in time. interpolation is
+    "Linear" (default) or "Cubic"."""
 
     def __init__(
         self,
         dates: list[Date],
         yields: list[float],
         day_counter: DayCounter,
+        interpolation: str = "Linear",
     ) -> None: ...
 
 class DiscountCurve(YieldTermStructure):
-    """A yield curve interpolating discount factors log-linearly (piecewise-constant
-    forwards). The first date is the reference date and its discount must be 1.0."""
+    """A yield curve interpolating discount factors between nodes. The first date
+    is the reference date and its discount must be 1.0. interpolation is
+    "LogLinear" (default, piecewise-constant forwards) or "Cubic"."""
 
     def __init__(
         self,
@@ -66,6 +69,7 @@ class DiscountCurve(YieldTermStructure):
         discounts: list[float],
         day_counter: DayCounter,
         calendar: Calendar | None = None,
+        interpolation: str = "LogLinear",
     ) -> None: ...
 
 class ForwardCurve(YieldTermStructure):
@@ -91,6 +95,62 @@ class PiecewiseYieldCurve(YieldTermStructure):
         day_counter: DayCounter,
         interpolation: str = "LogLinear",
     ) -> None: ...
+
+class PiecewiseLogLinearDiscount(YieldTermStructure):
+    """A curve bootstrapped in discount-factor space with log-linear interpolation
+    (PiecewiseYieldCurve<Discount, LogLinear>). data() are discount factors, so
+    data()[0] is the reference node's 1.0."""
+
+    def __init__(
+        self,
+        reference_date: Date,
+        helpers: list[RateHelper],
+        day_counter: DayCounter,
+    ) -> None: ...
+    def dates(self) -> list[Date]: ...
+    def data(self) -> list[float]: ...
+
+class PiecewiseLinearZero(YieldTermStructure):
+    """A curve bootstrapped in zero-rate space with linear interpolation
+    (PiecewiseYieldCurve<ZeroYield, Linear>). data() are zero rates."""
+
+    def __init__(
+        self,
+        reference_date: Date,
+        helpers: list[RateHelper],
+        day_counter: DayCounter,
+    ) -> None: ...
+    def dates(self) -> list[Date]: ...
+    def data(self) -> list[float]: ...
+
+class PiecewiseLinearForward(YieldTermStructure):
+    """A curve bootstrapped in instantaneous forward-rate space with linear
+    interpolation (PiecewiseYieldCurve<ForwardRate, Linear>). data() are forward
+    rates."""
+
+    def __init__(
+        self,
+        reference_date: Date,
+        helpers: list[RateHelper],
+        day_counter: DayCounter,
+    ) -> None: ...
+    def dates(self) -> list[Date]: ...
+    def data(self) -> list[float]: ...
+
+class PiecewiseFlatForward(YieldTermStructure):
+    """A curve bootstrapped in instantaneous forward-rate space with backward-flat
+    interpolation (PiecewiseYieldCurve<ForwardRate, BackwardFlat>). Numerically
+    identical to PiecewiseLogLinearDiscount under every query; only data() (forward
+    rates vs discount factors) tells them apart."""
+
+    def __init__(
+        self,
+        reference_date: Date,
+        helpers: list[RateHelper],
+        day_counter: DayCounter,
+    ) -> None: ...
+    def dates(self) -> list[Date]: ...
+    def data(self) -> list[float]: ...
 
 class BlackConstantVol(BlackVolTermStructure):
     """A flat Black volatility, constant in strike and time."""
