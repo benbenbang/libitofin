@@ -71,6 +71,7 @@
 //! `!using_at_par_coupons()`); a request that agrees, or `None`, is accepted and
 //! the Settings mode drives the coupons. The builder never mutates [`Settings`].
 
+use crate::cashflows::{IborCoupon, IborLeg};
 use crate::currency::Currency;
 use crate::errors::QlResult;
 use crate::handle::Handle;
@@ -381,6 +382,42 @@ impl MakeVanillaSwap {
             fixed_day_count,
             float_day_count,
         )
+    }
+
+    /// Builds just the floating leg the swap would carry, reusing the same start
+    /// and end date derivation as [`build`](Self::build).
+    ///
+    /// This is the path `MakeCapFloor` takes: C++ builds the whole swap and keeps
+    /// only `VanillaSwap::floatingLeg()` (`makecapfloor.cpp:50`), so the fixed-leg
+    /// currency defaults are never consulted and this succeeds for currencies
+    /// [`build`](Self::build) could not price. The schedule and coupon
+    /// construction is kept identical to the floating leg [`VanillaSwap::new`]
+    /// assembles (nominal, zero spread, index day counter, payment adjustment
+    /// resolved against the floating schedule) so the leg matches the through-swap
+    /// one; this small replication is the price of not exposing concrete
+    /// [`IborCoupon`]s off the erased swap `Leg`.
+    pub fn floating_leg(&self) -> QlResult<Vec<Shared<IborCoupon>>> {
+        let start_date = self.start_date()?;
+        let end_date = self.end_date(start_date);
+        let float_schedule = Schedule::new(
+            start_date,
+            end_date,
+            self.ibor_index.tenor(),
+            self.float_calendar.clone(),
+            self.float_convention,
+            self.float_termination_date_convention,
+            DateGeneration::Backward,
+            self.float_end_of_month,
+            Date::null(),
+            Date::null(),
+        );
+        let resolved_convention = float_schedule.business_day_convention();
+        IborLeg::new(float_schedule, Shared::clone(&self.ibor_index))
+            .with_notionals(vec![self.nominal])
+            .with_payment_day_counter(self.ibor_index.day_counter().clone())
+            .with_payment_adjustment(resolved_convention)
+            .with_spreads(vec![0.0])
+            .coupons()
     }
 
     /// Derives the start date: an explicit effective date, or the spot date from

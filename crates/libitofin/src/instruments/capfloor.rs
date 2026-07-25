@@ -23,9 +23,10 @@
 //!
 //! - The generic `Leg`/`FloatingRateCoupon` surface becomes the concrete
 //!   `IborCoupon`, as above; the fixture only ever builds ibor legs.
-//! - `MakeCapFloor` is not ported (the fixture constructs `Cap`/`Floor`
-//!   directly); nor are `optionlet`, `lastFloatingRateCoupon`, `impliedVolatility`
-//!   or `deepUpdate`, none of which the ported tests reach.
+//! - [`MakeCapFloor`](super::MakeCapFloor) builds the market cap/floor and
+//!   [`CapFloor::last_floating_rate_coupon`] exposes the trailing coupon the
+//!   optionlet stripper reads; `optionlet`, `impliedVolatility` and `deepUpdate`
+//!   remain unported, as no ported test reaches them.
 //! - The `CapFloor::arguments` bundle carries `start_dates` (read by the analytic
 //!   Hull-White engine to form each optionlet's exercise maturity, #438); the C++
 //!   `spreads` and `indexes` are filled but unread by any ported engine, so they
@@ -215,6 +216,13 @@ impl CapFloor {
     /// The floating coupons.
     pub fn coupons(&self) -> &[Shared<IborCoupon>] {
         &self.coupons
+    }
+
+    /// The last floating coupon (`lastFloatingRateCoupon`), the coupon the
+    /// optionlet stripper reads its fixing date, payment date and accrual period
+    /// off. `None` only for an empty leg, which the constructors never produce.
+    pub fn last_floating_rate_coupon(&self) -> Option<&Shared<IborCoupon>> {
+        self.coupons.last()
     }
 
     /// The leg's earliest accrual start (`startDate`).
