@@ -48,9 +48,10 @@ use crate::errors::QlResult;
 use crate::handle::Handle;
 use crate::math::interpolations::Interpolation2D;
 use crate::math::interpolations::bicubic::BicubicSpline;
+use crate::math::matrix::Matrix;
 use crate::patterns::lazyobject::LazyObject;
 use crate::patterns::observable::{AsObservable, Observable, Observer};
-use crate::quotes::Quote;
+use crate::quotes::{Quote, make_quote_handle};
 use crate::settings::Settings;
 use crate::shared::{Shared, SharedMut, shared_mut};
 use crate::termstructures::volatility::VolatilityTermStructure;
@@ -150,6 +151,60 @@ impl CapFloorTermVolSurface {
         )
     }
 
+    /// Fixed reference date, fixed market data. C++'s fixed-reference + `Matrix`
+    /// constructor. The cells are wrapped in unobserved quote handles so the
+    /// refresh path is shared with the quote forms; no market data is registered.
+    #[allow(clippy::too_many_arguments)]
+    pub fn with_reference_date_from_matrix(
+        reference_date: Date,
+        calendar: Calendar,
+        business_day_convention: BusinessDayConvention,
+        option_tenors: Vec<Period>,
+        strikes: Vec<Rate>,
+        vols: &Matrix,
+        day_counter: DayCounter,
+    ) -> QlResult<CapFloorTermVolSurface> {
+        let base = TermStructureBase::with_reference_date(
+            reference_date,
+            Some(calendar),
+            Some(day_counter),
+        );
+        Self::assemble(
+            base,
+            business_day_convention,
+            option_tenors,
+            strikes,
+            matrix_to_handles(vols),
+            false,
+        )
+    }
+
+    /// Floating reference date, fixed market data. C++'s floating-reference +
+    /// `Matrix` constructor. As with the fixed-reference `Matrix` form, the cells
+    /// are wrapped in unobserved quote handles and no market data is registered.
+    #[allow(clippy::too_many_arguments)]
+    pub fn moving_from_matrix(
+        settlement_days: Natural,
+        calendar: Calendar,
+        business_day_convention: BusinessDayConvention,
+        option_tenors: Vec<Period>,
+        strikes: Vec<Rate>,
+        vols: &Matrix,
+        day_counter: DayCounter,
+        settings: Shared<Settings<Date>>,
+    ) -> QlResult<CapFloorTermVolSurface> {
+        let base =
+            TermStructureBase::moving(settlement_days, calendar, Some(day_counter), settings);
+        Self::assemble(
+            base,
+            business_day_convention,
+            option_tenors,
+            strikes,
+            matrix_to_handles(vols),
+            false,
+        )
+    }
+
     fn assemble(
         base: TermStructureBase,
         business_day_convention: BusinessDayConvention,
@@ -235,6 +290,16 @@ impl CapFloorTermVolSurface {
         self.calculate()?;
         Ok(self.interp.borrow().option_times.clone())
     }
+}
+
+fn matrix_to_handles(matrix: &Matrix) -> Vec<Vec<Handle<dyn Quote>>> {
+    (0..matrix.rows())
+        .map(|i| {
+            (0..matrix.columns())
+                .map(|j| make_quote_handle(matrix[(i, j)]).handle())
+                .collect()
+        })
+        .collect()
 }
 
 fn check_inputs(
