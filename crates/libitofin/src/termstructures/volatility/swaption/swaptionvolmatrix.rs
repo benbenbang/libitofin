@@ -362,3 +362,266 @@ impl SwaptionVolatilityStructure for SwaptionVolatilityMatrix {
         self.interp.borrow().shifts.value(swap_length, option_time)
     }
 }
+
+/// These tests mirror `testSwaptionVolMatrixCoherence`'s node-recovery arm
+/// (`QuantLib/test-suite/swaptionvolatilitymatrix.cpp`, `makeCoherenceTest`)
+/// with the `swaptionvolstructuresutilities.hpp` fixture. The discriminating
+/// oracle is node recovery to 1e-16 (bilinear is exact at nodes) plus the
+/// lazy-refresh arm, which alone catches an interpolation that is built once and
+/// never rebuilt on a quote bump.
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::patterns::observable::AsObservable;
+    use crate::quotes::SimpleQuote;
+    use crate::shared::shared;
+    use crate::test_support::{Flag, as_observer};
+    use crate::time::calendars::target::Target;
+    use crate::time::date::Month;
+    use crate::time::daycounters::actual365fixed::Actual365Fixed;
+    use crate::time::timeunit::TimeUnit;
+
+    const BDC: BusinessDayConvention = BusinessDayConvention::ModifiedFollowing;
+    const TOL: Real = 1e-16;
+
+    fn option_tenors() -> Vec<Period> {
+        vec![
+            Period::new(1, TimeUnit::Months),
+            Period::new(6, TimeUnit::Months),
+            Period::new(1, TimeUnit::Years),
+            Period::new(5, TimeUnit::Years),
+            Period::new(10, TimeUnit::Years),
+            Period::new(30, TimeUnit::Years),
+        ]
+    }
+
+    fn swap_tenors() -> Vec<Period> {
+        vec![
+            Period::new(1, TimeUnit::Years),
+            Period::new(5, TimeUnit::Years),
+            Period::new(10, TimeUnit::Years),
+            Period::new(30, TimeUnit::Years),
+        ]
+    }
+
+    fn vols() -> Vec<Vec<Real>> {
+        vec![
+            vec![0.1300, 0.1560, 0.1390, 0.1220],
+            vec![0.1440, 0.1580, 0.1460, 0.1260],
+            vec![0.1600, 0.1590, 0.1470, 0.1290],
+            vec![0.1640, 0.1470, 0.1370, 0.1220],
+            vec![0.1400, 0.1300, 0.1250, 0.1100],
+            vec![0.1130, 0.1090, 0.1070, 0.0930],
+        ]
+    }
+
+    type QuoteGrid = Vec<Vec<Shared<SimpleQuote>>>;
+    type HandleGrid = Vec<Vec<Handle<dyn Quote>>>;
+
+    /// Per-cell `SimpleQuote`s (a distinct quote per node, as the C++ fixture
+    /// comment requires) plus the handles wrapping them.
+    fn quote_grid() -> (QuoteGrid, HandleGrid) {
+        let quotes: Vec<Vec<Shared<SimpleQuote>>> = vols()
+            .iter()
+            .map(|row| row.iter().map(|&v| shared(SimpleQuote::new(v))).collect())
+            .collect();
+        let handles = quotes
+            .iter()
+            .map(|row| {
+                row.iter()
+                    .map(|q| Handle::new(q.clone() as Shared<dyn Quote>))
+                    .collect()
+            })
+            .collect();
+        (quotes, handles)
+    }
+
+    fn moving_surface(
+        handles: Vec<Vec<Handle<dyn Quote>>>,
+        settings: Shared<Settings<Date>>,
+    ) -> SwaptionVolatilityMatrix {
+        SwaptionVolatilityMatrix::moving(
+            Target::new(),
+            BDC,
+            option_tenors(),
+            swap_tenors(),
+            handles,
+            Actual365Fixed::new(),
+            VolatilityType::ShiftedLognormal,
+            Vec::new(),
+            settings,
+        )
+        .unwrap()
+    }
+
+    fn settings_at(date: Date) -> Shared<Settings<Date>> {
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(date);
+        settings
+    }
+
+    #[test]
+    fn recovers_every_node_vol_to_machine_precision() {
+        let settings = settings_at(Date::new(15, Month::June, 2026));
+        let (_quotes, handles) = quote_grid();
+        let surface = moving_surface(handles, settings);
+        for (i, option_tenor) in option_tenors().into_iter().enumerate() {
+            for (j, swap_tenor) in swap_tenors().into_iter().enumerate() {
+                let got = surface
+                    .volatility_tenors(option_tenor, swap_tenor, 0.0, false)
+                    .unwrap();
+                assert!(
+                    (got - vols()[i][j]).abs() <= TOL,
+                    "node ({i},{j}): got {got}, expected {}",
+                    vols()[i][j]
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn quote_bump_refreshes_the_interpolation_and_notifies() {
+        let settings = settings_at(Date::new(15, Month::June, 2026));
+        let (quotes, handles) = quote_grid();
+        let surface = moving_surface(handles, settings);
+
+        let node = surface
+            .volatility_tenors(option_tenors()[0], swap_tenors()[0], 0.0, false)
+            .unwrap();
+        assert!((node - 0.1300).abs() <= TOL);
+
+        let flag = Flag::new();
+        surface.observable().register_observer(&as_observer(&flag));
+
+        quotes[0][0].set_value(0.2000);
+        assert!(Flag::is_up(&flag), "quote bump must notify observers");
+
+        let refreshed = surface
+            .volatility_tenors(option_tenors()[0], swap_tenors()[0], 0.0, false)
+            .unwrap();
+        assert!(
+            (refreshed - 0.2000).abs() <= TOL,
+            "bumped node must serve the new vol, got {refreshed}"
+        );
+        let neighbor = surface
+            .volatility_tenors(option_tenors()[0], swap_tenors()[1], 0.0, false)
+            .unwrap();
+        assert!(
+            (neighbor - 0.1560).abs() <= TOL,
+            "untouched neighbor must be unchanged, got {neighbor}"
+        );
+    }
+
+    #[test]
+    fn between_nodes_stays_within_the_surrounding_corners() {
+        let settings = settings_at(Date::new(15, Month::June, 2026));
+        let (_quotes, handles) = quote_grid();
+        let surface = moving_surface(handles, settings);
+
+        let t0 = surface
+            .time_from_reference(surface.option_date_from_tenor(option_tenors()[0]).unwrap())
+            .unwrap();
+        let t1 = surface
+            .time_from_reference(surface.option_date_from_tenor(option_tenors()[1]).unwrap())
+            .unwrap();
+        let option_time = 0.5 * (t0 + t1);
+        let swap_length = 3.0;
+
+        let got = surface
+            .volatility_time(option_time, swap_length, 0.0, false)
+            .unwrap();
+        let corners = [vols()[0][0], vols()[0][1], vols()[1][0], vols()[1][1]];
+        let lo = corners.iter().cloned().fold(Real::INFINITY, Real::min);
+        let hi = corners.iter().cloned().fold(Real::NEG_INFINITY, Real::max);
+        assert!(
+            lo <= got && got <= hi,
+            "between-node vol {got} outside [{lo}, {hi}]"
+        );
+    }
+
+    #[test]
+    fn max_date_and_max_swap_tenor_come_from_the_grids() {
+        let settings = settings_at(Date::new(15, Month::June, 2026));
+        let (_quotes, handles) = quote_grid();
+        let surface = moving_surface(handles, settings);
+        let last_option_date = surface
+            .option_date_from_tenor(*option_tenors().last().unwrap())
+            .unwrap();
+        assert_eq!(surface.max_date(), last_option_date);
+        assert_eq!(surface.max_swap_tenor(), Period::new(30, TimeUnit::Years));
+    }
+
+    #[test]
+    fn volatility_type_round_trips_the_constructor_argument() {
+        let settings = settings_at(Date::new(15, Month::June, 2026));
+        let (_quotes, handles) = quote_grid();
+        let surface = SwaptionVolatilityMatrix::moving(
+            Target::new(),
+            BDC,
+            option_tenors(),
+            swap_tenors(),
+            handles,
+            Actual365Fixed::new(),
+            VolatilityType::Normal,
+            Vec::new(),
+            settings,
+        )
+        .unwrap();
+        assert_eq!(surface.volatility_type(), VolatilityType::Normal);
+    }
+
+    #[test]
+    fn fixed_reference_matrix_constructor_recovers_nodes() {
+        let reference = Date::new(15, Month::June, 2026);
+        let mut matrix = Matrix::with_size(6, 4);
+        for (i, row) in vols().iter().enumerate() {
+            for (j, &v) in row.iter().enumerate() {
+                matrix[(i, j)] = v;
+            }
+        }
+        let surface = SwaptionVolatilityMatrix::new(
+            reference,
+            Target::new(),
+            BDC,
+            option_tenors(),
+            swap_tenors(),
+            &matrix,
+            Actual365Fixed::new(),
+            VolatilityType::ShiftedLognormal,
+            &Matrix::new(),
+        )
+        .unwrap();
+        for (i, option_tenor) in option_tenors().into_iter().enumerate() {
+            for (j, swap_tenor) in swap_tenors().into_iter().enumerate() {
+                let got = surface
+                    .volatility_tenors(option_tenor, swap_tenor, 0.0, false)
+                    .unwrap();
+                assert!(
+                    (got - vols()[i][j]).abs() <= TOL,
+                    "node ({i},{j}): got {got}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn wrong_shaped_vol_matrix_is_rejected() {
+        let settings = settings_at(Date::new(15, Month::June, 2026));
+        let (_quotes, mut handles) = quote_grid();
+        handles.pop();
+        assert!(
+            SwaptionVolatilityMatrix::moving(
+                Target::new(),
+                BDC,
+                option_tenors(),
+                swap_tenors(),
+                handles,
+                Actual365Fixed::new(),
+                VolatilityType::ShiftedLognormal,
+                Vec::new(),
+                settings,
+            )
+            .is_err()
+        );
+    }
+}
