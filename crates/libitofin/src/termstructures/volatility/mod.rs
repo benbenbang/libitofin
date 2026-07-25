@@ -48,7 +48,7 @@ pub use localvolsurface::LocalVolSurface;
 pub use localvoltermstructure::LocalVolTermStructure;
 pub use optionlet::{
     ConstantOptionletVolatility, OptionletStripper, OptionletStripper1, OptionletStripperCaches,
-    OptionletVolatilityStructure, StrippedOptionletBase,
+    OptionletVolatilityStructure, StrippedOptionletAdapter, StrippedOptionletBase,
 };
 pub use swaption::{
     ConstantSwaptionVolatility, SwaptionVolatilityDiscrete, SwaptionVolatilityMatrix,

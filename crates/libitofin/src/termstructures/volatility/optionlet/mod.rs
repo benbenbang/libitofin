@@ -15,17 +15,21 @@
 //!   alone, mirroring C++'s pure-virtual `volatilityImpl(Time, Rate)`; the
 //!   `Date`-based volatility path converts to time and dispatches to it, as the
 //!   C++ default `volatilityImpl(Date, Rate)` does.
-//! - Only the constant surface is ported here ([`ConstantOptionletVolatility`]).
-//!   The stripped and interpolated optionlet surfaces are deferred.
+//! - The constant surface ([`ConstantOptionletVolatility`]) and the stripped,
+//!   linearly interpolated surface ([`StrippedOptionletAdapter`] over
+//!   [`OptionletStripper1`]) are ported. The smile-section layer the C++ adapter
+//!   also exposes is deferred.
 
 mod constantoptionletvol;
 mod optionletstripper;
 mod optionletstripper1;
+mod strippedoptionletadapter;
 mod strippedoptionletbase;
 
 pub use constantoptionletvol::ConstantOptionletVolatility;
 pub use optionletstripper::{OptionletStripper, OptionletStripperCaches};
 pub use optionletstripper1::OptionletStripper1;
+pub use strippedoptionletadapter::StrippedOptionletAdapter;
 pub use strippedoptionletbase::StrippedOptionletBase;
 
 use crate::errors::QlResult;
