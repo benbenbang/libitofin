@@ -508,19 +508,11 @@ mod tests {
         );
     }
 
-    /// A valid mixed market strip - deposits (1W/1M/3M), a 3-month IMM future,
-    /// a 9x15 FRA and swaps (2Y/3Y/5Y) - bootstraps cleanly and every
-    /// instrument reprices its own quote off the solved curve to 1e-9. The strip
-    /// is arranged so pillar dates are distinct and latest-relevant dates are
-    /// strictly monotone (the two ordering invariants `IterativeBootstrap`
-    /// enforces, `iterativebootstrap.rs:136-145`); the futures window overlaps
-    /// the 3M deposit in time but its pillar still sorts after, which the
-    /// bootstrap accepts. The reprice is the bootstrap's own self-consistency
-    /// residual: its value here is confirming the single-forward-pass property
-    /// holds across a mixed strip, that solving the later swap nodes does not
-    /// disturb the deposit/futures/FRA repricing.
-    #[test]
-    fn mixed_strip_bootstraps() {
+    /// Builds the mixed market strip - deposits (1W/1M/3M), a 3-month IMM
+    /// future, a 9x15 FRA and swaps (2Y/3Y/5Y) - shared by the positive
+    /// bootstrap test and the global-interpolator rejection test. Returns the
+    /// settlement date (the curve reference) and the helper set.
+    fn build_mixed_strip() -> (Date, Vec<Shared<dyn RateHelper>>) {
         use crate::instruments::FuturesType;
         use crate::termstructures::yields::{FraRateHelper, FuturesRateHelper, Pillar};
         use crate::time::imm;
@@ -597,6 +589,24 @@ mod tests {
             ) as Shared<dyn RateHelper>);
         }
 
+        (settlement, helpers)
+    }
+
+    /// A valid mixed market strip - deposits (1W/1M/3M), a 3-month IMM future,
+    /// a 9x15 FRA and swaps (2Y/3Y/5Y) - bootstraps cleanly and every
+    /// instrument reprices its own quote off the solved curve to 1e-9. The strip
+    /// is arranged so pillar dates are distinct and latest-relevant dates are
+    /// strictly monotone (the two ordering invariants `IterativeBootstrap`
+    /// enforces, `iterativebootstrap.rs:136-145`); the futures window overlaps
+    /// the 3M deposit in time but its pillar still sorts after, which the
+    /// bootstrap accepts. The reprice is the bootstrap's own self-consistency
+    /// residual: its value here is confirming the single-forward-pass property
+    /// holds across a mixed strip, that solving the later swap nodes does not
+    /// disturb the deposit/futures/FRA repricing.
+    #[test]
+    fn mixed_strip_bootstraps() {
+        let (settlement, helpers) = build_mixed_strip();
+
         let curve = PiecewiseYieldCurve::<Discount, LogLinear>::new(
             settlement,
             helpers.clone(),
@@ -629,6 +639,38 @@ mod tests {
         assert!(
             worst <= TOLERANCE,
             "worst mixed-strip reprice error {worst}"
+        );
+    }
+
+    /// The negative control for `mixed_strip_bootstraps`: the SAME mixed strip
+    /// under a global interpolator (`Cubic`) must fail LOUDLY at bootstrap time
+    /// rather than return a silently mispriced curve. `Cubic` is global (every
+    /// node depends on all others), which the single-pass `IterativeBootstrap`
+    /// cannot converge, so `calculate` rejects it up front (mirroring C++'s
+    /// `loopRequired_ = Interpolator::global`, `iterativebootstrap.hpp:136`).
+    /// The deferral pointer to the convergence loop (#543) is pinned in the
+    /// message. The discriminating pair is `LogLinear` -> Ok (the positive test)
+    /// versus `Cubic` -> Err here; a deposits-only strip cannot detect the
+    /// difference (deposits read the curve only at their own pillar).
+    #[test]
+    fn global_interpolator_is_rejected() {
+        use crate::math::interpolations::cubic::Cubic;
+
+        let (settlement, helpers) = build_mixed_strip();
+
+        let curve = PiecewiseYieldCurve::<ForwardRate, Cubic>::new(
+            settlement,
+            helpers,
+            Actual360::new(),
+            Cubic,
+        )
+        .unwrap();
+
+        let err = curve.dates().unwrap_err();
+        assert!(
+            err.message().contains("#543"),
+            "the rejection must point at the unported convergence loop (#543): {}",
+            err.message()
         );
     }
 

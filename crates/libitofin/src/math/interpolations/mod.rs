@@ -45,6 +45,16 @@ pub trait Interpolator {
     /// The interpolation type this factory builds.
     type Output: Interpolation;
 
+    /// Whether this is a global interpolator: every interpolated value depends
+    /// on all node values, so moving one node re-shapes the whole curve.
+    ///
+    /// Mirrors QuantLib's `Interpolator::global`. A single-pass bootstrap solves
+    /// each node once against the curve built so far, which cannot converge a
+    /// global interpolator (an earlier node's value shifts once later nodes are
+    /// added). Local interpolators (`Linear`, `LogLinear`, `BackwardFlat`) leave
+    /// this `false`; `Cubic` overrides it to `true`.
+    const GLOBAL: bool = false;
+
     /// Builds an interpolation through `(x, y)`.
     fn interpolate(&self, x: &[Real], y: &[Real]) -> QlResult<Self::Output>;
 

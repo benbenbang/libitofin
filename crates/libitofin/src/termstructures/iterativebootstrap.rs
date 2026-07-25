@@ -121,6 +121,14 @@ impl IterativeBootstrap {
     pub fn calculate<C: PiecewiseCurve>(&self, curve: &C) -> QlResult<()> {
         let mut helpers: Vec<Shared<dyn RateHelper>> = curve.instruments().to_vec();
         let n = helpers.len();
+        require!(
+            !C::Interp::GLOBAL,
+            "global interpolators cannot be bootstrapped by the single-pass \
+             IterativeBootstrap: every node depends on all others, so one pass \
+             leaves the curve mispriced. The convergence loop (C++'s \
+             loopRequired_) is unported (#543); use a local interpolator \
+             (Linear, LogLinear, BackwardFlat) until it lands."
+        );
         require!(n > 0, "no bootstrap helpers given");
         sort_by_pillar_date(&mut helpers);
 

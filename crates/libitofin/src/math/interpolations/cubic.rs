@@ -730,6 +730,8 @@ pub struct Cubic;
 impl Interpolator for Cubic {
     type Output = CubicInterpolation;
 
+    const GLOBAL: bool = true;
+
     fn interpolate(&self, x: &[Real], y: &[Real]) -> QlResult<CubicInterpolation> {
         CubicInterpolation::new(x.to_vec(), y.to_vec(), CubicDerivativeApprox::Kruger)
     }
