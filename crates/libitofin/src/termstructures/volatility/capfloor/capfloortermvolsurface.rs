@@ -427,3 +427,265 @@ impl CapFloorTermVolatilityStructure for CapFloorTermVolSurface {
         self.interp.borrow().interpolation.value(strike, length)
     }
 }
+
+/// The oracle has two discriminating arms. Node recovery at 1e-12 over a
+/// non-flat, non-square 4x5 grid (a transpose fails as a bicubic dimension
+/// mismatch, an axis swap fails numerically). The required quote-bump arm, built
+/// through a `Handle<Quote>` constructor, catches a spline that is built once and
+/// never rebuilt on a quote bump. A between-nodes sanity check and the
+/// min/max-strike + max-date pins round it out.
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::quotes::SimpleQuote;
+    use crate::shared::shared;
+    use crate::test_support::{Flag, as_observer};
+    use crate::time::calendars::target::Target;
+    use crate::time::date::Month;
+    use crate::time::daycounters::actual365fixed::Actual365Fixed;
+    use crate::types::Real;
+
+    const BDC: BusinessDayConvention = BusinessDayConvention::ModifiedFollowing;
+    const TOL: Real = 1e-12;
+    const REFERENCE: fn() -> Date = || Date::new(15, Month::June, 2026);
+
+    fn option_tenors() -> Vec<Period> {
+        (1..=4)
+            .map(|n| Period::new(n, crate::time::timeunit::TimeUnit::Years))
+            .collect()
+    }
+
+    fn strikes() -> Vec<Rate> {
+        vec![0.01, 0.02, 0.03, 0.04, 0.05]
+    }
+
+    fn vols() -> Vec<Vec<Real>> {
+        (0..4)
+            .map(|i| {
+                (0..5)
+                    .map(|j| 0.10 + 0.01 * i as Real + 0.001 * j as Real)
+                    .collect()
+            })
+            .collect()
+    }
+
+    type QuoteGrid = Vec<Vec<Shared<SimpleQuote>>>;
+    type HandleGrid = Vec<Vec<Handle<dyn Quote>>>;
+
+    fn quote_grid() -> (QuoteGrid, HandleGrid) {
+        let quotes: QuoteGrid = vols()
+            .iter()
+            .map(|row| row.iter().map(|&v| shared(SimpleQuote::new(v))).collect())
+            .collect();
+        let handles = quotes
+            .iter()
+            .map(|row| {
+                row.iter()
+                    .map(|q| Handle::new(q.clone() as Shared<dyn Quote>))
+                    .collect()
+            })
+            .collect();
+        (quotes, handles)
+    }
+
+    fn fixed_handle_surface(handles: HandleGrid) -> CapFloorTermVolSurface {
+        CapFloorTermVolSurface::with_reference_date(
+            REFERENCE(),
+            Target::new(),
+            BDC,
+            option_tenors(),
+            strikes(),
+            handles,
+            Actual365Fixed::new(),
+        )
+        .unwrap()
+    }
+
+    fn vols_matrix() -> Matrix {
+        let mut m = Matrix::with_size(4, 5);
+        for (i, row) in vols().iter().enumerate() {
+            for (j, &v) in row.iter().enumerate() {
+                m[(i, j)] = v;
+            }
+        }
+        m
+    }
+
+    fn settings_at(date: Date) -> Shared<Settings<Date>> {
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(date);
+        settings
+    }
+
+    #[test]
+    fn recovers_every_node_vol_to_1e_12() {
+        let (_quotes, handles) = quote_grid();
+        let surface = fixed_handle_surface(handles);
+        for (i, tenor) in option_tenors().into_iter().enumerate() {
+            for (j, &strike) in strikes().iter().enumerate() {
+                let got = surface.volatility_tenor(tenor, strike, false).unwrap();
+                assert!(
+                    (got - vols()[i][j]).abs() <= TOL,
+                    "node ({i},{j}): got {got}, expected {}",
+                    vols()[i][j]
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn quote_bump_refreshes_the_interpolation_and_notifies() {
+        let (quotes, handles) = quote_grid();
+        let surface = fixed_handle_surface(handles);
+
+        let node = surface
+            .volatility_tenor(option_tenors()[0], strikes()[0], false)
+            .unwrap();
+        assert!((node - 0.100).abs() <= TOL);
+
+        let flag = Flag::new();
+        surface.observable().register_observer(&as_observer(&flag));
+
+        quotes[0][0].set_value(0.5);
+        assert!(Flag::is_up(&flag), "quote bump must notify observers");
+
+        let refreshed = surface
+            .volatility_tenor(option_tenors()[0], strikes()[0], false)
+            .unwrap();
+        assert!(
+            (refreshed - 0.5).abs() <= TOL,
+            "bumped node must serve the new vol, got {refreshed}"
+        );
+        let neighbor = surface
+            .volatility_tenor(option_tenors()[0], strikes()[1], false)
+            .unwrap();
+        assert!(
+            (neighbor - 0.101).abs() <= TOL,
+            "untouched neighbor must be unchanged, got {neighbor}"
+        );
+    }
+
+    #[test]
+    fn between_nodes_stays_near_the_surrounding_nodes() {
+        let (_quotes, handles) = quote_grid();
+        let surface = fixed_handle_surface(handles);
+
+        let times = surface.option_times().unwrap();
+        let option_time = 0.5 * (times[0] + times[1]);
+        let strike = 0.5 * (strikes()[0] + strikes()[1]);
+
+        let got = surface.volatility_time(option_time, strike, false).unwrap();
+        let corners = [vols()[0][0], vols()[0][1], vols()[1][0], vols()[1][1]];
+        let lo = corners.iter().cloned().fold(Real::INFINITY, Real::min);
+        let hi = corners.iter().cloned().fold(Real::NEG_INFINITY, Real::max);
+        let band = 1e-2;
+        assert!(
+            lo - band <= got && got <= hi + band,
+            "between-node vol {got} outside [{lo}, {hi}] +/- {band}"
+        );
+    }
+
+    #[test]
+    fn min_max_strike_and_max_date_come_from_the_grid() {
+        let (_quotes, handles) = quote_grid();
+        let surface = fixed_handle_surface(handles);
+        assert_eq!(surface.min_strike(), 0.01);
+        assert_eq!(surface.max_strike(), 0.05);
+        let last = surface
+            .option_date_from_tenor(*option_tenors().last().unwrap())
+            .unwrap();
+        assert_eq!(surface.max_date(), last);
+    }
+
+    #[test]
+    fn fixed_matrix_constructor_recovers_nodes_without_registering_quotes() {
+        let surface = CapFloorTermVolSurface::with_reference_date_from_matrix(
+            REFERENCE(),
+            Target::new(),
+            BDC,
+            option_tenors(),
+            strikes(),
+            &vols_matrix(),
+            Actual365Fixed::new(),
+        )
+        .unwrap();
+        for (i, tenor) in option_tenors().into_iter().enumerate() {
+            for (j, &strike) in strikes().iter().enumerate() {
+                let got = surface.volatility_tenor(tenor, strike, false).unwrap();
+                assert!(
+                    (got - vols()[i][j]).abs() <= TOL,
+                    "node ({i},{j}): got {got}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn moving_constructors_build_and_price_at_a_node() {
+        let settings = settings_at(Date::new(15, Month::January, 2026));
+        let (_quotes, handles) = quote_grid();
+        let moving = CapFloorTermVolSurface::moving(
+            2,
+            Target::new(),
+            BDC,
+            option_tenors(),
+            strikes(),
+            handles,
+            Actual365Fixed::new(),
+            settings.clone(),
+        )
+        .unwrap();
+        let from_matrix = CapFloorTermVolSurface::moving_from_matrix(
+            2,
+            Target::new(),
+            BDC,
+            option_tenors(),
+            strikes(),
+            &vols_matrix(),
+            Actual365Fixed::new(),
+            settings,
+        )
+        .unwrap();
+        for surface in [&moving, &from_matrix] {
+            let got = surface
+                .volatility_tenor(option_tenors()[1], strikes()[2], false)
+                .unwrap();
+            assert!((got - vols()[1][2]).abs() <= TOL, "moving node: got {got}");
+        }
+    }
+
+    #[test]
+    fn malformed_grids_are_rejected() {
+        let (_quotes, mut handles) = quote_grid();
+        handles.pop();
+        assert!(
+            CapFloorTermVolSurface::with_reference_date(
+                REFERENCE(),
+                Target::new(),
+                BDC,
+                option_tenors(),
+                strikes(),
+                handles,
+                Actual365Fixed::new(),
+            )
+            .is_err(),
+            "row/tenor count mismatch must be rejected"
+        );
+
+        let (_quotes, handles) = quote_grid();
+        let bad_strikes = vec![0.02, 0.01, 0.03, 0.04, 0.05];
+        assert!(
+            CapFloorTermVolSurface::with_reference_date(
+                REFERENCE(),
+                Target::new(),
+                BDC,
+                option_tenors(),
+                bad_strikes,
+                handles,
+                Actual365Fixed::new(),
+            )
+            .is_err(),
+            "non-increasing strikes must be rejected"
+        );
+    }
+}
