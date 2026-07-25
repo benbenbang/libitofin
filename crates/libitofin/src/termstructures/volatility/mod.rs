@@ -41,7 +41,7 @@ mod volatilitytype;
 pub use blackconstantvol::BlackConstantVol;
 pub use blackvariancecurve::{BlackVarianceCurve, BlackVolTimeExtrapolation};
 pub use blackvariancesurface::{BlackVarianceSurface, Extrapolation};
-pub use capfloor::CapFloorTermVolatilityStructure;
+pub use capfloor::{CapFloorTermVolSurface, CapFloorTermVolatilityStructure};
 pub use localconstantvol::LocalConstantVol;
 pub use localvolcurve::LocalVolCurve;
 pub use localvolsurface::LocalVolSurface;

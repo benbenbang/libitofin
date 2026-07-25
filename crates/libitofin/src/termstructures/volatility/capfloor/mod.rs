@@ -20,6 +20,10 @@
 //!   required hook is [`volatility_impl`](CapFloorTermVolatilityStructure::volatility_impl)
 //!   alone, mirroring C++'s pure-virtual `volatilityImpl(Time, Rate)`.
 
+mod capfloortermvolsurface;
+
+pub use capfloortermvolsurface::CapFloorTermVolSurface;
+
 use crate::errors::QlResult;
 use crate::termstructures::volatility::VolatilityTermStructure;
 use crate::time::date::Date;
