@@ -31,8 +31,10 @@
 use crate::errors::QlResult;
 use crate::fail;
 use crate::math::distributions::normal::{CumulativeNormalDistribution, NormalDistribution};
+use crate::math::solver1d::{DerivativeSolver, func1d};
+use crate::math::solvers1d::newtonsafe::NewtonSafe;
 use crate::option::OptionType;
-use crate::types::Real;
+use crate::types::{Natural, Real};
 
 /// QuantLib's `checkParameters` (`blackformula.cpp:44,47,50`): the
 /// `displacement >= 0`, `strike + displacement >= 0` and
@@ -305,6 +307,113 @@ pub fn black_formula_std_dev_second_derivative(
     let d1_prime = -(forward / strike).ln() / (std_dev * std_dev) + 0.5;
     let density = NormalDistribution::standard();
     Ok(discount * forward * density.derivative(d1) * d1_prime)
+}
+
+/// Implied Black standard deviation that reprices `black_price` under
+/// [`black_formula`].
+///
+/// Port of `blackFormulaImpliedStdDev` (`blackformula.cpp:382-440`): checks the
+/// price against put-call parity, converts an in-the-money option to its
+/// out-of-the-money complement (greater vega/price ratio, hence numerically more
+/// robust), then inverts [`black_formula`] for the standard deviation with a
+/// [`NewtonSafe`] solve bracketed on `[0, 24]` (`24 = 300% * sqrt(60)`).
+///
+/// The undiscounted objective and its derivative mirror C++'s
+/// `BlackImpliedStdDevHelper` (`blackformula.cpp:330-379`): the value is
+/// `black_formula(type, strike, forward, std_dev, 1, 0) - black_price/discount`
+/// on the displacement-shifted strike and forward, and the derivative is the
+/// helper's signed `signedForward * phi(signed d1)`, reproduced here as
+/// `sign * black_formula_std_dev_derivative(...)`. The sign is negative for the
+/// out-of-the-money put branch, exactly as the helper computes it; the solve
+/// still converges because [`NewtonSafe`] bisects whenever a Newton step leaves
+/// the bracket.
+///
+/// # Divergence
+///
+/// C++ seeds the solve with `blackFormulaImpliedStdDevApproximation` when `guess`
+/// is `Null<Real>`; the Rust API instead requires a finite non-negative `guess`
+/// (the optionlet stripper always supplies one). The approximation-seeded
+/// overload is deferred to #577.
+///
+/// # Errors
+///
+/// Rejects a non-positive `discount`, a negative `black_price`, a price implying
+/// a negative complementary option under put-call parity, and a negative or
+/// non-finite `guess`; propagates a solver that fails to converge.
+#[allow(clippy::too_many_arguments)]
+pub fn black_formula_implied_std_dev(
+    option_type: OptionType,
+    strike: Real,
+    forward: Real,
+    black_price: Real,
+    discount: Real,
+    displacement: Real,
+    guess: Real,
+    accuracy: Real,
+    max_iterations: Natural,
+) -> QlResult<Real> {
+    check_parameters(strike, forward, displacement)?;
+    if !discount.is_finite() || discount <= 0.0 {
+        fail!("discount ({discount}) must be positive");
+    }
+    if !black_price.is_finite() || black_price < 0.0 {
+        fail!("option price ({black_price}) must be non-negative");
+    }
+
+    let mut option_type = option_type;
+    let mut black_price = black_price;
+    let other_option_price = black_price - sign_of(option_type) * (forward - strike) * discount;
+    if other_option_price < 0.0 {
+        fail!(
+            "negative complementary-option price ({other_option_price}) implied by put-call \
+             parity: no solution exists for {option_type} strike {strike}, forward {forward}, \
+             price {black_price}, deflator {discount}"
+        );
+    }
+
+    if matches!(option_type, OptionType::Put) && strike > forward {
+        option_type = OptionType::Call;
+        black_price = other_option_price;
+    }
+    if matches!(option_type, OptionType::Call) && strike < forward {
+        option_type = OptionType::Put;
+        black_price = other_option_price;
+    }
+
+    if !guess.is_finite() || guess < 0.0 {
+        fail!("stdDev guess ({guess}) must be non-negative");
+    }
+
+    let shifted_strike = strike + displacement;
+    let shifted_forward = forward + displacement;
+    let target = black_price / discount;
+    let otm_sign = sign_of(option_type);
+
+    let value = |std_dev: Real| {
+        black_formula(
+            option_type,
+            shifted_strike,
+            shifted_forward,
+            std_dev,
+            1.0,
+            0.0,
+        )
+        .map(|price| price - target)
+        .unwrap_or(Real::NAN)
+    };
+    let derivative = |std_dev: Real| {
+        black_formula_std_dev_derivative(shifted_strike, shifted_forward, std_dev, 1.0, 0.0)
+            .map(|d| otm_sign * d)
+            .unwrap_or(Real::NAN)
+    };
+
+    let std_dev = NewtonSafe::new()
+        .with_max_evaluations(max_iterations as usize)
+        .solve_bracketed(func1d(value, derivative), accuracy, guess, 0.0, 24.0)?;
+    if std_dev < 0.0 {
+        fail!("stdDev ({std_dev}) must be non-negative");
+    }
+    Ok(std_dev)
 }
 
 /// Bachelier (normal-model) value of a European option on the given forward.
@@ -900,5 +1009,99 @@ mod tests {
         );
         assert!(bachelier_black_formula_std_dev_derivative(1.0, 1.0, -0.1, 0.95).is_err());
         assert!(bachelier_black_formula_std_dev_derivative(1.0, 1.0, 0.1, 0.0).is_err());
+    }
+
+    /// Round-trips vol -> price -> implied stddev across Call/Put and ITM/OTM,
+    /// with and without a displacement, so both the put-call-parity conversion
+    /// (the ITM cases flip to the OTM complement) and the shifted-lognormal
+    /// branch are exercised. This is the supporting oracle for the enabler; the
+    /// discriminating stripper round-trip is #576.
+    #[test]
+    fn implied_std_dev_round_trips_black_formula() {
+        let discount = 0.95;
+        let true_std_dev = 0.15;
+        let accuracy = 1e-10;
+        for displacement in [0.0, 0.01] {
+            for (option_type, strike, forward) in [
+                (OptionType::Call, 0.03, 0.025),
+                (OptionType::Call, 0.02, 0.025),
+                (OptionType::Put, 0.02, 0.025),
+                (OptionType::Put, 0.03, 0.025),
+            ] {
+                let price = black_formula(
+                    option_type,
+                    strike,
+                    forward,
+                    true_std_dev,
+                    discount,
+                    displacement,
+                )
+                .expect("valid inputs");
+                let recovered = black_formula_implied_std_dev(
+                    option_type,
+                    strike,
+                    forward,
+                    price,
+                    discount,
+                    displacement,
+                    0.14,
+                    accuracy,
+                    100,
+                )
+                .expect("inverts black_formula");
+                assert_close(recovered, true_std_dev, 1e-6);
+            }
+        }
+    }
+
+    #[test]
+    fn implied_std_dev_rejects_a_negative_guess() {
+        let price = black_formula(OptionType::Call, 0.03, 0.025, 0.15, 0.95, 0.0).expect("valid");
+        assert!(
+            black_formula_implied_std_dev(
+                OptionType::Call,
+                0.03,
+                0.025,
+                price,
+                0.95,
+                0.0,
+                -1.0,
+                1e-10,
+                100
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn implied_std_dev_rejects_invalid_price_and_discount() {
+        assert!(
+            black_formula_implied_std_dev(
+                OptionType::Call,
+                0.03,
+                0.025,
+                -0.1,
+                0.95,
+                0.0,
+                0.14,
+                1e-10,
+                100
+            )
+            .is_err()
+        );
+        assert!(
+            black_formula_implied_std_dev(
+                OptionType::Call,
+                0.03,
+                0.025,
+                0.01,
+                0.0,
+                0.0,
+                0.14,
+                1e-10,
+                100
+            )
+            .is_err()
+        );
     }
 }
