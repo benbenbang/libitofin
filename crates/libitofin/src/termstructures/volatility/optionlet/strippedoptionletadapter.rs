@@ -313,4 +313,133 @@ mod tests {
             "interpolated optionlet vol {vol}"
         );
     }
+
+    use crate::instrument::Instrument;
+    use crate::instruments::{CapFloorType, MakeCapFloor};
+    use crate::math::matrix::Matrix;
+    use crate::pricingengine::PricingEngine;
+    use crate::pricingengines::BlackCapFloorEngine;
+    use crate::quotes::make_quote_handle;
+    use crate::shared::{SharedMut, shared_mut};
+
+    /// `optionletstripper.cpp` `testFlatTermVolatilityStripping1` (`:489-548`):
+    /// eval date 28-Oct-2013, a flat 18% cap/floor term-vol surface (10 tenors x
+    /// 10 strikes) over a flat 4% Actual365Fixed curve. Stripping into optionlet
+    /// volatilities, adapting them into an interpolated surface and repricing each
+    /// cap on that surface must reproduce the flat-vol cap price to 2.5e-8. This
+    /// is the whole B2 pipeline: strip -> per-maturity strike interpolation ->
+    /// time interpolation -> reprice, and it is not tautological (the flat term
+    /// vol must survive the round trip back to the same cap price).
+    #[test]
+    fn flat_term_vol_round_trips_through_the_stripped_optionlets() {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(Date::new(28, Month::October, 2013));
+
+        let curve: Handle<dyn YieldTermStructure> =
+            Handle::new(shared(FlatForward::moving_with_rate(
+                0,
+                Target::new(),
+                0.04,
+                Actual365Fixed::new(),
+                Compounding::Continuous,
+                Frequency::Annual,
+                Shared::clone(&settings),
+            )) as Shared<dyn YieldTermStructure>);
+
+        let option_tenors: Vec<Period> =
+            (1..=10).map(|n| Period::new(n, TimeUnit::Years)).collect();
+        let strikes: Vec<Rate> = (1..=10).map(|j| j as Real / 100.0).collect();
+        let flat_vol = 0.18;
+        let vols = Matrix::filled(option_tenors.len(), strikes.len(), flat_vol);
+        let surface = shared(
+            CapFloorTermVolSurface::moving_from_matrix(
+                0,
+                Target::new(),
+                BusinessDayConvention::Following,
+                option_tenors.clone(),
+                strikes.clone(),
+                &vols,
+                Actual365Fixed::new(),
+                Shared::clone(&settings),
+            )
+            .unwrap(),
+        );
+
+        let index: Shared<IborIndex> = shared(crate::indexes::ibor::Euribor::six_months(
+            curve.clone(),
+            Shared::clone(&settings),
+        ));
+
+        let stripper = shared(
+            OptionletStripper1::new(
+                surface,
+                Shared::clone(&index),
+                Handle::<dyn YieldTermStructure>::empty(),
+                1e-6,
+                100,
+                VolatilityType::ShiftedLognormal,
+                0.0,
+                None,
+            )
+            .unwrap(),
+        );
+        let adapter = shared(
+            StrippedOptionletAdapter::new(
+                Shared::clone(&stripper) as Shared<dyn StrippedOptionletBase>,
+                Shared::clone(&settings),
+            )
+            .unwrap(),
+        );
+        adapter.enable_extrapolation();
+
+        let stripped_engine = shared_mut(
+            BlackCapFloorEngine::new(
+                curve.clone(),
+                Handle::new(Shared::clone(&adapter) as Shared<dyn OptionletVolatilityStructure>),
+                None,
+            )
+            .unwrap(),
+        ) as SharedMut<dyn PricingEngine>;
+
+        let tolerance = 2.5e-8;
+        let mut max_error: Real = 0.0;
+        for tenor in &option_tenors {
+            for &strike in &strikes {
+                let mut cap = MakeCapFloor::new(
+                    CapFloorType::Cap,
+                    *tenor,
+                    Shared::clone(&index),
+                    strike,
+                    Period::new(0, TimeUnit::Days),
+                    Shared::clone(&settings),
+                )
+                .with_pricing_engine(SharedMut::clone(&stripped_engine))
+                .build()
+                .unwrap();
+                let price_stripped = cap.npv().unwrap();
+
+                let constant_engine = shared_mut(
+                    BlackCapFloorEngine::with_flat_vol(
+                        curve.clone(),
+                        make_quote_handle(flat_vol).handle(),
+                        Actual365Fixed::new(),
+                        0.0,
+                        Shared::clone(&settings),
+                    )
+                    .unwrap(),
+                ) as SharedMut<dyn PricingEngine>;
+                cap.base_mut().set_pricing_engine(constant_engine);
+                let price_constant = cap.npv().unwrap();
+
+                let error = (price_stripped - price_constant).abs();
+                max_error = max_error.max(error);
+                assert!(
+                    error < tolerance,
+                    "tenor {tenor} strike {strike}: stripped {price_stripped} vs \
+                     constant {price_constant}, error {error} > tolerance {tolerance}"
+                );
+            }
+        }
+        assert!(max_error < tolerance, "max round-trip error {max_error}");
+    }
 }
