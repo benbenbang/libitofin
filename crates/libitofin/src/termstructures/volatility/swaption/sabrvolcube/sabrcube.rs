@@ -2017,4 +2017,243 @@ mod tests {
             "dense ATM recovery worst error {worst} over the widened grid"
         );
     }
+
+    // --- CommonVars discriminating SABR oracle (swaptionvolatilitycube.cpp) ---
+    //
+    // The full end-to-end fixture from the C++ test suite's CommonVars +
+    // swaptionvolstructuresutilities.hpp: a real 6x4 SwaptionVolatilityMatrix ATM
+    // surface, a 3x3 cube with five strike spreads and nine market vol-spread
+    // rows, two EuriborSwapIsdaFixA-style base swap indexes (2Y long, 1Y short),
+    // and the C++ constructor defaults. testSabrVols runs the dense ATM-calibrated
+    // cube and checks it reproduces the ATM matrix vols (3e-4) and the input smile
+    // spreads (12e-4).
+
+    /// The B1 6x4 ATM matrix option tenors {1M,6M,1Y,5Y,10Y,30Y}.
+    fn atm_option_tenors() -> Vec<Period> {
+        vec![
+            Period::new(1, TimeUnit::Months),
+            Period::new(6, TimeUnit::Months),
+            Period::new(1, TimeUnit::Years),
+            Period::new(5, TimeUnit::Years),
+            Period::new(10, TimeUnit::Years),
+            Period::new(30, TimeUnit::Years),
+        ]
+    }
+
+    /// The B1 4-swap axis {1Y,5Y,10Y,30Y}.
+    fn atm_swap_tenors() -> Vec<Period> {
+        vec![
+            Period::new(1, TimeUnit::Years),
+            Period::new(5, TimeUnit::Years),
+            Period::new(10, TimeUnit::Years),
+            Period::new(30, TimeUnit::Years),
+        ]
+    }
+
+    /// The B1 6x4 ATM lognormal vols (swaptionvolstructuresutilities.hpp,
+    /// AtmVolatility::setMarketData); the same numbers the swaptionvolmatrix tests
+    /// carry.
+    fn atm_vols() -> [[Volatility; 4]; 6] {
+        [
+            [0.1300, 0.1560, 0.1390, 0.1220],
+            [0.1440, 0.1580, 0.1460, 0.1260],
+            [0.1600, 0.1590, 0.1470, 0.1290],
+            [0.1640, 0.1470, 0.1370, 0.1220],
+            [0.1400, 0.1300, 0.1250, 0.1100],
+            [0.1130, 0.1090, 0.1070, 0.0930],
+        ]
+    }
+
+    /// The moving 6x4 ATM surface (C++'s floating-reference
+    /// `SwaptionVolatilityMatrix`), so the cube grid and the ATM grid share the
+    /// moving reference date.
+    fn common_atm_matrix(settings: &Shared<Settings<Date>>) -> Shared<SwaptionVolatilityMatrix> {
+        let vols = atm_vols();
+        let vols_handle: Vec<Vec<Handle<dyn Quote>>> = (0..6)
+            .map(|i| {
+                (0..4)
+                    .map(|j| Handle::new(shared(SimpleQuote::new(vols[i][j])) as Shared<dyn Quote>))
+                    .collect()
+            })
+            .collect();
+        shared(
+            SwaptionVolatilityMatrix::moving(
+                Target::new(),
+                BDC,
+                atm_option_tenors(),
+                atm_swap_tenors(),
+                vols_handle,
+                Actual365Fixed::new(),
+                VolatilityType::ShiftedLognormal,
+                Vec::new(),
+                Shared::clone(settings),
+            )
+            .unwrap(),
+        )
+    }
+
+    /// The cube's option axis {1Y,10Y,30Y}.
+    fn common_cube_option_tenors() -> Vec<Period> {
+        vec![
+            Period::new(1, TimeUnit::Years),
+            Period::new(10, TimeUnit::Years),
+            Period::new(30, TimeUnit::Years),
+        ]
+    }
+
+    /// The cube's swap axis {2Y,10Y,30Y}.
+    fn common_cube_swap_tenors() -> Vec<Period> {
+        vec![
+            Period::new(2, TimeUnit::Years),
+            Period::new(10, TimeUnit::Years),
+            Period::new(30, TimeUnit::Years),
+        ]
+    }
+
+    /// The cube's five strike spreads {-2%,-0.5%,0,+0.5%,+2%}.
+    fn common_strike_spreads() -> Vec<Real> {
+        vec![-0.020, -0.005, 0.000, 0.005, 0.020]
+    }
+
+    /// The nine 5-strike market vol-spread rows (row `i*3+j` = option-`i`,
+    /// swap-`j`), transcribed from VolatilityCube::setMarketData.
+    fn common_vol_spreads() -> [[Volatility; 5]; 9] {
+        [
+            [0.0599, 0.0049, 0.0000, -0.0001, 0.0127],
+            [0.0729, 0.0086, 0.0000, -0.0024, 0.0098],
+            [0.0738, 0.0102, 0.0000, -0.0039, 0.0065],
+            [0.0465, 0.0063, 0.0000, -0.0032, -0.0010],
+            [0.0558, 0.0084, 0.0000, -0.0050, -0.0057],
+            [0.0576, 0.0083, 0.0000, -0.0043, -0.0014],
+            [0.0437, 0.0059, 0.0000, -0.0030, -0.0006],
+            [0.0533, 0.0078, 0.0000, -0.0045, -0.0046],
+            [0.0545, 0.0079, 0.0000, -0.0042, -0.0020],
+        ]
+    }
+
+    /// A base swap index with EuriborSwapIsdaFixA-style conventions (hand-built
+    /// per the #594/#595 precedent, not the named family): annual Thirty360 fixed
+    /// leg forecasting off `euribor6m`. `atm_strike` reconstructs from these
+    /// conventions at the requested swap tenor.
+    fn isda_swap_index(
+        euribor6m: &Shared<IborIndex>,
+        settings: &Shared<Settings<Date>>,
+        tenor: Period,
+    ) -> Shared<SwapIndex> {
+        shared(SwapIndex::new(
+            "EuriborSwapIsdaFixA".into(),
+            tenor,
+            2,
+            Currency::eur(),
+            Target::new(),
+            Period::new(1, TimeUnit::Years),
+            BDC,
+            Thirty360::with_convention(Convention::BondBasis),
+            Shared::clone(euribor6m),
+            Shared::clone(settings),
+        ))
+    }
+
+    /// Builds the CommonVars SABR cube (2Y long base, 1Y short base, guess
+    /// [0.2,0.5,0.4,0.0], all parameters free, C++ constructor defaults).
+    fn build_common_sabr_cube(
+        settings: &Shared<Settings<Date>>,
+        is_atm_calibrated: bool,
+    ) -> SabrSwaptionVolatilityCube {
+        let euribor6m = shared(Euribor::six_months(
+            flat_curve(0.05),
+            Shared::clone(settings),
+        ));
+        let long = isda_swap_index(&euribor6m, settings, Period::new(2, TimeUnit::Years));
+        let short = isda_swap_index(&euribor6m, settings, Period::new(1, TimeUnit::Years));
+        let atm =
+            Handle::new(common_atm_matrix(settings) as Shared<dyn SwaptionVolatilityStructure>);
+
+        let spreads = common_vol_spreads();
+        let vol_spreads: Vec<Vec<Handle<dyn Quote>>> = (0..9)
+            .map(|n| {
+                (0..5)
+                    .map(|k| {
+                        Handle::new(shared(SimpleQuote::new(spreads[n][k])) as Shared<dyn Quote>)
+                    })
+                    .collect()
+            })
+            .collect();
+        let parameters_guess: Vec<Vec<Handle<dyn Quote>>> = (0..9)
+            .map(|_| {
+                [0.2, 0.5, 0.4, 0.0]
+                    .iter()
+                    .map(|&v| Handle::new(shared(SimpleQuote::new(v)) as Shared<dyn Quote>))
+                    .collect()
+            })
+            .collect();
+
+        SabrSwaptionVolatilityCube::new(
+            atm,
+            common_cube_option_tenors(),
+            common_cube_swap_tenors(),
+            common_strike_spreads(),
+            vol_spreads,
+            long,
+            short,
+            false,
+            parameters_guess,
+            [false; N_SABR_PARAMS],
+            is_atm_calibrated,
+            None,
+            None,
+            None,
+            None,
+            false,
+            50,
+            false,
+            0.0001,
+            Shared::clone(settings),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn testsabrvols_recovers_atm_vols_and_smile_spreads() {
+        let settings = settings_today();
+        let cube = build_common_sabr_cube(&settings, true);
+        let atm = cube.cube().atm_vol();
+        let atm_link = atm.current_link().unwrap();
+
+        let mut worst_atm = 0.0_f64;
+        for &o in atm_option_tenors().iter() {
+            for &s in atm_swap_tenors().iter() {
+                let strike = cube.cube().atm_strike_from_tenor(o, s).unwrap();
+                let exp = atm_link.volatility_tenors(o, s, strike, true).unwrap();
+                let act = cube.volatility_tenors(o, s, strike, true).unwrap();
+                worst_atm = worst_atm.max((exp - act).abs());
+            }
+        }
+        assert!(
+            worst_atm < 3.0e-4,
+            "recovery of atm vols worst error {worst_atm} (tolerance 3e-4)"
+        );
+
+        let spreads_in = common_vol_spreads();
+        let strike_spreads = common_strike_spreads();
+        let mut worst_spread = 0.0_f64;
+        for (i, &o) in common_cube_option_tenors().iter().enumerate() {
+            for (j, &s) in common_cube_swap_tenors().iter().enumerate() {
+                let atm_strike = cube.cube().atm_strike_from_tenor(o, s).unwrap();
+                let atm_vol = atm_link.volatility_tenors(o, s, atm_strike, true).unwrap();
+                for (k, &spread) in strike_spreads.iter().enumerate() {
+                    let vol = cube
+                        .volatility_tenors(o, s, atm_strike + spread, true)
+                        .unwrap();
+                    let got_spread = vol - atm_vol;
+                    let exp_spread = spreads_in[i * 3 + j][k];
+                    worst_spread = worst_spread.max((exp_spread - got_spread).abs());
+                }
+            }
+        }
+        assert!(
+            worst_spread < 12.0e-4,
+            "recovery of smile vol spreads worst error {worst_spread} (tolerance 12e-4)"
+        );
+    }
 }
