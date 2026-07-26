@@ -4,6 +4,7 @@ pub mod bicubic;
 pub mod bilinear;
 pub mod cubic;
 pub mod flat;
+pub mod flatextrapolator2d;
 pub mod linear;
 pub mod loglinear;
 pub mod sabrinterpolation;
