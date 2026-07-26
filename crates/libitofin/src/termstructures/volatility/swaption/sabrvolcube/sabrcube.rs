@@ -1006,13 +1006,15 @@ mod tests {
     use super::*;
 
     use crate::currency::Currency;
-    use crate::indexes::{Euribor, IborIndex, SwapIndex};
+    use crate::indexes::{Euribor, IborIndex, Index, SwapIndex};
     use crate::interestrate::Compounding;
     use crate::patterns::observable::AsObservable;
     use crate::quotes::SimpleQuote;
     use crate::shared::{shared, shared_mut};
     use crate::termstructures::volatility::sabr::sabr_volatility;
-    use crate::termstructures::volatility::swaption::SwaptionCubeSmileSection;
+    use crate::termstructures::volatility::swaption::{
+        SwaptionCubeSmileSection, SwaptionVolatilityMatrix,
+    };
     use crate::termstructures::yields::FlatForward;
     use crate::termstructures::yieldtermstructure::YieldTermStructure;
     use crate::time::calendars::target::Target;
@@ -1711,6 +1713,241 @@ mod tests {
         assert!(
             msg.contains("grid-backed") || msg.contains("discrete"),
             "err was: {err}"
+        );
+    }
+
+    // --- Dense ATM-calibration oracle (#603) ---
+    //
+    // The ATM surface is a real SwaptionVolatilityMatrix on a grid STRICTLY denser
+    // than the cube's (option {1Y,2Y,3Y} x swap {2Y,5Y,10Y} vs cube {1Y,3Y} x
+    // {2Y,10Y}), so fillVolatilityCube genuinely inserts the 2Y-option and 5Y-swap
+    // nodes. The matrix ATM vols are SABR-consistent (each is the DENSE_PARAMS SABR
+    // ATM vol at that node's forward), and the cube smiles are seeded so the market
+    // smile IS an exact SABR smile at every cube node. Serving the dense params at
+    // the ATM strike then recovers the matrix's ATM vol.
+
+    const DENSE_PARAMS: [Real; N_SABR_PARAMS] = [0.20, 0.60, 0.30, -0.10];
+
+    fn matrix_option_tenors() -> Vec<Period> {
+        vec![
+            Period::new(1, TimeUnit::Years),
+            Period::new(2, TimeUnit::Years),
+            Period::new(3, TimeUnit::Years),
+        ]
+    }
+
+    fn matrix_swap_tenors() -> Vec<Period> {
+        vec![
+            Period::new(2, TimeUnit::Years),
+            Period::new(5, TimeUnit::Years),
+            Period::new(10, TimeUnit::Years),
+        ]
+    }
+
+    fn dense_cube_option_tenors() -> Vec<Period> {
+        vec![
+            Period::new(1, TimeUnit::Years),
+            Period::new(3, TimeUnit::Years),
+        ]
+    }
+
+    fn dense_cube_swap_tenors() -> Vec<Period> {
+        vec![
+            Period::new(2, TimeUnit::Years),
+            Period::new(10, TimeUnit::Years),
+        ]
+    }
+
+    /// A long-base swap index of arbitrary tenor, matching the conventions
+    /// [`SwaptionVolatilityCube::atm_strike`] reconstructs on its long branch, so
+    /// its `.fixing` reproduces the node forward the cube uses.
+    fn long_swap_index(
+        euribor6m: &Shared<IborIndex>,
+        settings: &Shared<Settings<Date>>,
+        tenor: Period,
+    ) -> SwapIndex {
+        SwapIndex::new(
+            "LongSwap".into(),
+            tenor,
+            2,
+            Currency::eur(),
+            Target::new(),
+            Period::new(1, TimeUnit::Years),
+            BDC,
+            Thirty360::with_convention(Convention::BondBasis),
+            Shared::clone(euribor6m),
+            Shared::clone(settings),
+        )
+    }
+
+    /// The SABR-consistent ATM matrix: `M[i][j] = sabr ATM vol` at the forward of
+    /// (option tenor i, swap tenor j), fixed reference at [`today`].
+    fn sabr_consistent_matrix(
+        euribor6m: &Shared<IborIndex>,
+        settings: &Shared<Settings<Date>>,
+    ) -> SwaptionVolatilityMatrix {
+        let option_tenors = matrix_option_tenors();
+        let swap_tenors = matrix_swap_tenors();
+        let day_counter = Actual365Fixed::new();
+        let mut vols = Matrix::with_size(option_tenors.len(), swap_tenors.len());
+        for (i, &option_tenor) in option_tenors.iter().enumerate() {
+            let option_date = Target::new().advance_by_period(today(), option_tenor, BDC, false);
+            let option_time = day_counter.year_fraction(today(), option_date);
+            for (j, &swap_tenor) in swap_tenors.iter().enumerate() {
+                let forward = long_swap_index(euribor6m, settings, swap_tenor)
+                    .fixing(option_date, false)
+                    .unwrap();
+                vols[(i, j)] = sabr_volatility(
+                    forward,
+                    forward,
+                    option_time,
+                    DENSE_PARAMS[0],
+                    DENSE_PARAMS[1],
+                    DENSE_PARAMS[2],
+                    DENSE_PARAMS[3],
+                    VolatilityType::ShiftedLognormal,
+                )
+                .unwrap();
+            }
+        }
+        SwaptionVolatilityMatrix::new(
+            today(),
+            Target::new(),
+            BDC,
+            option_tenors,
+            swap_tenors,
+            &vols,
+            Actual365Fixed::new(),
+            VolatilityType::ShiftedLognormal,
+            &Matrix::default(),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn dense_arm_recovers_matrix_atm_vol_over_the_widened_grid() {
+        let settings = settings_today();
+        let euribor6m = shared(Euribor::six_months(
+            flat_curve(0.05),
+            Shared::clone(&settings),
+        ));
+        let long = long_index(&euribor6m, &settings);
+        let short = short_index(&euribor6m, &settings);
+        let matrix = sabr_consistent_matrix(&euribor6m, &settings);
+        let atm = Handle::new(shared(matrix) as Shared<dyn SwaptionVolatilityStructure>);
+
+        let n_strikes = strike_spreads().len();
+        let n_nodes = dense_cube_option_tenors().len() * dense_cube_swap_tenors().len();
+        let spread_quotes: Vec<Vec<Shared<SimpleQuote>>> = (0..n_nodes)
+            .map(|_| {
+                (0..n_strikes)
+                    .map(|_| shared(SimpleQuote::new(0.0)))
+                    .collect()
+            })
+            .collect();
+        let vol_spreads: Vec<Vec<Handle<dyn Quote>>> = spread_quotes
+            .iter()
+            .map(|row| {
+                row.iter()
+                    .map(|q| Handle::new(Shared::clone(q) as Shared<dyn Quote>))
+                    .collect()
+            })
+            .collect();
+        let parameters_guess: Vec<Vec<Handle<dyn Quote>>> = (0..n_nodes)
+            .map(|_| {
+                [0.15, DENSE_PARAMS[1], 0.20, 0.0]
+                    .iter()
+                    .map(|&v| Handle::new(shared(SimpleQuote::new(v)) as Shared<dyn Quote>))
+                    .collect()
+            })
+            .collect();
+
+        let cube = SabrSwaptionVolatilityCube::new(
+            atm.clone(),
+            dense_cube_option_tenors(),
+            dense_cube_swap_tenors(),
+            strike_spreads(),
+            vol_spreads,
+            long,
+            short,
+            false,
+            parameters_guess,
+            [false, true, false, false],
+            true,
+            None,
+            Some(1.0),
+            None,
+            None,
+            false,
+            50,
+            false,
+            0.0001,
+            Shared::clone(&settings),
+        )
+        .unwrap();
+
+        let atm_link = atm.current_link().unwrap();
+        for (n, &(od, st, ot, sl)) in node_info(&cube).iter().enumerate() {
+            let forward = cube.cube().atm_strike(od, st).unwrap();
+            let atm_node_vol = atm_link.volatility(od, sl, forward, false).unwrap();
+            for (i, &spread) in strike_spreads().iter().enumerate() {
+                let vol = sabr_volatility(
+                    forward + spread,
+                    forward,
+                    ot,
+                    DENSE_PARAMS[0],
+                    DENSE_PARAMS[1],
+                    DENSE_PARAMS[2],
+                    DENSE_PARAMS[3],
+                    VolatilityType::ShiftedLognormal,
+                )
+                .unwrap();
+                spread_quotes[n][i].set_value(vol - atm_node_vol);
+            }
+        }
+
+        for &(_od, _st, ot, sl) in node_info(&cube).iter() {
+            let p = cube.sparse_parameter_values(ot, sl).unwrap();
+            for (idx, &want) in DENSE_PARAMS.iter().enumerate() {
+                assert!(
+                    (p[idx] - want).abs() < 1e-6,
+                    "sparse node param {idx}: got {}, want {want}",
+                    p[idx]
+                );
+            }
+        }
+
+        let day_counter = Actual365Fixed::new();
+        let mut worst = 0.0_f64;
+        for &option_tenor in matrix_option_tenors().iter() {
+            let od = Target::new().advance_by_period(today(), option_tenor, BDC, false);
+            let ot = day_counter.year_fraction(today(), od);
+            for &swap_tenor in matrix_swap_tenors().iter() {
+                let sl = swap_tenor.length() as Time;
+                let dense = cube.dense_parameter_values(ot, sl).unwrap();
+                let forward = dense[N_SABR_PARAMS];
+                assert!(
+                    forward > 0.0,
+                    "dense forward must be positive at ({ot},{sl})"
+                );
+                let served = sabr_volatility(
+                    forward,
+                    forward,
+                    ot,
+                    dense[0],
+                    dense[1],
+                    dense[2],
+                    dense[3],
+                    VolatilityType::ShiftedLognormal,
+                )
+                .unwrap();
+                let matrix_vol = atm_link.volatility(od, sl, forward, false).unwrap();
+                worst = worst.max((served - matrix_vol).abs());
+            }
+        }
+        assert!(
+            worst < 1e-6,
+            "dense ATM recovery worst error {worst} over the widened grid"
         );
     }
 }
