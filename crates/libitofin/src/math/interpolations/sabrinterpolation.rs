@@ -638,3 +638,180 @@ mod transform_tests {
         assert!(cost.value(&sabr_inverse(&Array::from(TRUE_PARAMS))) < 1e-20);
     }
 }
+
+#[cfg(test)]
+mod calibration_tests {
+    use super::*;
+    use crate::math::optimization::levenbergmarquardt::LevenbergMarquardt;
+    use crate::math::optimization::simplex::Simplex;
+
+    const FORWARD: Rate = 0.039;
+    const EXPIRY: Time = 1.0;
+    const ALPHA: Real = 0.3;
+    const BETA: Real = 0.6;
+    const NU: Real = 0.02;
+    const RHO: Real = 0.01;
+
+    /// The 31-strike/vol smile generated at `(0.3, 0.6, 0.02, 0.01)` from
+    /// `interpolations.cpp testSabrInterpolation:1377-1402`; the same table
+    /// checked analytically in `termstructures::volatility::sabr`'s tests,
+    /// duplicated here to keep that fixture test-private.
+    fn smile() -> ([Real; 31], [Real; 31]) {
+        let strikes = [
+            0.03, 0.032, 0.034, 0.036, 0.038, 0.04, 0.042, 0.044, 0.046, 0.048, 0.05, 0.052, 0.054,
+            0.056, 0.058, 0.06, 0.062, 0.064, 0.066, 0.068, 0.07, 0.072, 0.074, 0.076, 0.078, 0.08,
+            0.082, 0.084, 0.086, 0.088, 0.09,
+        ];
+        let vols = [
+            1.16725837321531,
+            1.15226075991385,
+            1.13829711098834,
+            1.12524190877505,
+            1.11299079244474,
+            1.10145609357162,
+            1.09056348513411,
+            1.08024942745106,
+            1.07045919457758,
+            1.06114533019077,
+            1.05226642581503,
+            1.04378614411707,
+            1.03567243073732,
+            1.0278968727451,
+            1.02043417226345,
+            1.01326171139321,
+            1.00635919013311,
+            0.999708323124949,
+            0.993292584155381,
+            0.987096989695393,
+            0.98110791455717,
+            0.975312934134512,
+            0.969700688771689,
+            0.964260766651027,
+            0.958983602256592,
+            0.953860388001395,
+            0.948882997029509,
+            0.944043915545469,
+            0.939336183299237,
+            0.934753341079515,
+            0.930289384251337,
+        ];
+        (strikes, vols)
+    }
+
+    /// Oracle port of `interpolations.cpp testSabrInterpolation:1424-1524`:
+    /// recover the four generating parameters to `5e-8` from deliberately wrong
+    /// guesses that land in a local minimum without the random-restart loop,
+    /// across both optimizers, both vega-weighting flags, and all 16
+    /// fixed/free subsets (64 calibrations).
+    #[test]
+    fn recovers_the_generating_parameters_across_all_64_combinations() {
+        let (strikes, vols) = smile();
+        let alpha_guess = 0.2_f64.sqrt();
+        let beta_guess = 0.5;
+        let nu_guess = 0.4_f64.sqrt();
+        let rho_guess = 0.0;
+        let end_criteria = EndCriteria::new(100_000, Some(100), 1e-8, 1e-8, Some(1e-8)).unwrap();
+        let tolerance = 5e-8;
+
+        let mut simplex = Simplex::new(0.01);
+        let mut lm = LevenbergMarquardt::new(1e-8, 1e-8, 1e-8, false);
+        let mut worst = 0.0_f64;
+        for method in [
+            &mut simplex as &mut dyn OptimizationMethod,
+            &mut lm as &mut dyn OptimizationMethod,
+        ] {
+            for &vega in &[true, false] {
+                for &k_a in &[true, false] {
+                    for &k_b in &[true, false] {
+                        for &k_n in &[true, false] {
+                            for &k_r in &[true, false] {
+                                let mut interp = SABRInterpolation::new(
+                                    strikes.to_vec(),
+                                    vols.to_vec(),
+                                    EXPIRY,
+                                    FORWARD,
+                                    if k_a { ALPHA } else { alpha_guess },
+                                    if k_b { BETA } else { beta_guess },
+                                    if k_n { NU } else { nu_guess },
+                                    if k_r { RHO } else { rho_guess },
+                                    k_a,
+                                    k_b,
+                                    k_n,
+                                    k_r,
+                                    vega,
+                                    end_criteria,
+                                    1e-10,
+                                    50,
+                                    VolatilityType::ShiftedLognormal,
+                                )
+                                .unwrap();
+                                interp.update(&mut *method).unwrap();
+                                for (got, want, name) in [
+                                    (interp.alpha(), ALPHA, "alpha"),
+                                    (interp.beta(), BETA, "beta"),
+                                    (interp.nu(), NU, "nu"),
+                                    (interp.rho(), RHO, "rho"),
+                                ] {
+                                    let error = (got - want).abs();
+                                    worst = worst.max(error);
+                                    assert!(
+                                        error < tolerance,
+                                        "{name} not recovered (vega={vega} a{k_a} b{k_b} n{k_n} r{k_r}): got {got}, want {want}, err {error}"
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        assert!(worst < tolerance, "worst parameter error {worst}");
+    }
+
+    /// Confirm-by-stubbing: with the restart loop disabled (`max_guesses = 1`),
+    /// the Simplex fit of the nu-fixed, alpha/beta/rho-free subset stays trapped
+    /// in a local minimum and misses the `5e-8` recovery. It is the one combo of
+    /// the 64 that fails without restarts, so it proves the restart machinery -
+    /// not the initial guess - recovers the parameters. QuantLib's comment
+    /// attributes the trap to fixed-subset cases; the all-free fit is recovered
+    /// directly by Levenberg-Marquardt and does not exercise the restarts.
+    #[test]
+    fn without_restarts_a_fixed_subset_stays_in_a_local_minimum() {
+        let (strikes, vols) = smile();
+        let end_criteria = EndCriteria::new(100_000, Some(100), 1e-8, 1e-8, Some(1e-8)).unwrap();
+        let mut simplex = Simplex::new(0.01);
+        let mut interp = SABRInterpolation::new(
+            strikes.to_vec(),
+            vols.to_vec(),
+            EXPIRY,
+            FORWARD,
+            0.2_f64.sqrt(),
+            0.5,
+            NU,
+            0.0,
+            false,
+            false,
+            true,
+            false,
+            false,
+            end_criteria,
+            1e-10,
+            1,
+            VolatilityType::ShiftedLognormal,
+        )
+        .unwrap();
+        interp.update(&mut simplex).unwrap();
+        let worst = [
+            (interp.alpha() - ALPHA).abs(),
+            (interp.beta() - BETA).abs(),
+            (interp.nu() - NU).abs(),
+            (interp.rho() - RHO).abs(),
+        ]
+        .into_iter()
+        .fold(0.0_f64, f64::max);
+        assert!(
+            worst > 5e-8,
+            "expected the restart-free fixed-nu Simplex fit to miss recovery, but worst error was {worst}"
+        );
+    }
+}
