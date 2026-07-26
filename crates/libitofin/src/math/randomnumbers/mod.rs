@@ -15,6 +15,7 @@
 use crate::types::Real;
 
 pub mod boxmullergaussianrng;
+pub mod haltonrsg;
 pub mod inversecumulativersg;
 pub mod knuthuniformrng;
 pub mod lattice;
@@ -29,6 +30,7 @@ pub mod xoshiro256starstaruniformrng;
 pub mod zigguratgaussianrng;
 
 pub use boxmullergaussianrng::BoxMullerGaussianRng;
+pub use haltonrsg::HaltonRsg;
 pub use inversecumulativersg::InverseCumulativeRsg;
 pub use knuthuniformrng::KnuthUniformRng;
 pub use mt19937uniformrng::MersenneTwisterUniformRng;
