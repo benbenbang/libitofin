@@ -30,12 +30,14 @@ mod blackconstantvol;
 mod blackvariancecurve;
 mod blackvariancesurface;
 mod capfloor;
+mod flatsmilesection;
 mod localconstantvol;
 mod localvolcurve;
 mod localvolsurface;
 mod localvoltermstructure;
 mod optionlet;
 mod sabr;
+mod smilesection;
 mod swaption;
 mod volatilitytype;
 
@@ -43,6 +45,7 @@ pub use blackconstantvol::BlackConstantVol;
 pub use blackvariancecurve::{BlackVarianceCurve, BlackVolTimeExtrapolation};
 pub use blackvariancesurface::{BlackVarianceSurface, Extrapolation};
 pub use capfloor::{CapFloorTermVolSurface, CapFloorTermVolatilityStructure};
+pub use flatsmilesection::FlatSmileSection;
 pub use localconstantvol::LocalConstantVol;
 pub use localvolcurve::LocalVolCurve;
 pub use localvolsurface::LocalVolSurface;
@@ -52,6 +55,7 @@ pub use optionlet::{
     OptionletVolatilityStructure, StrippedOptionletAdapter, StrippedOptionletBase,
 };
 pub use sabr::{sabr_volatility, unsafe_sabr_volatility, validate_sabr_parameters};
+pub use smilesection::{SmileSection, SmileSectionBase};
 pub use swaption::{
     ConstantSwaptionVolatility, SwaptionVolatilityDiscrete, SwaptionVolatilityMatrix,
     SwaptionVolatilityStructure,
