@@ -36,11 +36,13 @@
 //!   remaining three (fixed-reference + handles, floating-reference + `Matrix`,
 //!   and the fixed-reference + option-dates + `Matrix` form) are convenience
 //!   shapes deferred to #570.
-//! - `flatExtrapolation` and its `FlatExtrapolator2D` wrapper are not ported
-//!   (#569). Only the plain-bilinear (`flatExtrapolation = false`) path exists,
-//!   so the parameter is omitted entirely rather than accepted-and-rejected.
-//!   The two interpolations are built with extrapolation enabled, mirroring the
-//!   `true` flag C++ passes on every interpolation call.
+//! - C++'s `flatExtrapolation` flag is exposed through the dedicated
+//!   [`moving_flat`](SwaptionVolatilityMatrix::moving_flat) and
+//!   [`new_flat`](SwaptionVolatilityMatrix::new_flat) constructors (#569), which
+//!   wrap both interpolations in a [`FlatExtrapolator2D`] so out-of-grid queries
+//!   clamp to the nearest edge or corner vol. The plain `moving`/`new`
+//!   constructors keep the boundary-extending bilinear (extrapolation enabled,
+//!   mirroring the `true` flag C++ passes on every interpolation call).
 //! - The C++ `mutable Matrix volatilities_` field is not held separately: the
 //!   Rust bilinear owns its `z`, so the load-bearing state is the interpolation
 //!   rebuilt in `perform_calculations`, not a second copy of the vols.
@@ -54,6 +56,7 @@ use crate::errors::QlResult;
 use crate::handle::Handle;
 use crate::math::interpolations::Interpolation2D;
 use crate::math::interpolations::bilinear::BilinearInterpolation;
+use crate::math::interpolations::flatextrapolator2d::FlatExtrapolator2D;
 use crate::math::matrix::Matrix;
 use crate::patterns::lazyobject::LazyObject;
 use crate::patterns::observable::{AsObservable, Observable, Observer};
@@ -72,10 +75,13 @@ use crate::types::{Rate, Real, Time, Volatility};
 
 use super::{SwaptionVolatilityDiscrete, SwaptionVolatilityStructure};
 
-/// The two bilinear interpolations rebuilt on every refresh.
+/// The two interpolations rebuilt on every refresh. They are boxed as trait
+/// objects so the `flat_extrapolation` path can store a
+/// [`FlatExtrapolator2D`]-wrapped bilinear behind the same field as a plain
+/// [`BilinearInterpolation`].
 struct MatrixInterp {
-    volatilities: BilinearInterpolation,
-    shifts: BilinearInterpolation,
+    volatilities: Box<dyn Interpolation2D>,
+    shifts: Box<dyn Interpolation2D>,
 }
 
 /// Invalidates the matrix's lazy state when a quote bumps or the reference date
@@ -98,6 +104,7 @@ pub struct SwaptionVolatilityMatrix {
     vol_handles: Vec<Vec<Handle<dyn Quote>>>,
     shift_values: Vec<Vec<Real>>,
     volatility_type: VolatilityType,
+    flat_extrapolation: bool,
     interp: RefCell<MatrixInterp>,
     lazy: SharedMut<LazyObject>,
     _updater: SharedMut<MatrixUpdater>,
@@ -119,6 +126,62 @@ impl SwaptionVolatilityMatrix {
         shifts: Vec<Vec<Real>>,
         settings: Shared<Settings<Date>>,
     ) -> QlResult<SwaptionVolatilityMatrix> {
+        Self::moving_with(
+            calendar,
+            business_day_convention,
+            option_tenors,
+            swap_tenors,
+            vols,
+            day_counter,
+            volatility_type,
+            shifts,
+            settings,
+            false,
+        )
+    }
+
+    /// Floating-reference form with C++'s `flatExtrapolation = true`: queries past
+    /// the grid clamp to the nearest edge or corner vol rather than extending the
+    /// boundary bilinear surface. Signature mirrors [`moving`](Self::moving).
+    #[allow(clippy::too_many_arguments)]
+    pub fn moving_flat(
+        calendar: Calendar,
+        business_day_convention: BusinessDayConvention,
+        option_tenors: Vec<Period>,
+        swap_tenors: Vec<Period>,
+        vols: Vec<Vec<Handle<dyn Quote>>>,
+        day_counter: DayCounter,
+        volatility_type: VolatilityType,
+        shifts: Vec<Vec<Real>>,
+        settings: Shared<Settings<Date>>,
+    ) -> QlResult<SwaptionVolatilityMatrix> {
+        Self::moving_with(
+            calendar,
+            business_day_convention,
+            option_tenors,
+            swap_tenors,
+            vols,
+            day_counter,
+            volatility_type,
+            shifts,
+            settings,
+            true,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn moving_with(
+        calendar: Calendar,
+        business_day_convention: BusinessDayConvention,
+        option_tenors: Vec<Period>,
+        swap_tenors: Vec<Period>,
+        vols: Vec<Vec<Handle<dyn Quote>>>,
+        day_counter: DayCounter,
+        volatility_type: VolatilityType,
+        shifts: Vec<Vec<Real>>,
+        settings: Shared<Settings<Date>>,
+        flat_extrapolation: bool,
+    ) -> QlResult<SwaptionVolatilityMatrix> {
         let discrete = SwaptionVolatilityDiscrete::moving(
             option_tenors,
             swap_tenors,
@@ -128,7 +191,7 @@ impl SwaptionVolatilityMatrix {
             day_counter,
             settings,
         )?;
-        Self::assemble(discrete, vols, volatility_type, shifts)
+        Self::assemble(discrete, vols, volatility_type, shifts, flat_extrapolation)
     }
 
     /// Fixed reference date, fixed market data. C++'s fixed-reference + `Matrix`
@@ -147,6 +210,62 @@ impl SwaptionVolatilityMatrix {
         volatility_type: VolatilityType,
         shifts: &Matrix,
     ) -> QlResult<SwaptionVolatilityMatrix> {
+        Self::new_with(
+            reference_date,
+            calendar,
+            business_day_convention,
+            option_tenors,
+            swap_tenors,
+            volatilities,
+            day_counter,
+            volatility_type,
+            shifts,
+            false,
+        )
+    }
+
+    /// Fixed-reference form with C++'s `flatExtrapolation = true`. Signature
+    /// mirrors [`new`](Self::new); see [`moving_flat`](Self::moving_flat) for the
+    /// clamping behaviour.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_flat(
+        reference_date: Date,
+        calendar: Calendar,
+        business_day_convention: BusinessDayConvention,
+        option_tenors: Vec<Period>,
+        swap_tenors: Vec<Period>,
+        volatilities: &Matrix,
+        day_counter: DayCounter,
+        volatility_type: VolatilityType,
+        shifts: &Matrix,
+    ) -> QlResult<SwaptionVolatilityMatrix> {
+        Self::new_with(
+            reference_date,
+            calendar,
+            business_day_convention,
+            option_tenors,
+            swap_tenors,
+            volatilities,
+            day_counter,
+            volatility_type,
+            shifts,
+            true,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn new_with(
+        reference_date: Date,
+        calendar: Calendar,
+        business_day_convention: BusinessDayConvention,
+        option_tenors: Vec<Period>,
+        swap_tenors: Vec<Period>,
+        volatilities: &Matrix,
+        day_counter: DayCounter,
+        volatility_type: VolatilityType,
+        shifts: &Matrix,
+        flat_extrapolation: bool,
+    ) -> QlResult<SwaptionVolatilityMatrix> {
         let discrete = SwaptionVolatilityDiscrete::new(
             option_tenors,
             swap_tenors,
@@ -161,7 +280,13 @@ impl SwaptionVolatilityMatrix {
         } else {
             matrix_to_rows(shifts)
         };
-        Self::assemble(discrete, vols, volatility_type, shift_values)
+        Self::assemble(
+            discrete,
+            vols,
+            volatility_type,
+            shift_values,
+            flat_extrapolation,
+        )
     }
 
     fn assemble(
@@ -169,6 +294,7 @@ impl SwaptionVolatilityMatrix {
         vol_handles: Vec<Vec<Handle<dyn Quote>>>,
         volatility_type: VolatilityType,
         shift_values: Vec<Vec<Real>>,
+        flat_extrapolation: bool,
     ) -> QlResult<SwaptionVolatilityMatrix> {
         check_inputs(&discrete, &vol_handles, &shift_values)?;
         let base_updater = discrete.base().updater();
@@ -177,7 +303,7 @@ impl SwaptionVolatilityMatrix {
                 handle.register_observer(&base_updater);
             }
         }
-        let interp = build_interps(&discrete, &vol_handles, &shift_values)?;
+        let interp = build_interps(&discrete, &vol_handles, &shift_values, flat_extrapolation)?;
         let lazy = shared_mut(LazyObject::new(true));
         let updater = shared_mut(MatrixUpdater {
             lazy: SharedMut::clone(&lazy),
@@ -190,6 +316,7 @@ impl SwaptionVolatilityMatrix {
             vol_handles,
             shift_values,
             volatility_type,
+            flat_extrapolation,
             interp: RefCell::new(interp),
             lazy,
             _updater: updater,
@@ -210,7 +337,12 @@ impl SwaptionVolatilityMatrix {
 
     fn perform_calculations(&self) -> QlResult<()> {
         self.discrete.calculate()?;
-        let interp = build_interps(&self.discrete, &self.vol_handles, &self.shift_values)?;
+        let interp = build_interps(
+            &self.discrete,
+            &self.vol_handles,
+            &self.shift_values,
+            self.flat_extrapolation,
+        )?;
         *self.interp.borrow_mut() = interp;
         Ok(())
     }
@@ -270,6 +402,7 @@ fn build_interps(
     discrete: &SwaptionVolatilityDiscrete,
     vol_handles: &[Vec<Handle<dyn Quote>>],
     shift_values: &[Vec<Real>],
+    flat_extrapolation: bool,
 ) -> QlResult<MatrixInterp> {
     let swap_lengths = discrete.swap_lengths()?;
     let option_times = discrete.option_times()?;
@@ -287,14 +420,26 @@ fn build_interps(
         shift_values.to_vec()
     };
     let volatilities =
-        BilinearInterpolation::new(swap_lengths.clone(), option_times.clone(), volatilities)?
-            .with_extrapolation(true);
-    let shifts =
-        BilinearInterpolation::new(swap_lengths, option_times, shifts)?.with_extrapolation(true);
+        BilinearInterpolation::new(swap_lengths.clone(), option_times.clone(), volatilities)?;
+    let shifts = BilinearInterpolation::new(swap_lengths, option_times, shifts)?;
     Ok(MatrixInterp {
-        volatilities,
-        shifts,
+        volatilities: wrap(volatilities, flat_extrapolation),
+        shifts: wrap(shifts, flat_extrapolation),
     })
+}
+
+/// Wraps a bilinear either in a flat-clamping [`FlatExtrapolator2D`] (queries
+/// past the grid return the nearest edge or corner) or, in the plain path, with
+/// boundary-extending extrapolation enabled (mirroring the `true` flag C++ passes
+/// on every interpolation call). The flat path leaves the inner bilinear's own
+/// extrapolation off: the wrapper clamps every query into the closed domain, so
+/// the inner is always evaluated in range.
+fn wrap(bilinear: BilinearInterpolation, flat_extrapolation: bool) -> Box<dyn Interpolation2D> {
+    if flat_extrapolation {
+        Box::new(FlatExtrapolator2D::new(bilinear))
+    } else {
+        Box::new(bilinear.with_extrapolation(true))
+    }
 }
 
 impl AsObservable for SwaptionVolatilityMatrix {
