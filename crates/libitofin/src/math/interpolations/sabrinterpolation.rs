@@ -5,12 +5,14 @@
 //! calibrator, per D10: the generic XABR framework and the other smile models
 //! it can host are deferred to #586.
 //!
-//! This first layer holds the machinery the optimizer drives: the SABR
-//! reparametrization transforms ([`sabr_direct`], [`sabr_inverse`],
-//! [`sabr_guess`]) ported verbatim from `SABRSpecs` (sabrinterpolation.hpp:
-//! 82-130), and the vol-error cost function ([`SabrCostFunction`]). The exact
-//! sqrt/asin/exp transform forms matter: a simpler reparametrization changes
-//! which local minima the random restarts escape.
+//! [`SABRInterpolation`] fits the four SABR parameters (alpha, beta, nu, rho)
+//! to a strike/vol smile by least squares, optionally holding any subset fixed
+//! and vega-weighting the fit, with a Halton random-restart loop to escape
+//! local minima. It is driven by the SABR reparametrization transforms
+//! ([`sabr_direct`], [`sabr_inverse`], [`sabr_guess`]) ported verbatim from
+//! `SABRSpecs` (sabrinterpolation.hpp:82-130) and the vol-error cost function
+//! ([`SabrCostFunction`]). The exact sqrt/asin/exp transform forms matter: a
+//! simpler reparametrization changes which local minima the restarts escape.
 //!
 //! ## Scope and divergences
 //!
@@ -19,16 +21,27 @@
 //!   follows with the shifted vol formula (deferred to #586).
 //! - `VolatilityType::ShiftedLognormal` only; the Normal arm is deferred to
 //!   #586 in [`unsafe_sabr_volatility`].
+//! - `useMaxError` (ranking restarts by max rather than RMS error) is deferred
+//!   to #586; the RMS arm is used.
+//! - `HaltonRsg::new` is the deterministic (`randomStart=false`) arm (#587), so
+//!   the restart points are the plain low-discrepancy sequence, not QuantLib's
+//!   `HaltonRsg(free, 42)` Mersenne-offset stream. The optimizer is passed to
+//!   [`SABRInterpolation::update`] rather than stored in the constructor, since
+//!   `OptimizationMethod::minimize` needs `&mut self`.
 
-// The transforms and cost function below are exercised by this module's tests
-// and driven by `SABRInterpolation`, which lands in the next commit of this
-// stack; the allow is removed there once the driver consumes them.
-#![allow(dead_code)]
-
+use crate::errors::QlResult;
 use crate::math::array::Array;
+use crate::math::optimization::constraint::NoConstraint;
 use crate::math::optimization::costfunction::CostFunction;
+use crate::math::optimization::endcriteria::{EndCriteria, EndCriteriaType};
+use crate::math::optimization::method::OptimizationMethod;
+use crate::math::optimization::problem::Problem;
+use crate::math::optimization::projectedcostfunction::ProjectedCostFunction;
+use crate::math::randomnumbers::haltonrsg::HaltonRsg;
+use crate::pricingengines::blackformula::black_formula_std_dev_derivative;
 use crate::termstructures::volatility::{VolatilityType, unsafe_sabr_volatility};
 use crate::types::{Rate, Real, Time};
+use crate::{fail, require};
 
 const EPS1: Real = 1.0e-7;
 const EPS2: Real = 0.9999;
@@ -192,6 +205,338 @@ impl CostFunction for SabrCostFunction<'_> {
                 error * error * self.weights[i]
             })
             .sum()
+    }
+}
+
+/// The RMS interpolation error `sqrt(n * sum_i w_i (v_i - m_i)^2 / (n - 1))`
+/// over real (already `direct`ed) `params`, matching
+/// `XABRInterpolationImpl::interpolationError`.
+fn interpolation_rms_error(
+    params: &Array,
+    strikes: &[Real],
+    vols: &[Real],
+    weights: &[Real],
+    forward: Rate,
+    expiry_time: Time,
+    volatility_type: VolatilityType,
+) -> Real {
+    let n = strikes.len();
+    let squared: Real = (0..n)
+        .map(|i| {
+            let error =
+                model_vol(params, strikes[i], forward, expiry_time, volatility_type) - vols[i];
+            error * error * weights[i]
+        })
+        .sum();
+    let denom = if n == 1 { 1.0 } else { (n - 1) as Real };
+    (n as Real * squared / denom).sqrt()
+}
+
+/// The maximum absolute vol error over `params`, matching
+/// `XABRInterpolationImpl::interpolationMaxError`.
+fn interpolation_max_error(
+    params: &Array,
+    strikes: &[Real],
+    vols: &[Real],
+    forward: Rate,
+    expiry_time: Time,
+    volatility_type: VolatilityType,
+) -> Real {
+    strikes
+        .iter()
+        .zip(vols)
+        .map(|(&k, &v)| (model_vol(params, k, forward, expiry_time, volatility_type) - v).abs())
+        .fold(Real::MIN, Real::max)
+}
+
+/// SABR smile calibrated to a strike/vol table.
+///
+/// Concrete port of `SABRInterpolation` (sabrinterpolation.hpp:150).
+/// [`new`](SABRInterpolation::new) stores the smile and the guesses;
+/// [`update`](SABRInterpolation::update) runs the fit, holding any subset of
+/// {alpha, beta, nu, rho} fixed at its guess. Per-restart errors are measured
+/// at the returned optimum, where QuantLib reads the stale model left by the
+/// last cost evaluation; this keeps [`SabrCostFunction`] a stateless borrow.
+pub struct SABRInterpolation {
+    strikes: Vec<Real>,
+    vols: Vec<Real>,
+    expiry_time: Time,
+    forward: Rate,
+    params: [Real; 4],
+    param_is_fixed: [bool; 4],
+    vega_weighted: bool,
+    end_criteria: EndCriteria,
+    error_accept: Real,
+    max_guesses: usize,
+    volatility_type: VolatilityType,
+    weights: Vec<Real>,
+    rms_error: Real,
+    max_error: Real,
+    end_criteria_result: EndCriteriaType,
+}
+
+impl SABRInterpolation {
+    /// Builds an uncalibrated SABR smile over `strikes`/`vols`. The four
+    /// `*_guess` values seed the fit; a fixed parameter stays pinned at its
+    /// guess. Call [`update`](SABRInterpolation::update) to calibrate.
+    ///
+    /// # Errors
+    ///
+    /// Fails if `strikes`/`vols` differ in length or are empty, if `expiry_time`
+    /// or `forward` is not positive, or if `volatility_type` is
+    /// [`VolatilityType::Normal`] (deferred to #586).
+    #[allow(clippy::too_many_arguments, clippy::neg_cmp_op_on_partial_ord)]
+    pub fn new(
+        strikes: Vec<Real>,
+        vols: Vec<Real>,
+        expiry_time: Time,
+        forward: Rate,
+        alpha_guess: Real,
+        beta_guess: Real,
+        nu_guess: Real,
+        rho_guess: Real,
+        alpha_is_fixed: bool,
+        beta_is_fixed: bool,
+        nu_is_fixed: bool,
+        rho_is_fixed: bool,
+        vega_weighted: bool,
+        end_criteria: EndCriteria,
+        error_accept: Real,
+        max_guesses: usize,
+        volatility_type: VolatilityType,
+    ) -> QlResult<Self> {
+        require!(!strikes.is_empty(), "strikes must not be empty");
+        require!(
+            strikes.len() == vols.len(),
+            "strikes and volatilities must have the same length"
+        );
+        require!(
+            expiry_time > 0.0,
+            "expiry time must be positive: {expiry_time} not allowed"
+        );
+        require!(
+            forward > 0.0,
+            "forward must be positive: {forward} not allowed"
+        );
+        if volatility_type == VolatilityType::Normal {
+            fail!("normal (Bachelier) SABR calibration is not yet ported (deferred to #586)");
+        }
+        Ok(SABRInterpolation {
+            strikes,
+            vols,
+            expiry_time,
+            forward,
+            params: [alpha_guess, beta_guess, nu_guess, rho_guess],
+            param_is_fixed: [alpha_is_fixed, beta_is_fixed, nu_is_fixed, rho_is_fixed],
+            vega_weighted,
+            end_criteria,
+            error_accept,
+            max_guesses,
+            volatility_type,
+            weights: Vec::new(),
+            rms_error: Real::NAN,
+            max_error: Real::NAN,
+            end_criteria_result: EndCriteriaType::None,
+        })
+    }
+
+    /// Runs the vega-weight, least-squares calibration with the Halton
+    /// random-restart loop, using `method` as the optimizer and keeping the
+    /// lowest-error restart. A fully fixed parameter set skips optimization.
+    ///
+    /// # Errors
+    ///
+    /// Propagates weight-computation and optimizer failures.
+    pub fn update(&mut self, method: &mut dyn OptimizationMethod) -> QlResult<()> {
+        let n = self.strikes.len();
+        let weights = if self.vega_weighted {
+            let mut w = Vec::with_capacity(n);
+            let mut sum = 0.0;
+            for i in 0..n {
+                let std_dev = (self.vols[i] * self.vols[i] * self.expiry_time).sqrt();
+                let weight = black_formula_std_dev_derivative(
+                    self.strikes[i],
+                    self.forward,
+                    std_dev,
+                    1.0,
+                    0.0,
+                )?;
+                w.push(weight);
+                sum += weight;
+            }
+            for weight in &mut w {
+                *weight /= sum;
+            }
+            w
+        } else {
+            vec![1.0 / n as Real; n]
+        };
+        self.weights = weights.clone();
+
+        if self.param_is_fixed.iter().all(|&fixed| fixed) {
+            let params = Array::from(self.params);
+            self.rms_error = interpolation_rms_error(
+                &params,
+                &self.strikes,
+                &self.vols,
+                &weights,
+                self.forward,
+                self.expiry_time,
+                self.volatility_type,
+            );
+            self.max_error = interpolation_max_error(
+                &params,
+                &self.strikes,
+                &self.vols,
+                self.forward,
+                self.expiry_time,
+                self.volatility_type,
+            );
+            self.end_criteria_result = EndCriteriaType::None;
+            return Ok(());
+        }
+
+        let cost = SabrCostFunction {
+            strikes: &self.strikes,
+            vols: &self.vols,
+            weights: &weights,
+            forward: self.forward,
+            expiry_time: self.expiry_time,
+            volatility_type: self.volatility_type,
+        };
+        let free = self.param_is_fixed.iter().filter(|&&fixed| !fixed).count();
+        let mut halton = HaltonRsg::new(free)?;
+        let mut guess = Array::from(self.params);
+        let mut best_error = Real::MAX;
+        let mut best_params = Array::from(self.params);
+        let mut best_end = EndCriteriaType::None;
+        let mut iterations = 0usize;
+        loop {
+            if iterations > 0 {
+                let draw = halton.next_sequence();
+                sabr_guess(&mut guess, &self.param_is_fixed, self.forward, draw);
+                for i in 0..4 {
+                    if self.param_is_fixed[i] {
+                        guess[i] = self.params[i];
+                    }
+                }
+            }
+            let inversed = sabr_inverse(&guess);
+            let projected_cost =
+                ProjectedCostFunction::new(&cost, &inversed, self.param_is_fixed.to_vec())?;
+            let projected_guess = projected_cost.project(&inversed);
+            let constraint = NoConstraint;
+            let mut problem = Problem::new(&projected_cost, &constraint, projected_guess);
+            let end = method.minimize(&mut problem, &self.end_criteria)?;
+            let result = sabr_direct(&projected_cost.include(problem.current_value()));
+            let error = interpolation_rms_error(
+                &result,
+                &self.strikes,
+                &self.vols,
+                &weights,
+                self.forward,
+                self.expiry_time,
+                self.volatility_type,
+            );
+            if error < best_error {
+                best_error = error;
+                best_params = result;
+                best_end = end;
+            }
+            iterations += 1;
+            if iterations >= self.max_guesses || error <= self.error_accept {
+                break;
+            }
+        }
+
+        let final_rms = interpolation_rms_error(
+            &best_params,
+            &self.strikes,
+            &self.vols,
+            &weights,
+            self.forward,
+            self.expiry_time,
+            self.volatility_type,
+        );
+        let final_max = interpolation_max_error(
+            &best_params,
+            &self.strikes,
+            &self.vols,
+            self.forward,
+            self.expiry_time,
+            self.volatility_type,
+        );
+        self.params = [
+            best_params[0],
+            best_params[1],
+            best_params[2],
+            best_params[3],
+        ];
+        self.rms_error = final_rms;
+        self.max_error = final_max;
+        self.end_criteria_result = best_end;
+        Ok(())
+    }
+
+    /// The calibrated (or pre-`update` guessed) alpha.
+    pub fn alpha(&self) -> Real {
+        self.params[0]
+    }
+
+    /// The calibrated beta.
+    pub fn beta(&self) -> Real {
+        self.params[1]
+    }
+
+    /// The calibrated nu.
+    pub fn nu(&self) -> Real {
+        self.params[2]
+    }
+
+    /// The calibrated rho.
+    pub fn rho(&self) -> Real {
+        self.params[3]
+    }
+
+    /// The RMS calibration error (`NaN` before `update`).
+    pub fn rms_error(&self) -> Real {
+        self.rms_error
+    }
+
+    /// The maximum absolute vol error (`NaN` before `update`).
+    pub fn max_error(&self) -> Real {
+        self.max_error
+    }
+
+    /// The end criterion of the retained restart.
+    pub fn end_criteria(&self) -> EndCriteriaType {
+        self.end_criteria_result
+    }
+
+    /// The option expiry, in years.
+    pub fn expiry(&self) -> Time {
+        self.expiry_time
+    }
+
+    /// The forward.
+    pub fn forward(&self) -> Rate {
+        self.forward
+    }
+
+    /// The normalized fit weights (empty before `update`).
+    pub fn interpolation_weights(&self) -> &[Real] {
+        &self.weights
+    }
+
+    /// The SABR implied vol at `strike` for the current parameters.
+    pub fn volatility(&self, strike: Rate) -> Real {
+        model_vol(
+            &Array::from(self.params),
+            strike,
+            self.forward,
+            self.expiry_time,
+            self.volatility_type,
+        )
     }
 }
 
