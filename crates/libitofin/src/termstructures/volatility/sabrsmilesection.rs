@@ -224,3 +224,237 @@ impl SmileSection for SabrSmileSection {
         Some(self.forward)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::termstructures::volatility::sabr_volatility;
+    use crate::time::date::Month;
+
+    const FORWARD: Rate = 0.039;
+    const EXPIRY: Time = 1.0;
+    const ALPHA: Real = 0.3;
+    const BETA: Real = 0.6;
+    const NU: Real = 0.02;
+    const RHO: Real = 0.01;
+
+    fn fixture() -> SabrSmileSection {
+        SabrSmileSection::with_exercise_time(
+            EXPIRY,
+            FORWARD,
+            ALPHA,
+            BETA,
+            NU,
+            RHO,
+            0.0,
+            VolatilityType::ShiftedLognormal,
+        )
+        .unwrap()
+    }
+
+    fn reference_vol(strike: Rate) -> Volatility {
+        sabr_volatility(
+            strike,
+            FORWARD,
+            EXPIRY,
+            ALPHA,
+            BETA,
+            NU,
+            RHO,
+            VolatilityType::ShiftedLognormal,
+        )
+        .unwrap()
+    }
+
+    /// The section is a thin wrapper over #582's SABR formula, so its volatility
+    /// must equal `sabr_volatility` exactly across the T1 fixture's 31 strikes
+    /// plus the at-the-money forward.
+    #[test]
+    fn volatility_matches_sabr_volatility_across_strikes() {
+        let section = fixture();
+        for i in 0..31 {
+            let strike = 0.03 + 0.002 * i as Real;
+            let got = section.volatility(strike).unwrap();
+            let expected = reference_vol(strike);
+            assert!(
+                (got - expected).abs() <= 1e-14,
+                "strike {strike}: expected {expected}, got {got}"
+            );
+        }
+        let atm = section.volatility(FORWARD).unwrap();
+        assert!((atm - reference_vol(FORWARD)).abs() <= 1e-14);
+    }
+
+    #[test]
+    fn atm_level_is_the_forward() {
+        assert_eq!(fixture().atm_level(), Some(FORWARD));
+    }
+
+    /// The provided `variance` must equal `volatility^2 * exercise_time`, the
+    /// C++ `varianceImpl` (identical because `volatility_impl` already clamps).
+    #[test]
+    fn variance_is_volatility_squared_times_time() {
+        let section = fixture();
+        for strike in [0.03, 0.039, 0.05, 0.07, 0.09] {
+            let vol = section.volatility(strike).unwrap();
+            assert_eq!(section.variance(strike).unwrap(), vol * vol * EXPIRY);
+        }
+    }
+
+    /// Strikes below the clamp floor route through the unsafe SABR core: every
+    /// sub-floor strike returns the vol at `0.00001`, and a strike `<= 0` (which
+    /// #582's validated `sabr_volatility` rejects) still succeeds. If the section
+    /// delegated to the validated function on the raw strike, `volatility(-0.01)`
+    /// would be an `Err`, so its success proves the unsafe-core routing.
+    #[test]
+    fn sub_floor_strikes_route_through_unsafe_core() {
+        let section = fixture();
+        let floor_vol = section.volatility(0.00001).unwrap();
+        assert_eq!(section.volatility(1e-9).unwrap(), floor_vol);
+        assert_eq!(section.volatility(-0.01).unwrap(), floor_vol);
+        assert!(
+            sabr_volatility(
+                -0.01,
+                FORWARD,
+                EXPIRY,
+                ALPHA,
+                BETA,
+                NU,
+                RHO,
+                VolatilityType::ShiftedLognormal,
+            )
+            .is_err(),
+            "the validated function must reject a non-positive strike"
+        );
+    }
+
+    #[test]
+    fn nonzero_shift_is_deferred_to_586() {
+        let err = SabrSmileSection::with_exercise_time(
+            EXPIRY,
+            FORWARD,
+            ALPHA,
+            BETA,
+            NU,
+            RHO,
+            0.01,
+            VolatilityType::ShiftedLognormal,
+        )
+        .unwrap_err();
+        assert!(err.message().contains("#586"), "{}", err.message());
+    }
+
+    #[test]
+    fn normal_volatility_type_is_deferred_to_586() {
+        let err = SabrSmileSection::with_exercise_time(
+            EXPIRY,
+            FORWARD,
+            ALPHA,
+            BETA,
+            NU,
+            RHO,
+            0.0,
+            VolatilityType::Normal,
+        )
+        .unwrap_err();
+        assert!(err.message().contains("#586"), "{}", err.message());
+    }
+
+    #[test]
+    fn bad_sabr_parameters_are_rejected() {
+        assert!(
+            SabrSmileSection::with_exercise_time(
+                EXPIRY,
+                FORWARD,
+                0.0,
+                BETA,
+                NU,
+                RHO,
+                0.0,
+                VolatilityType::ShiftedLognormal,
+            )
+            .is_err()
+        );
+        assert!(
+            SabrSmileSection::with_exercise_time(
+                EXPIRY,
+                FORWARD,
+                ALPHA,
+                1.5,
+                NU,
+                RHO,
+                0.0,
+                VolatilityType::ShiftedLognormal,
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn non_positive_forward_is_rejected() {
+        assert!(
+            SabrSmileSection::with_exercise_time(
+                EXPIRY,
+                0.0,
+                ALPHA,
+                BETA,
+                NU,
+                RHO,
+                0.0,
+                VolatilityType::ShiftedLognormal,
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn accessors_return_the_stored_parameters() {
+        let section = fixture();
+        assert_eq!(section.alpha(), ALPHA);
+        assert_eq!(section.beta(), BETA);
+        assert_eq!(section.nu(), NU);
+        assert_eq!(section.rho(), RHO);
+    }
+
+    /// The date form computes the exercise time from the day counter and agrees
+    /// with the time form at that same effective time.
+    #[test]
+    fn date_form_matches_time_form_at_equal_time() {
+        let reference = Date::new(15, Month::June, 2026);
+        let exercise = Date::new(15, Month::June, 2027);
+        let dc = Actual365Fixed::new();
+        let dated = SabrSmileSection::with_reference_date(
+            exercise,
+            FORWARD,
+            ALPHA,
+            BETA,
+            NU,
+            RHO,
+            dc.clone(),
+            reference,
+            0.0,
+            VolatilityType::ShiftedLognormal,
+        )
+        .unwrap();
+        let expected_time = dc.year_fraction(reference, exercise);
+        assert_eq!(dated.exercise_time(), expected_time);
+
+        let timed = SabrSmileSection::with_exercise_time(
+            expected_time,
+            FORWARD,
+            ALPHA,
+            BETA,
+            NU,
+            RHO,
+            0.0,
+            VolatilityType::ShiftedLognormal,
+        )
+        .unwrap();
+        for strike in [0.03, 0.05, 0.09] {
+            assert_eq!(
+                dated.volatility(strike).unwrap(),
+                timed.volatility(strike).unwrap()
+            );
+        }
+    }
+}
