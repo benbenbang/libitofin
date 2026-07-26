@@ -47,8 +47,13 @@
 //!   [`SwaptionVolatilityStructure::discrete_grid`], the downcast-equivalent for
 //!   C++'s `dynamic_pointer_cast<SwaptionVolatilityDiscrete>`; a non-grid ATM
 //!   handle returns `Err` there, exactly where the C++ cast would null-deref.
-//! - `smileSectionImpl` (the volatility query) still returns `Err` naming #604:
-//!   wiring the public smile hook to the dense/sparse params is that ticket.
+//! - `smileSectionImpl` (the volatility query) serves the calibrated smile
+//!   (this ticket, #604): it [`calculate`](SabrSwaptionVolatilityCube::calculate)s,
+//!   then builds the [`SabrSmileSection`] from the dense parameter cube when
+//!   `isAtmCalibrated`, else the sparse cube (hpp:878-884). `volatilityImpl`
+//!   routes through it via the #594 seam, and the public
+//!   [`smile_section`](SabrSwaptionVolatilityCube::smile_section) exposes the
+//!   concrete smile for an option/swap tenor.
 //! - A non-zero ATM shift returns `Err` naming #586 (displaced SABR); the oracle
 //!   fixtures are shift-0.
 //! - `backwardFlat = true` returns `Err` naming #606, as the #601 [`Cube`] does.
@@ -70,7 +75,7 @@ use crate::patterns::lazyobject::LazyObject;
 use crate::patterns::observable::{AsObservable, Observable, Observer};
 use crate::quotes::Quote;
 use crate::settings::Settings;
-use crate::shared::{Shared, SharedMut, shared_mut};
+use crate::shared::{Shared, SharedMut, shared, shared_mut};
 use crate::termstructures::volatility::sabrsmilesection::SabrSmileSection;
 use crate::termstructures::volatility::{SmileSection, VolatilityTermStructure, VolatilityType};
 use crate::termstructures::{TermStructure, TermStructureBase};
@@ -456,6 +461,53 @@ impl SabrSwaptionVolatilityCube {
             shift,
             self.volatility_type,
         )
+    }
+
+    /// The served SABR smile at `(option_time, swap_length)` (`smileSectionImpl`,
+    /// hpp:878-884): [`calculate`](Self::calculate)s, then reads the DENSE
+    /// parameter cube when `is_atm_calibrated`, else the SPARSE cube. Unlike the
+    /// private [`smile_section_from_cube`](Self::smile_section_from_cube) it runs
+    /// the lazy calibration first, as C++'s `smileSection` does before indexing
+    /// the parameter cube.
+    fn served_smile_section(
+        &self,
+        option_time: Time,
+        swap_length: Time,
+    ) -> QlResult<SabrSmileSection> {
+        self.calculate()?;
+        if self.is_atm_calibrated {
+            let dense = self.dense_parameters.borrow();
+            self.smile_section_from_cube(option_time, swap_length, &dense)
+        } else {
+            let sparse = self.sparse_parameters.borrow();
+            self.smile_section_from_cube(option_time, swap_length, &sparse)
+        }
+    }
+
+    /// The calibrated SABR smile section for an option tenor and swap tenor
+    /// (C++'s inherited `smileSection(optionTenor, swapTenor)`,
+    /// swaptionvolstructure.hpp:277/457): resolves the option date off the
+    /// reference date and the swap length off the tenor, then serves the smile.
+    ///
+    /// Returns the concrete [`SabrSmileSection`] so its `alpha`/`beta`/`nu`/`rho`
+    /// and `atm_level` accessors are reachable; Rust cannot downcast the
+    /// `dyn SmileSection` the
+    /// [`smile_section_impl`](SwaptionCubeSmileSection::smile_section_impl) seam
+    /// returns, so this is the concrete-typed public entry the C++
+    /// `dynamic_pointer_cast<SabrSmileSection>` stands in for.
+    ///
+    /// # Errors
+    ///
+    /// Propagates the tenor-to-date/length conversions and the calibration.
+    pub fn smile_section(
+        &self,
+        option_tenor: Period,
+        swap_tenor: Period,
+    ) -> QlResult<SabrSmileSection> {
+        let option_date = self.option_date_from_tenor(option_tenor)?;
+        let option_time = self.time_from_reference(option_date)?;
+        let swap_length = self.swap_length_tenor(swap_tenor)?;
+        self.served_smile_section(option_time, swap_length)
     }
 
     /// Interpolates the per-strike vol spreads onto an ATM node
@@ -916,12 +968,11 @@ fn zero_cube(
 impl SwaptionCubeSmileSection for SabrSwaptionVolatilityCube {
     fn smile_section_impl(
         &self,
-        _option_time: Time,
-        _swap_length: Time,
+        option_time: Time,
+        swap_length: Time,
     ) -> QlResult<Shared<dyn SmileSection>> {
-        fail!(
-            "SABR cube smile section (SabrSmileSection bridge) is not yet ported; deferred to #604"
-        )
+        let section = self.served_smile_section(option_time, swap_length)?;
+        Ok(shared(section) as Shared<dyn SmileSection>)
     }
 }
 
@@ -1668,7 +1719,7 @@ mod tests {
     }
 
     #[test]
-    fn smile_section_and_volatility_defer_to_604() {
+    fn smile_section_serves_the_calibrated_sparse_smile() {
         let f = fixture(
             uniform_guess([0.15, TRUE_PARAMS[1], 0.20, 0.0]),
             [false, true, false, false],
@@ -1676,21 +1727,37 @@ mod tests {
             false,
         );
         seed_sabr_smile(&f, TRUE_PARAMS);
-        let (_od, _st, ot, sl) = node_info(&f.cube)[0];
-        f.cube
-            .sparse_parameter_values(ot, sl)
-            .expect("sparse calibration itself succeeds");
+        let (od, st, ot, sl) = node_info(&f.cube)[0];
+        let forward = f.cube.cube().atm_strike(od, st).unwrap();
 
-        match f.cube.smile_section_impl(ot, sl) {
-            Ok(_) => panic!("smile section must defer to #604"),
-            Err(e) => assert!(e.to_string().contains("604"), "err was: {e}"),
-        }
-
-        let vol_err = f
+        let section = f
             .cube
-            .volatility_impl(ot, sl, 0.05)
-            .expect_err("volatility query routes through the smile hook and defers to #604");
-        assert!(vol_err.to_string().contains("604"), "err was: {vol_err}");
+            .smile_section_impl(ot, sl)
+            .expect("the sparse SABR smile now serves");
+        for spread in [-0.01, 0.0, 0.01] {
+            let strike = forward + spread;
+            let expected = sabr_volatility(
+                strike,
+                forward,
+                ot,
+                TRUE_PARAMS[0],
+                TRUE_PARAMS[1],
+                TRUE_PARAMS[2],
+                TRUE_PARAMS[3],
+                VolatilityType::ShiftedLognormal,
+            )
+            .unwrap();
+            let served = section.volatility(strike).unwrap();
+            assert!(
+                (served - expected).abs() < 1e-6,
+                "served smile vol {served} vs true SABR {expected} at strike {strike}"
+            );
+            let via_impl = f.cube.volatility_impl(ot, sl, strike).unwrap();
+            assert!(
+                (via_impl - served).abs() < 1e-12,
+                "volatility_impl must route through the served smile: {via_impl} vs {served}"
+            );
+        }
     }
 
     #[test]
