@@ -2256,4 +2256,117 @@ mod tests {
             "recovery of smile vol spreads worst error {worst_spread} (tolerance 12e-4)"
         );
     }
+
+    #[test]
+    fn testsabrparameters_interpolates_between_swap_nodes() {
+        let settings = settings_today();
+        let cube = build_common_sabr_cube(&settings, true);
+
+        let option = Period::new(10, TimeUnit::Years);
+        let smile1 = cube
+            .smile_section(option, Period::new(2, TimeUnit::Years))
+            .unwrap();
+        let smile2 = cube
+            .smile_section(option, Period::new(4, TimeUnit::Years))
+            .unwrap();
+        let smile3 = cube
+            .smile_section(option, Period::new(3, TimeUnit::Years))
+            .unwrap();
+
+        let tolerance = 1.0e-4;
+        assert!(
+            (smile3.alpha() - 0.5 * (smile1.alpha() + smile2.alpha())).abs() < tolerance,
+            "alpha at 3Y {} vs midpoint of 2Y/4Y",
+            smile3.alpha()
+        );
+        assert!(
+            (smile3.beta() - 0.5 * (smile1.beta() + smile2.beta())).abs() < tolerance,
+            "beta at 3Y {} vs midpoint of 2Y/4Y",
+            smile3.beta()
+        );
+        assert!(
+            (smile3.rho() - 0.5 * (smile1.rho() + smile2.rho())).abs() < tolerance,
+            "rho at 3Y {} vs midpoint of 2Y/4Y",
+            smile3.rho()
+        );
+        assert!(
+            (smile3.nu() - 0.5 * (smile1.nu() + smile2.nu())).abs() < tolerance,
+            "nu at 3Y {} vs midpoint of 2Y/4Y",
+            smile3.nu()
+        );
+
+        let forward1 = smile1.atm_level().unwrap();
+        let forward2 = smile2.atm_level().unwrap();
+        let forward3 = smile3.atm_level().unwrap();
+        assert!(
+            (forward3 - 0.5 * (forward1 + forward2)).abs() < tolerance,
+            "forward at 3Y {forward3} vs midpoint of 2Y/4Y"
+        );
+    }
+
+    #[test]
+    fn testobservability_sabr_arm_reanchors_on_eval_date_move() {
+        let settings = settings_today();
+        let cube1_0 = build_common_sabr_cube(&settings, true);
+
+        let reference = today();
+        let dummy_strike = 0.03;
+        let strike_spreads = common_strike_spreads();
+
+        // Force cube1_0 to calibrate against the D0 grid before the move, so the
+        // eval-date change must invalidate its cached calibration for the re-query
+        // to agree. Without this warm-up the cube's first (and only) calculation
+        // would land after the move and the test would not exercise the observer
+        // wiring at all (confirmed by stubbing out the SabrCubeUpdater).
+        for &o in common_cube_option_tenors().iter() {
+            for &s in common_cube_swap_tenors().iter() {
+                for &spread in strike_spreads.iter() {
+                    cube1_0
+                        .volatility_tenors(o, s, dummy_strike + spread, false)
+                        .unwrap();
+                }
+            }
+        }
+
+        let moved =
+            Target::new().advance_by_period(reference, Period::new(1, TimeUnit::Days), BDC, false);
+        settings.set_evaluation_date(moved);
+
+        let cube1_1 = build_common_sabr_cube(&settings, true);
+
+        assert_eq!(
+            cube1_0.base().reference_date().unwrap(),
+            cube1_0
+                .cube()
+                .atm_vol()
+                .current_link()
+                .unwrap()
+                .base()
+                .reference_date()
+                .unwrap(),
+            "the moving cube grid must anchor to the same reference date as the moving ATM matrix"
+        );
+
+        let mut worst = 0.0_f64;
+        for &o in common_cube_option_tenors().iter() {
+            for &s in common_cube_swap_tenors().iter() {
+                for &spread in strike_spreads.iter() {
+                    let v0 = cube1_0
+                        .volatility_tenors(o, s, dummy_strike + spread, false)
+                        .unwrap();
+                    let v1 = cube1_1
+                        .volatility_tenors(o, s, dummy_strike + spread, false)
+                        .unwrap();
+                    worst = worst.max((v0 - v1).abs());
+                }
+            }
+        }
+        assert!(
+            worst < 1e-14,
+            "a cube built before the eval-date move must re-anchor and match a fresh cube \
+             built after: worst |v0 - v1| {worst}"
+        );
+
+        settings.set_evaluation_date(reference);
+    }
 }
