@@ -699,7 +699,6 @@ impl SwaptionVolatilityStructure for SabrSwaptionVolatilityCube {
 /// vol is shift-0.
 #[cfg(test)]
 mod tests {
-    #![allow(unused_imports)]
     use super::*;
 
     use crate::currency::Currency;
@@ -973,6 +972,51 @@ mod tests {
         }
     }
 
+    /// The full node coordinates in row-major `j*nSwaps + k` order:
+    /// `(option_date, swap_tenor, option_time, swap_length)`.
+    fn node_info(cube: &SabrSwaptionVolatilityCube) -> Vec<(Date, Period, Time, Time)> {
+        let discrete = cube.cube().discrete();
+        let dates = discrete.option_dates().unwrap();
+        let tenors = discrete.swap_tenors().to_vec();
+        let times = discrete.option_times().unwrap();
+        let lengths = discrete.swap_lengths().unwrap();
+        let mut nodes = Vec::with_capacity(times.len() * lengths.len());
+        for j in 0..times.len() {
+            for k in 0..lengths.len() {
+                nodes.push((dates[j], tenors[k], times[j], lengths[k]));
+            }
+        }
+        nodes
+    }
+
+    /// Overwrites every vol-spread quote so each node's market smile IS the
+    /// `params` SABR smile: at node `n`, strike `atm_forward_n + spread_i` gets
+    /// `sabr_volatility(...) - ATM_VOL` so `marketVolCube = ATM_VOL + spread`
+    /// reconstructs the SABR vol exactly. `atm_forward_n` and the expiry are read
+    /// off the constructed cube - the same values the calibration feeds
+    /// `SABRInterpolation`.
+    fn seed_sabr_smile(f: &Fixture, params: [Real; N_SABR_PARAMS]) {
+        let spreads = strike_spreads();
+        for (n, &(od, st, ot, _sl)) in node_info(&f.cube).iter().enumerate() {
+            let forward = f.cube.cube().atm_strike(od, st).unwrap();
+            for (i, &spread) in spreads.iter().enumerate() {
+                let strike = forward + spread;
+                let vol = sabr_volatility(
+                    strike,
+                    forward,
+                    ot,
+                    params[0],
+                    params[1],
+                    params[2],
+                    params[3],
+                    VolatilityType::ShiftedLognormal,
+                )
+                .unwrap();
+                f.spread_quotes[n][i].set_value(vol - ATM_VOL);
+            }
+        }
+    }
+
     /// The grid nodes as `(option_time, swap_length)`, node-index order matching
     /// the row-major `j*nSwaps + k` layout of the quote grid.
     fn grid_nodes(cube: &SabrSwaptionVolatilityCube) -> Vec<(Time, Time)> {
@@ -991,6 +1035,7 @@ mod tests {
     fn uniform_guess(g: [Real; N_SABR_PARAMS]) -> Vec<[Real; N_SABR_PARAMS]> {
         vec![g; N_NODES]
     }
+
     #[test]
     fn backward_flat_defers_to_606() {
         let settings = settings_today();
@@ -1164,5 +1209,200 @@ mod tests {
             "guess cube must rebuild from the bumped quote: got {}",
             after[0]
         );
+    }
+
+    const TRUE_PARAMS: [Real; N_SABR_PARAMS] = [0.20, 0.60, 0.30, -0.10];
+
+    /// A flat swaption vol surface carrying a constant non-zero lognormal shift,
+    /// to drive the displaced-SABR (#586) seam.
+    struct MockShiftedAtmVol {
+        base: TermStructureBase,
+        vol: Volatility,
+        shift: Real,
+    }
+
+    impl AsObservable for MockShiftedAtmVol {
+        fn observable(&self) -> &Observable {
+            self.base.observable()
+        }
+    }
+
+    impl TermStructure for MockShiftedAtmVol {
+        fn base(&self) -> &TermStructureBase {
+            &self.base
+        }
+        fn max_date(&self) -> Date {
+            Date::max_date()
+        }
+    }
+
+    impl VolatilityTermStructure for MockShiftedAtmVol {
+        fn business_day_convention(&self) -> BusinessDayConvention {
+            BDC
+        }
+        fn min_strike(&self) -> Rate {
+            Rate::MIN
+        }
+        fn max_strike(&self) -> Rate {
+            Rate::MAX
+        }
+    }
+
+    impl SwaptionVolatilityStructure for MockShiftedAtmVol {
+        fn volatility_impl(&self, _t: Time, _l: Time, _strike: Rate) -> QlResult<Volatility> {
+            Ok(self.vol)
+        }
+        fn max_swap_tenor(&self) -> Period {
+            Period::new(100, TimeUnit::Years)
+        }
+        fn shift_impl(&self, _option_time: Time, _swap_length: Time) -> QlResult<Real> {
+            Ok(self.shift)
+        }
+    }
+
+    #[test]
+    fn sparse_calibration_recovers_the_true_params_at_every_node() {
+        let guess = uniform_guess([0.15, TRUE_PARAMS[1], 0.20, 0.0]);
+        let is_fixed = [false, true, false, false];
+        let f = fixture(guess, is_fixed, None, false);
+        seed_sabr_smile(&f, TRUE_PARAMS);
+
+        let mut worst_param = 0.0_f64;
+        let mut worst_error = 0.0_f64;
+        for &(_od, _st, ot, sl) in node_info(&f.cube).iter() {
+            let p = f.cube.sparse_parameter_values(ot, sl).unwrap();
+            for (idx, &want) in TRUE_PARAMS.iter().enumerate() {
+                worst_param = worst_param.max((p[idx] - want).abs());
+            }
+            assert!(
+                (p[1] - TRUE_PARAMS[1]).abs() < 1e-15,
+                "fixed beta must stay at its guess exactly: got {}",
+                p[1]
+            );
+            worst_error = worst_error.max(p[5]);
+        }
+        assert!(
+            worst_param < 1e-8,
+            "worst SABR parameter recovery error {worst_param}"
+        );
+        assert!(
+            worst_error < 1e-6,
+            "rms fit error should be tiny for exact synthetic data, worst {worst_error}"
+        );
+    }
+
+    #[test]
+    fn fixed_parameter_is_held_at_a_wrong_value() {
+        let wrong_beta = 0.30;
+        let guess = uniform_guess([0.15, wrong_beta, 0.20, 0.0]);
+        let is_fixed = [false, true, false, false];
+        let f = fixture(guess, is_fixed, Some(1.0), false);
+        seed_sabr_smile(&f, TRUE_PARAMS);
+
+        for &(_od, _st, ot, sl) in node_info(&f.cube).iter() {
+            let p = f.cube.sparse_parameter_values(ot, sl).unwrap();
+            assert!(
+                (p[1] - wrong_beta).abs() < 1e-15,
+                "wrongly-fixed beta must be held exactly at {wrong_beta}, got {}",
+                p[1]
+            );
+        }
+    }
+
+    #[test]
+    fn recalibrates_when_a_fixed_guess_is_bumped() {
+        let fixed_alpha = 0.25;
+        let guess = uniform_guess([fixed_alpha, TRUE_PARAMS[1], TRUE_PARAMS[2], TRUE_PARAMS[3]]);
+        let is_fixed = [true, false, false, false];
+        let f = fixture(guess, is_fixed, Some(1.0), false);
+        seed_sabr_smile(&f, TRUE_PARAMS);
+
+        let (_od, _st, ot0, sl0) = node_info(&f.cube)[0];
+        let before = f.cube.sparse_parameter_values(ot0, sl0).unwrap();
+        assert!(
+            (before[0] - fixed_alpha).abs() < 1e-15,
+            "fixed alpha must be pinned at its guess, got {}",
+            before[0]
+        );
+
+        f.guess_quotes[0][0].set_value(0.18);
+        let after = f.cube.sparse_parameter_values(ot0, sl0).unwrap();
+        assert!(
+            (after[0] - 0.18).abs() < 1e-15,
+            "bumping the fixed alpha-guess must rebuild the guess and recalibrate: got {}",
+            after[0]
+        );
+    }
+
+    #[test]
+    fn non_zero_atm_shift_defers_to_586() {
+        let atm = Handle::new(shared(MockShiftedAtmVol {
+            base: TermStructureBase::with_reference_date(
+                today(),
+                Some(Target::new()),
+                Some(Actual365Fixed::new()),
+            ),
+            vol: ATM_VOL,
+            shift: 0.01,
+        }) as Shared<dyn SwaptionVolatilityStructure>);
+        let f = fixture_full(
+            atm,
+            uniform_guess([0.15, TRUE_PARAMS[1], 0.20, 0.0]),
+            [false, true, false, false],
+            None,
+            false,
+            false,
+        );
+        let (_od, _st, ot, sl) = node_info(&f.cube)[0];
+        let err = f
+            .cube
+            .sparse_parameter_values(ot, sl)
+            .expect_err("non-zero shift must defer");
+        assert!(err.to_string().contains("586"), "err was: {err}");
+    }
+
+    #[test]
+    fn smile_section_and_volatility_defer_to_604() {
+        let f = fixture(
+            uniform_guess([0.15, TRUE_PARAMS[1], 0.20, 0.0]),
+            [false, true, false, false],
+            None,
+            false,
+        );
+        seed_sabr_smile(&f, TRUE_PARAMS);
+        let (_od, _st, ot, sl) = node_info(&f.cube)[0];
+        f.cube
+            .sparse_parameter_values(ot, sl)
+            .expect("sparse calibration itself succeeds");
+
+        match f.cube.smile_section_impl(ot, sl) {
+            Ok(_) => panic!("smile section must defer to #604"),
+            Err(e) => assert!(e.to_string().contains("604"), "err was: {e}"),
+        }
+
+        let vol_err = f
+            .cube
+            .volatility_impl(ot, sl, 0.05)
+            .expect_err("volatility query routes through the smile hook and defers to #604");
+        assert!(vol_err.to_string().contains("604"), "err was: {vol_err}");
+    }
+
+    #[test]
+    fn atm_calibrated_dense_arm_defers_to_603() {
+        let f = fixture_full(
+            atm_handle(ATM_VOL),
+            uniform_guess([0.15, TRUE_PARAMS[1], 0.20, 0.0]),
+            [false, true, false, false],
+            None,
+            false,
+            true,
+        );
+        seed_sabr_smile(&f, TRUE_PARAMS);
+        let (_od, _st, ot, sl) = node_info(&f.cube)[0];
+        let err = f
+            .cube
+            .sparse_parameter_values(ot, sl)
+            .expect_err("is_atm_calibrated dense arm must defer");
+        assert!(err.to_string().contains("603"), "err was: {err}");
     }
 }
