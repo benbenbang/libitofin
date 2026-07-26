@@ -388,3 +388,200 @@ fn contains(sorted: &[Time], v: Time) -> bool {
 fn lower_bound(sorted: &[Time], v: Time) -> Size {
     sorted.partition_point(|&probe| probe < v)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::time::date::Month;
+    use crate::time::timeunit::TimeUnit;
+
+    const OPTION_TIMES: [Time; 3] = [1.0, 2.0, 3.0];
+    const SWAP_LENGTHS: [Time; 2] = [5.0, 10.0];
+    const N_LAYERS: Size = 3;
+
+    fn node(layer: usize, option_idx: usize, swap_idx: usize) -> Real {
+        100.0 * layer as Real + 10.0 * option_idx as Real + swap_idx as Real
+    }
+
+    fn option_date(i: usize) -> Date {
+        Date::new(10 + i as i32, Month::January, 2026)
+    }
+
+    fn swap_tenor(k: usize) -> Period {
+        Period::new(5 * (k as i64 + 1) as i32, TimeUnit::Years)
+    }
+
+    /// A 3-option x 2-swap (non-square) cube with distinct per-node per-layer
+    /// values `node(l, j, k) = 100*l + 10*j + k`, interpolators refreshed.
+    fn built_cube() -> Cube {
+        let option_dates = vec![option_date(0), option_date(1), option_date(2)];
+        let swap_tenors = vec![swap_tenor(0), swap_tenor(1)];
+        let mut cube = Cube::new(
+            option_dates,
+            swap_tenors,
+            OPTION_TIMES.to_vec(),
+            SWAP_LENGTHS.to_vec(),
+            N_LAYERS,
+            true,
+            false,
+        )
+        .unwrap();
+        for l in 0..N_LAYERS {
+            let mut m = Matrix::with_size(OPTION_TIMES.len(), SWAP_LENGTHS.len());
+            for j in 0..OPTION_TIMES.len() {
+                for k in 0..SWAP_LENGTHS.len() {
+                    m[(j, k)] = node(l, j, k);
+                }
+            }
+            cube.set_layer(l, m).unwrap();
+        }
+        cube.update_interpolators().unwrap();
+        cube
+    }
+
+    fn assert_exact(got: Real, expected: Real) {
+        assert!(
+            (got - expected).abs() <= 1e-15 * (1.0 + expected.abs()),
+            "got {got}, expected {expected}"
+        );
+    }
+
+    #[test]
+    fn recovers_every_node_value_on_a_non_square_grid() {
+        let cube = built_cube();
+        for (j, &option_time) in OPTION_TIMES.iter().enumerate() {
+            for (k, &swap_length) in SWAP_LENGTHS.iter().enumerate() {
+                let v = cube.value(option_time, swap_length).unwrap();
+                assert_eq!(v.len(), N_LAYERS);
+                for (l, &got) in v.iter().enumerate() {
+                    assert_exact(got, node(l, j, k));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn interpolates_linearly_between_adjacent_nodes() {
+        let cube = built_cube();
+        let mid_option = cube.value(1.5, SWAP_LENGTHS[0]).unwrap();
+        for (l, &got) in mid_option.iter().enumerate() {
+            assert_exact(got, 0.5 * (node(l, 0, 0) + node(l, 1, 0)));
+        }
+        let mid_swap = cube.value(OPTION_TIMES[0], 7.5).unwrap();
+        for (l, &got) in mid_swap.iter().enumerate() {
+            assert_exact(got, 0.5 * (node(l, 0, 0) + node(l, 0, 1)));
+        }
+    }
+
+    #[test]
+    fn extrapolates_flat_past_every_edge_and_corner() {
+        let cube = built_cube();
+        let low_corner = cube.value(0.0, 1.0).unwrap();
+        let high_corner = cube.value(9.0, 99.0).unwrap();
+        let swap_edge = cube.value(OPTION_TIMES[1], 99.0).unwrap();
+        let option_edge = cube.value(0.0, SWAP_LENGTHS[1]).unwrap();
+        for l in 0..N_LAYERS {
+            assert_exact(low_corner[l], node(l, 0, 0));
+            assert_exact(high_corner[l], node(l, 2, 1));
+            assert_exact(swap_edge[l], node(l, 1, 1));
+            assert_exact(option_edge[l], node(l, 0, 1));
+        }
+    }
+
+    #[test]
+    fn set_point_on_existing_node_overwrites_without_expanding() {
+        let mut cube = built_cube();
+        let new_point: Vec<Real> = (0..N_LAYERS).map(|l| 900.0 + l as Real).collect();
+        cube.set_point(
+            option_date(1),
+            swap_tenor(0),
+            OPTION_TIMES[1],
+            SWAP_LENGTHS[0],
+            new_point.clone(),
+        )
+        .unwrap();
+
+        assert_eq!(cube.option_times(), &OPTION_TIMES[..]);
+        assert_eq!(cube.swap_lengths(), &SWAP_LENGTHS[..]);
+        for (l, &expected) in new_point.iter().enumerate() {
+            assert_eq!(cube.points()[l].rows(), 3);
+            assert_eq!(cube.points()[l].columns(), 2);
+            assert_exact(cube.points()[l][(1, 0)], expected);
+            assert_exact(cube.points()[l][(0, 0)], node(l, 0, 0));
+        }
+    }
+
+    #[test]
+    fn set_point_with_new_option_time_expands_grid_and_keeps_old_nodes() {
+        let mut cube = built_cube();
+        let new_point: Vec<Real> = (0..N_LAYERS).map(|l| 700.0 + l as Real).collect();
+        cube.set_point(
+            option_date(0),
+            swap_tenor(0),
+            2.5,
+            SWAP_LENGTHS[0],
+            new_point.clone(),
+        )
+        .unwrap();
+
+        assert_eq!(cube.option_times(), &[1.0, 2.0, 2.5, 3.0][..]);
+        assert_eq!(cube.swap_lengths(), &SWAP_LENGTHS[..]);
+        for (l, &expected) in new_point.iter().enumerate() {
+            assert_eq!(cube.points()[l].rows(), 4);
+            assert_eq!(cube.points()[l].columns(), 2);
+            assert_exact(cube.points()[l][(0, 0)], node(l, 0, 0));
+            assert_exact(cube.points()[l][(1, 1)], node(l, 1, 1));
+            assert_exact(cube.points()[l][(3, 0)], node(l, 2, 0));
+            assert_exact(cube.points()[l][(3, 1)], node(l, 2, 1));
+            assert_exact(cube.points()[l][(2, 0)], expected);
+            assert_exact(cube.points()[l][(2, 1)], 0.0);
+        }
+    }
+
+    #[test]
+    fn expand_layers_inserts_zeroed_row_and_column() {
+        let mut cube = built_cube();
+        cube.expand_layers(1, true, 1, true).unwrap();
+        for l in 0..N_LAYERS {
+            assert_eq!(cube.points()[l].rows(), 4);
+            assert_eq!(cube.points()[l].columns(), 3);
+            for k in 0..3 {
+                assert_exact(cube.points()[l][(1, k)], 0.0);
+            }
+            for j in 0..4 {
+                assert_exact(cube.points()[l][(j, 1)], 0.0);
+            }
+            assert_exact(cube.points()[l][(3, 2)], node(l, 2, 1));
+        }
+    }
+
+    #[test]
+    fn backward_flat_is_a_documented_deferral() {
+        let err = Cube::new(
+            vec![option_date(0), option_date(1), option_date(2)],
+            vec![swap_tenor(0), swap_tenor(1)],
+            OPTION_TIMES.to_vec(),
+            SWAP_LENGTHS.to_vec(),
+            N_LAYERS,
+            true,
+            true,
+        )
+        .err()
+        .expect("backward_flat = true must be rejected");
+        assert!(err.to_string().contains("596"));
+    }
+
+    #[test]
+    fn constructor_rejects_undersized_axes() {
+        let short = Cube::new(
+            vec![option_date(0)],
+            vec![swap_tenor(0), swap_tenor(1)],
+            vec![1.0],
+            SWAP_LENGTHS.to_vec(),
+            N_LAYERS,
+            true,
+            false,
+        );
+        assert!(short.is_err());
+    }
+}
