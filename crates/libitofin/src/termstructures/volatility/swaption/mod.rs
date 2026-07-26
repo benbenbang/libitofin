@@ -39,6 +39,7 @@
 
 mod constantswaptionvol;
 mod interpolatedswaptionvolcube;
+mod sabrvolcube;
 mod swaptionvolcube;
 mod swaptionvoldiscrete;
 mod swaptionvolmatrix;
