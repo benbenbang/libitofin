@@ -38,11 +38,13 @@
 //!   deferred.
 
 mod constantswaptionvol;
+mod interpolatedswaptionvolcube;
 mod swaptionvolcube;
 mod swaptionvoldiscrete;
 mod swaptionvolmatrix;
 
 pub use constantswaptionvol::ConstantSwaptionVolatility;
+pub use interpolatedswaptionvolcube::InterpolatedSwaptionVolatilityCube;
 pub use swaptionvolcube::{SwaptionCubeSmileSection, SwaptionVolatilityCube};
 pub use swaptionvoldiscrete::SwaptionVolatilityDiscrete;
 pub use swaptionvolmatrix::SwaptionVolatilityMatrix;

@@ -61,8 +61,9 @@ pub use sabr::{sabr_volatility, unsafe_sabr_volatility, validate_sabr_parameters
 pub use sabrsmilesection::SabrSmileSection;
 pub use smilesection::{SmileSection, SmileSectionBase};
 pub use swaption::{
-    ConstantSwaptionVolatility, SwaptionCubeSmileSection, SwaptionVolatilityCube,
-    SwaptionVolatilityDiscrete, SwaptionVolatilityMatrix, SwaptionVolatilityStructure,
+    ConstantSwaptionVolatility, InterpolatedSwaptionVolatilityCube, SwaptionCubeSmileSection,
+    SwaptionVolatilityCube, SwaptionVolatilityDiscrete, SwaptionVolatilityMatrix,
+    SwaptionVolatilityStructure,
 };
 pub use volatilitytype::VolatilityType;
 
