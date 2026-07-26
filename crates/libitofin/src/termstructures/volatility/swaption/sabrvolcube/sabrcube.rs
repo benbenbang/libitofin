@@ -36,18 +36,25 @@
 //!
 //! ## What works after #602 T3b, and what defers
 //!
-//! - Construction, the guess store, the observer wiring, and the sparse per-node
-//!   SABR calibration work.
-//! - `smileSectionImpl` (the volatility query) returns `Err` naming #604: the
-//!   [`SabrSmileSection`](crate::termstructures::volatility::sabrsmilesection)
-//!   bridge is that ticket.
-//! - The `isAtmCalibrated` dense arm (`fillVolatilityCube` + `denseParameters_`)
-//!   returns `Err` naming #603 rather than stubbing silently.
+//! - Construction, the guess store, the observer wiring, the sparse per-node
+//!   SABR calibration, and (from #603) the `isAtmCalibrated` dense arm work.
+//! - The dense arm (`fillVolatilityCube` + `spreadVolInterpolation` +
+//!   `denseParameters_`, hpp:394-398/646-857) widens the cube with ATM-anchored
+//!   points and re-fits SABR over the widened grid; the private
+//!   `smileSection(paramCube)` helper (hpp:861-874) lands here too, building the
+//!   per-node [`SabrSmileSection`](crate::termstructures::volatility::sabrsmilesection).
+//!   The ATM structure's grid is read through
+//!   [`SwaptionVolatilityStructure::discrete_grid`], the downcast-equivalent for
+//!   C++'s `dynamic_pointer_cast<SwaptionVolatilityDiscrete>`; a non-grid ATM
+//!   handle returns `Err` there, exactly where the C++ cast would null-deref.
+//! - `smileSectionImpl` (the volatility query) still returns `Err` naming #604:
+//!   wiring the public smile hook to the dense/sparse params is that ticket.
 //! - A non-zero ATM shift returns `Err` naming #586 (displaced SABR); the oracle
 //!   fixtures are shift-0.
 //! - `backwardFlat = true` returns `Err` naming #606, as the #601 [`Cube`] does.
-//! - `sabrCalibrationSection` and `recalibration` (the dense/section-recalibration
-//!   API) are not ported; they defer with the dense arm.
+//! - `updateAfterRecalibration`, `sabrCalibrationSection` and `recalibration`
+//!   (the section-recalibration API) are not ported; they defer as their own
+//!   issue.
 #![allow(dead_code)]
 
 use std::cell::RefCell;
@@ -64,6 +71,7 @@ use crate::patterns::observable::{AsObservable, Observable, Observer};
 use crate::quotes::Quote;
 use crate::settings::Settings;
 use crate::shared::{Shared, SharedMut, shared_mut};
+use crate::termstructures::volatility::sabrsmilesection::SabrSmileSection;
 use crate::termstructures::volatility::{SmileSection, VolatilityTermStructure, VolatilityType};
 use crate::termstructures::{TermStructure, TermStructureBase};
 use crate::time::businessdayconvention::BusinessDayConvention;
@@ -115,6 +123,7 @@ pub struct SabrSwaptionVolatilityCube {
     parameters_guess: RefCell<Cube>,
     market_vol_cube: RefCell<Cube>,
     sparse_parameters: RefCell<Cube>,
+    dense_parameters: RefCell<Cube>,
     is_parameter_fixed: [bool; N_SABR_PARAMS],
     is_atm_calibrated: bool,
     end_criteria: EndCriteria,
@@ -242,6 +251,7 @@ impl SabrSwaptionVolatilityCube {
             build_guess_cube(&cube, &parameters_guess, backward_flat, n_options, n_swaps)?;
         let market_vol_cube = zero_cube(&cube, n_strikes, backward_flat)?;
         let sparse_parameters = zero_cube(&cube, N_SABR_PARAMS + N_METADATA_LAYERS, backward_flat)?;
+        let dense_parameters = zero_cube(&cube, N_SABR_PARAMS + N_METADATA_LAYERS, backward_flat)?;
 
         let lazy = shared_mut(LazyObject::new(true));
         let updater = shared_mut(SabrCubeUpdater {
@@ -263,6 +273,7 @@ impl SabrSwaptionVolatilityCube {
             parameters_guess: RefCell::new(parameters_guess_cube),
             market_vol_cube: RefCell::new(market_vol_cube),
             sparse_parameters: RefCell::new(sparse_parameters),
+            dense_parameters: RefCell::new(dense_parameters),
             is_parameter_fixed,
             is_atm_calibrated,
             end_criteria,
@@ -316,16 +327,244 @@ impl SabrSwaptionVolatilityCube {
 
         let market = self.build_market_vol_cube(n_options, n_swaps)?;
         let sparse = self.sabr_calibration(&market)?;
-        *self.market_vol_cube.borrow_mut() = market;
-        *self.sparse_parameters.borrow_mut() = sparse;
 
         if self.is_atm_calibrated {
-            fail!(
-                "SABR cube ATM-calibrated (dense) arm - fillVolatilityCube + denseParameters - is \
-                 not yet ported; deferred to #603"
-            );
+            let sparse_smiles = self.create_sparse_smiles(&sparse)?;
+            let mut vol_cube_atm_calibrated = self.build_market_vol_cube(n_options, n_swaps)?;
+            self.fill_volatility_cube(&mut vol_cube_atm_calibrated, &sparse, &sparse_smiles)?;
+            *self.dense_parameters.borrow_mut() =
+                self.sabr_calibration(&vol_cube_atm_calibrated)?;
         }
+
+        *self.market_vol_cube.borrow_mut() = market;
+        *self.sparse_parameters.borrow_mut() = sparse;
         Ok(())
+    }
+
+    /// Widens `vol_cube_atm_calibrated` with ATM-anchored points
+    /// (`fillVolatilityCube`, hpp:646-715). It merges the ATM structure's own
+    /// option/swap grid (read through
+    /// [`SwaptionVolatilityStructure::discrete_grid`], the downcast-equivalent for
+    /// C++'s `dynamic_pointer_cast<SwaptionVolatilityDiscrete>`) with the cube's,
+    /// and for every merged node NOT already present in the cube sets the ATM vol
+    /// plus the interpolated per-strike vol spread ([`spread_vol_interpolation`]).
+    /// The four merged axes are index-aligned exactly as C++ leaves them: the
+    /// binary-search checks read the cube's ORIGINAL axes, captured before the
+    /// widening loop mutates the cube.
+    #[allow(clippy::needless_range_loop)]
+    fn fill_volatility_cube(
+        &self,
+        vol_cube_atm_calibrated: &mut Cube,
+        sparse: &Cube,
+        sparse_smiles: &[Vec<SabrSmileSection>],
+    ) -> QlResult<()> {
+        let atm = self.cube.atm_vol().current_link()?;
+        let grid = atm.discrete_grid()?;
+        let n_strikes = self.cube.strike_spreads().len();
+
+        let cube_option_times = vol_cube_atm_calibrated.option_times().to_vec();
+        let cube_swap_lengths = vol_cube_atm_calibrated.swap_lengths().to_vec();
+
+        let atm_option_times = union_sorted_times(&grid.option_times, &cube_option_times);
+        let atm_swap_lengths = union_sorted_times(&grid.swap_lengths, &cube_swap_lengths);
+        let atm_option_dates =
+            union_sorted_dates(&grid.option_dates, vol_cube_atm_calibrated.option_dates());
+        let atm_swap_tenors =
+            union_sorted_tenors(&grid.swap_tenors, vol_cube_atm_calibrated.swap_tenors());
+
+        for j in 0..atm_option_times.len() {
+            for k in 0..atm_swap_lengths.len() {
+                let expand_option_times = !sorted_contains(&cube_option_times, atm_option_times[j]);
+                let expand_swap_lengths = !sorted_contains(&cube_swap_lengths, atm_swap_lengths[k]);
+                if !(expand_option_times || expand_swap_lengths) {
+                    continue;
+                }
+                let atm_forward = self
+                    .cube
+                    .atm_strike(atm_option_dates[j], atm_swap_tenors[k])?;
+                let atm_vol =
+                    atm.volatility(atm_option_dates[j], atm_swap_lengths[k], atm_forward, false)?;
+                let spread_vols = self.spread_vol_interpolation(
+                    atm_option_dates[j],
+                    atm_swap_tenors[k],
+                    sparse,
+                    sparse_smiles,
+                )?;
+                let mut vol_atm_calibrated = Vec::with_capacity(n_strikes);
+                for i in 0..n_strikes {
+                    vol_atm_calibrated.push(atm_vol + spread_vols[i]);
+                }
+                vol_cube_atm_calibrated.set_point(
+                    atm_option_dates[j],
+                    atm_swap_tenors[k],
+                    atm_option_times[j],
+                    atm_swap_lengths[k],
+                    vol_atm_calibrated,
+                )?;
+            }
+        }
+        vol_cube_atm_calibrated.update_interpolators()?;
+        Ok(())
+    }
+
+    /// The sparse smile sections (`createSparseSmiles`, hpp:719-734): for each
+    /// sparse `(optionTime, swapLength)` node, the [`SabrSmileSection`] built from
+    /// the sparse parameter cube. Row-major over the sparse option axis, each row
+    /// over the sparse swap axis, mirroring C++'s `sparseSmiles_`.
+    fn create_sparse_smiles(&self, sparse: &Cube) -> QlResult<Vec<Vec<SabrSmileSection>>> {
+        let option_times = sparse.option_times().to_vec();
+        let swap_lengths = sparse.swap_lengths().to_vec();
+        let mut smiles = Vec::with_capacity(option_times.len());
+        for &option_time in &option_times {
+            let mut row = Vec::with_capacity(swap_lengths.len());
+            for &swap_length in &swap_lengths {
+                row.push(self.smile_section_from_cube(option_time, swap_length, sparse)?);
+            }
+            smiles.push(row);
+        }
+        Ok(smiles)
+    }
+
+    /// The private `smileSection(optionTime, swapLength, paramCube)` helper
+    /// (hpp:861-874): reads `[alpha, beta, nu, rho, forward, ...]` at the node from
+    /// a parameter cube and builds the (shift-0) [`SabrSmileSection`]. The forward
+    /// is stored at index [`N_SABR_PARAMS`], after the model parameters. Unlike
+    /// C++ it does not call `calculate()`: it runs only from inside
+    /// [`perform_calculations`](Self::perform_calculations), where the lazy guard
+    /// is already held; the public smile hook (#604) will call `calculate()` before
+    /// delegating here.
+    fn smile_section_from_cube(
+        &self,
+        option_time: Time,
+        swap_length: Time,
+        param_cube: &Cube,
+    ) -> QlResult<SabrSmileSection> {
+        let params = param_cube.value(option_time, swap_length)?;
+        let forward = params[N_SABR_PARAMS];
+        let shift =
+            self.cube
+                .atm_vol()
+                .current_link()?
+                .shift_time(option_time, swap_length, false)?;
+        SabrSmileSection::with_exercise_time(
+            option_time,
+            forward,
+            params[0],
+            params[1],
+            params[2],
+            params[3],
+            shift,
+            self.volatility_type,
+        )
+    }
+
+    /// Interpolates the per-strike vol spreads onto an ATM node
+    /// (`spreadVolInterpolation`, hpp:737-857). It brackets the ATM node between
+    /// the four surrounding sparse nodes (a `lower_bound` then step back on each
+    /// axis, clamped at 0), then for each strike spread: rescales the strike to
+    /// each corner's forward through the shared moneyness, reads the corner smile
+    /// vol minus that corner's ATM vol, and bilinearly blends the four corner
+    /// spreads in `(optionTime, swapLength)` via a local one-layer [`Cube`]. This
+    /// carries the documented small ATM-fit-error the C++ comment (hpp:818-832)
+    /// describes.
+    #[allow(clippy::needless_range_loop)]
+    fn spread_vol_interpolation(
+        &self,
+        atm_option_date: Date,
+        atm_swap_tenor: Period,
+        sparse: &Cube,
+        sparse_smiles: &[Vec<SabrSmileSection>],
+    ) -> QlResult<Vec<Real>> {
+        let atm_option_time = self.time_from_reference(atm_option_date)?;
+        let atm_time_length = self.swap_length_tenor(atm_swap_tenor)?;
+
+        let option_times = sparse.option_times();
+        let swap_lengths = sparse.swap_lengths();
+        let option_dates = sparse.option_dates();
+        let swap_tenors = sparse.swap_tenors();
+
+        let opt_prev = lower_bound(option_times, atm_option_time).saturating_sub(1);
+        let swp_prev = lower_bound(swap_lengths, atm_time_length).saturating_sub(1);
+
+        require!(
+            opt_prev + 1 < sparse_smiles.len(),
+            "optionTimesPreviousIndex+1 >= sparseSmiles length"
+        );
+        require!(
+            opt_prev + 1 < option_times.len() && swp_prev + 1 < swap_lengths.len(),
+            "sparse bracket index out of range"
+        );
+        require!(
+            swp_prev + 1 < sparse_smiles[0].len(),
+            "swapLengthsPreviousIndex+1 >= sparseSmiles[0] length"
+        );
+
+        let smiles = [
+            [
+                &sparse_smiles[opt_prev][swp_prev],
+                &sparse_smiles[opt_prev][swp_prev + 1],
+            ],
+            [
+                &sparse_smiles[opt_prev + 1][swp_prev],
+                &sparse_smiles[opt_prev + 1][swp_prev + 1],
+            ],
+        ];
+        let options_nodes = [option_times[opt_prev], option_times[opt_prev + 1]];
+        let options_date_nodes = [option_dates[opt_prev], option_dates[opt_prev + 1]];
+        let swap_lengths_nodes = [swap_lengths[swp_prev], swap_lengths[swp_prev + 1]];
+        let swap_tenor_nodes = [swap_tenors[swp_prev], swap_tenors[swp_prev + 1]];
+
+        let atm_forward = self.cube.atm_strike(atm_option_date, atm_swap_tenor)?;
+        let atm = self.cube.atm_vol().current_link()?;
+        let shift = atm.shift_time(atm_option_time, atm_time_length, false)?;
+
+        let mut atm_forwards = [[0.0; 2]; 2];
+        let mut atm_shifts = [[0.0; 2]; 2];
+        let mut atm_vols = [[0.0; 2]; 2];
+        for i in 0..2 {
+            for j in 0..2 {
+                atm_forwards[i][j] = self
+                    .cube
+                    .atm_strike(options_date_nodes[i], swap_tenor_nodes[j])?;
+                atm_shifts[i][j] =
+                    atm.shift_time(options_nodes[i], swap_lengths_nodes[j], false)?;
+                atm_vols[i][j] = atm.volatility(
+                    options_date_nodes[i],
+                    swap_lengths_nodes[j],
+                    atm_forwards[i][j],
+                    false,
+                )?;
+            }
+        }
+
+        let strike_spreads = self.cube.strike_spreads();
+        let n_strikes = strike_spreads.len();
+        let mut result = Vec::with_capacity(n_strikes);
+        for k in 0..n_strikes {
+            let strike = (atm_forward + strike_spreads[k]).max(self.cutoff_strike - shift);
+            let moneyness = (atm_forward + shift) / (strike + shift);
+            let mut spread_vols = Matrix::with_size(2, 2);
+            for i in 0..2 {
+                for j in 0..2 {
+                    let node_strike =
+                        (atm_forwards[i][j] + atm_shifts[i][j]) / moneyness - atm_shifts[i][j];
+                    spread_vols[(i, j)] = smiles[i][j].volatility(node_strike)? - atm_vols[i][j];
+                }
+            }
+            let mut local = Cube::new(
+                options_date_nodes.to_vec(),
+                swap_tenor_nodes.to_vec(),
+                options_nodes.to_vec(),
+                swap_lengths_nodes.to_vec(),
+                1,
+                true,
+                self.backward_flat,
+            )?;
+            local.set_layer(0, spread_vols)?;
+            local.update_interpolators()?;
+            result.push(local.value(atm_option_time, atm_time_length)?[0]);
+        }
+        Ok(result)
     }
 
     /// Assembles `marketVolCube_` (hpp:370-386): one layer per strike spread,
@@ -528,6 +767,71 @@ impl SabrSwaptionVolatilityCube {
             .borrow()
             .value(option_time, swap_length)
     }
+
+    /// The calibrated DENSE SABR parameters at `(option_time, swap_length)`:
+    /// `[alpha, beta, nu, rho, forward, rms_error, max_error, end_criteria]` over
+    /// the ATM-widened grid (`denseParameters_`). Only populated when
+    /// `is_atm_calibrated`; on a sparse-only cube it stays the zero placeholder.
+    ///
+    /// # Errors
+    ///
+    /// Propagates the calibration (including the #586 shift deferral).
+    pub fn dense_parameter_values(
+        &self,
+        option_time: Time,
+        swap_length: Time,
+    ) -> QlResult<Vec<Real>> {
+        self.calculate()?;
+        self.dense_parameters
+            .borrow()
+            .value(option_time, swap_length)
+    }
+}
+
+/// The sorted-unique union of two finite time axes (C++'s concat + `std::sort` +
+/// `std::unique`). Panics only on a non-finite axis value, which the cube grid
+/// never holds.
+fn union_sorted_times(a: &[Time], b: &[Time]) -> Vec<Time> {
+    let mut v: Vec<Time> = a.iter().chain(b.iter()).copied().collect();
+    v.sort_by(|x, y| x.partial_cmp(y).expect("cube axis times are finite"));
+    v.dedup();
+    v
+}
+
+/// The sorted-unique union of two option-date axes.
+fn union_sorted_dates(a: &[Date], b: &[Date]) -> Vec<Date> {
+    let mut v: Vec<Date> = a.iter().chain(b.iter()).copied().collect();
+    v.sort();
+    v.dedup();
+    v
+}
+
+/// The sorted-unique union of two swap-tenor axes. Panics only on an
+/// incomparable tenor pair (mixed sub-month units), which the year/month cube
+/// axes never hold.
+fn union_sorted_tenors(a: &[Period], b: &[Period]) -> Vec<Period> {
+    let mut v: Vec<Period> = a.iter().chain(b.iter()).copied().collect();
+    v.sort_by(|x, y| x.partial_cmp(y).expect("cube swap tenors are comparable"));
+    v.dedup();
+    v
+}
+
+/// Whether the strictly-increasing finite axis `sorted` already contains `v`
+/// (C++'s `std::binary_search`).
+fn sorted_contains(sorted: &[Time], v: Time) -> bool {
+    sorted
+        .binary_search_by(|probe| {
+            probe
+                .partial_cmp(&v)
+                .expect("cube axis times are finite and comparable")
+        })
+        .is_ok()
+}
+
+/// The index of the first element of `sorted` not less than `v` (C++'s
+/// `std::lower_bound`).
+fn lower_bound(sorted: &[Time], v: Time) -> usize {
+    sorted.partition_point(|&probe| probe < v)
 }
 
 /// Maps an [`EndCriteriaType`] to the numeric code stored in the sparse cube's
@@ -1388,7 +1692,7 @@ mod tests {
     }
 
     #[test]
-    fn atm_calibrated_dense_arm_defers_to_603() {
+    fn atm_calibrated_with_non_grid_atm_surface_errors() {
         let f = fixture_full(
             atm_handle(ATM_VOL),
             uniform_guess([0.15, TRUE_PARAMS[1], 0.20, 0.0]),
@@ -1402,7 +1706,11 @@ mod tests {
         let err = f
             .cube
             .sparse_parameter_values(ot, sl)
-            .expect_err("is_atm_calibrated dense arm must defer");
-        assert!(err.to_string().contains("603"), "err was: {err}");
+            .expect_err("dense arm over a non-grid ATM surface must error at discrete_grid");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("grid-backed") || msg.contains("discrete"),
+            "err was: {err}"
+        );
     }
 }
