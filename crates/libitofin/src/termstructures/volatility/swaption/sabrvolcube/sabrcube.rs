@@ -854,6 +854,143 @@ mod tests {
     const N_NODES: usize = 4;
     const ATM_VOL: Volatility = 0.20;
 
+    /// Records whether it was notified (the QuantLib test-suite `Flag`).
+    #[derive(Default)]
+    struct Flag {
+        up: bool,
+    }
+
+    impl Observer for Flag {
+        fn update(&mut self) {
+            self.up = true;
+        }
+    }
+
+    struct Fixture {
+        settings: Shared<Settings<Date>>,
+        cube: SabrSwaptionVolatilityCube,
+        guess_quotes: Vec<Vec<Shared<SimpleQuote>>>,
+        spread_quotes: Vec<Vec<Shared<SimpleQuote>>>,
+    }
+
+    /// Builds the fixture with per-node guesses `guess[node] = [alpha, beta, nu,
+    /// rho]`, the given fixed flags, tolerance, and vega weighting, over the flat
+    /// shift-0 ATM surface with `is_atm_calibrated = false`.
+    fn fixture(
+        guess: Vec<[Real; N_SABR_PARAMS]>,
+        is_fixed: [bool; N_SABR_PARAMS],
+        max_error_tolerance: Option<Real>,
+        vega: bool,
+    ) -> Fixture {
+        fixture_full(
+            atm_handle(ATM_VOL),
+            guess,
+            is_fixed,
+            max_error_tolerance,
+            vega,
+            false,
+        )
+    }
+
+    /// The general fixture builder: takes the ATM handle and `is_atm_calibrated`
+    /// so the shift and dense-arm seams can be exercised. Vol-spread quotes start
+    /// at zero; a calibration test sets them to a synthetic smile.
+    fn fixture_full(
+        atm: Handle<dyn SwaptionVolatilityStructure>,
+        guess: Vec<[Real; N_SABR_PARAMS]>,
+        is_fixed: [bool; N_SABR_PARAMS],
+        max_error_tolerance: Option<Real>,
+        vega: bool,
+        is_atm_calibrated: bool,
+    ) -> Fixture {
+        let settings = settings_today();
+        let euribor6m = shared(Euribor::six_months(
+            flat_curve(0.05),
+            Shared::clone(&settings),
+        ));
+        let long = long_index(&euribor6m, &settings);
+        let short = short_index(&euribor6m, &settings);
+
+        let n_strikes = strike_spreads().len();
+        let spread_quotes: Vec<Vec<Shared<SimpleQuote>>> = (0..N_NODES)
+            .map(|_| {
+                (0..n_strikes)
+                    .map(|_| shared(SimpleQuote::new(0.0)))
+                    .collect()
+            })
+            .collect();
+        let vol_spreads: Vec<Vec<Handle<dyn Quote>>> = spread_quotes
+            .iter()
+            .map(|row| {
+                row.iter()
+                    .map(|q| Handle::new(Shared::clone(q) as Shared<dyn Quote>))
+                    .collect()
+            })
+            .collect();
+
+        let guess_quotes: Vec<Vec<Shared<SimpleQuote>>> = guess
+            .iter()
+            .map(|node| node.iter().map(|&v| shared(SimpleQuote::new(v))).collect())
+            .collect();
+        let parameters_guess: Vec<Vec<Handle<dyn Quote>>> = guess_quotes
+            .iter()
+            .map(|row| {
+                row.iter()
+                    .map(|q| Handle::new(Shared::clone(q) as Shared<dyn Quote>))
+                    .collect()
+            })
+            .collect();
+
+        let cube = SabrSwaptionVolatilityCube::new(
+            atm,
+            option_tenors(),
+            swap_tenors(),
+            strike_spreads(),
+            vol_spreads,
+            long,
+            short,
+            vega,
+            parameters_guess,
+            is_fixed,
+            is_atm_calibrated,
+            None,
+            max_error_tolerance,
+            None,
+            None,
+            false,
+            50,
+            false,
+            0.0001,
+            Shared::clone(&settings),
+        )
+        .unwrap();
+
+        Fixture {
+            settings,
+            cube,
+            guess_quotes,
+            spread_quotes,
+        }
+    }
+
+    /// The grid nodes as `(option_time, swap_length)`, node-index order matching
+    /// the row-major `j*nSwaps + k` layout of the quote grid.
+    fn grid_nodes(cube: &SabrSwaptionVolatilityCube) -> Vec<(Time, Time)> {
+        let discrete = cube.cube().discrete();
+        let times = discrete.option_times().unwrap();
+        let lengths = discrete.swap_lengths().unwrap();
+        let mut nodes = Vec::with_capacity(times.len() * lengths.len());
+        for &t in &times {
+            for &l in &lengths {
+                nodes.push((t, l));
+            }
+        }
+        nodes
+    }
+
+    fn uniform_guess(g: [Real; N_SABR_PARAMS]) -> Vec<[Real; N_SABR_PARAMS]> {
+        vec![g; N_NODES]
+    }
     #[test]
     fn backward_flat_defers_to_606() {
         let settings = settings_today();
@@ -968,6 +1105,64 @@ mod tests {
         assert!(
             build(wrong_cols).is_err(),
             "each row must hold four guesses"
+        );
+    }
+
+    #[test]
+    fn guess_cube_recovers_the_quote_values_at_each_node() {
+        let guess: Vec<[Real; N_SABR_PARAMS]> = (0..N_NODES)
+            .map(|n| {
+                let base = n as Real;
+                [0.20 + base, 0.60 + base, 0.30 + base, -0.10 + 0.01 * base]
+            })
+            .collect();
+        let f = fixture(guess.clone(), [false; N_SABR_PARAMS], None, false);
+        let nodes = grid_nodes(&f.cube);
+        for (node, &(t, l)) in nodes.iter().enumerate() {
+            let got = f.cube.parameters_guess_value(t, l).unwrap();
+            for p in 0..N_SABR_PARAMS {
+                assert!(
+                    (got[p] - guess[node][p]).abs() < 1e-14,
+                    "node {node} param {p}: got {}, want {}",
+                    got[p],
+                    guess[node][p]
+                );
+            }
+        }
+        let _ = &f.settings;
+        let _ = &f.spread_quotes;
+    }
+
+    #[test]
+    fn guess_quote_bump_rebuilds_the_guess_cube_and_notifies() {
+        let f = fixture(
+            uniform_guess([0.20, 0.60, 0.30, -0.10]),
+            [false; N_SABR_PARAMS],
+            None,
+            false,
+        );
+        let flag = shared_mut(Flag::default());
+        f.cube
+            .observable()
+            .register_observer(&(Shared::clone(&flag) as SharedMut<dyn Observer>));
+
+        let nodes = grid_nodes(&f.cube);
+        let (t0, l0) = nodes[0];
+        let before = f.cube.parameters_guess_value(t0, l0).unwrap();
+        assert!((before[0] - 0.20).abs() < 1e-14);
+
+        flag.borrow_mut().up = false;
+        f.guess_quotes[0][0].set_value(0.35);
+        assert!(
+            flag.borrow().up,
+            "a guess-quote bump must notify the cube's observers"
+        );
+
+        let after = f.cube.parameters_guess_value(t0, l0).unwrap();
+        assert!(
+            (after[0] - 0.35).abs() < 1e-14,
+            "guess cube must rebuild from the bumped quote: got {}",
+            after[0]
         );
     }
 }
