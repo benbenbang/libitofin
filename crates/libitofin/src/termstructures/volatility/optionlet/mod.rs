@@ -10,7 +10,9 @@
 //! ## Divergences from QuantLib
 //!
 //! - The `smileSection` family and the `smileSectionImpl` hook are not ported:
-//!   they need the smile-section layer, which is not in the crate yet. The
+//!   the smile-section layer itself now exists
+//!   ([`SmileSection`](crate::termstructures::volatility::SmileSection), #584),
+//!   but wiring this surface's `smileSectionImpl` bridge to it stays unported. The
 //!   required hook is therefore [`volatility_impl`](OptionletVolatilityStructure::volatility_impl)
 //!   alone, mirroring C++'s pure-virtual `volatilityImpl(Time, Rate)`; the
 //!   `Date`-based volatility path converts to time and dispatches to it, as the
