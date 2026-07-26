@@ -35,6 +35,7 @@ mod localvolcurve;
 mod localvolsurface;
 mod localvoltermstructure;
 mod optionlet;
+mod sabr;
 mod swaption;
 mod volatilitytype;
 
@@ -50,6 +51,7 @@ pub use optionlet::{
     ConstantOptionletVolatility, OptionletStripper, OptionletStripper1, OptionletStripperCaches,
     OptionletVolatilityStructure, StrippedOptionletAdapter, StrippedOptionletBase,
 };
+pub use sabr::{sabr_volatility, unsafe_sabr_volatility, validate_sabr_parameters};
 pub use swaption::{
     ConstantSwaptionVolatility, SwaptionVolatilityDiscrete, SwaptionVolatilityMatrix,
     SwaptionVolatilityStructure,
