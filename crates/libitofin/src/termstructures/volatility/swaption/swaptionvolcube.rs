@@ -379,10 +379,13 @@ impl SwaptionVolatilityCube {
     }
 }
 
-/// These tests pin the cube framework's construction guards and provide the
-/// fixtures the rest of the suite builds on: a flat ATM surface, the long
-/// (5Y, annual, exogenous-discount) and short (1Y, semiannual, plain) base swap
-/// indexes, and the cube builder.
+/// These tests pin the cube framework standalone; the ATM-recovery oracle
+/// (`testAtmVols`) needs a concrete smile and folds into #595. They cover:
+/// `atm_strike`'s branch selection and convention plumbing against
+/// independently built swap indexes (long-and-exogenous vs short-and-plain, two
+/// of the four C++ branches - the two remaining exogenous/plain mirrors are
+/// deferred with #596's calibration tests), the four construction guards, and
+/// the smile-hook routing through a minimal stub concrete.
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -393,6 +396,7 @@ mod tests {
     use crate::patterns::observable::AsObservable;
     use crate::quotes::make_quote_handle;
     use crate::shared::shared;
+    use crate::termstructures::volatility::FlatSmileSection;
     use crate::termstructures::yields::FlatForward;
     use crate::termstructures::yieldtermstructure::YieldTermStructure;
     use crate::termstructures::{TermStructure, volatility::VolatilityTermStructure};
@@ -408,6 +412,10 @@ mod tests {
 
     fn today() -> Date {
         Date::new(15, Month::June, 2026)
+    }
+
+    fn option_date() -> Date {
+        Date::new(15, Month::June, 2027)
     }
 
     /// A flat swaption vol surface standing in for the ATM matrix: the cube reads
@@ -523,6 +531,8 @@ mod tests {
 
     struct Parts {
         settings: Shared<Settings<Date>>,
+        euribor6m: Shared<IborIndex>,
+        discount: Handle<dyn YieldTermStructure>,
         long: Shared<SwapIndex>,
         short: Shared<SwapIndex>,
     }
@@ -538,6 +548,8 @@ mod tests {
         let short = shared(short_index(&euribor6m, &settings));
         Parts {
             settings,
+            euribor6m,
+            discount,
             long,
             short,
         }
@@ -585,6 +597,83 @@ mod tests {
         )
     }
 
+    fn valid_cube(p: &Parts) -> SwaptionVolatilityCube {
+        build_cube(p, vec![-0.01, 0.0, 0.01], vol_spreads(4, 3)).unwrap()
+    }
+
+    #[test]
+    fn atm_strike_long_branch_uses_the_long_base_conventions() {
+        let p = parts();
+        let cube = valid_cube(&p);
+        let swap_tenor = Period::new(2, TimeUnit::Years);
+
+        let mut expected_index = long_index(&p.euribor6m, &p.discount, &p.settings);
+        expected_index = SwapIndex::with_exogenous_discount(
+            "LongSwap".into(),
+            swap_tenor,
+            2,
+            Currency::eur(),
+            Target::new(),
+            Period::new(1, TimeUnit::Years),
+            BDC,
+            Thirty360::with_convention(Convention::BondBasis),
+            expected_index.ibor_index(),
+            p.discount.clone(),
+            Shared::clone(&p.settings),
+        );
+        let expected = expected_index.fixing(option_date(), false).unwrap();
+
+        let got = cube.atm_strike(option_date(), swap_tenor).unwrap();
+        assert!(
+            (got - expected).abs() < 1e-14,
+            "long-branch atm strike {got} vs independently built {expected}"
+        );
+        assert!(got > 0.0, "a positive swap rate off a 5% forwarding curve");
+    }
+
+    #[test]
+    fn atm_strike_short_branch_uses_the_short_base_conventions() {
+        let p = parts();
+        let cube = valid_cube(&p);
+        let swap_tenor = Period::new(1, TimeUnit::Years);
+
+        let expected_index = SwapIndex::new(
+            "ShortSwap".into(),
+            swap_tenor,
+            2,
+            Currency::eur(),
+            Target::new(),
+            Period::new(6, TimeUnit::Months),
+            BDC,
+            Thirty360::with_convention(Convention::BondBasis),
+            Shared::clone(&p.euribor6m),
+            Shared::clone(&p.settings),
+        );
+        let expected = expected_index.fixing(option_date(), false).unwrap();
+
+        let got = cube.atm_strike(option_date(), swap_tenor).unwrap();
+        assert!(
+            (got - expected).abs() < 1e-14,
+            "short-branch atm strike {got} vs independently built {expected}"
+        );
+    }
+
+    #[test]
+    fn atm_strike_branches_differ_by_base() {
+        let p = parts();
+        let cube = valid_cube(&p);
+        let long_branch = cube
+            .atm_strike(option_date(), Period::new(2, TimeUnit::Years))
+            .unwrap();
+        let short_branch = cube
+            .atm_strike(option_date(), Period::new(1, TimeUnit::Years))
+            .unwrap();
+        assert!(
+            (long_branch - short_branch).abs() > 1e-6,
+            "the two bases must produce distinct rates, got {long_branch} and {short_branch}"
+        );
+    }
+
     #[test]
     fn too_few_strikes_is_rejected() {
         let p = parts();
@@ -628,5 +717,98 @@ mod tests {
             swapped.is_err(),
             "short (5Y) longer than long (1Y) must be rejected"
         );
+    }
+
+    /// A minimal concrete cube supplying the smile hook, proving
+    /// `volatility_impl` routes through `cube_volatility_impl` into the smile
+    /// section's `volatility`.
+    struct StubCube {
+        cube: SwaptionVolatilityCube,
+        flat_vol: Volatility,
+    }
+
+    impl SwaptionCubeSmileSection for StubCube {
+        fn smile_section_impl(
+            &self,
+            option_time: Time,
+            swap_length: Time,
+        ) -> QlResult<Shared<dyn SmileSection>> {
+            let _ = swap_length;
+            let section = FlatSmileSection::with_exercise_time(
+                option_time,
+                self.flat_vol,
+                Actual365Fixed::new(),
+                Some(0.03),
+                VolatilityType::ShiftedLognormal,
+                0.0,
+            )?;
+            Ok(shared(section) as Shared<dyn SmileSection>)
+        }
+    }
+
+    impl AsObservable for StubCube {
+        fn observable(&self) -> &Observable {
+            self.cube.observable()
+        }
+    }
+
+    impl TermStructure for StubCube {
+        fn base(&self) -> &TermStructureBase {
+            self.cube.base()
+        }
+        fn max_date(&self) -> Date {
+            self.cube
+                .atm_vol()
+                .current_link()
+                .map(|a| a.max_date())
+                .unwrap_or_else(|_| Date::max_date())
+        }
+    }
+
+    impl VolatilityTermStructure for StubCube {
+        fn business_day_convention(&self) -> BusinessDayConvention {
+            self.cube.business_day_convention()
+        }
+        fn min_strike(&self) -> Rate {
+            Rate::MIN
+        }
+        fn max_strike(&self) -> Rate {
+            Rate::MAX
+        }
+    }
+
+    impl SwaptionVolatilityStructure for StubCube {
+        fn volatility_impl(
+            &self,
+            option_time: Time,
+            swap_length: Time,
+            strike: Rate,
+        ) -> QlResult<Volatility> {
+            self.cube_volatility_impl(option_time, swap_length, strike)
+        }
+        fn max_swap_tenor(&self) -> Period {
+            Period::new(100, TimeUnit::Years)
+        }
+        fn volatility_type(&self) -> VolatilityType {
+            self.cube
+                .volatility_type()
+                .unwrap_or(VolatilityType::ShiftedLognormal)
+        }
+    }
+
+    #[test]
+    fn volatility_impl_routes_through_the_smile_hook() {
+        let p = parts();
+        let stub = StubCube {
+            cube: valid_cube(&p),
+            flat_vol: 0.17,
+        };
+        for strike in [0.01, 0.03, 0.08] {
+            let got = stub.volatility_impl(1.0, 5.0, strike).unwrap();
+            assert!(
+                (got - 0.17).abs() < 1e-15,
+                "routing must return the flat smile vol at strike {strike}, got {got}"
+            );
+        }
     }
 }
