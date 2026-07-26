@@ -343,3 +343,346 @@ impl SwaptionVolatilityStructure for InterpolatedSwaptionVolatilityCube {
             .shift_time(option_time, swap_length, false)
     }
 }
+
+/// These tests mirror the two `swaptionvolatilitycube.cpp` cases the review gate
+/// cites for the interpolated cube: `testAtmVols` (:194-211, `makeAtmVolTest`,
+/// tolerance 1e-16) and `testSmile` (:214-231, `makeVolSpreadsTest`, tolerance
+/// 1e-16). Both reuse the `swaptionvolstructuresutilities.hpp` `AtmVolatility`
+/// 6x4 matrix (transcribed in [`SwaptionVolatilityMatrix`]'s tests) and the
+/// `VolatilityCube` 3x3x5 strike/vol-spread grid, plus two hand-built
+/// `EuriborSwapIsdaFixA`-convention swap indexes (long 2Y over 6M Euribor, short
+/// 1Y over 3M Euribor). A third arm pins the RefCell rebuild and observer chain
+/// end-to-end by bumping one vol-spread quote, and a reference-date assertion
+/// pins the #594 anchoring-agreement case (both cube and ATM surface settlement-0
+/// moving off the same `Settings`).
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::currency::Currency;
+    use crate::indexes::Euribor;
+    use crate::interestrate::Compounding;
+    use crate::quotes::SimpleQuote;
+    use crate::shared::shared;
+    use crate::termstructures::volatility::SwaptionVolatilityMatrix;
+    use crate::termstructures::yields::FlatForward;
+    use crate::termstructures::yieldtermstructure::YieldTermStructure;
+    use crate::time::calendars::target::Target;
+    use crate::time::date::Month;
+    use crate::time::daycounters::actual365fixed::Actual365Fixed;
+    use crate::time::daycounters::thirty360::{Convention, Thirty360};
+    use crate::time::frequency::Frequency;
+
+    const BDC: BusinessDayConvention = BusinessDayConvention::ModifiedFollowing;
+    const TOL: Real = 1e-16;
+
+    fn today() -> Date {
+        Date::new(15, Month::June, 2026)
+    }
+
+    fn settings_today() -> Shared<Settings<Date>> {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(today());
+        settings
+    }
+
+    fn flat_curve() -> Handle<dyn YieldTermStructure> {
+        Handle::new(shared(FlatForward::with_rate(
+            today(),
+            0.05,
+            Actual365Fixed::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>)
+    }
+
+    fn atm_option_tenors() -> Vec<Period> {
+        vec![
+            Period::new(1, TimeUnit::Months),
+            Period::new(6, TimeUnit::Months),
+            Period::new(1, TimeUnit::Years),
+            Period::new(5, TimeUnit::Years),
+            Period::new(10, TimeUnit::Years),
+            Period::new(30, TimeUnit::Years),
+        ]
+    }
+
+    fn atm_swap_tenors() -> Vec<Period> {
+        vec![
+            Period::new(1, TimeUnit::Years),
+            Period::new(5, TimeUnit::Years),
+            Period::new(10, TimeUnit::Years),
+            Period::new(30, TimeUnit::Years),
+        ]
+    }
+
+    /// The `AtmVolatility` 6x4 matrix (swaptionvolstructuresutilities.hpp:70-75).
+    fn atm_vols() -> Vec<Vec<Real>> {
+        vec![
+            vec![0.1300, 0.1560, 0.1390, 0.1220],
+            vec![0.1440, 0.1580, 0.1460, 0.1260],
+            vec![0.1600, 0.1590, 0.1470, 0.1290],
+            vec![0.1640, 0.1470, 0.1370, 0.1220],
+            vec![0.1400, 0.1300, 0.1250, 0.1100],
+            vec![0.1130, 0.1090, 0.1070, 0.0930],
+        ]
+    }
+
+    fn cube_option_tenors() -> Vec<Period> {
+        vec![
+            Period::new(1, TimeUnit::Years),
+            Period::new(10, TimeUnit::Years),
+            Period::new(30, TimeUnit::Years),
+        ]
+    }
+
+    fn cube_swap_tenors() -> Vec<Period> {
+        vec![
+            Period::new(2, TimeUnit::Years),
+            Period::new(10, TimeUnit::Years),
+            Period::new(30, TimeUnit::Years),
+        ]
+    }
+
+    fn strike_spreads() -> Vec<Real> {
+        vec![-0.020, -0.005, 0.000, 0.005, 0.020]
+    }
+
+    /// The `VolatilityCube` 9x5 spread grid (swaptionvolstructuresutilities.hpp:108-134),
+    /// row-major over the `(option tenor, swap tenor)` nodes.
+    fn vol_spreads() -> Vec<Vec<Real>> {
+        vec![
+            vec![0.0599, 0.0049, 0.0000, -0.0001, 0.0127],
+            vec![0.0729, 0.0086, 0.0000, -0.0024, 0.0098],
+            vec![0.0738, 0.0102, 0.0000, -0.0039, 0.0065],
+            vec![0.0465, 0.0063, 0.0000, -0.0032, -0.0010],
+            vec![0.0558, 0.0084, 0.0000, -0.0050, -0.0057],
+            vec![0.0576, 0.0083, 0.0000, -0.0043, -0.0014],
+            vec![0.0437, 0.0059, 0.0000, -0.0030, -0.0006],
+            vec![0.0533, 0.0078, 0.0000, -0.0045, -0.0046],
+            vec![0.0545, 0.0079, 0.0000, -0.0042, -0.0020],
+        ]
+    }
+
+    fn atm_matrix(settings: &Shared<Settings<Date>>) -> Shared<SwaptionVolatilityMatrix> {
+        let handles: Vec<Vec<Handle<dyn Quote>>> = atm_vols()
+            .iter()
+            .map(|row| {
+                row.iter()
+                    .map(|&v| Handle::new(shared(SimpleQuote::new(v)) as Shared<dyn Quote>))
+                    .collect()
+            })
+            .collect();
+        shared(
+            SwaptionVolatilityMatrix::moving(
+                Target::new(),
+                BDC,
+                atm_option_tenors(),
+                atm_swap_tenors(),
+                handles,
+                Actual365Fixed::new(),
+                VolatilityType::ShiftedLognormal,
+                Vec::new(),
+                Shared::clone(settings),
+            )
+            .unwrap(),
+        )
+    }
+
+    /// The long base index: `EuriborSwapIsdaFixA(2Y)` conventions (2Y over 6M
+    /// Euribor, annual 30/360 fixed leg) hand-built rather than porting the named
+    /// family.
+    fn long_base(
+        curve: &Handle<dyn YieldTermStructure>,
+        settings: &Shared<Settings<Date>>,
+    ) -> Shared<SwapIndex> {
+        let euribor6m = shared(Euribor::six_months(curve.clone(), Shared::clone(settings)));
+        shared(SwapIndex::new(
+            "EuriborSwapIsdaFixA".into(),
+            Period::new(2, TimeUnit::Years),
+            2,
+            Currency::eur(),
+            Target::new(),
+            Period::new(1, TimeUnit::Years),
+            BDC,
+            Thirty360::with_convention(Convention::BondBasis),
+            euribor6m,
+            Shared::clone(settings),
+        ))
+    }
+
+    /// The short base index: `EuriborSwapIsdaFixA(1Y)` conventions (1Y over 3M
+    /// Euribor).
+    fn short_base(
+        curve: &Handle<dyn YieldTermStructure>,
+        settings: &Shared<Settings<Date>>,
+    ) -> Shared<SwapIndex> {
+        let euribor3m = shared(Euribor::three_months(
+            curve.clone(),
+            Shared::clone(settings),
+        ));
+        shared(SwapIndex::new(
+            "EuriborSwapIsdaFixA".into(),
+            Period::new(1, TimeUnit::Years),
+            2,
+            Currency::eur(),
+            Target::new(),
+            Period::new(1, TimeUnit::Years),
+            BDC,
+            Thirty360::with_convention(Convention::BondBasis),
+            euribor3m,
+            Shared::clone(settings),
+        ))
+    }
+
+    struct Fixture {
+        atm: Shared<SwaptionVolatilityMatrix>,
+        cube: InterpolatedSwaptionVolatilityCube,
+        spread_quotes: Vec<Vec<Shared<SimpleQuote>>>,
+    }
+
+    fn fixture() -> Fixture {
+        let settings = settings_today();
+        let curve = flat_curve();
+        let atm = atm_matrix(&settings);
+        let atm_handle =
+            Handle::new(Shared::clone(&atm) as Shared<dyn SwaptionVolatilityStructure>);
+
+        let spread_quotes: Vec<Vec<Shared<SimpleQuote>>> = vol_spreads()
+            .iter()
+            .map(|row| row.iter().map(|&v| shared(SimpleQuote::new(v))).collect())
+            .collect();
+        let spread_handles: Vec<Vec<Handle<dyn Quote>>> = spread_quotes
+            .iter()
+            .map(|row| {
+                row.iter()
+                    .map(|q| Handle::new(Shared::clone(q) as Shared<dyn Quote>))
+                    .collect()
+            })
+            .collect();
+
+        let cube = InterpolatedSwaptionVolatilityCube::new(
+            atm_handle,
+            cube_option_tenors(),
+            cube_swap_tenors(),
+            strike_spreads(),
+            spread_handles,
+            long_base(&curve, &settings),
+            short_base(&curve, &settings),
+            false,
+            settings,
+        )
+        .unwrap();
+
+        Fixture {
+            atm,
+            cube,
+            spread_quotes,
+        }
+    }
+
+    #[test]
+    fn cube_reference_matches_the_atm_surface_reference() {
+        let f = fixture();
+        assert_eq!(
+            f.cube.reference_date().unwrap(),
+            f.atm.reference_date().unwrap(),
+            "settlement-0 moving cube and ATM surface must share a reference date"
+        );
+    }
+
+    #[test]
+    fn recovers_atm_vols_at_spread_zero() {
+        let f = fixture();
+        for &option in &cube_option_tenors() {
+            for &swap in &cube_swap_tenors() {
+                let strike = f.cube.cube().atm_strike_from_tenor(option, swap).unwrap();
+                let exp_vol = f.atm.volatility_tenors(option, swap, strike, true).unwrap();
+                let act_vol = f
+                    .cube
+                    .volatility_tenors(option, swap, strike, true)
+                    .unwrap();
+                assert!(
+                    (exp_vol - act_vol).abs() <= TOL,
+                    "atm recovery failed at ({option}, {swap}): exp {exp_vol}, act {act_vol}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn recovers_input_vol_spreads_at_the_smile_nodes() {
+        let f = fixture();
+        let options = cube_option_tenors();
+        let swaps = cube_swap_tenors();
+        let spreads = strike_spreads();
+        let inputs = vol_spreads();
+        for (i, &option) in options.iter().enumerate() {
+            for (j, &swap) in swaps.iter().enumerate() {
+                let atm_strike = f.cube.cube().atm_strike_from_tenor(option, swap).unwrap();
+                let atm_vol = f
+                    .atm
+                    .volatility_tenors(option, swap, atm_strike, true)
+                    .unwrap();
+                for (k, &strike_spread) in spreads.iter().enumerate() {
+                    let vol = f
+                        .cube
+                        .volatility_tenors(option, swap, atm_strike + strike_spread, true)
+                        .unwrap();
+                    let spread = vol - atm_vol;
+                    let expected = inputs[i * swaps.len() + j][k];
+                    assert!(
+                        (expected - spread).abs() <= TOL,
+                        "spread recovery failed at ({option}, {swap}, spread {strike_spread}): \
+                         exp {expected}, got {spread}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn vol_spread_quote_bump_propagates_to_the_smile() {
+        let f = fixture();
+        let option = cube_option_tenors()[1];
+        let swap = cube_swap_tenors()[1];
+        let node = cube_swap_tenors().len() + 1;
+        let strike_spread = strike_spreads()[0];
+
+        let atm_strike = f.cube.cube().atm_strike_from_tenor(option, swap).unwrap();
+        let atm_vol = f
+            .atm
+            .volatility_tenors(option, swap, atm_strike, true)
+            .unwrap();
+        let before = f
+            .cube
+            .volatility_tenors(option, swap, atm_strike + strike_spread, true)
+            .unwrap()
+            - atm_vol;
+        assert!((before - vol_spreads()[node][0]).abs() <= TOL);
+
+        let bumped = vol_spreads()[node][0] + 0.0100;
+        f.spread_quotes[node][0].set_value(bumped);
+
+        let after = f
+            .cube
+            .volatility_tenors(option, swap, atm_strike + strike_spread, true)
+            .unwrap()
+            - atm_vol;
+        assert!(
+            (after - bumped).abs() <= TOL,
+            "bumped node spread must propagate: exp {bumped}, got {after}"
+        );
+
+        let neighbor_spread = strike_spreads()[3];
+        let neighbor = f
+            .cube
+            .volatility_tenors(option, swap, atm_strike + neighbor_spread, true)
+            .unwrap()
+            - atm_vol;
+        assert!(
+            (neighbor - vol_spreads()[node][3]).abs() <= TOL,
+            "untouched strike must be unchanged, got {neighbor}"
+        );
+    }
+}
