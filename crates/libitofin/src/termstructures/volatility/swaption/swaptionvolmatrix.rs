@@ -506,6 +506,15 @@ impl SwaptionVolatilityStructure for SwaptionVolatilityMatrix {
         self.calculate()?;
         self.interp.borrow().shifts.value(swap_length, option_time)
     }
+
+    fn discrete_grid(&self) -> QlResult<super::SwaptionVolatilityGrid> {
+        Ok(super::SwaptionVolatilityGrid {
+            option_times: self.discrete.option_times()?,
+            swap_lengths: self.discrete.swap_lengths()?,
+            option_dates: self.discrete.option_dates()?,
+            swap_tenors: self.discrete.swap_tenors().to_vec(),
+        })
+    }
 }
 
 /// These tests mirror `testSwaptionVolMatrixCoherence`'s node-recovery arm
@@ -640,6 +649,18 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn discrete_grid_delegates_to_the_embedded_discrete() {
+        let settings = settings_at(Date::new(15, Month::June, 2026));
+        let (_quotes, handles) = quote_grid();
+        let surface = moving_surface(handles, settings);
+        let grid = surface.discrete_grid().unwrap();
+        assert_eq!(grid.option_times, surface.discrete.option_times().unwrap());
+        assert_eq!(grid.swap_lengths, surface.discrete.swap_lengths().unwrap());
+        assert_eq!(grid.option_dates, surface.discrete.option_dates().unwrap());
+        assert_eq!(grid.swap_tenors, surface.discrete.swap_tenors());
     }
 
     #[test]

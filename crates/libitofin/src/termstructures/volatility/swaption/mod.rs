@@ -59,6 +59,28 @@ use crate::time::timeunit::TimeUnit;
 use crate::types::{Rate, Real, Time, Volatility};
 use crate::{fail, require};
 
+/// The discrete option/swap grid a grid-backed swaption vol structure exposes.
+///
+/// The SABR cube's dense ATM-calibration fill reads the ATM surface's own
+/// option/swap grid to widen the cube's node set. In QuantLib that grid is read
+/// through `dynamic_pointer_cast<SwaptionVolatilityDiscrete>(*atmVol_)`
+/// (sabrswaptionvolatilitycube.hpp:648-681); Rust `Handle<dyn
+/// SwaptionVolatilityStructure>` has no downcast, so a discrete-backed structure
+/// surfaces its grid through [`SwaptionVolatilityStructure::discrete_grid`]. The
+/// four axes are index-aligned exactly as the C++ base holds them: `option_dates[j]`
+/// is the date whose year fraction is `option_times[j]`, and `swap_tenors[k]` the
+/// tenor whose length is `swap_lengths[k]`.
+pub struct SwaptionVolatilityGrid {
+    /// The option (exercise) times (year fractions from the reference date).
+    pub option_times: Vec<Time>,
+    /// The swap lengths in years.
+    pub swap_lengths: Vec<Time>,
+    /// The option (exercise) dates.
+    pub option_dates: Vec<Date>,
+    /// The swap tenors.
+    pub swap_tenors: Vec<Period>,
+}
+
 /// Swaption volatility structure.
 ///
 /// Mirrors QuantLib's `SwaptionVolatilityStructure`: concrete surfaces implement
@@ -88,6 +110,20 @@ pub trait SwaptionVolatilityStructure: VolatilityTermStructure {
     fn shift_impl(&self, _option_time: Time, _swap_length: Time) -> QlResult<Real> {
         require_lognormal_for_shift(self.volatility_type())?;
         Ok(0.0)
+    }
+
+    /// The structure's own discrete option/swap grid, for a consumer that needs to
+    /// read the node set (the SABR cube's dense ATM-calibration fill). The default
+    /// returns `Err`: only a grid-backed structure (one built on
+    /// [`SwaptionVolatilityDiscrete`], such as [`SwaptionVolatilityMatrix`]) can
+    /// answer. This stands in for QuantLib's
+    /// `dynamic_pointer_cast<SwaptionVolatilityDiscrete>(*atmVol_)`, surfacing an
+    /// `Err` exactly where the C++ cast would null-deref.
+    fn discrete_grid(&self) -> QlResult<SwaptionVolatilityGrid> {
+        fail!(
+            "swaption vol structure is not grid-backed (not a SwaptionVolatilityDiscrete); the \
+             SABR cube dense ATM-calibration fill requires a discrete ATM surface"
+        )
     }
 
     /// The largest swap length (in time) for which the surface can return vols.
@@ -339,6 +375,15 @@ mod tests {
             let _ = (option_time, swap_length);
             Ok(self.shift)
         }
+    }
+
+    #[test]
+    fn discrete_grid_defaults_to_err_for_a_non_grid_structure() {
+        let s = MockSwaptionVol::flat(0.2);
+        assert!(
+            s.discrete_grid().is_err(),
+            "a structure not built on SwaptionVolatilityDiscrete must not answer discrete_grid"
+        );
     }
 
     #[test]
