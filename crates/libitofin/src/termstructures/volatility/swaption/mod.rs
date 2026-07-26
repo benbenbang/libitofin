@@ -32,13 +32,18 @@
 //!   [`shift`](SwaptionVolatilityStructure::shift).
 //! - The constant surface ([`ConstantSwaptionVolatility`]) and the
 //!   bilinear-interpolated at-the-money matrix ([`SwaptionVolatilityMatrix`])
-//!   are ported here. The stripped and cube swaption vol surfaces are deferred.
+//!   are ported here, as is the swaption vol cube framework
+//!   ([`SwaptionVolatilityCube`]); the two concrete cubes it feeds (the
+//!   interpolated cube #595 and the SABR cube #596) and the stripped surface are
+//!   deferred.
 
 mod constantswaptionvol;
+mod swaptionvolcube;
 mod swaptionvoldiscrete;
 mod swaptionvolmatrix;
 
 pub use constantswaptionvol::ConstantSwaptionVolatility;
+pub use swaptionvolcube::{SwaptionCubeSmileSection, SwaptionVolatilityCube};
 pub use swaptionvoldiscrete::SwaptionVolatilityDiscrete;
 pub use swaptionvolmatrix::SwaptionVolatilityMatrix;
 
