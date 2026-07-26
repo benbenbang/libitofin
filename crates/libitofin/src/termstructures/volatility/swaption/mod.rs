@@ -46,6 +46,7 @@ mod swaptionvolmatrix;
 
 pub use constantswaptionvol::ConstantSwaptionVolatility;
 pub use interpolatedswaptionvolcube::InterpolatedSwaptionVolatilityCube;
+pub use sabrvolcube::SabrSwaptionVolatilityCube;
 pub use swaptionvolcube::{SwaptionCubeSmileSection, SwaptionVolatilityCube};
 pub use swaptionvoldiscrete::SwaptionVolatilityDiscrete;
 pub use swaptionvolmatrix::SwaptionVolatilityMatrix;
