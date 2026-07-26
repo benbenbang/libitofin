@@ -599,6 +599,24 @@ mod tests {
         .unwrap()
     }
 
+    fn moving_flat_surface(
+        handles: Vec<Vec<Handle<dyn Quote>>>,
+        settings: Shared<Settings<Date>>,
+    ) -> SwaptionVolatilityMatrix {
+        SwaptionVolatilityMatrix::moving_flat(
+            Target::new(),
+            BDC,
+            option_tenors(),
+            swap_tenors(),
+            handles,
+            Actual365Fixed::new(),
+            VolatilityType::ShiftedLognormal,
+            Vec::new(),
+            settings,
+        )
+        .unwrap()
+    }
+
     fn settings_at(date: Date) -> Shared<Settings<Date>> {
         let settings = shared(Settings::new());
         settings.set_evaluation_date(date);
@@ -747,6 +765,80 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn flat_matrix_recovers_every_node_vol() {
+        let settings = settings_at(Date::new(15, Month::June, 2026));
+        let (_quotes, handles) = quote_grid();
+        let surface = moving_flat_surface(handles, settings);
+        for (i, option_tenor) in option_tenors().into_iter().enumerate() {
+            for (j, swap_tenor) in swap_tenors().into_iter().enumerate() {
+                let got = surface
+                    .volatility_tenors(option_tenor, swap_tenor, 0.0, false)
+                    .unwrap();
+                assert!(
+                    (got - vols()[i][j]).abs() <= TOL,
+                    "node ({i},{j}): got {got}, expected {}",
+                    vols()[i][j]
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn flat_clamps_far_query_to_corner_while_plain_extends() {
+        let settings = settings_at(Date::new(15, Month::June, 2026));
+        let (_qf, handles_flat) = quote_grid();
+        let (_qp, handles_plain) = quote_grid();
+        let flat = moving_flat_surface(handles_flat, Shared::clone(&settings));
+        let plain = moving_surface(handles_plain, settings);
+
+        // Both axes past the grid (max swap length 30y, max option tenor 30y):
+        // the flat matrix clamps to the (max swap, max option) corner node,
+        // which is vols[5][3] = 0.0930.
+        let far_option_time = 60.0;
+        let far_swap_length = 50.0;
+        let corner = vols()[5][3];
+
+        let flat_vol = flat
+            .volatility_time(far_option_time, far_swap_length, 0.0, true)
+            .unwrap();
+        assert!(
+            (flat_vol - corner).abs() <= TOL,
+            "flat far query {flat_vol} must equal corner node {corner}"
+        );
+
+        let plain_vol = plain
+            .volatility_time(far_option_time, far_swap_length, 0.0, true)
+            .unwrap();
+        assert!(
+            (plain_vol - flat_vol).abs() > 1e-6,
+            "plain bilinear must extend past the corner (got {plain_vol}), not clamp like flat ({flat_vol})"
+        );
+    }
+
+    #[test]
+    fn flat_matrix_quote_bump_re_wraps_and_refreshes() {
+        let settings = settings_at(Date::new(15, Month::June, 2026));
+        let (quotes, handles) = quote_grid();
+        let surface = moving_flat_surface(handles, settings);
+
+        let far_option_time = 60.0;
+        let far_swap_length = 50.0;
+        let before = surface
+            .volatility_time(far_option_time, far_swap_length, 0.0, true)
+            .unwrap();
+        assert!((before - vols()[5][3]).abs() <= TOL);
+
+        quotes[5][3].set_value(0.2500);
+        let after = surface
+            .volatility_time(far_option_time, far_swap_length, 0.0, true)
+            .unwrap();
+        assert!(
+            (after - 0.2500).abs() <= TOL,
+            "flat far query must serve the bumped corner vol after rebuild, got {after}"
+        );
     }
 
     #[test]
