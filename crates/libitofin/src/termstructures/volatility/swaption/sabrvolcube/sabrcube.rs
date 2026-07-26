@@ -49,13 +49,14 @@
 //! - `sabrCalibrationSection` and `recalibration` (the dense/section-recalibration
 //!   API) are not ported; they defer with the dense arm.
 #![allow(dead_code)]
-#![allow(unused_imports)]
 
 use std::cell::RefCell;
 
 use crate::errors::QlResult;
 use crate::handle::Handle;
-use crate::math::optimization::endcriteria::EndCriteria;
+use crate::math::interpolations::sabrinterpolation::SABRInterpolation;
+use crate::math::matrix::Matrix;
+use crate::math::optimization::endcriteria::{EndCriteria, EndCriteriaType};
 use crate::math::optimization::levenbergmarquardt::LevenbergMarquardt;
 use crate::math::optimization::method::OptimizationMethod;
 use crate::patterns::lazyobject::LazyObject;
@@ -312,7 +313,239 @@ impl SabrSwaptionVolatilityCube {
             n_options,
             n_swaps,
         )?;
+
+        let market = self.build_market_vol_cube(n_options, n_swaps)?;
+        let sparse = self.sabr_calibration(&market)?;
+        *self.market_vol_cube.borrow_mut() = market;
+        *self.sparse_parameters.borrow_mut() = sparse;
+
+        if self.is_atm_calibrated {
+            fail!(
+                "SABR cube ATM-calibrated (dense) arm - fillVolatilityCube + denseParameters - is \
+                 not yet ported; deferred to #603"
+            );
+        }
         Ok(())
+    }
+
+    /// Assembles `marketVolCube_` (hpp:370-386): one layer per strike spread,
+    /// each node the ATM vol plus that strike's vol-spread quote.
+    #[allow(clippy::needless_range_loop)]
+    fn build_market_vol_cube(&self, n_options: usize, n_swaps: usize) -> QlResult<Cube> {
+        let atm = self.cube.atm_vol().current_link()?;
+        let strike_spreads = self.cube.strike_spreads();
+        let n_strikes = strike_spreads.len();
+        let (dates, tenors, times, lengths) = cube_grid(&self.cube)?;
+        let mut market = Cube::new(
+            dates.clone(),
+            tenors.clone(),
+            times,
+            lengths.clone(),
+            n_strikes,
+            true,
+            self.backward_flat,
+        )?;
+        for j in 0..n_options {
+            for k in 0..n_swaps {
+                let atm_forward = self.cube.atm_strike(dates[j], tenors[k])?;
+                let atm_vol = atm.volatility(dates[j], lengths[k], atm_forward, false)?;
+                for i in 0..n_strikes {
+                    let spread = self.cube.vol_spreads()[j * n_swaps + k][i]
+                        .current_link()?
+                        .value()?;
+                    market.set_element(i, j, k, atm_vol + spread)?;
+                }
+            }
+        }
+        market.update_interpolators()?;
+        Ok(market)
+    }
+
+    /// The sparse per-node SABR calibration (`sabrCalibration`, hpp:411-535).
+    /// For each `(option, swap)` node it fits the four SABR parameters to the
+    /// node's `(atmForward + spread, marketVol)` smile with
+    /// [`SABRInterpolation`], honouring the per-node guess, the fixed flags and
+    /// vega weighting, and fails loudly (mapping C++'s `QL_ENSURE`s to `Err`)
+    /// when a node hits `MaxIterations` or exceeds the error tolerance.
+    ///
+    /// The returned [`Cube`] carries eight layers: the four parameters
+    /// (alpha, beta, nu, rho), then the forward, rms error, max error and an
+    /// end-criteria code (hpp:515-531).
+    ///
+    /// A non-zero ATM shift returns `Err` naming #586 (displaced SABR).
+    #[allow(clippy::needless_range_loop)]
+    fn sabr_calibration(&self, market: &Cube) -> QlResult<Cube> {
+        let option_times = market.option_times().to_vec();
+        let swap_lengths = market.swap_lengths().to_vec();
+        let option_dates = market.option_dates().to_vec();
+        let swap_tenors = market.swap_tenors().to_vec();
+        let n_options = option_times.len();
+        let n_swaps = swap_lengths.len();
+        let strike_spreads = self.cube.strike_spreads();
+        let n_strikes = strike_spreads.len();
+        let vega_weighted = self.cube.vega_weighted_smile_fit();
+        let atm = self.cube.atm_vol().current_link()?;
+        let guess = self.parameters_guess.borrow();
+        let mut method = self.opt_method.borrow_mut();
+
+        let n_layers = N_SABR_PARAMS + N_METADATA_LAYERS;
+        let mut layers: Vec<Matrix> = (0..n_layers)
+            .map(|_| Matrix::with_size(n_options, n_swaps))
+            .collect();
+
+        for j in 0..n_options {
+            for k in 0..n_swaps {
+                let atm_forward = self.cube.atm_strike(option_dates[j], swap_tenors[k])?;
+                let shift = atm.shift_time(option_times[j], swap_lengths[k], false)?;
+                if shift != 0.0 {
+                    fail!(
+                        "SABR cube with non-zero ATM shift ({shift}) - displaced SABR - is not yet \
+                         ported; deferred to #586"
+                    );
+                }
+
+                let mut strikes = Vec::with_capacity(n_strikes);
+                let mut vols = Vec::with_capacity(n_strikes);
+                for i in 0..n_strikes {
+                    let strike = atm_forward + strike_spreads[i];
+                    if strike + shift >= self.cutoff_strike {
+                        strikes.push(strike);
+                        vols.push(market.points()[i][(j, k)]);
+                    }
+                }
+
+                let node_guess = guess.value(option_times[j], swap_lengths[k])?;
+                let mut interp = SABRInterpolation::new(
+                    strikes,
+                    vols,
+                    option_times[j],
+                    atm_forward,
+                    node_guess[0],
+                    node_guess[1],
+                    node_guess[2],
+                    node_guess[3],
+                    self.is_parameter_fixed[0],
+                    self.is_parameter_fixed[1],
+                    self.is_parameter_fixed[2],
+                    self.is_parameter_fixed[3],
+                    vega_weighted,
+                    self.end_criteria,
+                    self.error_accept,
+                    self.max_guesses,
+                    self.volatility_type,
+                )?;
+                interp.update(&mut **method)?;
+
+                if interp.end_criteria() == EndCriteriaType::MaxIterations {
+                    fail!(
+                        "global swaptions calibration failed: MaxIterations reached at option \
+                         maturity {}, swap tenor {} (rms error {}, max error {})",
+                        option_dates[j],
+                        swap_tenors[k],
+                        interp.rms_error(),
+                        interp.max_error()
+                    );
+                }
+                let error_metric = if self.use_max_error {
+                    interp.max_error()
+                } else {
+                    interp.rms_error()
+                };
+                if error_metric >= self.max_error_tolerance {
+                    fail!(
+                        "global swaptions calibration failed: error tolerance {} exceeded at \
+                         option maturity {}, swap tenor {} (rms error {}, max error {})",
+                        self.max_error_tolerance,
+                        option_dates[j],
+                        swap_tenors[k],
+                        interp.rms_error(),
+                        interp.max_error()
+                    );
+                }
+
+                layers[0][(j, k)] = interp.alpha();
+                layers[1][(j, k)] = interp.beta();
+                layers[2][(j, k)] = interp.nu();
+                layers[3][(j, k)] = interp.rho();
+                layers[4][(j, k)] = atm_forward;
+                layers[5][(j, k)] = interp.rms_error();
+                layers[6][(j, k)] = interp.max_error();
+                layers[7][(j, k)] = end_criteria_code(interp.end_criteria());
+            }
+        }
+        drop(guess);
+        drop(method);
+
+        let mut sparse = Cube::new(
+            option_dates,
+            swap_tenors,
+            option_times,
+            swap_lengths,
+            n_layers,
+            true,
+            self.backward_flat,
+        )?;
+        for (layer, matrix) in layers.into_iter().enumerate() {
+            sparse.set_layer(layer, matrix)?;
+        }
+        sparse.update_interpolators()?;
+        Ok(sparse)
+    }
+
+    /// The interpolated guess parameters `[alpha, beta, nu, rho]` at
+    /// `(option_time, swap_length)` (recomputed after any quote bump). At a grid
+    /// node it returns that node's guess exactly.
+    ///
+    /// # Errors
+    ///
+    /// Propagates the lazy recomputation.
+    pub fn parameters_guess_value(
+        &self,
+        option_time: Time,
+        swap_length: Time,
+    ) -> QlResult<Vec<Real>> {
+        self.calculate()?;
+        self.parameters_guess
+            .borrow()
+            .value(option_time, swap_length)
+    }
+
+    /// The calibrated sparse SABR parameters at `(option_time, swap_length)`:
+    /// `[alpha, beta, nu, rho, forward, rms_error, max_error, end_criteria]`
+    /// (the layers of `sparseParameters_`). At a grid node it returns that node's
+    /// fitted values exactly.
+    ///
+    /// # Errors
+    ///
+    /// Propagates the calibration (including the #586/#603 deferrals).
+    pub fn sparse_parameter_values(
+        &self,
+        option_time: Time,
+        swap_length: Time,
+    ) -> QlResult<Vec<Real>> {
+        self.calculate()?;
+        self.sparse_parameters
+            .borrow()
+            .value(option_time, swap_length)
+    }
+}
+
+/// Maps an [`EndCriteriaType`] to the numeric code stored in the sparse cube's
+/// end-criteria layer, matching the Rust variant order (the analogue of C++'s
+/// `Integer(EndCriteria::Type)`; the Rust enum has an extra variant so codes >= 6
+/// need not coincide). Cosmetic in this ticket's scope: the fail-loud checks read
+/// the enum directly, and the consumers #603/#604 read the parameter and forward
+/// layers.
+fn end_criteria_code(criteria: EndCriteriaType) -> Real {
+    match criteria {
+        EndCriteriaType::None => 0.0,
+        EndCriteriaType::MaxIterations => 1.0,
+        EndCriteriaType::StationaryPoint => 2.0,
+        EndCriteriaType::StationaryFunctionValue => 3.0,
+        EndCriteriaType::StationaryFunctionAccuracy => 4.0,
+        EndCriteriaType::ZeroGradientNorm => 5.0,
+        EndCriteriaType::FunctionEpsilonTooSmall => 6.0,
+        EndCriteriaType::Unknown => 7.0,
     }
 }
 
@@ -374,4 +607,87 @@ fn zero_cube(
 ) -> QlResult<Cube> {
     let (dates, tenors, times, lengths) = cube_grid(cube)?;
     Cube::new(dates, tenors, times, lengths, n_layers, true, backward_flat)
+}
+
+impl SwaptionCubeSmileSection for SabrSwaptionVolatilityCube {
+    fn smile_section_impl(
+        &self,
+        _option_time: Time,
+        _swap_length: Time,
+    ) -> QlResult<Shared<dyn SmileSection>> {
+        fail!(
+            "SABR cube smile section (SabrSmileSection bridge) is not yet ported; deferred to #604"
+        )
+    }
+}
+
+impl AsObservable for SabrSwaptionVolatilityCube {
+    fn observable(&self) -> &Observable {
+        self.cube.observable()
+    }
+}
+
+impl TermStructure for SabrSwaptionVolatilityCube {
+    fn base(&self) -> &TermStructureBase {
+        self.cube.base()
+    }
+
+    fn max_date(&self) -> Date {
+        self.cube
+            .atm_vol()
+            .current_link()
+            .map(|atm| atm.max_date())
+            .unwrap_or_else(|_| Date::max_date())
+    }
+}
+
+impl VolatilityTermStructure for SabrSwaptionVolatilityCube {
+    fn business_day_convention(&self) -> BusinessDayConvention {
+        self.cube.business_day_convention()
+    }
+
+    fn min_strike(&self) -> Rate {
+        Rate::MIN
+    }
+
+    fn max_strike(&self) -> Rate {
+        Rate::MAX
+    }
+}
+
+impl SwaptionVolatilityStructure for SabrSwaptionVolatilityCube {
+    fn volatility_impl(
+        &self,
+        option_time: Time,
+        swap_length: Time,
+        strike: Rate,
+    ) -> QlResult<Volatility> {
+        self.cube_volatility_impl(option_time, swap_length, strike)
+    }
+
+    fn max_swap_tenor(&self) -> Period {
+        self.cube
+            .atm_vol()
+            .current_link()
+            .map(|atm| atm.max_swap_tenor())
+            .unwrap_or_else(|_| {
+                self.cube
+                    .discrete()
+                    .swap_tenors()
+                    .last()
+                    .copied()
+                    .expect("swap tenors are non-empty by construction")
+            })
+    }
+
+    fn volatility_type(&self) -> VolatilityType {
+        self.volatility_type
+    }
+
+    fn shift_impl(&self, option_time: Time, swap_length: Time) -> QlResult<Real> {
+        self.cube
+            .atm_vol()
+            .current_link()?
+            .shift_time(option_time, swap_length, false)
+    }
 }
