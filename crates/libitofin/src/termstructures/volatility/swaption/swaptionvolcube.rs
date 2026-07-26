@@ -378,3 +378,255 @@ impl SwaptionVolatilityCube {
         self.atm_strike(option_date, swap_tenor)
     }
 }
+
+/// These tests pin the cube framework's construction guards and provide the
+/// fixtures the rest of the suite builds on: a flat ATM surface, the long
+/// (5Y, annual, exogenous-discount) and short (1Y, semiannual, plain) base swap
+/// indexes, and the cube builder.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::currency::Currency;
+    use crate::indexes::{Euribor, IborIndex};
+    use crate::interestrate::Compounding;
+    use crate::patterns::observable::AsObservable;
+    use crate::quotes::make_quote_handle;
+    use crate::shared::shared;
+    use crate::termstructures::yields::FlatForward;
+    use crate::termstructures::yieldtermstructure::YieldTermStructure;
+    use crate::termstructures::{TermStructure, volatility::VolatilityTermStructure};
+    use crate::time::calendars::target::Target;
+    use crate::time::date::Month;
+    use crate::time::daycounters::actual360::Actual360;
+    use crate::time::daycounters::actual365fixed::Actual365Fixed;
+    use crate::time::daycounters::thirty360::{Convention, Thirty360};
+    use crate::time::frequency::Frequency;
+    use crate::time::timeunit::TimeUnit;
+
+    const BDC: BusinessDayConvention = BusinessDayConvention::ModifiedFollowing;
+
+    fn today() -> Date {
+        Date::new(15, Month::June, 2026)
+    }
+
+    /// A flat swaption vol surface standing in for the ATM matrix: the cube reads
+    /// its calendar, business-day convention and day counter and enables its
+    /// extrapolation. Its own reference date is unused by the cube's grid, which
+    /// is moving off `Settings`.
+    struct MockAtmVol {
+        base: TermStructureBase,
+        vol: Volatility,
+    }
+
+    impl AsObservable for MockAtmVol {
+        fn observable(&self) -> &Observable {
+            self.base.observable()
+        }
+    }
+
+    impl TermStructure for MockAtmVol {
+        fn base(&self) -> &TermStructureBase {
+            &self.base
+        }
+        fn max_date(&self) -> Date {
+            Date::max_date()
+        }
+    }
+
+    impl VolatilityTermStructure for MockAtmVol {
+        fn business_day_convention(&self) -> BusinessDayConvention {
+            BDC
+        }
+        fn min_strike(&self) -> Rate {
+            Rate::MIN
+        }
+        fn max_strike(&self) -> Rate {
+            Rate::MAX
+        }
+    }
+
+    impl SwaptionVolatilityStructure for MockAtmVol {
+        fn volatility_impl(&self, _t: Time, _l: Time, _strike: Rate) -> QlResult<Volatility> {
+            Ok(self.vol)
+        }
+        fn max_swap_tenor(&self) -> Period {
+            Period::new(100, TimeUnit::Years)
+        }
+    }
+
+    fn settings_today() -> Shared<Settings<Date>> {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(today());
+        settings
+    }
+
+    fn flat_curve(rate: Rate) -> Handle<dyn YieldTermStructure> {
+        Handle::new(shared(FlatForward::with_rate(
+            today(),
+            rate,
+            Actual360::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>)
+    }
+
+    fn atm_handle(vol: Volatility) -> Handle<dyn SwaptionVolatilityStructure> {
+        Handle::new(shared(MockAtmVol {
+            base: TermStructureBase::with_reference_date(
+                today(),
+                Some(Target::new()),
+                Some(Actual365Fixed::new()),
+            ),
+            vol,
+        }) as Shared<dyn SwaptionVolatilityStructure>)
+    }
+
+    /// The long base index: 5Y, annual fixed leg, discounting off a separate
+    /// curve. The exogenous discount and the annual leg are what make the
+    /// long-branch oracle discriminating against the short base.
+    fn long_index(
+        euribor6m: &Shared<IborIndex>,
+        discount: &Handle<dyn YieldTermStructure>,
+        settings: &Shared<Settings<Date>>,
+    ) -> SwapIndex {
+        SwapIndex::with_exogenous_discount(
+            "LongSwap".into(),
+            Period::new(5, TimeUnit::Years),
+            2,
+            Currency::eur(),
+            Target::new(),
+            Period::new(1, TimeUnit::Years),
+            BDC,
+            Thirty360::with_convention(Convention::BondBasis),
+            Shared::clone(euribor6m),
+            discount.clone(),
+            Shared::clone(settings),
+        )
+    }
+
+    /// The short base index: 1Y, semiannual fixed leg, no exogenous discount.
+    fn short_index(euribor6m: &Shared<IborIndex>, settings: &Shared<Settings<Date>>) -> SwapIndex {
+        SwapIndex::new(
+            "ShortSwap".into(),
+            Period::new(1, TimeUnit::Years),
+            2,
+            Currency::eur(),
+            Target::new(),
+            Period::new(6, TimeUnit::Months),
+            BDC,
+            Thirty360::with_convention(Convention::BondBasis),
+            Shared::clone(euribor6m),
+            Shared::clone(settings),
+        )
+    }
+
+    struct Parts {
+        settings: Shared<Settings<Date>>,
+        long: Shared<SwapIndex>,
+        short: Shared<SwapIndex>,
+    }
+
+    fn parts() -> Parts {
+        let settings = settings_today();
+        let euribor6m = shared(Euribor::six_months(
+            flat_curve(0.05),
+            Shared::clone(&settings),
+        ));
+        let discount = flat_curve(0.03);
+        let long = shared(long_index(&euribor6m, &discount, &settings));
+        let short = shared(short_index(&euribor6m, &settings));
+        Parts {
+            settings,
+            long,
+            short,
+        }
+    }
+
+    fn option_tenors() -> Vec<Period> {
+        vec![
+            Period::new(1, TimeUnit::Years),
+            Period::new(2, TimeUnit::Years),
+        ]
+    }
+
+    fn swap_tenors() -> Vec<Period> {
+        vec![
+            Period::new(1, TimeUnit::Years),
+            Period::new(5, TimeUnit::Years),
+        ]
+    }
+
+    fn vol_spreads(n_rows: usize, n_strikes: usize) -> Vec<Vec<Handle<dyn Quote>>> {
+        (0..n_rows)
+            .map(|_| {
+                (0..n_strikes)
+                    .map(|_| make_quote_handle(0.001).handle())
+                    .collect()
+            })
+            .collect()
+    }
+
+    fn build_cube(
+        p: &Parts,
+        strike_spreads: Vec<Real>,
+        vol_spreads: Vec<Vec<Handle<dyn Quote>>>,
+    ) -> QlResult<SwaptionVolatilityCube> {
+        SwaptionVolatilityCube::new(
+            atm_handle(0.2),
+            option_tenors(),
+            swap_tenors(),
+            strike_spreads,
+            vol_spreads,
+            Shared::clone(&p.long),
+            Shared::clone(&p.short),
+            false,
+            Shared::clone(&p.settings),
+        )
+    }
+
+    #[test]
+    fn too_few_strikes_is_rejected() {
+        let p = parts();
+        assert!(build_cube(&p, vec![0.0], vol_spreads(4, 1)).is_err());
+    }
+
+    #[test]
+    fn non_increasing_strike_spreads_are_rejected() {
+        let p = parts();
+        assert!(build_cube(&p, vec![0.01, 0.0, -0.01], vol_spreads(4, 3)).is_err());
+    }
+
+    #[test]
+    fn wrong_shaped_vol_spreads_are_rejected() {
+        let p = parts();
+        assert!(
+            build_cube(&p, vec![-0.01, 0.0, 0.01], vol_spreads(3, 3)).is_err(),
+            "row count must equal option tenors * swap tenors"
+        );
+        assert!(
+            build_cube(&p, vec![-0.01, 0.0, 0.01], vol_spreads(4, 2)).is_err(),
+            "each row must hold one quote per strike"
+        );
+    }
+
+    #[test]
+    fn short_tenor_longer_than_long_tenor_is_rejected() {
+        let p = parts();
+        let swapped = SwaptionVolatilityCube::new(
+            atm_handle(0.2),
+            option_tenors(),
+            swap_tenors(),
+            vec![-0.01, 0.0, 0.01],
+            vol_spreads(4, 3),
+            Shared::clone(&p.short),
+            Shared::clone(&p.long),
+            false,
+            Shared::clone(&p.settings),
+        );
+        assert!(
+            swapped.is_err(),
+            "short (5Y) longer than long (1Y) must be rejected"
+        );
+    }
+}
