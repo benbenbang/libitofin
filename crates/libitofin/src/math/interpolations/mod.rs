@@ -6,6 +6,7 @@ pub mod cubic;
 pub mod flat;
 pub mod linear;
 pub mod loglinear;
+pub mod sabrinterpolation;
 
 use crate::errors::QlResult;
 use crate::types::{Real, Size};

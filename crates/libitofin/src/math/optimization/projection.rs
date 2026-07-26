@@ -8,9 +8,10 @@
 //! the free parameters only, then reassembles the full parameter set.
 //!
 //! QuantLib's protected `mapFreeParameters` and its `mutable actualParameters_`
-//! cache are used only by `ProjectedCostFunction`, which is not part of this
-//! wave; they are deferred until that class is ported. `project`/`include`
-//! reconstruct their result directly, so nothing here depends on the cache.
+//! cache back its `ProjectedCostFunction`; the Rust
+//! [`ProjectedCostFunction`](super::projectedcostfunction::ProjectedCostFunction)
+//! reconstructs the full vector through [`Projection::include`] instead, so
+//! neither the helper nor the cache is needed.
 
 use crate::errors::QlResult;
 use crate::math::array::Array;
