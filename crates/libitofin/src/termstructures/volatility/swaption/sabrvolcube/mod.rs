@@ -3,6 +3,8 @@
 //! as siblings here.
 
 mod cube;
+mod sabrcube;
 
 #[allow(unused_imports)]
 pub(crate) use cube::Cube;
+pub use sabrcube::SabrSwaptionVolatilityCube;
