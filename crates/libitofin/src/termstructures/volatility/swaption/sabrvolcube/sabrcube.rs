@@ -691,3 +691,283 @@ impl SwaptionVolatilityStructure for SabrSwaptionVolatilityCube {
             .shift_time(option_time, swap_length, false)
     }
 }
+
+/// A 2x2-node SABR cube fixture over a flat ATM surface and two hand-built swap
+/// indexes. The guess and vol-spread quotes are held as [`SimpleQuote`]s so the
+/// observer arm can bump them; [`atm_strike`](SwaptionVolatilityCube::atm_strike)
+/// forecasts a positive swap rate off the 5% forwarding curve, and the flat ATM
+/// vol is shift-0.
+#[cfg(test)]
+mod tests {
+    #![allow(unused_imports)]
+    use super::*;
+
+    use crate::currency::Currency;
+    use crate::indexes::{Euribor, IborIndex, SwapIndex};
+    use crate::interestrate::Compounding;
+    use crate::patterns::observable::AsObservable;
+    use crate::quotes::SimpleQuote;
+    use crate::shared::{shared, shared_mut};
+    use crate::termstructures::volatility::sabr::sabr_volatility;
+    use crate::termstructures::volatility::swaption::SwaptionCubeSmileSection;
+    use crate::termstructures::yields::FlatForward;
+    use crate::termstructures::yieldtermstructure::YieldTermStructure;
+    use crate::time::calendars::target::Target;
+    use crate::time::date::Month;
+    use crate::time::daycounters::actual360::Actual360;
+    use crate::time::daycounters::actual365fixed::Actual365Fixed;
+    use crate::time::daycounters::thirty360::{Convention, Thirty360};
+    use crate::time::frequency::Frequency;
+    use crate::time::timeunit::TimeUnit;
+
+    const BDC: BusinessDayConvention = BusinessDayConvention::ModifiedFollowing;
+
+    fn today() -> Date {
+        Date::new(15, Month::June, 2026)
+    }
+
+    fn settings_today() -> Shared<Settings<Date>> {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(today());
+        settings
+    }
+
+    fn flat_curve(rate: Rate) -> Handle<dyn YieldTermStructure> {
+        Handle::new(shared(FlatForward::with_rate(
+            today(),
+            rate,
+            Actual360::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>)
+    }
+
+    /// A flat, shift-0 swaption vol surface standing in for the ATM matrix.
+    struct MockAtmVol {
+        base: TermStructureBase,
+        vol: Volatility,
+    }
+
+    impl AsObservable for MockAtmVol {
+        fn observable(&self) -> &Observable {
+            self.base.observable()
+        }
+    }
+
+    impl TermStructure for MockAtmVol {
+        fn base(&self) -> &TermStructureBase {
+            &self.base
+        }
+        fn max_date(&self) -> Date {
+            Date::max_date()
+        }
+    }
+
+    impl VolatilityTermStructure for MockAtmVol {
+        fn business_day_convention(&self) -> BusinessDayConvention {
+            BDC
+        }
+        fn min_strike(&self) -> Rate {
+            Rate::MIN
+        }
+        fn max_strike(&self) -> Rate {
+            Rate::MAX
+        }
+    }
+
+    impl SwaptionVolatilityStructure for MockAtmVol {
+        fn volatility_impl(&self, _t: Time, _l: Time, _strike: Rate) -> QlResult<Volatility> {
+            Ok(self.vol)
+        }
+        fn max_swap_tenor(&self) -> Period {
+            Period::new(100, TimeUnit::Years)
+        }
+    }
+
+    fn atm_handle(vol: Volatility) -> Handle<dyn SwaptionVolatilityStructure> {
+        Handle::new(shared(MockAtmVol {
+            base: TermStructureBase::with_reference_date(
+                today(),
+                Some(Target::new()),
+                Some(Actual365Fixed::new()),
+            ),
+            vol,
+        }) as Shared<dyn SwaptionVolatilityStructure>)
+    }
+
+    fn long_index(
+        euribor6m: &Shared<IborIndex>,
+        settings: &Shared<Settings<Date>>,
+    ) -> Shared<SwapIndex> {
+        shared(SwapIndex::new(
+            "LongSwap".into(),
+            Period::new(5, TimeUnit::Years),
+            2,
+            Currency::eur(),
+            Target::new(),
+            Period::new(1, TimeUnit::Years),
+            BDC,
+            Thirty360::with_convention(Convention::BondBasis),
+            Shared::clone(euribor6m),
+            Shared::clone(settings),
+        ))
+    }
+
+    fn short_index(
+        euribor6m: &Shared<IborIndex>,
+        settings: &Shared<Settings<Date>>,
+    ) -> Shared<SwapIndex> {
+        shared(SwapIndex::new(
+            "ShortSwap".into(),
+            Period::new(1, TimeUnit::Years),
+            2,
+            Currency::eur(),
+            Target::new(),
+            Period::new(1, TimeUnit::Years),
+            BDC,
+            Thirty360::with_convention(Convention::BondBasis),
+            Shared::clone(euribor6m),
+            Shared::clone(settings),
+        ))
+    }
+
+    fn option_tenors() -> Vec<Period> {
+        vec![
+            Period::new(1, TimeUnit::Years),
+            Period::new(2, TimeUnit::Years),
+        ]
+    }
+
+    fn swap_tenors() -> Vec<Period> {
+        vec![
+            Period::new(1, TimeUnit::Years),
+            Period::new(5, TimeUnit::Years),
+        ]
+    }
+
+    /// Seven strike spreads around the ATM level, all keeping strikes positive
+    /// off a ~5% forward, enough points to identify the SABR parameters.
+    fn strike_spreads() -> Vec<Real> {
+        vec![-0.02, -0.01, -0.005, 0.0, 0.005, 0.01, 0.02]
+    }
+
+    const N_NODES: usize = 4;
+    const ATM_VOL: Volatility = 0.20;
+
+    #[test]
+    fn backward_flat_defers_to_606() {
+        let settings = settings_today();
+        let euribor6m = shared(Euribor::six_months(
+            flat_curve(0.05),
+            Shared::clone(&settings),
+        ));
+        let long = long_index(&euribor6m, &settings);
+        let short = short_index(&euribor6m, &settings);
+        let n_strikes = strike_spreads().len();
+        let vol_spreads: Vec<Vec<Handle<dyn Quote>>> = (0..N_NODES)
+            .map(|_| {
+                (0..n_strikes)
+                    .map(|_| Handle::new(shared(SimpleQuote::new(0.0)) as Shared<dyn Quote>))
+                    .collect()
+            })
+            .collect();
+        let parameters_guess: Vec<Vec<Handle<dyn Quote>>> = (0..N_NODES)
+            .map(|_| {
+                (0..N_SABR_PARAMS)
+                    .map(|_| Handle::new(shared(SimpleQuote::new(0.2)) as Shared<dyn Quote>))
+                    .collect()
+            })
+            .collect();
+        let err = SabrSwaptionVolatilityCube::new(
+            atm_handle(ATM_VOL),
+            option_tenors(),
+            swap_tenors(),
+            strike_spreads(),
+            vol_spreads,
+            long,
+            short,
+            false,
+            parameters_guess,
+            [false; N_SABR_PARAMS],
+            false,
+            None,
+            None,
+            None,
+            None,
+            false,
+            50,
+            true,
+            0.0001,
+            settings,
+        )
+        .err()
+        .expect("backward_flat = true must be rejected");
+        assert!(err.to_string().contains("606"), "err was: {err}");
+    }
+
+    #[test]
+    fn wrong_guess_shape_is_rejected() {
+        let settings = settings_today();
+        let euribor6m = shared(Euribor::six_months(
+            flat_curve(0.05),
+            Shared::clone(&settings),
+        ));
+        let long = long_index(&euribor6m, &settings);
+        let short = short_index(&euribor6m, &settings);
+        let n_strikes = strike_spreads().len();
+        let build = |guess: Vec<Vec<Handle<dyn Quote>>>| {
+            let vol_spreads: Vec<Vec<Handle<dyn Quote>>> = (0..N_NODES)
+                .map(|_| {
+                    (0..n_strikes)
+                        .map(|_| Handle::new(shared(SimpleQuote::new(0.0)) as Shared<dyn Quote>))
+                        .collect()
+                })
+                .collect();
+            SabrSwaptionVolatilityCube::new(
+                atm_handle(ATM_VOL),
+                option_tenors(),
+                swap_tenors(),
+                strike_spreads(),
+                vol_spreads,
+                Shared::clone(&long),
+                Shared::clone(&short),
+                false,
+                guess,
+                [false; N_SABR_PARAMS],
+                false,
+                None,
+                None,
+                None,
+                None,
+                false,
+                50,
+                false,
+                0.0001,
+                Shared::clone(&settings),
+            )
+        };
+        let too_few_rows: Vec<Vec<Handle<dyn Quote>>> = (0..N_NODES - 1)
+            .map(|_| {
+                (0..N_SABR_PARAMS)
+                    .map(|_| Handle::new(shared(SimpleQuote::new(0.2)) as Shared<dyn Quote>))
+                    .collect()
+            })
+            .collect();
+        assert!(
+            build(too_few_rows).is_err(),
+            "row count must be nOptions*nSwaps"
+        );
+
+        let wrong_cols: Vec<Vec<Handle<dyn Quote>>> = (0..N_NODES)
+            .map(|_| {
+                (0..N_SABR_PARAMS - 1)
+                    .map(|_| Handle::new(shared(SimpleQuote::new(0.2)) as Shared<dyn Quote>))
+                    .collect()
+            })
+            .collect();
+        assert!(
+            build(wrong_cols).is_err(),
+            "each row must hold four guesses"
+        );
+    }
+}
