@@ -43,6 +43,15 @@
 //!   as C++ does (`.fixing(optionD)`, whose default `forecastTodaysFixing` is
 //!   false): a strictly-future date forecasts the underlying swap's fair rate, a
 //!   past or today date routes to the D11 fixing store.
+//! - The embedded discrete grid anchors to the moving reference date
+//!   (`eval_date + 0` settlement days), whereas C++ overrides `referenceDate()`
+//!   to delegate to `atmVol_->referenceDate()` (hpp:55) and builds its
+//!   option-date grid off that. The two agree for the expected case - a
+//!   settlement-0 moving ATM surface - and diverge for a fixed-reference or
+//!   non-zero-settlement ATM surface. `atm_strike` takes an explicit option date
+//!   and is unaffected either way; the grid this anchors is what the interpolated
+//!   cube (#595) will read, so #595 must confirm the anchoring against its ATM
+//!   surface before interpolating.
 
 use crate::errors::QlResult;
 use crate::handle::Handle;
