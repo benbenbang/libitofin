@@ -44,7 +44,10 @@ use hullwhite::{PyEuribor, PyHullWhite, PySwaptionHelper};
 use libitofin::errors::QlError;
 use market::{PyBlackScholesProcess, PySimpleQuote};
 use option::{PyOptionType, PyVanillaOption};
-use optionletvol::{PyConstantOptionletVolatility, PyOptionletVolatilityStructure};
+use optionletvol::{
+    PyConstantOptionletVolatility, PyOptionletStripper1, PyOptionletVolatilityStructure,
+    PyStrippedOptionletAdapter,
+};
 use pyo3::create_exception;
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
@@ -155,6 +158,8 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     termstructures.add_class::<PyOptionletVolatilityStructure>()?;
     termstructures.add_class::<PyConstantOptionletVolatility>()?;
     termstructures.add_class::<PyCapFloorTermVolSurface>()?;
+    termstructures.add_class::<PyOptionletStripper1>()?;
+    termstructures.add_class::<PyStrippedOptionletAdapter>()?;
 
     let processes = PyModule::new(py, "processes")?;
     processes.add_class::<PyBlackScholesProcess>()?;

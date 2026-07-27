@@ -743,3 +743,56 @@ class CapFloorTermVolSurface:
         """length is a year fraction off the reference date in the surface's own
         day count."""
         ...
+
+class OptionletStripper1:
+    """Bootstraps caplet volatilities out of a market cap/floor term-volatility
+    surface.
+
+    Not itself a volatility surface: it produces a grid of caplet volatilities
+    that StrippedOptionletAdapter interpolates into one. Stripping is lazy and
+    cached, and re-runs only when a surface quote or the index changes.
+
+    term_vol_surface must come from CapFloorTermVolSurface.moving or
+    moving_with_quotes; a pinned-reference surface carries no settlement days
+    and fails the adapter. VolatilityType.Normal is deferred (#440/#577) and
+    fails at the strip, not at construction."""
+
+    def __init__(
+        self,
+        term_vol_surface: CapFloorTermVolSurface,
+        ibor_index: Euribor,
+        volatility_type: VolatilityType,
+        accuracy: float = 1e-6,
+        max_iter: int = 100,
+        displacement: float = 0.0,
+        discount: YieldTermStructure | None = None,
+        optionlet_frequency: Period | None = None,
+    ) -> None:
+        """discount None falls back to the index's own forwarding curve;
+        optionlet_frequency None uses the index tenor as the caplet step."""
+        ...
+    def switch_strike(self) -> float:
+        """The mean at-the-money caplet rate, which decides whether each strike
+        is stripped out of caps or out of floors. The first call strips."""
+        ...
+    def atm_optionlet_rates(self) -> list[float]:
+        """The at-the-money forward rate of each caplet, one per maturity."""
+        ...
+
+class StrippedOptionletAdapter(OptionletVolatilityStructure):
+    """Serves a stripper's caplet volatility grid as an
+    OptionletVolatilityStructure: linear in strike within each maturity, then
+    linear across maturities.
+
+    This closes the cap/floor volatility loop - a BlackCapFloorEngine on this
+    surface reprices the caps the term volatilities were quoted on. The
+    reference date floats off the evaluation date carried by settings, advanced
+    by the term-volatility surface's settlement days. The surface ends at the
+    last caplet fixing, so pricing a cap that reaches it wants
+    enable_extrapolation()."""
+
+    def __init__(self, stripper: OptionletStripper1, settings: Settings) -> None:
+        """Strips eagerly, to snapshot the strike domain and maximum date.
+        Raises ItofinError on a stripper whose term-volatility surface carries
+        no settlement days."""
+        ...
