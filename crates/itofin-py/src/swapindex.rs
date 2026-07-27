@@ -130,7 +130,6 @@ impl PySwapIndex {
 
 impl PySwapIndex {
     /// A clone of the inner index for the volatility cube facades.
-    #[allow(dead_code)]
     pub(crate) fn inner(&self) -> Shared<SwapIndex> {
         Shared::clone(&self.inner)
     }

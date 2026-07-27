@@ -1,7 +1,8 @@
 //! Facades for the swaption volatility stack: the [`PySwaptionVolatilityStructure`]
 //! base, the [`PyVolatilityType`] flag, the constant surface
-//! [`PyConstantSwaptionVolatility`] and the at-the-money grid
-//! [`PySwaptionVolatilityMatrix`].
+//! [`PyConstantSwaptionVolatility`], the at-the-money grid
+//! [`PySwaptionVolatilityMatrix`] and the spread cube over it,
+//! [`PyInterpolatedSwaptionVolatilityCube`].
 //!
 //! The base holds the erased `Handle<dyn SwaptionVolatilityStructure>` and
 //! exposes the queries every concrete surface inherits; concrete surfaces
@@ -19,14 +20,15 @@
 use crate::PyQlError;
 use crate::market::PySimpleQuote;
 use crate::settings::PySettings;
+use crate::swapindex::PySwapIndex;
 use crate::time::{PyBusinessDayConvention, PyCalendar, PyDate, PyDayCounter, PyPeriod};
 use libitofin::handle::Handle;
 use libitofin::math::matrix::Matrix;
 use libitofin::quotes::Quote;
 use libitofin::shared::{Shared, shared};
 use libitofin::termstructures::volatility::{
-    ConstantSwaptionVolatility, SwaptionVolatilityMatrix, SwaptionVolatilityStructure,
-    VolatilityType,
+    ConstantSwaptionVolatility, InterpolatedSwaptionVolatilityCube, SwaptionVolatilityMatrix,
+    SwaptionVolatilityStructure, VolatilityType,
 };
 use libitofin::time::period::Period;
 use pyo3::prelude::*;
@@ -345,6 +347,106 @@ impl PySwaptionVolatilityMatrix {
             )))
             .add_subclass(PySwaptionVolatilityMatrix),
         )
+    }
+}
+
+/// Python `InterpolatedSwaptionVolatilityCube`: a smile cube adding
+/// bilinearly-interpolated volatility spreads to an at-the-money surface
+/// (`termstructures::volatility::InterpolatedSwaptionVolatilityCube`).
+///
+/// Extends [`PySwaptionVolatilityStructure`], so the inherited `volatility`
+/// query now takes a real strike: the cube reads the at-the-money forward off
+/// its base swap indexes, the at-the-money volatility off `atm_vol`, and adds
+/// the spread interpolated at `strike - atm_strike`. `atm_strike` is served by
+/// [`atm_strike_from_tenor`](PyInterpolatedSwaptionVolatilityCube::atm_strike_from_tenor),
+/// which is what a caller needs to place a query on the smile.
+///
+/// `vol_spreads` is **row-major over the `(option tenor, swap tenor)` nodes**:
+/// row `i * len(swap_tenors) + j` is the smile at `(option_tenors[i],
+/// swap_tenors[j])`, holding one quote per entry of `strike_spreads`. The shape
+/// is checked here rather than left to the core's dimension error. A later
+/// `set_value` on any of those quotes rebuilds the per-strike interpolators.
+///
+/// `swap_index_base` is the long base index and `short_swap_index_base` the
+/// short one; the cube picks between them per query by swap tenor, so the short
+/// index's tenor must not exceed the long one's.
+#[pyclass(name = "InterpolatedSwaptionVolatilityCube", extends = PySwaptionVolatilityStructure, unsendable)]
+pub struct PyInterpolatedSwaptionVolatilityCube {
+    concrete: Shared<InterpolatedSwaptionVolatilityCube>,
+}
+
+#[pymethods]
+impl PyInterpolatedSwaptionVolatilityCube {
+    #[new]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (atm_vol, option_tenors, swap_tenors, strike_spreads, vol_spreads, swap_index_base, short_swap_index_base, settings, vega_weighted_smile_fit = false))]
+    fn new(
+        atm_vol: &PySwaptionVolatilityStructure,
+        option_tenors: Vec<PyRef<'_, PyPeriod>>,
+        swap_tenors: Vec<PyRef<'_, PyPeriod>>,
+        strike_spreads: Vec<f64>,
+        vol_spreads: Vec<Vec<PyRef<'_, PySimpleQuote>>>,
+        swap_index_base: &PySwapIndex,
+        short_swap_index_base: &PySwapIndex,
+        settings: &PySettings,
+        vega_weighted_smile_fit: bool,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        let columns = check_grid(&vol_spreads, "vol spread")?;
+        let nodes = option_tenors.len() * swap_tenors.len();
+        if vol_spreads.len() != nodes {
+            return Err(crate::ItofinError::new_err(format!(
+                "vol spread grid must have one row per (option tenor, swap tenor) node: \
+                 expected {nodes}, got {}",
+                vol_spreads.len()
+            )));
+        }
+        if columns != strike_spreads.len() {
+            return Err(crate::ItofinError::new_err(format!(
+                "vol spread rows must have one column per strike spread: expected {}, got {columns}",
+                strike_spreads.len()
+            )));
+        }
+        let vol_spreads: Vec<Vec<Handle<dyn Quote>>> = vol_spreads
+            .iter()
+            .map(|row| row.iter().map(|quote| quote.handle()).collect())
+            .collect();
+        let cube = shared(
+            InterpolatedSwaptionVolatilityCube::new(
+                atm_vol.handle(),
+                tenors(&option_tenors),
+                tenors(&swap_tenors),
+                strike_spreads,
+                vol_spreads,
+                swap_index_base.inner(),
+                short_swap_index_base.inner(),
+                vega_weighted_smile_fit,
+                settings.inner(),
+            )
+            .map_err(PyQlError::from)?,
+        );
+        let erased = Handle::new(Shared::clone(&cube) as Shared<dyn SwaptionVolatilityStructure>);
+        Ok(
+            PyClassInitializer::from(PySwaptionVolatilityStructure::from_handle(erased))
+                .add_subclass(PyInterpolatedSwaptionVolatilityCube { concrete: cube }),
+        )
+    }
+
+    /// The at-the-money strike for an option tenor and swap tenor: the fixing of
+    /// whichever base swap index the swap tenor selects, off the option date the
+    /// tenor resolves to against the cube's reference date and calendar.
+    ///
+    /// Lives on the concrete cube rather than the inherited base because it is
+    /// the cube framework's, not the volatility structure trait's.
+    fn atm_strike_from_tenor(
+        &self,
+        option_tenor: &PyPeriod,
+        swap_tenor: &PyPeriod,
+    ) -> PyResult<f64> {
+        Ok(self
+            .concrete
+            .cube()
+            .atm_strike_from_tenor(option_tenor.inner(), swap_tenor.inner())
+            .map_err(PyQlError::from)?)
     }
 }
 
