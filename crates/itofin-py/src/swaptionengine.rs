@@ -7,7 +7,7 @@
 //!
 //! Deferred (visible): `BachelierSwaptionEngine` (the normal/Bachelier spec of
 //! the same template) is not exposed; it lands with the normal-volatility
-//! surfaces in #615.
+//! surfaces in #616.
 
 use crate::curve::PyYieldTermStructure;
 use crate::market::PySimpleQuote;
