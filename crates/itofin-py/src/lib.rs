@@ -14,6 +14,7 @@ mod market;
 mod option;
 mod settings;
 mod swap;
+mod swapindex;
 mod swaption;
 mod swaptionengine;
 mod swaptionvol;
@@ -41,6 +42,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use settings::PySettings;
 use swap::{PySwapType, PyVanillaSwap};
+use swapindex::PySwapIndex;
 use swaption::{PyEuropeanExercise, PySettlementMethod, PySettlementType, PySwaption};
 use swaptionengine::{PyBlackSwaptionEngine, PyCashAnnuityModel};
 use swaptionvol::{
@@ -142,6 +144,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     let indexes = PyModule::new(py, "indexes")?;
     indexes.add_class::<PyEuribor>()?;
     indexes.add_class::<PyEstr>()?;
+    indexes.add_class::<PySwapIndex>()?;
 
     let instruments = PyModule::new(py, "instruments")?;
     instruments.add_class::<PyOptionType>()?;

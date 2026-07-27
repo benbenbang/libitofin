@@ -229,6 +229,11 @@ impl PyPeriod {
     pub(crate) fn inner(&self) -> Period {
         self.inner
     }
+
+    /// A facade over a core [`Period`], for the inspectors that return one.
+    pub(crate) fn from_inner(inner: Period) -> Self {
+        PyPeriod { inner }
+    }
 }
 
 /// Maps a `{"Days", "Weeks", "Months", "Years"}` string to a [`TimeUnit`],
