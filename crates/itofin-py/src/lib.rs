@@ -15,6 +15,7 @@ mod option;
 mod settings;
 mod swap;
 mod swaption;
+mod swaptionvol;
 mod time;
 mod vol;
 
@@ -40,6 +41,7 @@ use pyo3::types::PyDict;
 use settings::PySettings;
 use swap::{PySwapType, PyVanillaSwap};
 use swaption::{PyEuropeanExercise, PySettlementMethod, PySettlementType, PySwaption};
+use swaptionvol::{PyConstantSwaptionVolatility, PySwaptionVolatilityStructure, PyVolatilityType};
 use time::{
     PyBusinessDayConvention, PyCalendar, PyDate, PyDayCounter, PyFrequency, PyPeriod, PySchedule,
 };
@@ -123,6 +125,9 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     termstructures.add_class::<PyPiecewiseLinearZero>()?;
     termstructures.add_class::<PyPiecewiseLinearForward>()?;
     termstructures.add_class::<PyPiecewiseFlatForward>()?;
+    termstructures.add_class::<PySwaptionVolatilityStructure>()?;
+    termstructures.add_class::<PyVolatilityType>()?;
+    termstructures.add_class::<PyConstantSwaptionVolatility>()?;
 
     let processes = PyModule::new(py, "processes")?;
     processes.add_class::<PyBlackScholesProcess>()?;

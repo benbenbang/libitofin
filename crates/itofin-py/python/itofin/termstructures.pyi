@@ -1,4 +1,5 @@
-# Hand-written stubs for itofin.termstructures; sync manually with src/curve.rs, src/vol.rs and src/helpers.rs (#517).
+# Hand-written stubs for itofin.termstructures; sync manually with src/curve.rs, src/vol.rs,
+# src/helpers.rs and src/swaptionvol.rs (#517).
 
 from itofin import Settings
 from itofin.indexes import Estr, Euribor
@@ -360,3 +361,66 @@ class OISRateHelper(RateHelper):
         pillar: Pillar = ...,
         averaging_method: RateAveraging = ...,
     ) -> None: ...
+
+class SwaptionVolatilityStructure:
+    """Shared base for every swaption volatility surface: volatility, Black
+    variance and lognormal shift, addressed by option and swap tenor."""
+
+    def volatility(
+        self,
+        option_tenor: Period,
+        swap_tenor: Period,
+        strike: float,
+        extrapolate: bool = False,
+    ) -> float: ...
+    def black_variance(
+        self,
+        option_tenor: Period,
+        swap_tenor: Period,
+        strike: float,
+        extrapolate: bool = False,
+    ) -> float: ...
+    def shift(
+        self, option_date: Date, swap_length: float, extrapolate: bool = False
+    ) -> float:
+        """The lognormal shift, in the date form: the core has no tenor overload
+        for the shift. Errors on a normal-volatility surface."""
+        ...
+
+class VolatilityType:
+    """Whether a surface quotes shifted-lognormal (Black) or normal (Bachelier)
+    volatilities. A mismatch with the engine's formula surfaces at pricing time."""
+
+    ShiftedLognormal: VolatilityType
+    Normal: VolatilityType
+
+class ConstantSwaptionVolatility(SwaptionVolatilityStructure):
+    """A single volatility with no option-time, swap-length or strike dependence.
+
+    Both constructors pin the reference date, so every query's option time runs
+    from reference_date rather than the evaluation date. The moving (floating
+    reference date) forms are not exposed."""
+
+    def __init__(
+        self,
+        reference_date: Date,
+        calendar: Calendar,
+        business_day_convention: BusinessDayConvention,
+        volatility: float,
+        day_counter: DayCounter,
+        volatility_type: VolatilityType,
+        shift: float = 0.0,
+    ) -> None: ...
+    @staticmethod
+    def with_quote(
+        reference_date: Date,
+        calendar: Calendar,
+        business_day_convention: BusinessDayConvention,
+        volatility: SimpleQuote,
+        day_counter: DayCounter,
+        volatility_type: VolatilityType,
+        shift: float = 0.0,
+    ) -> ConstantSwaptionVolatility:
+        """Reads the volatility from the caller's quote; a later set_value
+        notifies the surface's observers."""
+        ...
