@@ -13,6 +13,7 @@ mod hullwhite;
 mod market;
 mod option;
 mod settings;
+mod smilesection;
 mod swap;
 mod swapindex;
 mod swaption;
@@ -41,6 +42,7 @@ use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use settings::PySettings;
+use smilesection::PySabrSmileSection;
 use swap::{PySwapType, PyVanillaSwap};
 use swapindex::PySwapIndex;
 use swaption::{PyEuropeanExercise, PySettlementMethod, PySettlementType, PySwaption};
@@ -137,6 +139,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     termstructures.add_class::<PyConstantSwaptionVolatility>()?;
     termstructures.add_class::<PySwaptionVolatilityMatrix>()?;
     termstructures.add_class::<PyInterpolatedSwaptionVolatilityCube>()?;
+    termstructures.add_class::<PySabrSmileSection>()?;
 
     let processes = PyModule::new(py, "processes")?;
     processes.add_class::<PyBlackScholesProcess>()?;

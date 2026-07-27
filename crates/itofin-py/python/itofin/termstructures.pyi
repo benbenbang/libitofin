@@ -1,5 +1,5 @@
 # Hand-written stubs for itofin.termstructures; sync manually with src/curve.rs, src/vol.rs,
-# src/helpers.rs and src/swaptionvol.rs (#517).
+# src/helpers.rs, src/swaptionvol.rs and src/smilesection.rs (#517).
 
 from itofin import Settings
 from itofin.indexes import Estr, Euribor, SwapIndex
@@ -498,3 +498,41 @@ class InterpolatedSwaptionVolatilityCube(SwaptionVolatilityStructure):
         """The at-the-money strike for an option tenor and swap tenor: the fixing
         of whichever base swap index the swap tenor selects."""
         ...
+
+class SabrSmileSection:
+    """One option expiry's volatility smile, read off the closed-form Hagan SABR
+    formula at fixed parameters.
+
+    There is no calibration here: the four parameters are inputs. A fitted smile
+    is what SabrSwaptionVolatilityCube serves; this class is for querying a smile
+    whose parameters are already known."""
+
+    def __init__(
+        self,
+        exercise_time: float,
+        forward: float,
+        alpha: float,
+        beta: float,
+        nu: float,
+        rho: float,
+        shift: float = 0.0,
+        volatility_type: VolatilityType = ...,
+    ) -> None:
+        """Raises ItofinError on a non-zero shift or a Normal volatility_type
+        (both deferred to #586), on a non-positive shifted forward, and on SABR
+        parameters outside alpha > 0, beta in [0, 1], nu >= 0, rho^2 < 1."""
+        ...
+    def volatility(self, strike: float) -> float: ...
+    def variance(self, strike: float) -> float: ...
+    @property
+    def exercise_time(self) -> float: ...
+    @property
+    def atm_level(self) -> float: ...
+    @property
+    def alpha(self) -> float: ...
+    @property
+    def beta(self) -> float: ...
+    @property
+    def nu(self) -> float: ...
+    @property
+    def rho(self) -> float: ...

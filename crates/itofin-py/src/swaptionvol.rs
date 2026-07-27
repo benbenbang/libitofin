@@ -140,7 +140,7 @@ pub enum PyVolatilityType {
 
 impl PyVolatilityType {
     /// The core [`VolatilityType`] this variant stands for.
-    fn inner(&self) -> VolatilityType {
+    pub(crate) fn inner(&self) -> VolatilityType {
         match self {
             PyVolatilityType::ShiftedLognormal => VolatilityType::ShiftedLognormal,
             PyVolatilityType::Normal => VolatilityType::Normal,
