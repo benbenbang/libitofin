@@ -4,7 +4,7 @@
 from itofin import Settings
 from itofin.indexes import Euribor
 from itofin.models import HestonModel, HullWhite
-from itofin.pricingengines import BlackSwaptionEngine
+from itofin.pricingengines import BlackCapFloorEngine, BlackSwaptionEngine
 from itofin.processes import BlackScholesProcess
 from itofin.termstructures import YieldTermStructure
 from itofin.time import Date, DayCounter, Period, Schedule
@@ -147,6 +147,11 @@ class CapFloor:
     def cap_rates(self) -> list[float]: ...
     def floor_rates(self) -> list[float]: ...
     def coupon_count(self) -> int: ...
+    def set_black_engine(self, engine: BlackCapFloorEngine) -> None:
+        """Price each optionlet off an optionlet volatility surface. The engine
+        must resolve its dates against the same Settings object as this
+        cap/floor."""
+        ...
     def npv(self) -> float:
         """Raises ItofinError with no engine attached."""
         ...
