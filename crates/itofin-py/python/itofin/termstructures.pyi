@@ -424,3 +424,47 @@ class ConstantSwaptionVolatility(SwaptionVolatilityStructure):
         """Reads the volatility from the caller's quote; a later set_value
         notifies the surface's observers."""
         ...
+
+class SwaptionVolatilityMatrix(SwaptionVolatilityStructure):
+    """An at-the-money volatility grid, bilinear over an option-tenor x
+    swap-tenor lattice.
+
+    Every grid is a row per option tenor and a column per swap tenor; shifts,
+    when given, must match that shape, and None means all-zero shifts. The grid
+    is at the money, so a query's strike is range-checked and then ignored.
+    flat_extrapolation clamps a query past the grid to the nearest edge or
+    corner vol instead of extending the boundary surface."""
+
+    def __init__(
+        self,
+        reference_date: Date,
+        calendar: Calendar,
+        business_day_convention: BusinessDayConvention,
+        option_tenors: list[Period],
+        swap_tenors: list[Period],
+        volatilities: list[list[float]],
+        day_counter: DayCounter,
+        volatility_type: VolatilityType,
+        shifts: list[list[float]] | None = None,
+        flat_extrapolation: bool = False,
+    ) -> None:
+        """Pins the reference date, so every query's option time runs from
+        reference_date rather than the evaluation date."""
+        ...
+    @staticmethod
+    def moving(
+        calendar: Calendar,
+        business_day_convention: BusinessDayConvention,
+        option_tenors: list[Period],
+        swap_tenors: list[Period],
+        volatilities: list[list[SimpleQuote]],
+        day_counter: DayCounter,
+        volatility_type: VolatilityType,
+        settings: Settings,
+        shifts: list[list[float]] | None = None,
+        flat_extrapolation: bool = False,
+    ) -> SwaptionVolatilityMatrix:
+        """A grid whose reference date floats off the evaluation date, reading
+        each node from the caller's quote: a later set_value on any of them
+        rebuilds the interpolation and notifies the grid's observers."""
+        ...

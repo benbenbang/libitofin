@@ -1,6 +1,7 @@
 //! Facades for the swaption volatility stack: the [`PySwaptionVolatilityStructure`]
-//! base, the [`PyVolatilityType`] flag and the constant surface
-//! [`PyConstantSwaptionVolatility`].
+//! base, the [`PyVolatilityType`] flag, the constant surface
+//! [`PyConstantSwaptionVolatility`] and the at-the-money grid
+//! [`PySwaptionVolatilityMatrix`].
 //!
 //! The base holds the erased `Handle<dyn SwaptionVolatilityStructure>` and
 //! exposes the queries every concrete surface inherits; concrete surfaces
@@ -17,12 +18,17 @@
 
 use crate::PyQlError;
 use crate::market::PySimpleQuote;
+use crate::settings::PySettings;
 use crate::time::{PyBusinessDayConvention, PyCalendar, PyDate, PyDayCounter, PyPeriod};
 use libitofin::handle::Handle;
+use libitofin::math::matrix::Matrix;
+use libitofin::quotes::Quote;
 use libitofin::shared::{Shared, shared};
 use libitofin::termstructures::volatility::{
-    ConstantSwaptionVolatility, SwaptionVolatilityStructure, VolatilityType,
+    ConstantSwaptionVolatility, SwaptionVolatilityMatrix, SwaptionVolatilityStructure,
+    VolatilityType,
 };
+use libitofin::time::period::Period;
 use pyo3::prelude::*;
 
 /// Python `SwaptionVolatilityStructure`: the shared base for every swaption
@@ -214,4 +220,170 @@ impl PyConstantSwaptionVolatility {
             .add_subclass(PyConstantSwaptionVolatility),
         )
     }
+}
+
+/// Python `SwaptionVolatilityMatrix`: the at-the-money volatility grid,
+/// bilinear over an option-tenor x swap-tenor lattice
+/// (`termstructures::volatility::SwaptionVolatilityMatrix`).
+///
+/// Extends [`PySwaptionVolatilityStructure`] and supplies only the
+/// constructors. Every grid is a row per option tenor and a column per swap
+/// tenor; `shifts`, when given, must match that shape, and `None` means
+/// all-zero shifts. The grid is at the money, so a query's strike argument is
+/// range-checked and then ignored. `flat_extrapolation` selects C++'s
+/// `flatExtrapolation = true`, under which a query past the grid clamps to the
+/// nearest edge or corner vol instead of extending the boundary surface.
+#[pyclass(name = "SwaptionVolatilityMatrix", extends = PySwaptionVolatilityStructure, unsendable)]
+pub struct PySwaptionVolatilityMatrix;
+
+#[pymethods]
+impl PySwaptionVolatilityMatrix {
+    /// A grid on a pinned reference date over fixed volatilities: every query's
+    /// option time runs from `reference_date`, not from the evaluation date.
+    #[new]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (reference_date, calendar, business_day_convention, option_tenors, swap_tenors, volatilities, day_counter, volatility_type, shifts = None, flat_extrapolation = false))]
+    fn new(
+        reference_date: &PyDate,
+        calendar: &PyCalendar,
+        business_day_convention: &PyBusinessDayConvention,
+        option_tenors: Vec<PyRef<'_, PyPeriod>>,
+        swap_tenors: Vec<PyRef<'_, PyPeriod>>,
+        volatilities: Vec<Vec<f64>>,
+        day_counter: &PyDayCounter,
+        volatility_type: PyVolatilityType,
+        shifts: Option<Vec<Vec<f64>>>,
+        flat_extrapolation: bool,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        let volatilities = matrix_from_rows(&volatilities, "volatility")?;
+        let shifts = match shifts {
+            Some(rows) => matrix_from_rows(&rows, "shift")?,
+            None => Matrix::new(),
+        };
+        let build = if flat_extrapolation {
+            SwaptionVolatilityMatrix::new_flat
+        } else {
+            SwaptionVolatilityMatrix::new
+        };
+        let surface = shared(
+            build(
+                reference_date.inner(),
+                calendar.inner(),
+                business_day_convention.inner(),
+                tenors(&option_tenors),
+                tenors(&swap_tenors),
+                &volatilities,
+                day_counter.inner(),
+                volatility_type.inner(),
+                &shifts,
+            )
+            .map_err(PyQlError::from)?,
+        ) as Shared<dyn SwaptionVolatilityStructure>;
+        Ok(
+            PyClassInitializer::from(PySwaptionVolatilityStructure::from_handle(Handle::new(
+                surface,
+            )))
+            .add_subclass(PySwaptionVolatilityMatrix),
+        )
+    }
+
+    /// A grid whose reference date floats off `settings`' evaluation date (zero
+    /// settlement days), reading each node from the caller's quote: a later
+    /// `set_value` on any of them rebuilds the interpolation and notifies the
+    /// grid's observers.
+    #[staticmethod]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (calendar, business_day_convention, option_tenors, swap_tenors, volatilities, day_counter, volatility_type, settings, shifts = None, flat_extrapolation = false))]
+    fn moving(
+        py: Python<'_>,
+        calendar: &PyCalendar,
+        business_day_convention: &PyBusinessDayConvention,
+        option_tenors: Vec<PyRef<'_, PyPeriod>>,
+        swap_tenors: Vec<PyRef<'_, PyPeriod>>,
+        volatilities: Vec<Vec<PyRef<'_, PySimpleQuote>>>,
+        day_counter: &PyDayCounter,
+        volatility_type: PyVolatilityType,
+        settings: &PySettings,
+        shifts: Option<Vec<Vec<f64>>>,
+        flat_extrapolation: bool,
+    ) -> PyResult<Py<Self>> {
+        check_grid(&volatilities, "volatility")?;
+        let volatilities: Vec<Vec<Handle<dyn Quote>>> = volatilities
+            .iter()
+            .map(|row| row.iter().map(|quote| quote.handle()).collect())
+            .collect();
+        let shifts = match shifts {
+            Some(rows) => {
+                check_grid(&rows, "shift")?;
+                rows
+            }
+            None => Vec::new(),
+        };
+        let build = if flat_extrapolation {
+            SwaptionVolatilityMatrix::moving_flat
+        } else {
+            SwaptionVolatilityMatrix::moving
+        };
+        let surface = shared(
+            build(
+                calendar.inner(),
+                business_day_convention.inner(),
+                tenors(&option_tenors),
+                tenors(&swap_tenors),
+                volatilities,
+                day_counter.inner(),
+                volatility_type.inner(),
+                shifts,
+                settings.inner(),
+            )
+            .map_err(PyQlError::from)?,
+        ) as Shared<dyn SwaptionVolatilityStructure>;
+        Py::new(
+            py,
+            PyClassInitializer::from(PySwaptionVolatilityStructure::from_handle(Handle::new(
+                surface,
+            )))
+            .add_subclass(PySwaptionVolatilityMatrix),
+        )
+    }
+}
+
+/// The wrapped core periods, in order.
+fn tenors(periods: &[PyRef<'_, PyPeriod>]) -> Vec<Period> {
+    periods.iter().map(|period| period.inner()).collect()
+}
+
+/// The shape check both grid constructors share, rejecting an empty or ragged
+/// `list[list[...]]` before it reaches the core's dimension checks. Returns the
+/// common row length.
+fn check_grid<T>(rows: &[Vec<T>], label: &str) -> PyResult<usize> {
+    let Some(first) = rows.first() else {
+        return Err(crate::ItofinError::new_err(format!(
+            "swaption {label} grid must have at least one row"
+        )));
+    };
+    let columns = first.len();
+    if columns == 0 {
+        return Err(crate::ItofinError::new_err(format!(
+            "swaption {label} grid rows must have at least one column"
+        )));
+    }
+    if rows.iter().any(|row| row.len() != columns) {
+        return Err(crate::ItofinError::new_err(format!(
+            "swaption {label} grid rows must all have the same length"
+        )));
+    }
+    Ok(columns)
+}
+
+/// A `list[list[float]]` as a core [`Matrix`], one row per option tenor.
+fn matrix_from_rows(rows: &[Vec<f64>], label: &str) -> PyResult<Matrix> {
+    let columns = check_grid(rows, label)?;
+    let mut matrix = Matrix::with_size(rows.len(), columns);
+    for (i, row) in rows.iter().enumerate() {
+        for (j, &value) in row.iter().enumerate() {
+            matrix[(i, j)] = value;
+        }
+    }
+    Ok(matrix)
 }
