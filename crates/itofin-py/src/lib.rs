@@ -57,6 +57,7 @@ use time::{
 };
 use vol::{
     PyBlackConstantVol, PyBlackVarianceCurve, PyBlackVarianceSurface, PyBlackVolTermStructure,
+    PyBlackVolTimeExtrapolation,
 };
 
 create_exception!(itofin, ItofinError, PyException);
@@ -119,6 +120,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     termstructures.add_class::<PyDiscountCurve>()?;
     termstructures.add_class::<PyForwardCurve>()?;
     termstructures.add_class::<PyBlackConstantVol>()?;
+    termstructures.add_class::<PyBlackVolTimeExtrapolation>()?;
     termstructures.add_class::<PyBlackVarianceCurve>()?;
     termstructures.add_class::<PyBlackVarianceSurface>()?;
     termstructures.add_class::<PyRateHelper>()?;

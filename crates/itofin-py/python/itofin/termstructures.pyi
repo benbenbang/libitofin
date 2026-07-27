@@ -165,9 +165,22 @@ class BlackConstantVol(BlackVolTermStructure):
         calendar: Calendar | None = None,
     ) -> None: ...
 
+class BlackVolTimeExtrapolation:
+    """How a variance curve extrapolates past its last node.
+
+    ``UseInterpolator`` is accepted at construction but raises ItofinError on
+    any extrapolating query: the interpolation layer cannot be evaluated past
+    its last node, and the core errors rather than silently substituting
+    another rule."""
+
+    FlatVolatility: BlackVolTimeExtrapolation
+    UseInterpolator: BlackVolTimeExtrapolation
+    LinearVariance: BlackVolTimeExtrapolation
+
 class BlackVarianceCurve(BlackVolTermStructure):
     """A term structure of Black volatility (no strike dimension), interpolating
-    linearly on variance. Finite in time: enable extrapolation past the last date."""
+    linearly on variance. Finite in time: enable extrapolation past the last date,
+    where ``time_extrapolation`` picks the rule."""
 
     def __init__(
         self,
@@ -176,6 +189,7 @@ class BlackVarianceCurve(BlackVolTermStructure):
         black_vol_curve: list[float],
         day_counter: DayCounter,
         force_monotone_variance: bool,
+        time_extrapolation: BlackVolTimeExtrapolation = ...,
     ) -> None: ...
 
 class BlackVarianceSurface(BlackVolTermStructure):

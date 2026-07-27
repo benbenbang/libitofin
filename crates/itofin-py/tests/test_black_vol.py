@@ -8,6 +8,7 @@ from itofin.termstructures import (
     BlackVarianceCurve,
     BlackVarianceSurface,
     BlackVolTermStructure,
+    BlackVolTimeExtrapolation,
 )
 from itofin.time import Date, DayCounter
 
@@ -78,6 +79,49 @@ def test_curve_is_finite_in_time_and_extrapolation_is_the_escape_hatch():
     assert curve.black_vol(3.0, 100.0, True) == pytest.approx(0.30, abs=1e-15)
     curve.enable_extrapolation()
     assert curve.black_vol(2.5, 100.0, False) == pytest.approx(0.30, abs=1e-15)
+
+
+def _curve_with(time_extrapolation):
+    """blackvariancecurve.rs:363-375 sample_with: the same three nodes, varying
+    only the time-extrapolation rule."""
+    dc = DayCounter.actual360()
+    dates = [REF + 180, REF + 360, REF + 720]
+    return BlackVarianceCurve(REF, dates, [0.20, 0.25, 0.30], dc, True, time_extrapolation)
+
+
+def test_time_extrapolation_defaults_to_flat_volatility():
+    """The unset default is the C++ FlatVolatility, so it reproduces _curve()."""
+    default = _curve()
+    explicit = _curve_with(BlackVolTimeExtrapolation.FlatVolatility)
+    assert explicit.black_variance(3.0, 100.0, True) == pytest.approx(
+        default.black_variance(3.0, 100.0, True), abs=1e-15
+    )
+    assert explicit.black_variance(3.0, 100.0, True) == pytest.approx(0.27, abs=1e-15)
+
+
+def test_linear_variance_extrapolation_continues_the_last_segment():
+    """blackvariancecurve.rs:378-385: variance(3) continues the 1->2 segment,
+    and the rule leaves in-range interpolation untouched."""
+    curve = _curve_with(BlackVolTimeExtrapolation.LinearVariance)
+    expected = 0.0625 + (3.0 - 1.0) * (0.18 - 0.0625) / (2.0 - 1.0)
+    assert curve.black_variance(3.0, 100.0, True) == pytest.approx(expected, abs=1e-15)
+    assert curve.black_variance(1.5, 100.0, False) == pytest.approx(
+        0.0625 + 0.5 * (0.18 - 0.0625), abs=1e-15
+    )
+
+
+def test_use_interpolator_builds_then_errors_only_on_extrapolation():
+    """blackvariancecurve.rs:389-393: construction and in-range queries succeed;
+    the failure is deferred to the extrapolating query, where the core refuses
+    to substitute another rule (D10). The error must be the UseInterpolator one,
+    not the ordinary out-of-range refusal, so extrapolation is enabled first."""
+    curve = _curve_with(BlackVolTimeExtrapolation.UseInterpolator)
+    assert curve.black_variance(2.0, 100.0, False) == pytest.approx(0.18, abs=1e-15)
+    with pytest.raises(ItofinError, match="UseInterpolator"):
+        curve.black_variance(3.0, 100.0, True)
+    curve.enable_extrapolation()
+    with pytest.raises(ItofinError, match="UseInterpolator"):
+        curve.black_variance(3.0, 100.0, False)
 
 
 def test_surface_extends_base_and_reproduces_nodes():
