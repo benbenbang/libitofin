@@ -7,7 +7,7 @@ from itofin.models import HestonModel, HullWhite
 from itofin.pricingengines import BlackSwaptionEngine
 from itofin.processes import BlackScholesProcess
 from itofin.termstructures import YieldTermStructure
-from itofin.time import Date, DayCounter, Schedule
+from itofin.time import Date, DayCounter, Period, Schedule
 
 class OptionType:
     """The call/put flag."""
@@ -58,6 +58,26 @@ class VanillaSwap:
     def npv(self) -> float: ...
     def nominal(self) -> float: ...
     def fixed_rate(self) -> float: ...
+
+class MakeVanillaSwap:
+    """Market-convention builder for a VanillaSwap: derives both schedules, the
+    fixed-leg tenor and day count and the discounting engine from a swap tenor
+    and an Ibor index. ``fixed_rate=None`` builds a par swap. The built swap
+    already carries its DiscountingSwapEngine."""
+
+    def __init__(
+        self,
+        swap_tenor: Period,
+        ibor_index: Euribor,
+        settings: Settings,
+        fixed_rate: float | None = None,
+        forward_start: Period | None = None,
+        effective_date: Date | None = None,
+        nominal: float | None = None,
+        fixed_leg_tenor: Period | None = None,
+        fixed_leg_day_count: DayCounter | None = None,
+    ) -> None: ...
+    def build(self) -> VanillaSwap: ...
 
 class EuropeanExercise:
     """A single-date exercise schedule."""

@@ -43,7 +43,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use settings::PySettings;
 use smilesection::PySabrSmileSection;
-use swap::{PySwapType, PyVanillaSwap};
+use swap::{PyMakeVanillaSwap, PySwapType, PyVanillaSwap};
 use swapindex::PySwapIndex;
 use swaption::{PyEuropeanExercise, PySettlementMethod, PySettlementType, PySwaption};
 use swaptionengine::{PyBlackSwaptionEngine, PyCashAnnuityModel};
@@ -157,6 +157,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     instruments.add_class::<PyVanillaOption>()?;
     instruments.add_class::<PySwapType>()?;
     instruments.add_class::<PyVanillaSwap>()?;
+    instruments.add_class::<PyMakeVanillaSwap>()?;
     instruments.add_class::<PyEuropeanExercise>()?;
     instruments.add_class::<PySettlementType>()?;
     instruments.add_class::<PySettlementMethod>()?;
