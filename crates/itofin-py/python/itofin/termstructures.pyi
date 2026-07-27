@@ -557,7 +557,10 @@ class SabrSwaptionVolatilityCube(SwaptionVolatilityStructure):
     The end criteria, maximum error tolerance, optimisation method and accepted
     error are left at the core's C++ defaults. Backward-flat interpolation
     (core #606) is not exposed, and the optimisation method is always
-    Levenberg-Marquardt, since a trait object does not cross FFI."""
+    Levenberg-Marquardt, since a trait object does not cross FFI. ZABR and the
+    generic XABR cube are a separate core track (#597), and the section-
+    recalibration API is unported in the core: re-fit by bumping the guess or
+    vol-spread quotes."""
 
     def __init__(
         self,
