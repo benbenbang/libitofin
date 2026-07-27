@@ -16,8 +16,8 @@
 //! rejects a collar - it has no single-strike form
 //! (`makecapfloor.rs:135`) - and the raw-leg `CapFloor::collar` constructor needs
 //! an `IborLeg` facade that does not exist yet, so a collar has no reachable
-//! construction path from Python. Exposing it needs that leg facade first; no
-//! issue tracks either yet.
+//! construction path from Python. Exposing it needs that leg facade first;
+//! tracked as #626.
 
 use crate::PyQlError;
 use crate::capfloorengine::PyBlackCapFloorEngine;
