@@ -123,10 +123,18 @@ def _pinned_surface():
     )
 
 
-def _stripper(curve, surface=None, volatility_type=VolatilityType.ShiftedLognormal):
+def _stripper(
+    curve,
+    surface=None,
+    volatility_type=VolatilityType.ShiftedLognormal,
+    optionlet_frequency=None,
+):
     surface = _moving_surface() if surface is None else surface
     return OptionletStripper1(
-        surface, Euribor.six_months(curve, SETTINGS), volatility_type
+        surface,
+        Euribor.six_months(curve, SETTINGS),
+        volatility_type,
+        optionlet_frequency=optionlet_frequency,
     )
 
 
@@ -173,7 +181,13 @@ def test_a_flat_term_vol_surface_round_trips_through_the_stripped_optionlets():
             )
 
     print(f"\nworst round-trip |npv diff| = {worst!r} at {worst_at}")
-    assert worst > 0.0, "an identically zero error would mean neither path priced"
+    assert worst > 0.0, (
+        "the anti-tautology guard: a stripper that echoed the flat input straight "
+        "through would feed both engines the identical vol, forward, strike, time "
+        "and discount, and the two NPVs would agree bit-for-bit. A non-zero worst "
+        "error is what proves the stripped caplet vols really differ from the flat "
+        "term vol, so arm A is a round-trip and not a circular identity."
+    )
 
 
 def test_the_switch_strike_is_the_mean_atm_caplet_rate():
@@ -184,6 +198,20 @@ def test_the_switch_strike_is_the_mean_atm_caplet_rate():
     assert stripper.switch_strike() == pytest.approx(
         expected, abs=SWITCH_STRIKE_TOLERANCE
     )
+
+
+def test_the_optionlet_frequency_overrides_the_index_tenor_as_the_caplet_step():
+    """The caplet grid is built by stepping the index tenor across the surface
+    (``optionletstripper.rs:128-151``), so a 1Y override on a 6M index halves the
+    number of caplets. This is what pins that the argument reaches the core
+    rather than being dropped by the facade."""
+    curve = _curve()
+    by_index_tenor = len(_stripper(curve).atm_optionlet_rates())
+    by_override = len(
+        _stripper(curve, optionlet_frequency=Period(1, "Years")).atm_optionlet_rates()
+    )
+    assert by_override == pytest.approx(by_index_tenor / 2, abs=1)
+    assert by_override < by_index_tenor
 
 
 def test_a_normal_volatility_type_is_rejected_at_the_strip_not_at_construction():
