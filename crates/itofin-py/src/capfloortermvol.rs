@@ -14,14 +14,19 @@
 //! `SabrSmileSection` precedent). A base can be introduced if a second one ever
 //! lands.
 //!
-//! Deferred (visible): the two MOVING constructors (`moving` /
-//! `moving_from_matrix`, whose reference date floats `settlement_days` off the
-//! evaluation date) are not exposed. Both fixed-reference forms are, so a
-//! caller can pin the reference date and still read the surface off live
-//! quotes, which is the path the stripper consumes.
+//! All four core constructors are exposed: a fixed reference date or one
+//! floating `settlement_days` off the evaluation date, each over fixed
+//! volatilities or over the caller's quotes. The moving pair is not optional
+//! polish here - it is what the optionlet stripping pipeline runs on. The
+//! adapter that serves the stripped surface reads its settlement days from this
+//! surface (`strippedoptionletadapter.rs:87` through
+//! `optionletstripper.rs:241`), and a fixed-reference term structure has none,
+//! so a surface built by the fixed forms fails the adapter with `"settlement
+//! days not provided for this instance"`.
 
 use crate::PyQlError;
 use crate::market::PySimpleQuote;
+use crate::settings::PySettings;
 use crate::time::{PyBusinessDayConvention, PyCalendar, PyDate, PyDayCounter, PyPeriod};
 use libitofin::handle::Handle;
 use libitofin::math::matrix::Matrix;
@@ -109,6 +114,78 @@ impl PyCapFloorTermVolSurface {
                 strikes,
                 volatilities,
                 day_counter.inner(),
+            )
+            .map_err(PyQlError::from)?,
+        );
+        Ok(PyCapFloorTermVolSurface { inner })
+    }
+
+    /// A surface whose reference date floats `settlement_days` business days
+    /// off the evaluation date, over fixed volatilities.
+    ///
+    /// This is the form the optionlet stripping pipeline needs: unlike the
+    /// pinned-reference constructors, it carries the settlement days
+    /// `StrippedOptionletAdapter` reads back off the stripper.
+    #[staticmethod]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (settlement_days, calendar, business_day_convention, option_tenors, strikes, volatilities, day_counter, settings))]
+    fn moving(
+        settlement_days: u32,
+        calendar: &PyCalendar,
+        business_day_convention: &PyBusinessDayConvention,
+        option_tenors: Vec<PyRef<'_, PyPeriod>>,
+        strikes: Vec<f64>,
+        volatilities: Vec<Vec<f64>>,
+        day_counter: &PyDayCounter,
+        settings: &PySettings,
+    ) -> PyResult<Self> {
+        let volatilities = matrix_from_rows(&volatilities)?;
+        let inner = shared(
+            CapFloorTermVolSurface::moving_from_matrix(
+                settlement_days,
+                calendar.inner(),
+                business_day_convention.inner(),
+                tenors(&option_tenors),
+                strikes,
+                &volatilities,
+                day_counter.inner(),
+                settings.inner(),
+            )
+            .map_err(PyQlError::from)?,
+        );
+        Ok(PyCapFloorTermVolSurface { inner })
+    }
+
+    /// The same floating-reference surface reading each node from the caller's
+    /// quote.
+    #[staticmethod]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (settlement_days, calendar, business_day_convention, option_tenors, strikes, volatilities, day_counter, settings))]
+    fn moving_with_quotes(
+        settlement_days: u32,
+        calendar: &PyCalendar,
+        business_day_convention: &PyBusinessDayConvention,
+        option_tenors: Vec<PyRef<'_, PyPeriod>>,
+        strikes: Vec<f64>,
+        volatilities: Vec<Vec<PyRef<'_, PySimpleQuote>>>,
+        day_counter: &PyDayCounter,
+        settings: &PySettings,
+    ) -> PyResult<Self> {
+        check_grid(&volatilities)?;
+        let volatilities: Vec<Vec<Handle<dyn Quote>>> = volatilities
+            .iter()
+            .map(|row| row.iter().map(|quote| quote.handle()).collect())
+            .collect();
+        let inner = shared(
+            CapFloorTermVolSurface::moving(
+                settlement_days,
+                calendar.inner(),
+                business_day_convention.inner(),
+                tenors(&option_tenors),
+                strikes,
+                volatilities,
+                day_counter.inner(),
+                settings.inner(),
             )
             .map_err(PyQlError::from)?,
         );

@@ -16,7 +16,7 @@
 //! Deferred (visible): the MOVING `ConstantOptionletVolatility` constructors
 //! (`moving` / `moving_with_quote`, whose reference date floats off the
 //! evaluation date) are not exposed; only the fixed-reference-date `new` and
-//! `with_quote` are, as for the constant swaption surface.
+//! `with_quote` are, as for the constant swaption surface. Tracked as #627.
 //! `BlackCapFloorEngine.with_flat_vol` builds a moving surface internally, but
 //! that is the engine's business, not this facade's.
 
@@ -88,6 +88,38 @@ impl PyOptionletVolatilityStructure {
             .map_err(PyQlError::from)?
             .black_variance_tenor(option_tenor.inner(), strike, extrapolate)
             .map_err(PyQlError::from)?)
+    }
+
+    /// Whether the surface answers dates/times beyond its maximum.
+    fn allows_extrapolation(&self) -> PyResult<bool> {
+        Ok(self
+            .inner
+            .current_link()
+            .map_err(PyQlError::from)?
+            .allows_extrapolation())
+    }
+
+    /// Allows extrapolation past the maximum date/time.
+    ///
+    /// A stripped surface ends at its last optionlet fixing, so a cap whose own
+    /// last caplet fixes there queries the boundary; the core's round-trip
+    /// fixture enables extrapolation before repricing
+    /// (`strippedoptionletadapter.rs:393`).
+    fn enable_extrapolation(&self) -> PyResult<()> {
+        self.inner
+            .current_link()
+            .map_err(PyQlError::from)?
+            .enable_extrapolation();
+        Ok(())
+    }
+
+    /// Forbids extrapolation past the maximum date/time.
+    fn disable_extrapolation(&self) -> PyResult<()> {
+        self.inner
+            .current_link()
+            .map_err(PyQlError::from)?
+            .disable_extrapolation();
+        Ok(())
     }
 
     /// The lognormal shift applied to forwards and strikes; `0.0` for the
