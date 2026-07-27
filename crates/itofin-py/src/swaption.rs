@@ -15,6 +15,7 @@ use crate::PyQlError;
 use crate::hullwhite::PyHullWhite;
 use crate::settings::PySettings;
 use crate::swap::PyVanillaSwap;
+use crate::swaptionengine::PyBlackSwaptionEngine;
 use crate::time::PyDate;
 use libitofin::exercise::{EuropeanExercise, Exercise};
 use libitofin::instrument::Instrument;
@@ -108,7 +109,8 @@ impl PySettlementMethod {
 ///
 /// Built with [`Swaption::new`] (infallible): it registers with the underlying
 /// swap and the settings evaluation date (D5). Pricing needs an engine: call
-/// [`set_jamshidian_engine`](Self::set_jamshidian_engine) before [`npv`](Self::npv).
+/// [`set_jamshidian_engine`](Self::set_jamshidian_engine) or
+/// [`set_black_engine`](Self::set_black_engine) before [`npv`](Self::npv).
 /// The (settlement type, method) consistency check runs at pricing time, so a
 /// mismatched pair surfaces as an `ItofinError` from `npv()`, not the ctor.
 #[pyclass(name = "Swaption", unsendable)]
@@ -149,10 +151,23 @@ impl PySwaption {
         self.inner.base_mut().set_pricing_engine(engine);
     }
 
+    /// Attaches a [`PyBlackSwaptionEngine`] so the swaption prices off a
+    /// swaption volatility surface rather than a short-rate model.
+    ///
+    /// The engine is built separately and installed here, so the same engine can
+    /// be shared across swaptions. It must carry the same `Settings` object this
+    /// swaption was built with: the engine resolves its own evaluation date, and
+    /// two different settings would price the swap and the option on different
+    /// dates without any error being raised.
+    fn set_black_engine(&mut self, engine: &PyBlackSwaptionEngine) {
+        self.inner.base_mut().set_pricing_engine(engine.engine());
+    }
+
     /// The swaption NPV under the attached engine.
     ///
-    /// Fallible: an engine must be attached ([`set_jamshidian_engine`](Self::set_jamshidian_engine))
-    /// and the (settlement type, method) pair consistent.
+    /// Fallible: an engine must be attached ([`set_jamshidian_engine`](Self::set_jamshidian_engine)
+    /// or [`set_black_engine`](Self::set_black_engine)) and the (settlement type,
+    /// method) pair consistent.
     fn npv(&mut self) -> PyResult<f64> {
         Ok(self.inner.npv().map_err(PyQlError::from)?)
     }

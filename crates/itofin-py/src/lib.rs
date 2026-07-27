@@ -15,6 +15,7 @@ mod option;
 mod settings;
 mod swap;
 mod swaption;
+mod swaptionengine;
 mod swaptionvol;
 mod time;
 mod vol;
@@ -41,6 +42,7 @@ use pyo3::types::PyDict;
 use settings::PySettings;
 use swap::{PySwapType, PyVanillaSwap};
 use swaption::{PyEuropeanExercise, PySettlementMethod, PySettlementType, PySwaption};
+use swaptionengine::{PyBlackSwaptionEngine, PyCashAnnuityModel};
 use swaptionvol::{PyConstantSwaptionVolatility, PySwaptionVolatilityStructure, PyVolatilityType};
 use time::{
     PyBusinessDayConvention, PyCalendar, PyDate, PyDayCounter, PyFrequency, PyPeriod, PySchedule,
@@ -73,7 +75,7 @@ impl From<PyQlError> for PyErr {
     }
 }
 
-/// Registers the eight `ql/`-faithful submodules on `itofin`.
+/// Registers the nine `ql/`-faithful submodules on `itofin`.
 ///
 /// Nested PyO3 modules give attribute access (`itofin.time.Date`) but do not
 /// form a Python package, so `import itofin.time` / `from itofin.time import
@@ -154,6 +156,10 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     models.add_class::<PySwaptionHelper>()?;
     models.add_class::<PyCalibrationErrorType>()?;
 
+    let pricingengines = PyModule::new(py, "pricingengines")?;
+    pricingengines.add_class::<PyCashAnnuityModel>()?;
+    pricingengines.add_class::<PyBlackSwaptionEngine>()?;
+
     let optimization = PyModule::new(py, "optimization")?;
     optimization.add_class::<PyLevenbergMarquardt>()?;
     optimization.add_class::<PyEndCriteria>()?;
@@ -166,6 +172,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
         ("indexes", &indexes),
         ("instruments", &instruments),
         ("models", &models),
+        ("pricingengines", &pricingengines),
         ("optimization", &optimization),
     ];
 
