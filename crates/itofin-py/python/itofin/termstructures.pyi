@@ -2,7 +2,7 @@
 # src/helpers.rs and src/swaptionvol.rs (#517).
 
 from itofin import Settings
-from itofin.indexes import Estr, Euribor
+from itofin.indexes import Estr, Euribor, SwapIndex
 from itofin.quotes import SimpleQuote
 from itofin.time import (
     BusinessDayConvention,
@@ -467,4 +467,34 @@ class SwaptionVolatilityMatrix(SwaptionVolatilityStructure):
         """A grid whose reference date floats off the evaluation date, reading
         each node from the caller's quote: a later set_value on any of them
         rebuilds the interpolation and notifies the grid's observers."""
+        ...
+
+class InterpolatedSwaptionVolatilityCube(SwaptionVolatilityStructure):
+    """A smile cube adding bilinearly-interpolated volatility spreads to an
+    at-the-money surface.
+
+    The inherited volatility query now takes a real strike: the cube reads the
+    at-the-money forward off its base swap indexes, the at-the-money volatility
+    off atm_vol, and adds the spread interpolated at strike - atm_strike.
+
+    vol_spreads is row-major over the (option tenor, swap tenor) nodes: row
+    i * len(swap_tenors) + j is the smile at (option_tenors[i], swap_tenors[j]),
+    holding one quote per entry of strike_spreads. A later set_value on any of
+    those quotes rebuilds the per-strike interpolators."""
+
+    def __init__(
+        self,
+        atm_vol: SwaptionVolatilityStructure,
+        option_tenors: list[Period],
+        swap_tenors: list[Period],
+        strike_spreads: list[float],
+        vol_spreads: list[list[SimpleQuote]],
+        swap_index_base: SwapIndex,
+        short_swap_index_base: SwapIndex,
+        settings: Settings,
+        vega_weighted_smile_fit: bool = False,
+    ) -> None: ...
+    def atm_strike_from_tenor(self, option_tenor: Period, swap_tenor: Period) -> float:
+        """The at-the-money strike for an option tenor and swap tenor: the fixing
+        of whichever base swap index the swap tenor selects."""
         ...
