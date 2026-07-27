@@ -43,7 +43,10 @@ use settings::PySettings;
 use swap::{PySwapType, PyVanillaSwap};
 use swaption::{PyEuropeanExercise, PySettlementMethod, PySettlementType, PySwaption};
 use swaptionengine::{PyBlackSwaptionEngine, PyCashAnnuityModel};
-use swaptionvol::{PyConstantSwaptionVolatility, PySwaptionVolatilityStructure, PyVolatilityType};
+use swaptionvol::{
+    PyConstantSwaptionVolatility, PySwaptionVolatilityMatrix, PySwaptionVolatilityStructure,
+    PyVolatilityType,
+};
 use time::{
     PyBusinessDayConvention, PyCalendar, PyDate, PyDayCounter, PyFrequency, PyPeriod, PySchedule,
 };
@@ -130,6 +133,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     termstructures.add_class::<PySwaptionVolatilityStructure>()?;
     termstructures.add_class::<PyVolatilityType>()?;
     termstructures.add_class::<PyConstantSwaptionVolatility>()?;
+    termstructures.add_class::<PySwaptionVolatilityMatrix>()?;
 
     let processes = PyModule::new(py, "processes")?;
     processes.add_class::<PyBlackScholesProcess>()?;
