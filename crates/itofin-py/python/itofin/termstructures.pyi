@@ -615,6 +615,12 @@ class OptionletVolatilityStructure:
     def black_variance(
         self, option_tenor: Period, strike: float, extrapolate: bool = False
     ) -> float: ...
+    def allows_extrapolation(self) -> bool: ...
+    def enable_extrapolation(self) -> None:
+        """A stripped surface ends at its last optionlet fixing, so a cap whose
+        own last caplet fixes there queries the boundary."""
+        ...
+    def disable_extrapolation(self) -> None: ...
     def displacement(self) -> float:
         """The lognormal shift applied to forwards and strikes. This is what
         BlackCapFloorEngine checks a caller-supplied displacement against."""
@@ -625,7 +631,7 @@ class ConstantOptionletVolatility(OptionletVolatilityStructure):
 
     Both constructors pin the reference date, so every query's option time runs
     from reference_date rather than the evaluation date. The moving (floating
-    reference date) forms are not exposed."""
+    reference date) forms are not exposed; tracked as #627."""
 
     def __init__(
         self,
@@ -661,10 +667,14 @@ class CapFloorTermVolSurface:
     OptionletVolatilityStructure.
 
     volatilities is a row per option tenor and a column per strike; both axes
-    must be strictly increasing. The moving (floating reference date)
-    constructors are not exposed - both forms here pin the reference date, so
-    every query's option time runs from reference_date rather than the
-    evaluation date."""
+    must be strictly increasing.
+
+    All four constructors are exposed. __init__ and with_quotes pin the
+    reference date, so every query's option time runs from reference_date rather
+    than the evaluation date. moving and moving_with_quotes float it
+    settlement_days off the evaluation date, and are what the optionlet
+    stripping pipeline runs on: StrippedOptionletAdapter reads its settlement
+    days back off this surface, and a pinned-reference surface has none."""
 
     def __init__(
         self,
@@ -692,6 +702,34 @@ class CapFloorTermVolSurface:
     ) -> CapFloorTermVolSurface:
         """Reads each node from the caller's quote; a later set_value rebuilds
         the interpolation and notifies the surface's observers."""
+        ...
+    @staticmethod
+    def moving(
+        settlement_days: int,
+        calendar: Calendar,
+        business_day_convention: BusinessDayConvention,
+        option_tenors: list[Period],
+        strikes: list[float],
+        volatilities: list[list[float]],
+        day_counter: DayCounter,
+        settings: Settings,
+    ) -> CapFloorTermVolSurface:
+        """The reference date floats settlement_days business days off the
+        evaluation date. This is the form OptionletStripper1 and
+        StrippedOptionletAdapter need."""
+        ...
+    @staticmethod
+    def moving_with_quotes(
+        settlement_days: int,
+        calendar: Calendar,
+        business_day_convention: BusinessDayConvention,
+        option_tenors: list[Period],
+        strikes: list[float],
+        volatilities: list[list[SimpleQuote]],
+        day_counter: DayCounter,
+        settings: Settings,
+    ) -> CapFloorTermVolSurface:
+        """The floating-reference surface over the caller's quotes."""
         ...
     def volatility(
         self, option_tenor: Period, strike: float, extrapolate: bool = False
