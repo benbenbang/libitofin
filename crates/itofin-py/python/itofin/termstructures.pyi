@@ -1,5 +1,5 @@
 # Hand-written stubs for itofin.termstructures; sync manually with src/curve.rs, src/vol.rs,
-# src/helpers.rs, src/swaptionvol.rs and src/smilesection.rs (#517).
+# src/helpers.rs, src/swaptionvol.rs, src/optionletvol.rs and src/smilesection.rs (#517).
 
 from itofin import Settings
 from itofin.indexes import Estr, Euribor, SwapIndex
@@ -597,4 +597,56 @@ class SabrSwaptionVolatilityCube(SwaptionVolatilityStructure):
     def atm_strike_from_tenor(self, option_tenor: Period, swap_tenor: Period) -> float:
         """The at-the-money strike for an option tenor and swap tenor: the strike
         the fitted smile is centred on."""
+        ...
+
+class OptionletVolatilityStructure:
+    """Shared base for every caplet/floorlet volatility surface: volatility,
+    Black variance and the lognormal displacement.
+
+    A single option axis, unlike the swaption surfaces: a query takes one option
+    tenor (or date) and a strike."""
+
+    def volatility(
+        self, option_tenor: Period, strike: float, extrapolate: bool = False
+    ) -> float: ...
+    def volatility_date(
+        self, option_date: Date, strike: float, extrapolate: bool = False
+    ) -> float: ...
+    def black_variance(
+        self, option_tenor: Period, strike: float, extrapolate: bool = False
+    ) -> float: ...
+    def displacement(self) -> float:
+        """The lognormal shift applied to forwards and strikes. This is what
+        BlackCapFloorEngine checks a caller-supplied displacement against."""
+        ...
+
+class ConstantOptionletVolatility(OptionletVolatilityStructure):
+    """A single caplet volatility with no option-time or strike dependence.
+
+    Both constructors pin the reference date, so every query's option time runs
+    from reference_date rather than the evaluation date. The moving (floating
+    reference date) forms are not exposed."""
+
+    def __init__(
+        self,
+        reference_date: Date,
+        calendar: Calendar,
+        business_day_convention: BusinessDayConvention,
+        volatility: float,
+        day_counter: DayCounter,
+        volatility_type: VolatilityType,
+        displacement: float = 0.0,
+    ) -> None: ...
+    @staticmethod
+    def with_quote(
+        reference_date: Date,
+        calendar: Calendar,
+        business_day_convention: BusinessDayConvention,
+        volatility: SimpleQuote,
+        day_counter: DayCounter,
+        volatility_type: VolatilityType,
+        displacement: float = 0.0,
+    ) -> ConstantOptionletVolatility:
+        """Reads the volatility from the caller's quote; a later set_value
+        notifies the surface's observers."""
         ...
