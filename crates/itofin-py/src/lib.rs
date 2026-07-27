@@ -13,6 +13,7 @@ mod heston;
 mod hullwhite;
 mod market;
 mod option;
+mod optionletvol;
 mod settings;
 mod smilesection;
 mod swap;
@@ -39,6 +40,7 @@ use hullwhite::{PyEuribor, PyHullWhite, PySwaptionHelper};
 use libitofin::errors::QlError;
 use market::{PyBlackScholesProcess, PySimpleQuote};
 use option::{PyOptionType, PyVanillaOption};
+use optionletvol::{PyConstantOptionletVolatility, PyOptionletVolatilityStructure};
 use pyo3::create_exception;
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
@@ -146,6 +148,8 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     termstructures.add_class::<PyInterpolatedSwaptionVolatilityCube>()?;
     termstructures.add_class::<PySabrSwaptionVolatilityCube>()?;
     termstructures.add_class::<PySabrSmileSection>()?;
+    termstructures.add_class::<PyOptionletVolatilityStructure>()?;
+    termstructures.add_class::<PyConstantOptionletVolatility>()?;
 
     let processes = PyModule::new(py, "processes")?;
     processes.add_class::<PyBlackScholesProcess>()?;

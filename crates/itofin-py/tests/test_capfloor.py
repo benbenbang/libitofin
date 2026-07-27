@@ -35,8 +35,13 @@ import pytest
 from itofin import ItofinError, Settings
 from itofin.indexes import Euribor
 from itofin.instruments import CapFloor, CapFloorType
-from itofin.termstructures import FlatForward
-from itofin.time import DayCounter, Date, Period
+from itofin.quotes import SimpleQuote
+from itofin.termstructures import (
+    ConstantOptionletVolatility,
+    FlatForward,
+    VolatilityType,
+)
+from itofin.time import BusinessDayConvention, Calendar, DayCounter, Date, Period
 
 EVAL = Date(15, 1, 2026)
 
@@ -45,6 +50,7 @@ CAP_STRIKE = 0.04
 FLOOR_STRIKE = 0.06
 OUT_OF_THE_MONEY_STRIKE = 0.06
 
+VOL = 0.20
 TENOR = Period(5, "Years")
 SPOT = Period(0, "Days")
 
@@ -54,6 +60,19 @@ SETTINGS.set_evaluation_date(EVAL)
 
 def _curve():
     return FlatForward(EVAL, CURVE_RATE, DayCounter.actual365_fixed())
+
+
+def _surface(displacement=0.0):
+    """The fixed-reference twin of the moving surface ``with_flat_vol`` builds."""
+    return ConstantOptionletVolatility(
+        EVAL,
+        Calendar.null_calendar(),
+        BusinessDayConvention.Following,
+        VOL,
+        DayCounter.actual365_fixed(),
+        VolatilityType.ShiftedLognormal,
+        displacement,
+    )
 
 
 def _cap_floor(cap_floor_type, strike):
@@ -80,6 +99,38 @@ def test_pricing_without_an_engine_raises():
     _, cap = _cap_floor(CapFloorType.Cap, CAP_STRIKE)
     with pytest.raises(ItofinError):
         cap.npv()
+
+
+def test_constant_surface_returns_the_constructed_volatility():
+    surface = _surface()
+    for tenor in [1, 2, 5]:
+        assert surface.volatility(Period(tenor, "Years"), CAP_STRIKE) == VOL
+        assert surface.volatility_date(EVAL + 365 * tenor, CAP_STRIKE) == VOL
+    assert surface.displacement() == 0.0
+
+
+def test_constant_surface_black_variance_is_vol_squared_times_time():
+    surface = _surface()
+    one_year = Period(1, "Years")
+    option_time = surface.black_variance(one_year, CAP_STRIKE) / (VOL * VOL)
+    assert option_time == pytest.approx(1.0, abs=0.01)
+
+
+def test_quote_backed_surface_tracks_its_quote():
+    quote = SimpleQuote(VOL)
+    surface = ConstantOptionletVolatility.with_quote(
+        EVAL,
+        Calendar.null_calendar(),
+        BusinessDayConvention.Following,
+        quote,
+        DayCounter.actual365_fixed(),
+        VolatilityType.ShiftedLognormal,
+        0.0,
+    )
+    one_year = (Period(1, "Years"), CAP_STRIKE)
+    assert surface.volatility(*one_year) == VOL
+    quote.set_value(0.25)
+    assert surface.volatility(*one_year) == 0.25
 
 
 def test_cap_floor_type_exposes_cap_and_floor_only():
