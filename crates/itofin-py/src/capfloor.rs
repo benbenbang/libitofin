@@ -15,11 +15,12 @@
 //! Deferred (visible): `CapFloorType.Collar` is not exposed. [`MakeCapFloor`]
 //! rejects a collar - it has no single-strike form
 //! (`makecapfloor.rs:135`) - and the raw-leg `CapFloor::collar` constructor needs
-//! the `IborLeg` facade that does not exist yet, so a collar has no reachable
-//! construction path from Python. It lands with the leg facades, tracked under
-//! the binding session #605.
+//! an `IborLeg` facade that does not exist yet, so a collar has no reachable
+//! construction path from Python. Exposing it needs that leg facade first; no
+//! issue tracks either yet.
 
 use crate::PyQlError;
+use crate::capfloorengine::PyBlackCapFloorEngine;
 use crate::hullwhite::PyEuribor;
 use crate::settings::PySettings;
 use crate::time::PyPeriod;
@@ -107,6 +108,18 @@ impl PyCapFloor {
     /// The number of optionlets, one per floating coupon.
     fn coupon_count(&self) -> usize {
         self.inner.coupons().len()
+    }
+
+    /// Attaches a [`PyBlackCapFloorEngine`] so the cap/floor prices each
+    /// optionlet off an optionlet volatility surface.
+    ///
+    /// The engine is built separately and installed here, so the same engine can
+    /// be shared across instruments. It must resolve its dates against the same
+    /// `Settings` object this cap/floor was built with: two different settings
+    /// would price the leg and the optionlets on different dates without any
+    /// error being raised.
+    fn set_black_engine(&mut self, engine: &PyBlackCapFloorEngine) {
+        self.inner.base_mut().set_pricing_engine(engine.engine());
     }
 
     /// The cap/floor NPV under the attached engine.

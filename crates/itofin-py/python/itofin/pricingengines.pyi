@@ -1,8 +1,13 @@
-# Hand-written stubs for itofin.pricingengines; sync manually with src/swaptionengine.rs (#517).
+# Hand-written stubs for itofin.pricingengines; sync manually with src/swaptionengine.rs
+# and src/capfloorengine.rs (#517).
 
 from itofin import Settings
 from itofin.quotes import SimpleQuote
-from itofin.termstructures import SwaptionVolatilityStructure, YieldTermStructure
+from itofin.termstructures import (
+    OptionletVolatilityStructure,
+    SwaptionVolatilityStructure,
+    YieldTermStructure,
+)
 from itofin.time import DayCounter
 
 class CashAnnuityModel:
@@ -41,3 +46,37 @@ class BlackSwaptionEngine:
         constant surface on a null calendar whose reference date tracks the
         evaluation date. displacement is that surface's lognormal shift."""
         ...
+
+class BlackCapFloorEngine:
+    """The shifted-lognormal Black-formula cap/floor engine, one Black 1976
+    optionlet per coupon.
+
+    Only the shifted-lognormal path is priced in the core, so a normal-volatility
+    surface is rejected by the constructor rather than bound to a Bachelier
+    engine. The instrument this engine prices must resolve its dates against the
+    same Settings object the engine does."""
+
+    def __init__(
+        self,
+        vol: OptionletVolatilityStructure,
+        discount: YieldTermStructure,
+        displacement: float | None = None,
+    ) -> None:
+        """Raises ItofinError on a normal-volatility surface, and when a given
+        displacement differs from the surface's own. None adopts the surface's
+        displacement."""
+        ...
+    @staticmethod
+    def with_flat_vol(
+        discount: YieldTermStructure,
+        vol: SimpleQuote,
+        day_counter: DayCounter,
+        displacement: float,
+        settings: Settings,
+    ) -> BlackCapFloorEngine:
+        """An engine over a flat volatility quote, wrapped internally in a
+        constant optionlet surface on a null calendar whose reference date
+        tracks the evaluation date. displacement is that surface's lognormal
+        shift."""
+        ...
+    def displacement(self) -> float: ...

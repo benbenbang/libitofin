@@ -7,6 +7,7 @@
 
 mod calibration;
 mod capfloor;
+mod capfloorengine;
 mod curve;
 mod helpers;
 mod heston;
@@ -26,6 +27,7 @@ mod vol;
 
 use calibration::{PyCalibrationErrorType, PyEndCriteria, PyLevenbergMarquardt};
 use capfloor::{PyCapFloor, PyCapFloorType};
+use capfloorengine::PyBlackCapFloorEngine;
 use curve::{
     PyDiscountCurve, PyFlatForward, PyForwardCurve, PyPiecewiseFlatForward,
     PyPiecewiseLinearForward, PyPiecewiseLinearZero, PyPiecewiseLogLinearDiscount,
@@ -183,6 +185,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     let pricingengines = PyModule::new(py, "pricingengines")?;
     pricingengines.add_class::<PyCashAnnuityModel>()?;
     pricingengines.add_class::<PyBlackSwaptionEngine>()?;
+    pricingengines.add_class::<PyBlackCapFloorEngine>()?;
 
     let optimization = PyModule::new(py, "optimization")?;
     optimization.add_class::<PyLevenbergMarquardt>()?;
