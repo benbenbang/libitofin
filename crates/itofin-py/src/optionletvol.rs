@@ -1,6 +1,8 @@
 //! Facades for the optionlet (caplet/floorlet) volatility stack: the
-//! [`PyOptionletVolatilityStructure`] base and the constant surface
-//! [`PyConstantOptionletVolatility`].
+//! [`PyOptionletVolatilityStructure`] base, the constant surface
+//! [`PyConstantOptionletVolatility`], and the stripping pair
+//! [`PyOptionletStripper1`] / [`PyStrippedOptionletAdapter`] that turns market
+//! cap term volatilities into a caplet surface.
 //!
 //! The base holds the erased `Handle<dyn OptionletVolatilityStructure>` and
 //! exposes the queries every concrete surface inherits; concrete surfaces
@@ -21,14 +23,20 @@
 //! that is the engine's business, not this facade's.
 
 use crate::PyQlError;
+use crate::capfloortermvol::PyCapFloorTermVolSurface;
+use crate::curve::PyYieldTermStructure;
+use crate::hullwhite::PyEuribor;
 use crate::market::PySimpleQuote;
+use crate::settings::PySettings;
 use crate::swaptionvol::PyVolatilityType;
 use crate::time::{PyBusinessDayConvention, PyCalendar, PyDate, PyDayCounter, PyPeriod};
 use libitofin::handle::Handle;
 use libitofin::shared::{Shared, shared};
 use libitofin::termstructures::volatility::{
-    ConstantOptionletVolatility, OptionletVolatilityStructure,
+    ConstantOptionletVolatility, OptionletStripper1, OptionletVolatilityStructure,
+    StrippedOptionletAdapter, StrippedOptionletBase,
 };
+use libitofin::termstructures::yieldtermstructure::YieldTermStructure;
 use pyo3::prelude::*;
 
 /// Python `OptionletVolatilityStructure`: the shared base for every caplet
@@ -223,6 +231,134 @@ impl PyConstantOptionletVolatility {
                 surface,
             )))
             .add_subclass(PyConstantOptionletVolatility),
+        )
+    }
+}
+
+/// Python `OptionletStripper1`: bootstraps caplet volatilities out of a market
+/// cap/floor term-volatility surface
+/// (`termstructures::volatility::OptionletStripper1`).
+///
+/// The stripper is not itself a volatility surface: it produces a grid of
+/// caplet volatilities that [`PyStrippedOptionletAdapter`] interpolates into
+/// one. It prices a cap at each of its own lengths off `term_vol_surface`,
+/// differences consecutive prices into a single caplet price, and inverts that
+/// for the caplet's implied volatility.
+///
+/// Stripping is lazy and cached: nothing runs until a query needs the grid, and
+/// it re-runs only when a surface quote or the index changes. The
+/// [`Normal`](crate::swaptionvol::PyVolatilityType::Normal) model is deferred
+/// (#440/#577) and fails at the strip rather than at construction.
+#[pyclass(name = "OptionletStripper1", unsendable)]
+pub struct PyOptionletStripper1 {
+    inner: Shared<OptionletStripper1>,
+}
+
+#[pymethods]
+impl PyOptionletStripper1 {
+    /// A stripper over `term_vol_surface` and `ibor_index`.
+    ///
+    /// `term_vol_surface` must be one of the MOVING forms: the adapter reads
+    /// its settlement days back off the surface, and a pinned-reference surface
+    /// has none. `discount` is the curve the caps are priced on; `None` falls
+    /// back to the index's own forwarding curve. `accuracy` and `max_iter` size
+    /// the implied-volatility solve, and `optionlet_frequency` overrides the
+    /// index tenor as the caplet step.
+    #[new]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (term_vol_surface, ibor_index, volatility_type, accuracy = 1e-6, max_iter = 100, displacement = 0.0, discount = None, optionlet_frequency = None))]
+    fn new(
+        term_vol_surface: &PyCapFloorTermVolSurface,
+        ibor_index: &PyEuribor,
+        volatility_type: PyVolatilityType,
+        accuracy: f64,
+        max_iter: u32,
+        displacement: f64,
+        discount: Option<&PyYieldTermStructure>,
+        optionlet_frequency: Option<&PyPeriod>,
+    ) -> PyResult<Self> {
+        let discount = match discount {
+            Some(curve) => curve.handle(),
+            None => Handle::<dyn YieldTermStructure>::empty(),
+        };
+        Ok(PyOptionletStripper1 {
+            inner: shared(
+                OptionletStripper1::new(
+                    term_vol_surface.inner(),
+                    ibor_index.inner(),
+                    discount,
+                    accuracy,
+                    max_iter,
+                    volatility_type.inner(),
+                    displacement,
+                    optionlet_frequency.map(|period| period.inner()),
+                )
+                .map_err(PyQlError::from)?,
+            ),
+        })
+    }
+
+    /// The floating switch strike: the mean at-the-money caplet rate, which
+    /// decides whether each strike is stripped out of caps or out of floors.
+    ///
+    /// Fallible, and the first call triggers the strip.
+    fn switch_strike(&self) -> PyResult<f64> {
+        Ok(self.inner.switch_strike().map_err(PyQlError::from)?)
+    }
+
+    /// The at-the-money forward rate of each caplet, one per maturity.
+    fn atm_optionlet_rates(&self) -> PyResult<Vec<f64>> {
+        Ok(self.inner.atm_optionlet_rates().map_err(PyQlError::from)?)
+    }
+}
+
+impl PyOptionletStripper1 {
+    /// The wrapped stripper, erased to the trait the adapter takes.
+    fn erased(&self) -> Shared<dyn StrippedOptionletBase> {
+        Shared::clone(&self.inner) as Shared<dyn StrippedOptionletBase>
+    }
+}
+
+/// Python `StrippedOptionletAdapter`: serves a stripper's caplet volatility
+/// grid as an [`PyOptionletVolatilityStructure`]
+/// (`termstructures::volatility::StrippedOptionletAdapter`).
+///
+/// This is what closes the cap/floor volatility loop: a
+/// [`PyBlackCapFloorEngine`](crate::capfloorengine::PyBlackCapFloorEngine)
+/// built on this surface reprices the caps the term volatilities were quoted
+/// on. Linear in strike within each maturity, then linear across maturities.
+///
+/// Extends [`PyOptionletVolatilityStructure`] and supplies only the
+/// constructor; the query surface is inherited. Its reference date floats off
+/// the evaluation date carried by `settings`, advanced by the settlement days
+/// the underlying term-volatility surface carries. The surface ends at the last
+/// caplet fixing, so pricing a cap that reaches it wants
+/// `enable_extrapolation()`.
+#[pyclass(name = "StrippedOptionletAdapter", extends = PyOptionletVolatilityStructure, unsendable)]
+pub struct PyStrippedOptionletAdapter;
+
+#[pymethods]
+impl PyStrippedOptionletAdapter {
+    /// The interpolated surface over `stripper`.
+    ///
+    /// Fallible, and it strips eagerly: the constructor reads the caplet
+    /// strikes and fixing dates to snapshot its strike domain and maximum date.
+    /// It fails on a stripper whose term-volatility surface carries no
+    /// settlement days, which is every pinned-reference surface.
+    #[new]
+    fn new(
+        stripper: &PyOptionletStripper1,
+        settings: &PySettings,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        let adapter = shared(
+            StrippedOptionletAdapter::new(stripper.erased(), settings.inner())
+                .map_err(PyQlError::from)?,
+        ) as Shared<dyn OptionletVolatilityStructure>;
+        Ok(
+            PyClassInitializer::from(PyOptionletVolatilityStructure::from_handle(Handle::new(
+                adapter,
+            )))
+            .add_subclass(PyStrippedOptionletAdapter),
         )
     }
 }

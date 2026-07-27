@@ -224,7 +224,6 @@ impl PyCapFloorTermVolSurface {
 impl PyCapFloorTermVolSurface {
     /// The wrapped core surface for the optionlet-stripper facade, which takes
     /// the concrete type rather than a handle.
-    #[allow(dead_code)]
     pub(crate) fn inner(&self) -> Shared<CapFloorTermVolSurface> {
         Shared::clone(&self.inner)
     }
