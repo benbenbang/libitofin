@@ -11,6 +11,7 @@
 #   indexes       <- src/hullwhite.rs
 #   instruments   <- src/option.rs, src/swap.rs, src/swaption.rs
 #   models        <- src/heston.rs, src/hullwhite.rs, src/calibration.rs
+#   pricingengines<- src/swaptionengine.rs
 #   optimization  <- src/calibration.rs
 """Python bindings for libitofin, a Rust port of QuantLib."""
 
@@ -18,6 +19,7 @@ from . import indexes as indexes
 from . import instruments as instruments
 from . import models as models
 from . import optimization as optimization
+from . import pricingengines as pricingengines
 from . import processes as processes
 from . import quotes as quotes
 from . import termstructures as termstructures

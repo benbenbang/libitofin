@@ -4,6 +4,7 @@
 from itofin import Settings
 from itofin.indexes import Euribor
 from itofin.models import HestonModel, HullWhite
+from itofin.pricingengines import BlackSwaptionEngine
 from itofin.processes import BlackScholesProcess
 from itofin.termstructures import YieldTermStructure
 from itofin.time import Date, DayCounter, Schedule
@@ -89,4 +90,8 @@ class Swaption:
         settings: Settings,
     ) -> None: ...
     def set_jamshidian_engine(self, model: HullWhite) -> None: ...
+    def set_black_engine(self, engine: BlackSwaptionEngine) -> None:
+        """Price off a swaption volatility surface instead of a short-rate
+        model. The engine must carry the same Settings object as this swaption."""
+        ...
     def npv(self) -> float: ...
