@@ -246,6 +246,47 @@ def test_the_swap_spans_the_seven_year_tenor_the_matrix_is_queried_at():
     assert round(SPAN_DAYS / 365.25 * 12.0) / 12.0 == 7.0
 
 
+def test_flat_extrapolation_clamps_past_the_grid():
+    """Both constructors route on flat_extrapolation, so both are pinned: an
+    inverted flag or a route that ignores it is otherwise invisible. Past the
+    30Y option tenor the plain grid extends the boundary surface while the flat
+    one clamps to the 30Y x 30Y corner vol exactly."""
+    past = (Period(40, "Years"), SWAP_TENORS[-1], STRIKE, True)
+    corner = VOLS[-1][-1]
+
+    plain_fixed = _fixed_matrix()
+    flat_fixed = SwaptionVolatilityMatrix(
+        EVAL,
+        Calendar.target(),
+        BDC,
+        OPTION_TENORS,
+        SWAP_TENORS,
+        VOLS,
+        DayCounter.actual365_fixed(),
+        VolatilityType.ShiftedLognormal,
+        None,
+        True,
+    )
+    assert flat_fixed.volatility(*past) == pytest.approx(corner, abs=TOL)
+    assert plain_fixed.volatility(*past) != flat_fixed.volatility(*past)
+
+    plain_moving, _quotes = _moving_matrix()
+    flat_moving = SwaptionVolatilityMatrix.moving(
+        Calendar.target(),
+        BDC,
+        OPTION_TENORS,
+        SWAP_TENORS,
+        [[SimpleQuote(vol) for vol in row] for row in VOLS],
+        DayCounter.actual365_fixed(),
+        VolatilityType.ShiftedLognormal,
+        SETTINGS,
+        None,
+        True,
+    )
+    assert flat_moving.volatility(*past) == pytest.approx(corner, abs=TOL)
+    assert plain_moving.volatility(*past) != flat_moving.volatility(*past)
+
+
 def test_the_engine_prices_off_this_matrix():
     matrix = _fixed_matrix()
     served = matrix.volatility(ENGINE_OPTION_TENOR, ENGINE_SWAP_TENOR, STRIKE)
