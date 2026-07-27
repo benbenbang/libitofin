@@ -477,7 +477,12 @@ impl PyInterpolatedSwaptionVolatilityCube {
 /// is not exposed; the optimisation method is always the core's default
 /// Levenberg-Marquardt, since a trait object does not cross FFI (D7); a normal
 /// (Bachelier) at-the-money surface needs the normal SABR formula, deferred to
-/// core #586, and surfaces as an `ItofinError` from the constructor.
+/// core #586, and surfaces as an `ItofinError` from the constructor. ZABR and
+/// the generic XABR cube are a separate core track (#597), so SABR is the only
+/// smile model bound here. The section-recalibration API (C++'s
+/// `recalibration` / `sabrCalibrationSection`) has no binding because the core
+/// does not port it (sabrcube.rs:60-62); a caller re-fits by bumping the guess
+/// or vol-spread quotes, which invalidates the calibration.
 #[pyclass(name = "SabrSwaptionVolatilityCube", extends = PySwaptionVolatilityStructure, unsendable)]
 pub struct PySabrSwaptionVolatilityCube {
     concrete: Shared<SabrSwaptionVolatilityCube>,
