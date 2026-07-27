@@ -1,5 +1,5 @@
 # Hand-written stubs for itofin.instruments; sync manually with src/option.rs,
-# src/swap.rs and src/swaption.rs (#517).
+# src/swap.rs, src/swaption.rs and src/capfloor.rs (#517).
 
 from itofin import Settings
 from itofin.indexes import Euribor
@@ -115,3 +115,38 @@ class Swaption:
         model. The engine must carry the same Settings object as this swaption."""
         ...
     def npv(self) -> float: ...
+
+class CapFloorType:
+    """Whether the instrument caps or floors its floating leg.
+
+    The core enum's third variant, Collar, is not exposed: MakeCapFloor rejects
+    it and the raw-leg constructor needs an IborLeg facade that does not exist
+    yet, so a collar has no construction path from Python."""
+
+    Cap: CapFloorType
+    Floor: CapFloorType
+
+class CapFloor:
+    """A cap or floor over a floating (ibor) leg, built through the standard
+    market builder MakeCapFloor.
+
+    The leg carries a unit nominal and one strike, padded across every coupon. A
+    zero forward_start excludes the spot caplet, so the leg is one coupon shorter
+    than the schedule: that is what lets the cap price without a historical index
+    fixing at the evaluation date."""
+
+    def __init__(
+        self,
+        cap_floor_type: CapFloorType,
+        tenor: Period,
+        ibor_index: Euribor,
+        strike: float,
+        forward_start: Period,
+        settings: Settings,
+    ) -> None: ...
+    def cap_rates(self) -> list[float]: ...
+    def floor_rates(self) -> list[float]: ...
+    def coupon_count(self) -> int: ...
+    def npv(self) -> float:
+        """Raises ItofinError with no engine attached."""
+        ...
