@@ -6,6 +6,7 @@
 //! tickets (#485-#487).
 
 mod calibration;
+mod capfloor;
 mod curve;
 mod helpers;
 mod heston;
@@ -23,6 +24,7 @@ mod time;
 mod vol;
 
 use calibration::{PyCalibrationErrorType, PyEndCriteria, PyLevenbergMarquardt};
+use capfloor::{PyCapFloor, PyCapFloorType};
 use curve::{
     PyDiscountCurve, PyFlatForward, PyForwardCurve, PyPiecewiseFlatForward,
     PyPiecewiseLinearForward, PyPiecewiseLinearZero, PyPiecewiseLogLinearDiscount,
@@ -164,6 +166,8 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     instruments.add_class::<PySettlementType>()?;
     instruments.add_class::<PySettlementMethod>()?;
     instruments.add_class::<PySwaption>()?;
+    instruments.add_class::<PyCapFloorType>()?;
+    instruments.add_class::<PyCapFloor>()?;
 
     let models = PyModule::new(py, "models")?;
     models.add_class::<PyHestonModel>()?;
