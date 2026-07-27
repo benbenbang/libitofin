@@ -536,3 +536,48 @@ class SabrSmileSection:
     def nu(self) -> float: ...
     @property
     def rho(self) -> float: ...
+
+class SabrSwaptionVolatilityCube(SwaptionVolatilityStructure):
+    """A smile cube whose every node is a SABR smile fitted to the at-the-money
+    volatility plus the market vol spreads.
+
+    The inherited volatility query takes a real strike and answers off the fitted
+    smile rather than an interpolated spread. Construction is where the work
+    happens: every node is calibrated by Levenberg-Marquardt, and with
+    is_atm_calibrated a second dense pass re-anchors the fitted smiles on the
+    at-the-money surface.
+
+    vol_spreads and parameters_guess are both row-major over the (option tenor,
+    swap tenor) nodes: row i * len(swap_tenors) + j is the node at
+    (option_tenors[i], swap_tenors[j]). A vol_spreads row holds one quote per
+    entry of strike_spreads; a parameters_guess row holds the four SABR starting
+    values [alpha, beta, nu, rho]. is_parameter_fixed pins a parameter at its
+    guess across every node, in that same order.
+
+    The end criteria, maximum error tolerance, optimisation method and accepted
+    error are left at the core's C++ defaults. Backward-flat interpolation
+    (core #606) is not exposed, and the optimisation method is always
+    Levenberg-Marquardt, since a trait object does not cross FFI."""
+
+    def __init__(
+        self,
+        atm_vol: SwaptionVolatilityStructure,
+        option_tenors: list[Period],
+        swap_tenors: list[Period],
+        strike_spreads: list[float],
+        vol_spreads: list[list[SimpleQuote]],
+        swap_index_base: SwapIndex,
+        short_swap_index_base: SwapIndex,
+        parameters_guess: list[list[SimpleQuote]],
+        is_parameter_fixed: list[bool],
+        is_atm_calibrated: bool,
+        settings: Settings,
+        vega_weighted_smile_fit: bool = False,
+        use_max_error: bool = False,
+        max_guesses: int = 50,
+        cutoff_strike: float = 0.0001,
+    ) -> None: ...
+    def atm_strike_from_tenor(self, option_tenor: Period, swap_tenor: Period) -> float:
+        """The at-the-money strike for an option tenor and swap tenor: the strike
+        the fitted smile is centred on."""
+        ...

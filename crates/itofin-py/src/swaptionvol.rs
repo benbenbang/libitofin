@@ -1,8 +1,9 @@
 //! Facades for the swaption volatility stack: the [`PySwaptionVolatilityStructure`]
 //! base, the [`PyVolatilityType`] flag, the constant surface
 //! [`PyConstantSwaptionVolatility`], the at-the-money grid
-//! [`PySwaptionVolatilityMatrix`] and the spread cube over it,
-//! [`PyInterpolatedSwaptionVolatilityCube`].
+//! [`PySwaptionVolatilityMatrix`], the spread cube over it,
+//! [`PyInterpolatedSwaptionVolatilityCube`], and the calibrated
+//! [`PySabrSwaptionVolatilityCube`].
 //!
 //! The base holds the erased `Handle<dyn SwaptionVolatilityStructure>` and
 //! exposes the queries every concrete surface inherits; concrete surfaces
@@ -27,11 +28,15 @@ use libitofin::math::matrix::Matrix;
 use libitofin::quotes::Quote;
 use libitofin::shared::{Shared, shared};
 use libitofin::termstructures::volatility::{
-    ConstantSwaptionVolatility, InterpolatedSwaptionVolatilityCube, SwaptionVolatilityMatrix,
-    SwaptionVolatilityStructure, VolatilityType,
+    ConstantSwaptionVolatility, InterpolatedSwaptionVolatilityCube, SabrSwaptionVolatilityCube,
+    SwaptionVolatilityMatrix, SwaptionVolatilityStructure, VolatilityType,
 };
 use libitofin::time::period::Period;
 use pyo3::prelude::*;
+
+/// The four SABR parameters a guess row and the fixed-parameter flags carry,
+/// in the order `[alpha, beta, nu, rho]`.
+const SABR_PARAMETERS: usize = 4;
 
 /// Python `SwaptionVolatilityStructure`: the shared base for every swaption
 /// volatility surface (`termstructures::volatility::SwaptionVolatilityStructure`).
@@ -450,6 +455,133 @@ impl PyInterpolatedSwaptionVolatilityCube {
     }
 }
 
+/// Python `SabrSwaptionVolatilityCube`: a smile cube whose every node is a SABR
+/// smile fitted to the at-the-money volatility plus the market vol spreads
+/// (`termstructures::volatility::SabrSwaptionVolatilityCube`).
+///
+/// Extends [`PySwaptionVolatilityStructure`], so the inherited `volatility`
+/// query takes a real strike and answers off the fitted smile rather than an
+/// interpolated spread. Construction is where the work happens: every node is
+/// calibrated by Levenberg-Marquardt, and with `is_atm_calibrated` a second
+/// dense pass re-anchors the fitted smiles on the at-the-money surface.
+///
+/// `vol_spreads` and `parameters_guess` are both **row-major over the
+/// `(option tenor, swap tenor)` nodes**, as in
+/// [`PyInterpolatedSwaptionVolatilityCube`]: row `i * len(swap_tenors) + j` is
+/// the node at `(option_tenors[i], swap_tenors[j])`. A `vol_spreads` row holds
+/// one quote per entry of `strike_spreads`; a `parameters_guess` row holds the
+/// four SABR starting values `[alpha, beta, nu, rho]`. `is_parameter_fixed` pins
+/// a parameter at its guess across every node, in that same order.
+///
+/// Deferred (visible): backward-flat interpolation is not ported (core #606) and
+/// is not exposed; the optimisation method is always the core's default
+/// Levenberg-Marquardt, since a trait object does not cross FFI (D7); a normal
+/// (Bachelier) at-the-money surface needs the normal SABR formula, deferred to
+/// core #586, and surfaces as an `ItofinError` from the constructor.
+#[pyclass(name = "SabrSwaptionVolatilityCube", extends = PySwaptionVolatilityStructure, unsendable)]
+pub struct PySabrSwaptionVolatilityCube {
+    concrete: Shared<SabrSwaptionVolatilityCube>,
+}
+
+#[pymethods]
+impl PySabrSwaptionVolatilityCube {
+    /// A cube calibrating every node on construction. `end_criteria`, the
+    /// maximum error tolerance, the optimisation method and the accepted error
+    /// are left at the core's C++ defaults.
+    #[new]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (atm_vol, option_tenors, swap_tenors, strike_spreads, vol_spreads, swap_index_base, short_swap_index_base, parameters_guess, is_parameter_fixed, is_atm_calibrated, settings, vega_weighted_smile_fit = false, use_max_error = false, max_guesses = 50, cutoff_strike = 0.0001))]
+    fn new(
+        atm_vol: &PySwaptionVolatilityStructure,
+        option_tenors: Vec<PyRef<'_, PyPeriod>>,
+        swap_tenors: Vec<PyRef<'_, PyPeriod>>,
+        strike_spreads: Vec<f64>,
+        vol_spreads: Vec<Vec<PyRef<'_, PySimpleQuote>>>,
+        swap_index_base: &PySwapIndex,
+        short_swap_index_base: &PySwapIndex,
+        parameters_guess: Vec<Vec<PyRef<'_, PySimpleQuote>>>,
+        is_parameter_fixed: Vec<bool>,
+        is_atm_calibrated: bool,
+        settings: &PySettings,
+        vega_weighted_smile_fit: bool,
+        use_max_error: bool,
+        max_guesses: usize,
+        cutoff_strike: f64,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        let nodes = option_tenors.len() * swap_tenors.len();
+        let vol_spreads = node_grid(
+            &vol_spreads,
+            nodes,
+            strike_spreads.len(),
+            "vol spread",
+            "strike spread",
+        )?;
+        let parameters_guess = node_grid(
+            &parameters_guess,
+            nodes,
+            SABR_PARAMETERS,
+            "parameters guess",
+            "SABR parameter (alpha, beta, nu, rho)",
+        )?;
+        let flags = is_parameter_fixed.len();
+        let is_parameter_fixed: [bool; SABR_PARAMETERS] =
+            is_parameter_fixed.try_into().map_err(|_| {
+                crate::ItofinError::new_err(format!(
+                    "is_parameter_fixed must hold one flag per SABR parameter \
+                     (alpha, beta, nu, rho): expected {SABR_PARAMETERS}, got {flags}"
+                ))
+            })?;
+        let cube = shared(
+            SabrSwaptionVolatilityCube::new(
+                atm_vol.handle(),
+                tenors(&option_tenors),
+                tenors(&swap_tenors),
+                strike_spreads,
+                vol_spreads,
+                swap_index_base.inner(),
+                short_swap_index_base.inner(),
+                vega_weighted_smile_fit,
+                parameters_guess,
+                is_parameter_fixed,
+                is_atm_calibrated,
+                None,
+                None,
+                None,
+                None,
+                use_max_error,
+                max_guesses,
+                false,
+                cutoff_strike,
+                settings.inner(),
+            )
+            .map_err(PyQlError::from)?,
+        );
+        let erased = Handle::new(Shared::clone(&cube) as Shared<dyn SwaptionVolatilityStructure>);
+        Ok(
+            PyClassInitializer::from(PySwaptionVolatilityStructure::from_handle(erased))
+                .add_subclass(PySabrSwaptionVolatilityCube { concrete: cube }),
+        )
+    }
+
+    /// The at-the-money strike for an option tenor and swap tenor: the fixing of
+    /// whichever base swap index the swap tenor selects, off the option date the
+    /// tenor resolves to against the cube's reference date and calendar.
+    ///
+    /// This is the strike the fitted smile is centred on, so it is what a caller
+    /// needs to place a query at a given moneyness.
+    fn atm_strike_from_tenor(
+        &self,
+        option_tenor: &PyPeriod,
+        swap_tenor: &PyPeriod,
+    ) -> PyResult<f64> {
+        Ok(self
+            .concrete
+            .cube()
+            .atm_strike_from_tenor(option_tenor.inner(), swap_tenor.inner())
+            .map_err(PyQlError::from)?)
+    }
+}
+
 /// The wrapped core periods, in order.
 fn tenors(periods: &[PyRef<'_, PyPeriod>]) -> Vec<Period> {
     periods.iter().map(|period| period.inner()).collect()
@@ -476,6 +608,36 @@ fn check_grid<T>(rows: &[Vec<T>], label: &str) -> PyResult<usize> {
         )));
     }
     Ok(columns)
+}
+
+/// A node-indexed quote grid as core handles, after checking it is `nodes` rows
+/// of `columns`. The row count is the `(option tenor, swap tenor)` node count
+/// and the column count is fixed by what the row holds, so both are checked
+/// here, before the core's dimension errors.
+fn node_grid(
+    rows: &[Vec<PyRef<'_, PySimpleQuote>>],
+    nodes: usize,
+    columns: usize,
+    label: &str,
+    column_label: &str,
+) -> PyResult<Vec<Vec<Handle<dyn Quote>>>> {
+    let got = check_grid(rows, label)?;
+    if rows.len() != nodes {
+        return Err(crate::ItofinError::new_err(format!(
+            "{label} grid must have one row per (option tenor, swap tenor) node: \
+             expected {nodes}, got {}",
+            rows.len()
+        )));
+    }
+    if got != columns {
+        return Err(crate::ItofinError::new_err(format!(
+            "{label} rows must have one column per {column_label}: expected {columns}, got {got}"
+        )));
+    }
+    Ok(rows
+        .iter()
+        .map(|row| row.iter().map(|quote| quote.handle()).collect())
+        .collect())
 }
 
 /// A `list[list[float]]` as a core [`Matrix`], one row per option tenor.
