@@ -9,6 +9,7 @@ use libitofin::math::matrix::Matrix;
 use libitofin::shared::{Shared, shared};
 use libitofin::termstructures::volatility::{
     BlackConstantVol, BlackVarianceCurve, BlackVarianceSurface, BlackVolTermStructure,
+    BlackVolTimeExtrapolation,
 };
 use pyo3::prelude::*;
 
@@ -193,14 +194,56 @@ impl PyBlackConstantVol {
     }
 }
 
+/// Python `BlackVolTimeExtrapolation`: how a variance curve extrapolates past
+/// its last node (`termstructures::volatility::BlackVolTimeExtrapolation`).
+///
+/// A fieldless pyo3 enum. `UseInterpolator` is accepted at construction but
+/// **fails on any extrapolating query**: delegating to the interpolation needs
+/// it evaluated past its last node, which the interpolation layer cannot enable
+/// generically (`blackvariancecurve.rs:22-25,156-160`). The core returns an
+/// `Err` there rather than silently substituting another rule, so the Python
+/// boundary surfaces an [`struct@crate::ItofinError`] from the *query*, not the
+/// constructor - the D10 no-silent-fallback line.
+#[pyclass(name = "BlackVolTimeExtrapolation", eq, eq_int, from_py_object)]
+#[derive(Clone, Copy, PartialEq)]
+pub enum PyBlackVolTimeExtrapolation {
+    FlatVolatility,
+    UseInterpolator,
+    LinearVariance,
+}
+
+impl PyBlackVolTimeExtrapolation {
+    /// The core [`BlackVolTimeExtrapolation`] this variant stands for.
+    fn inner(&self) -> BlackVolTimeExtrapolation {
+        match self {
+            PyBlackVolTimeExtrapolation::FlatVolatility => {
+                BlackVolTimeExtrapolation::FlatVolatility
+            }
+            PyBlackVolTimeExtrapolation::UseInterpolator => {
+                BlackVolTimeExtrapolation::UseInterpolator
+            }
+            PyBlackVolTimeExtrapolation::LinearVariance => {
+                BlackVolTimeExtrapolation::LinearVariance
+            }
+        }
+    }
+}
+
 /// Python `BlackVarianceCurve`: a term structure of Black volatility with no
 /// strike dimension, interpolating linearly on variance
 /// (`termstructures::volatility::BlackVarianceCurve<Linear>`).
 ///
 /// Extends [`PyBlackVolTermStructure`]. Finite in time: the last date is the
-/// maximum, so queries past it require `enable_extrapolation()`. The concrete
-/// `Linear` handle is retained alongside the erased base handle for a future
-/// local-volatility curve facade.
+/// maximum, so queries past it require `enable_extrapolation()`, and
+/// `time_extrapolation` picks the rule applied there (default
+/// `FlatVolatility`, the C++ default). The interpolation stays `Linear`: only
+/// the extrapolation axis is exposed, which keeps the concrete
+/// `BlackVarianceCurve<Linear>` handle retained alongside the erased base
+/// handle for a future local-volatility curve facade.
+///
+/// Selecting `UseInterpolator` constructs fine and answers in-range queries,
+/// then errors on an extrapolating one; see
+/// [`PyBlackVolTimeExtrapolation`].
 #[pyclass(name = "BlackVarianceCurve", extends = PyBlackVolTermStructure, unsendable)]
 pub struct PyBlackVarianceCurve {
     #[allow(dead_code)]
@@ -210,21 +253,32 @@ pub struct PyBlackVarianceCurve {
 #[pymethods]
 impl PyBlackVarianceCurve {
     #[new]
+    #[pyo3(signature = (
+        reference_date,
+        dates,
+        black_vol_curve,
+        day_counter,
+        force_monotone_variance,
+        time_extrapolation = PyBlackVolTimeExtrapolation::FlatVolatility,
+    ))]
     fn new(
         reference_date: &PyDate,
         dates: Vec<PyRef<PyDate>>,
         black_vol_curve: Vec<f64>,
         day_counter: &PyDayCounter,
         force_monotone_variance: bool,
+        time_extrapolation: PyBlackVolTimeExtrapolation,
     ) -> PyResult<PyClassInitializer<Self>> {
         let dates: Vec<_> = dates.iter().map(|d| d.inner()).collect();
         let curve = shared(
-            BlackVarianceCurve::new(
+            BlackVarianceCurve::with_interpolator(
                 reference_date.inner(),
                 &dates,
                 &black_vol_curve,
                 day_counter.inner(),
                 force_monotone_variance,
+                time_extrapolation.inner(),
+                Linear,
             )
             .map_err(PyQlError::from)?,
         );
