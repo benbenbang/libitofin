@@ -650,3 +650,58 @@ class ConstantOptionletVolatility(OptionletVolatilityStructure):
         """Reads the volatility from the caller's quote; a later set_value
         notifies the surface's observers."""
         ...
+
+class CapFloorTermVolSurface:
+    """The market cap/floor TERM-volatility surface, bicubic over an option-tenor
+    x strike grid.
+
+    This is the flat volatility of a WHOLE cap by cap length, which is how the
+    market quotes caps, not the volatility of the individual caplets it
+    decomposes into: it is the optionlet stripper's input, and it is not an
+    OptionletVolatilityStructure.
+
+    volatilities is a row per option tenor and a column per strike; both axes
+    must be strictly increasing. The moving (floating reference date)
+    constructors are not exposed - both forms here pin the reference date, so
+    every query's option time runs from reference_date rather than the
+    evaluation date."""
+
+    def __init__(
+        self,
+        reference_date: Date,
+        calendar: Calendar,
+        business_day_convention: BusinessDayConvention,
+        option_tenors: list[Period],
+        strikes: list[float],
+        volatilities: list[list[float]],
+        day_counter: DayCounter,
+    ) -> None:
+        """Raises ItofinError on an empty or ragged grid, on a grid whose shape
+        does not match the tenors and strikes, and on a non-increasing tenor or
+        strike axis."""
+        ...
+    @staticmethod
+    def with_quotes(
+        reference_date: Date,
+        calendar: Calendar,
+        business_day_convention: BusinessDayConvention,
+        option_tenors: list[Period],
+        strikes: list[float],
+        volatilities: list[list[SimpleQuote]],
+        day_counter: DayCounter,
+    ) -> CapFloorTermVolSurface:
+        """Reads each node from the caller's quote; a later set_value rebuilds
+        the interpolation and notifies the surface's observers."""
+        ...
+    def volatility(
+        self, option_tenor: Period, strike: float, extrapolate: bool = False
+    ) -> float: ...
+    def volatility_date(
+        self, end_date: Date, strike: float, extrapolate: bool = False
+    ) -> float: ...
+    def volatility_time(
+        self, length: float, strike: float, extrapolate: bool = False
+    ) -> float:
+        """length is a year fraction off the reference date in the surface's own
+        day count."""
+        ...

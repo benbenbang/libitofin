@@ -8,6 +8,7 @@
 mod calibration;
 mod capfloor;
 mod capfloorengine;
+mod capfloortermvol;
 mod curve;
 mod helpers;
 mod heston;
@@ -28,6 +29,7 @@ mod vol;
 use calibration::{PyCalibrationErrorType, PyEndCriteria, PyLevenbergMarquardt};
 use capfloor::{PyCapFloor, PyCapFloorType};
 use capfloorengine::PyBlackCapFloorEngine;
+use capfloortermvol::PyCapFloorTermVolSurface;
 use curve::{
     PyDiscountCurve, PyFlatForward, PyForwardCurve, PyPiecewiseFlatForward,
     PyPiecewiseLinearForward, PyPiecewiseLinearZero, PyPiecewiseLogLinearDiscount,
@@ -152,6 +154,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     termstructures.add_class::<PySabrSmileSection>()?;
     termstructures.add_class::<PyOptionletVolatilityStructure>()?;
     termstructures.add_class::<PyConstantOptionletVolatility>()?;
+    termstructures.add_class::<PyCapFloorTermVolSurface>()?;
 
     let processes = PyModule::new(py, "processes")?;
     processes.add_class::<PyBlackScholesProcess>()?;
