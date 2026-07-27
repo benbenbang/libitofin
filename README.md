@@ -39,8 +39,10 @@ The same engine is reachable from Python via [`itofin`](https://pypi.org/project
 (`itofin.time`, `itofin.instruments`, `itofin.processes`, ...), while `Settings`
 and `ItofinError` stay at the top level. Real market data is first-class - yield
 curves (bootstrapped from a deposit/swap strip via `PiecewiseYieldCurve`, or
-interpolated) and Black-vol surfaces - so you price against a market snapshot, not
-just flat inputs. Type stubs ship in the wheel, so editors and `mypy` see the full API.
+interpolated), Black-vol surfaces, swaption vol cubes (matrix, interpolated, or
+SABR-calibrated), and cap/floor optionlet-vol stripping - so you price against a
+market snapshot, not just flat inputs. Type stubs ship in the wheel, so editors
+and `mypy` see the full API.
 
 ```sh
 pip install itofin
@@ -83,6 +85,31 @@ vols = BlackVarianceSurface(
 print(f"{vols.black_vol(1.0, 100.0):.2f}")  # 0.18
 ```
 
+…or query a swaption vol surface - here the ATM matrix; `InterpolatedSwaptionVolatilityCube`
+and the SABR-calibrated `SabrSwaptionVolatilityCube` add the strike dimension, and
+`pricingengines.BlackSwaptionEngine` (via `Swaption.set_black_engine`) prices a
+swaption straight off any of them:
+
+```python
+from itofin import Settings
+from itofin.termstructures import SwaptionVolatilityMatrix, VolatilityType
+from itofin.time import Date, Period, Calendar, DayCounter, BusinessDayConvention
+
+s = Settings()
+s.set_evaluation_date(Date(15, 6, 2026))
+opt = [Period(1, "Years"), Period(5, "Years")]   # option tenors (rows)
+swp = [Period(1, "Years"), Period(5, "Years")]   # swap tenors (columns)
+vols = [[0.20, 0.18],
+        [0.17, 0.16]]
+
+svol = SwaptionVolatilityMatrix(
+    Date(15, 6, 2026), Calendar.target(), BusinessDayConvention.Following,
+    opt, swp, vols, DayCounter.actual365_fixed(), VolatilityType.ShiftedLognormal,
+)
+print(f"{svol.volatility(Period(1, 'Years'), Period(5, 'Years'), 0.03):.4f}")  # 0.1800 (node)
+print(f"{svol.volatility(Period(3, 'Years'), Period(3, 'Years'), 0.03):.4f}")  # 0.1775 (bilinear)
+```
+
 ## Why
 
 QuantLib is ~470k lines of mature, battle-tested C++ across 16 modules. This
@@ -114,7 +141,7 @@ repository's issues (the board is the source of truth, not a checked-in file).
 | **L1** | math | array/matrix, distributions, interpolation, integrals, solvers, optimization, statistics, RNG, ODE, copulas, decompositions | ✅ done |
 | **L2** | time | `Date`, `Period`, `Calendar`, `DayCounter`, `Schedule`, IMM/ASX/ECB | ✅ done |
 | **L3** | quotes | `Quote`, `SimpleQuote`, derived quotes, `InterestRate`, compounding | ✅ done |
-| **L4** | term structures | interpolated yield curves, Black-vol curves/surfaces, local vol | ✅ done |
+| **L4** | term structures | interpolated yield curves, Black-vol curves/surfaces, local vol, swaption vol surfaces (matrix / interpolated / SABR cube), cap-floor term-vol surfaces + optionlet stripping | ✅ done |
 | **L5** | processes | multi-factor `StochasticProcess` / `StochasticProcess1D`, Black-Scholes, Heston (analytic surface), Ornstein-Uhlenbeck, correlated process array | 🚧 in progress |
 | **L6** | indexes | `InterestRateIndex`, Ibor family (Euribor / Eonia / €STR / SOFR), `SwapIndex` | 🚧 in progress |
 | **L7** | cashflows | fixed / floating / Ibor / overnight coupons and legs, coupon pricers, duration, capped-floored coupons | 🚧 in progress |
@@ -150,7 +177,9 @@ Verified end-to-end since then, each against the matching `test-suite/` oracle:
 - **`quotes` / `interestrate`** — simple and derived quotes, interest-rate and
   compounding conversions.
 - **`termstructures`** — flat and interpolated yield curves (zero/discount/
-  forward), implied and spreaded curves, Black-variance curves/surfaces, local vol.
+  forward), implied and spreaded curves, Black-variance curves/surfaces, local vol,
+  swaption vol surfaces (matrix / interpolated / SABR cube) and cap-floor term-vol
+  surfaces with optionlet stripping (SABR smile sections + calibrated interpolation).
 - **`indexes`** — `InterestRateIndex`, the Ibor family (Euribor / Eonia / €STR /
   SOFR) and `SwapIndex`, with fixings threaded through `Settings` (D11).
 - **`cashflows`** — fixed, floating, Ibor and overnight coupons and legs, coupon
