@@ -7,8 +7,9 @@ The grid is deliberately NON-FLAT and NON-SQUARE: a transposed grid fails the
 core's dimension check outright, and a swapped axis fails numerically, so the
 node-recovery arm cannot pass on a facade that crosses the axes.
 
-Neither constructor here needs a ``Settings``: both pin the reference date, so
-no query reads an evaluation date.
+The two pinned constructors need no ``Settings``: they fix the reference date,
+so no query reads an evaluation date. The two moving ones do, and the fixture's
+``SETTINGS`` sits on ``REFERENCE`` so all four agree on the reference date.
 
 Four arms:
 
@@ -35,13 +36,22 @@ C. The three query forms agree at an off-node point (18M x 2.5%, on no tenor
 D. The shape guard. A ragged grid is rejected as an ``ItofinError`` before it
    reaches the core, where a short row would index a `Matrix` out of bounds and
    panic across the FFI boundary.
+E. The two MOVING constructors (#623), whose reference date floats
+   ``settlement_days`` off the evaluation date rather than being pinned. They
+   are a distinct code path, not a thin wrapper: they carry the settlement days
+   the optionlet-stripping adapter reads back, and the quote form registers
+   market data the matrix form does not. Both go through arm A, so a
+   transposed grid cannot hide behind the flat fixture the stripping oracle
+   uses; the quote form also goes through arm B's bump. At zero settlement days
+   their reference date IS the evaluation date, which the fixture sets to
+   REFERENCE, so they must recover exactly the pinned surface's nodes.
 """
 
 import datetime
 
 import pytest
 
-from itofin import ItofinError
+from itofin import ItofinError, Settings
 from itofin.quotes import SimpleQuote
 from itofin.termstructures import CapFloorTermVolSurface
 from itofin.time import BusinessDayConvention, Calendar, DayCounter, Date, Period
@@ -58,6 +68,9 @@ BUMPED = 0.5
 
 OFF_NODE_TENOR = Period(18, "Months")
 OFF_NODE_STRIKE = 0.025
+
+SETTINGS = Settings()
+SETTINGS.set_evaluation_date(REFERENCE)
 
 
 def _matrix_surface():
@@ -87,6 +100,38 @@ def _quote_surface():
     return surface, quotes
 
 
+def _moving_matrix_surface():
+    """The floating-reference surface over fixed volatilities, at zero settlement
+    days so its reference date is the evaluation date."""
+    return CapFloorTermVolSurface.moving(
+        0,
+        Calendar.target(),
+        BDC,
+        OPTION_TENORS,
+        STRIKES,
+        VOLS,
+        DayCounter.actual365_fixed(),
+        SETTINGS,
+    )
+
+
+def _moving_quote_surface():
+    """The floating-reference surface over a distinct quote per node, plus those
+    quotes."""
+    quotes = [[SimpleQuote(vol) for vol in row] for row in VOLS]
+    surface = CapFloorTermVolSurface.moving_with_quotes(
+        0,
+        Calendar.target(),
+        BDC,
+        OPTION_TENORS,
+        STRIKES,
+        quotes,
+        DayCounter.actual365_fixed(),
+        SETTINGS,
+    )
+    return surface, quotes
+
+
 def _year_fraction(start, end):
     """Actual/365F between two ``Date``s, computed off Python's own calendar."""
     days = datetime.date(end.year, end.month, end.day) - datetime.date(
@@ -95,7 +140,15 @@ def _year_fraction(start, end):
     return days.days / 365.0
 
 
-@pytest.mark.parametrize("build", [_matrix_surface, lambda: _quote_surface()[0]])
+@pytest.mark.parametrize(
+    "build",
+    [
+        _matrix_surface,
+        lambda: _quote_surface()[0],
+        _moving_matrix_surface,
+        lambda: _moving_quote_surface()[0],
+    ],
+)
 def test_every_node_vol_comes_back(build):
     surface = build()
     for i, tenor in enumerate(OPTION_TENORS):
@@ -104,8 +157,9 @@ def test_every_node_vol_comes_back(build):
             assert got == pytest.approx(VOLS[i][j], abs=TOL), f"node ({i},{j})"
 
 
-def test_a_quote_bump_refreshes_only_its_own_node():
-    surface, quotes = _quote_surface()
+@pytest.mark.parametrize("build", [_quote_surface, _moving_quote_surface])
+def test_a_quote_bump_refreshes_only_its_own_node(build):
+    surface, quotes = build()
     assert surface.volatility(OPTION_TENORS[0], STRIKES[0]) == pytest.approx(
         VOLS[0][0], abs=TOL
     )
