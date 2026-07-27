@@ -6,7 +6,7 @@
 # changes, update the matching stub here. Submodule -> source map:
 #   time          <- src/time.rs
 #   quotes        <- src/market.rs
-#   termstructures<- src/curve.rs
+#   termstructures<- src/curve.rs, src/vol.rs, src/helpers.rs, src/swaptionvol.rs
 #   processes     <- src/market.rs, src/heston.rs
 #   indexes       <- src/hullwhite.rs
 #   instruments   <- src/option.rs, src/swap.rs, src/swaption.rs
