@@ -11,6 +11,7 @@ mod stepcondition;
 pub mod meshers;
 pub mod operators;
 pub mod schemes;
+pub mod stepconditions;
 pub mod utilities;
 
 pub use boundarycondition::{BoundaryCondition, BoundarySide};
