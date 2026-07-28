@@ -231,6 +231,21 @@ mod tests {
             as Shared<dyn BlackVolTermStructure>)
     }
 
+    /// The grid values every test pushes through the operator.
+    ///
+    /// Quadratic, and that is load-bearing: the second-derivative operator
+    /// annihilates a linear probe - its interior stencil is exact on linears
+    /// and its boundary rows carry no bands - which would leave the diffusion
+    /// coefficient multiplying zero and hide any error in its magnitude.
+    fn probe(mesher: &Shared<dyn FdmMesher>) -> Array {
+        (0..mesher.layout().size())
+            .map(|i| {
+                let i = i as Real;
+                1.0 + 0.5 * i + 0.05 * i * i
+            })
+            .collect()
+    }
+
     fn assert_close(actual: &Array, expected: &Array) {
         assert_eq!(actual.size(), expected.size());
         for i in 0..actual.size() {
@@ -245,7 +260,12 @@ mod tests {
 
     /// The generator is `(r - q - v/2) D1 + (v/2) D2 - r I`. The expectation is
     /// built from the derivative operators the constructor is told to use, so
-    /// this pins the wiring; the operators themselves are oracled in #640.
+    /// this pins both the wiring and the coefficient each operator is scaled
+    /// by; the operators themselves are oracled in #640.
+    ///
+    /// Pinning the diffusion coefficient is what the quadratic [`probe`] buys:
+    /// against a linear one `applied_dxx` vanishes identically, and `v/2` could
+    /// be any multiple of `v` without this test noticing.
     #[test]
     fn set_time_builds_the_generator_from_the_derivative_operators() {
         let mesher = mesher();
@@ -254,10 +274,14 @@ mod tests {
 
         let dx = first_derivative_op(DIRECTION, Shared::clone(&mesher));
         let dxx = second_derivative_op(DIRECTION, Shared::clone(&mesher));
-        let u = Array::incremental(mesher.layout().size(), 1.0, 0.5);
+        let u = probe(&mesher);
 
         let v = VOL * VOL;
         let (applied_dx, applied_dxx) = (dx.apply(&u), dxx.apply(&u));
+        assert!(
+            (0..u.size()).any(|i| applied_dxx[i].abs() > 1e-8),
+            "the probe must not be annihilated by the second-derivative operator"
+        );
         let expected: Array = (0..u.size())
             .map(|i| (R - Q - 0.5 * v) * applied_dx[i] + 0.5 * v * applied_dxx[i] - R * u[i])
             .collect();
@@ -279,7 +303,7 @@ mod tests {
     fn set_time_replaces_the_previous_step() {
         let mesher = mesher();
         let mut operator = black_scholes_op(&mesher);
-        let u = Array::incremental(mesher.layout().size(), 1.0, 0.5);
+        let u = probe(&mesher);
 
         operator.set_time(T1, T2).unwrap();
         let once = operator.apply(&u);
@@ -297,7 +321,7 @@ mod tests {
     fn apply_mixed_is_zero() {
         let mesher = mesher();
         let operator = black_scholes_op(&mesher);
-        let u = Array::incremental(mesher.layout().size(), 1.0, 0.5);
+        let u = probe(&mesher);
 
         assert_eq!(operator.apply_mixed(&u), Array::with_size(u.size()));
     }
@@ -307,7 +331,7 @@ mod tests {
         let mesher = mesher();
         let mut operator = black_scholes_op(&mesher);
         operator.set_time(T1, T2).unwrap();
-        let u = Array::incremental(mesher.layout().size(), 1.0, 0.5);
+        let u = probe(&mesher);
 
         assert_eq!(operator.apply_direction(DIRECTION, &u), operator.apply(&u));
         assert_eq!(
@@ -325,7 +349,7 @@ mod tests {
         let mut operator = black_scholes_op(&mesher);
         operator.set_time(T1, T2).unwrap();
 
-        let u = Array::incremental(mesher.layout().size(), 2.0, -0.25);
+        let u = probe(&mesher);
         let s = 0.01;
         let applied = operator.apply(&u);
         let r: Array = (0..u.size()).map(|i| s * applied[i] + u[i]).collect();
@@ -356,7 +380,7 @@ mod tests {
     fn the_operator_drives_the_scheme_shapes_through_a_shared_handle() {
         let mesher = mesher();
         let handle: SharedMut<dyn FdmLinearOpComposite> = shared_mut(black_scholes_op(&mesher));
-        let u = Array::incremental(mesher.layout().size(), 1.0, 0.5);
+        let u = probe(&mesher);
 
         let applied = {
             let mut composite = handle.borrow_mut();
