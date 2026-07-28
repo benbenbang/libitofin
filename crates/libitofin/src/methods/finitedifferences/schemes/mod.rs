@@ -7,6 +7,8 @@
 mod boundaryconditionschemehelper;
 mod douglasscheme;
 mod scheme;
+#[cfg(test)]
+mod testops;
 
 pub use boundaryconditionschemehelper::BoundaryConditionSchemeHelper;
 pub use douglasscheme::DouglasScheme;
