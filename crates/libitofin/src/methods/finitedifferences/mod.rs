@@ -3,8 +3,8 @@
 //! Port of `ql/methods/finitedifferences/`. The operator layer lands first,
 //! then the meshers that give its index space a geometry, then the utilities
 //! that compute over a finished grid, then the conditions a step must respect,
-//! then the schemes that take one timestep; the solver driving them stacks on
-//! all of them in #658.
+//! then the schemes that take one timestep, and last the rollback loop and the
+//! backward solver that drive them.
 
 mod boundarycondition;
 mod finitedifferencemodel;
