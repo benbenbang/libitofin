@@ -86,7 +86,7 @@ impl StrikedTypePayoff for PlainVanillaPayoff {
 /// Binary cash-or-nothing payoff: a fixed `cash_payoff` when the price ends
 /// strictly beyond the strike, nothing otherwise.
 ///
-/// Ports `CashOrNothingPayoff` (`ql/instruments/payoffs.hpp:148`,
+/// Ports `CashOrNothingPayoff` (`ql/instruments/payoffs.hpp:152`,
 /// `payoffs.cpp:154-163`). The comparison is strict on both sides, so a price
 /// exactly at the strike pays nothing for either option type.
 #[derive(Clone, Copy, Debug, PartialEq)]

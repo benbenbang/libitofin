@@ -12,10 +12,10 @@
 //! - The C++ second constructor taking a separate discounting curve is
 //!   follow-up work; the risk-free curve embedded in the process is used for
 //!   both forecasting and discounting, as with the C++ default constructor.
-//! - The C++ engine accepts any `StrikedTypePayoff` and lets the calculator
-//!   visit the concrete type; only [`PlainVanillaPayoff`] exists in the crate
-//!   (and the calculator supports nothing else), so any other payoff is an
-//!   explicit error instead of a silently wrong price.
+//! - As in C++, the engine accepts any `StrikedTypePayoff` and lets the
+//!   calculator visit the concrete type; a payoff the calculator's visitor
+//!   does not handle is an explicit error from there rather than a silently
+//!   wrong price.
 
 pub mod analytichestonengine;
 pub mod mceuropeanengine;
@@ -36,7 +36,6 @@ use crate::exercise::ExerciseType;
 use crate::fail;
 use crate::instruments::{
     Greeks, MoreGreeks, OneAssetOptionEngine, OneAssetOptionResults, OptionArguments,
-    PlainVanillaPayoff, StrikedTypePayoff,
 };
 use crate::patterns::observable::{AsObservable, Observable};
 use crate::pricingengine::{Arguments, PricingEngine, Results};
@@ -92,11 +91,7 @@ impl PricingEngine for AnalyticEuropeanEngine {
         let Some(payoff) = &arguments.payoff else {
             fail!("no payoff given");
         };
-        let payoff: &dyn StrikedTypePayoff = &**payoff;
-        let Some(payoff) = (payoff as &dyn Any).downcast_ref::<PlainVanillaPayoff>() else {
-            fail!("only plain-vanilla payoffs are supported");
-        };
-        let payoff = *payoff;
+        let payoff = Shared::clone(payoff);
         let maturity_date = exercise.last_date();
 
         let risk_free = self.process.risk_free_rate().current_link()?;
@@ -113,7 +108,8 @@ impl PricingEngine for AnalyticEuropeanEngine {
         }
         let forward_price = spot * dividend_discount / risk_free_discount;
 
-        let black = BlackCalculator::with_payoff(&payoff, forward_price, variance.sqrt(), df)?;
+        let black =
+            BlackCalculator::with_striked_payoff(&*payoff, forward_price, variance.sqrt(), df)?;
 
         let value = black.value();
         let delta = black.delta(spot)?;
@@ -180,7 +176,7 @@ pub(crate) mod test_market {
     use crate::exercise::EuropeanExercise;
     use crate::handle::Handle;
     use crate::instrument::Instrument;
-    use crate::instruments::{EuropeanOption, PlainVanillaPayoff};
+    use crate::instruments::{EuropeanOption, PlainVanillaPayoff, StrikedTypePayoff};
     use crate::interestrate::Compounding;
     use crate::option::OptionType;
     use crate::pricingengine::PricingEngine;
@@ -231,7 +227,14 @@ pub(crate) mod test_market {
             strike: Real,
             expiry: Date,
         ) -> EuropeanOption {
-            let payoff = shared(PlainVanillaPayoff::new(option_type, strike));
+            self.option_with_payoff(shared(PlainVanillaPayoff::new(option_type, strike)), expiry)
+        }
+
+        pub(crate) fn option_with_payoff(
+            &self,
+            payoff: Shared<dyn StrikedTypePayoff>,
+            expiry: Date,
+        ) -> EuropeanOption {
             let exercise = shared(EuropeanExercise::new(expiry));
             let mut option = EuropeanOption::new(payoff, exercise, Shared::clone(&self.settings));
             let engine = shared_mut(AnalyticEuropeanEngine::new(Shared::clone(&self.process)));
@@ -394,12 +397,17 @@ mod tests {
         );
     }
 
+    /// The engine no longer screens the payoff type: it hands any striked
+    /// payoff to the calculator, so the rejection boundary moved to the
+    /// calculator's `visit(Payoff&)` arm (`blackcalculator.cpp:152-154`).
+    /// `PercentageStrikePayoff` is a real C++ striked payoff the visitor does
+    /// not handle, so it stands in for the unsupported case.
     #[test]
-    fn non_plain_vanilla_payoffs_are_rejected() {
-        struct CashOrNothingStub;
-        impl Payoff for CashOrNothingStub {
+    fn payoffs_the_calculator_cannot_visit_are_rejected() {
+        struct PercentageStrikeStub;
+        impl Payoff for PercentageStrikeStub {
             fn name(&self) -> String {
-                "CashOrNothing".to_string()
+                "PercentageStrike".to_string()
             }
             fn description(&self) -> String {
                 "stub".to_string()
@@ -408,12 +416,12 @@ mod tests {
                 0.0
             }
         }
-        impl TypePayoff for CashOrNothingStub {
+        impl TypePayoff for PercentageStrikeStub {
             fn option_type(&self) -> OptionType {
                 OptionType::Call
             }
         }
-        impl StrikedTypePayoff for CashOrNothingStub {
+        impl StrikedTypePayoff for PercentageStrikeStub {
             fn strike(&self) -> Real {
                 100.0
             }
@@ -421,18 +429,11 @@ mod tests {
 
         let market = market();
         market.set(100.0, 0.04, 0.06, 0.20);
-        let template = market.option(OptionType::Call, 100.0, today() + 360);
-        let mut option = crate::instruments::OneAssetOption::new(
-            crate::shared::shared(CashOrNothingStub),
-            template.exercise().clone(),
-            crate::shared::Shared::clone(&market.settings),
-        );
-        option
-            .base_mut()
-            .set_pricing_engine(template.base().pricing_engine().unwrap().clone());
+        let mut option =
+            market.option_with_payoff(crate::shared::shared(PercentageStrikeStub), today() + 360);
         assert_eq!(
             option.npv().unwrap_err().message(),
-            "only plain-vanilla payoffs are supported"
+            "unsupported payoff type: PercentageStrike"
         );
     }
 }
@@ -891,12 +892,179 @@ mod test_greek_values {
 }
 
 #[cfg(test)]
+mod test_cash_or_nothing {
+    //! The `testCashOrNothingEuropeanValues` oracle of
+    //! `test-suite/digitaloption.cpp:77-129`, plus the finite-difference pins
+    //! the C++ suite gets only from its `testGreeks` digital sweep.
+
+    use super::test_market::{market, time_to_days, today};
+    use crate::instrument::Instrument;
+    use crate::instruments::{CashOrNothingPayoff, EuropeanOption};
+    use crate::option::OptionType::{self, Call, Put};
+    use crate::shared::shared;
+    use crate::types::{Rate, Real, Time, Volatility};
+
+    const CASH: Real = 10.0;
+
+    fn digital(
+        option_type: OptionType,
+        strike: Real,
+        expiry_time: Time,
+        market: &super::test_market::Market,
+    ) -> EuropeanOption {
+        let expiry = today() + time_to_days(expiry_time);
+        market.option_with_payoff(
+            shared(CashOrNothingPayoff::new(option_type, strike, CASH)),
+            expiry,
+        )
+    }
+
+    /// The single row of the C++ fixture (`digitaloption.cpp:82-85`): a Haug
+    /// p.88 put, asserted at the C++ tolerance of 1e-4. The table has exactly
+    /// one row and it is a put; there is no cached call value to port.
+    ///
+    /// As in `test_values`, the published figure is paired with a
+    /// full-precision reference at 1e-12: `discount * cash * N(-d2)`
+    /// evaluated by an independent double-precision transliteration, which
+    /// agrees with the engine to a unit in the last place. The published
+    /// value alone leaves only a 2.2x margin at its own tolerance.
+    #[test]
+    fn value_matches_the_haug_cash_or_nothing_row() {
+        let (strike, spot, q, r, t, vol): (Real, Real, Rate, Rate, Time, Volatility) =
+            (80.0, 100.0, 0.06, 0.06, 0.75, 0.35);
+        let haug: Real = 2.6710;
+        let precise: Real = 2.671045684461348;
+
+        let market = market();
+        market.set(spot, q, r, vol);
+        let mut option = digital(Put, strike, t, &market);
+
+        let calculated = option.npv().unwrap();
+        assert!(
+            (calculated - haug).abs() <= 1.0e-4,
+            "cash-or-nothing put K={strike} S={spot}: {calculated} vs Haug {haug} \
+             (error {})",
+            (calculated - haug).abs()
+        );
+        assert!(
+            (calculated - precise).abs() <= 1.0e-12,
+            "cash-or-nothing put K={strike} S={spot}: {calculated} vs reference {precise} \
+             (error {})",
+            (calculated - precise).abs()
+        );
+    }
+
+    /// Exactly one of the two digitals pays, so together they are a
+    /// zero-coupon bond on the cash amount. The identity is exact - both
+    /// alphas are zero and the betas are `N(d2)` and `1 - N(d2)` - so it
+    /// pins the call arm of the visitor (`blackcalculator.cpp:165-171`)
+    /// without inventing a cached number the C++ suite does not carry.
+    #[test]
+    fn call_and_put_digitals_sum_to_the_discounted_cash() {
+        let market = market();
+        market.set(100.0, 0.04, 0.06, 0.30);
+        let t: Time = 0.5;
+
+        for strike in [80.0, 100.0, 120.0] {
+            let mut call = digital(Call, strike, t, &market);
+            let mut put = digital(Put, strike, t, &market);
+            let discount = (-0.06 * t).exp();
+            let total = call.npv().unwrap() + put.npv().unwrap();
+            assert!(
+                (total - discount * CASH).abs() <= 1.0e-14,
+                "K={strike}: call + put {total} vs discounted cash {}",
+                discount * CASH
+            );
+        }
+    }
+
+    /// Gate F1: the digital delta, gamma and strike sensitivity against
+    /// central differences of the engine's own NPV, on a `q != r` fixture so
+    /// the forward differs from the spot.
+    ///
+    /// The bump is `h = 1e-4` relative to the bumped quantity, which balances
+    /// the two error sources of the second difference: truncation falls as
+    /// `h^2 / 12 * d4V/dS4` while roundoff grows as `4 * eps * value / h^2`,
+    /// bounding them at 3.6e-11 and 2.2e-11 here (truncation alone is 5.4e-7
+    /// at `h = 1e-2` relative). The observed errors are 2.0e-9 for delta,
+    /// 9.5e-12 for gamma and 1.6e-9 for the strike sensitivity - the
+    /// first-difference pair is truncation-dominated at `h^2 / 6 * d3V/dS3` -
+    /// so the tolerance is 1e-7, some fifty times the worst of them.
+    ///
+    /// Analytic gamma is 8.3e-4 on this fixture, four orders above the
+    /// tolerance, and the test asserts it is non-negligible so a
+    /// both-sides-zero result cannot pass. Both option types are swept: the
+    /// value formula reads only `alpha`, `beta` and `x`, so the visitor's
+    /// per-type `dbeta_dd2` (`blackcalculator.cpp:167,170`) is invisible to
+    /// every value-based check and a sign error there survives them all. The
+    /// strike arm is in turn the only check that sees `dx_dstrike` (`:161`):
+    /// leaving it at the base 1.0 adds `discount * beta`, about 0.5 against
+    /// an analytic 0.125.
+    #[test]
+    fn digital_greeks_match_central_differences() {
+        let (strike, spot, q, r, t, vol): (Real, Real, Rate, Rate, Time, Volatility) =
+            (100.0, 100.0, 0.04, 0.06, 0.75, 0.35);
+        let tolerance: Real = 1.0e-7;
+
+        let market = market();
+        market.set(spot, q, r, vol);
+
+        for option_type in [Call, Put] {
+            let mut option = digital(option_type, strike, t, &market);
+
+            let delta = option.delta().unwrap();
+            let gamma = option.gamma().unwrap();
+            let strike_sensitivity = option.strike_sensitivity().unwrap();
+            assert!(
+                gamma.abs() > 1.0e-4,
+                "the fixture must have a gamma worth pinning, got {gamma}"
+            );
+
+            let h = spot * 1.0e-4;
+            market.spot.set_value(spot + h);
+            let value_up = option.npv().unwrap();
+            market.spot.set_value(spot - h);
+            let value_down = option.npv().unwrap();
+            market.spot.set_value(spot);
+            let value = option.npv().unwrap();
+
+            let fd_delta = (value_up - value_down) / (2.0 * h);
+            let fd_gamma = (value_up - 2.0 * value + value_down) / (h * h);
+
+            let hk = strike * 1.0e-4;
+            let fd_strike_sensitivity =
+                (digital(option_type, strike + hk, t, &market).npv().unwrap()
+                    - digital(option_type, strike - hk, t, &market).npv().unwrap())
+                    / (2.0 * hk);
+
+            for (name, analytic, finite_difference) in [
+                ("delta", delta, fd_delta),
+                ("gamma", gamma, fd_gamma),
+                (
+                    "strikeSensitivity",
+                    strike_sensitivity,
+                    fd_strike_sensitivity,
+                ),
+            ] {
+                assert!(
+                    (analytic - finite_difference).abs() <= tolerance,
+                    "{name} of the {option_type:?} digital: analytic {analytic} vs finite \
+                     difference {finite_difference} (error {})",
+                    (analytic - finite_difference).abs()
+                );
+            }
+        }
+    }
+}
+
+#[cfg(test)]
 mod test_greeks {
     //! The `testGreeks` oracle of `test-suite/europeanoption.cpp`: analytic
     //! greeks against central finite differences over the full plain-vanilla
     //! grid, on curves moving off the evaluation date. The C++ test also
-    //! sweeps cash-or-nothing, asset-or-nothing and gap payoffs; those
-    //! payoffs are follow-up work and their sweeps come with them.
+    //! sweeps asset-or-nothing and gap payoffs; those payoffs are follow-up
+    //! work and their sweeps come with them. The cash-or-nothing sweep is
+    //! covered by `test_cash_or_nothing` above.
 
     use super::AnalyticEuropeanEngine;
     use super::test_market::{quote_handle, time_to_days, today};
