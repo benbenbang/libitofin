@@ -154,6 +154,7 @@ mod tests {
         WHOLE, assert_close, probe, scaled_composite,
     };
     use crate::methods::finitedifferences::schemes::{DouglasScheme, ImplicitEulerScheme};
+    use crate::methods::finitedifferences::stepconditions::FdmSnapshotCondition;
     use crate::shared::{Shared, shared};
 
     const THETA: Real = 0.5;
@@ -312,5 +313,92 @@ mod tests {
 
         assert!(model.rollback(&mut probe(SIZE), 1.0, 0.0, 4, None).is_err());
         assert_eq!(log.borrow().len(), 1);
+    }
+
+    /// `hpp:98-101`: a stopping time at `from` applies the condition before the
+    /// first step, so a snapshot taken there records the grid untouched.
+    #[test]
+    fn a_stopping_time_at_from_applies_the_condition_first() {
+        let (_, mut model) = log_model(false, &[1.0]);
+        let snapshot = FdmSnapshotCondition::new(1.0);
+
+        let u = probe(SIZE);
+        model
+            .rollback(&mut u.clone(), 1.0, 0.0, 4, Some(&snapshot))
+            .unwrap();
+
+        assert_eq!(snapshot.values(), u);
+    }
+
+    /// `hpp:110-136`: a step spanning two stopping times is cut at both, and
+    /// the scan runs from the latest down - it steps to `0.9` first and to
+    /// `0.7` from there, not straight to `0.7`. Scanning the other way would
+    /// leave three steps here instead of four, which is also what makes the
+    /// constructor's sort load-bearing: the times are given out of order.
+    ///
+    /// Mechanical, not an oracle: it pins the sub-stepping sequence against
+    /// the C++ control flow, not against any C++ number.
+    #[test]
+    fn a_step_spanning_stopping_times_is_cut_at_each_from_the_latest_down() {
+        let (log, mut model) = log_model(false, &[0.7, 0.9, 0.7]);
+        let condition = LogCondition {
+            log: Shared::clone(&log),
+        };
+
+        model
+            .rollback(&mut probe(SIZE), 1.0, 0.0, 2, Some(&condition))
+            .unwrap();
+
+        assert_eq!(
+            *log.borrow(),
+            vec![
+                "step dt=0.100000 t=1.000000",
+                "condition t=0.900000",
+                "step dt=0.200000 t=0.900000",
+                "condition t=0.700000",
+                "step dt=0.200000 t=0.700000",
+                "condition t=0.500000",
+                "step dt=0.500000 t=0.500000",
+                "condition t=0.000000",
+            ]
+        );
+    }
+
+    /// `hpp:106-108`: a stopping time at `to` is hit on the last step, which
+    /// needs that step to end on `to` exactly. These are the smallest steps at
+    /// which the accumulated `from - steps dt` overshoots `to` instead of
+    /// undershooting it - by `1.6e-14`, enough to put the stopping time above
+    /// `next` and miss it. Dropping both guards drops the capture; dropping
+    /// either one leaves the other covering the last step.
+    #[test]
+    fn a_stopping_time_at_to_is_hit_on_the_last_step() {
+        let (_, mut model) = log_model(false, &[4.0]);
+        let snapshot = FdmSnapshotCondition::new(4.0);
+
+        model
+            .rollback(&mut probe(SIZE), 4.625, 4.0, 38, Some(&snapshot))
+            .unwrap();
+
+        assert_eq!(snapshot.values(), probe(SIZE));
+    }
+
+    /// The snapshot fires inside the big step, at the sub-step boundary the
+    /// scan cut - which is the point of cutting it.
+    #[test]
+    fn a_condition_at_a_stopping_time_sees_the_grid_at_that_time() {
+        let mut model = FiniteDifferenceModel::new(
+            ImplicitEulerScheme::new(scaled_composite(&[COEFFICIENT]), Vec::new()),
+            &[0.9],
+        );
+        let snapshot = FdmSnapshotCondition::new(0.9);
+
+        let u = probe(SIZE);
+        let mut a = u.clone();
+        model
+            .rollback(&mut a, 1.0, 0.0, 2, Some(&snapshot))
+            .unwrap();
+
+        let expected = &u / (1.0 - 0.1 * COEFFICIENT);
+        assert_close(&snapshot.values(), &expected);
     }
 }
