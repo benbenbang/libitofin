@@ -7,6 +7,7 @@
 //! all of them in #658.
 
 mod boundarycondition;
+mod finitedifferencemodel;
 mod stepcondition;
 
 pub mod meshers;
@@ -17,4 +18,5 @@ pub mod stepconditions;
 pub mod utilities;
 
 pub use boundarycondition::{BoundaryCondition, BoundarySide};
+pub use finitedifferencemodel::FiniteDifferenceModel;
 pub use stepcondition::{NullCondition, StepCondition};
