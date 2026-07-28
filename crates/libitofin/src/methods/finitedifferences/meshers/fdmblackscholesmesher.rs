@@ -26,7 +26,7 @@ use super::uniform1dmesher::uniform_1d_mesher;
 /// widened either way by `normInvEps * scaleFactor * sigma * sqrt(maturity)`
 /// (`cpp:96-102`). The forward is rolled through the discount-factor ratios of
 /// the risk-free and dividend curves at a set of intermediate times - the
-/// dividend dates that fall in `(0, maturity]` plus `max(2, 24 * maturity)`
+/// dividend dates that fall in `[0, maturity]` plus `max(2, 24 * maturity)`
 /// equally spaced steps (`cpp:51-93`) - and each discrete dividend is
 /// subtracted as it is passed, so both the pre-dividend high and the
 /// post-dividend low enter the range. `x_min_constraint` / `x_max_constraint`
@@ -140,7 +140,7 @@ pub fn fdm_black_scholes_mesher(
 }
 
 /// A Black-Scholes process on flat curves and a constant volatility, the
-/// market the mesher's own tests and the FD engines' shortcuts are built on.
+/// market the FD engines' shortcut constructors are built on.
 ///
 /// Port of the static `FdmBlackScholesMesher::processHelper`
 /// (`cpp:133-148`). The volatility curve takes its reference date and
