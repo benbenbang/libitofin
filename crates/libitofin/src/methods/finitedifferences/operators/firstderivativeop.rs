@@ -64,9 +64,11 @@ pub fn first_derivative_op(direction: Size, mesher: Shared<dyn FdmMesher>) -> Tr
 mod tests {
     use super::*;
 
+    use crate::math::array::Array;
     use crate::methods::finitedifferences::meshers::UniformGridMesher;
     use crate::methods::finitedifferences::operators::{FdmLinearOp, FdmLinearOpLayout};
     use crate::shared::shared;
+    use crate::types::Real;
 
     /// A linear function is differenced exactly by all three stencils, so this
     /// pins the interior weights and both one-sided boundary weights at once.
@@ -81,6 +83,60 @@ mod tests {
 
         for i in 0..t.size() {
             assert!((t[i] - 1.0).abs() <= 1e-12, "at {i}: {}", t[i]);
+        }
+    }
+
+    /// `testFirstDerivativesMapApply`,
+    /// `QuantLib/test-suite/fdmlinearop.cpp:360`. The grid is two million
+    /// points, as in C++, so the walks below use the layout's cursor rather
+    /// than [`iter`](FdmLinearOpLayout::iter), which clones a position per
+    /// point.
+    #[test]
+    fn first_derivatives_map_apply_matches_quantlib() {
+        let dim = [400, 100, 50];
+        let layout = shared(FdmLinearOpLayout::new(dim.to_vec()));
+        let boundaries = [(-5.0, 5.0), (0.0, 10.0), (5.0, 15.0)];
+        let mesher: Shared<dyn FdmMesher> =
+            shared(UniformGridMesher::new(Shared::clone(&layout), &boundaries).unwrap());
+
+        let map = first_derivative_op(2, Shared::clone(&mesher));
+
+        let mut r = Array::with_size(layout.size());
+        let mut position = layout.begin();
+        while position.index() < layout.size() {
+            r[position.index()] =
+                mesher.location(&position, 0).sin() + mesher.location(&position, 2).cos();
+            position.advance();
+        }
+
+        let t = map.apply(&r);
+
+        let (z_min, z_max) = boundaries[2];
+        let dz = (z_max - z_min) / (dim[2] - 1) as Real;
+
+        let mut position = layout.begin();
+        while position.index() < layout.size() {
+            let z = position.coordinates()[2];
+            let z0 = if z > 0 { z - 1 } else { 1 };
+            let z2 = if z < dim[2] - 1 { z + 1 } else { dim[2] - 2 };
+            let lz0 = z_min + z0 as Real * dz;
+            let lz2 = z_min + z2 as Real * dz;
+
+            let expected = if z == 0 {
+                ((z_min + dz).cos() - z_min.cos()) / dz
+            } else if z == dim[2] - 1 {
+                (z_max.cos() - (z_max - dz).cos()) / dz
+            } else {
+                (lz2.cos() - lz0.cos()) / (2.0 * dz)
+            };
+
+            let calculated = t[position.index()];
+            assert!(
+                (calculated - expected).abs() <= 1e-10,
+                "first derivative at {}: {calculated} != {expected}",
+                position.index()
+            );
+            position.advance();
         }
     }
 }

@@ -68,4 +68,54 @@ mod tests {
             assert!((t[i] - expected).abs() <= 1e-12, "at {i}: {}", t[i]);
         }
     }
+
+    /// `testSecondDerivativesMapApply`,
+    /// `QuantLib/test-suite/fdmlinearop.cpp:413`. C++ writes the three
+    /// directions as three copies of one loop; they differ only in the sign
+    /// the exact second derivative of `sin(x) cos(y) exp(z)` carries along
+    /// that direction, so they are one loop over that sign here.
+    #[test]
+    fn second_derivatives_map_apply_matches_quantlib() {
+        let dim = [50, 50, 50];
+        let layout = shared(FdmLinearOpLayout::new(dim.to_vec()));
+        let boundaries = [(0.0, 0.5); 3];
+        let mesher: Shared<dyn FdmMesher> =
+            shared(UniformGridMesher::new(Shared::clone(&layout), &boundaries).unwrap());
+
+        let value = |position: &_| {
+            mesher.location(position, 0).sin()
+                * mesher.location(position, 1).cos()
+                * mesher.location(position, 2).exp()
+        };
+
+        let mut r = Array::with_size(layout.size());
+        let mut position = layout.begin();
+        while position.index() < layout.size() {
+            r[position.index()] = value(&position);
+            position.advance();
+        }
+
+        let tol = 5e-2;
+        for (direction, sign) in [(0, -1.0), (1, -1.0), (2, 1.0)] {
+            let t = second_derivative_op(direction, Shared::clone(&mesher)).apply(&r);
+
+            let mut position = layout.begin();
+            while position.index() < layout.size() {
+                let coordinate = position.coordinates()[direction];
+                let expected: Real = if coordinate == 0 || coordinate == dim[direction] - 1 {
+                    0.0
+                } else {
+                    sign * value(&position)
+                };
+
+                let calculated = t[position.index()];
+                assert!(
+                    (calculated - expected).abs() <= tol,
+                    "d2/dx{direction}2 at {}: {calculated} != {expected}",
+                    position.index()
+                );
+                position.advance();
+            }
+        }
+    }
 }

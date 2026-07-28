@@ -9,11 +9,12 @@
 //! `toMatrix` (`triplebandlinearop.hpp:64`) is omitted with the rest of the
 //! sparse-matrix work in #636.
 //!
-//! No QuantLib test constructs a `TripleBandLinearOp` directly, so the tests
-//! below are not an oracle: they are hand-computed products and algebraic
-//! identities that pin this port's own behaviour. The oracle is
-//! `testTripleBandMapSolve` (`QuantLib/test-suite/fdmlinearop.cpp:755`), which
-//! reaches `solve_splitting` through the derivative operators of #640.
+//! No QuantLib test constructs a `TripleBandLinearOp` directly, so the
+//! hand-computed products and algebraic identities below are not an oracle:
+//! they pin this port's own behaviour. The oracle is `testTripleBandMapSolve`
+//! (`QuantLib/test-suite/fdmlinearop.cpp:756`), which reaches
+//! `solve_splitting` through the derivative operators of #640; it is ported
+//! alongside them.
 
 use crate::errors::QlResult;
 use crate::math::array::Array;
@@ -330,6 +331,7 @@ mod tests {
     use super::*;
 
     use crate::methods::finitedifferences::meshers::UniformGridMesher;
+    use crate::methods::finitedifferences::operators::{first_derivative_op, second_derivative_op};
     use crate::shared::shared;
 
     const DIM: [Size; 2] = [3, 4];
@@ -630,5 +632,70 @@ mod tests {
     fn mult_r_rejects_a_mismatched_argument() {
         let operator = banded(&DIM, DIRECTION);
         operator.mult_r(&Array::with_size(operator.size() - 1));
+    }
+
+    /// `testTripleBandMapSolve`, `QuantLib/test-suite/fdmlinearop.cpp:756`.
+    ///
+    /// Two C++ shapes have no direct Rust equivalent. `dy.axpyb(a, dy, dy, b)`
+    /// (`:770`) and `dxx.axpyb(a, dxx, dx, b)` (`:805`) alias the target with a
+    /// source, which the borrow checker rejects; the C++ loop reads a slot's
+    /// `x` and `y` before writing that slot and never looks ahead
+    /// (`triplebandlinearop.cpp:106-156`), so sourcing from a copy taken
+    /// beforehand produces the same bands. And `copyOfDxx.add(...)` (`:821`)
+    /// returns a new operator, leaving `copyOfDxx` untouched, so that arm only
+    /// exercises the assignment on the next line - here a clone.
+    #[test]
+    fn triple_band_map_solve_matches_quantlib() {
+        let layout = shared(FdmLinearOpLayout::new(vec![100, 400]));
+        let mesher: Shared<dyn FdmMesher> =
+            shared(UniformGridMesher::new(Shared::clone(&layout), &[(0.0, 1.0); 2]).unwrap());
+
+        let one = Array::filled(1, 1.0);
+
+        let u: Array = (0..layout.size())
+            .map(|i| (0.1 * i as Real).sin() + (0.35 * i as Real).cos())
+            .collect();
+        let assert_recovers = |recovered: &Array| {
+            for i in 0..u.size() {
+                assert!(
+                    (u[i] - recovered[i]).abs() <= 1e-6,
+                    "solve and apply are not consistent at {i}: {} != {}",
+                    recovered[i],
+                    u[i]
+                );
+            }
+        };
+
+        let mut dy = first_derivative_op(1, Shared::clone(&mesher));
+        let dy_before = dy.clone();
+        dy.axpyb(&Array::filled(1, 2.0), &dy_before, &dy_before, &one);
+        let copy_of_dy = dy.clone();
+
+        assert_recovers(&dy.solve_splitting(&copy_of_dy.apply(&u), 1.0, 0.0).unwrap());
+
+        let mut dx = first_derivative_op(0, Shared::clone(&mesher));
+        let dx_before = dx.clone();
+        dx.axpyb(&Array::new(), &dx_before, &dx_before, &one);
+        let copy_of_dx = dx.clone();
+
+        assert_recovers(&dx.solve_splitting(&copy_of_dx.apply(&u), 1.0, 0.0).unwrap());
+
+        let mut dxx = second_derivative_op(0, Shared::clone(&mesher));
+        let dxx_before = dxx.clone();
+        dxx.axpyb(&Array::filled(1, 0.5), &dxx_before, &dx, &one);
+        let copy_of_dxx = dxx.clone();
+
+        assert_recovers(
+            &dxx.solve_splitting(&copy_of_dxx.apply(&u), 1.0, 0.0)
+                .unwrap(),
+        );
+
+        let _ = copy_of_dxx.add_op(&second_derivative_op(1, Shared::clone(&mesher)));
+        let copy_of_dxx = dxx.clone();
+
+        assert_recovers(
+            &dxx.solve_splitting(&copy_of_dxx.apply(&u), 1.0, 0.0)
+                .unwrap(),
+        );
     }
 }
