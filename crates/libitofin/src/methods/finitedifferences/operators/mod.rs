@@ -1,11 +1,14 @@
 //! Finite-difference operators.
 //!
-//! Port of `ql/methods/finitedifferences/operators/`. The indexing primitives
-//! every operator is built on land first: the grid odometer
-//! [`FdmLinearOpIterator`] and the index space [`FdmLinearOpLayout`] it walks.
+//! Port of `ql/methods/finitedifferences/operators/`. This ticket lands the
+//! indexing primitives every operator is built on -
+//! [`FdmLinearOpIterator`] and [`FdmLinearOpLayout`] - plus the
+//! [`FdmLinearOp`] contract the operators themselves implement.
 
+mod fdmlinearop;
 mod fdmlinearopiterator;
 mod fdmlinearoplayout;
 
+pub use fdmlinearop::FdmLinearOp;
 pub use fdmlinearopiterator::FdmLinearOpIterator;
 pub use fdmlinearoplayout::FdmLinearOpLayout;
