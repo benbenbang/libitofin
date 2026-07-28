@@ -8,6 +8,7 @@
 //!
 mod concentrating1dmesher;
 mod fdm1dmesher;
+mod fdmblackscholesmesher;
 mod fdmmesher;
 mod fdmmeshercomposite;
 mod uniform1dmesher;
@@ -15,6 +16,7 @@ mod uniformgridmesher;
 
 pub use concentrating1dmesher::concentrating_1d_mesher;
 pub use fdm1dmesher::Fdm1dMesher;
+pub use fdmblackscholesmesher::{fdm_black_scholes_mesher, process_helper};
 pub use fdmmesher::FdmMesher;
 pub use fdmmeshercomposite::FdmMesherComposite;
 pub use uniform1dmesher::uniform_1d_mesher;
