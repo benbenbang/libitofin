@@ -2,9 +2,15 @@
 //!
 //! Port of `ql/pricingengines/blackcalculator.{hpp,cpp}`: a
 //! [`BlackCalculator`] prices a European payoff on a forward and exposes the
-//! full greek set. Only the plain-vanilla payoff is supported; the C++
-//! visitor dispatch on the other striked payoffs follows those payoffs as a
-//! follow-up, as do `strike_gamma`, `vanna` and `volga`.
+//! full greek set. The plain-vanilla and cash-or-nothing payoffs are
+//! supported; the C++ visitor's remaining arms (`AssetOrNothingPayoff`,
+//! `GapPayoff`) follow those payoffs as a follow-up, as do `strike_gamma`,
+//! `vanna` and `volga`.
+//!
+//! Known limitation carried over from the reference: the zero-volatility
+//! branches below return the plain-vanilla ladder, which is meaningless for a
+//! digital payoff. C++ has the same gap - its branches read the option type
+//! off `alpha_ >= 0`, and a digital's `alpha_` is always zero.
 //!
 //! Divergence, throughout: every argument requirement here is QuantLib's own
 //! (`blackcalculator.cpp:66,68,72,74` for the constructor, `:204` and `:316`
@@ -25,9 +31,11 @@
 //! the C++ and return `NaN`, while `value` and the ITM probabilities stay
 //! well-defined; a test locks the artifact.
 
+use std::any::Any;
+
 use crate::errors::QlResult;
 use crate::fail;
-use crate::instruments::{PlainVanillaPayoff, StrikedTypePayoff, TypePayoff};
+use crate::instruments::{CashOrNothingPayoff, PlainVanillaPayoff, StrikedTypePayoff, TypePayoff};
 use crate::math::comparison::close;
 use crate::math::distributions::normal::CumulativeNormalDistribution;
 use crate::option::OptionType;
@@ -50,6 +58,7 @@ pub struct BlackCalculator {
     dbeta_dd2: Real,
     cum_d1: Real,
     cum_d2: Real,
+    n_d2: Real,
     x: Real,
     dx_ds: Real,
     dx_dstrike: Real,
@@ -150,6 +159,7 @@ impl BlackCalculator {
             dbeta_dd2,
             cum_d1,
             cum_d2,
+            n_d2,
             x: strike,
             dx_ds: 0.0,
             dx_dstrike: 1.0,
@@ -170,6 +180,54 @@ impl BlackCalculator {
             std_dev,
             discount,
         )
+    }
+
+    /// Builds a calculator from any striked payoff the C++ visitor handles.
+    ///
+    /// Ports `BlackCalculator::Calculator` (`blackcalculator.cpp:149-174`):
+    /// the coefficients [`BlackCalculator::new`] lays down are the
+    /// plain-vanilla ones and stand as they are, the cash-or-nothing payoff
+    /// replaces them with the digital ones (`:158-174`), and every other
+    /// payoff hits the `visit(Payoff&)` failure (`:152-154`).
+    ///
+    /// # Errors
+    ///
+    /// Errors on the arguments [`BlackCalculator::new`] rejects, and on a
+    /// payoff type the visitor does not handle.
+    pub fn with_striked_payoff(
+        payoff: &dyn StrikedTypePayoff,
+        forward: Real,
+        std_dev: Real,
+        discount: Real,
+    ) -> QlResult<BlackCalculator> {
+        let mut black = BlackCalculator::new(
+            payoff.option_type(),
+            payoff.strike(),
+            forward,
+            std_dev,
+            discount,
+        )?;
+
+        let dynamic = payoff as &dyn Any;
+        if dynamic.is::<PlainVanillaPayoff>() {
+            return Ok(black);
+        }
+        if let Some(digital) = dynamic.downcast_ref::<CashOrNothingPayoff>() {
+            black.alpha = 0.0;
+            black.dalpha_dd1 = 0.0;
+            black.x = digital.cash_payoff();
+            black.dx_dstrike = 0.0;
+            let (beta, dbeta_dd2) = match digital.option_type() {
+                OptionType::Call => (black.cum_d2, black.n_d2),
+                OptionType::Put => (1.0 - black.cum_d2, -black.n_d2),
+            };
+            black.beta = beta;
+            black.dbeta_dd2 = dbeta_dd2;
+            return Ok(black);
+        }
+
+        let name = payoff.name();
+        fail!("unsupported payoff type: {name}");
     }
 
     /// Zero-volatility sensitivities by moneyness, negated for puts;
@@ -418,6 +476,7 @@ fn elasticity_from(value: Real, delta: Real, underlying: Real) -> Real {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::payoff::Payoff;
     use crate::pricingengines::blackformula::black_formula;
 
     use crate::pricingengines::hull_fixture::{DISCOUNT, FORWARD, MATURITY, SPOT, STD_DEV, STRIKE};
@@ -515,6 +574,93 @@ mod tests {
         let from_payoff = BlackCalculator::with_payoff(&payoff, FORWARD, STD_DEV, DISCOUNT)
             .expect("valid inputs");
         assert_close(from_payoff.value(), hull(OptionType::Put).value(), 0.0);
+    }
+
+    #[test]
+    fn striked_payoff_constructor_leaves_the_vanilla_path_alone() {
+        let payoff = PlainVanillaPayoff::new(OptionType::Put, STRIKE);
+        let visited = BlackCalculator::with_striked_payoff(&payoff, FORWARD, STD_DEV, DISCOUNT)
+            .expect("valid inputs");
+        assert_close(visited.value(), hull(OptionType::Put).value(), 0.0);
+        assert_close(
+            visited.strike_sensitivity(),
+            hull(OptionType::Put).strike_sensitivity(),
+            0.0,
+        );
+    }
+
+    /// The digital value is `discount * cash * N(d2)` for a call and
+    /// `discount * cash * N(-d2)` for a put; the coefficient assignment of
+    /// `blackcalculator.cpp:158-174` must reproduce it through the shared
+    /// `value()` formula.
+    #[test]
+    fn digital_coefficients_reproduce_the_closed_form() {
+        let cash = 10.0;
+        let d2 = (FORWARD / STRIKE).ln() / STD_DEV - 0.5 * STD_DEV;
+        let f = CumulativeNormalDistribution::standard();
+        for (option_type, expected) in [
+            (OptionType::Call, DISCOUNT * cash * f.value(d2)),
+            (OptionType::Put, DISCOUNT * cash * f.value(-d2)),
+        ] {
+            let payoff = CashOrNothingPayoff::new(option_type, STRIKE, cash);
+            let black = BlackCalculator::with_striked_payoff(&payoff, FORWARD, STD_DEV, DISCOUNT)
+                .expect("valid inputs");
+            assert_close(black.value(), expected, 1e-14);
+            assert_close(black.alpha(), 0.0, 0.0);
+        }
+    }
+
+    /// `x_` becomes the cash amount and no longer tracks the strike, so
+    /// `DxDstrike_` is reset to zero (`blackcalculator.cpp:161`). The strike
+    /// derivative of `discount * cash * N(-d2)` is
+    /// `discount * cash * n(d2) / (stdDev * strike)`.
+    #[test]
+    fn digital_strike_sensitivity_drops_the_strike_carrying_term() {
+        let cash = 10.0;
+        let d2 = (FORWARD / STRIKE).ln() / STD_DEV - 0.5 * STD_DEV;
+        let f = CumulativeNormalDistribution::standard();
+        let expected = DISCOUNT * cash * f.derivative(d2) / (STD_DEV * STRIKE);
+        let payoff = CashOrNothingPayoff::new(OptionType::Put, STRIKE, cash);
+        let black = BlackCalculator::with_striked_payoff(&payoff, FORWARD, STD_DEV, DISCOUNT)
+            .expect("valid inputs");
+        assert_close(black.strike_sensitivity(), expected, 1e-14);
+    }
+
+    #[test]
+    fn payoffs_outside_the_visitor_are_rejected() {
+        let payoff = PercentageStrikeStub;
+        let error = BlackCalculator::with_striked_payoff(&payoff, FORWARD, STD_DEV, DISCOUNT)
+            .expect_err("the visitor does not handle this payoff");
+        assert_eq!(error.message(), "unsupported payoff type: PercentageStrike");
+    }
+
+    /// Stands in for `PercentageStrikePayoff`, a striked payoff the C++
+    /// visitor genuinely does not handle (`blackcalculator.cpp:25-32` lists
+    /// its arms), so it falls through to `visit(Payoff&)`.
+    struct PercentageStrikeStub;
+
+    impl Payoff for PercentageStrikeStub {
+        fn name(&self) -> String {
+            "PercentageStrike".to_string()
+        }
+        fn description(&self) -> String {
+            self.name()
+        }
+        fn value(&self, price: Real) -> Real {
+            price
+        }
+    }
+
+    impl TypePayoff for PercentageStrikeStub {
+        fn option_type(&self) -> OptionType {
+            OptionType::Call
+        }
+    }
+
+    impl StrikedTypePayoff for PercentageStrikeStub {
+        fn strike(&self) -> Real {
+            STRIKE
+        }
     }
 
     #[test]
