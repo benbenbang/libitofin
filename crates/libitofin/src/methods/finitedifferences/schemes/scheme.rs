@@ -17,7 +17,7 @@ pub trait Scheme {
     /// C++ leaves `dt_` at `Null<Real>()` until this is called; the schemes
     /// here hold an `Option` instead and answer an unset step with an error.
     /// `FiniteDifferenceModel::rollbackImpl` calls this once, before the first
-    /// step (`finitedifferencemodel.hpp:97`).
+    /// step (`finitedifferencemodel.hpp:96`).
     fn set_step(&mut self, dt: Time);
 
     /// Rolls `a` back over one timestep ending at `t`, in place.

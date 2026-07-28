@@ -1,7 +1,7 @@
 //! Douglas operator splitting.
 //!
 //! Port of `ql/methods/finitedifferences/schemes/douglasscheme.hpp:35` and its
-//! `.cpp:26-52`. C++ derives the sibling schemes from `MixedScheme`; this one
+//! `.cpp:26-51`. C++ derives the sibling schemes from `MixedScheme`; this one
 //! is standalone there too, so nothing of that base class is needed here.
 
 use crate::errors::QlResult;
@@ -54,7 +54,7 @@ impl Scheme for DouglasScheme {
         self.dt = Some(dt);
     }
 
-    /// `douglasscheme.cpp:32-47`.
+    /// `douglasscheme.cpp:31-47`.
     ///
     /// The right-hand side of each implicit correction applies the operator to
     /// the step's input values, not to the explicit update `y` that the same
@@ -194,7 +194,7 @@ mod tests {
         assert_close(&a, &expected);
     }
 
-    /// `cpp:34-35`: the operator and the conditions are both set at
+    /// `cpp:33-34`: the operator and the conditions are both set at
     /// `max(0, t - dt)`. The clamp only shows on a step whose start is
     /// negative but inside the guard's tolerance, so that is the `t` here.
     #[test]
@@ -228,7 +228,7 @@ mod tests {
         assert!(scheme.step(&mut probe(4), T).is_err());
     }
 
-    /// `cpp:33`.
+    /// `cpp:32`.
     #[test]
     fn a_step_towards_negative_time_fails() {
         let mut scheme = douglas(scaled_composite(&COEFFICIENTS), Vec::new());

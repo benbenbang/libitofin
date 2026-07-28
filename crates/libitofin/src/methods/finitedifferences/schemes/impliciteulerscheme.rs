@@ -1,7 +1,7 @@
 //! Fully implicit Euler stepping.
 //!
 //! Port of `ql/methods/finitedifferences/schemes/impliciteulerscheme.hpp:35`
-//! and the one-direction branch of its `.cpp:41-63`. This is the scheme the
+//! and the one-direction branch of its `.cpp:41-79`. This is the scheme the
 //! backward solver of #658 damps with before handing over to the scheme the
 //! caller asked for (`fdmbackwardsolver.cpp:100-106`).
 //!
@@ -9,21 +9,21 @@
 //! are omitted here rather than accepted and left wrong:
 //!
 //! - the iterative branch taken when the operator splits into more than one
-//!   direction (`cpp:59-73`), which needs `BiCGstab` and `GMRES`; those are
+//!   direction (`cpp:55-78`), which needs `BiCGstab` and `GMRES`; those are
 //!   deferred with the rest of the sparse-matrix work in #636, so [`step`]
 //!   answers such an operator with an error instead of silently running the
 //!   one-direction arm on it;
 //! - the `relTol` and `solverType` constructor parameters (`hpp:47-50`), which
 //!   only reach that branch. The solver of #658 constructs the scheme with
-//!   both defaulted (`fdmbackwardsolver.cpp:101` and `:155`), so dropping them
+//!   both defaulted (`fdmbackwardsolver.cpp:101` and `:156`), so dropping them
 //!   costs it nothing;
 //! - `numberOfIterations` and the `iterations_` counter it reports
-//!   (`hpp:54`), which count iterations of that branch and stay at zero
+//!   (`hpp:55`), which count iterations of that branch and stay at zero
 //!   without it;
 //! - the protected `step(a, t, theta)` overload and the `apply(r, theta)` it
-//!   uses (`hpp:57-59`), which exist for `CrankNicolsonScheme` - a `friend`
-//!   (`hpp:56`) that is not ported. The public step fixes `theta` at `1.0`
-//!   (`cpp:46`), which is what this one does.
+//!   uses (`hpp:58` and `hpp:60`), which exist for `CrankNicolsonScheme` - a `friend`
+//!   (`hpp:57`) that is not ported. The public step fixes `theta` at `1.0`
+//!   (`cpp:42`), which is what this one does.
 //!
 //! [`step`]: Scheme::step
 
@@ -64,13 +64,13 @@ impl ImplicitEulerScheme {
 }
 
 impl Scheme for ImplicitEulerScheme {
-    /// `impliciteulerscheme.cpp:78`.
+    /// `impliciteulerscheme.cpp:82`.
     fn set_step(&mut self, dt: Time) {
         self.dt = Some(dt);
     }
 
-    /// `impliciteulerscheme.cpp:45-63`, the one-direction branch, with `theta`
-    /// at the `1.0` the public C++ step passes (`cpp:46`).
+    /// `impliciteulerscheme.cpp:45-79`, the one-direction branch, with `theta`
+    /// at the `1.0` the public C++ step passes (`cpp:42`).
     ///
     /// Unlike Douglas there is no explicit stage, so the conditions are
     /// reached through `apply_before_solving` and `apply_after_solving` only.
@@ -170,7 +170,7 @@ mod tests {
         assert_close(&a, &(&u / (1.0 - DT * COEFFICIENTS[0])));
     }
 
-    /// `cpp:34-35` again, plus the call set: without an explicit stage the
+    /// `cpp:47-48` again, plus the call set: without an explicit stage the
     /// conditions never see `apply_before_applying` or `apply_after_applying`,
     /// which is what tells this scheme's boundary handling from Douglas's. The
     /// step's start is negative but inside the guard's tolerance, so the
@@ -196,7 +196,7 @@ mod tests {
         );
     }
 
-    /// The deferral of `cpp:59-73` is visible, not silent: an operator with
+    /// The deferral of `cpp:55-78` is visible, not silent: an operator with
     /// more than one direction is refused rather than run through the
     /// one-direction arm.
     #[test]
@@ -215,7 +215,7 @@ mod tests {
         assert!(scheme.step(&mut probe(4), T).is_err());
     }
 
-    /// `cpp:45`.
+    /// `cpp:46`.
     #[test]
     fn a_step_towards_negative_time_fails() {
         let mut scheme = implicit_euler(scaled_composite(&COEFFICIENTS[..1]), Vec::new());

@@ -52,6 +52,11 @@ const TOL: Real = 1e-13;
 /// of `(I + s A_d) x = r`. Give it coefficients that differ from [`WHOLE`] and
 /// from each other and every one of the three shows up separately in the
 /// result of a step.
+///
+/// It therefore breaks the invariant a real composite keeps - `apply` is not
+/// the sum of the directions and the mixed term - and does so deliberately:
+/// an operator whose parts agree is exactly one that cannot say which part a
+/// scheme reached for.
 pub struct ScaledComposite {
     coefficients: Vec<Real>,
     /// The arguments the last `set_time` was given, `None` before the first.
