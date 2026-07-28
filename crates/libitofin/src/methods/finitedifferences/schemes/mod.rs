@@ -9,7 +9,7 @@ mod douglasscheme;
 mod impliciteulerscheme;
 mod scheme;
 #[cfg(test)]
-mod testops;
+pub(crate) mod testops;
 
 pub use boundaryconditionschemehelper::BoundaryConditionSchemeHelper;
 pub use douglasscheme::DouglasScheme;
