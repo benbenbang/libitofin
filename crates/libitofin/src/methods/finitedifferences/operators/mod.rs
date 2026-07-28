@@ -8,9 +8,13 @@
 mod fdmlinearop;
 mod fdmlinearopiterator;
 mod fdmlinearoplayout;
+mod firstderivativeop;
+mod secondderivativeop;
 mod triplebandlinearop;
 
 pub use fdmlinearop::FdmLinearOp;
 pub use fdmlinearopiterator::FdmLinearOpIterator;
 pub use fdmlinearoplayout::FdmLinearOpLayout;
+pub use firstderivativeop::first_derivative_op;
+pub use secondderivativeop::second_derivative_op;
 pub use triplebandlinearop::TripleBandLinearOp;
