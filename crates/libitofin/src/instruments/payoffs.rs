@@ -1,10 +1,10 @@
 //! Payoffs for various options.
 //!
 //! Port of the plain-vanilla subset of `ql/instruments/payoffs.{hpp,cpp}`:
-//! the [`TypePayoff`] and [`StrikedTypePayoff`] intermediate contracts and
-//! the [`PlainVanillaPayoff`]. The remaining payoffs (`NullPayoff`,
-//! `FloatingTypePayoff`, `PercentageStrikePayoff`, `AssetOrNothingPayoff`,
-//! `CashOrNothingPayoff`, `GapPayoff`, `SuperFundPayoff`,
+//! the [`TypePayoff`] and [`StrikedTypePayoff`] intermediate contracts, the
+//! [`PlainVanillaPayoff`] and the [`CashOrNothingPayoff`]. The remaining
+//! payoffs (`NullPayoff`, `FloatingTypePayoff`, `PercentageStrikePayoff`,
+//! `AssetOrNothingPayoff`, `GapPayoff`, `SuperFundPayoff`,
 //! `SuperSharePayoff`) are follow-up work.
 
 use std::any::Any;
@@ -83,6 +83,76 @@ impl StrikedTypePayoff for PlainVanillaPayoff {
     }
 }
 
+/// Binary cash-or-nothing payoff: a fixed `cash_payoff` when the price ends
+/// strictly beyond the strike, nothing otherwise.
+///
+/// Ports `CashOrNothingPayoff` (`ql/instruments/payoffs.hpp:148`,
+/// `payoffs.cpp:154-163`). The comparison is strict on both sides, so a price
+/// exactly at the strike pays nothing for either option type.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CashOrNothingPayoff {
+    option_type: OptionType,
+    strike: Real,
+    cash_payoff: Real,
+}
+
+impl CashOrNothingPayoff {
+    /// Builds a cash-or-nothing payoff of the given type, strike and cash
+    /// amount.
+    pub fn new(option_type: OptionType, strike: Real, cash_payoff: Real) -> CashOrNothingPayoff {
+        CashOrNothingPayoff {
+            option_type,
+            strike,
+            cash_payoff,
+        }
+    }
+
+    /// The amount paid when the payoff is in the money.
+    pub fn cash_payoff(&self) -> Real {
+        self.cash_payoff
+    }
+}
+
+impl Payoff for CashOrNothingPayoff {
+    fn name(&self) -> String {
+        "CashOrNothing".to_string()
+    }
+
+    fn description(&self) -> String {
+        format!(
+            "{} {}, {} strike, {} cash payoff",
+            self.name(),
+            self.option_type,
+            self.strike,
+            self.cash_payoff
+        )
+    }
+
+    fn value(&self, price: Real) -> Real {
+        let moneyness = match self.option_type {
+            OptionType::Call => price - self.strike,
+            OptionType::Put => self.strike - price,
+        };
+        if moneyness > 0.0 {
+            self.cash_payoff
+        } else {
+            0.0
+        }
+    }
+}
+
+impl TypePayoff for CashOrNothingPayoff {
+    fn option_type(&self) -> OptionType {
+        self.option_type
+    }
+}
+
+impl StrikedTypePayoff for CashOrNothingPayoff {
+    fn strike(&self) -> Real {
+        self.strike
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -133,6 +203,49 @@ mod tests {
         let payoff = PlainVanillaPayoff::new(OptionType::Call, 100.0);
         let dynamic: &dyn StrikedTypePayoff = &payoff;
         assert_eq!(dynamic.value(107.0), 7.0);
+        assert_eq!(dynamic.option_type(), OptionType::Call);
+        assert_eq!(dynamic.strike(), 100.0);
+    }
+
+    #[test]
+    fn digital_pays_the_cash_amount_beyond_the_strike() {
+        let call = CashOrNothingPayoff::new(OptionType::Call, 100.0, 10.0);
+        assert_eq!(call.value(110.0), 10.0);
+        assert_eq!(call.value(90.0), 0.0);
+
+        let put = CashOrNothingPayoff::new(OptionType::Put, 100.0, 10.0);
+        assert_eq!(put.value(90.0), 10.0);
+        assert_eq!(put.value(110.0), 0.0);
+    }
+
+    /// `payoffs.cpp:156,158` compares `> 0.0`, so the strike itself is out of
+    /// the money for both types - a non-strict comparison would pay twice.
+    #[test]
+    fn digital_at_the_strike_pays_nothing_either_way() {
+        let call = CashOrNothingPayoff::new(OptionType::Call, 100.0, 10.0);
+        let put = CashOrNothingPayoff::new(OptionType::Put, 100.0, 10.0);
+        assert_eq!(call.value(100.0), 0.0);
+        assert_eq!(put.value(100.0), 0.0);
+    }
+
+    #[test]
+    fn digital_accessors_and_description_match_quantlib() {
+        let put = CashOrNothingPayoff::new(OptionType::Put, 80.0, 10.0);
+        assert_eq!(put.option_type(), OptionType::Put);
+        assert_eq!(put.strike(), 80.0);
+        assert_eq!(put.cash_payoff(), 10.0);
+        assert_eq!(put.name(), "CashOrNothing");
+        assert_eq!(
+            put.description(),
+            "CashOrNothing Put, 80 strike, 10 cash payoff"
+        );
+    }
+
+    #[test]
+    fn digital_usable_as_trait_object() {
+        let payoff = CashOrNothingPayoff::new(OptionType::Call, 100.0, 10.0);
+        let dynamic: &dyn StrikedTypePayoff = &payoff;
+        assert_eq!(dynamic.value(107.0), 10.0);
         assert_eq!(dynamic.option_type(), OptionType::Call);
         assert_eq!(dynamic.strike(), 100.0);
     }
