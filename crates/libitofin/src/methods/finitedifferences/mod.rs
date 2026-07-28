@@ -7,6 +7,8 @@
 //! backward solver that drive them.
 
 mod boundarycondition;
+#[cfg(test)]
+mod cranknicolsondamping_oracle;
 mod finitedifferencemodel;
 mod stepcondition;
 
