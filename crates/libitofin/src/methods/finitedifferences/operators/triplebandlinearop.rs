@@ -188,9 +188,127 @@ impl TripleBandLinearOp {
         Ok(result)
     }
 
+    /// Overwrites this operator's bands with `a * x + y`, adding `b` to the
+    /// diagonal (`triplebandlinearop.cpp:89-158`).
+    ///
+    /// `a` and `b` each broadcast: empty drops the term entirely, one element
+    /// scales every row by it, and a full-length array scales row by row. C++
+    /// reaches this through pointer arithmetic with a zeroed stride
+    /// (`triplebandlinearop.cpp:114`), which silently reads past the end at any
+    /// other length; here the length is checked.
+    ///
+    /// Only the bands are read, not the index maps, so `x` and `y` are expected
+    /// to run along the same direction of the same mesh as this operator. C++
+    /// does not check that either.
+    ///
+    /// Taking `x` and `y` as shared references means this operator cannot also
+    /// be `x` or `y`. No caller needs that: `x == y` is the common shape
+    /// (`fdmg2op.cpp:69`, `fdmsabrop.cpp:54`) and works, while the target is
+    /// always a distinct operator across every call site in `ql/`.
+    pub fn axpyb(&mut self, a: &Array, x: &TripleBandLinearOp, y: &TripleBandLinearOp, b: &Array) {
+        let size = self.size();
+        assert!(broadcasts_over(a, size), "inconsistent size of a");
+        assert!(broadcasts_over(b, size), "inconsistent size of b");
+
+        let a_stride = if a.size() > 1 { 1 } else { 0 };
+        let b_stride = if b.size() > 1 { 1 } else { 0 };
+
+        for i in 0..size {
+            let (lower, mut diag, upper) = if a.is_empty() {
+                (y.lower[i], y.diag[i], y.upper[i])
+            } else {
+                let s = a[i * a_stride];
+                (
+                    y.lower[i] + s * x.lower[i],
+                    y.diag[i] + s * x.diag[i],
+                    y.upper[i] + s * x.upper[i],
+                )
+            };
+            if !b.is_empty() {
+                diag += b[i * b_stride];
+            }
+
+            self.lower[i] = lower;
+            self.diag[i] = diag;
+            self.upper[i] = upper;
+        }
+    }
+
+    /// A copy of this operator with row `i` scaled by `u[i]`, that is
+    /// `diag(u) * self` (`triplebandlinearop.cpp:175-189`).
+    pub fn mult(&self, u: &Array) -> TripleBandLinearOp {
+        assert_eq!(u.size(), self.size(), "inconsistent size of u");
+        self.map_bands(|i, lower, diag, upper| {
+            let s = u[i];
+            (lower * s, diag * s, upper * s)
+        })
+    }
+
+    /// A copy of this operator with each band scaled by `u` sampled at the
+    /// entry that band multiplies, that is `self * diag(u)`
+    /// (`triplebandlinearop.cpp:191-207`).
+    ///
+    /// `u` is sampled at the flat positions `i - 1`, `i` and `i + 1`, not at
+    /// the neighbours along `direction` that the bands actually reach, and
+    /// `1.0` stands in at the two ends of the flat array rather than at the
+    /// ends of each line. The two agree only on a one-dimensional mesh. This
+    /// port keeps the C++ indexing exactly (`triplebandlinearop.cpp:198-200`),
+    /// because it is what the derivative operators are calibrated against.
+    pub fn mult_r(&self, u: &Array) -> TripleBandLinearOp {
+        let size = self.size();
+        assert_eq!(u.size(), size, "inconsistent size of rhs");
+        self.map_bands(|i, lower, diag, upper| {
+            let previous = if i > 0 { u[i - 1] } else { 1.0 };
+            let next = if i + 1 < size { u[i + 1] } else { 1.0 };
+            (lower * previous, diag * u[i], upper * next)
+        })
+    }
+
+    /// The band-wise sum of this operator and `m`
+    /// (`triplebandlinearop.cpp:160-172`).
+    ///
+    /// C++ overloads `add` on the argument type (`triplebandlinearop.hpp:55-56`);
+    /// Rust names the two forms separately. Both return a new operator rather
+    /// than mutating, as in C++.
+    pub fn add_op(&self, m: &TripleBandLinearOp) -> TripleBandLinearOp {
+        self.map_bands(|i, lower, diag, upper| {
+            (lower + m.lower[i], diag + m.diag[i], upper + m.upper[i])
+        })
+    }
+
+    /// A copy of this operator with `u` added to its diagonal
+    /// (`triplebandlinearop.cpp:209-222`).
+    pub fn add_diagonal(&self, u: &Array) -> TripleBandLinearOp {
+        assert_eq!(u.size(), self.size(), "inconsistent size of u");
+        self.map_bands(|i, lower, diag, upper| (lower, diag + u[i], upper))
+    }
+
+    /// C++ builds the result through the public constructor, which recomputes
+    /// the index maps from the mesh (`triplebandlinearop.cpp:162`). Cloning
+    /// copies them instead, as the C++ copy constructor does
+    /// (`triplebandlinearop.cpp:61-78`); they depend only on the mesh and the
+    /// direction, which the result shares.
+    fn map_bands(
+        &self,
+        bands: impl Fn(Size, Real, Real, Real) -> (Real, Real, Real),
+    ) -> TripleBandLinearOp {
+        let mut result = self.clone();
+        for i in 0..self.size() {
+            let (lower, diag, upper) = bands(i, self.lower[i], self.diag[i], self.upper[i]);
+            result.lower[i] = lower;
+            result.diag[i] = diag;
+            result.upper[i] = upper;
+        }
+        result
+    }
+
     fn size(&self) -> Size {
         self.diag.len()
     }
+}
+
+fn broadcasts_over(values: &Array, size: Size) -> bool {
+    values.is_empty() || values.size() == 1 || values.size() == size
 }
 
 impl FdmLinearOp for TripleBandLinearOp {
@@ -245,6 +363,19 @@ mod tests {
         TripleBandLinearOp::with_bands(direction, mesher, move |_, position| {
             band_values(position.index(), position.coordinates()[direction], extent)
         })
+    }
+
+    /// A second operator over the same mesh and direction, so that its bands
+    /// address the same neighbours as `operator`'s.
+    fn alternate(operator: &TripleBandLinearOp) -> TripleBandLinearOp {
+        TripleBandLinearOp::with_bands(
+            operator.direction(),
+            Shared::clone(operator.mesher()),
+            |_, position| {
+                let i = position.index() as Real;
+                (0.5 - 0.05 * i, 2.0 * i, 1.0 + 0.15 * i)
+            },
+        )
     }
 
     fn assert_close(actual: &Array, expected: &Array) {
@@ -359,9 +490,145 @@ mod tests {
     }
 
     #[test]
+    fn axpyb_broadcasts_a_and_b_over_the_grid() {
+        let operator = banded(&DIM, DIRECTION);
+        let size = operator.size();
+        let r = Array::incremental(size, 1.0, 2.0);
+        let applied = operator.apply(&r);
+
+        let scalar = 3.0;
+        let vector = Array::incremental(size, 0.5, 0.25);
+        let shift = Array::incremental(size, -2.0, 0.125);
+
+        let cases: [(Array, Array); 4] = [
+            (Array::new(), Array::new()),
+            (Array::new(), Array::filled(1, 0.75)),
+            (Array::filled(1, scalar), Array::new()),
+            (vector.clone(), shift.clone()),
+        ];
+
+        for (a, b) in cases {
+            let mut target = TripleBandLinearOp::new(DIRECTION, Shared::clone(operator.mesher()));
+            target.axpyb(&a, &operator, &operator, &b);
+
+            let mut expected = Array::with_size(size);
+            for i in 0..size {
+                let scale = if a.is_empty() {
+                    0.0
+                } else if a.size() == 1 {
+                    a[0]
+                } else {
+                    a[i]
+                };
+                let bias = if b.is_empty() {
+                    0.0
+                } else if b.size() == 1 {
+                    b[0]
+                } else {
+                    b[i]
+                };
+                expected[i] = applied[i] * (1.0 + scale) + bias * r[i];
+            }
+
+            assert_close(&target.apply(&r), &expected);
+        }
+    }
+
+    #[test]
+    fn axpyb_combines_two_distinct_operators() {
+        let x = banded(&DIM, DIRECTION);
+        let y = alternate(&x);
+        let size = x.size();
+        let r = Array::incremental(size, 3.0, -1.0);
+        let a = Array::incremental(size, 1.0, 0.5);
+
+        let mut target = TripleBandLinearOp::new(DIRECTION, Shared::clone(x.mesher()));
+        target.axpyb(&a, &x, &y, &Array::new());
+
+        let (applied_x, applied_y) = (x.apply(&r), y.apply(&r));
+        let expected: Array = (0..size)
+            .map(|i| applied_y[i] + a[i] * applied_x[i])
+            .collect();
+
+        assert_close(&target.apply(&r), &expected);
+    }
+
+    #[test]
+    #[should_panic(expected = "inconsistent size of a")]
+    fn axpyb_rejects_an_unbroadcastable_a() {
+        let operator = banded(&DIM, DIRECTION);
+        let mut target = TripleBandLinearOp::new(DIRECTION, Shared::clone(operator.mesher()));
+        target.axpyb(&Array::with_size(2), &operator, &operator, &Array::new());
+    }
+
+    #[test]
     #[should_panic(expected = "inconsistent length of r")]
     fn apply_rejects_a_mismatched_argument() {
         let operator = banded(&DIM, DIRECTION);
         operator.apply(&Array::with_size(operator.size() + 1));
+    }
+
+    #[test]
+    fn mult_scales_each_row() {
+        let operator = banded(&DIM, DIRECTION);
+        let size = operator.size();
+        let r = Array::incremental(size, 1.0, 1.5);
+        let u = Array::incremental(size, 0.5, 0.25);
+
+        let applied = operator.apply(&r);
+        let expected: Array = (0..size).map(|i| u[i] * applied[i]).collect();
+
+        assert_close(&operator.mult(&u).apply(&r), &expected);
+    }
+
+    #[test]
+    fn mult_r_scales_each_column() {
+        let operator = banded(&[4], 0);
+        let r = Array::from([1.0, 2.0, 3.0, 4.0]);
+        let u = Array::from([0.5, -1.5, 2.0, 3.5]);
+
+        let scaled: Array = (0..r.size()).map(|i| u[i] * r[i]).collect();
+        assert_close(&operator.mult_r(&u).apply(&r), &operator.apply(&scaled));
+    }
+
+    #[test]
+    fn mult_r_substitutes_one_at_the_flat_array_ends() {
+        let operator = TripleBandLinearOp::with_bands(0, mesher(&[3]), |_, _| (1.0, 1.0, 1.0));
+        let scaled = operator.mult_r(&Array::with_size(3));
+
+        assert_eq!(
+            scaled.apply(&Array::from([1.0, 2.0, 3.0])),
+            Array::from([2.0, 0.0, 2.0])
+        );
+    }
+
+    #[test]
+    fn add_op_sums_the_operators() {
+        let operator = banded(&DIM, DIRECTION);
+        let other = alternate(&operator);
+        let r = Array::incremental(operator.size(), 2.0, -0.75);
+
+        let expected = &operator.apply(&r) + &other.apply(&r);
+        assert_close(&operator.add_op(&other).apply(&r), &expected);
+    }
+
+    #[test]
+    fn add_diagonal_adds_to_the_diagonal() {
+        let operator = banded(&DIM, DIRECTION);
+        let size = operator.size();
+        let r = Array::incremental(size, 1.0, 0.5);
+        let u = Array::incremental(size, -1.0, 0.3);
+
+        let applied = operator.apply(&r);
+        let expected: Array = (0..size).map(|i| applied[i] + u[i] * r[i]).collect();
+
+        assert_close(&operator.add_diagonal(&u).apply(&r), &expected);
+    }
+
+    #[test]
+    #[should_panic(expected = "inconsistent size of rhs")]
+    fn mult_r_rejects_a_mismatched_argument() {
+        let operator = banded(&DIM, DIRECTION);
+        operator.mult_r(&Array::with_size(operator.size() - 1));
     }
 }
