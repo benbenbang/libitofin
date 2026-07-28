@@ -172,3 +172,231 @@ pub fn fdm_log_inner_value(
 ) -> FdmCellAveragingInnerValue {
     FdmCellAveragingInnerValue::with_grid_mapping(payoff, mesher, direction, GridMapping::Exp)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::cell::Cell;
+
+    use crate::instruments::PlainVanillaPayoff;
+    use crate::methods::finitedifferences::meshers::UniformGridMesher;
+    use crate::methods::finitedifferences::operators::FdmLinearOpLayout;
+    use crate::option::OptionType;
+    use crate::shared::shared;
+
+    const DIM: [Size; 2] = [5, 3];
+    const BOUNDARIES: [(Real, Real); 2] = [(80.0, 120.0), (0.0, 1.0)];
+
+    /// Two dimensions, so that a grid point is not its own averaging
+    /// coordinate: the layout holds 15 points over 5 coordinates along
+    /// direction 0.
+    fn mesher() -> Shared<dyn FdmMesher> {
+        let layout = shared(FdmLinearOpLayout::new(DIM.to_vec()));
+        shared(UniformGridMesher::new(layout, &BOUNDARIES).unwrap())
+    }
+
+    fn call(strike: Real) -> Shared<dyn Payoff> {
+        shared(PlainVanillaPayoff::new(OptionType::Call, strike))
+    }
+
+    fn calculator(strike: Real) -> FdmCellAveragingInnerValue {
+        FdmCellAveragingInnerValue::new(call(strike), mesher(), 0)
+    }
+
+    /// A payoff that is a spike at one point and negligible everywhere else.
+    ///
+    /// The negligible value drives the accuracy heuristic (`cpp:96-97`) below
+    /// machine epsilon, which `SimpsonIntegral::new` rejects; the spike then
+    /// makes the fallback visible, because an integral that did run would
+    /// average the spike away.
+    struct SpikePayoff {
+        location: Real,
+    }
+
+    impl Payoff for SpikePayoff {
+        fn name(&self) -> String {
+            "Spike".to_string()
+        }
+
+        fn description(&self) -> String {
+            "Spike".to_string()
+        }
+
+        fn value(&self, price: Real) -> Real {
+            if (price - self.location).abs() < 1e-9 {
+                42.0
+            } else {
+                1e-13
+            }
+        }
+    }
+
+    /// A plain-vanilla payoff that counts how often it is evaluated.
+    struct CountingPayoff {
+        inner: PlainVanillaPayoff,
+        evaluations: Cell<usize>,
+    }
+
+    impl Payoff for CountingPayoff {
+        fn name(&self) -> String {
+            self.inner.name()
+        }
+
+        fn description(&self) -> String {
+            self.inner.description()
+        }
+
+        fn value(&self, price: Real) -> Real {
+            self.evaluations.set(self.evaluations.get() + 1);
+            self.inner.value(price)
+        }
+    }
+
+    /// Smoke test, not a QuantLib oracle: batch 2 has none, and the numbers are
+    /// validated downstream by `testCrankNicolsonWithDamping`
+    /// (`fdmlinearop.cpp:1291`). The property is `cpp:85-86`, which returns the
+    /// grid-point value verbatim at the outermost coordinates.
+    ///
+    /// The strike sits on the lowest grid point, so the cell around it is half
+    /// in the money: an average taken over it would be strictly positive where
+    /// the grid-point value is zero.
+    #[test]
+    fn the_outermost_cells_take_the_grid_point_value() {
+        let calculator = calculator(80.0);
+        let mesher = mesher();
+
+        let mut boundary_points = 0;
+        for position in mesher.layout().iter() {
+            let coord = position.coordinates()[0];
+            if coord == 0 || coord == DIM[0] - 1 {
+                boundary_points += 1;
+                assert_eq!(
+                    calculator.avg_inner_value(&position, 0.0),
+                    calculator.inner_value(&position, 0.0)
+                );
+            }
+        }
+        assert_eq!(boundary_points, 2 * DIM[1]);
+    }
+
+    /// The cache holds one value per coordinate along the averaging direction,
+    /// not one per grid point (`cpp:66-78`): points differing only in the other
+    /// coordinate share it.
+    #[test]
+    fn the_average_depends_only_on_the_averaging_coordinate() {
+        let calculator = calculator(100.0);
+        let mesher = mesher();
+
+        let mut by_coordinate = vec![None; DIM[0]];
+        for position in mesher.layout().iter() {
+            let value = calculator.avg_inner_value(&position, 0.0);
+            match by_coordinate[position.coordinates()[0]] {
+                None => by_coordinate[position.coordinates()[0]] = Some(value),
+                Some(first) => assert_eq!(value, first),
+            }
+        }
+        assert!(by_coordinate.iter().all(Option::is_some));
+    }
+
+    /// Simpson is exact on a linear integrand, so a cell that lies entirely in
+    /// the money averages to its midpoint - which is the grid point itself on a
+    /// uniform grid. That pins the `/(b-a)` normalisation (`cpp:98`).
+    #[test]
+    fn a_cell_over_a_linear_payoff_averages_to_its_grid_point() {
+        let calculator = calculator(84.0);
+        let mesher = mesher();
+
+        for position in mesher.layout().iter() {
+            let coord = position.coordinates()[0];
+            if coord == 0 || coord == DIM[0] - 1 {
+                continue;
+            }
+            let expected = calculator.inner_value(&position, 0.0);
+            let average = calculator.avg_inner_value(&position, 0.0);
+            assert!(
+                (average - expected).abs() <= 1e-13 * expected,
+                "coordinate {coord}: {average} vs {expected}"
+            );
+        }
+    }
+
+    /// A cell straddling the strike averages strictly above its grid point: the
+    /// integral picks up the kink the grid-point value misses. This is what the
+    /// cell averaging exists for, and it fails if the fallback is taken.
+    #[test]
+    fn a_cell_straddling_the_strike_averages_above_its_grid_point() {
+        let calculator = calculator(100.0);
+        let mesher = mesher();
+        let at_the_money = mesher.layout().iter().find(|p| p.coordinates()[0] == 2);
+        let at_the_money = at_the_money.unwrap();
+
+        assert_eq!(calculator.inner_value(&at_the_money, 0.0), 0.0);
+        assert!(calculator.avg_inner_value(&at_the_money, 0.0) > 0.0);
+    }
+
+    /// `FdmLogInnerValue` reads the grid as log-underlying (`cpp:114`).
+    #[test]
+    fn the_log_calculator_evaluates_the_payoff_at_the_exponential() {
+        let payoff = PlainVanillaPayoff::new(OptionType::Call, 100.0);
+        let layout = shared(FdmLinearOpLayout::new(vec![7]));
+        let mesher: Shared<dyn FdmMesher> =
+            shared(UniformGridMesher::new(layout, &[(4.0, 5.0)]).unwrap());
+        let calculator = fdm_log_inner_value(shared(payoff), Shared::clone(&mesher), 0);
+
+        for position in mesher.layout().iter() {
+            let x = mesher.location(&position, 0);
+            assert_eq!(
+                calculator.inner_value(&position, 0.0),
+                payoff.value(x.exp())
+            );
+        }
+    }
+
+    /// An accuracy the integrator rejects falls back to the grid-point value
+    /// rather than propagating the error, standing in for the C++
+    /// `catch (Error&)` (`cpp:99-103`).
+    #[test]
+    fn an_unusable_accuracy_falls_back_to_the_grid_point_value() {
+        let mesher = mesher();
+        let interior = mesher.layout().iter().find(|p| p.coordinates()[0] == 1);
+        let interior = interior.unwrap();
+        let location = mesher.location(&interior, 0);
+        let calculator =
+            FdmCellAveragingInnerValue::new(shared(SpikePayoff { location }), mesher, 0);
+
+        assert_eq!(calculator.inner_value(&interior, 0.0), 42.0);
+        assert_eq!(calculator.avg_inner_value(&interior, 0.0), 42.0);
+    }
+
+    /// The cache answers every call after the first (`cpp:64-65`).
+    #[test]
+    fn the_average_is_computed_once_per_coordinate() {
+        let payoff = shared(CountingPayoff {
+            inner: PlainVanillaPayoff::new(OptionType::Call, 100.0),
+            evaluations: Cell::new(0),
+        });
+        let mesher = mesher();
+        let calculator = FdmCellAveragingInnerValue::new(
+            Shared::clone(&payoff) as Shared<dyn Payoff>,
+            Shared::clone(&mesher),
+            0,
+        );
+
+        let first: Vec<Real> = mesher
+            .layout()
+            .iter()
+            .map(|position| calculator.avg_inner_value(&position, 0.0))
+            .collect();
+        let evaluations = payoff.evaluations.get();
+        assert!(evaluations > 0);
+
+        let second: Vec<Real> = mesher
+            .layout()
+            .iter()
+            .map(|position| calculator.avg_inner_value(&position, 0.0))
+            .collect();
+        assert_eq!(second, first);
+        assert_eq!(payoff.evaluations.get(), evaluations);
+    }
+}
