@@ -1,7 +1,7 @@
 //! The scheme choice a backward solver switches on.
 //!
 //! Port of `ql/methods/finitedifferences/solvers/fdmbackwardsolver.hpp:35-59`.
-//! `FdmBackwardSolver`, the rest of that header (`:60`), lands with #658.
+//! `FdmBackwardSolver`, the rest of that header (`:61`), lands with #658.
 
 use crate::types::Real;
 
@@ -35,7 +35,7 @@ pub enum FdmSchemeType {
 /// plain public fields here.
 ///
 /// The header declares ten factories over these nine types
-/// (`fdmbackwardsolver.cpp:44-75`) - `ModifiedHundsdorfer` (`cpp:58`) is a
+/// (`fdmbackwardsolver.cpp:46-78`) - `ModifiedHundsdorfer` (`cpp:62`) is a
 /// second `HundsdorferType` with a different `theta`. Two of the ten are
 /// ported, [`douglas`](Self::douglas) and
 /// [`implicit_euler`](Self::implicit_euler), which are the schemes #657
@@ -57,7 +57,7 @@ pub struct FdmSchemeDesc {
 
 impl FdmSchemeDesc {
     /// A descriptor with the given type and parameters
-    /// (`fdmbackwardsolver.cpp:42-43`).
+    /// (`fdmbackwardsolver.cpp:43-44`).
     pub fn new(scheme_type: FdmSchemeType, theta: Real, mu: Real) -> Self {
         FdmSchemeDesc {
             scheme_type,
@@ -67,12 +67,12 @@ impl FdmSchemeDesc {
     }
 
     /// Douglas splitting, the same as Crank-Nicolson in one dimension
-    /// (`fdmbackwardsolver.cpp:45`).
+    /// (`fdmbackwardsolver.cpp:46`).
     pub fn douglas() -> Self {
         FdmSchemeDesc::new(FdmSchemeType::Douglas, 0.5, 0.0)
     }
 
-    /// Fully implicit Euler (`fdmbackwardsolver.cpp:69-71`).
+    /// Fully implicit Euler (`fdmbackwardsolver.cpp:70-72`).
     pub fn implicit_euler() -> Self {
         FdmSchemeDesc::new(FdmSchemeType::ImplicitEuler, 0.0, 0.0)
     }
