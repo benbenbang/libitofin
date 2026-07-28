@@ -343,6 +343,82 @@ mod tests {
         assert!((calculated_min - minimum).abs() <= rel_tol * minimum);
     }
 
+    /// The critical point is used only when the grid can bracket it; a spot
+    /// outside `[exp(x_min), exp(x_max)]` falls back to the uniform grid
+    /// (`cpp:112-124`).
+    #[test]
+    fn critical_point_concentrates_only_when_the_grid_brackets_it() {
+        let dc = Actual365Fixed::new();
+        let today = Date::new(11, Month::February, 2018);
+        let process = GeneralizedBlackScholesProcess::new(
+            make_quote_handle(100.0).handle(),
+            flat_rate(today, 0.02, dc.clone()),
+            flat_rate(today, 0.05, dc.clone()),
+            flat_vol(today, 0.25, dc),
+        );
+
+        let build = |c_point| {
+            fdm_black_scholes_mesher(
+                9,
+                &process,
+                1.0,
+                100.0,
+                None,
+                None,
+                0.0001,
+                1.5,
+                c_point,
+                &[],
+                0.0,
+            )
+            .unwrap()
+        };
+
+        let uniform = build(None);
+        let concentrated = build(Some((100.0, 0.1)));
+        let out_of_range = build(Some((1e9, 0.1)));
+
+        assert_eq!(uniform.locations()[0], concentrated.locations()[0]);
+        assert_eq!(uniform.locations()[8], concentrated.locations()[8]);
+        assert_ne!(uniform.locations()[4], concentrated.locations()[4]);
+        assert_eq!(uniform.locations(), out_of_range.locations());
+    }
+
+    /// `processHelper` wires the dividend curve into the process's dividend
+    /// slot and the risk-free curve into its own (`cpp:139-147`, where the
+    /// argument order is `s0, qTS, rTS`).
+    #[test]
+    fn process_helper_keeps_the_two_curves_apart() {
+        let dc = Actual365Fixed::new();
+        let today = Date::new(11, Month::February, 2018);
+        let r_ts = flat_rate(today, 0.16, dc.clone());
+        let q_ts = flat_rate(today, 0.07, dc.clone());
+
+        let process = process_helper(make_quote_handle(100.0).handle(), r_ts, q_ts, 0.25).unwrap();
+
+        let discount = |curve: Handle<dyn YieldTermStructure>| {
+            curve.current_link().unwrap().discount(1.0, false).unwrap()
+        };
+        assert!((discount(process.risk_free_rate()) - (-0.16_f64).exp()).abs() < 1e-14);
+        assert!((discount(process.dividend_yield()) - (-0.07_f64).exp()).abs() < 1e-14);
+
+        let vol = process
+            .black_volatility()
+            .current_link()
+            .unwrap()
+            .black_vol(1.0, 100.0, false)
+            .unwrap();
+        assert_eq!(vol, 0.25);
+        assert_eq!(
+            process
+                .black_volatility()
+                .current_link()
+                .unwrap()
+                .day_counter(),
+            Some(dc)
+        );
+    }
+
     #[test]
     fn spot_must_be_positive() {
         let dc = Actual365Fixed::new();
