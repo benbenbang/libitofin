@@ -2,6 +2,10 @@
 //!
 //! Port of `ql/methods/finitedifferences/utilities/`.
 
+mod fdminnervaluecalculator;
 mod fdmmesherintegral;
 
+pub use fdminnervaluecalculator::{
+    FdmCellAveragingInnerValue, FdmInnerValueCalculator, GridMapping, fdm_log_inner_value,
+};
 pub use fdmmesherintegral::FdmMesherIntegral;
