@@ -385,3 +385,135 @@ mod test_fd_engines {
         );
     }
 }
+
+#[cfg(test)]
+mod test_fd_engine_with_non_constant_parameters {
+    //! The `testFdEngineWithNonConstantParameters` oracle of
+    //! `test-suite/europeanoption.cpp:1578-1631`: the only European arm whose
+    //! risk-free curve is not flat, and so the only one that pins the
+    //! per-step forward reads of `set_time` to intervals that telescope to
+    //! the right integrated rate. The flat sweep above cannot: every interval
+    //! of a flat curve returns the same forward. What survives here is a read
+    //! over a fixed short interval, which integrates too little rate over the
+    //! year; a read over the whole life still integrates correctly and this
+    //! oracle does not separate it from the correct one.
+
+    use super::super::AnalyticEuropeanEngine;
+    use super::super::test_market::today;
+    use super::FdBlackScholesVanillaEngine;
+    use crate::exercise::EuropeanExercise;
+    use crate::handle::Handle;
+    use crate::instrument::Instrument;
+    use crate::instruments::{EuropeanOption, PlainVanillaPayoff};
+    use crate::interestrate::Compounding;
+    use crate::math::interpolations::flat::BackwardFlat;
+    use crate::methods::finitedifferences::solvers::FdmSchemeDesc;
+    use crate::option::OptionType::Call;
+    use crate::pricingengine::PricingEngine;
+    use crate::processes::GeneralizedBlackScholesProcess;
+    use crate::quotes::{Quote, SimpleQuote};
+    use crate::settings::Settings;
+    use crate::shared::{Shared, SharedMut, shared, shared_mut};
+    use crate::termstructures::volatility::{BlackConstantVol, BlackVolTermStructure};
+    use crate::termstructures::yields::{FlatForward, ForwardCurve};
+    use crate::termstructures::yieldtermstructure::YieldTermStructure;
+    use crate::time::daycounters::actual360::Actual360;
+    use crate::time::daycounters::actual365fixed::Actual365Fixed;
+    use crate::time::frequency::Frequency;
+    use crate::types::{Real, Size, Volatility};
+
+    /// `u` and `v` of `cpp:1582-1583`; the strike of `cpp:1610` is the spot.
+    const UNDERLYING: Real = 190.0;
+    const STRIKE: Real = 190.0;
+    const VOLATILITY: Volatility = 0.20;
+
+    /// `timeSteps` and `gridPoints` of `cpp:1617-1618`.
+    const T_GRID: Size = 200;
+    const X_GRID: Size = 201;
+
+    /// `tolerance` of `cpp:1623`, absolute on the price rather than the
+    /// relative measure the sweep uses.
+    const TOLERANCE: Real = 0.01;
+
+    /// The process of `cpp:1602-1605`. C++ names `BlackScholesProcess`, whose
+    /// constructor supplies the dividend yield the generalized process needs
+    /// as a flat zero `FlatForward` on Actual/365 Fixed
+    /// (`ql/processes/blackscholesprocess.cpp:238-239`); with a zero rate the
+    /// day counter is numerically inert.
+    fn process() -> GeneralizedBlackScholesProcess {
+        let day_counter = Actual360::new();
+        let spot = shared(SimpleQuote::new(UNDERLYING)) as Shared<dyn Quote>;
+        let vol = shared(BlackConstantVol::new(
+            today(),
+            None,
+            VOLATILITY,
+            day_counter.clone(),
+        )) as Shared<dyn BlackVolTermStructure>;
+
+        let dates = vec![
+            today(),
+            today() + 90,
+            today() + 180,
+            today() + 270,
+            today() + 360,
+        ];
+        let forwards = vec![0.0, 0.001, 0.002, 0.005, 0.01];
+        let risk_free =
+            shared(ForwardCurve::new(dates, forwards, day_counter.clone(), BackwardFlat).unwrap())
+                as Shared<dyn YieldTermStructure>;
+
+        let dividend = shared(FlatForward::with_rate(
+            today(),
+            0.0,
+            Actual365Fixed::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>;
+
+        GeneralizedBlackScholesProcess::new(
+            Handle::new(spot),
+            Handle::new(dividend),
+            Handle::new(risk_free),
+            Handle::new(vol),
+        )
+    }
+
+    /// The forward the curve carries rises from 0.001 to 0.01 across the
+    /// year, so a `set_time` pinned to a fixed short interval integrates too
+    /// little rate and the price misses by around thirty times the tolerance.
+    #[test]
+    fn fd_engine_matches_the_analytic_engine_under_a_time_varying_rate() {
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(today());
+        let process = shared(process());
+
+        let payoff = shared(PlainVanillaPayoff::new(Call, STRIKE));
+        let exercise = shared(EuropeanExercise::new(today() + 360));
+        let mut option = EuropeanOption::new(payoff, exercise, Shared::clone(&settings));
+
+        let analytic = shared_mut(AnalyticEuropeanEngine::new(Shared::clone(&process)));
+        option
+            .base_mut()
+            .set_pricing_engine(analytic as SharedMut<dyn PricingEngine>);
+        let expected = option.npv().unwrap();
+
+        let finite_difference = shared_mut(FdBlackScholesVanillaEngine::new(
+            Shared::clone(&process),
+            T_GRID,
+            X_GRID,
+            0,
+            FdmSchemeDesc::douglas(),
+        ));
+        option
+            .base_mut()
+            .set_pricing_engine(finite_difference as SharedMut<dyn PricingEngine>);
+        let calculated = option.npv().unwrap();
+
+        let error = (expected - calculated).abs();
+        assert!(
+            error <= TOLERANCE,
+            "analytic {expected} vs finite difference {calculated} \
+             (absolute error {error} over {TOLERANCE})"
+        );
+    }
+}
