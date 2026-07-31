@@ -155,3 +155,215 @@ impl FdmBlackScholesSolver {
         read(solver)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::handle::Handle;
+    use crate::instruments::PlainVanillaPayoff;
+    use crate::interestrate::Compounding;
+    use crate::methods::finitedifferences::meshers::FdmMesher;
+    use crate::methods::finitedifferences::schemes::testops;
+    use crate::methods::finitedifferences::stepconditions::FdmStepConditionComposite;
+    use crate::methods::finitedifferences::utilities::fdm_log_inner_value;
+    use crate::option::OptionType::Call;
+    use crate::payoff::Payoff;
+    use crate::quotes::make_quote_handle;
+    use crate::shared::shared;
+    use crate::termstructures::volatility::{BlackConstantVol, BlackVolTermStructure};
+    use crate::termstructures::yields::FlatForward;
+    use crate::termstructures::yieldtermstructure::YieldTermStructure;
+    use crate::time::date::{Date, Month};
+    use crate::time::daycounter::DayCounter;
+    use crate::time::daycounters::actual365fixed::Actual365Fixed;
+    use crate::time::frequency::Frequency;
+    use crate::types::{Rate, Time, Volatility};
+
+    const R: Rate = 0.05;
+    const Q: Rate = 0.02;
+    const VOL: Volatility = 0.2;
+    const STRIKE: Real = 100.0;
+    const MATURITY: Time = 0.75;
+    const STEPS: Size = 10;
+    const DAMPING_STEPS: Size = 2;
+
+    /// A spot inside the grid: [`testops::mesher`] spans `(4.0, 5.0)` in
+    /// `ln(S)`, so the read-offs are interpolations rather than extrapolations
+    /// for any spot between `e^4` and `e^5`.
+    const SPOT: Real = 90.0;
+
+    fn process() -> Shared<GeneralizedBlackScholesProcess> {
+        let dc = Actual365Fixed::new();
+        let today = Date::new(11, Month::February, 2018);
+
+        shared(GeneralizedBlackScholesProcess::new(
+            make_quote_handle(100.0).handle(),
+            flat_rate(today, Q, dc.clone()),
+            flat_rate(today, R, dc.clone()),
+            flat_vol(today, VOL, dc),
+        ))
+    }
+
+    fn flat_rate(reference: Date, rate: Rate, dc: DayCounter) -> Handle<dyn YieldTermStructure> {
+        Handle::new(shared(FlatForward::with_rate(
+            reference,
+            rate,
+            dc,
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>)
+    }
+
+    fn flat_vol(
+        reference: Date,
+        vol: Volatility,
+        dc: DayCounter,
+    ) -> Handle<dyn BlackVolTermStructure> {
+        Handle::new(shared(BlackConstantVol::new(reference, None, vol, dc))
+            as Shared<dyn BlackVolTermStructure>)
+    }
+
+    /// A call struck inside the grid, so the seed carries the kink and the
+    /// rolled grid is curved where it is read.
+    fn desc(mesher: &Shared<dyn FdmMesher>) -> FdmSolverDesc {
+        let payoff = shared(PlainVanillaPayoff::new(Call, STRIKE)) as Shared<dyn Payoff>;
+
+        FdmSolverDesc {
+            mesher: Shared::clone(mesher),
+            bc_set: Vec::new(),
+            condition: shared(FdmStepConditionComposite::new(&[], Vec::new())),
+            calculator: shared(fdm_log_inner_value(payoff, Shared::clone(mesher), 0)),
+            maturity: MATURITY,
+            time_steps: STEPS,
+            damping_steps: DAMPING_STEPS,
+        }
+    }
+
+    fn solver(mesher: &Shared<dyn FdmMesher>) -> FdmBlackScholesSolver {
+        FdmBlackScholesSolver::new(process(), STRIKE, desc(mesher), FdmSchemeDesc::douglas())
+    }
+
+    /// The same wiring by hand: the generator of #656 over the same mesh and
+    /// process, handed to the driver of #666 with the same descriptor. Every
+    /// number the wrapper answers has to come off this, which is what
+    /// separates the transforms from the raw log-space read-offs.
+    fn driven_by_hand(mesher: &Shared<dyn FdmMesher>) -> Fdm1DimSolver {
+        let op = shared_mut(
+            FdmBlackScholesOp::new(Shared::clone(mesher), &process(), STRIKE, DIRECTION).unwrap(),
+        ) as SharedMut<dyn FdmLinearOpComposite>;
+
+        Fdm1DimSolver::new(desc(mesher), FdmSchemeDesc::douglas(), op)
+    }
+
+    /// `cpp:57-60`: the value is the driver's read-off at the log of the spot,
+    /// which pins that the wrapper takes a spot and the driver a log-spot.
+    #[test]
+    fn the_value_is_the_read_off_at_the_log_of_the_spot() {
+        let mesher = testops::mesher();
+
+        assert_eq!(
+            solver(&mesher).value_at(SPOT).unwrap(),
+            driven_by_hand(&mesher).interpolate_at(SPOT.ln()).unwrap()
+        );
+    }
+
+    /// The two log-space derivatives at the probe are non-zero and differ from
+    /// each other, without which the chain rules below could not fail: a gamma
+    /// reading `dxx / s^2` or the subtraction the wrong way round would pass,
+    /// and a delta dividing by `s^2` would too.
+    #[test]
+    fn the_probe_tells_the_two_derivatives_apart() {
+        let mesher = testops::mesher();
+        let hand = driven_by_hand(&mesher);
+
+        let dx = hand.derivative_x(SPOT.ln()).unwrap();
+        let dxx = hand.derivative_xx(SPOT.ln()).unwrap();
+
+        assert!(dx.abs() > 1e-3, "the first derivative is degenerate: {dx}");
+        assert!(
+            dxx.abs() > 1e-3,
+            "the second derivative is degenerate: {dxx}"
+        );
+        assert!(
+            (dxx - dx).abs() > 1e-3,
+            "the two derivatives do not discriminate: {dx} against {dxx}"
+        );
+    }
+
+    /// `cpp:62-65`: the delta is the log-space first derivative over the spot.
+    #[test]
+    fn the_delta_carries_the_chain_rule_for_the_log_grid() {
+        let mesher = testops::mesher();
+        let hand = driven_by_hand(&mesher);
+
+        assert_eq!(
+            solver(&mesher).delta_at(SPOT).unwrap(),
+            hand.derivative_x(SPOT.ln()).unwrap() / SPOT
+        );
+    }
+
+    /// `cpp:67-71`: the gamma is the second log-space derivative less the
+    /// first, over the spot squared.
+    #[test]
+    fn the_gamma_carries_the_second_chain_rule_term() {
+        let mesher = testops::mesher();
+        let hand = driven_by_hand(&mesher);
+
+        let expected = (hand.derivative_xx(SPOT.ln()).unwrap()
+            - hand.derivative_x(SPOT.ln()).unwrap())
+            / (SPOT * SPOT);
+
+        assert_eq!(solver(&mesher).gamma_at(SPOT).unwrap(), expected);
+    }
+
+    /// `cpp:73-75`: the theta is the driver's, at the log of the spot and
+    /// untransformed - time is not the variable the grid was changed in.
+    #[test]
+    fn the_theta_is_the_read_off_at_the_log_of_the_spot() {
+        let mesher = testops::mesher();
+
+        let expected = driven_by_hand(&mesher)
+            .theta_at(SPOT.ln())
+            .unwrap()
+            .expect("a capture away from today has a theta");
+
+        assert_eq!(
+            solver(&mesher)
+                .theta_at(SPOT)
+                .unwrap()
+                .expect("a capture away from today has a theta"),
+            expected
+        );
+    }
+
+    /// The divergence from `cpp:74`, where the theta reads `solver_` without
+    /// building it and only the engine's call order saves it: asked first, the
+    /// theta is the same number it is when the other three have run before it.
+    ///
+    /// Equality is exact because both wrappers build the same generator over
+    /// the same descriptor, so the divergence is pinned to be about when the
+    /// solver is built and not about what it answers.
+    #[test]
+    fn the_theta_asked_first_is_the_theta_asked_last() {
+        let mesher = testops::mesher();
+
+        let asked_first = solver(&mesher)
+            .theta_at(SPOT)
+            .unwrap()
+            .expect("a capture away from today has a theta");
+
+        let in_order = solver(&mesher);
+        in_order.value_at(SPOT).unwrap();
+        in_order.delta_at(SPOT).unwrap();
+        in_order.gamma_at(SPOT).unwrap();
+
+        assert_eq!(
+            in_order
+                .theta_at(SPOT)
+                .unwrap()
+                .expect("a capture away from today has a theta"),
+            asked_first
+        );
+    }
+}
