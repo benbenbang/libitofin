@@ -18,11 +18,13 @@
 //!   wrong price.
 
 pub mod analytichestonengine;
+pub mod fdblackscholesvanillaengine;
 pub mod mceuropeanengine;
 pub mod mceuropeanhestonengine;
 pub mod mcvanillaengine;
 
 pub use analytichestonengine::HestonChf;
+pub use fdblackscholesvanillaengine::FdBlackScholesVanillaEngine;
 pub use mceuropeanengine::{EuropeanPathPricer, MCEuropeanEngine, MakeMcEuropeanEngine};
 pub use mceuropeanhestonengine::{
     EuropeanHestonPathPricer, MCEuropeanHestonEngine, MakeMcEuropeanHestonEngine,
