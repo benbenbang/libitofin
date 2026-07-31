@@ -42,16 +42,16 @@ use crate::shared::{Shared, shared};
 use crate::stochasticprocess::StochasticProcess1D;
 use crate::types::Size;
 
-/// The direction the equity grid is laid out in (`cpp:165`, `cpp:171`).
+/// The direction the equity grid is laid out in (`cpp:171`).
 const DIRECTION: Size = 0;
 
-/// The truncation probability of the grid bounds (`cpp:162`).
+/// The truncation probability of the grid bounds (`cpp:161`).
 const EPS: f64 = 0.0001;
 
-/// The factor the grid bounds are widened by (`cpp:162`).
+/// The factor the grid bounds are widened by (`cpp:161`).
 const SCALE_FACTOR: f64 = 1.5;
 
-/// The density of the concentration around the strike (`cpp:163`).
+/// The density of the concentration around the strike (`cpp:162`).
 const C_POINT_DENSITY: f64 = 0.1;
 
 /// Finite-difference pricing engine for European vanilla options.
