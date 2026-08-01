@@ -7,6 +7,7 @@ mod bond;
 mod bonds;
 mod capfloor;
 mod claim;
+mod creditdefaultswap;
 mod fixedvsfloatingswap;
 mod futures;
 mod makecapfloor;
@@ -25,6 +26,7 @@ pub use bond::{Bond, BondArguments, BondEngine, BondPrice, BondPriceType, BondRe
 pub use bonds::FixedRateBond;
 pub use capfloor::{CapFloor, CapFloorArguments, CapFloorType};
 pub use claim::{Claim, FaceValueClaim};
+pub use creditdefaultswap::{CdsTerms, CreditDefaultSwap};
 pub use fixedvsfloatingswap::{
     FixedVsFloatingSwap, FixedVsFloatingSwapArguments, FixedVsFloatingSwapEngine,
     FixedVsFloatingSwapResults, FloatingArgumentsFn,
