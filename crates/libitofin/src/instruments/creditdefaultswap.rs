@@ -345,3 +345,203 @@ impl CreditDefaultSwap {
         self.cash_settlement_days
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cashflow::CashFlow;
+    use crate::event::Event;
+    use crate::time::calendars::weekendsonly::WeekendsOnly;
+    use crate::time::date::Month;
+    use crate::time::daycounters::actual360::Actual360;
+    use crate::time::schedule::MakeSchedule;
+
+    const NOTIONAL: Real = 10_000_000.0;
+    const SPREAD: Rate = 0.01;
+
+    /// A ten-year semiannual contract on the conventions a standard CDS quotes
+    /// with. The `Backward` rule keeps it pre-Big-Bang, which is the arm the
+    /// trade-date deduction and the protection-start check both branch on.
+    fn ten_year_schedule() -> Schedule {
+        MakeSchedule::new()
+            .from(Date::new(20, Month::June, 2026))
+            .to(Date::new(20, Month::June, 2036))
+            .with_frequency(Frequency::Semiannual)
+            .with_calendar(WeekendsOnly::new())
+            .with_convention(BusinessDayConvention::Following)
+            .with_termination_date_convention(BusinessDayConvention::Unadjusted)
+            .backwards()
+            .build()
+    }
+
+    fn contract(terms: CdsTerms) -> QlResult<CreditDefaultSwap> {
+        CreditDefaultSwap::with_terms(
+            ProtectionSide::Buyer,
+            NOTIONAL,
+            SPREAD,
+            ten_year_schedule(),
+            BusinessDayConvention::Following,
+            Actual360::new(),
+            terms,
+        )
+    }
+
+    #[test]
+    fn the_premium_leg_spans_the_schedule_and_the_contract_matures_with_it() {
+        let schedule = ten_year_schedule();
+        let cds = CreditDefaultSwap::new(
+            ProtectionSide::Buyer,
+            NOTIONAL,
+            SPREAD,
+            schedule.clone(),
+            BusinessDayConvention::Following,
+            Actual360::new(),
+            true,
+            true,
+        )
+        .unwrap();
+
+        assert_eq!(cds.coupons().len(), schedule.len() - 1);
+        assert_eq!(cds.coupons().len(), 20);
+        assert_eq!(
+            Event::date(cds.coupons()[0].as_ref()),
+            WeekendsOnly::new().adjust(schedule.date(1), BusinessDayConvention::Following)
+        );
+        assert_eq!(cds.maturity(), *schedule.dates().last().unwrap());
+        assert_eq!(cds.side(), ProtectionSide::Buyer);
+        assert_eq!(cds.notional(), NOTIONAL);
+        assert_eq!(cds.running_spread(), SPREAD);
+        assert!(cds.settles_accrual());
+        assert!(cds.pays_at_default_time());
+        assert_eq!(cds.cash_settlement_days(), 3);
+    }
+
+    /// `creditdefaultswap.cpp:110-116`, the pre-Big-Bang arm.
+    #[test]
+    fn the_trade_date_defaults_to_the_day_before_the_protection_start() {
+        let cds = contract(CdsTerms::default()).unwrap();
+
+        assert_eq!(cds.trade_date(), cds.protection_start_date() - 1);
+    }
+
+    /// `creditdefaultswap.cpp:56`.
+    #[test]
+    fn the_protection_starts_on_the_first_accrual_date_unless_given() {
+        let schedule = ten_year_schedule();
+        assert_eq!(
+            contract(CdsTerms::default())
+                .unwrap()
+                .protection_start_date(),
+            schedule.date(0)
+        );
+
+        let earlier = schedule.date(0) - 10;
+        let cds = contract(CdsTerms {
+            protection_start: Some(earlier),
+            ..CdsTerms::default()
+        })
+        .unwrap();
+        assert_eq!(cds.protection_start_date(), earlier);
+        assert_eq!(cds.trade_date(), earlier - 1);
+    }
+
+    /// A running-spread contract quotes no upfront, so the payment is a zero
+    /// flow that exists only for the engines to read
+    /// (`creditdefaultswap.cpp:127-131`).
+    #[test]
+    fn the_upfront_payment_is_a_zero_flow_on_the_cash_settlement_date() {
+        let cds = contract(CdsTerms::default()).unwrap();
+        let expected = WeekendsOnly::new().advance(
+            cds.trade_date(),
+            3,
+            TimeUnit::Days,
+            BusinessDayConvention::Following,
+            false,
+        );
+
+        assert_eq!(cds.upfront(), None);
+        assert_eq!(cds.upfront_payment().amount().unwrap(), 0.0);
+        assert_eq!(Event::date(cds.upfront_payment().as_ref()), expected);
+        assert!(expected >= cds.protection_start_date());
+    }
+
+    /// `creditdefaultswap.cpp:138-171`: the rebate is a flow the contract either
+    /// carries or does not, which is what `rebatesAccrual()` reads
+    /// (`creditdefaultswap.hpp:186`).
+    #[test]
+    fn the_accrual_rebate_is_a_zero_flow_when_rebated_and_absent_otherwise() {
+        let rebated = contract(CdsTerms::default()).unwrap();
+        let rebate = rebated.accrual_rebate().unwrap();
+        assert!(rebated.rebates_accrual());
+        assert_eq!(rebate.amount().unwrap(), 0.0);
+        assert_eq!(
+            Event::date(rebate.as_ref()),
+            Event::date(rebated.upfront_payment().as_ref())
+        );
+
+        let bare = contract(CdsTerms {
+            rebates_accrual: false,
+            ..CdsTerms::default()
+        })
+        .unwrap();
+        assert!(bare.accrual_rebate().is_none());
+        assert!(!bare.rebates_accrual());
+    }
+
+    /// `creditdefaultswap.cpp:91`. C++ reads `schedule[0]` for the protection
+    /// start before this check runs; the port checks first, so an empty schedule
+    /// is an error rather than an out-of-range index.
+    #[test]
+    fn an_empty_schedule_is_an_error_not_a_panic() {
+        let empty = CreditDefaultSwap::with_terms(
+            ProtectionSide::Buyer,
+            NOTIONAL,
+            SPREAD,
+            Schedule::from_dates(Vec::new()),
+            BusinessDayConvention::Following,
+            Actual360::new(),
+            CdsTerms::default(),
+        );
+
+        assert!(empty.is_err());
+    }
+
+    /// `creditdefaultswap.cpp:99-101`, which only guards the pre-Big-Bang arm.
+    #[test]
+    fn protection_can_not_start_after_the_first_accrual_date() {
+        let late = ten_year_schedule().date(0) + 1;
+
+        assert!(
+            contract(CdsTerms {
+                protection_start: Some(late),
+                ..CdsTerms::default()
+            })
+            .is_err()
+        );
+    }
+
+    /// The deferred rebate arithmetic (`creditdefaultswap.cpp:143-168`): a trade
+    /// date on or after the first accrual date rebates a non-zero accrued
+    /// coupon, so the contract refuses to build rather than rebate zero. Without
+    /// the rebate there is nothing to compute and the same terms build.
+    #[test]
+    fn a_trade_date_on_or_after_the_first_accrual_date_is_refused_while_rebating() {
+        let first_accrual = ten_year_schedule().date(0);
+
+        assert!(
+            contract(CdsTerms {
+                trade_date: Some(first_accrual),
+                ..CdsTerms::default()
+            })
+            .is_err()
+        );
+
+        let bare = contract(CdsTerms {
+            trade_date: Some(first_accrual),
+            rebates_accrual: false,
+            ..CdsTerms::default()
+        })
+        .unwrap();
+        assert_eq!(bare.trade_date(), first_accrual);
+    }
+}
