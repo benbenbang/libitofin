@@ -7,3 +7,4 @@
 //! concrete curves that build on it follow within EPIC Credit (#676).
 
 pub mod defaulttermstructure;
+pub mod hazardratestructure;
