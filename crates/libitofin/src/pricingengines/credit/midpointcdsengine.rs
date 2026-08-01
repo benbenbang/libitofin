@@ -671,3 +671,244 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod oracle {
+    //! The numeric oracle for this engine: the first Rust credit-default swap
+    //! priced against the C++ cached value.
+    //!
+    //! `testCachedValue` (`creditdefaultswap.cpp:57-117`) prices a ten-year
+    //! semiannual contract off a flat 1.234% hazard curve and a flat 6%
+    //! discount curve, and checks its NPV and fair spread against the two
+    //! values cached at `creditdefaultswap.cpp:98-99`. Those two literals are
+    //! the only cached numbers here; every other quantity is built from the C++
+    //! fixture rather than from anything this port produced.
+    //!
+    //! The NPV reproduces to the printed precision of its literal. The fair
+    //! rate is met at the C++ tolerance but leaves a residual of `6.5e-8`,
+    //! wider than that literal's twelve printed digits, and the two literals
+    //! cannot both be reproduced exactly at once: they were cached together by
+    //! the commit that first added credit-default swaps, and reconciling them
+    //! needs both legs about `0.0114` above what this port computes, a shift
+    //! that cancels in their difference and so leaves the NPV untouched. Sixty
+    //! one commits have touched the engine and the instrument since, among them
+    //! an accrual-calculation refactor (`creditdefaultswap.cpp`, 2022), so the
+    //! legs the literals were cached from are not the legs either side computes
+    //! today. What discriminates a stale literal from a defect here is a leg
+    //! read individually rather than through a difference or a ratio, which the
+    //! later `testFairUpfront` (`creditdefaultswap.cpp:480`) supplies.
+    //!
+    //! `testFairSpread` (`creditdefaultswap.cpp:417-478`) needs no cached
+    //! number at all: it reprices the contract at the fair spread the engine
+    //! quotes for it and requires the result to vanish, which pins the fair
+    //! spread against the pricer independently of the value above.
+    //!
+    //! Deviations, documented per D5/D10:
+    //! - `testFairSpread` takes `today` from `Date::todaysDate()`
+    //!   (`creditdefaultswap.cpp:422`), a clock read D10 does not allow. The
+    //!   port pins the same 9 June 2006 the cached case uses, which is a TARGET
+    //!   business day and keeps the round trip reproducible.
+    //! - One [`Settings`] feeds the moving hazard curve, both contracts and the
+    //!   engine, standing in for the C++ global (`creditdefaultswap.cpp:61`).
+    //!   Two of them would let `today` diverge silently between curve and
+    //!   engine.
+    //! - The C++ `RelinkableHandle` (`:66`, `:71`) becomes a plain [`Handle`]:
+    //!   neither case relinks after linking once.
+    //! - The `IntegralCdsEngine` re-price the cached case ends with
+    //!   (`creditdefaultswap.cpp:119-165`) is DEFERRED: that engine is a later
+    //!   ticket of EPIC Credit (#676) and is not ported yet.
+
+    use super::*;
+    use crate::instrument::Instrument;
+    use crate::instruments::CreditDefaultSwap;
+    use crate::interestrate::Compounding;
+    use crate::quotes::{Quote, SimpleQuote};
+    use crate::shared::{SharedMut, shared, shared_mut};
+    use crate::termstructures::credit::flathazardrate::FlatHazardRate;
+    use crate::termstructures::yields::FlatForward;
+    use crate::time::businessdayconvention::BusinessDayConvention;
+    use crate::time::calendar::Calendar;
+    use crate::time::calendars::target::Target;
+    use crate::time::date::Month;
+    use crate::time::dategenerationrule::DateGeneration;
+    use crate::time::daycounters::actual360::Actual360;
+    use crate::time::frequency::Frequency;
+    use crate::time::period::Period;
+    use crate::time::schedule::{MakeSchedule, Schedule};
+    use crate::time::timeunit::TimeUnit;
+
+    const NOTIONAL: Real = 10_000.0;
+    const RECOVERY: Real = 0.4;
+
+    /// The curves both cases share (`creditdefaultswap.cpp:61-77` and
+    /// `:420-436`), which differ only in the schedule and the spread built over
+    /// them.
+    struct CommonVars {
+        settings: Shared<Settings<Date>>,
+        calendar: Calendar,
+        today: Date,
+        probability: Handle<dyn DefaultProbabilityTermStructure>,
+        discount: Handle<dyn YieldTermStructure>,
+    }
+
+    impl CommonVars {
+        fn new() -> CommonVars {
+            let today = Date::new(9, Month::June, 2006);
+            let settings = shared(Settings::new());
+            settings.set_evaluation_date(today);
+            let calendar = Target::new();
+
+            let hazard_rate = Handle::new(shared(SimpleQuote::new(0.01234)) as Shared<dyn Quote>);
+            let probability = Handle::new(shared(FlatHazardRate::moving(
+                0,
+                calendar.clone(),
+                hazard_rate,
+                Actual360::new(),
+                Shared::clone(&settings),
+            ))
+                as Shared<dyn DefaultProbabilityTermStructure>);
+            let discount = Handle::new(shared(FlatForward::with_rate(
+                today,
+                0.06,
+                Actual360::new(),
+                Compounding::Continuous,
+                Frequency::Annual,
+            )) as Shared<dyn YieldTermStructure>);
+
+            CommonVars {
+                settings,
+                calendar,
+                today,
+                probability,
+                discount,
+            }
+        }
+
+        /// `creditdefaultswap.cpp:96`: no `includeSettlementDateFlows`
+        /// override, so the coupon paying exactly on the settlement date is
+        /// dropped.
+        fn engine(&self) -> SharedMut<dyn PricingEngine> {
+            shared_mut(MidPointCdsEngine::new(
+                self.probability.clone(),
+                RECOVERY,
+                self.discount.clone(),
+                None,
+                Shared::clone(&self.settings),
+            )) as SharedMut<dyn PricingEngine>
+        }
+
+        /// The issue and maturity dates both cases advance to
+        /// (`creditdefaultswap.cpp:79-80`), on the C++ `advance` defaults of
+        /// `Following` and no end-of-month snapping.
+        fn issue_and_maturity(&self) -> (Date, Date) {
+            let issue_date = self.calendar.advance(
+                self.today,
+                -1,
+                TimeUnit::Years,
+                BusinessDayConvention::Following,
+                false,
+            );
+            let maturity = self.calendar.advance(
+                issue_date,
+                10,
+                TimeUnit::Years,
+                BusinessDayConvention::Following,
+                false,
+            );
+            (issue_date, maturity)
+        }
+
+        fn contract(
+            &self,
+            spread: Rate,
+            schedule: Schedule,
+            convention: BusinessDayConvention,
+        ) -> CreditDefaultSwap {
+            CreditDefaultSwap::new(
+                ProtectionSide::Seller,
+                NOTIONAL,
+                spread,
+                schedule,
+                convention,
+                Actual360::new(),
+                true,
+                true,
+                Shared::clone(&self.settings),
+            )
+            .unwrap()
+        }
+    }
+
+    /// `creditdefaultswap.cpp:57-117`, against the values cached at `:98-99`.
+    #[test]
+    fn a_ten_year_contract_matches_the_cached_mid_point_value() {
+        let vars = CommonVars::new();
+        let (issue_date, maturity) = vars.issue_and_maturity();
+        let convention = BusinessDayConvention::ModifiedFollowing;
+        let schedule = Schedule::new(
+            issue_date,
+            maturity,
+            Period::try_from(Frequency::Semiannual).unwrap(),
+            vars.calendar.clone(),
+            convention,
+            convention,
+            DateGeneration::Forward,
+            false,
+            Date::null(),
+            Date::null(),
+        );
+        let mut cds = vars.contract(0.0120, schedule, convention);
+        cds.base_mut().set_pricing_engine(vars.engine());
+
+        let npv = cds.npv().unwrap();
+        let fair_spread = cds.fair_spread().unwrap();
+
+        assert!(
+            (npv - 295.015_339_8).abs() <= 1.0e-7,
+            "the mid-point engine priced the cached contract at {npv} rather than 295.0153398"
+        );
+        assert!(
+            (fair_spread - 0.007_517_539_081).abs() <= 1.0e-7,
+            "the mid-point engine quoted a fair spread of {fair_spread} rather than 0.007517539081"
+        );
+    }
+
+    /// `creditdefaultswap.cpp:417-478`: a contract rebuilt at its own fair
+    /// spread is worth nothing.
+    ///
+    /// One engine prices both contracts, as in C++ (`:456-464`), so the fair
+    /// spread and the repricing cannot drift apart through two separately built
+    /// pricers.
+    #[test]
+    fn repricing_at_the_fair_spread_prices_the_contract_to_nothing() {
+        let vars = CommonVars::new();
+        let (issue_date, maturity) = vars.issue_and_maturity();
+        let convention = BusinessDayConvention::Following;
+        let schedule = MakeSchedule::new()
+            .from(issue_date)
+            .to(maturity)
+            .with_frequency(Frequency::Quarterly)
+            .with_calendar(vars.calendar.clone())
+            .with_termination_date_convention(convention)
+            .with_rule(DateGeneration::TwentiethIMM)
+            .build();
+        let engine = vars.engine();
+
+        let mut cds = vars.contract(0.001, schedule.clone(), convention);
+        cds.base_mut().set_pricing_engine(SharedMut::clone(&engine));
+        let fair_rate = cds.fair_spread().unwrap();
+
+        let mut fair_cds = vars.contract(fair_rate, schedule, convention);
+        fair_cds.base_mut().set_pricing_engine(engine);
+        let fair_npv = fair_cds.npv().unwrap();
+
+        assert!(
+            fair_rate > 0.0,
+            "a non-positive fair spread of {fair_rate} would make the round trip vacuous"
+        );
+        assert!(
+            fair_npv.abs() < 1.0e-9,
+            "the contract rebuilt at its fair spread {fair_rate} priced at {fair_npv} rather than nothing"
+        );
+    }
+}
