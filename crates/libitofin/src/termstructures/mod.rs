@@ -34,6 +34,7 @@
 
 pub mod bootstraphelper;
 pub mod bootstraptraits;
+pub mod credit;
 pub mod interpolatedcurve;
 pub mod iterativebootstrap;
 pub mod volatility;
