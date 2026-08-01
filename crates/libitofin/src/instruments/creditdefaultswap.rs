@@ -28,16 +28,32 @@
 //!   (`fixedratecoupon.cpp:255-257`).
 //! - `registerWith(claim_)` (`creditdefaultswap.cpp:175`) has no counterpart:
 //!   the ported [`Claim`] is not an `Observable` (see `claim.rs`), so there is
-//!   nothing to subscribe to.
+//!   nothing to subscribe to. The only other registration is the evaluation
+//!   date the C++ [`Instrument`](crate::instrument::Instrument) base subscribes
+//!   to (`instrument.cpp:26-32`); with no singleton to reach (D5) the caller
+//!   passes the [`Settings`] instead. C++ does not register with the premium
+//!   leg's flows, and neither does this port.
+//! - The engine bundles' sentinels all become [`Option`] (D4): the
+//!   `Null<Real>`/`Null<Rate>` "result not available" of [`CdsResults`], and the
+//!   `Protection::Side(-1)`, `Null<Real>`, null `shared_ptr` and `Date()` "not
+//!   set" of [`CdsArguments`] (`creditdefaultswap.cpp:451-453`). `upfront` is
+//!   the exception that is no translation at all: C++ already declares it
+//!   `ext::optional<Rate>` (`creditdefaultswap.hpp:314`) and does not validate
+//!   it, because an absent upfront is a running-spread contract rather than a
+//!   missing input.
+//! - [`setup_expired`] zeroes seven results where the eight-field
+//!   [`CdsResults`] might suggest eight: `accrualRebateNPV_` is absent from
+//!   `setupExpired` (`creditdefaultswap.cpp:215-220`), is declared without an
+//!   initialiser (`creditdefaultswap.hpp:302`), and is written only by
+//!   `fetchResults` (`creditdefaultswap.cpp:256`), so C++ reads an
+//!   uninitialised member from `accrualRebateNPV()` on an expired contract.
+//!   The port leaves it `None`, whose accessor reports it as not available.
 //!
 //! ## Deferred
 //!
 //! Within EPIC Credit (#676), and each omitted visibly rather than accepted and
 //! ignored:
 //!
-//! - The [`Instrument`](crate::instrument::Instrument) interface: `isExpired`,
-//!   `setupArguments`, `fetchResults` and the priced accessors
-//!   (`creditdefaultswap.cpp:207-313`). This module builds the contract only.
 //! - The upfront-quoted constructor (`creditdefaultswap.cpp:62-85`), which is
 //!   the only path setting `upfront_` and taking an explicit upfront date.
 //! - The accrual-rebate arithmetic (`creditdefaultswap.cpp:143-168`). A trade
@@ -54,14 +70,19 @@
 //!   [`CashFlow::as_coupon`](crate::cashflow::CashFlow::as_coupon) ports.
 //!
 //! [`upfront`]: CreditDefaultSwap::upfront
+//! [`setup_expired`]: CreditDefaultSwap::setup_expired
+
+use std::any::Any;
 
 use crate::cashflow::Leg;
 use crate::cashflows::{FixedRateLeg, SimpleCashFlow};
 use crate::errors::QlResult;
+use crate::instrument::{Instrument, InstrumentBase, InstrumentResults};
 use crate::instruments::claim::{Claim, FaceValueClaim};
 use crate::instruments::protection::ProtectionSide;
 use crate::interestrate::Compounding;
-use crate::require;
+use crate::pricingengine::{Arguments, GenericEngine, Results};
+use crate::settings::Settings;
 use crate::shared::{Shared, shared};
 use crate::time::businessdayconvention::BusinessDayConvention;
 use crate::time::date::Date;
@@ -71,6 +92,7 @@ use crate::time::frequency::Frequency;
 use crate::time::schedule::Schedule;
 use crate::time::timeunit::TimeUnit;
 use crate::types::{Integer, Natural, Rate, Real};
+use crate::{fail, require};
 
 /// The terms a [`CreditDefaultSwap`] defaults when they are not quoted.
 ///
@@ -112,11 +134,120 @@ impl Default for CdsTerms {
     }
 }
 
+/// Arguments passed to a credit-default-swap pricing engine (the C++
+/// `CreditDefaultSwap::arguments`, `creditdefaultswap.hpp:311-329`).
+///
+/// Every field the C++ default constructor sentinels
+/// (`creditdefaultswap.cpp:451-453`) or leaves null is an [`Option`] here, and
+/// [`validate`](Arguments::validate) reads them as C++ reads the sentinels.
+#[derive(Default)]
+pub struct CdsArguments {
+    /// Which side of the protection the contract holds.
+    pub side: Option<ProtectionSide>,
+    /// The notional the protection covers.
+    pub notional: Option<Real>,
+    /// The upfront, in fractional units, when the contract quotes one.
+    ///
+    /// Already an `ext::optional` in C++ and, like it, not validated: a
+    /// running-spread contract legitimately has none.
+    pub upfront: Option<Rate>,
+    /// The running spread the premium leg pays.
+    pub spread: Option<Rate>,
+    /// The premium leg.
+    pub leg: Leg,
+    /// The upfront payment, due on the cash settlement date.
+    pub upfront_payment: Option<Shared<SimpleCashFlow>>,
+    /// The accrual rebate, when the contract carries one.
+    pub accrual_rebate: Option<Shared<SimpleCashFlow>>,
+    /// Whether the accrued coupon is due on a default.
+    pub settles_accrual: bool,
+    /// Whether a default pays at default time.
+    pub pays_at_default_time: bool,
+    /// What a default pays out.
+    pub claim: Option<Shared<dyn Claim>>,
+    /// The first date a default triggers the contract.
+    pub protection_start: Option<Date>,
+    /// The date the contract matures.
+    pub maturity: Option<Date>,
+}
+
+impl Arguments for CdsArguments {
+    fn validate(&self) -> QlResult<()> {
+        require!(self.side.is_some(), "side not set");
+        let Some(notional) = self.notional else {
+            fail!("notional not set");
+        };
+        require!(notional != 0.0, "null notional set");
+        require!(self.spread.is_some(), "spread not set");
+        require!(!self.leg.is_empty(), "coupons not set");
+        require!(self.upfront_payment.is_some(), "upfront payment not set");
+        require!(self.claim.is_some(), "claim not set");
+        require!(
+            self.protection_start.is_some(),
+            "protection start date not set"
+        );
+        require!(self.maturity.is_some(), "maturity date not set");
+        Ok(())
+    }
+}
+
+/// Results returned by a credit-default-swap pricing engine (the C++
+/// `CreditDefaultSwap::results`, `creditdefaultswap.hpp:331-342`).
+///
+/// A result the engine did not provide is `None`, the C++ `Null<Real>` /
+/// `Null<Rate>` sentinel [`reset`](Results::reset) restores; the matching
+/// accessor on the instrument then reports it as not available.
+#[derive(Default)]
+pub struct CdsResults {
+    /// The instrument-level results (NPV and the rest).
+    pub instrument: InstrumentResults,
+    /// The spread that prices the contract at zero.
+    pub fair_spread: Option<Rate>,
+    /// The upfront that prices the contract at zero.
+    pub fair_upfront: Option<Rate>,
+    /// The premium leg's sensitivity to a one-basis-point spread move.
+    pub coupon_leg_bps: Option<Real>,
+    /// The premium leg's NPV.
+    pub coupon_leg_npv: Option<Real>,
+    /// The protection leg's NPV.
+    pub default_leg_npv: Option<Real>,
+    /// The upfront payment's sensitivity to a one-basis-point upfront move.
+    pub upfront_bps: Option<Real>,
+    /// The upfront payment's NPV.
+    pub upfront_npv: Option<Real>,
+    /// The accrual rebate's NPV.
+    pub accrual_rebate_npv: Option<Real>,
+}
+
+impl Results for CdsResults {
+    fn reset(&mut self) {
+        self.instrument.reset();
+        self.fair_spread = None;
+        self.fair_upfront = None;
+        self.coupon_leg_bps = None;
+        self.coupon_leg_npv = None;
+        self.default_leg_npv = None;
+        self.upfront_bps = None;
+        self.upfront_npv = None;
+        self.accrual_rebate_npv = None;
+    }
+
+    fn as_instrument_results(&self) -> Option<&InstrumentResults> {
+        Some(&self.instrument)
+    }
+}
+
+/// Engine base for credit-default swaps (the C++ `CreditDefaultSwap::engine`,
+/// `creditdefaultswap.hpp:344-346`).
+pub type CdsEngine = GenericEngine<CdsArguments, CdsResults>;
+
 /// A credit-default swap quoted as a running spread.
 ///
 /// One side pays the premium leg and receives the protection payment, the other
 /// the reverse; which way round is [`side`](CreditDefaultSwap::side).
 pub struct CreditDefaultSwap {
+    base: InstrumentBase,
+    settings: Shared<Settings<Date>>,
     side: ProtectionSide,
     notional: Real,
     upfront: Option<Rate>,
@@ -131,6 +262,14 @@ pub struct CreditDefaultSwap {
     upfront_payment: Shared<SimpleCashFlow>,
     accrual_rebate: Option<Shared<SimpleCashFlow>>,
     maturity: Date,
+    fair_spread: Option<Rate>,
+    fair_upfront: Option<Rate>,
+    coupon_leg_bps: Option<Real>,
+    coupon_leg_npv: Option<Real>,
+    default_leg_npv: Option<Real>,
+    upfront_bps: Option<Real>,
+    upfront_npv: Option<Real>,
+    accrual_rebate_npv: Option<Real>,
 }
 
 impl CreditDefaultSwap {
@@ -155,6 +294,7 @@ impl CreditDefaultSwap {
         day_counter: DayCounter,
         settles_accrual: bool,
         pays_at_default_time: bool,
+        settings: Shared<Settings<Date>>,
     ) -> QlResult<CreditDefaultSwap> {
         CreditDefaultSwap::with_terms(
             side,
@@ -168,6 +308,7 @@ impl CreditDefaultSwap {
                 pays_at_default_time,
                 ..CdsTerms::default()
             },
+            settings,
         )
     }
 
@@ -181,6 +322,7 @@ impl CreditDefaultSwap {
     /// settlement date before the protection start, and on the deferred
     /// accrual-rebate case where the trade date falls on or after the first
     /// accrual date. Propagates the premium leg's own preconditions.
+    #[allow(clippy::too_many_arguments)]
     pub fn with_terms(
         side: ProtectionSide,
         notional: Real,
@@ -189,6 +331,7 @@ impl CreditDefaultSwap {
         payment_convention: BusinessDayConvention,
         day_counter: DayCounter,
         terms: CdsTerms,
+        settings: Shared<Settings<Date>>,
     ) -> QlResult<CreditDefaultSwap> {
         require!(
             !schedule.is_empty(),
@@ -250,7 +393,12 @@ impl CreditDefaultSwap {
             None
         };
 
+        let base = InstrumentBase::new();
+        settings.register_eval_date_observer(&base.observer());
+
         Ok(CreditDefaultSwap {
+            base,
+            settings,
             side,
             notional,
             upfront: None,
@@ -265,6 +413,14 @@ impl CreditDefaultSwap {
             upfront_payment,
             accrual_rebate,
             maturity: schedule.date(schedule.len() - 1),
+            fair_spread: None,
+            fair_upfront: None,
+            coupon_leg_bps: None,
+            coupon_leg_npv: None,
+            default_leg_npv: None,
+            upfront_bps: None,
+            upfront_npv: None,
+            accrual_rebate_npv: None,
         })
     }
 
@@ -346,6 +502,193 @@ impl CreditDefaultSwap {
     pub fn cash_settlement_days(&self) -> Natural {
         self.cash_settlement_days
     }
+
+    /// The spread that prices the contract at zero
+    /// (`creditdefaultswap.cpp:266-271`).
+    ///
+    /// # Errors
+    ///
+    /// The calculation must succeed and the engine must have provided the
+    /// value; an engine pricing a worthless premium leg does not
+    /// (`midpointcdsengine.cpp:156-157`).
+    pub fn fair_spread(&mut self) -> QlResult<Rate> {
+        self.calculate()?;
+        let Some(value) = self.fair_spread else {
+            fail!("fair spread not available");
+        };
+        Ok(value)
+    }
+
+    /// The upfront that prices the contract at zero
+    /// (`creditdefaultswap.cpp:259-264`).
+    ///
+    /// # Errors
+    ///
+    /// As [`fair_spread`](CreditDefaultSwap::fair_spread).
+    pub fn fair_upfront(&mut self) -> QlResult<Rate> {
+        self.calculate()?;
+        let Some(value) = self.fair_upfront else {
+            fail!("fair upfront not available");
+        };
+        Ok(value)
+    }
+
+    /// The premium leg's sensitivity to a one-basis-point spread move
+    /// (`creditdefaultswap.cpp:273-278`).
+    ///
+    /// # Errors
+    ///
+    /// As [`fair_spread`](CreditDefaultSwap::fair_spread).
+    pub fn coupon_leg_bps(&mut self) -> QlResult<Real> {
+        self.calculate()?;
+        let Some(value) = self.coupon_leg_bps else {
+            fail!("coupon-leg BPS not available");
+        };
+        Ok(value)
+    }
+
+    /// The premium leg's NPV (`creditdefaultswap.cpp:280-285`).
+    ///
+    /// # Errors
+    ///
+    /// As [`fair_spread`](CreditDefaultSwap::fair_spread).
+    pub fn coupon_leg_npv(&mut self) -> QlResult<Real> {
+        self.calculate()?;
+        let Some(value) = self.coupon_leg_npv else {
+            fail!("coupon-leg NPV not available");
+        };
+        Ok(value)
+    }
+
+    /// The protection leg's NPV (`creditdefaultswap.cpp:287-292`).
+    ///
+    /// # Errors
+    ///
+    /// As [`fair_spread`](CreditDefaultSwap::fair_spread).
+    pub fn default_leg_npv(&mut self) -> QlResult<Real> {
+        self.calculate()?;
+        let Some(value) = self.default_leg_npv else {
+            fail!("default-leg NPV not available");
+        };
+        Ok(value)
+    }
+
+    /// The upfront payment's NPV (`creditdefaultswap.cpp:294-299`).
+    ///
+    /// # Errors
+    ///
+    /// As [`fair_spread`](CreditDefaultSwap::fair_spread).
+    pub fn upfront_npv(&mut self) -> QlResult<Real> {
+        self.calculate()?;
+        let Some(value) = self.upfront_npv else {
+            fail!("upfront NPV not available");
+        };
+        Ok(value)
+    }
+
+    /// The upfront payment's sensitivity to a one-basis-point upfront move
+    /// (`creditdefaultswap.cpp:301-306`).
+    ///
+    /// # Errors
+    ///
+    /// As [`fair_spread`](CreditDefaultSwap::fair_spread).
+    pub fn upfront_bps(&mut self) -> QlResult<Real> {
+        self.calculate()?;
+        let Some(value) = self.upfront_bps else {
+            fail!("upfront BPS not available");
+        };
+        Ok(value)
+    }
+
+    /// The accrual rebate's NPV (`creditdefaultswap.cpp:308-313`).
+    ///
+    /// # Errors
+    ///
+    /// As [`fair_spread`](CreditDefaultSwap::fair_spread), and additionally on
+    /// an expired contract, which C++ leaves reading an uninitialised member.
+    pub fn accrual_rebate_npv(&mut self) -> QlResult<Real> {
+        self.calculate()?;
+        let Some(value) = self.accrual_rebate_npv else {
+            fail!("accrual Rebate NPV not available");
+        };
+        Ok(value)
+    }
+}
+
+impl Instrument for CreditDefaultSwap {
+    fn base(&self) -> &InstrumentBase {
+        &self.base
+    }
+
+    fn base_mut(&mut self) -> &mut InstrumentBase {
+        &mut self.base
+    }
+
+    /// `creditdefaultswap.cpp:207-213`: expired once every premium flow has
+    /// occurred.
+    fn is_expired(&self) -> QlResult<bool> {
+        for flow in self.leg.iter().rev() {
+            if !flow.has_occurred(&self.settings, None, None)? {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+
+    /// `creditdefaultswap.cpp:222-239`.
+    fn setup_arguments(&self, arguments: &mut dyn Arguments) -> QlResult<()> {
+        let Some(arguments) = (arguments as &mut dyn Any).downcast_mut::<CdsArguments>() else {
+            fail!("wrong argument type");
+        };
+        arguments.side = Some(self.side);
+        arguments.notional = Some(self.notional);
+        arguments.leg = self.leg.clone();
+        arguments.upfront_payment = Some(Shared::clone(&self.upfront_payment));
+        arguments.accrual_rebate = self.accrual_rebate.as_ref().map(Shared::clone);
+        arguments.settles_accrual = self.settles_accrual;
+        arguments.pays_at_default_time = self.pays_at_default_time;
+        arguments.claim = Some(Shared::clone(&self.claim));
+        arguments.upfront = self.upfront;
+        arguments.spread = Some(self.running_spread);
+        arguments.protection_start = Some(self.protection_start);
+        arguments.maturity = Some(self.maturity);
+        Ok(())
+    }
+
+    /// `creditdefaultswap.cpp:215-220`, which zeroes seven of the eight
+    /// results and leaves `accrualRebateNPV_` as it found it.
+    fn setup_expired(&mut self) {
+        let expired = InstrumentResults {
+            value: Some(0.0),
+            error_estimate: Some(0.0),
+            ..InstrumentResults::default()
+        };
+        self.base_mut().store_results(&expired);
+        self.fair_spread = Some(0.0);
+        self.fair_upfront = Some(0.0);
+        self.coupon_leg_bps = Some(0.0);
+        self.upfront_bps = Some(0.0);
+        self.coupon_leg_npv = Some(0.0);
+        self.default_leg_npv = Some(0.0);
+        self.upfront_npv = Some(0.0);
+    }
+
+    /// `creditdefaultswap.cpp:242-257`.
+    fn fetch_results(&mut self, results: &dyn Results) -> QlResult<()> {
+        let Some(results) = (results as &dyn Any).downcast_ref::<CdsResults>() else {
+            fail!("wrong result type");
+        };
+        self.base_mut().store_results(&results.instrument);
+        self.fair_spread = results.fair_spread;
+        self.fair_upfront = results.fair_upfront;
+        self.coupon_leg_bps = results.coupon_leg_bps;
+        self.coupon_leg_npv = results.coupon_leg_npv;
+        self.default_leg_npv = results.default_leg_npv;
+        self.upfront_npv = results.upfront_npv;
+        self.upfront_bps = results.upfront_bps;
+        self.accrual_rebate_npv = results.accrual_rebate_npv;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -361,6 +704,18 @@ mod tests {
 
     const NOTIONAL: Real = 10_000_000.0;
     const SPREAD: Rate = 0.01;
+
+    /// The day before the schedule's first accrual date, so that no premium
+    /// flow has occurred and the contract is live.
+    fn today() -> Date {
+        Date::new(19, Month::June, 2026)
+    }
+
+    fn settings_today() -> Shared<Settings<Date>> {
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(today());
+        settings
+    }
 
     /// A ten-year semiannual contract on the conventions a standard CDS quotes
     /// with. The `Backward` rule keeps it pre-Big-Bang, which is the arm the
@@ -386,6 +741,7 @@ mod tests {
             BusinessDayConvention::Following,
             Actual360::new(),
             terms,
+            settings_today(),
         )
     }
 
@@ -401,6 +757,7 @@ mod tests {
             Actual360::new(),
             true,
             true,
+            settings_today(),
         )
         .unwrap();
 
@@ -504,6 +861,7 @@ mod tests {
             BusinessDayConvention::Following,
             Actual360::new(),
             CdsTerms::default(),
+            settings_today(),
         );
 
         assert!(empty.is_err());
@@ -575,6 +933,7 @@ mod tests {
                 BusinessDayConvention::Following,
                 Actual360::new(),
                 terms,
+                settings_today(),
             )
         };
 
