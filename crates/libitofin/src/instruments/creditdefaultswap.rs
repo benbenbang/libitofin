@@ -46,8 +46,10 @@
 //!   `setupExpired` (`creditdefaultswap.cpp:215-220`), is declared without an
 //!   initialiser (`creditdefaultswap.hpp:302`), and is written only by
 //!   `fetchResults` (`creditdefaultswap.cpp:256`), so C++ reads an
-//!   uninitialised member from `accrualRebateNPV()` on an expired contract.
-//!   The port leaves it `None`, whose accessor reports it as not available.
+//!   uninitialised member from `accrualRebateNPV()` on a contract that expires
+//!   before it is ever priced. The port leaves it `None`, whose accessor
+//!   reports it as not available. A contract priced before it expired keeps the
+//!   fetched value in both, since `setupExpired` does not touch the field.
 //!
 //! ## Deferred
 //!
@@ -696,6 +698,9 @@ mod tests {
     use super::*;
     use crate::cashflow::CashFlow;
     use crate::event::Event;
+    use crate::patterns::observable::{AsObservable, Observable};
+    use crate::pricingengine::PricingEngine;
+    use crate::shared::{SharedMut, shared_mut};
     use crate::time::calendars::weekendsonly::WeekendsOnly;
     use crate::time::date::Month;
     use crate::time::daycounters::actual360::Actual360;
@@ -733,6 +738,13 @@ mod tests {
     }
 
     fn contract(terms: CdsTerms) -> QlResult<CreditDefaultSwap> {
+        contract_priced_on(terms, settings_today())
+    }
+
+    fn contract_priced_on(
+        terms: CdsTerms,
+        settings: Shared<Settings<Date>>,
+    ) -> QlResult<CreditDefaultSwap> {
         CreditDefaultSwap::with_terms(
             ProtectionSide::Buyer,
             NOTIONAL,
@@ -741,7 +753,7 @@ mod tests {
             BusinessDayConvention::Following,
             Actual360::new(),
             terms,
-            settings_today(),
+            settings,
         )
     }
 
@@ -975,5 +987,307 @@ mod tests {
         let last = plain.coupons().len() - 1;
         assert_ne!(amount(&plain, last), amount(&overridden, last));
         assert_eq!(amount(&plain, 0), amount(&overridden, 0));
+    }
+
+    /// The bundle the contract fills in, as an engine receives it.
+    fn arguments(cds: &CreditDefaultSwap) -> CdsArguments {
+        let mut arguments = CdsArguments::default();
+        cds.setup_arguments(&mut arguments).unwrap();
+        arguments
+    }
+
+    /// An engine that either fills every result or leaves them all as
+    /// [`Results::reset`] left them, to tell "the engine did not provide it"
+    /// from a provided value.
+    struct StubEngine {
+        base: CdsEngine,
+        fills_results: bool,
+    }
+
+    impl AsObservable for StubEngine {
+        fn observable(&self) -> &Observable {
+            self.base.observable()
+        }
+    }
+
+    impl PricingEngine for StubEngine {
+        fn arguments_mut(&mut self) -> &mut dyn Arguments {
+            self.base.arguments_mut()
+        }
+
+        fn results(&self) -> &dyn Results {
+            self.base.results()
+        }
+
+        fn reset(&mut self) {
+            self.base.reset();
+        }
+
+        fn calculate(&mut self) -> QlResult<()> {
+            if !self.fills_results {
+                return Ok(());
+            }
+            let results = self.base.results_mut();
+            results.instrument.value = Some(1.0);
+            results.fair_spread = Some(0.02);
+            results.fair_upfront = Some(0.03);
+            results.coupon_leg_bps = Some(4.0);
+            results.coupon_leg_npv = Some(5.0);
+            results.default_leg_npv = Some(6.0);
+            results.upfront_bps = Some(7.0);
+            results.upfront_npv = Some(8.0);
+            results.accrual_rebate_npv = Some(9.0);
+            Ok(())
+        }
+    }
+
+    fn engine(fills_results: bool) -> SharedMut<StubEngine> {
+        shared_mut(StubEngine {
+            base: CdsEngine::new(CdsArguments::default(), CdsResults::default()),
+            fills_results,
+        })
+    }
+
+    /// `creditdefaultswap.cpp:222-239`: every field the engine reads reaches it,
+    /// carrying the contract's own values rather than the bundle's defaults.
+    #[test]
+    fn setup_arguments_round_trips_the_contract_into_the_bundle() {
+        let cds = contract(CdsTerms::default()).unwrap();
+        let arguments = arguments(&cds);
+
+        assert_eq!(arguments.side, Some(ProtectionSide::Buyer));
+        assert_eq!(arguments.notional, Some(NOTIONAL));
+        assert_eq!(arguments.spread, Some(SPREAD));
+        assert_eq!(arguments.upfront, None);
+        assert_eq!(arguments.leg.len(), cds.coupons().len());
+        assert!(Shared::ptr_eq(&arguments.leg[0], &cds.coupons()[0]));
+        assert!(Shared::ptr_eq(
+            arguments.upfront_payment.as_ref().unwrap(),
+            cds.upfront_payment()
+        ));
+        assert!(Shared::ptr_eq(
+            arguments.accrual_rebate.as_ref().unwrap(),
+            cds.accrual_rebate().unwrap()
+        ));
+        assert!(arguments.settles_accrual);
+        assert!(arguments.pays_at_default_time);
+        assert_eq!(
+            arguments
+                .claim
+                .as_ref()
+                .unwrap()
+                .amount(&cds.maturity(), NOTIONAL, 0.4),
+            NOTIONAL * 0.6
+        );
+        assert_eq!(
+            arguments.protection_start,
+            Some(cds.protection_start_date())
+        );
+        assert_eq!(arguments.maturity, Some(cds.maturity()));
+    }
+
+    /// A contract without a rebate leaves the bundle's rebate empty, which is
+    /// the one null `shared_ptr` `validate` does not reject.
+    #[test]
+    fn an_unrebated_contract_leaves_the_bundle_rebate_empty() {
+        let cds = contract(CdsTerms {
+            rebates_accrual: false,
+            ..CdsTerms::default()
+        })
+        .unwrap();
+        let arguments = arguments(&cds);
+
+        assert!(arguments.accrual_rebate.is_none());
+        assert!(arguments.validate().is_ok());
+    }
+
+    /// `creditdefaultswap.cpp:455-465`, message for message. A zero notional is
+    /// rejected separately from an unset one, as C++ rejects `Null<Real>` and
+    /// `0.0` with different messages.
+    #[test]
+    fn validate_rejects_each_unset_field_with_the_cpp_message() {
+        let cds = contract(CdsTerms::default()).unwrap();
+        assert!(arguments(&cds).validate().is_ok());
+
+        let rejects = |breaks: fn(&mut CdsArguments), message: &str| {
+            let mut arguments = arguments(&cds);
+            breaks(&mut arguments);
+            assert_eq!(arguments.validate().unwrap_err().message(), message);
+        };
+
+        rejects(|a| a.side = None, "side not set");
+        rejects(|a| a.notional = None, "notional not set");
+        rejects(|a| a.notional = Some(0.0), "null notional set");
+        rejects(|a| a.spread = None, "spread not set");
+        rejects(|a| a.leg.clear(), "coupons not set");
+        rejects(|a| a.upfront_payment = None, "upfront payment not set");
+        rejects(|a| a.claim = None, "claim not set");
+        rejects(
+            |a| a.protection_start = None,
+            "protection start date not set",
+        );
+        rejects(|a| a.maturity = None, "maturity date not set");
+    }
+
+    /// `creditdefaultswap.cpp:467-477`: reset restores the `Null` sentinels,
+    /// which are `None` here, across all eight results and the instrument's own.
+    #[test]
+    fn reset_clears_every_result() {
+        let mut results = CdsResults {
+            instrument: InstrumentResults {
+                value: Some(1.0),
+                ..InstrumentResults::default()
+            },
+            fair_spread: Some(0.02),
+            fair_upfront: Some(0.03),
+            coupon_leg_bps: Some(4.0),
+            coupon_leg_npv: Some(5.0),
+            default_leg_npv: Some(6.0),
+            upfront_bps: Some(7.0),
+            upfront_npv: Some(8.0),
+            accrual_rebate_npv: Some(9.0),
+        };
+
+        results.reset();
+
+        assert_eq!(results.instrument.value, None);
+        assert_eq!(results.fair_spread, None);
+        assert_eq!(results.fair_upfront, None);
+        assert_eq!(results.coupon_leg_bps, None);
+        assert_eq!(results.coupon_leg_npv, None);
+        assert_eq!(results.default_leg_npv, None);
+        assert_eq!(results.upfront_bps, None);
+        assert_eq!(results.upfront_npv, None);
+        assert_eq!(results.accrual_rebate_npv, None);
+    }
+
+    /// `creditdefaultswap.cpp:242-257`: the engine's results reach the
+    /// accessors, which price the contract first.
+    #[test]
+    fn the_accessors_read_the_engine_results() {
+        let mut cds = contract(CdsTerms::default()).unwrap();
+        cds.base_mut().set_pricing_engine(engine(true));
+
+        assert_eq!(cds.npv().unwrap(), 1.0);
+        assert_eq!(cds.fair_spread().unwrap(), 0.02);
+        assert_eq!(cds.fair_upfront().unwrap(), 0.03);
+        assert_eq!(cds.coupon_leg_bps().unwrap(), 4.0);
+        assert_eq!(cds.coupon_leg_npv().unwrap(), 5.0);
+        assert_eq!(cds.default_leg_npv().unwrap(), 6.0);
+        assert_eq!(cds.upfront_bps().unwrap(), 7.0);
+        assert_eq!(cds.upfront_npv().unwrap(), 8.0);
+        assert_eq!(cds.accrual_rebate_npv().unwrap(), 9.0);
+    }
+
+    /// A result the engine left alone is the C++ `Null` the accessor rejects
+    /// (`creditdefaultswap.cpp:259-313`), message for message.
+    #[test]
+    fn unprovided_results_are_not_available() {
+        let mut cds = contract(CdsTerms::default()).unwrap();
+        cds.base_mut().set_pricing_engine(engine(false));
+
+        let message = |result: QlResult<Real>| result.unwrap_err().message().to_string();
+        assert_eq!(message(cds.fair_spread()), "fair spread not available");
+        assert_eq!(message(cds.fair_upfront()), "fair upfront not available");
+        assert_eq!(
+            message(cds.coupon_leg_bps()),
+            "coupon-leg BPS not available"
+        );
+        assert_eq!(
+            message(cds.coupon_leg_npv()),
+            "coupon-leg NPV not available"
+        );
+        assert_eq!(
+            message(cds.default_leg_npv()),
+            "default-leg NPV not available"
+        );
+        assert_eq!(message(cds.upfront_bps()), "upfront BPS not available");
+        assert_eq!(message(cds.upfront_npv()), "upfront NPV not available");
+        assert_eq!(
+            message(cds.accrual_rebate_npv()),
+            "accrual Rebate NPV not available"
+        );
+    }
+
+    /// An accessor prices the contract before reading, so with no engine
+    /// installed it surfaces the failure to price rather than a stale value.
+    #[test]
+    fn an_accessor_on_an_unpriced_contract_reports_the_missing_engine() {
+        let mut cds = contract(CdsTerms::default()).unwrap();
+
+        assert_eq!(
+            cds.fair_spread().unwrap_err().message(),
+            "null pricing engine"
+        );
+    }
+
+    /// `creditdefaultswap.cpp:215-220` zeroes seven results, not eight:
+    /// `accrualRebateNPV_` is absent there and uninitialised in the header
+    /// (`creditdefaultswap.hpp:302`), so C++ reads a garbage value from it on an
+    /// expired contract where this port reports it as unavailable. An expired
+    /// contract needs no engine to answer, which is what distinguishes these
+    /// zeros from an engine's results.
+    #[test]
+    fn an_expired_contract_zeroes_seven_results_and_leaves_the_rebate_unavailable() {
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(Date::new(21, Month::June, 2036));
+        let mut cds = contract_priced_on(CdsTerms::default(), settings).unwrap();
+        assert!(cds.is_expired().unwrap());
+
+        assert_eq!(cds.npv().unwrap(), 0.0);
+        assert_eq!(cds.fair_spread().unwrap(), 0.0);
+        assert_eq!(cds.fair_upfront().unwrap(), 0.0);
+        assert_eq!(cds.coupon_leg_bps().unwrap(), 0.0);
+        assert_eq!(cds.coupon_leg_npv().unwrap(), 0.0);
+        assert_eq!(cds.default_leg_npv().unwrap(), 0.0);
+        assert_eq!(cds.upfront_bps().unwrap(), 0.0);
+        assert_eq!(cds.upfront_npv().unwrap(), 0.0);
+        assert_eq!(
+            cds.accrual_rebate_npv().unwrap_err().message(),
+            "accrual Rebate NPV not available"
+        );
+    }
+
+    /// `creditdefaultswap.cpp:207-213`: live while any premium flow is still to
+    /// pay, expired once the last one has paid.
+    #[test]
+    fn is_expired_tracks_the_premium_legs_flows() {
+        assert!(!contract(CdsTerms::default()).unwrap().is_expired().unwrap());
+
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(Date::new(19, Month::June, 2036));
+        let last_coupon_due = contract_priced_on(CdsTerms::default(), settings).unwrap();
+        assert!(
+            !last_coupon_due.is_expired().unwrap(),
+            "the final premium flow has not paid yet"
+        );
+
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(Date::new(21, Month::June, 2036));
+        let matured = contract_priced_on(CdsTerms::default(), settings).unwrap();
+        assert!(
+            matured.is_expired().unwrap(),
+            "the final premium flow has paid"
+        );
+    }
+
+    /// The contract observes the evaluation date the C++ `Instrument` base
+    /// registers with through the settings singleton (`instrument.cpp:26-32`),
+    /// which D5 replaces with the [`Settings`] the constructor is handed: moving
+    /// the date invalidates the cached results.
+    #[test]
+    fn an_evaluation_date_change_invalidates_the_contract() {
+        let settings = settings_today();
+        let mut cds = contract_priced_on(CdsTerms::default(), Shared::clone(&settings)).unwrap();
+        cds.base_mut().set_pricing_engine(engine(true));
+
+        cds.npv().unwrap();
+        assert!(cds.base().is_calculated());
+
+        settings.set_evaluation_date(today() + 1);
+        assert!(
+            !cds.base().is_calculated(),
+            "an evaluation-date change invalidates the contract"
+        );
     }
 }
