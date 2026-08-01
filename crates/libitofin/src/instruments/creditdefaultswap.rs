@@ -43,7 +43,9 @@
 //! - The accrual-rebate arithmetic (`creditdefaultswap.cpp:143-168`). A trade
 //!   date on or after the first accrual date rebates the coupon accrued to
 //!   `tradeDate + 1`; [`CreditDefaultSwap::with_terms`] rejects that case
-//!   instead of silently rebating zero.
+//!   instead of silently rebating zero. That covers every `CDS`- or
+//!   `CDS2015`-rule contract on default terms, whose deduced trade date is the
+//!   first accrual date, so those build only with `rebates_accrual` off.
 //! - `impliedHazardRate`, `conventionalSpread` and their objective function
 //!   (`creditdefaultswap.cpp:315-428`), and `cdsMaturity`
 //!   (`creditdefaultswap.cpp:479-506`).
@@ -354,6 +356,7 @@ mod tests {
     use crate::time::calendars::weekendsonly::WeekendsOnly;
     use crate::time::date::Month;
     use crate::time::daycounters::actual360::Actual360;
+    use crate::time::daycounters::actual365fixed::Actual365Fixed;
     use crate::time::schedule::MakeSchedule;
 
     const NOTIONAL: Real = 10_000_000.0;
@@ -543,5 +546,75 @@ mod tests {
         })
         .unwrap();
         assert_eq!(bare.trade_date(), first_accrual);
+    }
+
+    /// The post-Big-Bang arm of the trade-date deduction
+    /// (`creditdefaultswap.cpp:111-112`): protection is effective on the trade
+    /// date itself, and the protection-start check is skipped
+    /// (`creditdefaultswap.cpp:94-101`).
+    ///
+    /// That arm lands on the deferred rebate case by construction, since the
+    /// deduced trade date is the first accrual date, so a contract on a
+    /// `CDS`-rule schedule only builds without the rebate.
+    #[test]
+    fn a_post_big_bang_contract_trades_on_the_protection_start() {
+        let schedule = MakeSchedule::new()
+            .from(Date::new(20, Month::June, 2026))
+            .to(Date::new(20, Month::June, 2036))
+            .with_frequency(Frequency::Quarterly)
+            .with_calendar(WeekendsOnly::new())
+            .with_convention(BusinessDayConvention::Following)
+            .with_rule(DateGeneration::CDS)
+            .build();
+        let build = |terms| {
+            CreditDefaultSwap::with_terms(
+                ProtectionSide::Buyer,
+                NOTIONAL,
+                SPREAD,
+                schedule.clone(),
+                BusinessDayConvention::Following,
+                Actual360::new(),
+                terms,
+            )
+        };
+
+        let cds = build(CdsTerms {
+            rebates_accrual: false,
+            ..CdsTerms::default()
+        })
+        .unwrap();
+        assert_eq!(cds.trade_date(), cds.protection_start_date());
+        assert_eq!(cds.protection_start_date(), schedule.date(0));
+
+        assert!(build(CdsTerms::default()).is_err());
+    }
+
+    /// `creditdefaultswap.cpp:173-174`.
+    #[test]
+    fn the_claim_defaults_to_the_face_value() {
+        let cds = contract(CdsTerms::default()).unwrap();
+
+        assert_eq!(
+            cds.claim().amount(&cds.maturity(), NOTIONAL, 0.4),
+            NOTIONAL * 0.6
+        );
+    }
+
+    /// The last-period day counter overrides the spread's on the last coupon
+    /// alone, where an absent one leaves the spread's in place
+    /// (`fixedratecoupon.cpp:255-257`).
+    #[test]
+    fn the_last_period_day_counter_reaches_the_last_coupon_only() {
+        let plain = contract(CdsTerms::default()).unwrap();
+        let overridden = contract(CdsTerms {
+            last_period_day_counter: Some(Actual365Fixed::new()),
+            ..CdsTerms::default()
+        })
+        .unwrap();
+
+        let amount = |cds: &CreditDefaultSwap, i: usize| cds.coupons()[i].amount().unwrap();
+        let last = plain.coupons().len() - 1;
+        assert_ne!(amount(&plain, last), amount(&overridden, last));
+        assert_eq!(amount(&plain, 0), amount(&overridden, 0));
     }
 }
