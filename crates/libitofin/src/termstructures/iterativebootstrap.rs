@@ -285,7 +285,7 @@ mod tests {
     use crate::patterns::observable::{AsObservable, Observable};
     use crate::settings::Settings;
     use crate::shared::shared;
-    use crate::termstructures::bootstraptraits::Discount;
+    use crate::termstructures::bootstraptraits::{Discount, YieldBootstrapTraits};
     use crate::termstructures::yields::DepositRateHelper;
     use crate::termstructures::{TermStructure, TermStructureBase};
     use crate::time::date::{Date, Month};
