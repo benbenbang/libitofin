@@ -142,6 +142,17 @@ impl<I: Interpolator> InterpolatedHazardRateCurve<I> {
 /// C++ compares against `times_.back()` and returns `data_.back()`, which is
 /// the same node the interpolation's own upper end carries; taking it from the
 /// interpolation keeps the reads independent of whose node vectors they are.
+///
+/// That equivalence holds while the interpolation spans the *full* node set,
+/// and beyond it while extrapolation is flat. Both hold today: this curve
+/// interpolates all of its nodes, and the only interpolator the credit
+/// bootstrap wires is `BackwardFlat`, whose extrapolation past `x_max` is the
+/// last node's value. A future credit curve bootstrapped under a non-flat
+/// interpolator would part company here - mid-bootstrap the interpolation
+/// spans only the solved prefix, and on `(prefix end, times_.back()]` C++
+/// continues the last segment's slope where this goes flat. Reaching that case
+/// means comparing against the full pillar array, as C++ does, rather than
+/// against `x_max`.
 pub(crate) fn hazard_rate_from_nodes<I: Interpolation>(
     interpolation: &I,
     t: Time,
