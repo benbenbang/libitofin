@@ -42,8 +42,8 @@ pub mod yields;
 pub mod yieldtermstructure;
 
 pub use bootstraphelper::{
-    BootstrapHelperBase, RateHelper, RelativeDateRateHelper, compare_by_pillar_date,
-    sort_by_pillar_date,
+    BootstrapHelperBase, BootstrapHelperShared, RateHelper, RelativeDateRateHelper,
+    compare_by_pillar_date, sort_by_pillar_date,
 };
 
 use std::cell::Cell;

@@ -6,6 +6,7 @@
 //! trait is the contract every credit curve plugs into; the adapters and
 //! concrete curves that build on it follow within EPIC Credit (#676).
 
+pub mod defaultprobabilityhelpers;
 pub mod defaulttermstructure;
 pub mod flathazardrate;
 pub mod hazardratestructure;

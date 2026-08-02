@@ -57,9 +57,8 @@ use crate::math::solver1d::Solver1D;
 use crate::math::solvers1d::brent::Brent;
 use crate::math::solvers1d::finitedifferencenewtonsafe::FiniteDifferenceNewtonSafe;
 use crate::shared::Shared;
-use crate::termstructures::bootstraphelper::{RateHelper, sort_by_pillar_date};
+use crate::termstructures::bootstraphelper::{BootstrapHelperShared, sort_by_pillar_date};
 use crate::termstructures::bootstraptraits::{BootstrapTraits, CurveData};
-use crate::termstructures::yieldtermstructure::YieldTermStructure;
 use crate::time::date::Date;
 use crate::types::{Real, Size, Time};
 use crate::{fail, require};
@@ -76,9 +75,16 @@ pub trait PiecewiseCurve {
     type Traits: BootstrapTraits;
     /// The interpolation factory.
     type Interp: Interpolator;
+    /// The term-structure family the curve belongs to, handed to the helpers
+    /// so they price against it.
+    type TS: ?Sized;
+    /// The bootstrap-helper family the curve is fitted to (`dyn RateHelper`
+    /// for a yield curve). The association lives here rather than on the
+    /// helper traits: those must stay object-safe as bare `dyn RateHelper`.
+    type Helper: BootstrapHelperShared<TS = Self::TS> + ?Sized;
 
-    /// The rate helpers whose quotes the curve is bootstrapped to.
-    fn instruments(&self) -> &[Shared<dyn RateHelper>];
+    /// The bootstrap helpers whose quotes the curve is bootstrapped to.
+    fn instruments(&self) -> &[Shared<Self::Helper>];
 
     /// The interpolation factory.
     fn interpolator(&self) -> &Self::Interp;
@@ -95,9 +101,10 @@ pub trait PiecewiseCurve {
     /// The year fraction from the reference date to `date`.
     fn time_from_reference(&self, date: Date) -> QlResult<Time>;
 
-    /// A strong handle to the curve as a yield term structure, to hand to the
-    /// helpers so they price against it (C++'s `setTermStructure(this)`).
-    fn term_structure_shared(&self) -> QlResult<Shared<dyn YieldTermStructure>>;
+    /// A strong handle to the curve as a term structure of its family, to hand
+    /// to the helpers so they price against it (C++'s
+    /// `setTermStructure(this)`).
+    fn term_structure_shared(&self) -> QlResult<Shared<Self::TS>>;
 }
 
 /// The iterative bootstrap (`IterativeBootstrap`).
@@ -119,7 +126,7 @@ impl IterativeBootstrap {
     /// Bootstraps `curve` in place, solving every alive pillar (C++'s
     /// `calculate`, single-pass for the local-interpolator scope).
     pub fn calculate<C: PiecewiseCurve>(&self, curve: &C) -> QlResult<()> {
-        let mut helpers: Vec<Shared<dyn RateHelper>> = curve.instruments().to_vec();
+        let mut helpers: Vec<Shared<C::Helper>> = curve.instruments().to_vec();
         let n = helpers.len();
         require!(
             !C::Interp::GLOBAL,
@@ -189,7 +196,7 @@ impl IterativeBootstrap {
         // Hand the curve to each alive helper and reject invalid quotes.
         let term_structure = curve.term_structure_shared()?;
         for helper in helpers.iter().take(n).skip(first_alive) {
-            helper.base().quote_value()?;
+            helper.quote_value()?;
             helper.set_term_structure(&term_structure);
         }
 
@@ -263,7 +270,7 @@ impl IterativeBootstrap {
 fn node_error<C: PiecewiseCurve>(
     curve: &C,
     i: Size,
-    helper: &Shared<dyn RateHelper>,
+    helper: &Shared<C::Helper>,
     guess: Real,
 ) -> QlResult<Real> {
     {
@@ -285,8 +292,10 @@ mod tests {
     use crate::patterns::observable::{AsObservable, Observable};
     use crate::settings::Settings;
     use crate::shared::shared;
+    use crate::termstructures::bootstraphelper::RateHelper;
     use crate::termstructures::bootstraptraits::{Discount, YieldBootstrapTraits};
     use crate::termstructures::yields::DepositRateHelper;
+    use crate::termstructures::yieldtermstructure::YieldTermStructure;
     use crate::termstructures::{TermStructure, TermStructureBase};
     use crate::time::date::{Date, Month};
     use crate::time::daycounters::actual360::Actual360;
@@ -353,6 +362,8 @@ mod tests {
     impl PiecewiseCurve for StubCurve {
         type Traits = Discount;
         type Interp = LogLinear;
+        type TS = dyn YieldTermStructure;
+        type Helper = dyn RateHelper;
 
         fn instruments(&self) -> &[Shared<dyn RateHelper>] {
             &self.instruments
