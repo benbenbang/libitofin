@@ -127,22 +127,51 @@ impl<I: Interpolator> InterpolatedHazardRateCurve<I> {
             .zip(self.curve.data().iter().copied())
             .collect()
     }
+}
 
-    fn last_time(&self) -> Time {
-        *self
-            .curve
-            .times()
-            .last()
-            .expect("the constructor requires at least one node")
+/// The hazard rate read off interpolated `(time, hazard rate)` nodes
+/// (`interpolatedhazardratecurve.hpp:148-154`): the interpolated value inside
+/// the node range, the last node's rate flat beyond it.
+///
+/// Free rather than a method so the bootstrapped
+/// [`PiecewiseDefaultCurve`](crate::termstructures::credit::piecewisedefaultcurve::PiecewiseDefaultCurve)
+/// reads its solved nodes exactly as this curve reads its given ones - the C++
+/// `base_curve::hazardRateImpl` call the piecewise curve delegates to
+/// (`piecewisedefaultcurve.hpp:272-276`).
+///
+/// C++ compares against `times_.back()` and returns `data_.back()`, which is
+/// the same node the interpolation's own upper end carries; taking it from the
+/// interpolation keeps the reads independent of whose node vectors they are.
+pub(crate) fn hazard_rate_from_nodes<I: Interpolation>(
+    interpolation: &I,
+    t: Time,
+) -> QlResult<Rate> {
+    let max_time = interpolation.x_max();
+    if t <= max_time {
+        return interpolation.value(t);
     }
+    interpolation.value(max_time)
+}
 
-    fn last_hazard_rate(&self) -> Rate {
-        *self
-            .curve
-            .data()
-            .last()
-            .expect("the constructor requires at least one node")
+/// The survival probability `exp(-integral of the hazard rate)` read off
+/// interpolated nodes (`interpolatedhazardratecurve.hpp:157-172`): the
+/// interpolation's primitive inside the node range, continued at the last
+/// node's rate beyond it. Shared with the piecewise curve, as
+/// [`hazard_rate_from_nodes`] is.
+pub(crate) fn survival_probability_from_nodes<I: Interpolation>(
+    interpolation: &I,
+    t: Time,
+) -> QlResult<Probability> {
+    if t == 0.0 {
+        return Ok(1.0);
     }
+    let max_time = interpolation.x_max();
+    let integral = if t <= max_time {
+        interpolation.primitive(t)?
+    } else {
+        interpolation.primitive(max_time)? + interpolation.value(max_time)? * (t - max_time)
+    };
+    Ok((-integral).exp())
 }
 
 impl<I: Interpolator> AsObservable for InterpolatedHazardRateCurve<I> {
@@ -166,26 +195,13 @@ impl<I: Interpolator> TermStructure for InterpolatedHazardRateCurve<I> {
 
 impl<I: Interpolator> HazardRateStructure for InterpolatedHazardRateCurve<I> {
     fn hazard_rate_curve_impl(&self, t: Time) -> QlResult<Rate> {
-        if t <= self.last_time() {
-            return self.curve.interpolation()?.value(t);
-        }
-        Ok(self.last_hazard_rate())
+        hazard_rate_from_nodes(self.curve.interpolation()?, t)
     }
 }
 
 impl<I: Interpolator> DefaultProbabilityTermStructure for InterpolatedHazardRateCurve<I> {
     fn survival_probability_impl(&self, t: Time) -> QlResult<Probability> {
-        if t == 0.0 {
-            return Ok(1.0);
-        }
-        let interpolation = self.curve.interpolation()?;
-        let max_time = self.last_time();
-        let integral = if t <= max_time {
-            interpolation.primitive(t)?
-        } else {
-            interpolation.primitive(max_time)? + self.last_hazard_rate() * (t - max_time)
-        };
-        Ok((-integral).exp())
+        survival_probability_from_nodes(self.curve.interpolation()?, t)
     }
 
     fn default_density_impl(&self, t: Time) -> QlResult<Real> {
