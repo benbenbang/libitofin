@@ -289,3 +289,345 @@ impl<I: Interpolator + 'static> PiecewiseCurve for PiecewiseDefaultCurve<HazardR
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    //! Oracle: `defaultprobabilitycurves.cpp` `testFlatHazardConsistency`
+    //! (`:320`) through `testBootstrapFromSpread<HazardRate, BackwardFlat>`
+    //! (`:152-224`), and `testSingleInstrumentBootstrap` (`:344-378`). The
+    //! upfront halves of both cases (`testBootstrapFromUpfront`) need
+    //! `UpfrontCdsHelper`, deferred within EPIC Credit (#676).
+    //!
+    //! The round trip is self-consistent - every helper's own contract is
+    //! rebuilt and repriced off the bootstrapped curve and must reproduce its
+    //! input spread - so there are no external numbers to transcribe.
+    //!
+    //! Two deliberate departures from the C++ fixture, both from D5:
+    //!
+    //! - C++ takes `today` from `Settings::instance().evaluationDate()`, which
+    //!   the test suite's global fixture sets from the clock. Each test here
+    //!   owns its `Settings`, so the evaluation date is a fixed TARGET business
+    //!   day, asserted rather than assumed.
+    //! - The `SavedSettings` guard around the `includeTodaysCashFlows` write
+    //!   (`:196-198`) is not ported: the flag lives on a `Settings` this test
+    //!   owns outright, so there is no global to restore.
+
+    use super::*;
+    use crate::handle::Handle;
+    use crate::instrument::Instrument;
+    use crate::instruments::{CdsTerms, CreditDefaultSwap, ProtectionSide};
+    use crate::interestrate::Compounding;
+    use crate::math::interpolations::flat::BackwardFlat;
+    use crate::pricingengine::PricingEngine;
+    use crate::pricingengines::credit::MidPointCdsEngine;
+    use crate::quotes::{Quote, SimpleQuote};
+    use crate::settings::Settings;
+    use crate::shared::shared;
+    use crate::termstructures::credit::defaultprobabilityhelpers::SpreadCdsHelper;
+    use crate::termstructures::yields::FlatForward;
+    use crate::termstructures::yieldtermstructure::YieldTermStructure;
+    use crate::time::businessdayconvention::BusinessDayConvention;
+    use crate::time::calendars::target::Target;
+    use crate::time::date::Month;
+    use crate::time::dategenerationrule::DateGeneration;
+    use crate::time::daycounters::actual360::Actual360;
+    use crate::time::daycounters::thirty360::{Convention, Thirty360};
+    use crate::time::frequency::Frequency;
+    use crate::time::period::Period;
+    use crate::time::schedule::Schedule;
+    use crate::time::timeunit::TimeUnit;
+    use crate::types::Integer;
+
+    const QUOTES: [Real; 4] = [0.005, 0.006, 0.007, 0.009];
+    const TENORS: [i32; 4] = [1, 2, 3, 5];
+    const RECOVERY_RATE: Real = 0.4;
+    const TOLERANCE: Real = 1.0e-6;
+
+    /// The evaluation date, standing in for the C++ global fixture's. A TARGET
+    /// business day, and one whose yearly anniversaries miss the IMM twentieths
+    /// the schedules roll to - see
+    /// [`the_helper_and_the_round_trip_agree_on_the_imm_maturity`].
+    fn today() -> Date {
+        Date::new(9, Month::June, 2006)
+    }
+
+    fn settings_at(evaluation_date: Date) -> Shared<Settings<Date>> {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(evaluation_date);
+        settings
+    }
+
+    fn day_counter() -> DayCounter {
+        Thirty360::with_convention(Convention::BondBasis)
+    }
+
+    /// `FlatForward(today, 0.06, Actual360())` (`:172-173`), whose C++ defaults
+    /// are continuous compounding at annual frequency.
+    fn discount_curve(reference_date: Date) -> Handle<dyn YieldTermStructure> {
+        Handle::new(shared(FlatForward::with_rate(
+            reference_date,
+            0.06,
+            Actual360::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>)
+    }
+
+    fn spread_helper(
+        quote: Real,
+        tenor: Period,
+        settlement_days: Integer,
+        discount: &Handle<dyn YieldTermStructure>,
+        settings: &Shared<Settings<Date>>,
+    ) -> Shared<dyn DefaultProbabilityHelper> {
+        SpreadCdsHelper::new(
+            Handle::new(shared(SimpleQuote::new(quote)) as Shared<dyn Quote>),
+            tenor,
+            settlement_days,
+            Target::new(),
+            Frequency::Quarterly,
+            BusinessDayConvention::Following,
+            DateGeneration::TwentiethIMM,
+            day_counter(),
+            RECOVERY_RATE,
+            discount.clone(),
+            Shared::clone(settings),
+        )
+        .expect("TwentiethIMM is an accepted date-generation rule")
+            as Shared<dyn DefaultProbabilityHelper>
+    }
+
+    /// The round-trip contract's schedule (`:203-206`): it starts at the rolled
+    /// protection start, as the helper's does, but ends a tenor past `today`
+    /// where the helper's ends a tenor past the protection start.
+    fn round_trip_schedule(today: Date, tenor: Period) -> Schedule {
+        let calendar = Target::new();
+        let start_date = calendar.adjust(today + SETTLEMENT_DAYS, BusinessDayConvention::Following);
+        Schedule::new(
+            start_date,
+            today + tenor,
+            Period::try_from(Frequency::Quarterly).expect("a quarterly period"),
+            calendar,
+            BusinessDayConvention::Following,
+            BusinessDayConvention::Unadjusted,
+            DateGeneration::TwentiethIMM,
+            false,
+            Date::null(),
+            Date::null(),
+        )
+    }
+
+    fn rolled_back_date(schedule: &Schedule) -> Date {
+        Target::new().adjust(
+            schedule.date(schedule.len() - 1),
+            BusinessDayConvention::Following,
+        )
+    }
+
+    const SETTLEMENT_DAYS: Integer = 1;
+
+    struct Fixture {
+        settings: Shared<Settings<Date>>,
+        discount: Handle<dyn YieldTermStructure>,
+        helpers: Vec<Shared<dyn DefaultProbabilityHelper>>,
+        curve: Shared<PiecewiseDefaultCurve<HazardRate, BackwardFlat>>,
+    }
+
+    /// The four-pillar fixture of `testBootstrapFromSpread` (`:154-186`).
+    fn fixture() -> Fixture {
+        assert!(
+            Target::new().is_business_day(today()),
+            "the fixed evaluation date must be a TARGET business day, as the \
+             C++ fixture's clock-derived one is rolled to be"
+        );
+        let settings = settings_at(today());
+        // C++ sets this before the first pricing (`:198`); the helpers price
+        // their own contracts inside the bootstrap, so it must be in place
+        // before any read triggers it.
+        settings.set_include_todays_cash_flows(Some(true));
+        let discount = discount_curve(today());
+
+        let helpers: Vec<Shared<dyn DefaultProbabilityHelper>> = QUOTES
+            .iter()
+            .zip(TENORS)
+            .map(|(quote, n)| {
+                spread_helper(
+                    *quote,
+                    Period::new(n, TimeUnit::Years),
+                    SETTLEMENT_DAYS,
+                    &discount,
+                    &settings,
+                )
+            })
+            .collect();
+
+        let curve = PiecewiseDefaultCurve::<HazardRate, BackwardFlat>::new(
+            today(),
+            helpers.clone(),
+            day_counter(),
+            BackwardFlat,
+        )
+        .unwrap();
+
+        Fixture {
+            settings,
+            discount,
+            helpers,
+            curve,
+        }
+    }
+
+    /// `testBootstrapFromSpread<HazardRate, BackwardFlat>` (`:200-223`): each
+    /// pillar's CDS, rebuilt from the market conventions and repriced off the
+    /// bootstrapped curve, returns its own input spread to 1e-6.
+    #[test]
+    fn bootstrapped_curve_reproduces_the_input_cds_spreads() {
+        let fixture = fixture();
+        let curve: Handle<dyn DefaultProbabilityTermStructure> = Handle::new(Shared::clone(
+            &fixture.curve,
+        )
+            as Shared<dyn DefaultProbabilityTermStructure>);
+
+        for (quote, n) in QUOTES.iter().zip(TENORS) {
+            let tenor = Period::new(n, TimeUnit::Years);
+            let protection_start = today() + SETTLEMENT_DAYS;
+            let mut cds = CreditDefaultSwap::with_terms(
+                ProtectionSide::Buyer,
+                1.0,
+                *quote,
+                round_trip_schedule(today(), tenor),
+                BusinessDayConvention::Following,
+                day_counter(),
+                CdsTerms {
+                    protection_start: Some(protection_start),
+                    ..CdsTerms::default()
+                },
+                Shared::clone(&fixture.settings),
+            )
+            .unwrap();
+            let engine = MidPointCdsEngine::new(
+                curve.clone(),
+                RECOVERY_RATE,
+                fixture.discount.clone(),
+                None,
+                Shared::clone(&fixture.settings),
+            );
+            cds.base_mut()
+                .set_pricing_engine(shared_mut(engine) as SharedMut<dyn PricingEngine>);
+
+            let computed = cds.fair_spread().unwrap();
+            assert!(
+                (computed - quote).abs() <= TOLERANCE,
+                "failed to reproduce the fair spread for the {n}Y credit-default swap: \
+                 computed {computed}, input {quote}"
+            );
+        }
+    }
+
+    /// The maturity the round trip compares on is only the helper's because
+    /// `TwentiethIMM` snaps both to the same twentieth: the helper's schedule
+    /// ends a tenor past `today + settlementDays` (`defaultprobabilityhelpers
+    /// .cpp:90-92`) and the round trip's a tenor past `today` (`:205`).
+    ///
+    /// `next_twentieth` rolls to the twentieth *on or after* its argument
+    /// (`schedule.rs:956-958`), so the two agree everywhere except when
+    /// `today + n*Years` lands exactly on an IMM twentieth - there the helper's
+    /// one-day-later variant rolls a full quarter and the round trip would
+    /// silently compare a three-month-shorter contract against the curve node.
+    /// This asserts the agreement instead of documenting it, so a future
+    /// evaluation date on that boundary fails loudly.
+    #[test]
+    fn the_helper_and_the_round_trip_agree_on_the_imm_maturity() {
+        let fixture = fixture();
+        for (helper, n) in fixture.helpers.iter().zip(TENORS) {
+            let schedule = round_trip_schedule(today(), Period::new(n, TimeUnit::Years));
+            assert_eq!(
+                helper.latest_date(),
+                rolled_back_date(&schedule),
+                "the {n}Y helper's pillar and the round-trip contract's maturity diverge"
+            );
+        }
+    }
+
+    /// `testSingleInstrumentBootstrap` (`:344-378`): one helper is enough,
+    /// because `BackwardFlat` needs a single point (`flat.rs`), so the two nodes
+    /// a lone pillar lays down clear the driver's required-points guard
+    /// (`iterativebootstrap.rs:153-158`). C++ asserts nothing beyond the
+    /// bootstrap completing; the node count is added here to pin what makes it
+    /// complete.
+    #[test]
+    fn a_single_helper_bootstraps() {
+        let settings = settings_at(today());
+        let discount = discount_curve(today());
+        let helper = spread_helper(
+            0.005,
+            Period::new(2, TimeUnit::Years),
+            0,
+            &discount,
+            &settings,
+        );
+        let curve = PiecewiseDefaultCurve::<HazardRate, BackwardFlat>::new(
+            today(),
+            vec![helper],
+            day_counter(),
+            BackwardFlat,
+        )
+        .unwrap();
+
+        curve.calculate().unwrap();
+        assert_eq!(
+            curve.dates().unwrap().len(),
+            2,
+            "a lone pillar lays down the reference node and its own"
+        );
+    }
+
+    /// Construction lays down no nodes and runs no solver; the first read
+    /// bootstraps; a quote move invalidates the cache and the next read
+    /// re-bootstraps to a wider curve (the C++ `LazyObject` contract that keeps
+    /// the bootstrap out of the constructor).
+    #[test]
+    fn the_bootstrap_is_lazy_and_reruns_on_a_quote_change() {
+        let settings = settings_at(today());
+        let discount = discount_curve(today());
+        let quote = shared(SimpleQuote::new(0.005));
+        let helper = SpreadCdsHelper::new(
+            Handle::new(Shared::clone(&quote) as Shared<dyn Quote>),
+            Period::new(5, TimeUnit::Years),
+            SETTLEMENT_DAYS,
+            Target::new(),
+            Frequency::Quarterly,
+            BusinessDayConvention::Following,
+            DateGeneration::TwentiethIMM,
+            day_counter(),
+            RECOVERY_RATE,
+            discount,
+            Shared::clone(&settings),
+        )
+        .unwrap();
+        let curve = PiecewiseDefaultCurve::<HazardRate, BackwardFlat>::new(
+            today(),
+            vec![Shared::clone(&helper) as Shared<dyn DefaultProbabilityHelper>],
+            day_counter(),
+            BackwardFlat,
+        )
+        .unwrap();
+
+        assert!(!curve.lazy.borrow().is_calculated());
+        let first = curve
+            .survival_probability_date(helper.latest_date(), false)
+            .unwrap();
+        assert!(curve.lazy.borrow().is_calculated());
+        assert!(first < 1.0 && first > 0.0);
+
+        quote.set_value(0.02);
+        assert!(!curve.lazy.borrow().is_calculated());
+        let second = curve
+            .survival_probability_date(helper.latest_date(), false)
+            .unwrap();
+        assert!(
+            second < first,
+            "a wider spread must lower the survival probability: {second} vs {first}"
+        );
+    }
+}
