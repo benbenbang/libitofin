@@ -6,6 +6,7 @@
 mod bond;
 mod bonds;
 mod capfloor;
+mod claim;
 mod fixedvsfloatingswap;
 mod futures;
 mod makecapfloor;
@@ -15,6 +16,7 @@ mod makevanillaswap;
 mod oneassetoption;
 mod overnightindexedswap;
 mod payoffs;
+mod protection;
 mod swap;
 mod swaption;
 mod vanillaswap;
@@ -22,6 +24,7 @@ mod vanillaswap;
 pub use bond::{Bond, BondArguments, BondEngine, BondPrice, BondPriceType, BondResults};
 pub use bonds::FixedRateBond;
 pub use capfloor::{CapFloor, CapFloorArguments, CapFloorType};
+pub use claim::{Claim, FaceValueClaim};
 pub use fixedvsfloatingswap::{
     FixedVsFloatingSwap, FixedVsFloatingSwapArguments, FixedVsFloatingSwapEngine,
     FixedVsFloatingSwapResults, FloatingArgumentsFn,
@@ -37,6 +40,7 @@ pub use oneassetoption::{
 };
 pub use overnightindexedswap::OvernightIndexedSwap;
 pub use payoffs::{CashOrNothingPayoff, PlainVanillaPayoff, StrikedTypePayoff, TypePayoff};
+pub use protection::ProtectionSide;
 pub use swap::{Swap, SwapArguments, SwapEngine, SwapResults, SwapType};
 pub use swaption::{
     SettlementMethod, SettlementType, Swaption, SwaptionArguments, SwaptionEngine,
