@@ -7,13 +7,20 @@
 //!
 //! ## Divergences from QuantLib
 //!
-//! - C++ `BootstrapHelper<TS>` is a template over the term-structure type; the
-//!   only instantiation the yield-curve bootstrap needs is
-//!   `BootstrapHelper<YieldTermStructure>`, typedef'd `RateHelper`
-//!   (`ratehelpers.hpp:47`). This port specializes to [`YieldTermStructure`]
-//!   directly: [`RateHelper`] is the trait, with no `TS` parameter. A second
-//!   term-structure family (a default-probability bootstrap) would generalize
-//!   it then.
+//! - C++ `BootstrapHelper<TS>` is a template over the term-structure type, with
+//!   `BootstrapHelper<YieldTermStructure>` typedef'd `RateHelper`
+//!   (`ratehelpers.hpp:47`) and `BootstrapHelper<DefaultProbabilityTermStructure>`
+//!   typedef'd `DefaultProbabilityHelper`
+//!   (`credit/defaultprobabilityhelpers.hpp:41`). This port splits the template
+//!   in two along the line Rust's trait objects draw. The *state* -
+//!   [`BootstrapHelperBase`] - keeps the `TS` parameter, defaulted to
+//!   [`YieldTermStructure`] so the yield helpers name it bare. The *interface*
+//!   is one trait per family ([`RateHelper`] here,
+//!   [`DefaultProbabilityHelper`](crate::termstructures::credit::defaultprobabilityhelpers::DefaultProbabilityHelper)
+//!   for credit), because a single trait generic over `TS` could not be made
+//!   into the `dyn RateHelper` object the whole yield layer is typed on.
+//!   [`BootstrapHelperShared`] then names the slice of that interface the
+//!   bootstrap driver actually uses, so one driver serves both families.
 //! - The `AcyclicVisitor` `accept` hook is omitted; no visitor is ported.
 //!
 //! ## The ownership and observation contract
@@ -60,9 +67,15 @@ use crate::types::Real;
 /// from it; only [`implied_quote`](RateHelper::implied_quote) is left abstract.
 /// Dates use the null [`Date`] as the "unset" sentinel, mirroring the C++
 /// accessor fallback chain.
-pub struct BootstrapHelperBase {
+///
+/// `TS` is the term-structure family the helper is bootstrapped against, the
+/// port of the C++ class template's parameter. It defaults to
+/// [`YieldTermStructure`], so a yield helper writes the bare
+/// `BootstrapHelperBase`; a credit helper writes
+/// `BootstrapHelperBase<dyn DefaultProbabilityTermStructure>`.
+pub struct BootstrapHelperBase<TS: ?Sized = dyn YieldTermStructure> {
     quote: Handle<dyn Quote>,
-    term_structure: RefCell<Option<Weak<dyn YieldTermStructure>>>,
+    term_structure: RefCell<Option<Weak<TS>>>,
     earliest_date: Cell<Date>,
     latest_date: Cell<Date>,
     maturity_date: Cell<Date>,
@@ -83,13 +96,13 @@ struct RelativeState {
     update_dates: bool,
 }
 
-impl BootstrapHelperBase {
+impl<TS: ?Sized> BootstrapHelperBase<TS> {
     fn assemble(
         quote: Handle<dyn Quote>,
         observable: Shared<Observable>,
         forwarder: SharedMut<ResetThenNotify>,
         relative: Option<Shared<RelativeState>>,
-    ) -> BootstrapHelperBase {
+    ) -> BootstrapHelperBase<TS> {
         quote.register_observer(&(forwarder.clone() as SharedMut<dyn Observer>));
         BootstrapHelperBase {
             quote,
@@ -110,7 +123,7 @@ impl BootstrapHelperBase {
     /// Registers the helper's forwarding observer with `quote`, so a quote
     /// change re-broadcasts through [`observable`](Self::observable) - the port
     /// of the C++ constructor's `registerWith(quote_)`.
-    pub fn new(quote: Handle<dyn Quote>) -> BootstrapHelperBase {
+    pub fn new(quote: Handle<dyn Quote>) -> BootstrapHelperBase<TS> {
         let (observable, forwarder) = ResetThenNotify::forwarder();
         Self::assemble(quote, observable, forwarder, None)
     }
@@ -133,7 +146,7 @@ impl BootstrapHelperBase {
         settings: Shared<Settings<Date>>,
         update_dates: bool,
         on_eval_change: Box<dyn Fn()>,
-    ) -> BootstrapHelperBase {
+    ) -> BootstrapHelperBase<TS> {
         let relative = shared(RelativeState {
             settings: Shared::clone(&settings),
             evaluation_date: Cell::new(settings.evaluation_date()),
@@ -174,13 +187,13 @@ impl BootstrapHelperBase {
     /// The curve is held [`Weak`] (never observed), the two halves of the
     /// module's ownership contract: the curve owns its helpers, and the solver
     /// moves the curve while reading the helper.
-    pub fn set_term_structure(&self, term_structure: &Shared<dyn YieldTermStructure>) {
+    pub fn set_term_structure(&self, term_structure: &Shared<TS>) {
         *self.term_structure.borrow_mut() = Some(Shared::downgrade(term_structure));
     }
 
     /// The bootstrapping curve, or an error if none was set or it has been
     /// dropped (the port of C++'s `QL_REQUIRE(termStructure_ != nullptr)`).
-    pub fn term_structure(&self) -> QlResult<Shared<dyn YieldTermStructure>> {
+    pub fn term_structure(&self) -> QlResult<Shared<TS>> {
         match self
             .term_structure
             .borrow()
@@ -366,18 +379,96 @@ pub trait RelativeDateRateHelper: RateHelper {
     fn initialize_dates(&self);
 }
 
+/// The slice of a bootstrap helper's interface the bootstrap driver uses.
+///
+/// C++ needs no such trait: `IterativeBootstrap` is a template over the curve
+/// and calls `BootstrapHelper<TS>`'s members on whatever `TS` the curve carries
+/// (`iterativebootstrap.hpp:167-256`). Rust's helper interfaces are trait
+/// objects, one per term-structure family, so the driver needs a single bound
+/// naming what it calls; this is that bound, and [`TS`](Self::TS) is the family
+/// the helper prices against.
+///
+/// The set is exactly what
+/// [`IterativeBootstrap::calculate`](crate::termstructures::iterativebootstrap::IterativeBootstrap::calculate)
+/// and its `node_error` touch, no wider: the three dates it orders and reports
+/// on, the quote it validates before solving, the curve it hands over, and the
+/// error it drives to zero. `earliest_date` is deliberately absent - the driver
+/// never reads it.
+///
+/// It is implemented on the **trait objects** (`dyn RateHelper`,
+/// `dyn DefaultProbabilityHelper`), not blanket-implemented per family, since
+/// two blanket impls would overlap. A concrete helper therefore does not
+/// implement it; a curve stores `Shared<dyn RateHelper>` and gets it from there.
+pub trait BootstrapHelperShared {
+    /// The term-structure family the helper is bootstrapped against.
+    type TS: ?Sized;
+
+    /// Hands the helper the curve being bootstrapped.
+    fn set_term_structure(&self, term_structure: &Shared<Self::TS>);
+
+    /// The market quote's value, which the driver validates before solving.
+    fn quote_value(&self) -> QlResult<Real>;
+
+    /// The bootstrap's root: market quote minus curve-implied quote.
+    fn quote_error(&self) -> QlResult<Real>;
+
+    /// The pillar date, at which the curve node this helper sets sits.
+    fn pillar_date(&self) -> Date;
+
+    /// The latest date data are needed at.
+    fn latest_relevant_date(&self) -> Date;
+
+    /// The instrument's maturity date.
+    fn maturity_date(&self) -> Date;
+}
+
+/// Every method routes through the [`RateHelper`] trait rather than straight to
+/// the base, so a concrete helper's override still runs: `set_term_structure`
+/// in particular is overridden by five helpers to relink their own pricing
+/// handle *before* recording the curve, and short-circuiting to the base would
+/// leave them pricing off an unlinked handle.
+impl BootstrapHelperShared for dyn RateHelper {
+    type TS = dyn YieldTermStructure;
+
+    fn set_term_structure(&self, term_structure: &Shared<dyn YieldTermStructure>) {
+        RateHelper::set_term_structure(self, term_structure);
+    }
+
+    fn quote_value(&self) -> QlResult<Real> {
+        self.base().quote_value()
+    }
+
+    fn quote_error(&self) -> QlResult<Real> {
+        RateHelper::quote_error(self)
+    }
+
+    fn pillar_date(&self) -> Date {
+        RateHelper::pillar_date(self)
+    }
+
+    fn latest_relevant_date(&self) -> Date {
+        RateHelper::latest_relevant_date(self)
+    }
+
+    fn maturity_date(&self) -> Date {
+        RateHelper::maturity_date(self)
+    }
+}
+
 /// Orders helpers by pillar date (`detail::BootstrapHelperSorter`).
 ///
 /// The comparator the bootstrap sorts its helpers with before solving; exposed
-/// as a slice sort, the idiomatic Rust equivalent of the C++ functor.
-pub fn sort_by_pillar_date(helpers: &mut [Shared<dyn RateHelper>]) {
+/// as a slice sort, the idiomatic Rust equivalent of the C++ functor. Generic
+/// over the helper family, like the C++ functor's `template <class Helper>`
+/// `operator()` (`bootstraphelper.hpp:207`).
+pub fn sort_by_pillar_date<H: BootstrapHelperShared + ?Sized>(helpers: &mut [Shared<H>]) {
     helpers.sort_by(compare_by_pillar_date);
 }
 
 /// Compares two helpers by pillar date, for use with `sort_by`.
-pub fn compare_by_pillar_date(
-    left: &Shared<dyn RateHelper>,
-    right: &Shared<dyn RateHelper>,
+pub fn compare_by_pillar_date<H: BootstrapHelperShared + ?Sized>(
+    left: &Shared<H>,
+    right: &Shared<H>,
 ) -> Ordering {
     left.pillar_date().cmp(&right.pillar_date())
 }

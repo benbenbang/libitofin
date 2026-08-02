@@ -228,6 +228,8 @@ impl<T: YieldBootstrapTraits + 'static, I: Interpolator + 'static> PiecewiseCurv
 {
     type Traits = T;
     type Interp = I;
+    type TS = dyn YieldTermStructure;
+    type Helper = dyn RateHelper;
 
     fn instruments(&self) -> &[Shared<dyn RateHelper>] {
         &self.instruments
