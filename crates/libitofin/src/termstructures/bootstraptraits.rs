@@ -22,6 +22,15 @@
 //! The `Discount`, `ZeroYield` and `ForwardRate` traits are ported.
 //! `SimpleZeroYield` (`bootstraptraits.hpp:312`) is a documented deferral: it
 //! adds a `-1/t` rate floor and exp/log transforms this port does not need yet.
+//!
+//! ## The trait split
+//!
+//! C++ has one trait struct per convention. This port splits the Rust trait in
+//! two along the line the bootstrap driver draws: [`BootstrapTraits`] carries
+//! the six statics the driver calls to solve a node, and
+//! [`YieldBootstrapTraits`] adds `discount_from_nodes`, which only a yield
+//! curve's `discount_impl` calls. That lets the one driver serve a second
+//! term-structure family whose nodes are not discount factors.
 
 use crate::errors::QlResult;
 use crate::math::interpolations::{Interpolation, Interpolator};
@@ -42,6 +51,12 @@ const MAX_RATE: Real = 1.0;
 /// search converge, so they transcribe the C++ statics exactly rather than
 /// being reinvented. Every method reads the node `times` and the partially
 /// solved `data`, matching the C++ `c->times()` / `c->data()` access.
+///
+/// This is exactly the set the bootstrap driver calls
+/// (`iterativebootstrap.rs`'s `calculate`), and nothing more: the node-to-
+/// discount conversion a *yield* curve additionally needs lives on
+/// [`YieldBootstrapTraits`], because the driver never calls it and a credit
+/// convention (a hazard rate) has no discount factor to hand back.
 pub trait BootstrapTraits {
     /// The value at the reference-date node (`Traits::initialValue`).
     fn initial_value() -> Real;
@@ -61,7 +76,21 @@ pub trait BootstrapTraits {
 
     /// The convergence-loop iteration cap (`Traits::maxIterations`).
     fn max_iterations() -> Size;
+}
 
+/// The extra trait a *yield* curve convention carries: turning a solved node
+/// back into a discount factor.
+///
+/// C++ keeps this on the same `Discount`/`ZeroYield`/`ForwardRate` structs
+/// (`bootstraptraits.hpp`) because those structs only ever serve
+/// `PiecewiseYieldCurve`. This port splits it off [`BootstrapTraits`] so a
+/// second term-structure family can reuse the driver: the bootstrap solves
+/// nodes through [`BootstrapTraits`] alone, and only
+/// [`PiecewiseYieldCurve`](crate::termstructures::yields::PiecewiseYieldCurve)'s
+/// `discount_impl` needs the conversion. A credit convention (a hazard rate)
+/// implements the core trait and simply does not implement this one, rather
+/// than carrying a method it has no meaning for.
+pub trait YieldBootstrapTraits: BootstrapTraits {
     /// Converts an interpolated node at time `t` into a discount factor,
     /// applying this convention's node meaning (a discount factor for
     /// `Discount`, `exp(-z*t)` for a zero rate, `exp(-primitive)` for an
@@ -125,7 +154,9 @@ impl BootstrapTraits for Discount {
     fn max_iterations() -> Size {
         100
     }
+}
 
+impl YieldBootstrapTraits for Discount {
     /// The nodes are already discount factors, so the value is the discount
     /// factor directly (in range), and past the last solved node the last
     /// instantaneous forward continues flat (the port of
@@ -225,7 +256,9 @@ impl BootstrapTraits for ZeroYield {
     fn max_iterations() -> Size {
         100
     }
+}
 
+impl YieldBootstrapTraits for ZeroYield {
     /// The node is a zero rate `z(t)`, so the discount factor is `exp(-z*t)`.
     /// In range the rate is the interpolated value; past the last solved node
     /// the last instantaneous forward continues flat, mirroring
@@ -277,7 +310,9 @@ impl BootstrapTraits for ForwardRate {
     fn max_iterations() -> Size {
         100
     }
+}
 
+impl YieldBootstrapTraits for ForwardRate {
     /// The node is an instantaneous forward `f(t)`, so the discount factor is
     /// `exp(-int_0^t f)`. The interpolation's antiderivative gives the integral
     /// in range; past the last solved node the forward continues flat, mirroring
@@ -308,7 +343,7 @@ impl BootstrapTraits for ForwardRate {
 /// it through a `RefCell` on the curve and drives it a node at a time; the
 /// curve's discount lookup reads it back through
 /// [`interpolation`](Self::interpolation), handing that to the convention's
-/// [`discount_from_nodes`](BootstrapTraits::discount_from_nodes). During a
+/// [`discount_from_nodes`](YieldBootstrapTraits::discount_from_nodes). During a
 /// bootstrap the interpolation only spans the solved prefix `[0, upto]`, so
 /// that conversion extrapolates past the last solved node with a flat
 /// instantaneous forward - which is also why a helper for pillar `i` (whose
@@ -422,7 +457,7 @@ impl<I: Interpolator> CurveData<I> {
     }
 
     /// The interpolation rebuilt over the solved prefix, for a trait's
-    /// [`discount_from_nodes`](BootstrapTraits::discount_from_nodes) to read the
+    /// [`discount_from_nodes`](YieldBootstrapTraits::discount_from_nodes) to read the
     /// node value, derivative or antiderivative at a time. Errors before the
     /// bootstrap has laid one down.
     pub fn interpolation(&self) -> QlResult<&I::Output> {

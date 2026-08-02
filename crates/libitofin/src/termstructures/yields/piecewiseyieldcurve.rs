@@ -45,7 +45,7 @@ use crate::patterns::observable::{AsObservable, Observable, Observer};
 use crate::require;
 use crate::shared::{Shared, SharedMut, shared_mut};
 use crate::termstructures::bootstraphelper::RateHelper;
-use crate::termstructures::bootstraptraits::{BootstrapTraits, CurveData};
+use crate::termstructures::bootstraptraits::{CurveData, YieldBootstrapTraits};
 use crate::termstructures::iterativebootstrap::{IterativeBootstrap, PiecewiseCurve};
 use crate::termstructures::yieldtermstructure::YieldTermStructure;
 use crate::termstructures::{TermStructure, TermStructureBase};
@@ -74,7 +74,7 @@ impl Observer for CurveUpdater {
 /// is the interpolation factory (`LogLinear`, `Linear`, `BackwardFlat`). The
 /// node data lives in a `RefCell` the bootstrap mutates and the discount lookup
 /// reads back.
-pub struct PiecewiseYieldCurve<T: BootstrapTraits, I: Interpolator> {
+pub struct PiecewiseYieldCurve<T: YieldBootstrapTraits, I: Interpolator> {
     base: TermStructureBase,
     instruments: Vec<Shared<dyn RateHelper>>,
     interpolator: I,
@@ -88,7 +88,7 @@ pub struct PiecewiseYieldCurve<T: BootstrapTraits, I: Interpolator> {
     _traits: PhantomData<fn() -> T>,
 }
 
-impl<T: BootstrapTraits + 'static, I: Interpolator + 'static> PiecewiseYieldCurve<T, I> {
+impl<T: YieldBootstrapTraits + 'static, I: Interpolator + 'static> PiecewiseYieldCurve<T, I> {
     /// Builds a curve over `instruments` with a fixed `reference_date` (the C++
     /// reference-date constructor). Construction is cheap; the bootstrap runs
     /// on first use.
@@ -181,13 +181,13 @@ impl<T: BootstrapTraits + 'static, I: Interpolator + 'static> PiecewiseYieldCurv
     }
 }
 
-impl<T: BootstrapTraits, I: Interpolator> AsObservable for PiecewiseYieldCurve<T, I> {
+impl<T: YieldBootstrapTraits, I: Interpolator> AsObservable for PiecewiseYieldCurve<T, I> {
     fn observable(&self) -> &Observable {
         &self.observable
     }
 }
 
-impl<T: BootstrapTraits + 'static, I: Interpolator + 'static> TermStructure
+impl<T: YieldBootstrapTraits + 'static, I: Interpolator + 'static> TermStructure
     for PiecewiseYieldCurve<T, I>
 {
     fn base(&self) -> &TermStructureBase {
@@ -206,7 +206,7 @@ impl<T: BootstrapTraits + 'static, I: Interpolator + 'static> TermStructure
     }
 }
 
-impl<T: BootstrapTraits + 'static, I: Interpolator + 'static> YieldTermStructure
+impl<T: YieldBootstrapTraits + 'static, I: Interpolator + 'static> YieldTermStructure
     for PiecewiseYieldCurve<T, I>
 {
     /// Runs the bootstrap before the range check, so `max_date` reflects the
@@ -223,7 +223,7 @@ impl<T: BootstrapTraits + 'static, I: Interpolator + 'static> YieldTermStructure
     }
 }
 
-impl<T: BootstrapTraits + 'static, I: Interpolator + 'static> PiecewiseCurve
+impl<T: YieldBootstrapTraits + 'static, I: Interpolator + 'static> PiecewiseCurve
     for PiecewiseYieldCurve<T, I>
 {
     type Traits = T;
@@ -390,7 +390,7 @@ mod tests {
     /// bootstrapped curve is returned so a convention that stores rates can
     /// additionally assert on its solved nodes.
     fn check_curve_consistency<
-        T: BootstrapTraits + 'static,
+        T: YieldBootstrapTraits + 'static,
         I: Interpolator + Default + 'static,
     >() -> Shared<PiecewiseYieldCurve<T, I>> {
         let vars = common_vars();
