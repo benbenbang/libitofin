@@ -542,4 +542,327 @@ mod tests {
         }
         accepts_driver_helper::<dyn DefaultProbabilityHelper>();
     }
+
+    use crate::interestrate::Compounding;
+    use crate::quotes::SimpleQuote;
+    use crate::shared::shared;
+    use crate::termstructures::credit::flathazardrate::FlatHazardRate;
+    use crate::termstructures::yields::FlatForward;
+    use crate::test_support::{Flag, as_observer};
+    use crate::time::calendars::target::Target;
+    use crate::time::date::Month;
+    use crate::time::daycounters::actual360::Actual360;
+    use crate::time::daycounters::actual365fixed::Actual365Fixed;
+    use crate::time::timeunit::TimeUnit;
+
+    /// A Monday, so the schedule's start is a business day and the roll the
+    /// helper applies to it is visible as the identity it is.
+    fn today() -> Date {
+        Date::new(15, Month::June, 2026)
+    }
+
+    fn five_years() -> Period {
+        Period::new(5, TimeUnit::Years)
+    }
+
+    fn settings_at(evaluation_date: Date) -> Shared<Settings<Date>> {
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(evaluation_date);
+        settings
+    }
+
+    fn discount(settlement: Date) -> Handle<dyn YieldTermStructure> {
+        Handle::new(shared(FlatForward::with_rate(
+            settlement,
+            0.03,
+            Actual365Fixed::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>)
+    }
+
+    /// A one-settlement-day helper on a five-year `TwentiethIMM` schedule, the
+    /// pre-Big-Bang convention the ported date arm serves.
+    fn helper(settings: &Shared<Settings<Date>>, terms: CdsHelperTerms) -> Shared<SpreadCdsHelper> {
+        SpreadCdsHelper::with_terms(
+            Handle::new(shared(SimpleQuote::new(0.01)) as Shared<dyn Quote>),
+            five_years(),
+            1,
+            Target::new(),
+            Frequency::Quarterly,
+            BusinessDayConvention::Following,
+            DateGeneration::TwentiethIMM,
+            Actual360::new(),
+            0.4,
+            discount(today()),
+            terms,
+            Shared::clone(settings),
+        )
+        .unwrap()
+    }
+
+    /// The schedule `initialize_dates` is expected to have built, derived from
+    /// the two dates the C++ arm computes rather than read back off the helper.
+    fn expected_schedule(start_date: Date, end_date: Date) -> Schedule {
+        MakeSchedule::new()
+            .from(Target::new().adjust(start_date, BusinessDayConvention::Following))
+            .to(end_date)
+            .with_frequency(Frequency::Quarterly)
+            .with_calendar(Target::new())
+            .with_convention(BusinessDayConvention::Following)
+            .with_termination_date_convention(BusinessDayConvention::Unadjusted)
+            .with_rule(DateGeneration::TwentiethIMM)
+            .build()
+    }
+
+    fn last_date(schedule: &Schedule) -> Date {
+        schedule.date(schedule.len() - 1)
+    }
+
+    /// `initializeDates` (`defaultprobabilityhelpers.cpp:75-108`): protection
+    /// starts `settlementDays` past the evaluation date, the schedule starts
+    /// there rolled, and the maturity is the tenor past the protection start -
+    /// the `cdsMaturity` arm (`cpp:86-88`) covers only the rejected CDS rules,
+    /// so `TwentiethIMM` reaches this one.
+    #[test]
+    fn initialize_dates_spans_protection_start_to_the_tenor() {
+        let settings = settings_at(today());
+        let helper = helper(&settings, CdsHelperTerms::default());
+        let calendar = Target::new();
+
+        let protection_start = today() + 1;
+        assert_eq!(helper.protection_start(), protection_start);
+
+        let schedule = expected_schedule(protection_start, protection_start + five_years());
+        assert_eq!(
+            helper.earliest_date(),
+            calendar.adjust(protection_start, BusinessDayConvention::Following)
+        );
+        assert_eq!(helper.earliest_date(), schedule.date(0));
+        assert_eq!(
+            helper.latest_date(),
+            calendar.adjust(last_date(&schedule), BusinessDayConvention::Following)
+        );
+    }
+
+    /// The latest date is the rolled last coupon date and nothing more: C++ adds
+    /// a day only under the ISDA model (`cpp:105-106`), which is not ported.
+    /// Pillar and latest-relevant date follow it, which is what the bootstrap
+    /// driver orders the helpers on.
+    #[test]
+    fn the_node_sits_on_the_rolled_maturity() {
+        let settings = settings_at(today());
+        let helper = helper(&settings, CdsHelperTerms::default());
+
+        let schedule = expected_schedule(today() + 1, today() + 1 + five_years());
+        let rolled = Target::new().adjust(last_date(&schedule), BusinessDayConvention::Following);
+        assert_eq!(helper.latest_date(), rolled);
+        assert_eq!(helper.pillar_date(), rolled);
+        assert_eq!(helper.latest_relevant_date(), rolled);
+        assert_eq!(helper.maturity_date(), rolled);
+    }
+
+    /// An explicit start date replaces the protection start on both sides of the
+    /// schedule, but the maturity is measured from `startDate + settlementDays`
+    /// rather than from the start date itself (`cpp:90`) - the one place the two
+    /// arms of that ternary differ by more than the branch they take.
+    #[test]
+    fn an_explicit_start_date_offsets_the_maturity_by_the_settlement_days() {
+        let settings = settings_at(today());
+        let start_date = Date::new(20, Month::March, 2026);
+        let helper = helper(
+            &settings,
+            CdsHelperTerms {
+                start_date: Some(start_date),
+                ..CdsHelperTerms::default()
+            },
+        );
+
+        let schedule = expected_schedule(start_date, start_date + 1 + five_years());
+        assert_eq!(helper.earliest_date(), schedule.date(0));
+        assert_eq!(
+            helper.latest_date(),
+            Target::new().adjust(last_date(&schedule), BusinessDayConvention::Following)
+        );
+        assert_eq!(helper.protection_start(), today() + 1);
+    }
+
+    /// The relative-date rebuild (`cpp:70-73`): a moved evaluation date reruns
+    /// `initialize_dates` through the base's `new_relative` closure, so the whole
+    /// schedule shifts with it.
+    #[test]
+    fn an_evaluation_date_move_rebuilds_the_schedule() {
+        let settings = settings_at(today());
+        let helper = helper(&settings, CdsHelperTerms::default());
+        let (earliest, latest) = (helper.earliest_date(), helper.latest_date());
+
+        let moved = Date::new(15, Month::December, 2026);
+        settings.set_evaluation_date(moved);
+
+        assert_eq!(helper.protection_start(), moved + 1);
+        assert!(helper.earliest_date() > earliest);
+        assert!(helper.latest_date() > latest);
+        assert_eq!(
+            helper.earliest_date(),
+            Target::new().adjust(moved + 1, BusinessDayConvention::Following)
+        );
+    }
+
+    /// The three CDS rules need `cdsMaturity`, which is not ported; taking the
+    /// other arm for them would build a schedule ending on the wrong date, so
+    /// they are refused rather than silently mispriced (#676).
+    #[test]
+    fn the_post_big_bang_rules_are_refused() {
+        let settings = settings_at(today());
+        for rule in [
+            DateGeneration::CDS,
+            DateGeneration::CDS2015,
+            DateGeneration::OldCDS,
+        ] {
+            let result = SpreadCdsHelper::new(
+                Handle::new(shared(SimpleQuote::new(0.01)) as Shared<dyn Quote>),
+                five_years(),
+                1,
+                Target::new(),
+                Frequency::Quarterly,
+                BusinessDayConvention::Following,
+                rule,
+                Actual360::new(),
+                0.4,
+                discount(today()),
+                Shared::clone(&settings),
+            );
+            assert!(
+                result
+                    .err()
+                    .is_some_and(|error| { error.message().contains("cdsMaturity") })
+            );
+        }
+    }
+
+    /// `impliedQuote` (`cpp:132-135`) prices the helper's own contract against
+    /// the curve it was handed, which `set_term_structure` weak-links into the
+    /// engine and rebuilds the contract for (`cpp:60-68`).
+    ///
+    /// The forced recalculation is load-bearing, and this is what shows it: the
+    /// weak link registers no observer on the curve
+    /// ([`Link::link_weak`](crate::handle)), so moving the curve leaves the
+    /// contract still flagged as calculated. A plain `fair_spread` would answer
+    /// from that stale cache; the fresh number can only come from the
+    /// `recalculate` this makes first. During the bootstrap it is the solver
+    /// moving a curve node, which reaches the contract the same way: not at all.
+    #[test]
+    fn implied_quote_reprices_a_curve_it_does_not_observe() {
+        let settings = settings_at(today());
+        let helper = helper(&settings, CdsHelperTerms::default());
+
+        let hazard = shared(SimpleQuote::new(0.02));
+        let curve: Shared<dyn DefaultProbabilityTermStructure> = shared(FlatHazardRate::new(
+            today(),
+            Handle::new(Shared::clone(&hazard) as Shared<dyn Quote>),
+            Actual365Fixed::new(),
+        ));
+        helper.set_term_structure(&curve);
+
+        let first = helper.implied_quote().unwrap();
+        assert!(first.is_finite() && first > 0.0);
+        assert_eq!(helper.implied_quote().unwrap(), first);
+
+        hazard.set_value(0.05);
+        assert!(
+            helper
+                .swap
+                .borrow()
+                .as_ref()
+                .unwrap()
+                .base()
+                .is_calculated(),
+            "the weak link must leave the contract unnotified by the curve"
+        );
+
+        let second = helper.implied_quote().unwrap();
+        assert!(
+            second > first,
+            "a higher hazard rate must widen the fair spread, not repeat {first}"
+        );
+    }
+
+    /// The second `resetEngine` call site (`cpp:72`): the contract is rebuilt
+    /// after the schedule is, so the helper prices the moved dates rather than
+    /// the ones it was handed the curve on. Nothing else in the type system
+    /// enforces that ordering, and a contract left behind still prices - just
+    /// against the wrong schedule.
+    #[test]
+    fn an_evaluation_date_move_rebuilds_the_contract_too() {
+        let settings = settings_at(today());
+        let helper = helper(&settings, CdsHelperTerms::default());
+        let curve: Shared<dyn DefaultProbabilityTermStructure> = shared(FlatHazardRate::with_rate(
+            today(),
+            0.02,
+            Actual365Fixed::new(),
+        ));
+        helper.set_term_structure(&curve);
+        helper.implied_quote().unwrap();
+
+        let moved = Date::new(15, Month::December, 2026);
+        settings.set_evaluation_date(moved);
+
+        let schedule = expected_schedule(moved + 1, moved + 1 + five_years());
+        let swap = helper.swap.borrow();
+        let swap = swap.as_ref().unwrap();
+        assert_eq!(swap.protection_start_date(), moved + 1);
+        assert_eq!(swap.maturity(), last_date(&schedule));
+    }
+
+    /// `registerWith(discountCurve)` (`cpp:57`): the discount curve is the one
+    /// input the helper prices against that it does observe - unlike the
+    /// bootstrapping curve - so a move there re-broadcasts and reaches the curve
+    /// being built. This is what makes it safe for the rebuild to hang off the
+    /// evaluation date alone.
+    #[test]
+    fn a_discount_curve_move_notifies_the_helper() {
+        let settings = settings_at(today());
+        let rate = shared(SimpleQuote::new(0.03));
+        let discount_curve = Handle::new(shared(FlatForward::new(
+            today(),
+            Handle::new(Shared::clone(&rate) as Shared<dyn Quote>),
+            Actual365Fixed::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>);
+        let helper = SpreadCdsHelper::new(
+            Handle::new(shared(SimpleQuote::new(0.01)) as Shared<dyn Quote>),
+            five_years(),
+            1,
+            Target::new(),
+            Frequency::Quarterly,
+            BusinessDayConvention::Following,
+            DateGeneration::TwentiethIMM,
+            Actual360::new(),
+            0.4,
+            discount_curve,
+            Shared::clone(&settings),
+        )
+        .unwrap();
+
+        let flag = Flag::new();
+        helper.observable().register_observer(&as_observer(&flag));
+
+        rate.set_value(0.04);
+        assert!(Flag::is_up(&flag));
+    }
+
+    /// Before a curve arrives there is no contract to price, where C++ would
+    /// dereference its null `swap_`.
+    #[test]
+    fn implied_quote_without_a_curve_reports_the_missing_contract() {
+        let settings = settings_at(today());
+        let helper = helper(&settings, CdsHelperTerms::default());
+        assert!(
+            helper
+                .implied_quote()
+                .err()
+                .is_some_and(|error| error.message().contains("bootstrapping curve is set"))
+        );
+    }
 }
