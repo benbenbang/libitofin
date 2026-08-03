@@ -8,6 +8,7 @@
 pub mod ibor;
 pub mod iborindex;
 pub mod index;
+pub mod inflation;
 pub mod inflationindex;
 pub mod interestrateindex;
 pub mod region;
@@ -16,6 +17,7 @@ pub mod swapindex;
 pub use ibor::{Estr, Euribor, Sofr};
 pub use iborindex::{IborIndex, OvernightIndex};
 pub use index::Index;
+pub use inflation::{EuHicp, UkHicp, UkRpi};
 pub use inflationindex::{
     Cpi, CpiInterpolationType, InflationIndex, InflationIndexBase, ZeroInflationIndex,
     inflation_period,
