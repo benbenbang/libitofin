@@ -253,3 +253,188 @@ pub trait ZeroInflationTermStructure: InflationTermStructure {
         self.zero_rate_impl(t)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::patterns::observable::{AsObservable, Observable};
+    use crate::time::date::Month;
+    use crate::time::daycounters::actual360::Actual360;
+
+    struct TestCurve {
+        inflation: InflationTermStructureBase,
+        max: Date,
+    }
+
+    fn reference() -> Date {
+        Date::new(15, Month::January, 2026)
+    }
+
+    fn base_date() -> Date {
+        Date::new(1, Month::December, 2025)
+    }
+
+    fn curve_with(frequency: Frequency, base_rate: Option<Rate>) -> TestCurve {
+        TestCurve {
+            inflation: InflationTermStructureBase::with_reference_date(
+                reference(),
+                base_date(),
+                frequency,
+                Some(Actual360::new()),
+                base_rate,
+            ),
+            max: Date::new(15, Month::January, 2036),
+        }
+    }
+
+    fn curve(base_rate: Option<Rate>) -> TestCurve {
+        curve_with(Frequency::Monthly, base_rate)
+    }
+
+    impl AsObservable for TestCurve {
+        fn observable(&self) -> &Observable {
+            self.inflation.term_structure_base().observable()
+        }
+    }
+
+    impl TermStructure for TestCurve {
+        fn base(&self) -> &TermStructureBase {
+            self.inflation.term_structure_base()
+        }
+
+        fn max_date(&self) -> Date {
+            self.max
+        }
+    }
+
+    impl InflationTermStructure for TestCurve {
+        fn inflation_base(&self) -> &InflationTermStructureBase {
+            &self.inflation
+        }
+    }
+
+    impl ZeroInflationTermStructure for TestCurve {
+        fn zero_rate_impl(&self, t: Time) -> QlResult<Rate> {
+            Ok(t)
+        }
+    }
+
+    #[test]
+    fn date_range_check_bounds_on_the_base_date_not_the_reference_date() {
+        let curve = curve(None);
+        let between = Date::new(15, Month::December, 2025);
+
+        assert!(curve.check_inflation_range_date(base_date(), false).is_ok());
+        assert!(curve.check_inflation_range_date(between, false).is_ok());
+        assert!(TermStructure::check_range_date(&curve, between, false).is_err());
+
+        let before = curve
+            .check_inflation_range_date(base_date() - 1, false)
+            .unwrap_err();
+        assert!(before.message().contains("is before base date"));
+    }
+
+    #[test]
+    fn date_range_check_enforces_the_max_date_unless_extrapolating() {
+        let curve = curve(None);
+
+        assert!(curve.check_inflation_range_date(curve.max, false).is_ok());
+        let past = curve
+            .check_inflation_range_date(curve.max + 1, false)
+            .unwrap_err();
+        assert!(past.message().contains("past max curve date"));
+
+        assert!(
+            curve
+                .check_inflation_range_date(curve.max + 1, true)
+                .is_ok()
+        );
+        curve.enable_extrapolation();
+        assert!(
+            curve
+                .check_inflation_range_date(curve.max + 1, false)
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn time_range_check_bounds_on_the_negative_base_date_time() {
+        let curve = curve(None);
+        let base_time = curve.time_from_reference(base_date()).unwrap();
+        assert_eq!(base_time, -0.125);
+
+        assert!(curve.check_inflation_range_time(base_time, false).is_ok());
+        assert!(curve.check_inflation_range_time(-0.1, false).is_ok());
+        assert!(TermStructure::check_range_time(&curve, base_time, false).is_err());
+
+        let before = curve
+            .check_inflation_range_time(base_time - 0.001, false)
+            .unwrap_err();
+        assert!(before.message().contains("is before base date"));
+        assert!(curve.check_inflation_range_time(Time::NAN, true).is_err());
+
+        let past = curve
+            .check_inflation_range_time(curve.max_time().unwrap() + 1.0, false)
+            .unwrap_err();
+        assert!(past.message().contains("past max curve time"));
+    }
+
+    #[test]
+    fn zero_rate_date_quantizes_to_the_start_of_the_inflation_period() {
+        let curve = curve(None);
+        let mid_month = Date::new(15, Month::March, 2026);
+        let period_start = Date::new(1, Month::March, 2026);
+
+        let quantized = curve.time_from_reference(period_start).unwrap();
+        let unquantized = curve.time_from_reference(mid_month).unwrap();
+        assert_ne!(quantized, unquantized);
+
+        assert_eq!(curve.zero_rate_date(mid_month, false).unwrap(), quantized);
+        assert_eq!(quantized, 0.125);
+    }
+
+    #[test]
+    fn zero_rate_date_quantizes_to_the_curve_frequency_not_to_the_month() {
+        let curve = curve_with(Frequency::Quarterly, None);
+        let quarter_start = Date::new(1, Month::January, 2026);
+
+        let rate = curve
+            .zero_rate_date(Date::new(15, Month::March, 2026), false)
+            .unwrap();
+        assert_eq!(rate, curve.time_from_reference(quarter_start).unwrap());
+        assert!(rate < 0.0);
+    }
+
+    #[test]
+    fn zero_rate_date_reaches_dates_between_the_base_and_reference_dates() {
+        let curve = curve(None);
+        let rate = curve
+            .zero_rate_date(Date::new(15, Month::December, 2025), false)
+            .unwrap();
+        assert_eq!(rate, curve.time_from_reference(base_date()).unwrap());
+    }
+
+    #[test]
+    fn zero_rate_passes_the_time_through_unquantized() {
+        let curve = curve(None);
+        assert_eq!(curve.zero_rate(0.375, false).unwrap(), 0.375);
+        assert_eq!(curve.zero_rate(-0.1, false).unwrap(), -0.1);
+    }
+
+    #[test]
+    fn base_rate_is_available_only_when_the_curve_carries_one() {
+        let zero = curve(None);
+        let err = zero.base_rate().unwrap_err();
+        assert!(err.message().contains("base rate not available"));
+
+        assert_eq!(curve(Some(0.02)).base_rate().unwrap(), 0.02);
+    }
+
+    #[test]
+    fn inspectors_report_the_constructor_arguments() {
+        let curve = curve(None);
+        assert_eq!(curve.frequency(), Frequency::Monthly);
+        assert_eq!(curve.base_date(), base_date());
+        assert_eq!(curve.reference_date().unwrap(), reference());
+    }
+}
