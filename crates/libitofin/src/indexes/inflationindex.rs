@@ -1,8 +1,9 @@
-//! The inflation index base.
+//! Inflation indexes.
 //!
 //! Port of `ql/indexes/inflationindex.{hpp,cpp}`'s `InflationIndex`
-//! (`inflationindex.hpp:87`), plus the `inflationPeriod` free function it and
-//! every inflation term structure depend on.
+//! (`inflationindex.hpp:87`) and [`ZeroInflationIndex`]
+//! (`inflationindex.hpp:156`), plus the `inflationPeriod` free function they
+//! and every inflation term structure depend on.
 //!
 //! An inflation index is not a rate index: it has no tenor, no fixing days and
 //! no value-date algebra, so it derives from [`Index`] directly rather than
@@ -245,6 +246,179 @@ pub trait InflationIndex: Index {
     }
 }
 
+/// A zero inflation index (`ZeroInflationIndex`, `inflationindex.hpp:156`).
+///
+/// It publishes the level of a price index once per [`frequency`] period, and
+/// reads back either the stored figure or - once the period is too recent to
+/// have been published - a forecast off an inflation curve.
+///
+/// ## Deferred: the forecast
+///
+/// The curve is a `Handle<ZeroInflationTermStructure>`
+/// (`inflationindex.hpp:183`), a type this batch does not have. The handle
+/// field, its `registerWith` and the `forecastFixing` computation
+/// (`inflationindex.cpp:224-241`) all arrive with it in batch 2 of #705;
+/// `forecast_fixing` here fails with the
+/// message an empty [`Handle`](crate::handle::Handle) gives on dereference,
+/// which is exactly what C++ raises for an index built with the defaulted
+/// (empty) handle. Every forecast path is therefore live and observable now -
+/// only the number it would return is missing.
+///
+/// [`frequency`]: InflationIndex::frequency
+pub struct ZeroInflationIndex {
+    base: InflationIndexBase,
+}
+
+impl ZeroInflationIndex {
+    /// Builds a zero inflation index (`inflationindex.cpp:156-168`, less the
+    /// curve handle - see the type docs).
+    pub fn new(
+        family_name: String,
+        region: Region,
+        revised: bool,
+        frequency: Frequency,
+        availability_lag: Period,
+        currency: Currency,
+        settings: Shared<Settings<Date>>,
+    ) -> Self {
+        ZeroInflationIndex {
+            base: InflationIndexBase::new(
+                family_name,
+                region,
+                revised,
+                frequency,
+                availability_lag,
+                currency,
+                settings,
+            ),
+        }
+    }
+
+    /// The first day of the inflation period the latest stored figure
+    /// describes.
+    ///
+    /// `ZeroInflationIndex::lastFixingDate` (`inflationindex.cpp:190-195`):
+    /// the store holds a daily expansion, so its last date is the *end* of the
+    /// published period; C++ attributes the figure to the period's first day
+    /// and so does this. An index with no history is an error, C++'s
+    /// `QL_REQUIRE(!fixings.empty())`.
+    pub fn last_fixing_date(&self) -> QlResult<Date> {
+        let last = match self.base.settings().last_fixing_date(&self.base.name()) {
+            Some(date) => date,
+            None => crate::fail!("no fixings stored for {}", self.base.name()),
+        };
+        Ok(inflation_period(last, self.frequency())?.0)
+    }
+
+    /// Whether `fixing_date` has to be forecast rather than read from history.
+    ///
+    /// `ZeroInflationIndex::needsForecast` (`inflationindex.cpp:206-233`), a
+    /// three-way decision against the latest period that *could* have been
+    /// published by today, `inflationPeriod(today - availabilityLag)`. Zero
+    /// index fixings are never interpolated, so the date needed is always the
+    /// first day of the fixing's own period.
+    ///
+    /// 1. Before that period: history must have been provided, so no forecast
+    ///    - a missing fixing is then an error rather than a forecast.
+    /// 2. After it: the figure cannot have been published yet, so forecast.
+    ///    **This answers before consulting the store**, so a figure recorded
+    ///    beyond the publication horizon is still forecast rather than
+    ///    returned (`inflation.cpp:888-890`).
+    /// 3. Inside it: forecast only if nothing is on record.
+    pub fn needs_forecast(&self, fixing_date: Date) -> QlResult<bool> {
+        let today = match self.base.settings().evaluation_date() {
+            Some(today) => today,
+            None => crate::fail!("no evaluation date set: an index fixing needs a reference date"),
+        };
+        let frequency = self.frequency();
+        let latest_possible = inflation_period(today - self.availability_lag(), frequency)?;
+        let latest_needed_date = inflation_period(fixing_date, frequency)?.0;
+
+        if latest_needed_date < latest_possible.0 {
+            Ok(false)
+        } else if latest_needed_date > latest_possible.1 {
+            Ok(true)
+        } else {
+            Ok(self
+                .base
+                .settings()
+                .fixing(&self.base.name(), latest_needed_date)
+                .is_none())
+        }
+    }
+
+    /// The forecast fixing off the inflation curve - deferred to batch 2 of
+    /// #705, see the type docs.
+    fn forecast_fixing(&self, _fixing_date: Date) -> QlResult<Rate> {
+        crate::fail!("empty Handle cannot be dereferenced")
+    }
+}
+
+impl Index for ZeroInflationIndex {
+    fn name(&self) -> String {
+        self.base.name()
+    }
+
+    fn fixing_calendar(&self) -> Calendar {
+        self.base.fixing_calendar()
+    }
+
+    /// Always true: an inflation figure belongs to a period, not to a business
+    /// day (`inflationindex.hpp:107`).
+    fn is_valid_fixing_date(&self, _fixing_date: Date) -> bool {
+        true
+    }
+
+    /// The fixing at `fixing_date`, stored or forecast
+    /// (`inflationindex.cpp:170-182`).
+    ///
+    /// `forecast_todays_fixing` is ignored, as the C++ warning at
+    /// `inflationindex.hpp:175-177` documents: the choice between history and
+    /// forecast is made by [`needs_forecast`](ZeroInflationIndex::needs_forecast)
+    /// alone. A date the store should cover but does not is an error, not a
+    /// forecast.
+    fn fixing(&self, fixing_date: Date, _forecast_todays_fixing: bool) -> QlResult<Rate> {
+        if self.needs_forecast(fixing_date)? {
+            return self.forecast_fixing(fixing_date);
+        }
+        let (first, _) = inflation_period(fixing_date, self.frequency())?;
+        match self.past_fixing(fixing_date)? {
+            Some(fixing) => Ok(fixing),
+            None => crate::fail!("Missing {} fixing for {}", self.base.name(), first),
+        }
+    }
+
+    /// The stored figure of the period `fixing_date` falls in
+    /// (`inflationindex.cpp:184-188`), which is filed on the period's first
+    /// day.
+    fn past_fixing(&self, fixing_date: Date) -> QlResult<Option<Rate>> {
+        let (first, _) = inflation_period(fixing_date, self.frequency())?;
+        Ok(self.base.settings().fixing(&self.base.name(), first))
+    }
+
+    /// Delegated to [`InflationIndexBase::add_fixing`], which spreads the
+    /// figure over its whole inflation period. Inheriting the single-entry
+    /// trait default here would silently break every read outside the
+    /// published day.
+    fn add_fixing(&self, fixing_date: Date, value: Rate) -> QlResult<()> {
+        self.base.add_fixing(fixing_date, value)
+    }
+
+    fn settings(&self) -> &Settings<Date> {
+        self.base.settings()
+    }
+
+    fn observable(&self) -> &Observable {
+        self.base.observable()
+    }
+}
+
+impl InflationIndex for ZeroInflationIndex {
+    fn inflation_base(&self) -> &InflationIndexBase {
+        &self.base
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -456,6 +630,190 @@ mod tests {
         curve.register_observer(&index.inflation_base().observer());
         curve.notify_observers();
         assert!(flag.borrow().up);
+    }
+
+    fn a_zero_index(frequency: Frequency, settings: Shared<Settings<Date>>) -> ZeroInflationIndex {
+        ZeroInflationIndex::new(
+            "RPI".into(),
+            Region::uk(),
+            false,
+            frequency,
+            Period::new(1, TimeUnit::Months),
+            Currency::gbp(),
+            settings,
+        )
+    }
+
+    /// The fixture of `testZeroIndexFutureFixing` (`inflation.cpp:851-860`):
+    /// it is 10 April 2024 and the index publishes monthly with a one-month
+    /// availability lag, so the latest period that could have been published
+    /// is March 2024 - `inflationPeriod(10 March 2024) = [1 Mar, 31 Mar]`. The
+    /// history stops at February.
+    fn an_april_2024_zero_index() -> ZeroInflationIndex {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(Date::new(10, April, 2024));
+        let index = a_zero_index(Frequency::Monthly, settings);
+        for (date, value) in [
+            (Date::new(1, December, 2023), 100.0),
+            (Date::new(1, January, 2024), 100.1),
+            (Date::new(1, February, 2024), 100.2),
+        ] {
+            index
+                .add_fixing(date, value)
+                .expect("adding a published figure");
+        }
+        index
+    }
+
+    /// The D11 write-side pin on the concrete type: [`ZeroInflationIndex`]'s
+    /// own `impl Index` must route `add_fixing` to the base's daily expansion.
+    /// Inheriting the trait's single-entry default (`index.rs:110`) instead
+    /// stores 15 December alone, and the two inner dates - read raw, not
+    /// through `inflation_period` - then fail.
+    #[test]
+    fn a_zero_fixing_covers_its_whole_inflation_period() {
+        let index = a_zero_index(Frequency::Quarterly, shared(Settings::<Date>::new()));
+        index
+            .add_fixing(Date::new(15, December, 2007), 100.0)
+            .expect("adding a fixing on a quarterly zero inflation index");
+
+        assert!(index.has_historical_fixing(Date::new(30, November, 2007)));
+        assert!(index.has_historical_fixing(Date::new(31, December, 2007)));
+
+        assert!(!index.has_historical_fixing(Date::new(30, September, 2007)));
+        assert!(!index.has_historical_fixing(Date::new(1, January, 2008)));
+    }
+
+    /// A figure is read at the first day of its period, whatever day inside
+    /// the period is asked for (`inflationindex.cpp:184-188`).
+    ///
+    /// The plural `add_fixings` stays on the [`Index`] default and stores a
+    /// single raw entry - the C++ asymmetry, where only `addFixing` is the
+    /// virtual `InflationIndex` override - so 1 October is the *only* date on
+    /// record here. Reading the asked-for date raw would answer `None`.
+    #[test]
+    fn a_past_fixing_is_read_at_the_start_of_its_period() {
+        let index = a_zero_index(Frequency::Quarterly, shared(Settings::<Date>::new()));
+        index
+            .add_fixings([(Date::new(1, October, 2007), 100.0)])
+            .expect("recording a single raw entry through the Index default");
+
+        assert_eq!(
+            index
+                .past_fixing(Date::new(20, December, 2007))
+                .expect("every date is a valid fixing date"),
+            Some(100.0)
+        );
+    }
+
+    /// Branch 1 of `needsForecast`: the period is well before the publication
+    /// horizon, so the stored figure is returned rather than forecast.
+    #[test]
+    fn a_fixing_before_the_horizon_is_read_from_history() {
+        let index = an_april_2024_zero_index();
+        let february = Date::new(1, February, 2024);
+
+        assert!(!index.needs_forecast(february).expect("a monthly index"));
+        assert_eq!(
+            index
+                .fixing(february, false)
+                .expect("February 2024 is published"),
+            100.2
+        );
+    }
+
+    /// Branch 1 again, on the path that discriminates it from a forecast: a
+    /// period this old must have been published, so an absent figure is the
+    /// `QL_REQUIRE` of `inflationindex.cpp:174-177`, not a forecast.
+    #[test]
+    fn a_missing_fixing_before_the_horizon_is_an_error() {
+        let index = an_april_2024_zero_index();
+        let november = Date::new(1, November, 2023);
+
+        assert!(!index.needs_forecast(november).expect("a monthly index"));
+        let error = index
+            .fixing(november, false)
+            .expect_err("November 2023 was never published");
+        assert!(error.to_string().contains("Missing"), "err was: {error}");
+    }
+
+    /// Branch 3: March 2024 is the period that might just have been published,
+    /// so the store decides - forecast while it is absent, read once it lands.
+    #[test]
+    fn a_fixing_inside_the_horizon_forecasts_only_while_absent() {
+        let index = an_april_2024_zero_index();
+        let march = Date::new(1, March, 2024);
+
+        assert!(index.needs_forecast(march).expect("a monthly index"));
+        let error = index
+            .fixing(march, false)
+            .expect_err("March 2024 has no figure yet and no curve to forecast off");
+        assert!(
+            error.to_string().contains("empty Handle"),
+            "err was: {error}"
+        );
+
+        index
+            .add_fixing(march, 100.3)
+            .expect("March 2024 gets published");
+        assert!(!index.needs_forecast(march).expect("a monthly index"));
+        assert_eq!(
+            index.fixing(march, false).expect("March 2024 is published"),
+            100.3
+        );
+    }
+
+    /// Branch 2, the one that must answer before consulting the store
+    /// (`inflation.cpp:884-890`): April 2024 cannot have been published on 10
+    /// April, so it is forecast - and stays forecast even after a figure is
+    /// recorded for it. Probing the store first would return 100.4 here.
+    #[test]
+    fn a_fixing_beyond_the_horizon_forecasts_even_when_stored() {
+        let index = an_april_2024_zero_index();
+        let april = Date::new(1, April, 2024);
+
+        assert!(index.needs_forecast(april).expect("a monthly index"));
+
+        index
+            .add_fixing(april, 100.4)
+            .expect("recording a figure ahead of its publication");
+
+        assert!(index.needs_forecast(april).expect("a monthly index"));
+        let error = index
+            .fixing(april, false)
+            .expect_err("April 2024 is beyond the publication horizon");
+        assert!(
+            error.to_string().contains("empty Handle"),
+            "err was: {error}"
+        );
+    }
+
+    /// The figure is attributed to the first day of its period, where the
+    /// store's own last date is the period's last day
+    /// (`inflationindex.cpp:190-195`).
+    #[test]
+    fn the_last_fixing_date_is_the_start_of_the_published_period() {
+        let index = a_zero_index(Frequency::Quarterly, shared(Settings::<Date>::new()));
+        index
+            .add_fixing(Date::new(15, December, 2007), 100.0)
+            .expect("adding a fixing on a quarterly zero inflation index");
+
+        assert_eq!(
+            index.last_fixing_date().expect("the index has a history"),
+            Date::new(1, October, 2007)
+        );
+    }
+
+    #[test]
+    fn the_last_fixing_date_of_an_empty_index_is_an_error() {
+        let index = a_zero_index(Frequency::Quarterly, shared(Settings::<Date>::new()));
+        let error = index
+            .last_fixing_date()
+            .expect_err("an index with no history has no last fixing date");
+        assert!(
+            error.to_string().contains("no fixings stored"),
+            "err was: {error}"
+        );
     }
 
     /// `last_fixing_date` must reach the store through the same case-folding

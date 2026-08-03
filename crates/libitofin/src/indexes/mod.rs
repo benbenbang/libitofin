@@ -16,7 +16,9 @@ pub mod swapindex;
 pub use ibor::{Estr, Euribor, Sofr};
 pub use iborindex::{IborIndex, OvernightIndex};
 pub use index::Index;
-pub use inflationindex::{InflationIndex, InflationIndexBase, inflation_period};
+pub use inflationindex::{
+    InflationIndex, InflationIndexBase, ZeroInflationIndex, inflation_period,
+};
 pub use interestrateindex::{InterestRateIndex, InterestRateIndexBase};
 pub use region::Region;
 pub use swapindex::SwapIndex;
