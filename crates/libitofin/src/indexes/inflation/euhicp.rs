@@ -48,6 +48,7 @@ mod tests {
     use crate::indexes::index::Index;
     use crate::indexes::inflationindex::InflationIndex;
     use crate::shared::shared;
+    use crate::time::date::Month::{April, December, February, January, March};
 
     /// `testZeroIndex`'s EU HICP block (`inflation.cpp:218-228`).
     #[test]
@@ -59,5 +60,76 @@ mod tests {
         assert!(!index.revised());
         assert_eq!(index.availability_lag(), Period::new(1, TimeUnit::Months));
         assert_eq!(index.currency().code(), "EUR");
+    }
+
+    /// `testZeroIndexFutureFixing` (`inflation.cpp:847-891`), run end to end
+    /// through the concrete index and its own settings.
+    ///
+    /// It is 10 April 2024 and the history stops at February, so the latest
+    /// period that could have been published is March. February reads back;
+    /// March forecasts while absent and reads back once published; April is
+    /// beyond the horizon and forecasts *even after a figure is recorded for
+    /// it* - the discriminating assertion, since consulting the store first
+    /// would answer 100.4 there. With no inflation curve every forecast fails
+    /// on the empty handle, which is what C++ checks for too.
+    ///
+    /// `inflationindex.rs` pins the same three branches directly on
+    /// [`ZeroInflationIndex::needs_forecast`]; this is the oracle's own
+    /// sequence, read through [`Index::fixing`] on the named index.
+    #[test]
+    fn a_stored_figure_beyond_the_publication_horizon_still_forecasts() {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(Date::new(10, April, 2024));
+        let index = EuHicp::new(settings);
+
+        for (date, value) in [
+            (Date::new(1, December, 2023), 100.0),
+            (Date::new(1, January, 2024), 100.1),
+            (Date::new(1, February, 2024), 100.2),
+        ] {
+            index
+                .add_fixing(date, value)
+                .expect("adding a published figure");
+        }
+
+        let february = index
+            .fixing(Date::new(1, February, 2024), false)
+            .expect("February 2024 is stored");
+        assert!((february - 100.2).abs() < 1e-12, "{february}");
+
+        let march = Date::new(1, March, 2024);
+        let error = index
+            .fixing(march, false)
+            .expect_err("March 2024 has no figure yet and no curve to forecast off");
+        assert!(
+            error.to_string().contains("empty Handle"),
+            "err was: {error}"
+        );
+
+        index
+            .add_fixing(march, 100.3)
+            .expect("March gets published");
+        let published = index.fixing(march, false).expect("March 2024 is stored");
+        assert!((published - 100.3).abs() < 1e-12, "{published}");
+
+        let april = Date::new(1, April, 2024);
+        let error = index
+            .fixing(april, false)
+            .expect_err("April 2024 cannot have been published on 10 April");
+        assert!(
+            error.to_string().contains("empty Handle"),
+            "err was: {error}"
+        );
+
+        index
+            .add_fixing(april, 100.4)
+            .expect("recording a figure ahead of its publication");
+        let error = index
+            .fixing(april, false)
+            .expect_err("April 2024 is beyond the horizon, stored or not");
+        assert!(
+            error.to_string().contains("empty Handle"),
+            "err was: {error}"
+        );
     }
 }
