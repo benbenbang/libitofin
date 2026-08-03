@@ -5,8 +5,8 @@
 //! fractionary parts per unit. It is a value type, exercised through the indexes
 //! and (later) money rather than by any dedicated numeric test.
 //!
-//! Only [`Currency::eur`] is provided here, as the [`IborIndex`] slice (Euribor)
-//! needs it. The full `ql/currencies/*` catalogue is deferred to a later ticket.
+//! Only the currencies the ported indexes need are provided here. The full
+//! `ql/currencies/*` catalogue is deferred to a later ticket.
 //!
 //! ## Divergences from QuantLib
 //!
@@ -82,6 +82,16 @@ impl Currency {
         Currency::new("U.S. dollar", "USD", 840, "$", "\u{a2}", 100)
     }
 
+    /// The British pound sterling (ISO code `GBP`, numeric `826`, 100 pence
+    /// per unit).
+    ///
+    /// Values match `GBPCurrency` in QuantLib's `ql/currencies/europe.cpp`
+    /// (`:106-109`). Its default `Rounding()` convention is dropped along with
+    /// the `rounding` field (see the module divergences).
+    pub fn gbp() -> Self {
+        Currency::new("British pound sterling", "GBP", 826, "\u{a3}", "p", 100)
+    }
+
     /// Currency name, e.g. `"European Euro"`.
     pub fn name(&self) -> &str {
         &self.name
@@ -151,6 +161,17 @@ mod tests {
         assert_eq!(usd.symbol(), "$");
         assert_eq!(usd.fraction_symbol(), "\u{a2}");
         assert_eq!(usd.fractions_per_unit(), 100);
+    }
+
+    #[test]
+    fn gbp_fields_match_quantlib() {
+        let gbp = Currency::gbp();
+        assert_eq!(gbp.name(), "British pound sterling");
+        assert_eq!(gbp.code(), "GBP");
+        assert_eq!(gbp.numeric_code(), 826);
+        assert_eq!(gbp.symbol(), "\u{a3}");
+        assert_eq!(gbp.fraction_symbol(), "p");
+        assert_eq!(gbp.fractions_per_unit(), 100);
     }
 
     #[test]
