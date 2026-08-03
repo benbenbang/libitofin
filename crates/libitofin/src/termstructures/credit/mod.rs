@@ -10,3 +10,4 @@ pub mod defaultprobabilityhelpers;
 pub mod defaulttermstructure;
 pub mod flathazardrate;
 pub mod hazardratestructure;
+pub mod probabilitytraits;
