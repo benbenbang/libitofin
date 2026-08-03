@@ -8,3 +8,4 @@
 //! classes that build on it follow within EPIC Inflation (#705).
 
 pub mod inflationtermstructure;
+pub mod interpolatedzeroinflationcurve;
