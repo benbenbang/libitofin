@@ -33,21 +33,29 @@
 //! - **`forceOverwrite` dropped**, as on [`Index::add_fixing`]: the D11 store
 //!   rejects a conflicting value and accepts an identical one, and has no
 //!   overwrite mode to switch on.
+//! - **`inflationYearFraction` is homed here**, beside [`inflation_period`],
+//!   where C++ declares it with the term structures
+//!   (`inflationtermstructure.hpp:247`). It is the same period-quantizing
+//!   date arithmetic as its neighbour, and the zero index's forecast is its
+//!   only caller so far.
 
 use crate::currency::Currency;
 use crate::errors::QlResult;
+use crate::handle::Handle;
 use crate::indexes::index::Index;
 use crate::indexes::region::Region;
 use crate::patterns::observable::{Observable, Observer, ResetThenNotify};
 use crate::settings::Settings;
 use crate::shared::{Shared, SharedMut};
+use crate::termstructures::inflation::inflationtermstructure::ZeroInflationTermStructure;
 use crate::time::calendar::Calendar;
 use crate::time::calendars::nullcalendar::NullCalendar;
 use crate::time::date::{Date, Month};
+use crate::time::daycounter::DayCounter;
 use crate::time::frequency::Frequency;
 use crate::time::period::Period;
 use crate::time::timeunit::TimeUnit;
-use crate::types::{Integer, Rate};
+use crate::types::{Integer, Rate, Time};
 
 /// The inflation period `date` falls in, at the given `frequency`.
 ///
@@ -87,6 +95,36 @@ pub fn inflation_period(date: Date, frequency: Frequency) -> QlResult<(Date, Dat
         Date::new(1, Month::from_ordinal(start_month), year),
         Date::end_of_month(Date::new(1, Month::from_ordinal(end_month), year)),
     ))
+}
+
+/// The inflation time between `d1` and `d2` under `frequency`.
+///
+/// Port of the `inflationYearFraction` free function
+/// (`inflationtermstructure.cpp:290-310`, declared at
+/// `inflationtermstructure.hpp:247`); it lands here rather than in the term
+/// structures, see the module divergences.
+///
+/// An interpolated index reads a figure that moves within its period, so the
+/// plain day count between the two dates is the time between them. A
+/// non-interpolated one holds one figure for the whole period, so the time
+/// that matters is the one between the two *period starts* -
+/// [`inflation_period`] is applied to **both** ends, not just to `d2`. The
+/// caller usually passes a `d1` that is already a period start, which makes
+/// the quantization look redundant; it is not, and a `d1` inside its period
+/// takes the same time as its period's first day.
+pub fn inflation_year_fraction(
+    frequency: Frequency,
+    index_is_interpolated: bool,
+    day_counter: &DayCounter,
+    d1: Date,
+    d2: Date,
+) -> QlResult<Time> {
+    if index_is_interpolated {
+        return Ok(day_counter.year_fraction(d1, d2));
+    }
+    let (first_of_d1, _) = inflation_period(d1, frequency)?;
+    let (first_of_d2, _) = inflation_period(d2, frequency)?;
+    Ok(day_counter.year_fraction(first_of_d1, first_of_d2))
 }
 
 /// Shared state of every inflation index (`InflationIndex`'s members).
@@ -253,28 +291,34 @@ pub trait InflationIndex: Index {
 ///
 /// It publishes the level of a price index once per [`frequency`] period, and
 /// reads back either the stored figure or - once the period is too recent to
-/// have been published - a forecast off an inflation curve.
+/// have been published - a forecast off the inflation curve it holds
+/// (`zeroInflation_`, `inflationindex.hpp:183`).
 ///
-/// ## Deferred: the forecast
+/// [`new`](ZeroInflationIndex::new) leaves that curve [`Handle`] empty, as the
+/// C++ constructor's defaulted argument does, and
+/// [`with_term_structure`](ZeroInflationIndex::with_term_structure) links one
+/// in: the split keeps the concrete indexes (`UkRpi`, `UkHicp`, `EuHicp`) free
+/// of a curve they do not choose. An index on an empty handle answers every
+/// forecast with the dereference error, which is exactly what C++ raises for
+/// the defaulted handle.
 ///
-/// The curve is a `Handle<ZeroInflationTermStructure>`
-/// (`inflationindex.hpp:183`), a type this batch does not have. The handle
-/// field, its `registerWith` and the `forecastFixing` computation
-/// (`inflationindex.cpp:224-241`) all arrive with it in batch 2 of #705;
-/// `forecast_fixing` here fails with the
-/// message an empty [`Handle`](crate::handle::Handle) gives on dereference,
-/// which is exactly what C++ raises for an index built with the defaulted
-/// (empty) handle. Every forecast path is therefore live and observable now -
-/// only the number it would return is missing.
+/// ## Deferred
+///
+/// `ZeroInflationIndex::clone(h)` (`inflationindex.cpp:245-249`), which
+/// rebuilds the index against another curve, is **not ported**: its callers
+/// are the inflation coupons and rate helpers, neither of which exists yet.
+/// [`with_term_structure`](ZeroInflationIndex::with_term_structure) covers the
+/// build-time case it also serves.
 ///
 /// [`frequency`]: InflationIndex::frequency
 pub struct ZeroInflationIndex {
     base: InflationIndexBase,
+    term_structure: Handle<dyn ZeroInflationTermStructure>,
 }
 
 impl ZeroInflationIndex {
-    /// Builds a zero inflation index (`inflationindex.cpp:156-168`, less the
-    /// curve handle - see the type docs).
+    /// Builds a zero inflation index on an empty curve handle
+    /// (`inflationindex.cpp:158-168` with the defaulted `zeroInflation`).
     pub fn new(
         family_name: String,
         region: Region,
@@ -294,7 +338,34 @@ impl ZeroInflationIndex {
                 currency,
                 settings,
             ),
+            term_structure: Handle::empty(),
         }
+    }
+
+    /// Links the index to the inflation curve it forecasts off.
+    ///
+    /// The curve half of the C++ constructor: it stores the handle and
+    /// registers the index with it (`registerWith(zeroInflation_)`,
+    /// `inflationindex.cpp:167`), so relinking the handle - or a change in the
+    /// curve it points at - re-broadcasts through
+    /// [`observable`](Index::observable).
+    pub fn with_term_structure(
+        self,
+        term_structure: Handle<dyn ZeroInflationTermStructure>,
+    ) -> ZeroInflationIndex {
+        term_structure.register_observer(&self.base.observer());
+        ZeroInflationIndex {
+            base: self.base,
+            term_structure,
+        }
+    }
+
+    /// The inflation curve the index forecasts off
+    /// (`zeroInflationTermStructure`, `inflationindex.hpp:178`), empty until
+    /// [`with_term_structure`](ZeroInflationIndex::with_term_structure) links
+    /// one.
+    pub fn term_structure(&self) -> &Handle<dyn ZeroInflationTermStructure> {
+        &self.term_structure
     }
 
     /// The first day of the inflation period the latest stored figure
@@ -350,10 +421,51 @@ impl ZeroInflationIndex {
         }
     }
 
-    /// The forecast fixing off the inflation curve - deferred to batch 2 of
-    /// #705, see the type docs.
-    fn forecast_fixing(&self, _fixing_date: Date) -> QlResult<Rate> {
-        crate::fail!("empty Handle cannot be dereferenced")
+    /// The forecast fixing off the inflation curve
+    /// (`inflationindex.cpp:223-241`).
+    ///
+    /// The curve prices *relative to the fixing at its base date*, so the
+    /// forecast is that base figure compounded by the zero-coupon inflation
+    /// rate of the fixing's own period over the inflation time separating the
+    /// two: `baseFixing * (1 + Z1)^t1`. The base figure must therefore be on
+    /// record, which is why a base date past the publication horizon is an
+    /// error rather than a nested forecast.
+    ///
+    /// Both the rate and the time are taken at the *first day* of the fixing's
+    /// inflation period, a zero index's figure being constant across it.
+    ///
+    /// C++ guards the power against a rate at or below -100 %, which
+    /// bootstrapping can reach transiently while extrapolating, by returning
+    /// zero; the guard is kept after `t1` is computed, as it is there, so a
+    /// curve without a day counter fails the same way in both ports.
+    ///
+    /// # Errors
+    ///
+    /// An index with no curve linked fails here, with the message an empty
+    /// [`Handle`] gives on dereference.
+    fn forecast_fixing(&self, fixing_date: Date) -> QlResult<Rate> {
+        let curve = self.term_structure.current_link()?;
+        let base_date = curve.base_date();
+        crate::require!(
+            !self.needs_forecast(base_date)?,
+            "{} index fixing at base date {base_date} is not available",
+            self.base.name()
+        );
+        let base_fixing = self.fixing(base_date, false)?;
+
+        let (first_date_in_period, _) = inflation_period(fixing_date, self.frequency())?;
+        let z1 = curve.zero_rate_date(first_date_in_period, false)?;
+        let t1 = inflation_year_fraction(
+            self.frequency(),
+            false,
+            &curve.require_day_counter()?,
+            base_date,
+            first_date_in_period,
+        )?;
+        if z1 <= -1.0 {
+            return Ok(0.0);
+        }
+        Ok(base_fixing * (1.0 + z1).powf(t1))
     }
 }
 
@@ -503,10 +615,16 @@ impl Cpi {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::handle::RelinkableHandle;
+    use crate::math::interpolations::linear::Linear;
     use crate::shared::{shared, shared_mut};
+    use crate::termstructures::TermStructure;
+    use crate::termstructures::inflation::inflationtermstructure::InflationTermStructure;
+    use crate::termstructures::inflation::interpolatedzeroinflationcurve::ZeroInflationCurve;
     use crate::time::date::Month::{
         April, December, February, January, March, November, October, September,
     };
+    use crate::time::daycounters::actual360::Actual360;
     use crate::time::timeunit::TimeUnit;
 
     /// The minimal concrete inflation index: the [`Index`] surface delegated to
@@ -645,6 +763,44 @@ mod tests {
             .expect("annual is a handled frequency");
         assert_eq!(first, Date::new(1, January, 2007));
         assert_eq!(last, Date::new(31, December, 2007));
+    }
+
+    /// The non-interpolated branch quantizes **both** ends
+    /// (`inflationtermstructure.cpp:302-306`). Between two mid-month dates it
+    /// therefore counts 1 February to 1 April, where the interpolated branch
+    /// counts 14 February to 20 April; passing `d1` through unquantized would
+    /// land on a third number again.
+    #[test]
+    fn a_non_interpolated_year_fraction_counts_between_period_starts() {
+        let day_counter = Actual360::new();
+        let (d1, d2) = (Date::new(14, February, 2007), Date::new(20, April, 2007));
+
+        let interpolated =
+            inflation_year_fraction(Frequency::Monthly, true, &day_counter, d1, d2).unwrap();
+        let flat =
+            inflation_year_fraction(Frequency::Monthly, false, &day_counter, d1, d2).unwrap();
+
+        assert_eq!(interpolated, day_counter.year_fraction(d1, d2));
+        assert_eq!(interpolated, 65.0 / 360.0);
+        assert_eq!(flat, 59.0 / 360.0);
+        assert_ne!(
+            flat,
+            day_counter.year_fraction(d1, Date::new(1, April, 2007))
+        );
+    }
+
+    /// The quantization follows the frequency, not the calendar month, and a
+    /// frequency the periods are not defined for is an error.
+    #[test]
+    fn a_year_fraction_quantizes_to_the_frequency() {
+        let day_counter = Actual360::new();
+        let (d1, d2) = (Date::new(14, February, 2007), Date::new(20, April, 2007));
+
+        let quarterly =
+            inflation_year_fraction(Frequency::Quarterly, false, &day_counter, d1, d2).unwrap();
+        assert_eq!(quarterly, 90.0 / 360.0);
+
+        assert!(inflation_year_fraction(Frequency::Weekly, false, &day_counter, d1, d2).is_err());
     }
 
     #[test]
@@ -910,5 +1066,176 @@ mod tests {
         let expected = Some(Date::new(30, Month::June, 2007));
         assert_eq!(index.settings().last_fixing_date("UK RPI"), expected);
         assert_eq!(index.settings().last_fixing_date("uk rpi"), expected);
+    }
+
+    /// The forecast fixture, shaped like `testInterpolatedZeroTermStructure`
+    /// (`inflation.cpp:398-427`) but built directly rather than bootstrapped:
+    /// it is 15 January 2022, the curve's base date is 1 November 2021 and the
+    /// index publishes monthly one month in arrears, so every period from
+    /// January 2022 on is beyond the publication horizon and must be forecast.
+    const BASE_FIXING: Rate = 100.0;
+
+    fn today() -> Date {
+        Date::new(15, January, 2022)
+    }
+
+    fn curve_base_date() -> Date {
+        Date::new(1, November, 2021)
+    }
+
+    fn a_curve(base_date: Date, rates: Vec<Rate>) -> Shared<ZeroInflationCurve> {
+        shared(
+            ZeroInflationCurve::new(
+                today(),
+                vec![
+                    base_date,
+                    Date::new(1, January, 2023),
+                    Date::new(1, January, 2025),
+                ],
+                rates,
+                Frequency::Monthly,
+                Actual360::new(),
+                Linear,
+            )
+            .expect("a well-formed zero inflation curve"),
+        )
+    }
+
+    fn an_index_on(curve: &Shared<ZeroInflationCurve>) -> ZeroInflationIndex {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(today());
+        a_zero_index(Frequency::Monthly, settings)
+            .with_term_structure(Handle::new(
+                Shared::clone(curve) as Shared<dyn ZeroInflationTermStructure>
+            ))
+    }
+
+    /// The oracle: a forecast is the base-date figure compounded by the
+    /// curve's zero rate over the inflation time between the two
+    /// (`inflationindex.cpp:223-241`).
+    ///
+    /// The pin is computed **by hand** here - the zero rate by interpolating
+    /// the two bracketing nodes, the exponent by day-counting between the two
+    /// period starts - so it does not share
+    /// [`ZeroInflationTermStructure::zero_rate_date`]'s or
+    /// [`inflation_year_fraction`]'s arithmetic with the code under test.
+    ///
+    /// The pinned date is mid-period and genuinely on the forecast path: it
+    /// needs a forecast, and its curve time is positive, so the figure comes
+    /// off the curve rather than out of the history.
+    #[test]
+    fn a_forecast_compounds_the_base_fixing_by_the_curve_zero_rate() {
+        let curve = a_curve(curve_base_date(), vec![0.02, 0.05, 0.06]);
+        let index = an_index_on(&curve);
+        index
+            .add_fixing(curve_base_date(), BASE_FIXING)
+            .expect("seeding the base-date period");
+
+        let mid_march = Date::new(15, March, 2022);
+        let period_start = Date::new(1, March, 2022);
+        assert!(index.needs_forecast(mid_march).expect("a monthly index"));
+        let t = curve.time_from_reference(period_start).unwrap();
+        assert_eq!(t, 45.0 / 360.0);
+        assert!(t > 0.0);
+
+        let (t_lo, t_hi) = (curve.times()[0], curve.times()[1]);
+        let (r_lo, r_hi) = (curve.rates()[0], curve.rates()[1]);
+        let z1 = r_lo + (t - t_lo) / (t_hi - t_lo) * (r_hi - r_lo);
+        let t1 = (period_start - curve_base_date()) as Time / 360.0;
+        assert_eq!(t1, 120.0 / 360.0);
+        let expected = BASE_FIXING * (1.0 + z1).powf(t1);
+
+        let forecast = index
+            .fixing(mid_march, false)
+            .expect("March 2022 is forecast");
+        assert!(
+            (forecast - expected).abs() < 1.0e-10,
+            "forecast was {forecast}"
+        );
+
+        let unquantized = curve.time_from_reference(mid_march).unwrap();
+        let z_unquantized = r_lo + (unquantized - t_lo) / (t_hi - t_lo) * (r_hi - r_lo);
+        assert!((z1 - z_unquantized).abs() > 1.0e-4);
+    }
+
+    /// A zero index's figure is constant across its period, so every day of
+    /// March forecasts March's number.
+    #[test]
+    fn every_date_in_a_period_forecasts_the_same_figure() {
+        let curve = a_curve(curve_base_date(), vec![0.02, 0.05, 0.06]);
+        let index = an_index_on(&curve);
+        index
+            .add_fixing(curve_base_date(), BASE_FIXING)
+            .expect("seeding the base-date period");
+
+        let first = index.fixing(Date::new(1, March, 2022), false).unwrap();
+        assert_eq!(
+            index.fixing(Date::new(15, March, 2022), false).unwrap(),
+            first
+        );
+        assert_eq!(
+            index.fixing(Date::new(31, March, 2022), false).unwrap(),
+            first
+        );
+        assert_ne!(
+            index.fixing(Date::new(1, April, 2022), false).unwrap(),
+            first
+        );
+    }
+
+    /// The base figure has to be on record: a curve whose base date is itself
+    /// past the publication horizon would need a forecast to produce one, and
+    /// C++ stops rather than recurse (`inflationindex.cpp:225-227`).
+    #[test]
+    fn a_forecast_needs_the_fixing_at_the_curve_base_date() {
+        let curve = a_curve(Date::new(1, January, 2022), vec![0.02, 0.05, 0.06]);
+        let index = an_index_on(&curve);
+        assert!(index.needs_forecast(curve.base_date()).unwrap());
+
+        let error = index
+            .fixing(Date::new(15, March, 2022), false)
+            .expect_err("the base-date figure cannot have been published");
+        assert!(
+            error.to_string().contains("index fixing at base date"),
+            "err was: {error}"
+        );
+    }
+
+    /// The `pow` guard (`inflationindex.cpp:236-239`): a zero rate at or below
+    /// -100 %, which only extrapolation during a bootstrap reaches, forecasts
+    /// zero instead of raising a negative base to a fractional power. The base
+    /// node is the one the curve leaves unconstrained, so the segment running
+    /// off it can dip below -1.
+    #[test]
+    fn a_zero_rate_at_or_below_minus_one_forecasts_zero() {
+        let curve = a_curve(curve_base_date(), vec![-1.5, -0.9, -0.8]);
+        let index = an_index_on(&curve);
+        index
+            .add_fixing(curve_base_date(), BASE_FIXING)
+            .expect("seeding the base-date period");
+
+        let march = Date::new(15, March, 2022);
+        assert!(curve.zero_rate_date(march, false).unwrap() <= -1.0);
+        assert_eq!(index.fixing(march, false).unwrap(), 0.0);
+    }
+
+    /// `registerWith(zeroInflation_)` (`inflationindex.cpp:167`), asserted
+    /// structurally: the index computes every fixing on demand and caches
+    /// nothing, so a relink changes no value and only the notification
+    /// discriminates a registered index from an unregistered one.
+    #[test]
+    fn the_index_re_broadcasts_a_curve_relink() {
+        let curve = a_curve(curve_base_date(), vec![0.02, 0.05, 0.06]);
+        let handle: RelinkableHandle<dyn ZeroInflationTermStructure> = RelinkableHandle::empty();
+        let settings = shared(Settings::<Date>::new());
+        let index = a_zero_index(Frequency::Monthly, settings).with_term_structure(handle.handle());
+
+        let flag = shared_mut(Flag::default());
+        index
+            .observable()
+            .register_observer(&(flag.clone() as SharedMut<dyn Observer>));
+
+        handle.link_to(Shared::clone(&curve) as Shared<dyn ZeroInflationTermStructure>);
+        assert!(flag.borrow().up);
     }
 }
