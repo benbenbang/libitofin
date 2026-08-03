@@ -261,6 +261,19 @@ impl<D> Settings<D> {
             .and_then(|history| history.get(&date).copied())
     }
 
+    /// The latest date `index_name` has a fixing on record for, if any.
+    ///
+    /// The D11 counterpart of reading `IndexManager`'s `TimeSeries` back-to-front,
+    /// which is what `ZeroInflationIndex::lastFixingDate`
+    /// (`inflationindex.cpp:190`) does. `None` when the index has no history.
+    pub fn last_fixing_date(&self, index_name: &str) -> Option<Date> {
+        let key = Self::fixing_key(index_name);
+        self.fixing_store
+            .borrow()
+            .get(&key)
+            .and_then(|history| history.keys().next_back().copied())
+    }
+
     /// Whether a fixing of `index_name` is on record for `date`.
     ///
     /// Mirrors `IndexManager::hasHistoricalFixing`.
