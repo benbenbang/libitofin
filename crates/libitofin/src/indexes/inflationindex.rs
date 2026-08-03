@@ -244,3 +244,232 @@ pub trait InflationIndex: Index {
         &self.inflation_base().currency
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shared::{shared, shared_mut};
+    use crate::time::date::Month::{
+        April, December, February, January, March, November, October, September,
+    };
+    use crate::time::timeunit::TimeUnit;
+
+    /// The minimal concrete inflation index: the [`Index`] surface delegated to
+    /// the base, exactly as `ZeroInflationIndex` will delegate it, so the base
+    /// is exercised through the interface a caller actually uses.
+    struct TestInflationIndex {
+        base: InflationIndexBase,
+    }
+
+    impl TestInflationIndex {
+        fn new(frequency: Frequency) -> Self {
+            TestInflationIndex::with_settings(frequency, shared(Settings::<Date>::new()))
+        }
+
+        fn with_settings(frequency: Frequency, settings: Shared<Settings<Date>>) -> Self {
+            TestInflationIndex {
+                base: InflationIndexBase::new(
+                    "RPI".into(),
+                    Region::uk(),
+                    false,
+                    frequency,
+                    Period::new(1, TimeUnit::Months),
+                    Currency::gbp(),
+                    settings,
+                ),
+            }
+        }
+    }
+
+    #[derive(Default)]
+    struct Flag {
+        up: bool,
+    }
+
+    impl Observer for Flag {
+        fn update(&mut self) {
+            self.up = true;
+        }
+    }
+
+    impl Index for TestInflationIndex {
+        fn name(&self) -> String {
+            self.base.name()
+        }
+        fn fixing_calendar(&self) -> Calendar {
+            self.base.fixing_calendar()
+        }
+        fn is_valid_fixing_date(&self, _fixing_date: Date) -> bool {
+            true
+        }
+        fn fixing(&self, fixing_date: Date, _forecast_todays_fixing: bool) -> QlResult<Rate> {
+            match self.past_fixing(fixing_date)? {
+                Some(rate) => Ok(rate),
+                None => crate::fail!("no fixing for {fixing_date:?}"),
+            }
+        }
+        fn settings(&self) -> &Settings<Date> {
+            self.base.settings()
+        }
+        fn observable(&self) -> &Observable {
+            self.base.observable()
+        }
+        fn add_fixing(&self, fixing_date: Date, value: Rate) -> QlResult<()> {
+            self.base.add_fixing(fixing_date, value)
+        }
+    }
+
+    impl InflationIndex for TestInflationIndex {
+        fn inflation_base(&self) -> &InflationIndexBase {
+            &self.base
+        }
+    }
+
+    #[test]
+    fn name_is_region_plus_family() {
+        let index = TestInflationIndex::new(Frequency::Monthly);
+        assert_eq!(index.name(), "UK RPI");
+    }
+
+    #[test]
+    fn inspectors_round_trip_construction() {
+        let index = TestInflationIndex::new(Frequency::Monthly);
+        assert_eq!(index.family_name(), "RPI");
+        assert_eq!(index.region(), &Region::uk());
+        assert!(!index.revised());
+        assert_eq!(index.frequency(), Frequency::Monthly);
+        assert_eq!(index.availability_lag(), Period::new(1, TimeUnit::Months));
+        assert_eq!(index.currency().code(), "GBP");
+    }
+
+    #[test]
+    fn every_date_is_a_valid_fixing_date() {
+        let index = TestInflationIndex::new(Frequency::Monthly);
+        let sunday = Date::new(2, Month::December, 2007);
+        assert!(index.is_valid_fixing_date(sunday));
+        assert!(index.fixing_calendar().is_business_day(sunday));
+    }
+
+    #[test]
+    fn monthly_period_is_the_calendar_month() {
+        let (first, last) = inflation_period(Date::new(14, February, 2007), Frequency::Monthly)
+            .expect("monthly is a handled frequency");
+        assert_eq!(first, Date::new(1, February, 2007));
+        assert_eq!(last, Date::new(28, February, 2007));
+    }
+
+    #[test]
+    fn monthly_period_ends_on_the_leap_day() {
+        let (first, last) = inflation_period(Date::new(14, February, 2008), Frequency::Monthly)
+            .expect("monthly is a handled frequency");
+        assert_eq!(first, Date::new(1, February, 2008));
+        assert_eq!(last, Date::new(29, February, 2008));
+    }
+
+    #[test]
+    fn quarterly_period_aligns_to_the_calendar_quarter() {
+        let (first, last) = inflation_period(Date::new(15, December, 2007), Frequency::Quarterly)
+            .expect("quarterly is a handled frequency");
+        assert_eq!(first, Date::new(1, October, 2007));
+        assert_eq!(last, Date::new(31, December, 2007));
+
+        let (first, last) = inflation_period(Date::new(3, January, 2007), Frequency::Quarterly)
+            .expect("quarterly is a handled frequency");
+        assert_eq!(first, Date::new(1, January, 2007));
+        assert_eq!(last, Date::new(31, March, 2007));
+    }
+
+    #[test]
+    fn coarser_periods_align_from_january() {
+        let (first, last) = inflation_period(Date::new(15, December, 2007), Frequency::Semiannual)
+            .expect("semiannual is a handled frequency");
+        assert_eq!(first, Date::new(1, Month::July, 2007));
+        assert_eq!(last, Date::new(31, December, 2007));
+
+        let (first, last) = inflation_period(Date::new(15, December, 2007), Frequency::Annual)
+            .expect("annual is a handled frequency");
+        assert_eq!(first, Date::new(1, January, 2007));
+        assert_eq!(last, Date::new(31, December, 2007));
+    }
+
+    #[test]
+    fn finer_than_monthly_is_rejected() {
+        assert!(inflation_period(Date::new(15, December, 2007), Frequency::Weekly).is_err());
+        assert!(inflation_period(Date::new(15, December, 2007), Frequency::Once).is_err());
+    }
+
+    /// The D11 write-side pin: one published figure must land on every day of
+    /// its inflation period, not on the publication day alone and not on the
+    /// period's first day alone. The two inner dates fail under either of those
+    /// wrong stores; the outer date fails under an over-wide expansion.
+    #[test]
+    fn a_fixing_covers_its_whole_inflation_period() {
+        let index = TestInflationIndex::new(Frequency::Quarterly);
+        index
+            .add_fixing(Date::new(15, December, 2007), 100.0)
+            .expect("adding a fixing on a quarterly inflation index");
+
+        assert!(index.has_historical_fixing(Date::new(1, October, 2007)));
+        assert!(index.has_historical_fixing(Date::new(30, November, 2007)));
+        assert!(index.has_historical_fixing(Date::new(31, December, 2007)));
+
+        assert!(!index.has_historical_fixing(Date::new(30, September, 2007)));
+        assert!(!index.has_historical_fixing(Date::new(1, January, 2008)));
+    }
+
+    #[test]
+    fn last_fixing_date_is_the_end_of_the_published_period() {
+        let index = TestInflationIndex::new(Frequency::Quarterly);
+        index
+            .add_fixing(Date::new(15, December, 2007), 100.0)
+            .expect("adding a fixing on a quarterly inflation index");
+
+        assert_eq!(
+            index.settings().last_fixing_date("UK RPI"),
+            Some(Date::new(31, December, 2007))
+        );
+    }
+
+    #[test]
+    fn last_fixing_date_is_none_without_a_history() {
+        let index = TestInflationIndex::new(Frequency::Quarterly);
+        assert_eq!(index.settings().last_fixing_date("UK RPI"), None);
+    }
+
+    /// The constructor's two `registerWith` calls (`inflationindex.cpp:132-133`)
+    /// plus the hook a concrete index uses for its inflation curve: all three
+    /// reach the index's own observers through the one forwarding observable.
+    #[test]
+    fn the_index_re_broadcasts_its_dependencies() {
+        let settings = shared(Settings::<Date>::new());
+        let index = TestInflationIndex::with_settings(Frequency::Monthly, settings.clone());
+        let flag = shared_mut(Flag::default());
+        index
+            .observable()
+            .register_observer(&(flag.clone() as SharedMut<dyn Observer>));
+
+        settings.set_evaluation_date(Date::new(3, December, 2007));
+        assert!(flag.borrow().up);
+
+        flag.borrow_mut().up = false;
+        let curve = Observable::new();
+        curve.register_observer(&index.inflation_base().observer());
+        curve.notify_observers();
+        assert!(flag.borrow().up);
+    }
+
+    /// `last_fixing_date` must reach the store through the same case-folding
+    /// key as every other fixing accessor; reading it raw would answer `None`
+    /// for a differently-cased name.
+    #[test]
+    fn last_fixing_date_is_case_insensitive() {
+        let index = TestInflationIndex::new(Frequency::Quarterly);
+        index
+            .add_fixing(Date::new(15, April, 2007), 100.0)
+            .expect("adding a fixing on a quarterly inflation index");
+
+        let expected = Some(Date::new(30, Month::June, 2007));
+        assert_eq!(index.settings().last_fixing_date("UK RPI"), expected);
+        assert_eq!(index.settings().last_fixing_date("uk rpi"), expected);
+    }
+}
