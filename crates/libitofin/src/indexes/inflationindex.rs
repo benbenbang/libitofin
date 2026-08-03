@@ -3,7 +3,9 @@
 //! Port of `ql/indexes/inflationindex.{hpp,cpp}`'s `InflationIndex`
 //! (`inflationindex.hpp:87`) and [`ZeroInflationIndex`]
 //! (`inflationindex.hpp:156`), plus the `inflationPeriod` free function they
-//! and every inflation term structure depend on.
+//! and every inflation term structure depend on, and the [`Cpi`] observation
+//! conventions (`inflationindex.hpp:39`) that read a lagged fixing off a
+//! [`ZeroInflationIndex`].
 //!
 //! An inflation index is not a rate index: it has no tenor, no fixing days and
 //! no value-date algebra, so it derives from [`Index`] directly rather than
@@ -44,6 +46,7 @@ use crate::time::calendars::nullcalendar::NullCalendar;
 use crate::time::date::{Date, Month};
 use crate::time::frequency::Frequency;
 use crate::time::period::Period;
+use crate::time::timeunit::TimeUnit;
 use crate::types::{Integer, Rate};
 
 /// The inflation period `date` falls in, at the given `frequency`.
@@ -416,6 +419,84 @@ impl Index for ZeroInflationIndex {
 impl InflationIndex for ZeroInflationIndex {
     fn inflation_base(&self) -> &InflationIndexBase {
         &self.base
+    }
+}
+
+/// How an observation interpolates between the index fixings bracketing it
+/// (`CPI::InterpolationType`, `inflationindex.hpp:45-49`).
+///
+/// The deprecated `AsIndex` variant is **not ported**: it was a migration aid
+/// for the coupons, deprecated in QuantLib 1.43, and its arm in
+/// `laggedFixing` falls straight through to `Flat`
+/// (`inflationindex.cpp:36-42`) - so it carries no behaviour of its own.
+/// `testCpiAsIndexInterpolation` (`inflation.cpp:1410`) is therefore not
+/// ported either; it re-checks the [`Flat`](CpiInterpolationType::Flat)
+/// numbers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CpiInterpolationType {
+    /// Flat from the previous fixing.
+    Flat,
+    /// Linearly between the bracketing fixings.
+    Linear,
+}
+
+/// The `CPI` namespace of `inflationindex.hpp:39-83`.
+///
+/// `CPI::laggedYoYRate`, the year-on-year sibling of
+/// [`lagged_fixing`](Cpi::lagged_fixing) (`inflationindex.hpp:78-82`), is
+/// **not ported**: it takes a `YoYInflationIndex`, a type this batch of #705
+/// does not have. It arrives with that index.
+pub enum Cpi {}
+
+impl Cpi {
+    /// The `index` fixing observed at `date` under `observation_lag` and
+    /// `interpolation_type` (`CPI::laggedFixing`,
+    /// `inflationindex.cpp:28-64`).
+    ///
+    /// `date` is the unlagged date - usually the payment date of an
+    /// inflation-linked coupon. Subtracting the lag lands in the *fixing*
+    /// period: a May date with a three-month lag observes February's figure,
+    /// and March's too when interpolating.
+    ///
+    /// [`Flat`](CpiInterpolationType::Flat) reads the fixing of that lagged
+    /// period. [`Linear`](CpiInterpolationType::Linear) advances from it to the
+    /// next period's fixing by how far `date` has run into its own period,
+    /// except when `date` is that period's first day: there the weight is zero,
+    /// and C++ returns early rather than ask for the second fixing, which may
+    /// need a forecast curve that is not set.
+    ///
+    /// # Errors
+    ///
+    /// Propagates whatever [`ZeroInflationIndex::fixing`](Index::fixing)
+    /// raises: a period too old to be unpublished but absent from the history
+    /// is a missing-fixing error, not a forecast, and it surfaces here rather
+    /// than being swallowed.
+    pub fn lagged_fixing(
+        index: &ZeroInflationIndex,
+        date: Date,
+        observation_lag: Period,
+        interpolation_type: CpiInterpolationType,
+    ) -> QlResult<Rate> {
+        let frequency = index.frequency();
+        let fixing_period = inflation_period(date - observation_lag, frequency)?;
+        let i0 = index.fixing(fixing_period.0, false)?;
+
+        match interpolation_type {
+            CpiInterpolationType::Flat => Ok(i0),
+            CpiInterpolationType::Linear => {
+                let interpolation_period = inflation_period(date, frequency)?;
+                if date == interpolation_period.0 {
+                    return Ok(i0);
+                }
+
+                let one_day = Period::new(1, TimeUnit::Days);
+                let i1 = index.fixing(fixing_period.1 + one_day, false)?;
+
+                let elapsed = (date - interpolation_period.0) as Rate;
+                let length = ((interpolation_period.1 + one_day) - interpolation_period.0) as Rate;
+                Ok(i0 + (i1 - i0) * elapsed / length)
+            }
+        }
     }
 }
 
@@ -814,6 +895,122 @@ mod tests {
             error.to_string().contains("no fixings stored"),
             "err was: {error}"
         );
+    }
+
+    /// The fixture shared by `testCpiFlatInterpolation` and
+    /// `testCpiLinearInterpolation` (`inflation.cpp:1346-1408`): it is 10
+    /// February 2022 and a UKRPI-shaped index has published November 2020
+    /// through March 2021. Every date the two tests read is far behind the
+    /// publication horizon, so nothing forecasts and a gap is an error.
+    fn a_ukrpi_with_2021_fixings() -> ZeroInflationIndex {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(Date::new(10, February, 2022));
+        let index = a_zero_index(Frequency::Monthly, settings);
+        for (date, value) in [
+            (Date::new(1, November, 2020), 293.5),
+            (Date::new(1, December, 2020), 295.4),
+            (Date::new(1, January, 2021), 294.6),
+            (Date::new(1, February, 2021), 296.0),
+            (Date::new(1, March, 2021), 296.9),
+        ] {
+            index
+                .add_fixing(date, value)
+                .expect("adding a published figure");
+        }
+        index
+    }
+
+    fn lagged_fixing(
+        index: &ZeroInflationIndex,
+        date: Date,
+        interpolation_type: CpiInterpolationType,
+    ) -> QlResult<Rate> {
+        Cpi::lagged_fixing(
+            index,
+            date,
+            Period::new(3, TimeUnit::Months),
+            interpolation_type,
+        )
+    }
+
+    /// `testCpiFlatInterpolation` (`inflation.cpp:1346-1373`): the observation
+    /// is the fixing of the period the lagged date falls in, whatever day of
+    /// that period it is.
+    #[test]
+    fn a_flat_observation_reads_the_lagged_period() {
+        let index = a_ukrpi_with_2021_fixings();
+        for (date, expected) in [
+            (Date::new(10, February, 2021), 293.5),
+            (Date::new(12, Month::May, 2021), 296.0),
+            (Date::new(25, Month::June, 2021), 296.9),
+        ] {
+            let calculated = lagged_fixing(&index, date, CpiInterpolationType::Flat)
+                .expect("the observed period is published");
+            assert!(
+                (calculated - expected).abs() < 1e-8,
+                "{calculated} at {date}"
+            );
+        }
+    }
+
+    /// `testCpiLinearInterpolation` (`inflation.cpp:1375-1391`): the two
+    /// bracketing fixings weighted by how far the date has run into its own
+    /// (unlagged) period, whose length sets the denominator - 28 days for
+    /// February 2021, 31 for May.
+    #[test]
+    fn a_linear_observation_interpolates_the_bracketing_fixings() {
+        let index = a_ukrpi_with_2021_fixings();
+        for (date, expected) in [
+            (
+                Date::new(10, February, 2021),
+                293.5 * (19.0 / 28.0) + 295.4 * (9.0 / 28.0),
+            ),
+            (
+                Date::new(12, Month::May, 2021),
+                296.0 * (20.0 / 31.0) + 296.9 * (11.0 / 31.0),
+            ),
+        ] {
+            let calculated = lagged_fixing(&index, date, CpiInterpolationType::Linear)
+                .expect("both observed periods are published");
+            assert!(
+                (calculated - expected).abs() < 1e-8,
+                "{calculated} at {date}"
+            );
+        }
+    }
+
+    /// `inflation.cpp:1398-1401`: interpolating on 25 June needs the fixing
+    /// after March's, i.e. April 2021 - a period old enough that it must have
+    /// been published, so its absence is the missing-fixing error rather than
+    /// a forecast. Asserting the message discriminates the two: routing the
+    /// second fixing through the forecast branch also fails, with `empty
+    /// Handle`.
+    #[test]
+    fn a_linear_observation_propagates_a_missing_second_fixing() {
+        let index = a_ukrpi_with_2021_fixings();
+        let error = lagged_fixing(
+            &index,
+            Date::new(25, Month::June, 2021),
+            CpiInterpolationType::Linear,
+        )
+        .expect_err("April 2021 was never published");
+        assert!(error.to_string().contains("Missing"), "err was: {error}");
+    }
+
+    /// `inflation.cpp:1403-1407`: on the first day of the unlagged period the
+    /// interpolation weight is zero, and C++ returns the first fixing without
+    /// asking for the second - which is why 1 June succeeds where 25 June, one
+    /// period and one missing April fixing later, does not.
+    #[test]
+    fn a_linear_observation_on_a_period_start_skips_the_second_fixing() {
+        let index = a_ukrpi_with_2021_fixings();
+        let calculated = lagged_fixing(
+            &index,
+            Date::new(1, Month::June, 2021),
+            CpiInterpolationType::Linear,
+        )
+        .expect("the special case never reads April");
+        assert!((calculated - 296.9).abs() < 1e-8, "{calculated}");
     }
 
     /// `last_fixing_date` must reach the store through the same case-folding
