@@ -1,5 +1,5 @@
 # Hand-written stubs for itofin.instruments; sync manually with src/option.rs,
-# src/swap.rs, src/swaption.rs and src/capfloor.rs (#517).
+# src/swap.rs, src/swaption.rs, src/capfloor.rs and src/credit.rs (#517).
 
 from itofin import Settings
 from itofin.indexes import Euribor
@@ -155,3 +155,10 @@ class CapFloor:
     def npv(self) -> float:
         """Raises ItofinError with no engine attached."""
         ...
+
+class ProtectionSide:
+    """Which leg of a default-protection contract a party holds: the buyer pays
+    the premium leg and receives the default payment, the seller the reverse."""
+
+    Buyer: ProtectionSide
+    Seller: ProtectionSide

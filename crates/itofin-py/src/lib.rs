@@ -9,6 +9,7 @@ mod calibration;
 mod capfloor;
 mod capfloorengine;
 mod capfloortermvol;
+mod credit;
 mod curve;
 mod helpers;
 mod heston;
@@ -30,6 +31,7 @@ use calibration::{PyCalibrationErrorType, PyEndCriteria, PyLevenbergMarquardt};
 use capfloor::{PyCapFloor, PyCapFloorType};
 use capfloorengine::PyBlackCapFloorEngine;
 use capfloortermvol::PyCapFloorTermVolSurface;
+use credit::{PyDefaultProbabilityTermStructure, PyFlatHazardRate, PyProtectionSide};
 use curve::{
     PyDiscountCurve, PyFlatForward, PyForwardCurve, PyPiecewiseFlatForward,
     PyPiecewiseLinearForward, PyPiecewiseLinearZero, PyPiecewiseLogLinearDiscount,
@@ -160,6 +162,8 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     termstructures.add_class::<PyCapFloorTermVolSurface>()?;
     termstructures.add_class::<PyOptionletStripper1>()?;
     termstructures.add_class::<PyStrippedOptionletAdapter>()?;
+    termstructures.add_class::<PyDefaultProbabilityTermStructure>()?;
+    termstructures.add_class::<PyFlatHazardRate>()?;
 
     let processes = PyModule::new(py, "processes")?;
     processes.add_class::<PyBlackScholesProcess>()?;
@@ -182,6 +186,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     instruments.add_class::<PySwaption>()?;
     instruments.add_class::<PyCapFloorType>()?;
     instruments.add_class::<PyCapFloor>()?;
+    instruments.add_class::<PyProtectionSide>()?;
 
     let models = PyModule::new(py, "models")?;
     models.add_class::<PyHestonModel>()?;
