@@ -242,36 +242,73 @@ mod tests {
         accepts_driver_helper::<dyn ZeroInflationHelper>();
     }
 
-    /// Every driver-facing method routes through the trait, so a concrete
-    /// helper's overrides run. Short-circuiting to the base would leave a
-    /// helper pricing off an unlinked handle and would silently swap its
-    /// quote error for the default one. The curve is bound to a local because
-    /// the base holds it weakly and never owns it.
+    /// What a driver sees of a helper.
+    struct DriverView {
+        quote_value: Real,
+        quote_error: Real,
+        pillar_date: Date,
+        latest_relevant_date: Date,
+        maturity_date: Date,
+    }
+
+    /// Exercises the helper the way
+    /// [`IterativeBootstrap::calculate`](crate::termstructures::iterativebootstrap::IterativeBootstrap::calculate)
+    /// does: through a type parameter bounded by [`BootstrapHelperShared`], so
+    /// only that impl's methods are in scope.
+    ///
+    /// Reaching the bound through a type parameter is what makes the assertions
+    /// below bite. Calling the same method names straight on a
+    /// `Shared<dyn ZeroInflationHelper>` resolves to [`ZeroInflationHelper`]
+    /// instead and never enters the impl under test, which would leave the
+    /// routing claim untested.
+    fn drive<H>(helper: &Shared<H>, curve: &Shared<dyn ZeroInflationTermStructure>) -> DriverView
+    where
+        H: BootstrapHelperShared<TS = dyn ZeroInflationTermStructure> + ?Sized,
+    {
+        helper.set_term_structure(curve);
+        DriverView {
+            quote_value: helper.quote_value().unwrap(),
+            quote_error: helper.quote_error().unwrap(),
+            pillar_date: helper.pillar_date(),
+            latest_relevant_date: helper.latest_relevant_date(),
+            maturity_date: helper.maturity_date(),
+        }
+    }
+
+    /// Every driver-facing method routes through the [`ZeroInflationHelper`]
+    /// trait, so a concrete helper's overrides run. Short-circuiting the impl
+    /// to the base would leave a helper pricing off an unlinked handle and
+    /// would silently swap its quote error for the default one - here, the
+    /// stub's `-1.0` would become the default `0.03 - 0.01`. The curve is bound
+    /// to a local because the base holds it weakly and never owns it.
     #[test]
     fn the_driver_bound_routes_through_the_trait_so_overrides_run() {
         let helper = StubHelper::new();
         let driver: Shared<dyn ZeroInflationHelper> = Shared::clone(&helper) as _;
-
         let curve = curve();
-        driver.set_term_structure(&curve);
-        assert!(helper.curve_set.get());
-        assert!(helper.base.term_structure().is_ok());
 
-        assert_eq!(driver.quote_error().unwrap(), -1.0);
-        assert!(helper.error_called.get());
-        assert_eq!(driver.quote_value().unwrap(), 0.03);
+        let view = drive(&driver, &curve);
+
+        assert!(
+            helper.curve_set.get(),
+            "set_term_structure override skipped"
+        );
+        assert!(helper.base.term_structure().is_ok());
+        assert!(helper.error_called.get(), "quote_error override skipped");
+        assert_eq!(view.quote_error, -1.0);
+        assert_eq!(view.quote_value, 0.03);
     }
 
     #[test]
     fn the_driver_bound_reports_the_bases_dates() {
         let helper = StubHelper::new();
         let driver: Shared<dyn ZeroInflationHelper> = Shared::clone(&helper) as _;
+        let curve = curve();
 
-        assert_eq!(driver.pillar_date(), Date::new(1, Month::June, 2030));
-        assert_eq!(
-            driver.latest_relevant_date(),
-            Date::new(1, Month::July, 2030)
-        );
-        assert_eq!(driver.maturity_date(), Date::new(1, Month::June, 2030));
+        let view = drive(&driver, &curve);
+
+        assert_eq!(view.pillar_date, Date::new(1, Month::June, 2030));
+        assert_eq!(view.latest_relevant_date, Date::new(1, Month::July, 2030));
+        assert_eq!(view.maturity_date, Date::new(1, Month::June, 2030));
     }
 }
