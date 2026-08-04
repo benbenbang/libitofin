@@ -302,13 +302,9 @@ pub trait InflationIndex: Index {
 /// forecast with the dereference error, which is exactly what C++ raises for
 /// the defaulted handle.
 ///
-/// ## Deferred
-///
-/// `ZeroInflationIndex::clone(h)` (`inflationindex.cpp:245-249`), which
-/// rebuilds the index against another curve, is **not ported**: its callers
-/// are the inflation coupons and rate helpers, neither of which exists yet.
-/// [`with_term_structure`](ZeroInflationIndex::with_term_structure) covers the
-/// build-time case it also serves.
+/// [`clone_linked_to`](ZeroInflationIndex::clone_linked_to) is the relink-a-copy
+/// case the same split leaves open, for a caller that already holds an index and
+/// needs the same one reading a different curve.
 ///
 /// [`frequency`]: InflationIndex::frequency
 pub struct ZeroInflationIndex {
@@ -358,6 +354,40 @@ impl ZeroInflationIndex {
             base: self.base,
             term_structure,
         }
+    }
+
+    /// The same index reading a different inflation curve
+    /// (`ZeroInflationIndex::clone`, `inflationindex.cpp:245-249`).
+    ///
+    /// C++ rebuilds from the six identity fields and the new handle, and so does
+    /// this: the copy is a peer of the original, not a view of it, and the two
+    /// forecast independently off their own curves. A bootstrap helper builds one
+    /// against its own relinkable handle so it can point the index at the curve
+    /// being solved without touching the index the caller passed in.
+    ///
+    /// The copy sees the original's fixings. C++ gets that from the global
+    /// `IndexManager`, keyed by index name; here it follows from the two sharing
+    /// the [`Settings`] the fixing store lives on (D11) under a name recomposed
+    /// from the same family and region.
+    ///
+    /// The copy observes its new handle, exactly as
+    /// [`with_term_structure`](ZeroInflationIndex::with_term_structure) leaves it.
+    /// A helper that links that handle to the curve it is bootstrapping therefore
+    /// unregisters the copy again (`inflationhelpers.cpp:106-110`).
+    pub fn clone_linked_to(
+        &self,
+        term_structure: Handle<dyn ZeroInflationTermStructure>,
+    ) -> ZeroInflationIndex {
+        ZeroInflationIndex::new(
+            self.base.family_name.clone(),
+            self.base.region.clone(),
+            self.base.revised,
+            self.base.frequency,
+            self.base.availability_lag,
+            self.base.currency.clone(),
+            Shared::clone(self.base.settings()),
+        )
+        .with_term_structure(term_structure)
     }
 
     /// The inflation curve the index forecasts off
@@ -1237,5 +1267,113 @@ mod tests {
 
         handle.link_to(Shared::clone(&curve) as Shared<dyn ZeroInflationTermStructure>);
         assert!(flag.borrow().up);
+    }
+
+    /// The copy carries the six identity fields across
+    /// (`inflationindex.cpp:245-249`), so it keys the same fixing store and
+    /// answers the same publication questions.
+    #[test]
+    fn a_clone_keeps_the_indexs_identity() {
+        let curve = a_curve(curve_base_date(), vec![0.02, 0.05, 0.06]);
+        let index = an_index_on(&curve);
+        let copy = index.clone_linked_to(Handle::empty());
+
+        assert_eq!(copy.name(), index.name());
+        assert_eq!(copy.family_name(), index.family_name());
+        assert_eq!(copy.region(), index.region());
+        assert_eq!(copy.revised(), index.revised());
+        assert_eq!(copy.frequency(), index.frequency());
+        assert_eq!(copy.availability_lag(), index.availability_lag());
+        assert_eq!(copy.currency().code(), index.currency().code());
+    }
+
+    /// The two share one fixing history, which is what makes a helper's copy
+    /// usable: it prices off figures the caller published on the original. C++
+    /// routes both through the global `IndexManager`; here both hold the same
+    /// [`Settings`], so the store and the evaluation date are shared too.
+    ///
+    /// The write is made *after* the copy is taken, so a port that snapshotted
+    /// the history at clone time would fail here.
+    #[test]
+    fn a_clone_shares_the_originals_fixings() {
+        let curve = a_curve(curve_base_date(), vec![0.02, 0.05, 0.06]);
+        let index = an_index_on(&curve);
+        let copy = index.clone_linked_to(Handle::empty());
+
+        index
+            .add_fixing(curve_base_date(), BASE_FIXING)
+            .expect("seeding the base-date period");
+
+        assert_eq!(
+            copy.past_fixing(Date::new(20, November, 2021))
+                .expect("every date is a valid fixing date"),
+            Some(BASE_FIXING)
+        );
+        assert_eq!(
+            copy.last_fixing_date().expect("the shared history"),
+            curve_base_date()
+        );
+
+        copy.add_fixing(Date::new(1, December, 2021), 101.0)
+            .expect("publishing through the copy");
+        assert_eq!(
+            index
+                .past_fixing(Date::new(15, December, 2021))
+                .expect("every date is a valid fixing date"),
+            Some(101.0)
+        );
+    }
+
+    /// The point of the copy: it forecasts off the curve it was handed, not off
+    /// the original's. Both compound the same shared base figure over the same
+    /// inflation time, so only the curve's rate separates the two answers - here
+    /// 5 % against 2 % at the March 2022 node.
+    #[test]
+    fn a_clone_forecasts_off_its_own_curve() {
+        let index = an_index_on(&a_curve(curve_base_date(), vec![0.02, 0.05, 0.06]));
+        index
+            .add_fixing(curve_base_date(), BASE_FIXING)
+            .expect("seeding the base-date period");
+
+        let slower = a_curve(curve_base_date(), vec![0.01, 0.02, 0.03]);
+        let copy = index.clone_linked_to(Handle::new(
+            slower as Shared<dyn ZeroInflationTermStructure>,
+        ));
+
+        let march = Date::new(15, March, 2022);
+        let original = index.fixing(march, false).expect("March 2022 is forecast");
+        let cloned = copy.fixing(march, false).expect("March 2022 is forecast");
+
+        assert!(original > BASE_FIXING);
+        assert!(cloned > BASE_FIXING);
+        assert!(
+            original - cloned > 0.5,
+            "the two curves gave {original} and {cloned}"
+        );
+    }
+
+    /// The copy registers with its own handle, as the constructor does
+    /// (`inflationindex.cpp:167`), and the original keeps observing only its
+    /// own: relinking one notifies one index and not the other.
+    #[test]
+    fn a_clone_observes_only_its_own_handle() {
+        let curve = a_curve(curve_base_date(), vec![0.02, 0.05, 0.06]);
+        let handle: RelinkableHandle<dyn ZeroInflationTermStructure> = RelinkableHandle::empty();
+        let settings = shared(Settings::<Date>::new());
+        let index = a_zero_index(Frequency::Monthly, settings);
+        let copy = index.clone_linked_to(handle.handle());
+
+        let on_original = shared_mut(Flag::default());
+        index
+            .observable()
+            .register_observer(&(on_original.clone() as SharedMut<dyn Observer>));
+        let on_copy = shared_mut(Flag::default());
+        copy.observable()
+            .register_observer(&(on_copy.clone() as SharedMut<dyn Observer>));
+
+        handle.link_to(Shared::clone(&curve) as Shared<dyn ZeroInflationTermStructure>);
+
+        assert!(on_copy.borrow().up, "the copy observes the handle it took");
+        assert!(!on_original.borrow().up, "the original is a separate index");
     }
 }
