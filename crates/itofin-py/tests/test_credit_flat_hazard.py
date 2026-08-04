@@ -98,6 +98,21 @@ def test_moving_curve_answers_once_the_evaluation_date_is_set():
         assert abs(curve.hazard_rate(t) - HAZARD_RATE) <= TOLERANCE
 
 
+def test_moving_curve_reference_date_honours_the_settlement_days():
+    settings = Settings()
+    spot = FlatHazardRate.moving_with_rate(
+        0, Calendar.target(), HAZARD_RATE, _day_counter(), settings
+    )
+    settled = FlatHazardRate.moving_with_rate(
+        2, Calendar.target(), HAZARD_RATE, _day_counter(), settings
+    )
+    settings.set_evaluation_date(REFERENCE)
+    one_year = REFERENCE + 360
+
+    assert abs(spot.survival_probability_date(one_year) - math.exp(-HAZARD_RATE)) <= TOLERANCE
+    assert settled.survival_probability_date(one_year) > spot.survival_probability_date(one_year)
+
+
 def test_protection_side_variants_are_distinct():
     assert ProtectionSide.Buyer == ProtectionSide.Buyer
     assert ProtectionSide.Buyer != ProtectionSide.Seller
