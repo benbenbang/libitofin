@@ -24,6 +24,7 @@ mod overnightindexedcouponpricer;
 mod overnightleg;
 mod rateaveraging;
 mod simplecashflow;
+mod zeroinflationcashflow;
 
 pub use capflooredcoupon::{CappedFlooredCoupon, CappedFlooredIborCoupon};
 pub use cashflows::CashFlows;
@@ -44,3 +45,4 @@ pub use overnightindexedcouponpricer::{
 pub use overnightleg::OvernightLeg;
 pub use rateaveraging::RateAveraging;
 pub use simplecashflow::{AmortizingPayment, Redemption, SimpleCashFlow};
+pub use zeroinflationcashflow::ZeroInflationCashFlow;
