@@ -1,5 +1,6 @@
 # Hand-written stubs for itofin.termstructures; sync manually with src/curve.rs, src/vol.rs,
-# src/helpers.rs, src/swaptionvol.rs, src/optionletvol.rs and src/smilesection.rs (#517).
+# src/helpers.rs, src/swaptionvol.rs, src/optionletvol.rs, src/smilesection.rs and
+# src/credit.rs (#517).
 
 from itofin import Settings
 from itofin.indexes import Estr, Euribor, SwapIndex
@@ -795,4 +796,57 @@ class StrippedOptionletAdapter(OptionletVolatilityStructure):
         """Strips eagerly, to snapshot the strike domain and maximum date.
         Raises ItofinError on a stripper whose term-volatility surface carries
         no settlement days."""
+        ...
+
+class DefaultProbabilityTermStructure:
+    """Shared base for every credit curve: survival and default probabilities,
+    the default density and the hazard rate, each in a year-fraction and a date
+    form."""
+
+    def survival_probability(self, t: float, extrapolate: bool = False) -> float: ...
+    def survival_probability_date(self, date: Date, extrapolate: bool = False) -> float: ...
+    def default_probability(self, t: float, extrapolate: bool = False) -> float: ...
+    def default_probability_date(self, date: Date, extrapolate: bool = False) -> float: ...
+    def default_density(self, t: float, extrapolate: bool = False) -> float: ...
+    def default_density_date(self, date: Date, extrapolate: bool = False) -> float: ...
+    def hazard_rate(self, t: float, extrapolate: bool = False) -> float: ...
+    def hazard_rate_date(self, date: Date, extrapolate: bool = False) -> float: ...
+
+class FlatHazardRate(DefaultProbabilityTermStructure):
+    """A credit curve quoting one hazard rate for every maturity, whose survival
+    probability is the closed form exp(-h t).
+
+    The quote-backed forms retain the caller's SimpleQuote, so a later set_value
+    moves the curve; the rate-backed forms wrap the value in a fresh, un-retained
+    quote. The moving forms fix the reference date settlement_days business days
+    past the evaluation date carried by settings."""
+
+    def __init__(
+        self, reference_date: Date, hazard_rate: SimpleQuote, day_counter: DayCounter
+    ) -> None: ...
+    @staticmethod
+    def with_rate(
+        reference_date: Date, rate: float, day_counter: DayCounter
+    ) -> FlatHazardRate: ...
+    @staticmethod
+    def moving(
+        settlement_days: int,
+        calendar: Calendar,
+        hazard_rate: SimpleQuote,
+        day_counter: DayCounter,
+        settings: Settings,
+    ) -> FlatHazardRate:
+        """Raises ItofinError on any query made before settings carries an
+        evaluation date."""
+        ...
+    @staticmethod
+    def moving_with_rate(
+        settlement_days: int,
+        calendar: Calendar,
+        rate: float,
+        day_counter: DayCounter,
+        settings: Settings,
+    ) -> FlatHazardRate:
+        """Raises ItofinError on any query made before settings carries an
+        evaluation date."""
         ...
