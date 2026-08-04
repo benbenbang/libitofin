@@ -37,3 +37,9 @@ class Settings:
     def set_evaluation_date(self, date: time.Date) -> None:
         """Set the evaluation date, notifying observers if it changed."""
         ...
+    def set_include_todays_cash_flows(self, value: bool | None) -> None:
+        """Set whether cash flows on today's date enter an NPV; None clears."""
+        ...
+    def include_todays_cash_flows(self) -> bool | None:
+        """The current setting, or None while it is unset."""
+        ...

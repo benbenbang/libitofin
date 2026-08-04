@@ -29,6 +29,24 @@ impl PySettings {
     fn set_evaluation_date(&self, date: &PyDate) {
         self.inner.set_evaluation_date(date.inner());
     }
+
+    /// Sets whether cash flows falling on today's date enter an NPV.
+    ///
+    /// The flag is three-valued, as in the core (`settings.rs:141`): `True` and
+    /// `False` decide the question outright, and `None` clears it, restoring the
+    /// unset state in which each pricing site applies its own default. `value`
+    /// is required, so clearing is always deliberate.
+    #[pyo3(signature = (value))]
+    fn set_include_todays_cash_flows(&self, value: Option<bool>) {
+        self.inner.set_include_todays_cash_flows(value);
+    }
+
+    /// The current setting of
+    /// [`set_include_todays_cash_flows`](Self::set_include_todays_cash_flows),
+    /// or `None` while it is unset.
+    fn include_todays_cash_flows(&self) -> Option<bool> {
+        self.inner.include_todays_cash_flows()
+    }
 }
 
 impl PySettings {
