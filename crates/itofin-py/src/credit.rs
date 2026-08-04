@@ -1,6 +1,7 @@
 //! Facades for the credit hierarchy: the [`PyDefaultProbabilityTermStructure`]
-//! base, the concrete [`PyFlatHazardRate`] curve, the [`PyProtectionSide`] flag
-//! and the [`PyCreditDefaultSwap`] instrument.
+//! base, the concrete [`PyFlatHazardRate`] and [`PyInterpolatedHazardRateCurve`]
+//! curves, the [`PyProtectionSide`] flag and the [`PyCreditDefaultSwap`]
+//! instrument.
 
 use crate::PyQlError;
 use crate::creditengine::PyMidPointCdsEngine;
@@ -10,9 +11,11 @@ use crate::time::{PyBusinessDayConvention, PyCalendar, PyDate, PyDayCounter, PyS
 use libitofin::handle::Handle;
 use libitofin::instrument::Instrument;
 use libitofin::instruments::{CdsTerms, CreditDefaultSwap, ProtectionSide};
+use libitofin::math::interpolations::flat::BackwardFlat;
 use libitofin::shared::{Shared, SharedMut, shared, shared_mut};
 use libitofin::termstructures::credit::defaulttermstructure::DefaultProbabilityTermStructure;
 use libitofin::termstructures::credit::flathazardrate::FlatHazardRate;
+use libitofin::termstructures::credit::interpolatedhazardratecurve::InterpolatedHazardRateCurve;
 use libitofin::types::Natural;
 use pyo3::prelude::*;
 
@@ -268,6 +271,96 @@ impl PyFlatHazardRate {
             )))
             .add_subclass(PyFlatHazardRate),
         )
+    }
+}
+
+/// Python `InterpolatedHazardRateCurve`: a credit curve built from
+/// (date, hazard-rate) nodes, interpolating backward-flat
+/// (`termstructures::credit::InterpolatedHazardRateCurve<BackwardFlat>`).
+///
+/// Extends [`PyDefaultProbabilityTermStructure`], which carries the whole query
+/// surface. The first date is the reference date, and the day counter turns the
+/// rest into node times. Backward-flat reads the right-hand node on every
+/// segment, so the hazard rate is a right-continuous step function and the
+/// survival probability is `exp(-integral)` over those steps. Finite in time:
+/// queries past the last node need `extrapolate=True`, which continues at the
+/// last node's rate.
+///
+/// The concrete curve is retained alongside the erased handle so the node
+/// inspectors [`dates`](Self::dates), [`hazard_rates`](Self::hazard_rates) and
+/// [`nodes`](Self::nodes) stay reachable, the shape
+/// [`PyPiecewiseLogLinearDiscount`](crate::curve) uses.
+///
+/// Fallible, like [`PySpreadCdsHelper`](crate::credithelpers) and unlike the
+/// [`PyFlatHazardRate`] chain: the core rejects too few dates, a dates/rates
+/// count mismatch, a negative hazard rate and unsorted dates
+/// (`interpolatedhazardratecurve.rs:75-88`), each as
+/// [`struct@crate::ItofinError`].
+///
+/// `BackwardFlat` is pinned at the boundary: it is the only interpolator the
+/// credit side wires (`interpolatedhazardratecurve.rs:148-152`), so no
+/// interpolation argument is offered.
+///
+/// Deferred (visible): the calendar-carrying `with_calendar` constructor
+/// (`interpolatedhazardratecurve.rs:68`) is not exposed, so the curve has no
+/// calendar; and `times()` / `data()` are omitted, the former derivable from
+/// the day counter and the latter identical to [`hazard_rates`](Self::hazard_rates).
+#[pyclass(name = "InterpolatedHazardRateCurve", extends = PyDefaultProbabilityTermStructure, unsendable)]
+pub struct PyInterpolatedHazardRateCurve {
+    concrete: Shared<InterpolatedHazardRateCurve<BackwardFlat>>,
+}
+
+#[pymethods]
+impl PyInterpolatedHazardRateCurve {
+    /// A curve over the `(dates, hazard_rates)` nodes, with `dates[0]` as the
+    /// reference date.
+    #[new]
+    fn new(
+        dates: Vec<PyRef<PyDate>>,
+        hazard_rates: Vec<f64>,
+        day_counter: &PyDayCounter,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        let dates: Vec<_> = dates.iter().map(|date| date.inner()).collect();
+        let concrete = shared(
+            InterpolatedHazardRateCurve::new(
+                dates,
+                hazard_rates,
+                day_counter.inner(),
+                BackwardFlat,
+            )
+            .map_err(PyQlError::from)?,
+        );
+        let erased = Shared::clone(&concrete) as Shared<dyn DefaultProbabilityTermStructure>;
+        Ok(
+            PyClassInitializer::from(PyDefaultProbabilityTermStructure::from_handle(Handle::new(
+                erased,
+            )))
+            .add_subclass(PyInterpolatedHazardRateCurve { concrete }),
+        )
+    }
+
+    /// The node dates, the first of which is the reference date.
+    fn dates(&self) -> Vec<PyDate> {
+        self.concrete
+            .dates()
+            .iter()
+            .copied()
+            .map(PyDate::from_inner)
+            .collect()
+    }
+
+    /// The node hazard rates.
+    fn hazard_rates(&self) -> Vec<f64> {
+        self.concrete.hazard_rates().to_vec()
+    }
+
+    /// The `(date, hazard rate)` nodes.
+    fn nodes(&self) -> Vec<(PyDate, f64)> {
+        self.concrete
+            .nodes()
+            .into_iter()
+            .map(|(date, rate)| (PyDate::from_inner(date), rate))
+            .collect()
     }
 }
 
