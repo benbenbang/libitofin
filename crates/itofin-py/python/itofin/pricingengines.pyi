@@ -1,5 +1,5 @@
 # Hand-written stubs for itofin.pricingengines; sync manually with src/swaptionengine.rs,
-# src/capfloorengine.rs and src/creditengine.rs (#517).
+# src/capfloorengine.rs, src/creditengine.rs and src/inflation.rs (#517).
 
 from itofin import Settings
 from itofin.quotes import SimpleQuote
@@ -100,3 +100,15 @@ class MidPointCdsEngine:
         discount: YieldTermStructure,
         settings: Settings,
     ) -> None: ...
+
+class DiscountingSwapEngine:
+    """Discounts every leg of a swap over a single yield curve.
+
+    Infallible at construction - every precondition (an empty curve handle, an
+    unset evaluation date) is reported when the swap is priced. The core's
+    include_settlement_date_flows, settlement_date and npv_date overrides are
+    not exposed and are always None, so the flow decision follows the settings'
+    own flags and both dates fall back to the curve reference date. The swap
+    this engine prices must carry the same Settings object."""
+
+    def __init__(self, discount: YieldTermStructure, settings: Settings) -> None: ...

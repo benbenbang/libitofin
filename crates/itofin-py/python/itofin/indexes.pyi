@@ -1,5 +1,5 @@
-# Hand-written stubs for itofin.indexes; sync manually with src/hullwhite.rs, src/helpers.rs
-# and src/swapindex.rs (#517).
+# Hand-written stubs for itofin.indexes; sync manually with src/hullwhite.rs, src/helpers.rs,
+# src/swapindex.rs and src/inflation.rs (#517).
 
 from itofin import Settings
 from itofin.termstructures import YieldTermStructure
@@ -74,3 +74,12 @@ class SwapIndex:
         ...
     def fixed_leg_tenor(self) -> Period: ...
     def exogenous_discount(self) -> bool: ...
+
+class CpiInterpolationType:
+    """How a CPI observation interpolates between the index fixings bracketing
+    it. Flat reads the fixing of the lagged period outright; Linear advances
+    from it to the next period's fixing by how far the observation date has run
+    into its own period."""
+
+    Flat: CpiInterpolationType
+    Linear: CpiInterpolationType
