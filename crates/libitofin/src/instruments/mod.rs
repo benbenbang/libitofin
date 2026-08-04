@@ -21,6 +21,7 @@ mod protection;
 mod swap;
 mod swaption;
 mod vanillaswap;
+mod zerocouponinflationswap;
 
 pub use bond::{Bond, BondArguments, BondEngine, BondPrice, BondPriceType, BondResults};
 pub use bonds::FixedRateBond;
@@ -49,3 +50,4 @@ pub use swaption::{
     check_type_and_method_consistency,
 };
 pub use vanillaswap::VanillaSwap;
+pub use zerocouponinflationswap::ZeroCouponInflationSwap;
