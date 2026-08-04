@@ -7,6 +7,7 @@
 //! interpolated curves, the year-on-year structures and the seasonality
 //! classes that build on it follow within EPIC Inflation (#705).
 
+pub mod inflationhelpers;
 pub mod inflationtermstructure;
 pub mod inflationtraits;
 pub mod interpolatedzeroinflationcurve;
