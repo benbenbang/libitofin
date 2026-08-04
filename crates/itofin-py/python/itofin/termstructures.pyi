@@ -1,6 +1,6 @@
 # Hand-written stubs for itofin.termstructures; sync manually with src/curve.rs, src/vol.rs,
 # src/helpers.rs, src/swaptionvol.rs, src/optionletvol.rs, src/smilesection.rs and
-# src/credit.rs (#517).
+# src/credit.rs and src/credithelpers.rs (#517).
 
 from itofin import Settings
 from itofin.indexes import Estr, Euribor, SwapIndex
@@ -9,6 +9,7 @@ from itofin.time import (
     BusinessDayConvention,
     Calendar,
     Date,
+    DateGeneration,
     DayCounter,
     Frequency,
     Period,
@@ -849,4 +850,31 @@ class FlatHazardRate(DefaultProbabilityTermStructure):
     ) -> FlatHazardRate:
         """Raises ItofinError on any query made before settings carries an
         evaluation date."""
+        ...
+
+class DefaultProbabilityHelper:
+    """Shared base for every credit bootstrap helper."""
+
+    def pillar_date(self) -> Date: ...
+    def latest_date(self) -> Date: ...
+
+class SpreadCdsHelper(DefaultProbabilityHelper):
+    """Bootstrap helper fitting a CDS quoted as a running spread."""
+
+    def __init__(
+        self,
+        running_spread: SimpleQuote,
+        tenor: Period,
+        settlement_days: int,
+        calendar: Calendar,
+        frequency: Frequency,
+        payment_convention: BusinessDayConvention,
+        rule: DateGeneration,
+        day_counter: DayCounter,
+        recovery_rate: float,
+        discount_curve: YieldTermStructure,
+        settings: Settings,
+    ) -> None:
+        """Raises ItofinError on the post-Big-Bang rules DateGeneration.OldCDS,
+        .CDS and .CDS2015, whose maturity rule the core has not ported."""
         ...

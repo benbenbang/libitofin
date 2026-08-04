@@ -11,6 +11,7 @@ mod capfloorengine;
 mod capfloortermvol;
 mod credit;
 mod creditengine;
+mod credithelpers;
 mod curve;
 mod helpers;
 mod heston;
@@ -36,6 +37,7 @@ use credit::{
     PyCreditDefaultSwap, PyDefaultProbabilityTermStructure, PyFlatHazardRate, PyProtectionSide,
 };
 use creditengine::PyMidPointCdsEngine;
+use credithelpers::{PyDefaultProbabilityHelper, PySpreadCdsHelper};
 use curve::{
     PyDiscountCurve, PyFlatForward, PyForwardCurve, PyPiecewiseFlatForward,
     PyPiecewiseLinearForward, PyPiecewiseLinearZero, PyPiecewiseLogLinearDiscount,
@@ -170,6 +172,8 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     termstructures.add_class::<PyStrippedOptionletAdapter>()?;
     termstructures.add_class::<PyDefaultProbabilityTermStructure>()?;
     termstructures.add_class::<PyFlatHazardRate>()?;
+    termstructures.add_class::<PyDefaultProbabilityHelper>()?;
+    termstructures.add_class::<PySpreadCdsHelper>()?;
 
     let processes = PyModule::new(py, "processes")?;
     processes.add_class::<PyBlackScholesProcess>()?;
