@@ -83,3 +83,49 @@ class CpiInterpolationType:
 
     Flat: CpiInterpolationType
     Linear: CpiInterpolationType
+
+class ZeroInflationIndex:
+    """A price index publishing one level per period, reading back either a
+    stored figure or a forecast off its inflation curve.
+
+    The curve is reached through a relinkable handle the index owns, so an
+    index can be built before the curve it forecasts off exists. The handle
+    starts empty and a forecast before any link raises ItofinError. link_to,
+    which points it at a bootstrapped curve, lands with
+    PiecewiseZeroInflationCurve."""
+
+    @staticmethod
+    def uk_rpi(settings: Settings) -> ZeroInflationIndex:
+        """The UK Retail Price Index: monthly, one-month availability lag."""
+        ...
+    @staticmethod
+    def uk_hicp(settings: Settings) -> ZeroInflationIndex:
+        """The UK harmonised index of consumer prices."""
+        ...
+    @staticmethod
+    def eu_hicp(settings: Settings) -> ZeroInflationIndex:
+        """The euro-area harmonised index of consumer prices."""
+        ...
+    def name(self) -> str: ...
+    def add_fixing(self, fixing_date: Date, value: float) -> None:
+        """Records a published figure across the whole inflation period it
+        describes, so a later read on any day inside that period finds it."""
+        ...
+    def fixing(self, fixing_date: Date, forecast_todays_fixing: bool = False) -> float:
+        """The fixing at fixing_date, stored or forecast off the linked curve.
+
+        forecast_todays_fixing is accepted and ignored, as in the core:
+        needs_forecast alone decides between history and forecast. A date the
+        store should cover but does not is an error, and a forecast with no
+        curve linked raises the empty-handle error."""
+        ...
+    def last_fixing_date(self) -> Date:
+        """The first day of the inflation period the latest stored figure
+        describes. Raises ItofinError on an index with no history."""
+        ...
+    def needs_forecast(self, fixing_date: Date) -> bool:
+        """Whether fixing_date has to be forecast rather than read from
+        history, decided against the latest period that could have been
+        published by the settings' evaluation date."""
+        ...
+    def __repr__(self) -> str: ...
