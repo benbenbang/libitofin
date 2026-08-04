@@ -18,6 +18,7 @@ mod fixedrateleg;
 mod floatingratecoupon;
 mod iborcoupon;
 mod iborleg;
+mod indexedcashflow;
 mod overnightindexedcoupon;
 mod overnightindexedcouponpricer;
 mod overnightleg;
@@ -35,6 +36,7 @@ pub use fixedrateleg::FixedRateLeg;
 pub use floatingratecoupon::{FloatingIndex, FloatingRateCoupon};
 pub use iborcoupon::IborCoupon;
 pub use iborleg::{AttachPricer, IborLeg, set_coupon_pricer};
+pub use indexedcashflow::IndexedCashFlow;
 pub use overnightindexedcoupon::OvernightIndexedCoupon;
 pub use overnightindexedcouponpricer::{
     CompoundingOvernightIndexedCouponPricer, OvernightSchedule,
