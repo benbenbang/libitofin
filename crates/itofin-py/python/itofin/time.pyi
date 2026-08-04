@@ -91,7 +91,11 @@ class DateGeneration:
     CDS2015: DateGeneration
 
 class Schedule:
-    """A sequence of coupon dates built through MakeSchedule."""
+    """A sequence of coupon dates built through MakeSchedule.
+
+    termination_convention rolls the last date only, and defaults to
+    convention. CDS conventions need the two to differ: a credit helper leaves
+    its maturity unadjusted while paying Following."""
 
     def __init__(
         self,
@@ -101,6 +105,7 @@ class Schedule:
         calendar: Calendar,
         convention: BusinessDayConvention,
         rule: DateGeneration = ...,
+        termination_convention: BusinessDayConvention | None = None,
     ) -> None: ...
     def size(self) -> int: ...
     def date(self, i: int) -> Date: ...
