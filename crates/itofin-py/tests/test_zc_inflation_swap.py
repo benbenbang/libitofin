@@ -124,7 +124,8 @@ def test_the_observation_date_lags_the_maturity():
     maturity less the three-month lag, unsnapped to its inflation period, and
     obs_date is the same call on the swap (zerocouponinflationswap.rs:315-317)
     under the flow-level name."""
-    swap = _swap(_settings(), _index(_settings()))
+    settings = _settings()
+    swap = _swap(settings, _index(settings))
 
     assert swap.inflation_fixing_date() == Date(13, 5, 2008)
     assert swap.obs_date() == swap.inflation_fixing_date()
@@ -136,14 +137,21 @@ def test_the_maturity_round_trips_raw():
     Swap's span over the legs. The Saturday fixture that does is in the core
     (`the_raw_dates_override_the_bases_span_of_the_legs`); here it is an input
     round-trip."""
-    assert _swap(_settings(), _index(_settings())).maturity_date() == MATURITY
+    settings = _settings()
+
+    assert _swap(settings, _index(settings)).maturity_date() == MATURITY
 
 
 def test_an_unlinked_index_cannot_price_and_link_to_fixes_it():
     """The pin that makes link_to's wiring observable. The index's handle
     starts empty, so the maturity forecast - and everything downstream of it -
     raises until a curve is linked. Nothing about the swap changes in between:
-    the same object prices afterwards."""
+    the same object prices afterwards.
+
+    It does not show that a relink refreshes an already-priced swap. The failed
+    calculate() left the instrument uncalculated, so the second call simply
+    recomputes; whether a notification reaches a swap that priced successfully
+    is the separate #387 question."""
     settings = _settings()
     index = _index(settings)
     swap = _swap(settings, index)
