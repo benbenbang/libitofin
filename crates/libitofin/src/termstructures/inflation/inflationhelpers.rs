@@ -594,4 +594,285 @@ mod tests {
         assert_eq!(view.latest_relevant_date, Date::new(1, Month::July, 2030));
         assert_eq!(view.maturity_date, Date::new(1, Month::June, 2030));
     }
+
+    mod zero_coupon_swap_helper {
+        //! The helper's place inside a bootstrap is exercised by the piecewise
+        //! zero-inflation curve; what is checkable here is everything the helper
+        //! decides on its own - its dates, the swap it caches, and the two
+        //! wirings a bootstrap depends on but no numeric assertion would catch:
+        //! that its index copy reads the curve handed to
+        //! [`set_term_structure`](ZeroInflationHelper::set_term_structure), and
+        //! that the relink does not travel back to the helper.
+
+        use super::*;
+        use crate::indexes::Index;
+        use crate::indexes::inflation::UkRpi;
+        use crate::instrument::Instrument;
+        use crate::math::interpolations::linear::Linear;
+        use crate::test_support::{Flag, as_observer};
+        use crate::time::businessdayconvention::BusinessDayConvention;
+        use crate::time::calendars::unitedkingdom::{Market, UnitedKingdom};
+        use crate::time::date::Month::{August, June, May};
+        use crate::time::daycounters::actual365fixed::Actual365Fixed;
+        use crate::time::period::Period;
+        use crate::time::timeunit::TimeUnit;
+        use crate::types::Rate;
+
+        /// The May 2007 figure, which the swap's base observation reads.
+        const BASE_FIXING: Real = 195.0;
+        /// The June 2007 figure, which is also the curve's base date.
+        const CURVE_BASE_FIXING: Real = 200.0;
+
+        fn today() -> Date {
+            Date::new(13, Month::August, 2007)
+        }
+
+        /// One year out, so the fixing period observed under a three-month lag is
+        /// May 2008 - a date the curve carries a node at.
+        fn maturity() -> Date {
+            Date::new(13, August, 2008)
+        }
+
+        fn curve_base_date() -> Date {
+            Date::new(1, June, 2007)
+        }
+
+        fn lag() -> Period {
+            Period::new(3, TimeUnit::Months)
+        }
+
+        fn settings_today() -> Shared<Settings<Date>> {
+            let settings = shared(Settings::<Date>::new());
+            settings.set_evaluation_date(today());
+            settings
+        }
+
+        fn a_curve(rates: Vec<Rate>) -> Shared<dyn ZeroInflationTermStructure> {
+            shared(
+                ZeroInflationCurve::new(
+                    today(),
+                    vec![
+                        curve_base_date(),
+                        Date::new(1, May, 2008),
+                        Date::new(1, June, 2012),
+                    ],
+                    rates,
+                    Frequency::Monthly,
+                    Actual360::new(),
+                    Linear,
+                )
+                .expect("a well-formed zero inflation curve"),
+            ) as Shared<dyn ZeroInflationTermStructure>
+        }
+
+        /// UK RPI with the two figures the swap needs on record: its base
+        /// observation and the curve's base date. The index is left on an empty
+        /// curve handle, so any forecast it produced itself would fail - only the
+        /// helper's own copy, relinked to the bootstrapped curve, can forecast.
+        fn an_index(settings: &Shared<Settings<Date>>) -> Shared<ZeroInflationIndex> {
+            let index = shared(UkRpi::new(Shared::clone(settings)));
+            index
+                .add_fixing(Date::new(1, May, 2007), BASE_FIXING)
+                .expect("a published figure");
+            index
+                .add_fixing(curve_base_date(), CURVE_BASE_FIXING)
+                .expect("a published figure");
+            index
+        }
+
+        fn a_helper(
+            settings: &Shared<Settings<Date>>,
+            interpolation: CpiInterpolationType,
+        ) -> QlResult<Shared<ZeroCouponInflationSwapHelper>> {
+            ZeroCouponInflationSwapHelper::new(
+                Handle::new(shared(SimpleQuote::new(Some(0.03))) as Shared<dyn Quote>),
+                lag(),
+                maturity(),
+                UnitedKingdom::new(Market::Settlement),
+                BusinessDayConvention::ModifiedFollowing,
+                Actual365Fixed::new(),
+                &an_index(settings),
+                interpolation,
+                Shared::clone(settings),
+            )
+        }
+
+        /// All four dates collapse onto the first day of the observed fixing
+        /// period (`cpp:158-159`): 13 August 2008 less three months is 13 May
+        /// 2008, whose monthly period starts on 1 May 2008. C++ leaves the
+        /// relevant, maturity and pillar fields unset there and lets the base's
+        /// fallbacks answer; this port sets the pillar explicitly - the same value
+        /// - and leaves the other two to the fallbacks, as C++ does.
+        ///
+        /// The swap observes the *unrounded* 13 May 2008, the fixing period being
+        /// the helper's rounding and not the contract's.
+        #[test]
+        fn the_dates_collapse_onto_the_observed_fixing_period() {
+            let helper = a_helper(&settings_today(), CpiInterpolationType::Flat)
+                .expect("a three-month lag covers UK RPI's availability");
+            let period_start = Date::new(1, May, 2008);
+
+            assert_eq!(helper.earliest_date(), period_start);
+            assert_eq!(helper.latest_date(), period_start);
+            assert_eq!(helper.pillar_date(), period_start);
+            assert_eq!(helper.latest_relevant_date(), period_start);
+            assert_eq!(helper.maturity_date(), period_start);
+
+            let swap = helper.swap();
+            let swap = swap.as_ref().expect("the swap builds");
+            assert_eq!(swap.obs_date(), Date::new(13, May, 2008));
+            assert_eq!(swap.maturity_date(), maturity());
+            assert_eq!(swap.fixed_rate(), 0.0);
+            assert_eq!(swap.nominal(), 1.0);
+        }
+
+        /// The contract starts at the evaluation date and follows it, which is
+        /// what makes this a relative-date helper (`cpp:100`, `cpp:188`). The
+        /// helper's own dates come from the maturity and so do not move.
+        #[test]
+        fn moving_the_evaluation_date_rebuilds_the_swap() {
+            let settings = settings_today();
+            let helper = a_helper(&settings, CpiInterpolationType::Flat).expect("a valid lag");
+            assert_eq!(
+                helper
+                    .swap()
+                    .as_ref()
+                    .expect("the swap builds")
+                    .start_date(),
+                today()
+            );
+
+            let moved = Date::new(14, August, 2007);
+            settings.set_evaluation_date(moved);
+
+            assert_eq!(
+                helper
+                    .swap()
+                    .as_ref()
+                    .expect("the swap rebuilds")
+                    .start_date(),
+                moved
+            );
+            assert_eq!(helper.pillar_date(), Date::new(1, May, 2008));
+        }
+
+        /// The oracle, without a bootstrap: the quote the helper implies off a
+        /// directly built curve is the fair rate of the same swap built by hand
+        /// on that curve.
+        ///
+        /// It pins the whole chain the bootstrap relies on. The helper's index is
+        /// a *copy* reading a handle that is empty until `set_term_structure`
+        /// relinks it, so a copy that kept the caller's curve, or a relink that
+        /// never reached the copy, would fail to forecast at all rather than
+        /// answer a different number.
+        #[test]
+        fn the_implied_quote_is_the_swaps_fair_rate_on_the_curve_it_is_given() {
+            let settings = settings_today();
+            let helper = a_helper(&settings, CpiInterpolationType::Flat).expect("a valid lag");
+            let curve = a_curve(vec![0.02, 0.03, 0.04]);
+
+            assert!(
+                helper.implied_quote().is_err(),
+                "no curve has been handed over yet"
+            );
+            ZeroInflationHelper::set_term_structure(helper.as_ref(), &curve);
+
+            let by_hand = ZeroCouponInflationSwap::new(
+                SwapType::Payer,
+                1.0,
+                today(),
+                maturity(),
+                UnitedKingdom::new(Market::Settlement),
+                BusinessDayConvention::ModifiedFollowing,
+                Actual365Fixed::new(),
+                0.0,
+                shared(an_index(&settings).clone_linked_to(Handle::new(Shared::clone(&curve)))),
+                lag(),
+                CpiInterpolationType::Flat,
+                None,
+                None,
+                Shared::clone(&settings),
+            )
+            .expect("a valid lag");
+
+            let implied = helper.implied_quote().expect("the curve forecasts");
+            assert!(implied > 0.0);
+            assert!(
+                (implied - by_hand.fair_rate().expect("the curve forecasts")).abs() < 1e-14,
+                "implied {implied}"
+            );
+        }
+
+        /// The H7 hazard, pinned: the helper's own swap is struck at zero on a
+        /// flat 0 % nominal curve, so its NPV is nowhere near zero at the same
+        /// point where the implied quote is a perfectly good rate. A bootstrap
+        /// written against `helper.swap().npv() == 0` would never converge.
+        ///
+        /// The curve is bound to a local: the helper links it weakly, so a
+        /// temporary would be dropped before the quote is read.
+        #[test]
+        fn the_cached_swap_does_not_price_to_zero_at_the_implied_quote() {
+            let settings = settings_today();
+            let helper = a_helper(&settings, CpiInterpolationType::Flat).expect("a valid lag");
+            let curve = a_curve(vec![0.02, 0.03, 0.04]);
+            ZeroInflationHelper::set_term_structure(helper.as_ref(), &curve);
+
+            let implied = helper.implied_quote().expect("the curve forecasts");
+            let mut swap = helper.swap_mut();
+            let npv = swap
+                .as_mut()
+                .expect("the swap builds")
+                .npv()
+                .expect("the flat nominal curve discounts");
+
+            assert!(implied.is_finite() && implied > 0.0);
+            assert!(npv.abs() > 0.01, "npv was {npv}");
+        }
+
+        /// `cpp:107-110` and `cpp:199`, asserted structurally: the helper must not
+        /// hear about the curve it is being bootstrapped against. Two paths could
+        /// carry the news back - the copy still observing the handle the helper
+        /// relinks, and the relink itself subscribing to the curve - and both are
+        /// closed here. Either one open turns a solver step into a notification
+        /// the helper rebroadcasts to the curve that is moving it.
+        #[test]
+        fn the_relink_reaches_neither_the_helper_nor_its_index_copy() {
+            let helper =
+                a_helper(&settings_today(), CpiInterpolationType::Flat).expect("a valid lag");
+            let curve = a_curve(vec![0.02, 0.03, 0.04]);
+
+            let on_helper = Flag::new();
+            helper
+                .observable()
+                .register_observer(&as_observer(&on_helper));
+            let on_index = Flag::new();
+            helper
+                .inflation_index()
+                .observable()
+                .register_observer(&as_observer(&on_index));
+
+            ZeroInflationHelper::set_term_structure(helper.as_ref(), &curve);
+            assert!(
+                !Flag::is_up(&on_index),
+                "the copy still observes the handle"
+            );
+            assert!(!Flag::is_up(&on_helper), "the relink reached the helper");
+
+            curve.observable().notify_observers();
+            assert!(
+                !Flag::is_up(&on_helper),
+                "the helper must not observe the curve it is bootstrapped against"
+            );
+        }
+
+        /// The interpolated branch is omitted visibly: a caller asking for it is
+        /// told, not quietly given the flat dates.
+        #[test]
+        fn the_interpolated_observation_branch_is_rejected() {
+            let error = a_helper(&settings_today(), CpiInterpolationType::Linear)
+                .err()
+                .expect("the interpolated branch is deferred");
+            assert!(error.message().contains("not ported"), "err was: {error}");
+        }
+    }
 }
