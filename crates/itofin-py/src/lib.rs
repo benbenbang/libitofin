@@ -16,6 +16,7 @@ mod curve;
 mod helpers;
 mod heston;
 mod hullwhite;
+mod inflation;
 mod market;
 mod option;
 mod optionletvol;
@@ -50,6 +51,7 @@ use helpers::{
 };
 use heston::{PyHestonModel, PyHestonModelHelper, PyHestonProcess};
 use hullwhite::{PyEuribor, PyHullWhite, PySwaptionHelper};
+use inflation::{PyCpiInterpolationType, PyDiscountingSwapEngine};
 use libitofin::errors::QlError;
 use market::{PyBlackScholesProcess, PySimpleQuote};
 use option::{PyOptionType, PyVanillaOption};
@@ -186,6 +188,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     indexes.add_class::<PyEuribor>()?;
     indexes.add_class::<PyEstr>()?;
     indexes.add_class::<PySwapIndex>()?;
+    indexes.add_class::<PyCpiInterpolationType>()?;
 
     let instruments = PyModule::new(py, "instruments")?;
     instruments.add_class::<PyOptionType>()?;
@@ -214,6 +217,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     pricingengines.add_class::<PyBlackSwaptionEngine>()?;
     pricingengines.add_class::<PyBlackCapFloorEngine>()?;
     pricingengines.add_class::<PyMidPointCdsEngine>()?;
+    pricingengines.add_class::<PyDiscountingSwapEngine>()?;
 
     let optimization = PyModule::new(py, "optimization")?;
     optimization.add_class::<PyLevenbergMarquardt>()?;

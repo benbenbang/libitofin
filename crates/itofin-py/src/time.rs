@@ -3,6 +3,7 @@
 use crate::ItofinError;
 use libitofin::time::businessdayconvention::BusinessDayConvention;
 use libitofin::time::calendar::Calendar;
+use libitofin::time::calendars::unitedkingdom::{Market, UnitedKingdom};
 use libitofin::time::calendars::{NullCalendar, Target};
 use libitofin::time::date::{Date, Month};
 use libitofin::time::dategenerationrule::DateGeneration;
@@ -271,6 +272,19 @@ impl PyCalendar {
     fn null_calendar() -> Self {
         PyCalendar {
             inner: NullCalendar::new(),
+        }
+    }
+
+    /// The UK settlement calendar, the one the RPI inflation fixtures roll on.
+    ///
+    /// Only [`Market::Settlement`] is exposed: the Exchange and Metals markets
+    /// share an identical `is_business_day` body in the core
+    /// (`unitedkingdom.rs:60-61`) and differ solely in `name()`, so a market
+    /// argument would select between three calendars that behave alike.
+    #[staticmethod]
+    fn united_kingdom() -> Self {
+        PyCalendar {
+            inner: UnitedKingdom::new(Market::Settlement),
         }
     }
 
