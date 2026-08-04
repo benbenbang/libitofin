@@ -340,17 +340,22 @@ impl PyCalendar {
     }
 }
 
-/// Python `Frequency`: the coupon frequencies the fixtures need.
+/// Python `Frequency`: the coupon and fixing frequencies the fixtures need.
 ///
 /// A fieldless pyo3 enum exposing `Frequency.Annual` / `Frequency.Semiannual` /
-/// `Frequency.Quarterly`; only the variants the Jamshidian and CDS fixtures use
-/// are surfaced.
+/// `Frequency.Quarterly` / `Frequency.Monthly`; only the variants the
+/// Jamshidian, CDS and inflation fixtures use are surfaced. `Monthly` is the
+/// frequency every ported inflation index publishes at, and the only one
+/// [`ZeroInflationTermStructure`](crate::inflation::PyZeroInflationTermStructure)
+/// fixtures build curves under. New variants are appended, so the pyo3
+/// discriminants of the existing ones are unchanged.
 #[pyclass(name = "Frequency", eq, eq_int, from_py_object)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum PyFrequency {
     Annual,
     Semiannual,
     Quarterly,
+    Monthly,
 }
 
 impl PyFrequency {
@@ -360,6 +365,25 @@ impl PyFrequency {
             PyFrequency::Annual => Frequency::Annual,
             PyFrequency::Semiannual => Frequency::Semiannual,
             PyFrequency::Quarterly => Frequency::Quarterly,
+            PyFrequency::Monthly => Frequency::Monthly,
+        }
+    }
+
+    /// The variant standing for `frequency`, for the facades that read one back
+    /// off a core object.
+    ///
+    /// The core enum carries thirteen values against the four surfaced here, so
+    /// this is partial: a frequency with no counterpart is reported as
+    /// [`struct@ItofinError`] rather than mapped onto a neighbour.
+    pub(crate) fn from_inner(frequency: Frequency) -> PyResult<PyFrequency> {
+        match frequency {
+            Frequency::Annual => Ok(PyFrequency::Annual),
+            Frequency::Semiannual => Ok(PyFrequency::Semiannual),
+            Frequency::Quarterly => Ok(PyFrequency::Quarterly),
+            Frequency::Monthly => Ok(PyFrequency::Monthly),
+            other => Err(ItofinError::new_err(format!(
+                "frequency {other} is not exposed to Python"
+            ))),
         }
     }
 }

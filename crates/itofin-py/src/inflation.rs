@@ -1,6 +1,7 @@
 //! Facades for the inflation slice: the [`PyDiscountingSwapEngine`] every
 //! inflation swap prices through, the [`PyCpiInterpolationType`] observation
-//! flag and the [`PyZeroInflationIndex`] family.
+//! flag, the [`PyZeroInflationIndex`] family and the
+//! [`PyZeroInflationTermStructure`] curve hierarchy.
 //!
 //! The swap engine is generic rather than inflation-specific - it prices any
 //! swap - but is homed here because the inflation tickets are the first to need
@@ -9,15 +10,17 @@
 use crate::PyQlError;
 use crate::curve::PyYieldTermStructure;
 use crate::settings::PySettings;
-use crate::time::PyDate;
-use libitofin::handle::RelinkableHandle;
+use crate::time::{PyDate, PyDayCounter, PyFrequency};
+use libitofin::handle::{Handle, RelinkableHandle};
 use libitofin::indexes::index::Index;
 use libitofin::indexes::inflation::{EuHicp, UkHicp, UkRpi};
 use libitofin::indexes::inflationindex::ZeroInflationIndex;
+use libitofin::math::interpolations::linear::Linear;
 use libitofin::pricingengine::PricingEngine;
 use libitofin::pricingengines::DiscountingSwapEngine;
 use libitofin::shared::{Shared, SharedMut, shared, shared_mut};
 use libitofin::termstructures::inflation::inflationtermstructure::ZeroInflationTermStructure;
+use libitofin::termstructures::inflation::interpolatedzeroinflationcurve::InterpolatedZeroInflationCurve;
 use pyo3::prelude::*;
 
 /// Python `DiscountingSwapEngine`: discounts each leg of a swap over a single
@@ -209,5 +212,197 @@ impl PyZeroInflationIndex {
     #[allow(dead_code)]
     pub(crate) fn shared(&self) -> Shared<ZeroInflationIndex> {
         Shared::clone(&self.inner)
+    }
+}
+
+/// Python `ZeroInflationTermStructure`: the shared base for every zero-coupon
+/// inflation curve (`termstructures::inflation::inflationtermstructure`).
+///
+/// Holds the erased `Handle<dyn ZeroInflationTermStructure>` and exposes the
+/// query surface every concrete curve inherits, the shape
+/// [`PyDefaultProbabilityTermStructure`](crate::credit) already uses on the
+/// credit side. Concrete curves such as [`PyInterpolatedZeroInflationCurve`]
+/// subclass this and supply only their constructor and node inspectors.
+///
+/// The two rate reads are not interchangeable.
+/// [`zero_rate_date`](Self::zero_rate_date) snaps its date to the start of the
+/// inflation period containing it before the curve sees it, because a fixing
+/// applies to a whole period; [`zero_rate`](Self::zero_rate) takes a
+/// year-fraction already measured under the curve's own day counter and
+/// quantizes nothing. A mid-period date therefore reads that period's rate
+/// through the first and an interpolated one through the second.
+///
+/// Deferred (visible): `base_rate()` is not exposed. A zero curve carries no
+/// base rate, so the core accessor is an error on every curve reachable here
+/// (`inflationtermstructure.rs:159-166`); it follows with the year-on-year
+/// structures that do carry one.
+#[pyclass(name = "ZeroInflationTermStructure", subclass, unsendable)]
+pub struct PyZeroInflationTermStructure {
+    inner: Handle<dyn ZeroInflationTermStructure>,
+}
+
+#[pymethods]
+impl PyZeroInflationTermStructure {
+    /// The zero-coupon inflation rate at year-fraction `t`, on the yearly
+    /// compounding ZCIIS quotes assume.
+    ///
+    /// `t` must be measured with the curve's own day counter, and is negative
+    /// for the base period. Nothing here accounts for observation lags or
+    /// period interpolation: the caller manages those.
+    #[pyo3(signature = (t, extrapolate = false))]
+    fn zero_rate(&self, t: f64, extrapolate: bool) -> PyResult<f64> {
+        Ok(self
+            .inner
+            .current_link()
+            .map_err(PyQlError::from)?
+            .zero_rate(t, extrapolate)
+            .map_err(PyQlError::from)?)
+    }
+
+    /// The zero-coupon inflation rate for the inflation period containing
+    /// `date`.
+    ///
+    /// The date is quantized to that period's first day before both the range
+    /// check and the time conversion, so every day inside one period reads the
+    /// same rate.
+    #[pyo3(signature = (date, extrapolate = false))]
+    fn zero_rate_date(&self, date: &PyDate, extrapolate: bool) -> PyResult<f64> {
+        Ok(self
+            .inner
+            .current_link()
+            .map_err(PyQlError::from)?
+            .zero_rate_date(date.inner(), extrapolate)
+            .map_err(PyQlError::from)?)
+    }
+
+    /// The base date: the last date for which the fixing is known. It precedes
+    /// the reference date, so its year-fraction is negative.
+    fn base_date(&self) -> PyResult<PyDate> {
+        Ok(PyDate::from_inner(
+            self.inner
+                .current_link()
+                .map_err(PyQlError::from)?
+                .base_date(),
+        ))
+    }
+
+    /// The frequency of the inflation fixings the curve is built on.
+    fn frequency(&self) -> PyResult<PyFrequency> {
+        PyFrequency::from_inner(
+            self.inner
+                .current_link()
+                .map_err(PyQlError::from)?
+                .frequency(),
+        )
+    }
+}
+
+impl PyZeroInflationTermStructure {
+    /// The base half of a concrete curve's [`PyClassInitializer`] chain.
+    pub(crate) fn from_handle(inner: Handle<dyn ZeroInflationTermStructure>) -> Self {
+        PyZeroInflationTermStructure { inner }
+    }
+
+    /// A clone of the inner curve handle for the coupon and instrument facades
+    /// that take an inflation curve.
+    #[allow(dead_code)]
+    pub(crate) fn handle(&self) -> Handle<dyn ZeroInflationTermStructure> {
+        self.inner.clone()
+    }
+}
+
+/// Python `InterpolatedZeroInflationCurve`: a zero-coupon inflation curve built
+/// from (date, zero-rate) nodes, interpolating linearly in zero-rate space
+/// (`termstructures::inflation::InterpolatedZeroInflationCurve<Linear>`).
+///
+/// Extends [`PyZeroInflationTermStructure`], which carries the whole query
+/// surface. The first date is the *base* date rather than the reference date,
+/// which is passed separately and normally follows it; node times are measured
+/// from the reference date, so the first one is negative. That is the
+/// divergence from the yield-side [`ZeroCurve`](crate::curve::PyZeroCurve),
+/// whose first node is its own reference date at time zero.
+///
+/// The concrete curve is retained alongside the erased handle so the node
+/// inspectors [`times`](Self::times), [`dates`](Self::dates) and
+/// [`nodes`](Self::nodes) stay reachable, the shape
+/// [`PyInterpolatedHazardRateCurve`](crate::credit) uses.
+///
+/// Fallible: the core rejects fewer than two dates, a dates/rates count
+/// mismatch, a rate at or below -100 % from the second node on, and unsorted
+/// dates (`interpolatedzeroinflationcurve.rs:95-106`), each as
+/// [`struct@crate::ItofinError`].
+///
+/// `Linear` is pinned at the boundary: it is the interpolator C++'s
+/// `ZeroInflationCurve` typedef fixes (`interpolatedzeroinflationcurve.rs:74`),
+/// so no interpolation argument is offered.
+///
+/// Deferred (visible): the core's `rates()` / `data()` inspectors are omitted,
+/// both being the rate half of [`nodes`](Self::nodes); and the curve carries no
+/// seasonality, which the core does not port either.
+#[pyclass(
+    name = "InterpolatedZeroInflationCurve",
+    extends = PyZeroInflationTermStructure,
+    unsendable
+)]
+pub struct PyInterpolatedZeroInflationCurve {
+    concrete: Shared<InterpolatedZeroInflationCurve<Linear>>,
+}
+
+#[pymethods]
+impl PyInterpolatedZeroInflationCurve {
+    /// A curve through the `rates` quoted at `dates`, with `dates[0]` as the
+    /// base date and `reference_date` given separately.
+    #[new]
+    fn new(
+        reference_date: &PyDate,
+        dates: Vec<PyRef<PyDate>>,
+        rates: Vec<f64>,
+        frequency: &PyFrequency,
+        day_counter: &PyDayCounter,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        let dates: Vec<_> = dates.iter().map(|date| date.inner()).collect();
+        let concrete = shared(
+            InterpolatedZeroInflationCurve::new(
+                reference_date.inner(),
+                dates,
+                rates,
+                frequency.inner(),
+                day_counter.inner(),
+                Linear,
+            )
+            .map_err(PyQlError::from)?,
+        );
+        let erased = Shared::clone(&concrete) as Shared<dyn ZeroInflationTermStructure>;
+        Ok(
+            PyClassInitializer::from(PyZeroInflationTermStructure::from_handle(Handle::new(
+                erased,
+            )))
+            .add_subclass(PyInterpolatedZeroInflationCurve { concrete }),
+        )
+    }
+
+    /// The node times, measured from the reference date; the first is negative
+    /// whenever the base date precedes it.
+    fn times(&self) -> Vec<f64> {
+        self.concrete.times().to_vec()
+    }
+
+    /// The node dates, the first of which is the base date.
+    fn dates(&self) -> Vec<PyDate> {
+        self.concrete
+            .dates()
+            .iter()
+            .copied()
+            .map(PyDate::from_inner)
+            .collect()
+    }
+
+    /// The `(date, zero-rate)` nodes.
+    fn nodes(&self) -> Vec<(PyDate, f64)> {
+        self.concrete
+            .nodes()
+            .into_iter()
+            .map(|(date, rate)| (PyDate::from_inner(date), rate))
+            .collect()
     }
 }
