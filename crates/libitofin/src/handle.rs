@@ -152,6 +152,17 @@ impl<T: ?Sized> Handle<T> {
         self.link.borrow().observable.register_observer(observer)
     }
 
+    /// Unregisters an observer from the underlying link, returning `true` if it
+    /// had been registered.
+    ///
+    /// The port of C++ `unregisterWith(handle)`: an object built already
+    /// observing a handle can be detached from it again, which is how a bootstrap
+    /// helper stops its own index reacting to the handle it relinks each solver
+    /// step (`inflationhelpers.cpp:106-110`).
+    pub fn unregister_observer(&self, observer: &SharedMut<dyn Observer>) -> bool {
+        self.link.borrow().observable.unregister_observer(observer)
+    }
+
     /// Two handles are equal when they share the same underlying link.
     pub fn points_to_same_link(&self, other: &Handle<T>) -> bool {
         SharedMut::ptr_eq(&self.link, &other.link)
