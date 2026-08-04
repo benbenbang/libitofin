@@ -95,8 +95,22 @@ pub trait PiecewiseCurve {
     /// The stopping accuracy for the per-node root search.
     fn accuracy(&self) -> Real;
 
-    /// The curve's reference date (the first curve node).
+    /// The curve's reference date.
     fn reference_date(&self) -> QlResult<Date>;
+
+    /// The date of the first curve node (`Traits::initialDate`).
+    ///
+    /// C++ takes this from the traits struct, which for every yield and credit
+    /// convention returns the term structure's reference date - hence the
+    /// default here. An inflation curve overrides it with its base date, which
+    /// *precedes* the reference date, so its first node sits at a negative
+    /// time. The driver takes all three of its date decisions from this - the
+    /// expired-instrument threshold, the first-alive scan and node 0
+    /// (`iterativebootstrap.hpp:161-182`) - while `time_from_reference` stays
+    /// anchored to the reference date.
+    fn initial_date(&self) -> QlResult<Date> {
+        self.reference_date()
+    }
 
     /// The year fraction from the reference date to `date`.
     fn time_from_reference(&self, date: Date) -> QlResult<Time>;
@@ -139,7 +153,7 @@ impl IterativeBootstrap {
         require!(n > 0, "no bootstrap helpers given");
         sort_by_pillar_date(&mut helpers);
 
-        let first_date = curve.reference_date()?;
+        let first_date = curve.initial_date()?;
         require!(
             helpers[n - 1].pillar_date() > first_date,
             "all instruments expired"
@@ -312,10 +326,29 @@ mod tests {
         interpolator: LogLinear,
         data: RefCell<CurveData<LogLinear>>,
         self_weak: Weak<dyn YieldTermStructure>,
+        initial_date: Option<Date>,
     }
 
     impl StubCurve {
         fn new(reference: Date, instruments: Vec<Shared<dyn RateHelper>>) -> Shared<StubCurve> {
+            StubCurve::build(reference, instruments, None)
+        }
+
+        /// A curve whose first node sits at `initial_date` rather than at the
+        /// reference date, the way an inflation curve's base date does.
+        fn with_initial_date(
+            reference: Date,
+            instruments: Vec<Shared<dyn RateHelper>>,
+            initial_date: Date,
+        ) -> Shared<StubCurve> {
+            StubCurve::build(reference, instruments, Some(initial_date))
+        }
+
+        fn build(
+            reference: Date,
+            instruments: Vec<Shared<dyn RateHelper>>,
+            initial_date: Option<Date>,
+        ) -> Shared<StubCurve> {
             Shared::new_cyclic(|weak: &Weak<StubCurve>| {
                 let self_weak: Weak<dyn YieldTermStructure> = weak.clone();
                 StubCurve {
@@ -328,6 +361,7 @@ mod tests {
                     interpolator: LogLinear,
                     data: RefCell::new(CurveData::new()),
                     self_weak,
+                    initial_date,
                 }
             })
         }
@@ -385,6 +419,13 @@ mod tests {
             self.base.reference_date()
         }
 
+        fn initial_date(&self) -> QlResult<Date> {
+            match self.initial_date {
+                Some(date) => Ok(date),
+                None => self.base.reference_date(),
+            }
+        }
+
         fn time_from_reference(&self, date: Date) -> QlResult<Time> {
             TermStructure::time_from_reference(self, date)
         }
@@ -438,6 +479,44 @@ mod tests {
         IterativeBootstrap::new().calculate(curve.as_ref()).unwrap();
 
         for helper in [&h3, &h6, &h9] {
+            let error = helper.quote_error().unwrap();
+            assert!(error.abs() < 1.0e-12, "deposit quote error {error}");
+        }
+    }
+
+    /// The first node is laid down at the curve's `initial_date`, not at its
+    /// reference date, and its time is still measured from the reference - so a
+    /// curve whose first node precedes the reference (an inflation base date)
+    /// gets `times[0] < 0`. Without this the regression suites would not move:
+    /// the default `initial_date` makes the two dates equal everywhere else.
+    #[test]
+    fn the_first_node_sits_at_the_initial_date_which_may_precede_the_reference() {
+        let today = Date::new(15, Month::June, 2026);
+        let settings = settings_on(today);
+
+        let three_m = euribor(Period::new(3, TimeUnit::Months), settings.clone());
+        let six_m = euribor(Period::new(6, TimeUnit::Months), settings.clone());
+
+        let h3 = DepositRateHelper::from_rate(0.04557, &three_m);
+        let h6 = DepositRateHelper::from_rate(0.04496, &six_m);
+
+        let reference = h3.earliest_date();
+        let base_date = reference - 90;
+        let instruments: Vec<Shared<dyn RateHelper>> = vec![
+            Shared::clone(&h3) as Shared<dyn RateHelper>,
+            Shared::clone(&h6) as Shared<dyn RateHelper>,
+        ];
+
+        let curve = StubCurve::with_initial_date(reference, instruments, base_date);
+        IterativeBootstrap::new().calculate(curve.as_ref()).unwrap();
+
+        let data = curve.data.borrow();
+        assert_eq!(data.dates()[0], base_date);
+        assert!(data.times()[0] < 0.0, "times[0] = {}", data.times()[0]);
+        assert_eq!(data.times()[0], -90.0 / 360.0);
+        drop(data);
+
+        for helper in [&h3, &h6] {
             let error = helper.quote_error().unwrap();
             assert!(error.abs() < 1.0e-12, "deposit quote error {error}");
         }
