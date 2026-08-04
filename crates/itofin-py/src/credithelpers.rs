@@ -62,7 +62,6 @@ impl PyDefaultProbabilityHelper {
 
     /// A clone of the upcast helper, for the piecewise credit-curve facade,
     /// which takes a list of helpers and threads each into the bootstrap.
-    #[allow(dead_code)]
     pub(crate) fn shared(&self) -> Shared<dyn DefaultProbabilityHelper> {
         Shared::clone(&self.inner)
     }

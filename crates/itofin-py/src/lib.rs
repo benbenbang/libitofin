@@ -35,7 +35,7 @@ use capfloorengine::PyBlackCapFloorEngine;
 use capfloortermvol::PyCapFloorTermVolSurface;
 use credit::{
     PyCreditDefaultSwap, PyDefaultProbabilityTermStructure, PyFlatHazardRate,
-    PyInterpolatedHazardRateCurve, PyProtectionSide,
+    PyInterpolatedHazardRateCurve, PyPiecewiseDefaultCurve, PyProtectionSide,
 };
 use creditengine::PyMidPointCdsEngine;
 use credithelpers::{PyDefaultProbabilityHelper, PySpreadCdsHelper};
@@ -176,6 +176,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     termstructures.add_class::<PyInterpolatedHazardRateCurve>()?;
     termstructures.add_class::<PyDefaultProbabilityHelper>()?;
     termstructures.add_class::<PySpreadCdsHelper>()?;
+    termstructures.add_class::<PyPiecewiseDefaultCurve>()?;
 
     let processes = PyModule::new(py, "processes")?;
     processes.add_class::<PyBlackScholesProcess>()?;
