@@ -70,7 +70,8 @@ use swaptionvol::{
     PyVolatilityType,
 };
 use time::{
-    PyBusinessDayConvention, PyCalendar, PyDate, PyDayCounter, PyFrequency, PyPeriod, PySchedule,
+    PyBusinessDayConvention, PyCalendar, PyDate, PyDateGeneration, PyDayCounter, PyFrequency,
+    PyPeriod, PySchedule,
 };
 use vol::{
     PyBlackConstantVol, PyBlackVarianceCurve, PyBlackVarianceSurface, PyBlackVolTermStructure,
@@ -123,6 +124,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     time.add_class::<PyDayCounter>()?;
     time.add_class::<PyFrequency>()?;
     time.add_class::<PyBusinessDayConvention>()?;
+    time.add_class::<PyDateGeneration>()?;
     time.add_class::<PySchedule>()?;
     crate::time::add_functions(&time)?;
 

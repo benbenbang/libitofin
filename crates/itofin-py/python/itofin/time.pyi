@@ -67,6 +67,7 @@ class Frequency:
 
     Annual: Frequency
     Semiannual: Frequency
+    Quarterly: Frequency
 
 class BusinessDayConvention:
     """A holiday-rolling rule."""
@@ -74,6 +75,20 @@ class BusinessDayConvention:
     ModifiedFollowing: BusinessDayConvention
     Following: BusinessDayConvention
     Unadjusted: BusinessDayConvention
+
+class DateGeneration:
+    """The rule a Schedule generates its dates by."""
+
+    Backward: DateGeneration
+    Forward: DateGeneration
+    Zero: DateGeneration
+    ThirdWednesday: DateGeneration
+    ThirdWednesdayInclusive: DateGeneration
+    Twentieth: DateGeneration
+    TwentiethIMM: DateGeneration
+    OldCDS: DateGeneration
+    CDS: DateGeneration
+    CDS2015: DateGeneration
 
 class Schedule:
     """A sequence of coupon dates built through MakeSchedule."""
@@ -85,6 +100,7 @@ class Schedule:
         frequency: Frequency,
         calendar: Calendar,
         convention: BusinessDayConvention,
+        rule: DateGeneration = ...,
     ) -> None: ...
     def size(self) -> int: ...
     def date(self, i: int) -> Date: ...

@@ -5,6 +5,7 @@ use libitofin::time::businessdayconvention::BusinessDayConvention;
 use libitofin::time::calendar::Calendar;
 use libitofin::time::calendars::{NullCalendar, Target};
 use libitofin::time::date::{Date, Month};
+use libitofin::time::dategenerationrule::DateGeneration;
 use libitofin::time::daycounter::DayCounter;
 use libitofin::time::daycounters::actual360::Actual360;
 use libitofin::time::daycounters::actual365fixed::Actual365Fixed;
@@ -325,15 +326,17 @@ impl PyCalendar {
     }
 }
 
-/// Python `Frequency`: the coupon frequencies the swaption fixture needs.
+/// Python `Frequency`: the coupon frequencies the fixtures need.
 ///
-/// A fieldless pyo3 enum exposing `Frequency.Annual` / `Frequency.Semiannual`;
-/// only the variants the Jamshidian fixture uses are surfaced.
+/// A fieldless pyo3 enum exposing `Frequency.Annual` / `Frequency.Semiannual` /
+/// `Frequency.Quarterly`; only the variants the Jamshidian and CDS fixtures use
+/// are surfaced.
 #[pyclass(name = "Frequency", eq, eq_int, from_py_object)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum PyFrequency {
     Annual,
     Semiannual,
+    Quarterly,
 }
 
 impl PyFrequency {
@@ -342,6 +345,7 @@ impl PyFrequency {
         match self {
             PyFrequency::Annual => Frequency::Annual,
             PyFrequency::Semiannual => Frequency::Semiannual,
+            PyFrequency::Quarterly => Frequency::Quarterly,
         }
     }
 }
@@ -370,6 +374,55 @@ impl PyBusinessDayConvention {
     }
 }
 
+/// Python `DateGeneration`: the rule a `Schedule` generates its dates by
+/// (core `time::dategenerationrule::DateGeneration`).
+///
+/// A fieldless pyo3 enum exposing every rule the core ports. `Backward` and
+/// `Forward` roll from one end of the range to the other; `Zero` keeps only the
+/// two endpoints; the `ThirdWednesday` and `Twentieth` families snap the
+/// interior dates onto an IMM Wednesday or the twentieth of the month, the
+/// convention CDS schedules are quoted under.
+///
+/// The three post-Big-Bang rules (`OldCDS`, `CDS`, `CDS2015`) are surfaced here
+/// because a `Schedule` builds under them, but
+/// [`SpreadCdsHelper`](crate::credithelpers::PySpreadCdsHelper) rejects them:
+/// their maturity comes from `cdsMaturity`, which the core has not ported
+/// (`defaultprobabilityhelpers.rs:314-319`). That rejection surfaces as an
+/// [`struct@crate::ItofinError`] rather than a silently wrong schedule.
+#[pyclass(name = "DateGeneration", eq, eq_int, from_py_object)]
+#[derive(Clone, Copy, PartialEq)]
+#[allow(clippy::upper_case_acronyms)]
+pub enum PyDateGeneration {
+    Backward,
+    Forward,
+    Zero,
+    ThirdWednesday,
+    ThirdWednesdayInclusive,
+    Twentieth,
+    TwentiethIMM,
+    OldCDS,
+    CDS,
+    CDS2015,
+}
+
+impl PyDateGeneration {
+    /// The core [`DateGeneration`] this variant stands for.
+    pub(crate) fn inner(self) -> DateGeneration {
+        match self {
+            PyDateGeneration::Backward => DateGeneration::Backward,
+            PyDateGeneration::Forward => DateGeneration::Forward,
+            PyDateGeneration::Zero => DateGeneration::Zero,
+            PyDateGeneration::ThirdWednesday => DateGeneration::ThirdWednesday,
+            PyDateGeneration::ThirdWednesdayInclusive => DateGeneration::ThirdWednesdayInclusive,
+            PyDateGeneration::Twentieth => DateGeneration::Twentieth,
+            PyDateGeneration::TwentiethIMM => DateGeneration::TwentiethIMM,
+            PyDateGeneration::OldCDS => DateGeneration::OldCDS,
+            PyDateGeneration::CDS => DateGeneration::CDS,
+            PyDateGeneration::CDS2015 => DateGeneration::CDS2015,
+        }
+    }
+}
+
 /// Python `Schedule`: a sequence of coupon dates built through `MakeSchedule`.
 ///
 /// The core `Schedule::new` (via `MakeSchedule::build`) `panic!`s on degenerate
@@ -380,6 +433,14 @@ impl PyBusinessDayConvention {
 /// validated first and returns [`struct@ItofinError`] before the core is
 /// touched. `date` likewise bounds-checks the index the core would otherwise
 /// panic on.
+///
+/// `rule` selects the date-generation rule and defaults to
+/// [`PyDateGeneration::Forward`], which is exactly what the builder's
+/// `forwards()` sets (`schedule.rs:852-853`), so an omitted `rule` reproduces
+/// every schedule this facade built before. The rule-dependent `panic!`s in
+/// `Schedule::new` (`schedule.rs:151-189`) all guard a non-null `first_date` or
+/// `next_to_last_date`, neither of which this constructor supplies, so no rule
+/// reaches them.
 #[pyclass(name = "Schedule", unsendable)]
 pub struct PySchedule {
     inner: Schedule,
@@ -388,12 +449,21 @@ pub struct PySchedule {
 #[pymethods]
 impl PySchedule {
     #[new]
+    #[pyo3(signature = (
+        start,
+        end,
+        frequency,
+        calendar,
+        convention,
+        rule = PyDateGeneration::Forward,
+    ))]
     fn new(
         start: &PyDate,
         end: &PyDate,
         frequency: &PyFrequency,
         calendar: &PyCalendar,
         convention: &PyBusinessDayConvention,
+        rule: PyDateGeneration,
     ) -> PyResult<Self> {
         if start.inner() >= end.inner() {
             return Err(ItofinError::new_err(format!(
@@ -410,7 +480,7 @@ impl PySchedule {
             .with_calendar(calendar.inner())
             .with_convention(convention)
             .with_termination_date_convention(convention)
-            .forwards()
+            .with_rule(rule.inner())
             .build();
         Ok(PySchedule { inner })
     }
