@@ -1,8 +1,9 @@
 //! Facades for the inflation slice: the [`PyDiscountingSwapEngine`] every
 //! inflation swap prices through, the [`PyCpiInterpolationType`] observation
 //! flag, the [`PyZeroInflationIndex`] family, the
-//! [`PyZeroInflationTermStructure`] curve hierarchy and the
-//! [`PyZeroCouponInflationSwap`] the three of them price together.
+//! [`PyZeroInflationTermStructure`] curve hierarchy, the
+//! [`PyZeroInflationHelper`] bootstrap helpers that fit its piecewise member and
+//! the [`PyZeroCouponInflationSwap`] the rest of them price together.
 //!
 //! The swap engine is generic rather than inflation-specific - it prices any
 //! swap - but is homed here because the inflation tickets are the first to need
@@ -10,6 +11,7 @@
 
 use crate::PyQlError;
 use crate::curve::PyYieldTermStructure;
+use crate::market::PySimpleQuote;
 use crate::settings::PySettings;
 use crate::swap::PySwapType;
 use crate::time::{
@@ -25,8 +27,12 @@ use libitofin::math::interpolations::linear::Linear;
 use libitofin::pricingengine::PricingEngine;
 use libitofin::pricingengines::DiscountingSwapEngine;
 use libitofin::shared::{Shared, SharedMut, shared, shared_mut};
+use libitofin::termstructures::inflation::inflationhelpers::{
+    ZeroCouponInflationSwapHelper, ZeroInflationHelper,
+};
 use libitofin::termstructures::inflation::inflationtermstructure::ZeroInflationTermStructure;
 use libitofin::termstructures::inflation::interpolatedzeroinflationcurve::InterpolatedZeroInflationCurve;
+use libitofin::termstructures::inflation::piecewisezeroinflationcurve::PiecewiseZeroInflationCurve;
 use pyo3::prelude::*;
 
 /// Python `DiscountingSwapEngine`: discounts each leg of a swap over a single
@@ -432,6 +438,259 @@ impl PyInterpolatedZeroInflationCurve {
             .into_iter()
             .map(|(date, rate)| (PyDate::from_inner(date), rate))
             .collect()
+    }
+}
+
+/// Python `ZeroInflationHelper`: the shared base for every zero-inflation
+/// bootstrap helper
+/// (`termstructures::inflation::inflationhelpers::ZeroInflationHelper`).
+///
+/// Holds the erased `Shared<dyn ZeroInflationHelper>` and exposes the two dates
+/// the bootstrap places a curve node by, the shape
+/// [`PyDefaultProbabilityHelper`](crate::credithelpers::PyDefaultProbabilityHelper)
+/// already uses on the credit side. Concrete helpers such as
+/// [`PyZeroCouponInflationSwapHelper`] subclass this and supply only their
+/// constructor.
+///
+/// Deferred (visible): the core trait's `earliest_date`, `maturity_date` and
+/// `latest_relevant_date` are not exposed. On the one concrete helper reachable
+/// here all five dates collapse onto the same fixing-period start
+/// (`inflationhelpers.rs:288-290`), so the three would report exactly what
+/// [`pillar_date`](Self::pillar_date) reports; they follow with a helper whose
+/// dates straddle a period.
+#[pyclass(name = "ZeroInflationHelper", subclass, unsendable)]
+pub struct PyZeroInflationHelper {
+    inner: Shared<dyn ZeroInflationHelper>,
+}
+
+#[pymethods]
+impl PyZeroInflationHelper {
+    /// The pillar date, at which the curve node this helper sets sits.
+    fn pillar_date(&self) -> PyDate {
+        PyDate::from_inner(self.inner.pillar_date())
+    }
+
+    /// The latest date the helper needs curve data at (equal to the pillar
+    /// date).
+    fn latest_date(&self) -> PyDate {
+        PyDate::from_inner(self.inner.latest_date())
+    }
+}
+
+impl PyZeroInflationHelper {
+    /// The base half of a concrete helper's [`PyClassInitializer`] chain.
+    pub(crate) fn from_shared(inner: Shared<dyn ZeroInflationHelper>) -> Self {
+        PyZeroInflationHelper { inner }
+    }
+
+    /// A clone of the upcast helper, for the piecewise inflation-curve facade,
+    /// which takes a list of helpers and threads each into the bootstrap.
+    pub(crate) fn shared(&self) -> Shared<dyn ZeroInflationHelper> {
+        Shared::clone(&self.inner)
+    }
+}
+
+/// Python `ZeroCouponInflationSwapHelper`: the bootstrap helper fitting a
+/// zero-coupon inflation swap quoted as a rate
+/// (`termstructures::inflation::inflationhelpers::ZeroCouponInflationSwapHelper`).
+///
+/// The helper prices a unit-notional, zero-strike swap of its own and reports
+/// that contract's fair rate; the bootstrap drives the quoted rate less that
+/// fair rate to zero. It needs no nominal curve, building itself a flat 0 % one,
+/// because both legs pay on the same adjusted maturity and their discount
+/// factors cancel out of the fair rate.
+///
+/// The swap starts at the evaluation date held by `settings` and is rebuilt
+/// whenever that date moves, so the evaluation date must be set *before* the
+/// constructor runs, not merely before the bootstrap. The helper retains the
+/// caller's [`PySimpleQuote`], so a later `set_value` re-drives the bootstrap.
+///
+/// It prices through a *copy* of `index` linked to a handle of its own, which
+/// the bootstrap points at the curve under construction; the caller's index
+/// keeps whatever curve it had and need not be linked at all.
+///
+/// Fallible: the core rejects
+/// [`CpiInterpolationType.Linear`](PyCpiInterpolationType), whose date and
+/// pillar logic is a documented deferral of the port
+/// (`inflationhelpers.rs:252-255`), and rejects an observation lag the index
+/// cannot observe through, the swap being built here too. Both raise
+/// [`struct@crate::ItofinError`].
+#[pyclass(
+    name = "ZeroCouponInflationSwapHelper",
+    extends = PyZeroInflationHelper,
+    unsendable
+)]
+pub struct PyZeroCouponInflationSwapHelper {
+    concrete: Shared<ZeroCouponInflationSwapHelper>,
+}
+
+#[pymethods]
+impl PyZeroCouponInflationSwapHelper {
+    /// A helper fitting `quote` on a swap maturing at `maturity`.
+    #[new]
+    #[allow(clippy::too_many_arguments)]
+    fn new(
+        quote: &PySimpleQuote,
+        swap_obs_lag: &PyPeriod,
+        maturity: &PyDate,
+        calendar: &PyCalendar,
+        payment_convention: &PyBusinessDayConvention,
+        day_counter: &PyDayCounter,
+        index: &PyZeroInflationIndex,
+        observation_interpolation: &PyCpiInterpolationType,
+        settings: &PySettings,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        let concrete = ZeroCouponInflationSwapHelper::new(
+            quote.handle(),
+            swap_obs_lag.inner(),
+            maturity.inner(),
+            calendar.inner(),
+            payment_convention.inner(),
+            day_counter.inner(),
+            &index.shared(),
+            observation_interpolation.inner(),
+            settings.inner(),
+        )
+        .map_err(PyQlError::from)?;
+        let erased = Shared::clone(&concrete) as Shared<dyn ZeroInflationHelper>;
+        Ok(
+            PyClassInitializer::from(PyZeroInflationHelper::from_shared(erased))
+                .add_subclass(PyZeroCouponInflationSwapHelper { concrete }),
+        )
+    }
+
+    /// The date the maturity fixing is observed at on the helper's own swap:
+    /// `maturity` less the observation lag, unsnapped to its inflation period.
+    ///
+    /// Read off the cached contract's indexed flow, so it reports the date the
+    /// helper actually prices at rather than one recomputed here. It is *not*
+    /// [`pillar_date`](PyZeroInflationHelper::pillar_date), which is the first
+    /// day of the period containing it - the quantization being the helper's
+    /// rounding and not the contract's.
+    ///
+    /// Fallible: the cached swap carries the error that stopped it being built,
+    /// notably an evaluation date that was never set.
+    fn inflation_fixing_date(&self) -> PyResult<PyDate> {
+        let swap = self.concrete.swap();
+        let swap = swap
+            .as_ref()
+            .map_err(|error| PyQlError::from(error.clone()))?;
+        Ok(PyDate::from_inner(swap.inflation_cash_flow().fixing_date()))
+    }
+}
+
+/// Python `PiecewiseZeroInflationCurve`: a zero-coupon inflation curve
+/// bootstrapped from inflation helpers, solving one zero-rate node per helper
+/// (`termstructures::inflation::PiecewiseZeroInflationCurve<Linear>`).
+///
+/// Extends [`PyZeroInflationTermStructure`], which carries the whole query
+/// surface. Each helper's observed fixing period marks a segment boundary, and
+/// its node is solved so the helper reprices its own quote off the curve.
+///
+/// Node zero sits on `base_date`, not on `reference_date`: the base date is the
+/// last date for which a fixing is known - in practice
+/// [`ZeroInflationIndex.last_fixing_date`](PyZeroInflationIndex::last_fixing_date)
+/// - and precedes the reference date, so [`times`](Self::times)`[0]` is
+/// negative. That is the one structural difference from every other piecewise
+/// curve, whose first node is its own reference date at time zero.
+///
+/// Lazy, like the credit-side [`PyPiecewiseDefaultCurve`](crate::credit): the
+/// constructor only registers on the helpers, and the bootstrap runs on the
+/// first read - a query, an inspector, or an explicit
+/// [`calculate`](Self::calculate). A helper quote moving invalidates the cache,
+/// so the next read re-bootstraps. The evaluation date must therefore be in
+/// place before that first read as well as before the helpers were built.
+///
+/// The concrete curve is retained alongside the erased handle so the node
+/// inspectors stay reachable, as [`PyInterpolatedZeroInflationCurve`] and
+/// [`PyPiecewiseDefaultCurve`](crate::credit) both do.
+///
+/// Fallible: the core rejects an empty helper set, and every inspector
+/// propagates a bootstrap failure as [`struct@crate::ItofinError`].
+///
+/// `Linear` is pinned at the boundary: it is the only interpolator the core
+/// constructs (`piecewisezeroinflationcurve.rs:105-125`), so no interpolation
+/// argument is offered.
+///
+/// Deferred (visible): the core's `data()` inspector is omitted, being the rate
+/// half of [`nodes`](Self::nodes) - the choice
+/// [`PyInterpolatedZeroInflationCurve`] already made on this side, where the
+/// credit curve exposes both. Seasonality is omitted with the core, which does
+/// not port it either.
+#[pyclass(
+    name = "PiecewiseZeroInflationCurve",
+    extends = PyZeroInflationTermStructure,
+    unsendable
+)]
+pub struct PyPiecewiseZeroInflationCurve {
+    concrete: Shared<PiecewiseZeroInflationCurve<Linear>>,
+}
+
+#[pymethods]
+impl PyPiecewiseZeroInflationCurve {
+    /// A curve over `helpers` with a fixed `reference_date` and a `base_date`
+    /// preceding it. `helpers` accepts any
+    /// [`ZeroInflationHelper`](PyZeroInflationHelper) subclass.
+    #[new]
+    fn new(
+        reference_date: &PyDate,
+        base_date: &PyDate,
+        frequency: &PyFrequency,
+        day_counter: &PyDayCounter,
+        helpers: Vec<PyRef<PyZeroInflationHelper>>,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        let instruments: Vec<Shared<dyn ZeroInflationHelper>> =
+            helpers.iter().map(|helper| helper.shared()).collect();
+        let concrete = PiecewiseZeroInflationCurve::<Linear>::new(
+            reference_date.inner(),
+            base_date.inner(),
+            frequency.inner(),
+            day_counter.inner(),
+            instruments,
+        )
+        .map_err(PyQlError::from)?;
+        let erased = Shared::clone(&concrete) as Shared<dyn ZeroInflationTermStructure>;
+        Ok(
+            PyClassInitializer::from(PyZeroInflationTermStructure::from_handle(Handle::new(
+                erased,
+            )))
+            .add_subclass(PyPiecewiseZeroInflationCurve { concrete }),
+        )
+    }
+
+    /// Runs the bootstrap if the cache is stale, so a solver failure surfaces
+    /// here rather than inside a later query.
+    fn calculate(&self) -> PyResult<()> {
+        Ok(self.concrete.calculate().map_err(PyQlError::from)?)
+    }
+
+    /// The node times, measured from the reference date in the curve's own day
+    /// count; the first is negative (triggers the bootstrap).
+    fn times(&self) -> PyResult<Vec<f64>> {
+        Ok(self.concrete.times().map_err(PyQlError::from)?)
+    }
+
+    /// The node dates, the first of which is the base date (triggers the
+    /// bootstrap).
+    fn dates(&self) -> PyResult<Vec<PyDate>> {
+        Ok(self
+            .concrete
+            .dates()
+            .map_err(PyQlError::from)?
+            .into_iter()
+            .map(PyDate::from_inner)
+            .collect())
+    }
+
+    /// The solved `(date, zero-rate)` nodes (triggers the bootstrap).
+    fn nodes(&self) -> PyResult<Vec<(PyDate, f64)>> {
+        Ok(self
+            .concrete
+            .nodes()
+            .map_err(PyQlError::from)?
+            .into_iter()
+            .map(|(date, rate)| (PyDate::from_inner(date), rate))
+            .collect())
     }
 }
 
