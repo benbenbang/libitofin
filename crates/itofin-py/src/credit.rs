@@ -1,10 +1,11 @@
 //! Facades for the credit hierarchy: the [`PyDefaultProbabilityTermStructure`]
-//! base, the concrete [`PyFlatHazardRate`] and [`PyInterpolatedHazardRateCurve`]
-//! curves, the [`PyProtectionSide`] flag and the [`PyCreditDefaultSwap`]
-//! instrument.
+//! base, the concrete [`PyFlatHazardRate`], [`PyInterpolatedHazardRateCurve`]
+//! and [`PyPiecewiseDefaultCurve`] curves, the [`PyProtectionSide`] flag and the
+//! [`PyCreditDefaultSwap`] instrument.
 
 use crate::PyQlError;
 use crate::creditengine::PyMidPointCdsEngine;
+use crate::credithelpers::PyDefaultProbabilityHelper;
 use crate::market::PySimpleQuote;
 use crate::settings::PySettings;
 use crate::time::{PyBusinessDayConvention, PyCalendar, PyDate, PyDayCounter, PySchedule};
@@ -13,9 +14,12 @@ use libitofin::instrument::Instrument;
 use libitofin::instruments::{CdsTerms, CreditDefaultSwap, ProtectionSide};
 use libitofin::math::interpolations::flat::BackwardFlat;
 use libitofin::shared::{Shared, SharedMut, shared, shared_mut};
+use libitofin::termstructures::credit::defaultprobabilityhelpers::DefaultProbabilityHelper;
 use libitofin::termstructures::credit::defaulttermstructure::DefaultProbabilityTermStructure;
 use libitofin::termstructures::credit::flathazardrate::FlatHazardRate;
 use libitofin::termstructures::credit::interpolatedhazardratecurve::InterpolatedHazardRateCurve;
+use libitofin::termstructures::credit::piecewisedefaultcurve::PiecewiseDefaultCurve;
+use libitofin::termstructures::credit::probabilitytraits::HazardRate;
 use libitofin::types::Natural;
 use pyo3::prelude::*;
 
@@ -361,6 +365,110 @@ impl PyInterpolatedHazardRateCurve {
             .into_iter()
             .map(|(date, rate)| (PyDate::from_inner(date), rate))
             .collect()
+    }
+}
+
+/// Python `PiecewiseDefaultCurve`: a credit curve bootstrapped from CDS helpers,
+/// solving one hazard-rate node per helper maturity
+/// (`termstructures::credit::PiecewiseDefaultCurve<HazardRate, BackwardFlat>`).
+///
+/// Extends [`PyDefaultProbabilityTermStructure`], which carries the whole query
+/// surface. Each helper's maturity marks a segment boundary, and its node is
+/// solved so the helper reprices its own quote off the curve; the resulting
+/// curve is the market-implied credit term structure the helpers quote.
+///
+/// Lazy, like the yield-side [`PyPiecewiseLogLinearDiscount`](crate::curve): the
+/// constructor only registers on the helpers, and the bootstrap runs on the
+/// first read - a query, an inspector, or an explicit
+/// [`calculate`](Self::calculate). A helper quote moving invalidates the cache,
+/// so the next read re-bootstraps. Both the helpers' `Settings` flags (notably
+/// `include_todays_cash_flows`) and the evaluation date must therefore be in
+/// place before the first read, not merely before the constructor.
+///
+/// The concrete curve is retained alongside the erased handle so the node
+/// inspectors stay reachable, as
+/// [`PyInterpolatedHazardRateCurve`] and [`PyPiecewiseLogLinearDiscount`](crate::curve)
+/// both do. All five are exposed here, where the interpolated curve omits
+/// `times()` and `data()`: on a bootstrapped curve the solved node values are
+/// the result rather than a constructor input, so there is nothing for a caller
+/// to read them back from.
+///
+/// Fallible: the core rejects an empty helper set, and every inspector
+/// propagates a bootstrap failure as [`struct@crate::ItofinError`].
+///
+/// `HazardRate` and `BackwardFlat` are pinned at the boundary: they are the only
+/// traits/interpolator pair the core wires
+/// (`piecewisedefaultcurve.rs:36-45`), so neither is offered as an argument.
+#[pyclass(name = "PiecewiseDefaultCurve", extends = PyDefaultProbabilityTermStructure, unsendable)]
+pub struct PyPiecewiseDefaultCurve {
+    concrete: Shared<PiecewiseDefaultCurve<HazardRate, BackwardFlat>>,
+}
+
+#[pymethods]
+impl PyPiecewiseDefaultCurve {
+    /// A curve over `helpers` with a fixed `reference_date`. `helpers` accepts
+    /// any [`DefaultProbabilityHelper`](PyDefaultProbabilityHelper) subclass.
+    #[new]
+    fn new(
+        reference_date: &PyDate,
+        helpers: Vec<PyRef<PyDefaultProbabilityHelper>>,
+        day_counter: &PyDayCounter,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        let instruments: Vec<Shared<dyn DefaultProbabilityHelper>> =
+            helpers.iter().map(|helper| helper.shared()).collect();
+        let concrete = PiecewiseDefaultCurve::<HazardRate, BackwardFlat>::new(
+            reference_date.inner(),
+            instruments,
+            day_counter.inner(),
+            BackwardFlat,
+        )
+        .map_err(PyQlError::from)?;
+        let erased = Shared::clone(&concrete) as Shared<dyn DefaultProbabilityTermStructure>;
+        Ok(
+            PyClassInitializer::from(PyDefaultProbabilityTermStructure::from_handle(Handle::new(
+                erased,
+            )))
+            .add_subclass(PyPiecewiseDefaultCurve { concrete }),
+        )
+    }
+
+    /// Runs the bootstrap if the cache is stale, so a solver failure surfaces
+    /// here rather than inside a later query.
+    fn calculate(&self) -> PyResult<()> {
+        Ok(self.concrete.calculate().map_err(PyQlError::from)?)
+    }
+
+    /// The node times, in the curve's own day count (triggers the bootstrap).
+    fn times(&self) -> PyResult<Vec<f64>> {
+        Ok(self.concrete.times().map_err(PyQlError::from)?)
+    }
+
+    /// The node dates, the first of which is the reference date (triggers the
+    /// bootstrap).
+    fn dates(&self) -> PyResult<Vec<PyDate>> {
+        Ok(self
+            .concrete
+            .dates()
+            .map_err(PyQlError::from)?
+            .into_iter()
+            .map(PyDate::from_inner)
+            .collect())
+    }
+
+    /// The solved node hazard rates (triggers the bootstrap).
+    fn data(&self) -> PyResult<Vec<f64>> {
+        Ok(self.concrete.data().map_err(PyQlError::from)?)
+    }
+
+    /// The solved `(date, hazard rate)` nodes (triggers the bootstrap).
+    fn nodes(&self) -> PyResult<Vec<(PyDate, f64)>> {
+        Ok(self
+            .concrete
+            .nodes()
+            .map_err(PyQlError::from)?
+            .into_iter()
+            .map(|(date, rate)| (PyDate::from_inner(date), rate))
+            .collect())
     }
 }
 

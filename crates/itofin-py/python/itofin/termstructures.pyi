@@ -901,3 +901,25 @@ class SpreadCdsHelper(DefaultProbabilityHelper):
         """Raises ItofinError on the post-Big-Bang rules DateGeneration.OldCDS,
         .CDS and .CDS2015, whose maturity rule the core has not ported."""
         ...
+
+class PiecewiseDefaultCurve(DefaultProbabilityTermStructure):
+    """A credit curve bootstrapped from CDS helpers, solving one hazard-rate
+    node per helper maturity (PiecewiseDefaultCurve<HazardRate, BackwardFlat>).
+
+    Lazy: the bootstrap runs on the first read, so the helpers' Settings flags
+    and evaluation date must be in place before that read, not merely before
+    the constructor. A helper quote moving invalidates the cache."""
+
+    def __init__(
+        self,
+        reference_date: Date,
+        helpers: list[DefaultProbabilityHelper],
+        day_counter: DayCounter,
+    ) -> None:
+        """Raises ItofinError on an empty helper list."""
+        ...
+    def calculate(self) -> None: ...
+    def times(self) -> list[float]: ...
+    def dates(self) -> list[Date]: ...
+    def data(self) -> list[float]: ...
+    def nodes(self) -> list[tuple[Date, float]]: ...
