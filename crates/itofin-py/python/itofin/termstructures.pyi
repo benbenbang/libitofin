@@ -3,7 +3,7 @@
 # src/credit.rs, src/credithelpers.rs and src/inflation.rs (#517).
 
 from itofin import Settings
-from itofin.indexes import Estr, Euribor, SwapIndex
+from itofin.indexes import CpiInterpolationType, Estr, Euribor, SwapIndex, ZeroInflationIndex
 from itofin.quotes import SimpleQuote
 from itofin.time import (
     BusinessDayConvention,
@@ -959,6 +959,76 @@ class InterpolatedZeroInflationCurve(ZeroInflationTermStructure):
         mismatch, a rate at or below -100 % from the second node on, or
         unsorted dates."""
         ...
+    def times(self) -> list[float]: ...
+    def dates(self) -> list[Date]: ...
+    def nodes(self) -> list[tuple[Date, float]]: ...
+
+class ZeroInflationHelper:
+    """Shared base for every zero-inflation bootstrap helper: the two dates the
+    bootstrap places a curve node by.
+
+    Concrete helpers such as ZeroCouponInflationSwapHelper subclass this and
+    supply only their constructor."""
+
+    def pillar_date(self) -> Date: ...
+    def latest_date(self) -> Date: ...
+
+class ZeroCouponInflationSwapHelper(ZeroInflationHelper):
+    """The bootstrap helper fitting a zero-coupon inflation swap quoted as a
+    rate.
+
+    The helper prices a unit-notional, zero-strike swap of its own and reports
+    that contract's fair rate; the bootstrap drives the quoted rate less that
+    fair rate to zero. The swap starts at the evaluation date, so that date must
+    be set before this constructor runs, not merely before the bootstrap.
+
+    It prices through a copy of index linked to a handle of its own, so the
+    caller's index need not be linked to any curve."""
+
+    def __init__(
+        self,
+        quote: SimpleQuote,
+        swap_obs_lag: Period,
+        maturity: Date,
+        calendar: Calendar,
+        payment_convention: BusinessDayConvention,
+        day_counter: DayCounter,
+        index: ZeroInflationIndex,
+        observation_interpolation: CpiInterpolationType,
+        settings: Settings,
+    ) -> None:
+        """Raises ItofinError on CpiInterpolationType.Linear, whose date and
+        pillar logic is a documented deferral of the port, and on an observation
+        lag the index cannot observe through."""
+        ...
+    def inflation_fixing_date(self) -> Date:
+        """The maturity observation date on the helper's own swap: maturity less
+        the observation lag, unsnapped. Not pillar_date, which is the first day
+        of the period containing it."""
+        ...
+
+class PiecewiseZeroInflationCurve(ZeroInflationTermStructure):
+    """A zero-coupon inflation curve bootstrapped from inflation helpers,
+    solving one zero-rate node per helper fixing period.
+
+    Node zero sits on base_date, not on reference_date, so times()[0] is
+    negative - the one structural difference from every other piecewise curve.
+
+    Lazy: the bootstrap runs on the first read, so the evaluation date must be
+    in place before that read as well as before the helpers were built. A helper
+    quote moving invalidates the cache."""
+
+    def __init__(
+        self,
+        reference_date: Date,
+        base_date: Date,
+        frequency: Frequency,
+        day_counter: DayCounter,
+        helpers: list[ZeroInflationHelper],
+    ) -> None:
+        """Raises ItofinError on an empty helper list."""
+        ...
+    def calculate(self) -> None: ...
     def times(self) -> list[float]: ...
     def dates(self) -> list[Date]: ...
     def nodes(self) -> list[tuple[Date, float]]: ...
