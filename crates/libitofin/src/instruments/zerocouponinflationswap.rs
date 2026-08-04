@@ -92,6 +92,10 @@ use crate::time::daycounter::DayCounter;
 use crate::time::period::Period;
 use crate::types::{Rate, Real};
 
+/// A basis point, the shift [`fixed_leg_bps`](ZeroCouponInflationSwap::fixed_leg_bps)
+/// measures against (`cpp:150`).
+const BASIS_POINT: Real = 1.0e-4;
+
 /// Zero-coupon inflation-indexed swap: one fixed flow against one
 /// inflation-indexed flow, both at maturity.
 ///
@@ -325,6 +329,70 @@ impl ZeroCouponInflationSwap {
     /// The indexed flow itself, typed.
     pub fn inflation_cash_flow(&self) -> &Shared<ZeroInflationCashFlow> {
         &self.inflation_cash_flow
+    }
+
+    /// The fixed leg's NPV (`fixedLegNPV()`), priced on demand.
+    ///
+    /// # Errors
+    ///
+    /// As [`Swap::leg_npv`].
+    pub fn fixed_leg_npv(&mut self) -> QlResult<Real> {
+        self.swap.leg_npv(0)
+    }
+
+    /// The inflation leg's NPV (`inflationLegNPV()`), priced on demand.
+    ///
+    /// # Errors
+    ///
+    /// As [`Swap::leg_npv`].
+    pub fn inflation_leg_npv(&mut self) -> QlResult<Real> {
+        self.swap.leg_npv(1)
+    }
+
+    /// The rate that would make this swap worth nothing (`fairRate()`,
+    /// `cpp:118-138`).
+    ///
+    /// The indexed flow pays growth only, so `amount/notional + 1` is the index
+    /// ratio `I(T)/I(0)`, and the fair rate is that ratio de-compounded over the
+    /// same `T` the fixed amount uses. The flow is read directly rather than
+    /// through the engine: C++ calls no `calculate()` here either.
+    ///
+    /// # Errors
+    ///
+    /// Propagates the indexed flow's amount, which forecasts off the index's
+    /// inflation curve and so needs one linked.
+    pub fn fair_rate(&self) -> QlResult<Rate> {
+        let growth = self.inflation_cash_flow.amount()? / self.inflation_cash_flow.notional() + 1.0;
+        let time = self
+            .day_counter
+            .year_fraction(self.start_date, self.maturity_date);
+        Ok(growth.powf(1.0 / time) - 1.0)
+    }
+
+    /// The fixed leg's sensitivity to a basis point on `K` (`fixedLegBPS()`,
+    /// `cpp:140-155`), computed analytically.
+    ///
+    /// The engine's own `leg_bps[0]` is **zero** and must not be used: the fixed
+    /// leg is a [`SimpleCashFlow`], which the BPS pass treats as insensitive to
+    /// the rate, and the leg compounds annually so a linear-in-rate coupon would
+    /// not answer this either (the C++ comment at `cpp:141-145`). The shift is
+    /// therefore repriced in closed form, signed by the leg's payer multiplier
+    /// and discounted at its end discount factor.
+    ///
+    /// # Errors
+    ///
+    /// The engine must have populated the fixed leg's end discount factor (the
+    /// C++ `QL_REQUIRE` against `Null<DiscountFactor>`).
+    ///
+    /// [`SimpleCashFlow`]: crate::cashflows::SimpleCashFlow
+    pub fn fixed_leg_bps(&mut self) -> QlResult<Real> {
+        let discount = self.swap.end_discounts(0)?;
+        let sign = if self.swap.payer(0)? { -1.0 } else { 1.0 };
+        let time = self
+            .day_counter
+            .year_fraction(self.start_date, self.maturity_date);
+        let shifted = (1.0 + self.fixed_rate + BASIS_POINT).powf(time);
+        Ok(sign * discount * self.nominal * (shifted - (1.0 + self.fixed_rate).powf(time)))
     }
 }
 
