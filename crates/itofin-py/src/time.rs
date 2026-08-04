@@ -441,6 +441,15 @@ impl PyDateGeneration {
 /// `Schedule::new` (`schedule.rs:151-189`) all guard a non-null `first_date` or
 /// `next_to_last_date`, neither of which this constructor supplies, so no rule
 /// reaches them.
+///
+/// `termination_convention` rolls the last date only (`schedule.rs:415-421`)
+/// and defaults to `convention`, reproducing every schedule this facade built
+/// before it took one. CDS conventions need the two to differ: a credit helper
+/// leaves its maturity unadjusted (`defaultprobabilityhelpers.rs:512`) while
+/// paying `Following`, so under a twentieth rule a maturity landing on a
+/// weekend stays on the twentieth. Rolling it instead lengthens the contract by
+/// the roll, which the bootstrap round trip measures as a 3.6e-6 spread error
+/// on the one pillar it hits.
 #[pyclass(name = "Schedule", unsendable)]
 pub struct PySchedule {
     inner: Schedule,
@@ -456,6 +465,7 @@ impl PySchedule {
         calendar,
         convention,
         rule = PyDateGeneration::Forward,
+        termination_convention = None,
     ))]
     fn new(
         start: &PyDate,
@@ -464,6 +474,7 @@ impl PySchedule {
         calendar: &PyCalendar,
         convention: &PyBusinessDayConvention,
         rule: PyDateGeneration,
+        termination_convention: Option<PyBusinessDayConvention>,
     ) -> PyResult<Self> {
         if start.inner() >= end.inner() {
             return Err(ItofinError::new_err(format!(
@@ -473,13 +484,16 @@ impl PySchedule {
             )));
         }
         let convention = convention.inner();
+        let termination_convention = termination_convention
+            .map(|convention| convention.inner())
+            .unwrap_or(convention);
         let inner = MakeSchedule::new()
             .from(start.inner())
             .to(end.inner())
             .with_frequency(frequency.inner())
             .with_calendar(calendar.inner())
             .with_convention(convention)
-            .with_termination_date_convention(convention)
+            .with_termination_date_convention(termination_convention)
             .with_rule(rule.inner())
             .build();
         Ok(PySchedule { inner })
