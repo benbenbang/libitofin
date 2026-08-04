@@ -852,6 +852,29 @@ class FlatHazardRate(DefaultProbabilityTermStructure):
         evaluation date."""
         ...
 
+class InterpolatedHazardRateCurve(DefaultProbabilityTermStructure):
+    """A credit curve built from (date, hazard-rate) nodes, interpolating
+    backward-flat.
+
+    The first date is the reference date. Backward-flat reads the right-hand
+    node on every segment, so the hazard rate is a right-continuous step
+    function and the survival probability is exp(-integral) over those steps.
+    Finite in time: queries past the last node need extrapolate=True, which
+    continues at the last node's rate."""
+
+    def __init__(
+        self,
+        dates: list[Date],
+        hazard_rates: list[float],
+        day_counter: DayCounter,
+    ) -> None:
+        """Raises ItofinError on too few dates, a dates/hazard_rates count
+        mismatch, a negative hazard rate or unsorted dates."""
+        ...
+    def dates(self) -> list[Date]: ...
+    def hazard_rates(self) -> list[float]: ...
+    def nodes(self) -> list[tuple[Date, float]]: ...
+
 class DefaultProbabilityHelper:
     """Shared base for every credit bootstrap helper."""
 

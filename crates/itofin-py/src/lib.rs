@@ -34,7 +34,8 @@ use capfloor::{PyCapFloor, PyCapFloorType};
 use capfloorengine::PyBlackCapFloorEngine;
 use capfloortermvol::PyCapFloorTermVolSurface;
 use credit::{
-    PyCreditDefaultSwap, PyDefaultProbabilityTermStructure, PyFlatHazardRate, PyProtectionSide,
+    PyCreditDefaultSwap, PyDefaultProbabilityTermStructure, PyFlatHazardRate,
+    PyInterpolatedHazardRateCurve, PyProtectionSide,
 };
 use creditengine::PyMidPointCdsEngine;
 use credithelpers::{PyDefaultProbabilityHelper, PySpreadCdsHelper};
@@ -172,6 +173,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     termstructures.add_class::<PyStrippedOptionletAdapter>()?;
     termstructures.add_class::<PyDefaultProbabilityTermStructure>()?;
     termstructures.add_class::<PyFlatHazardRate>()?;
+    termstructures.add_class::<PyInterpolatedHazardRateCurve>()?;
     termstructures.add_class::<PyDefaultProbabilityHelper>()?;
     termstructures.add_class::<PySpreadCdsHelper>()?;
 
