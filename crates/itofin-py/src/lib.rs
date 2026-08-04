@@ -51,7 +51,7 @@ use helpers::{
 };
 use heston::{PyHestonModel, PyHestonModelHelper, PyHestonProcess};
 use hullwhite::{PyEuribor, PyHullWhite, PySwaptionHelper};
-use inflation::{PyCpiInterpolationType, PyDiscountingSwapEngine};
+use inflation::{PyCpiInterpolationType, PyDiscountingSwapEngine, PyZeroInflationIndex};
 use libitofin::errors::QlError;
 use market::{PyBlackScholesProcess, PySimpleQuote};
 use option::{PyOptionType, PyVanillaOption};
@@ -189,6 +189,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     indexes.add_class::<PyEstr>()?;
     indexes.add_class::<PySwapIndex>()?;
     indexes.add_class::<PyCpiInterpolationType>()?;
+    indexes.add_class::<PyZeroInflationIndex>()?;
 
     let instruments = PyModule::new(py, "instruments")?;
     instruments.add_class::<PyOptionType>()?;
