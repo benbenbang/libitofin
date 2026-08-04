@@ -13,7 +13,7 @@
 //! observer registration on every helper and the [`PiecewiseCurve`] surface the
 //! bootstrap drives are all the same. C++ derives from
 //! `InterpolatedZeroInflationCurve<Interpolator>` *and* `LazyObject`
-//! (`:56-57`); Rust has no inheritance, so the node storage lives here and
+//! (`:41-43`); Rust has no inheritance, so the node storage lives here and
 //! [`zero_rate_impl`](ZeroInflationTermStructure::zero_rate_impl) reads it the
 //! way [`InterpolatedZeroInflationCurve`] reads its own
 //! (`interpolatedzeroinflationcurve.hpp:137`).
@@ -37,8 +37,9 @@
 //!   caller needing it fails to compile. It follows with the seasonality
 //!   classes in EPIC Inflation (#705).
 //! - The `BaseDateFunc` constructor overload (`:73-90`), whose base date is
-//!   resolved lazily inside `performCalculations` (`:167-169`), is deferred
-//!   with it; the base date here is always the caller's.
+//!   resolved lazily inside `performCalculations` (`:168-169`), is deferred
+//!   with it, and with it its oracle `testZeroTermStructureLazyBaseDate`
+//!   (`inflation.cpp:512-593`); the base date here is always the caller's.
 //! - Only [`Linear`] is constructible ([`new`](PiecewiseZeroInflationCurve::new)
 //!   builds the interpolator itself), so the C++ `Interpolator` argument
 //!   (`:63`) has no counterpart. The impls below are generic, so a second
@@ -103,7 +104,7 @@ pub struct PiecewiseZeroInflationCurve<I: Interpolator> {
 
 impl PiecewiseZeroInflationCurve<Linear> {
     /// Builds a linearly interpolated curve over `instruments` with a fixed
-    /// `reference_date` (`:69-84`). Construction is cheap; the bootstrap runs on
+    /// `reference_date` (`:55-72`). Construction is cheap; the bootstrap runs on
     /// first use.
     ///
     /// `base_date` is the last date for which a fixing is known - in practice
@@ -161,7 +162,7 @@ impl PiecewiseZeroInflationCurve<Linear> {
 
 impl<I: Interpolator + 'static> PiecewiseZeroInflationCurve<I> {
     /// Runs the bootstrap if the cache is stale, caching the result
-    /// (`performCalculations`, `:165-171`). The lazy core is not borrowed while
+    /// (`performCalculations`, `:166-171`). The lazy core is not borrowed while
     /// the bootstrap runs, so a helper reading the curve mid-bootstrap - which
     /// every one of them does, through the index it forecasts with - re-enters
     /// here and returns on the pre-set flag, answering off the partially solved
@@ -178,27 +179,27 @@ impl<I: Interpolator + 'static> PiecewiseZeroInflationCurve<I> {
         result
     }
 
-    /// The node times, after bootstrapping (`:143-147`). The first is negative,
+    /// The node times, after bootstrapping (`:141-145`). The first is negative,
     /// the base date preceding the reference date.
     pub fn times(&self) -> QlResult<Vec<Time>> {
         self.calculate()?;
         Ok(self.data.borrow().times().to_vec())
     }
 
-    /// The node dates, after bootstrapping (`:149-153`). The first is the base
+    /// The node dates, after bootstrapping (`:147-151`). The first is the base
     /// date.
     pub fn dates(&self) -> QlResult<Vec<Date>> {
         self.calculate()?;
         Ok(self.data.borrow().dates().to_vec())
     }
 
-    /// The node zero-coupon inflation rates, after bootstrapping (`:155-159`).
+    /// The node zero-coupon inflation rates, after bootstrapping (`:153-157`).
     pub fn data(&self) -> QlResult<Vec<Real>> {
         self.calculate()?;
         Ok(self.data.borrow().data().to_vec())
     }
 
-    /// The (date, zero rate) nodes, after bootstrapping (`:161-166`).
+    /// The (date, zero rate) nodes, after bootstrapping (`:159-164`).
     pub fn nodes(&self) -> QlResult<Vec<(Date, Real)>> {
         self.calculate()?;
         Ok(self.data.borrow().nodes())
@@ -550,6 +551,12 @@ mod zero_term_structure_oracle {
     //! again, is **omitted**: seasonality is a documented deferral of this port
     //! (see the module divergences), and the Rust curve takes no seasonality
     //! argument, so phases 1 and 2 run exactly the numbers C++ runs before it.
+    //!
+    //! `testZeroTermStructureWithNominalCurve` (`:597-763`), which reruns the
+    //! same fixture through the deprecated nominal-curve helper constructor, is
+    //! omitted with that constructor (see the
+    //! [`inflationhelpers`](crate::termstructures::inflation::inflationhelpers)
+    //! deferrals).
 
     use super::*;
     use crate::handle::{Handle, RelinkableHandle};
