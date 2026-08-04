@@ -1,9 +1,10 @@
-# Hand-written stubs for itofin.pricingengines; sync manually with src/swaptionengine.rs
-# and src/capfloorengine.rs (#517).
+# Hand-written stubs for itofin.pricingengines; sync manually with src/swaptionengine.rs,
+# src/capfloorengine.rs and src/creditengine.rs (#517).
 
 from itofin import Settings
 from itofin.quotes import SimpleQuote
 from itofin.termstructures import (
+    DefaultProbabilityTermStructure,
     OptionletVolatilityStructure,
     SwaptionVolatilityStructure,
     YieldTermStructure,
@@ -80,3 +81,22 @@ class BlackCapFloorEngine:
         shift."""
         ...
     def displacement(self) -> float: ...
+
+class MidPointCdsEngine:
+    """The mid-point credit-default-swap engine: each live premium period is
+    priced against the default probability over that period, with the default
+    placed at the period's mid-point.
+
+    Infallible at construction - every precondition (an empty curve handle, an
+    unset evaluation date) is reported when the contract is priced. The core's
+    include_settlement_date_flows override is not exposed and is always None,
+    so the settlement-date flow decision follows the settings' own flags. The
+    contract this engine prices must carry the same Settings object."""
+
+    def __init__(
+        self,
+        probability: DefaultProbabilityTermStructure,
+        recovery: float,
+        discount: YieldTermStructure,
+        settings: Settings,
+    ) -> None: ...

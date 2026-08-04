@@ -1,14 +1,16 @@
 //! Facades for the credit hierarchy: the [`PyDefaultProbabilityTermStructure`]
-//! base, the concrete [`PyFlatHazardRate`] curve, and the
-//! [`PyProtectionSide`] flag.
+//! base, the concrete [`PyFlatHazardRate`] curve, the [`PyProtectionSide`] flag
+//! and the [`PyCreditDefaultSwap`] instrument.
 
 use crate::PyQlError;
+use crate::creditengine::PyMidPointCdsEngine;
 use crate::market::PySimpleQuote;
 use crate::settings::PySettings;
-use crate::time::{PyCalendar, PyDate, PyDayCounter};
+use crate::time::{PyBusinessDayConvention, PyCalendar, PyDate, PyDayCounter, PySchedule};
 use libitofin::handle::Handle;
-use libitofin::instruments::ProtectionSide;
-use libitofin::shared::{Shared, shared};
+use libitofin::instrument::Instrument;
+use libitofin::instruments::{CdsTerms, CreditDefaultSwap, ProtectionSide};
+use libitofin::shared::{Shared, SharedMut, shared, shared_mut};
 use libitofin::termstructures::credit::defaulttermstructure::DefaultProbabilityTermStructure;
 use libitofin::termstructures::credit::flathazardrate::FlatHazardRate;
 use libitofin::types::Natural;
@@ -29,7 +31,6 @@ pub enum PyProtectionSide {
 
 impl PyProtectionSide {
     /// The core [`ProtectionSide`] this variant stands for.
-    #[allow(dead_code)]
     pub(crate) fn inner(self) -> ProtectionSide {
         match self {
             PyProtectionSide::Buyer => ProtectionSide::Buyer,
@@ -151,7 +152,6 @@ impl PyDefaultProbabilityTermStructure {
 
     /// A clone of the inner curve handle for the CDS instrument and engine
     /// facades that take a credit curve.
-    #[allow(dead_code)]
     pub(crate) fn handle(&self) -> Handle<dyn DefaultProbabilityTermStructure> {
         self.inner.clone()
     }
@@ -268,5 +268,184 @@ impl PyFlatHazardRate {
             )))
             .add_subclass(PyFlatHazardRate),
         )
+    }
+}
+
+/// Python `CreditDefaultSwap`: a credit-default swap quoted as a running spread
+/// (`instruments::creditdefaultswap::CreditDefaultSwap`).
+///
+/// One side pays the premium leg and receives the protection payment, the other
+/// the reverse; [`ProtectionSide`] says which way round. The instrument is held
+/// behind a `SharedMut` because every priced accessor takes `&mut self`
+/// (`creditdefaultswap.rs:516-576`).
+///
+/// `__init__` takes the C++ default terms with `settles_accrual` and
+/// `pays_at_default_time` quoted; [`with_terms`](Self::with_terms) additionally
+/// exposes `protection_start` and `rebates_accrual`. Both are fallible: the
+/// schedule must be non-empty, the protection start must not follow the first
+/// accrual date under a pre-Big-Bang date-generation rule, and the premium leg
+/// carries its own preconditions.
+///
+/// Pricing needs an engine: call [`set_engine`](Self::set_engine) before
+/// [`npv`](Self::npv).
+///
+/// Deferred (visible): four of the eight `CdsTerms` fields are not exposed and
+/// keep their core defaults (`creditdefaultswap.rs:124-137`) - `claim` (a
+/// `FaceValueClaim`, which needs a claim facade that does not exist yet),
+/// `last_period_day_counter` (the spread's own day counter), `trade_date`
+/// (deduced from the protection start) and `cash_settlement_days` (3). The
+/// upfront-quoted constructor is likewise not ported in the core
+/// (`creditdefaultswap.rs:446-450`), so `upfront` is always absent.
+#[pyclass(name = "CreditDefaultSwap", unsendable)]
+pub struct PyCreditDefaultSwap {
+    inner: SharedMut<CreditDefaultSwap>,
+}
+
+#[pymethods]
+impl PyCreditDefaultSwap {
+    /// A contract on the C++ default terms, accruing and paying as
+    /// `settles_accrual` and `pays_at_default_time` say.
+    #[new]
+    #[allow(clippy::too_many_arguments)]
+    fn new(
+        side: PyProtectionSide,
+        notional: f64,
+        spread: f64,
+        schedule: &PySchedule,
+        payment_convention: &PyBusinessDayConvention,
+        day_counter: &PyDayCounter,
+        settles_accrual: bool,
+        pays_at_default_time: bool,
+        settings: &PySettings,
+    ) -> PyResult<Self> {
+        Ok(PyCreditDefaultSwap {
+            inner: shared_mut(
+                CreditDefaultSwap::new(
+                    side.inner(),
+                    notional,
+                    spread,
+                    schedule.inner(),
+                    payment_convention.inner(),
+                    day_counter.inner(),
+                    settles_accrual,
+                    pays_at_default_time,
+                    settings.inner(),
+                )
+                .map_err(PyQlError::from)?,
+            ),
+        })
+    }
+
+    /// A contract quoting the terms `__init__` defaults.
+    ///
+    /// `protection_start` is the first date a default triggers the contract;
+    /// `None` takes the schedule's first date, which is what `__init__` does.
+    /// The three flags carry the core defaults verbatim, so calling this with
+    /// only the positional arguments builds exactly what `__init__` builds.
+    ///
+    /// `settings` precedes the defaulted terms because a Python signature
+    /// cannot put a required argument after an optional one; the positional
+    /// order otherwise matches `__init__`.
+    #[staticmethod]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (
+        side,
+        notional,
+        spread,
+        schedule,
+        payment_convention,
+        day_counter,
+        settings,
+        protection_start = None,
+        settles_accrual = true,
+        pays_at_default_time = true,
+        rebates_accrual = true,
+    ))]
+    fn with_terms(
+        side: PyProtectionSide,
+        notional: f64,
+        spread: f64,
+        schedule: &PySchedule,
+        payment_convention: &PyBusinessDayConvention,
+        day_counter: &PyDayCounter,
+        settings: &PySettings,
+        protection_start: Option<&PyDate>,
+        settles_accrual: bool,
+        pays_at_default_time: bool,
+        rebates_accrual: bool,
+    ) -> PyResult<Self> {
+        let terms = CdsTerms {
+            settles_accrual,
+            pays_at_default_time,
+            protection_start: protection_start.map(PyDate::inner),
+            rebates_accrual,
+            ..CdsTerms::default()
+        };
+        Ok(PyCreditDefaultSwap {
+            inner: shared_mut(
+                CreditDefaultSwap::with_terms(
+                    side.inner(),
+                    notional,
+                    spread,
+                    schedule.inner(),
+                    payment_convention.inner(),
+                    day_counter.inner(),
+                    terms,
+                    settings.inner(),
+                )
+                .map_err(PyQlError::from)?,
+            ),
+        })
+    }
+
+    /// Attaches a [`PyMidPointCdsEngine`] so the contract prices.
+    ///
+    /// The engine is built separately and installed here, so one engine can be
+    /// shared across contracts. It must resolve its dates against the same
+    /// `Settings` object this contract was built with.
+    fn set_engine(&mut self, engine: &PyMidPointCdsEngine) {
+        self.inner
+            .borrow_mut()
+            .base_mut()
+            .set_pricing_engine(engine.engine());
+    }
+
+    /// The contract NPV under the attached engine.
+    ///
+    /// Fallible: with no engine attached the core reports `"null pricing
+    /// engine"` as an `ItofinError`.
+    fn npv(&mut self) -> PyResult<f64> {
+        Ok(self.inner.borrow_mut().npv().map_err(PyQlError::from)?)
+    }
+
+    /// The running spread that prices the contract at zero.
+    ///
+    /// Fallible as [`npv`](Self::npv), and additionally when the engine priced
+    /// a worthless premium leg and so provided no fair spread.
+    fn fair_spread(&mut self) -> PyResult<f64> {
+        Ok(self
+            .inner
+            .borrow_mut()
+            .fair_spread()
+            .map_err(PyQlError::from)?)
+    }
+
+    /// The premium leg's NPV. Fallible as [`fair_spread`](Self::fair_spread).
+    fn coupon_leg_npv(&mut self) -> PyResult<f64> {
+        Ok(self
+            .inner
+            .borrow_mut()
+            .coupon_leg_npv()
+            .map_err(PyQlError::from)?)
+    }
+
+    /// The protection leg's NPV. Fallible as
+    /// [`fair_spread`](Self::fair_spread).
+    fn default_leg_npv(&mut self) -> PyResult<f64> {
+        Ok(self
+            .inner
+            .borrow_mut()
+            .default_leg_npv()
+            .map_err(PyQlError::from)?)
     }
 }

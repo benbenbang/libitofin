@@ -10,6 +10,7 @@ mod capfloor;
 mod capfloorengine;
 mod capfloortermvol;
 mod credit;
+mod creditengine;
 mod curve;
 mod helpers;
 mod heston;
@@ -31,7 +32,10 @@ use calibration::{PyCalibrationErrorType, PyEndCriteria, PyLevenbergMarquardt};
 use capfloor::{PyCapFloor, PyCapFloorType};
 use capfloorengine::PyBlackCapFloorEngine;
 use capfloortermvol::PyCapFloorTermVolSurface;
-use credit::{PyDefaultProbabilityTermStructure, PyFlatHazardRate, PyProtectionSide};
+use credit::{
+    PyCreditDefaultSwap, PyDefaultProbabilityTermStructure, PyFlatHazardRate, PyProtectionSide,
+};
+use creditengine::PyMidPointCdsEngine;
 use curve::{
     PyDiscountCurve, PyFlatForward, PyForwardCurve, PyPiecewiseFlatForward,
     PyPiecewiseLinearForward, PyPiecewiseLinearZero, PyPiecewiseLogLinearDiscount,
@@ -187,6 +191,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     instruments.add_class::<PyCapFloorType>()?;
     instruments.add_class::<PyCapFloor>()?;
     instruments.add_class::<PyProtectionSide>()?;
+    instruments.add_class::<PyCreditDefaultSwap>()?;
 
     let models = PyModule::new(py, "models")?;
     models.add_class::<PyHestonModel>()?;
@@ -199,6 +204,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     pricingengines.add_class::<PyCashAnnuityModel>()?;
     pricingengines.add_class::<PyBlackSwaptionEngine>()?;
     pricingengines.add_class::<PyBlackCapFloorEngine>()?;
+    pricingengines.add_class::<PyMidPointCdsEngine>()?;
 
     let optimization = PyModule::new(py, "optimization")?;
     optimization.add_class::<PyLevenbergMarquardt>()?;

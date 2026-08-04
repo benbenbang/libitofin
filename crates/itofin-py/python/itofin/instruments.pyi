@@ -4,10 +4,20 @@
 from itofin import Settings
 from itofin.indexes import Euribor
 from itofin.models import HestonModel, HullWhite
-from itofin.pricingengines import BlackCapFloorEngine, BlackSwaptionEngine
+from itofin.pricingengines import (
+    BlackCapFloorEngine,
+    BlackSwaptionEngine,
+    MidPointCdsEngine,
+)
 from itofin.processes import BlackScholesProcess
 from itofin.termstructures import YieldTermStructure
-from itofin.time import Date, DayCounter, Period, Schedule
+from itofin.time import (
+    BusinessDayConvention,
+    Date,
+    DayCounter,
+    Period,
+    Schedule,
+)
 
 class OptionType:
     """The call/put flag."""
@@ -162,3 +172,64 @@ class ProtectionSide:
 
     Buyer: ProtectionSide
     Seller: ProtectionSide
+
+class CreditDefaultSwap:
+    """A credit-default swap quoted as a running spread.
+
+    __init__ takes the C++ default terms with settles_accrual and
+    pays_at_default_time quoted; with_terms additionally exposes
+    protection_start and rebates_accrual.
+
+    Four of the eight CdsTerms fields are not exposed and keep their core
+    defaults: claim (a face-value claim, which needs a claim facade that does
+    not exist yet), last_period_day_counter, trade_date and
+    cash_settlement_days. The upfront-quoted constructor is not ported in the
+    core either, so the contract never carries an upfront."""
+
+    def __init__(
+        self,
+        side: ProtectionSide,
+        notional: float,
+        spread: float,
+        schedule: Schedule,
+        payment_convention: BusinessDayConvention,
+        day_counter: DayCounter,
+        settles_accrual: bool,
+        pays_at_default_time: bool,
+        settings: Settings,
+    ) -> None: ...
+    @staticmethod
+    def with_terms(
+        side: ProtectionSide,
+        notional: float,
+        spread: float,
+        schedule: Schedule,
+        payment_convention: BusinessDayConvention,
+        day_counter: DayCounter,
+        settings: Settings,
+        protection_start: Date | None = None,
+        settles_accrual: bool = True,
+        pays_at_default_time: bool = True,
+        rebates_accrual: bool = True,
+    ) -> CreditDefaultSwap:
+        """A contract quoting the terms __init__ defaults. protection_start is
+        the first date a default triggers the contract; None takes the
+        schedule's first date, which is what __init__ does. settings precedes
+        the defaulted terms because a required argument cannot follow an
+        optional one."""
+        ...
+    def set_engine(self, engine: MidPointCdsEngine) -> None:
+        """Price the contract off a default-probability and a discount curve.
+        The engine must resolve its dates against the same Settings object as
+        this contract."""
+        ...
+    def npv(self) -> float:
+        """Raises ItofinError with no engine attached."""
+        ...
+    def fair_spread(self) -> float:
+        """The running spread that prices the contract at zero. Raises
+        ItofinError with no engine attached, and when the engine priced a
+        worthless premium leg and so provided no fair spread."""
+        ...
+    def coupon_leg_npv(self) -> float: ...
+    def default_leg_npv(self) -> float: ...
