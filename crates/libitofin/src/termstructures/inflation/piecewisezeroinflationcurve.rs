@@ -291,3 +291,242 @@ impl<I: Interpolator + 'static> PiecewiseCurve for PiecewiseZeroInflationCurve<I
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    //! The full oracle - `inflation.cpp`'s `testZeroTermStructure`, which
+    //! reprices fourteen quoted swaps off the bootstrapped curve - lives with
+    //! the swap it prices. What is checked here is what the curve decides on its
+    //! own: that the bootstrap runs lazily, that it lays its first node on the
+    //! base date at a negative time rather than on the reference date, and that
+    //! every helper reprices its own quote off the result.
+
+    use super::*;
+    use crate::handle::Handle;
+    use crate::indexes::Index;
+    use crate::indexes::inflation::UkRpi;
+    use crate::indexes::inflationindex::{CpiInterpolationType, ZeroInflationIndex};
+    use crate::quotes::{Quote, SimpleQuote};
+    use crate::settings::Settings;
+    use crate::shared::shared;
+    use crate::termstructures::inflation::inflationhelpers::ZeroCouponInflationSwapHelper;
+    use crate::time::businessdayconvention::BusinessDayConvention;
+    use crate::time::calendars::unitedkingdom::{Market, UnitedKingdom};
+    use crate::time::date::Month::{April, August, July, June, May};
+    use crate::time::daycounters::thirty360::{Convention, Thirty360};
+    use crate::time::period::Period;
+    use crate::time::timeunit::TimeUnit;
+
+    const QUOTES: [Real; 3] = [0.029, 0.030, 0.031];
+    const MATURITY_YEARS: [i32; 3] = [1, 3, 5];
+
+    fn today() -> Date {
+        Date::new(13, August, 2007)
+    }
+
+    fn base_date() -> Date {
+        Date::new(1, July, 2007)
+    }
+
+    fn day_counter() -> DayCounter {
+        Thirty360::with_convention(Convention::BondBasis)
+    }
+
+    fn settings_today() -> Shared<Settings<Date>> {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(today());
+        settings
+    }
+
+    /// UK RPI with the four figures the fixture needs: the swaps' own base
+    /// observation (May 2007, three months before the evaluation date) and the
+    /// run up to the curve's base date, which every forecast compounds off.
+    fn an_index(settings: &Shared<Settings<Date>>) -> Shared<ZeroInflationIndex> {
+        let index = shared(UkRpi::new(Shared::clone(settings)));
+        for (date, fixing) in [
+            (Date::new(1, April, 2007), 204.4),
+            (Date::new(1, May, 2007), 205.4),
+            (Date::new(1, June, 2007), 206.2),
+            (base_date(), 207.3),
+        ] {
+            index.add_fixing(date, fixing).expect("a published figure");
+        }
+        index
+    }
+
+    fn helpers(
+        settings: &Shared<Settings<Date>>,
+        index: &Shared<ZeroInflationIndex>,
+    ) -> Vec<Shared<dyn ZeroInflationHelper>> {
+        QUOTES
+            .iter()
+            .zip(MATURITY_YEARS)
+            .map(|(quote, years)| {
+                ZeroCouponInflationSwapHelper::new(
+                    Handle::new(shared(SimpleQuote::new(Some(*quote))) as Shared<dyn Quote>),
+                    Period::new(3, TimeUnit::Months),
+                    today() + Period::new(years, TimeUnit::Years),
+                    UnitedKingdom::new(Market::Settlement),
+                    BusinessDayConvention::ModifiedFollowing,
+                    day_counter(),
+                    index,
+                    CpiInterpolationType::Flat,
+                    Shared::clone(settings),
+                )
+                .expect("a three-month lag covers UK RPI's availability")
+                    as Shared<dyn ZeroInflationHelper>
+            })
+            .collect()
+    }
+
+    struct Fixture {
+        _settings: Shared<Settings<Date>>,
+        helpers: Vec<Shared<dyn ZeroInflationHelper>>,
+        curve: Shared<PiecewiseZeroInflationCurve<Linear>>,
+    }
+
+    fn a_curve() -> Fixture {
+        let settings = settings_today();
+        let index = an_index(&settings);
+        assert_eq!(
+            index.last_fixing_date().unwrap(),
+            base_date(),
+            "the curve's base date is the index's last published period"
+        );
+        let helpers = helpers(&settings, &index);
+        let curve = PiecewiseZeroInflationCurve::new(
+            today(),
+            base_date(),
+            Frequency::Monthly,
+            day_counter(),
+            helpers.clone(),
+        )
+        .unwrap();
+        Fixture {
+            _settings: settings,
+            helpers,
+            curve,
+        }
+    }
+
+    /// The T3 seam: node zero sits on the base date, at the negative time that
+    /// separates it from the reference date. A curve that took the driver's
+    /// default `initial_date` would put it on 13 August 2007 at time zero.
+    ///
+    /// The time is pinned exactly rather than by sign, so it discriminates the
+    /// day counter too: `Thirty360(BondBasis)` from 13 August 2007 back to 1
+    /// July 2007 is `(30 * (7 - 8) + (1 - 13)) / 360 = -42/360`.
+    #[test]
+    fn the_first_node_is_the_base_date_at_a_negative_time() {
+        let fixture = a_curve();
+        let (helpers, curve) = (&fixture.helpers, &fixture.curve);
+
+        assert_eq!(curve.dates().unwrap()[0], base_date());
+        assert_eq!(curve.times().unwrap()[0], -42.0 / 360.0);
+        assert_eq!(
+            curve.times().unwrap()[0],
+            TermStructure::time_from_reference(curve.as_ref(), base_date()).unwrap()
+        );
+        assert_eq!(
+            curve.dates().unwrap().len(),
+            helpers.len() + 1,
+            "one node per helper, plus the base-date node"
+        );
+        assert_eq!(curve.nodes().unwrap()[0].0, base_date());
+    }
+
+    /// Every helper reprices its own quoted rate off the bootstrapped curve.
+    #[test]
+    fn the_bootstrapped_curve_reproduces_the_quoted_swap_rates() {
+        let fixture = a_curve();
+        let (helpers, curve) = (&fixture.helpers, &fixture.curve);
+        curve.calculate().unwrap();
+
+        for (helper, quote) in helpers.iter().zip(QUOTES) {
+            let error = helper.quote_error().unwrap();
+            assert!(
+                error.abs() < 1.0e-12,
+                "quote error {error} on the {quote} helper"
+            );
+        }
+    }
+
+    /// The pillars are the helpers' observed fixing periods, and the node rates
+    /// are plausible inflation rates rather than the traits' `0.02` seed.
+    #[test]
+    fn the_pillars_are_the_helpers_fixing_periods() {
+        let fixture = a_curve();
+        let (helpers, curve) = (&fixture.helpers, &fixture.curve);
+        let dates = curve.dates().unwrap();
+
+        for (i, helper) in helpers.iter().enumerate() {
+            assert_eq!(dates[i + 1], helper.pillar_date());
+        }
+        assert_eq!(dates[1], Date::new(1, May, 2008));
+        assert_eq!(curve.max_date(), *dates.last().unwrap());
+
+        for rate in curve.data().unwrap() {
+            assert!((0.01..0.05).contains(&rate), "node rate {rate}");
+        }
+    }
+
+    /// Construction lays down no nodes and runs no solver; the first read
+    /// bootstraps; a quote move invalidates the cache and the next read
+    /// re-bootstraps to a higher curve (the C++ `LazyObject` contract, and the
+    /// [`CurveUpdater`] registration that carries the quote's notification).
+    #[test]
+    fn the_bootstrap_is_lazy_and_reruns_on_a_quote_change() {
+        let settings = settings_today();
+        let index = an_index(&settings);
+        let quote = shared(SimpleQuote::new(Some(0.029)));
+        let helper = ZeroCouponInflationSwapHelper::new(
+            Handle::new(Shared::clone(&quote) as Shared<dyn Quote>),
+            Period::new(3, TimeUnit::Months),
+            today() + Period::new(5, TimeUnit::Years),
+            UnitedKingdom::new(Market::Settlement),
+            BusinessDayConvention::ModifiedFollowing,
+            day_counter(),
+            &index,
+            CpiInterpolationType::Flat,
+            Shared::clone(&settings),
+        )
+        .unwrap();
+        let curve = PiecewiseZeroInflationCurve::new(
+            today(),
+            base_date(),
+            Frequency::Monthly,
+            day_counter(),
+            vec![Shared::clone(&helper) as Shared<dyn ZeroInflationHelper>],
+        )
+        .unwrap();
+
+        assert!(!curve.lazy.borrow().is_calculated());
+        let first = curve.data().unwrap()[1];
+        assert!(curve.lazy.borrow().is_calculated());
+        assert!((0.01..0.05).contains(&first), "solved {first}");
+
+        quote.set_value(Some(0.04));
+        assert!(!curve.lazy.borrow().is_calculated());
+        let second = curve.data().unwrap()[1];
+        assert!(
+            second > first,
+            "a higher quoted rate must lift the curve: {second} vs {first}"
+        );
+    }
+
+    #[test]
+    fn an_empty_helper_set_is_rejected() {
+        let built = PiecewiseZeroInflationCurve::new(
+            today(),
+            base_date(),
+            Frequency::Monthly,
+            day_counter(),
+            Vec::new(),
+        );
+        let err = match built {
+            Ok(_) => panic!("expected a construction error"),
+            Err(err) => err,
+        };
+        assert!(err.message().contains("no bootstrap helpers"));
+    }
+}
