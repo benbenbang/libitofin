@@ -69,11 +69,12 @@ class DayCounter:
     def __repr__(self) -> str: ...
 
 class Frequency:
-    """A coupon frequency."""
+    """A coupon or fixing frequency."""
 
     Annual: Frequency
     Semiannual: Frequency
     Quarterly: Frequency
+    Monthly: Frequency
 
 class BusinessDayConvention:
     """A holiday-rolling rule."""

@@ -1,6 +1,6 @@
 # Hand-written stubs for itofin.termstructures; sync manually with src/curve.rs, src/vol.rs,
 # src/helpers.rs, src/swaptionvol.rs, src/optionletvol.rs, src/smilesection.rs and
-# src/credit.rs and src/credithelpers.rs (#517).
+# src/credit.rs, src/credithelpers.rs and src/inflation.rs (#517).
 
 from itofin import Settings
 from itofin.indexes import Estr, Euribor, SwapIndex
@@ -922,4 +922,43 @@ class PiecewiseDefaultCurve(DefaultProbabilityTermStructure):
     def times(self) -> list[float]: ...
     def dates(self) -> list[Date]: ...
     def data(self) -> list[float]: ...
+    def nodes(self) -> list[tuple[Date, float]]: ...
+
+class ZeroInflationTermStructure:
+    """Shared base for every zero-coupon inflation curve: the zero-coupon
+    inflation rate in a year-fraction and a date form, plus the base date and
+    the fixing frequency.
+
+    The two rate reads are not interchangeable. zero_rate_date snaps its date
+    to the start of the inflation period containing it, because a fixing
+    applies to a whole period; zero_rate takes a year-fraction already measured
+    under the curve's own day counter and quantizes nothing."""
+
+    def zero_rate(self, t: float, extrapolate: bool = False) -> float: ...
+    def zero_rate_date(self, date: Date, extrapolate: bool = False) -> float: ...
+    def base_date(self) -> Date: ...
+    def frequency(self) -> Frequency: ...
+
+class InterpolatedZeroInflationCurve(ZeroInflationTermStructure):
+    """A zero-coupon inflation curve built from (date, zero-rate) nodes,
+    interpolating linearly in zero-rate space.
+
+    The first date is the base date rather than the reference date, which is
+    passed separately and normally follows it; node times are measured from the
+    reference date, so the first one is negative."""
+
+    def __init__(
+        self,
+        reference_date: Date,
+        dates: list[Date],
+        rates: list[float],
+        frequency: Frequency,
+        day_counter: DayCounter,
+    ) -> None:
+        """Raises ItofinError on fewer than two dates, a dates/rates count
+        mismatch, a rate at or below -100 % from the second node on, or
+        unsorted dates."""
+        ...
+    def times(self) -> list[float]: ...
+    def dates(self) -> list[Date]: ...
     def nodes(self) -> list[tuple[Date, float]]: ...
