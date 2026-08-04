@@ -164,8 +164,8 @@ def test_an_unlinked_index_cannot_price_and_link_to_fixes_it():
 
     index.link_to(_curve())
 
-    assert swap.fair_rate() == pytest.approx(FAIR_RATE, abs=TOLERANCE)
-    assert swap.npv() == pytest.approx(NPV, abs=TOLERANCE)
+    assert abs(swap.fair_rate() - FAIR_RATE) <= TOLERANCE
+    assert abs(swap.npv() - NPV) <= TOLERANCE
 
 
 def test_the_swap_prices_to_the_probed_values():
@@ -175,12 +175,10 @@ def test_the_swap_prices_to_the_probed_values():
     receives the fixed 23777 and pays the inflation 31730."""
     swap = _priced_swap()
 
-    assert swap.fixed_leg_npv() == pytest.approx(FIXED_LEG_NPV, abs=TOLERANCE)
-    assert swap.inflation_leg_npv() == pytest.approx(INFLATION_LEG_NPV, abs=TOLERANCE)
-    assert swap.npv() == pytest.approx(NPV, abs=TOLERANCE)
-    assert swap.fixed_leg_npv() + swap.inflation_leg_npv() == pytest.approx(
-        swap.npv(), abs=TOLERANCE
-    )
+    assert abs(swap.fixed_leg_npv() - FIXED_LEG_NPV) <= TOLERANCE
+    assert abs(swap.inflation_leg_npv() - INFLATION_LEG_NPV) <= TOLERANCE
+    assert abs(swap.npv() - NPV) <= TOLERANCE
+    assert abs(swap.fixed_leg_npv() + swap.inflation_leg_npv() - swap.npv()) <= TOLERANCE
 
     assert swap.npv() != 0.0
 
@@ -192,7 +190,7 @@ def test_the_fixed_leg_bps_reaches_the_engines_discount_factor():
     prices on demand (swap.rs:307-315)."""
     swap = _priced_swap()
 
-    assert swap.fixed_leg_bps() == pytest.approx(FIXED_LEG_BPS, abs=TOLERANCE)
+    assert abs(swap.fixed_leg_bps() - FIXED_LEG_BPS) <= TOLERANCE
 
 
 def test_fair_rate_needs_no_engine_but_npv_does():
@@ -209,7 +207,7 @@ def test_fair_rate_needs_no_engine_but_npv_does():
     index.link_to(_curve())
     swap = _swap(settings, index)
 
-    assert swap.fair_rate() == pytest.approx(FAIR_RATE, abs=TOLERANCE)
+    assert abs(swap.fair_rate() - FAIR_RATE) <= TOLERANCE
     with pytest.raises(ItofinError, match="null pricing engine"):
         swap.npv()
 
