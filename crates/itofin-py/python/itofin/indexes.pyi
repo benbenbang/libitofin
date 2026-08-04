@@ -2,7 +2,7 @@
 # src/swapindex.rs and src/inflation.rs (#517).
 
 from itofin import Settings
-from itofin.termstructures import YieldTermStructure
+from itofin.termstructures import YieldTermStructure, ZeroInflationTermStructure
 from itofin.time import (
     BusinessDayConvention,
     Calendar,
@@ -90,9 +90,8 @@ class ZeroInflationIndex:
 
     The curve is reached through a relinkable handle the index owns, so an
     index can be built before the curve it forecasts off exists. The handle
-    starts empty and a forecast before any link raises ItofinError. link_to,
-    which points it at a bootstrapped curve, lands with
-    PiecewiseZeroInflationCurve."""
+    starts empty and a forecast before any link raises ItofinError; link_to
+    fills it."""
 
     @staticmethod
     def uk_rpi(settings: Settings) -> ZeroInflationIndex:
@@ -122,6 +121,15 @@ class ZeroInflationIndex:
     def last_fixing_date(self) -> Date:
         """The first day of the inflation period the latest stored figure
         describes. Raises ItofinError on an index with no history."""
+        ...
+    def link_to(self, curve: ZeroInflationTermStructure) -> None:
+        """Points the index at curve, so every forecast from here on compounds
+        off it.
+
+        Takes the ZeroInflationTermStructure base, so any subclass links. It is
+        the curve behind that facade's handle at call time that is stored, not
+        the handle itself: relinking the facade afterwards leaves this index on
+        the curve it was given, and a later link_to is how it moves."""
         ...
     def needs_forecast(self, fixing_date: Date) -> bool:
         """Whether fixing_date has to be forecast rather than read from

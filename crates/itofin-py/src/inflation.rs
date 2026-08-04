@@ -1,7 +1,8 @@
 //! Facades for the inflation slice: the [`PyDiscountingSwapEngine`] every
 //! inflation swap prices through, the [`PyCpiInterpolationType`] observation
-//! flag, the [`PyZeroInflationIndex`] family and the
-//! [`PyZeroInflationTermStructure`] curve hierarchy.
+//! flag, the [`PyZeroInflationIndex`] family, the
+//! [`PyZeroInflationTermStructure`] curve hierarchy and the
+//! [`PyZeroCouponInflationSwap`] the three of them price together.
 //!
 //! The swap engine is generic rather than inflation-specific - it prices any
 //! swap - but is homed here because the inflation tickets are the first to need
@@ -10,11 +11,16 @@
 use crate::PyQlError;
 use crate::curve::PyYieldTermStructure;
 use crate::settings::PySettings;
-use crate::time::{PyDate, PyDayCounter, PyFrequency};
+use crate::swap::PySwapType;
+use crate::time::{
+    PyBusinessDayConvention, PyCalendar, PyDate, PyDayCounter, PyFrequency, PyPeriod,
+};
 use libitofin::handle::{Handle, RelinkableHandle};
 use libitofin::indexes::index::Index;
 use libitofin::indexes::inflation::{EuHicp, UkHicp, UkRpi};
-use libitofin::indexes::inflationindex::ZeroInflationIndex;
+use libitofin::indexes::inflationindex::{CpiInterpolationType, ZeroInflationIndex};
+use libitofin::instrument::Instrument;
+use libitofin::instruments::ZeroCouponInflationSwap;
 use libitofin::math::interpolations::linear::Linear;
 use libitofin::pricingengine::PricingEngine;
 use libitofin::pricingengines::DiscountingSwapEngine;
@@ -65,7 +71,6 @@ impl PyDiscountingSwapEngine {
 impl PyDiscountingSwapEngine {
     /// The erased engine the instrument facades install via
     /// `set_pricing_engine`.
-    #[allow(dead_code)]
     pub(crate) fn engine(&self) -> SharedMut<dyn PricingEngine> {
         SharedMut::clone(&self.inner) as SharedMut<dyn PricingEngine>
     }
@@ -88,6 +93,16 @@ pub enum PyCpiInterpolationType {
     Linear,
 }
 
+impl PyCpiInterpolationType {
+    /// The core [`CpiInterpolationType`] this variant stands for.
+    fn inner(&self) -> CpiInterpolationType {
+        match self {
+            PyCpiInterpolationType::Flat => CpiInterpolationType::Flat,
+            PyCpiInterpolationType::Linear => CpiInterpolationType::Linear,
+        }
+    }
+}
+
 /// Python `ZeroInflationIndex`: a price index publishing one level per period,
 /// reading back either a stored figure or a forecast off its inflation curve
 /// (core `indexes::inflationindex::ZeroInflationIndex`).
@@ -100,9 +115,6 @@ pub enum PyCpiInterpolationType {
 /// choice to `link_to`, which is how the bootstrapped-curve fixtures need it.
 /// The handle starts empty, exactly as the core's own constructor leaves it, so
 /// a forecast before any link raises the empty-handle error.
-///
-/// `link_to`, which points that handle at a bootstrapped curve, lands with
-/// `PiecewiseZeroInflationCurve`: there is no curve facade to link to yet.
 #[pyclass(name = "ZeroInflationIndex", unsendable)]
 pub struct PyZeroInflationIndex {
     inner: Shared<ZeroInflationIndex>,
@@ -183,6 +195,26 @@ impl PyZeroInflationIndex {
         ))
     }
 
+    /// Points the index at `curve`, so every forecast from here on compounds
+    /// off it.
+    ///
+    /// Takes the [`PyZeroInflationTermStructure`] base, so any subclass links:
+    /// the directly-built [`PyInterpolatedZeroInflationCurve`] as much as the
+    /// bootstrapped curves that follow. The base's handle is filled at
+    /// construction, so it always dereferences here.
+    ///
+    /// It is the curve *behind* `curve`'s handle at call time that is stored,
+    /// not the handle itself: relinking the facade afterwards leaves this index
+    /// on the curve it was given, and a later `link_to` is how it moves.
+    ///
+    /// # Errors
+    ///
+    /// Reports the empty-handle error if `curve` somehow carries no link.
+    fn link_to(&self, curve: &PyZeroInflationTermStructure) -> PyResult<()> {
+        self.relink(curve.handle().current_link().map_err(PyQlError::from)?);
+        Ok(())
+    }
+
     /// Whether `fixing_date` has to be forecast rather than read from history,
     /// decided against the latest period that could have been published by the
     /// settings' evaluation date.
@@ -201,15 +233,12 @@ impl PyZeroInflationIndex {
 impl PyZeroInflationIndex {
     /// Points the internal handle at `curve`, so the index forecasts off it.
     ///
-    /// The seam the `link_to` method calls once a zero inflation curve facade
-    /// exists.
-    #[allow(dead_code)]
+    /// The seam [`link_to`](Self::link_to) dereferences a curve facade into.
     pub(crate) fn relink(&self, curve: Shared<dyn ZeroInflationTermStructure>) {
         self.curve.link_to(curve);
     }
 
     /// The wrapped core index, for the coupon and helper facades that take one.
-    #[allow(dead_code)]
     pub(crate) fn shared(&self) -> Shared<ZeroInflationIndex> {
         Shared::clone(&self.inner)
     }
@@ -305,7 +334,6 @@ impl PyZeroInflationTermStructure {
 
     /// A clone of the inner curve handle for the coupon and instrument facades
     /// that take an inflation curve.
-    #[allow(dead_code)]
     pub(crate) fn handle(&self) -> Handle<dyn ZeroInflationTermStructure> {
         self.inner.clone()
     }
@@ -404,5 +432,182 @@ impl PyInterpolatedZeroInflationCurve {
             .into_iter()
             .map(|(date, rate)| (PyDate::from_inner(date), rate))
             .collect()
+    }
+}
+
+/// Python `ZeroCouponInflationSwap`: one fixed flow against one
+/// inflation-indexed flow, both exchanged at maturity
+/// (`instruments::zerocouponinflationswap`).
+///
+/// The quoted `fixed_rate` is the `K` that at inception matches the inflation
+/// growth. [`SwapType`](crate::swap::PySwapType) names the *inflation* leg, so a
+/// `Payer` pays inflation and receives fixed.
+///
+/// `maturity` is pre-adjustment: each leg's payment date is it rolled on that
+/// leg's calendar and convention, while the year fraction behind the fixed
+/// amount stays on the raw date. `inflation_calendar` and
+/// `inflation_convention` fall back to the fixed-leg ones when `None`, and are
+/// stored resolved.
+///
+/// Fallible at construction: the observation lag must let the index observe
+/// fixings that exist, which under
+/// [`Linear`](PyCpiInterpolationType::Linear) costs a further publication
+/// period (`zerocouponinflationswap.rs:156-176`).
+///
+/// Pricing needs an engine: call [`set_engine`](Self::set_engine) before
+/// [`npv`](Self::npv). [`fair_rate`](Self::fair_rate) is the exception - it
+/// reads the indexed flow directly and prices with no engine at all - but it
+/// does need the index linked to a curve.
+///
+/// Deferred (visible): the core omits `adjust_inf_obs_dates` from its own
+/// signature, so there is nothing to expose here; the leg and cash-flow
+/// accessors are not surfaced either, there being no cash-flow facade, and
+/// [`inflation_fixing_date`](Self::inflation_fixing_date) carries the one datum
+/// off the indexed flow that the fixtures read.
+#[pyclass(name = "ZeroCouponInflationSwap", unsendable)]
+pub struct PyZeroCouponInflationSwap {
+    inner: SharedMut<ZeroCouponInflationSwap>,
+}
+
+#[pymethods]
+impl PyZeroCouponInflationSwap {
+    #[new]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (
+        swap_type,
+        nominal,
+        start_date,
+        maturity,
+        fixed_calendar,
+        fixed_convention,
+        day_counter,
+        fixed_rate,
+        inflation_index,
+        observation_lag,
+        observation_interpolation,
+        inflation_calendar,
+        inflation_convention,
+        settings,
+    ))]
+    fn new(
+        swap_type: &PySwapType,
+        nominal: f64,
+        start_date: &PyDate,
+        maturity: &PyDate,
+        fixed_calendar: &PyCalendar,
+        fixed_convention: &PyBusinessDayConvention,
+        day_counter: &PyDayCounter,
+        fixed_rate: f64,
+        inflation_index: &PyZeroInflationIndex,
+        observation_lag: &PyPeriod,
+        observation_interpolation: &PyCpiInterpolationType,
+        inflation_calendar: Option<&PyCalendar>,
+        inflation_convention: Option<PyBusinessDayConvention>,
+        settings: &PySettings,
+    ) -> PyResult<Self> {
+        Ok(PyZeroCouponInflationSwap {
+            inner: shared_mut(
+                ZeroCouponInflationSwap::new(
+                    swap_type.inner(),
+                    nominal,
+                    start_date.inner(),
+                    maturity.inner(),
+                    fixed_calendar.inner(),
+                    fixed_convention.inner(),
+                    day_counter.inner(),
+                    fixed_rate,
+                    inflation_index.shared(),
+                    observation_lag.inner(),
+                    observation_interpolation.inner(),
+                    inflation_calendar.map(PyCalendar::inner),
+                    inflation_convention.map(|convention| convention.inner()),
+                    settings.inner(),
+                )
+                .map_err(PyQlError::from)?,
+            ),
+        })
+    }
+
+    /// Attaches a [`PyDiscountingSwapEngine`] so the swap prices.
+    ///
+    /// The engine must resolve its dates against the same `Settings` object
+    /// this swap was built with.
+    fn set_engine(&mut self, engine: &PyDiscountingSwapEngine) {
+        self.inner
+            .borrow_mut()
+            .base_mut()
+            .set_pricing_engine(engine.engine());
+    }
+
+    /// The swap NPV under the attached engine.
+    ///
+    /// Fallible: with no engine attached the core reports `"null pricing
+    /// engine"`, and with no curve linked into the index the indexed flow
+    /// cannot be forecast.
+    fn npv(&mut self) -> PyResult<f64> {
+        Ok(self.inner.borrow_mut().npv().map_err(PyQlError::from)?)
+    }
+
+    /// The rate that would price the swap at zero: the index ratio
+    /// `I(T)/I(0)` de-compounded over the swap's own year fraction.
+    ///
+    /// Needs no engine - it reads the indexed flow rather than any priced
+    /// result - but does need the index linked, the flow's amount being a
+    /// forecast off the inflation curve.
+    fn fair_rate(&self) -> PyResult<f64> {
+        Ok(self.inner.borrow().fair_rate().map_err(PyQlError::from)?)
+    }
+
+    /// The fixed leg's NPV, priced on demand. Fallible as [`npv`](Self::npv).
+    fn fixed_leg_npv(&mut self) -> PyResult<f64> {
+        Ok(self
+            .inner
+            .borrow_mut()
+            .fixed_leg_npv()
+            .map_err(PyQlError::from)?)
+    }
+
+    /// The inflation leg's NPV, priced on demand. Fallible as
+    /// [`npv`](Self::npv).
+    fn inflation_leg_npv(&mut self) -> PyResult<f64> {
+        Ok(self
+            .inner
+            .borrow_mut()
+            .inflation_leg_npv()
+            .map_err(PyQlError::from)?)
+    }
+
+    /// The fixed leg's sensitivity to a basis point on the quoted rate,
+    /// computed in closed form rather than read off the engine, whose own leg
+    /// BPS is zero for a non-coupon flow.
+    ///
+    /// Fallible as [`npv`](Self::npv): it needs the engine's discount factor at
+    /// the fixed leg's end date.
+    fn fixed_leg_bps(&mut self) -> PyResult<f64> {
+        Ok(self
+            .inner
+            .borrow_mut()
+            .fixed_leg_bps()
+            .map_err(PyQlError::from)?)
+    }
+
+    /// The contract maturity, raw and pre-adjustment - not either leg's
+    /// payment date.
+    fn maturity_date(&self) -> PyDate {
+        PyDate::from_inner(self.inner.borrow().maturity_date())
+    }
+
+    /// The date the maturity fixing is observed at, `maturity` less the
+    /// observation lag, unsnapped.
+    fn obs_date(&self) -> PyDate {
+        PyDate::from_inner(self.inner.borrow().obs_date())
+    }
+
+    /// The same date as [`obs_date`](Self::obs_date), read off the indexed flow
+    /// rather than off the swap: the core's `obs_date()` is that call
+    /// (`zerocouponinflationswap.rs:315-317`). Both names are kept because both
+    /// exist in the core, and the oracle asserts they coincide.
+    fn inflation_fixing_date(&self) -> PyDate {
+        PyDate::from_inner(self.inner.borrow().inflation_cash_flow().fixing_date())
     }
 }

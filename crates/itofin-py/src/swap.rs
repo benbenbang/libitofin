@@ -38,7 +38,7 @@ pub enum PySwapType {
 
 impl PySwapType {
     /// The core [`SwapType`] this variant stands for.
-    fn inner(&self) -> SwapType {
+    pub(crate) fn inner(&self) -> SwapType {
         match self {
             PySwapType::Payer => SwapType::Payer,
             PySwapType::Receiver => SwapType::Receiver,

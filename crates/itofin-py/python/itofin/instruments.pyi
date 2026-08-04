@@ -1,18 +1,21 @@
 # Hand-written stubs for itofin.instruments; sync manually with src/option.rs,
-# src/swap.rs, src/swaption.rs, src/capfloor.rs and src/credit.rs (#517).
+# src/swap.rs, src/swaption.rs, src/capfloor.rs, src/credit.rs and
+# src/inflation.rs (#517).
 
 from itofin import Settings
-from itofin.indexes import Euribor
+from itofin.indexes import CpiInterpolationType, Euribor, ZeroInflationIndex
 from itofin.models import HestonModel, HullWhite
 from itofin.pricingengines import (
     BlackCapFloorEngine,
     BlackSwaptionEngine,
+    DiscountingSwapEngine,
     MidPointCdsEngine,
 )
 from itofin.processes import BlackScholesProcess
 from itofin.termstructures import YieldTermStructure
 from itofin.time import (
     BusinessDayConvention,
+    Calendar,
     Date,
     DayCounter,
     Period,
@@ -233,3 +236,74 @@ class CreditDefaultSwap:
         ...
     def coupon_leg_npv(self) -> float: ...
     def default_leg_npv(self) -> float: ...
+
+class ZeroCouponInflationSwap:
+    """One fixed flow against one inflation-indexed flow, both exchanged at
+    maturity.
+
+    fixed_rate is the K that at inception matches the inflation growth.
+    SwapType names the inflation leg, so a Payer pays inflation and receives
+    fixed.
+
+    maturity is pre-adjustment: each leg's payment date is it rolled on that
+    leg's calendar and convention, while the year fraction behind the fixed
+    amount stays on the raw date. inflation_calendar and inflation_convention
+    fall back to the fixed-leg ones when None.
+
+    The core omits adjust_inf_obs_dates from its own signature, so there is
+    nothing to expose here; the leg and cash-flow accessors are not surfaced
+    either, there being no cash-flow facade."""
+
+    def __init__(
+        self,
+        swap_type: SwapType,
+        nominal: float,
+        start_date: Date,
+        maturity: Date,
+        fixed_calendar: Calendar,
+        fixed_convention: BusinessDayConvention,
+        day_counter: DayCounter,
+        fixed_rate: float,
+        inflation_index: ZeroInflationIndex,
+        observation_lag: Period,
+        observation_interpolation: CpiInterpolationType,
+        inflation_calendar: Calendar | None,
+        inflation_convention: BusinessDayConvention | None,
+        settings: Settings,
+    ) -> None:
+        """Raises ItofinError when the observation lag is too short for the
+        index to observe fixings that exist."""
+        ...
+    def set_engine(self, engine: DiscountingSwapEngine) -> None:
+        """Price the swap off a discount curve. The engine must resolve its
+        dates against the same Settings object as this swap."""
+        ...
+    def npv(self) -> float:
+        """Raises ItofinError with no engine attached, and with no curve linked
+        into the index."""
+        ...
+    def fair_rate(self) -> float:
+        """The index ratio de-compounded over the swap's own year fraction.
+
+        Needs no engine - it reads the indexed flow rather than any priced
+        result - but does need the index linked to a curve."""
+        ...
+    def fixed_leg_npv(self) -> float: ...
+    def inflation_leg_npv(self) -> float: ...
+    def fixed_leg_bps(self) -> float:
+        """The fixed leg's sensitivity to a basis point on the quoted rate,
+        computed in closed form rather than read off the engine, whose own leg
+        BPS is zero for a non-coupon flow."""
+        ...
+    def maturity_date(self) -> Date:
+        """The contract maturity, raw and pre-adjustment - not either leg's
+        payment date."""
+        ...
+    def obs_date(self) -> Date:
+        """The date the maturity fixing is observed at, maturity less the
+        observation lag, unsnapped."""
+        ...
+    def inflation_fixing_date(self) -> Date:
+        """The same date as obs_date, read off the indexed flow rather than off
+        the swap. Both names are kept because both exist in the core."""
+        ...
