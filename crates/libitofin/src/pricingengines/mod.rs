@@ -9,6 +9,7 @@ pub mod blackformula;
 pub mod bond;
 pub mod capfloor;
 pub mod credit;
+pub mod mclongstaffschwartzengine;
 pub mod swap;
 pub mod swaption;
 pub mod vanilla;
@@ -17,6 +18,7 @@ pub use blackcalculator::BlackCalculator;
 pub use bond::{BondFunctions, DiscountingBondEngine};
 pub use capfloor::{AnalyticCapFloorEngine, BlackCapFloorEngine};
 pub use credit::MidPointCdsEngine;
+pub use mclongstaffschwartzengine::McLongstaffSchwartzEngineBase;
 pub use swap::DiscountingSwapEngine;
 pub use swaption::{
     BachelierSpec, BachelierSwaptionEngine, Black76Spec, BlackStyleSpec, BlackStyleSwaptionEngine,
