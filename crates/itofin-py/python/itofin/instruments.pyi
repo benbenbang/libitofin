@@ -9,6 +9,7 @@ from itofin.pricingengines import (
     BlackCapFloorEngine,
     BlackSwaptionEngine,
     DiscountingSwapEngine,
+    MCAmericanEngine,
     MCEuropeanEngine,
     MCEuropeanHestonEngine,
     MidPointCdsEngine,
@@ -31,15 +32,32 @@ class OptionType:
     Put: OptionType
 
 class VanillaOption:
-    """A single-asset European option."""
+    """A single-asset vanilla option: European by construction, American
+    through the american classmethod."""
 
     def __init__(
         self, option_type: OptionType, strike: float, expiry: Date, settings: Settings
     ) -> None: ...
+    @classmethod
+    def american(
+        cls,
+        option_type: OptionType,
+        strike: float,
+        earliest: Date,
+        latest: Date,
+        settings: Settings,
+    ) -> VanillaOption:
+        """The option exercisable at any time over [earliest, latest], paying on
+        exercise. Raises ItofinError when earliest is after latest."""
+        ...
     def set_engine(self, process: BlackScholesProcess) -> None: ...
     def set_heston_engine(self, model: HestonModel, integration_order: int) -> None: ...
     def set_mc_engine(self, engine: MCEuropeanEngine) -> None: ...
     def set_mc_heston_engine(self, engine: MCEuropeanHestonEngine) -> None: ...
+    def set_mc_american_engine(self, engine: MCAmericanEngine) -> None:
+        """Attaches the Monte Carlo American engine. A European-exercise option
+        raises ItofinError ("wrong exercise given") when priced on it."""
+        ...
     def npv(self) -> float: ...
     def delta(self) -> float: ...
     def gamma(self) -> float: ...
@@ -50,6 +68,11 @@ class VanillaOption:
     def error_estimate(self) -> float:
         """The standard error on the present value. Raises ItofinError on the
         engines that do not produce one, which is every analytic engine here."""
+        ...
+    def exercise_probability(self) -> float:
+        """The fraction of simulated paths exercised before expiry. Raises
+        ItofinError on every engine that does not report it - only
+        MCAmericanEngine does."""
         ...
 
 class SwapType:

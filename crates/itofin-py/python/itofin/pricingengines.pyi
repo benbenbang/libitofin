@@ -163,3 +163,36 @@ class MCEuropeanHestonEngine:
         """Raises ItofinError when neither or both of steps / steps_per_year are
         given, and when both samples and absolute_tolerance are given."""
         ...
+
+class MCAmericanEngine:
+    """The Longstaff-Schwartz least-squares Monte Carlo engine for American
+    payoffs, over the pseudo-random RNG policy. The low-discrepancy policy is
+    not exposed (#454), and the Monomial regression basis is not selectable
+    (#453).
+
+    The option priced must come from VanillaOption.american(...): a
+    European-exercise option raises ItofinError ("wrong exercise given") when
+    priced here.
+
+    Pricing is seeded and deterministic: the same seed reproduces the NPV
+    bitwise, the standard error is read back through
+    VanillaOption.error_estimate() and the early-exercise fraction through
+    VanillaOption.exercise_probability()."""
+
+    def __init__(
+        self,
+        process: BlackScholesProcess,
+        steps: int | None = None,
+        steps_per_year: int | None = None,
+        samples: int | None = None,
+        absolute_tolerance: float | None = None,
+        max_samples: int | None = None,
+        seed: int | None = None,
+        antithetic: bool | None = None,
+        polynomial_order: int | None = None,
+        calibration_samples: int | None = None,
+    ) -> None:
+        """Raises ItofinError when neither or both of steps / steps_per_year are
+        given, and when both samples and absolute_tolerance are given. The
+        polynomial order defaults to 2 and the calibration samples to 2048."""
+        ...
