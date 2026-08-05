@@ -396,3 +396,250 @@ impl<RNG: McRngTraits> MakeMcAmericanEngine<RNG> {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::any::Any;
+
+    use super::*;
+    use crate::exercise::{EuropeanExercise, Exercise};
+    use crate::instruments::{OptionArguments, PlainVanillaPayoff};
+    use crate::math::array::Array;
+    use crate::math::randomnumbers::rngtraits::PseudoRandom;
+    use crate::math::timegrid::TimeGrid;
+    use crate::option::OptionType;
+    use crate::pricingengines::vanilla::test_market::{Market, market, time_to_days, today};
+    use crate::time::date::Date;
+
+    const STRIKE: Real = 40.0;
+    const TOL: Real = 1e-14;
+
+    /// Stands in for the `AmericanExercise` of #762, so the requires-check of
+    /// `mcamericanengine.hpp:196` can be exercised on both branches today.
+    struct AmericanStub {
+        dates: [Date; 1],
+    }
+
+    impl Exercise for AmericanStub {
+        fn exercise_type(&self) -> ExerciseType {
+            ExerciseType::American
+        }
+
+        fn dates(&self) -> &[Date] {
+            &self.dates
+        }
+    }
+
+    fn put_pricer(order: Size) -> AmericanPathPricer {
+        AmericanPathPricer::new(
+            shared(PlainVanillaPayoff::new(OptionType::Put, STRIKE))
+                as Shared<dyn StrikedTypePayoff>,
+            order,
+            PolynomialType::Monomial,
+        )
+    }
+
+    fn path(values: [Real; 3]) -> Path {
+        Path::new(TimeGrid::new(1.0, 2).unwrap(), Array::from(values)).unwrap()
+    }
+
+    fn flat_market() -> Market {
+        let market = market();
+        market.set(36.0, 0.0, 0.06, 0.20);
+        market
+    }
+
+    fn engine(market: &Market) -> MCAmericanEngine<PseudoRandom> {
+        MakeMcAmericanEngine::<PseudoRandom>::new(Shared::clone(&market.process))
+            .with_steps(4)
+            .with_samples(256)
+            .with_seed(42)
+            .build()
+            .unwrap()
+    }
+
+    fn set_option(engine: &mut MCAmericanEngine<PseudoRandom>, exercise: Shared<dyn Exercise>) {
+        let args = (engine.arguments_mut() as &mut dyn Any)
+            .downcast_mut::<OptionArguments>()
+            .unwrap();
+        args.payoff = Some(shared(PlainVanillaPayoff::new(OptionType::Put, STRIKE))
+            as Shared<dyn StrikedTypePayoff>);
+        args.exercise = Some(exercise);
+    }
+
+    /// The scaling arithmetic of `mcamericanengine.cpp:48-66` on a fixture where
+    /// every wrong wiring lands somewhere else: a K=40 put at a spot of 36 gives
+    /// `scaling = 0.025`, `state = 0.9`, and `value = 4`. Dividing rather than
+    /// multiplying in `state` gives 1440; evaluating the payoff at the SCALED
+    /// state gives 39.1.
+    #[test]
+    fn the_state_is_scaled_and_the_value_is_not() {
+        let pricer = put_pricer(3);
+        let p = path([36.0, 44.0, 38.0]);
+
+        assert!((pricer.state(&p, 0) - 0.9).abs() < TOL);
+        assert!((pricer.state(&p, 1) - 1.1).abs() < TOL);
+        assert!((pricer.value(&p, 0) - 4.0).abs() < TOL);
+        assert_eq!(pricer.value(&p, 1), 0.0, "an OTM put is worth 0");
+        assert!((pricer.value(&p, 2) - 2.0).abs() < TOL);
+    }
+
+    /// The exercise value goes through the same scaling round trip C++ takes
+    /// (`mcamericanengine.cpp:58-60`), not a shortcut to `payoff(path[t])`. On a
+    /// K=3 put at a spot of 0.89 the round trip is not the identity, so the two
+    /// compositions differ in the last bit and the exact compare separates them.
+    #[test]
+    fn the_exercise_value_round_trips_through_the_scaling() {
+        let pricer = AmericanPathPricer::new(
+            shared(PlainVanillaPayoff::new(OptionType::Put, 3.0)) as Shared<dyn StrikedTypePayoff>,
+            2,
+            PolynomialType::Monomial,
+        );
+        let p = path([0.89, 0.89, 0.89]);
+
+        assert_eq!(pricer.value(&p, 0), 2.1100000000000003);
+        assert_ne!(pricer.value(&p, 0), 3.0 - 0.89);
+    }
+
+    /// The payoff is APPENDED to the monomials (`mcamericanengine.cpp:45-46`),
+    /// so order 3 gives five functions and the last one, fed the SCALED state
+    /// 0.9, must report the payoff of the unscaled 36.
+    #[test]
+    fn the_payoff_is_the_extra_basis_function() {
+        for order in [2, 3] {
+            let basis = put_pricer(order).basis_system();
+            assert_eq!(
+                basis.len(),
+                order + 2,
+                "order {order}: monomials plus payoff"
+            );
+
+            assert!((basis[0](0.9) - 1.0).abs() < TOL);
+            assert!((basis[1](0.9) - 0.9).abs() < TOL);
+            assert!(
+                (basis[order + 1](0.9) - 4.0).abs() < TOL,
+                "the appended function must unscale before applying the payoff"
+            );
+            assert_eq!(
+                basis[order + 1](1.1),
+                0.0,
+                "and must stay a payoff, not a monomial"
+            );
+        }
+    }
+
+    /// The exercise guard of `mcamericanengine.hpp:196`: American accepted,
+    /// anything else rejected. The accept path only builds the pricer here; it
+    /// is priced end to end in #762.
+    #[test]
+    fn only_an_american_exercise_builds_a_path_pricer() {
+        let market = flat_market();
+        let expiry = today() + time_to_days(1.0);
+
+        let mut accepted = engine(&market);
+        set_option(
+            &mut accepted,
+            shared(AmericanStub { dates: [expiry] }) as Shared<dyn Exercise>,
+        );
+        assert!(accepted.lsm_path_pricer().is_ok());
+
+        let mut rejected = engine(&market);
+        set_option(
+            &mut rejected,
+            shared(EuropeanExercise::new(expiry)) as Shared<dyn Exercise>,
+        );
+        assert_eq!(
+            rejected.lsm_path_pricer().err().unwrap().message(),
+            "wrong exercise given"
+        );
+    }
+
+    /// An engine with nothing set reports the missing exercise before anything
+    /// else touches it.
+    #[test]
+    fn a_missing_exercise_is_rejected() {
+        let market = flat_market();
+        let mut bare = engine(&market);
+        assert_eq!(
+            bare.lsm_path_pricer().err().unwrap().message(),
+            "no exercise given"
+        );
+
+        let args = (bare.arguments_mut() as &mut dyn Any)
+            .downcast_mut::<OptionArguments>()
+            .unwrap();
+        args.exercise = Some(shared(AmericanStub {
+            dates: [today() + time_to_days(1.0)],
+        }) as Shared<dyn Exercise>);
+        assert_eq!(
+            bare.lsm_path_pricer().err().unwrap().message(),
+            "no payoff given"
+        );
+    }
+
+    /// The builder defaults of `mcamericanengine.hpp:130-137`: order 2, no
+    /// antithetic variate, and the driver's 2048 calibration samples.
+    #[test]
+    fn the_builder_defaults_match_the_cpp_factory() {
+        let market = flat_market();
+        let built = engine(&market);
+        assert_eq!(built.polynomial_order(), 2);
+        assert_eq!(built.lsm_base().n_calibration_samples(), 2048);
+        assert!(!built.lsm_base().antithetic_variate_calibration());
+
+        let overridden = MakeMcAmericanEngine::<PseudoRandom>::new(Shared::clone(&market.process))
+            .with_steps(4)
+            .with_samples(256)
+            .with_polynomial_order(4)
+            .with_calibration_samples(64)
+            .build()
+            .unwrap();
+        assert_eq!(overridden.polynomial_order(), 4);
+        assert_eq!(overridden.lsm_base().n_calibration_samples(), 64);
+    }
+
+    /// The build guards of `mcamericanengine.hpp:296,305,352-355`, plus the
+    /// visible antithetic-variate deferral.
+    #[test]
+    fn the_builder_validates_its_named_parameters() {
+        let market = flat_market();
+        let maker = || MakeMcAmericanEngine::<PseudoRandom>::new(Shared::clone(&market.process));
+
+        assert!(maker().with_samples(256).build().is_err(), "no steps given");
+        assert!(
+            maker()
+                .with_steps(4)
+                .with_steps_per_year(50)
+                .with_samples(256)
+                .build()
+                .is_err(),
+            "steps overspecified"
+        );
+        assert!(
+            maker()
+                .with_steps(4)
+                .with_samples(256)
+                .with_absolute_tolerance(0.02)
+                .build()
+                .is_err(),
+            "samples and tolerance are exclusive"
+        );
+        assert!(
+            maker()
+                .with_steps(4)
+                .with_samples(256)
+                .with_antithetic_variate(true)
+                .build()
+                .is_err(),
+            "the antithetic variate is deferred"
+        );
+        assert!(
+            maker()
+                .with_steps(4)
+                .with_absolute_tolerance(0.02)
+                .with_max_samples(4_096)
+                .build()
+                .is_ok()
+        );
+    }
+}
