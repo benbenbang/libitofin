@@ -183,8 +183,9 @@ impl<RNG: McRngTraits> MCAmericanEngine<RNG> {
     ///
     /// # Errors
     ///
-    /// Errors on a missing payoff, a missing exercise, or an exercise that is
-    /// not American (`:196`); propagates a grid or discount failure.
+    /// Errors on a missing payoff, a missing exercise, an exercise that is not
+    /// American (`:196`), or one paying at expiry (`:197-198`); propagates a
+    /// grid or discount failure.
     pub fn lsm_path_pricer(&self) -> QlResult<Shared<LongstaffSchwartzPathPricer>> {
         let arguments = self.base.arguments();
         let Some(exercise) = &arguments.exercise else {
@@ -194,6 +195,7 @@ impl<RNG: McRngTraits> MCAmericanEngine<RNG> {
             exercise.exercise_type() == ExerciseType::American,
             "wrong exercise given"
         );
+        require!(!exercise.payoff_at_expiry(), "payoff at expiry not handled");
         let Some(payoff) = &arguments.payoff else {
             fail!("no payoff given");
         };
@@ -399,7 +401,7 @@ mod tests {
     use std::any::Any;
 
     use super::*;
-    use crate::exercise::{EuropeanExercise, Exercise};
+    use crate::exercise::{AmericanExercise, EuropeanExercise, Exercise};
     use crate::instruments::{OptionArguments, PlainVanillaPayoff};
     use crate::math::array::Array;
     use crate::math::randomnumbers::rngtraits::PseudoRandom;
@@ -411,20 +413,8 @@ mod tests {
     const STRIKE: Real = 40.0;
     const TOL: Real = 1e-14;
 
-    /// Stands in for the `AmericanExercise` of #762, so the requires-check of
-    /// `mcamericanengine.hpp:196` can be exercised on both branches today.
-    struct AmericanStub {
-        dates: [Date; 1],
-    }
-
-    impl Exercise for AmericanStub {
-        fn exercise_type(&self) -> ExerciseType {
-            ExerciseType::American
-        }
-
-        fn dates(&self) -> &[Date] {
-            &self.dates
-        }
+    fn american(expiry: Date) -> Shared<dyn Exercise> {
+        shared(AmericanExercise::over(today(), expiry).unwrap()) as Shared<dyn Exercise>
     }
 
     fn put_pricer(order: Size) -> AmericanPathPricer {
@@ -525,19 +515,16 @@ mod tests {
         }
     }
 
-    /// The exercise guard of `mcamericanengine.hpp:196`: American accepted,
-    /// anything else rejected. The accept path only builds the pricer here; it
-    /// is priced end to end in #762.
+    /// The exercise guards of `mcamericanengine.hpp:196-198`: a plain American
+    /// exercise is accepted, a European one and an American one paying at
+    /// expiry are not.
     #[test]
-    fn only_an_american_exercise_builds_a_path_pricer() {
+    fn only_a_plain_american_exercise_builds_a_path_pricer() {
         let market = flat_market();
         let expiry = today() + time_to_days(1.0);
 
         let mut accepted = engine(&market);
-        set_option(
-            &mut accepted,
-            shared(AmericanStub { dates: [expiry] }) as Shared<dyn Exercise>,
-        );
+        set_option(&mut accepted, american(expiry));
         assert!(accepted.lsm_path_pricer().is_ok());
 
         let mut rejected = engine(&market);
@@ -548,6 +535,16 @@ mod tests {
         assert_eq!(
             rejected.lsm_path_pricer().err().unwrap().message(),
             "wrong exercise given"
+        );
+
+        let mut at_expiry = engine(&market);
+        set_option(
+            &mut at_expiry,
+            shared(AmericanExercise::new(today(), expiry, true).unwrap()) as Shared<dyn Exercise>,
+        );
+        assert_eq!(
+            at_expiry.lsm_path_pricer().err().unwrap().message(),
+            "payoff at expiry not handled"
         );
     }
 
@@ -565,9 +562,7 @@ mod tests {
         let args = (bare.arguments_mut() as &mut dyn Any)
             .downcast_mut::<OptionArguments>()
             .unwrap();
-        args.exercise = Some(shared(AmericanStub {
-            dates: [today() + time_to_days(1.0)],
-        }) as Shared<dyn Exercise>);
+        args.exercise = Some(american(today() + time_to_days(1.0)));
         assert_eq!(
             bare.lsm_path_pricer().err().unwrap().message(),
             "no payoff given"
