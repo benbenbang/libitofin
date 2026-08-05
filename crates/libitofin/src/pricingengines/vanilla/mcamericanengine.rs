@@ -635,3 +635,180 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod oracle {
+    //! The American-MC milestone: `test-suite/mclongstaffschwartzengine.cpp:123`
+    //! `testAmericanOption`, the `i = 0, j = 0` case.
+    //!
+    //! Fixture, digit for digit from the C++ (`:127-193`): an American put on a
+    //! spot of 36 struck at 36, `q = 0`, `r = 6%`, `sigma = 20%`, evaluation
+    //! date 15 May 1998, curve reference 17 May 1998, maturity 17 May 1999,
+    //! Actual365Fixed throughout. The engine is
+    //! `MakeMCAmericanEngine<PseudoRandom>` with 75 steps, the antithetic
+    //! variate, an absolute tolerance of 0.02, seed 42, polynomial order 3 over
+    //! the Monomial basis, and the driver's default 2048 calibration paths. The
+    //! evaluation date is deliberately NOT the curves' reference date; the C++
+    //! fixture is the same way round.
+    //!
+    //! REFERENCE SUBSTITUTION, stated plainly. The C++ test reprices the option
+    //! with `FdBlackScholesVanillaEngine(process, 401, 200)` and checks
+    //! `|mc - fd| < 2.34 * errorEstimate` (`:201-206`). This crate's
+    //! [`FdBlackScholesVanillaEngine`](super::FdBlackScholesVanillaEngine)
+    //! rejects an American exercise (`fdblackscholesvanillaengine.rs:129`), so
+    //! the reference here is the MC value QuantLib itself produces on this
+    //! fixture, measured on a locally built QuantLib 1.43 dylib:
+    //! `mc = 2.054422273006143`, `errorEstimate = 0.01775722870215829`,
+    //! `exerciseProbability = 0.4897360703812317`, `fd = 2.08679820123328`.
+    //! The band factor 2.34 is the C++ one unchanged.
+    //!
+    //! The 2.105 that the C++ file records in a comment (`:154`) is NOT usable
+    //! as the reference: it is a third-party binomial number that fails the C++
+    //! test's own band against QuantLib's own MC value
+    //! (`|2.0544 - 2.105| = 0.0506 > 0.0416`), and an independent
+    //! Cox-Rubinstein tree at 20001 steps puts the true American price at
+    //! 2.08764, agreeing with the FD engine rather than with 2.105.
+    //!
+    //! Rust and C++ do not share a sample path bit for bit: the generated paths
+    //! agree to 14 significant digits (a 75-step accumulation of last-bit
+    //! ordering differences), and the near-collinear order-3 regression
+    //! amplifies that into a different exercise boundary at only 2048
+    //! calibration paths. The two agree where that noise washes out: at 131072
+    //! calibration paths Rust prices 2.06774 against C++'s 2.06907, 0.07 error
+    //! estimates apart, with exercise probabilities 0.4703 and 0.4712.
+    //!
+    //! Three independent gates: the price against QuantLib's own value within
+    //! the C++ band, the exercise probability against 0.48013 within the C++
+    //! 1.5% tolerance (`:154,214`), and the never-early-exercise floor, since
+    //! an American put cannot be worth less than its European twin.
+    //!
+    //! Deferred with the ticket: the other five cases of the parameter grid, the
+    //! four other basis families, the Brownian bridge (#453), the
+    //! low-discrepancy variant (#454), and the control variate.
+
+    use super::MakeMcAmericanEngine;
+    use crate::exercise::{AmericanExercise, EuropeanExercise, Exercise};
+    use crate::handle::Handle;
+    use crate::instrument::Instrument;
+    use crate::instruments::{PlainVanillaPayoff, StrikedTypePayoff, VanillaOption};
+    use crate::interestrate::Compounding;
+    use crate::math::randomnumbers::rngtraits::PseudoRandom;
+    use crate::option::OptionType;
+    use crate::pricingengine::PricingEngine;
+    use crate::pricingengines::vanilla::AnalyticEuropeanEngine;
+    use crate::processes::GeneralizedBlackScholesProcess;
+    use crate::quotes::{Quote, SimpleQuote};
+    use crate::settings::Settings;
+    use crate::shared::{Shared, SharedMut, shared, shared_mut};
+    use crate::termstructures::volatility::{BlackConstantVol, BlackVolTermStructure};
+    use crate::termstructures::yields::FlatForward;
+    use crate::termstructures::yieldtermstructure::YieldTermStructure;
+    use crate::time::date::{Date, Month};
+    use crate::time::daycounters::actual365fixed::Actual365Fixed;
+    use crate::time::frequency::Frequency;
+    use crate::types::{Rate, Real, Volatility};
+
+    const UNDERLYING: Real = 36.0;
+    const DIVIDEND_YIELD: Rate = 0.0;
+    const RISK_FREE_RATE: Rate = 0.06;
+    const VOLATILITY: Volatility = 0.20;
+
+    const QUANTLIB_MC_VALUE: Real = 2.054422273006143;
+    const EXPECTED_EXERCISE_PROBABILITY: Real = 0.48013;
+
+    fn todays_date() -> Date {
+        Date::new(15, Month::May, 1998)
+    }
+
+    fn settlement_date() -> Date {
+        Date::new(17, Month::May, 1998)
+    }
+
+    fn maturity() -> Date {
+        Date::new(17, Month::May, 1999)
+    }
+
+    fn flat_curve(rate: Rate) -> Handle<dyn YieldTermStructure> {
+        Handle::new(shared(FlatForward::with_rate(
+            settlement_date(),
+            rate,
+            Actual365Fixed::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>)
+    }
+
+    fn process() -> Shared<GeneralizedBlackScholesProcess> {
+        let spot = Handle::new(shared(SimpleQuote::new(UNDERLYING)) as Shared<dyn Quote>);
+        let vol = Handle::new(shared(BlackConstantVol::new(
+            settlement_date(),
+            None,
+            VOLATILITY,
+            Actual365Fixed::new(),
+        )) as Shared<dyn BlackVolTermStructure>);
+        shared(GeneralizedBlackScholesProcess::new(
+            spot,
+            flat_curve(DIVIDEND_YIELD),
+            flat_curve(RISK_FREE_RATE),
+            vol,
+        ))
+    }
+
+    fn payoff() -> Shared<dyn StrikedTypePayoff> {
+        shared(PlainVanillaPayoff::new(OptionType::Put, UNDERLYING))
+            as Shared<dyn StrikedTypePayoff>
+    }
+
+    #[test]
+    fn american_put_reproduces_the_quantlib_price_and_exercise_probability() {
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(todays_date());
+        let process = process();
+
+        let exercise = shared(AmericanExercise::over(settlement_date(), maturity()).unwrap())
+            as Shared<dyn Exercise>;
+        let mut american = VanillaOption::new(payoff(), exercise, Shared::clone(&settings));
+        american.base_mut().set_pricing_engine(shared_mut(
+            MakeMcAmericanEngine::<PseudoRandom>::new(Shared::clone(&process))
+                .with_steps(75)
+                .with_antithetic_variate(true)
+                .with_absolute_tolerance(0.02)
+                .with_seed(42)
+                .with_polynomial_order(3)
+                .build()
+                .unwrap(),
+        ) as SharedMut<dyn PricingEngine>);
+
+        let calculated = american.npv().unwrap();
+        let error_estimate = american.error_estimate().unwrap();
+        let exercise_probability = american.result::<Real>("exerciseProbability").unwrap();
+
+        let mut european = VanillaOption::new(
+            payoff(),
+            shared(EuropeanExercise::new(maturity())) as Shared<dyn Exercise>,
+            settings,
+        );
+        european.base_mut().set_pricing_engine(
+            shared_mut(AnalyticEuropeanEngine::new(process)) as SharedMut<dyn PricingEngine>
+        );
+        let european_value = european.npv().unwrap();
+
+        assert!(
+            (calculated - QUANTLIB_MC_VALUE).abs() < 2.34 * error_estimate,
+            "price {calculated} +/- {error_estimate} misses QuantLib's \
+             {QUANTLIB_MC_VALUE} by {}, band {}",
+            (calculated - QUANTLIB_MC_VALUE).abs(),
+            2.34 * error_estimate
+        );
+        assert!(
+            (exercise_probability - EXPECTED_EXERCISE_PROBABILITY).abs() < 0.015,
+            "exercise probability {exercise_probability} vs \
+             {EXPECTED_EXERCISE_PROBABILITY}"
+        );
+        assert!(
+            calculated > european_value,
+            "an American put {calculated} cannot be worth less than its \
+             European twin {european_value}"
+        );
+    }
+}
