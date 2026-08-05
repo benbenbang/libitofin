@@ -144,6 +144,11 @@ impl<RNG: McRngTraits> McVanillaEngineBase<RNG> {
         self.base.results()
     }
 
+    /// The results being filled, for an engine writing more than the mean.
+    pub fn results_mut(&mut self) -> &mut OneAssetOptionResults {
+        self.base.results_mut()
+    }
+
     /// Clears the results ahead of a calculation.
     pub fn reset(&mut self) {
         self.base.reset();
@@ -185,9 +190,20 @@ impl<RNG: McRngTraits> McVanillaEngineBase<RNG> {
     /// Propagates a [`time_grid`](McVanillaEngineBase::time_grid),
     /// sequence-generator, or [`PathGenerator`] failure.
     pub fn path_generator(&self) -> QlResult<PathGenerator<RNG::RsgType>> {
+        self.path_generator_with_seed(self.seed)
+    }
+
+    /// The same generator on a caller-supplied seed, the seam a two-pass engine
+    /// needs to draw calibration paths from a stream independent of the pricing
+    /// one (`mclongstaffschwartzengine.hpp:185-191`).
+    ///
+    /// # Errors
+    ///
+    /// As [`path_generator`](McVanillaEngineBase::path_generator).
+    pub fn path_generator_with_seed(&self, seed: u32) -> QlResult<PathGenerator<RNG::RsgType>> {
         let grid = self.time_grid()?;
         let dimension = grid.size() - 1;
-        let generator = RNG::make_sequence_generator(dimension, self.seed)?;
+        let generator = RNG::make_sequence_generator(dimension, seed)?;
         PathGenerator::from_time_grid(
             Shared::clone(&self.process),
             grid,
