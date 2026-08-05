@@ -30,13 +30,12 @@ pub trait PathGen {
     fn next(&mut self) -> QlResult<Sample<Self::PathType>>;
 
     /// Draws the antithetic partner of the last forward path: the same draws
-    /// negated (`multipathgenerator.hpp:97`).
+    /// negated (`pathgenerator.hpp:118`, `multipathgenerator.hpp:97`).
     ///
     /// # Errors
     ///
-    /// Errors when the generator does not support antithetic sampling (the
-    /// single-factor [`PathGenerator`](super::PathGenerator) deferral), or
-    /// propagates a process or sequence-generator failure.
+    /// Errors when there is no last forward draw to negate, or propagates a
+    /// process or sequence-generator failure.
     fn antithetic(&mut self) -> QlResult<Sample<Self::PathType>>;
 
     /// The sequence-generator dimensionality (`pathgenerator.hpp:62`).
