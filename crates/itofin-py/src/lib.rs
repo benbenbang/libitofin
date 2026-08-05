@@ -59,7 +59,7 @@ use inflation::{
 };
 use libitofin::errors::QlError;
 use market::{PyBlackScholesProcess, PySimpleQuote};
-use mcengine::PyMCEuropeanEngine;
+use mcengine::{PyMCEuropeanEngine, PyMCEuropeanHestonEngine};
 use option::{PyOptionType, PyVanillaOption};
 use optionletvol::{
     PyConstantOptionletVolatility, PyOptionletStripper1, PyOptionletVolatilityStructure,
@@ -232,6 +232,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     pricingengines.add_class::<PyMidPointCdsEngine>()?;
     pricingengines.add_class::<PyDiscountingSwapEngine>()?;
     pricingengines.add_class::<PyMCEuropeanEngine>()?;
+    pricingengines.add_class::<PyMCEuropeanHestonEngine>()?;
 
     let optimization = PyModule::new(py, "optimization")?;
     optimization.add_class::<PyLevenbergMarquardt>()?;
