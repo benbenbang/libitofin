@@ -37,6 +37,7 @@
 use crate::errors::QlResult;
 use crate::math::statistics::{GeneralStatistics, Statistics};
 use crate::methods::montecarlo::PathGen;
+use crate::shared::Shared;
 use crate::types::{Real, Size};
 
 /// Maps a realized path of type `P` to its payoff (the C++ `path_pricer_type`,
@@ -53,6 +54,23 @@ pub trait PathPricer<P> {
 impl<P, F: Fn(&P) -> Real> PathPricer<P> for F {
     fn price(&self, path: &P) -> Real {
         self(path)
+    }
+}
+
+/// A [`Shared`] pricer is itself a [`PathPricer`], so ONE calibrated pricer can
+/// drive several models.
+///
+/// [`MonteCarloModel::new`] takes its pricer by value, whereas C++ holds the
+/// Longstaff-Schwartz pricer as a `shared_ptr`
+/// (`mclongstaffschwartzengine.hpp:110-111`), hands that same pointer to the
+/// calibration model (`:194`), calibrates it (`:198`), and then prices through
+/// it again. Cloning the [`Shared`] gives each model a handle to the one
+/// pricer instead of a copy of it. This does not overlap the `Fn` blanket impl
+/// above: [`Shared`] is [`Rc`](std::rc::Rc), which is not callable and cannot
+/// be made callable by any crate.
+impl<P, T: PathPricer<P>> PathPricer<P> for Shared<T> {
+    fn price(&self, path: &P) -> Real {
+        (**self).price(path)
     }
 }
 
@@ -157,6 +175,7 @@ mod tests {
     use crate::time::daycounters::actual360::Actual360;
     use crate::time::frequency::Frequency;
     use crate::types::{Rate, Time, Volatility};
+    use std::cell::RefCell;
 
     const SPOT: Real = 100.0;
     const R: Rate = 0.05;
@@ -473,6 +492,77 @@ mod tests {
             se_plain > 0.01,
             "non-antithetic run must retain material variance: se={se_plain}"
         );
+    }
+
+    /// A pricer whose per-call state survives being priced through, standing in
+    /// for the Longstaff-Schwartz pricer that collects calibration paths from
+    /// its const `operator()` (`longstaffschwartzpathpricer.hpp:61,80`).
+    struct CountingPricer {
+        value: Real,
+        calls: RefCell<Size>,
+    }
+
+    impl PathPricer<Path> for CountingPricer {
+        fn price(&self, _path: &Path) -> Real {
+            *self.calls.borrow_mut() += 1;
+            self.value
+        }
+    }
+
+    /// The bridge is transparent: pricing through a [`Shared`] returns what the
+    /// bare pricer returns.
+    #[test]
+    fn a_shared_pricer_prices_as_the_bare_pricer_does() {
+        const V: Real = 2.75;
+        let grid = TimeGrid::new(1.0, 2).unwrap();
+        let p = Path::new(grid, Array::from([1.0, 2.0, 3.0])).unwrap();
+
+        let bare = CountingPricer {
+            value: V,
+            calls: RefCell::new(0),
+        };
+        let direct = bare.price(&p);
+
+        let wrapped = shared(CountingPricer {
+            value: V,
+            calls: RefCell::new(0),
+        });
+        assert_eq!(PathPricer::price(&wrapped, &p), direct);
+        assert_eq!(direct, V);
+    }
+
+    /// The reason the bridge exists: [`MonteCarloModel::new`] takes its pricer
+    /// BY VALUE, so without it a Longstaff-Schwartz pricer could not be shared
+    /// between the calibration model and the pricing model
+    /// (`mclongstaffschwartzengine.hpp:110-111,194-198`). Two models built from
+    /// clones of ONE [`Shared`] pricer must accumulate their calls on the same
+    /// pricer, not on private copies.
+    ///
+    /// Confirm-by-stubbing: were the bridge to clone the pointee instead of
+    /// dereferencing it, each model would count its own draws and the shared
+    /// total would read `N`, not `2 * N`.
+    #[test]
+    fn one_shared_pricer_drives_two_models() {
+        const N: Size = 8;
+        let pricer = shared(CountingPricer {
+            value: 1.0,
+            calls: RefCell::new(0),
+        });
+
+        let mut calibration = model(Shared::clone(&pricer), 4, 42);
+        calibration.add_samples(N).unwrap();
+        assert_eq!(*pricer.calls.borrow(), N);
+
+        let mut pricing = model(Shared::clone(&pricer), 4, 43);
+        pricing.add_samples(N).unwrap();
+
+        assert_eq!(
+            *pricer.calls.borrow(),
+            2 * N,
+            "both models must price through the same pricer"
+        );
+        assert_eq!(calibration.sample_accumulator().samples(), N);
+        assert_eq!(pricing.sample_accumulator().samples(), N);
     }
 
     #[test]
