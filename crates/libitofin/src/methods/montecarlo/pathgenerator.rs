@@ -24,23 +24,26 @@
 //! - **`next` is fallible**: `evolve` returns `QlResult` on main
 //!   (`stochasticprocess.rs:81`); a mid-path `Err` is a setup/data error, not a
 //!   per-sample outcome, so it aborts the whole call.
+//! - **`antithetic()` before any `next()` is an error**: C++ reads whatever
+//!   `generator_.lastSequence()` holds (`pathgenerator.hpp:127`), which on an
+//!   undrawn `InverseCumulativeRsg` is a zero vector
+//!   (`inversecumulativersg.rs:34`) and so a silent zero-noise path. Per D4 the
+//!   undrawn case returns `Err` instead.
 //!
 //! Deferred, rejected visibly rather than silently ignored:
 //! - **Brownian bridge** (`pathgenerator.hpp:130-133`): the constructor accepts
 //!   the `brownian_bridge` flag but returns `Err` when it is `true`; only the
 //!   `std::copy` branch (`pathgenerator.hpp:134-138`) is ported.
-//! - **antithetic sampling** (`pathgenerator.hpp:117,127`): `antithetic()` and
-//!   the negated-draw path are not ported; only `next()` is.
 
 use crate::errors::QlResult;
 use crate::math::array::Array;
 use crate::math::randomnumbers::rngtraits::SequenceGenerator;
 use crate::math::timegrid::TimeGrid;
 use crate::methods::montecarlo::{Path, PathGen, Sample};
+use crate::require;
 use crate::shared::Shared;
 use crate::stochasticprocess::StochasticProcess1D;
 use crate::types::{Size, Time};
-use crate::{fail, require};
 
 /// Generates random single-factor paths from a Gaussian sequence generator.
 pub struct PathGenerator<GSG> {
@@ -48,6 +51,7 @@ pub struct PathGenerator<GSG> {
     dimension: Size,
     time_grid: TimeGrid,
     process: Shared<dyn StochasticProcess1D>,
+    drawn: bool,
 }
 
 impl<GSG: SequenceGenerator> PathGenerator<GSG> {
@@ -108,6 +112,7 @@ impl<GSG: SequenceGenerator> PathGenerator<GSG> {
             dimension,
             time_grid,
             process,
+            drawn: false,
         })
     }
 
@@ -121,18 +126,44 @@ impl<GSG: SequenceGenerator> PathGenerator<GSG> {
         &self.time_grid
     }
 
-    /// Draws the next path (`pathgenerator.hpp:121-154`, the `brownian_bridge
-    /// == false` branch).
+    /// Draws the next forward path (`pathgenerator.hpp:112`).
     ///
     /// # Errors
     ///
     /// Propagates any `evolve`/`x0` error from the process, aborting the path.
     #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> QlResult<Sample<Path>> {
+        self.generate(false)
+    }
+
+    /// Draws the antithetic partner of the last forward path: the SAME draws,
+    /// negated, under the same weight (`pathgenerator.hpp:118,127,140,149`).
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` when no forward path has been drawn yet, since there is no
+    /// last sequence to negate; propagates any `evolve`/`x0` error from the
+    /// process.
+    pub fn antithetic(&mut self) -> QlResult<Sample<Path>> {
+        self.generate(true)
+    }
+
+    /// The `next(bool)` core (`pathgenerator.hpp:121-154`, the
+    /// `brownian_bridge == false` branch, which is the only one constructed).
+    fn generate(&mut self, antithetic: bool) -> QlResult<Sample<Path>> {
+        require!(
+            !antithetic || self.drawn,
+            "no path drawn yet: the antithetic partner negates the last sequence"
+        );
         let (weight, draws) = {
-            let sequence = self.generator.next_sequence();
+            let sequence = if antithetic {
+                self.generator.last_sequence()
+            } else {
+                self.generator.next_sequence()
+            };
             (sequence.weight, sequence.value.clone())
         };
+        self.drawn = true;
 
         let mut path = Path::new(self.time_grid.clone(), Array::new())?;
         *path.front_mut() = self.process.x0()?;
@@ -140,7 +171,12 @@ impl<GSG: SequenceGenerator> PathGenerator<GSG> {
         for i in 1..path.length() {
             let t = self.time_grid[i - 1];
             let dt = self.time_grid.dt(i - 1);
-            path[i] = self.process.evolve(t, path[i - 1], dt, draws[i - 1])?;
+            let dw = if antithetic {
+                -draws[i - 1]
+            } else {
+                draws[i - 1]
+            };
+            path[i] = self.process.evolve(t, path[i - 1], dt, dw)?;
         }
 
         Ok(Sample::new(path, weight))
@@ -151,17 +187,11 @@ impl<GSG: SequenceGenerator> PathGen for PathGenerator<GSG> {
     type PathType = Path;
 
     fn next(&mut self) -> QlResult<Sample<Path>> {
-        PathGenerator::next(self)
+        self.generate(false)
     }
 
-    /// Antithetic sampling is deferred for the single-factor generator
-    /// (`pathgenerator.hpp:117,127`): only [`next`](PathGenerator::next) is
-    /// ported, so this fails loudly rather than returning an unnegated draw.
     fn antithetic(&mut self) -> QlResult<Sample<Path>> {
-        fail!(
-            "antithetic single-factor path generation is not yet ported; only \
-             the forward draw is available"
-        )
+        self.generate(true)
     }
 
     fn dimension(&self) -> Size {
@@ -175,6 +205,7 @@ mod tests {
     use crate::handle::{Handle, RelinkableHandle};
     use crate::interestrate::Compounding;
     use crate::math::randomnumbers::rngtraits::{McRngTraits, PseudoRandom};
+    use crate::patterns::observable::{AsObservable, Observable};
     use crate::processes::BlackScholesMertonProcess;
     use crate::quotes::make_quote_handle;
     use crate::shared::shared;
@@ -274,14 +305,124 @@ mod tests {
         }
     }
 
+    /// A generator whose draws ADVANCE on every `next_sequence`, so reusing the
+    /// cached sequence and drawing a fresh one give different numbers. A stub
+    /// returning one constant vector cannot tell the two apart.
+    struct AdvancingSequence {
+        sample: Sample<Vec<Real>>,
+        drawn: usize,
+    }
+
+    impl AdvancingSequence {
+        fn new(dimension: usize) -> Self {
+            AdvancingSequence {
+                sample: Sample::new(vec![0.0; dimension], 0.0),
+                drawn: 0,
+            }
+        }
+    }
+
+    impl SequenceGenerator for AdvancingSequence {
+        fn next_sequence(&mut self) -> &Sample<Vec<Real>> {
+            self.drawn += 1;
+            let base = 100.0 * self.drawn as Real;
+            for (i, v) in self.sample.value.iter_mut().enumerate() {
+                *v = base + (i + 1) as Real;
+            }
+            self.sample.weight = self.drawn as Real;
+            &self.sample
+        }
+
+        fn last_sequence(&self) -> &Sample<Vec<Real>> {
+            &self.sample
+        }
+
+        fn dimension(&self) -> usize {
+            self.sample.value.len()
+        }
+    }
+
+    /// `evolve` is the running sum of the draws, so a path reads back the exact
+    /// increments it was built from.
+    struct DrawSumProcess {
+        observable: Observable,
+    }
+
+    impl AsObservable for DrawSumProcess {
+        fn observable(&self) -> &Observable {
+            &self.observable
+        }
+    }
+
+    impl StochasticProcess1D for DrawSumProcess {
+        fn x0(&self) -> QlResult<Real> {
+            Ok(0.0)
+        }
+
+        fn drift(&self, _t: Time, _x: Real) -> QlResult<Real> {
+            Ok(0.0)
+        }
+
+        fn diffusion(&self, _t: Time, _x: Real) -> QlResult<Real> {
+            Ok(1.0)
+        }
+
+        fn evolve(&self, _t0: Time, x0: Real, _dt: Time, dw: Real) -> QlResult<Real> {
+            Ok(x0 + dw)
+        }
+    }
+
+    fn draw_sum_generator(steps: usize) -> PathGenerator<AdvancingSequence> {
+        let process = shared(DrawSumProcess {
+            observable: Observable::new(),
+        }) as Shared<dyn StochasticProcess1D>;
+        PathGenerator::new(process, 1.0, steps, AdvancingSequence::new(steps), false).unwrap()
+    }
+
+    /// `pathgenerator.hpp:127,140,149`: the antithetic draw reuses the CACHED
+    /// last sequence negated, under that sequence's weight, and does NOT consume
+    /// a fresh draw. With draws advancing by 100 per call, a fresh-draw
+    /// implementation would put the second block's numbers in the first
+    /// antithetic path, so the increments separate the two.
     #[test]
-    fn pathgen_antithetic_is_rejected_as_deferred() {
-        // pathgenerator.hpp:117,127: single-factor antithetic is not ported;
-        // the PathGen impl must fail loudly rather than reuse the forward draw.
-        let mut pg = PathGenerator::new(gbs_process(), 1.0, 12, generator(12, 42), false).unwrap();
+    fn antithetic_negates_the_last_forward_draws() {
+        let mut pg = draw_sum_generator(3);
+
+        let forward = pg.next().unwrap();
+        assert_eq!(
+            forward.value.values().to_vec(),
+            vec![0.0, 101.0, 203.0, 306.0]
+        );
+        assert_eq!(forward.weight, 1.0);
+
+        let anti = PathGen::antithetic(&mut pg).unwrap();
+        assert_eq!(
+            anti.value.values().to_vec(),
+            vec![0.0, -101.0, -203.0, -306.0]
+        );
+        assert_eq!(anti.weight, 1.0, "the cached sequence carries the weight");
+
+        let second = pg.next().unwrap();
+        assert_eq!(
+            second.value.values().to_vec(),
+            vec![0.0, 201.0, 403.0, 606.0]
+        );
+        let second_anti = PathGen::antithetic(&mut pg).unwrap();
+        assert_eq!(
+            second_anti.value.values().to_vec(),
+            vec![0.0, -201.0, -403.0, -606.0]
+        );
+        assert_eq!(second_anti.weight, 2.0);
+    }
+
+    /// The D4 divergence: with no cached sequence to negate, the undrawn
+    /// generator errors rather than evolving the zero vector C++ would read.
+    #[test]
+    fn antithetic_before_any_forward_draw_is_rejected() {
+        let mut pg = draw_sum_generator(3);
         match PathGen::antithetic(&mut pg) {
-            Err(e) => assert!(e.message().contains("antithetic")),
-            Ok(_) => panic!("single-factor antithetic must be rejected as deferred"),
+            Err(e) => assert!(e.message().contains("no path drawn yet")),
+            Ok(_) => panic!("antithetic before the first draw must be rejected"),
         }
     }
 

@@ -26,10 +26,6 @@
 //! - **control variate** (`mcsimulation.hpp:167-188`): [`new`] keeps the
 //!   `control_variate` flag but [`calculate`](McSimulation::calculate) returns
 //!   `Err` when it is `true`; the CV model-construction branch is omitted.
-//! - **antithetic variate**: threaded to [`MonteCarloModel::new`], which averages
-//!   the forward path with its antithetic partner when the generator supports it
-//!   (the multi-factor path); the single-factor generator's antithetic draw is a
-//!   fail-loud `Err`.
 //! - **`maxError` over a sequence** (`mcsimulation.hpp:89-95`): the multi-variate
 //!   `max_element` reduction is dropped; the single-variate `result_type = Real`
 //!   is its own error.
@@ -167,8 +163,7 @@ where
     /// # Errors
     ///
     /// Errors if neither `required_tolerance` nor `required_samples` is set, if
-    /// control variate is requested (deferred), or on an accumulation failure
-    /// (including a single-factor antithetic draw, deferred).
+    /// control variate is requested (deferred), or on an accumulation failure.
     pub fn calculate(
         &mut self,
         path_generator: PG,

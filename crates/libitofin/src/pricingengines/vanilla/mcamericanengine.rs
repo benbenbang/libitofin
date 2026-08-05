@@ -327,8 +327,8 @@ impl<RNG: McRngTraits> MakeMcAmericanEngine<RNG> {
     }
 
     /// Requests the antithetic-variate variance reduction
-    /// (`mcamericanengine.hpp:340`). Deferred: setting `true` makes
-    /// [`build`](MakeMcAmericanEngine::build) return `Err`.
+    /// (`mcamericanengine.hpp:340`), on both the pricing and, by the driver's
+    /// fallback, the calibration pass.
     #[must_use]
     pub fn with_antithetic_variate(mut self, antithetic: bool) -> Self {
         self.antithetic = antithetic;
@@ -355,9 +355,8 @@ impl<RNG: McRngTraits> MakeMcAmericanEngine<RNG> {
     /// # Errors
     ///
     /// Errors if neither or both of `steps`/`steps_per_year` are set (`:352-355`),
-    /// if both `samples` and `tolerance` are set (`:296,305`), if a tolerance is
-    /// set on an RNG policy without an error estimate (`:307`), or if the
-    /// deferred antithetic variate is requested.
+    /// if both `samples` and `tolerance` are set (`:296,305`), or if a tolerance
+    /// is set on an RNG policy without an error estimate (`:307`).
     pub fn build(self) -> QlResult<MCAmericanEngine<RNG>> {
         require!(
             self.steps.is_some() || self.steps_per_year.is_some(),
@@ -377,13 +376,11 @@ impl<RNG: McRngTraits> MakeMcAmericanEngine<RNG> {
                 "chosen random generator policy does not allow an error estimate"
             );
         }
-        require!(!self.antithetic, "antithetic variate not yet supported");
-
         MCAmericanEngine::new(
             self.process,
             self.steps,
             self.steps_per_year,
-            false,
+            self.antithetic,
             self.samples,
             self.tolerance,
             self.max_samples,
@@ -598,8 +595,7 @@ mod tests {
         assert_eq!(overridden.lsm_base().n_calibration_samples(), 64);
     }
 
-    /// The build guards of `mcamericanengine.hpp:296,305,352-355`, plus the
-    /// visible antithetic-variate deferral.
+    /// The build guards of `mcamericanengine.hpp:296,305,352-355`.
     #[test]
     fn the_builder_validates_its_named_parameters() {
         let market = flat_market();
@@ -624,14 +620,15 @@ mod tests {
                 .is_err(),
             "samples and tolerance are exclusive"
         );
+        let antithetic = maker()
+            .with_steps(4)
+            .with_samples(256)
+            .with_antithetic_variate(true)
+            .build()
+            .unwrap();
         assert!(
-            maker()
-                .with_steps(4)
-                .with_samples(256)
-                .with_antithetic_variate(true)
-                .build()
-                .is_err(),
-            "the antithetic variate is deferred"
+            antithetic.lsm_base().antithetic_variate_calibration(),
+            "the pricing flag must reach the engine, not a hardcoded false"
         );
         assert!(
             maker()

@@ -24,9 +24,8 @@
 //! Antithetic averaging (`montecarlomodel.hpp:108-123`) is ported: when
 //! `antithetic_variate` is set, each iteration draws the forward path, then its
 //! antithetic partner, prices both, and accumulates `(price + price2) / 2` under
-//! the FORWARD sample's weight (`montecarlomodel.hpp:120,127`). Because the
-//! single-factor [`PathGen::antithetic`] is a fail-loud `Err`, averaging is
-//! exercised only over a multi-factor generator.
+//! the FORWARD sample's weight (`montecarlomodel.hpp:120,127`), over either the
+//! single- or the multi-factor generator.
 //!
 //! Deferred, rejected visibly rather than silently ignored:
 //! - **control variate** (`montecarlomodel.hpp:67-69,98-106`): the four CV

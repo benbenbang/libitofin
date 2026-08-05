@@ -34,8 +34,6 @@
 //! - **`brownianBridgeCalibration`** (`:145`): deferred with the Brownian bridge
 //!   itself (#453); the calibration generator is always built without one, as
 //!   the American engine's `false` (`mcamericanengine.hpp:161`) asks.
-//! - **antithetic variate on either pass**: the flag is threaded and honoured,
-//!   but the single-factor generator's antithetic draw is a fail-loud `Err`.
 //! - **control variate**: still rejected by
 //!   [`McSimulation`](crate::methods::montecarlo::McSimulation).
 
@@ -368,14 +366,18 @@ mod tests {
         assert_eq!(probability, pricer.exercise_probability().unwrap());
     }
 
-    /// Antithetic on the calibration pass reaches the single-factor generator's
-    /// fail-loud antithetic draw rather than silently pricing the forward path
-    /// twice.
+    /// Antithetic on the calibration pass buffers the negated partner of every
+    /// calibration path (`:194`), so the pricer sees twice the requested paths
+    /// and the run still produces a sane price.
     #[test]
-    fn antithetic_calibration_is_rejected_as_deferred() {
+    fn antithetic_calibration_doubles_the_buffered_paths() {
         let market = flat_market();
         let mut engine = driver(&market, false, Some(true), Some(16), None);
         let pricer = lsm(&market, &engine);
-        assert!(engine.calculate_with(pricer).is_err());
+        engine.calculate_with(Shared::clone(&pricer)).unwrap();
+
+        let results = instrument_results(&engine);
+        assert!(results.value.unwrap() > 0.0);
+        assert!((0.0..=1.0).contains(&pricer.exercise_probability().unwrap()));
     }
 }
