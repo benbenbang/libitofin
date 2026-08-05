@@ -4,6 +4,8 @@
 //! [`Sample`]; the path generators, path pricers, and Monte Carlo model stack
 //! stack on top in later tickets.
 
+mod earlyexercisepathpricer;
+mod lsmbasissystem;
 mod mcsimulation;
 mod montecarlomodel;
 mod multipath;
@@ -13,6 +15,8 @@ mod pathgen;
 mod pathgenerator;
 mod sample;
 
+pub use earlyexercisepathpricer::EarlyExercisePathPricer;
+pub use lsmbasissystem::{LsmBasisSystem, PolynomialType};
 pub use mcsimulation::{DEFAULT_MIN_SAMPLES, McSimulation};
 pub use montecarlomodel::{MonteCarloModel, PathPricer};
 pub use multipath::MultiPath;
