@@ -5,6 +5,7 @@
 //! stack on top in later tickets.
 
 mod earlyexercisepathpricer;
+mod longstaffschwartzpathpricer;
 mod lsmbasissystem;
 mod mcsimulation;
 mod montecarlomodel;
@@ -16,6 +17,7 @@ mod pathgenerator;
 mod sample;
 
 pub use earlyexercisepathpricer::EarlyExercisePathPricer;
+pub use longstaffschwartzpathpricer::LongstaffSchwartzPathPricer;
 pub use lsmbasissystem::{LsmBasisSystem, PolynomialType};
 pub use mcsimulation::{DEFAULT_MIN_SAMPLES, McSimulation};
 pub use montecarlomodel::{MonteCarloModel, PathPricer};
