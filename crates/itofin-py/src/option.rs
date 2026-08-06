@@ -3,6 +3,7 @@
 use crate::PyQlError;
 use crate::heston::PyHestonModel;
 use crate::market::PyBlackScholesProcess;
+use crate::mcengine::PyMCEuropeanEngine;
 use crate::settings::PySettings;
 use crate::time::PyDate;
 use libitofin::exercise::{EuropeanExercise, Exercise};
@@ -88,6 +89,12 @@ impl PyVanillaOption {
         Ok(())
     }
 
+    /// Attaches the Monte Carlo European engine `engine`, which already holds
+    /// the process it prices on.
+    fn set_mc_engine(&mut self, engine: &PyMCEuropeanEngine) {
+        self.inner.base_mut().set_pricing_engine(engine.engine());
+    }
+
     /// The present value, erroring when no evaluation date or engine is set.
     fn npv(&mut self) -> PyResult<f64> {
         Ok(self.inner.npv().map_err(PyQlError::from)?)
@@ -121,5 +128,11 @@ impl PyVanillaOption {
     /// The option dividend rho.
     fn dividend_rho(&mut self) -> PyResult<f64> {
         Ok(self.inner.dividend_rho().map_err(PyQlError::from)?)
+    }
+
+    /// The standard error on the present value, raising `ItofinError` on the
+    /// engines that do not produce one (every analytic engine here).
+    fn error_estimate(&mut self) -> PyResult<f64> {
+        Ok(self.inner.error_estimate().map_err(PyQlError::from)?)
     }
 }

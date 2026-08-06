@@ -1,7 +1,8 @@
 # Hand-written stubs for itofin.pricingengines; sync manually with src/swaptionengine.rs,
-# src/capfloorengine.rs, src/creditengine.rs and src/inflation.rs (#517).
+# src/capfloorengine.rs, src/creditengine.rs, src/inflation.rs and src/mcengine.rs (#517).
 
 from itofin import Settings
+from itofin.processes import BlackScholesProcess
 from itofin.quotes import SimpleQuote
 from itofin.termstructures import (
     DefaultProbabilityTermStructure,
@@ -112,3 +113,28 @@ class DiscountingSwapEngine:
     this engine prices must carry the same Settings object."""
 
     def __init__(self, discount: YieldTermStructure, settings: Settings) -> None: ...
+
+class MCEuropeanEngine:
+    """The Monte Carlo engine for European payoffs, over the pseudo-random RNG
+    policy. The low-discrepancy policy is not exposed (#454).
+
+    Pricing is seeded and deterministic: the same seed reproduces the NPV
+    bitwise, and the standard error is read back through
+    VanillaOption.error_estimate()."""
+
+    def __init__(
+        self,
+        process: BlackScholesProcess,
+        steps: int | None = None,
+        steps_per_year: int | None = None,
+        samples: int | None = None,
+        absolute_tolerance: float | None = None,
+        max_samples: int | None = None,
+        seed: int | None = None,
+        antithetic: bool | None = None,
+    ) -> None:
+        """Raises ItofinError when neither or both of steps / steps_per_year are
+        given, when both samples and absolute_tolerance are given, and when
+        antithetic is True: the antithetic variate is not yet supported by the
+        core engine (#772)."""
+        ...
