@@ -2,7 +2,7 @@
 # src/capfloorengine.rs, src/creditengine.rs, src/inflation.rs and src/mcengine.rs (#517).
 
 from itofin import Settings
-from itofin.processes import BlackScholesProcess
+from itofin.processes import BlackScholesProcess, HestonProcess
 from itofin.quotes import SimpleQuote
 from itofin.termstructures import (
     DefaultProbabilityTermStructure,
@@ -137,4 +137,29 @@ class MCEuropeanEngine:
         given, when both samples and absolute_tolerance are given, and when
         antithetic is True: the antithetic variate is not yet supported by the
         core engine (#772)."""
+        ...
+
+class MCEuropeanHestonEngine:
+    """The Monte Carlo engine for European payoffs on a Heston process, over the
+    pseudo-random RNG policy. The low-discrepancy policy is not exposed (#454).
+
+    Unlike MCEuropeanEngine, the antithetic variate is supported here.
+
+    Pricing is seeded and deterministic: the same seed reproduces the NPV
+    bitwise, and the standard error is read back through
+    VanillaOption.error_estimate()."""
+
+    def __init__(
+        self,
+        process: HestonProcess,
+        steps: int | None = None,
+        steps_per_year: int | None = None,
+        samples: int | None = None,
+        absolute_tolerance: float | None = None,
+        max_samples: int | None = None,
+        seed: int | None = None,
+        antithetic: bool | None = None,
+    ) -> None:
+        """Raises ItofinError when neither or both of steps / steps_per_year are
+        given, and when both samples and absolute_tolerance are given."""
         ...

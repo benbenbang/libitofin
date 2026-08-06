@@ -3,7 +3,7 @@
 use crate::PyQlError;
 use crate::heston::PyHestonModel;
 use crate::market::PyBlackScholesProcess;
-use crate::mcengine::PyMCEuropeanEngine;
+use crate::mcengine::{PyMCEuropeanEngine, PyMCEuropeanHestonEngine};
 use crate::settings::PySettings;
 use crate::time::PyDate;
 use libitofin::exercise::{EuropeanExercise, Exercise};
@@ -92,6 +92,12 @@ impl PyVanillaOption {
     /// Attaches the Monte Carlo European engine `engine`, which already holds
     /// the process it prices on.
     fn set_mc_engine(&mut self, engine: &PyMCEuropeanEngine) {
+        self.inner.base_mut().set_pricing_engine(engine.engine());
+    }
+
+    /// Attaches the Monte Carlo Heston engine `engine`, which already holds the
+    /// Heston process it prices on.
+    fn set_mc_heston_engine(&mut self, engine: &PyMCEuropeanHestonEngine) {
         self.inner.base_mut().set_pricing_engine(engine.engine());
     }
 
