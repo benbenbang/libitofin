@@ -1,0 +1,173 @@
+[project]
+name = "ito-fin"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = []
+
+[tool.uv]
+package = true
+
+# optional - choose between tool.uv or build-version
+# [build-system]
+# requires = ["uv_build>=0.8.9,<0.9.0"]
+# build-backend = "uv_build"
+
+[project.scripts]
+# command-name = "project-name.module-name:function-name"
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".ipynb_checkpoints",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pyenv",
+    ".pytest_cache",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    ".vscode",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "site-packages",
+    "venv",
+]
+
+[tool.ruff.lint]
+fixable = ["ALL"]
+unfixable = []
+ignore = ["E731"]
+# exclude = ["ALL"]
+# select = ["PL"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.pylint.messages_control]
+disable = ["all"]
+enable = [
+    "consider-using-f-string",
+    "cyclic-import",
+    "deprecated-module",
+    "f-string-without-interpolation",
+    "import-error",
+    "import-self",
+    "undefined-variable",
+    "undefined-all-variable",
+    "unused-format-string-argument",
+    "unused-format-string-key",
+    "unused-import",
+    #   This might be unused but a mandatory signature in airflow runtime
+    #   "unused-argument",
+    "unused-wildcard-import",
+    "unused-variable",
+    "used-before-assignment",
+    "use-list-literal",
+    "raise-missing-from",
+    "simplifiable-condition",
+    "simplify-boolean-expression",
+    "super-with-arguments",
+    "wrong-spelling-in-comment",
+    "wrong-spelling-in-docstring",
+]
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+
+[tool.pytest.ini_options]
+addopts = '--basetemp=/tmp/pytest'
+# switch on `-s` for deep debuging
+# addopts = '-s --basetemp=/tmp/pytest'
+
+filterwarnings = [
+    "ignore:distutils Version classes:DeprecationWarning",
+    "ignore:'contextfilter' is renamed:DeprecationWarning",
+    "ignore:Unbuilt egg for pytest-airflow-utils:UserWarning",
+    "ignore:The 'missing' argument:DeprecationWarning",
+    "ignore:The 'default' argument:DeprecationWarning",
+    "ignore:The field metadata as keyword:DeprecationWarning",
+    "ignore:Passing field metadata:DeprecationWarning",
+    "ignore:.*__new__.*:pytest.PytestCollectionWarning",
+    "ignore:'_request_ctx_stack':DeprecationWarning",
+    "ignore:'_app_ctx_stack':DeprecationWarning",
+    "ignore:'urllib3.contrib.pyopenssl':DeprecationWarning",
+    "ignore:::.*pkg_resources.*:2350",
+    "ignore:::.*pkg_resources.*:2871",
+    "ignore:::.*gunicorn.*",
+    "ignore:::.*grpc_gcp*",
+]
+
+# testpaths = ["tests/project-name"]
+
+markers = [
+    "unittests: run unittests",
+    "integrationtests: run integrationtests",
+]
+
+[tool.mypy]
+ignore_missing_imports = true
+warn_unreachable = true
+
+[tool.black]
+line-length = 120
+exclude = '''
+/(
+  | {{ cookiecutter.* }}
+  | hooks
+  | .venv
+  | .cache
+)/
+'''
+
+[tool.coverage.run]
+omit = [
+    "tests/*",
+    "**/__init__.py",
+    "datamodel/*",
+    "*/sql/*",
+    "*__SQL.py",
+    "*__DAG.py",
+    "*/__init__.py",
+    "*/setup.py",
+    "provider/*",
+]
+source = ["."]
+parallel = true
+
+[tool.coverage.report]
+exclude_lines = ["if TYPE_CHECKING:", '\.\.\.', '...']
+exclude_also = [
+    "# pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+    '\.\.\.',
+    '...',
+]
