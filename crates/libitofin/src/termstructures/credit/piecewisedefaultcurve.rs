@@ -294,9 +294,9 @@ impl<I: Interpolator + 'static> PiecewiseCurve for PiecewiseDefaultCurve<HazardR
 mod tests {
     //! Oracle: `defaultprobabilitycurves.cpp` `testFlatHazardConsistency`
     //! (`:320`) through `testBootstrapFromSpread<HazardRate, BackwardFlat>`
-    //! (`:152-224`), and `testSingleInstrumentBootstrap` (`:344-378`). The
-    //! upfront halves of both cases (`testBootstrapFromUpfront`) need
-    //! `UpfrontCdsHelper`, deferred within EPIC Credit (#676).
+    //! (`:152-224`) and `testBootstrapFromUpfront<HazardRate, BackwardFlat>`
+    //! (`:230-317`), `testSingleInstrumentBootstrap` (`:344-378`) and
+    //! `testUpfrontBootstrap` (`:380-395`).
     //!
     //! The round trip is self-consistent - every helper's own contract is
     //! rebuilt and repriced off the bootstrapped curve and must reproduce its
@@ -315,7 +315,7 @@ mod tests {
     use super::*;
     use crate::handle::Handle;
     use crate::instrument::Instrument;
-    use crate::instruments::{CdsTerms, CreditDefaultSwap, ProtectionSide};
+    use crate::instruments::{CdsTerms, CreditDefaultSwap, ProtectionSide, cds_maturity};
     use crate::interestrate::Compounding;
     use crate::math::interpolations::flat::BackwardFlat;
     use crate::pricingengine::PricingEngine;
@@ -323,7 +323,9 @@ mod tests {
     use crate::quotes::{Quote, SimpleQuote};
     use crate::settings::Settings;
     use crate::shared::shared;
-    use crate::termstructures::credit::defaultprobabilityhelpers::SpreadCdsHelper;
+    use crate::termstructures::credit::defaultprobabilityhelpers::{
+        CdsHelperTerms, SpreadCdsHelper, UpfrontCdsHelper,
+    };
     use crate::termstructures::yields::FlatForward;
     use crate::termstructures::yieldtermstructure::YieldTermStructure;
     use crate::time::businessdayconvention::BusinessDayConvention;
@@ -336,7 +338,7 @@ mod tests {
     use crate::time::period::Period;
     use crate::time::schedule::Schedule;
     use crate::time::timeunit::TimeUnit;
-    use crate::types::Integer;
+    use crate::types::{Integer, Natural, Rate};
 
     const QUOTES: [Real; 4] = [0.005, 0.006, 0.007, 0.009];
     const TENORS: [i32; 4] = [1, 2, 3, 5];
@@ -629,5 +631,190 @@ mod tests {
             second < first,
             "a wider spread must lower the survival probability: {second} vs {first}"
         );
+    }
+
+    const UPFRONT_QUOTES: [Real; 4] = [0.01, 0.02, 0.04, 0.06];
+    const UPFRONT_TENORS: [i32; 4] = [2, 3, 5, 7];
+    const RUNNING_SPREAD: Rate = 0.05;
+    const UPFRONT_SETTLEMENT_DAYS: Natural = 3;
+
+    /// The upfront fixture's conventions (`:234-247`), which differ from the
+    /// spread one's in more than the quotation: the contracts roll on
+    /// `DateGeneration::CDS` under `ModifiedFollowing`, accrue on `Actual360`
+    /// with the last period including its end date, and pay a fixed 5% coupon
+    /// while the quote is the upfront.
+    fn upfront_helper(
+        quote: Real,
+        tenor: Period,
+        discount: &Handle<dyn YieldTermStructure>,
+        settings: &Shared<Settings<Date>>,
+    ) -> Shared<dyn DefaultProbabilityHelper> {
+        UpfrontCdsHelper::with_terms(
+            Handle::new(shared(SimpleQuote::new(quote)) as Shared<dyn Quote>),
+            RUNNING_SPREAD,
+            tenor,
+            SETTLEMENT_DAYS,
+            Target::new(),
+            Frequency::Quarterly,
+            BusinessDayConvention::ModifiedFollowing,
+            DateGeneration::CDS,
+            Actual360::new(),
+            RECOVERY_RATE,
+            discount.clone(),
+            UPFRONT_SETTLEMENT_DAYS,
+            CdsHelperTerms {
+                last_period_day_counter: Some(Actual360::with_last_day(true)),
+                ..CdsHelperTerms::default()
+            },
+            Shared::clone(settings),
+        )
+        .expect("the CDS rule rolls every tenor quoted here")
+            as Shared<dyn DefaultProbabilityHelper>
+    }
+
+    /// The round-trip contract's schedule (`:290-291`), from the protection
+    /// start to the rolled CDS maturity.
+    fn upfront_schedule(today: Date, tenor: Period) -> Schedule {
+        Schedule::new(
+            today + SETTLEMENT_DAYS,
+            cds_maturity(today, tenor, DateGeneration::CDS)
+                .unwrap()
+                .expect("a live CDS maturity"),
+            Period::try_from(Frequency::Quarterly).expect("a quarterly period"),
+            Target::new(),
+            BusinessDayConvention::ModifiedFollowing,
+            BusinessDayConvention::Unadjusted,
+            DateGeneration::CDS,
+            false,
+            Date::null(),
+            Date::null(),
+        )
+    }
+
+    /// The four upfront helpers of `testBootstrapFromUpfront` (`:252-266`) and
+    /// the curve they bootstrap.
+    fn upfront_fixture(settings: &Shared<Settings<Date>>) -> Fixture {
+        let discount = discount_curve(today());
+        let helpers: Vec<Shared<dyn DefaultProbabilityHelper>> = UPFRONT_QUOTES
+            .iter()
+            .zip(UPFRONT_TENORS)
+            .map(|(quote, n)| {
+                upfront_helper(*quote, Period::new(n, TimeUnit::Years), &discount, settings)
+            })
+            .collect();
+        let curve = PiecewiseDefaultCurve::<HazardRate, BackwardFlat>::new(
+            today(),
+            helpers.clone(),
+            day_counter(),
+            BackwardFlat,
+        )
+        .unwrap();
+        Fixture {
+            settings: Shared::clone(settings),
+            discount,
+            helpers,
+            curve,
+        }
+    }
+
+    /// The reprice loop of `testBootstrapFromUpfront` (`:277-315`): each
+    /// pillar's contract, rebuilt from the market conventions and priced off
+    /// the bootstrapped curve, must return its own input upfront.
+    ///
+    /// The `includeTodaysCashFlows` write and its unwind are the C++ block's
+    /// (`:278-281`), kept around the reprice alone so that what the flag holds
+    /// outside it is the caller's business.
+    fn assert_the_upfronts_reproduce(fixture: &Fixture) {
+        let curve: Handle<dyn DefaultProbabilityTermStructure> = Handle::new(Shared::clone(
+            &fixture.curve,
+        )
+            as Shared<dyn DefaultProbabilityTermStructure>);
+        let restore = fixture.settings.include_todays_cash_flows();
+        fixture.settings.set_include_todays_cash_flows(Some(true));
+
+        for (quote, n) in UPFRONT_QUOTES.iter().zip(UPFRONT_TENORS) {
+            let tenor = Period::new(n, TimeUnit::Years);
+            let mut cds = CreditDefaultSwap::with_upfront_and_terms(
+                ProtectionSide::Buyer,
+                1.0,
+                *quote,
+                RUNNING_SPREAD,
+                upfront_schedule(today(), tenor),
+                BusinessDayConvention::ModifiedFollowing,
+                Actual360::new(),
+                CdsTerms {
+                    protection_start: Some(today() + SETTLEMENT_DAYS),
+                    upfront_date: Some(Target::new().advance(
+                        today(),
+                        UPFRONT_SETTLEMENT_DAYS as Integer,
+                        TimeUnit::Days,
+                        BusinessDayConvention::ModifiedFollowing,
+                        false,
+                    )),
+                    last_period_day_counter: Some(Actual360::with_last_day(true)),
+                    trade_date: Some(today()),
+                    ..CdsTerms::default()
+                },
+                Shared::clone(&fixture.settings),
+            )
+            .unwrap();
+            let engine = MidPointCdsEngine::new(
+                curve.clone(),
+                RECOVERY_RATE,
+                fixture.discount.clone(),
+                Some(true),
+                Shared::clone(&fixture.settings),
+            );
+            cds.base_mut()
+                .set_pricing_engine(shared_mut(engine) as SharedMut<dyn PricingEngine>);
+
+            let computed = cds.fair_upfront().unwrap();
+            assert!(
+                (computed - quote).abs() <= TOLERANCE,
+                "failed to reproduce the fair upfront for the {n}Y credit-default swap: \
+                 computed {computed}, input {quote}"
+            );
+        }
+        fixture.settings.set_include_todays_cash_flows(restore);
+    }
+
+    /// `testBootstrapFromUpfront<HazardRate, BackwardFlat>` (`:230-317`).
+    #[test]
+    fn bootstrapped_curve_reproduces_the_input_cds_upfronts() {
+        assert_the_upfronts_reproduce(&upfront_fixture(&settings_at(today())));
+    }
+
+    /// `testUpfrontBootstrap` (`:380-395`): the bootstrap runs with the
+    /// caller's flag switched off and leaves it switched off afterwards.
+    ///
+    /// The bootstrap is forced before the reprice, which runs under a flag of
+    /// its own: a curve first read inside that loop would be bootstrapped under
+    /// the loop's `true`, and the assertion below would pin the loop's unwind
+    /// rather than the helper's. C++ leaves it to the loop, so this is the
+    /// stricter of the two.
+    ///
+    /// What this pins is the unwind, not the write. The C++ comment claims a
+    /// `false` flag "would prevent the upfront from being used", but the flag
+    /// only decides flows dated *on* the evaluation date
+    /// (`cashflow.rs:94-113`), and this fixture has none: the upfront and its
+    /// rebate settle three business days out and the first coupon later still.
+    /// Removing the write from `implied_quote` leaves both upfront tests green.
+    /// The write is ported for fidelity and pinned for its unwind
+    /// (`the_cash_flow_flag_is_restored_when_the_contract_cannot_price`,
+    /// defaultprobabilityhelpers.rs); no oracle here discriminates it.
+    #[test]
+    fn the_upfront_bootstrap_leaves_the_cash_flow_flag_as_it_found_it() {
+        let settings = settings_at(today());
+        settings.set_include_todays_cash_flows(Some(false));
+        let fixture = upfront_fixture(&settings);
+
+        fixture.curve.calculate().unwrap();
+        assert_eq!(
+            settings.include_todays_cash_flows(),
+            Some(false),
+            "the helper's own write must be unwound, not left on the caller's settings"
+        );
+        assert_the_upfronts_reproduce(&fixture);
+        assert_eq!(settings.include_todays_cash_flows(), Some(false));
     }
 }
