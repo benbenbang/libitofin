@@ -22,18 +22,17 @@
 //! bootstrap is driven by. `UpfrontCdsHelper` (`defaultprobabilityhelpers.hpp:170`)
 //! is not here yet and follows within EPIC Credit (#676).
 
-use std::cell::{Cell, RefCell};
+use std::cell::{Cell, Ref, RefCell};
 use std::rc::Weak;
 
 use crate::errors::{QlError, QlResult};
 use crate::handle::{Handle, RelinkableHandle};
 use crate::instrument::Instrument;
-use crate::instruments::{CdsTerms, CreditDefaultSwap, ProtectionSide};
+use crate::instruments::{CdsTerms, CreditDefaultSwap, PricingModel, ProtectionSide, cds_maturity};
 use crate::patterns::observable::{AsObservable, Observable};
 use crate::pricingengine::PricingEngine;
 use crate::pricingengines::credit::MidPointCdsEngine;
 use crate::quotes::Quote;
-use crate::require;
 use crate::settings::Settings;
 use crate::shared::{Shared, SharedMut, shared_mut};
 use crate::termstructures::bootstraphelper::{BootstrapHelperBase, BootstrapHelperShared};
@@ -48,6 +47,7 @@ use crate::time::frequency::Frequency;
 use crate::time::period::Period;
 use crate::time::schedule::{MakeSchedule, Schedule};
 use crate::types::{Integer, Real};
+use crate::{fail, require};
 
 /// The shared state of a credit bootstrap helper: a
 /// [`BootstrapHelperBase`] whose back-pointer is a default-probability curve.
@@ -126,7 +126,15 @@ pub trait DefaultProbabilityHelper: AsObservable {
 /// [`initialize_dates`](Self::initialize_dates).
 pub trait RelativeDateDefaultProbabilityHelper: DefaultProbabilityHelper {
     /// Rebuilds the helper's date schedule off the current evaluation date.
-    fn initialize_dates(&self);
+    ///
+    /// Fallible where the yield family's is not: a CDS schedule's maturity
+    /// comes from [`cds_maturity`], which rejects a tenor it cannot roll, and
+    /// the bootstrap must carry that out rather than unwrap it (D4).
+    ///
+    /// # Errors
+    ///
+    /// As the concrete helper's date rule.
+    fn initialize_dates(&self) -> QlResult<()>;
 }
 
 /// The credit half of the driver bound. Like the yield impl, every method
@@ -160,15 +168,14 @@ impl BootstrapHelperShared for dyn DefaultProbabilityHelper {
     }
 }
 
-/// The terms a [`SpreadCdsHelper`] defaults when they are not quoted.
+/// The terms a CDS bootstrap helper defaults when they are not quoted.
 ///
 /// One field per defaulted argument of the C++ `CdsHelper` constructor
-/// (`defaultprobabilityhelpers.hpp:90-94`); [`Default`] carries their C++
-/// values. The `model` argument has no field: only
-/// [`Midpoint`](crate::pricingengines::credit::MidPointCdsEngine) is ported, the
-/// ISDA arm of `resetEngine` (`defaultprobabilityhelpers.cpp:143-148`) staying
-/// deferred within EPIC Credit (#676).
+/// (`defaultprobabilityhelpers.hpp:90-95`); [`Default`] carries their C++
+/// values.
 pub struct CdsHelperTerms {
+    /// The model the helper prices its contract under.
+    pub model: PricingModel,
     /// Whether the accrued coupon is due on a default.
     pub settles_accrual: bool,
     /// Whether a default pays at default time rather than at the end of the
@@ -186,6 +193,7 @@ pub struct CdsHelperTerms {
 impl Default for CdsHelperTerms {
     fn default() -> CdsHelperTerms {
         CdsHelperTerms {
+            model: PricingModel::Midpoint,
             settles_accrual: true,
             pays_at_default_time: true,
             start_date: None,
@@ -195,23 +203,15 @@ impl Default for CdsHelperTerms {
     }
 }
 
-/// A spread-quoted CDS as a credit bootstrap helper (`SpreadCdsHelper`,
-/// `defaultprobabilityhelpers.hpp:128`).
+/// The state and dates every CDS bootstrap helper shares (`CdsHelper`,
+/// `defaultprobabilityhelpers.hpp:48-128`).
 ///
-/// The helper prices a par CDS on its own schedule against the curve being
-/// bootstrapped and reports that contract's fair spread as
-/// [`implied_quote`](DefaultProbabilityHelper::implied_quote); the bootstrap
-/// drives `quoted spread - fair spread` to zero.
-///
-/// The C++ `CdsHelper` base (`defaultprobabilityhelpers.hpp:47-126`) has no
-/// separate type here. It exists in C++ only to share state and
-/// `initializeDates` with `UpfrontCdsHelper`, and that sibling is deferred
-/// (#676), so its state and `initializeDates` live directly in this struct.
-/// Porting `UpfrontCdsHelper` means factoring out the fields below plus
-/// [`initialize_dates`](RelativeDateDefaultProbabilityHelper::initialize_dates)
-/// and [`set_term_structure`](DefaultProbabilityHelper::set_term_structure),
-/// leaving only `reset_engine` and `implied_quote` per subclass.
-pub struct SpreadCdsHelper {
+/// C++ makes this an abstract class between the relative-date helper and the
+/// two quoted contracts; here it is the state those contracts embed. A concrete
+/// helper holds one, reports its [`base`](CdsHelperBase::base) as its own, and
+/// supplies the two members C++ leaves virtual: the contract `reset_engine`
+/// builds and [`implied_quote`](DefaultProbabilityHelper::implied_quote).
+pub struct CdsHelperBase {
     base: DefaultProbabilityHelperBase,
     tenor: Period,
     settlement_days: Integer,
@@ -227,6 +227,7 @@ pub struct SpreadCdsHelper {
     start_date: Option<Date>,
     last_period_day_counter: Option<DayCounter>,
     rebates_accrual: bool,
+    model: PricingModel,
     settings: Shared<Settings<Date>>,
     schedule: RefCell<Schedule>,
     protection_start: Cell<Date>,
@@ -242,6 +243,234 @@ fn engine_not_reset() -> QlError {
         file!(),
         line!(),
     )
+}
+
+impl CdsHelperBase {
+    /// The C++ `CdsHelper` constructor (`defaultprobabilityhelpers.cpp:32-58`),
+    /// less the `initializeDates` its callers run once the concrete helper
+    /// exists to hold this.
+    ///
+    /// `on_eval_change` is the rebuild the base runs when the evaluation date
+    /// moves; it reaches the concrete helper, since the contract it rebuilds is
+    /// the subclass's to build.
+    #[allow(clippy::too_many_arguments)]
+    fn new(
+        quote: Handle<dyn Quote>,
+        tenor: Period,
+        settlement_days: Integer,
+        calendar: Calendar,
+        frequency: Frequency,
+        payment_convention: BusinessDayConvention,
+        rule: DateGeneration,
+        day_counter: DayCounter,
+        recovery_rate: Real,
+        discount_curve: Handle<dyn YieldTermStructure>,
+        terms: CdsHelperTerms,
+        settings: Shared<Settings<Date>>,
+        on_eval_change: Box<dyn Fn()>,
+    ) -> CdsHelperBase {
+        let base = BootstrapHelperBase::new_relative(
+            quote,
+            Shared::clone(&settings),
+            true,
+            on_eval_change,
+        );
+        discount_curve.register_observer(&base.observer());
+        CdsHelperBase {
+            base,
+            tenor,
+            settlement_days,
+            calendar,
+            frequency,
+            payment_convention,
+            rule,
+            day_counter,
+            recovery_rate,
+            discount_curve,
+            settles_accrual: terms.settles_accrual,
+            pays_at_default_time: terms.pays_at_default_time,
+            start_date: terms.start_date,
+            last_period_day_counter: terms.last_period_day_counter,
+            rebates_accrual: terms.rebates_accrual,
+            model: terms.model,
+            settings,
+            schedule: RefCell::new(Schedule::from_dates(Vec::new())),
+            protection_start: Cell::new(Date::null()),
+            probability: RelinkableHandle::empty(),
+            swap: RefCell::new(Err(engine_not_reset())),
+        }
+    }
+
+    /// The embedded bootstrap-helper state.
+    pub fn base(&self) -> &DefaultProbabilityHelperBase {
+        &self.base
+    }
+
+    /// The contract the helper prices (`swap()`, `hpp:98-100`), or the reason
+    /// it could not be built.
+    pub fn swap(&self) -> Ref<'_, QlResult<CreditDefaultSwap>> {
+        self.swap.borrow()
+    }
+
+    /// The schedule the contract pays on (`schedule_`, `hpp:126`).
+    pub fn schedule(&self) -> Ref<'_, Schedule> {
+        self.schedule.borrow()
+    }
+
+    /// The date protection starts, `settlement_days` past the evaluation date
+    /// (`cpp:79`).
+    pub fn protection_start(&self) -> Date {
+        self.protection_start.get()
+    }
+
+    /// The evaluation date the schedule is measured from.
+    fn evaluation_date(&self) -> Date {
+        self.base
+            .evaluation_date()
+            .expect("a relative-date helper always tracks an evaluation date")
+    }
+
+    /// Stores the rebuilt contract, or the reason it could not be built.
+    fn set_swap(&self, swap: QlResult<CreditDefaultSwap>) {
+        *self.swap.borrow_mut() = swap;
+    }
+
+    /// Records the curve and hands it to the engine (`setTermStructure`,
+    /// `cpp:60-68`), leaving the contract rebuild to the caller.
+    ///
+    /// The engine's handle is linked weakly, the port of the C++
+    /// `linkTo(..., false)` at `cpp:63-65`: the curve owns this helper, which
+    /// owns the contract, which owns the engine, and a strong link would close
+    /// that ring.
+    fn set_term_structure(&self, term_structure: &Shared<dyn DefaultProbabilityTermStructure>) {
+        self.base.set_term_structure(term_structure);
+        self.probability
+            .link_to_weak(Shared::downgrade(term_structure));
+    }
+
+    /// The terms the priced contract inherits from the helper.
+    ///
+    /// The trade date is the evaluation date, as C++ passes it
+    /// (`cpp:141` and `cpp:201`), rather than the contract's own deduction: it
+    /// is what the accrual rebate accrues to, so leaving it to the contract
+    /// would rebate a different amount than the quoted market convention.
+    fn contract_terms(&self) -> CdsTerms {
+        CdsTerms {
+            settles_accrual: self.settles_accrual,
+            pays_at_default_time: self.pays_at_default_time,
+            protection_start: Some(self.protection_start.get()),
+            last_period_day_counter: self.last_period_day_counter.clone(),
+            rebates_accrual: self.rebates_accrual,
+            trade_date: Some(self.evaluation_date()),
+            ..CdsTerms::default()
+        }
+    }
+
+    /// Installs the model's engine over the helper's own probability handle
+    /// (`resetEngine`'s switch, `cpp:143-153`).
+    ///
+    /// # Errors
+    ///
+    /// [`PricingModel::Isda`] needs the `IsdaCdsEngine` deferred to #783; the
+    /// arm is refused rather than silently priced on the mid-point engine.
+    fn install_engine(&self, swap: &mut CreditDefaultSwap) -> QlResult<()> {
+        require!(
+            self.model == PricingModel::Midpoint,
+            "the ISDA arm of resetEngine (defaultprobabilityhelpers.cpp:143-148) needs the \
+             IsdaCdsEngine, which is not ported yet (#783)"
+        );
+        let engine = MidPointCdsEngine::new(
+            self.probability.handle(),
+            self.recovery_rate,
+            self.discount_curve.clone(),
+            None,
+            Shared::clone(&self.settings),
+        );
+        swap.base_mut()
+            .set_pricing_engine(shared_mut(engine) as SharedMut<dyn PricingEngine>);
+        Ok(())
+    }
+
+    /// Rebuilds the schedule off the current evaluation date (`initializeDates`,
+    /// `cpp:75-108`).
+    ///
+    /// Protection starts `settlement_days` past the evaluation date and, absent
+    /// an explicit start, the schedule starts there too, rolled to a business
+    /// day for every rule but the two post-Big-Bang ones. The maturity has two
+    /// arms: the three CDS rules roll it off [`cds_maturity`] measured from the
+    /// evaluation date (`cpp:86-88`), every other rule measures a tenor from the
+    /// protection start (`cpp:90-92`) - a different reference date, not just a
+    /// different roll.
+    ///
+    /// The earliest date is the schedule's first date and the latest its last,
+    /// rolled, plus the day the ISDA model adds (`cpp:105-106`).
+    ///
+    /// # Errors
+    ///
+    /// If [`cds_maturity`] refuses the tenor, or rolls it to a contract that has
+    /// already matured.
+    fn initialize_dates(&self) -> QlResult<()> {
+        let evaluation_date = self.evaluation_date();
+        let protection_start = evaluation_date + self.settlement_days;
+        self.protection_start.set(protection_start);
+
+        let mut start_date = self.start_date.unwrap_or(protection_start);
+        if self.rule != DateGeneration::CDS && self.rule != DateGeneration::CDS2015 {
+            start_date = self.calendar.adjust(start_date, self.payment_convention);
+        }
+
+        let end_date = if matches!(
+            self.rule,
+            DateGeneration::CDS2015 | DateGeneration::CDS | DateGeneration::OldCDS
+        ) {
+            let reference_date = self.start_date.unwrap_or(evaluation_date);
+            match cds_maturity(reference_date, self.tenor, self.rule)? {
+                Some(date) => date,
+                None => fail!(
+                    "the CDS2015 contract quoted at a zero tenor on {reference_date} has already \
+                     matured (creditdefaultswap.cpp:494)"
+                ),
+            }
+        } else {
+            let reference_date = match self.start_date {
+                Some(date) => date + self.settlement_days,
+                None => protection_start,
+            };
+            reference_date + self.tenor
+        };
+
+        let schedule = MakeSchedule::new()
+            .from(start_date)
+            .to(end_date)
+            .with_frequency(self.frequency)
+            .with_calendar(self.calendar.clone())
+            .with_convention(self.payment_convention)
+            .with_termination_date_convention(BusinessDayConvention::Unadjusted)
+            .with_rule(self.rule)
+            .build();
+
+        let mut latest_date = self
+            .calendar
+            .adjust(schedule.date(schedule.len() - 1), self.payment_convention);
+        if self.model == PricingModel::Isda {
+            latest_date += 1;
+        }
+        self.base.set_earliest_date(schedule.date(0));
+        self.base.set_latest_date(latest_date);
+        *self.schedule.borrow_mut() = schedule;
+        Ok(())
+    }
+}
+
+/// A spread-quoted CDS as a credit bootstrap helper (`SpreadCdsHelper`,
+/// `defaultprobabilityhelpers.hpp:129`).
+///
+/// The helper prices a par CDS on its own schedule against the curve being
+/// bootstrapped and reports that contract's fair spread as
+/// [`implied_quote`](DefaultProbabilityHelper::implied_quote); the bootstrap
+/// drives `quoted spread - fair spread` to zero.
+pub struct SpreadCdsHelper {
+    cds: CdsHelperBase,
 }
 
 impl SpreadCdsHelper {
@@ -292,10 +521,8 @@ impl SpreadCdsHelper {
     ///
     /// # Errors
     ///
-    /// Rejects the three CDS date-generation rules. Their maturity comes from
-    /// `cdsMaturity` (`cpp:87`), which is not ported, and taking the other arm
-    /// for them would silently produce a schedule ending on the wrong date; that
-    /// branch is deferred within EPIC Credit (#676).
+    /// If the date rule cannot roll the tenor to a maturity
+    /// ([`initialize_dates`](CdsHelperBase::initialize_dates)).
     #[allow(clippy::too_many_arguments)]
     pub fn with_terms(
         running_spread: Handle<dyn Quote>,
@@ -311,60 +538,42 @@ impl SpreadCdsHelper {
         terms: CdsHelperTerms,
         settings: Shared<Settings<Date>>,
     ) -> QlResult<Shared<SpreadCdsHelper>> {
-        require!(
-            !matches!(
-                rule,
-                DateGeneration::CDS | DateGeneration::CDS2015 | DateGeneration::OldCDS
-            ),
-            "the post-Big-Bang date-generation rules need cdsMaturity, which is not ported yet \
-             (defaultprobabilityhelpers.cpp:85-88)"
-        );
-        Ok(Shared::new_cyclic(|weak: &Weak<SpreadCdsHelper>| {
+        let helper = Shared::new_cyclic(|weak: &Weak<SpreadCdsHelper>| {
             let weak = weak.clone();
             let on_eval_change = Box::new(move || {
                 if let Some(helper) = weak.upgrade() {
-                    helper.initialize_dates();
-                    helper.reset_engine();
+                    match helper.cds.initialize_dates() {
+                        Ok(()) => helper.reset_engine(),
+                        Err(error) => helper.cds.set_swap(Err(error)),
+                    }
                 }
             });
-            let base = BootstrapHelperBase::new_relative(
-                running_spread,
-                Shared::clone(&settings),
-                true,
-                on_eval_change,
-            );
-            discount_curve.register_observer(&base.observer());
-            let helper = SpreadCdsHelper {
-                base,
-                tenor,
-                settlement_days,
-                calendar,
-                frequency,
-                payment_convention,
-                rule,
-                day_counter,
-                recovery_rate,
-                discount_curve,
-                settles_accrual: terms.settles_accrual,
-                pays_at_default_time: terms.pays_at_default_time,
-                start_date: terms.start_date,
-                last_period_day_counter: terms.last_period_day_counter,
-                rebates_accrual: terms.rebates_accrual,
-                settings,
-                schedule: RefCell::new(Schedule::from_dates(Vec::new())),
-                protection_start: Cell::new(Date::null()),
-                probability: RelinkableHandle::empty(),
-                swap: RefCell::new(Err(engine_not_reset())),
-            };
-            helper.initialize_dates();
-            helper
-        }))
+            SpreadCdsHelper {
+                cds: CdsHelperBase::new(
+                    running_spread,
+                    tenor,
+                    settlement_days,
+                    calendar,
+                    frequency,
+                    payment_convention,
+                    rule,
+                    day_counter,
+                    recovery_rate,
+                    discount_curve,
+                    terms,
+                    settings,
+                    on_eval_change,
+                ),
+            }
+        });
+        helper.cds.initialize_dates()?;
+        Ok(helper)
     }
 
     /// The date protection starts, `settlement_days` past the evaluation date
     /// (`cpp:79`).
     pub fn protection_start(&self) -> Date {
-        self.protection_start.get()
+        self.cds.protection_start()
     }
 
     /// Rebuilds the priced contract and its engine (`resetEngine`, `cpp:137-153`).
@@ -387,61 +596,37 @@ impl SpreadCdsHelper {
     /// [`implied_quote`](DefaultProbabilityHelper::implied_quote), since the C++
     /// signature this mirrors returns nothing.
     fn reset_engine(&self) {
-        *self.swap.borrow_mut() = self.build_swap();
+        self.cds.set_swap(self.build_swap());
     }
 
     /// The par contract the helper prices: a protection-buyer CDS on a notional
     /// of 100 paying a 1% running spread (`cpp:138-141`), under a fresh midpoint
     /// engine over the helper's own probability handle (`cpp:151-152`).
-    ///
-    /// C++ passes its `evaluationDate_` as the contract's trade date; this
-    /// leaves the trade date to the contract, which deduces `protection start -
-    /// 1` for a pre-Big-Bang rule (`creditdefaultswap.rs:365-371`). The two
-    /// differ only when `settlement_days` is zero, and only in the accrual
-    /// rebate and upfront payment, both zero-amount flows on a contract with no
-    /// upfront: the deduced date keeps the helper clear of the rebate
-    /// arithmetic deferred by #689, which the C++ date would enter with nothing
-    /// to show for it.
     fn build_swap(&self) -> QlResult<CreditDefaultSwap> {
         let mut swap = CreditDefaultSwap::with_terms(
             ProtectionSide::Buyer,
             100.0,
             0.01,
-            self.schedule.borrow().clone(),
-            self.payment_convention,
-            self.day_counter.clone(),
-            CdsTerms {
-                settles_accrual: self.settles_accrual,
-                pays_at_default_time: self.pays_at_default_time,
-                protection_start: Some(self.protection_start.get()),
-                last_period_day_counter: self.last_period_day_counter.clone(),
-                rebates_accrual: self.rebates_accrual,
-                ..CdsTerms::default()
-            },
-            Shared::clone(&self.settings),
+            self.cds.schedule().clone(),
+            self.cds.payment_convention,
+            self.cds.day_counter.clone(),
+            self.cds.contract_terms(),
+            Shared::clone(&self.cds.settings),
         )?;
-        let engine = MidPointCdsEngine::new(
-            self.probability.handle(),
-            self.recovery_rate,
-            self.discount_curve.clone(),
-            None,
-            Shared::clone(&self.settings),
-        );
-        swap.base_mut()
-            .set_pricing_engine(shared_mut(engine) as SharedMut<dyn PricingEngine>);
+        self.cds.install_engine(&mut swap)?;
         Ok(swap)
     }
 }
 
 impl AsObservable for SpreadCdsHelper {
     fn observable(&self) -> &Observable {
-        self.base.observable()
+        self.cds.base.observable()
     }
 }
 
 impl DefaultProbabilityHelper for SpreadCdsHelper {
     fn base(&self) -> &DefaultProbabilityHelperBase {
-        &self.base
+        self.cds.base()
     }
 
     /// The contract's fair spread (`impliedQuote`, `cpp:132-135`).
@@ -451,7 +636,7 @@ impl DefaultProbabilityHelper for SpreadCdsHelper {
     /// bootstrap has just moved does not notify the contract, and a plain
     /// `fair_spread` would answer from the previous iteration's results.
     fn implied_quote(&self) -> QlResult<Real> {
-        let mut swap = self.swap.borrow_mut();
+        let mut swap = self.cds.swap.borrow_mut();
         let swap = swap.as_mut().map_err(|error| error.clone())?;
         swap.recalculate()?;
         swap.fair_spread()
@@ -459,66 +644,15 @@ impl DefaultProbabilityHelper for SpreadCdsHelper {
 
     /// Records the curve, hands it to the engine, and rebuilds the contract
     /// (`setTermStructure`, `cpp:60-68`).
-    ///
-    /// The engine's handle is linked weakly, the port of the C++
-    /// `linkTo(..., false)` at `cpp:63-65`: the curve owns this helper, which
-    /// owns the contract, which owns the engine, and a strong link would close
-    /// that ring.
     fn set_term_structure(&self, term_structure: &Shared<dyn DefaultProbabilityTermStructure>) {
-        self.base.set_term_structure(term_structure);
-        self.probability
-            .link_to_weak(Shared::downgrade(term_structure));
+        self.cds.set_term_structure(term_structure);
         self.reset_engine();
     }
 }
 
 impl RelativeDateDefaultProbabilityHelper for SpreadCdsHelper {
-    /// Rebuilds the schedule off the current evaluation date (`initializeDates`,
-    /// `cpp:75-108`).
-    ///
-    /// Protection starts `settlement_days` past the evaluation date and, absent
-    /// an explicit start, the schedule starts there too, rolled to a business
-    /// day. The maturity is the tenor past that same reference date - the
-    /// `cdsMaturity` arm above it (`cpp:86-88`) covers only the three CDS rules,
-    /// which the constructor rejects; `TwentiethIMM` takes this arm.
-    ///
-    /// The earliest date is the schedule's first date and the latest its last,
-    /// rolled. C++ then adds a day under the ISDA model (`cpp:105-106`); the
-    /// midpoint model, the only one ported, does not.
-    fn initialize_dates(&self) {
-        let evaluation_date = self
-            .base
-            .evaluation_date()
-            .expect("a relative-date helper always tracks an evaluation date");
-        let protection_start = evaluation_date + self.settlement_days;
-        self.protection_start.set(protection_start);
-
-        let mut start_date = self.start_date.unwrap_or(protection_start);
-        if self.rule != DateGeneration::CDS && self.rule != DateGeneration::CDS2015 {
-            start_date = self.calendar.adjust(start_date, self.payment_convention);
-        }
-        let reference_date = match self.start_date {
-            Some(date) => date + self.settlement_days,
-            None => protection_start,
-        };
-        let end_date = reference_date + self.tenor;
-
-        let schedule = MakeSchedule::new()
-            .from(start_date)
-            .to(end_date)
-            .with_frequency(self.frequency)
-            .with_calendar(self.calendar.clone())
-            .with_convention(self.payment_convention)
-            .with_termination_date_convention(BusinessDayConvention::Unadjusted)
-            .with_rule(self.rule)
-            .build();
-
-        self.base.set_earliest_date(schedule.date(0));
-        self.base.set_latest_date(
-            self.calendar
-                .adjust(schedule.date(schedule.len() - 1), self.payment_convention),
-        );
-        *self.schedule.borrow_mut() = schedule;
+    fn initialize_dates(&self) -> QlResult<()> {
+        self.cds.initialize_dates()
     }
 }
 
@@ -708,35 +842,54 @@ mod tests {
         );
     }
 
-    /// The three CDS rules need `cdsMaturity`, which is not ported; taking the
-    /// other arm for them would build a schedule ending on the wrong date, so
-    /// they are refused rather than silently mispriced (#676).
+    /// The `cdsMaturity` arm of `initializeDates` (`cpp:85-88`): under the three
+    /// post-Big-Bang rules the maturity is rolled off the *evaluation date*,
+    /// where the other arm measures a tenor from the protection start, and the
+    /// schedule runs from the previous IMM twentieth to it.
+    ///
+    /// Every date here is derived by hand from the rule - the twentieth of
+    /// March, June, September or December at or before the trade date, plus the
+    /// tenor, plus a quarter - rather than read back from [`cds_maturity`]. The
+    /// helper calls that function itself, so an equality against it would hold
+    /// for whatever maturity it returned. The round-trip bootstrap cannot stand
+    /// in either: it rebuilds its contract on the same conventions, so a shared
+    /// wrong schedule still reprices to the quote.
     #[test]
-    fn the_post_big_bang_rules_are_refused() {
+    fn the_cds_rules_roll_the_maturity_off_the_evaluation_date() {
         let settings = settings_at(today());
-        for rule in [
-            DateGeneration::CDS,
-            DateGeneration::CDS2015,
-            DateGeneration::OldCDS,
+        let calendar = Target::new();
+        let anchor = Date::new(20, Month::March, 2026);
+
+        for (years, maturity) in [
+            (2, Date::new(20, Month::June, 2028)),
+            (3, Date::new(20, Month::June, 2029)),
+            (5, Date::new(20, Month::June, 2031)),
+            (7, Date::new(20, Month::June, 2033)),
         ] {
-            let result = SpreadCdsHelper::new(
+            let helper = SpreadCdsHelper::new(
                 Handle::new(shared(SimpleQuote::new(0.01)) as Shared<dyn Quote>),
-                five_years(),
+                Period::new(years, TimeUnit::Years),
                 1,
-                Target::new(),
+                calendar.clone(),
                 Frequency::Quarterly,
                 BusinessDayConvention::Following,
-                rule,
+                DateGeneration::CDS,
                 Actual360::new(),
                 0.4,
                 discount(today()),
                 Shared::clone(&settings),
+            )
+            .unwrap();
+
+            let schedule = helper.cds.schedule();
+            assert_eq!(schedule.date(0), anchor);
+            assert_eq!(last_date(&schedule), maturity);
+            assert_eq!(helper.earliest_date(), anchor);
+            assert_eq!(
+                helper.latest_date(),
+                calendar.adjust(maturity, BusinessDayConvention::Following)
             );
-            assert!(
-                result
-                    .err()
-                    .is_some_and(|error| { error.message().contains("cdsMaturity") })
-            );
+            assert_eq!(helper.protection_start(), today() + 1);
         }
     }
 
@@ -770,13 +923,7 @@ mod tests {
 
         hazard.set_value(0.05);
         assert!(
-            helper
-                .swap
-                .borrow()
-                .as_ref()
-                .unwrap()
-                .base()
-                .is_calculated(),
+            helper.cds.swap().as_ref().unwrap().base().is_calculated(),
             "the weak link must leave the contract unnotified by the curve"
         );
 
@@ -808,7 +955,7 @@ mod tests {
         settings.set_evaluation_date(moved);
 
         let schedule = expected_schedule(moved + 1, moved + 1 + five_years());
-        let swap = helper.swap.borrow();
+        let swap = helper.cds.swap();
         let swap = swap.as_ref().unwrap();
         assert_eq!(swap.protection_start_date(), moved + 1);
         assert_eq!(swap.maturity(), last_date(&schedule));

@@ -12,14 +12,16 @@ repricing oracle would not discriminate:
   ``forwards()`` is ``with_rule(DateGeneration::Forward)`` (schedule.rs:852-853),
   so the two are identical by construction; this pins the default at the Python
   boundary.
-* ``SpreadCdsHelper`` builds under a CDS rule and rejects the three
-  post-Big-Bang ones, whose maturity rule the core has not ported.
+* ``SpreadCdsHelper`` builds under every date-generation rule the core takes,
+  and the three post-Big-Bang ones reach ``cdsMaturity``: their pillar is the
+  hand-derived CDS roll date, which a helper that had dropped the rule would
+  miss by a quarter.
 * ``Settings.include_todays_cash_flows`` round-trips its three states. Whether
   the flag moves a price is A5's.
 """
 
 import pytest
-from itofin import ItofinError, Settings
+from itofin import Settings
 from itofin.quotes import SimpleQuote
 from itofin.termstructures import FlatForward, SpreadCdsHelper
 from itofin.time import (
@@ -112,9 +114,11 @@ def test_a_spread_helper_builds_under_the_twentieth_imm_rule():
 @pytest.mark.parametrize(
     "rule", [DateGeneration.OldCDS, DateGeneration.CDS, DateGeneration.CDS2015]
 )
-def test_the_post_big_bang_rules_are_refused_rather_than_mispriced(rule):
-    with pytest.raises(ItofinError):
-        Market().helper(rule)
+def test_the_post_big_bang_rules_roll_the_maturity_to_a_cds_date(rule):
+    """Five years quoted on 15 May 2007 rolls to the twentieth of the IMM month
+    a quarter past the anniversary of the previous roll date, which is a
+    different date from the 15 May 2012 a dropped rule would produce."""
+    assert Market().helper(rule).latest_date() == Date(20, 6, 2012)
 
 
 def test_include_todays_cash_flows_round_trips_its_three_states():

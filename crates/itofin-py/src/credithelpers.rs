@@ -77,11 +77,10 @@ impl PyDefaultProbabilityHelper {
 /// `set_value` re-drives the bootstrap, and it observes `discount_curve`.
 ///
 /// Fallible, unlike the [`PyFlatHazardRate`](crate::credit::PyFlatHazardRate)
-/// chain it otherwise mirrors: the core rejects the three post-Big-Bang rules
-/// (`DateGeneration.OldCDS` / `.CDS` / `.CDS2015`), whose maturity comes from an
-/// unported `cdsMaturity` (`defaultprobabilityhelpers.rs:314-319`). Passing one
-/// raises [`struct@crate::ItofinError`] instead of building a schedule that ends
-/// on the wrong date.
+/// chain it otherwise mirrors: under the three post-Big-Bang rules
+/// (`DateGeneration.OldCDS` / `.CDS` / `.CDS2015`) the maturity is rolled by
+/// `cdsMaturity`, which raises [`struct@crate::ItofinError`] on a tenor it
+/// cannot roll rather than building a schedule that ends on the wrong date.
 #[pyclass(name = "SpreadCdsHelper", extends = PyDefaultProbabilityHelper, unsendable)]
 pub struct PySpreadCdsHelper;
 
