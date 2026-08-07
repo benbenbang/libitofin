@@ -56,34 +56,52 @@
 //!   before it is ever priced. The port leaves it `None`, whose accessor
 //!   reports it as not available. A contract priced before it expired keeps the
 //!   fetched value in both, since `setupExpired` does not touch the field.
+//! - [`implied_hazard_rate`] validates the arguments it sets its solving engine
+//!   up with, which `impliedHazardRate` (`creditdefaultswap.cpp:373`) does not:
+//!   a bundle C++ inverts unvalidated is one whose pricing failure the port
+//!   could only report as a failure to bracket (D4).
 //!
 //! ## Deferred
 //!
 //! Within EPIC Credit (#676), and each omitted visibly rather than accepted and
 //! ignored:
 //!
-//! - `impliedHazardRate`, `conventionalSpread` and their objective function
-//!   (`creditdefaultswap.cpp:315-428`).
+//! - `conventionalSpread` (`creditdefaultswap.cpp:383-428`), whose only caller
+//!   anywhere in `ql/` is the upfront rate helper it ships with (#782).
+//! - The [`PricingModel::Isda`] branch of [`implied_hazard_rate`]
+//!   (`creditdefaultswap.cpp:361-368`), which prices on the `IsdaCdsEngine`
+//!   (#783); until that engine lands the branch is a typed error rather than a
+//!   silent fall back to the mid-point one.
 //! - `protectionEndDate` (`creditdefaultswap.cpp:430-432`), which reads the
 //!   accrual end of the last coupon through the `coupon_cast` that
 //!   [`CashFlow::as_coupon`](crate::cashflow::CashFlow::as_coupon) ports.
 //!
 //! [`upfront`]: CreditDefaultSwap::upfront
 //! [`setup_expired`]: CreditDefaultSwap::setup_expired
+//! [`implied_hazard_rate`]: CreditDefaultSwap::implied_hazard_rate
 
 use std::any::Any;
 
 use crate::cashflow::Leg;
 use crate::cashflows::{FixedRateLeg, SimpleCashFlow};
 use crate::errors::QlResult;
+use crate::handle::Handle;
 use crate::instrument::{Instrument, InstrumentBase, InstrumentResults};
 use crate::instruments::claim::{Claim, FaceValueClaim};
 use crate::instruments::protection::ProtectionSide;
 use crate::interestrate::Compounding;
-use crate::pricingengine::{Arguments, GenericEngine, Results};
+use crate::math::solver1d::Solver1D;
+use crate::math::solvers1d::brent::Brent;
+use crate::pricingengine::{Arguments, GenericEngine, PricingEngine, Results};
+use crate::pricingengines::credit::MidPointCdsEngine;
+use crate::quotes::{Quote, SimpleQuote};
 use crate::settings::Settings;
 use crate::shared::{Shared, shared};
+use crate::termstructures::credit::defaulttermstructure::DefaultProbabilityTermStructure;
+use crate::termstructures::credit::flathazardrate::FlatHazardRate;
+use crate::termstructures::yieldtermstructure::YieldTermStructure;
 use crate::time::businessdayconvention::BusinessDayConvention;
+use crate::time::calendars::weekendsonly::WeekendsOnly;
 use crate::time::date::{Date, Month};
 use crate::time::dategenerationrule::DateGeneration;
 use crate::time::daycounter::DayCounter;
@@ -245,6 +263,17 @@ impl Results for CdsResults {
 /// Engine base for credit-default swaps (the C++ `CreditDefaultSwap::engine`,
 /// `creditdefaultswap.hpp:344-346`).
 pub type CdsEngine = GenericEngine<CdsArguments, CdsResults>;
+
+/// The model a quoted contract is inverted under
+/// (`CreditDefaultSwap::PricingModel`, `creditdefaultswap.hpp:61-64`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PricingModel {
+    /// The mid-point engine, which is not ISDA conform
+    /// (`creditdefaultswap.hpp:51-52`).
+    Midpoint,
+    /// The ISDA engine.
+    Isda,
+}
 
 /// A credit-default swap quoted as a running spread.
 ///
@@ -736,6 +765,70 @@ impl CreditDefaultSwap {
         };
         Ok(value)
     }
+
+    /// The flat hazard rate that prices this contract at `target_npv`
+    /// (`creditdefaultswap.cpp:339-381`).
+    ///
+    /// A Brent solve over the one quote of a [`FlatHazardRate`] curve, started
+    /// from the running spread grossed up by the loss given default - already a
+    /// very close guess when `target_npv` is zero
+    /// (`creditdefaultswap.cpp:377-380`).
+    ///
+    /// The contract is set up on the solving engine once and only the quote
+    /// moves between iterations, as in C++. Unlike C++, which inverts an
+    /// unvalidated bundle, the port validates it first, so that a malformed
+    /// contract reports itself rather than reaching the solver as a pricing
+    /// failure it can only report as a failure to bracket (D4).
+    ///
+    /// # Errors
+    ///
+    /// [`PricingModel::Isda`] needs the `IsdaCdsEngine` deferred to #783.
+    /// Otherwise errors on a malformed contract, and if the solve does not
+    /// converge - which includes a pricing failure at some hazard rate, since
+    /// that reaches the solver as the non-finite value it rejects.
+    pub fn implied_hazard_rate(
+        &self,
+        target_npv: Real,
+        discount_curve: &Handle<dyn YieldTermStructure>,
+        day_counter: DayCounter,
+        recovery_rate: Real,
+        accuracy: Real,
+        model: PricingModel,
+    ) -> QlResult<Rate> {
+        if model == PricingModel::Isda {
+            fail!("the ISDA pricing model needs the IsdaCdsEngine, deferred to #783");
+        }
+        let flat_rate = shared(SimpleQuote::new(0.0));
+        let probability = Handle::new(shared(FlatHazardRate::moving(
+            0,
+            WeekendsOnly::new(),
+            Handle::new(Shared::clone(&flat_rate) as Shared<dyn Quote>),
+            day_counter,
+            Shared::clone(&self.settings),
+        )) as Shared<dyn DefaultProbabilityTermStructure>);
+        let mut engine = MidPointCdsEngine::new(
+            probability,
+            recovery_rate,
+            discount_curve.clone(),
+            None,
+            Shared::clone(&self.settings),
+        );
+        self.setup_arguments(engine.arguments_mut())?;
+        engine.arguments_mut().validate()?;
+
+        let objective = |hazard_rate: Rate| -> Real {
+            flat_rate.set_value(hazard_rate);
+            if engine.calculate().is_err() {
+                return Real::NAN;
+            }
+            match (engine.results() as &dyn Any).downcast_ref::<CdsResults>() {
+                Some(results) => results.instrument.value.unwrap_or(Real::NAN) - target_npv,
+                None => Real::NAN,
+            }
+        };
+        let guess = self.running_spread / (1.0 - recovery_rate) * 365.0 / 360.0;
+        Brent::new().solve(objective, accuracy, guess, 0.1 * guess)
+    }
 }
 
 impl Instrument for CreditDefaultSwap {
@@ -875,10 +968,12 @@ mod tests {
     use super::*;
     use crate::cashflow::CashFlow;
     use crate::event::Event;
+    use crate::math::interpolations::flat::BackwardFlat;
     use crate::patterns::observable::{AsObservable, Observable};
-    use crate::pricingengine::PricingEngine;
     use crate::shared::{SharedMut, shared_mut};
-    use crate::time::calendars::weekendsonly::WeekendsOnly;
+    use crate::termstructures::credit::interpolatedhazardratecurve::InterpolatedHazardRateCurve;
+    use crate::termstructures::yields::FlatForward;
+    use crate::time::calendars::target::Target;
     use crate::time::daycounters::actual360::Actual360;
     use crate::time::daycounters::actual365fixed::Actual365Fixed;
     use crate::time::schedule::MakeSchedule;
@@ -1641,5 +1736,162 @@ mod tests {
     fn a_maturity_on_or_before_the_trade_date_is_rejected() {
         let message = rejection(Period::new(-1, TimeUnit::Years), DateGeneration::CDS);
         assert!(message.contains("<= trade date"), "{message}");
+    }
+
+    /// `testImpliedHazardRate` (`creditdefaultswap.cpp:313-415`): a credit
+    /// curve flat at 30% out to five years and 40% beyond, inverted through
+    /// contracts maturing between the two.
+    ///
+    /// A contract straddling the step implies a flat rate strictly between the
+    /// two, rising with maturity as more of the contract sits past the step.
+    ///
+    /// The evaluation date is a Monday and no TARGET holiday, which is what
+    /// lets the moving curve the solve builds off `WeekendsOnly` and the fixed
+    /// curve the round trip reprices on share a reference date - as they do in
+    /// C++, which adjusts `todaysDate` onto a business day.
+    #[test]
+    fn the_implied_hazard_rate_brackets_the_curve_and_reprices_the_contract() {
+        const H1: Rate = 0.30;
+        const H2: Rate = 0.40;
+        const RECOVERY: Real = 0.4;
+
+        let calendar = Target::new();
+        let today = Date::new(15, Month::June, 2026);
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(today);
+
+        let probability_curve = Handle::new(shared(
+            InterpolatedHazardRateCurve::new(
+                vec![
+                    today,
+                    today + Period::new(5, TimeUnit::Years),
+                    today + Period::new(10, TimeUnit::Years),
+                ],
+                vec![H1, H1, H2],
+                Actual365Fixed::new(),
+                BackwardFlat,
+            )
+            .unwrap(),
+        )
+            as Shared<dyn DefaultProbabilityTermStructure>);
+        let discount_curve = Handle::new(shared(FlatForward::with_rate(
+            today,
+            0.03,
+            Actual360::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>);
+
+        let issue_date = calendar.advance(
+            today,
+            -6,
+            TimeUnit::Months,
+            BusinessDayConvention::Following,
+            false,
+        );
+        let mut previous: Option<Rate> = None;
+
+        for n in 6..=10 {
+            let maturity = calendar.advance(
+                issue_date,
+                n,
+                TimeUnit::Years,
+                BusinessDayConvention::Following,
+                false,
+            );
+            let schedule = Schedule::new(
+                issue_date,
+                maturity,
+                Period::new(6, TimeUnit::Months),
+                calendar.clone(),
+                BusinessDayConvention::ModifiedFollowing,
+                BusinessDayConvention::ModifiedFollowing,
+                DateGeneration::Forward,
+                false,
+                Date::null(),
+                Date::null(),
+            );
+            let priced_on = |probability: Handle<dyn DefaultProbabilityTermStructure>| {
+                let mut cds = CreditDefaultSwap::new(
+                    ProtectionSide::Seller,
+                    10_000.0,
+                    0.0120,
+                    schedule.clone(),
+                    BusinessDayConvention::ModifiedFollowing,
+                    Actual360::new(),
+                    true,
+                    true,
+                    Shared::clone(&settings),
+                )
+                .unwrap();
+                cds.base_mut()
+                    .set_pricing_engine(shared_mut(MidPointCdsEngine::new(
+                        probability,
+                        RECOVERY,
+                        discount_curve.clone(),
+                        None,
+                        Shared::clone(&settings),
+                    )) as SharedMut<dyn PricingEngine>);
+                cds
+            };
+
+            let mut cds = priced_on(probability_curve.clone());
+            let npv = cds.npv().unwrap();
+            let rate = cds
+                .implied_hazard_rate(
+                    npv,
+                    &discount_curve,
+                    Actual365Fixed::new(),
+                    RECOVERY,
+                    1.0e-8,
+                    PricingModel::Midpoint,
+                )
+                .unwrap();
+
+            assert!(
+                (H1..=H2).contains(&rate),
+                "the {n}Y implied rate {rate} is outside [{H1}, {H2}]"
+            );
+            if let Some(previous) = previous {
+                assert!(
+                    rate >= previous,
+                    "the {n}Y implied rate {rate} falls below the previous {previous}"
+                );
+            }
+            previous = Some(rate);
+
+            let flat = Handle::new(shared(FlatHazardRate::new(
+                today,
+                Handle::new(shared(SimpleQuote::new(rate)) as Shared<dyn Quote>),
+                Actual365Fixed::new(),
+            ))
+                as Shared<dyn DefaultProbabilityTermStructure>);
+            let reproduced = priced_on(flat).npv().unwrap();
+            assert!(
+                (npv - reproduced).abs() < 1.0,
+                "the {n}Y implied rate reprices to {reproduced}, not {npv}"
+            );
+        }
+    }
+
+    /// The ISDA branch (`creditdefaultswap.cpp:361-368`) prices on an engine
+    /// this port has not reached, and says so rather than quietly answering off
+    /// the mid-point one.
+    #[test]
+    fn the_isda_model_is_an_error_rather_than_a_silent_mid_point_answer() {
+        let cds = contract(CdsTerms::default()).unwrap();
+        let message = cds
+            .implied_hazard_rate(
+                0.0,
+                &Handle::<dyn YieldTermStructure>::empty(),
+                Actual365Fixed::new(),
+                0.4,
+                1.0e-8,
+                PricingModel::Isda,
+            )
+            .unwrap_err()
+            .to_string();
+        assert!(message.contains("ISDA"), "{message}");
+        assert!(message.contains("783"), "{message}");
     }
 }
