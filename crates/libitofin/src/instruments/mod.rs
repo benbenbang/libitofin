@@ -11,6 +11,7 @@ mod creditdefaultswap;
 mod fixedvsfloatingswap;
 mod futures;
 mod makecapfloor;
+mod makecds;
 mod makeois;
 mod makeswaption;
 mod makevanillaswap;
@@ -36,6 +37,7 @@ pub use fixedvsfloatingswap::{
 };
 pub use futures::FuturesType;
 pub use makecapfloor::MakeCapFloor;
+pub use makecds::MakeCreditDefaultSwap;
 pub use makeois::MakeOis;
 pub use makeswaption::MakeSwaption;
 pub use makevanillaswap::MakeVanillaSwap;
