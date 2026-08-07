@@ -28,7 +28,7 @@ pub use bonds::FixedRateBond;
 pub use capfloor::{CapFloor, CapFloorArguments, CapFloorType};
 pub use claim::{Claim, FaceValueClaim};
 pub use creditdefaultswap::{
-    CdsArguments, CdsEngine, CdsResults, CdsTerms, CreditDefaultSwap, cds_maturity,
+    CdsArguments, CdsEngine, CdsResults, CdsTerms, CreditDefaultSwap, PricingModel, cds_maturity,
 };
 pub use fixedvsfloatingswap::{
     FixedVsFloatingSwap, FixedVsFloatingSwapArguments, FixedVsFloatingSwapEngine,
