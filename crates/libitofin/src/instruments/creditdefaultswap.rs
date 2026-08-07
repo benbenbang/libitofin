@@ -1,21 +1,27 @@
 //! Credit-default swap.
 //!
-//! Port of the running-spread half of
-//! `ql/instruments/creditdefaultswap.{hpp,cpp}`: the contract's terms, the
-//! premium leg it pays, and the cash-settled upfront and accrual-rebate flows
-//! that frame it (`creditdefaultswap.cpp:39-60` and `:87-176`).
+//! Port of `ql/instruments/creditdefaultswap.{hpp,cpp}`: the contract's terms,
+//! the premium leg it pays, and the cash-settled upfront and accrual-rebate
+//! flows that frame it (`creditdefaultswap.cpp:39-85` and `:87-176`).
 //!
-//! A running-spread contract quotes no upfront, so [`upfront`] is always `None`
-//! and the upfront payment is a zero-amount flow on the cash settlement date;
-//! it exists because the engines read it unconditionally
-//! (`creditdefaultswap.cpp:127-131`).
+//! A contract quoted as a running spread alone carries no [`upfront`], and its
+//! upfront payment is a zero-amount flow on the cash settlement date that exists
+//! only because the engines read it unconditionally. The upfront-quoted
+//! constructors add the quote, and with it a payment of `upfront * notional`
+//! held unsigned as C++ holds it (`creditdefaultswap.cpp:127-131`): the sign the
+//! protection side gives it is the engine's to apply.
 //!
 //! ## Divergences from QuantLib
 //!
-//! - The C++ constructor's eight defaulted arguments (`creditdefaultswap.hpp:105-112`)
-//!   become [`CdsTerms`], whose [`Default`] carries the C++ defaults.
-//!   [`CreditDefaultSwap::new`] takes the eight leading arguments and defaults
-//!   the rest; [`CreditDefaultSwap::with_terms`] takes them all.
+//! - The C++ constructors' defaulted arguments (`creditdefaultswap.hpp:105-112`
+//!   and `:155-166`) become [`CdsTerms`], whose [`Default`] carries the C++
+//!   defaults. [`CreditDefaultSwap::new`] and [`CreditDefaultSwap::with_upfront`]
+//!   take the leading arguments and default the rest;
+//!   [`CreditDefaultSwap::with_terms`] and
+//!   [`CreditDefaultSwap::with_upfront_and_terms`] take them all. Only the
+//!   upfront-quoted C++ constructor takes an `upfrontDate`, so there a
+//!   running-spread contract cannot reach it; here it is one [`CdsTerms`] field
+//!   among the rest that the running-spread constructors leave `None`.
 //! - The empty-schedule check runs before the protection-start default, where
 //!   C++ runs it after: `protectionStart == Date() ? schedule[0]` sits in the
 //!   member-initialiser list (`creditdefaultswap.cpp:56`) and so reads
@@ -56,14 +62,6 @@
 //! Within EPIC Credit (#676), and each omitted visibly rather than accepted and
 //! ignored:
 //!
-//! - The upfront-quoted constructor (`creditdefaultswap.cpp:62-85`), which is
-//!   the only path setting `upfront_` and taking an explicit upfront date.
-//! - The accrual-rebate arithmetic (`creditdefaultswap.cpp:143-168`). A trade
-//!   date on or after the first accrual date rebates the coupon accrued to
-//!   `tradeDate + 1`; [`CreditDefaultSwap::with_terms`] rejects that case
-//!   instead of silently rebating zero. That covers every `CDS`- or
-//!   `CDS2015`-rule contract on default terms, whose deduced trade date is the
-//!   first accrual date, so those build only with `rebates_accrual` off.
 //! - `impliedHazardRate`, `conventionalSpread` and their objective function
 //!   (`creditdefaultswap.cpp:315-428`), and `cdsMaturity`
 //!   (`creditdefaultswap.cpp:479-506`).
@@ -109,6 +107,10 @@ pub struct CdsTerms {
     /// The first date a default triggers the contract; the schedule's first
     /// date when absent.
     pub protection_start: Option<Date>,
+    /// The date the upfront and the accrual rebate settle on; deduced from the
+    /// trade date and [`cash_settlement_days`](CdsTerms::cash_settlement_days)
+    /// when absent.
+    pub upfront_date: Option<Date>,
     /// What a default pays out; a [`FaceValueClaim`] when absent.
     pub claim: Option<Shared<dyn Claim>>,
     /// The day counter the last coupon accrues with, overriding the spread's.
@@ -127,6 +129,7 @@ impl Default for CdsTerms {
             settles_accrual: true,
             pays_at_default_time: true,
             protection_start: None,
+            upfront_date: None,
             claim: None,
             last_period_day_counter: None,
             rebates_accrual: true,
@@ -321,13 +324,110 @@ impl CreditDefaultSwap {
     ///
     /// Errors on an empty schedule, on a protection start after the first
     /// accrual date under a pre-Big-Bang date-generation rule, on a cash
-    /// settlement date before the protection start, and on the deferred
-    /// accrual-rebate case where the trade date falls on or after the first
-    /// accrual date. Propagates the premium leg's own preconditions.
+    /// settlement date before the protection start, and on a premium leg
+    /// carrying a flow that is not a coupon to rebate. Propagates the premium
+    /// leg's own preconditions.
     #[allow(clippy::too_many_arguments)]
     pub fn with_terms(
         side: ProtectionSide,
         notional: Real,
+        spread: Rate,
+        schedule: Schedule,
+        payment_convention: BusinessDayConvention,
+        day_counter: DayCounter,
+        terms: CdsTerms,
+        settings: Shared<Settings<Date>>,
+    ) -> QlResult<CreditDefaultSwap> {
+        CreditDefaultSwap::build(
+            side,
+            notional,
+            None,
+            spread,
+            schedule,
+            payment_convention,
+            day_counter,
+            terms,
+            settings,
+        )
+    }
+
+    /// A contract quoted as an upfront plus a running spread, on the C++
+    /// default terms (`creditdefaultswap.cpp:62-85`). The remaining terms take
+    /// their C++ defaults; [`with_upfront_and_terms`] gives them.
+    ///
+    /// # Errors
+    ///
+    /// As [`with_terms`](CreditDefaultSwap::with_terms).
+    ///
+    /// [`with_upfront_and_terms`]: CreditDefaultSwap::with_upfront_and_terms
+    #[allow(clippy::too_many_arguments)]
+    pub fn with_upfront(
+        side: ProtectionSide,
+        notional: Real,
+        upfront: Rate,
+        spread: Rate,
+        schedule: Schedule,
+        payment_convention: BusinessDayConvention,
+        day_counter: DayCounter,
+        settles_accrual: bool,
+        pays_at_default_time: bool,
+        settings: Shared<Settings<Date>>,
+    ) -> QlResult<CreditDefaultSwap> {
+        CreditDefaultSwap::with_upfront_and_terms(
+            side,
+            notional,
+            upfront,
+            spread,
+            schedule,
+            payment_convention,
+            day_counter,
+            CdsTerms {
+                settles_accrual,
+                pays_at_default_time,
+                ..CdsTerms::default()
+            },
+            settings,
+        )
+    }
+
+    /// A contract quoted as an upfront plus a running spread, on the given
+    /// `terms` (`creditdefaultswap.cpp:62-85`).
+    ///
+    /// # Errors
+    ///
+    /// As [`with_terms`](CreditDefaultSwap::with_terms).
+    #[allow(clippy::too_many_arguments)]
+    pub fn with_upfront_and_terms(
+        side: ProtectionSide,
+        notional: Real,
+        upfront: Rate,
+        spread: Rate,
+        schedule: Schedule,
+        payment_convention: BusinessDayConvention,
+        day_counter: DayCounter,
+        terms: CdsTerms,
+        settings: Shared<Settings<Date>>,
+    ) -> QlResult<CreditDefaultSwap> {
+        CreditDefaultSwap::build(
+            side,
+            notional,
+            Some(upfront),
+            spread,
+            schedule,
+            payment_convention,
+            day_counter,
+            terms,
+            settings,
+        )
+    }
+
+    /// The shared C++ `init` (`creditdefaultswap.cpp:87-176`), which both
+    /// quotations reach through their own constructor.
+    #[allow(clippy::too_many_arguments)]
+    fn build(
+        side: ProtectionSide,
+        notional: Real,
+        upfront: Option<Rate>,
         spread: Rate,
         schedule: Schedule,
         payment_convention: BusinessDayConvention,
@@ -370,27 +470,50 @@ impl CreditDefaultSwap {
             }
         });
 
-        let effective_upfront_date = schedule.calendar().advance(
-            trade_date,
-            terms.cash_settlement_days as Integer,
-            TimeUnit::Days,
-            payment_convention,
-            false,
-        );
+        let effective_upfront_date = terms.upfront_date.unwrap_or_else(|| {
+            schedule.calendar().advance(
+                trade_date,
+                terms.cash_settlement_days as Integer,
+                TimeUnit::Days,
+                payment_convention,
+                false,
+            )
+        });
         require!(
             effective_upfront_date >= protection_start,
             "The cash settlement date must not be before the protection start date."
         );
 
-        let upfront_payment = shared(SimpleCashFlow::new(0.0, effective_upfront_date)?);
+        let upfront_amount = upfront.map_or(0.0, |upfront| upfront * notional);
+        let upfront_payment = shared(SimpleCashFlow::new(upfront_amount, effective_upfront_date)?);
 
         let accrual_rebate = if terms.rebates_accrual {
-            require!(
-                trade_date < schedule.date(0),
-                "a trade date on or after the first accrual date rebates the accrued coupon, \
-                 which is not ported yet (creditdefaultswap.cpp:143-168)"
-            );
-            Some(shared(SimpleCashFlow::new(0.0, effective_upfront_date)?))
+            let mut rebate_amount = 0.0;
+            let reference_date = trade_date + 1;
+            if trade_date >= schedule.date(0) {
+                let last = leg.len() - 1;
+                for (i, flow) in leg.iter().enumerate() {
+                    let payment_date = flow.date();
+                    if reference_date > payment_date {
+                        continue;
+                    }
+                    let Some(coupon) = flow.as_coupon() else {
+                        fail!("premium leg flow #{} is not a coupon", i + 1);
+                    };
+                    if reference_date == payment_date {
+                        if i == last {
+                            rebate_amount = coupon.amount()?;
+                        }
+                    } else {
+                        rebate_amount = coupon.accrued_amount(reference_date)?;
+                    }
+                    break;
+                }
+            }
+            Some(shared(SimpleCashFlow::new(
+                rebate_amount,
+                effective_upfront_date,
+            )?))
         } else {
             None
         };
@@ -403,7 +526,7 @@ impl CreditDefaultSwap {
             settings,
             side,
             notional,
-            upfront: None,
+            upfront,
             running_spread: spread,
             settles_accrual: terms.settles_accrual,
             pays_at_default_time: terms.pays_at_default_time,
@@ -441,10 +564,8 @@ impl CreditDefaultSwap {
         self.running_spread
     }
 
-    /// The upfront, in fractional units.
-    ///
-    /// Always `None` here: only the deferred upfront-quoted constructor sets it
-    /// (`creditdefaultswap.cpp:78`).
+    /// The upfront, in fractional units, when the contract quotes one
+    /// (`creditdefaultswap.cpp:78`); `None` on a running-spread contract.
     pub fn upfront(&self) -> Option<Rate> {
         self.upfront
     }
@@ -479,7 +600,7 @@ impl CreditDefaultSwap {
         self.maturity
     }
 
-    /// The zero-amount upfront payment, due on the cash settlement date.
+    /// The upfront payment, due on the cash settlement date.
     pub fn upfront_payment(&self) -> &Shared<SimpleCashFlow> {
         &self.upfront_payment
     }
@@ -705,6 +826,7 @@ mod tests {
     use crate::time::date::Month;
     use crate::time::daycounters::actual360::Actual360;
     use crate::time::daycounters::actual365fixed::Actual365Fixed;
+    use crate::time::period::Period;
     use crate::time::schedule::MakeSchedule;
 
     const NOTIONAL: Real = 10_000_000.0;
@@ -837,6 +959,127 @@ mod tests {
         assert!(expected >= cds.protection_start_date());
     }
 
+    /// `creditdefaultswap.cpp:62-85` and `:127-131`: the upfront-quoted
+    /// constructor is the one path that sets `upfront_`, and the payment it
+    /// makes is `upfront * notional` held unsigned, which is what leaves the
+    /// protection side's sign to the engine.
+    #[test]
+    fn the_upfront_constructor_quotes_the_upfront_and_pays_it_unsigned() {
+        for side in [ProtectionSide::Buyer, ProtectionSide::Seller] {
+            let cds = CreditDefaultSwap::with_upfront(
+                side,
+                NOTIONAL,
+                0.001,
+                SPREAD,
+                ten_year_schedule(),
+                BusinessDayConvention::Following,
+                Actual360::new(),
+                true,
+                true,
+                settings_today(),
+            )
+            .unwrap();
+
+            assert_eq!(cds.upfront(), Some(0.001));
+            assert_eq!(cds.upfront_payment().amount().unwrap(), NOTIONAL * 0.001);
+            assert_eq!(arguments(&cds).upfront, Some(0.001));
+        }
+    }
+
+    /// `creditdefaultswap.cpp:118-123`: an upfront date given outright settles
+    /// both cash flows, in place of the trade date advanced by the cash
+    /// settlement days.
+    #[test]
+    fn an_upfront_date_given_outright_settles_both_cash_flows() {
+        let deduced = contract(CdsTerms::default()).unwrap();
+        let given = Event::date(deduced.upfront_payment().as_ref()) + 7;
+        let cds = contract(CdsTerms {
+            upfront_date: Some(given),
+            ..CdsTerms::default()
+        })
+        .unwrap();
+
+        assert_eq!(Event::date(cds.upfront_payment().as_ref()), given);
+        assert_eq!(Event::date(cds.accrual_rebate().unwrap().as_ref()), given);
+    }
+
+    /// `creditdefaultswap.cpp:724-757` (`testAccrualRebateAmounts`), whose ten
+    /// expected amounts come from the ISDA CDS model website.
+    ///
+    /// C++ builds each contract through `MakeCreditDefaultSwap`, which is not
+    /// ported. The direct constructor reproduces it exactly rather than
+    /// approximately: `MakeCreditDefaultSwap(termDate, spread)` takes the term
+    /// date as the schedule's end and never consults `cdsMaturity`
+    /// (`makecds.cpp:70-88`), and every term below is either one of its defaults
+    /// (`makecds.hpp:118-138`) or the trade date it derives the rest from. Its
+    /// `Actual360(true)` last-period day counter leaves the two 2014 rows
+    /// untouched, whose two-date schedule takes no last-period override
+    /// (`fixedratecoupon.cpp:235`).
+    #[test]
+    fn the_accrual_rebate_matches_the_isda_amounts() {
+        let maturity = Date::new(20, Month::June, 2014);
+        let expected = [
+            (Date::new(18, Month::March, 2009), 24_166.67),
+            (Date::new(19, Month::March, 2009), 0.00),
+            (Date::new(20, Month::March, 2009), 277.78),
+            (Date::new(23, Month::March, 2009), 1_111.11),
+            (Date::new(19, Month::June, 2009), 25_555.56),
+            (Date::new(20, Month::June, 2009), 25_833.33),
+            (Date::new(21, Month::June, 2009), 0.00),
+            (Date::new(22, Month::June, 2009), 277.78),
+            (Date::new(18, Month::June, 2014), 25_277.78),
+            (Date::new(19, Month::June, 2014), 25_555.56),
+        ];
+
+        for (trade_date, amount) in expected {
+            let settings = shared(Settings::new());
+            settings.set_evaluation_date(trade_date);
+            let calendar = WeekendsOnly::new();
+            let schedule = Schedule::new(
+                trade_date,
+                maturity,
+                Period::new(3, TimeUnit::Months),
+                calendar.clone(),
+                BusinessDayConvention::Following,
+                BusinessDayConvention::Unadjusted,
+                DateGeneration::CDS,
+                false,
+                Date::null(),
+                Date::null(),
+            );
+            let cds = CreditDefaultSwap::with_upfront_and_terms(
+                ProtectionSide::Buyer,
+                NOTIONAL,
+                0.0,
+                SPREAD,
+                schedule,
+                BusinessDayConvention::Following,
+                Actual360::new(),
+                CdsTerms {
+                    protection_start: Some(trade_date),
+                    upfront_date: Some(calendar.advance(
+                        trade_date,
+                        3,
+                        TimeUnit::Days,
+                        BusinessDayConvention::Following,
+                        false,
+                    )),
+                    last_period_day_counter: Some(Actual360::with_last_day(true)),
+                    trade_date: Some(trade_date),
+                    ..CdsTerms::default()
+                },
+                settings,
+            )
+            .unwrap();
+
+            let rebate = cds.accrual_rebate().unwrap().amount().unwrap();
+            assert!(
+                (rebate - amount).abs() < 0.01,
+                "a contract traded on {trade_date} rebated {rebate} rather than {amount}"
+            );
+        }
+    }
+
     /// `creditdefaultswap.cpp:138-171`: the rebate is a flow the contract either
     /// carries or does not, which is what `rebatesAccrual()` reads
     /// (`creditdefaultswap.hpp:186`).
@@ -893,39 +1136,37 @@ mod tests {
         );
     }
 
-    /// The deferred rebate arithmetic (`creditdefaultswap.cpp:143-168`): a trade
-    /// date on or after the first accrual date rebates a non-zero accrued
-    /// coupon, so the contract refuses to build rather than rebate zero. Without
-    /// the rebate there is nothing to compute and the same terms build.
+    /// `creditdefaultswap.cpp:143`: a trade date before the first accrual date
+    /// skips the loop and rebates nothing, where one on or after it rebates the
+    /// coupon accrued to the day after the trade (`:163-164`). The accrued
+    /// amount is read off the coupon the loop must land on, not off a number
+    /// this port produced.
     #[test]
-    fn a_trade_date_on_or_after_the_first_accrual_date_is_refused_while_rebating() {
+    fn only_a_trade_date_on_or_after_the_first_accrual_date_rebates_anything() {
         let first_accrual = ten_year_schedule().date(0);
 
-        assert!(
-            contract(CdsTerms {
-                trade_date: Some(first_accrual),
-                ..CdsTerms::default()
-            })
-            .is_err()
-        );
+        let before = contract(CdsTerms::default()).unwrap();
+        assert!(before.trade_date() < first_accrual);
+        assert_eq!(before.accrual_rebate().unwrap().amount().unwrap(), 0.0);
 
-        let bare = contract(CdsTerms {
+        let on = contract(CdsTerms {
             trade_date: Some(first_accrual),
-            rebates_accrual: false,
             ..CdsTerms::default()
         })
         .unwrap();
-        assert_eq!(bare.trade_date(), first_accrual);
+        let accrued = on.coupons()[0]
+            .as_coupon()
+            .unwrap()
+            .accrued_amount(first_accrual + 1)
+            .unwrap();
+        assert!(accrued > 0.0);
+        assert_eq!(on.accrual_rebate().unwrap().amount().unwrap(), accrued);
     }
 
     /// The post-Big-Bang arm of the trade-date deduction
     /// (`creditdefaultswap.cpp:111-112`): protection is effective on the trade
     /// date itself, and the protection-start check is skipped
     /// (`creditdefaultswap.cpp:94-101`).
-    ///
-    /// That arm lands on the deferred rebate case by construction, since the
-    /// deduced trade date is the first accrual date, so a contract on a
-    /// `CDS`-rule schedule only builds without the rebate.
     #[test]
     fn a_post_big_bang_contract_trades_on_the_protection_start() {
         let schedule = MakeSchedule::new()
@@ -949,15 +1190,9 @@ mod tests {
             )
         };
 
-        let cds = build(CdsTerms {
-            rebates_accrual: false,
-            ..CdsTerms::default()
-        })
-        .unwrap();
+        let cds = build(CdsTerms::default()).unwrap();
         assert_eq!(cds.trade_date(), cds.protection_start_date());
         assert_eq!(cds.protection_start_date(), schedule.date(0));
-
-        assert!(build(CdsTerms::default()).is_err());
     }
 
     /// `creditdefaultswap.cpp:173-174`.
