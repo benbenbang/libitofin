@@ -66,8 +66,9 @@
 //! Within EPIC Credit (#676), and each omitted visibly rather than accepted and
 //! ignored:
 //!
-//! - `conventionalSpread` (`creditdefaultswap.cpp:383-428`), whose only caller
-//!   anywhere in `ql/` is the upfront rate helper it ships with (#782).
+//! - `conventionalSpread` (`creditdefaultswap.cpp:383-428`), which has no
+//!   caller anywhere in `ql/` - not even the upfront rate helper it ships
+//!   with, which quotes `fairUpfront` instead (#790).
 //! - The [`PricingModel::Isda`] branch of [`implied_hazard_rate`]
 //!   (`creditdefaultswap.cpp:361-368`), which prices on the `IsdaCdsEngine`
 //!   (#783); until that engine lands the branch is a typed error rather than a
