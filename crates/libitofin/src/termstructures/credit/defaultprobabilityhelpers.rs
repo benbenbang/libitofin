@@ -1222,6 +1222,68 @@ mod tests {
         assert!(Flag::is_up(&flag));
     }
 
+    /// The roll-off case `cdsMaturity` answers with a null date
+    /// (`creditdefaultswap.cpp:494`): a `CDS2015` contract quoted at a zero
+    /// tenor whose anchor is a June or December twentieth has already matured.
+    ///
+    /// C++ hands that null date to `MakeSchedule` and builds a schedule ending
+    /// nowhere; the port refuses instead (D4), and this is the one input that
+    /// reaches the refusal. The evaluation date is chosen to put the anchor on
+    /// 20 June: `previous_twentieth` rolls any date from that day to the
+    /// September twentieth back onto it.
+    #[test]
+    fn a_matured_zero_tenor_is_refused_rather_than_scheduled() {
+        let settings = settings_at(Date::new(15, Month::July, 2026));
+        let result = SpreadCdsHelper::new(
+            Handle::new(shared(SimpleQuote::new(0.01)) as Shared<dyn Quote>),
+            Period::new(0, TimeUnit::Months),
+            1,
+            Target::new(),
+            Frequency::Quarterly,
+            BusinessDayConvention::Following,
+            DateGeneration::CDS2015,
+            Actual360::new(),
+            0.4,
+            discount(today()),
+            settings,
+        );
+        assert!(
+            result
+                .err()
+                .is_some_and(|error| error.message().contains("has already matured"))
+        );
+    }
+
+    /// The ISDA arm, ported as far as it goes: the pillar takes the extra day
+    /// `initializeDates` adds under that model (`cpp:105-106`), and the engine
+    /// it would price on is the deferral (`cpp:144-148`, #783).
+    ///
+    /// Both are inert on every other test here, which is the reason for this
+    /// one: an omitted `++latestDate` and a silent fall back to the mid-point
+    /// engine would each leave the whole suite green.
+    #[test]
+    fn the_isda_model_moves_the_pillar_and_defers_the_engine() {
+        let settings = settings_at(today());
+        let isda = helper(
+            &settings,
+            CdsHelperTerms {
+                model: PricingModel::Isda,
+                ..CdsHelperTerms::default()
+            },
+        );
+        assert_eq!(
+            isda.latest_date(),
+            helper(&settings, CdsHelperTerms::default()).latest_date() + 1
+        );
+
+        isda.set_term_structure(&hazard_curve());
+        assert!(
+            isda.implied_quote()
+                .err()
+                .is_some_and(|error| error.message().contains("#783"))
+        );
+    }
+
     /// An upfront helper on a `lag`-day cash settlement, quoting a 1% upfront
     /// over a 5% running spread.
     fn upfront_helper(settings: &Shared<Settings<Date>>, lag: Natural) -> Shared<UpfrontCdsHelper> {
