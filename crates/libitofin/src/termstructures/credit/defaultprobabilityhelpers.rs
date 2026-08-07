@@ -18,9 +18,10 @@
 //! shared driver reaches both through [`BootstrapHelperShared`], implemented
 //! below on `dyn DefaultProbabilityHelper`.
 //!
-//! [`SpreadCdsHelper`] follows them: the running-spread CDS helper the credit
-//! bootstrap is driven by. `UpfrontCdsHelper` (`defaultprobabilityhelpers.hpp:170`)
-//! is not here yet and follows within EPIC Credit (#676).
+//! [`CdsHelperBase`] follows them, with the two quoted contracts it serves:
+//! [`SpreadCdsHelper`] and [`UpfrontCdsHelper`]. Only the mid-point model is
+//! ported; the ISDA arm of `resetEngine`
+//! (`defaultprobabilityhelpers.cpp:143-148`) rides the `IsdaCdsEngine` (#783).
 
 use std::cell::{Cell, Ref, RefCell};
 use std::rc::Weak;
@@ -46,7 +47,8 @@ use crate::time::daycounter::DayCounter;
 use crate::time::frequency::Frequency;
 use crate::time::period::Period;
 use crate::time::schedule::{MakeSchedule, Schedule};
-use crate::types::{Integer, Real};
+use crate::time::timeunit::TimeUnit;
+use crate::types::{Integer, Natural, Rate, Real};
 use crate::{fail, require};
 
 /// The shared state of a credit bootstrap helper: a
@@ -656,6 +658,226 @@ impl RelativeDateDefaultProbabilityHelper for SpreadCdsHelper {
     }
 }
 
+/// An upfront-quoted CDS as a credit bootstrap helper (`UpfrontCdsHelper`,
+/// `defaultprobabilityhelpers.hpp:158`).
+///
+/// The market quote is the upfront, paid on a cash-settlement date of its own
+/// while the contract runs at a fixed `running_spread`; the bootstrap drives
+/// `quoted upfront - fair upfront` to zero. The upfront must be quoted in
+/// fractional units (`hpp:159`).
+pub struct UpfrontCdsHelper {
+    cds: CdsHelperBase,
+    running_spread: Rate,
+    upfront_settlement_days: Natural,
+    upfront_date: Cell<Date>,
+}
+
+impl UpfrontCdsHelper {
+    /// A helper on the C++ default terms and cash-settlement lag
+    /// (`defaultprobabilityhelpers.hpp:171-177`).
+    ///
+    /// # Errors
+    ///
+    /// As [`with_terms`](UpfrontCdsHelper::with_terms).
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        upfront: Handle<dyn Quote>,
+        running_spread: Rate,
+        tenor: Period,
+        settlement_days: Integer,
+        calendar: Calendar,
+        frequency: Frequency,
+        payment_convention: BusinessDayConvention,
+        rule: DateGeneration,
+        day_counter: DayCounter,
+        recovery_rate: Real,
+        discount_curve: Handle<dyn YieldTermStructure>,
+        settings: Shared<Settings<Date>>,
+    ) -> QlResult<Shared<UpfrontCdsHelper>> {
+        UpfrontCdsHelper::with_terms(
+            upfront,
+            running_spread,
+            tenor,
+            settlement_days,
+            calendar,
+            frequency,
+            payment_convention,
+            rule,
+            day_counter,
+            recovery_rate,
+            discount_curve,
+            3,
+            CdsHelperTerms::default(),
+            settings,
+        )
+    }
+
+    /// A helper settling its upfront `upfront_settlement_days` past the
+    /// evaluation date, on the given `terms` (`defaultprobabilityhelpers.cpp:159-184`).
+    ///
+    /// # Errors
+    ///
+    /// If the date rule cannot roll the tenor to a maturity
+    /// ([`initialize_dates`](CdsHelperBase::initialize_dates)).
+    #[allow(clippy::too_many_arguments)]
+    pub fn with_terms(
+        upfront: Handle<dyn Quote>,
+        running_spread: Rate,
+        tenor: Period,
+        settlement_days: Integer,
+        calendar: Calendar,
+        frequency: Frequency,
+        payment_convention: BusinessDayConvention,
+        rule: DateGeneration,
+        day_counter: DayCounter,
+        recovery_rate: Real,
+        discount_curve: Handle<dyn YieldTermStructure>,
+        upfront_settlement_days: Natural,
+        terms: CdsHelperTerms,
+        settings: Shared<Settings<Date>>,
+    ) -> QlResult<Shared<UpfrontCdsHelper>> {
+        let helper = Shared::new_cyclic(|weak: &Weak<UpfrontCdsHelper>| {
+            let weak = weak.clone();
+            let on_eval_change = Box::new(move || {
+                if let Some(helper) = weak.upgrade() {
+                    match helper.initialize_dates() {
+                        Ok(()) => helper.reset_engine(),
+                        Err(error) => helper.cds.set_swap(Err(error)),
+                    }
+                }
+            });
+            UpfrontCdsHelper {
+                cds: CdsHelperBase::new(
+                    upfront,
+                    tenor,
+                    settlement_days,
+                    calendar,
+                    frequency,
+                    payment_convention,
+                    rule,
+                    day_counter,
+                    recovery_rate,
+                    discount_curve,
+                    terms,
+                    settings,
+                    on_eval_change,
+                ),
+                running_spread,
+                upfront_settlement_days,
+                upfront_date: Cell::new(Date::null()),
+            }
+        });
+        helper.initialize_dates()?;
+        Ok(helper)
+    }
+
+    /// The date the upfront and the accrual rebate settle on (`upfrontDate`,
+    /// `cpp:186-188`).
+    pub fn upfront_date(&self) -> Date {
+        self.upfront_date.get()
+    }
+
+    /// The fixed coupon the contract runs at, alongside the quoted upfront.
+    pub fn running_spread(&self) -> Rate {
+        self.running_spread
+    }
+
+    /// Rebuilds the priced contract and its engine (`resetEngine`,
+    /// `cpp:195-217`).
+    fn reset_engine(&self) {
+        self.cds.set_swap(self.build_swap());
+    }
+
+    /// The contract the helper prices: the spread helper's par CDS with the
+    /// quoted running spread and its own cash-settlement date (`cpp:196-201`).
+    fn build_swap(&self) -> QlResult<CreditDefaultSwap> {
+        let mut swap = CreditDefaultSwap::with_upfront_and_terms(
+            ProtectionSide::Buyer,
+            100.0,
+            0.01,
+            self.running_spread,
+            self.cds.schedule().clone(),
+            self.cds.payment_convention,
+            self.cds.day_counter.clone(),
+            CdsTerms {
+                upfront_date: Some(self.upfront_date.get()),
+                ..self.cds.contract_terms()
+            },
+            Shared::clone(&self.cds.settings),
+        )?;
+        self.cds.install_engine(&mut swap)?;
+        Ok(swap)
+    }
+
+    /// The contract's fair upfront, off a forced recalculation for the reason
+    /// [`SpreadCdsHelper`]'s is forced.
+    fn fair_upfront(&self) -> QlResult<Real> {
+        let mut swap = self.cds.swap.borrow_mut();
+        let swap = swap.as_mut().map_err(|error| error.clone())?;
+        swap.recalculate()?;
+        swap.fair_upfront()
+    }
+}
+
+impl AsObservable for UpfrontCdsHelper {
+    fn observable(&self) -> &Observable {
+        self.cds.base.observable()
+    }
+}
+
+impl DefaultProbabilityHelper for UpfrontCdsHelper {
+    fn base(&self) -> &DefaultProbabilityHelperBase {
+        self.cds.base()
+    }
+
+    /// The contract's fair upfront, priced with today's cash flows included
+    /// (`impliedQuote`, `cpp:219-224`).
+    ///
+    /// The flag matters because the quote is a cash-settled amount: dropping a
+    /// flow that falls on the evaluation date would leave the bootstrap fitting
+    /// a different contract than the one quoted. C++ forces it through the
+    /// singleton and unwinds with `SavedSettings`; with the flag on a
+    /// [`Settings`] the caller owns (D5), the unwind is explicit and runs on the
+    /// error path too, so a contract that fails to price does not leave the
+    /// caller's flag flipped.
+    fn implied_quote(&self) -> QlResult<Real> {
+        let restore = self.cds.settings.include_todays_cash_flows();
+        self.cds.settings.set_include_todays_cash_flows(Some(true));
+        let quote = self.fair_upfront();
+        self.cds.settings.set_include_todays_cash_flows(restore);
+        quote
+    }
+
+    /// Records the curve, hands it to the engine, and rebuilds the contract
+    /// (`setTermStructure`, `cpp:60-68`).
+    fn set_term_structure(&self, term_structure: &Shared<dyn DefaultProbabilityTermStructure>) {
+        self.cds.set_term_structure(term_structure);
+        self.reset_engine();
+    }
+}
+
+impl RelativeDateDefaultProbabilityHelper for UpfrontCdsHelper {
+    /// The base's dates, then the cash-settlement date they move
+    /// (`initializeDates`, `cpp:190-193`).
+    ///
+    /// The override is what keeps the upfront date on the evaluation date it is
+    /// measured from: the base rebuild alone would leave it at the date the
+    /// helper was built on, and the contract would settle its upfront in the
+    /// past without any of its other dates disagreeing.
+    fn initialize_dates(&self) -> QlResult<()> {
+        self.cds.initialize_dates()?;
+        let upfront_date = self.cds.calendar.advance(
+            self.cds.evaluation_date(),
+            self.upfront_settlement_days as Integer,
+            TimeUnit::Days,
+            self.cds.payment_convention,
+            false,
+        );
+        self.upfront_date.set(upfront_date);
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -677,6 +899,7 @@ mod tests {
         accepts_driver_helper::<dyn DefaultProbabilityHelper>();
     }
 
+    use crate::event::Event;
     use crate::interestrate::Compounding;
     use crate::quotes::SimpleQuote;
     use crate::shared::shared;
@@ -997,6 +1220,126 @@ mod tests {
 
         rate.set_value(0.04);
         assert!(Flag::is_up(&flag));
+    }
+
+    /// An upfront helper on a `lag`-day cash settlement, quoting a 1% upfront
+    /// over a 5% running spread.
+    fn upfront_helper(settings: &Shared<Settings<Date>>, lag: Natural) -> Shared<UpfrontCdsHelper> {
+        UpfrontCdsHelper::with_terms(
+            Handle::new(shared(SimpleQuote::new(0.01)) as Shared<dyn Quote>),
+            0.05,
+            five_years(),
+            1,
+            Target::new(),
+            Frequency::Quarterly,
+            BusinessDayConvention::Following,
+            DateGeneration::CDS,
+            Actual360::new(),
+            0.4,
+            discount(today()),
+            lag,
+            CdsHelperTerms::default(),
+            Shared::clone(settings),
+        )
+        .unwrap()
+    }
+
+    fn hazard_curve() -> Shared<dyn DefaultProbabilityTermStructure> {
+        shared(FlatHazardRate::with_rate(
+            today(),
+            0.02,
+            Actual365Fixed::new(),
+        ))
+    }
+
+    /// `upfrontDate` (`cpp:186-188`) and the contract it reaches (`cpp:199`):
+    /// the upfront settles on the helper's own lag past the evaluation date.
+    ///
+    /// The lag here is five days rather than the C++ default of three, and that
+    /// is the point: the contract deduces its own cash settlement three
+    /// business days past the trade date (`creditdefaultswap.rs:502-509`), so a
+    /// helper that never passed its `upfront_date` down would agree with one
+    /// that did on every three-day fixture - including the bootstrap oracle.
+    #[test]
+    fn the_upfront_settles_on_the_helpers_own_lag() {
+        let settings = settings_at(today());
+        let helper = upfront_helper(&settings, 5);
+        let calendar = Target::new();
+        let expected = calendar.advance(
+            today(),
+            5,
+            TimeUnit::Days,
+            BusinessDayConvention::Following,
+            false,
+        );
+        assert_ne!(
+            expected,
+            calendar.advance(
+                today(),
+                3,
+                TimeUnit::Days,
+                BusinessDayConvention::Following,
+                false
+            ),
+            "the fixture's lag must differ from the contract's own default, or \
+             this pins nothing"
+        );
+        assert_eq!(helper.upfront_date(), expected);
+
+        helper.set_term_structure(&hazard_curve());
+        let swap = helper.cds.swap();
+        let swap = swap.as_ref().unwrap();
+        assert_eq!(swap.upfront_payment().date(), expected);
+        assert_eq!(swap.running_spread(), 0.05);
+        assert_eq!(swap.trade_date(), today());
+    }
+
+    /// The `initializeDates` override (`cpp:190-193`): a moved evaluation date
+    /// carries the upfront date with it, in the contract as well as the helper.
+    ///
+    /// Composition loses the C++ override for free - a rebuild routed at the
+    /// shared base would leave the upfront settling on a date the contract has
+    /// already passed, with every other date in agreement.
+    #[test]
+    fn an_evaluation_date_move_rebuilds_the_upfront_date() {
+        let settings = settings_at(today());
+        let helper = upfront_helper(&settings, 5);
+        helper.set_term_structure(&hazard_curve());
+
+        let moved = Date::new(15, Month::December, 2026);
+        settings.set_evaluation_date(moved);
+
+        let expected = Target::new().advance(
+            moved,
+            5,
+            TimeUnit::Days,
+            BusinessDayConvention::Following,
+            false,
+        );
+        assert_eq!(helper.upfront_date(), expected);
+        assert_eq!(
+            helper.cds.swap().as_ref().unwrap().upfront_payment().date(),
+            expected
+        );
+    }
+
+    /// `impliedQuote`'s `SavedSettings` (`cpp:220-221`) unwinds however the
+    /// pricing ends. The bootstrap oracle only ever exercises the path that
+    /// returns a quote; this is the other one, where a `?` between the write
+    /// and its unwind would leave the caller's flag flipped.
+    #[test]
+    fn the_cash_flow_flag_is_restored_when_the_contract_cannot_price() {
+        let settings = settings_at(today());
+        settings.set_include_todays_cash_flows(Some(false));
+        let helper = upfront_helper(&settings, 3);
+
+        assert!(
+            helper
+                .implied_quote()
+                .err()
+                .is_some_and(|error| error.message().contains("bootstrapping curve is set"))
+        );
+        assert_eq!(settings.include_todays_cash_flows(), Some(false));
     }
 
     /// Before a curve arrives there is no contract to price, where C++ would
