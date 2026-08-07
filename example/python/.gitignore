@@ -1,0 +1,190 @@
+`# AI configs
+.claude
+.codex
+.gemini
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# C extensions
+*.so
+
+# celery beat schedule file
+celerybeat-schedule
+
+# CocoaPods
+#
+# We recommend against adding the Pods directory to your .gitignore. However
+# you should judge for yourself, the pros and cons are mentioned at:
+# https://guides.cocoapods.org/using/using-cocoapods.html#should-i-check-the-pods-directory-into-source-control
+#
+# Pods/
+#
+# Add this line if you want to avoid checking in source code from the Xcode workspace
+# *.xcworkspace
+
+# Carthage
+#
+# Add this line if you want to avoid checking in source code from Carthage dependencies.
+# Carthage/Checkouts
+
+Carthage/Build/
+
+# Data
+*.csv
+*.h5
+*.hdf5
+*.pickle
+
+# Database
+*.db
+*.rdb
+
+# Django stuff:
+local_settings.py
+db.sqlite3
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/*
+!lib/*.py
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# exclude data from source control by default
+data/
+mlruns/
+
+# fastlane
+#
+# It is recommended to not store the screenshots in the git repo.
+# Instead, use fastlane to re-generate the screenshots whenever they are needed.
+# For more information about the recommended setup visit:
+# https://docs.fastlane.tools/best-practices/source-control/#source-control
+
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Go Project
+vendor
+_vendor*
+.pcg.yaml
+
+# IDE / Editor
+*.sublime-workspace
+*.sublime-project
+.vscode
+.idea
+.anaconda
+pyrightconfig.json
+
+# iOS Project
+# Package.resolved
+# *.xcodeproj
+#
+# Xcode automatically generates this directory with a .xcworkspacedata file and xcuserdata
+# hence it is not needed unless you have added a package configuration file to your project
+# .swiftpm
+
+.build/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# logs
+*.log
+.Rhistory
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Mac
+.DS_Store
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+
+# PyBuilder
+target/
+
+# PyInstaller
+#  Usually these files are written by a python script from a template
+#  before PyInstaller builds the exe, so as to inject date/other infos into it.
+*.manifest
+*.spec
+
+# pyenv
+.python-version
+
+# Rope project settings
+.ropeproject
+
+# SageMath parsed files
+*.sage.py
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+docs/source/*.rst
+!docs/source/index.rst
+*/docs/_build/
+*/docs/source/*.rst
+!*/docs/source/index.rst
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Translations
+*.mo
+*.pot
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Project Level 👇
+# Remove the existed one or use anti pattern ! to allow some patterns if needed

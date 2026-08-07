@@ -784,15 +784,18 @@ mod oracle {
             }
         }
 
-        /// `creditdefaultswap.cpp:96`: no `includeSettlementDateFlows`
+        /// `creditdefaultswap.cpp:96` passes no `includeSettlementDateFlows`
         /// override, so the coupon paying exactly on the settlement date is
-        /// dropped.
-        fn engine(&self) -> SharedMut<dyn PricingEngine> {
+        /// dropped; `:523` overrides it to `true` and keeps that coupon.
+        fn engine(
+            &self,
+            include_settlement_date_flows: Option<bool>,
+        ) -> SharedMut<dyn PricingEngine> {
             shared_mut(MidPointCdsEngine::new(
                 self.probability.clone(),
                 RECOVERY,
                 self.discount.clone(),
-                None,
+                include_settlement_date_flows,
                 Shared::clone(&self.settings),
             )) as SharedMut<dyn PricingEngine>
         }
@@ -837,6 +840,30 @@ mod oracle {
             )
             .unwrap()
         }
+
+        /// The same contract quoted as an upfront plus a running spread
+        /// (`creditdefaultswap.cpp:525-526`).
+        fn upfront_contract(
+            &self,
+            upfront: Rate,
+            spread: Rate,
+            schedule: Schedule,
+            convention: BusinessDayConvention,
+        ) -> CreditDefaultSwap {
+            CreditDefaultSwap::with_upfront(
+                ProtectionSide::Seller,
+                NOTIONAL,
+                upfront,
+                spread,
+                schedule,
+                convention,
+                Actual360::new(),
+                true,
+                true,
+                Shared::clone(&self.settings),
+            )
+            .unwrap()
+        }
     }
 
     /// `creditdefaultswap.cpp:57-117`, against the values cached at `:98-99`.
@@ -858,7 +885,7 @@ mod oracle {
             Date::null(),
         );
         let mut cds = vars.contract(0.0120, schedule, convention);
-        cds.base_mut().set_pricing_engine(vars.engine());
+        cds.base_mut().set_pricing_engine(vars.engine(None));
 
         let npv = cds.npv().unwrap();
         let fair_spread = cds.fair_spread().unwrap();
@@ -892,7 +919,7 @@ mod oracle {
             .with_termination_date_convention(convention)
             .with_rule(DateGeneration::TwentiethIMM)
             .build();
-        let engine = vars.engine();
+        let engine = vars.engine(None);
 
         let mut cds = vars.contract(0.001, schedule.clone(), convention);
         cds.base_mut().set_pricing_engine(SharedMut::clone(&engine));
@@ -910,5 +937,56 @@ mod oracle {
             fair_npv.abs() < 1.0e-9,
             "the contract rebuilt at its fair spread {fair_rate} priced at {fair_npv} rather than nothing"
         );
+    }
+
+    /// `creditdefaultswap.cpp:480-565`: a contract rebuilt at its own fair
+    /// upfront is worth nothing, whichever upfront it was quoted at to begin
+    /// with (`:513` then `:545`).
+    ///
+    /// The fixture is this case's own, not the one above: the schedule runs from
+    /// today rather than from the cached case's issue date a year back
+    /// (`:503-504`), and the engine keeps the coupon paying on the settlement
+    /// date (`:523`). It also supplies the leg read individually that the cached
+    /// case cannot, dividing the two legs' sum by the upfront's own PV01 rather
+    /// than by one of them. `today` is pinned as above, not read off the clock.
+    #[test]
+    fn repricing_at_the_fair_upfront_prices_the_contract_to_nothing() {
+        let vars = CommonVars::new();
+        let convention = BusinessDayConvention::Following;
+        let maturity = vars
+            .calendar
+            .advance(vars.today, 10, TimeUnit::Years, convention, false);
+        let schedule = MakeSchedule::new()
+            .from(vars.today)
+            .to(maturity)
+            .with_frequency(Frequency::Quarterly)
+            .with_calendar(vars.calendar.clone())
+            .with_termination_date_convention(convention)
+            .with_rule(DateGeneration::TwentiethIMM)
+            .build();
+        let fixed_rate = 0.05;
+
+        for upfront in [0.001, 0.0] {
+            let engine = vars.engine(Some(true));
+            let mut cds = vars.upfront_contract(upfront, fixed_rate, schedule.clone(), convention);
+            assert_eq!(cds.upfront(), Some(upfront));
+            cds.base_mut().set_pricing_engine(SharedMut::clone(&engine));
+            let quoted_npv = cds.npv().unwrap();
+            let fair_upfront = cds.fair_upfront().unwrap();
+            assert!(
+                quoted_npv.abs() > 1.0,
+                "a contract already worth {quoted_npv} would make the round trip vacuous"
+            );
+
+            let mut fair_cds =
+                vars.upfront_contract(fair_upfront, fixed_rate, schedule.clone(), convention);
+            fair_cds.base_mut().set_pricing_engine(engine);
+            let fair_npv = fair_cds.npv().unwrap();
+            assert!(
+                fair_npv.abs() < 1.0e-9,
+                "the contract quoted at {upfront} and rebuilt at its fair upfront {fair_upfront} \
+                 priced at {fair_npv} rather than nothing"
+            );
+        }
     }
 }

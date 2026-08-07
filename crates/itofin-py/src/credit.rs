@@ -490,13 +490,13 @@ impl PyPiecewiseDefaultCurve {
 /// Pricing needs an engine: call [`set_engine`](Self::set_engine) before
 /// [`npv`](Self::npv).
 ///
-/// Deferred (visible): four of the eight `CdsTerms` fields are not exposed and
-/// keep their core defaults (`creditdefaultswap.rs:124-137`) - `claim` (a
-/// `FaceValueClaim`, which needs a claim facade that does not exist yet),
-/// `last_period_day_counter` (the spread's own day counter), `trade_date`
-/// (deduced from the protection start) and `cash_settlement_days` (3). The
-/// upfront-quoted constructor is likewise not ported in the core
-/// (`creditdefaultswap.rs:446-450`), so `upfront` is always absent.
+/// Deferred (visible): five of the nine `CdsTerms` fields are not exposed and
+/// keep their core defaults - `claim` (a `FaceValueClaim`, which needs a claim
+/// facade that does not exist yet), `last_period_day_counter` (the spread's own
+/// day counter), `trade_date` (deduced from the protection start),
+/// `upfront_date` (deduced from the trade date) and `cash_settlement_days` (3).
+/// The core's upfront-quoted constructors are likewise not exposed here, so
+/// `upfront` is always absent.
 #[pyclass(name = "CreditDefaultSwap", unsendable)]
 pub struct PyCreditDefaultSwap {
     inner: SharedMut<CreditDefaultSwap>,
