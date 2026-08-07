@@ -1116,6 +1116,52 @@ mod tests {
         }
     }
 
+    /// The date the CDS arm rolls *from* is the evaluation date (`cpp:87`), not
+    /// the protection start the non-CDS arm measures from and the schedule
+    /// starts on.
+    ///
+    /// The two are `settlement_days` apart, and on almost every date they roll
+    /// back to the same twentieth - including the fixture above, where both
+    /// land on 20 March 2026, so swapping one for the other there changes
+    /// nothing. This evaluation date straddles a roll instead: 19 March rolls
+    /// back to the previous December, while the protection start a day later is
+    /// itself the March twentieth. The mis-wire that reads `protection_start`
+    /// here therefore matures on 20 June 2031, a full quarter past the literal
+    /// asserted below.
+    #[test]
+    fn the_cds_reference_date_is_the_evaluation_date_not_the_protection_start() {
+        let evaluation_date = Date::new(19, Month::March, 2026);
+        let calendar = Target::new();
+        let helper = SpreadCdsHelper::new(
+            Handle::new(shared(SimpleQuote::new(0.01)) as Shared<dyn Quote>),
+            five_years(),
+            1,
+            calendar.clone(),
+            Frequency::Quarterly,
+            BusinessDayConvention::Following,
+            DateGeneration::CDS,
+            Actual360::new(),
+            0.4,
+            discount(evaluation_date),
+            settings_at(evaluation_date),
+        )
+        .unwrap();
+
+        let maturity = Date::new(20, Month::March, 2031);
+        assert_eq!(helper.protection_start(), Date::new(20, Month::March, 2026));
+        assert_eq!(last_date(&helper.cds.schedule()), maturity);
+        assert_eq!(
+            helper.latest_date(),
+            calendar.adjust(maturity, BusinessDayConvention::Following)
+        );
+        assert_ne!(
+            helper.latest_date(),
+            Date::new(20, Month::June, 2031),
+            "the maturity rolled off the protection start rather than the \
+             evaluation date"
+        );
+    }
+
     /// `impliedQuote` (`cpp:132-135`) prices the helper's own contract against
     /// the curve it was handed, which `set_term_structure` weak-links into the
     /// engine and rebuilds the contract for (`cpp:60-68`).
