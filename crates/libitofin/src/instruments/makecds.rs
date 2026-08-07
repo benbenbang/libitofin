@@ -364,3 +364,255 @@ impl MakeCreditDefaultSwap {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cashflow::CashFlow;
+    use crate::event::Event;
+    use crate::shared::shared;
+    use crate::time::date::Month;
+    use crate::time::daycounters::actual365fixed::Actual365Fixed;
+
+    /// `creditdefaultswap.cpp:964`, a Friday.
+    fn today() -> Date {
+        Date::new(6, Month::March, 2026)
+    }
+
+    fn settings_today() -> Shared<Settings<Date>> {
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(today());
+        settings
+    }
+
+    fn years(n: Integer) -> Period {
+        Period::new(n, TimeUnit::Years)
+    }
+
+    fn five_year() -> MakeCreditDefaultSwap {
+        MakeCreditDefaultSwap::new(years(5), 0.01, settings_today())
+    }
+
+    /// What C++'s `protectionEndDate` reads (`creditdefaultswap.cpp:430-432`),
+    /// which is deferred on [`CreditDefaultSwap`] itself.
+    fn protection_end_date(cds: &CreditDefaultSwap) -> Date {
+        cds.coupons()[cds.coupons().len() - 1]
+            .as_coupon()
+            .unwrap()
+            .accrual_end_date()
+    }
+
+    fn day_counter_names(cds: &CreditDefaultSwap) -> (String, String) {
+        let coupons = cds.coupons();
+        (
+            coupons[0].as_coupon().unwrap().day_counter().name(),
+            coupons[coupons.len() - 1]
+                .as_coupon()
+                .unwrap()
+                .day_counter()
+                .name(),
+        )
+    }
+
+    /// `testDefaultConventions` (`creditdefaultswap.cpp:969-994`): every default
+    /// of `makecds.hpp:71-88` read back off the built contract.
+    #[test]
+    fn the_tenor_quotation_builds_on_the_standard_conventions() {
+        let cds = five_year().build().unwrap();
+
+        assert_eq!(cds.running_spread(), 0.01);
+        assert_eq!(cds.notional(), 1.0);
+        assert_eq!(cds.upfront(), Some(0.0));
+
+        assert_eq!(cds.trade_date(), today());
+        assert_eq!(cds.cash_settlement_days(), 3);
+        assert_eq!(cds.upfront_payment().date(), today() + 5);
+        assert_eq!(cds.protection_start_date(), today());
+        assert_eq!(
+            protection_end_date(&cds),
+            cds_maturity(today(), years(5), DateGeneration::CDS)
+                .unwrap()
+                .unwrap()
+        );
+
+        assert_eq!(cds.coupons().len(), 21);
+
+        assert!(cds.settles_accrual());
+        assert!(cds.pays_at_default_time());
+        assert!(cds.rebates_accrual());
+
+        let (first, last) = day_counter_names(&cds);
+        assert_eq!(first, "Actual/360");
+        assert_eq!(last, "Actual/360 (inc)");
+    }
+
+    /// `creditdefaultswap.cpp:996-998`. The term date is quoted off `CDS2015`
+    /// but the builder still generates on its default `CDS` rule.
+    #[test]
+    fn the_term_date_quotation_matures_on_the_given_date() {
+        let term_date = cds_maturity(today(), years(3), DateGeneration::CDS2015)
+            .unwrap()
+            .unwrap();
+        let cds = MakeCreditDefaultSwap::from_term_date(term_date, 0.01, settings_today())
+            .build()
+            .unwrap();
+
+        assert_eq!(protection_end_date(&cds), term_date);
+    }
+
+    /// `creditdefaultswap.cpp:1000-1005`: a schedule given outright frames the
+    /// protection, so the protection start comes off its front rather than off
+    /// the trade date.
+    #[test]
+    fn the_schedule_quotation_frames_the_protection() {
+        let term_date = cds_maturity(today() - 4, years(10), DateGeneration::CDS2015)
+            .unwrap()
+            .unwrap();
+        let schedule = premium_schedule(
+            today() - 4,
+            term_date,
+            Period::new(3, TimeUnit::Months),
+            BusinessDayConvention::Following,
+            DateGeneration::CDS2015,
+        );
+        let front = schedule.date(0);
+        let back = schedule.date(schedule.len() - 1);
+
+        let cds = MakeCreditDefaultSwap::from_schedule(schedule, 0.01, settings_today())
+            .build()
+            .unwrap();
+
+        assert_eq!(cds.protection_start_date(), front);
+        assert_eq!(protection_end_date(&cds), back);
+    }
+
+    /// `creditdefaultswap.cpp:1009-1018`: the notional reaches both the contract
+    /// and its coupons, and the upfront payment is `upfront * notional`.
+    #[test]
+    fn the_nominal_and_the_upfront_rate_scale_the_contract() {
+        let cds = five_year()
+            .with_nominal(10_000.0)
+            .with_upfront_rate(0.02)
+            .build()
+            .unwrap();
+
+        assert_eq!(cds.notional(), 10_000.0);
+        assert_eq!(cds.coupons()[0].as_coupon().unwrap().nominal(), 10_000.0);
+        assert_eq!(cds.upfront(), Some(0.02));
+        assert_eq!(cds.upfront_payment().amount().unwrap(), 200.0);
+    }
+
+    /// `creditdefaultswap.cpp:1020-1030`: the cash settlement days roll the
+    /// upfront date over the weekend, and an explicit upfront date wins.
+    #[test]
+    fn the_cash_settlement_days_place_the_upfront_date() {
+        let cds = five_year().with_cash_settlement_days(2).build().unwrap();
+        assert_eq!(cds.cash_settlement_days(), 2);
+        assert_eq!(cds.upfront_payment().date(), today() + 4);
+
+        let cds = five_year()
+            .with_cash_settlement_days(2)
+            .with_upfront_date(today() + 7)
+            .build()
+            .unwrap();
+        assert_eq!(cds.cash_settlement_days(), 2);
+        assert_eq!(cds.upfront_payment().date(), today() + 7);
+    }
+
+    /// `creditdefaultswap.cpp:1032-1034`.
+    #[test]
+    fn an_explicit_protection_start_overrides_the_trade_date() {
+        let cds = five_year()
+            .with_protection_start(today() + 2)
+            .build()
+            .unwrap();
+
+        assert_eq!(cds.protection_start_date(), today() + 2);
+    }
+
+    /// `creditdefaultswap.cpp:1036-1038`.
+    #[test]
+    fn the_coupon_tenor_sets_the_premium_frequency() {
+        let cds = five_year()
+            .with_coupon_tenor(Period::new(6, TimeUnit::Months))
+            .build()
+            .unwrap();
+
+        assert_eq!(cds.coupons().len(), 11);
+    }
+
+    /// `creditdefaultswap.cpp:1040-1046`: the trade date carries the cash
+    /// settlement and the protection start with it, leaving the settlement days
+    /// at their default.
+    #[test]
+    fn an_explicit_trade_date_moves_the_settlement_and_the_protection_start() {
+        let cds = five_year().with_trade_date(today() + 3).build().unwrap();
+
+        assert_eq!(cds.trade_date(), today() + 3);
+        assert_eq!(cds.cash_settlement_days(), 3);
+        assert_eq!(cds.upfront_payment().date(), today() + 6);
+        assert_eq!(cds.protection_start_date(), today() + 3);
+    }
+
+    /// `creditdefaultswap.cpp:1048-1058`.
+    #[test]
+    fn the_three_default_conventions_can_each_be_turned_off() {
+        assert!(
+            !five_year()
+                .settle_accrual(false)
+                .build()
+                .unwrap()
+                .settles_accrual()
+        );
+        assert!(
+            !five_year()
+                .pay_at_default_time(false)
+                .build()
+                .unwrap()
+                .pays_at_default_time()
+        );
+        assert!(
+            !five_year()
+                .rebate_accrual(false)
+                .build()
+                .unwrap()
+                .rebates_accrual()
+        );
+    }
+
+    /// `creditdefaultswap.cpp:1060-1077`: the two day counters are independent,
+    /// the last period's overriding the premium's only on the last coupon.
+    #[test]
+    fn the_premium_and_the_last_period_day_counters_are_independent() {
+        let cds = five_year()
+            .with_day_counter(Actual365Fixed::new())
+            .build()
+            .unwrap();
+        assert_eq!(
+            day_counter_names(&cds),
+            (
+                "Actual/365 (Fixed)".to_string(),
+                "Actual/360 (inc)".to_string()
+            )
+        );
+
+        let cds = five_year()
+            .with_last_period_day_counter(Actual365Fixed::new())
+            .build()
+            .unwrap();
+        assert_eq!(
+            day_counter_names(&cds),
+            ("Actual/360".to_string(), "Actual/365 (Fixed)".to_string())
+        );
+    }
+
+    /// D5/D10: with no evaluation date there is no trade date to fall back on,
+    /// and the builder says so rather than reading a clock.
+    #[test]
+    fn an_unset_evaluation_date_is_an_error() {
+        let settings = shared(Settings::new());
+        let built = MakeCreditDefaultSwap::new(years(5), 0.01, settings).build();
+
+        assert!(built.is_err());
+    }
+}
