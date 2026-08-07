@@ -980,6 +980,7 @@ fn is_imm_date(d: Date) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::instruments::cds_maturity;
     use crate::time::calendars::japan::Japan;
     use crate::time::calendars::target::Target;
     use crate::time::calendars::unitedstates::{Market, UnitedStates};
@@ -1000,33 +1001,6 @@ mod tests {
             .with_termination_date_convention(BusinessDayConvention::Unadjusted)
             .with_rule(rule)
             .build()
-    }
-
-    fn cds_maturity(trade_date: Date, tenor: Period, rule: DateGeneration) -> Option<Date> {
-        assert!(matches!(
-            rule,
-            DateGeneration::CDS2015 | DateGeneration::CDS | DateGeneration::OldCDS
-        ));
-        assert!(
-            tenor.units() == TimeUnit::Years
-                || (tenor.units() == TimeUnit::Months && tenor.length() % 3 == 0)
-        );
-        if rule == DateGeneration::OldCDS {
-            assert!(tenor != Period::new(0, TimeUnit::Months));
-        }
-        let mut anchor_date = previous_twentieth(trade_date, rule);
-        if rule == DateGeneration::CDS2015
-            && (anchor_date == d(20, Month::December, anchor_date.year())
-                || anchor_date == d(20, Month::June, anchor_date.year()))
-        {
-            if tenor.length() == 0 {
-                return None;
-            }
-            anchor_date = anchor_date - Period::new(3, TimeUnit::Months);
-        }
-        let maturity = anchor_date + tenor + Period::new(3, TimeUnit::Months);
-        assert!(maturity > trade_date, "error calculating CDS maturity");
-        Some(maturity)
     }
 
     fn check_dates(s: &Schedule, expected: &[Date]) {
@@ -1502,7 +1476,9 @@ mod tests {
             let exp_start = d(sd, Month::from_ordinal(sm), sy);
             let exp_end = d(ed, Month::from_ordinal(em), ey);
 
-            let maturity = cds_maturity(from, tenor, rule).expect("live CDS maturity");
+            let maturity = cds_maturity(from, tenor, rule)
+                .unwrap()
+                .expect("live CDS maturity");
             assert_eq!(maturity, exp_end, "maturity from {from}, tenor {tenor}");
 
             let s = make_cds_schedule(from, maturity, rule);
@@ -1740,7 +1716,9 @@ mod tests {
         let tenor = Period::new(5, TimeUnit::Years);
 
         let trade_date = d(12, Month::December, 2016);
-        let maturity = cds_maturity(trade_date, tenor, rule).unwrap();
+        let maturity = cds_maturity(trade_date, tenor, rule)
+            .unwrap()
+            .expect("live CDS maturity");
         let exp_start = d(20, Month::September, 2016);
         let exp_maturity = d(20, Month::December, 2021);
         assert_eq!(maturity, exp_maturity);
@@ -1754,7 +1732,9 @@ mod tests {
         assert_eq!(s.end_date(), exp_maturity);
 
         let trade_date = d(1, Month::March, 2017);
-        let maturity = cds_maturity(trade_date, tenor, rule).unwrap();
+        let maturity = cds_maturity(trade_date, tenor, rule)
+            .unwrap()
+            .expect("live CDS maturity");
         assert_eq!(maturity, exp_maturity);
         let s = make_cds_schedule(trade_date, maturity, rule);
         let exp_start = d(20, Month::December, 2016);
@@ -1767,7 +1747,9 @@ mod tests {
         assert_eq!(s.end_date(), d(20, Month::March, 2022));
 
         let trade_date = d(20, Month::March, 2017);
-        let maturity = cds_maturity(trade_date, tenor, rule).unwrap();
+        let maturity = cds_maturity(trade_date, tenor, rule)
+            .unwrap()
+            .expect("live CDS maturity");
         let exp_start = d(20, Month::March, 2017);
         let exp_maturity = d(20, Month::June, 2022);
         assert_eq!(maturity, exp_maturity);
@@ -1782,7 +1764,9 @@ mod tests {
         let tenor = Period::new(1, TimeUnit::Years);
 
         let trade_date = d(18, Month::September, 2015);
-        let maturity = cds_maturity(trade_date, tenor, rule).unwrap();
+        let maturity = cds_maturity(trade_date, tenor, rule)
+            .unwrap()
+            .expect("live CDS maturity");
         let s = make_cds_schedule(trade_date, maturity, rule);
         let mut exp_dates = vec![
             d(22, Month::June, 2015),
@@ -1794,19 +1778,25 @@ mod tests {
         check_dates(&s, &exp_dates);
 
         let trade_date = d(19, Month::September, 2015);
-        let maturity = cds_maturity(trade_date, tenor, rule).unwrap();
+        let maturity = cds_maturity(trade_date, tenor, rule)
+            .unwrap()
+            .expect("live CDS maturity");
         let s = make_cds_schedule(trade_date, maturity, rule);
         check_dates(&s, &exp_dates);
 
         let trade_date = d(20, Month::September, 2015);
-        let maturity = cds_maturity(trade_date, tenor, rule).unwrap();
+        let maturity = cds_maturity(trade_date, tenor, rule)
+            .unwrap()
+            .expect("live CDS maturity");
         let s = make_cds_schedule(trade_date, maturity, rule);
         exp_dates.push(d(20, Month::September, 2016));
         exp_dates.push(d(20, Month::December, 2016));
         check_dates(&s, &exp_dates);
 
         let trade_date = d(21, Month::September, 2015);
-        let maturity = cds_maturity(trade_date, tenor, rule).unwrap();
+        let maturity = cds_maturity(trade_date, tenor, rule)
+            .unwrap()
+            .expect("live CDS maturity");
         let s = make_cds_schedule(trade_date, maturity, rule);
         exp_dates.remove(0);
         check_dates(&s, &exp_dates);
@@ -1838,7 +1828,9 @@ mod tests {
         let tenor = Period::new(1, TimeUnit::Years);
 
         let trade_date = d(18, Month::September, 2015);
-        let maturity = cds_maturity(trade_date, tenor, rule).unwrap();
+        let maturity = cds_maturity(trade_date, tenor, rule)
+            .unwrap()
+            .expect("live CDS maturity");
         let s = make_cds_schedule(trade_date, maturity, rule);
         let mut exp_dates = vec![
             d(22, Month::June, 2015),
@@ -1851,18 +1843,24 @@ mod tests {
         check_dates(&s, &exp_dates);
 
         let trade_date = d(19, Month::September, 2015);
-        let maturity = cds_maturity(trade_date, tenor, rule).unwrap();
+        let maturity = cds_maturity(trade_date, tenor, rule)
+            .unwrap()
+            .expect("live CDS maturity");
         let s = make_cds_schedule(trade_date, maturity, rule);
         check_dates(&s, &exp_dates);
 
         let trade_date = d(20, Month::September, 2015);
-        let maturity = cds_maturity(trade_date, tenor, rule).unwrap();
+        let maturity = cds_maturity(trade_date, tenor, rule)
+            .unwrap()
+            .expect("live CDS maturity");
         let s = make_cds_schedule(trade_date, maturity, rule);
         exp_dates.push(d(20, Month::December, 2016));
         check_dates(&s, &exp_dates);
 
         let trade_date = d(21, Month::September, 2015);
-        let maturity = cds_maturity(trade_date, tenor, rule).unwrap();
+        let maturity = cds_maturity(trade_date, tenor, rule)
+            .unwrap()
+            .expect("live CDS maturity");
         let s = make_cds_schedule(trade_date, maturity, rule);
         exp_dates.remove(0);
         check_dates(&s, &exp_dates);
@@ -1894,7 +1892,9 @@ mod tests {
         let tenor = Period::new(1, TimeUnit::Years);
 
         let mut trade_date_plus_one = d(18, Month::September, 2015);
-        let maturity = cds_maturity(trade_date_plus_one, tenor, rule).unwrap();
+        let maturity = cds_maturity(trade_date_plus_one, tenor, rule)
+            .unwrap()
+            .expect("live CDS maturity");
         let s = make_cds_schedule(trade_date_plus_one, maturity, rule);
         let mut exp_dates = vec![
             d(18, Month::September, 2015),
@@ -1907,20 +1907,26 @@ mod tests {
 
         trade_date_plus_one = d(19, Month::September, 2015);
         exp_dates[0] = trade_date_plus_one;
-        let maturity = cds_maturity(trade_date_plus_one, tenor, rule).unwrap();
+        let maturity = cds_maturity(trade_date_plus_one, tenor, rule)
+            .unwrap()
+            .expect("live CDS maturity");
         let s = make_cds_schedule(trade_date_plus_one, maturity, rule);
         check_dates(&s, &exp_dates);
 
         trade_date_plus_one = d(20, Month::September, 2015);
         exp_dates[0] = trade_date_plus_one;
-        let maturity = cds_maturity(trade_date_plus_one, tenor, rule).unwrap();
+        let maturity = cds_maturity(trade_date_plus_one, tenor, rule)
+            .unwrap()
+            .expect("live CDS maturity");
         let s = make_cds_schedule(trade_date_plus_one, maturity, rule);
         exp_dates.push(d(20, Month::December, 2016));
         check_dates(&s, &exp_dates);
 
         trade_date_plus_one = d(21, Month::September, 2015);
         exp_dates[0] = trade_date_plus_one;
-        let maturity = cds_maturity(trade_date_plus_one, tenor, rule).unwrap();
+        let maturity = cds_maturity(trade_date_plus_one, tenor, rule)
+            .unwrap()
+            .expect("live CDS maturity");
         let s = make_cds_schedule(trade_date_plus_one, maturity, rule);
         check_dates(&s, &exp_dates);
 
@@ -1957,7 +1963,11 @@ mod tests {
         ];
 
         for input in inputs {
-            assert_eq!(cds_maturity(input, tenor, rule), None, "at {input}");
+            assert_eq!(
+                cds_maturity(input, tenor, rule).unwrap(),
+                None,
+                "at {input}"
+            );
         }
     }
 

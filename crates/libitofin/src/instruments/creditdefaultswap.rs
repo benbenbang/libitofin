@@ -63,8 +63,7 @@
 //! ignored:
 //!
 //! - `impliedHazardRate`, `conventionalSpread` and their objective function
-//!   (`creditdefaultswap.cpp:315-428`), and `cdsMaturity`
-//!   (`creditdefaultswap.cpp:479-506`).
+//!   (`creditdefaultswap.cpp:315-428`).
 //! - `protectionEndDate` (`creditdefaultswap.cpp:430-432`), which reads the
 //!   accrual end of the last coupon through the `coupon_cast` that
 //!   [`CashFlow::as_coupon`](crate::cashflow::CashFlow::as_coupon) ports.
@@ -85,11 +84,12 @@ use crate::pricingengine::{Arguments, GenericEngine, Results};
 use crate::settings::Settings;
 use crate::shared::{Shared, shared};
 use crate::time::businessdayconvention::BusinessDayConvention;
-use crate::time::date::Date;
+use crate::time::date::{Date, Month};
 use crate::time::dategenerationrule::DateGeneration;
 use crate::time::daycounter::DayCounter;
 use crate::time::frequency::Frequency;
-use crate::time::schedule::Schedule;
+use crate::time::period::Period;
+use crate::time::schedule::{Schedule, previous_twentieth};
 use crate::time::timeunit::TimeUnit;
 use crate::types::{Integer, Natural, Rate, Real};
 use crate::{fail, require};
@@ -814,6 +814,62 @@ impl Instrument for CreditDefaultSwap {
     }
 }
 
+/// The date a standard CDS traded on `trade_date` at a quoted `tenor` matures,
+/// under one of the CDS date-generation rules.
+///
+/// Port of `cdsMaturity` (`creditdefaultswap.cpp:479-506`). The tenor must be
+/// quoted in years or in a whole number of quarters, and `OldCDS` does not
+/// admit a zero tenor.
+///
+/// `Ok(None)` stands for the null `Date` C++ returns in its one such case
+/// (`creditdefaultswap.cpp:494`): a `CDS2015` contract quoted at a zero tenor
+/// whose anchor date is 20 December or 20 June, which has already matured. All
+/// other rejections are `Err` (D4).
+pub fn cds_maturity(
+    trade_date: Date,
+    tenor: Period,
+    rule: DateGeneration,
+) -> QlResult<Option<Date>> {
+    require!(
+        matches!(
+            rule,
+            DateGeneration::CDS2015 | DateGeneration::CDS | DateGeneration::OldCDS
+        ),
+        "cds_maturity should only be used with date generation rule CDS2015, CDS or OldCDS"
+    );
+    require!(
+        tenor.units() == TimeUnit::Years
+            || (tenor.units() == TimeUnit::Months && tenor.length() % 3 == 0),
+        "cds_maturity expects a tenor that is a multiple of 3 months."
+    );
+    if rule == DateGeneration::OldCDS {
+        require!(
+            tenor != Period::new(0, TimeUnit::Months),
+            "A tenor of 0M is not supported for OldCDS."
+        );
+    }
+
+    let mut anchor_date = previous_twentieth(trade_date, rule);
+    if rule == DateGeneration::CDS2015
+        && (anchor_date == Date::new(20, Month::December, anchor_date.year())
+            || anchor_date == Date::new(20, Month::June, anchor_date.year()))
+    {
+        if tenor.length() == 0 {
+            return Ok(None);
+        }
+        anchor_date = anchor_date - Period::new(3, TimeUnit::Months);
+    }
+
+    let maturity = anchor_date + tenor + Period::new(3, TimeUnit::Months);
+    require!(
+        maturity > trade_date,
+        "error calculating CDS maturity. Tenor is {tenor}, trade date is {trade_date} \
+         generating a maturity of {maturity} <= trade date."
+    );
+
+    Ok(Some(maturity))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -823,10 +879,8 @@ mod tests {
     use crate::pricingengine::PricingEngine;
     use crate::shared::{SharedMut, shared_mut};
     use crate::time::calendars::weekendsonly::WeekendsOnly;
-    use crate::time::date::Month;
     use crate::time::daycounters::actual360::Actual360;
     use crate::time::daycounters::actual365fixed::Actual365Fixed;
-    use crate::time::period::Period;
     use crate::time::schedule::MakeSchedule;
 
     const NOTIONAL: Real = 10_000_000.0;
@@ -1524,5 +1578,68 @@ mod tests {
             !cds.base().is_calculated(),
             "an evaluation-date change invalidates the contract"
         );
+    }
+
+    /// The maturity a tenor implies is graded against the CDS date-generation
+    /// grids in `schedule.rs`, which the C++ test suite also keeps in
+    /// `test-suite/schedule.cpp:415` rather than beside the function. What is
+    /// left to pin here is the four rejections those grids never reach.
+    fn rejection(tenor: Period, rule: DateGeneration) -> String {
+        cds_maturity(Date::new(1, Month::March, 2017), tenor, rule)
+            .unwrap_err()
+            .message()
+            .to_string()
+    }
+
+    #[test]
+    fn only_the_three_cds_rules_imply_a_maturity() {
+        let message = rejection(
+            Period::new(5, TimeUnit::Years),
+            DateGeneration::TwentiethIMM,
+        );
+        assert!(message.contains("CDS2015, CDS or OldCDS"), "{message}");
+    }
+
+    #[test]
+    fn a_tenor_that_is_not_a_whole_number_of_quarters_is_rejected() {
+        let message = rejection(Period::new(4, TimeUnit::Months), DateGeneration::CDS2015);
+        assert!(message.contains("multiple of 3 months"), "{message}");
+    }
+
+    /// C++ compares the tenor against `0*Months` through the unit-converting
+    /// `Period::operator==`, so a zero tenor quoted in years is the same zero and
+    /// is rejected too. [`PartialEq`] ports that comparison rather than deriving
+    /// on the unit, which is what keeps the two agreeing.
+    #[test]
+    fn a_zero_tenor_is_rejected_under_the_old_rule_alone() {
+        let zero = Period::new(0, TimeUnit::Months);
+        let message = rejection(zero, DateGeneration::OldCDS);
+        assert!(
+            message.contains("0M is not supported for OldCDS"),
+            "{message}"
+        );
+
+        let message = rejection(Period::new(0, TimeUnit::Years), DateGeneration::OldCDS);
+        assert!(
+            message.contains("0M is not supported for OldCDS"),
+            "a zero tenor quoted in years is the same zero: {message}"
+        );
+
+        let live = cds_maturity(
+            Date::new(1, Month::December, 2016),
+            zero,
+            DateGeneration::CDS2015,
+        );
+        assert_eq!(live.unwrap(), Some(Date::new(20, Month::December, 2016)));
+    }
+
+    /// The guard is out of reach of a forward tenor: the anchor is the latest
+    /// twentieth of an IMM month on or before the trade date, so it sits under
+    /// three months back and the three months the maturity adds carry it past
+    /// the trade date again. A tenor quoted backwards reaches it.
+    #[test]
+    fn a_maturity_on_or_before_the_trade_date_is_rejected() {
+        let message = rejection(Period::new(-1, TimeUnit::Years), DateGeneration::CDS);
+        assert!(message.contains("<= trade date"), "{message}");
     }
 }
