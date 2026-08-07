@@ -17,7 +17,7 @@ pub mod vanilla;
 pub use blackcalculator::BlackCalculator;
 pub use bond::{BondFunctions, DiscountingBondEngine};
 pub use capfloor::{AnalyticCapFloorEngine, BlackCapFloorEngine};
-pub use credit::MidPointCdsEngine;
+pub use credit::{IntegralCdsEngine, MidPointCdsEngine};
 pub use mclongstaffschwartzengine::McLongstaffSchwartzEngineBase;
 pub use swap::DiscountingSwapEngine;
 pub use swaption::{
