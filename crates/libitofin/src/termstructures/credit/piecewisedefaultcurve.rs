@@ -239,10 +239,10 @@ impl<I: Interpolator + 'static> DefaultProbabilityTermStructure
 {
     /// Opts the bootstrapped curve into the downcast seam, for the same reason
     /// its yield-side twin does
-    /// ([`PiecewiseYieldCurve`](crate::termstructures::yields::piecewiseyieldcurve::PiecewiseYieldCurve)):
+    /// ([`PiecewiseYieldCurve`](crate::termstructures::yields::PiecewiseYieldCurve)):
     /// C++ casts a `PiecewiseDefaultCurve<HazardRate, BackwardFlat>` to its
     /// `InterpolatedHazardRateCurve<BackwardFlat>` base
-    /// (`isdacdsengine.cpp:136-141`), which composition cannot reproduce.
+    /// (`isdacdsengine.cpp:137-141`), which composition cannot reproduce.
     fn as_any(&self) -> Option<&dyn std::any::Any> {
         Some(self)
     }
@@ -538,7 +538,7 @@ mod tests {
 
     /// The bootstrapped curve is what the ISDA engine is handed, so it must be
     /// introspectable through the downcast seam
-    /// (`isdacdsengine.cpp:136-141`). C++ gets there by inheritance - a
+    /// (`isdacdsengine.cpp:137-141`). C++ gets there by inheritance - a
     /// `PiecewiseDefaultCurve<HazardRate, BackwardFlat>` *is* an
     /// `InterpolatedHazardRateCurve<BackwardFlat>` - which this port's
     /// composition cannot reproduce, so the arm is named for the piecewise

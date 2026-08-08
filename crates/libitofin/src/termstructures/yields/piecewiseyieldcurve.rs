@@ -215,7 +215,7 @@ impl<T: YieldBootstrapTraits + 'static, I: Interpolator + 'static> YieldTermStru
     /// `PiecewiseYieldCurve<Discount, LogLinear>` *is* an
     /// `InterpolatedDiscountCurve<LogLinear>`, so the engine's
     /// `dynamic_pointer_cast` to the base succeeds
-    /// (`isdacdsengine.cpp:113-119`). This port composes instead of inheriting,
+    /// (`isdacdsengine.cpp:113-116`). This port composes instead of inheriting,
     /// so the piecewise curve must be named at the downcast site in its own
     /// right; see
     /// [`isda_node_grid`](crate::pricingengines::credit::isda_node_grid).
@@ -296,10 +296,13 @@ mod tests {
     use crate::math::interpolations::flat::BackwardFlat;
     use crate::math::interpolations::linear::Linear;
     use crate::math::interpolations::loglinear::LogLinear;
+    use crate::pricingengines::credit::isda_node_grid;
     use crate::quotes::{Quote, SimpleQuote};
     use crate::settings::Settings;
     use crate::shared::shared;
     use crate::termstructures::bootstraptraits::{Discount, ForwardRate, ZeroYield};
+    use crate::termstructures::credit::defaulttermstructure::DefaultProbabilityTermStructure;
+    use crate::termstructures::credit::flathazardrate::FlatHazardRate;
     use crate::termstructures::yields::{DepositRateHelper, SwapRateHelper};
     use crate::time::businessdayconvention::BusinessDayConvention;
     use crate::time::calendars::target::Target;
@@ -522,6 +525,30 @@ mod tests {
             data[0], data[1],
             "the reference forward must mirror the first solved pillar"
         );
+    }
+
+    /// The bootstrapped forward curve must be introspectable through the
+    /// downcast seam (`isdacdsengine.cpp:117-120`), the arm a
+    /// `PiecewiseYieldCurve<ForwardRate, BackwardFlat>` reaches in C++ by
+    /// inheriting `InterpolatedForwardCurve<BackwardFlat>`. The flat credit
+    /// curve contributes nothing, leaving the grid as the solved pillars alone.
+    #[test]
+    fn bootstrapped_forward_curve_feeds_the_isda_node_grid() {
+        let curve = check_curve_consistency::<ForwardRate, BackwardFlat>();
+        let pillars = curve.dates().unwrap();
+        let credit = Handle::new(shared(FlatHazardRate::with_rate(
+            pillars[0],
+            0.01,
+            Actual360::new(),
+        )) as Shared<dyn DefaultProbabilityTermStructure>);
+
+        let grid = isda_node_grid(
+            &Handle::new(curve as Shared<dyn YieldTermStructure>),
+            &credit,
+            pillars[0] + 10_000,
+        )
+        .expect("a bootstrapped backward-flat forward curve is an ISDA curve");
+        assert_eq!(grid, pillars);
     }
 
     /// Builds the mixed market strip - deposits (1W/1M/3M), a 3-month IMM

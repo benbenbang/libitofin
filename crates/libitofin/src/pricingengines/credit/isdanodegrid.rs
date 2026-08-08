@@ -1,7 +1,7 @@
 //! The ISDA integration grid: the union of the curves' own node dates.
 //!
 //! Port of the node-collection prologue of `IsdaCdsEngine::calculate`
-//! (`ql/pricingengines/credit/isdacdsengine.cpp:104-157`). The ISDA model
+//! (`ql/pricingengines/credit/isdacdsengine.cpp:104-156`). The ISDA model
 //! integrates the protection and premium legs over the pillar dates of the
 //! discount and credit curves themselves, so the engine must recover each
 //! curve's concrete type from the abstract handle it was given.
@@ -35,8 +35,8 @@
 //!
 //! ## Deferred (#799)
 //!
-//! `InterpolatedForwardCurve<ForwardFlat>` (`isdacdsengine.cpp:120-124`) and
-//! `InterpolatedSurvivalProbabilityCurve<LogLinear>` (`:130-135`) are the two
+//! `InterpolatedForwardCurve<ForwardFlat>` (`isdacdsengine.cpp:121-124`) and
+//! `InterpolatedSurvivalProbabilityCurve<LogLinear>` (`:132-136`) are the two
 //! ISDA curve variants absent from this port: there is no `ForwardFlat`
 //! interpolator factory and no survival-probability curve yet. Their arms are
 //! simply missing, so such a curve reports the same error as any other
@@ -61,7 +61,7 @@ use crate::time::date::Date;
 
 /// The dates the ISDA engine integrates over: the sorted union of the discount
 /// and credit curves' node dates, or `maturity` alone when both curves are flat
-/// (`isdacdsengine.cpp:149-156`).
+/// (`isdacdsengine.cpp:150-156`).
 ///
 /// Both curves are read once up front (`:110-111`). C++ forces the bootstrap
 /// there because its `dates()` resolves to the interpolated base class and so
@@ -96,7 +96,7 @@ pub fn isda_node_grid(
     Ok(nodes)
 }
 
-/// The discount curve's node dates (`isdacdsengine.cpp:112-130`): its pillars
+/// The discount curve's node dates (`isdacdsengine.cpp:113-130`): its pillars
 /// if it is one of the supported interpolated shapes, none if it is flat, an
 /// error otherwise.
 fn yield_curve_dates(curve: &dyn YieldTermStructure) -> QlResult<Vec<Date>> {
@@ -123,7 +123,7 @@ fn yield_curve_dates(curve: &dyn YieldTermStructure) -> QlResult<Vec<Date>> {
     fail!("{UNSUPPORTED}")
 }
 
-/// The credit curve's node dates (`isdacdsengine.cpp:131-148`), on the same
+/// The credit curve's node dates (`isdacdsengine.cpp:132-148`), on the same
 /// terms as [`yield_curve_dates`].
 fn credit_curve_dates(curve: &dyn DefaultProbabilityTermStructure) -> QlResult<Vec<Date>> {
     const UNSUPPORTED: &str = "Credit curve must be flat forward interpolated";
@@ -146,7 +146,7 @@ fn credit_curve_dates(curve: &dyn DefaultProbabilityTermStructure) -> QlResult<V
 #[cfg(test)]
 mod tests {
     //! Oracle: the node-collection prologue of `IsdaCdsEngine::calculate`
-    //! (`isdacdsengine.cpp:104-157`). There are no numbers to transcribe - the
+    //! (`isdacdsengine.cpp:104-156`). There are no numbers to transcribe - the
     //! block is pure curve introspection - so the assertions are on which
     //! curves are accepted and on the exact grid each pair yields.
 
@@ -258,18 +258,31 @@ mod tests {
     #[test]
     fn forward_curve_is_downcastable_to_its_pillar_dates() {
         let dates = dates_at(&YIELD_OFFSETS);
-        let curve = InterpolatedForwardCurve::new(
-            dates.clone(),
-            vec![0.02, 0.021, 0.022, 0.023],
-            day_counter(),
-            BackwardFlat,
-        )
-        .expect("the forward nodes are well formed");
-        let any = YieldTermStructure::as_any(&curve).expect("the curve opts into the seam");
+        let curve = shared(
+            InterpolatedForwardCurve::new(
+                dates.clone(),
+                vec![0.02, 0.021, 0.022, 0.023],
+                day_counter(),
+                BackwardFlat,
+            )
+            .expect("the forward nodes are well formed"),
+        );
+        let any = YieldTermStructure::as_any(&*curve).expect("the curve opts into the seam");
         let recovered = any
             .downcast_ref::<InterpolatedForwardCurve<BackwardFlat>>()
             .expect("the curve is backward-flat interpolated");
         assert_eq!(recovered.dates(), dates);
+
+        let grid = isda_node_grid(
+            &yield_handle(curve),
+            &credit_handle(flat_hazard_rate()),
+            maturity(),
+        )
+        .expect("a backward-flat forward curve is supported");
+        assert_eq!(
+            grid, dates,
+            "the arm is reached through the grid, not only directly"
+        );
     }
 
     #[test]
