@@ -30,19 +30,17 @@
 //!   (D4). The narrowing stops at `dyn Coupon` rather than at the fixed-rate
 //!   coupon, which is every member the kernel reads; a floating-rate coupon in
 //!   the leg would therefore price here where C++ is undefined.
-//!
-//! ## Unported (#797)
-//!
-//! The results tail (`isdacdsengine.cpp:288-310`) is not written yet:
-//! [`IsdaCdsEngine::calculate`] values both legs, records them, and then reports
-//! #797 rather than returning a price - an engine answering `0.0` here could not
-//! be told apart from a contract genuinely worth nothing.
+//! - The C++ `default:` arm of the side switch (`isdacdsengine.cpp:322-323`) has
+//!   no counterpart: [`ProtectionSide`] has exactly the two variants, so there
+//!   is no unknown side to reject.
 
-use crate::cashflow::Leg;
+use crate::cashflow::{CashFlow, Leg};
 use crate::cashflows::Coupon;
 use crate::errors::QlResult;
-use crate::event::event_has_occurred;
-use crate::instruments::{CdsArguments, CdsEngine, CdsResults, Claim, FaceValueClaim};
+use crate::event::{Event, event_has_occurred};
+use crate::instruments::{
+    CdsArguments, CdsEngine, CdsResults, Claim, FaceValueClaim, ProtectionSide,
+};
 use crate::patterns::observable::{AsObservable, Observable};
 use crate::pricingengine::{Arguments, PricingEngine, Results};
 use crate::settings::Settings;
@@ -53,10 +51,15 @@ use crate::time::date::Date;
 use crate::time::daycounter::DayCounter;
 use crate::time::daycounters::actual360::Actual360;
 use crate::time::daycounters::actual365fixed::Actual365Fixed;
-use crate::types::Real;
+use crate::types::{Rate, Real};
 use crate::{fail, handle::Handle, require};
 
 use super::isda_node_grid;
+
+/// The one-basis-point move the leg sensitivities are quoted against
+/// (`isdacdsengine.cpp:349`), as for
+/// [`MidPointCdsEngine`](super::MidPointCdsEngine).
+const BASIS_POINT: Rate = 1.0e-4;
 
 /// How the engine keeps the integrands' `f_i + h_i` denominators away from zero
 /// (`isdacdsengine.hpp:66-70`).
@@ -230,8 +233,8 @@ impl IsdaCdsEngine {
     /// The value is positive here, whatever the C++ comment at `:159` says:
     /// `h_hat` is the fall in the log survival probability over a step and so is
     /// non-negative, as is the `N (1 - R)` it ends up scaled by. The sign the
-    /// protection side gives the leg belongs to the results tail (`:311-320`,
-    /// #797), exactly as it does for
+    /// protection side gives the leg belongs to the results tail (`:311-324`),
+    /// exactly as it does for
     /// [`MidPointCdsEngine`](super::MidPointCdsEngine) (`midpointcdsengine.cpp:143`).
     ///
     /// C++ rolls a `d1` into `d0` alongside `P0` and `Q0` (`:192-194`) that
@@ -459,8 +462,8 @@ struct IsdaContext {
     discount: Shared<dyn YieldTermStructure>,
     probability: Shared<dyn DefaultProbabilityTermStructure>,
     /// The one field neither leg reads: the results tail measures the upfront
-    /// payment against it (`isdacdsengine.cpp:292`, #797).
-    #[allow(dead_code)]
+    /// payment and the accrual rebate against it (`isdacdsengine.cpp:292`,
+    /// `:304`).
     eval_date: Date,
     effective_protection_start: Date,
     nodes: Vec<Date>,
@@ -491,19 +494,40 @@ impl PricingEngine for IsdaCdsEngine {
         self.base.reset();
     }
 
-    /// `isdacdsengine.cpp:52-310`, of which the validation, the setup
-    /// (`:54-157`) and both leg integrations (`:159-287`) are ported.
+    /// `isdacdsengine.cpp:52-364`: the validation and the setup (`:54-157`),
+    /// both leg integrations (`:159-287`), and the results tail (`:289-364`)
+    /// that signs the legs by protection side and derives the fair quotes from
+    /// them.
     ///
-    /// The legs are recorded before the report, so a caller that means to read
-    /// one can do so through [`results`](PricingEngine::results) despite the
-    /// `Err`.
+    /// The fair spread's guard is C++'s verbatim: it tests the coupon leg alone
+    /// (`:331`) yet divides by the coupon leg plus the accrual rebate (`:333`),
+    /// so a contract whose coupon leg is worth nothing reports none even where
+    /// the rebate alone would carry the quotient. The mid-point engine holds the
+    /// same quirk (`midpointcdsengine.cpp:152-155`).
     fn calculate(&mut self) -> QlResult<()> {
         let context = self.validated()?;
-        let (default_leg_npv, coupon_leg_npv) = {
+        let (side, notional, spread, upfront, upfront_payment, accrual_rebate) = {
             let arguments = self.base.arguments();
-            let Some(notional) = arguments.notional else {
-                fail!("notional not set");
+            let (Some(side), Some(notional), Some(spread)) =
+                (arguments.side, arguments.notional, arguments.spread)
+            else {
+                fail!("side, notional or spread not set");
             };
+            let Some(upfront_payment) = arguments.upfront_payment.as_ref() else {
+                fail!("upfront payment not set");
+            };
+            (
+                side,
+                notional,
+                spread,
+                arguments.upfront,
+                Shared::clone(upfront_payment),
+                arguments.accrual_rebate.as_ref().map(Shared::clone),
+            )
+        };
+
+        let (mut default_leg_npv, mut coupon_leg_npv) = {
+            let arguments = self.base.arguments();
             let Some(claim) = arguments.claim.as_ref() else {
                 fail!("claim not set");
             };
@@ -513,25 +537,99 @@ impl PricingEngine for IsdaCdsEngine {
             )
         };
 
+        let mut upfront_pvo1 = 0.0;
+        let mut upfront_npv = 0.0;
+        if !upfront_payment.has_occurred(
+            &self.settings,
+            Some(context.eval_date),
+            context.include_settlement_date_flows,
+        )? {
+            upfront_pvo1 = context
+                .discount
+                .discount_date(upfront_payment.date(), false)?;
+            if upfront_payment.amount()? != 0.0 {
+                upfront_npv = upfront_pvo1 * upfront_payment.amount()?;
+            }
+        }
+
+        let mut accrual_rebate_npv = 0.0;
+        if let Some(rebate) = accrual_rebate.as_ref()
+            && rebate.amount()? != 0.0
+            && !rebate.has_occurred(
+                &self.settings,
+                Some(context.eval_date),
+                context.include_settlement_date_flows,
+            )?
+        {
+            accrual_rebate_npv =
+                context.discount.discount_date(rebate.date(), false)? * rebate.amount()?;
+        }
+
+        let mut upfront_sign = 1.0;
+        match side {
+            ProtectionSide::Seller => {
+                default_leg_npv *= -1.0;
+                accrual_rebate_npv *= -1.0;
+            }
+            ProtectionSide::Buyer => {
+                coupon_leg_npv *= -1.0;
+                upfront_npv *= -1.0;
+                upfront_sign = -1.0;
+            }
+        }
+
+        let fair_spread = if coupon_leg_npv != 0.0 {
+            Some(-default_leg_npv * spread / (coupon_leg_npv + accrual_rebate_npv))
+        } else {
+            None
+        };
+        let upfront_sensitivity = upfront_pvo1 * notional;
+        let fair_upfront = if upfront_sensitivity != 0.0 {
+            Some(
+                -upfront_sign * (default_leg_npv + coupon_leg_npv + accrual_rebate_npv)
+                    / upfront_sensitivity,
+            )
+        } else {
+            None
+        };
+        let coupon_leg_bps = if spread != 0.0 {
+            Some(coupon_leg_npv * BASIS_POINT / spread)
+        } else {
+            None
+        };
+        let upfront_bps = match upfront {
+            Some(upfront) if upfront != 0.0 => Some(upfront_npv * BASIS_POINT / upfront),
+            _ => None,
+        };
+
         let results = self.base.results_mut();
+        results.instrument.value =
+            Some(default_leg_npv + coupon_leg_npv + upfront_npv + accrual_rebate_npv);
+        results.instrument.error_estimate = None;
         results.default_leg_npv = Some(default_leg_npv);
         results.coupon_leg_npv = Some(coupon_leg_npv);
-        fail!("the ISDA CDS engine prices no contract yet: its results are #797")
+        results.upfront_npv = Some(upfront_npv);
+        results.accrual_rebate_npv = Some(accrual_rebate_npv);
+        results.fair_spread = fair_spread;
+        results.fair_upfront = fair_upfront;
+        results.coupon_leg_bps = coupon_leg_bps;
+        results.upfront_bps = upfront_bps;
+        Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
     //! Oracle: the ISDA-compatibility block of `IsdaCdsEngine::calculate`
-    //! (`isdacdsengine.cpp:54-98`). Nothing prices yet, so what is pinned is
-    //! which inputs the engine refuses and with which message.
+    //! (`isdacdsengine.cpp:54-98`), which is about which inputs the engine
+    //! refuses and with which message.
     //!
     //! Every case starts from one fixture the engine accepts and corrupts a
     //! single dimension of it, and compares the message rather than only that an
     //! error came back: the checks run in a fixed order, so a case that broke two
     //! dimensions at once would pass on the wrong guard. The uncorrupted fixture
-    //! is a case of its own and reaches the unported integrations, which is what
-    //! shows every guard above it passed.
+    //! is a case of its own and prices, which is what shows every guard above it
+    //! passed.
 
     use super::*;
     use crate::instrument::Instrument;
@@ -627,7 +725,7 @@ mod tests {
     ) -> String {
         armed(discount, credit, corrupt)
             .calculate()
-            .expect_err("no ISDA contract prices yet")
+            .expect_err("the corrupted dimension is refused")
             .message()
             .to_string()
     }
@@ -713,15 +811,17 @@ mod tests {
     }
 
     /// The fixture every case above corrupts, left alone: it clears every guard
-    /// and stops only on the results tail #797 has yet to write, which is what
-    /// makes each of those cases a single-dimension corruption.
+    /// and prices, which is what makes each of those cases a single-dimension
+    /// corruption.
     #[test]
-    fn a_compatible_contract_reaches_the_unported_results() {
-        let message = compatible(|_| {});
-        assert!(
-            message.contains("#797"),
-            "a compatible contract should stop on the unported results, not on {message}"
+    fn a_compatible_contract_prices() {
+        let mut engine = armed(
+            discount(today(), act365f()),
+            credit(today(), act365f()),
+            |_| {},
         );
+        engine.calculate().expect("the fixture clears every guard");
+        assert!(engine.base.results().instrument.value.is_some());
     }
 
     /// What the checks leave behind for the kernels of #796: the flags the
@@ -787,6 +887,7 @@ mod protection_leg {
     //! are the mechanical pins that gate cannot localise.
 
     use super::*;
+    use crate::cashflows::SimpleCashFlow;
     use crate::math::interpolations::loglinear::LogLinear;
     use crate::shared::shared;
     use crate::termstructures::credit::flathazardrate::FlatHazardRate;
@@ -835,12 +936,14 @@ mod protection_leg {
         hazard / total * (1.0 - (-total * years(end)).exp()) * NOTIONAL * (1.0 - RECOVERY)
     }
 
-    /// The protection leg of a contract on those curves, read out of the results
-    /// the engine records before reporting the premium leg it has yet to value.
+    /// The protection leg of a contract on those curves, read out of the priced
+    /// results.
     ///
     /// The arguments are set directly rather than through a contract: the
-    /// protection leg reads only these four, and a schedule would tie the
-    /// maturity to a coupon date and so hide the clamp below.
+    /// protection leg reads only four of them, and a schedule would tie the
+    /// maturity to a coupon date and so hide the clamp below. The rest are the
+    /// least the results tail needs, on the buyer's side, which is the one that
+    /// leaves the protection leg its own sign (`isdacdsengine.cpp:311-324`).
     fn protection_leg(
         rate: Real,
         hazard: Real,
@@ -874,10 +977,13 @@ mod protection_leg {
         arguments.maturity = Some(today() + maturity);
         arguments.settles_accrual = true;
         arguments.pays_at_default_time = true;
+        arguments.side = Some(ProtectionSide::Buyer);
+        arguments.spread = Some(0.0);
+        arguments.upfront_payment = Some(shared(
+            SimpleCashFlow::new(0.0, today()).expect("a flow of nothing is well formed"),
+        ));
 
-        engine
-            .calculate()
-            .expect_err("the results tail is not written yet");
+        engine.calculate().expect("the arguments are complete");
         engine
             .base
             .results()
@@ -1030,7 +1136,7 @@ mod premium_leg {
     /// pillar, which is what the piecewise flag needs to be seen at all: over a
     /// segment of constant forward the accrual integral is additive, so
     /// subdividing a flat curve returns the very same number.
-    fn stepped_discount() -> Handle<dyn YieldTermStructure> {
+    pub(super) fn stepped_discount() -> Handle<dyn YieldTermStructure> {
         let mut dates = vec![today()];
         let mut discounts = vec![1.0];
         let mut log_discount: Real = 0.0;
@@ -1047,7 +1153,7 @@ mod premium_leg {
 
     /// That curve's discount factor, read off a curve built again rather than
     /// out of the engine's own.
-    fn discount_factor(date: Date) -> Real {
+    pub(super) fn discount_factor(date: Date) -> Real {
         stepped_discount()
             .current_link()
             .expect("the handle is linked")
@@ -1109,12 +1215,11 @@ mod premium_leg {
         engine
     }
 
-    /// The premium leg the engine records before reporting the results it has
-    /// yet to write.
+    /// The premium leg of a priced contract. Every fixture here is on the
+    /// seller's side, which is the one that leaves the premium leg its own sign
+    /// (`isdacdsengine.cpp:311-324`).
     fn coupon_leg(engine: &mut IsdaCdsEngine) -> Real {
-        engine
-            .calculate()
-            .expect_err("the results tail is not written yet");
+        engine.calculate().expect("the contract prices");
         engine
             .base
             .results()
@@ -1127,18 +1232,15 @@ mod premium_leg {
     #[test]
     fn a_coupon_counted_outside_the_isda_conventions_is_refused() {
         for accepted in [act365f(), Actual360::new(), Actual360::with_last_day(true)] {
-            let message = armed(
-                accepted.clone(),
-                AccrualBias::HalfDayBias,
-                ForwardsInCouponPeriod::Piecewise,
-            )
-            .calculate()
-            .expect_err("nothing prices yet")
-            .message()
-            .to_string();
             assert!(
-                message.contains("#797"),
-                "a leg counted in {accepted} should reach the results, not stop on {message}"
+                armed(
+                    accepted.clone(),
+                    AccrualBias::HalfDayBias,
+                    ForwardsInCouponPeriod::Piecewise,
+                )
+                .calculate()
+                .is_ok(),
+                "a leg counted in {accepted} should price"
             );
         }
 
