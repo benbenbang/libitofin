@@ -3,10 +3,10 @@
 
 The numeric milestone - fourteen quoted swaps repriced to zero off the
 bootstrapped curve - is #752. What is checked here is the wiring the milestone
-would fail on for reasons it could not report: the helper's dates, the visible
-rejection of the interpolated observation branch, and that the bootstrapped
-curve lays node zero on the base date and reaches Python through *both* halves
-of its class chain.
+would fail on for reasons it could not report: the helper's dates under both
+observation interpolations, the trailing pillar keyword that picks its node, and
+that the bootstrapped curve lays node zero on the base date and reaches Python
+through *both* halves of its class chain.
 
 Fixture. It is 13 August 2007. UK RPI carries the four monthly figures the Rust
 core fixture carries (piecewisezeroinflationcurve.rs:345-356), so the curve's
@@ -28,6 +28,7 @@ from itofin.indexes import CpiInterpolationType, ZeroInflationIndex
 from itofin.quotes import SimpleQuote
 from itofin.termstructures import (
     PiecewiseZeroInflationCurve,
+    Pillar,
     ZeroCouponInflationSwapHelper,
     ZeroInflationHelper,
     ZeroInflationTermStructure,
@@ -79,8 +80,11 @@ def _helper(
     settings: Settings,
     index: ZeroInflationIndex,
     interpolation: CpiInterpolationType = CpiInterpolationType.Flat,
+    pillar: Pillar | None = None,
 ) -> ZeroCouponInflationSwapHelper:
-    return ZeroCouponInflationSwapHelper(
+    """A helper on the quoted swap. `pillar` left `None` omits the keyword
+    altogether, so the default the constructor carries is what gets exercised."""
+    arguments = (
         SimpleQuote(QUOTE),
         LAG,
         MATURITY,
@@ -91,6 +95,9 @@ def _helper(
         interpolation,
         settings,
     )
+    if pillar is None:
+        return ZeroCouponInflationSwapHelper(*arguments)
+    return ZeroCouponInflationSwapHelper(*arguments, pillar=pillar)
 
 
 def _curve(settings: Settings, index: ZeroInflationIndex) -> PiecewiseZeroInflationCurve:
@@ -130,14 +137,35 @@ def test_the_caller_index_needs_no_curve_link():
     assert _curve(settings, index).calculate() is None
 
 
-def test_the_interpolated_observation_branch_is_rejected():
-    """Omitted visibly: Linear's date and pillar logic is a documented deferral
-    of the port, so a caller asking for it is told rather than quietly given the
-    flat dates."""
-    settings = _settings()
+def test_the_interpolated_window_straddles_the_fixing_period():
+    """Linear reads the two fixings bracketing 13 May 2008, so the helper's
+    window closes on 1 June 2008 - the day after the May period ends, which is
+    the June figure's date - where Flat collapses it onto 1 May.
 
-    with pytest.raises(ItofinError, match="not ported"):
-        _helper(settings, _index(settings), CpiInterpolationType.Linear)
+    The node still lands on 1 May: the pillar goes to whichever end carries the
+    dominant interpolation weight, and 13 August 2008 sits 12 days into a 31-day
+    month, so the near end wins."""
+    settings = _settings()
+    helper = _helper(settings, _index(settings), CpiInterpolationType.Linear)
+
+    assert helper.latest_date() == Date(1, 6, 2008)
+    assert helper.pillar_date() == PILLAR
+
+
+def test_the_pillar_keyword_moves_the_node_to_the_far_end():
+    """`pillar` is a trailing keyword defaulting to LastRelevantDate, so every
+    call that predates it keeps its node. Asking for MaturityDate instead puts
+    the node a month later, at the far end of the interpolated window, which is
+    what makes a keyword dropped on the way to the core visible."""
+    settings = _settings()
+    helper = _helper(
+        settings,
+        _index(settings),
+        CpiInterpolationType.Linear,
+        pillar=Pillar.MaturityDate,
+    )
+
+    assert helper.pillar_date() == Date(1, 6, 2008)
 
 
 def test_the_first_node_is_the_base_date_at_a_negative_time():

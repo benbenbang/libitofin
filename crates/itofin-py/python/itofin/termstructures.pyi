@@ -983,7 +983,10 @@ class ZeroCouponInflationSwapHelper(ZeroInflationHelper):
     be set before this constructor runs, not merely before the bootstrap.
 
     It prices through a copy of index linked to a handle of its own, so the
-    caller's index need not be linked to any curve."""
+    caller's index need not be linked to any curve.
+
+    pillar picks which of the two nodes an interpolated swap straddles the helper
+    fits; a flat swap reads a single fixing and ignores it."""
 
     def __init__(
         self,
@@ -996,10 +999,11 @@ class ZeroCouponInflationSwapHelper(ZeroInflationHelper):
         index: ZeroInflationIndex,
         observation_interpolation: CpiInterpolationType,
         settings: Settings,
+        pillar: Pillar = ...,
     ) -> None:
-        """Raises ItofinError on CpiInterpolationType.Linear, whose date and
-        pillar logic is a documented deferral of the port, and on an observation
-        lag the index cannot observe through."""
+        """Raises ItofinError on an observation lag the index cannot observe
+        through, and under CpiInterpolationType.Linear on one that leaves less
+        than a whole index period over the index's availability lag."""
         ...
     def inflation_fixing_date(self) -> Date:
         """The maturity observation date on the helper's own swap: maturity less

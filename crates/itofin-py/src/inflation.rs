@@ -11,6 +11,7 @@
 
 use crate::PyQlError;
 use crate::curve::PyYieldTermStructure;
+use crate::helpers::PyPillar;
 use crate::market::PySimpleQuote;
 use crate::settings::PySettings;
 use crate::swap::PySwapType;
@@ -510,11 +511,14 @@ impl PyZeroInflationHelper {
 /// the bootstrap points at the curve under construction; the caller's index
 /// keeps whatever curve it had and need not be linked at all.
 ///
-/// Fallible: the core rejects
-/// [`CpiInterpolationType.Linear`](PyCpiInterpolationType), whose date and
-/// pillar logic is a documented deferral of the port
-/// (`inflationhelpers.rs:252-255`), and rejects an observation lag the index
-/// cannot observe through, the swap being built here too. Both raise
+/// `pillar` picks which of the two nodes an interpolated swap straddles the
+/// helper fits; a flat swap reads a single fixing and ignores it.
+///
+/// Fallible: the core rejects an observation lag the index cannot observe
+/// through, the swap being built here too, and under
+/// [`CpiInterpolationType.Linear`](PyCpiInterpolationType) one that leaves less
+/// than a whole index period over the index's availability lag, interpolation
+/// reading the month after the one the lag lands in. Both raise
 /// [`struct@crate::ItofinError`].
 #[pyclass(
     name = "ZeroCouponInflationSwapHelper",
@@ -529,6 +533,18 @@ pub struct PyZeroCouponInflationSwapHelper {
 impl PyZeroCouponInflationSwapHelper {
     /// A helper fitting `quote` on a swap maturing at `maturity`.
     #[new]
+    #[pyo3(signature = (
+        quote,
+        swap_obs_lag,
+        maturity,
+        calendar,
+        payment_convention,
+        day_counter,
+        index,
+        observation_interpolation,
+        settings,
+        pillar = PyPillar::LastRelevantDate,
+    ))]
     #[allow(clippy::too_many_arguments)]
     fn new(
         quote: &PySimpleQuote,
@@ -540,6 +556,7 @@ impl PyZeroCouponInflationSwapHelper {
         index: &PyZeroInflationIndex,
         observation_interpolation: &PyCpiInterpolationType,
         settings: &PySettings,
+        pillar: PyPillar,
     ) -> PyResult<PyClassInitializer<Self>> {
         let concrete = ZeroCouponInflationSwapHelper::new(
             quote.handle(),
@@ -550,6 +567,7 @@ impl PyZeroCouponInflationSwapHelper {
             day_counter.inner(),
             &index.shared(),
             observation_interpolation.inner(),
+            pillar.inner(),
             settings.inner(),
         )
         .map_err(PyQlError::from)?;

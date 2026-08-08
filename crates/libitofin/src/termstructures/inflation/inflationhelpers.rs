@@ -22,16 +22,11 @@
 //!
 //! ## Deferred within EPIC Inflation (#705)
 //!
-//! - The **interpolated observation branch** (`inflationhelpers.cpp:114-153`):
-//!   its earliest/latest dates straddle the fixing period and its pillar follows
-//!   an interpolation weight. [`ZeroCouponInflationSwapHelper::new`] rejects
-//!   [`CpiInterpolationType::Linear`] rather than walking the flat path with it.
-//! - The **start/end-date constructor** (`cpp:52-69`), so every helper here
+//! - The **start/end-date constructor** (`cpp:52-69`, #806), so every helper here
 //!   rebuilds its schedule off the evaluation date, and the deprecated
 //!   nominal-curve constructor (`cpp:71-86`).
-//! - The `Pillar::CustomDate` / `Pillar::MaturityDate` choices, which only the
-//!   interpolated branch reads (`cpp:120-152`); the flat branch has one
-//!   possible pillar.
+//! - The `Pillar::CustomDate` choice (`cpp:140-150`, #808), which needs an
+//!   explicit pillar date threaded through construction plus its bounds check.
 //! - `YearOnYearInflationSwapHelper` (`cpp:208-360`), which needs the
 //!   year-on-year curve and index.
 
@@ -56,7 +51,7 @@ use crate::settings::Settings;
 use crate::shared::{Shared, SharedMut, shared, shared_mut};
 use crate::termstructures::bootstraphelper::{BootstrapHelperBase, BootstrapHelperShared};
 use crate::termstructures::inflation::inflationtermstructure::ZeroInflationTermStructure;
-use crate::termstructures::yields::FlatForward;
+use crate::termstructures::yields::{FlatForward, Pillar};
 use crate::termstructures::yieldtermstructure::YieldTermStructure;
 use crate::time::businessdayconvention::BusinessDayConvention;
 use crate::time::calendar::Calendar;
@@ -231,12 +226,27 @@ impl ZeroCouponInflationSwapHelper {
     /// nominal curve (`cpp:173-174`); it does **not** observe the curve it is
     /// bootstrapped against.
     ///
+    /// `pillar` picks which of the two nodes the interpolated swap straddles the
+    /// helper fits (`cpp:118-139`); the flat swap reads one fixing, so its single
+    /// node is the pillar whatever the choice (`cpp:154-159`). C++ defaults the
+    /// argument to [`Pillar::LastRelevantDate`] (`hpp:48`).
+    ///
+    /// On the interpolated path C++ weights that choice by the swap's *start*
+    /// date where it has one, falling back to the maturity (`cpp:132`), so that
+    /// helpers sharing a start date all pick the same side. This constructor is
+    /// the relative-date one, whose start date is the moving evaluation date and
+    /// not a schedule input, so it is always the maturity arm - the fixed-date
+    /// constructor that would supply the other is #806.
+    ///
     /// # Errors
     ///
-    /// [`CpiInterpolationType::Linear`] is rejected: its date and pillar logic is
-    /// a documented deferral (see the module docs). The swap the helper prices is
-    /// built here too, so a `swap_obs_lag` the index cannot observe through fails
-    /// at construction, as the C++ constructor's `initializeDates` throws.
+    /// The swap the helper prices is built here, so a `swap_obs_lag` the index
+    /// cannot observe through fails at construction, as the C++ constructor's
+    /// `initializeDates` throws. The interpolated path needs a further whole
+    /// index period of lag on top of the index's availability lag
+    /// (`cpp:165-171`), reading as it does the fixing of the month *after* the
+    /// one the lag lands in; a pair of lags [`Period`]'s partial ordering cannot
+    /// decide fails there too, where C++ throws out of the comparison itself.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         quote: Handle<dyn Quote>,
@@ -247,13 +257,30 @@ impl ZeroCouponInflationSwapHelper {
         day_counter: DayCounter,
         zii: &Shared<ZeroInflationIndex>,
         observation_interpolation: CpiInterpolationType,
+        pillar: Pillar,
         settings: Shared<Settings<Date>>,
     ) -> QlResult<Shared<ZeroCouponInflationSwapHelper>> {
-        require!(
-            observation_interpolation == CpiInterpolationType::Flat,
-            "the interpolated observation branch (inflationhelpers.cpp:114-153) is not ported"
-        );
         let fixing_period = inflation_period(maturity - swap_obs_lag, zii.frequency())?;
+        let (earliest_date, latest_date, pillar_date) = Self::dates(
+            fixing_period,
+            maturity,
+            zii,
+            observation_interpolation,
+            pillar,
+        )?;
+        if observation_interpolation == CpiInterpolationType::Linear {
+            let period_shift = Period::try_from(zii.frequency())?;
+            let availability_lag = zii.availability_lag();
+            let excess = swap_obs_lag - period_shift;
+            require!(
+                excess
+                    .partial_cmp(&availability_lag)
+                    .is_some_and(std::cmp::Ordering::is_ge),
+                "inconsistency between swap observation lag {swap_obs_lag}, index period \
+                 {period_shift} and index availability {availability_lag}: need (obsLag-index \
+                 period) >= availLag"
+            );
+        }
         let nominal_term_structure = Handle::new(shared(FlatForward::moving_with_rate(
             0,
             NullCalendar::new(),
@@ -285,9 +312,11 @@ impl ZeroCouponInflationSwapHelper {
             index.observable().register_observer(&base.observer());
             nominal_term_structure.register_observer(&base.observer());
 
-            base.set_earliest_date(fixing_period.0);
-            base.set_latest_date(fixing_period.0);
-            base.set_pillar_date(fixing_period.0);
+            base.set_earliest_date(earliest_date);
+            base.set_latest_date(latest_date);
+            if let Some(pillar_date) = pillar_date {
+                base.set_pillar_date(pillar_date);
+            }
 
             let helper = ZeroCouponInflationSwapHelper {
                 base,
@@ -314,6 +343,49 @@ impl ZeroCouponInflationSwapHelper {
             return Err(error.clone());
         }
         Ok(helper)
+    }
+
+    /// The helper's earliest and latest dates and its pillar, if it pins one
+    /// (`cpp:114-160`).
+    ///
+    /// The flat swap reads a single fixing, so all three collapse onto the first
+    /// day of the observed fixing period (`cpp:154-159`). The interpolated swap
+    /// reads the fixings bracketing its observation date, so its window opens on
+    /// that day and closes the day after the period ends (`cpp:115-116`), and the
+    /// pillar goes to whichever end carries the dominant interpolation weight
+    /// (`cpp:118-139`).
+    ///
+    /// `None` is the C++ `pillarDate_ == Date()` the `dt/dp > 0.5` arm leaves
+    /// behind (`cpp:136-137`): the pillar is not the fixing period's start there,
+    /// it is unset, and
+    /// [`BootstrapHelperBase::pillar_date`](crate::termstructures::bootstraphelper::BootstrapHelperBase::pillar_date)
+    /// answers with the latest date exactly as `bootstraphelper.hpp:193-197`
+    /// does.
+    fn dates(
+        fixing_period: (Date, Date),
+        maturity: Date,
+        zii: &Shared<ZeroInflationIndex>,
+        observation_interpolation: CpiInterpolationType,
+        pillar: Pillar,
+    ) -> QlResult<(Date, Date, Option<Date>)> {
+        match observation_interpolation {
+            CpiInterpolationType::Flat => {
+                Ok((fixing_period.0, fixing_period.0, Some(fixing_period.0)))
+            }
+            CpiInterpolationType::Linear => {
+                let latest_date = fixing_period.1 + 1;
+                let pillar_date = match pillar {
+                    Pillar::MaturityDate => Some(latest_date),
+                    Pillar::LastRelevantDate => {
+                        let weight_period = inflation_period(maturity, zii.frequency())?;
+                        let dp = Real::from(weight_period.1 + 1 - weight_period.0);
+                        let dt = Real::from(maturity - weight_period.0);
+                        (dt / dp <= 0.5).then_some(fixing_period.0)
+                    }
+                };
+                Ok((fixing_period.0, latest_date, pillar_date))
+            }
+        }
     }
 
     /// The cached swap, or the error that stopped it being built (`swap()`,
@@ -686,15 +758,32 @@ mod tests {
             settings: &Shared<Settings<Date>>,
             interpolation: CpiInterpolationType,
         ) -> QlResult<Shared<ZeroCouponInflationSwapHelper>> {
+            a_helper_with(
+                settings,
+                interpolation,
+                Pillar::LastRelevantDate,
+                maturity(),
+                lag(),
+            )
+        }
+
+        fn a_helper_with(
+            settings: &Shared<Settings<Date>>,
+            interpolation: CpiInterpolationType,
+            pillar: Pillar,
+            maturity: Date,
+            obs_lag: Period,
+        ) -> QlResult<Shared<ZeroCouponInflationSwapHelper>> {
             ZeroCouponInflationSwapHelper::new(
                 Handle::new(shared(SimpleQuote::new(Some(0.03))) as Shared<dyn Quote>),
-                lag(),
-                maturity(),
+                obs_lag,
+                maturity,
                 UnitedKingdom::new(Market::Settlement),
                 BusinessDayConvention::ModifiedFollowing,
                 Actual365Fixed::new(),
                 &an_index(settings),
                 interpolation,
+                pillar,
                 Shared::clone(settings),
             )
         }
@@ -867,14 +956,119 @@ mod tests {
             );
         }
 
-        /// The interpolated branch is omitted visibly: a caller asking for it is
-        /// told, not quietly given the flat dates.
+        /// The interpolated window straddles the observed fixing period
+        /// (`cpp:115-116`). The swap observes 13 May 2008, whose monthly period is
+        /// 1 to 31 May, and it reads the fixings bracketing that day: the May
+        /// figure, dated 1 May 2008, and the June one, dated the day after May's
+        /// period ends - 1 June 2008. The flat helper collapses both onto 1 May.
+        ///
+        /// The relevant and maturity dates follow the far end rather than the
+        /// near one, both falling back to the latest date
+        /// (`bootstraphelper.hpp:190-197`), and it is the relevant date that sets
+        /// how far a bootstrapped curve reaches.
         #[test]
-        fn the_interpolated_observation_branch_is_rejected() {
-            let error = a_helper(&settings_today(), CpiInterpolationType::Linear)
-                .err()
-                .expect("the interpolated branch is deferred");
-            assert!(error.message().contains("not ported"), "err was: {error}");
+        fn the_interpolated_dates_straddle_the_observed_fixing_period() {
+            let helper = a_helper(&settings_today(), CpiInterpolationType::Linear)
+                .expect("a three-month lag leaves a month over UK RPI's availability");
+
+            assert_eq!(helper.earliest_date(), Date::new(1, May, 2008));
+            assert_eq!(helper.latest_date(), Date::new(1, June, 2008));
+            assert_eq!(helper.latest_relevant_date(), Date::new(1, June, 2008));
+            assert_eq!(helper.maturity_date(), Date::new(1, June, 2008));
+        }
+
+        /// [`Pillar::MaturityDate`] pins the node at the window's far end
+        /// (`cpp:119-121`), the June figure's date - not the near end the weighted
+        /// choice picks for this same maturity below.
+        #[test]
+        fn the_maturity_date_pillar_is_the_windows_far_end() {
+            let helper = a_helper_with(
+                &settings_today(),
+                CpiInterpolationType::Linear,
+                Pillar::MaturityDate,
+                maturity(),
+                lag(),
+            )
+            .expect("a valid lag");
+
+            assert_eq!(helper.pillar_date(), Date::new(1, June, 2008));
+        }
+
+        /// [`Pillar::LastRelevantDate`] pins the node at whichever end carries the
+        /// dominant interpolation weight (`cpp:122-138`), weighed on the maturity
+        /// because this relative-date helper has no schedule start date
+        /// (`cpp:132`). 13 August 2008 falls 12 days into a 31-day month, so
+        /// `dt/dp` is 12/31 = 0.387 and the near end wins: the pillar is the
+        /// window's start, a full month before its far end.
+        #[test]
+        fn the_weighted_pillar_takes_the_windows_start_early_in_the_month() {
+            let helper =
+                a_helper(&settings_today(), CpiInterpolationType::Linear).expect("a valid lag");
+
+            assert_eq!(helper.pillar_date(), Date::new(1, May, 2008));
+        }
+
+        /// The far side of the same threshold: 25 August 2008 falls 24 days into
+        /// that 31-day month, `dt/dp` is 24/31 = 0.774, and the far end wins. C++
+        /// leaves the pillar unset there rather than assigning one (`cpp:136-137`)
+        /// and the base answers with the latest date
+        /// (`bootstraphelper.hpp:193-197`); this port does the same. The window
+        /// itself does not move - 25 May 2008 sits in the same May period - so the
+        /// weight is the only thing the later maturity changes.
+        #[test]
+        fn the_weighted_pillar_takes_the_windows_far_end_late_in_the_month() {
+            let helper = a_helper_with(
+                &settings_today(),
+                CpiInterpolationType::Linear,
+                Pillar::LastRelevantDate,
+                Date::new(25, August, 2008),
+                lag(),
+            )
+            .expect("a valid lag");
+
+            assert_eq!(helper.earliest_date(), Date::new(1, May, 2008));
+            assert_eq!(helper.pillar_date(), Date::new(1, June, 2008));
+        }
+
+        /// The interpolated path needs a whole index period of observation lag on
+        /// top of the index's availability lag (`cpp:165-171`), since it reads the
+        /// month *after* the one the lag lands in. UK RPI publishes a month in
+        /// arrears, so a one-month lag leaves nothing for that second figure.
+        ///
+        /// The message names all three quantities, which is what tells this apart
+        /// from the swap's own availability failure - the flat path builds on the
+        /// same one-month lag.
+        #[test]
+        fn an_interpolated_lag_short_of_an_index_period_is_rejected() {
+            let settings = settings_today();
+            let short_lag = Period::new(1, TimeUnit::Months);
+            let error = a_helper_with(
+                &settings,
+                CpiInterpolationType::Linear,
+                Pillar::LastRelevantDate,
+                maturity(),
+                short_lag,
+            )
+            .err()
+            .expect("one month of lag cannot cover the interpolation");
+
+            assert!(
+                error
+                    .message()
+                    .contains("need (obsLag-index period) >= availLag"),
+                "err was: {error}"
+            );
+            assert!(
+                a_helper_with(
+                    &settings,
+                    CpiInterpolationType::Flat,
+                    Pillar::LastRelevantDate,
+                    maturity(),
+                    short_lag,
+                )
+                .is_ok(),
+                "the flat path has no such requirement"
+            );
         }
     }
 }
