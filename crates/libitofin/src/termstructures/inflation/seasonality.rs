@@ -366,3 +366,220 @@ impl Seasonality for MultiplicativePriceSeasonality {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    //! The factor set is anchored on 31 January 2007 while the curve's base
+    //! date is 1 July 2007, so the two reference factors differ and the
+    //! end-to-end zero correction discriminates which of them divides which.
+
+    use super::*;
+    use crate::math::interpolations::linear::Linear;
+    use crate::termstructures::inflation::interpolatedzeroinflationcurve::ZeroInflationCurve;
+    use crate::time::date::Month::{August, December, January, July};
+    use crate::time::daycounters::thirty360::{Convention, Thirty360};
+
+    /// Readable factors: the value names its own index.
+    fn factors(count: usize) -> Vec<Rate> {
+        (0..count).map(|i| 1.0 + i as Rate / 1000.0).collect()
+    }
+
+    fn seasonality_base_date() -> Date {
+        Date::new(31, January, 2007)
+    }
+
+    fn curve_base_date() -> Date {
+        Date::new(1, July, 2007)
+    }
+
+    fn monthly(count: usize) -> MultiplicativePriceSeasonality {
+        MultiplicativePriceSeasonality::new(
+            seasonality_base_date(),
+            Frequency::Monthly,
+            factors(count),
+        )
+        .expect("a whole multiple of twelve factors")
+    }
+
+    /// A carrier for the three properties a correction reads off a curve: the
+    /// base date, the frequency and the day counter.
+    fn a_curve() -> ZeroInflationCurve {
+        ZeroInflationCurve::new(
+            Date::new(13, August, 2007),
+            vec![curve_base_date(), Date::new(13, August, 2012)],
+            vec![0.02, 0.03],
+            Frequency::Monthly,
+            Thirty360::with_convention(Convention::BondBasis),
+            Linear,
+        )
+        .expect("two sorted nodes and plausible rates")
+    }
+
+    /// The offset is counted in whole months from the seasonality base date
+    /// and wraps modulo twelve, in both directions.
+    ///
+    /// The four dates are hand-counted off 31 January 2007: 1 July 2007 is six
+    /// stepped months later, 1 August 2008 nineteen (so it wraps to seven), 1
+    /// December 2006 one earlier (wrapping to eleven) and 1 December 2005
+    /// thirteen earlier (wrapping past a whole year, to eleven again).
+    #[test]
+    fn the_factor_is_picked_by_stepped_month_offset_and_wraps_both_ways() {
+        let seasonality = monthly(12);
+
+        assert_eq!(
+            seasonality
+                .seasonality_factor(seasonality_base_date())
+                .unwrap(),
+            factors(12)[0]
+        );
+        assert_eq!(
+            seasonality.seasonality_factor(curve_base_date()).unwrap(),
+            factors(12)[6]
+        );
+        assert_eq!(
+            seasonality
+                .seasonality_factor(Date::new(1, August, 2008))
+                .unwrap(),
+            factors(12)[7]
+        );
+        assert_eq!(
+            seasonality
+                .seasonality_factor(Date::new(1, December, 2006))
+                .unwrap(),
+            factors(12)[11]
+        );
+        assert_eq!(
+            seasonality
+                .seasonality_factor(Date::new(1, December, 2005))
+                .unwrap(),
+            factors(12)[11]
+        );
+    }
+
+    /// The year-on-year branch is the plain ratio of the factor at the date to
+    /// the one a year earlier - `curve_base_date` never reaches it - and the
+    /// zero branch spreads its ratio over the time from the curve base.
+    #[test]
+    fn the_correction_is_the_rate_grossed_up_by_the_factor_ratio() {
+        let seasonality = monthly(24);
+        let day_counter = Thirty360::with_convention(Convention::BondBasis);
+        let at = Date::new(1, August, 2008);
+        let rate = 0.03;
+
+        let factor_at = seasonality.seasonality_factor(at).unwrap();
+        let a_year_before = seasonality
+            .seasonality_factor(Date::new(1, August, 2007))
+            .unwrap();
+        assert_ne!(factor_at, a_year_before, "a two-year factor set moves YoY");
+        assert_eq!(
+            seasonality
+                .seasonality_correction(rate, at, &day_counter, Date::null(), false)
+                .unwrap(),
+            (rate + 1.0) * (factor_at / a_year_before) - 1.0
+        );
+
+        let factor_base = seasonality.seasonality_factor(curve_base_date()).unwrap();
+        let f = (factor_at / factor_base).powf(1.0 / (390.0 / 360.0));
+        assert_eq!(
+            seasonality
+                .seasonality_correction(rate, at, &day_counter, curve_base_date(), true)
+                .unwrap(),
+            (rate + 1.0) * f - 1.0
+        );
+    }
+
+    /// The end-to-end zero correction off a real curve, pinned to a factor
+    /// ratio and a year fraction computed by hand.
+    ///
+    /// The reference factor is the one at the curve's base date, 1 July 2007
+    /// (index six), and the corrected factor the one at the start of the
+    /// query's inflation period, 1 August 2008 (index seven). Dividing the
+    /// other way round, or referencing the *end* of the base period
+    /// (31 July 2007, index six as well but a different year fraction),
+    /// changes the answer. `Thirty360(BondBasis)` from 1 July 2007 to 1 August
+    /// 2008 is `(360 + 30) / 360`.
+    #[test]
+    fn the_zero_correction_normalizes_against_the_curves_true_base_date() {
+        let seasonality = monthly(12);
+        let curve = a_curve();
+        let rate = 0.03;
+
+        let expected_f = (factors(12)[7] / factors(12)[6]).powf(1.0 / (390.0 / 360.0));
+        assert_eq!(
+            seasonality
+                .correct_zero_rate(Date::new(15, August, 2008), rate, &curve)
+                .unwrap(),
+            (rate + 1.0) * expected_f - 1.0
+        );
+        assert!(expected_f > 1.0, "the factor set rises over that span");
+        assert_ne!(
+            seasonality
+                .correct_zero_rate(Date::new(15, August, 2008), rate, &curve)
+                .unwrap(),
+            rate,
+            "the correction must move the rate at all"
+        );
+    }
+
+    /// Stationary price seasonality leaves year-on-year rates untouched: the
+    /// factor a year earlier is the very same one, so the ratio is exactly one
+    /// and only the `(rate + 1) * 1 - 1` round trip separates the answer from
+    /// the input.
+    #[test]
+    fn a_stationary_factor_set_does_not_move_a_year_on_year_rate() {
+        let seasonality = monthly(12);
+        let curve = a_curve();
+        let at = Date::new(1, August, 2008);
+
+        assert_eq!(
+            seasonality.seasonality_factor(at).unwrap(),
+            seasonality
+                .seasonality_factor(Date::new(1, August, 2007))
+                .unwrap()
+        );
+        let corrected = seasonality.correct_yoy_rate(at, 0.03, &curve).unwrap();
+        assert!((corrected - 0.03).abs() < 1.0e-15, "moved to {corrected}");
+    }
+
+    /// Twelve monthly factors are consistent with any curve; twenty-four are
+    /// the deferred multi-year branch; thirteen never build at all.
+    #[test]
+    fn consistency_covers_the_stationary_case_and_defers_the_multi_year_one() {
+        let curve = a_curve();
+
+        assert!(monthly(12).is_consistent(&curve).unwrap());
+        let deferred = monthly(24).is_consistent(&curve).unwrap_err();
+        assert!(deferred.message().contains("#807"));
+
+        let rejected = MultiplicativePriceSeasonality::new(
+            seasonality_base_date(),
+            Frequency::Monthly,
+            factors(13),
+        )
+        .unwrap_err();
+        assert!(
+            rejected
+                .message()
+                .contains("require multiple of 12 factors 13 were given")
+        );
+    }
+
+    #[test]
+    fn only_semiannual_through_daily_frequencies_are_accepted() {
+        let annual = MultiplicativePriceSeasonality::new(
+            seasonality_base_date(),
+            Frequency::Annual,
+            factors(1),
+        )
+        .unwrap_err();
+        assert!(annual.message().contains("bad frequency specified"));
+
+        let empty = MultiplicativePriceSeasonality::new(
+            seasonality_base_date(),
+            Frequency::Monthly,
+            vec![],
+        )
+        .unwrap_err();
+        assert!(empty.message().contains("no seasonality factors given"));
+    }
+}
