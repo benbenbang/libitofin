@@ -1360,3 +1360,272 @@ mod premium_leg {
         );
     }
 }
+
+#[cfg(test)]
+mod results_tail {
+    //! Oracle: the results tail (`isdacdsengine.cpp:289-364`).
+    //!
+    //! The numeric acceptance for this engine is the Markit grid of #798; what
+    //! is pinned here is the wiring that grid would fail on without saying
+    //! where - which leg each protection side negates, the identity the value
+    //! sums to, the two fair quotes and the sentinels the sensitivities fall
+    //! back on - and the one place the port keeps a C++ quirk rather than the
+    //! formula the quirk was meant to be.
+    //!
+    //! Every case prices one contract whose accrual opened three months before
+    //! the evaluation date and whose trade date is the evaluation date itself,
+    //! so that the accrual rebate is worth a quarter's coupon rather than
+    //! nothing. That is what the fair-spread case needs: the divisor is the
+    //! coupon leg plus the rebate, which a rebate worth nothing could not be
+    //! told from the coupon leg alone.
+
+    use super::premium_leg::{discount_factor, stepped_discount};
+    use super::protection_leg::{act365f, today};
+    use super::*;
+    use crate::instrument::Instrument;
+    use crate::instruments::{CdsTerms, CreditDefaultSwap};
+    use crate::shared::shared;
+    use crate::termstructures::credit::flathazardrate::FlatHazardRate;
+    use crate::time::businessdayconvention::BusinessDayConvention;
+    use crate::time::calendars::weekendsonly::WeekendsOnly;
+    use crate::time::date::Month;
+    use crate::time::frequency::Frequency;
+    use crate::time::schedule::MakeSchedule;
+
+    const NOTIONAL: Real = 10_000_000.0;
+    const SPREAD: Rate = 0.01;
+    const UPFRONT: Rate = 0.05;
+    const RECOVERY: Real = 0.4;
+    const HAZARD: Real = 0.02;
+
+    /// A two-year semiannual contract on the premium leg's curves, quoted on an
+    /// upfront and a running spread and traded today, straddling the evaluation
+    /// date inside its first coupon period.
+    fn armed(
+        side: ProtectionSide,
+        spread: Rate,
+        upfront: Rate,
+        upfront_date: Option<Date>,
+    ) -> (IsdaCdsEngine, CreditDefaultSwap) {
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(today());
+        let credit = Handle::new(
+            shared(FlatHazardRate::with_rate(today(), HAZARD, act365f()))
+                as Shared<dyn DefaultProbabilityTermStructure>,
+        );
+        let mut engine = IsdaCdsEngine::new(
+            credit,
+            RECOVERY,
+            stepped_discount(),
+            None,
+            Shared::clone(&settings),
+        );
+        let schedule = MakeSchedule::new()
+            .from(Date::new(15, Month::March, 2026))
+            .to(Date::new(15, Month::March, 2028))
+            .with_frequency(Frequency::Semiannual)
+            .with_calendar(WeekendsOnly::new())
+            .build();
+        let cds = CreditDefaultSwap::with_upfront_and_terms(
+            side,
+            NOTIONAL,
+            upfront,
+            spread,
+            schedule,
+            BusinessDayConvention::Following,
+            Actual360::new(),
+            CdsTerms {
+                settles_accrual: true,
+                pays_at_default_time: true,
+                trade_date: Some(today()),
+                upfront_date,
+                ..CdsTerms::default()
+            },
+            settings,
+        )
+        .expect("the contract is well formed");
+        cds.setup_arguments(engine.base.arguments_mut())
+            .expect("the contract fills the arguments");
+        (engine, cds)
+    }
+
+    /// The four signed legs a priced fixture leaves behind, in the order the
+    /// value sums them (`isdacdsengine.cpp:326`).
+    fn legs(results: &CdsResults) -> (Real, Real, Real, Real) {
+        (
+            results
+                .default_leg_npv
+                .expect("the protection leg is valued"),
+            results.coupon_leg_npv.expect("the premium leg is valued"),
+            results.upfront_npv.expect("the upfront is valued"),
+            results
+                .accrual_rebate_npv
+                .expect("the accrual rebate is valued"),
+        )
+    }
+
+    /// `isdacdsengine.cpp:326-328`: the value is the four signed legs, and the
+    /// engine offers no error estimate.
+    ///
+    /// The sum is asserted exactly, in the order C++ adds it in: the legs are
+    /// read back out of the results, so anything but the same additions would
+    /// be a different number, not a rounding of this one.
+    #[test]
+    fn the_value_sums_the_four_signed_legs() {
+        for side in [ProtectionSide::Seller, ProtectionSide::Buyer] {
+            let (mut engine, _) = armed(side, SPREAD, UPFRONT, None);
+            engine.calculate().expect("the contract prices");
+            let results = engine.base.results();
+            let (default_leg, coupon_leg, upfront, rebate) = legs(results);
+
+            for leg in [default_leg, coupon_leg, upfront, rebate] {
+                assert!(
+                    leg != 0.0 && leg.is_finite(),
+                    "a leg worth {leg} could not tell one sum from another"
+                );
+            }
+            assert_eq!(
+                results.instrument.value,
+                Some(default_leg + coupon_leg + upfront + rebate)
+            );
+            assert_eq!(results.instrument.error_estimate, None);
+        }
+    }
+
+    /// `isdacdsengine.cpp:311-324`: the seller negates the protection leg and
+    /// the rebate, the buyer the premium leg and the upfront.
+    ///
+    /// Each leg is pinned on its own rather than only through the sum, which
+    /// two legs swapped between the arms would leave untouched; and since the
+    /// two sides negate disjoint halves of the same four, the contract is worth
+    /// exactly the opposite to each of them, bit for bit.
+    #[test]
+    fn each_side_negates_its_own_two_legs() {
+        let (mut seller, _) = armed(ProtectionSide::Seller, SPREAD, UPFRONT, None);
+        seller.calculate().expect("the contract prices");
+        let (mut buyer, _) = armed(ProtectionSide::Buyer, SPREAD, UPFRONT, None);
+        buyer.calculate().expect("the contract prices");
+
+        let sold = legs(seller.base.results());
+        let bought = legs(buyer.base.results());
+
+        assert!(sold.0 < 0.0 && sold.1 > 0.0 && sold.2 > 0.0 && sold.3 < 0.0);
+        assert!(bought.0 > 0.0 && bought.1 < 0.0 && bought.2 < 0.0 && bought.3 > 0.0);
+        assert_eq!(sold.0, -bought.0);
+        assert_eq!(sold.1, -bought.1);
+        assert_eq!(sold.2, -bought.2);
+        assert_eq!(sold.3, -bought.3);
+        assert_eq!(
+            seller.base.results().instrument.value,
+            buyer.base.results().instrument.value.map(|value| -value)
+        );
+    }
+
+    /// `isdacdsengine.cpp:331-337`, quirk included: the guard tests the premium
+    /// leg alone yet the divisor is the premium leg plus the accrual rebate.
+    ///
+    /// The two divisors are told apart here, which is what makes this the quirk
+    /// and not a restatement: the fixture's rebate is worth about a percent of
+    /// its premium leg, so dividing by the premium leg alone moves the fair
+    /// spread far past any rounding. The rebate is asserted to carry that
+    /// weight before the quirk is asserted at all, since a rebate worth nothing
+    /// would make the two formulas the same expression.
+    #[test]
+    fn the_fair_spread_divides_by_the_premium_leg_and_the_rebate() {
+        let (mut engine, _) = armed(ProtectionSide::Seller, SPREAD, UPFRONT, None);
+        engine.calculate().expect("the contract prices");
+        let results = engine.base.results();
+        let (default_leg, coupon_leg, _, rebate) = legs(results);
+
+        assert!(
+            rebate.abs() > 1.0e-4 * coupon_leg.abs(),
+            "a rebate of {rebate} against a premium leg of {coupon_leg} could not tell the \
+             divisors apart"
+        );
+        let faithful = -default_leg * SPREAD / (coupon_leg + rebate);
+        let premium_leg_alone = -default_leg * SPREAD / coupon_leg;
+
+        assert_eq!(results.fair_spread, Some(faithful));
+        assert!(
+            (faithful - premium_leg_alone).abs() > 1.0e-6 * faithful.abs(),
+            "the two divisors agreed to {faithful}, so the quirk is not pinned"
+        );
+    }
+
+    /// `isdacdsengine.cpp:339-347`: the fair upfront is what the three other
+    /// signed legs come to, per unit of the upfront's own sensitivity, against
+    /// the sign the protection side gives that sensitivity.
+    ///
+    /// The sensitivity is rebuilt from the contract's own settlement date and a
+    /// curve built again, rather than from the upfront NPV the same tail
+    /// wrote, so the discount factor is an input to this case and not an
+    /// output of it.
+    #[test]
+    fn the_fair_upfront_prices_the_other_three_legs() {
+        for (side, upfront_sign) in [(ProtectionSide::Seller, 1.0), (ProtectionSide::Buyer, -1.0)] {
+            let (mut engine, cds) = armed(side, SPREAD, UPFRONT, None);
+            engine.calculate().expect("the contract prices");
+            let results = engine.base.results();
+            let (default_leg, coupon_leg, _, rebate) = legs(results);
+
+            let sensitivity =
+                discount_factor(Event::date(cds.upfront_payment().as_ref())) * NOTIONAL;
+            assert!(
+                sensitivity > 0.0,
+                "an upfront still owed should carry a sensitivity"
+            );
+            let expected: Real = -upfront_sign * (default_leg + coupon_leg + rebate) / sensitivity;
+            let fair_upfront = results.fair_upfront.expect("the fair upfront is available");
+
+            assert!(
+                expected != 0.0 && expected.is_finite(),
+                "a fair upfront of {expected} would be vacuous"
+            );
+            assert!(
+                (fair_upfront - expected).abs() <= 1.0e-12 * expected.abs(),
+                "the fair upfront came to {fair_upfront} rather than to {expected}"
+            );
+        }
+    }
+
+    /// `isdacdsengine.cpp:341-346`: an upfront the cash settlement date has
+    /// already seen leaves no sensitivity, and so no fair upfront.
+    ///
+    /// The rebate settles on that same date (`creditdefaultswap.cpp:543-546`),
+    /// so it is worth nothing here too, which is what leaves the guard the only
+    /// thing that could return the sentinel.
+    #[test]
+    fn an_upfront_already_settled_prices_no_fair_upfront() {
+        let (mut engine, _) = armed(ProtectionSide::Seller, SPREAD, UPFRONT, Some(today() - 1));
+        engine.calculate().expect("the contract prices");
+        let results = engine.base.results();
+
+        assert_eq!(results.upfront_npv, Some(0.0));
+        assert_eq!(results.accrual_rebate_npv, Some(0.0));
+        assert_eq!(results.fair_upfront, None);
+        assert!(results.fair_spread.is_some());
+    }
+
+    /// `isdacdsengine.cpp:349-364`: each sensitivity is a basis point of its own
+    /// leg per unit of its own quote, and reports the sentinel where that quote
+    /// is nothing to divide by.
+    #[test]
+    fn the_sensitivities_follow_the_quotes_they_divide_by() {
+        let (mut quoted, _) = armed(ProtectionSide::Seller, SPREAD, UPFRONT, None);
+        quoted.calculate().expect("the contract prices");
+        let results = quoted.base.results();
+        let (_, coupon_leg, upfront, _) = legs(results);
+
+        assert_eq!(results.coupon_leg_bps, Some(coupon_leg * 1.0e-4 / SPREAD));
+        assert_eq!(results.upfront_bps, Some(upfront * 1.0e-4 / UPFRONT));
+
+        let (mut unquoted, _) = armed(ProtectionSide::Seller, 0.0, 0.0, None);
+        unquoted.calculate().expect("the contract prices");
+        let results = unquoted.base.results();
+
+        assert_eq!(results.coupon_leg_npv, Some(0.0));
+        assert_eq!(results.coupon_leg_bps, None);
+        assert_eq!(results.upfront_bps, None);
+        assert_eq!(results.fair_spread, None);
+    }
+}
