@@ -25,14 +25,14 @@
 //!
 //! ## Unported (#796, #797)
 //!
-//! The leg integrations (`isdacdsengine.cpp:159-286`) and the results tail
-//! (`:288-310`) are not written yet: [`IsdaCdsEngine::calculate`] validates its
-//! inputs, builds what those kernels run on, and then reports #796 rather than
-//! returning a price - an engine answering `0.0` here could not be told apart
-//! from a contract genuinely worth nothing.
+//! The premium-leg integration (`isdacdsengine.cpp:201-287`) and the results
+//! tail (`:288-310`) are not written yet: [`IsdaCdsEngine::calculate`] values
+//! the protection leg, records it, and then reports #796 rather than returning
+//! a price - an engine answering `0.0` here could not be told apart from a
+//! contract genuinely worth nothing.
 
 use crate::errors::QlResult;
-use crate::instruments::{CdsArguments, CdsEngine, CdsResults, FaceValueClaim};
+use crate::instruments::{CdsArguments, CdsEngine, CdsResults, Claim, FaceValueClaim};
 use crate::patterns::observable::{AsObservable, Observable};
 use crate::pricingengine::{Arguments, PricingEngine, Results};
 use crate::settings::Settings;
@@ -208,9 +208,83 @@ impl IsdaCdsEngine {
             include_settlement_date_flows: self.include_settlement_date_flows,
             accrual_bias: self.accrual_bias,
             forwards_in_coupon_period: self.forwards_in_coupon_period,
+            maturity,
         })
     }
+
+    /// `isdacdsengine.cpp:159-197`: the protection leg, integrated over the
+    /// grid nodes from the day before the effective protection start out to the
+    /// maturity, and scaled by what a default would claim.
+    ///
+    /// The value is positive here, whatever the C++ comment at `:159` says:
+    /// `h_hat` is the fall in the log survival probability over a step and so is
+    /// non-negative, as is the `N (1 - R)` it ends up scaled by. The sign the
+    /// protection side gives the leg belongs to the results tail (`:311-320`,
+    /// #797), exactly as it does for
+    /// [`MidPointCdsEngine`](super::MidPointCdsEngine) (`midpointcdsengine.cpp:143`).
+    ///
+    /// C++ rolls a `d1` into `d0` alongside `P0` and `Q0` (`:192-194`) that
+    /// nothing reads after the two curve lookups it seeds (`:163-164`); the port
+    /// keeps the lookups and drops the date.
+    ///
+    /// The claim is asked for its amount on the null date, as in C++ (`:196`).
+    /// The engine settles face-value claims alone (`:97-98`) and those ignore
+    /// the date, so nothing is lost by having no default date to offer.
+    fn protection_leg_npv(
+        &self,
+        context: &IsdaContext,
+        claim: &dyn Claim,
+        notional: Real,
+    ) -> QlResult<Real> {
+        let opening = context.effective_protection_start - 1;
+        let mut p0 = context.discount.discount_date(opening, false)?;
+        let mut q0 = context
+            .probability
+            .survival_probability_date(opening, false)?;
+        let mut protection_npv = 0.0;
+
+        let mut index = context
+            .nodes
+            .partition_point(|node| *node <= context.effective_protection_start);
+        while index < context.nodes.len() {
+            let past_maturity = context.nodes[index] > context.maturity;
+            let d1 = if past_maturity {
+                context.maturity
+            } else {
+                context.nodes[index]
+            };
+            let p1 = context.discount.discount_date(d1, false)?;
+            let q1 = context.probability.survival_probability_date(d1, false)?;
+            let f_hat = p0.ln() - p1.ln();
+            let h_hat = q0.ln() - q1.ln();
+            let fhphh = f_hat + h_hat;
+
+            protection_npv +=
+                if fhphh < TAYLOR_THRESHOLD && self.numerical_fix == NumericalFix::Taylor {
+                    let fhphhq = fhphh * fhphh;
+                    p0 * q0
+                        * h_hat
+                        * (1.0 - 0.5 * fhphh + 1.0 / 6.0 * fhphhq - 1.0 / 24.0 * fhphhq * fhphh
+                            + 1.0 / 120.0 * fhphhq * fhphhq)
+                } else {
+                    h_hat / (fhphh + context.n_fix) * (p0 * q0 - p1 * q1)
+                };
+
+            p0 = p1;
+            q0 = q1;
+            if past_maturity {
+                break;
+            }
+            index += 1;
+        }
+
+        Ok(protection_npv * claim.amount(&Date::null(), notional, context.recovery_rate))
+    }
 }
+
+/// Below this the integrands' quotients are replaced by their Taylor expansions
+/// (`isdacdsengine.cpp:183`, `:256`), when the engine was asked for them.
+const TAYLOR_THRESHOLD: Real = 1.0e-4;
 
 /// `isdacdsengine.cpp:77-84`: the specification fixes both curves on
 /// Act/365 (Fixed), which C++ checks by comparing the day counters themselves.
@@ -229,8 +303,9 @@ fn require_act_365_fixed(day_counter: Option<DayCounter>, curve: &str) -> QlResu
 
 /// What the leg kernels run on once the compatibility checks have passed: the
 /// C++ locals of `isdacdsengine.cpp:66-157`, gathered so that the kernels can be
-/// written against them without reshaping the engine. Every field is read by the
-/// integrations of #796; the scaffold only builds it.
+/// written against them without reshaping the engine. The fields the protection
+/// leg does not read are the premium leg's (#796) and the results tail's
+/// (`eval_date`, first read at `:292`, #797).
 #[allow(dead_code)]
 struct IsdaContext {
     discount: Shared<dyn YieldTermStructure>,
@@ -243,6 +318,7 @@ struct IsdaContext {
     include_settlement_date_flows: Option<bool>,
     accrual_bias: AccrualBias,
     forwards_in_coupon_period: ForwardsInCouponPeriod,
+    maturity: Date,
 }
 
 impl AsObservable for IsdaCdsEngine {
@@ -264,11 +340,25 @@ impl PricingEngine for IsdaCdsEngine {
         self.base.reset();
     }
 
-    /// `isdacdsengine.cpp:52-310`, of which only the validation and the setup
-    /// (`:54-157`) are ported.
+    /// `isdacdsengine.cpp:52-310`, of which the validation, the setup
+    /// (`:54-157`) and the protection leg (`:159-199`) are ported.
+    ///
+    /// The protection leg is recorded before the report, so a caller that means
+    /// to read it can do so through [`results`](PricingEngine::results) despite
+    /// the `Err`.
     fn calculate(&mut self) -> QlResult<()> {
-        let _context = self.validated()?;
-        fail!("the ISDA CDS engine values no legs yet: its integrations are #796")
+        let context = self.validated()?;
+        let arguments = self.base.arguments();
+        let Some(notional) = arguments.notional else {
+            fail!("notional not set");
+        };
+        let Some(claim) = arguments.claim.as_ref().map(Shared::clone) else {
+            fail!("claim not set");
+        };
+
+        let default_leg_npv = self.protection_leg_npv(&context, &*claim, notional)?;
+        self.base.results_mut().default_leg_npv = Some(default_leg_npv);
+        fail!("the ISDA CDS engine values no premium leg yet: its integration is #796")
     }
 }
 
@@ -513,6 +603,220 @@ mod tests {
         assert_eq!(
             chosen.forwards_in_coupon_period,
             ForwardsInCouponPeriod::Flat
+        );
+    }
+}
+
+#[cfg(test)]
+mod protection_leg {
+    //! Oracle: the protection-leg integration (`isdacdsengine.cpp:159-199`).
+    //!
+    //! The grid this walks is not something a contract can be asked for, so
+    //! every case grades it against a closed form instead of against a repriced
+    //! contract. On curves of a flat continuous rate `r` and a flat hazard `h`,
+    //! a step's exact integrand `h_hat / (f_hat + h_hat) (P0 Q0 - P1 Q1)`
+    //! collapses to `h/(r+h) (P0 Q0 - P1 Q1)`, so the sum telescopes to
+    //! `h/(r+h) (P0 Q0 - P_end Q_end)` whatever the nodes in between are. That
+    //! value is arrived at without walking anything, which is what makes it an
+    //! oracle for the walk rather than a restatement of it.
+    //!
+    //! The discount curve is interpolated rather than flat even though it prices
+    //! flat: `isda_node_grid` takes the grid from the curves' own pillars, so
+    //! two flat curves leave it as the maturity alone and nothing about the walk
+    //! over it could be seen (which is what the scaffold's own grid case pins).
+    //!
+    //! The full numeric gate for this engine is the Markit grid of #798; these
+    //! are the mechanical pins that gate cannot localise.
+
+    use super::*;
+    use crate::math::interpolations::loglinear::LogLinear;
+    use crate::shared::shared;
+    use crate::termstructures::credit::flathazardrate::FlatHazardRate;
+    use crate::termstructures::yields::InterpolatedDiscountCurve;
+    use crate::time::date::{Month, SerialNumber};
+
+    const NOTIONAL: Real = 10_000_000.0;
+    const RECOVERY: Real = 0.4;
+
+    fn today() -> Date {
+        Date::new(15, Month::June, 2026)
+    }
+
+    fn act365f() -> DayCounter {
+        Actual365Fixed::new()
+    }
+
+    /// Act/365 (Fixed) time from the evaluation date, which both curves count
+    /// in and which the closed form below is stated in.
+    fn years(days: SerialNumber) -> Real {
+        Real::from(days) / 365.0
+    }
+
+    /// A log-linear discount curve pillared at `offsets` days from today, its
+    /// factors set to `exp(-rate t)`. It prices as a flat continuous curve - log
+    /// linear in the discount factor is linear in `-rate t` - while contributing
+    /// those pillars to the ISDA grid.
+    fn nodal_discount(rate: Real, offsets: &[SerialNumber]) -> Handle<dyn YieldTermStructure> {
+        let dates = offsets.iter().map(|days| today() + *days).collect();
+        let discounts = offsets
+            .iter()
+            .map(|days| (-rate * years(*days)).exp())
+            .collect();
+        Handle::new(shared(
+            InterpolatedDiscountCurve::<LogLinear>::new(dates, discounts, act365f(), None)
+                .expect("the pillars increase and open at a discount factor of 1"),
+        ) as Shared<dyn YieldTermStructure>)
+    }
+
+    /// The protection leg the walk should sum to, in closed form. The
+    /// integration opens at the day before the effective protection start, which
+    /// for a protection start on or before today is today itself, where the time
+    /// is zero and both curves are `1`.
+    fn analytic(rate: Real, hazard: Real, end: SerialNumber) -> Real {
+        let total = rate + hazard;
+        hazard / total * (1.0 - (-total * years(end)).exp()) * NOTIONAL * (1.0 - RECOVERY)
+    }
+
+    /// The protection leg of a contract on those curves, read out of the results
+    /// the engine records before reporting the premium leg it has yet to value.
+    ///
+    /// The arguments are set directly rather than through a contract: the
+    /// protection leg reads only these four, and a schedule would tie the
+    /// maturity to a coupon date and so hide the clamp below.
+    fn protection_leg(
+        rate: Real,
+        hazard: Real,
+        offsets: &[SerialNumber],
+        maturity: SerialNumber,
+        numerical_fix: NumericalFix,
+    ) -> Real {
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(today());
+        let credit = Handle::new(
+            shared(FlatHazardRate::with_rate(today(), hazard, act365f()))
+                as Shared<dyn DefaultProbabilityTermStructure>,
+        );
+        let mut engine = IsdaCdsEngine::new(
+            credit,
+            RECOVERY,
+            nodal_discount(rate, offsets),
+            None,
+            settings,
+        )
+        .with_fidelity(
+            numerical_fix,
+            AccrualBias::HalfDayBias,
+            ForwardsInCouponPeriod::Piecewise,
+        );
+
+        let arguments = engine.base.arguments_mut();
+        arguments.notional = Some(NOTIONAL);
+        arguments.claim = Some(shared(FaceValueClaim) as Shared<dyn Claim>);
+        arguments.protection_start = Some(today());
+        arguments.maturity = Some(today() + maturity);
+        arguments.settles_accrual = true;
+        arguments.pays_at_default_time = true;
+
+        engine
+            .calculate()
+            .expect_err("the premium leg is not valued yet");
+        engine
+            .base
+            .results()
+            .default_leg_npv
+            .expect("the protection leg is valued")
+    }
+
+    /// `isdacdsengine.cpp:162-195`: the walk over a grid of several pillars sums
+    /// to the closed form, and does so positive - the C++ comment at `:159`
+    /// notwithstanding.
+    #[test]
+    fn the_walk_over_the_grid_sums_to_the_closed_form() {
+        let value = protection_leg(0.03, 0.02, &[0, 30, 180, 400], 400, NumericalFix::NoFix);
+        let expected = analytic(0.03, 0.02, 400);
+
+        assert!(expected > 0.0, "a leg worth nothing would be vacuous");
+        assert!(
+            (value - expected).abs() <= 1.0e-12 * expected,
+            "the walk summed to {value} rather than to the closed form {expected}"
+        );
+    }
+
+    /// `isdacdsengine.cpp:170-172`: a pillar past the maturity is integrated to
+    /// the maturity instead and ends the walk, rather than overshooting it.
+    #[test]
+    fn a_pillar_past_the_maturity_integrates_to_the_maturity() {
+        let value = protection_leg(0.03, 0.02, &[0, 30, 180, 400], 300, NumericalFix::NoFix);
+        let expected = analytic(0.03, 0.02, 300);
+        let overshoot = analytic(0.03, 0.02, 400);
+
+        assert!(
+            overshoot - expected > 1.0e-3 * expected,
+            "a grid that stopped at the maturity anyway would be vacuous"
+        );
+        assert!(
+            (value - expected).abs() <= 1.0e-12 * expected,
+            "the walk ran to {value} rather than to the maturity's {expected}"
+        );
+    }
+
+    /// `isdacdsengine.cpp:183-190`: the Taylor series and the quotient it stands
+    /// in for agree, and both meet the closed form, on a grid whose every step
+    /// falls under the threshold.
+    ///
+    /// Two-day steps at a combined rate of `0.015` put `f + h` at `8.2e-5`,
+    /// under the `1e-4` the series is selected below. It is graded against the
+    /// closed form rather than only against the quotient, which is what makes
+    /// the coefficients load bearing: raising the `1/6` term to `1/5` moves the
+    /// sum by `2e-10` relative, and the `1/2` term by `1.4e-5`.
+    #[test]
+    fn the_taylor_series_meets_the_quotient_and_the_closed_form() {
+        let offsets = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+        let taylor = protection_leg(0.01, 0.005, &offsets, 8, NumericalFix::Taylor);
+        let quotient = protection_leg(0.01, 0.005, &offsets, 8, NumericalFix::NoFix);
+        let expected = analytic(0.01, 0.005, 8);
+
+        assert!(expected > 0.0, "a leg worth nothing would be vacuous");
+        assert!(
+            (taylor - expected).abs() <= 1.0e-12 * expected,
+            "the series summed to {taylor} rather than to the closed form {expected}"
+        );
+        assert!(
+            (quotient - expected).abs() <= 1.0e-12 * expected,
+            "the quotient summed to {quotient} rather than to the closed form {expected}"
+        );
+        assert!(
+            (taylor - quotient).abs() <= 1.0e-12 * expected,
+            "the two arms parted by {} at the crossover",
+            taylor - quotient
+        );
+    }
+
+    /// What the numerical fix is for ([1] footnote 26, [2]), and the one case in
+    /// which the two arms are told apart at all: a discount rate that cancels
+    /// the hazard leaves `f + h` at zero, where the quotient divides a rounding
+    /// error by `10^-50` and the series returns the limit.
+    ///
+    /// The limit of `h/(r+h) (1 - e^{-(r+h)t})` as `r + h` goes to zero is
+    /// `h t`, which is what the series must reproduce. The quotient is asserted
+    /// only to be nowhere near it, since what it returns is not a number this
+    /// port should be pinned to.
+    #[test]
+    fn the_series_returns_the_limit_the_quotient_cannot() {
+        let hazard = 0.02;
+        let offsets = [0, 1, 2];
+        let expected = hazard * years(2) * NOTIONAL * (1.0 - RECOVERY);
+        let taylor = protection_leg(-hazard, hazard, &offsets, 2, NumericalFix::Taylor);
+        let quotient = protection_leg(-hazard, hazard, &offsets, 2, NumericalFix::NoFix);
+
+        assert!(
+            (taylor - expected).abs() <= 1.0e-12 * expected,
+            "the series returned {taylor} rather than the limit {expected}"
+        );
+        assert!(
+            (quotient - expected).abs() > 0.5 * expected,
+            "the quotient returned {quotient}, near enough the limit {expected} that the arms \
+             cannot be told apart here"
         );
     }
 }
