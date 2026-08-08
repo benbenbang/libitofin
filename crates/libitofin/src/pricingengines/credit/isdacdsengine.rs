@@ -31,17 +31,17 @@
 //!   coupon, which is every member the kernel reads; a floating-rate coupon in
 //!   the leg would therefore price here where C++ is undefined.
 //!
-//! ## Unported (#796, #797)
+//! ## Unported (#797)
 //!
-//! The premium leg's default accrual (`isdacdsengine.cpp:223-283`) and the
-//! results tail (`:288-310`) are not written yet: [`IsdaCdsEngine::calculate`]
-//! values the protection leg and the premium coupons, records them, and then
-//! reports #797 rather than returning a price - an engine answering `0.0` here
-//! could not be told apart from a contract genuinely worth nothing. The accrual
-//! is #796's second half.
+//! The results tail (`isdacdsengine.cpp:288-310`) is not written yet:
+//! [`IsdaCdsEngine::calculate`] values both legs, records them, and then reports
+//! #797 rather than returning a price - an engine answering `0.0` here could not
+//! be told apart from a contract genuinely worth nothing.
 
 use crate::cashflow::Leg;
+use crate::cashflows::Coupon;
 use crate::errors::QlResult;
+use crate::event::event_has_occurred;
 use crate::instruments::{CdsArguments, CdsEngine, CdsResults, Claim, FaceValueClaim};
 use crate::patterns::observable::{AsObservable, Observable};
 use crate::pricingengine::{Arguments, PricingEngine, Results};
@@ -292,8 +292,9 @@ impl IsdaCdsEngine {
         Ok(protection_npv * claim.amount(&Date::null(), notional, context.recovery_rate))
     }
 
-    /// `isdacdsengine.cpp:201-221`: the premium leg's coupons, each live one
-    /// carried by the survival to the day before it pays.
+    /// `isdacdsengine.cpp:201-287`: the premium leg - each live coupon carried
+    /// by the survival to the day before it pays, plus what a default part way
+    /// through a period would accrue.
     ///
     /// The survival factor and its one-day offset (`:218`) are the standard
     /// model's, not a discounting identity: a coupon is paid only if the name
@@ -301,12 +302,11 @@ impl IsdaCdsEngine {
     /// the date the coupon is discounted from.
     ///
     /// The specification fixes the premium leg's day count as well as the
-    /// curves' (`:205-211`).
-    ///
-    /// What a default part way through a period accrues (`:223-283`) is not
-    /// added here yet; it is the second half of #796.
-    fn premium_leg_npv(&self, context: &IsdaContext, leg: &Leg) -> QlResult<Real> {
+    /// curves' (`:205-211`), so the ISDA `365/360` scaling at `:282` is the
+    /// conversion between the two conventions it allows.
+    fn premium_leg_npv(&self, context: &IsdaContext, leg: &Leg, notional: Real) -> QlResult<Real> {
         let mut premium_npv = 0.0;
+        let mut default_accrual_npv = 0.0;
 
         for (position, flow) in leg.iter().enumerate() {
             let Some(coupon) = flow.as_coupon() else {
@@ -331,9 +331,105 @@ impl IsdaCdsEngine {
                         .probability
                         .survival_probability_date(flow.date() - 1, false)?;
             }
+
+            if event_has_occurred(
+                coupon.accrual_end_date(),
+                &self.settings,
+                Some(context.effective_protection_start),
+                Some(false),
+            )? {
+                continue;
+            }
+            default_accrual_npv += self.default_accrual(context, coupon, flow.date())?
+                * notional
+                * coupon.rate()?
+                * 365.0
+                / 360.0;
         }
 
-        Ok(premium_npv)
+        Ok(premium_npv + default_accrual_npv)
+    }
+
+    /// `isdacdsengine.cpp:223-280`: what a default inside one coupon's period
+    /// accrues, per unit of notional and of coupon rate.
+    ///
+    /// The period is integrated from the day before its accrual starts - or
+    /// before the protection does, whichever is later - to the day before it
+    /// pays (`:225-227`), subdivided at the grid's own nodes when the engine was
+    /// asked to see the forwards inside the period as piecewise (`:231-241`).
+    /// Only the caller's guard on the accrual end (`:223-224`) keeps that
+    /// subdivision well formed: it holds the period open past the effective
+    /// protection start, which with a payment date no earlier than the accrual
+    /// end puts the opening date strictly before the closing one, so the node
+    /// range between them cannot run backwards.
+    ///
+    /// `tstart` is measured from the unclamped accrual start (`:228-230`), a day
+    /// earlier than the accrual it weights, which is what the half-day bias
+    /// half-corrects.
+    fn default_accrual(
+        &self,
+        context: &IsdaContext,
+        coupon: &dyn Coupon,
+        payment_date: Date,
+    ) -> QlResult<Real> {
+        let start = coupon
+            .accrual_start_date()
+            .max(context.effective_protection_start)
+            - 1;
+        let end = payment_date - 1;
+        let tstart = context
+            .discount
+            .time_from_reference(coupon.accrual_start_date() - 1)?
+            - match context.accrual_bias {
+                AccrualBias::HalfDayBias => 1.0 / 730.0,
+                AccrualBias::NoBias => 0.0,
+            };
+
+        let mut local_nodes = vec![start];
+        if context.forwards_in_coupon_period == ForwardsInCouponPeriod::Piecewise {
+            let opening = context.nodes.partition_point(|node| *node <= start);
+            let closing = context.nodes.partition_point(|node| *node < end);
+            local_nodes.extend_from_slice(&context.nodes[opening..closing]);
+        }
+        local_nodes.push(end);
+
+        let mut accrual = 0.0;
+        let mut t0 = context.discount.time_from_reference(local_nodes[0])?;
+        let mut p0 = context.discount.discount_date(local_nodes[0], false)?;
+        let mut q0 = context
+            .probability
+            .survival_probability_date(local_nodes[0], false)?;
+        for node in &local_nodes[1..] {
+            let t1 = context.discount.time_from_reference(*node)?;
+            let p1 = context.discount.discount_date(*node, false)?;
+            let q1 = context
+                .probability
+                .survival_probability_date(*node, false)?;
+            let f_hat = p0.ln() - p1.ln();
+            let h_hat = q0.ln() - q1.ln();
+            let fhphh = f_hat + h_hat;
+
+            accrual += if fhphh < TAYLOR_THRESHOLD && self.numerical_fix == NumericalFix::Taylor {
+                let fhphhq = fhphh * fhphh;
+                h_hat
+                    * p0
+                    * q0
+                    * ((t0 - tstart)
+                        * (1.0 - 0.5 * fhphh + 1.0 / 6.0 * fhphhq - 1.0 / 24.0 * fhphhq * fhphh)
+                        + (t1 - t0)
+                            * (0.5 - 1.0 / 3.0 * fhphh + 1.0 / 8.0 * fhphhq
+                                - 1.0 / 30.0 * fhphhq * fhphh))
+            } else {
+                (h_hat / (fhphh + context.n_fix))
+                    * ((t1 - t0) * ((p0 * q0 - p1 * q1) / (fhphh + context.n_fix) - p1 * q1)
+                        + (t0 - tstart) * (p0 * q0 - p1 * q1))
+            };
+
+            t0 = t1;
+            p0 = p1;
+            q0 = q1;
+        }
+        Ok(accrual)
     }
 }
 
@@ -358,13 +454,13 @@ fn require_act_365_fixed(day_counter: Option<DayCounter>, curve: &str) -> QlResu
 
 /// What the leg kernels run on once the compatibility checks have passed: the
 /// C++ locals of `isdacdsengine.cpp:66-157`, gathered so that the kernels can be
-/// written against them without reshaping the engine. The fields nothing reads
-/// yet belong to the default accrual (the two flags, #796) and to the results
-/// tail (`eval_date`, first read at `isdacdsengine.cpp:292`, #797).
-#[allow(dead_code)]
+/// written against them without reshaping the engine.
 struct IsdaContext {
     discount: Shared<dyn YieldTermStructure>,
     probability: Shared<dyn DefaultProbabilityTermStructure>,
+    /// The one field neither leg reads: the results tail measures the upfront
+    /// payment against it (`isdacdsengine.cpp:292`, #797).
+    #[allow(dead_code)]
     eval_date: Date,
     effective_protection_start: Date,
     nodes: Vec<Date>,
@@ -413,7 +509,7 @@ impl PricingEngine for IsdaCdsEngine {
             };
             (
                 self.protection_leg_npv(&context, &**claim, notional)?,
-                self.premium_leg_npv(&context, &arguments.leg)?,
+                self.premium_leg_npv(&context, &arguments.leg, notional)?,
             )
         };
 
@@ -903,7 +999,6 @@ mod premium_leg {
     use super::protection_leg::{act365f, today, years};
     use super::*;
     use crate::cashflow::CashFlow;
-    use crate::cashflows::Coupon;
     use crate::cashflows::FixedRateCoupon;
     use crate::instrument::Instrument;
     use crate::instruments::{CreditDefaultSwap, ProtectionSide};
@@ -1109,6 +1204,57 @@ mod premium_leg {
             (coupon_leg(&mut engine) - expected).abs() <= 1.0e-12 * expected,
             "the premium leg came to {} rather than to {expected}",
             coupon_leg(&mut engine)
+        );
+    }
+
+    /// `isdacdsengine.cpp:228-230`: the half-day bias reaches the accrual.
+    ///
+    /// The two settings differ by the `1/730` of a year the biased one shifts
+    /// `tstart` back by, which is worth about a day's accrual on each period, so
+    /// the biased leg is worth strictly more.
+    #[test]
+    fn the_half_day_bias_moves_the_accrual() {
+        let biased = coupon_leg(&mut armed(
+            act365f(),
+            AccrualBias::HalfDayBias,
+            ForwardsInCouponPeriod::Piecewise,
+        ));
+        let unbiased = coupon_leg(&mut armed(
+            act365f(),
+            AccrualBias::NoBias,
+            ForwardsInCouponPeriod::Piecewise,
+        ));
+
+        assert!(unbiased > 0.0, "a leg worth nothing would be vacuous");
+        assert!(
+            biased > unbiased,
+            "the biased leg came to {biased}, not above the unbiased {unbiased}"
+        );
+    }
+
+    /// `isdacdsengine.cpp:231-241`: subdividing a coupon period at the grid's
+    /// own pillars reaches the accrual.
+    ///
+    /// The fixture's pillars fall strictly inside the coupon periods, which is
+    /// what the two settings part over: with none inside, both integrate each
+    /// period in one step and price identically.
+    #[test]
+    fn the_pillars_inside_a_coupon_period_move_the_accrual() {
+        let piecewise = coupon_leg(&mut armed(
+            act365f(),
+            AccrualBias::NoBias,
+            ForwardsInCouponPeriod::Piecewise,
+        ));
+        let flat = coupon_leg(&mut armed(
+            act365f(),
+            AccrualBias::NoBias,
+            ForwardsInCouponPeriod::Flat,
+        ));
+
+        assert!(flat > 0.0, "a leg worth nothing would be vacuous");
+        assert!(
+            (piecewise - flat).abs() > 1.0e-12 * flat,
+            "subdividing the periods left the leg at {piecewise}, apart from {flat} by nothing"
         );
     }
 }
