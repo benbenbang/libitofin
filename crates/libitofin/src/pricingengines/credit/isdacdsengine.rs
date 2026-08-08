@@ -271,3 +271,248 @@ impl PricingEngine for IsdaCdsEngine {
         fail!("the ISDA CDS engine values no legs yet: its integrations are #796")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    //! Oracle: the ISDA-compatibility block of `IsdaCdsEngine::calculate`
+    //! (`isdacdsengine.cpp:54-98`). Nothing prices yet, so what is pinned is
+    //! which inputs the engine refuses and with which message.
+    //!
+    //! Every case starts from one fixture the engine accepts and corrupts a
+    //! single dimension of it, and compares the message rather than only that an
+    //! error came back: the checks run in a fixed order, so a case that broke two
+    //! dimensions at once would pass on the wrong guard. The uncorrupted fixture
+    //! is a case of its own and reaches the unported integrations, which is what
+    //! shows every guard above it passed.
+
+    use super::*;
+    use crate::instrument::Instrument;
+    use crate::instruments::{Claim, CreditDefaultSwap, ProtectionSide};
+    use crate::interestrate::Compounding;
+    use crate::shared::shared;
+    use crate::termstructures::credit::flathazardrate::FlatHazardRate;
+    use crate::termstructures::yields::FlatForward;
+    use crate::time::businessdayconvention::BusinessDayConvention;
+    use crate::time::calendars::weekendsonly::WeekendsOnly;
+    use crate::time::date::Month;
+    use crate::time::daycounters::actual360::Actual360;
+    use crate::time::frequency::Frequency;
+    use crate::time::schedule::MakeSchedule;
+
+    fn today() -> Date {
+        Date::new(15, Month::June, 2026)
+    }
+
+    fn act365f() -> DayCounter {
+        Actual365Fixed::new()
+    }
+
+    fn discount(reference: Date, day_counter: DayCounter) -> Handle<dyn YieldTermStructure> {
+        Handle::new(shared(FlatForward::with_rate(
+            reference,
+            0.03,
+            day_counter,
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>)
+    }
+
+    fn credit(
+        reference: Date,
+        day_counter: DayCounter,
+    ) -> Handle<dyn DefaultProbabilityTermStructure> {
+        Handle::new(
+            shared(FlatHazardRate::with_rate(reference, 0.02, day_counter))
+                as Shared<dyn DefaultProbabilityTermStructure>,
+        )
+    }
+
+    /// A claim outside the downcast seam, standing in for the claims the ISDA
+    /// model does not settle (`isdacdsengine.cpp:97-98`).
+    struct WholeNotionalClaim;
+
+    impl Claim for WholeNotionalClaim {
+        fn amount(&self, _default_date: &Date, notional: Real, _recovery_rate: Real) -> Real {
+            notional
+        }
+    }
+
+    /// Arms an engine over the two curves with a contract the ISDA model
+    /// covers, then corrupts one dimension of the arguments.
+    fn armed(
+        discount: Handle<dyn YieldTermStructure>,
+        credit: Handle<dyn DefaultProbabilityTermStructure>,
+        corrupt: impl FnOnce(&mut CdsArguments),
+    ) -> IsdaCdsEngine {
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(today());
+        let mut engine = IsdaCdsEngine::new(credit, 0.4, discount, None, Shared::clone(&settings));
+        let schedule = MakeSchedule::new()
+            .from(today())
+            .to(Date::new(15, Month::June, 2028))
+            .with_frequency(Frequency::Semiannual)
+            .with_calendar(WeekendsOnly::new())
+            .build();
+        let cds = CreditDefaultSwap::new(
+            ProtectionSide::Seller,
+            10_000_000.0,
+            0.01,
+            schedule,
+            BusinessDayConvention::Following,
+            Actual360::new(),
+            true,
+            true,
+            settings,
+        )
+        .expect("the contract is well formed");
+        cds.setup_arguments(engine.base.arguments_mut())
+            .expect("the contract fills the arguments");
+        corrupt(engine.base.arguments_mut());
+        engine
+    }
+
+    /// What `calculate` reports for such an engine.
+    fn refusal(
+        discount: Handle<dyn YieldTermStructure>,
+        credit: Handle<dyn DefaultProbabilityTermStructure>,
+        corrupt: impl FnOnce(&mut CdsArguments),
+    ) -> String {
+        armed(discount, credit, corrupt)
+            .calculate()
+            .expect_err("no ISDA contract prices yet")
+            .message()
+            .to_string()
+    }
+
+    /// The fixture every argument-side case corrupts: both curves Act/365
+    /// (Fixed) at the evaluation date, as the specification asks.
+    fn compatible(corrupt: impl FnOnce(&mut CdsArguments)) -> String {
+        refusal(
+            discount(today(), act365f()),
+            credit(today(), act365f()),
+            corrupt,
+        )
+    }
+
+    /// `isdacdsengine.cpp:77-84`.
+    #[test]
+    fn a_curve_that_does_not_count_act_365_fixed_is_refused() {
+        assert_eq!(
+            refusal(
+                discount(today(), Actual360::new()),
+                credit(today(), act365f()),
+                |_| {}
+            ),
+            "yield term structure day counter (Actual/360) should be Act/365(Fixed)"
+        );
+        assert_eq!(
+            refusal(
+                discount(today(), act365f()),
+                credit(today(), Actual360::new()),
+                |_| {}
+            ),
+            "probability term structure day counter (Actual/360) should be Act/365(Fixed)"
+        );
+    }
+
+    /// `isdacdsengine.cpp:85-92`: the date the curves are held against is the
+    /// evaluation date the engine was threaded with (D5), not a clock.
+    #[test]
+    fn a_curve_referenced_off_the_evaluation_date_is_refused() {
+        let tomorrow = today() + 1;
+        assert_eq!(
+            refusal(
+                discount(tomorrow, act365f()),
+                credit(today(), act365f()),
+                |_| {}
+            ),
+            format!(
+                "yield term structure reference date ({tomorrow}) should be evaluation date ({})",
+                today()
+            )
+        );
+        assert_eq!(
+            refusal(
+                discount(today(), act365f()),
+                credit(tomorrow, act365f()),
+                |_| {}
+            ),
+            format!(
+                "probability term structure reference date ({tomorrow}) should be evaluation date ({})",
+                today()
+            )
+        );
+    }
+
+    /// `isdacdsengine.cpp:93-98`: the three contract features the ISDA model
+    /// does not cover, the last read through the [`Claim`] downcast seam.
+    #[test]
+    fn a_contract_feature_the_isda_model_does_not_cover_is_refused() {
+        assert_eq!(
+            compatible(|arguments| arguments.settles_accrual = false),
+            "ISDA engine not compatible with non accrual paying CDS"
+        );
+        assert_eq!(
+            compatible(|arguments| arguments.pays_at_default_time = false),
+            "ISDA engine not compatible with end period payment"
+        );
+        assert_eq!(
+            compatible(|arguments| {
+                arguments.claim = Some(shared(WholeNotionalClaim) as Shared<dyn Claim>);
+            }),
+            "ISDA engine not compatible with non face value claim"
+        );
+    }
+
+    /// The fixture every case above corrupts, left alone: it clears every guard
+    /// and stops only on the integrations #796 has yet to write, which is what
+    /// makes each of those cases a single-dimension corruption.
+    #[test]
+    fn a_compatible_contract_reaches_the_unported_integrations() {
+        let message = compatible(|_| {});
+        assert!(
+            message.contains("#796"),
+            "a compatible contract should stop on the unported integrations, not on {message}"
+        );
+    }
+
+    /// What the checks leave behind for the kernels of #796: the flags the
+    /// caller chose (`isdacdsengine.hpp:98-104`), the `10^-50` the no-fix
+    /// variant puts into the denominators (`:157`), the protection start pushed
+    /// past the evaluation date (`:100-102`) and the integration grid
+    /// (`:150-156`), which two flat curves leave as the maturity alone.
+    #[test]
+    fn the_checks_leave_the_kernels_the_flags_and_the_grid() {
+        let fixture = || {
+            armed(
+                discount(today(), act365f()),
+                credit(today(), act365f()),
+                |_| {},
+            )
+        };
+        let defaulted = fixture().validated().expect("the fixture is compatible");
+        assert_eq!(defaulted.n_fix, 0.0);
+        assert_eq!(defaulted.accrual_bias, AccrualBias::HalfDayBias);
+        assert_eq!(
+            defaulted.forwards_in_coupon_period,
+            ForwardsInCouponPeriod::Piecewise
+        );
+        assert_eq!(defaulted.effective_protection_start, today() + 1);
+        assert_eq!(defaulted.nodes, vec![Date::new(15, Month::June, 2028)]);
+
+        let chosen = fixture()
+            .with_fidelity(
+                NumericalFix::NoFix,
+                AccrualBias::NoBias,
+                ForwardsInCouponPeriod::Flat,
+            )
+            .validated()
+            .expect("the fixture is compatible");
+        assert_eq!(chosen.n_fix, 1.0e-50);
+        assert_eq!(chosen.accrual_bias, AccrualBias::NoBias);
+        assert_eq!(
+            chosen.forwards_in_coupon_period,
+            ForwardsInCouponPeriod::Flat
+        );
+    }
+}
