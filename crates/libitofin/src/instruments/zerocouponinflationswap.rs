@@ -515,6 +515,7 @@ mod tests {
                 Frequency::Monthly,
                 Actual360::new(),
                 Linear,
+                None,
             )
             .expect("a well-formed zero inflation curve"),
         );

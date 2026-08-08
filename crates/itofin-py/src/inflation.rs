@@ -403,6 +403,7 @@ impl PyInterpolatedZeroInflationCurve {
                 frequency.inner(),
                 day_counter.inner(),
                 Linear,
+                None,
             )
             .map_err(PyQlError::from)?,
         );
@@ -647,6 +648,7 @@ impl PyPiecewiseZeroInflationCurve {
             frequency.inner(),
             day_counter.inner(),
             instruments,
+            None,
         )
         .map_err(PyQlError::from)?;
         let erased = Shared::clone(&concrete) as Shared<dyn ZeroInflationTermStructure>;

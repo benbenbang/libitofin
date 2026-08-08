@@ -411,6 +411,7 @@ mod tests {
             Frequency::Monthly,
             Thirty360::with_convention(Convention::BondBasis),
             Linear,
+            None,
         )
         .expect("two sorted nodes and plausible rates")
     }

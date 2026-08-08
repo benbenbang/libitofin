@@ -32,10 +32,13 @@
 //!
 //! ## Divergences from QuantLib
 //!
-//! - Seasonality (`:61`) is omitted rather than accepted and ignored, following
-//!   the [`inflationtermstructure`](super::inflationtermstructure) contract: a
-//!   caller needing it fails to compile. It follows with the seasonality
-//!   classes in EPIC Inflation (#705).
+//! - The seasonality argument (`:61`) is ported, and so is C++'s virtual
+//!   `update()` behind
+//!   [`set_seasonality`](InflationTermStructure::set_seasonality): installing
+//!   one invalidates the bootstrap, so the next read re-solves every node
+//!   against the corrected rates. The consistency gate runs from this
+//!   constructor rather than from the base one; see the
+//!   [`inflationtermstructure`](super::inflationtermstructure) divergences.
 //! - The `BaseDateFunc` constructor overload (`:73-90`), whose base date is
 //!   resolved lazily inside `performCalculations` (`:168-169`), is deferred
 //!   with it, and with it its oracle `testZeroTermStructureLazyBaseDate`
@@ -61,6 +64,7 @@ use crate::termstructures::inflation::inflationtermstructure::{
     InflationTermStructure, InflationTermStructureBase, ZeroInflationTermStructure,
 };
 use crate::termstructures::inflation::inflationtraits::ZeroInflationTraits;
+use crate::termstructures::inflation::seasonality::Seasonality;
 use crate::termstructures::iterativebootstrap::{IterativeBootstrap, PiecewiseCurve};
 use crate::termstructures::{TermStructure, TermStructureBase};
 use crate::time::date::Date;
@@ -122,6 +126,7 @@ impl PiecewiseZeroInflationCurve<Linear> {
         frequency: Frequency,
         day_counter: DayCounter,
         instruments: Vec<Shared<dyn ZeroInflationHelper>>,
+        seasonality: Option<Shared<dyn Seasonality>>,
     ) -> QlResult<Shared<PiecewiseZeroInflationCurve<Linear>>> {
         require!(!instruments.is_empty(), "no bootstrap helpers given");
 
@@ -139,6 +144,7 @@ impl PiecewiseZeroInflationCurve<Linear> {
                     frequency,
                     Some(day_counter),
                     None,
+                    seasonality,
                 ),
                 instruments,
                 interpolator: Linear,
@@ -156,6 +162,7 @@ impl PiecewiseZeroInflationCurve<Linear> {
         for helper in &curve.instruments {
             helper.observable().register_observer(&observer);
         }
+        curve.check_seasonality()?;
         Ok(curve)
     }
 }
@@ -238,6 +245,20 @@ impl<I: Interpolator + 'static> TermStructure for PiecewiseZeroInflationCurve<I>
 impl<I: Interpolator + 'static> InflationTermStructure for PiecewiseZeroInflationCurve<I> {
     fn inflation_base(&self) -> &InflationTermStructureBase {
         &self.inflation
+    }
+
+    fn as_inflation_term_structure(&self) -> &dyn InflationTermStructure {
+        self
+    }
+
+    /// Invalidates the bootstrap before broadcasting: a seasonality change
+    /// moves the rates the helpers reprice against, so the solved nodes are
+    /// stale and every one of them has to be solved again. This is the curve's
+    /// own `update()` (`:180-183`), which the base default cannot reach.
+    fn update_after_seasonality_change(&self) {
+        if let Some(update) = LazyObject::deferred_update(&self.lazy) {
+            update.notify_observers();
+        }
     }
 }
 
@@ -401,6 +422,7 @@ mod tests {
             Frequency::Monthly,
             day_counter(),
             helpers.clone(),
+            None,
         )
         .unwrap();
         Fixture {
@@ -498,6 +520,7 @@ mod tests {
             Frequency::Monthly,
             day_counter(),
             vec![Shared::clone(&helper) as Shared<dyn ZeroInflationHelper>],
+            None,
         )
         .unwrap();
 
@@ -523,6 +546,7 @@ mod tests {
             Frequency::Monthly,
             day_counter(),
             Vec::new(),
+            None,
         );
         let err = match built {
             Ok(_) => panic!("expected a construction error"),
@@ -547,10 +571,11 @@ mod zero_term_structure_oracle {
     //! placement, the fixing-period quantization and the forecast formula all
     //! at once, at the C++ tolerance of 1e-7.
     //!
-    //! Phase 3 (`:465-506`), which adds a seasonality correction and reprices
-    //! again, is **omitted**: seasonality is a documented deferral of this port
-    //! (see the module divergences), and the Rust curve takes no seasonality
-    //! argument, so phases 1 and 2 run exactly the numbers C++ runs before it.
+    //! Phase 3 (`:465-506`) installs a twelve-factor monthly price seasonality
+    //! on the bootstrapped curve and reprices the same fourteen swaps. The
+    //! factors are not one, so the corrected rates move and the curve has to
+    //! re-solve every node against them to come back to zero: a curve that
+    //! stored the correction without invalidating its bootstrap fails it.
     //!
     //! `testZeroTermStructureWithNominalCurve` (`:597-763`), which reruns the
     //! same fixture through the deprecated nominal-curve helper constructor, is
@@ -574,6 +599,7 @@ mod zero_term_structure_oracle {
     use crate::settings::Settings;
     use crate::shared::{SharedMut, shared, shared_mut};
     use crate::termstructures::inflation::inflationhelpers::ZeroCouponInflationSwapHelper;
+    use crate::termstructures::inflation::seasonality::MultiplicativePriceSeasonality;
     use crate::termstructures::yields::FlatForward;
     use crate::termstructures::yieldtermstructure::YieldTermStructure;
     use crate::time::businessdayconvention::BusinessDayConvention;
@@ -750,6 +776,7 @@ mod zero_term_structure_oracle {
             Frequency::Monthly,
             day_counter(),
             helpers,
+            None,
         )
         .unwrap();
         hz.link_to(Shared::clone(&curve) as Shared<dyn ZeroInflationTermStructure>);
@@ -809,6 +836,74 @@ mod zero_term_structure_oracle {
         println!("worst |NPV| {worst_npv:e}, worst fixed-leg BPS error {worst_bps:e}");
         assert!(worst_npv < EPS, "worst |NPV| {worst_npv}");
         assert!(worst_bps < EPS, "worst fixed-leg BPS error {worst_bps}");
+    }
+
+    /// The twelve monthly factors phase 3 installs (`:469-483`), anchored on 31
+    /// January of the year the curve's base period ends in (`:467-468`).
+    const SEASONALITY_FACTORS: [Real; 12] = [
+        1.003245, 1.000000, 0.999715, 1.000495, 1.000929, 0.998687, 0.995949, 0.994682, 0.995949,
+        1.000519, 1.003705, 1.004186,
+    ];
+
+    fn a_seasonality(curve: &PiecewiseZeroInflationCurve<Linear>) -> Shared<dyn Seasonality> {
+        let (_, next_base_date) =
+            inflation_period(curve.base_date(), Frequency::Monthly).expect("a monthly curve");
+        shared(
+            MultiplicativePriceSeasonality::new(
+                Date::new(31, January, next_base_date.year()),
+                Frequency::Monthly,
+                SEASONALITY_FACTORS.to_vec(),
+            )
+            .expect("twelve monthly factors"),
+        ) as Shared<dyn Seasonality>
+    }
+
+    /// Phase 3 (`:465-506`): the same fourteen swaps still reprice to zero once
+    /// a non-unit seasonality is installed on the bootstrapped curve.
+    ///
+    /// The direct pin comes first and is what makes the reprice loop mean
+    /// anything. Phase 3 on its own is degenerate: if the correction were
+    /// stored but never folded into the published rate, the re-bootstrap would
+    /// hit the very same nodes off the very same quotes and every swap would
+    /// still come back worth nothing - a false pass. So the index's own
+    /// forecast, which is the path every helper and every swap reaches the
+    /// curve through, is required to *move*. The reprice loop then covers the
+    /// other half: with the correction live, only a bootstrap that re-solved
+    /// against it can return to zero.
+    #[test]
+    fn a_seasonality_moves_the_forecast_and_the_curve_reprices_the_swaps_again() {
+        let fixture = a_fixture();
+        let curve = &fixture.curve;
+        let a_date = Date::new(1, August, 2012);
+
+        let (maturity, rate) = zc_data()[6];
+        let mut held = fixture.a_swap(maturity, rate / 100.0);
+        let held_npv = held.npv().unwrap();
+
+        let before = fixture.index.fixing(a_date, true).unwrap();
+        curve
+            .set_seasonality(Some(a_seasonality(curve.as_ref())))
+            .unwrap();
+        assert_ne!(
+            held.npv().unwrap(),
+            held_npv,
+            "an already-priced swap was never told the curve moved"
+        );
+        let after = fixture.index.fixing(a_date, true).unwrap();
+        println!("forecast at {a_date}: {before} -> {after}");
+        assert!(
+            (after - before).abs() > 1.0e-3,
+            "the seasonality never reached the forecast: {before} vs {after}"
+        );
+        assert!(curve.has_seasonality());
+
+        let mut worst_npv = 0.0_f64;
+        for (maturity, rate) in zc_data() {
+            let mut swap = fixture.a_swap(maturity, rate / 100.0);
+            worst_npv = worst_npv.max(swap.npv().unwrap().abs());
+        }
+        println!("worst |NPV| under seasonality {worst_npv:e}");
+        assert!(worst_npv < EPS, "worst |NPV| {worst_npv}");
     }
 
     /// Phase 2 (`:437-463`): the index, forecasting off the bootstrapped curve,

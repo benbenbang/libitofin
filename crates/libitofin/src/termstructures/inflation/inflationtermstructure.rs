@@ -25,15 +25,22 @@
 //!   live two-argument overload, which delegates with a zero lag and no
 //!   forced interpolation (`inflationtermstructure.cpp:134-138`), so it takes
 //!   the `else` branch only.
-//! - Seasonality (`seasonality_`, `setSeasonality`, `seasonality()`,
-//!   `hasSeasonality()` and the `correctZeroRate` fold at
-//!   `inflationtermstructure.cpp:170-172`) is not ported. Every use of it in
-//!   this file is guarded by `hasSeasonality()`, which is false for a curve
-//!   built without one, so the omission is behaviour-free for the curves
-//!   landing now; it follows with the seasonality classes in EPIC Inflation
-//!   (#705). The accessors are omitted rather than stubbed to a constant
-//!   `false`, so a curve needing seasonality fails to compile instead of
-//!   silently skipping the correction.
+//! - C++ gates [`Seasonality::is_consistent`] inside the three
+//!   `InflationTermStructure` constructors, against a partially constructed
+//!   `*this` (`inflationtermstructure.cpp:34-38,57-61,79-83`). A Rust holder
+//!   is not the curve and cannot produce the `&dyn InflationTermStructure`
+//!   that check needs, so the gate moves *out* to the concrete curve
+//!   constructors, which run
+//!   [`check_seasonality`](InflationTermStructure::check_seasonality) once
+//!   they have a whole curve. The holder still stores whatever it is given.
+//! - C++'s `setSeasonality` closes with a call to the virtual `update()`
+//!   (`inflationtermstructure.cpp:87`); the Rust equivalent is
+//!   [`update_after_seasonality_change`](InflationTermStructure::update_after_seasonality_change),
+//!   a separate overridable hook, because the notification a bootstrapped
+//!   curve owes its observers also has to invalidate its own cache.
+//! - The seasonality is held in a [`RefCell`] rather than as a plain field:
+//!   C++ `setSeasonality` is non-const and called on the concrete curve, which
+//!   here lives behind a [`Shared`] that hands out only shared references.
 //! - C++'s `checkRange` overloads *hide* `TermStructure::checkRange`; Rust
 //!   traits have no name hiding, so they are ported under distinct names
 //!   ([`check_inflation_range_date`](InflationTermStructure::check_inflation_range_date)
@@ -44,10 +51,13 @@
 //! - C++ overloads on `Date`/`Time` become distinct method names, the `_date`
 //!   suffix taking dates.
 
+use std::cell::RefCell;
+
 use crate::errors::QlResult;
 use crate::indexes::inflationindex::inflation_period;
 use crate::settings::Settings;
 use crate::shared::Shared;
+use crate::termstructures::inflation::seasonality::Seasonality;
 use crate::termstructures::{TermStructure, TermStructureBase};
 use crate::time::calendar::Calendar;
 use crate::time::date::Date;
@@ -66,6 +76,7 @@ pub struct InflationTermStructureBase {
     frequency: Frequency,
     base_rate: Option<Rate>,
     base_date: Date,
+    seasonality: RefCell<Option<Shared<dyn Seasonality>>>,
 }
 
 impl InflationTermStructureBase {
@@ -80,12 +91,14 @@ impl InflationTermStructureBase {
         frequency: Frequency,
         day_counter: Option<DayCounter>,
         base_rate: Option<Rate>,
+        seasonality: Option<Shared<dyn Seasonality>>,
     ) -> InflationTermStructureBase {
         InflationTermStructureBase {
             base: TermStructureBase::new(day_counter),
             frequency,
             base_rate,
             base_date,
+            seasonality: RefCell::new(seasonality),
         }
     }
 
@@ -97,18 +110,21 @@ impl InflationTermStructureBase {
         frequency: Frequency,
         day_counter: Option<DayCounter>,
         base_rate: Option<Rate>,
+        seasonality: Option<Shared<dyn Seasonality>>,
     ) -> InflationTermStructureBase {
         InflationTermStructureBase {
             base: TermStructureBase::with_reference_date(reference_date, None, day_counter),
             frequency,
             base_rate,
             base_date,
+            seasonality: RefCell::new(seasonality),
         }
     }
 
     /// Holder whose reference date moves off the evaluation date
     /// (`inflationtermstructure.cpp:57-70`); the [`Settings`] handle is
     /// explicit per D5.
+    #[allow(clippy::too_many_arguments)]
     pub fn moving(
         settlement_days: Natural,
         calendar: Calendar,
@@ -116,6 +132,7 @@ impl InflationTermStructureBase {
         frequency: Frequency,
         day_counter: Option<DayCounter>,
         base_rate: Option<Rate>,
+        seasonality: Option<Shared<dyn Seasonality>>,
         settings: Shared<Settings<Date>>,
     ) -> InflationTermStructureBase {
         InflationTermStructureBase {
@@ -123,6 +140,7 @@ impl InflationTermStructureBase {
             frequency,
             base_rate,
             base_date,
+            seasonality: RefCell::new(seasonality),
         }
     }
 
@@ -141,6 +159,15 @@ impl InflationTermStructureBase {
 pub trait InflationTermStructure: TermStructure {
     /// The embedded shared holder.
     fn inflation_base(&self) -> &InflationTermStructureBase;
+
+    /// The curve as the trait object a [`Seasonality`] reads it through.
+    ///
+    /// C++ passes `*this` straight into `correctZeroRate`
+    /// (`inflationtermstructure.cpp:171`). A trait's default body cannot
+    /// unsize `&Self` - `Self` is not known to be sized there - so every
+    /// concrete curve supplies the coercion, whose only implementation is
+    /// `self`.
+    fn as_inflation_term_structure(&self) -> &dyn InflationTermStructure;
 
     /// The frequency of the inflation fixings the curve is built on
     /// (`inflationtermstructure.hpp:261-263`).
@@ -163,6 +190,66 @@ pub trait InflationTermStructure: TermStructure {
             Some(rate) => Ok(rate),
             None => fail!("base rate not available"),
         }
+    }
+
+    /// The seasonality correction folded into the rates the curve publishes,
+    /// if any (`inflationtermstructure.hpp:95`).
+    fn seasonality(&self) -> Option<Shared<dyn Seasonality>> {
+        self.inflation_base().seasonality.borrow().clone()
+    }
+
+    /// Whether the curve carries a seasonality correction
+    /// (`inflationtermstructure.hpp:96`).
+    fn has_seasonality(&self) -> bool {
+        self.inflation_base().seasonality.borrow().is_some()
+    }
+
+    /// Installs, replaces or (with `None`) clears the seasonality correction
+    /// (`inflationtermstructure.cpp:76-88`).
+    ///
+    /// The store happens first and unconditionally, as C++'s does; a
+    /// correction that then fails the consistency gate is left in place and
+    /// the notification does not fire.
+    ///
+    /// # Errors
+    ///
+    /// Propagates the consistency gate.
+    fn set_seasonality(&self, seasonality: Option<Shared<dyn Seasonality>>) -> QlResult<()> {
+        *self.inflation_base().seasonality.borrow_mut() = seasonality;
+        self.check_seasonality()?;
+        self.update_after_seasonality_change();
+        Ok(())
+    }
+
+    /// The consistency gate C++ runs from its constructors and its setter
+    /// (`inflationtermstructure.cpp:34-38,84-86`).
+    ///
+    /// A curve without a seasonality passes trivially.
+    ///
+    /// # Errors
+    ///
+    /// Reports the seasonality's own verdict, and any error it raised
+    /// reaching one.
+    fn check_seasonality(&self) -> QlResult<()> {
+        if let Some(seasonality) = self.seasonality() {
+            require!(
+                seasonality.is_consistent(self.as_inflation_term_structure())?,
+                "Seasonality inconsistent with inflation term structure"
+            );
+        }
+        Ok(())
+    }
+
+    /// The notification closing a successful
+    /// [`set_seasonality`](Self::set_seasonality), the port of C++'s
+    /// `update()` call (`inflationtermstructure.cpp:87`).
+    ///
+    /// The default behaves as `TermStructure::update()`: it refreshes a moving
+    /// reference date and broadcasts. A curve that caches anything derived
+    /// from the correction - every bootstrapped one does - overrides this to
+    /// invalidate that cache first.
+    fn update_after_seasonality_change(&self) {
+        self.base().updater().borrow_mut().update();
     }
 
     /// Date-range check (`inflationtermstructure.cpp:91-98`): `date` must not
@@ -234,11 +321,25 @@ pub trait ZeroInflationTermStructure: InflationTermStructure {
     /// before it reaches the curve: an inflation fixing applies to a whole
     /// period, so every date inside one must yield that period's rate. The
     /// range check and the time conversion both use the quantized date.
+    ///
+    /// Any seasonality correction is folded in last
+    /// (`inflationtermstructure.cpp:170-172`). It receives the *original*
+    /// date, as C++ does on this path - the lag it subtracts there is zero -
+    /// and quantizes for itself. This is the only entry point that corrects:
+    /// [`zero_rate`](Self::zero_rate), taking a time, cannot recover the date
+    /// the correction is a function of, and C++ leaves it uncorrected too
+    /// (`inflationtermstructure.cpp:176-180`).
     fn zero_rate_date(&self, date: Date, extrapolate: bool) -> QlResult<Rate> {
         let (period_start, _) = inflation_period(date, self.frequency())?;
         self.check_inflation_range_date(period_start, extrapolate)?;
         let t = self.time_from_reference(period_start)?;
-        self.zero_rate_impl(t)
+        let zero_rate = self.zero_rate_impl(t)?;
+        match self.seasonality() {
+            Some(seasonality) => {
+                seasonality.correct_zero_rate(date, zero_rate, self.as_inflation_term_structure())
+            }
+            None => Ok(zero_rate),
+        }
     }
 
     /// The zero-coupon inflation rate for time `t`
@@ -258,6 +359,8 @@ pub trait ZeroInflationTermStructure: InflationTermStructure {
 mod tests {
     use super::*;
     use crate::patterns::observable::{AsObservable, Observable};
+    use crate::shared::shared;
+    use crate::termstructures::inflation::seasonality::MultiplicativePriceSeasonality;
     use crate::time::date::Month;
     use crate::time::daycounters::actual360::Actual360;
 
@@ -282,6 +385,7 @@ mod tests {
                 frequency,
                 Some(Actual360::new()),
                 base_rate,
+                None,
             ),
             max: Date::new(15, Month::January, 2036),
         }
@@ -310,6 +414,10 @@ mod tests {
     impl InflationTermStructure for TestCurve {
         fn inflation_base(&self) -> &InflationTermStructureBase {
             &self.inflation
+        }
+
+        fn as_inflation_term_structure(&self) -> &dyn InflationTermStructure {
+            self
         }
     }
 
@@ -419,6 +527,66 @@ mod tests {
         let curve = curve(None);
         assert_eq!(curve.zero_rate(0.375, false).unwrap(), 0.375);
         assert_eq!(curve.zero_rate(-0.1, false).unwrap(), -0.1);
+    }
+
+    /// Twelve monthly factors anchored on a month other than the curve's base
+    /// month, so the correction is not the identity; `count` above twelve makes
+    /// it the multi-year case the consistency gate defers.
+    fn a_seasonality(count: usize) -> Shared<dyn Seasonality> {
+        shared(
+            MultiplicativePriceSeasonality::new(
+                Date::new(31, Month::January, 2026),
+                Frequency::Monthly,
+                (0..count).map(|i| 1.0 + i as Rate / 1000.0).collect(),
+            )
+            .expect("a whole multiple of twelve factors"),
+        ) as Shared<dyn Seasonality>
+    }
+
+    /// The correction is folded into the date-taking query and into nothing
+    /// else, and clearing it puts the raw rate back.
+    ///
+    /// [`zero_rate`](ZeroInflationTermStructure::zero_rate) cannot correct: a
+    /// time does not name the date the factors are a function of, and C++
+    /// leaves it alone too.
+    #[test]
+    fn only_the_date_query_folds_the_seasonality_and_clearing_it_undoes_that() {
+        let curve = curve(None);
+        let date = Date::new(15, Month::March, 2026);
+        let raw = curve.zero_rate_date(date, false).unwrap();
+        let seasonality = a_seasonality(12);
+
+        curve
+            .set_seasonality(Some(Shared::clone(&seasonality)))
+            .unwrap();
+        assert!(curve.has_seasonality());
+        let corrected = curve.zero_rate_date(date, false).unwrap();
+        assert_eq!(
+            corrected,
+            seasonality.correct_zero_rate(date, raw, &curve).unwrap()
+        );
+        assert_ne!(corrected, raw, "the fold must move the rate");
+        assert_eq!(
+            curve.zero_rate(raw, false).unwrap(),
+            raw,
+            "the time query stays raw"
+        );
+
+        curve.set_seasonality(None).unwrap();
+        assert!(!curve.has_seasonality());
+        assert_eq!(curve.zero_rate_date(date, false).unwrap(), raw);
+    }
+
+    /// The gate reports the seasonality's verdict, and - as C++ does - stores
+    /// the correction before consulting it.
+    #[test]
+    fn an_inconsistent_seasonality_is_reported_by_the_gate() {
+        let curve = curve(None);
+
+        let err = curve.set_seasonality(Some(a_seasonality(24))).unwrap_err();
+        assert!(err.message().contains("#807"), "{}", err.message());
+        assert!(curve.has_seasonality(), "C++ stores before it checks");
+        assert!(curve.check_seasonality().is_err());
     }
 
     #[test]

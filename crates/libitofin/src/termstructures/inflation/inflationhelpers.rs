@@ -504,6 +504,7 @@ mod tests {
             Frequency::Monthly,
             Actual360::new(),
             crate::math::interpolations::linear::Linear,
+            None,
         )
         .unwrap();
         shared(curve) as Shared<dyn ZeroInflationTermStructure>
@@ -660,6 +661,7 @@ mod tests {
                     Frequency::Monthly,
                     Actual360::new(),
                     Linear,
+                    None,
                 )
                 .expect("a well-formed zero inflation curve"),
             ) as Shared<dyn ZeroInflationTermStructure>
