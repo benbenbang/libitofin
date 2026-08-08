@@ -145,7 +145,14 @@ impl<I: Interpolator> TermStructure for InterpolatedDiscountCurve<I> {
     }
 }
 
-impl<I: Interpolator> YieldTermStructure for InterpolatedDiscountCurve<I> {
+impl<I: Interpolator + 'static> YieldTermStructure for InterpolatedDiscountCurve<I>
+where
+    I::Output: 'static,
+{
+    fn as_any(&self) -> Option<&dyn std::any::Any> {
+        Some(self)
+    }
+
     fn discount_impl(&self, t: Time) -> QlResult<DiscountFactor> {
         let interpolation = self.curve.interpolation()?;
         let t_max = *self

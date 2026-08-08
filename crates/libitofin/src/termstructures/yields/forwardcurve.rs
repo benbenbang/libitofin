@@ -157,7 +157,10 @@ impl<I: Interpolator> TermStructure for InterpolatedForwardCurve<I> {
     }
 }
 
-impl<I: Interpolator> ForwardRateStructure for InterpolatedForwardCurve<I> {
+impl<I: Interpolator + 'static> ForwardRateStructure for InterpolatedForwardCurve<I>
+where
+    I::Output: 'static,
+{
     fn forward_impl(&self, t: Time) -> QlResult<Rate> {
         if t <= self.last_time() {
             return self.curve.interpolation()?.value(t);
@@ -166,7 +169,10 @@ impl<I: Interpolator> ForwardRateStructure for InterpolatedForwardCurve<I> {
     }
 }
 
-impl<I: Interpolator> ZeroYieldStructure for InterpolatedForwardCurve<I> {
+impl<I: Interpolator + 'static> ZeroYieldStructure for InterpolatedForwardCurve<I>
+where
+    I::Output: 'static,
+{
     fn zero_yield_impl(&self, t: Time) -> QlResult<Rate> {
         let interpolation = self.curve.interpolation()?;
         if t == 0.0 {
@@ -182,7 +188,14 @@ impl<I: Interpolator> ZeroYieldStructure for InterpolatedForwardCurve<I> {
     }
 }
 
-impl<I: Interpolator> YieldTermStructure for InterpolatedForwardCurve<I> {
+impl<I: Interpolator + 'static> YieldTermStructure for InterpolatedForwardCurve<I>
+where
+    I::Output: 'static,
+{
+    fn as_any(&self) -> Option<&dyn std::any::Any> {
+        Some(self)
+    }
+
     fn discount_impl(&self, t: Time) -> QlResult<DiscountFactor> {
         self.discount_from_zero_yield(t)
     }

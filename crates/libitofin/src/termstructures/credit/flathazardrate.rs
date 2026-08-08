@@ -139,6 +139,10 @@ impl HazardRateStructure for FlatHazardRate {
 }
 
 impl DefaultProbabilityTermStructure for FlatHazardRate {
+    fn as_any(&self) -> Option<&dyn std::any::Any> {
+        Some(self)
+    }
+
     fn survival_probability_impl(&self, t: Time) -> QlResult<Probability> {
         Ok((-self.hazard_rate_value()? * t).exp())
     }

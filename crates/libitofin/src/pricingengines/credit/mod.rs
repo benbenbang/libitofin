@@ -4,7 +4,9 @@
 //! instruments of EPIC Credit (#676) over a default-probability curve.
 
 pub mod integralcdsengine;
+pub mod isdanodegrid;
 pub mod midpointcdsengine;
 
 pub use integralcdsengine::IntegralCdsEngine;
+pub use isdanodegrid::isda_node_grid;
 pub use midpointcdsengine::MidPointCdsEngine;

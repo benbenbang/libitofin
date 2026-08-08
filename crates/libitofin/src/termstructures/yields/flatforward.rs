@@ -174,6 +174,10 @@ impl TermStructure for FlatForward {
 }
 
 impl YieldTermStructure for FlatForward {
+    fn as_any(&self) -> Option<&dyn std::any::Any> {
+        Some(self)
+    }
+
     fn discount_impl(&self, t: Time) -> QlResult<DiscountFactor> {
         self.flat_rate()?.discount_factor(t)
     }

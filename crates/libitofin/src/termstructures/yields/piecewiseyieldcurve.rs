@@ -209,6 +209,20 @@ impl<T: YieldBootstrapTraits + 'static, I: Interpolator + 'static> TermStructure
 impl<T: YieldBootstrapTraits + 'static, I: Interpolator + 'static> YieldTermStructure
     for PiecewiseYieldCurve<T, I>
 {
+    /// Opts the bootstrapped curve into the downcast seam.
+    ///
+    /// C++ reaches these node dates through inheritance - a
+    /// `PiecewiseYieldCurve<Discount, LogLinear>` *is* an
+    /// `InterpolatedDiscountCurve<LogLinear>`, so the engine's
+    /// `dynamic_pointer_cast` to the base succeeds
+    /// (`isdacdsengine.cpp:113-119`). This port composes instead of inheriting,
+    /// so the piecewise curve must be named at the downcast site in its own
+    /// right; see
+    /// [`isda_node_grid`](crate::pricingengines::credit::isda_node_grid).
+    fn as_any(&self) -> Option<&dyn std::any::Any> {
+        Some(self)
+    }
+
     /// Runs the bootstrap before the range check, so `max_date` reflects the
     /// solved curve (the C++ `discountImpl`/`maxDate` both call `calculate`).
     fn discount(&self, t: Time, extrapolate: bool) -> QlResult<DiscountFactor> {
