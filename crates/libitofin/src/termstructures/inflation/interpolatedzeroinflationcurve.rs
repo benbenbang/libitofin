@@ -18,11 +18,11 @@
 //!
 //! ## Divergences from QuantLib
 //!
-//! - Seasonality is not ported, following the
-//!   [`inflationtermstructure`](super::inflationtermstructure) divergence: the
-//!   constructor argument (`interpolatedzeroinflationcurve.hpp:47`) is omitted
-//!   rather than accepted and ignored, so a curve needing seasonality fails to
-//!   compile.
+//! - The seasonality constructor argument
+//!   (`interpolatedzeroinflationcurve.hpp:47`) is ported, but the consistency
+//!   gate C++ runs from the base constructor runs here from this one, once the
+//!   curve exists; see the
+//!   [`inflationtermstructure`](super::inflationtermstructure) divergences.
 //! - The protected constructor for descendants that cannot supply their nodes
 //!   at construction (`interpolatedzeroinflationcurve.hpp:75-80,116-126`)
 //!   follows with the bootstrapped curves that use it.
@@ -48,9 +48,11 @@ use crate::errors::QlResult;
 use crate::math::interpolations::linear::Linear;
 use crate::math::interpolations::{Interpolation, Interpolator};
 use crate::patterns::observable::{AsObservable, Observable};
+use crate::shared::Shared;
 use crate::termstructures::inflation::inflationtermstructure::{
     InflationTermStructure, InflationTermStructureBase, ZeroInflationTermStructure,
 };
+use crate::termstructures::inflation::seasonality::Seasonality;
 use crate::termstructures::interpolatedcurve::InterpolatedCurve;
 use crate::termstructures::{TermStructure, TermStructureBase};
 use crate::time::date::Date;
@@ -91,6 +93,7 @@ impl<I: Interpolator> InterpolatedZeroInflationCurve<I> {
         frequency: Frequency,
         day_counter: DayCounter,
         interpolator: I,
+        seasonality: Option<Shared<dyn Seasonality>>,
     ) -> QlResult<InterpolatedZeroInflationCurve<I>> {
         require!(dates.len() > 1, "too few dates: {}", dates.len());
         require!(
@@ -115,12 +118,15 @@ impl<I: Interpolator> InterpolatedZeroInflationCurve<I> {
             frequency,
             Some(day_counter),
             None,
+            seasonality,
         );
-        Ok(InterpolatedZeroInflationCurve {
+        let curve = InterpolatedZeroInflationCurve {
             inflation,
             curve,
             dates,
-        })
+        };
+        curve.check_seasonality()?;
+        Ok(curve)
     }
 
     /// The node times, measured from the reference date; the first is
@@ -181,6 +187,10 @@ impl<I: Interpolator> InflationTermStructure for InterpolatedZeroInflationCurve<
     fn inflation_base(&self) -> &InflationTermStructureBase {
         &self.inflation
     }
+
+    fn as_inflation_term_structure(&self) -> &dyn InflationTermStructure {
+        self
+    }
 }
 
 impl<I: Interpolator> ZeroInflationTermStructure for InterpolatedZeroInflationCurve<I> {
@@ -192,6 +202,8 @@ impl<I: Interpolator> ZeroInflationTermStructure for InterpolatedZeroInflationCu
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::shared::shared;
+    use crate::termstructures::inflation::seasonality::MultiplicativePriceSeasonality;
     use crate::time::date::Month;
     use crate::time::daycounters::actual360::Actual360;
     use crate::time::period::Period;
@@ -236,11 +248,51 @@ mod tests {
             Frequency::Monthly,
             Actual360::new(),
             Linear,
+            None,
         )
     }
 
     fn sample() -> ZeroInflationCurve {
         build(sample_dates(), sample_rates()).unwrap()
+    }
+
+    /// A seasonality passed at construction is installed and gated there, where
+    /// C++ gates it in the base constructor: twelve monthly factors are
+    /// consistent with any curve, a twenty-four-factor set is the multi-year
+    /// case this port defers.
+    #[test]
+    fn the_constructor_installs_and_gates_a_seasonality() {
+        fn built(count: usize) -> QlResult<ZeroInflationCurve> {
+            let seasonality = shared(
+                MultiplicativePriceSeasonality::new(
+                    Date::new(31, Month::January, 2022),
+                    Frequency::Monthly,
+                    (0..count).map(|i| 1.0 + i as Rate / 1000.0).collect(),
+                )
+                .expect("a whole multiple of twelve factors"),
+            ) as Shared<dyn Seasonality>;
+            ZeroInflationCurve::new(
+                today(),
+                sample_dates(),
+                sample_rates(),
+                Frequency::Monthly,
+                Actual360::new(),
+                Linear,
+                Some(seasonality),
+            )
+        }
+
+        assert!(built(12).unwrap().has_seasonality());
+        let deferred = match built(24) {
+            Ok(_) => panic!("expected the multi-year seasonality to be rejected"),
+            Err(err) => err,
+        };
+        assert!(
+            deferred.message().contains("#807"),
+            "{}",
+            deferred.message()
+        );
+        assert!(!sample().has_seasonality());
     }
 
     #[test]
