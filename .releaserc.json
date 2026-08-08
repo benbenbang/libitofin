@@ -64,9 +64,7 @@
     [
       "@semantic-release/github",
       {
-        "failComment": false,
-        "githubUrl": "https://api.github.com",
-        "successComment": false
+        "githubUrl": "https://api.github.com"
       }
     ]
   ],
