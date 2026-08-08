@@ -1629,3 +1629,310 @@ mod results_tail {
         assert_eq!(results.fair_spread, None);
     }
 }
+
+/// The ISDA/Markit acceptance grid (`creditdefaultswap.cpp:567-722`).
+#[cfg(test)]
+mod markit_oracle {
+    use super::*;
+    use crate::currency::Currency;
+    use crate::indexes::iborindex::IborIndex;
+    use crate::instrument::Instrument;
+    use crate::instruments::{MakeCreditDefaultSwap, PricingModel, ProtectionSide};
+    use crate::math::interpolations::loglinear::LogLinear;
+    use crate::pricingengine::PricingEngine;
+    use crate::shared::{SharedMut, shared, shared_mut};
+    use crate::termstructures::bootstraphelper::RateHelper;
+    use crate::termstructures::bootstraptraits::Discount;
+    use crate::termstructures::credit::flathazardrate::FlatHazardRate;
+    use crate::termstructures::yields::{DepositRateHelper, PiecewiseYieldCurve, SwapRateHelper};
+    use crate::time::businessdayconvention::BusinessDayConvention;
+    use crate::time::calendars::weekendsonly::WeekendsOnly;
+    use crate::time::date::Month;
+    use crate::time::daycounters::actual360::Actual360;
+    use crate::time::daycounters::actual365fixed::Actual365Fixed;
+    use crate::time::daycounters::thirty360::{Convention, Thirty360};
+    use crate::time::frequency::Frequency;
+    use crate::time::period::Period;
+    use crate::time::timeunit::TimeUnit;
+    use crate::types::Integer;
+
+    const NOTIONAL: Real = 10_000_000.0;
+
+    /// Boost's `BOOST_CHECK_CLOSE`, which `QL_CHECK_CLOSE` forwards to: the
+    /// tolerance is a *percentage*, and the strong form requires the relative
+    /// difference to clear it against both operands. A `tolerance` of 1e-6 is
+    /// therefore a relative 1e-8, not a relative 1e-6.
+    fn assert_close(actual: Real, expected: Real, tolerance: Real, what: &str) {
+        let fraction = tolerance / 100.0;
+        let difference = (actual - expected).abs();
+        assert!(
+            difference <= fraction * actual.abs() && difference <= fraction * expected.abs(),
+            "{what}: {actual} is not within {tolerance}% of {expected} \
+             (relative {})",
+            difference / expected.abs()
+        );
+    }
+
+    /// The ISDA-convention forecasting index the C++ fixture builds inline
+    /// (`creditdefaultswap.cpp:616-618` and `:796-798`).
+    ///
+    /// The deposit helpers take one of these too: C++ reaches the same
+    /// conventions through `DepositRateHelper`'s explicit-convention
+    /// constructor, which synthesises exactly this index internally
+    /// (`ratehelpers.cpp:41-50`), while the port's helper takes the index
+    /// outright. The forwarding handle is left empty because both helpers
+    /// re-point their own clone of the index at the curve being bootstrapped
+    /// (`ratehelpers.rs:104` and `:834`).
+    fn isda_ibor(
+        tenor: Period,
+        currency: Currency,
+        settings: &Shared<Settings<Date>>,
+    ) -> IborIndex {
+        IborIndex::new(
+            "IsdaIbor".to_string(),
+            tenor,
+            2,
+            currency,
+            WeekendsOnly::new(),
+            BusinessDayConvention::ModifiedFollowing,
+            false,
+            Actual360::new(),
+            Handle::empty(),
+            Shared::clone(settings),
+        )
+    }
+
+    /// The ISDA-compliant discount curve: deposits in months, swaps in years,
+    /// bootstrapped log-linearly on discount factors over Act/365F
+    /// (`creditdefaultswap.cpp:628-632`).
+    ///
+    /// C++ builds it with a moving reference date at zero settlement days; the
+    /// port's piecewise curve takes the reference date outright, and the caller
+    /// passes the evaluation date, which is what zero settlement days on a
+    /// business day resolve to.
+    fn isda_curve(
+        reference: Date,
+        deposits: &[(Integer, Real)],
+        swaps: &[(Integer, Real)],
+        float_tenor: Period,
+        fixed_frequency: Frequency,
+        currency: Currency,
+        settings: &Shared<Settings<Date>>,
+    ) -> Handle<dyn YieldTermStructure> {
+        let mut helpers: Vec<Shared<dyn RateHelper>> = Vec::new();
+        for (months, quote) in deposits {
+            let index = isda_ibor(
+                Period::new(*months, TimeUnit::Months),
+                currency.clone(),
+                settings,
+            );
+            helpers.push(DepositRateHelper::from_rate(*quote, &index) as Shared<dyn RateHelper>);
+        }
+        let float_index = isda_ibor(float_tenor, currency, settings);
+        for (years, quote) in swaps {
+            helpers.push(SwapRateHelper::from_rate(
+                *quote,
+                Period::new(*years, TimeUnit::Years),
+                WeekendsOnly::new(),
+                fixed_frequency,
+                BusinessDayConvention::ModifiedFollowing,
+                Thirty360::with_convention(Convention::BondBasis),
+                &float_index,
+            ) as Shared<dyn RateHelper>);
+        }
+        let curve = PiecewiseYieldCurve::<Discount, LogLinear>::new(
+            reference,
+            helpers,
+            Actual365Fixed::new(),
+            LogLinear,
+        )
+        .expect("the ISDA rate helpers bootstrap");
+        Handle::new(curve as Shared<dyn YieldTermStructure>)
+    }
+
+    /// The engine the fixture prices on, over the flat hazard rate `h` and the
+    /// three fidelity flags C++ spells out (`creditdefaultswap.cpp:686-688`).
+    fn isda_engine(
+        hazard_rate: Rate,
+        recovery: Real,
+        discount: &Handle<dyn YieldTermStructure>,
+        settings: &Shared<Settings<Date>>,
+    ) -> SharedMut<dyn PricingEngine> {
+        let probability = Handle::new(shared(FlatHazardRate::moving_with_rate(
+            0,
+            WeekendsOnly::new(),
+            hazard_rate,
+            Actual365Fixed::new(),
+            Shared::clone(settings),
+        )) as Shared<dyn DefaultProbabilityTermStructure>);
+        shared_mut(
+            IsdaCdsEngine::new(
+                probability,
+                recovery,
+                discount.clone(),
+                None,
+                Shared::clone(settings),
+            )
+            .with_fidelity(
+                NumericalFix::Taylor,
+                AccrualBias::HalfDayBias,
+                ForwardsInCouponPeriod::Piecewise,
+            ),
+        ) as SharedMut<dyn PricingEngine>
+    }
+
+    /// `creditdefaultswap.cpp:583-588`: the Markit deposit quotes, in months.
+    const USD_DEPOSITS: [(Integer, Real); 6] = [
+        (1, 0.003081),
+        (2, 0.005525),
+        (3, 0.007163),
+        (6, 0.012413),
+        (9, 0.014),
+        (12, 0.015488),
+    ];
+
+    /// `creditdefaultswap.cpp:598-611`: the Markit swap quotes, in years.
+    const USD_SWAPS: [(Integer, Real); 14] = [
+        (2, 0.011907),
+        (3, 0.01699),
+        (4, 0.021198),
+        (5, 0.02444),
+        (6, 0.026937),
+        (7, 0.028967),
+        (8, 0.030504),
+        (9, 0.031719),
+        (10, 0.03279),
+        (12, 0.034535),
+        (15, 0.036217),
+        (20, 0.036981),
+        (25, 0.037246),
+        (30, 0.037605),
+    ];
+
+    /// `creditdefaultswap.cpp:643-664`: the ISDA-model upfronts on a ten-million
+    /// notional, in the term-date / spread / recovery order the loop visits.
+    const MARKIT_VALUES: [Real; 20] = [
+        -97798.29358,
+        -97776.11889,
+        914971.5977,
+        894985.6298,
+        -186921.3594,
+        -186839.8148,
+        1646623.672,
+        1579803.626,
+        -274298.9203,
+        -274122.4725,
+        2279730.93,
+        2147972.527,
+        -592420.2297,
+        -591571.2294,
+        3993550.206,
+        3545843.418,
+        -797501.1422,
+        -795915.9787,
+        4702034.688,
+        4042340.999,
+    ];
+
+    /// `creditdefaultswap.cpp:567-722`: 20 conventional trades reprice to the
+    /// Markit upfronts, and both sides of each are worth nothing once the fair
+    /// upfront is paid.
+    ///
+    /// Each case implies a flat hazard rate off a quoted trade through the ISDA
+    /// branch of
+    /// [`implied_hazard_rate`](crate::instruments::CreditDefaultSwap::implied_hazard_rate),
+    /// then prices a 1% conventional trade of the same maturity on that rate.
+    ///
+    /// ## Tolerance
+    ///
+    /// C++ picks its tolerance off `IborCoupon::Settings::usingAtParCoupons()`
+    /// (`creditdefaultswap.cpp:666-669`): 1e-6 with at-par coupons, 1e-3 with
+    /// indexed ones, because indexed coupons leave the bootstrapped risk-free
+    /// curve "a bit off". The port threads that flag on
+    /// [`Settings`](crate::settings::Settings::using_at_par_coupons) instead of
+    /// a singleton, defaulting to at-par, and the fixture leaves it there - so
+    /// the at-par arm is the live one and 1e-6 is the tolerance pinned. All 20
+    /// cases clear it with room: the worst relative error is 1.2e-9 against the
+    /// 1e-8 that a 1e-6 *percentage* allows, so no case is excluded.
+    #[test]
+    fn the_markit_grid_reproduces_the_isda_upfronts() {
+        const TOLERANCE: Real = 1.0e-6;
+        let settings = shared(Settings::<Date>::new());
+        let trade_date = Date::new(21, Month::May, 2009);
+        settings.set_evaluation_date(trade_date);
+        let discount = isda_curve(
+            trade_date,
+            &USD_DEPOSITS,
+            &USD_SWAPS,
+            Period::new(3, TimeUnit::Months),
+            Frequency::Semiannual,
+            Currency::usd(),
+            &settings,
+        );
+
+        let term_dates = [
+            Date::new(20, Month::June, 2010),
+            Date::new(20, Month::June, 2011),
+            Date::new(20, Month::June, 2012),
+            Date::new(20, Month::June, 2016),
+            Date::new(20, Month::June, 2019),
+        ];
+        let mut case = 0;
+        for term_date in term_dates {
+            for spread in [0.001, 0.1] {
+                for recovery in [0.2, 0.4] {
+                    let trade = |running: Rate| {
+                        MakeCreditDefaultSwap::from_term_date(
+                            term_date,
+                            running,
+                            Shared::clone(&settings),
+                        )
+                        .with_nominal(NOTIONAL)
+                    };
+                    let hazard_rate = trade(spread)
+                        .build()
+                        .expect("the quoted trade builds")
+                        .implied_hazard_rate(
+                            0.0,
+                            &discount,
+                            Actual365Fixed::new(),
+                            recovery,
+                            1.0e-10,
+                            PricingModel::Isda,
+                        )
+                        .expect("the quoted trade inverts on the ISDA engine");
+                    let engine = isda_engine(hazard_rate, recovery, &discount, &settings);
+
+                    let mut conventional = trade(0.01).build().expect("the trade builds");
+                    conventional
+                        .base_mut()
+                        .set_pricing_engine(SharedMut::clone(&engine));
+                    let fair_upfront = conventional.fair_upfront().expect("the trade prices");
+                    assert_close(
+                        conventional.notional() * fair_upfront,
+                        MARKIT_VALUES[case],
+                        TOLERANCE,
+                        &format!("case {case} ({term_date}, spread {spread}, recovery {recovery})"),
+                    );
+
+                    for side in [ProtectionSide::Buyer, ProtectionSide::Seller] {
+                        let mut at_fair = trade(0.01)
+                            .with_upfront_rate(fair_upfront)
+                            .with_side(side)
+                            .build()
+                            .expect("the trade builds");
+                        at_fair
+                            .base_mut()
+                            .set_pricing_engine(SharedMut::clone(&engine));
+                        let npv = at_fair.npv().expect("the trade prices");
+                        assert!(
+                            npv.abs() <= TOLERANCE,
+                            "case {case} {side:?} is worth {npv} at its own fair upfront"
+                        );
+                    }
+                    case += 1;
+                }
+            }
+        }
+    }
+}

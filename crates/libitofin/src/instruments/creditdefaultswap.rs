@@ -69,10 +69,6 @@
 //! - `conventionalSpread` (`creditdefaultswap.cpp:383-428`), which has no
 //!   caller anywhere in `ql/` - not even the upfront rate helper it ships
 //!   with, which quotes `fairUpfront` instead (#790).
-//! - The [`PricingModel::Isda`] branch of [`implied_hazard_rate`]
-//!   (`creditdefaultswap.cpp:361-368`), which prices on the `IsdaCdsEngine`
-//!   (#783); until that engine lands the branch is a typed error rather than a
-//!   silent fall back to the mid-point one.
 //! - `protectionEndDate` (`creditdefaultswap.cpp:430-432`), which reads the
 //!   accrual end of the last coupon through the `coupon_cast` that
 //!   [`CashFlow::as_coupon`](crate::cashflow::CashFlow::as_coupon) ports.
@@ -94,7 +90,9 @@ use crate::interestrate::Compounding;
 use crate::math::solver1d::Solver1D;
 use crate::math::solvers1d::brent::Brent;
 use crate::pricingengine::{Arguments, GenericEngine, PricingEngine, Results};
-use crate::pricingengines::credit::MidPointCdsEngine;
+use crate::pricingengines::credit::{
+    AccrualBias, ForwardsInCouponPeriod, IsdaCdsEngine, MidPointCdsEngine, NumericalFix,
+};
 use crate::quotes::{Quote, SimpleQuote};
 use crate::settings::Settings;
 use crate::shared::{Shared, shared};
@@ -781,12 +779,16 @@ impl CreditDefaultSwap {
     /// contract reports itself rather than reaching the solver as a pricing
     /// failure it can only report as a failure to bracket (D4).
     ///
+    /// [`PricingModel::Midpoint`] solves on a [`MidPointCdsEngine`] and
+    /// [`PricingModel::Isda`] on an [`IsdaCdsEngine`] carrying the three
+    /// fidelity flags C++ spells out at the call site
+    /// (`creditdefaultswap.cpp:361-368`).
+    ///
     /// # Errors
     ///
-    /// [`PricingModel::Isda`] needs the `IsdaCdsEngine` deferred to #783.
-    /// Otherwise errors on a malformed contract, and if the solve does not
-    /// converge - which includes a pricing failure at some hazard rate, since
-    /// that reaches the solver as the non-finite value it rejects.
+    /// Errors on a malformed contract, and if the solve does not converge -
+    /// which includes a pricing failure at some hazard rate, since that reaches
+    /// the solver as the non-finite value it rejects.
     pub fn implied_hazard_rate(
         &self,
         target_npv: Real,
@@ -796,9 +798,6 @@ impl CreditDefaultSwap {
         accuracy: Real,
         model: PricingModel,
     ) -> QlResult<Rate> {
-        if model == PricingModel::Isda {
-            fail!("the ISDA pricing model needs the IsdaCdsEngine, deferred to #783");
-        }
         let flat_rate = shared(SimpleQuote::new(0.0));
         let probability = Handle::new(shared(FlatHazardRate::moving(
             0,
@@ -807,13 +806,29 @@ impl CreditDefaultSwap {
             day_counter,
             Shared::clone(&self.settings),
         )) as Shared<dyn DefaultProbabilityTermStructure>);
-        let mut engine = MidPointCdsEngine::new(
-            probability,
-            recovery_rate,
-            discount_curve.clone(),
-            None,
-            Shared::clone(&self.settings),
-        );
+        let mut engine: Box<dyn PricingEngine> = match model {
+            PricingModel::Midpoint => Box::new(MidPointCdsEngine::new(
+                probability,
+                recovery_rate,
+                discount_curve.clone(),
+                None,
+                Shared::clone(&self.settings),
+            )),
+            PricingModel::Isda => Box::new(
+                IsdaCdsEngine::new(
+                    probability,
+                    recovery_rate,
+                    discount_curve.clone(),
+                    None,
+                    Shared::clone(&self.settings),
+                )
+                .with_fidelity(
+                    NumericalFix::Taylor,
+                    AccrualBias::HalfDayBias,
+                    ForwardsInCouponPeriod::Piecewise,
+                ),
+            ),
+        };
         self.setup_arguments(engine.arguments_mut())?;
         engine.arguments_mut().validate()?;
 
@@ -1873,26 +1888,5 @@ mod tests {
                 "the {n}Y implied rate reprices to {reproduced}, not {npv}"
             );
         }
-    }
-
-    /// The ISDA branch (`creditdefaultswap.cpp:361-368`) prices on an engine
-    /// this port has not reached, and says so rather than quietly answering off
-    /// the mid-point one.
-    #[test]
-    fn the_isda_model_is_an_error_rather_than_a_silent_mid_point_answer() {
-        let cds = contract(CdsTerms::default()).unwrap();
-        let message = cds
-            .implied_hazard_rate(
-                0.0,
-                &Handle::<dyn YieldTermStructure>::empty(),
-                Actual365Fixed::new(),
-                0.4,
-                1.0e-8,
-                PricingModel::Isda,
-            )
-            .unwrap_err()
-            .to_string();
-        assert!(message.contains("ISDA"), "{message}");
-        assert!(message.contains("783"), "{message}");
     }
 }
