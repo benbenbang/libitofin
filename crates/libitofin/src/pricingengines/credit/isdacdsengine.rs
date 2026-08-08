@@ -1630,11 +1630,16 @@ mod results_tail {
     }
 }
 
-/// The ISDA/Markit acceptance grid (`creditdefaultswap.cpp:567-722`).
+/// The ISDA/Markit acceptance oracle: the 20-case upfront grid
+/// (`creditdefaultswap.cpp:567-722`) and the two single-record reconciliations
+/// (`:759-861` and `:863-960`), all priced through the contract's own
+/// [`implied_hazard_rate`](crate::instruments::CreditDefaultSwap::implied_hazard_rate)
+/// rather than a hazard rate handed in.
 #[cfg(test)]
 mod markit_oracle {
     use super::*;
     use crate::currency::Currency;
+    use crate::event::Event;
     use crate::indexes::iborindex::IborIndex;
     use crate::instrument::Instrument;
     use crate::instruments::{MakeCreditDefaultSwap, PricingModel, ProtectionSide};
@@ -1680,9 +1685,14 @@ mod markit_oracle {
     /// conventions through `DepositRateHelper`'s explicit-convention
     /// constructor, which synthesises exactly this index internally
     /// (`ratehelpers.cpp:41-50`), while the port's helper takes the index
-    /// outright. The forwarding handle is left empty because both helpers
-    /// re-point their own clone of the index at the curve being bootstrapped
-    /// (`ratehelpers.rs:104` and `:834`).
+    /// outright. The forwarding handle is left empty because both helpers'
+    /// builders re-point their own clone of the index at the curve being
+    /// bootstrapped.
+    ///
+    /// C++ leaves that synthesised index an empty `Currency()`, which has no
+    /// counterpart here; the currency the fixture passes is inert, since the
+    /// swap helper is given its fixed-leg frequency and day counter outright
+    /// and so never reaches the currency defaults.
     fn isda_ibor(
         tenor: Period,
         currency: Currency,
@@ -1854,6 +1864,11 @@ mod markit_oracle {
     /// the at-par arm is the live one and 1e-6 is the tolerance pinned. All 20
     /// cases clear it with room: the worst relative error is 1.2e-9 against the
     /// 1e-8 that a 1e-6 *percentage* allows, so no case is excluded.
+    ///
+    /// The tight arm is load-bearing rather than merely available. Corrupting
+    /// the premium leg's survival offset (`isdacdsengine.cpp:218`) moves case 0
+    /// by a relative 4.0e-6, which the loose 1e-3 arm - a relative 1e-5 - would
+    /// have let through.
     #[test]
     fn the_markit_grid_reproduces_the_isda_upfronts() {
         const TOLERANCE: Real = 1.0e-6;
@@ -1934,5 +1949,182 @@ mod markit_oracle {
                 }
             }
         }
+    }
+
+    /// `creditdefaultswap.cpp:770-771` and `:875-876`: the EUR deposit quotes,
+    /// in months. Both reconciliation cases build the same curve.
+    const EUR_DEPOSITS: [(Integer, Real); 4] = [
+        (1, -0.0056),
+        (3, -0.005440),
+        (6, -0.005190),
+        (12, -0.004930),
+    ];
+
+    /// `creditdefaultswap.cpp:781-793` and `:886-898`: the EUR swap quotes, in
+    /// years.
+    const EUR_SWAPS: [(Integer, Real); 13] = [
+        (2, -0.004820),
+        (3, -0.004420),
+        (4, -0.003990),
+        (5, -0.003520),
+        (6, -0.002970),
+        (7, -0.002370),
+        (8, -0.001760),
+        (9, -0.001140),
+        (10, -0.000540),
+        (12, 0.000570),
+        (15, 0.001880),
+        (20, 0.002940),
+        (30, 0.002820),
+    ];
+
+    /// `creditdefaultswap.cpp:765` and `:869`: today, on both cases.
+    fn reconcile_value_date() -> Date {
+        Date::new(26, Month::July, 2021)
+    }
+
+    const RECONCILE_NOMINAL: Real = 1.0e6;
+    const RECONCILE_RECOVERY: Real = 0.4;
+    const RECONCILE_TOLERANCE: Real = 1.0e-3;
+    const CONVENTIONAL_SPREAD: Rate = 0.006713;
+
+    /// The EUR curve of both reconciliation cases, and the engine over the flat
+    /// hazard rate implied off a trade quoted at the conventional spread
+    /// (`creditdefaultswap.cpp:764-826`, which `:868-931` repeats verbatim).
+    ///
+    /// The evaluation date is set before the helpers are built, since they date
+    /// themselves off it.
+    fn reconcile_engine(settings: &Shared<Settings<Date>>) -> (SharedMut<dyn PricingEngine>, Date) {
+        let value_date = reconcile_value_date();
+        settings.set_evaluation_date(value_date);
+        let discount = isda_curve(
+            value_date,
+            &EUR_DEPOSITS,
+            &EUR_SWAPS,
+            Period::new(6, TimeUnit::Months),
+            Frequency::Annual,
+            Currency::eur(),
+            settings,
+        );
+        let maturity = Date::new(20, Month::June, 2026);
+        let hazard_rate = MakeCreditDefaultSwap::from_term_date(
+            maturity,
+            CONVENTIONAL_SPREAD,
+            Shared::clone(settings),
+        )
+        .with_nominal(RECONCILE_NOMINAL)
+        .build()
+        .expect("the quoted trade builds")
+        .implied_hazard_rate(
+            0.0,
+            &discount,
+            Actual365Fixed::new(),
+            RECONCILE_RECOVERY,
+            1.0e-10,
+            PricingModel::Isda,
+        )
+        .expect("the quoted trade inverts on the ISDA engine");
+        (
+            isda_engine(hazard_rate, RECONCILE_RECOVERY, &discount, settings),
+            maturity,
+        )
+    }
+
+    /// `creditdefaultswap.cpp:759-861`: one Markit record traded today
+    /// reconciles - its value, its upfront, and the thousand of accrual it
+    /// rebates, read both off the legs and off the rebate flow itself.
+    ///
+    /// `df` is C++'s own: the ratio of the upfront to the value, which carries
+    /// the discount to cash settlement, and which the second and third
+    /// assertions then divide back out.
+    #[test]
+    fn a_traded_today_record_reconciles_with_its_accrual_rebate() {
+        const MARKIT_VALUE: Real = -16070.7;
+        const EXPECTED_ACCRUAL: Real = 1000.0;
+        let settings = shared(Settings::<Date>::new());
+        let (engine, maturity) = reconcile_engine(&settings);
+
+        let mut conventional =
+            MakeCreditDefaultSwap::from_term_date(maturity, 0.01, Shared::clone(&settings))
+                .with_nominal(RECONCILE_NOMINAL)
+                .build()
+                .expect("the conventional trade builds");
+        conventional.base_mut().set_pricing_engine(engine);
+
+        let npv = conventional.npv().expect("the trade prices");
+        let calculated_upfront =
+            conventional.notional() * conventional.fair_upfront().expect("the trade prices");
+        let df = calculated_upfront / npv;
+        let derived_accrual = df
+            * (npv
+                - conventional.default_leg_npv().expect("the trade prices")
+                - conventional.coupon_leg_npv().expect("the trade prices"));
+        let rebate = conventional
+            .accrual_rebate()
+            .expect("a rebating trade carries the flow");
+        let calculated_accrual = rebate.amount().expect("the rebate is a known amount");
+        let settlement_date = Event::date(rebate.as_ref());
+
+        assert_close(npv, MARKIT_VALUE, RECONCILE_TOLERANCE, "the value");
+        assert_close(
+            calculated_upfront,
+            df * MARKIT_VALUE,
+            RECONCILE_TOLERANCE,
+            "the upfront",
+        );
+        assert_close(
+            derived_accrual,
+            EXPECTED_ACCRUAL,
+            RECONCILE_TOLERANCE,
+            "the accrual derived from the legs",
+        );
+        assert_close(
+            calculated_accrual,
+            EXPECTED_ACCRUAL,
+            RECONCILE_TOLERANCE,
+            "the accrual on the rebate flow",
+        );
+        assert_eq!(
+            settlement_date,
+            WeekendsOnly::new().advance(
+                reconcile_value_date(),
+                3,
+                TimeUnit::Days,
+                BusinessDayConvention::Following,
+                false,
+            )
+        );
+    }
+
+    /// `creditdefaultswap.cpp:863-960`: the same record traded two years ago
+    /// settled its rebate long before today, so the value drops by exactly the
+    /// thousand the rebate carried and the legs account for all of what is left.
+    #[test]
+    fn a_record_traded_in_the_past_reconciles_without_its_accrual_rebate() {
+        const MARKIT_VALUE: Real = -17070.77;
+        const EXPECTED_ACCRUAL: Real = 0.0;
+        let settings = shared(Settings::<Date>::new());
+        let (engine, maturity) = reconcile_engine(&settings);
+
+        let mut conventional =
+            MakeCreditDefaultSwap::from_term_date(maturity, 0.01, Shared::clone(&settings))
+                .with_nominal(RECONCILE_NOMINAL)
+                .with_trade_date(Date::new(20, Month::July, 2019))
+                .build()
+                .expect("the conventional trade builds");
+        conventional.base_mut().set_pricing_engine(engine);
+
+        let npv = conventional.npv().expect("the trade prices");
+        let calculated_accrual = npv
+            - conventional.default_leg_npv().expect("the trade prices")
+            - conventional.coupon_leg_npv().expect("the trade prices");
+
+        assert_close(npv, MARKIT_VALUE, RECONCILE_TOLERANCE, "the value");
+        assert_close(
+            calculated_accrual,
+            EXPECTED_ACCRUAL,
+            RECONCILE_TOLERANCE,
+            "the accrual derived from the legs",
+        );
     }
 }
