@@ -102,6 +102,29 @@ class MidPointCdsEngine:
         settings: Settings,
     ) -> None: ...
 
+class IsdaCdsEngine:
+    """The ISDA standard-model credit-default-swap engine: both legs are
+    integrated over the pillar dates of the two curves the engine is built with
+    rather than over the premium schedule alone.
+
+    Infallible at construction, like MidPointCdsEngine. The model is specified
+    against curves of a fixed shape, so every check - both curves counting
+    Act/365 (Fixed) and referenced at the evaluation date, the contract settling
+    its accrual, paying at the default time and carrying a face-value claim - is
+    reported as ItofinError when the contract is priced, not from __init__. The
+    core's include_settlement_date_flows override is not exposed and is always
+    None. The three fidelity flags keep the C++ defaults Taylor / HalfDayBias /
+    Piecewise; the builder that chooses them is not exposed (#814). The contract
+    this engine prices must carry the same Settings object."""
+
+    def __init__(
+        self,
+        probability: DefaultProbabilityTermStructure,
+        recovery: float,
+        discount: YieldTermStructure,
+        settings: Settings,
+    ) -> None: ...
+
 class DiscountingSwapEngine:
     """Discounts every leg of a swap over a single yield curve.
 

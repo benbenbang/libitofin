@@ -9,6 +9,7 @@ from itofin.pricingengines import (
     BlackCapFloorEngine,
     BlackSwaptionEngine,
     DiscountingSwapEngine,
+    IsdaCdsEngine,
     MCAmericanEngine,
     MCEuropeanEngine,
     MCEuropeanHestonEngine,
@@ -256,6 +257,12 @@ class CreditDefaultSwap:
         """Price the contract off a default-probability and a discount curve.
         The engine must resolve its dates against the same Settings object as
         this contract."""
+        ...
+    def set_isda_engine(self, engine: IsdaCdsEngine) -> None:
+        """Price the contract under the ISDA standard model. A separate setter
+        because the two engine classes are unrelated; the same same-Settings
+        rule applies, and the ISDA engine additionally refuses curves outside
+        its specification when the contract prices."""
         ...
     def npv(self) -> float:
         """Raises ItofinError with no engine attached."""

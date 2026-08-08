@@ -4,7 +4,7 @@
 //! [`PyCreditDefaultSwap`] instrument.
 
 use crate::PyQlError;
-use crate::creditengine::PyMidPointCdsEngine;
+use crate::creditengine::{PyIsdaCdsEngine, PyMidPointCdsEngine};
 use crate::credithelpers::PyDefaultProbabilityHelper;
 use crate::market::PySimpleQuote;
 use crate::settings::PySettings;
@@ -605,6 +605,21 @@ impl PyCreditDefaultSwap {
     /// shared across contracts. It must resolve its dates against the same
     /// `Settings` object this contract was built with.
     fn set_engine(&mut self, engine: &PyMidPointCdsEngine) {
+        self.inner
+            .borrow_mut()
+            .base_mut()
+            .set_pricing_engine(engine.engine());
+    }
+
+    /// Attaches a [`PyIsdaCdsEngine`] so the contract prices under the ISDA
+    /// standard model.
+    ///
+    /// A separate setter rather than a widened [`set_engine`](Self::set_engine):
+    /// the two engine facades are unrelated pyo3 classes, so one argument cannot
+    /// name both. The same sharing and same-`Settings` rules apply, and the ISDA
+    /// engine additionally refuses curves outside its specification when the
+    /// contract prices.
+    fn set_isda_engine(&mut self, engine: &PyIsdaCdsEngine) {
         self.inner
             .borrow_mut()
             .base_mut()
