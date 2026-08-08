@@ -28,6 +28,19 @@ pub trait Claim {
     /// The claim paid on a default at `default_date`, for a contract of
     /// `notional` recovering `recovery_rate` of it.
     fn amount(&self, default_date: &Date, notional: Real, recovery_rate: Real) -> Real;
+
+    /// The claim as [`Any`](std::any::Any), for the callers that must recover
+    /// its concrete type from a `dyn Claim`.
+    ///
+    /// The port of C++'s `dynamic_pointer_cast<FaceValueClaim>`
+    /// (`isdacdsengine.cpp:97`): `Rc` carries no downcast of its own, so a claim
+    /// opts in by overriding this. The default `None` reads as "this claim
+    /// declines to be introspected", which
+    /// [`IsdaCdsEngine`](crate::pricingengines::credit::IsdaCdsEngine) - the
+    /// only caller - treats as the C++ null-cast arm.
+    fn as_any(&self) -> Option<&dyn std::any::Any> {
+        None
+    }
 }
 
 /// A claim on the notional alone (`FaceValueClaim`).
@@ -42,6 +55,12 @@ impl Claim for FaceValueClaim {
     /// (`claim.cpp:24-28`).
     fn amount(&self, _default_date: &Date, notional: Real, recovery_rate: Real) -> Real {
         notional * (1.0 - recovery_rate)
+    }
+
+    /// Opts into the downcast seam: the ISDA engine settles face-value claims
+    /// alone (`isdacdsengine.cpp:97-98`).
+    fn as_any(&self) -> Option<&dyn std::any::Any> {
+        Some(self)
     }
 }
 
