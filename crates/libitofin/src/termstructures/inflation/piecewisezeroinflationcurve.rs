@@ -332,6 +332,7 @@ mod tests {
     use crate::settings::Settings;
     use crate::shared::shared;
     use crate::termstructures::inflation::inflationhelpers::ZeroCouponInflationSwapHelper;
+    use crate::termstructures::yields::Pillar;
     use crate::time::businessdayconvention::BusinessDayConvention;
     use crate::time::calendars::unitedkingdom::{Market, UnitedKingdom};
     use crate::time::date::Month::{April, August, July, June, May};
@@ -393,6 +394,7 @@ mod tests {
                     day_counter(),
                     index,
                     CpiInterpolationType::Flat,
+                    Pillar::LastRelevantDate,
                     Shared::clone(settings),
                 )
                 .expect("a three-month lag covers UK RPI's availability")
@@ -511,6 +513,7 @@ mod tests {
             day_counter(),
             &index,
             CpiInterpolationType::Flat,
+            Pillar::LastRelevantDate,
             Shared::clone(&settings),
         )
         .unwrap();
@@ -600,7 +603,7 @@ mod zero_term_structure_oracle {
     use crate::shared::{SharedMut, shared, shared_mut};
     use crate::termstructures::inflation::inflationhelpers::ZeroCouponInflationSwapHelper;
     use crate::termstructures::inflation::seasonality::MultiplicativePriceSeasonality;
-    use crate::termstructures::yields::FlatForward;
+    use crate::termstructures::yields::{FlatForward, Pillar};
     use crate::termstructures::yieldtermstructure::YieldTermStructure;
     use crate::time::businessdayconvention::BusinessDayConvention;
     use crate::time::calendar::Calendar;
@@ -754,6 +757,7 @@ mod zero_term_structure_oracle {
                     day_counter(),
                     &index,
                     CpiInterpolationType::Flat,
+                    Pillar::LastRelevantDate,
                     Shared::clone(&settings),
                 )
                 .expect("a three-month lag covers UK RPI's availability")
