@@ -4,11 +4,14 @@
 //! under `ql/termstructures/inflation/`. The
 //! [`ZeroInflationTermStructure`](inflationtermstructure::ZeroInflationTermStructure)
 //! trait is the contract every zero-coupon inflation curve plugs into; the
-//! interpolated curves, the year-on-year structures and the seasonality
-//! classes that build on it follow within EPIC Inflation (#705).
+//! interpolated curves and the seasonality corrections build on it; the
+//! year-on-year structures follow within EPIC Inflation (#705).
 
 pub mod inflationhelpers;
 pub mod inflationtermstructure;
 pub mod inflationtraits;
 pub mod interpolatedzeroinflationcurve;
 pub mod piecewisezeroinflationcurve;
+pub mod seasonality;
+
+pub use seasonality::{MultiplicativePriceSeasonality, Seasonality};
