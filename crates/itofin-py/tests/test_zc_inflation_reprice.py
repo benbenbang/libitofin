@@ -15,11 +15,15 @@ and every forecast compounds off its 207.3. Fourteen swap rates are quoted out
 to 2057 under a three-month observation lag, flat CPI observation, UK
 settlement calendar and Thirty360 BondBasis throughout.
 
-Omitted visibly: phase 2 (`:822`), where the index forecasting off the
+Phase 3 (#813), the seasonality rerun, follows below: the same fourteen swaps
+still reprice to nothing once a twelve-factor monthly correction is installed on
+the bootstrapped curve, and the forecast the swaps reach it through demonstrably
+moves.
+
+Omitted visibly: phase 2 (`:913`), where the index forecasting off the
 bootstrapped curve is checked against the curve's own compounded zero rate, is
 left on the Rust side. It exercises no facade this file does not already build,
-and the ticket scopes it out. Phase 3, the seasonality rerun, is a documented
-deferral of the port itself and exists on neither side.
+and the ticket scopes it out.
 
 What the guards do and do not cover. Thirty-one hand-typed floats are the
 largest silent-failure surface here, and a green milestone does not vindicate
@@ -29,13 +33,16 @@ observation reads from history, and July 2007, which the forecast compounds off
 covered by count alone.
 """
 
-from itofin import Settings
+import pytest
+
+from itofin import ItofinError, Settings
 from itofin.indexes import CpiInterpolationType, ZeroInflationIndex
 from itofin.instruments import SwapType, ZeroCouponInflationSwap
 from itofin.pricingengines import DiscountingSwapEngine
 from itofin.quotes import SimpleQuote
 from itofin.termstructures import (
     FlatForward,
+    MultiplicativePriceSeasonality,
     PiecewiseZeroInflationCurve,
     ZeroCouponInflationSwapHelper,
 )
@@ -83,6 +90,18 @@ ZC_DATA = [
 ]
 
 LOAD_BEARING_FIXINGS = [(Date(1, 5, 2007), 205.4), (CURVE_BASE, 207.3)]
+
+SEASONALITY_FACTORS = [
+    1.003245, 1.000000, 0.999715, 1.000495, 1.000929, 0.998687,
+    0.995949, 0.994682, 0.995949, 1.000519, 1.003705, 1.004186,
+]
+
+SEASONALITY_ANCHOR = Date(31, 1, 2007)
+SEASONALITY_PROBE = Date(1, 8, 2012)
+FORECAST_RAW = 239.95839754779345
+FORECAST_CORRECTED = 238.4450543710035
+FORECAST_MATCH = 1e-10
+RATE_MOVE = 1e-4
 
 
 def _fixing_date(i: int) -> Date:
@@ -188,6 +207,27 @@ def _a_swap(
     return swap
 
 
+def _a_seasonality(factors: list[float] = None) -> MultiplicativePriceSeasonality:
+    """The twelve monthly factors phase 3 installs (`inflation.cpp:469-483`).
+
+    The anchor is 31 January of the year the curve's base period ends in
+    (`:467-468`). The base date is 1 July 2007 and a monthly inflation period
+    runs to the month's end, so that year is 2007; the Rust fixture derives it
+    with `inflation_period`, which is not exposed here, and
+    test_the_transcribed_fixture_is_the_one_the_oracle_runs pins the base date
+    the derivation starts from.
+
+    The anchor is not discriminated by the numbers below: the factor lookup
+    wraps modulo the factor count, so shifting a stationary twelve-factor set by
+    a whole year picks the very same factors. It is pinned by derivation alone.
+    """
+    return MultiplicativePriceSeasonality(
+        SEASONALITY_ANCHOR,
+        Frequency.Monthly,
+        SEASONALITY_FACTORS if factors is None else factors,
+    )
+
+
 def test_the_transcribed_fixture_is_the_one_the_oracle_runs():
     """The transcription guards. The counts pin the two hand-typed tables, the
     base date pins where the last figure's period falls, and the two figures the
@@ -258,3 +298,74 @@ def test_the_bootstrapped_curve_reprices_the_quoted_swaps_to_zero():
     print(f"NPV by maturity = {npv_by_maturity}")
     assert worst_npv < EPS
     assert worst_bps < EPS
+
+
+def test_a_seasonality_moves_the_forecast_and_the_curve_reprices_the_swaps_again():
+    """Phase 3. Reprice-to-zero alone would be a false pass here: if the
+    correction were stored but never folded into the published rate, the
+    re-bootstrap would hit the very same nodes off the very same quotes and
+    every swap would still come back worth nothing.
+
+    So the discriminator comes first. The index's own forecast - the path every
+    helper and every swap reaches the curve through - is required to move, and
+    to move to the level the Rust oracle measures over this identical fixture
+    (`piecewisezeroinflationcurve.rs:878`, which prints 239.95839754779345 ->
+    238.4450543710035 at this same date). Clearing the correction has to put the
+    raw forecast back. The reprice loop then covers the other half: with the
+    correction live, only a bootstrap that re-solved against it returns to zero.
+    """
+    settings = _settings()
+    index = _index(settings)
+    curve = _bootstrapped(settings, index)
+
+    assert not curve.has_seasonality()
+    raw_forecast = index.fixing(SEASONALITY_PROBE, True)
+    raw_rate = curve.zero_rate_date(SEASONALITY_PROBE)
+    assert abs(raw_forecast - FORECAST_RAW) < FORECAST_MATCH
+
+    curve.set_seasonality(_a_seasonality())
+    assert curve.has_seasonality()
+    corrected_forecast = index.fixing(SEASONALITY_PROBE, True)
+    corrected_rate = curve.zero_rate_date(SEASONALITY_PROBE)
+    print(f"forecast at {SEASONALITY_PROBE}: {raw_forecast} -> {corrected_forecast}")
+    print(f"zero rate at {SEASONALITY_PROBE}: {raw_rate} -> {corrected_rate}")
+    assert abs(corrected_forecast - FORECAST_CORRECTED) < FORECAST_MATCH
+    assert abs(corrected_forecast - raw_forecast) > 1e-3
+    assert abs(corrected_rate - raw_rate) > RATE_MOVE
+
+    worst_npv = 0.0
+    for maturity, rate in ZC_DATA:
+        swap = _a_swap(settings, index, maturity, rate / 100.0)
+        worst_npv = max(worst_npv, abs(swap.npv()))
+    print(f"worst |NPV| under seasonality = {worst_npv:.3e}")
+    assert worst_npv < EPS
+
+    curve.set_seasonality(None)
+    assert not curve.has_seasonality()
+    assert abs(index.fixing(SEASONALITY_PROBE, True) - raw_forecast) < FORECAST_MATCH
+    assert abs(curve.zero_rate_date(SEASONALITY_PROBE) - raw_rate) < FORECAST_MATCH
+
+
+def test_a_multi_year_seasonality_is_rejected_by_the_consistency_gate():
+    """The gate reports the correction's own verdict, and a twenty-four-factor
+    set is the multi-year branch the core defers (#807).
+
+    It runs on its own fixture because the failure leaves the curve in a state
+    the reprice test must not inherit: the store happens before the gate, as
+    C++'s does, so the rejected correction stays installed - which
+    has_seasonality() reports as True below, deliberately - while the
+    notification that would invalidate the bootstrap never fires. Reading the
+    curve from here would fold a correction onto nodes that were never re-solved
+    against it, so the correction is cleared before the test ends.
+    """
+    settings = _settings()
+    index = _index(settings)
+    curve = _bootstrapped(settings, index)
+
+    with pytest.raises(ItofinError) as raised:
+        curve.set_seasonality(_a_seasonality(SEASONALITY_FACTORS * 2))
+    assert "#807" in str(raised.value)
+
+    assert curve.has_seasonality(), "the store precedes the gate, as C++'s does"
+    curve.set_seasonality(None)
+    assert not curve.has_seasonality()
