@@ -329,7 +329,7 @@ mod tests {
     use crate::interestrate::Compounding;
     use crate::math::interpolations::flat::BackwardFlat;
     use crate::pricingengine::PricingEngine;
-    use crate::pricingengines::credit::MidPointCdsEngine;
+    use crate::pricingengines::credit::{MidPointCdsEngine, isda_node_grid};
     use crate::quotes::{Quote, SimpleQuote};
     use crate::settings::Settings;
     use crate::shared::shared;
@@ -534,6 +534,34 @@ mod tests {
                  computed {computed}, input {quote}"
             );
         }
+    }
+
+    /// The bootstrapped curve is what the ISDA engine is handed, so it must be
+    /// introspectable through the downcast seam
+    /// (`isdacdsengine.cpp:136-141`). C++ gets there by inheritance - a
+    /// `PiecewiseDefaultCurve<HazardRate, BackwardFlat>` *is* an
+    /// `InterpolatedHazardRateCurve<BackwardFlat>` - which this port's
+    /// composition cannot reproduce, so the arm is named for the piecewise
+    /// curve in its own right. The fixture's discount curve is flat and
+    /// contributes nothing, leaving the grid as the solved pillars alone.
+    #[test]
+    fn bootstrapped_curve_feeds_the_isda_node_grid() {
+        let fixture = fixture();
+        let curve: Handle<dyn DefaultProbabilityTermStructure> = Handle::new(Shared::clone(
+            &fixture.curve,
+        )
+            as Shared<dyn DefaultProbabilityTermStructure>);
+
+        let pillars = fixture.curve.dates().expect("the bootstrap succeeds");
+        assert_eq!(
+            pillars.len(),
+            TENORS.len() + 1,
+            "the reference date plus a pillar per tenor"
+        );
+
+        let grid = isda_node_grid(&fixture.discount, &curve, today() + 10_000)
+            .expect("a bootstrapped backward-flat hazard-rate curve is an ISDA curve");
+        assert_eq!(grid, pillars);
     }
 
     /// The maturity the round trip compares on is only the helper's because
