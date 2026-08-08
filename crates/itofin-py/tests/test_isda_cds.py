@@ -45,7 +45,13 @@ SPREAD = 0.01
 NPV = -52927.18294373818
 COUPON_LEG_NPV = 281656.6267407311
 DEFAULT_LEG_NPV = -334583.8096844693
-TOLERANCE = 1e-10
+
+# Wide enough to survive a platform's exp differing in its last bit: the values
+# run to 1e5, so this is a relative 2e-13, while the literals were recorded on
+# one machine and are asserted on whichever one CI happens to run. Still some
+# nine orders of magnitude below anything a mis-wired engine, curve or contract
+# term would move the price by.
+TOLERANCE = 1e-8
 
 
 class Market:
@@ -137,9 +143,21 @@ def test_curves_outside_the_isda_conventions_are_refused_when_pricing():
 
 def test_the_mid_point_engine_accepts_the_curves_the_isda_engine_refuses():
     """The refusal above is the ISDA engine's own check, not something about the
-    Act/360 fixture: the mid-point engine prices it."""
+    Act/360 fixture: the mid-point engine prices that same fixture to
+    -57557.43897416495.
+
+    The sign and the magnitude are pinned rather than the digits, which belong
+    to the mid-point engine and are not this test's subject: the contract is
+    sold protection at a spread below the fair one, so the value is negative and
+    is tens of thousands on a ten-million notional. A price of zero, of the
+    wrong sign, or rounding to nothing would all mean the engine had not really
+    priced the contract, which is the only thing being shown here.
+    """
     market = Market(curve_day_counter=DayCounter.actual360())
     cds = market.contract()
     cds.set_engine(market.mid_point_engine())
 
-    assert cds.npv() != 0.0
+    npv = cds.npv()
+
+    assert npv < 0.0
+    assert 1e4 < abs(npv) < 1e5

@@ -2179,7 +2179,13 @@ mod binding_oracle {
     const NPV: Real = -52927.18294373818;
     const COUPON_LEG_NPV: Real = 281656.6267407311;
     const DEFAULT_LEG_NPV: Real = -334583.8096844693;
-    const TOLERANCE: Real = 1.0e-10;
+
+    /// Wide enough to survive a platform's `exp` differing in its last bit: the
+    /// values run to `10^5`, so this is a relative `2 * 10^-13`, while the
+    /// literals were recorded on one machine and are asserted on whichever one
+    /// CI happens to run. Still some nine orders of magnitude below anything a
+    /// mis-wired engine, curve or contract term would move the price by.
+    const TOLERANCE: Real = 1.0e-8;
 
     fn today() -> Date {
         Date::new(15, Month::June, 2026)
