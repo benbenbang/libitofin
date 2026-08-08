@@ -324,19 +324,23 @@ mod tests {
 
     use super::*;
     use crate::handle::Handle;
+    use crate::indexes::ibor::euribor::Euribor;
     use crate::instrument::Instrument;
     use crate::instruments::{CdsTerms, CreditDefaultSwap, ProtectionSide, cds_maturity};
     use crate::interestrate::Compounding;
     use crate::math::interpolations::flat::BackwardFlat;
+    use crate::math::interpolations::loglinear::LogLinear;
     use crate::pricingengine::PricingEngine;
     use crate::pricingengines::credit::{MidPointCdsEngine, isda_node_grid};
     use crate::quotes::{Quote, SimpleQuote};
     use crate::settings::Settings;
     use crate::shared::shared;
+    use crate::termstructures::RateHelper;
+    use crate::termstructures::bootstraptraits::Discount;
     use crate::termstructures::credit::defaultprobabilityhelpers::{
         CdsHelperTerms, SpreadCdsHelper, UpfrontCdsHelper,
     };
-    use crate::termstructures::yields::FlatForward;
+    use crate::termstructures::yields::{DepositRateHelper, FlatForward, PiecewiseYieldCurve};
     use crate::termstructures::yieldtermstructure::YieldTermStructure;
     use crate::time::businessdayconvention::BusinessDayConvention;
     use crate::time::calendars::target::Target;
@@ -562,6 +566,97 @@ mod tests {
         let grid = isda_node_grid(&fixture.discount, &curve, today() + 10_000)
             .expect("a bootstrapped backward-flat hazard-rate curve is an ISDA curve");
         assert_eq!(grid, pillars);
+    }
+
+    /// Two *bootstrapped* curves through the seam at once - the path
+    /// `testIsdaEngine` drives, and the only test where the union
+    /// (`isdacdsengine.cpp:150-151`) has to merge two solved node sets rather
+    /// than fold one against a flat curve's empty list.
+    ///
+    /// The two pillar sets are genuinely distinct: the yield curve's are
+    /// deposit maturities a few months out, the credit curve's are the IMM
+    /// twentieths of the 1Y/2Y/3Y/5Y helpers, and they share only the common
+    /// reference date. The expected grid is rebuilt here from the two curves'
+    /// own dates rather than transcribed, so it survives a change of fixture;
+    /// the assertions that make it non-degenerate are the exact length
+    /// (which pins the single shared date collapsing exactly once), strict
+    /// increase, and the presence of a date unique to each curve.
+    #[test]
+    fn two_bootstrapped_curves_merge_into_one_sorted_grid() {
+        let fixture = fixture();
+        let credit: Handle<dyn DefaultProbabilityTermStructure> = Handle::new(Shared::clone(
+            &fixture.curve,
+        )
+            as Shared<dyn DefaultProbabilityTermStructure>);
+
+        let deposits: Vec<Shared<dyn RateHelper>> = [(3, TimeUnit::Months), (6, TimeUnit::Months)]
+            .iter()
+            .map(|(n, units)| {
+                let quote = Handle::new(shared(SimpleQuote::new(0.04)) as Shared<dyn Quote>);
+                let index = Euribor::new(
+                    Period::new(*n, *units),
+                    Handle::empty(),
+                    Shared::clone(&fixture.settings),
+                )
+                .expect("the deposit tenor is valid");
+                DepositRateHelper::new(quote, &index) as Shared<dyn RateHelper>
+            })
+            .collect();
+        let yield_curve = PiecewiseYieldCurve::<Discount, LogLinear>::new(
+            today(),
+            deposits,
+            Actual360::new(),
+            LogLinear,
+        )
+        .expect("the deposit helpers bootstrap");
+
+        let yield_pillars = yield_curve.dates().expect("the yield bootstrap succeeds");
+        let credit_pillars = fixture
+            .curve
+            .dates()
+            .expect("the credit bootstrap succeeds");
+        assert_eq!(
+            yield_pillars.len(),
+            3,
+            "the reference date plus two deposits"
+        );
+        assert_eq!(
+            credit_pillars.len(),
+            TENORS.len() + 1,
+            "the reference date plus a pillar per tenor"
+        );
+
+        let grid = isda_node_grid(
+            &Handle::new(yield_curve as Shared<dyn YieldTermStructure>),
+            &credit,
+            today() + 10_000,
+        )
+        .expect("two bootstrapped ISDA curves are supported");
+
+        let shared_dates = yield_pillars
+            .iter()
+            .filter(|date| credit_pillars.contains(date))
+            .count();
+        assert_eq!(
+            shared_dates, 1,
+            "the two curves share only the reference date"
+        );
+        assert_eq!(
+            grid.len(),
+            yield_pillars.len() + credit_pillars.len() - shared_dates,
+            "the shared reference date collapses exactly once"
+        );
+        assert!(
+            grid.windows(2).all(|pair| pair[0] < pair[1]),
+            "the grid is strictly increasing: {grid:?}"
+        );
+        assert!(
+            grid.contains(&yield_pillars[1]) && grid.contains(&credit_pillars[1]),
+            "both curves contribute a pillar of their own"
+        );
+        for date in yield_pillars.iter().chain(credit_pillars.iter()) {
+            assert!(grid.contains(date), "the grid drops the pillar {date:?}");
+        }
     }
 
     /// The maturity the round trip compares on is only the helper's because
