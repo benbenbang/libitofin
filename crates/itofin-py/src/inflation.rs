@@ -2,8 +2,9 @@
 //! inflation swap prices through, the [`PyCpiInterpolationType`] observation
 //! flag, the [`PyZeroInflationIndex`] family, the
 //! [`PyZeroInflationTermStructure`] curve hierarchy, the
-//! [`PyZeroInflationHelper`] bootstrap helpers that fit its piecewise member and
-//! the [`PyZeroCouponInflationSwap`] the rest of them price together.
+//! [`PyMultiplicativePriceSeasonality`] correction any of its curves can carry,
+//! the [`PyZeroInflationHelper`] bootstrap helpers that fit its piecewise member
+//! and the [`PyZeroCouponInflationSwap`] the rest of them price together.
 //!
 //! The swap engine is generic rather than inflation-specific - it prices any
 //! swap - but is homed here because the inflation tickets are the first to need
@@ -34,6 +35,9 @@ use libitofin::termstructures::inflation::inflationhelpers::{
 use libitofin::termstructures::inflation::inflationtermstructure::ZeroInflationTermStructure;
 use libitofin::termstructures::inflation::interpolatedzeroinflationcurve::InterpolatedZeroInflationCurve;
 use libitofin::termstructures::inflation::piecewisezeroinflationcurve::PiecewiseZeroInflationCurve;
+use libitofin::termstructures::inflation::seasonality::{
+    MultiplicativePriceSeasonality, Seasonality,
+};
 use pyo3::prelude::*;
 
 /// Python `DiscountingSwapEngine`: discounts each leg of a swap over a single
@@ -251,6 +255,101 @@ impl PyZeroInflationIndex {
     }
 }
 
+/// Python `MultiplicativePriceSeasonality`: the seasonal correction a price
+/// index carries, whose factors multiply the index level itself
+/// (`termstructures::inflation::seasonality::MultiplicativePriceSeasonality`).
+///
+/// Seasonality fills an inflation curve in between the integer-year maturities
+/// the market quotes. The factors are given in whole multiples of the count the
+/// frequency dictates - twelve for [`Frequency.Monthly`](crate::time::PyFrequency)
+/// - and are reused as long as needed, so twelve of them are stationary and
+/// twenty-four repeat every two years. They are not applied raw: the factor at
+/// the queried date is normalized against the one at a reference date, which for
+/// a zero rate is the curve's own base date, so the correction is the identity
+/// there.
+///
+/// Install it with
+/// [`ZeroInflationTermStructure.set_seasonality`](PyZeroInflationTermStructure::set_seasonality).
+/// Only the date-taking rate query folds the correction in; the year-fraction
+/// one cannot, a time not naming the date the factors are a function of.
+///
+/// Fallible at construction: the core rejects a frequency outside
+/// semiannual-through-daily - `Frequency.Annual` among them - an empty factor
+/// set, and a factor count that is not a whole multiple of the frequency, each
+/// as [`struct@crate::ItofinError`].
+///
+/// Deferred (visible): the core's `set`, which replaces the whole
+/// specification in place, is not exposed - building a new object and
+/// installing it says the same thing without a second mutation path. The core's
+/// `is_consistent` is not exposed either: it is what `set_seasonality` runs as
+/// its gate, and is reported from there.
+#[pyclass(name = "MultiplicativePriceSeasonality", unsendable)]
+pub struct PyMultiplicativePriceSeasonality {
+    inner: Shared<MultiplicativePriceSeasonality>,
+}
+
+#[pymethods]
+impl PyMultiplicativePriceSeasonality {
+    /// The seasonality whose `seasonality_factors` start at
+    /// `seasonality_base_date` and step at `frequency`.
+    #[new]
+    fn new(
+        seasonality_base_date: &PyDate,
+        frequency: &PyFrequency,
+        seasonality_factors: Vec<f64>,
+    ) -> PyResult<Self> {
+        Ok(PyMultiplicativePriceSeasonality {
+            inner: shared(
+                MultiplicativePriceSeasonality::new(
+                    seasonality_base_date.inner(),
+                    frequency.inner(),
+                    seasonality_factors,
+                )
+                .map_err(PyQlError::from)?,
+            ),
+        })
+    }
+
+    /// The date the factor set is anchored on.
+    fn seasonality_base_date(&self) -> PyDate {
+        PyDate::from_inner(self.inner.seasonality_base_date())
+    }
+
+    /// The frequency the factors step at.
+    fn frequency(&self) -> PyResult<PyFrequency> {
+        PyFrequency::from_inner(self.inner.frequency())
+    }
+
+    /// The factors, in order from the seasonality base date.
+    fn seasonality_factors(&self) -> Vec<f64> {
+        self.inner.seasonality_factors().to_vec()
+    }
+
+    /// The raw factor covering `to`, before any normalization against a
+    /// reference date - not the correction the curve applies.
+    ///
+    /// The offset from the seasonality base date is counted in whole factor
+    /// periods and wrapped modulo the factor count, so a set shorter than the
+    /// span repeats and dates before the anchor wrap backwards.
+    ///
+    /// # Errors
+    ///
+    /// Reports a year-based factor period, which cannot express seasonality.
+    fn seasonality_factor(&self, to: &PyDate) -> PyResult<f64> {
+        Ok(self
+            .inner
+            .seasonality_factor(to.inner())
+            .map_err(PyQlError::from)?)
+    }
+}
+
+impl PyMultiplicativePriceSeasonality {
+    /// The upcast correction, for the curve facade that installs one.
+    pub(crate) fn shared(&self) -> Shared<dyn Seasonality> {
+        Shared::clone(&self.inner) as Shared<dyn Seasonality>
+    }
+}
+
 /// Python `ZeroInflationTermStructure`: the shared base for every zero-coupon
 /// inflation curve (`termstructures::inflation::inflationtermstructure`).
 ///
@@ -268,10 +367,21 @@ impl PyZeroInflationIndex {
 /// quantizes nothing. A mid-period date therefore reads that period's rate
 /// through the first and an interpolated one through the second.
 ///
+/// [`set_seasonality`](Self::set_seasonality) lives here rather than on either
+/// concrete curve: it is an `InflationTermStructure` method reached through the
+/// erased handle, and the handle holds the very object the subclass wraps, so
+/// the one method serves both.
+///
 /// Deferred (visible): `base_rate()` is not exposed. A zero curve carries no
 /// base rate, so the core accessor is an error on every curve reachable here
 /// (`inflationtermstructure.rs:159-166`); it follows with the year-on-year
-/// structures that do carry one.
+/// structures that do carry one. The core's `seasonality()` getter is omitted
+/// too: it hands back an erased `Shared<dyn Seasonality>`, and the trait carries
+/// no downcast surface to recover the concrete
+/// [`PyMultiplicativePriceSeasonality`] from, so the getter could only return
+/// something lossy. [`has_seasonality`](Self::has_seasonality) answers the
+/// question the fixtures ask, and the caller already holds the object it
+/// installed.
 #[pyclass(name = "ZeroInflationTermStructure", subclass, unsendable)]
 pub struct PyZeroInflationTermStructure {
     inner: Handle<dyn ZeroInflationTermStructure>,
@@ -331,6 +441,43 @@ impl PyZeroInflationTermStructure {
                 .frequency(),
         )
     }
+
+    /// Installs `seasonality` on the curve, replacing whatever it carried;
+    /// `None` clears it.
+    ///
+    /// A curve that caches anything derived from the correction - every
+    /// bootstrapped one does - is invalidated here, so the next read re-solves
+    /// against the new correction.
+    ///
+    /// # Errors
+    ///
+    /// Reports the consistency gate, which a multi-year factor set fails: the
+    /// whole-year comparison deciding those is a documented core deferral
+    /// (#807). The store happens *before* the gate runs, as C++'s does, so a
+    /// rejected correction is left installed and unannounced - clear it with
+    /// `None` before reading the curve again.
+    #[pyo3(signature = (seasonality))]
+    fn set_seasonality(
+        &self,
+        seasonality: Option<&PyMultiplicativePriceSeasonality>,
+    ) -> PyResult<()> {
+        Ok(self
+            .inner
+            .current_link()
+            .map_err(PyQlError::from)?
+            .set_seasonality(seasonality.map(PyMultiplicativePriceSeasonality::shared))
+            .map_err(PyQlError::from)?)
+    }
+
+    /// Whether the curve carries a seasonality correction. Reports one left
+    /// installed by a [`set_seasonality`](Self::set_seasonality) that raised.
+    fn has_seasonality(&self) -> PyResult<bool> {
+        Ok(self
+            .inner
+            .current_link()
+            .map_err(PyQlError::from)?
+            .has_seasonality())
+    }
 }
 
 impl PyZeroInflationTermStructure {
@@ -372,8 +519,7 @@ impl PyZeroInflationTermStructure {
 /// so no interpolation argument is offered.
 ///
 /// Deferred (visible): the core's `rates()` / `data()` inspectors are omitted,
-/// both being the rate half of [`nodes`](Self::nodes); and the curve carries no
-/// seasonality, which the core does not port either.
+/// both being the rate half of [`nodes`](Self::nodes).
 #[pyclass(
     name = "InterpolatedZeroInflationCurve",
     extends = PyZeroInflationTermStructure,
@@ -631,11 +777,15 @@ impl PyZeroCouponInflationSwapHelper {
 /// constructs (`piecewisezeroinflationcurve.rs:105-125`), so no interpolation
 /// argument is offered.
 ///
+/// A seasonality installed through
+/// [`set_seasonality`](PyZeroInflationTermStructure::set_seasonality)
+/// invalidates the bootstrap, so the next read re-solves every node against the
+/// correction and the quoted swaps still reprice to nothing.
+///
 /// Deferred (visible): the core's `data()` inspector is omitted, being the rate
 /// half of [`nodes`](Self::nodes) - the choice
 /// [`PyInterpolatedZeroInflationCurve`] already made on this side, where the
-/// credit curve exposes both. Seasonality is omitted with the core, which does
-/// not port it either.
+/// credit curve exposes both.
 #[pyclass(
     name = "PiecewiseZeroInflationCurve",
     extends = PyZeroInflationTermStructure,

@@ -924,20 +924,69 @@ class PiecewiseDefaultCurve(DefaultProbabilityTermStructure):
     def data(self) -> list[float]: ...
     def nodes(self) -> list[tuple[Date, float]]: ...
 
+class MultiplicativePriceSeasonality:
+    """The seasonal correction a price index carries, whose factors multiply
+    the index level itself.
+
+    The factors are given in whole multiples of the count the frequency
+    dictates - twelve for Frequency.Monthly - and are reused as long as needed,
+    so twelve of them are stationary and twenty-four repeat every two years.
+    They are not applied raw: the factor at the queried date is normalized
+    against the one at a reference date, which for a zero rate is the curve's
+    own base date, so the correction is the identity there.
+
+    Install it with ZeroInflationTermStructure.set_seasonality. Only the
+    date-taking rate query folds the correction in; the year-fraction one
+    cannot, a time not naming the date the factors are a function of."""
+
+    def __init__(
+        self,
+        seasonality_base_date: Date,
+        frequency: Frequency,
+        seasonality_factors: list[float],
+    ) -> None:
+        """Raises ItofinError on a frequency outside semiannual-through-daily
+        (Frequency.Annual among them), an empty factor set, or a factor count
+        that is not a whole multiple of the frequency."""
+        ...
+    def seasonality_base_date(self) -> Date: ...
+    def frequency(self) -> Frequency: ...
+    def seasonality_factors(self) -> list[float]: ...
+    def seasonality_factor(self, to: Date) -> float:
+        """The raw factor covering `to`, before any normalization against a
+        reference date - not the correction the curve applies. The offset is
+        counted in whole factor periods from the seasonality base date and
+        wraps modulo the factor count, in both directions."""
+        ...
+
 class ZeroInflationTermStructure:
     """Shared base for every zero-coupon inflation curve: the zero-coupon
-    inflation rate in a year-fraction and a date form, plus the base date and
-    the fixing frequency.
+    inflation rate in a year-fraction and a date form, the base date, the
+    fixing frequency and the seasonality correction the curve carries.
 
     The two rate reads are not interchangeable. zero_rate_date snaps its date
     to the start of the inflation period containing it, because a fixing
     applies to a whole period; zero_rate takes a year-fraction already measured
-    under the curve's own day counter and quantizes nothing."""
+    under the curve's own day counter and quantizes nothing. Only the first
+    folds in any seasonality."""
 
     def zero_rate(self, t: float, extrapolate: bool = False) -> float: ...
     def zero_rate_date(self, date: Date, extrapolate: bool = False) -> float: ...
     def base_date(self) -> Date: ...
     def frequency(self) -> Frequency: ...
+    def set_seasonality(
+        self, seasonality: MultiplicativePriceSeasonality | None
+    ) -> None:
+        """Installs seasonality on the curve, replacing whatever it carried;
+        None clears it. A bootstrapped curve is invalidated here, so the next
+        read re-solves against the new correction.
+
+        Raises ItofinError from the consistency gate, which a multi-year factor
+        set fails (a documented core deferral, #807). The store happens before
+        the gate runs, as C++'s does, so a rejected correction is left
+        installed - clear it with None before reading the curve again."""
+        ...
+    def has_seasonality(self) -> bool: ...
 
 class InterpolatedZeroInflationCurve(ZeroInflationTermStructure):
     """A zero-coupon inflation curve built from (date, zero-rate) nodes,
