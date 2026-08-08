@@ -237,6 +237,16 @@ impl<I: Interpolator + 'static> HazardRateStructure for PiecewiseDefaultCurve<Ha
 impl<I: Interpolator + 'static> DefaultProbabilityTermStructure
     for PiecewiseDefaultCurve<HazardRate, I>
 {
+    /// Opts the bootstrapped curve into the downcast seam, for the same reason
+    /// its yield-side twin does
+    /// ([`PiecewiseYieldCurve`](crate::termstructures::yields::piecewiseyieldcurve::PiecewiseYieldCurve)):
+    /// C++ casts a `PiecewiseDefaultCurve<HazardRate, BackwardFlat>` to its
+    /// `InterpolatedHazardRateCurve<BackwardFlat>` base
+    /// (`isdacdsengine.cpp:136-141`), which composition cannot reproduce.
+    fn as_any(&self) -> Option<&dyn std::any::Any> {
+        Some(self)
+    }
+
     fn survival_probability_impl(&self, t: Time) -> QlResult<Probability> {
         self.calculate()?;
         let data = self.data.borrow();

@@ -62,6 +62,17 @@ pub trait DefaultProbabilityTermStructure: TermStructure {
     /// Default-density calculation, implemented by concrete curves.
     fn default_density_impl(&self, t: Time) -> QlResult<Real>;
 
+    /// The curve as [`Any`](std::any::Any), for the callers that must recover
+    /// its concrete type from a `dyn DefaultProbabilityTermStructure`.
+    ///
+    /// The credit-side twin of
+    /// [`YieldTermStructure::as_any`](crate::termstructures::yieldtermstructure::YieldTermStructure::as_any);
+    /// see that method for why the seam exists and what the default `None`
+    /// means.
+    fn as_any(&self) -> Option<&dyn std::any::Any> {
+        None
+    }
+
     /// Hazard-rate calculation, derived from the density and the survival
     /// probability; curves quoting the hazard rate override it with a more
     /// efficient implementation.

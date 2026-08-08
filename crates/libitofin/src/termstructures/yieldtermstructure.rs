@@ -39,6 +39,19 @@ pub trait YieldTermStructure: TermStructure {
     /// Discount factor calculation, implemented by concrete curves.
     fn discount_impl(&self, t: Time) -> QlResult<DiscountFactor>;
 
+    /// The curve as [`Any`](std::any::Any), for the callers that must recover
+    /// its concrete type from a `dyn YieldTermStructure`.
+    ///
+    /// The port of C++'s `dynamic_pointer_cast` on a `Handle<YieldTermStructure>`:
+    /// `Rc` carries no downcast of its own, so a curve opts in by overriding
+    /// this. The default `None` reads as "this curve declines to be
+    /// introspected", which
+    /// [`isda_node_grid`](crate::pricingengines::credit::isda_node_grid)
+    /// - the only caller - treats as the C++ `QL_FAIL` arm.
+    fn as_any(&self) -> Option<&dyn std::any::Any> {
+        None
+    }
+
     /// The discount factor from `date` to the reference date.
     fn discount_date(&self, date: Date, extrapolate: bool) -> QlResult<DiscountFactor> {
         self.discount(self.time_from_reference(date)?, extrapolate)

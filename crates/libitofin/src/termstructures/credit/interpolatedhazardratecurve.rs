@@ -204,13 +204,23 @@ impl<I: Interpolator> TermStructure for InterpolatedHazardRateCurve<I> {
     }
 }
 
-impl<I: Interpolator> HazardRateStructure for InterpolatedHazardRateCurve<I> {
+impl<I: Interpolator + 'static> HazardRateStructure for InterpolatedHazardRateCurve<I>
+where
+    I::Output: 'static,
+{
     fn hazard_rate_curve_impl(&self, t: Time) -> QlResult<Rate> {
         hazard_rate_from_nodes(self.curve.interpolation()?, t)
     }
 }
 
-impl<I: Interpolator> DefaultProbabilityTermStructure for InterpolatedHazardRateCurve<I> {
+impl<I: Interpolator + 'static> DefaultProbabilityTermStructure for InterpolatedHazardRateCurve<I>
+where
+    I::Output: 'static,
+{
+    fn as_any(&self) -> Option<&dyn std::any::Any> {
+        Some(self)
+    }
+
     fn survival_probability_impl(&self, t: Time) -> QlResult<Probability> {
         survival_probability_from_nodes(self.curve.interpolation()?, t)
     }
