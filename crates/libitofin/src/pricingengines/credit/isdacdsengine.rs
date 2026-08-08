@@ -2128,3 +2128,130 @@ mod markit_oracle {
         );
     }
 }
+
+/// The oracle the Python `IsdaCdsEngine` facade (#812) is pinned against: a
+/// three-year contract on two flat Act/365F curves referenced at the evaluation
+/// date, priced through the instrument the way a caller prices one.
+///
+/// The fixture lives here rather than only in the binding because the pinned
+/// number has to come out of the constructor the facade wraps.
+/// `crates/itofin-py/tests/test_isda_cds.py` rebuilds it byte-for-byte - the
+/// same dates, curves, schedule and contract terms - and asserts the same three
+/// literals, so a facade that reached a different engine, or dropped one of the
+/// arguments it forwards, shows up there as a mismatch rather than as a
+/// plausible number nothing grades.
+///
+/// The schedule is built through the same builder calls `PySchedule::new`
+/// (`itofin-py/src/time.rs:528-536`) makes, including the rule and the
+/// termination convention the refusal fixture leaves defaulted, and its shape
+/// is asserted alongside the value so a drift in the dates is told apart from a
+/// drift in the pricing. Two flat curves leave the integration grid as the
+/// maturity alone (`isdanodegrid.rs:122-124`), so this is a single-node ISDA
+/// reprice - still the engine's own kernels, and still distinct from the
+/// mid-point engine's period-by-period integration.
+#[cfg(test)]
+mod binding_oracle {
+    use super::*;
+    use crate::instrument::Instrument;
+    use crate::instruments::{CreditDefaultSwap, ProtectionSide};
+    use crate::interestrate::Compounding;
+    use crate::pricingengine::PricingEngine;
+    use crate::shared::{SharedMut, shared, shared_mut};
+    use crate::termstructures::credit::flathazardrate::FlatHazardRate;
+    use crate::termstructures::yields::FlatForward;
+    use crate::time::businessdayconvention::BusinessDayConvention;
+    use crate::time::calendars::target::Target;
+    use crate::time::date::Month;
+    use crate::time::dategenerationrule::DateGeneration;
+    use crate::time::daycounters::actual360::Actual360;
+    use crate::time::frequency::Frequency;
+    use crate::time::schedule::MakeSchedule;
+
+    const NOTIONAL: Real = 10_000_000.0;
+    const SPREAD: Rate = 0.01;
+    const RECOVERY: Real = 0.4;
+    const HAZARD: Real = 0.02;
+    const DISCOUNT_RATE: Rate = 0.03;
+
+    /// What the fixture prices to, recorded from this test's own run to the
+    /// precision an `f64` round-trips at. `test_isda_cds.py` carries the same
+    /// three numbers.
+    const NPV: Real = -52927.18294373818;
+    const COUPON_LEG_NPV: Real = 281656.6267407311;
+    const DEFAULT_LEG_NPV: Real = -334583.8096844693;
+    const TOLERANCE: Real = 1.0e-10;
+
+    fn today() -> Date {
+        Date::new(15, Month::June, 2026)
+    }
+
+    fn maturity() -> Date {
+        Date::new(15, Month::June, 2029)
+    }
+
+    /// The contract of the fixture, with the ISDA engine already installed.
+    fn priced() -> CreditDefaultSwap {
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(today());
+        let discount = Handle::new(shared(FlatForward::with_rate(
+            today(),
+            DISCOUNT_RATE,
+            Actual365Fixed::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>);
+        let credit = Handle::new(shared(FlatHazardRate::with_rate(
+            today(),
+            HAZARD,
+            Actual365Fixed::new(),
+        )) as Shared<dyn DefaultProbabilityTermStructure>);
+        let schedule = MakeSchedule::new()
+            .from(today())
+            .to(maturity())
+            .with_frequency(Frequency::Quarterly)
+            .with_calendar(Target::new())
+            .with_convention(BusinessDayConvention::Following)
+            .with_termination_date_convention(BusinessDayConvention::Following)
+            .with_rule(DateGeneration::Forward)
+            .build();
+        assert_eq!(schedule.dates().len(), 13);
+        assert_eq!(schedule.dates()[0], today());
+        assert_eq!(schedule.dates()[12], maturity());
+        let mut cds = CreditDefaultSwap::new(
+            ProtectionSide::Seller,
+            NOTIONAL,
+            SPREAD,
+            schedule,
+            BusinessDayConvention::Following,
+            Actual360::new(),
+            true,
+            true,
+            Shared::clone(&settings),
+        )
+        .expect("the contract is well formed");
+        let engine = shared_mut(IsdaCdsEngine::new(
+            credit, RECOVERY, discount, None, settings,
+        )) as SharedMut<dyn PricingEngine>;
+        cds.base_mut().set_pricing_engine(engine);
+        cds
+    }
+
+    /// The value and its two legs, which the Python oracle asserts to the same
+    /// three literals.
+    ///
+    /// The legs are pinned alongside the value so that a Python-side mismatch
+    /// says which half of the price moved rather than only that the total did.
+    #[test]
+    fn the_flat_curve_fixture_prices_to_the_pinned_value() {
+        let mut cds = priced();
+        assert!((cds.npv().expect("the contract prices") - NPV).abs() <= TOLERANCE);
+        assert!(
+            (cds.coupon_leg_npv().expect("the premium leg is valued") - COUPON_LEG_NPV).abs()
+                <= TOLERANCE
+        );
+        assert!(
+            (cds.default_leg_npv().expect("the protection leg is valued") - DEFAULT_LEG_NPV).abs()
+                <= TOLERANCE
+        );
+    }
+}
