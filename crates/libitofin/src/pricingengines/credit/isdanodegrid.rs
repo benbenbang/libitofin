@@ -31,7 +31,9 @@
 //! oversight: `InterpolatedDiscountCurve<Linear>` is a different C++ type from
 //! `InterpolatedDiscountCurve<LogLinear>` and matches no arm, and there is no
 //! `InterpolatedZeroCurve` arm at all, so a `PiecewiseYieldCurve<ZeroYield, _>`
-//! is an error on both sides.
+//! is an error on both sides. Both fall to the same `QL_FAIL` C++ reaches
+//! (`isdacdsengine.cpp:128-129` on the yield side, `:146-147` on the credit
+//! side) - the rejection is the ported behaviour, not a missing feature.
 //!
 //! ## Deferred (#799)
 //!
