@@ -22,15 +22,25 @@
 //! - The three range checks on the flags (`isdacdsengine.cpp:54-60`) have no
 //!   counterpart: they reject a `NumericalFix` that is neither `None` nor
 //!   `Taylor`, which a C++ enum permits and a Rust one does not.
+//! - The C++ `dynamic_pointer_cast<FixedRateCoupon>` on each premium flow
+//!   (`isdacdsengine.cpp:205`) becomes
+//!   [`CashFlow::as_coupon`](crate::cashflow::CashFlow::as_coupon), as it does for
+//!   [`MidPointCdsEngine`](super::MidPointCdsEngine): C++ dereferences the
+//!   resulting null pointer when a flow is not a coupon and the port reports it
+//!   (D4). The narrowing stops at `dyn Coupon` rather than at the fixed-rate
+//!   coupon, which is every member the kernel reads; a floating-rate coupon in
+//!   the leg would therefore price here where C++ is undefined.
 //!
 //! ## Unported (#796, #797)
 //!
-//! The premium-leg integration (`isdacdsengine.cpp:201-287`) and the results
-//! tail (`:288-310`) are not written yet: [`IsdaCdsEngine::calculate`] values
-//! the protection leg, records it, and then reports #796 rather than returning
-//! a price - an engine answering `0.0` here could not be told apart from a
-//! contract genuinely worth nothing.
+//! The premium leg's default accrual (`isdacdsengine.cpp:223-283`) and the
+//! results tail (`:288-310`) are not written yet: [`IsdaCdsEngine::calculate`]
+//! values the protection leg and the premium coupons, records them, and then
+//! reports #797 rather than returning a price - an engine answering `0.0` here
+//! could not be told apart from a contract genuinely worth nothing. The accrual
+//! is #796's second half.
 
+use crate::cashflow::Leg;
 use crate::errors::QlResult;
 use crate::instruments::{CdsArguments, CdsEngine, CdsResults, Claim, FaceValueClaim};
 use crate::patterns::observable::{AsObservable, Observable};
@@ -41,6 +51,7 @@ use crate::termstructures::credit::defaulttermstructure::DefaultProbabilityTermS
 use crate::termstructures::yieldtermstructure::YieldTermStructure;
 use crate::time::date::Date;
 use crate::time::daycounter::DayCounter;
+use crate::time::daycounters::actual360::Actual360;
 use crate::time::daycounters::actual365fixed::Actual365Fixed;
 use crate::types::Real;
 use crate::{fail, handle::Handle, require};
@@ -280,6 +291,50 @@ impl IsdaCdsEngine {
 
         Ok(protection_npv * claim.amount(&Date::null(), notional, context.recovery_rate))
     }
+
+    /// `isdacdsengine.cpp:201-221`: the premium leg's coupons, each live one
+    /// carried by the survival to the day before it pays.
+    ///
+    /// The survival factor and its one-day offset (`:218`) are the standard
+    /// model's, not a discounting identity: a coupon is paid only if the name
+    /// survived the day before the payment date, which is a day earlier than
+    /// the date the coupon is discounted from.
+    ///
+    /// The specification fixes the premium leg's day count as well as the
+    /// curves' (`:205-211`).
+    ///
+    /// What a default part way through a period accrues (`:223-283`) is not
+    /// added here yet; it is the second half of #796.
+    fn premium_leg_npv(&self, context: &IsdaContext, leg: &Leg) -> QlResult<Real> {
+        let mut premium_npv = 0.0;
+
+        for (position, flow) in leg.iter().enumerate() {
+            let Some(coupon) = flow.as_coupon() else {
+                fail!("premium leg flow #{} is not a coupon", position + 1);
+            };
+            let day_counter = coupon.day_counter();
+            require!(
+                day_counter == Actual365Fixed::new()
+                    || day_counter == Actual360::new()
+                    || day_counter == Actual360::with_last_day(true),
+                "ISDA engine requires a coupon day counter Act/365Fixed or Act/360 ({day_counter})"
+            );
+
+            if !flow.has_occurred(
+                &self.settings,
+                Some(context.effective_protection_start),
+                context.include_settlement_date_flows,
+            )? {
+                premium_npv += coupon.amount()?
+                    * context.discount.discount_date(flow.date(), false)?
+                    * context
+                        .probability
+                        .survival_probability_date(flow.date() - 1, false)?;
+            }
+        }
+
+        Ok(premium_npv)
+    }
 }
 
 /// Below this the integrands' quotients are replaced by their Taylor expansions
@@ -303,9 +358,9 @@ fn require_act_365_fixed(day_counter: Option<DayCounter>, curve: &str) -> QlResu
 
 /// What the leg kernels run on once the compatibility checks have passed: the
 /// C++ locals of `isdacdsengine.cpp:66-157`, gathered so that the kernels can be
-/// written against them without reshaping the engine. The fields the protection
-/// leg does not read are the premium leg's (#796) and the results tail's
-/// (`eval_date`, first read at `:292`, #797).
+/// written against them without reshaping the engine. The fields nothing reads
+/// yet belong to the default accrual (the two flags, #796) and to the results
+/// tail (`eval_date`, first read at `isdacdsengine.cpp:292`, #797).
 #[allow(dead_code)]
 struct IsdaContext {
     discount: Shared<dyn YieldTermStructure>,
@@ -341,24 +396,31 @@ impl PricingEngine for IsdaCdsEngine {
     }
 
     /// `isdacdsengine.cpp:52-310`, of which the validation, the setup
-    /// (`:54-157`) and the protection leg (`:159-199`) are ported.
+    /// (`:54-157`) and both leg integrations (`:159-287`) are ported.
     ///
-    /// The protection leg is recorded before the report, so a caller that means
-    /// to read it can do so through [`results`](PricingEngine::results) despite
-    /// the `Err`.
+    /// The legs are recorded before the report, so a caller that means to read
+    /// one can do so through [`results`](PricingEngine::results) despite the
+    /// `Err`.
     fn calculate(&mut self) -> QlResult<()> {
         let context = self.validated()?;
-        let arguments = self.base.arguments();
-        let Some(notional) = arguments.notional else {
-            fail!("notional not set");
-        };
-        let Some(claim) = arguments.claim.as_ref().map(Shared::clone) else {
-            fail!("claim not set");
+        let (default_leg_npv, coupon_leg_npv) = {
+            let arguments = self.base.arguments();
+            let Some(notional) = arguments.notional else {
+                fail!("notional not set");
+            };
+            let Some(claim) = arguments.claim.as_ref() else {
+                fail!("claim not set");
+            };
+            (
+                self.protection_leg_npv(&context, &**claim, notional)?,
+                self.premium_leg_npv(&context, &arguments.leg)?,
+            )
         };
 
-        let default_leg_npv = self.protection_leg_npv(&context, &*claim, notional)?;
-        self.base.results_mut().default_leg_npv = Some(default_leg_npv);
-        fail!("the ISDA CDS engine values no premium leg yet: its integration is #796")
+        let results = self.base.results_mut();
+        results.default_leg_npv = Some(default_leg_npv);
+        results.coupon_leg_npv = Some(coupon_leg_npv);
+        fail!("the ISDA CDS engine prices no contract yet: its results are #797")
     }
 }
 
@@ -555,14 +617,14 @@ mod tests {
     }
 
     /// The fixture every case above corrupts, left alone: it clears every guard
-    /// and stops only on the integrations #796 has yet to write, which is what
+    /// and stops only on the results tail #797 has yet to write, which is what
     /// makes each of those cases a single-dimension corruption.
     #[test]
-    fn a_compatible_contract_reaches_the_unported_integrations() {
+    fn a_compatible_contract_reaches_the_unported_results() {
         let message = compatible(|_| {});
         assert!(
-            message.contains("#796"),
-            "a compatible contract should stop on the unported integrations, not on {message}"
+            message.contains("#797"),
+            "a compatible contract should stop on the unported results, not on {message}"
         );
     }
 
@@ -638,17 +700,17 @@ mod protection_leg {
     const NOTIONAL: Real = 10_000_000.0;
     const RECOVERY: Real = 0.4;
 
-    fn today() -> Date {
+    pub(super) fn today() -> Date {
         Date::new(15, Month::June, 2026)
     }
 
-    fn act365f() -> DayCounter {
+    pub(super) fn act365f() -> DayCounter {
         Actual365Fixed::new()
     }
 
     /// Act/365 (Fixed) time from the evaluation date, which both curves count
     /// in and which the closed form below is stated in.
-    fn years(days: SerialNumber) -> Real {
+    pub(super) fn years(days: SerialNumber) -> Real {
         Real::from(days) / 365.0
     }
 
@@ -719,7 +781,7 @@ mod protection_leg {
 
         engine
             .calculate()
-            .expect_err("the premium leg is not valued yet");
+            .expect_err("the results tail is not written yet");
         engine
             .base
             .results()
@@ -817,6 +879,236 @@ mod protection_leg {
             (quotient - expected).abs() > 0.5 * expected,
             "the quotient returned {quotient}, near enough the limit {expected} that the arms \
              cannot be told apart here"
+        );
+    }
+}
+
+#[cfg(test)]
+mod premium_leg {
+    //! Oracle: the premium-leg integration (`isdacdsengine.cpp:201-287`).
+    //!
+    //! The two kernels of this leg have no closed form the way the protection
+    //! leg does, so what is pinned here is what the Markit grid of #798 would
+    //! fail on without saying where: the survival factor and its one-day offset,
+    //! which discounting alone would not produce; the day counters the
+    //! specification allows; and that each of the two fidelity flags reaches the
+    //! number at all, since a flag read but never applied prices identically to
+    //! one that was never read.
+    //!
+    //! The curves are the protection leg's, for the same reason: the grid the
+    //! accrual subdivides is the discount curve's own pillars, and two flat
+    //! curves leave it as the maturity alone, where the piecewise flag has
+    //! nothing to insert and could not be seen.
+
+    use super::protection_leg::{act365f, today, years};
+    use super::*;
+    use crate::cashflow::CashFlow;
+    use crate::cashflows::Coupon;
+    use crate::cashflows::FixedRateCoupon;
+    use crate::instrument::Instrument;
+    use crate::instruments::{CreditDefaultSwap, ProtectionSide};
+    use crate::interestrate::{Compounding, InterestRate};
+    use crate::math::interpolations::loglinear::LogLinear;
+    use crate::shared::shared;
+    use crate::termstructures::credit::flathazardrate::FlatHazardRate;
+    use crate::termstructures::yields::InterpolatedDiscountCurve;
+    use crate::time::businessdayconvention::BusinessDayConvention;
+    use crate::time::calendars::weekendsonly::WeekendsOnly;
+    use crate::time::date::{Month, SerialNumber};
+    use crate::time::daycounters::thirty360::{Convention, Thirty360};
+    use crate::time::frequency::Frequency;
+    use crate::time::schedule::MakeSchedule;
+
+    const NOTIONAL: Real = 10_000_000.0;
+    const SPREAD: Real = 0.01;
+    const RECOVERY: Real = 0.4;
+    const HAZARD: Real = 0.02;
+
+    /// Pillars spread through the two years the contract runs, so that every
+    /// coupon period has at least one strictly inside it.
+    const PILLARS: [SerialNumber; 6] = [0, 30, 100, 200, 400, 800];
+
+    /// The forward rate over each segment between those pillars.
+    const FORWARDS: [Real; 5] = [0.01, 0.05, 0.02, 0.07, 0.03];
+
+    /// A log-linear discount curve whose forward rate changes from pillar to
+    /// pillar, which is what the piecewise flag needs to be seen at all: over a
+    /// segment of constant forward the accrual integral is additive, so
+    /// subdividing a flat curve returns the very same number.
+    fn stepped_discount() -> Handle<dyn YieldTermStructure> {
+        let mut dates = vec![today()];
+        let mut discounts = vec![1.0];
+        let mut log_discount: Real = 0.0;
+        for (segment, forward) in FORWARDS.iter().enumerate() {
+            log_discount -= forward * (years(PILLARS[segment + 1]) - years(PILLARS[segment]));
+            dates.push(today() + PILLARS[segment + 1]);
+            discounts.push(log_discount.exp());
+        }
+        Handle::new(shared(
+            InterpolatedDiscountCurve::<LogLinear>::new(dates, discounts, act365f(), None)
+                .expect("the pillars increase and open at a discount factor of 1"),
+        ) as Shared<dyn YieldTermStructure>)
+    }
+
+    /// That curve's discount factor, read off a curve built again rather than
+    /// out of the engine's own.
+    fn discount_factor(date: Date) -> Real {
+        stepped_discount()
+            .current_link()
+            .expect("the handle is linked")
+            .discount_date(date, false)
+            .expect("the date is inside the curve")
+    }
+
+    /// The flat hazard curve's survival probability, by hand.
+    fn survival(date: Date) -> Real {
+        (-HAZARD * years(date - today())).exp()
+    }
+
+    /// An engine over the nodal curves, armed with a two-year semiannual
+    /// contract counted in `day_counter`.
+    fn armed(
+        day_counter: DayCounter,
+        accrual_bias: AccrualBias,
+        forwards_in_coupon_period: ForwardsInCouponPeriod,
+    ) -> IsdaCdsEngine {
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(today());
+        let credit = Handle::new(
+            shared(FlatHazardRate::with_rate(today(), HAZARD, act365f()))
+                as Shared<dyn DefaultProbabilityTermStructure>,
+        );
+        let mut engine = IsdaCdsEngine::new(
+            credit,
+            RECOVERY,
+            stepped_discount(),
+            None,
+            Shared::clone(&settings),
+        )
+        .with_fidelity(
+            NumericalFix::Taylor,
+            accrual_bias,
+            forwards_in_coupon_period,
+        );
+
+        let schedule = MakeSchedule::new()
+            .from(today())
+            .to(Date::new(15, Month::June, 2028))
+            .with_frequency(Frequency::Semiannual)
+            .with_calendar(WeekendsOnly::new())
+            .build();
+        let cds = CreditDefaultSwap::new(
+            ProtectionSide::Seller,
+            NOTIONAL,
+            SPREAD,
+            schedule,
+            BusinessDayConvention::Following,
+            day_counter,
+            true,
+            true,
+            settings,
+        )
+        .expect("the contract is well formed");
+        cds.setup_arguments(engine.base.arguments_mut())
+            .expect("the contract fills the arguments");
+        engine
+    }
+
+    /// The premium leg the engine records before reporting the results it has
+    /// yet to write.
+    fn coupon_leg(engine: &mut IsdaCdsEngine) -> Real {
+        engine
+            .calculate()
+            .expect_err("the results tail is not written yet");
+        engine
+            .base
+            .results()
+            .coupon_leg_npv
+            .expect("the premium leg is valued")
+    }
+
+    /// `isdacdsengine.cpp:205-211`: the specification fixes the premium leg's
+    /// day count on the three conventions it names, and refuses the rest.
+    #[test]
+    fn a_coupon_counted_outside_the_isda_conventions_is_refused() {
+        for accepted in [act365f(), Actual360::new(), Actual360::with_last_day(true)] {
+            let message = armed(
+                accepted.clone(),
+                AccrualBias::HalfDayBias,
+                ForwardsInCouponPeriod::Piecewise,
+            )
+            .calculate()
+            .expect_err("nothing prices yet")
+            .message()
+            .to_string();
+            assert!(
+                message.contains("#797"),
+                "a leg counted in {accepted} should reach the results, not stop on {message}"
+            );
+        }
+
+        assert_eq!(
+            armed(
+                Thirty360::with_convention(Convention::BondBasis),
+                AccrualBias::HalfDayBias,
+                ForwardsInCouponPeriod::Piecewise,
+            )
+            .calculate()
+            .expect_err("the day counter is outside the specification")
+            .message(),
+            "ISDA engine requires a coupon day counter Act/365Fixed or Act/360 \
+             (30/360 (Bond Basis))"
+        );
+    }
+
+    /// `isdacdsengine.cpp:214-219`: a coupon is discounted to its payment date
+    /// but carried by the survival to the day *before* it.
+    ///
+    /// The leg is one coupon whose accrual closed before the protection opens,
+    /// which the accrual guard (`:223-224`) drops, so the premium leg is that
+    /// coupon alone and can be read against the curves directly. The two mutants
+    /// the identity has to exclude - the survival read on the payment date, and
+    /// no survival factor at all - are computed alongside it and asserted to
+    /// differ, so neither could pass this fixture.
+    #[test]
+    fn a_coupon_is_carried_by_the_survival_to_the_day_before_it_pays() {
+        let payment = today() + 30;
+        let mut engine = armed(
+            act365f(),
+            AccrualBias::HalfDayBias,
+            ForwardsInCouponPeriod::Piecewise,
+        );
+        let coupon = shared(FixedRateCoupon::new(
+            payment,
+            NOTIONAL,
+            InterestRate::new(SPREAD, act365f(), Compounding::Simple, Frequency::Annual)
+                .expect("a simple annual rate is well formed"),
+            today() - 180,
+            today() - 1,
+            None,
+            None,
+            None,
+        ));
+        let amount = Coupon::amount(&*coupon).expect("the coupon accrues an amount");
+        engine.base.arguments_mut().leg = vec![coupon as Shared<dyn CashFlow>];
+
+        let discount = discount_factor(payment);
+        let expected = amount * discount * survival(payment - 1);
+        let on_the_payment_date = amount * discount * survival(payment);
+        let without_survival = amount * discount;
+
+        assert!(
+            (expected - on_the_payment_date).abs() > 1.0e-9 * expected,
+            "a fixture whose survival does not move over a day could not see the offset"
+        );
+        assert!(
+            (expected - without_survival).abs() > 1.0e-3 * expected,
+            "a fixture surviving with certainty could not see the factor at all"
+        );
+        assert!(
+            (coupon_leg(&mut engine) - expected).abs() <= 1.0e-12 * expected,
+            "the premium leg came to {} rather than to {expected}",
+            coupon_leg(&mut engine)
         );
     }
 }
