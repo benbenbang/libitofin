@@ -112,6 +112,22 @@ pub trait PiecewiseCurve {
         self.reference_date()
     }
 
+    /// The value seeded into the first curve node (`Traits::initialValue`).
+    ///
+    /// The mirror of [`initial_date`](Self::initial_date): C++ passes the term
+    /// structure to `Traits::initialValue(const TS*)`, and while every yield and
+    /// credit convention ignores that pointer - hence the default here,
+    /// delegating to the traits constant - the year-on-year inflation
+    /// convention reads the curve's base rate off it
+    /// (`YoYInflationTraits::initialValue(t) = t->baseRate()`,
+    /// `inflationtraits.hpp:129-131`, against the zero convention's constant at
+    /// `:50-53`). Taking it from the curve rather than from the traits struct is
+    /// what lets such a curve seed node 0 from its own state. It returns a
+    /// `QlResult` because that base rate is itself fallible.
+    fn initial_value(&self) -> QlResult<Real> {
+        Ok(Self::Traits::initial_value())
+    }
+
     /// The year fraction from the reference date to `date`.
     fn time_from_reference(&self, date: Date) -> QlResult<Time>;
 
@@ -154,6 +170,7 @@ impl IterativeBootstrap {
         sort_by_pillar_date(&mut helpers);
 
         let first_date = curve.initial_date()?;
+        let initial_value = curve.initial_value()?;
         require!(
             helpers[n - 1].pillar_date() > first_date,
             "all instruments expired"
@@ -194,14 +211,14 @@ impl IterativeBootstrap {
         }
 
         // Install the pillars, seeding the values from a still-valid previous
-        // solution when its shape matches, otherwise resetting to the traits'
+        // solution when its shape matches, otherwise resetting to the curve's
         // initial value (`:212-218`).
         let valid_data = {
             let mut cd = curve.curve_data().borrow_mut();
             let reuse = cd.is_valid() && cd.data().len() == nodes;
             cd.set_pillars(dates, times);
             if !reuse {
-                cd.reset_data(C::Traits::initial_value(), nodes);
+                cd.reset_data(initial_value, nodes);
             }
             cd.set_max_date(max_date);
             reuse
@@ -327,11 +344,12 @@ mod tests {
         data: RefCell<CurveData<LogLinear>>,
         self_weak: Weak<dyn YieldTermStructure>,
         initial_date: Option<Date>,
+        initial_value: Option<Real>,
     }
 
     impl StubCurve {
         fn new(reference: Date, instruments: Vec<Shared<dyn RateHelper>>) -> Shared<StubCurve> {
-            StubCurve::build(reference, instruments, None)
+            StubCurve::build(reference, instruments, None, None)
         }
 
         /// A curve whose first node sits at `initial_date` rather than at the
@@ -341,13 +359,25 @@ mod tests {
             instruments: Vec<Shared<dyn RateHelper>>,
             initial_date: Date,
         ) -> Shared<StubCurve> {
-            StubCurve::build(reference, instruments, Some(initial_date))
+            StubCurve::build(reference, instruments, Some(initial_date), None)
+        }
+
+        /// A curve that seeds node 0 from its own state rather than from the
+        /// traits constant, the way a year-on-year inflation curve seeds it
+        /// from its base rate.
+        fn with_initial_value(
+            reference: Date,
+            instruments: Vec<Shared<dyn RateHelper>>,
+            initial_value: Real,
+        ) -> Shared<StubCurve> {
+            StubCurve::build(reference, instruments, None, Some(initial_value))
         }
 
         fn build(
             reference: Date,
             instruments: Vec<Shared<dyn RateHelper>>,
             initial_date: Option<Date>,
+            initial_value: Option<Real>,
         ) -> Shared<StubCurve> {
             Shared::new_cyclic(|weak: &Weak<StubCurve>| {
                 let self_weak: Weak<dyn YieldTermStructure> = weak.clone();
@@ -362,6 +392,7 @@ mod tests {
                     data: RefCell::new(CurveData::new()),
                     self_weak,
                     initial_date,
+                    initial_value,
                 }
             })
         }
@@ -423,6 +454,13 @@ mod tests {
             match self.initial_date {
                 Some(date) => Ok(date),
                 None => self.base.reference_date(),
+            }
+        }
+
+        fn initial_value(&self) -> QlResult<Real> {
+            match self.initial_value {
+                Some(value) => Ok(value),
+                None => Ok(Discount::initial_value()),
             }
         }
 
@@ -515,6 +553,45 @@ mod tests {
         assert!(data.times()[0] < 0.0, "times[0] = {}", data.times()[0]);
         assert_eq!(data.times()[0], -90.0 / 360.0);
         drop(data);
+
+        for helper in [&h3, &h6] {
+            let error = helper.quote_error().unwrap();
+            assert!(error.abs() < 1.0e-12, "deposit quote error {error}");
+        }
+    }
+
+    /// Node 0 is seeded through the curve's `initial_value` hook, not from the
+    /// traits constant: a curve that overrides the hook sees its own value in
+    /// the bootstrapped node vector. `Discount::update_guess` only ever writes
+    /// nodes `1..`, so the seed survives the solve and the assertion reads it
+    /// back after the driver has run to completion - which the quote errors
+    /// confirm. This is what proves the hook is wired into the driver rather
+    /// than merely defined: with the seed still taken from the traits, node 0
+    /// would read back as `Discount::initial_value()`.
+    #[test]
+    fn node_zero_is_seeded_from_the_curves_initial_value_hook() {
+        let today = Date::new(15, Month::June, 2026);
+        let settings = settings_on(today);
+
+        let three_m = euribor(Period::new(3, TimeUnit::Months), settings.clone());
+        let six_m = euribor(Period::new(6, TimeUnit::Months), settings.clone());
+
+        let h3 = DepositRateHelper::from_rate(0.04557, &three_m);
+        let h6 = DepositRateHelper::from_rate(0.04496, &six_m);
+
+        let reference = h3.earliest_date();
+        let instruments: Vec<Shared<dyn RateHelper>> = vec![
+            Shared::clone(&h3) as Shared<dyn RateHelper>,
+            Shared::clone(&h6) as Shared<dyn RateHelper>,
+        ];
+
+        let seed = 0.42;
+        assert_ne!(seed, Discount::initial_value());
+
+        let curve = StubCurve::with_initial_value(reference, instruments, seed);
+        IterativeBootstrap::new().calculate(curve.as_ref()).unwrap();
+
+        assert_eq!(curve.data.borrow().data()[0], seed);
 
         for helper in [&h3, &h6] {
             let error = helper.quote_error().unwrap();
