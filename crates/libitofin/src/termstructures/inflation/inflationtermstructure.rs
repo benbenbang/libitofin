@@ -7,6 +7,8 @@
 //! [`ZeroInflationTermStructure`] adds the zero-coupon inflation rate derived
 //! from the single required
 //! [`zero_rate_impl`](ZeroInflationTermStructure::zero_rate_impl).
+//! [`YoYInflationTermStructure`] is its year-on-year sibling, derived the same
+//! way from [`yoy_rate_impl`](YoYInflationTermStructure::yoy_rate_impl).
 //!
 //! ## Divergences from QuantLib
 //!
@@ -25,6 +27,14 @@
 //!   live two-argument overload, which delegates with a zero lag and no
 //!   forced interpolation (`inflationtermstructure.cpp:134-138`), so it takes
 //!   the `else` branch only.
+//! - The deprecated four-argument `yoyRate(d, instObsLag,
+//!   forceLinearInterpolation, extrapolate)`
+//!   (`inflationtermstructure.hpp:216-222`) is dropped for the same reasons,
+//!   and with it its own `forceLinearInterpolation` branch
+//!   (`inflationtermstructure.cpp:226-238`). The ported
+//!   [`yoy_rate_date`](YoYInflationTermStructure::yoy_rate_date) is the live
+//!   two-argument overload, delegating with a zero lag
+//!   (`inflationtermstructure.cpp:210-214`).
 //! - C++ gates [`Seasonality::is_consistent`] inside the three
 //!   `InflationTermStructure` constructors, against a partially constructed
 //!   `*this` (`inflationtermstructure.cpp:34-38,57-61,79-83`). A Rust holder
@@ -355,6 +365,69 @@ pub trait ZeroInflationTermStructure: InflationTermStructure {
     }
 }
 
+/// Year-on-year inflation term structure.
+///
+/// Mirrors QuantLib's `YoYInflationTermStructure`
+/// (`inflationtermstructure.hpp:181-238`): concrete curves implement
+/// [`yoy_rate_impl`](Self::yoy_rate_impl) (called after range checking, so it
+/// must assume extrapolation is required) and inherit the rest. Unlike a zero
+/// curve, a year-on-year one carries a base rate: C++ forwards `baseYoYRate`
+/// into the base constructor's `baseRate` slot
+/// (`inflationtermstructure.cpp:189,198,208`), so its holder takes
+/// `Some(base_yoy_rate)` and
+/// [`base_rate`](InflationTermStructure::base_rate) succeeds.
+pub trait YoYInflationTermStructure: InflationTermStructure {
+    /// Year-on-year rate calculation, implemented by concrete curves
+    /// (`inflationtermstructure.hpp:237`).
+    fn yoy_rate_impl(&self, t: Time) -> QlResult<Rate>;
+
+    /// The year-on-year inflation rate for `date`
+    /// (`inflationtermstructure.cpp:210-214` delegating to the `else` branch
+    /// at `:239-243`).
+    ///
+    /// This is not the year-on-year swap (YYIIS) rate; that comes from the
+    /// instrument (`inflationtermstructure.hpp:210-213`).
+    ///
+    /// The query date is quantized to the start of its inflation period before
+    /// it reaches the curve, as on the zero path: the range check and the time
+    /// conversion both use the quantized date.
+    ///
+    /// Any seasonality correction is folded in last
+    /// (`inflationtermstructure.cpp:246-248`). It receives the *original*
+    /// date, as C++ does on this path - the lag it subtracts there is zero -
+    /// and, unlike
+    /// [`correct_zero_rate`](crate::termstructures::inflation::seasonality::Seasonality::correct_zero_rate),
+    /// [`correct_yoy_rate`](crate::termstructures::inflation::seasonality::Seasonality::correct_yoy_rate)
+    /// does not quantize for itself: it reads its factor at the date it is
+    /// handed (`seasonality.cpp:136-142`). Passing the period start instead
+    /// would agree for monthly factor sets and diverge for finer ones.
+    fn yoy_rate_date(&self, date: Date, extrapolate: bool) -> QlResult<Rate> {
+        let (period_start, _) = inflation_period(date, self.frequency())?;
+        self.check_inflation_range_date(period_start, extrapolate)?;
+        let t = self.time_from_reference(period_start)?;
+        let yoy_rate = self.yoy_rate_impl(t)?;
+        match self.seasonality() {
+            Some(seasonality) => {
+                seasonality.correct_yoy_rate(date, yoy_rate, self.as_inflation_term_structure())
+            }
+            None => Ok(yoy_rate),
+        }
+    }
+
+    /// The year-on-year inflation rate for time `t`
+    /// (`inflationtermstructure.cpp:252-256`).
+    ///
+    /// The time must be calculated with the same day-counting rule used by the
+    /// term structure. Inflation being tightly bound to dates (lags,
+    /// interpolation, seasonality), this accounts for none of those effects:
+    /// the caller manages them, and no seasonality is folded in here for the
+    /// reason [`zero_rate`](ZeroInflationTermStructure::zero_rate) folds none.
+    fn yoy_rate(&self, t: Time, extrapolate: bool) -> QlResult<Rate> {
+        self.check_inflation_range_time(t, extrapolate)?;
+        self.yoy_rate_impl(t)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -424,6 +497,42 @@ mod tests {
     impl ZeroInflationTermStructure for TestCurve {
         fn zero_rate_impl(&self, t: Time) -> QlResult<Rate> {
             Ok(t)
+        }
+    }
+
+    impl YoYInflationTermStructure for TestCurve {
+        fn yoy_rate_impl(&self, t: Time) -> QlResult<Rate> {
+            Ok(t)
+        }
+    }
+
+    /// A correction that is a function of the day of the month, so a rate
+    /// corrected at a mid-period date is distinguishable from the same rate
+    /// corrected at the start of that period.
+    ///
+    /// [`MultiplicativePriceSeasonality`] cannot discriminate the year-on-year
+    /// fold: a stationary factor set - the only kind
+    /// [`Seasonality::is_consistent`] admits - divides by the factor a year
+    /// earlier, which is the same factor, leaving the rate untouched.
+    struct DayOfMonthSeasonality;
+
+    impl Seasonality for DayOfMonthSeasonality {
+        fn correct_zero_rate(
+            &self,
+            _date: Date,
+            rate: Rate,
+            _its: &dyn InflationTermStructure,
+        ) -> QlResult<Rate> {
+            Ok(rate)
+        }
+
+        fn correct_yoy_rate(
+            &self,
+            date: Date,
+            rate: Rate,
+            _its: &dyn InflationTermStructure,
+        ) -> QlResult<Rate> {
+            Ok(rate + f64::from(date.day_of_month()) / 1000.0)
         }
     }
 
@@ -596,6 +705,68 @@ mod tests {
         assert!(err.message().contains("base rate not available"));
 
         assert_eq!(curve(Some(0.02)).base_rate().unwrap(), 0.02);
+    }
+
+    #[test]
+    fn yoy_rate_date_quantizes_to_the_start_of_the_inflation_period() {
+        let curve = curve(Some(0.02));
+        let mid_month = Date::new(15, Month::March, 2026);
+        let period_start = Date::new(1, Month::March, 2026);
+
+        let quantized = curve.time_from_reference(period_start).unwrap();
+        assert_ne!(quantized, curve.time_from_reference(mid_month).unwrap());
+        assert_eq!(curve.yoy_rate_date(mid_month, false).unwrap(), quantized);
+        assert_eq!(quantized, 0.125);
+    }
+
+    /// The date query bounds on the base date, as the zero one does, and the
+    /// holder a year-on-year curve builds carries the base rate its zero
+    /// counterpart lacks.
+    #[test]
+    fn yoy_rate_date_bounds_on_the_base_date_and_the_curve_carries_a_base_rate() {
+        let curve = curve(Some(0.02));
+        assert_eq!(curve.base_rate().unwrap(), 0.02);
+
+        let between = curve
+            .yoy_rate_date(Date::new(15, Month::December, 2025), false)
+            .unwrap();
+        assert_eq!(between, curve.time_from_reference(base_date()).unwrap());
+
+        let before = curve.yoy_rate_date(base_date() - 1, false).unwrap_err();
+        assert!(before.message().contains("is before base date"));
+    }
+
+    /// The correction is folded into the date-taking query and into nothing
+    /// else, it sees the date it was asked about rather than the quantized one
+    /// it priced at, and clearing it puts the raw rate back.
+    #[test]
+    fn only_the_date_query_folds_the_yoy_seasonality_and_clearing_it_undoes_that() {
+        let curve = curve(Some(0.02));
+        let date = Date::new(15, Month::March, 2026);
+        let raw = curve.yoy_rate_date(date, false).unwrap();
+
+        curve
+            .set_seasonality(Some(
+                shared(DayOfMonthSeasonality) as Shared<dyn Seasonality>
+            ))
+            .unwrap();
+        assert!(curve.has_seasonality());
+
+        let corrected = curve.yoy_rate_date(date, false).unwrap();
+        assert_eq!(corrected, raw + 0.015, "the fold must move the rate");
+        assert_ne!(
+            corrected,
+            raw + 0.001,
+            "the fold sees the original date, not the period start"
+        );
+        assert_eq!(
+            curve.yoy_rate(raw, false).unwrap(),
+            raw,
+            "the time query stays raw"
+        );
+
+        curve.set_seasonality(None).unwrap();
+        assert_eq!(curve.yoy_rate_date(date, false).unwrap(), raw);
     }
 
     #[test]
