@@ -1,17 +1,18 @@
 //! Facades for the credit hierarchy: the [`PyDefaultProbabilityTermStructure`]
 //! base, the concrete [`PyFlatHazardRate`], [`PyInterpolatedHazardRateCurve`]
-//! and [`PyPiecewiseDefaultCurve`] curves, the [`PyProtectionSide`] flag and the
-//! [`PyCreditDefaultSwap`] instrument.
+//! and [`PyPiecewiseDefaultCurve`] curves, the [`PyProtectionSide`] and
+//! [`PyPricingModel`] flags and the [`PyCreditDefaultSwap`] instrument.
 
 use crate::PyQlError;
 use crate::creditengine::{PyIsdaCdsEngine, PyMidPointCdsEngine};
 use crate::credithelpers::PyDefaultProbabilityHelper;
+use crate::curve::PyYieldTermStructure;
 use crate::market::PySimpleQuote;
 use crate::settings::PySettings;
 use crate::time::{PyBusinessDayConvention, PyCalendar, PyDate, PyDayCounter, PySchedule};
 use libitofin::handle::Handle;
 use libitofin::instrument::Instrument;
-use libitofin::instruments::{CdsTerms, CreditDefaultSwap, ProtectionSide};
+use libitofin::instruments::{CdsTerms, CreditDefaultSwap, PricingModel, ProtectionSide};
 use libitofin::math::interpolations::flat::BackwardFlat;
 use libitofin::shared::{Shared, SharedMut, shared, shared_mut};
 use libitofin::termstructures::credit::defaultprobabilityhelpers::DefaultProbabilityHelper;
@@ -42,6 +43,31 @@ impl PyProtectionSide {
         match self {
             PyProtectionSide::Buyer => ProtectionSide::Buyer,
             PyProtectionSide::Seller => ProtectionSide::Seller,
+        }
+    }
+}
+
+/// Python `PricingModel`: the model a quoted contract is inverted under
+/// (core `instruments::PricingModel`).
+///
+/// A fieldless pyo3 enum exposing `PricingModel.Midpoint` / `PricingModel.Isda`,
+/// the two choices
+/// [`CreditDefaultSwap.implied_hazard_rate`](PyCreditDefaultSwap::implied_hazard_rate)
+/// solves on. `Midpoint` is not ISDA conform; `Isda` carries the three fidelity
+/// flags the core fixes at that call site.
+#[pyclass(name = "PricingModel", eq, eq_int, from_py_object)]
+#[derive(Clone, Copy, PartialEq)]
+pub enum PyPricingModel {
+    Midpoint,
+    Isda,
+}
+
+impl PyPricingModel {
+    /// The core [`PricingModel`] this variant stands for.
+    pub(crate) fn inner(self) -> PricingModel {
+        match self {
+            PyPricingModel::Midpoint => PricingModel::Midpoint,
+            PyPricingModel::Isda => PricingModel::Isda,
         }
     }
 }
@@ -662,6 +688,45 @@ impl PyCreditDefaultSwap {
             .inner
             .borrow_mut()
             .default_leg_npv()
+            .map_err(PyQlError::from)?)
+    }
+
+    /// The flat hazard rate at which this contract is worth `target_npv`.
+    ///
+    /// The solve stands on its own engine rather than on whichever one
+    /// [`set_engine`](Self::set_engine) attached: it builds a flat, quote-backed
+    /// probability curve counting `day_counter` and prices on `model` against
+    /// `discount`, solving to `accuracy` on the rate. There is therefore no
+    /// probability-curve argument - the curve being solved for is the one the
+    /// core builds.
+    ///
+    /// `day_counter` is the day counter of that internal curve, not of the
+    /// contract. Under [`PricingModel`]`.Isda` both it and `discount` must count
+    /// Act/365 (Fixed), which is what the ISDA engine requires of its curves.
+    ///
+    /// Fallible: on a malformed contract, and when the solve does not converge -
+    /// which includes a pricing failure at some hazard rate, since that reaches
+    /// the solver as the non-finite value it rejects.
+    fn implied_hazard_rate(
+        &self,
+        target_npv: f64,
+        discount: &PyYieldTermStructure,
+        day_counter: &PyDayCounter,
+        recovery_rate: f64,
+        accuracy: f64,
+        model: PyPricingModel,
+    ) -> PyResult<f64> {
+        Ok(self
+            .inner
+            .borrow()
+            .implied_hazard_rate(
+                target_npv,
+                &discount.handle(),
+                day_counter.inner(),
+                recovery_rate,
+                accuracy,
+                model.inner(),
+            )
             .map_err(PyQlError::from)?)
     }
 }
