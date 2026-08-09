@@ -9,11 +9,6 @@
 //!
 //! Deferred to #636, and omitted rather than accepted and ignored:
 //!
-//! - Bermudan exercise. C++ grows an `FdmBermudanStepCondition` inside
-//!   `FdmStepConditionComposite::vanillaComposite` (`cpp:186-191`) when the
-//!   exercise is Bermudan; it is not ported, so the composite rejects that
-//!   exercise type here rather than rolling back under an empty condition list,
-//!   which would be a silently European price (#827);
 //! - cash dividends, both the `Spot` and the `Escrowed` model (`cpp:111-152`,
 //!   `cpp:172-184`). The dividend schedule is always empty and the spot
 //!   adjustment always zero, as on the C++ default path;
@@ -54,7 +49,8 @@ const SCALE_FACTOR: f64 = 1.5;
 /// The density of the concentration around the strike (`cpp:162`).
 const C_POINT_DENSITY: f64 = 0.1;
 
-/// Finite-difference pricing engine for European and American vanilla options.
+/// Finite-difference pricing engine for European, American and Bermudan
+/// vanilla options.
 ///
 /// Everything the engine builds - mesher, calculator, conditions, solver -
 /// lives inside a single [`calculate`](PricingEngine::calculate), as in C++
@@ -214,9 +210,8 @@ mod test_fd_engines {
 
     use super::super::test_market::{market, today};
     use super::FdBlackScholesVanillaEngine;
-    use crate::exercise::{Exercise, ExerciseType};
     use crate::instrument::Instrument;
-    use crate::instruments::{EuropeanOption, OneAssetOption, PlainVanillaPayoff};
+    use crate::instruments::{EuropeanOption, PlainVanillaPayoff};
     use crate::methods::finitedifferences::solvers::FdmSchemeDesc;
     use crate::option::OptionType::{self, Call, Put};
     use crate::pricingengine::PricingEngine;
@@ -355,48 +350,6 @@ mod test_fd_engines {
         println!(
             "testFdEngines: {:?} for 108 combinations; worst relative errors {worst:?}",
             started.elapsed()
-        );
-    }
-
-    /// The visible half of the Bermudan deferral: C++ prices a Bermudan
-    /// exercise through the `FdmBermudanStepCondition` branch of
-    /// `vanillaComposite` (`fdmstepconditioncomposite.cpp:133-140`), and this
-    /// port says so rather than quietly returning the European price. American
-    /// exercise, which shares the guard until #827, prices instead of failing
-    /// and is pinned by the `test_fd_values` oracle below.
-    #[test]
-    fn a_bermudan_exercise_is_rejected_rather_than_priced_as_european() {
-        struct BermudanStub {
-            dates: [Date; 2],
-        }
-        impl Exercise for BermudanStub {
-            fn exercise_type(&self) -> ExerciseType {
-                ExerciseType::Bermudan
-            }
-            fn dates(&self) -> &[Date] {
-                &self.dates
-            }
-        }
-
-        let market = market();
-        market.set(UNDERLYING, 0.00, 0.05, 0.20);
-        let expiry = today() + 360;
-        let european = fd_option(&market, Call, 100.0, expiry);
-
-        let mut bermudan = OneAssetOption::new(
-            Shared::clone(european.payoff()),
-            shared(BermudanStub {
-                dates: [today() + 180, expiry],
-            }) as Shared<dyn Exercise>,
-            Shared::clone(&market.settings),
-        );
-        bermudan
-            .base_mut()
-            .set_pricing_engine(european.base().pricing_engine().unwrap().clone());
-
-        assert_eq!(
-            bermudan.npv().unwrap_err().message(),
-            "exercise type is not supported"
         );
     }
 }

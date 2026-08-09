@@ -1,9 +1,9 @@
 //! Option exercise classes.
 //!
-//! Port of the European and American subset of `ql/exercise.{hpp,cpp}`: the
-//! [`Exercise`] trait is the base exercise contract, [`EuropeanExercise`] its
-//! single-date implementation and [`AmericanExercise`] the continuous
-//! `[earliest, latest]` one.
+//! Port of `ql/exercise.{hpp,cpp}`: the [`Exercise`] trait is the base exercise
+//! contract, [`EuropeanExercise`] its single-date implementation,
+//! [`AmericanExercise`] the continuous `[earliest, latest]` one and
+//! [`BermudanExercise`] the sorted multi-date one.
 //!
 //! Divergence: C++ puts the `payoffAtExpiry` flag on an intermediate
 //! `EarlyExercise` base (`exercise.hpp:57-65`). Rust has no class hierarchy to
@@ -14,9 +14,10 @@
 //! is not attempted.
 //!
 //! Deferred, omitted visibly rather than accepted and ignored:
-//! - **`BermudanExercise`** (`exercise.cpp:52-59`): the sorted multi-date form,
-//!   with the Bermudan simulation grid it needs
-//!   (`mclongstaffschwartzengine.hpp:218-231`).
+//! - **the Bermudan simulation grid of the Monte Carlo engines**
+//!   (`mclongstaffschwartzengine.hpp:218-231`). [`BermudanExercise`] itself is
+//!   ported and prices under the finite-difference engine; only the path
+//!   generator that would exercise it along a simulated path is missing.
 //! - **the latest-date-only `AmericanExercise` constructor**
 //!   (`exercise.cpp:43-50`): it opens the window at `Date::minDate()`, a
 //!   sentinel this stack has no date for.
@@ -140,6 +141,56 @@ impl Exercise for AmericanExercise {
     }
 }
 
+/// Bermudan exercise: the option can be exercised on a fixed set of dates
+/// (`exercise.hpp:84-88`).
+///
+/// The dates are sorted on construction and **not** deduplicated
+/// (`exercise.cpp:56-57` calls `std::sort` and no `std::unique`), which the
+/// port keeps: a repeated date is harmless downstream, since the step-condition
+/// composite deduplicates the stopping times it merges and a repeated
+/// elementwise maximum is idempotent.
+///
+/// The dates are carried in a `Vec` rather than the fixed array the other two
+/// exercises use, so this is the one exercise that is not `Copy`.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct BermudanExercise {
+    dates: Vec<Date>,
+    payoff_at_expiry: bool,
+}
+
+impl BermudanExercise {
+    /// Builds a Bermudan exercise over `dates` (`exercise.cpp:52-58`).
+    /// `payoff_at_expiry` defers the payment of an early exercise to the expiry
+    /// date.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` when `dates` is empty (`exercise.cpp:55`).
+    pub fn new(dates: Vec<Date>, payoff_at_expiry: bool) -> QlResult<BermudanExercise> {
+        require!(!dates.is_empty(), "no exercise date given");
+        let mut dates = dates;
+        dates.sort_unstable();
+        Ok(BermudanExercise {
+            dates,
+            payoff_at_expiry,
+        })
+    }
+}
+
+impl Exercise for BermudanExercise {
+    fn exercise_type(&self) -> ExerciseType {
+        ExerciseType::Bermudan
+    }
+
+    fn dates(&self) -> &[Date] {
+        &self.dates
+    }
+
+    fn payoff_at_expiry(&self) -> bool {
+        self.payoff_at_expiry
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -195,6 +246,50 @@ mod tests {
                 .payoff_at_expiry()
         );
         assert!(!EuropeanExercise::new(latest).payoff_at_expiry());
+    }
+
+    /// `exercise.cpp:56-57`: the dates come out sorted whatever order they go
+    /// in, and `lastDate()` is the latest of them.
+    #[test]
+    fn bermudan_exercise_sorts_its_dates() {
+        let first = Date::new(17, Month::May, 1998);
+        let second = Date::new(17, Month::November, 1998);
+        let third = Date::new(17, Month::May, 1999);
+
+        let exercise = BermudanExercise::new(vec![third, first, second], false).unwrap();
+
+        assert_eq!(exercise.exercise_type(), ExerciseType::Bermudan);
+        assert_eq!(exercise.dates(), &[first, second, third]);
+        assert_eq!(exercise.last_date(), third);
+        assert!(!exercise.payoff_at_expiry(), "the C++ default is false");
+    }
+
+    /// C++ sorts and stops there (`exercise.cpp:57`), with no `std::unique`, so
+    /// a repeated date survives construction rather than being folded away.
+    #[test]
+    fn bermudan_exercise_keeps_repeated_dates() {
+        let date = Date::new(17, Month::May, 1999);
+        let exercise = BermudanExercise::new(vec![date, date], false).unwrap();
+
+        assert_eq!(exercise.dates(), &[date, date]);
+    }
+
+    #[test]
+    fn an_empty_bermudan_date_set_is_rejected() {
+        match BermudanExercise::new(Vec::new(), false) {
+            Err(e) => assert_eq!(e.message(), "no exercise date given"),
+            Ok(_) => panic!("an empty date set must be rejected"),
+        }
+    }
+
+    #[test]
+    fn a_bermudan_exercise_carries_payoff_at_expiry() {
+        let date = Date::new(17, Month::May, 1999);
+        assert!(
+            BermudanExercise::new(vec![date], true)
+                .unwrap()
+                .payoff_at_expiry()
+        );
     }
 
     #[test]
