@@ -102,6 +102,34 @@ class MidPointCdsEngine:
         settings: Settings,
     ) -> None: ...
 
+class NumericalFix:
+    """How the ISDA engine keeps the integrands' f + h denominators away from
+    zero. NoFix adds 10^-50 to them instead; Taylor, the default, replaces the
+    quotient by its Taylor expansion once f + h falls below 10^-4. Spelled
+    NoFix rather than C++'s None, which Python cannot name."""
+
+    NoFix: NumericalFix
+    Taylor: NumericalFix
+
+class AccrualBias:
+    """Whether the premium leg carries the standard model's half-day accrual
+    bias, which shifts the accrual's tstart back by 1/730 of a year.
+    HalfDayBias, the default, includes it as the model's C code does before
+    version 1.8.2; NoBias leaves it out, as from 1.8.2 on."""
+
+    HalfDayBias: AccrualBias
+    NoBias: AccrualBias
+
+class ForwardsInCouponPeriod:
+    """How the ISDA engine treats forward rates inside a coupon period.
+    Piecewise, the default, subdivides each period at the integration grid's own
+    nodes; Flat integrates each period in a single step. The two part only where
+    the grid has nodes strictly inside a coupon period, so two flat curves price
+    identically under either."""
+
+    Flat: ForwardsInCouponPeriod
+    Piecewise: ForwardsInCouponPeriod
+
 class IsdaCdsEngine:
     """The ISDA standard-model credit-default-swap engine: both legs are
     integrated over the pillar dates of the two curves the engine is built with
@@ -113,9 +141,12 @@ class IsdaCdsEngine:
     its accrual, paying at the default time and carrying a face-value claim - is
     reported as ItofinError when the contract is priced, not from __init__. The
     core's include_settlement_date_flows override is not exposed and is always
-    None. The three fidelity flags keep the C++ defaults Taylor / HalfDayBias /
-    Piecewise; the builder that chooses them is not exposed (#814). The contract
-    this engine prices must carry the same Settings object."""
+    None. The three fidelity flags are trailing keyword arguments defaulting to
+    the C++ defaults Taylor / HalfDayBias / Piecewise, so an engine built
+    without them prices as before; they are taken here rather than through a
+    with_fidelity method because the core builder consumes the engine while
+    set_isda_engine has already cloned it into the contract. The contract this
+    engine prices must carry the same Settings object."""
 
     def __init__(
         self,
@@ -123,6 +154,9 @@ class IsdaCdsEngine:
         recovery: float,
         discount: YieldTermStructure,
         settings: Settings,
+        numerical_fix: NumericalFix = ...,
+        accrual_bias: AccrualBias = ...,
+        forwards_in_coupon_period: ForwardsInCouponPeriod = ...,
     ) -> None: ...
 
 class DiscountingSwapEngine:

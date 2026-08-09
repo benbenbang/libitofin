@@ -19,7 +19,9 @@ use crate::curve::PyYieldTermStructure;
 use crate::settings::PySettings;
 use libitofin::pricingengine::PricingEngine;
 use libitofin::pricingengines::MidPointCdsEngine;
-use libitofin::pricingengines::credit::IsdaCdsEngine;
+use libitofin::pricingengines::credit::{
+    AccrualBias, ForwardsInCouponPeriod, IsdaCdsEngine, NumericalFix,
+};
 use libitofin::shared::{SharedMut, shared_mut};
 use pyo3::prelude::*;
 
@@ -71,6 +73,82 @@ impl PyMidPointCdsEngine {
     }
 }
 
+/// Python `NumericalFix`: how the ISDA engine keeps the integrands'
+/// `f_i + h_i` denominators away from zero (core
+/// `pricingengines::credit::NumericalFix`).
+///
+/// `NumericalFix.NoFix` adds `10^-50` to the denominators instead; the default
+/// `NumericalFix.Taylor` replaces the quotient by its Taylor expansion once
+/// `f_i + h_i` falls below `10^-4`. The core already renames C++'s `None`
+/// variant to `NoFix` (`isdacdsengine.rs:71`), which is also what Python needs:
+/// `NumericalFix.None` is a syntax error.
+#[pyclass(name = "NumericalFix", eq, eq_int, from_py_object)]
+#[derive(Clone, Copy, PartialEq)]
+pub enum PyNumericalFix {
+    NoFix,
+    Taylor,
+}
+
+impl PyNumericalFix {
+    /// The core [`NumericalFix`] this variant stands for.
+    pub(crate) fn inner(self) -> NumericalFix {
+        match self {
+            PyNumericalFix::NoFix => NumericalFix::NoFix,
+            PyNumericalFix::Taylor => NumericalFix::Taylor,
+        }
+    }
+}
+
+/// Python `AccrualBias`: whether the premium leg carries the ISDA standard
+/// model's half-day accrual bias (core `pricingengines::credit::AccrualBias`).
+///
+/// The default `AccrualBias.HalfDayBias` includes the erroneous second term the
+/// standard model's C code carries before version 1.8.2, which shifts the
+/// accrual's `tstart` back by `1/730` of a year; `AccrualBias.NoBias` leaves it
+/// out, as from 1.8.2 on.
+#[pyclass(name = "AccrualBias", eq, eq_int, from_py_object)]
+#[derive(Clone, Copy, PartialEq)]
+pub enum PyAccrualBias {
+    HalfDayBias,
+    NoBias,
+}
+
+impl PyAccrualBias {
+    /// The core [`AccrualBias`] this variant stands for.
+    pub(crate) fn inner(self) -> AccrualBias {
+        match self {
+            PyAccrualBias::HalfDayBias => AccrualBias::HalfDayBias,
+            PyAccrualBias::NoBias => AccrualBias::NoBias,
+        }
+    }
+}
+
+/// Python `ForwardsInCouponPeriod`: how the ISDA engine treats forward rates
+/// inside a coupon period (core
+/// `pricingengines::credit::ForwardsInCouponPeriod`).
+///
+/// The default `ForwardsInCouponPeriod.Piecewise` subdivides each coupon period
+/// at the integration grid's own nodes; `ForwardsInCouponPeriod.Flat`
+/// integrates each period in a single step. The two part only where the grid
+/// has nodes strictly inside a coupon period, so two flat curves price
+/// identically under either.
+#[pyclass(name = "ForwardsInCouponPeriod", eq, eq_int, from_py_object)]
+#[derive(Clone, Copy, PartialEq)]
+pub enum PyForwardsInCouponPeriod {
+    Flat,
+    Piecewise,
+}
+
+impl PyForwardsInCouponPeriod {
+    /// The core [`ForwardsInCouponPeriod`] this variant stands for.
+    pub(crate) fn inner(self) -> ForwardsInCouponPeriod {
+        match self {
+            PyForwardsInCouponPeriod::Flat => ForwardsInCouponPeriod::Flat,
+            PyForwardsInCouponPeriod::Piecewise => ForwardsInCouponPeriod::Piecewise,
+        }
+    }
+}
+
 /// Python `IsdaCdsEngine`: the ISDA standard-model credit-default-swap engine
 /// (`pricingengines::credit::isdacdsengine::IsdaCdsEngine`).
 ///
@@ -91,10 +169,14 @@ impl PyMidPointCdsEngine {
 /// engine prices was built with, or the two resolve their dates against
 /// different evaluation dates and the NPV is silently wrong.
 ///
-/// Deferred (visible): the three fidelity flags are left at the C++ defaults
-/// `Taylor` / `HalfDayBias` / `Piecewise` that the core constructor bakes in
-/// (`isdacdsengine.rs:139-141`); the `with_fidelity` builder that chooses them
-/// (`:148-158`) and the three enums it takes are not exposed (#814).
+/// The three fidelity flags are trailing keyword arguments defaulting to the
+/// C++ defaults `Taylor` / `HalfDayBias` / `Piecewise` the core constructor
+/// bakes in (`isdacdsengine.rs:139-141`), so an engine built without them
+/// prices exactly as before. They are taken here rather than through a
+/// `with_fidelity` method because the core builder consumes the engine
+/// (`:148-158`) while [`set_isda_engine`](crate::credit::PyCreditDefaultSwap)
+/// has already cloned it into the contract, which a post-construction
+/// reconfiguration would leave behind on the unconfigured engine.
 #[pyclass(name = "IsdaCdsEngine", unsendable)]
 pub struct PyIsdaCdsEngine {
     inner: SharedMut<IsdaCdsEngine>,
@@ -104,22 +186,41 @@ pub struct PyIsdaCdsEngine {
 impl PyIsdaCdsEngine {
     /// An engine reading default probabilities off `probability`, paying
     /// `1 - recovery` of the notional on a default, and discounting on
-    /// `discount`.
+    /// `discount`, under the three fidelity flags.
     #[new]
+    #[pyo3(signature = (
+        probability,
+        recovery,
+        discount,
+        settings,
+        numerical_fix = PyNumericalFix::Taylor,
+        accrual_bias = PyAccrualBias::HalfDayBias,
+        forwards_in_coupon_period = PyForwardsInCouponPeriod::Piecewise,
+    ))]
     fn new(
         probability: &PyDefaultProbabilityTermStructure,
         recovery: f64,
         discount: &PyYieldTermStructure,
         settings: &PySettings,
+        numerical_fix: PyNumericalFix,
+        accrual_bias: PyAccrualBias,
+        forwards_in_coupon_period: PyForwardsInCouponPeriod,
     ) -> Self {
         PyIsdaCdsEngine {
-            inner: shared_mut(IsdaCdsEngine::new(
-                probability.handle(),
-                recovery,
-                discount.handle(),
-                None,
-                settings.inner(),
-            )),
+            inner: shared_mut(
+                IsdaCdsEngine::new(
+                    probability.handle(),
+                    recovery,
+                    discount.handle(),
+                    None,
+                    settings.inner(),
+                )
+                .with_fidelity(
+                    numerical_fix.inner(),
+                    accrual_bias.inner(),
+                    forwards_in_coupon_period.inner(),
+                ),
+            ),
         }
     }
 }
