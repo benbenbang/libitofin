@@ -19,8 +19,8 @@ pub use iborindex::{IborIndex, OvernightIndex};
 pub use index::Index;
 pub use inflation::{EuHicp, UkHicp, UkRpi};
 pub use inflationindex::{
-    Cpi, CpiInterpolationType, InflationIndex, InflationIndexBase, ZeroInflationIndex,
-    inflation_period,
+    Cpi, CpiInterpolationType, InflationIndex, InflationIndexBase, YoYInflationIndex,
+    ZeroInflationIndex, inflation_period,
 };
 pub use interestrateindex::{InterestRateIndex, InterestRateIndexBase};
 pub use region::Region;

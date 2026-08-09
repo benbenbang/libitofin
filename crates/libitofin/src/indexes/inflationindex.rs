@@ -33,6 +33,16 @@
 //! - **`forceOverwrite` dropped**, as on [`Index::add_fixing`]: the D11 store
 //!   rejects a conflicting value and accepts an identical one, and has no
 //!   overwrite mode to switch on.
+//! - **No `interpolated_` member on [`YoYInflationIndex`]**. C++ declares one
+//!   (`inflationindex.hpp:253`), deprecated in 1.43, that nothing ever assigns:
+//!   it is `false` at declaration and no constructor, subclass or setter moves
+//!   it. Its four readers are the branches of `pastFixing`, `needsForecast` and
+//!   `forecastFixing` ported here (`inflationindex.cpp:304,335,353,376`) plus
+//!   the `AsIndex` arm of `detail::CPI::effectiveInterpolationType`
+//!   (`:417`), and `AsIndex` is itself unported (see
+//!   [`CpiInterpolationType`]). The field is therefore carried neither as
+//!   state nor as an `interpolated()` inspector, and only the live
+//!   non-interpolated branch of each of those three methods is ported.
 //! - **`inflationYearFraction` is homed here**, beside [`inflation_period`],
 //!   where C++ declares it with the term structures
 //!   (`inflationtermstructure.hpp:247`). It is the same period-quantizing
@@ -47,7 +57,9 @@ use crate::indexes::region::Region;
 use crate::patterns::observable::{Observable, Observer, ResetThenNotify};
 use crate::settings::Settings;
 use crate::shared::{Shared, SharedMut};
-use crate::termstructures::inflation::inflationtermstructure::ZeroInflationTermStructure;
+use crate::termstructures::inflation::inflationtermstructure::{
+    YoYInflationTermStructure, ZeroInflationTermStructure,
+};
 use crate::time::calendar::Calendar;
 use crate::time::calendars::nullcalendar::NullCalendar;
 use crate::time::date::{Date, Month};
@@ -559,6 +571,311 @@ impl Index for ZeroInflationIndex {
 }
 
 impl InflationIndex for ZeroInflationIndex {
+    fn inflation_base(&self) -> &InflationIndexBase {
+        &self.base
+    }
+}
+
+/// A year-on-year inflation index (`YoYInflationIndex`,
+/// `inflationindex.hpp:192`).
+///
+/// It answers the inflation *rate* over the year ending in the period asked
+/// for, where a [`ZeroInflationIndex`] answers the price *level*. It comes in
+/// two shapes, and the shape it was built in decides where every past figure
+/// comes from:
+///
+/// - a **ratio** index ([`from_underlying`](YoYInflationIndex::from_underlying))
+///   stores nothing of its own and divides two fixings of the zero index it
+///   wraps, a year apart (`inflationindex.cpp:331-341`);
+/// - a **quoted** index ([`new`](YoYInflationIndex::new)) is published as a rate
+///   in its own right - on Bloomberg, say - and reads its own fixing history
+///   (`:343-369`).
+///
+/// Either way a period too recent to have been published is forecast off the
+/// year-on-year curve the index holds, which
+/// [`new`](YoYInflationIndex::new) and
+/// [`from_underlying`](YoYInflationIndex::from_underlying) leave empty and
+/// [`with_term_structure`](YoYInflationIndex::with_term_structure) links, on the
+/// split [`ZeroInflationIndex`] uses and for the same reason.
+pub struct YoYInflationIndex {
+    base: InflationIndexBase,
+    term_structure: Handle<dyn YoYInflationTermStructure>,
+    ratio: bool,
+    underlying: Option<Shared<ZeroInflationIndex>>,
+}
+
+impl YoYInflationIndex {
+    /// Builds a **quoted** year-on-year index on an empty curve handle
+    /// (`inflationindex.cpp:264-274` with the defaulted `yoyInflation`).
+    ///
+    /// The metadata is given explicitly, and the index keeps its own history:
+    /// the published year-on-year rates have to be recorded on it through
+    /// [`add_fixing`](Index::add_fixing).
+    pub fn new(
+        family_name: String,
+        region: Region,
+        revised: bool,
+        frequency: Frequency,
+        availability_lag: Period,
+        currency: Currency,
+        settings: Shared<Settings<Date>>,
+    ) -> Self {
+        YoYInflationIndex {
+            base: InflationIndexBase::new(
+                family_name,
+                region,
+                revised,
+                frequency,
+                availability_lag,
+                currency,
+                settings,
+            ),
+            term_structure: Handle::empty(),
+            ratio: false,
+            underlying: None,
+        }
+    }
+
+    /// Builds a **ratio** year-on-year index over `underlying`
+    /// (`inflationindex.cpp:253-262` with the defaulted `yoyInflation`).
+    ///
+    /// The metadata is inherited wholesale from the zero index, bar the family
+    /// name, which is prefixed `YYR_` - so a `"UK RPI"` underlying yields
+    /// `"UK YYR_RPI"`. The index stores no fixings of its own; it registers
+    /// with the underlying (`registerWith(underlyingIndex_)`, `:260`) so a
+    /// figure published there re-broadcasts through
+    /// [`observable`](Index::observable).
+    pub fn from_underlying(underlying: Shared<ZeroInflationIndex>) -> Self {
+        let base = InflationIndexBase::new(
+            format!("YYR_{}", underlying.family_name()),
+            underlying.region().clone(),
+            underlying.revised(),
+            underlying.frequency(),
+            underlying.availability_lag(),
+            underlying.currency().clone(),
+            Shared::clone(underlying.inflation_base().settings()),
+        );
+        underlying.observable().register_observer(&base.observer());
+        YoYInflationIndex {
+            base,
+            term_structure: Handle::empty(),
+            ratio: true,
+            underlying: Some(underlying),
+        }
+    }
+
+    /// Links the index to the year-on-year curve it forecasts off, registering
+    /// with it (`registerWith(yoyInflation_)`, `inflationindex.cpp:261,273`).
+    pub fn with_term_structure(
+        self,
+        term_structure: Handle<dyn YoYInflationTermStructure>,
+    ) -> YoYInflationIndex {
+        term_structure.register_observer(&self.base.observer());
+        YoYInflationIndex {
+            term_structure,
+            ..self
+        }
+    }
+
+    /// Whether this index is the ratio of two [`ZeroInflationIndex`] fixings
+    /// rather than a quoted rate (`inflationindex.hpp:241`).
+    pub fn ratio(&self) -> bool {
+        self.ratio
+    }
+
+    /// The zero index a ratio index divides, `None` on a quoted one
+    /// (`inflationindex.hpp:242`).
+    pub fn underlying_index(&self) -> Option<&Shared<ZeroInflationIndex>> {
+        self.underlying.as_ref()
+    }
+
+    /// The year-on-year curve the index forecasts off
+    /// (`inflationindex.hpp:243`), empty until
+    /// [`with_term_structure`](YoYInflationIndex::with_term_structure) links
+    /// one.
+    pub fn yoy_inflation_term_structure(&self) -> &Handle<dyn YoYInflationTermStructure> {
+        &self.term_structure
+    }
+
+    /// The first day of the inflation period the latest figure on record
+    /// describes (`inflationindex.cpp:287-296`).
+    ///
+    /// A ratio index owns no history, so it answers with the underlying's; a
+    /// quoted one reads its own store, whose last date is the *end* of the
+    /// published period, and attributes the figure to that period's first day.
+    pub fn last_fixing_date(&self) -> QlResult<Date> {
+        if let Some(underlying) = &self.underlying {
+            return underlying.last_fixing_date();
+        }
+        let last = match self.base.settings().last_fixing_date(&self.base.name()) {
+            Some(date) => date,
+            None => crate::fail!("no fixings stored for {}", self.base.name()),
+        };
+        Ok(inflation_period(last, self.frequency())?.0)
+    }
+
+    /// Whether `fixing_date` has to be forecast rather than read from history
+    /// (`inflationindex.cpp:298-329`).
+    ///
+    /// The figure needed is the one at the first day of the fixing's own
+    /// period, the index not interpolating (see the module divergences). A
+    /// ratio index defers the question to the underlying, which is where the
+    /// figures actually live; a quoted one runs the same three-way decision
+    /// against the publication horizon as
+    /// [`ZeroInflationIndex::needs_forecast`], including its second branch
+    /// answering before the store is consulted.
+    pub fn needs_forecast(&self, fixing_date: Date) -> QlResult<bool> {
+        let frequency = self.frequency();
+        let latest_needed_date = inflation_period(fixing_date, frequency)?.0;
+
+        if let Some(underlying) = &self.underlying {
+            return underlying.needs_forecast(latest_needed_date);
+        }
+
+        let today = match self.base.settings().evaluation_date() {
+            Some(today) => today,
+            None => crate::fail!("no evaluation date set: an index fixing needs a reference date"),
+        };
+        let latest_possible = inflation_period(today - self.availability_lag(), frequency)?;
+
+        if latest_needed_date < latest_possible.0 {
+            Ok(false)
+        } else if latest_needed_date > latest_possible.1 {
+            Ok(true)
+        } else {
+            Ok(self
+                .base
+                .settings()
+                .fixing(&self.base.name(), latest_needed_date)
+                .is_none())
+        }
+    }
+
+    /// The forecast rate off the year-on-year curve
+    /// (`inflationindex.cpp:372-387`).
+    ///
+    /// The date handed to the curve is the *first day* of the fixing's own
+    /// period, derived before the curve is reached exactly as C++ derives it:
+    /// [`yoy_rate_date`](YoYInflationTermStructure::yoy_rate_date) folds any
+    /// seasonality in at the date it receives rather than at the period start,
+    /// so passing the raw fixing date would agree for monthly factor sets and
+    /// diverge for finer ones.
+    ///
+    /// # Errors
+    ///
+    /// An index with no curve linked fails here, with the message an empty
+    /// [`Handle`] gives on dereference.
+    fn forecast_fixing(&self, fixing_date: Date) -> QlResult<Rate> {
+        let (first_date_in_period, _) = inflation_period(fixing_date, self.frequency())?;
+        self.term_structure
+            .current_link()?
+            .yoy_rate_date(first_date_in_period, false)
+    }
+
+    /// The same index reading a different year-on-year curve
+    /// (`YoYInflationIndex::clone`, `inflationindex.cpp:389-398`).
+    ///
+    /// C++ rebuilds through whichever constructor built the original, and so
+    /// does this: a ratio copy wraps the same underlying, a quoted one
+    /// recomposes from the six identity fields and so keys - and sees - the
+    /// same fixing history.
+    pub fn clone_linked_to(
+        &self,
+        term_structure: Handle<dyn YoYInflationTermStructure>,
+    ) -> YoYInflationIndex {
+        let copy = match &self.underlying {
+            Some(underlying) => YoYInflationIndex::from_underlying(Shared::clone(underlying)),
+            None => YoYInflationIndex::new(
+                self.base.family_name.clone(),
+                self.base.region.clone(),
+                self.base.revised,
+                self.base.frequency,
+                self.base.availability_lag,
+                self.base.currency.clone(),
+                Shared::clone(self.base.settings()),
+            ),
+        };
+        copy.with_term_structure(term_structure)
+    }
+}
+
+impl Index for YoYInflationIndex {
+    fn name(&self) -> String {
+        self.base.name()
+    }
+
+    fn fixing_calendar(&self) -> Calendar {
+        self.base.fixing_calendar()
+    }
+
+    /// Always true: an inflation figure belongs to a period, not to a business
+    /// day (`inflationindex.hpp:107`).
+    fn is_valid_fixing_date(&self, _fixing_date: Date) -> bool {
+        true
+    }
+
+    /// The rate at `fixing_date`, past or forecast
+    /// (`inflationindex.cpp:277-285`).
+    ///
+    /// `forecast_todays_fixing` is ignored, as the C++ warning at
+    /// `inflationindex.hpp:222-224` documents.
+    fn fixing(&self, fixing_date: Date, _forecast_todays_fixing: bool) -> QlResult<Rate> {
+        if self.needs_forecast(fixing_date)? {
+            return self.forecast_fixing(fixing_date);
+        }
+        let (first, _) = inflation_period(fixing_date, self.frequency())?;
+        match self.past_fixing(fixing_date)? {
+            Some(fixing) => Ok(fixing),
+            None => crate::fail!("Missing {} fixing for {}", self.base.name(), first),
+        }
+    }
+
+    /// The past rate of the period `fixing_date` falls in
+    /// (`inflationindex.cpp:331-370`).
+    ///
+    /// A ratio index divides the underlying's figure for that period by its
+    /// figure a year earlier, both read flat off their own periods - the zero
+    /// lag being what makes [`Cpi::lagged_fixing`] land on the period the
+    /// fixing date is already in. A quoted index reads the figure filed on its
+    /// own period's first day, and answers `None` when there is none, which
+    /// [`fixing`](Index::fixing) turns into C++'s missing-fixing error.
+    fn past_fixing(&self, fixing_date: Date) -> QlResult<Option<Rate>> {
+        let underlying = match &self.underlying {
+            Some(underlying) => underlying,
+            None => {
+                let (first, _) = inflation_period(fixing_date, self.frequency())?;
+                return Ok(self.base.settings().fixing(&self.base.name(), first));
+            }
+        };
+
+        let no_lag = Period::new(0, TimeUnit::Months);
+        let interpolation = CpiInterpolationType::Flat;
+        let past = Cpi::lagged_fixing(underlying, fixing_date, no_lag, interpolation)?;
+        let previous = Cpi::lagged_fixing(
+            underlying,
+            fixing_date - Period::new(1, TimeUnit::Years),
+            no_lag,
+            interpolation,
+        )?;
+        Ok(Some(past / previous - 1.0))
+    }
+
+    /// Delegated to [`InflationIndexBase::add_fixing`], which spreads the
+    /// figure over its whole inflation period.
+    fn add_fixing(&self, fixing_date: Date, value: Rate) -> QlResult<()> {
+        self.base.add_fixing(fixing_date, value)
+    }
+
+    fn settings(&self) -> &Settings<Date> {
+        self.base.settings()
+    }
+
+    fn observable(&self) -> &Observable {
+        self.base.observable()
+    }
+}
+
+impl InflationIndex for YoYInflationIndex {
     fn inflation_base(&self) -> &InflationIndexBase {
         &self.base
     }
