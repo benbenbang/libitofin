@@ -968,10 +968,13 @@ mod tests {
     use crate::termstructures::TermStructure;
     use crate::termstructures::inflation::inflationtermstructure::InflationTermStructure;
     use crate::termstructures::inflation::interpolatedzeroinflationcurve::ZeroInflationCurve;
+    use crate::time::businessdayconvention::BusinessDayConvention;
+    use crate::time::calendars::unitedkingdom::{Market, UnitedKingdom};
     use crate::time::date::Month::{
-        April, December, February, January, March, November, October, September,
+        April, August, December, February, January, June, March, November, October, September,
     };
     use crate::time::daycounters::actual360::Actual360;
+    use crate::time::schedule::MakeSchedule;
     use crate::time::timeunit::TimeUnit;
 
     /// The minimal concrete inflation index: the [`Index`] surface delegated to
@@ -1693,5 +1696,310 @@ mod tests {
 
         assert!(on_copy.borrow().up, "the copy observes the handle it took");
         assert!(!on_original.borrow().up, "the original is a separate index");
+    }
+
+    /// The ratio pair of `testRatioYYIndex` (`inflation.cpp:990-1000`): the
+    /// wrapped index is the same UK RPI [`a_zero_index`] builds, which is what
+    /// `UKRPI` is (`ukrpi.hpp:33-38`).
+    fn a_yoy_ratio_index(
+        settings: Shared<Settings<Date>>,
+    ) -> (Shared<ZeroInflationIndex>, YoYInflationIndex) {
+        let underlying = shared(a_zero_index(Frequency::Monthly, settings));
+        let ratio = YoYInflationIndex::from_underlying(Shared::clone(&underlying));
+        (underlying, ratio)
+    }
+
+    /// The quoted index of `testQuotedYYIndex`: `YYUKRPI` (`ukrpi.hpp:42-52`),
+    /// built directly rather than through a named subclass this batch does not
+    /// port.
+    fn a_quoted_yoy_index(settings: Shared<Settings<Date>>) -> YoYInflationIndex {
+        YoYInflationIndex::new(
+            "YY_RPI".into(),
+            Region::uk(),
+            false,
+            Frequency::Monthly,
+            Period::new(1, TimeUnit::Months),
+            Currency::gbp(),
+            settings,
+        )
+    }
+
+    /// `testQuotedYYIndex` (`inflation.cpp:933-953`): a quoted index states its
+    /// own metadata and wraps nothing.
+    #[test]
+    fn a_quoted_yoy_index_states_its_own_metadata() {
+        let index = a_quoted_yoy_index(shared(Settings::<Date>::new()));
+
+        assert_eq!(index.name(), "UK YY_RPI");
+        assert_eq!(index.frequency(), Frequency::Monthly);
+        assert!(!index.revised());
+        assert!(!index.ratio());
+        assert!(index.underlying_index().is_none());
+        assert_eq!(index.availability_lag(), Period::new(1, TimeUnit::Months));
+    }
+
+    /// `testRatioYYIndex`'s construction half (`inflation.cpp:994-1013`): the
+    /// metadata comes across from the underlying, and only the family name
+    /// changes - `"RPI"` becomes `"YYR_RPI"`, so the composed name is
+    /// `"UK YYR_RPI"`.
+    #[test]
+    fn a_ratio_yoy_index_inherits_the_underlyings_metadata() {
+        let (underlying, index) = a_yoy_ratio_index(shared(Settings::<Date>::new()));
+
+        assert_eq!(index.name(), "UK YYR_RPI");
+        assert_eq!(index.family_name(), "YYR_RPI");
+        assert_eq!(index.frequency(), underlying.frequency());
+        assert_eq!(index.revised(), underlying.revised());
+        assert!(index.ratio());
+        assert_eq!(index.availability_lag(), underlying.availability_lag());
+        assert_eq!(index.currency().code(), underlying.currency().code());
+    }
+
+    /// The 31 UK RPI figures of `testRatioYYIndex` (`inflation.cpp:1026-1032`),
+    /// January 2005 through July 2007.
+    const YOY_FIX_DATA: [Rate; 31] = [
+        189.9, 189.9, 189.6, 190.5, 191.6, 192.0, 192.2, 192.2, 192.6, 193.1, 193.3, 193.6, 194.1,
+        193.4, 194.2, 195.0, 196.5, 197.7, 198.5, 198.5, 199.2, 200.1, 200.4, 201.1, 202.7, 201.6,
+        203.1, 204.4, 205.4, 206.2, 207.3,
+    ];
+
+    /// **The value pin** of `testRatioYYIndex` (`inflation.cpp:1043-1065`): a
+    /// ratio index answers the underlying's figure divided by its figure twelve
+    /// months earlier, constant on every day of the period, with no curve
+    /// anywhere in sight.
+    ///
+    /// The loop stops short of the publication horizon, `todayMinusLag`
+    /// (`:1036-1038`), because past it the index forecasts and the handle is
+    /// empty; it is derived here as C++ derives it rather than written down.
+    /// The loop is bounded by the *fixing table* rather than by the schedule:
+    /// C++ bounds it by `rpiSchedule.size()`, two longer, and gets away with
+    /// reading past the end of `fixData` only because the horizon guard never
+    /// lets those iterations evaluate the expression.
+    ///
+    /// The schedule is generated backwards from 13 August 2007, so its front is
+    /// a stub and figures 0 and 1 *both* land in January 2005 - the store takes
+    /// the second write because both are 189.9 - and figure `i` describes month
+    /// `i - 1` from there on. What the pin actually needs is only that `i` and
+    /// `i - 12` sit a year apart, which is asserted rather than assumed.
+    #[test]
+    fn a_ratio_fixing_is_the_underlyings_year_on_year_ratio() {
+        let settings = shared(Settings::<Date>::new());
+        let evaluation_date = UnitedKingdom::new(Market::Settlement).adjust(
+            Date::new(13, August, 2007),
+            BusinessDayConvention::Following,
+        );
+        settings.set_evaluation_date(evaluation_date);
+        let (underlying, index) = a_yoy_ratio_index(settings);
+
+        let schedule = MakeSchedule::new()
+            .from(Date::new(1, January, 2005))
+            .to(Date::new(13, August, 2007))
+            .with_tenor(Period::new(1, TimeUnit::Months))
+            .with_calendar(UnitedKingdom::new(Market::Settlement))
+            .with_convention(BusinessDayConvention::ModifiedFollowing)
+            .build();
+        let dates = schedule.dates();
+
+        assert!(dates.len() >= YOY_FIX_DATA.len());
+        let month_of = |date: Date| {
+            inflation_period(date, index.frequency())
+                .expect("a monthly index")
+                .0
+        };
+        assert_eq!(month_of(dates[0]), month_of(dates[1]));
+        for i in 13..YOY_FIX_DATA.len() {
+            assert_eq!(
+                month_of(dates[i]),
+                month_of(dates[i - 12]) + Period::new(1, TimeUnit::Years),
+                "figures {i} and {} are not a year apart",
+                i - 12
+            );
+        }
+
+        for (date, value) in dates.iter().zip(YOY_FIX_DATA) {
+            underlying
+                .add_fixing(*date, value)
+                .expect("adding a published figure");
+        }
+
+        let (_, latest_possible_end) = inflation_period(
+            evaluation_date - index.availability_lag(),
+            index.frequency(),
+        )
+        .expect("a monthly index");
+        let horizon = latest_possible_end + 1 - Period::new(2, TimeUnit::Months);
+        assert_eq!(horizon, Date::new(1, June, 2007));
+
+        for i in 13..YOY_FIX_DATA.len() {
+            let (first, last) =
+                inflation_period(dates[i], index.frequency()).expect("a monthly index");
+            let expected = YOY_FIX_DATA[i] / YOY_FIX_DATA[i - 12] - 1.0;
+            for day in (0..=(last - first)).map(|offset| first + offset) {
+                if day < horizon {
+                    let calculated = index
+                        .fixing(day, false)
+                        .expect("both periods are published");
+                    assert!(
+                        (calculated - expected).abs() < 1e-8,
+                        "{calculated} at {day}, should be {expected}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// `testQuotedYYIndexFutureFixing` (`inflation.cpp:955-988`): a quoted index
+    /// reads its own stored rates back, and a period beyond the publication
+    /// horizon forecasts - off an empty handle here - even once a figure has
+    /// been recorded for it.
+    #[test]
+    fn a_quoted_yoy_index_forecasts_beyond_the_publication_horizon() {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(Date::new(10, April, 2024));
+        let index = a_quoted_yoy_index(settings);
+        for (date, value) in [
+            (Date::new(1, December, 2023), 100.0),
+            (Date::new(1, January, 2024), 100.1),
+            (Date::new(1, February, 2024), 100.2),
+        ] {
+            index
+                .add_fixing(date, value)
+                .expect("adding a published rate");
+        }
+
+        assert_eq!(
+            index.last_fixing_date().expect("the index has a history"),
+            Date::new(1, February, 2024)
+        );
+        assert_eq!(
+            index
+                .fixing(Date::new(15, January, 2024), false)
+                .expect("January 2024 is published"),
+            100.1
+        );
+        assert_eq!(
+            index
+                .fixing(Date::new(15, February, 2024), false)
+                .expect("February 2024 is published"),
+            100.2
+        );
+
+        index
+            .add_fixing(Date::new(1, March, 2024), 100.3)
+            .expect("March 2024 gets published");
+        assert_eq!(
+            index.last_fixing_date().expect("the index has a history"),
+            Date::new(1, March, 2024)
+        );
+        assert_eq!(
+            index
+                .fixing(Date::new(15, February, 2024), false)
+                .expect("February 2024 is still published"),
+            100.2
+        );
+
+        index
+            .add_fixing(Date::new(1, April, 2024), 100.4)
+            .expect("recording a rate ahead of its publication");
+        let error = index
+            .fixing(Date::new(1, April, 2024), false)
+            .expect_err("April 2024 is beyond the publication horizon");
+        assert!(
+            error.to_string().contains("empty Handle"),
+            "err was: {error}"
+        );
+    }
+
+    /// A quoted index's own store is the base's period-spreading one, and a
+    /// period it does not cover is the missing-fixing error rather than a
+    /// forecast (`inflationindex.cpp:343-346`). December 2023 is well behind
+    /// the horizon, so nothing forecasts; the message names the period's first
+    /// day.
+    #[test]
+    fn a_missing_quoted_rate_before_the_horizon_is_an_error() {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(Date::new(10, April, 2024));
+        let index = a_quoted_yoy_index(settings);
+
+        let error = index
+            .fixing(Date::new(15, December, 2023), false)
+            .expect_err("December 2023 was never published");
+        assert!(
+            error.to_string().contains("Missing UK YY_RPI fixing"),
+            "err was: {error}"
+        );
+    }
+
+    /// `testRatioYYIndexFutureFixing` (`inflation.cpp:1068-1107`): the only pin
+    /// on the ratio side of the forecast decision. `needs_forecast` and
+    /// `last_fixing_date` both defer to the underlying, which owns the history,
+    /// so April 2024 forecasts off the ratio index's own empty year-on-year
+    /// handle even though the underlying has a figure recorded for it.
+    ///
+    /// C++ wraps `EUHICP` here; the wrapped index is immaterial to what is
+    /// pinned, and UK RPI keeps the fixture on the one zero index this module's
+    /// tests already build.
+    #[test]
+    fn a_ratio_yoy_index_defers_the_forecast_decision_to_its_underlying() {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(Date::new(10, April, 2024));
+        let (underlying, index) = a_yoy_ratio_index(settings);
+        for (date, value) in [
+            (Date::new(1, December, 2022), 98.0),
+            (Date::new(1, January, 2023), 98.1),
+            (Date::new(1, February, 2023), 98.2),
+            (Date::new(1, March, 2023), 98.3),
+            (Date::new(1, December, 2023), 100.0),
+            (Date::new(1, January, 2024), 100.1),
+            (Date::new(1, February, 2024), 100.2),
+        ] {
+            underlying
+                .add_fixing(date, value)
+                .expect("adding a published figure");
+        }
+
+        assert_eq!(
+            index
+                .last_fixing_date()
+                .expect("the underlying has a history"),
+            Date::new(1, February, 2024)
+        );
+        assert!(
+            (index
+                .fixing(Date::new(15, January, 2024), false)
+                .expect("both January periods are published")
+                - (100.1 / 98.1 - 1.0))
+                .abs()
+                < 1e-8
+        );
+        assert!(
+            (index
+                .fixing(Date::new(15, February, 2024), false)
+                .expect("both February periods are published")
+                - (100.2 / 98.2 - 1.0))
+                .abs()
+                < 1e-8
+        );
+
+        underlying
+            .add_fixing(Date::new(1, March, 2024), 100.3)
+            .expect("March 2024 gets published");
+        assert_eq!(
+            index
+                .last_fixing_date()
+                .expect("the underlying has a history"),
+            Date::new(1, March, 2024)
+        );
+
+        underlying
+            .add_fixing(Date::new(1, April, 2024), 100.4)
+            .expect("recording a figure ahead of its publication");
+        let error = index
+            .fixing(Date::new(1, April, 2024), false)
+            .expect_err("April 2024 is beyond the publication horizon");
+        assert!(
+            error.to_string().contains("empty Handle"),
+            "err was: {error}"
+        );
     }
 }
