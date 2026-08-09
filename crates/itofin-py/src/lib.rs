@@ -39,7 +39,9 @@ use credit::{
     PyCreditDefaultSwap, PyDefaultProbabilityTermStructure, PyFlatHazardRate,
     PyInterpolatedHazardRateCurve, PyPiecewiseDefaultCurve, PyProtectionSide,
 };
-use creditengine::{PyIsdaCdsEngine, PyMidPointCdsEngine};
+use creditengine::{
+    PyAccrualBias, PyForwardsInCouponPeriod, PyIsdaCdsEngine, PyMidPointCdsEngine, PyNumericalFix,
+};
 use credithelpers::{PyDefaultProbabilityHelper, PySpreadCdsHelper};
 use curve::{
     PyDiscountCurve, PyFlatForward, PyForwardCurve, PyPiecewiseFlatForward,
@@ -233,6 +235,9 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     pricingengines.add_class::<PyBlackCapFloorEngine>()?;
     pricingengines.add_class::<PyMidPointCdsEngine>()?;
     pricingengines.add_class::<PyIsdaCdsEngine>()?;
+    pricingengines.add_class::<PyNumericalFix>()?;
+    pricingengines.add_class::<PyAccrualBias>()?;
+    pricingengines.add_class::<PyForwardsInCouponPeriod>()?;
     pricingengines.add_class::<PyDiscountingSwapEngine>()?;
     pricingengines.add_class::<PyMCEuropeanEngine>()?;
     pricingengines.add_class::<PyMCEuropeanHestonEngine>()?;

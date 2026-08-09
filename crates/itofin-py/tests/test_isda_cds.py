@@ -23,7 +23,13 @@ the discriminator below.
 import pytest
 from itofin import ItofinError, Settings
 from itofin.instruments import CreditDefaultSwap, ProtectionSide
-from itofin.pricingengines import IsdaCdsEngine, MidPointCdsEngine
+from itofin.pricingengines import (
+    AccrualBias,
+    ForwardsInCouponPeriod,
+    IsdaCdsEngine,
+    MidPointCdsEngine,
+    NumericalFix,
+)
 from itofin.termstructures import FlatForward, FlatHazardRate
 from itofin.time import (
     BusinessDayConvention,
@@ -112,6 +118,31 @@ def test_the_flat_curve_contract_prices_to_the_rust_pinned_value():
     assert abs(cds.npv() - NPV) < TOLERANCE
     assert abs(cds.coupon_leg_npv() - COUPON_LEG_NPV) < TOLERANCE
     assert abs(cds.default_leg_npv() - DEFAULT_LEG_NPV) < TOLERANCE
+
+
+def test_spelling_out_the_default_fidelity_flags_changes_nothing():
+    """The three fidelity kwargs (#814) default to the flags the core
+    constructor bakes in, so naming them must reproduce the price above to the
+    last bit rather than merely to the tolerance."""
+    market = Market()
+    implicit = market.contract()
+    implicit.set_isda_engine(market.isda_engine())
+    explicit = market.contract()
+    explicit.set_isda_engine(
+        IsdaCdsEngine(
+            market.hazard,
+            RECOVERY,
+            market.discount,
+            market.settings,
+            numerical_fix=NumericalFix.Taylor,
+            accrual_bias=AccrualBias.HalfDayBias,
+            forwards_in_coupon_period=ForwardsInCouponPeriod.Piecewise,
+        )
+    )
+
+    assert explicit.npv() == implicit.npv()
+    assert explicit.coupon_leg_npv() == implicit.coupon_leg_npv()
+    assert explicit.default_leg_npv() == implicit.default_leg_npv()
 
 
 def test_the_isda_price_differs_meaningfully_from_the_mid_point_price():
