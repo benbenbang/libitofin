@@ -3,10 +3,17 @@
 //! Port of `ql/methods/finitedifferences/stepconditions/fdmstepconditioncomposite.hpp:43`
 //! and its `.cpp`.
 
-use super::FdmSnapshotCondition;
+use super::{FdmAmericanStepCondition, FdmSnapshotCondition};
+use crate::errors::QlResult;
+use crate::exercise::{Exercise, ExerciseType};
 use crate::math::array::Array;
 use crate::methods::finitedifferences::StepCondition;
+use crate::methods::finitedifferences::meshers::FdmMesher;
+use crate::methods::finitedifferences::utilities::FdmInnerValueCalculator;
+use crate::require;
 use crate::shared::{Shared, shared};
+use crate::time::date::Date;
+use crate::time::daycounter::DayCounter;
 use crate::types::{Real, Time};
 
 /// The step conditions of one solver, applied in order at every step.
@@ -63,6 +70,63 @@ impl FdmStepConditionComposite {
             vec![composite, snapshot],
         ))
     }
+
+    /// The conditions a vanilla option is rolled back under (`cpp:80-145`).
+    ///
+    /// A European exercise contributes nothing: the terminal payoff alone
+    /// prices it. An American exercise contributes an
+    /// [`FdmAmericanStepCondition`] opening at `exercise.dates()[0]` and no
+    /// stopping time, because it exercises continuously rather than on a set of
+    /// dates (`cpp:126-132`).
+    ///
+    /// `ref_date` and `day_counter` place `exercise_start` on the same clock as
+    /// the times the solver steps through, which is the risk-free curve's
+    /// reference date and day counter at the only call site
+    /// (`fdblackscholesvanillaengine.cpp:190-191`).
+    ///
+    /// Deferred, and omitted rather than accepted and ignored:
+    ///
+    /// - the cash-dividend branch (`cpp:92-120`), which needs
+    ///   `FdmDividendHandler` and a `DividendSchedule`, neither of which this
+    ///   crate has: #828. C++ takes the schedule as the first argument; there
+    ///   is no type to name here yet, so the argument is absent instead of
+    ///   present and ignored;
+    /// - the Bermudan branch (`cpp:133-140`), which needs
+    ///   `FdmBermudanStepCondition`: #827. A Bermudan exercise is an error here
+    ///   rather than an empty condition list, which would silently be a
+    ///   European price.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` for any exercise type without a branch, where C++ accepts
+    /// all three (`cpp:122-125`).
+    pub fn vanilla_composite(
+        exercise: &Shared<dyn Exercise>,
+        mesher: Shared<dyn FdmMesher>,
+        calculator: Shared<dyn FdmInnerValueCalculator>,
+        ref_date: Date,
+        day_counter: &DayCounter,
+    ) -> QlResult<Shared<FdmStepConditionComposite>> {
+        require!(
+            matches!(
+                exercise.exercise_type(),
+                ExerciseType::European | ExerciseType::American
+            ),
+            "exercise type is not supported"
+        );
+
+        let mut conditions: Vec<Shared<dyn StepCondition>> = Vec::new();
+        if exercise.exercise_type() == ExerciseType::American {
+            let exercise_start = day_counter.year_fraction(ref_date, exercise.dates()[0]);
+            conditions.push(shared(FdmAmericanStepCondition::new(
+                mesher,
+                calculator,
+                exercise_start,
+            )));
+        }
+
+        Ok(shared(FdmStepConditionComposite::new(&[], conditions)))
+    }
 }
 
 impl StepCondition for FdmStepConditionComposite {
@@ -79,6 +143,11 @@ mod tests {
     use std::cell::RefCell;
 
     use super::*;
+
+    use crate::exercise::{AmericanExercise, EuropeanExercise};
+    use crate::methods::finitedifferences::meshers::UniformGridMesher;
+    use crate::methods::finitedifferences::operators::{FdmLinearOpIterator, FdmLinearOpLayout};
+    use crate::time::daycounters::actual360::Actual360;
 
     struct Recorder {
         tag: &'static str,
@@ -174,6 +243,101 @@ mod tests {
 
         assert_eq!(*log.borrow(), vec!["inner:1".to_string()]);
         assert_eq!(snapshot.values(), Array::from([3.0]));
+    }
+
+    /// A payoff of one everywhere, so a lifted grid point is visible without
+    /// building a payoff and a log-grid calculator around it.
+    struct UnitInnerValue;
+
+    impl FdmInnerValueCalculator for UnitInnerValue {
+        fn inner_value(&self, _iter: &FdmLinearOpIterator, _t: Time) -> Real {
+            1.0
+        }
+
+        fn avg_inner_value(&self, iter: &FdmLinearOpIterator, t: Time) -> Real {
+            self.inner_value(iter, t)
+        }
+    }
+
+    fn vanilla_composite(
+        exercise: Shared<dyn Exercise>,
+    ) -> QlResult<Shared<FdmStepConditionComposite>> {
+        let layout = shared(FdmLinearOpLayout::new(vec![2]));
+        let mesher = shared(UniformGridMesher::new(layout, &[(0.0, 1.0)]).unwrap());
+        FdmStepConditionComposite::vanilla_composite(
+            &exercise,
+            mesher as Shared<dyn FdmMesher>,
+            shared(UnitInnerValue) as Shared<dyn FdmInnerValueCalculator>,
+            reference(),
+            &Actual360::new(),
+        )
+    }
+
+    fn reference() -> Date {
+        Date::new(15, crate::time::date::Month::June, 2026)
+    }
+
+    #[test]
+    fn a_european_exercise_contributes_no_condition_and_no_stopping_time() {
+        let exercise = shared(EuropeanExercise::new(reference() + 360)) as Shared<dyn Exercise>;
+
+        let composite = vanilla_composite(exercise).unwrap();
+
+        assert!(composite.conditions().is_empty());
+        assert!(composite.stopping_times().is_empty());
+    }
+
+    #[test]
+    fn an_american_exercise_contributes_one_condition_and_no_stopping_time() {
+        let exercise = shared(AmericanExercise::over(reference(), reference() + 360).unwrap())
+            as Shared<dyn Exercise>;
+
+        let composite = vanilla_composite(exercise).unwrap();
+
+        assert_eq!(composite.conditions().len(), 1);
+        assert!(composite.stopping_times().is_empty());
+    }
+
+    /// The window opens at the first exercise date, not the last: reading
+    /// `last_date()` here would put `exercise_start` at 1.0 and leave the grid
+    /// untouched at 0.3.
+    #[test]
+    fn the_american_window_opens_at_the_first_exercise_date() {
+        let exercise = shared(AmericanExercise::over(reference() + 90, reference() + 360).unwrap())
+            as Shared<dyn Exercise>;
+        let composite = vanilla_composite(exercise).unwrap();
+
+        let mut before = Array::from([0.0, 0.0]);
+        composite.apply_to(&mut before, 0.2);
+        let mut after = Array::from([0.0, 0.0]);
+        composite.apply_to(&mut after, 0.3);
+
+        assert_eq!(before, Array::from([0.0, 0.0]));
+        assert_eq!(after, Array::from([1.0, 1.0]));
+    }
+
+    #[test]
+    fn a_bermudan_exercise_is_rejected_rather_than_priced_without_its_condition() {
+        struct BermudanStub {
+            dates: [Date; 2],
+        }
+        impl Exercise for BermudanStub {
+            fn exercise_type(&self) -> ExerciseType {
+                ExerciseType::Bermudan
+            }
+            fn dates(&self) -> &[Date] {
+                &self.dates
+            }
+        }
+
+        let exercise = shared(BermudanStub {
+            dates: [reference() + 180, reference() + 360],
+        }) as Shared<dyn Exercise>;
+
+        let Err(error) = vanilla_composite(exercise) else {
+            panic!("a Bermudan exercise must be rejected");
+        };
+        assert_eq!(error.message(), "exercise type is not supported");
     }
 
     #[test]
