@@ -900,11 +900,6 @@ pub enum CpiInterpolationType {
 }
 
 /// The `CPI` namespace of `inflationindex.hpp:39-83`.
-///
-/// `CPI::laggedYoYRate`, the year-on-year sibling of
-/// [`lagged_fixing`](Cpi::lagged_fixing) (`inflationindex.hpp:78-82`), is
-/// **not ported**: it takes a `YoYInflationIndex`, a type this batch of #705
-/// does not have. It arrives with that index.
 pub enum Cpi {}
 
 impl Cpi {
@@ -957,6 +952,78 @@ impl Cpi {
             }
         }
     }
+
+    /// The `yoy_index` rate observed at `date` under `observation_lag` and
+    /// `interpolation_type` (`CPI::laggedYoYRate`,
+    /// `inflationindex.cpp:67-120`).
+    ///
+    /// The year-on-year sibling of [`lagged_fixing`](Cpi::lagged_fixing), and
+    /// [`Flat`](CpiInterpolationType::Flat) behaves exactly as it does there:
+    /// the rate of the lagged period, read straight off the index.
+    ///
+    /// [`Linear`](CpiInterpolationType::Linear) is where the two part company,
+    /// because a year-on-year rate can be interpolated in two orders that do
+    /// not agree. On a **ratio** index whose figures are all in the past, the
+    /// convention is to interpolate the *underlying levels* first and divide
+    /// afterwards (`:82-96`) - so both ends of the ratio move with the date,
+    /// each weighted by its own period length. Otherwise - a quoted index, or a
+    /// ratio one reaching past the publication horizon - the year-on-year rates
+    /// themselves are interpolated (`:98-115`), which is dividing first and
+    /// interpolating after. A forecast has to take that second route whatever
+    /// the index's shape: it comes off the year-on-year curve, which knows
+    /// nothing of the underlying levels.
+    ///
+    /// The lag passed on to the underlying is `observation_lag`, not the zero
+    /// lag [`YoYInflationIndex::past_fixing`] uses: there the fixing date has
+    /// already been lagged, here it has not.
+    ///
+    /// As in [`lagged_fixing`](Cpi::lagged_fixing), a `date` falling on the
+    /// first day of its own period returns the first rate without asking for
+    /// the second.
+    pub fn lagged_yoy_rate(
+        yoy_index: &YoYInflationIndex,
+        date: Date,
+        observation_lag: Period,
+        interpolation_type: CpiInterpolationType,
+    ) -> QlResult<Rate> {
+        let frequency = yoy_index.frequency();
+
+        match interpolation_type {
+            CpiInterpolationType::Flat => {
+                let fixing_period = inflation_period(date - observation_lag, frequency)?;
+                yoy_index.fixing(fixing_period.0, false)
+            }
+            CpiInterpolationType::Linear => {
+                if let Some(underlying) = yoy_index.underlying_index()
+                    && !yoy_index.needs_forecast(date)?
+                {
+                    let z1 =
+                        Cpi::lagged_fixing(underlying, date, observation_lag, interpolation_type)?;
+                    let z0 = Cpi::lagged_fixing(
+                        underlying,
+                        date - Period::new(1, TimeUnit::Years),
+                        observation_lag,
+                        interpolation_type,
+                    )?;
+                    return Ok(z1 / z0 - 1.0);
+                }
+
+                let fixing_period = inflation_period(date - observation_lag, frequency)?;
+                let interpolation_period = inflation_period(date, frequency)?;
+                let y0 = yoy_index.fixing(fixing_period.0, false)?;
+                if date == interpolation_period.0 {
+                    return Ok(y0);
+                }
+
+                let one_day = Period::new(1, TimeUnit::Days);
+                let y1 = yoy_index.fixing(fixing_period.1 + one_day, false)?;
+
+                let elapsed = (date - interpolation_period.0) as Rate;
+                let length = ((interpolation_period.1 + one_day) - interpolation_period.0) as Rate;
+                Ok(y0 + (y1 - y0) * elapsed / length)
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -971,7 +1038,7 @@ mod tests {
     use crate::time::businessdayconvention::BusinessDayConvention;
     use crate::time::calendars::unitedkingdom::{Market, UnitedKingdom};
     use crate::time::date::Month::{
-        April, August, December, February, January, June, March, November, October, September,
+        April, August, December, February, January, June, March, May, November, October, September,
     };
     use crate::time::daycounters::actual360::Actual360;
     use crate::time::schedule::MakeSchedule;
@@ -2000,6 +2067,239 @@ mod tests {
         assert!(
             error.to_string().contains("empty Handle"),
             "err was: {error}"
+        );
+    }
+
+    /// The quoted fixture of `testCpiYoYQuotedFlatInterpolation` and its linear
+    /// sibling (`inflation.cpp:1449-1461`): it is 10 February 2022 and UK
+    /// YY_RPI has published November 2020 through March 2021. Every date the
+    /// two read is far behind the publication horizon, so nothing forecasts and
+    /// a gap is an error.
+    fn a_quoted_yoy_with_2021_rates() -> YoYInflationIndex {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(Date::new(10, February, 2022));
+        let index = a_quoted_yoy_index(settings);
+        for (date, value) in [
+            (Date::new(1, November, 2020), 0.02935),
+            (Date::new(1, December, 2020), 0.02954),
+            (Date::new(1, January, 2021), 0.02946),
+            (Date::new(1, February, 2021), 0.02960),
+            (Date::new(1, March, 2021), 0.02969),
+        ] {
+            index
+                .add_fixing(date, value)
+                .expect("adding a published rate");
+        }
+        index
+    }
+
+    /// The ratio fixture of `testCpiYoYRatioFlatInterpolation` and its linear
+    /// sibling (`inflation.cpp:1512-1531`): the same five UK RPI levels twice,
+    /// a year apart, so the ratio has both ends on record.
+    fn a_ratio_yoy_with_2021_fixings() -> YoYInflationIndex {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(Date::new(10, February, 2022));
+        let (underlying, index) = a_yoy_ratio_index(settings);
+        for (date, value) in [
+            (Date::new(1, November, 2019), 291.0),
+            (Date::new(1, December, 2019), 291.9),
+            (Date::new(1, January, 2020), 290.6),
+            (Date::new(1, February, 2020), 292.0),
+            (Date::new(1, March, 2020), 292.6),
+            (Date::new(1, November, 2020), 293.5),
+            (Date::new(1, December, 2020), 295.4),
+            (Date::new(1, January, 2021), 294.6),
+            (Date::new(1, February, 2021), 296.0),
+            (Date::new(1, March, 2021), 296.9),
+        ] {
+            underlying
+                .add_fixing(date, value)
+                .expect("adding a published figure");
+        }
+        index
+    }
+
+    fn lagged_yoy_rate(
+        index: &YoYInflationIndex,
+        date: Date,
+        interpolation_type: CpiInterpolationType,
+    ) -> QlResult<Rate> {
+        Cpi::lagged_yoy_rate(
+            index,
+            date,
+            Period::new(3, TimeUnit::Months),
+            interpolation_type,
+        )
+    }
+
+    /// `testCpiYoYQuotedFlatInterpolation` (`inflation.cpp:1447-1469`): the
+    /// observation is the rate of the period the lagged date falls in.
+    #[test]
+    fn a_flat_yoy_observation_reads_the_lagged_period() {
+        let index = a_quoted_yoy_with_2021_rates();
+        for (date, expected) in [
+            (Date::new(10, February, 2021), 0.02935),
+            (Date::new(25, June, 2021), 0.02969),
+        ] {
+            let calculated = lagged_yoy_rate(&index, date, CpiInterpolationType::Flat)
+                .expect("the observed period is published");
+            assert!(
+                (calculated - expected).abs() < 1e-8,
+                "{calculated} at {date}"
+            );
+        }
+    }
+
+    /// `testCpiYoYQuotedLinearInterpolation` (`inflation.cpp:1471-1490`): a
+    /// quoted index interpolates the year-on-year *rates* themselves, weighted
+    /// by how far the date has run into its own unlagged period - 28 days for
+    /// February 2021, 31 for May.
+    #[test]
+    fn a_linear_yoy_observation_interpolates_the_quoted_rates() {
+        let index = a_quoted_yoy_with_2021_rates();
+        for (date, expected) in [
+            (
+                Date::new(10, February, 2021),
+                0.02935 * (19.0 / 28.0) + 0.02954 * (9.0 / 28.0),
+            ),
+            (
+                Date::new(12, May, 2021),
+                0.02960 * (20.0 / 31.0) + 0.02969 * (11.0 / 31.0),
+            ),
+        ] {
+            let calculated = lagged_yoy_rate(&index, date, CpiInterpolationType::Linear)
+                .expect("both observed periods are published");
+            assert!(
+                (calculated - expected).abs() < 1e-8,
+                "{calculated} at {date}"
+            );
+        }
+    }
+
+    /// `inflation.cpp:1492-1497`: interpolating on 25 June needs the rate after
+    /// March's, i.e. April 2021 - old enough that it must have been published,
+    /// so its absence is the missing-fixing error naming the *quoted* index
+    /// rather than a forecast off the empty handle.
+    #[test]
+    fn a_linear_yoy_observation_propagates_a_missing_quoted_rate() {
+        let index = a_quoted_yoy_with_2021_rates();
+        let error = lagged_yoy_rate(
+            &index,
+            Date::new(25, June, 2021),
+            CpiInterpolationType::Linear,
+        )
+        .expect_err("April 2021 was never published");
+        assert!(
+            error.to_string().contains("Missing UK YY_RPI fixing"),
+            "err was: {error}"
+        );
+    }
+
+    /// `inflation.cpp:1499-1504`: on the first day of the unlagged period the
+    /// weight is zero and the second rate is never asked for, which is why 1
+    /// June succeeds where 25 June does not.
+    #[test]
+    fn a_linear_yoy_observation_on_a_period_start_skips_the_second_rate() {
+        let index = a_quoted_yoy_with_2021_rates();
+        let calculated = lagged_yoy_rate(
+            &index,
+            Date::new(1, June, 2021),
+            CpiInterpolationType::Linear,
+        )
+        .expect("the special case never reads April");
+        assert!((calculated - 0.02969).abs() < 1e-8, "{calculated}");
+    }
+
+    /// `testCpiYoYRatioFlatInterpolation` (`inflation.cpp:1507-1537`): a flat
+    /// observation on a ratio index is the plain ratio of the two lagged
+    /// levels, no interpolation on either end.
+    #[test]
+    fn a_flat_yoy_observation_on_a_ratio_index_divides_the_lagged_levels() {
+        let index = a_ratio_yoy_with_2021_fixings();
+        for (date, expected) in [
+            (Date::new(10, February, 2021), 293.5 / 291.0 - 1.0),
+            (Date::new(25, June, 2021), 296.9 / 292.6 - 1.0),
+        ] {
+            let calculated = lagged_yoy_rate(&index, date, CpiInterpolationType::Flat)
+                .expect("both observed periods are published");
+            assert!(
+                (calculated - expected).abs() < 1e-8,
+                "{calculated} at {date}"
+            );
+        }
+    }
+
+    /// **The discriminating pin** of `testCpiYoYRatioLinearInterpolation`
+    /// (`inflation.cpp:1560-1567`): a past ratio interpolates the underlying
+    /// *levels* and divides afterwards, not the other way round.
+    ///
+    /// The two orders are told apart by the denominators. Interpolating first
+    /// weights each end by its own period: 28 days for February 2021 against 29
+    /// for the leap February 2020, so the numerator runs `19/28, 9/28` and the
+    /// divisor `20/29, 9/29`. Dividing first and interpolating after would
+    /// weight both ends by the *same* 28ths, and the second case - where both
+    /// Mays are 31 days - is deliberately kept alongside because it cannot tell
+    /// the two apart, which is what makes the February case load-bearing.
+    #[test]
+    fn a_linear_yoy_observation_on_a_ratio_index_interpolates_before_dividing() {
+        let index = a_ratio_yoy_with_2021_fixings();
+        for (date, expected) in [
+            (
+                Date::new(10, February, 2021),
+                (293.5 * (19.0 / 28.0) + 295.4 * (9.0 / 28.0))
+                    / (291.0 * (20.0 / 29.0) + 291.9 * (9.0 / 29.0))
+                    - 1.0,
+            ),
+            (
+                Date::new(12, May, 2021),
+                (296.0 * (20.0 / 31.0) + 296.9 * (11.0 / 31.0))
+                    / (292.0 * (20.0 / 31.0) + 292.6 * (11.0 / 31.0))
+                    - 1.0,
+            ),
+        ] {
+            let calculated = lagged_yoy_rate(&index, date, CpiInterpolationType::Linear)
+                .expect("both observed periods are published");
+            assert!(
+                (calculated - expected).abs() < 1e-8,
+                "{calculated} at {date}"
+            );
+        }
+    }
+
+    /// `inflation.cpp:1569-1574`: the ratio branch reaches the *underlying*, so
+    /// the missing April 2021 figure surfaces named `UK RPI` - where the quoted
+    /// index's counterpart names `UK YY_RPI`. The two messages are what
+    /// separate the branch taken here from the one taken there.
+    #[test]
+    fn a_linear_yoy_ratio_propagates_a_missing_underlying_fixing() {
+        let index = a_ratio_yoy_with_2021_fixings();
+        let error = lagged_yoy_rate(
+            &index,
+            Date::new(25, June, 2021),
+            CpiInterpolationType::Linear,
+        )
+        .expect_err("April 2021 was never published");
+        assert!(
+            error.to_string().contains("Missing UK RPI fixing"),
+            "err was: {error}"
+        );
+    }
+
+    /// `inflation.cpp:1576-1580`: the period-start special case reached through
+    /// the ratio branch, where it applies to *each* underlying observation
+    /// independently, so neither end ever asks for April.
+    #[test]
+    fn a_linear_yoy_ratio_on_a_period_start_skips_both_second_fixings() {
+        let index = a_ratio_yoy_with_2021_fixings();
+        let calculated = lagged_yoy_rate(
+            &index,
+            Date::new(1, June, 2021),
+            CpiInterpolationType::Linear,
+        )
+        .expect("the special case never reads April");
+        assert!(
+            (calculated - (296.9 / 292.6 - 1.0)).abs() < 1e-8,
+            "{calculated}"
         );
     }
 }
