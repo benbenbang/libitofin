@@ -7,15 +7,16 @@
 //! design.
 //!
 //! [`FdmStepConditionComposite::vanilla_composite`] (`cpp:80-145`) carries the
-//! European and American branches. Its two other sites are deferred and
-//! omitted visibly: `FdmDividendHandler` (`cpp:104`) to #828 and
-//! `FdmBermudanStepCondition` (`cpp:134`) to #827, so an exercise type without
-//! a branch is an error rather than an empty condition list.
+//! European, American and Bermudan branches. Its one other site is deferred and
+//! omitted visibly: `FdmDividendHandler` (`cpp:104`) to #828, so an exercise
+//! type without a branch is an error rather than an empty condition list.
 
 mod fdmamericanstepcondition;
+mod fdmbermudanstepcondition;
 mod fdmsnapshotcondition;
 mod fdmstepconditioncomposite;
 
 pub use fdmamericanstepcondition::FdmAmericanStepCondition;
+pub use fdmbermudanstepcondition::FdmBermudanStepCondition;
 pub use fdmsnapshotcondition::FdmSnapshotCondition;
 pub use fdmstepconditioncomposite::FdmStepConditionComposite;

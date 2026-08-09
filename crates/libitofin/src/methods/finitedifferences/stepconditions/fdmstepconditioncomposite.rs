@@ -3,7 +3,7 @@
 //! Port of `ql/methods/finitedifferences/stepconditions/fdmstepconditioncomposite.hpp:43`
 //! and its `.cpp`.
 
-use super::{FdmAmericanStepCondition, FdmSnapshotCondition};
+use super::{FdmAmericanStepCondition, FdmBermudanStepCondition, FdmSnapshotCondition};
 use crate::errors::QlResult;
 use crate::exercise::{Exercise, ExerciseType};
 use crate::math::array::Array;
@@ -77,29 +77,29 @@ impl FdmStepConditionComposite {
     /// prices it. An American exercise contributes an
     /// [`FdmAmericanStepCondition`] opening at `exercise.dates()[0]` and no
     /// stopping time, because it exercises continuously rather than on a set of
-    /// dates (`cpp:126-132`).
+    /// dates (`cpp:126-132`). A Bermudan exercise contributes an
+    /// [`FdmBermudanStepCondition`] and, unlike the American one, its exercise
+    /// times as stopping times (`cpp:133-140`): the condition only fires when a
+    /// step lands on an exercise time, so the solver has to be told to put one
+    /// there.
     ///
-    /// `ref_date` and `day_counter` place `exercise_start` on the same clock as
-    /// the times the solver steps through, which is the risk-free curve's
-    /// reference date and day counter at the only call site
-    /// (`fdblackscholesvanillaengine.cpp:190-191`).
+    /// `ref_date` and `day_counter` place `exercise_start` and the Bermudan
+    /// exercise times on the same clock as the times the solver steps through,
+    /// which is the risk-free curve's reference date and day counter at the
+    /// only call site (`fdblackscholesvanillaengine.cpp:190-191`).
     ///
-    /// Deferred, and omitted rather than accepted and ignored:
-    ///
-    /// - the cash-dividend branch (`cpp:92-120`), which needs
-    ///   `FdmDividendHandler` and a `DividendSchedule`, neither of which this
-    ///   crate has: #828. C++ takes the schedule as the first argument; there
-    ///   is no type to name here yet, so the argument is absent instead of
-    ///   present and ignored;
-    /// - the Bermudan branch (`cpp:133-140`), which needs
-    ///   `FdmBermudanStepCondition`: #827. A Bermudan exercise is an error here
-    ///   rather than an empty condition list, which would silently be a
-    ///   European price.
+    /// Deferred, and omitted rather than accepted and ignored: the
+    /// cash-dividend branch (`cpp:92-120`), which needs `FdmDividendHandler`
+    /// and a `DividendSchedule`, neither of which this crate has: #828. C++
+    /// takes the schedule as the first argument; there is no type to name here
+    /// yet, so the argument is absent instead of present and ignored.
     ///
     /// # Errors
     ///
-    /// Returns `Err` for any exercise type without a branch, where C++ accepts
-    /// all three (`cpp:122-125`).
+    /// Returns `Err` for an exercise type without a branch (`cpp:122-125`).
+    /// With all three types now branched the guard is total and cannot fire;
+    /// it is kept as the port of the C++ `QL_REQUIRE`, and the exhaustive match
+    /// below is the stronger, compile-time form of the same check.
     pub fn vanilla_composite(
         exercise: &Shared<dyn Exercise>,
         mesher: Shared<dyn FdmMesher>,
@@ -110,22 +110,40 @@ impl FdmStepConditionComposite {
         require!(
             matches!(
                 exercise.exercise_type(),
-                ExerciseType::European | ExerciseType::American
+                ExerciseType::European | ExerciseType::American | ExerciseType::Bermudan
             ),
             "exercise type is not supported"
         );
 
         let mut conditions: Vec<Shared<dyn StepCondition>> = Vec::new();
-        if exercise.exercise_type() == ExerciseType::American {
-            let exercise_start = day_counter.year_fraction(ref_date, exercise.dates()[0]);
-            conditions.push(shared(FdmAmericanStepCondition::new(
-                mesher,
-                calculator,
-                exercise_start,
-            )));
+        let mut stopping_times: Vec<Vec<Time>> = Vec::new();
+        match exercise.exercise_type() {
+            ExerciseType::American => {
+                let exercise_start = day_counter.year_fraction(ref_date, exercise.dates()[0]);
+                conditions.push(shared(FdmAmericanStepCondition::new(
+                    mesher,
+                    calculator,
+                    exercise_start,
+                )));
+            }
+            ExerciseType::Bermudan => {
+                let bermudan = shared(FdmBermudanStepCondition::new(
+                    exercise.dates(),
+                    ref_date,
+                    day_counter,
+                    mesher,
+                    calculator,
+                ));
+                stopping_times.push(bermudan.exercise_times().to_vec());
+                conditions.push(bermudan);
+            }
+            ExerciseType::European => {}
         }
 
-        Ok(shared(FdmStepConditionComposite::new(&[], conditions)))
+        Ok(shared(FdmStepConditionComposite::new(
+            &stopping_times,
+            conditions,
+        )))
     }
 }
 
@@ -144,7 +162,7 @@ mod tests {
 
     use super::*;
 
-    use crate::exercise::{AmericanExercise, EuropeanExercise};
+    use crate::exercise::{AmericanExercise, BermudanExercise, EuropeanExercise};
     use crate::methods::finitedifferences::meshers::UniformGridMesher;
     use crate::methods::finitedifferences::operators::{FdmLinearOpIterator, FdmLinearOpLayout};
     use crate::time::daycounters::actual360::Actual360;
@@ -316,28 +334,21 @@ mod tests {
         assert_eq!(after, Array::from([1.0, 1.0]));
     }
 
+    /// The discriminator between the two early-exercise branches: American
+    /// contributes no stopping time (`cpp:126-132`), Bermudan contributes one
+    /// per exercise date (`cpp:139`). Without that push the solver would step
+    /// straight past every exercise time and the condition, which only fires on
+    /// an exact match, would never lift the grid.
     #[test]
-    fn a_bermudan_exercise_is_rejected_rather_than_priced_without_its_condition() {
-        struct BermudanStub {
-            dates: [Date; 2],
-        }
-        impl Exercise for BermudanStub {
-            fn exercise_type(&self) -> ExerciseType {
-                ExerciseType::Bermudan
-            }
-            fn dates(&self) -> &[Date] {
-                &self.dates
-            }
-        }
+    fn a_bermudan_exercise_contributes_its_exercise_times_as_stopping_times() {
+        let exercise = shared(
+            BermudanExercise::new(vec![reference() + 180, reference() + 360], false).unwrap(),
+        ) as Shared<dyn Exercise>;
 
-        let exercise = shared(BermudanStub {
-            dates: [reference() + 180, reference() + 360],
-        }) as Shared<dyn Exercise>;
+        let composite = vanilla_composite(exercise).unwrap();
 
-        let Err(error) = vanilla_composite(exercise) else {
-            panic!("a Bermudan exercise must be rejected");
-        };
-        assert_eq!(error.message(), "exercise type is not supported");
+        assert_eq!(composite.conditions().len(), 1);
+        assert_eq!(composite.stopping_times(), &[0.5, 1.0]);
     }
 
     #[test]
