@@ -531,17 +531,17 @@ mod test_fd_earliest_exercise_date {
     use crate::types::{Rate, Real, Size, Volatility};
 
     /// The market of `:2186-2195`.
-    const S0: Real = 80.0;
-    const STRIKE: Real = 100.0;
+    pub(super) const S0: Real = 80.0;
+    pub(super) const STRIKE: Real = 100.0;
     const SIGMA: Volatility = 0.25;
     const R: Rate = 0.05;
     const Q: Rate = 0.0;
 
     /// The grid of `:2206`.
-    const T_GRID: Size = 200;
-    const X_GRID: Size = 200;
+    pub(super) const T_GRID: Size = 200;
+    pub(super) const X_GRID: Size = 200;
 
-    fn today() -> Date {
+    pub(super) fn today() -> Date {
         Date::new(15, Month::January, 2025)
     }
 
@@ -555,7 +555,7 @@ mod test_fd_earliest_exercise_date {
         )) as Shared<dyn YieldTermStructure>)
     }
 
-    fn process() -> Shared<GeneralizedBlackScholesProcess> {
+    pub(super) fn process() -> Shared<GeneralizedBlackScholesProcess> {
         let spot = Handle::new(shared(SimpleQuote::new(S0)) as Shared<dyn Quote>);
         let vol = Handle::new(shared(BlackConstantVol::new(
             today(),
@@ -651,6 +651,178 @@ mod test_fd_earliest_exercise_date {
         assert!(
             full >= mid - 1e-8,
             "the full window should give the highest price: full {full} 6M {mid}"
+        );
+    }
+}
+
+#[cfg(test)]
+mod test_fd_bermudan {
+    //! A degeneracy oracle for the Bermudan branch, not a port: the C++ test
+    //! suite prices no Bermudan option through this engine, so there is no
+    //! upstream number to reproduce and inventing one would pin nothing.
+    //!
+    //! It runs on the deep in-the-money put of
+    //! `test-suite/americanoption.cpp:2186-2195`, whose early-exercise premium
+    //! is around two, and prices every arm through this same engine on the same
+    //! grid so the arms differ only in the exercise.
+
+    use super::FdBlackScholesVanillaEngine;
+    use super::test_fd_earliest_exercise_date::{S0, STRIKE, T_GRID, X_GRID, process, today};
+    use crate::exercise::{AmericanExercise, BermudanExercise, EuropeanExercise, Exercise};
+    use crate::instrument::Instrument;
+    use crate::instruments::{OneAssetOption, PlainVanillaPayoff};
+    use crate::methods::finitedifferences::solvers::FdmSchemeDesc;
+    use crate::option::OptionType::Put;
+    use crate::pricingengine::PricingEngine;
+    use crate::processes::GeneralizedBlackScholesProcess;
+    use crate::settings::Settings;
+    use crate::shared::{Shared, SharedMut, shared, shared_mut};
+    use crate::time::date::Date;
+    use crate::time::period::Period;
+    use crate::time::timeunit::TimeUnit;
+    use crate::types::Real;
+
+    fn fd_price(
+        settings: &Shared<Settings<Date>>,
+        process: &Shared<GeneralizedBlackScholesProcess>,
+        exercise: Shared<dyn Exercise>,
+    ) -> Real {
+        let mut option = OneAssetOption::new(
+            shared(PlainVanillaPayoff::new(Put, STRIKE)),
+            exercise,
+            Shared::clone(settings),
+        );
+        let engine = shared_mut(FdBlackScholesVanillaEngine::new(
+            Shared::clone(process),
+            T_GRID,
+            X_GRID,
+            0,
+            FdmSchemeDesc::douglas(),
+        ));
+        option
+            .base_mut()
+            .set_pricing_engine(engine as SharedMut<dyn PricingEngine>);
+        option.npv().unwrap()
+    }
+
+    /// The exercise dates `months` after the reference date, the last of which
+    /// is the maturity when it is `12`.
+    fn every(months: &[i32]) -> Shared<dyn Exercise> {
+        let dates = months
+            .iter()
+            .map(|m| today() + Period::new(*m, TimeUnit::Months))
+            .collect();
+        shared(BermudanExercise::new(dates, false).unwrap()) as Shared<dyn Exercise>
+    }
+
+    fn maturity() -> Date {
+        today() + Period::new(1, TimeUnit::Years)
+    }
+
+    fn fixture() -> (
+        Shared<Settings<Date>>,
+        Shared<GeneralizedBlackScholesProcess>,
+    ) {
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(today());
+        (settings, process())
+    }
+
+    /// The single-date form, whose one exercise opportunity is the expiry, is
+    /// the European option. It agrees to `3.8e-7`, not to the last bit, and the
+    /// residual is mechanism rather than noise: that lone exercise time reaches
+    /// the solver as a stopping time equal to the rollback's own starting time,
+    /// so the model applies the condition once before it steps
+    /// (`finitedifferencemodel.rs:96-100`), taking `max` against a terminal grid
+    /// that the solver seeded with `avg_inner_value` while the condition reads
+    /// `inner_value`. Where the node value exceeds the cell average the grid is
+    /// lifted, and the measured gap is the sum of those lifts. C++ does the
+    /// identical thing.
+    ///
+    /// This arm pins that the Bermudan branch does not *corrupt* a price it
+    /// should reproduce. It cannot pin that the condition fires, because a
+    /// condition that never fired would pass it just as well - that is
+    /// [`dense_exercise_dates_price_above_the_european_and_under_the_american`].
+    #[test]
+    fn a_single_exercise_date_at_expiry_degenerates_to_the_european_price() {
+        let (settings, process) = fixture();
+
+        let euro = fd_price(
+            &settings,
+            &process,
+            shared(EuropeanExercise::new(maturity())) as Shared<dyn Exercise>,
+        );
+        let bermudan = fd_price(&settings, &process, every(&[12]));
+
+        let error = (bermudan - euro).abs();
+        assert!(
+            error <= 1.0e-5,
+            "a Bermudan exercisable only at expiry should be the European option: \
+             Bermudan {bermudan} european {euro} (absolute error {error})"
+        );
+    }
+
+    /// The load-bearing arm. Twelve monthly exercise opportunities on a put
+    /// this deep in the money capture almost all of an early-exercise premium
+    /// worth about two, so the price sits far above the European one and just
+    /// under the continuously exercisable American one.
+    ///
+    /// A condition that never fired - a wrong exercise-time clock, a dropped
+    /// stopping-time push leaving the solver stepping past every exercise date,
+    /// an inverted comparison - prices the European value and misses the floor
+    /// by two hundred times its slack.
+    #[test]
+    fn dense_exercise_dates_price_above_the_european_and_under_the_american() {
+        let (settings, process) = fixture();
+
+        let euro = fd_price(
+            &settings,
+            &process,
+            shared(EuropeanExercise::new(maturity())) as Shared<dyn Exercise>,
+        );
+        let monthly = fd_price(
+            &settings,
+            &process,
+            every(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]),
+        );
+        let american = fd_price(
+            &settings,
+            &process,
+            shared(AmericanExercise::over(today(), maturity()).unwrap()) as Shared<dyn Exercise>,
+        );
+
+        println!("testFdBermudan: S0={S0} european {euro} monthly {monthly} american {american}");
+
+        assert!(
+            monthly > euro + 1.0,
+            "monthly exercise should capture most of the early-exercise premium: \
+             monthly {monthly} european {euro}"
+        );
+        assert!(
+            monthly <= american,
+            "a Bermudan cannot beat the American it is a subset of: \
+             monthly {monthly} american {american}"
+        );
+    }
+
+    /// Adding exercise opportunities cannot make the option worth less. The
+    /// quarterly dates are a subset of the monthly ones, so this compares two
+    /// exercise sets rather than two grids of different fineness.
+    #[test]
+    fn price_is_monotone_in_the_exercise_date_set() {
+        let (settings, process) = fixture();
+
+        let quarterly = fd_price(&settings, &process, every(&[3, 6, 9, 12]));
+        let monthly = fd_price(
+            &settings,
+            &process,
+            every(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]),
+        );
+
+        assert!(
+            monthly >= quarterly - 1.0e-8,
+            "more exercise dates should not lower the price: \
+             quarterly {quarterly} monthly {monthly}"
         );
     }
 }
