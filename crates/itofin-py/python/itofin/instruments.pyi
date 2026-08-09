@@ -208,6 +208,14 @@ class ProtectionSide:
     Buyer: ProtectionSide
     Seller: ProtectionSide
 
+class PricingModel:
+    """The model a quoted contract is inverted under by
+    CreditDefaultSwap.implied_hazard_rate: Midpoint is not ISDA conform, Isda
+    carries the three fidelity flags the core fixes at that call site."""
+
+    Midpoint: PricingModel
+    Isda: PricingModel
+
 class CreditDefaultSwap:
     """A credit-default swap quoted as a running spread.
 
@@ -274,6 +282,26 @@ class CreditDefaultSwap:
         ...
     def coupon_leg_npv(self) -> float: ...
     def default_leg_npv(self) -> float: ...
+    def implied_hazard_rate(
+        self,
+        target_npv: float,
+        discount: YieldTermStructure,
+        day_counter: DayCounter,
+        recovery_rate: float,
+        accuracy: float,
+        model: PricingModel,
+    ) -> float:
+        """The flat hazard rate at which this contract is worth target_npv.
+
+        The solve stands on its own engine rather than on whichever one
+        set_engine attached, so there is no probability-curve argument:
+        day_counter counts the flat curve the solve builds, not the contract.
+        Under PricingModel.Isda both it and discount must count Act/365 (Fixed),
+        which is what the ISDA engine requires of its curves.
+
+        Raises ItofinError on a malformed contract and when the solve does not
+        converge, which includes a pricing failure at some hazard rate."""
+        ...
 
 class ZeroCouponInflationSwap:
     """One fixed flow against one inflation-indexed flow, both exchanged at

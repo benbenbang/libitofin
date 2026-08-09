@@ -37,7 +37,7 @@ use capfloorengine::PyBlackCapFloorEngine;
 use capfloortermvol::PyCapFloorTermVolSurface;
 use credit::{
     PyCreditDefaultSwap, PyDefaultProbabilityTermStructure, PyFlatHazardRate,
-    PyInterpolatedHazardRateCurve, PyPiecewiseDefaultCurve, PyProtectionSide,
+    PyInterpolatedHazardRateCurve, PyPiecewiseDefaultCurve, PyPricingModel, PyProtectionSide,
 };
 use creditengine::{
     PyAccrualBias, PyForwardsInCouponPeriod, PyIsdaCdsEngine, PyMidPointCdsEngine, PyNumericalFix,
@@ -219,6 +219,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     instruments.add_class::<PyCapFloorType>()?;
     instruments.add_class::<PyCapFloor>()?;
     instruments.add_class::<PyProtectionSide>()?;
+    instruments.add_class::<PyPricingModel>()?;
     instruments.add_class::<PyCreditDefaultSwap>()?;
     instruments.add_class::<PyZeroCouponInflationSwap>()?;
 
