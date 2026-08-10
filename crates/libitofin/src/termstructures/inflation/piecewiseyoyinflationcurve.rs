@@ -332,3 +332,250 @@ impl<I: Interpolator + 'static> PiecewiseCurve for PiecewiseYoYInflationCurve<I>
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    //! `inflation.cpp`'s `testYYTermStructure` (`:1109`) is the only
+    //! year-on-year curve QuantLib builds anywhere, and it needs the
+    //! year-on-year swap and its helper; that reprice-to-zero against C++'s own
+    //! numbers is the oracle of the batch that lands them. What is checked here
+    //! is what this curve decides on its own, against a helper written to make
+    //! those decisions visible.
+    //!
+    //! The mock reprices off *two* points of the curve, its own pillar and the
+    //! base node, so its solved value is a function of the base rate rather
+    //! than of its quote alone. That is what a real year-on-year helper does -
+    //! a swap's fair rate depends on the whole curve prefix - and it is what
+    //! turns the seeding of node zero into something a repricing test can see:
+    //! with `implied = (curve(pillar) + curve(base)) / 2`, the solved pillar is
+    //! `2 * quote - base_rate`, so a curve seeded from the traits' `0.02`
+    //! instead of its own base rate lands every node somewhere else while still
+    //! repricing its quotes perfectly.
+
+    use super::*;
+    use crate::handle::Handle;
+    use crate::patterns::observable::AsObservable;
+    use crate::quotes::{Quote, SimpleQuote};
+    use crate::shared::shared;
+    use crate::termstructures::inflation::inflationhelpers::YoYInflationHelperBase;
+    use crate::time::date::Month::{August, July};
+    use crate::time::daycounters::thirty360::{Convention, Thirty360};
+    use crate::time::period::Period;
+    use crate::time::timeunit::TimeUnit;
+
+    /// Distinct from the traits' `0.02` seed and from every solved pillar
+    /// below, in the spirit of C++'s `baseYYRate = yyData[0] / 100 = 0.0295`
+    /// (`inflation.cpp:1181`). A base rate of `0.02` would let a curve that
+    /// ignored the `initial_value` override pass every assertion here.
+    const BASE_YOY_RATE: Rate = 0.029;
+    const QUOTES: [Real; 3] = [0.026, 0.028, 0.030];
+    const MATURITY_YEARS: [i32; 3] = [1, 3, 5];
+
+    fn today() -> Date {
+        Date::new(13, August, 2007)
+    }
+
+    fn base_date() -> Date {
+        Date::new(1, July, 2007)
+    }
+
+    fn day_counter() -> DayCounter {
+        Thirty360::with_convention(Convention::BondBasis)
+    }
+
+    /// A helper whose implied quote is the mean of the curve's year-on-year
+    /// rate at its pillar and at the base date.
+    ///
+    /// It reads the curve by *time*, not by date: the date entry point
+    /// quantizes to the start of the query's inflation period, which for
+    /// pillars that are not month starts would land the read between two nodes
+    /// and blunt the solver's sensitivity to the node it is solving. A test
+    /// double is free to take the unquantized path; the curve is not.
+    struct MeanRateHelper {
+        base: YoYInflationHelperBase,
+    }
+
+    impl MeanRateHelper {
+        fn new(quote: &Shared<SimpleQuote>, pillar: Date) -> Shared<MeanRateHelper> {
+            let base =
+                YoYInflationHelperBase::new(Handle::new(Shared::clone(quote) as Shared<dyn Quote>));
+            base.set_pillar_date(pillar);
+            base.set_latest_relevant_date(pillar);
+            base.set_maturity_date(pillar);
+            shared(MeanRateHelper { base })
+        }
+    }
+
+    impl AsObservable for MeanRateHelper {
+        fn observable(&self) -> &Observable {
+            self.base.observable()
+        }
+    }
+
+    impl YoYInflationHelper for MeanRateHelper {
+        fn base(&self) -> &YoYInflationHelperBase {
+            &self.base
+        }
+
+        /// Extrapolation is requested because the curve is only partially
+        /// solved while the bootstrap is running; both reads sit on nodes of
+        /// the solved prefix, so nothing is ever extrapolated in fact.
+        fn implied_quote(&self) -> QlResult<Real> {
+            let curve = self.base.term_structure()?;
+            let at_pillar = curve.time_from_reference(self.base.pillar_date())?;
+            let at_base = curve.time_from_reference(curve.base_date())?;
+            Ok(0.5 * (curve.yoy_rate(at_pillar, true)? + curve.yoy_rate(at_base, true)?))
+        }
+    }
+
+    struct Fixture {
+        helpers: Vec<Shared<dyn YoYInflationHelper>>,
+        curve: Shared<PiecewiseYoYInflationCurve<Linear>>,
+    }
+
+    fn a_curve() -> Fixture {
+        let helpers: Vec<Shared<dyn YoYInflationHelper>> = QUOTES
+            .iter()
+            .zip(MATURITY_YEARS)
+            .map(|(quote, years)| {
+                MeanRateHelper::new(
+                    &shared(SimpleQuote::new(Some(*quote))),
+                    today() + Period::new(years, TimeUnit::Years),
+                ) as Shared<dyn YoYInflationHelper>
+            })
+            .collect();
+        let curve = PiecewiseYoYInflationCurve::new(
+            today(),
+            base_date(),
+            BASE_YOY_RATE,
+            Frequency::Monthly,
+            day_counter(),
+            helpers.clone(),
+            None,
+        )
+        .unwrap();
+        Fixture { helpers, curve }
+    }
+
+    /// Every helper reprices its quote off the bootstrapped curve, and the
+    /// pillars land where the helpers put them.
+    #[test]
+    fn the_bootstrapped_curve_reproduces_every_helpers_quote() {
+        let fixture = a_curve();
+        let (helpers, curve) = (&fixture.helpers, &fixture.curve);
+        curve.calculate().unwrap();
+
+        for (helper, quote) in helpers.iter().zip(QUOTES) {
+            let error = helper.quote_error().unwrap();
+            assert!(
+                error.abs() < 1.0e-10,
+                "quote error {error} on the {quote} helper"
+            );
+        }
+
+        let dates = curve.dates().unwrap();
+        assert_eq!(
+            dates.len(),
+            helpers.len() + 1,
+            "one node per helper, plus the base-date node"
+        );
+        assert_eq!(dates[0], base_date());
+        for (i, helper) in helpers.iter().enumerate() {
+            assert_eq!(dates[i + 1], helper.pillar_date());
+        }
+    }
+
+    /// The discriminator of the two halves of the year-on-year convention: node
+    /// zero is seeded from the curve's own base rate through the
+    /// `initial_value` override, and `YoYInflationTraits::update_guess` never
+    /// writes to it, so it still holds that rate bit for bit once every pillar
+    /// is solved. A curve seeded from the traits' constant, or one whose traits
+    /// mirrored the first solved pillar onto node zero the way the
+    /// zero-inflation convention does, fails on the first assertion; the
+    /// solved-value pin that follows fails on the seeding independently, the
+    /// helpers reading node zero back.
+    #[test]
+    fn the_base_node_keeps_the_curves_own_base_rate_through_the_bootstrap() {
+        let curve = a_curve().curve;
+        let data = curve.data().unwrap();
+
+        assert_eq!(data[0], BASE_YOY_RATE);
+        for (i, quote) in QUOTES.iter().enumerate() {
+            let expected = 2.0 * quote - BASE_YOY_RATE;
+            assert!(
+                (data[i + 1] - expected).abs() < 1.0e-10,
+                "node {} solved to {} against {expected}",
+                i + 1,
+                data[i + 1]
+            );
+            assert_ne!(data[i + 1], data[0], "the fixture must not be degenerate");
+        }
+        assert_ne!(
+            data[0], 0.02,
+            "a 0.02 base rate would hide a seeding mis-wire"
+        );
+    }
+
+    /// Between two pillars the curve is the linear interpolant of the solved
+    /// nodes, read at a time so the query is not quantized to a period start.
+    #[test]
+    fn the_curve_interpolates_linearly_between_the_solved_pillars() {
+        let curve = a_curve().curve;
+        let (times, data) = (curve.times().unwrap(), curve.data().unwrap());
+
+        let midpoint = 0.5 * (times[1] + times[2]);
+        let expected = 0.5 * (data[1] + data[2]);
+        assert!((curve.yoy_rate(midpoint, false).unwrap() - expected).abs() < 1.0e-12);
+        assert!((curve.yoy_rate(times[0], false).unwrap() - BASE_YOY_RATE).abs() < 1.0e-12);
+    }
+
+    /// Construction lays down no nodes and runs no solver; the first read
+    /// bootstraps; a quote move invalidates the cache and the next read
+    /// re-bootstraps higher (the `LazyObject` contract, and the [`CurveUpdater`]
+    /// registration that carries the quote's notification).
+    #[test]
+    fn the_bootstrap_is_lazy_and_reruns_on_a_quote_change() {
+        let quote = shared(SimpleQuote::new(Some(0.026)));
+        let helper = MeanRateHelper::new(&quote, today() + Period::new(5, TimeUnit::Years));
+        let curve = PiecewiseYoYInflationCurve::new(
+            today(),
+            base_date(),
+            BASE_YOY_RATE,
+            Frequency::Monthly,
+            day_counter(),
+            vec![Shared::clone(&helper) as Shared<dyn YoYInflationHelper>],
+            None,
+        )
+        .unwrap();
+
+        assert!(!curve.lazy.borrow().is_calculated());
+        let first = curve.data().unwrap()[1];
+        assert!(curve.lazy.borrow().is_calculated());
+        assert!((first - (2.0 * 0.026 - BASE_YOY_RATE)).abs() < 1.0e-10);
+
+        quote.set_value(Some(0.04));
+        assert!(!curve.lazy.borrow().is_calculated());
+        assert!(
+            curve.data().unwrap()[1] > first,
+            "a higher quoted rate must lift the curve"
+        );
+    }
+
+    #[test]
+    fn an_empty_helper_set_is_rejected() {
+        let built = PiecewiseYoYInflationCurve::new(
+            today(),
+            base_date(),
+            BASE_YOY_RATE,
+            Frequency::Monthly,
+            day_counter(),
+            Vec::new(),
+            None,
+        );
+        let err = match built {
+            Ok(_) => panic!("expected a construction error"),
+            Err(err) => err,
+        };
+        assert!(err.message().contains("no bootstrap helpers"));
+    }
+}
