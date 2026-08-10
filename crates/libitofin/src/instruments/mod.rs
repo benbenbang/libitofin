@@ -22,6 +22,7 @@ mod protection;
 mod swap;
 mod swaption;
 mod vanillaswap;
+mod yearonyearinflationswap;
 mod zerocouponinflationswap;
 
 pub use bond::{Bond, BondArguments, BondEngine, BondPrice, BondPriceType, BondResults};
@@ -54,4 +55,5 @@ pub use swaption::{
     check_type_and_method_consistency,
 };
 pub use vanillaswap::VanillaSwap;
+pub use yearonyearinflationswap::YearOnYearInflationSwap;
 pub use zerocouponinflationswap::ZeroCouponInflationSwap;
