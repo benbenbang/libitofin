@@ -277,3 +277,346 @@ fn broadcast<T: Clone>(values: &[T], index: usize, default: T) -> T {
         Some(last) => values.get(index).unwrap_or(last).clone(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    //! The one literal QuantLib supplies for this builder is the fixing date of
+    //! the first year-on-year swap coupon of `testYYTermStructure`
+    //! (`inflation.cpp:1176-1178`), reached below without the swap or the curve
+    //! that surround it there: the schedule the helper builds
+    //! (`inflationhelpers.cpp:314-321`) is reconstructed directly.
+    //!
+    //! The amount oracle takes its shape from `makeYoYLeg`
+    //! (`inflationcapflooredcoupon.cpp:198-220`) - an annual, forward-generated,
+    //! unadjusted UK schedule paid `ModifiedFollowing` over `Thirty360` - but
+    //! moves it onto published historical fixings. `makeYoYLeg` starts on its
+    //! 13 August 2007 evaluation date and forecasts every fixing off the
+    //! bootstrapped year-on-year curve, which lands with `Y3`; the amounts
+    //! themselves are then checked against [`Cpi::lagged_yoy_rate`], whose
+    //! numbers `testCpiYoY*Interpolation` pins.
+    //!
+    //! The stub schedule is the one `testPartialScheduleLegConstruction`
+    //! (`cashflows.cpp`) hands the ibor leg, whose reference dates
+    //! [`IborLeg`](super::super::IborLeg) already pins: the two builders run the
+    //! same `FloatingLeg` stub arithmetic, so the same schedule must give the
+    //! same reference periods.
+
+    use super::*;
+    use crate::cashflows::coupon::Coupon;
+    use crate::currency::Currency;
+    use crate::indexes::Region;
+    use crate::indexes::index::Index;
+    use crate::indexes::inflationindex::Cpi;
+    use crate::settings::Settings;
+    use crate::time::calendars::unitedkingdom::{self, UnitedKingdom};
+    use crate::time::date::Date;
+    use crate::time::date::Month::{August, February, June, March, September};
+    use crate::time::daycounters::thirty360::{Convention, Thirty360};
+    use crate::time::frequency::Frequency;
+    use crate::time::schedule::MakeSchedule;
+    use crate::time::timeunit::TimeUnit;
+    use crate::types::Rate;
+
+    const NOTIONAL: Real = 1_000_000.0;
+
+    fn uk() -> Calendar {
+        UnitedKingdom::new(unitedkingdom::Market::Settlement)
+    }
+
+    fn day_counter() -> DayCounter {
+        Thirty360::with_convention(Convention::BondBasis)
+    }
+
+    fn lag() -> Period {
+        Period::new(2, TimeUnit::Months)
+    }
+
+    /// UK `YY_RPI` as of 10 February 2022, carrying whatever year-on-year rates
+    /// `rates` publishes. Every date the coupons below read is behind that
+    /// horizon, so nothing forecasts off the empty curve handle.
+    fn published_index(rates: &[(Date, Rate)]) -> Shared<YoYInflationIndex> {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(Date::new(10, February, 2022));
+        let index = shared(YoYInflationIndex::new(
+            "YY_RPI".into(),
+            Region::uk(),
+            false,
+            Frequency::Monthly,
+            Period::new(1, TimeUnit::Months),
+            Currency::gbp(),
+            settings,
+        ));
+        for &(date, rate) in rates {
+            index.add_fixing(date, rate).expect("publishing a rate");
+        }
+        index
+    }
+
+    fn leg(schedule: Schedule, index: Shared<YoYInflationIndex>) -> YoYInflationLeg {
+        YoYInflationLeg::new(schedule, uk(), index, lag(), CpiInterpolationType::Flat)
+            .with_notional(NOTIONAL)
+            .with_payment_day_counter(day_counter())
+    }
+
+    /// `inflation.cpp:1176-1178`: the first coupon of the 13 August 2008
+    /// year-on-year swap fixes on 13 June 2008. The swap helper builds its leg
+    /// off a one-year, unadjusted, backward-generated UK schedule from the
+    /// 13 August 2007 evaluation date to the quoted maturity
+    /// (`inflationhelpers.cpp:314-321`), so the leg has a single regular
+    /// coupon whose reference-period end is the maturity itself and whose
+    /// fixing date is that end lagged two months.
+    #[test]
+    fn the_front_coupon_fixes_two_months_before_its_reference_period_end() {
+        let schedule = MakeSchedule::new()
+            .from(Date::new(13, August, 2007))
+            .to(Date::new(13, August, 2008))
+            .with_tenor(Period::new(1, TimeUnit::Years))
+            .with_calendar(uk())
+            .with_convention(BusinessDayConvention::Unadjusted)
+            .backwards()
+            .build();
+
+        let coupons = leg(schedule.clone(), published_index(&[]))
+            .coupons()
+            .expect("the leg is fully specified");
+
+        assert_eq!(coupons.len(), 1);
+        assert_eq!(
+            coupons[0].reference_period_end(),
+            Date::new(13, August, 2008)
+        );
+        assert_eq!(coupons[0].fixing_date(), Date::new(13, June, 2008));
+
+        let rolled = leg(schedule, published_index(&[]))
+            .with_fixing_days(3)
+            .coupons()
+            .expect("the leg is fully specified");
+        assert_eq!(rolled[0].fixing_date(), Date::new(10, June, 2008));
+    }
+
+    /// Five annual coupons off `makeYoYLeg`'s schedule shape, each paying
+    /// `nominal * accrualPeriod * (gearing * laggedYoYRate + spread)`. The three
+    /// broadcast shapes are exercised at once: notionals given in full, a
+    /// two-element gearing list held over the last three coupons, and a scalar
+    /// spread. A gearing that changes between the second and third coupon keeps
+    /// a broken carry-over from passing.
+    #[test]
+    fn each_coupon_gears_and_spreads_its_lagged_rate() {
+        let rates: Vec<(Date, Rate)> = (2016..=2020)
+            .map(|year| {
+                (
+                    Date::new(1, June, year),
+                    0.02 + 0.001 * f64::from(year - 2016),
+                )
+            })
+            .collect();
+        let index = published_index(&rates);
+        let schedule = MakeSchedule::new()
+            .from(Date::new(13, August, 2015))
+            .to(Date::new(13, August, 2020))
+            .with_frequency(Frequency::Annual)
+            .with_calendar(uk())
+            .with_convention(BusinessDayConvention::Unadjusted)
+            .forwards()
+            .build();
+
+        let notionals = vec![1e6, 2e6, 3e6, 4e6, 5e6];
+        let gearings = vec![1.5, 2.5];
+        let spread = 0.0035;
+        let coupons = leg(schedule, Shared::clone(&index))
+            .with_notionals(notionals.clone())
+            .with_gearings(gearings)
+            .with_spread(spread)
+            .coupons()
+            .expect("the leg is fully specified");
+
+        assert_eq!(coupons.len(), 5);
+        let expected_gearings = [1.5, 2.5, 2.5, 2.5, 2.5];
+        for (i, coupon) in coupons.iter().enumerate() {
+            let fixing = Cpi::lagged_yoy_rate(
+                &index,
+                coupon.accrual_end_date(),
+                lag(),
+                CpiInterpolationType::Flat,
+            )
+            .expect("the observed month is published");
+            assert!(
+                (fixing - rates[i].1).abs() < 1e-12,
+                "coupon {i} observed {fixing}"
+            );
+
+            let expected =
+                notionals[i] * coupon.accrual_period() * (expected_gearings[i] * fixing + spread);
+            let amount = Coupon::amount(&**coupon).expect("the observed month is published");
+            assert!(
+                (amount - expected).abs() < 1e-8,
+                "coupon {i} paid {amount}, expected {expected}"
+            );
+        }
+
+        assert_eq!(coupons[0].accrual_end_date(), Date::new(13, August, 2016));
+        assert_eq!(
+            coupons[0].coupon_base().payment_date(),
+            Date::new(15, August, 2016)
+        );
+    }
+
+    /// The `IborLeg` reference dates of `testPartialScheduleLegConstruction`:
+    /// an irregular first period pulls the reference start back a tenor from
+    /// the accrual end, an irregular last one pushes the reference end a tenor
+    /// on from the accrual start, and a regular schedule leaves both alone.
+    #[test]
+    fn an_irregular_period_accrues_against_a_full_reference_period() {
+        let index = published_index(&[]);
+        let irregular = MakeSchedule::new()
+            .from(Date::new(15, September, 2017))
+            .to(Date::new(30, September, 2020))
+            .with_next_to_last_date(Date::new(25, September, 2020))
+            .with_frequency(Frequency::Semiannual)
+            .backwards()
+            .build();
+
+        let coupons = leg(irregular, Shared::clone(&index))
+            .coupons()
+            .expect("the leg is fully specified");
+        let last = coupons.last().expect("the schedule spans periods");
+        assert_eq!(
+            coupons[0].reference_period_start(),
+            Date::new(25, March, 2017)
+        );
+        assert_eq!(
+            coupons[0].reference_period_end(),
+            Date::new(25, September, 2017)
+        );
+        assert_eq!(
+            last.reference_period_start(),
+            Date::new(25, September, 2020)
+        );
+        assert_eq!(last.reference_period_end(), Date::new(25, March, 2021));
+
+        let regular = MakeSchedule::new()
+            .from(Date::new(13, August, 2015))
+            .to(Date::new(13, August, 2020))
+            .with_frequency(Frequency::Annual)
+            .with_calendar(uk())
+            .with_convention(BusinessDayConvention::Unadjusted)
+            .forwards()
+            .build();
+        let coupons = leg(regular, index)
+            .coupons()
+            .expect("the leg is fully specified");
+        for coupon in coupons {
+            assert_eq!(coupon.reference_period_start(), coupon.accrual_start_date());
+            assert_eq!(coupon.reference_period_end(), coupon.accrual_end_date());
+        }
+    }
+
+    /// The builder attaches the swaplet pricer itself (`.cpp:228-229`), so a
+    /// coupon rates without one being installed by hand. That pricer carries no
+    /// nominal curve, so it rates but refuses to price.
+    #[test]
+    fn the_builder_attaches_a_rating_but_not_discounting_pricer() {
+        let index = published_index(&[(Date::new(1, June, 2016), 0.02)]);
+        let schedule = MakeSchedule::new()
+            .from(Date::new(13, August, 2015))
+            .to(Date::new(13, August, 2016))
+            .with_frequency(Frequency::Annual)
+            .with_calendar(uk())
+            .with_convention(BusinessDayConvention::Unadjusted)
+            .forwards()
+            .build();
+
+        let coupons = leg(schedule, index)
+            .coupons()
+            .expect("the leg is fully specified");
+        let pricer = coupons[0].pricer().expect("the builder attached a pricer");
+        Coupon::amount(&*coupons[0]).expect("a rate needs no curve");
+
+        let err = pricer
+            .borrow()
+            .swaplet_price()
+            .expect_err("prices need a nominal curve");
+        assert!(
+            err.message().contains("no nominal term structure provided"),
+            "err was: {err}"
+        );
+    }
+
+    /// A zero gearing is built as a plain coupon rather than collapsed to a
+    /// `FixedRateCoupon` (`.cpp:185-192`), and pays what that collapse would
+    /// have paid: `nominal * accrualPeriod * spread`.
+    #[test]
+    fn a_zero_gearing_pays_its_spread_alone() {
+        let index = published_index(&[(Date::new(1, June, 2016), 0.02)]);
+        let schedule = MakeSchedule::new()
+            .from(Date::new(13, August, 2015))
+            .to(Date::new(13, August, 2016))
+            .with_frequency(Frequency::Annual)
+            .with_calendar(uk())
+            .with_convention(BusinessDayConvention::Unadjusted)
+            .forwards()
+            .build();
+        let spread = 0.0035;
+
+        let coupons = leg(schedule, index)
+            .with_gearing(0.0)
+            .with_spread(spread)
+            .coupons()
+            .expect("the leg is fully specified");
+
+        let expected = NOTIONAL * coupons[0].accrual_period() * spread;
+        let amount = Coupon::amount(&*coupons[0]).expect("the observed month is published");
+        assert!((amount - expected).abs() < 1e-10, "amount was {amount}");
+    }
+
+    #[test]
+    fn an_underspecified_or_oversized_leg_is_an_error() {
+        let index = published_index(&[]);
+        let schedule = MakeSchedule::new()
+            .from(Date::new(13, August, 2015))
+            .to(Date::new(13, August, 2020))
+            .with_frequency(Frequency::Annual)
+            .with_calendar(uk())
+            .with_convention(BusinessDayConvention::Unadjusted)
+            .forwards()
+            .build();
+        let bare = || {
+            YoYInflationLeg::new(
+                schedule.clone(),
+                uk(),
+                Shared::clone(&index),
+                lag(),
+                CpiInterpolationType::Flat,
+            )
+        };
+
+        let Err(no_day_counter) = bare().with_notional(NOTIONAL).coupons() else {
+            panic!("a coupon needs a day counter");
+        };
+        assert!(
+            no_day_counter.message().contains("no payment daycounter"),
+            "err was: {no_day_counter}"
+        );
+
+        let Err(no_notional) = bare().with_payment_day_counter(day_counter()).coupons() else {
+            panic!("a coupon needs a notional");
+        };
+        assert!(
+            no_notional.message().contains("no notional given"),
+            "err was: {no_notional}"
+        );
+
+        let Err(too_many) = bare()
+            .with_payment_day_counter(day_counter())
+            .with_notional(NOTIONAL)
+            .with_gearings(vec![1.0; 6])
+            .coupons()
+        else {
+            panic!("the schedule has five periods");
+        };
+        assert!(
+            too_many.message().contains("too many gearings (6), only 5"),
+            "err was: {too_many}"
+        );
+    }
+}
