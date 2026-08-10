@@ -10,6 +10,7 @@
 pub mod inflationhelpers;
 pub mod inflationtermstructure;
 pub mod inflationtraits;
+pub mod interpolatedyoyinflationcurve;
 pub mod interpolatedzeroinflationcurve;
 pub mod piecewisezeroinflationcurve;
 pub mod seasonality;
