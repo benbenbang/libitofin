@@ -208,3 +208,217 @@ impl<I: Interpolator> YoYInflationTermStructure for InterpolatedYoYInflationCurv
         self.curve.interpolation()?.value(t)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    //! QuantLib constructs this curve nowhere in its test suite - the only
+    //! year-on-year curve `inflation.cpp` builds is the piecewise one
+    //! (`:1109`), through the swap helper - so there is no C++ number to pin
+    //! against. What is pinned instead is the interpolation itself: the rates
+    //! and dates go in explicitly, so every published rate is a hand-computable
+    //! function of them, and the fixture's rates are chosen so that no two
+    //! agree and the base rate matches none of the interior ones.
+
+    use super::*;
+    use crate::shared::shared;
+    use crate::termstructures::inflation::seasonality::MultiplicativePriceSeasonality;
+    use crate::time::date::Month;
+    use crate::time::daycounters::actual360::Actual360;
+    use crate::time::period::Period;
+    use crate::time::timeunit::TimeUnit;
+
+    fn today() -> Date {
+        Date::new(27, Month::January, 2022)
+    }
+
+    fn base_date() -> Date {
+        Date::new(1, Month::December, 2021)
+    }
+
+    /// Node dates on the first of a month, so that a query date quantized by
+    /// [`inflation_period`](crate::indexes::inflationindex::inflation_period)
+    /// lands on a node rather than between two.
+    fn sample_dates() -> Vec<Date> {
+        vec![
+            base_date(),
+            Date::new(1, Month::December, 2022),
+            Date::new(1, Month::December, 2023),
+            Date::new(1, Month::December, 2024),
+        ]
+    }
+
+    /// Every rate distinct, and the base rate distinct from all of them: a
+    /// readback of the base rate would be degenerate otherwise.
+    fn sample_rates() -> Vec<Rate> {
+        vec![0.029, 0.021, 0.024, 0.026]
+    }
+
+    fn build(dates: Vec<Date>, rates: Vec<Rate>) -> QlResult<YoYInflationCurve> {
+        YoYInflationCurve::new(
+            today(),
+            dates,
+            rates,
+            Frequency::Monthly,
+            Actual360::new(),
+            Linear,
+            None,
+        )
+    }
+
+    fn sample() -> YoYInflationCurve {
+        build(sample_dates(), sample_rates()).unwrap()
+    }
+
+    /// The base rate is the first quoted rate, where a zero curve carries none
+    /// at all. The fixture's `0.029` is not any interior rate, so this cannot
+    /// pass on a curve that read the wrong node.
+    #[test]
+    fn the_base_rate_is_the_first_rate_where_a_zero_curve_has_none() {
+        let curve = sample();
+        assert_eq!(curve.base_rate().unwrap(), 0.029);
+        assert_eq!(curve.base_date(), base_date());
+        assert!(
+            !curve.rates()[1..].contains(&curve.base_rate().unwrap()),
+            "the base rate must differ from every interior node"
+        );
+    }
+
+    /// At a node the published rate is that node's rate, and between two it is
+    /// the hand-computed linear interpolant. Both entry points are checked: the
+    /// date one quantizes to the period start first, so a mid-month date must
+    /// answer its month's rate exactly.
+    #[test]
+    fn the_curve_interpolates_linearly_between_the_quoted_nodes() {
+        let curve = sample();
+        let (times, rates) = (curve.times(), curve.rates());
+
+        for (i, date) in sample_dates().iter().enumerate() {
+            assert!((curve.yoy_rate(times[i], false).unwrap() - rates[i]).abs() < 1.0e-12);
+            assert!((curve.yoy_rate_date(*date, false).unwrap() - rates[i]).abs() < 1.0e-12);
+        }
+
+        let midpoint = 0.5 * (times[1] + times[2]);
+        let expected = 0.5 * (rates[1] + rates[2]);
+        assert!((curve.yoy_rate(midpoint, false).unwrap() - expected).abs() < 1.0e-12);
+
+        let mid_month = Date::new(17, Month::December, 2023);
+        assert!((curve.yoy_rate_date(mid_month, false).unwrap() - rates[2]).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn the_base_node_sits_before_the_reference_date_at_a_negative_time() {
+        let curve = sample();
+        assert_eq!(curve.reference_date().unwrap(), today());
+        assert_eq!(curve.times()[0], -57.0 / 360.0);
+        assert_eq!(
+            curve.times()[0],
+            curve.time_from_reference(base_date()).unwrap()
+        );
+    }
+
+    fn build_err(dates: Vec<Date>, rates: Vec<Rate>) -> String {
+        match build(dates, rates) {
+            Ok(_) => panic!("expected a construction error"),
+            Err(err) => err.message().to_string(),
+        }
+    }
+
+    #[test]
+    fn constructor_rejects_too_few_dates_before_reading_the_base_date() {
+        assert!(build_err(vec![], vec![]).contains("too few dates"));
+        assert!(build_err(vec![base_date()], vec![0.029]).contains("too few dates"));
+        assert!(
+            build_err(sample_dates(), vec![0.029, 0.021]).contains("indices/dates count mismatch")
+        );
+    }
+
+    /// The `> -1.0` bound skips the base node, so a base rate below it is
+    /// accepted while the same figure at an interior node is not; `NaN` fails
+    /// the same check, as it fails C++'s.
+    #[test]
+    fn the_minus_one_bound_skips_the_base_node() {
+        let mut rates = sample_rates();
+        rates[1] = -1.0;
+        assert!(build_err(sample_dates(), rates).contains("year-on-year inflation data < -100 %"));
+
+        let mut rates = sample_rates();
+        rates[1] = Rate::NAN;
+        assert!(build_err(sample_dates(), rates).contains("year-on-year inflation data < -100 %"));
+
+        let mut rates = sample_rates();
+        rates[1] = -0.5;
+        assert_eq!(build(sample_dates(), rates).unwrap().rates()[1], -0.5);
+
+        let mut rates = sample_rates();
+        rates[0] = -1.5;
+        assert_eq!(
+            build(sample_dates(), rates).unwrap().base_rate().unwrap(),
+            -1.5
+        );
+    }
+
+    #[test]
+    fn inspectors_expose_the_nodes() {
+        let curve = sample();
+        assert_eq!(curve.dates(), &sample_dates()[..]);
+        assert_eq!(curve.rates(), &sample_rates()[..]);
+        assert_eq!(curve.data(), curve.rates());
+        assert_eq!(curve.nodes().len(), sample_dates().len());
+        assert_eq!(curve.nodes()[0], (base_date(), 0.029));
+        assert_eq!(curve.frequency(), Frequency::Monthly);
+        assert_eq!(curve.max_date(), Date::new(1, Month::December, 2024));
+        assert_eq!(curve.max_time().unwrap(), *curve.times().last().unwrap());
+    }
+
+    /// The seasonality gate runs from this constructor, as it does on the zero
+    /// curve: twelve monthly factors are consistent with any curve, a
+    /// twenty-four-factor set is the multi-year case this port defers.
+    #[test]
+    fn the_constructor_installs_and_gates_a_seasonality() {
+        fn built(count: usize) -> QlResult<YoYInflationCurve> {
+            let seasonality = shared(
+                MultiplicativePriceSeasonality::new(
+                    Date::new(31, Month::January, 2022),
+                    Frequency::Monthly,
+                    (0..count).map(|i| 1.0 + i as Rate / 1000.0).collect(),
+                )
+                .expect("a whole multiple of twelve factors"),
+            ) as Shared<dyn Seasonality>;
+            YoYInflationCurve::new(
+                today(),
+                sample_dates(),
+                sample_rates(),
+                Frequency::Monthly,
+                Actual360::new(),
+                Linear,
+                Some(seasonality),
+            )
+        }
+
+        assert!(built(12).unwrap().has_seasonality());
+        let deferred = match built(24) {
+            Ok(_) => panic!("expected the multi-year seasonality to be rejected"),
+            Err(err) => err,
+        };
+        assert!(
+            deferred.message().contains("#807"),
+            "{}",
+            deferred.message()
+        );
+        assert!(!sample().has_seasonality());
+    }
+
+    #[test]
+    fn extrapolating_past_the_last_node_errors_where_cpp_extends_the_end_segment() {
+        let curve = sample();
+        let beyond = curve.max_date() + Period::new(1, TimeUnit::Years);
+
+        let err = curve.yoy_rate_date(beyond, true).unwrap_err();
+        assert!(err.message().contains("extrapolation"));
+
+        let before = curve
+            .yoy_rate_date(Date::new(15, Month::November, 2021), false)
+            .unwrap_err();
+        assert!(before.message().contains("is before base date"));
+    }
+}
