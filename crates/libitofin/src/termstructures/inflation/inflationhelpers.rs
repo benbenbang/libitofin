@@ -1451,3 +1451,176 @@ mod tests {
         }
     }
 }
+#[cfg(test)]
+mod yoy_swap_helper_tests {
+    //! The year-on-year helper's own wiring, off a **flat, directly built**
+    //! curve linked onto its handle. `test-suite/inflation.cpp`'s oracle
+    //! (`testYYTermStructure`, `:1109`) exercises it against a bootstrapped
+    //! curve instead and lands with that curve's tests.
+    //!
+    //! A flat curve makes the implied quote the curve's own rate whatever the
+    //! nominal curve discounts at, so this pins the plumbing - the index copy
+    //! reaching the linked curve, the contract being built and priced - and
+    //! *not* which nominal curve the engine got.
+
+    use super::*;
+    use crate::currency::Currency;
+    use crate::indexes::Region;
+    use crate::math::interpolations::linear::Linear;
+    use crate::quotes::SimpleQuote;
+    use crate::termstructures::inflation::interpolatedyoyinflationcurve::YoYInflationCurve;
+    use crate::time::calendars::unitedkingdom::{self, UnitedKingdom};
+    use crate::time::date::Month::{August, July};
+    use crate::time::daycounters::actual360::Actual360;
+    use crate::time::daycounters::thirty360::{Convention, Thirty360};
+
+    /// The flat year-on-year rate the curve publishes everywhere.
+    const CURVE_RATE: Real = 0.03;
+
+    fn today() -> Date {
+        Date::new(13, August, 2007)
+    }
+
+    fn maturity() -> Date {
+        Date::new(13, August, 2012)
+    }
+
+    fn lag() -> Period {
+        Period::new(2, TimeUnit::Months)
+    }
+
+    fn settings_today() -> Shared<Settings<Date>> {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(today());
+        settings
+    }
+
+    fn an_index(settings: &Shared<Settings<Date>>) -> Shared<YoYInflationIndex> {
+        shared(YoYInflationIndex::new(
+            "YY_RPI".into(),
+            Region::uk(),
+            false,
+            Frequency::Monthly,
+            Period::new(1, TimeUnit::Months),
+            Currency::gbp(),
+            Shared::clone(settings),
+        ))
+    }
+
+    /// Flat at [`CURVE_RATE`] over the whole span the coupons observe.
+    fn a_flat_curve() -> Shared<dyn YoYInflationTermStructure> {
+        shared(
+            YoYInflationCurve::new(
+                today(),
+                vec![Date::new(1, July, 2007), Date::new(1, July, 2015)],
+                vec![CURVE_RATE, CURVE_RATE],
+                Frequency::Monthly,
+                Actual360::new(),
+                Linear,
+                None,
+            )
+            .expect("a well-formed year-on-year curve"),
+        ) as Shared<dyn YoYInflationTermStructure>
+    }
+
+    fn a_nominal_curve() -> Handle<dyn YieldTermStructure> {
+        Handle::new(shared(FlatForward::with_rate(
+            today(),
+            0.05,
+            Actual360::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>)
+    }
+
+    fn a_helper(
+        settings: &Shared<Settings<Date>>,
+        interpolation: CpiInterpolationType,
+    ) -> QlResult<Shared<YearOnYearInflationSwapHelper>> {
+        YearOnYearInflationSwapHelper::new(
+            Handle::new(shared(SimpleQuote::new(Some(CURVE_RATE)))),
+            lag(),
+            maturity(),
+            UnitedKingdom::new(unitedkingdom::Market::Settlement),
+            BusinessDayConvention::ModifiedFollowing,
+            Thirty360::with_convention(Convention::BondBasis),
+            &an_index(settings),
+            interpolation,
+            a_nominal_curve(),
+            Pillar::LastRelevantDate,
+            Shared::clone(settings),
+        )
+    }
+
+    /// On a curve flat at `r` every forward year-on-year rate is `r`, so the
+    /// swap that is fair against it is the one struck at `r`, and the helper's
+    /// implied quote is `r` however the legs are discounted.
+    #[test]
+    fn the_implied_quote_is_the_flat_curves_rate() {
+        let settings = settings_today();
+        let helper = a_helper(&settings, CpiInterpolationType::Flat).expect("a well-formed helper");
+        let curve = a_flat_curve();
+        helper.set_term_structure(&curve);
+
+        assert!((helper.implied_quote().unwrap() - CURVE_RATE).abs() < 1e-8);
+        assert!((helper.quote_error().unwrap()).abs() < 1e-8);
+    }
+
+    /// The flat path collapses the helper's window onto the first day of the
+    /// period the observation lands in: 13 August 2012 less two months is in
+    /// June 2012 (`cpp:289-291`).
+    #[test]
+    fn the_flat_helper_pins_one_date() {
+        let settings = settings_today();
+        let helper = a_helper(&settings, CpiInterpolationType::Flat).expect("a well-formed helper");
+        let period_start = Date::new(1, crate::time::date::Month::June, 2012);
+
+        assert_eq!(helper.earliest_date(), period_start);
+        assert_eq!(helper.latest_date(), period_start);
+        assert_eq!(helper.pillar_date(), period_start);
+    }
+
+    /// The helper's contract is a unit-notional, zero-strike payer swap from the
+    /// evaluation date to the maturity, both legs on one annual schedule
+    /// (`cpp:314-334`), priced by an engine over the nominal curve it was
+    /// handed rather than one it built.
+    #[test]
+    fn the_contract_is_a_unit_zero_strike_payer_swap() {
+        let settings = settings_today();
+        let helper = a_helper(&settings, CpiInterpolationType::Flat).expect("a well-formed helper");
+        let swap = helper.swap();
+        let swap = swap.as_ref().expect("the contract was built");
+
+        assert_eq!(swap.swap_type(), SwapType::Payer);
+        assert_eq!(swap.nominal(), 1.0);
+        assert_eq!(swap.fixed_rate(), 0.0);
+        assert_eq!(swap.spread(), 0.0);
+        assert_eq!(swap.fixed_schedule().dates(), swap.yoy_schedule().dates());
+        assert_eq!(swap.yoy_coupons().len(), 5);
+        assert_eq!(
+            helper
+                .nominal_term_structure()
+                .current_link()
+                .unwrap()
+                .reference_date()
+                .unwrap(),
+            today(),
+            "the helper kept the curve it was handed"
+        );
+    }
+
+    /// The interpolated branch is refused rather than silently taking the flat
+    /// path (`cpp:253-306` is deferred).
+    #[test]
+    fn the_interpolated_branch_is_refused() {
+        let settings = settings_today();
+        let error = a_helper(&settings, CpiInterpolationType::Linear)
+            .map(|_| ())
+            .expect_err("the interpolated branch is deferred");
+
+        assert!(
+            error.message().contains("not ported yet"),
+            "err was: {error}"
+        );
+    }
+}
