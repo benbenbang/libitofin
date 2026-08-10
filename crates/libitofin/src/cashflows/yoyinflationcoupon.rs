@@ -383,3 +383,298 @@ impl YoYInflationCouponPricer for SwapletYoYInflationCouponPricer {
         Ok(self.swaplet_rate()? * self.accrual_period * discount.clone()?)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    //! QuantLib prices no bare year-on-year coupon: `inflation.cpp` reaches one
+    //! only through the swap helpers, and never calls `amount()` on it. The
+    //! amount oracle below is therefore self-authored against
+    //! [`Cpi::lagged_yoy_rate`], whose own numbers `testCpiYoY*Interpolation`
+    //! pins (`inflationindex.rs`). The one literal QuantLib supplies is the
+    //! fixing date of the 2008 swap's first coupon.
+
+    use super::*;
+    use crate::currency::Currency;
+    use crate::indexes::Region;
+    use crate::interestrate::Compounding;
+    use crate::patterns::observable::Observer;
+    use crate::settings::Settings;
+    use crate::shared::{shared, shared_mut};
+    use crate::termstructures::yields::FlatForward;
+    use crate::time::date::Month::{
+        August, December, February, January, July, June, March, November, September,
+    };
+    use crate::time::daycounters::actual360::Actual360;
+    use crate::time::frequency::Frequency;
+
+    const NOMINAL: Real = 1_000_000.0;
+    const GEARING: Real = 2.5;
+    const SPREAD: Spread = 0.0035;
+
+    fn lag() -> Period {
+        Period::new(3, TimeUnit::Months)
+    }
+
+    /// The quoted fixture of `testCpiYoYQuotedFlatInterpolation`
+    /// (`inflation.cpp:1449-1461`): it is 10 February 2022 and UK YY_RPI has
+    /// published `rates`. Every date the coupons read is far behind the
+    /// publication horizon, so nothing forecasts off the empty curve handle.
+    fn published_index(rates: &[(Date, Rate)]) -> Shared<YoYInflationIndex> {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(Date::new(10, February, 2022));
+        let index = shared(YoYInflationIndex::new(
+            "YY_RPI".into(),
+            Region::uk(),
+            false,
+            Frequency::Monthly,
+            Period::new(1, TimeUnit::Months),
+            Currency::gbp(),
+            settings,
+        ));
+        for &(date, rate) in rates {
+            index
+                .add_fixing(date, rate)
+                .expect("adding a published rate");
+        }
+        index
+    }
+
+    fn rates_2021() -> Vec<(Date, Rate)> {
+        vec![
+            (Date::new(1, November, 2020), 0.02935),
+            (Date::new(1, December, 2020), 0.02954),
+            (Date::new(1, January, 2021), 0.02946),
+            (Date::new(1, February, 2021), 0.02960),
+            (Date::new(1, March, 2021), 0.02969),
+        ]
+    }
+
+    fn coupon_ending(
+        index: &Shared<YoYInflationIndex>,
+        accrual_end: Date,
+        payment_date: Date,
+    ) -> YoYInflationCoupon {
+        YoYInflationCoupon::new(
+            payment_date,
+            NOMINAL,
+            accrual_end - Period::new(1, TimeUnit::Years),
+            accrual_end,
+            0,
+            Shared::clone(index),
+            lag(),
+            CpiInterpolationType::Flat,
+            Actual360::new(),
+            GEARING,
+            SPREAD,
+            None,
+            None,
+        )
+    }
+
+    fn swaplet_pricer(coupon: &YoYInflationCoupon) -> SharedMut<SwapletYoYInflationCouponPricer> {
+        let pricer = shared_mut(SwapletYoYInflationCouponPricer::new());
+        coupon.set_pricer(pricer.clone() as SharedMut<dyn YoYInflationCouponPricer>);
+        pricer
+    }
+
+    #[derive(Default)]
+    struct Flag {
+        up: bool,
+    }
+
+    impl Observer for Flag {
+        fn update(&mut self) {
+            self.up = true;
+        }
+    }
+
+    /// The coupon pays `nominal * accrualPeriod * (gearing * indexFixing +
+    /// spread)`, with the fixing lagged off the accrual end. A gearing away
+    /// from one and a non-zero spread keep either term from hiding a dropped
+    /// one.
+    #[test]
+    fn the_amount_gears_and_spreads_the_lagged_yoy_rate() {
+        let index = published_index(&rates_2021());
+        let accrual_end = Date::new(10, February, 2021);
+        let coupon = coupon_ending(&index, accrual_end, Date::new(12, February, 2021));
+        swaplet_pricer(&coupon);
+
+        let fixing = Cpi::lagged_yoy_rate(&index, accrual_end, lag(), CpiInterpolationType::Flat)
+            .expect("November 2020 is on record");
+        assert!((fixing - 0.02935).abs() < 1e-12, "fixing was {fixing}");
+
+        let expected = NOMINAL * coupon.accrual_period() * (GEARING * fixing + SPREAD);
+        let amount = coupon.amount().expect("the observed period is published");
+        assert!((amount - expected).abs() < 1e-10, "amount was {amount}");
+    }
+
+    /// `inflation.cpp:1176-1178`: the first coupon of the 2008 year-on-year
+    /// swap fixes on 13 June 2008, its reference-period end lagged two months
+    /// with no fixing days to roll. The second assertion pins that the lag runs
+    /// off the *reference* period end and not the accrual end, which the swap's
+    /// regular first period leaves indistinguishable.
+    #[test]
+    fn the_fixing_date_lags_the_reference_period_end() {
+        let index = published_index(&[]);
+        let fixing_date_with = |ref_period_end: Date| {
+            YoYInflationCoupon::new(
+                Date::new(13, August, 2008),
+                NOMINAL,
+                Date::new(13, August, 2007),
+                Date::new(13, August, 2008),
+                0,
+                Shared::clone(&index),
+                Period::new(2, TimeUnit::Months),
+                CpiInterpolationType::Flat,
+                Actual360::new(),
+                1.0,
+                0.0,
+                Some(Date::new(13, August, 2007)),
+                Some(ref_period_end),
+            )
+            .fixing_date()
+        };
+
+        assert_eq!(
+            fixing_date_with(Date::new(13, August, 2008)),
+            Date::new(13, June, 2008)
+        );
+        assert_eq!(
+            fixing_date_with(Date::new(13, September, 2008)),
+            Date::new(13, July, 2008)
+        );
+    }
+
+    /// The coupon captures no fixing at construction: a figure published later
+    /// turns a refusal into a number. The D11 store rejects a *conflicting*
+    /// value for a date it already holds, so the observable change is the
+    /// missing-to-published one rather than a revision.
+    #[test]
+    fn a_fixing_published_after_construction_is_read_live() {
+        let rates = rates_2021();
+        let index = published_index(&rates[..4]);
+        let coupon = coupon_ending(&index, Date::new(10, June, 2021), Date::new(10, June, 2021));
+        swaplet_pricer(&coupon);
+
+        let missing = coupon
+            .amount()
+            .expect_err("March 2021 is not published yet");
+        assert!(
+            missing.to_string().contains("Missing UK YY_RPI fixing"),
+            "err was: {missing}"
+        );
+
+        let (date, rate) = rates[4];
+        index
+            .add_fixing(date, rate)
+            .expect("March 2021 is published");
+
+        let expected = NOMINAL * coupon.accrual_period() * (GEARING * rate + SPREAD);
+        let amount = coupon
+            .amount()
+            .expect("the observed period is now published");
+        assert!((amount - expected).abs() < 1e-10, "amount was {amount}");
+    }
+
+    /// The coupon registers with the index (`inflationcoupon.cpp:47`), so a
+    /// published figure reaches the coupon's own observers. Load-bearing where
+    /// the live read above is not: an engine caching an NPV is invalidated only
+    /// through this chain, and a deleted registration still reads live.
+    #[test]
+    fn a_published_fixing_notifies_the_coupons_observers() {
+        let rates = rates_2021();
+        let index = published_index(&rates[..4]);
+        let coupon = coupon_ending(&index, Date::new(10, June, 2021), Date::new(10, June, 2021));
+
+        let flag = shared_mut(Flag::default());
+        coupon
+            .observable()
+            .register_observer(&(flag.clone() as SharedMut<dyn Observer>));
+
+        let (date, rate) = rates[4];
+        index
+            .add_fixing(date, rate)
+            .expect("March 2021 is published");
+
+        assert!(flag.borrow().up, "the index reaches the coupon's observers");
+    }
+
+    /// `swapletPrice` accrues and discounts what `swapletRate` returns
+    /// (`inflationcouponpricer.cpp:157-160`), reading the accrual period the
+    /// C++ pricer takes back off its coupon pointer.
+    #[test]
+    fn a_swaplet_price_accrues_and_discounts_the_rate() {
+        let index = published_index(&rates_2021());
+        let payment_date = Date::new(10, March, 2022);
+        let coupon = coupon_ending(&index, Date::new(10, February, 2021), payment_date);
+
+        let curve: Handle<dyn YieldTermStructure> = Handle::new(shared(FlatForward::with_rate(
+            Date::new(10, February, 2022),
+            0.03,
+            Actual360::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        ))
+            as Shared<dyn YieldTermStructure>);
+        let pricer =
+            shared_mut(SwapletYoYInflationCouponPricer::with_nominal_term_structure(curve.clone()));
+        coupon.set_pricer(pricer.clone() as SharedMut<dyn YoYInflationCouponPricer>);
+
+        let rate = coupon.rate().expect("the observed period is published");
+        let discount = curve
+            .current_link()
+            .expect("the curve is linked")
+            .discount_date(payment_date, false)
+            .expect("the payment is on the curve");
+        assert!(discount < 1.0, "the payment discounts, discount {discount}");
+
+        let price = pricer.borrow().swaplet_price().expect("the curve prices");
+        let expected = rate * coupon.accrual_period() * discount;
+        assert!((price - expected).abs() < 1e-12, "price was {price}");
+    }
+
+    #[test]
+    fn a_rate_without_a_pricer_is_an_error() {
+        let index = published_index(&rates_2021());
+        let coupon = coupon_ending(
+            &index,
+            Date::new(10, February, 2021),
+            Date::new(10, February, 2021),
+        );
+
+        let err = coupon.rate().expect_err("no pricer is attached");
+        assert!(err.message().contains("pricer not set"), "err was: {err}");
+    }
+
+    #[test]
+    fn a_swaplet_price_without_a_nominal_curve_is_an_error() {
+        let index = published_index(&rates_2021());
+        let coupon = coupon_ending(
+            &index,
+            Date::new(10, February, 2021),
+            Date::new(10, February, 2021),
+        );
+        let pricer = swaplet_pricer(&coupon);
+        coupon.rate().expect("a rate needs no curve");
+
+        let err = pricer
+            .borrow()
+            .swaplet_price()
+            .expect_err("prices need a nominal curve");
+        assert!(
+            err.message().contains("no nominal term structure provided"),
+            "err was: {err}"
+        );
+    }
+
+    #[test]
+    fn a_swaplet_rate_before_initialize_is_an_error() {
+        let pricer = SwapletYoYInflationCouponPricer::new();
+
+        let err = pricer.swaplet_rate().expect_err("no coupon was captured");
+        assert!(
+            err.message().contains("pricer not initialized"),
+            "err was: {err}"
+        );
+    }
+}
