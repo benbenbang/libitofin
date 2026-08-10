@@ -378,3 +378,289 @@ fn recover(npv: Option<Real>, leg_bps: Option<&Real>, quoted: Real) -> Option<Re
     };
     (!bps.is_null()).then(|| quoted - npv / (bps / BASIS_POINT))
 }
+#[cfg(test)]
+mod tests {
+    //! `test-suite/inflation.cpp`'s year-on-year swap oracle (`testYYTermStructure`,
+    //! `:1109`) prices off a *bootstrapped* curve through the swap helper, and
+    //! is ported with that helper. These tests price the same instrument on a
+    //! **flat, directly built** [`YoYInflationCurve`] instead, so they are
+    //! self-contained and every expected number is exact.
+    //!
+    //! The fixture is degenerate on purpose: the two legs share a schedule, a
+    //! day counter and a payment convention, and the curve is flat, so a swap
+    //! struck at the curve's rate pays identical amounts on identical dates on
+    //! both legs and is worth nothing whatever the discount curve. That makes
+    //! the at-market case blind to the payer mapping and to the discounting;
+    //! the off-market case below is what pins the signs.
+
+    use super::*;
+    use crate::currency::Currency;
+    use crate::handle::Handle;
+    use crate::indexes::Region;
+    use crate::indexes::index::Index;
+    use crate::math::interpolations::linear::Linear;
+    use crate::pricingengine::PricingEngine;
+    use crate::pricingengines::DiscountingSwapEngine;
+    use crate::shared::{SharedMut, shared, shared_mut};
+    use crate::termstructures::inflation::inflationtermstructure::YoYInflationTermStructure;
+    use crate::termstructures::inflation::interpolatedyoyinflationcurve::YoYInflationCurve;
+    use crate::termstructures::yields::FlatForward;
+    use crate::termstructures::yieldtermstructure::YieldTermStructure;
+    use crate::time::calendars::unitedkingdom::{self, UnitedKingdom};
+    use crate::time::date::Month::{August, July};
+    use crate::time::daycounters::actual360::Actual360;
+    use crate::time::daycounters::thirty360::{Convention, Thirty360};
+    use crate::time::schedule::MakeSchedule;
+    use crate::time::timeunit::TimeUnit;
+
+    const NOMINAL: Real = 1_000_000.0;
+    /// The flat year-on-year rate the curve publishes everywhere.
+    const CURVE_RATE: Rate = 0.03;
+    /// A strike a full per cent above the curve, so the two legs cannot cancel.
+    const OFF_MARKET_RATE: Rate = 0.04;
+    const NOMINAL_RATE: Rate = 0.05;
+
+    fn today() -> Date {
+        Date::new(13, August, 2007)
+    }
+
+    fn maturity() -> Date {
+        Date::new(13, August, 2012)
+    }
+
+    fn uk() -> Calendar {
+        UnitedKingdom::new(unitedkingdom::Market::Settlement)
+    }
+
+    fn day_counter() -> DayCounter {
+        Thirty360::with_convention(Convention::BondBasis)
+    }
+
+    fn lag() -> Period {
+        Period::new(2, TimeUnit::Months)
+    }
+
+    fn settings_today() -> Shared<Settings<Date>> {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(today());
+        settings
+    }
+
+    /// A quoted UK year-on-year index with no history, linked to a curve flat at
+    /// [`CURVE_RATE`] over the whole span the coupons observe: every fixing date
+    /// is beyond the publication horizon, so every coupon forecasts and every
+    /// forecast answers the same rate.
+    fn an_index(settings: &Shared<Settings<Date>>) -> Shared<YoYInflationIndex> {
+        let curve = shared(
+            YoYInflationCurve::new(
+                today(),
+                vec![Date::new(1, July, 2007), Date::new(1, July, 2015)],
+                vec![CURVE_RATE, CURVE_RATE],
+                Frequency::Monthly,
+                Actual360::new(),
+                Linear,
+                None,
+            )
+            .expect("a well-formed year-on-year curve"),
+        );
+        shared(
+            YoYInflationIndex::new(
+                "YY_RPI".into(),
+                Region::uk(),
+                false,
+                Frequency::Monthly,
+                Period::new(1, TimeUnit::Months),
+                Currency::gbp(),
+                Shared::clone(settings),
+            )
+            .with_term_structure(Handle::new(curve as Shared<dyn YoYInflationTermStructure>)),
+        )
+    }
+
+    /// A flat 5 % continuously-compounded nominal curve anchored at the
+    /// evaluation date.
+    fn a_discount_engine(settings: Shared<Settings<Date>>) -> SharedMut<dyn PricingEngine> {
+        let curve = shared(FlatForward::with_rate(
+            today(),
+            NOMINAL_RATE,
+            Actual360::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>;
+        shared_mut(DiscountingSwapEngine::new(
+            Handle::new(curve),
+            None,
+            None,
+            None,
+            settings,
+        )) as SharedMut<dyn PricingEngine>
+    }
+
+    /// Five annual coupons a side, on the schedule shape the bootstrap helper
+    /// builds (`inflationhelpers.cpp:314-321`): unadjusted, backward-generated,
+    /// UK, one year.
+    fn a_swap(swap_type: SwapType, fixed_rate: Rate) -> YearOnYearInflationSwap {
+        let settings = settings_today();
+        let schedule = MakeSchedule::new()
+            .from(today())
+            .to(maturity())
+            .with_tenor(Period::new(1, TimeUnit::Years))
+            .with_convention(BusinessDayConvention::Unadjusted)
+            .with_calendar(uk())
+            .backwards()
+            .build();
+        let mut swap = YearOnYearInflationSwap::new(
+            swap_type,
+            NOMINAL,
+            schedule.clone(),
+            fixed_rate,
+            day_counter(),
+            schedule,
+            an_index(&settings),
+            lag(),
+            CpiInterpolationType::Flat,
+            0.0,
+            day_counter(),
+            uk(),
+            BusinessDayConvention::ModifiedFollowing,
+            Shared::clone(&settings),
+        )
+        .expect("both legs are fully specified");
+        swap.base_mut()
+            .set_pricing_engine(a_discount_engine(settings));
+        swap
+    }
+
+    /// Two coupon legs of five coupons each, both over the same schedule, and
+    /// every year-on-year coupon forecasting the curve's flat rate.
+    #[test]
+    fn the_two_legs_run_over_the_same_five_periods() {
+        let swap = a_swap(SwapType::Payer, CURVE_RATE);
+
+        assert_eq!(swap.swap().number_of_legs(), 2);
+        assert_eq!(swap.fixed_leg().len(), 5);
+        assert_eq!(swap.yoy_leg().len(), 5);
+        assert_eq!(swap.yoy_coupons().len(), 5);
+        for (fixed, yoy) in swap.fixed_leg().iter().zip(swap.yoy_leg()) {
+            assert_eq!(fixed.date(), yoy.date());
+        }
+        for coupon in swap.yoy_coupons() {
+            assert!((coupon.index_fixing().unwrap() - CURVE_RATE).abs() < 1e-14);
+        }
+    }
+
+    /// Struck at the curve's own rate the legs cancel coupon by coupon: the
+    /// fixed one pays `N * K * tau` under `Simple` compounding and the
+    /// year-on-year one `N * tau * (rate + spread)` on the same `tau` and the
+    /// same date, with `K = rate` and no spread.
+    ///
+    /// This says nothing about the payer mapping or the discounting - both
+    /// cancel out of a zero - and it is
+    /// [`an_off_market_payer_pays_the_fixed_leg`] that pins those.
+    #[test]
+    fn an_at_market_swap_is_worth_nothing_and_is_fair_at_the_curve_rate() {
+        let mut swap = a_swap(SwapType::Payer, CURVE_RATE);
+
+        assert!(swap.npv().unwrap().abs() < 1e-8);
+        assert!((swap.fair_rate().unwrap() - CURVE_RATE).abs() < 1e-8);
+        assert!((swap.fair_spread().unwrap() - 0.0).abs() < 1e-8);
+    }
+
+    /// The payer-sign pin (`cpp:71-74`: `payer_[0] = -1` for a `Payer`, the
+    /// opposite of the zero-coupon swap's mapping).
+    ///
+    /// A `Payer` pays the fixed leg, so struck a per cent above the curve it is
+    /// out of the money: the fixed leg's NPV is negative, the year-on-year
+    /// leg's positive, and the swap's negative. Under the zero-coupon swap's
+    /// `vec![false, true]` every one of those three signs flips while the fair
+    /// rate below stays put, which is why the fair rate alone cannot see the
+    /// mapping.
+    ///
+    /// The leg NPVs are read *before* the fair rate on purpose: both go through
+    /// the same cached calculation, and reading a leg first is what would leave
+    /// the fair rate unrecovered if the calculation were driven off the base
+    /// rather than off this instrument.
+    #[test]
+    fn an_off_market_payer_pays_the_fixed_leg() {
+        let mut swap = a_swap(SwapType::Payer, OFF_MARKET_RATE);
+
+        let fixed = swap.fixed_leg_npv().unwrap();
+        let yoy = swap.yoy_leg_npv().unwrap();
+        assert!(fixed < 0.0, "a payer pays the fixed leg: {fixed}");
+        assert!(yoy > 0.0, "a payer receives the year-on-year leg: {yoy}");
+        assert!(swap.npv().unwrap() < 0.0);
+        assert!(swap.swap().payer(0).unwrap());
+        assert!(!swap.swap().payer(1).unwrap());
+
+        assert!((swap.fair_rate().unwrap() - CURVE_RATE).abs() < 1e-8);
+    }
+
+    /// The back-solve reaches the same fair rate from either side of the trade,
+    /// the engine having signed both the NPV and the BPS, and the receiver's
+    /// NPV is the payer's negated.
+    #[test]
+    fn a_receiver_swap_negates_the_payer_npv_at_the_same_fair_rate() {
+        let mut payer = a_swap(SwapType::Payer, OFF_MARKET_RATE);
+        let mut receiver = a_swap(SwapType::Receiver, OFF_MARKET_RATE);
+
+        assert!((receiver.npv().unwrap() + payer.npv().unwrap()).abs() < 1e-8);
+        assert!(receiver.npv().unwrap() > 0.0);
+        assert!((receiver.fair_rate().unwrap() - payer.fair_rate().unwrap()).abs() < 1e-12);
+    }
+
+    /// The inspectors report what the swap was built with.
+    #[test]
+    fn the_inspectors_report_the_contract_terms() {
+        let swap = a_swap(SwapType::Payer, OFF_MARKET_RATE);
+
+        assert_eq!(swap.swap_type(), SwapType::Payer);
+        assert_eq!(swap.nominal(), NOMINAL);
+        assert_eq!(swap.fixed_rate(), OFF_MARKET_RATE);
+        assert_eq!(swap.observation_lag(), lag());
+        assert_eq!(swap.interpolation(), CpiInterpolationType::Flat);
+        assert_eq!(swap.spread(), 0.0);
+        assert_eq!(swap.payment_calendar().name(), uk().name());
+        assert_eq!(
+            swap.payment_convention(),
+            BusinessDayConvention::ModifiedFollowing
+        );
+        assert_eq!(swap.fixed_schedule().dates(), swap.yoy_schedule().dates());
+        assert_eq!(swap.fixed_day_count().name(), day_counter().name());
+        assert_eq!(swap.yoy_day_count().name(), day_counter().name());
+        assert_eq!(swap.yoy_inflation_index().name(), "UK YY_RPI");
+    }
+
+    /// A swap with no engine cannot answer either fair value.
+    #[test]
+    fn the_fair_values_need_a_priced_swap() {
+        let settings = settings_today();
+        let schedule = MakeSchedule::new()
+            .from(today())
+            .to(maturity())
+            .with_tenor(Period::new(1, TimeUnit::Years))
+            .with_convention(BusinessDayConvention::Unadjusted)
+            .with_calendar(uk())
+            .backwards()
+            .build();
+        let mut swap = YearOnYearInflationSwap::new(
+            SwapType::Payer,
+            NOMINAL,
+            schedule.clone(),
+            CURVE_RATE,
+            day_counter(),
+            schedule,
+            an_index(&settings),
+            lag(),
+            CpiInterpolationType::Flat,
+            0.0,
+            day_counter(),
+            uk(),
+            BusinessDayConvention::ModifiedFollowing,
+            settings,
+        )
+        .expect("both legs are fully specified");
+
+        assert!(swap.fair_rate().is_err());
+        assert!(swap.fair_spread().is_err());
+    }
+}
