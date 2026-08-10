@@ -1,10 +1,11 @@
-//! Bootstrap helpers for zero-inflation term structures.
+//! Bootstrap helpers for inflation term structures.
 //!
 //! Port of the helper base `ZeroCouponInflationSwapHelper` derives from
 //! (`ql/termstructures/inflation/inflationhelpers.hpp:36-37`, a
 //! `RelativeDateBootstrapHelper<ZeroInflationTermStructure>`) together with the
 //! plain `BootstrapHelper<ZeroInflationTermStructure>` the traits name as their
-//! helper type (`inflationtraits.hpp:43`). They are the inflation twins of
+//! helper type (`inflationtraits.hpp:43`) and its year-on-year twin
+//! (`:121`). They are the inflation twins of
 //! [`RateHelper`](crate::termstructures::bootstraphelper::RateHelper) and
 //! [`DefaultProbabilityHelper`](crate::termstructures::credit::defaultprobabilityhelpers::DefaultProbabilityHelper),
 //! and they carry no behaviour of their own: everything is inherited from the
@@ -27,8 +28,10 @@
 //!   nominal-curve constructor (`cpp:71-86`).
 //! - The `Pillar::CustomDate` choice (`cpp:140-150`, #808), which needs an
 //!   explicit pillar date threaded through construction plus its bounds check.
-//! - `YearOnYearInflationSwapHelper` (`cpp:208-360`), which needs the
-//!   year-on-year curve and index.
+//! - The concrete `YearOnYearInflationSwapHelper` (`cpp:208-360`), which needs
+//!   the year-on-year swap. Its base - the [`YoYInflationHelper`] trait and
+//!   [`YoYInflationHelperBase`] - is here, since the year-on-year curves are
+//!   typed on it.
 
 use std::cell::{Ref, RefCell, RefMut};
 use std::rc::Weak;
@@ -50,7 +53,9 @@ use crate::require;
 use crate::settings::Settings;
 use crate::shared::{Shared, SharedMut, shared, shared_mut};
 use crate::termstructures::bootstraphelper::{BootstrapHelperBase, BootstrapHelperShared};
-use crate::termstructures::inflation::inflationtermstructure::ZeroInflationTermStructure;
+use crate::termstructures::inflation::inflationtermstructure::{
+    YoYInflationTermStructure, ZeroInflationTermStructure,
+};
 use crate::termstructures::yields::{FlatForward, Pillar};
 use crate::termstructures::yieldtermstructure::YieldTermStructure;
 use crate::time::businessdayconvention::BusinessDayConvention;
@@ -130,6 +135,77 @@ pub trait ZeroInflationHelper: AsObservable {
     }
 }
 
+/// The shared state of a year-on-year inflation bootstrap helper: a
+/// [`BootstrapHelperBase`] whose back-pointer is a year-on-year curve.
+pub type YoYInflationHelperBase = BootstrapHelperBase<dyn YoYInflationTermStructure>;
+
+/// Bootstrap helper for the year-on-year-inflation-curve bootstrap
+/// (`BootstrapHelper<YoYInflationTermStructure>`, `inflationtraits.hpp:121`).
+///
+/// The zero twin above over [`YoYInflationTermStructure`], and separate from it
+/// for the same reason the two curve families are separate: the term structure
+/// a helper is handed is part of its interface, and a single trait generic over
+/// it could not be made into the bare trait object
+/// [`PiecewiseYoYInflationCurve`](super::piecewiseyoyinflationcurve::PiecewiseYoYInflationCurve)
+/// names as its helper family.
+///
+/// The concrete `YearOnYearInflationSwapHelper` (`inflationhelpers.cpp:208-360`)
+/// is deferred with the swap it prices; this trait and its base are what the
+/// curve is typed on in the meantime.
+pub trait YoYInflationHelper: AsObservable {
+    /// The embedded shared state.
+    fn base(&self) -> &YoYInflationHelperBase;
+
+    /// The quote implied by the current curve, computed by the concrete helper.
+    ///
+    /// The helper does not observe the curve, so this must force any
+    /// recalculation it needs itself rather than trusting a cached value.
+    fn implied_quote(&self) -> QlResult<Real>;
+
+    /// The market quote the helper fits the curve to.
+    fn quote(&self) -> &Handle<dyn Quote> {
+        self.base().quote()
+    }
+
+    /// The bootstrap's root: market quote minus implied quote, driven to zero.
+    fn quote_error(&self) -> QlResult<Real> {
+        Ok(self.base().quote_value()? - self.implied_quote()?)
+    }
+
+    /// Sets the curve being bootstrapped (non-owning, unobserved).
+    ///
+    /// A concrete helper that hands the curve to an instrument overrides this
+    /// to relink that handle first, then delegates here.
+    fn set_term_structure(&self, term_structure: &Shared<dyn YoYInflationTermStructure>) {
+        self.base().set_term_structure(term_structure);
+    }
+
+    /// The earliest date data are needed at.
+    fn earliest_date(&self) -> Date {
+        self.base().earliest_date()
+    }
+
+    /// The instrument's maturity date.
+    fn maturity_date(&self) -> Date {
+        self.base().maturity_date()
+    }
+
+    /// The latest date data are needed at.
+    fn latest_relevant_date(&self) -> Date {
+        self.base().latest_relevant_date()
+    }
+
+    /// The pillar date, at which the curve node this helper sets sits.
+    fn pillar_date(&self) -> Date {
+        self.base().pillar_date()
+    }
+
+    /// The latest date, equal to the pillar date.
+    fn latest_date(&self) -> Date {
+        self.base().latest_date()
+    }
+}
+
 /// Inflation bootstrap helper whose date schedule is relative to the
 /// evaluation date (`RelativeDateBootstrapHelper<ZeroInflationTermStructure>`).
 ///
@@ -173,6 +249,37 @@ impl BootstrapHelperShared for dyn ZeroInflationHelper {
 
     fn maturity_date(&self) -> Date {
         ZeroInflationHelper::maturity_date(self)
+    }
+}
+
+/// The year-on-year half of the driver bound, routing through
+/// [`YoYInflationHelper`] for the reason the zero impl routes through its own
+/// trait: a concrete helper's `set_term_structure` override has to run.
+impl BootstrapHelperShared for dyn YoYInflationHelper {
+    type TS = dyn YoYInflationTermStructure;
+
+    fn set_term_structure(&self, term_structure: &Shared<dyn YoYInflationTermStructure>) {
+        YoYInflationHelper::set_term_structure(self, term_structure);
+    }
+
+    fn quote_value(&self) -> QlResult<Real> {
+        self.base().quote_value()
+    }
+
+    fn quote_error(&self) -> QlResult<Real> {
+        YoYInflationHelper::quote_error(self)
+    }
+
+    fn pillar_date(&self) -> Date {
+        YoYInflationHelper::pillar_date(self)
+    }
+
+    fn latest_relevant_date(&self) -> Date {
+        YoYInflationHelper::latest_relevant_date(self)
+    }
+
+    fn maturity_date(&self) -> Date {
+        YoYInflationHelper::maturity_date(self)
     }
 }
 
