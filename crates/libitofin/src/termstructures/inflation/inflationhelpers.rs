@@ -18,8 +18,9 @@
 //! reaches all three through [`BootstrapHelperShared`], implemented below on
 //! `dyn ZeroInflationHelper`.
 //!
-//! [`ZeroCouponInflationSwapHelper`] (`inflationhelpers.hpp:35`) is the one
-//! concrete helper ported, and it plugs into that base.
+//! [`ZeroCouponInflationSwapHelper`] (`inflationhelpers.hpp:35`) and
+//! [`YearOnYearInflationSwapHelper`] (`:118`) are the concrete helpers, one per
+//! family, and each plugs into its own base.
 //!
 //! ## Deferred within EPIC Inflation (#705)
 //!
@@ -28,10 +29,10 @@
 //!   nominal-curve constructor (`cpp:71-86`).
 //! - The `Pillar::CustomDate` choice (`cpp:140-150`, #808), which needs an
 //!   explicit pillar date threaded through construction plus its bounds check.
-//! - The concrete `YearOnYearInflationSwapHelper` (`cpp:208-360`), which needs
-//!   the year-on-year swap. Its base - the [`YoYInflationHelper`] trait and
-//!   [`YoYInflationHelperBase`] - is here, since the year-on-year curves are
-//!   typed on it.
+//! - The interpolated branch of [`YearOnYearInflationSwapHelper`]
+//!   (`cpp:253-306`), which widens the date window, picks a pillar and checks
+//!   the observation lag against the index period. It is refused rather than
+//!   ignored, and comes with the rest of `CPI::Linear` (#730 follow-up).
 
 use std::cell::{Ref, RefCell, RefMut};
 use std::rc::Weak;
@@ -40,10 +41,10 @@ use crate::errors::QlResult;
 use crate::handle::{Handle, RelinkableHandle};
 use crate::indexes::Index;
 use crate::indexes::inflationindex::{
-    CpiInterpolationType, InflationIndex, ZeroInflationIndex, inflation_period,
+    CpiInterpolationType, InflationIndex, YoYInflationIndex, ZeroInflationIndex, inflation_period,
 };
 use crate::instrument::Instrument;
-use crate::instruments::{SwapType, ZeroCouponInflationSwap};
+use crate::instruments::{SwapType, YearOnYearInflationSwap, ZeroCouponInflationSwap};
 use crate::interestrate::Compounding;
 use crate::patterns::observable::AsObservable;
 use crate::pricingengine::PricingEngine;
@@ -65,6 +66,8 @@ use crate::time::date::Date;
 use crate::time::daycounter::DayCounter;
 use crate::time::frequency::Frequency;
 use crate::time::period::Period;
+use crate::time::schedule::MakeSchedule;
+use crate::time::timeunit::TimeUnit;
 use crate::types::Real;
 
 /// The shared state of an inflation bootstrap helper: a
@@ -149,9 +152,8 @@ pub type YoYInflationHelperBase = BootstrapHelperBase<dyn YoYInflationTermStruct
 /// [`PiecewiseYoYInflationCurve`](super::piecewiseyoyinflationcurve::PiecewiseYoYInflationCurve)
 /// names as its helper family.
 ///
-/// The concrete `YearOnYearInflationSwapHelper` (`inflationhelpers.cpp:208-360`)
-/// is deferred with the swap it prices; this trait and its base are what the
-/// curve is typed on in the meantime.
+/// [`YearOnYearInflationSwapHelper`] (`inflationhelpers.cpp:209-346`) is the
+/// concrete helper implementing it.
 pub trait YoYInflationHelper: AsObservable {
     /// The embedded shared state.
     fn base(&self) -> &YoYInflationHelperBase;
@@ -216,6 +218,17 @@ pub trait YoYInflationHelper: AsObservable {
 /// [`initialize_dates`](Self::initialize_dates).
 pub trait RelativeDateZeroInflationHelper: ZeroInflationHelper {
     /// Rebuilds the helper's date schedule off the current evaluation date.
+    fn initialize_dates(&self);
+}
+
+/// The year-on-year twin of [`RelativeDateZeroInflationHelper`], the port of
+/// `RelativeDateBootstrapHelper<YoYInflationTermStructure>`
+/// (`inflationhelpers.hpp:119`).
+///
+/// [`YearOnYearInflationSwapHelper`] derives from it: its swap schedule runs
+/// from the evaluation date, so the contract is rebuilt whenever that moves.
+pub trait RelativeDateYoYInflationHelper: YoYInflationHelper {
+    /// Rebuilds the helper's contract off the current evaluation date.
     fn initialize_dates(&self);
 }
 
@@ -598,6 +611,265 @@ impl ZeroInflationHelper for ZeroCouponInflationSwapHelper {
 impl RelativeDateZeroInflationHelper for ZeroCouponInflationSwapHelper {
     /// Rebuilds the swap off the current evaluation date (`initializeDates`,
     /// `cpp:186-195`).
+    ///
+    /// The helper's own dates are not rebuilt: they come from the fixing period
+    /// of `maturity - swap_obs_lag`, which no evaluation date moves.
+    fn initialize_dates(&self) {
+        *self.swap.borrow_mut() = self.build_swap();
+    }
+}
+
+/// Bootstrap helper quoting a year-on-year inflation swap
+/// (`YearOnYearInflationSwapHelper`, `inflationhelpers.hpp:118-166`).
+///
+/// The helper prices a unit-notional, zero-strike [`YearOnYearInflationSwap`]
+/// of its own against the curve being bootstrapped and reports that contract's
+/// [`fair_rate`](YearOnYearInflationSwap::fair_rate) as
+/// [`implied_quote`](YoYInflationHelper::implied_quote); the bootstrap drives
+/// `quoted rate - fair rate` to zero.
+///
+/// ## It is handed its nominal curve; it does not build one
+///
+/// The zero-coupon twin above builds its own flat 0 % discount curve, which it
+/// can because both of its legs pay one flow on the same date, so the discount
+/// factors cancel out of its fair rate (`cpp:66-68`). That does not hold here:
+/// this swap pays annually over its whole life, and the fair rate is a
+/// discount-weighted average of the forward year-on-year rates. C++ therefore
+/// takes the nominal curve as a constructor argument (`hpp:129`, member
+/// `:165`) and hands it to the contract's [`DiscountingSwapEngine`]
+/// (`cpp:333-334`), and so does this.
+///
+/// As in the zero twin, the helper prices through a copy of the caller's index
+/// ([`clone_linked_to`](YoYInflationIndex::clone_linked_to), `cpp:246`) linked
+/// to its own relinkable handle and unregistered from it (`cpp:247-250`), so
+/// that a relink per solver step does not notify the curve that is relinking
+/// it.
+pub struct YearOnYearInflationSwapHelper {
+    base: YoYInflationHelperBase,
+    swap_obs_lag: Period,
+    maturity: Date,
+    calendar: Calendar,
+    payment_convention: BusinessDayConvention,
+    day_counter: DayCounter,
+    yii: Shared<YoYInflationIndex>,
+    interpolation: CpiInterpolationType,
+    nominal_term_structure: Handle<dyn YieldTermStructure>,
+    term_structure_handle: RelinkableHandle<dyn YoYInflationTermStructure>,
+    settings: Shared<Settings<Date>>,
+    swap: RefCell<QlResult<YearOnYearInflationSwap>>,
+}
+
+impl YearOnYearInflationSwapHelper {
+    /// A helper on a swap maturing at `maturity` (`cpp:209-224`, delegating to
+    /// `cpp:226-307`).
+    ///
+    /// The swap runs from the evaluation date, this being the constructor C++
+    /// marks relative by passing a null start date (`cpp:222`), so the contract
+    /// is rebuilt whenever the evaluation date moves.
+    ///
+    /// The helper observes its quote, the index copy it prices through and the
+    /// nominal curve (`cpp:304-305`); it does **not** observe the curve it is
+    /// bootstrapped against.
+    ///
+    /// `pillar` is accepted for signature parity but never read: it only ever
+    /// discriminates on the interpolated path (`cpp:294-303`), which is
+    /// deferred below.
+    ///
+    /// # Errors
+    ///
+    /// [`Linear`](CpiInterpolationType::Linear) is refused: the interpolated
+    /// branch of the C++ constructor - its wider date window, its pillar choice
+    /// and its observation-lag consistency check (`cpp:253-306`) - is deferred
+    /// with the rest of `CPI::Linear`, and refusing is how that stays visible.
+    /// The swap the helper prices is also built here, so a `swap_obs_lag` its
+    /// legs cannot be built under fails at construction, as the C++
+    /// `initializeDates` throws.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        quote: Handle<dyn Quote>,
+        swap_obs_lag: Period,
+        maturity: Date,
+        calendar: Calendar,
+        payment_convention: BusinessDayConvention,
+        day_counter: DayCounter,
+        yii: &Shared<YoYInflationIndex>,
+        interpolation: CpiInterpolationType,
+        nominal_term_structure: Handle<dyn YieldTermStructure>,
+        _pillar: Pillar,
+        settings: Shared<Settings<Date>>,
+    ) -> QlResult<Shared<YearOnYearInflationSwapHelper>> {
+        require!(
+            interpolation == CpiInterpolationType::Flat,
+            "interpolated year-on-year swap helpers are not ported yet: the pillar \
+             choice and the observation-lag consistency check the interpolated \
+             branch carries (inflationhelpers.cpp:253-306) come with CPI::Linear"
+        );
+        let fixing_period = inflation_period(maturity - swap_obs_lag, yii.frequency())?;
+
+        let helper = Shared::new_cyclic(|weak: &Weak<YearOnYearInflationSwapHelper>| {
+            let weak = weak.clone();
+            let on_eval_change = Box::new(move || {
+                if let Some(helper) = weak.upgrade() {
+                    helper.initialize_dates();
+                }
+            });
+            let base = YoYInflationHelperBase::new_relative(
+                quote,
+                Shared::clone(&settings),
+                true,
+                on_eval_change,
+            );
+            let term_structure_handle = RelinkableHandle::empty();
+            let yii = shared(yii.clone_linked_to(term_structure_handle.handle()));
+            term_structure_handle
+                .handle()
+                .unregister_observer(&yii.inflation_base().observer());
+            yii.observable().register_observer(&base.observer());
+            nominal_term_structure.register_observer(&base.observer());
+
+            base.set_earliest_date(fixing_period.0);
+            base.set_latest_date(fixing_period.0);
+
+            let helper = YearOnYearInflationSwapHelper {
+                base,
+                swap_obs_lag,
+                maturity,
+                calendar,
+                payment_convention,
+                day_counter,
+                yii,
+                interpolation,
+                nominal_term_structure,
+                term_structure_handle,
+                settings,
+                swap: RefCell::new(Err(crate::errors::QlError::new(
+                    "the helper's swap is built by initialize_dates",
+                    file!(),
+                    line!(),
+                ))),
+            };
+            helper.initialize_dates();
+            helper
+        });
+        if let Err(error) = helper.swap.borrow().as_ref() {
+            return Err(error.clone());
+        }
+        Ok(helper)
+    }
+
+    /// The cached swap, or the error that stopped it being built (`swap()`,
+    /// `hpp:150`).
+    pub fn swap(&self) -> Ref<'_, QlResult<YearOnYearInflationSwap>> {
+        self.swap.borrow()
+    }
+
+    /// The cached swap, mutably, for its on-demand pricing accessors.
+    pub fn swap_mut(&self) -> RefMut<'_, QlResult<YearOnYearInflationSwap>> {
+        self.swap.borrow_mut()
+    }
+
+    /// The index copy the helper prices through, linked to its own handle.
+    pub fn yoy_inflation_index(&self) -> &Shared<YoYInflationIndex> {
+        &self.yii
+    }
+
+    /// The nominal curve the contract's engine discounts on, as handed in
+    /// (`hpp:165`).
+    pub fn nominal_term_structure(&self) -> &Handle<dyn YieldTermStructure> {
+        &self.nominal_term_structure
+    }
+
+    /// The unit-notional, zero-strike swap the helper quotes, under a
+    /// discounting engine over the nominal curve (`initializeDates`,
+    /// `cpp:311-335`).
+    ///
+    /// Both legs run over one annual, unadjusted, backward-generated schedule
+    /// from the evaluation date to the maturity; a one-year tenor never runs
+    /// into a days-in-month mismatch, which is why C++ can share the schedule
+    /// here while the contract itself takes two. An evaluation date that was
+    /// never set is an error rather than a panic (D10), surfaced when the
+    /// cached result is next read.
+    fn build_swap(&self) -> QlResult<YearOnYearInflationSwap> {
+        let start_date = match self.base.evaluation_date() {
+            Some(date) => date,
+            None => crate::fail!("no evaluation date set: the helper's swap starts at it"),
+        };
+        let schedule = MakeSchedule::new()
+            .from(start_date)
+            .to(self.maturity)
+            .with_tenor(Period::new(1, TimeUnit::Years))
+            .with_convention(BusinessDayConvention::Unadjusted)
+            .with_calendar(self.calendar.clone())
+            .backwards()
+            .build();
+        let mut swap = YearOnYearInflationSwap::new(
+            SwapType::Payer,
+            1.0,
+            schedule.clone(),
+            0.0,
+            self.day_counter.clone(),
+            schedule,
+            Shared::clone(&self.yii),
+            self.swap_obs_lag,
+            self.interpolation,
+            0.0,
+            self.day_counter.clone(),
+            self.calendar.clone(),
+            self.payment_convention,
+            Shared::clone(&self.settings),
+        )?;
+        let engine = DiscountingSwapEngine::new(
+            self.nominal_term_structure.clone(),
+            None,
+            None,
+            None,
+            Shared::clone(&self.settings),
+        );
+        swap.base_mut()
+            .set_pricing_engine(shared_mut(engine) as SharedMut<dyn PricingEngine>);
+        Ok(swap)
+    }
+}
+
+impl AsObservable for YearOnYearInflationSwapHelper {
+    fn observable(&self) -> &crate::patterns::observable::Observable {
+        self.base.observable()
+    }
+}
+
+impl YoYInflationHelper for YearOnYearInflationSwapHelper {
+    fn base(&self) -> &YoYInflationHelperBase {
+        &self.base
+    }
+
+    /// The swap's fair rate (`impliedQuote`, `cpp:309-312`).
+    ///
+    /// The `deepUpdate` is load-bearing here, unlike in the zero twin: the fair
+    /// rate is a *priced* result, cached on the contract behind its lazy flag,
+    /// so a node the bootstrap has just moved would otherwise go unseen.
+    fn implied_quote(&self) -> QlResult<Real> {
+        let mut swap = self.swap.borrow_mut();
+        let swap = swap.as_mut().map_err(|error| error.clone())?;
+        swap.swap_mut().deep_update();
+        swap.fair_rate()
+    }
+
+    /// Points the index copy's handle at the curve, then records it
+    /// (`setTermStructure`, `cpp:337-346`).
+    ///
+    /// The link is weak and unobserved, the port of the C++ `null_deleter` plus
+    /// `observer = false`, and for the same reason as in the zero twin: the
+    /// curve owns this helper, which owns the swap, which owns the index copy.
+    fn set_term_structure(&self, term_structure: &Shared<dyn YoYInflationTermStructure>) {
+        self.term_structure_handle
+            .link_to_weak(Shared::downgrade(term_structure));
+        self.base.set_term_structure(term_structure);
+    }
+}
+
+impl RelativeDateYoYInflationHelper for YearOnYearInflationSwapHelper {
+    /// Rebuilds the swap off the current evaluation date (`initializeDates`,
+    /// `cpp:311-335`).
     ///
     /// The helper's own dates are not rebuilt: they come from the fixing period
     /// of `maturity - swap_obs_lag`, which no evaluation date moves.
