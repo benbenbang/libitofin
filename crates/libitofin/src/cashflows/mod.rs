@@ -25,6 +25,7 @@ mod overnightleg;
 mod rateaveraging;
 mod simplecashflow;
 mod yoyinflationcoupon;
+mod yoyinflationleg;
 mod zeroinflationcashflow;
 
 pub use capflooredcoupon::{CappedFlooredCoupon, CappedFlooredIborCoupon};
@@ -49,4 +50,5 @@ pub use simplecashflow::{AmortizingPayment, Redemption, SimpleCashFlow};
 pub use yoyinflationcoupon::{
     SwapletYoYInflationCouponPricer, YoYInflationCoupon, YoYInflationCouponPricer,
 };
+pub use yoyinflationleg::YoYInflationLeg;
 pub use zeroinflationcashflow::ZeroInflationCashFlow;
