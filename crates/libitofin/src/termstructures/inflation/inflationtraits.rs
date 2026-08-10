@@ -1,7 +1,7 @@
 //! Inflation bootstrap traits.
 //!
-//! Port of the `ZeroInflationTraits` class in
-//! `ql/termstructures/inflation/inflationtraits.hpp:41-115`.
+//! Port of the `ZeroInflationTraits` and `YoYInflationTraits` classes in
+//! `ql/termstructures/inflation/inflationtraits.hpp:41-115,117-198`.
 //!
 //! ## Why this is not the zero-rate trait
 //!
@@ -26,8 +26,8 @@
 //!
 //! ## Only the core trait
 //!
-//! [`ZeroInflationTraits`] implements
-//! [`BootstrapTraits`] and deliberately does not implement
+//! Both structs implement
+//! [`BootstrapTraits`] and deliberately do not implement
 //! [`YieldBootstrapTraits`](crate::termstructures::bootstraptraits::YieldBootstrapTraits):
 //! the nodes *are* the zero-inflation rates, and there is no discount factor to
 //! convert them into. C++'s `transformDirect`/`transformInverse`
@@ -35,10 +35,15 @@
 //! identity, they exist for an unconstrained-optimization path this port does
 //! not have, and the bootstrap driver never calls them.
 //!
-//! `YoYInflationTraits` (`inflationtraits.hpp:117-198`) is a documented
-//! deferral within EPIC Inflation (#705): it seeds from the curve's base rate
-//! and has no node-0 mirror, so it is a separate transcription rather than a
-//! variation on this one.
+//! ## Zero against year-on-year
+//!
+//! [`YoYInflationTraits`] (`inflationtraits.hpp:118-191`) is transcribed
+//! separately rather than derived, because C++ writes the two structs out in
+//! full and they differ in exactly three places: the helper family they name,
+//! the seeding of node 0, and the absence of the node-0 mirror in
+//! `updateGuess`. Only the last of the three is visible here; the first two are
+//! decisions this port carries on the curve rather than in the traits, and the
+//! divergence is documented on each.
 
 use crate::termstructures::bootstraptraits::BootstrapTraits;
 use crate::types::{Real, Size, Time};
@@ -122,6 +127,81 @@ impl BootstrapTraits for ZeroInflationTraits {
 
     /// The convergence-loop cap (`maxIterations`, `:114`). Inflation pillars
     /// are solved in fewer passes than yield pillars, which allow `100`.
+    fn max_iterations() -> Size {
+        40
+    }
+}
+
+/// Year-on-year inflation bootstrap traits (`class YoYInflationTraits`,
+/// `inflationtraits.hpp:118`). The curve nodes are year-on-year inflation
+/// rates; the guesses, the brackets and the iteration cap are the
+/// zero-inflation ones to the digit.
+pub struct YoYInflationTraits;
+
+impl BootstrapTraits for YoYInflationTraits {
+    /// The average inflation rate (`initialValue`, `:129-131`, where C++ reads
+    /// the *curve's* base rate off the term-structure pointer it is handed).
+    ///
+    /// This constant is therefore never the seeding path for a year-on-year
+    /// curve. That decision belongs to the curve here, as
+    /// [`PiecewiseCurve::initial_value`](crate::termstructures::iterativebootstrap::PiecewiseCurve::initial_value),
+    /// which
+    /// [`PiecewiseYoYInflationCurve`](super::piecewiseyoyinflationcurve::PiecewiseYoYInflationCurve)
+    /// overrides with its base rate; the driver reads it off the curve exactly
+    /// as C++'s reads `Traits::initialValue(t)`. What is left here is the value
+    /// C++ would return for a curve carrying no base rate, and it is kept
+    /// rather than made unreachable because the C++ static is a total function.
+    fn initial_value() -> Real {
+        AVG_INFLATION
+    }
+
+    /// The per-node guess (`guess`, `:135-146`): byte for byte the
+    /// zero-inflation one - the stored node on a seeded pass, otherwise the
+    /// average inflation rate at every pillar.
+    fn guess(i: Size, _times: &[Time], data: &[Real], valid_data: bool) -> Real {
+        if valid_data {
+            return data[i];
+        }
+        AVG_INFLATION
+    }
+
+    /// The lower bracket (`minValueAfter`, `:149-160`), identical to the
+    /// zero-inflation one: the smallest node doubled when negative and halved
+    /// when positive, otherwise `-maxInflation`.
+    fn min_value_after(_i: Size, _times: &[Time], data: &[Real], valid_data: bool) -> Real {
+        if valid_data {
+            let r = data.iter().copied().fold(Real::INFINITY, Real::min);
+            return if r < 0.0 { r * 2.0 } else { r / 2.0 };
+        }
+        -MAX_INFLATION
+    }
+
+    /// The upper bracket (`maxValueAfter`, `:161-173`), identical to the
+    /// zero-inflation one: the largest node halved when negative and doubled
+    /// when positive, otherwise `maxInflation`.
+    fn max_value_after(_i: Size, _times: &[Time], data: &[Real], valid_data: bool) -> Real {
+        if valid_data {
+            let r = data.iter().copied().fold(Real::NEG_INFINITY, Real::max);
+            return if r < 0.0 { r / 2.0 } else { r * 2.0 };
+        }
+        MAX_INFLATION
+    }
+
+    /// Writes a solved rate back (`updateGuess`, `:175-179`): node `i` takes
+    /// the rate and **nothing else moves**.
+    ///
+    /// This is the one difference from
+    /// [`ZeroInflationTraits::update_guess`] visible in this file, and it is
+    /// load-bearing rather than incidental. Node 0 of a year-on-year curve
+    /// carries the curve's own base rate, seeded through the curve's
+    /// `initial_value` hook; mirroring the first solved pillar onto it - which
+    /// is exactly what the zero convention does, its node 0 holding only a
+    /// dummy - would overwrite a real quoted figure with an interpolated one.
+    fn update_guess(data: &mut [Real], value: Real, i: Size) {
+        data[i] = value;
+    }
+
+    /// The convergence-loop cap (`maxIterations`, `:190`), the same `40`.
     fn max_iterations() -> Size {
         40
     }
@@ -218,5 +298,58 @@ mod tests {
         ZeroInflationTraits::update_guess(&mut data, 0.04, 2);
         assert_eq!(data[2], 0.04);
         assert_eq!(data[0], 0.03);
+    }
+
+    /// The crux of the year-on-year convention: the first solved pillar is
+    /// *not* mirrored onto node 0, where the zero convention mirrors it.
+    #[test]
+    fn the_year_on_year_update_guess_leaves_the_base_node_alone() {
+        let mut yoy = [0.029, 0.02, 0.02];
+        YoYInflationTraits::update_guess(&mut yoy, 0.031, 1);
+        assert_eq!(yoy[1], 0.031);
+        assert_eq!(yoy[0], 0.029, "the base-rate node must survive pillar 1");
+
+        let mut zero = [0.029, 0.02, 0.02];
+        ZeroInflationTraits::update_guess(&mut zero, 0.031, 1);
+        assert_ne!(zero[0], yoy[0]);
+    }
+
+    /// The traits' own `initial_value` stays the C++ constant. It is not the
+    /// seeding path - the curve's `initial_value` hook is, and returns the base
+    /// rate - so this pins the constant that would otherwise drift towards the
+    /// behaviour it is not responsible for. Its counterpart is the piecewise
+    /// curve's non-degenerate base-node assertion, which fails if the seeding
+    /// ever comes from here.
+    #[test]
+    fn the_year_on_year_traits_seed_is_the_average_rate_not_a_curve_base_rate() {
+        assert_eq!(YoYInflationTraits::initial_value(), 0.02);
+        assert_eq!(
+            YoYInflationTraits::initial_value(),
+            ZeroInflationTraits::initial_value()
+        );
+    }
+
+    /// Everything but `update_guess` is the zero convention to the digit
+    /// (`inflationtraits.hpp:135-173,190` against `:56-97,114`).
+    #[test]
+    fn the_year_on_year_guesses_brackets_and_cap_match_the_zero_convention() {
+        let times = [0.0, 1.0, 2.0];
+        for data in [[0.02, 0.03, 0.05], [-0.02, -0.02, -0.01]] {
+            for valid in [false, true] {
+                assert_eq!(
+                    YoYInflationTraits::guess(2, &times, &data, valid),
+                    ZeroInflationTraits::guess(2, &times, &data, valid)
+                );
+                assert_eq!(
+                    YoYInflationTraits::min_value_after(2, &times, &data, valid),
+                    ZeroInflationTraits::min_value_after(2, &times, &data, valid)
+                );
+                assert_eq!(
+                    YoYInflationTraits::max_value_after(2, &times, &data, valid),
+                    ZeroInflationTraits::max_value_after(2, &times, &data, valid)
+                );
+            }
+        }
+        assert_eq!(YoYInflationTraits::max_iterations(), 40);
     }
 }
