@@ -55,10 +55,11 @@ use helpers::{
 use heston::{PyHestonModel, PyHestonModelHelper, PyHestonProcess};
 use hullwhite::{PyEuribor, PyHullWhite, PySwaptionHelper};
 use inflation::{
-    PyCpiInterpolationType, PyDiscountingSwapEngine, PyInterpolatedZeroInflationCurve,
-    PyMultiplicativePriceSeasonality, PyPiecewiseZeroInflationCurve, PyZeroCouponInflationSwap,
-    PyZeroCouponInflationSwapHelper, PyZeroInflationHelper, PyZeroInflationIndex,
-    PyZeroInflationTermStructure,
+    PyCpiInterpolationType, PyDiscountingSwapEngine, PyInterpolatedYoYInflationCurve,
+    PyInterpolatedZeroInflationCurve, PyMultiplicativePriceSeasonality,
+    PyPiecewiseZeroInflationCurve, PyYoYInflationHelper, PyYoYInflationTermStructure,
+    PyZeroCouponInflationSwap, PyZeroCouponInflationSwapHelper, PyZeroInflationHelper,
+    PyZeroInflationIndex, PyZeroInflationTermStructure,
 };
 use libitofin::errors::QlError;
 use market::{PyBlackScholesProcess, PySimpleQuote};
@@ -194,6 +195,9 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     termstructures.add_class::<PyZeroCouponInflationSwapHelper>()?;
     termstructures.add_class::<PyPiecewiseZeroInflationCurve>()?;
     termstructures.add_class::<PyMultiplicativePriceSeasonality>()?;
+    termstructures.add_class::<PyYoYInflationTermStructure>()?;
+    termstructures.add_class::<PyInterpolatedYoYInflationCurve>()?;
+    termstructures.add_class::<PyYoYInflationHelper>()?;
 
     let processes = PyModule::new(py, "processes")?;
     processes.add_class::<PyBlackScholesProcess>()?;
