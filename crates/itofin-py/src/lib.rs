@@ -57,9 +57,9 @@ use hullwhite::{PyEuribor, PyHullWhite, PySwaptionHelper};
 use inflation::{
     PyCpiInterpolationType, PyDiscountingSwapEngine, PyInterpolatedYoYInflationCurve,
     PyInterpolatedZeroInflationCurve, PyMultiplicativePriceSeasonality,
-    PyPiecewiseZeroInflationCurve, PyYoYInflationHelper, PyYoYInflationTermStructure,
-    PyZeroCouponInflationSwap, PyZeroCouponInflationSwapHelper, PyZeroInflationHelper,
-    PyZeroInflationIndex, PyZeroInflationTermStructure,
+    PyPiecewiseZeroInflationCurve, PyYoYInflationHelper, PyYoYInflationIndex,
+    PyYoYInflationTermStructure, PyZeroCouponInflationSwap, PyZeroCouponInflationSwapHelper,
+    PyZeroInflationHelper, PyZeroInflationIndex, PyZeroInflationTermStructure,
 };
 use libitofin::errors::QlError;
 use market::{PyBlackScholesProcess, PySimpleQuote};
@@ -209,6 +209,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     indexes.add_class::<PySwapIndex>()?;
     indexes.add_class::<PyCpiInterpolationType>()?;
     indexes.add_class::<PyZeroInflationIndex>()?;
+    indexes.add_class::<PyYoYInflationIndex>()?;
 
     let instruments = PyModule::new(py, "instruments")?;
     instruments.add_class::<PyOptionType>()?;

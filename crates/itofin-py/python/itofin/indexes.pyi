@@ -2,7 +2,11 @@
 # src/swapindex.rs and src/inflation.rs (#517).
 
 from itofin import Settings
-from itofin.termstructures import YieldTermStructure, ZeroInflationTermStructure
+from itofin.termstructures import (
+    YieldTermStructure,
+    YoYInflationTermStructure,
+    ZeroInflationTermStructure,
+)
 from itofin.time import (
     BusinessDayConvention,
     Calendar,
@@ -135,5 +139,77 @@ class ZeroInflationIndex:
         """Whether fixing_date has to be forecast rather than read from
         history, decided against the latest period that could have been
         published by the settings' evaluation date."""
+        ...
+    def __repr__(self) -> str: ...
+
+class YoYInflationIndex:
+    """An index publishing one year-on-year inflation rate per period, read
+    back as a stored figure or forecast off its year-on-year curve.
+
+    Two forms. A ratio index (from_underlying) derives its rate from two
+    ZeroInflationIndex fixings a year apart and owns no history of its own; a
+    quoted one (the constructor) is published as a rate in its own right and
+    keeps its own history through add_fixing.
+
+    Both forms link to a relinkable handle the index owns, so an index can be
+    built before the curve it forecasts off exists. The handle starts empty and
+    a forecast before any link raises ItofinError; link_to fills it.
+
+    The quoted constructor spells its region and currency out as their component
+    fields: neither core type has a Python facade, and defaulting the currency
+    metadata would put made-up values on the index."""
+
+    def __init__(
+        self,
+        family_name: str,
+        region_name: str,
+        region_code: str,
+        revised: bool,
+        frequency: Frequency,
+        availability_lag: Period,
+        currency_name: str,
+        currency_code: str,
+        currency_numeric_code: int,
+        currency_symbol: str,
+        currency_fraction_symbol: str,
+        currency_fractions_per_unit: int,
+        settings: Settings,
+    ) -> None: ...
+    @staticmethod
+    def from_underlying(underlying: ZeroInflationIndex) -> YoYInflationIndex:
+        """A ratio index over underlying, dividing that index's figure for a
+        period by its figure a year earlier. The metadata is inherited bar the
+        family name, which is prefixed YYR_, so a "UK RPI" underlying yields
+        "UK YYR_RPI"; fixings belong on the underlying."""
+        ...
+    def name(self) -> str: ...
+    def ratio(self) -> bool: ...
+    def underlying_index(self) -> ZeroInflationIndex | None:
+        """The price index a ratio index divides, None on a quoted one. This is
+        the very object from_underlying was handed, not a fresh facade around
+        the same core index."""
+        ...
+    def add_fixing(self, fixing_date: Date, value: float) -> None:
+        """Records a published year-on-year rate across the whole inflation
+        period it describes. A ratio index reads the underlying's history, so
+        filing here records a figure it will never consult."""
+        ...
+    def fixing(self, fixing_date: Date, forecast_todays_fixing: bool = False) -> float:
+        """The rate at fixing_date, stored or forecast off the linked curve.
+        forecast_todays_fixing is accepted and ignored, as in the core."""
+        ...
+    def last_fixing_date(self) -> Date:
+        """The first day of the inflation period the latest figure on record
+        describes, read off the underlying on a ratio index. Raises ItofinError
+        on an index with no history."""
+        ...
+    def link_to(self, curve: YoYInflationTermStructure) -> None:
+        """Points the index at curve, so every forecast from here on reads it.
+        It is the curve behind that facade's handle at call time that is stored,
+        not the handle itself."""
+        ...
+    def needs_forecast(self, fixing_date: Date) -> bool:
+        """Whether fixing_date has to be forecast rather than read from history,
+        a ratio index deferring the question to its underlying."""
         ...
     def __repr__(self) -> str: ...
