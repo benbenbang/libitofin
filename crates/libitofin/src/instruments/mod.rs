@@ -10,6 +10,7 @@ mod claim;
 mod creditdefaultswap;
 mod fixedvsfloatingswap;
 mod futures;
+mod inflationcapfloor;
 mod makecapfloor;
 mod makecds;
 mod makeois;
@@ -37,6 +38,7 @@ pub use fixedvsfloatingswap::{
     FixedVsFloatingSwapResults, FloatingArgumentsFn,
 };
 pub use futures::FuturesType;
+pub use inflationcapfloor::{YoYInflationCapFloor, YoYInflationCapFloorArguments};
 pub use makecapfloor::MakeCapFloor;
 pub use makecds::MakeCreditDefaultSwap;
 pub use makeois::MakeOis;
