@@ -3,7 +3,14 @@
 # src/credit.rs, src/credithelpers.rs and src/inflation.rs (#517).
 
 from itofin import Settings
-from itofin.indexes import CpiInterpolationType, Estr, Euribor, SwapIndex, ZeroInflationIndex
+from itofin.indexes import (
+    CpiInterpolationType,
+    Estr,
+    Euribor,
+    SwapIndex,
+    YoYInflationIndex,
+    ZeroInflationIndex,
+)
 from itofin.quotes import SimpleQuote
 from itofin.time import (
     BusinessDayConvention,
@@ -1148,3 +1155,68 @@ class YoYInflationHelper:
 
     def pillar_date(self) -> Date: ...
     def latest_date(self) -> Date: ...
+
+class YearOnYearInflationSwapHelper(YoYInflationHelper):
+    """The bootstrap helper fitting a year-on-year inflation swap quoted as a
+    rate.
+
+    The helper prices a unit-notional, zero-strike swap of its own and reports
+    that contract's fair rate; the bootstrap drives the quoted rate less that
+    fair rate to zero. Unlike its zero-coupon twin it does need a nominal curve:
+    the year-on-year legs pay on a schedule of dates rather than one, so their
+    discount factors do not cancel.
+
+    The swap starts at the evaluation date, so that date must be set before this
+    constructor runs, not merely before the bootstrap. It prices through a copy
+    of index linked to a handle of its own, so the caller's index need not be
+    linked to any curve.
+
+    pillar is accepted for signature parity but never read: it only ever
+    discriminates on the interpolated path, which is refused."""
+
+    def __init__(
+        self,
+        quote: SimpleQuote,
+        swap_obs_lag: Period,
+        maturity: Date,
+        calendar: Calendar,
+        payment_convention: BusinessDayConvention,
+        day_counter: DayCounter,
+        index: YoYInflationIndex,
+        interpolation: CpiInterpolationType,
+        nominal_term_structure: YieldTermStructure,
+        settings: Settings,
+        pillar: Pillar = ...,
+    ) -> None:
+        """Raises ItofinError on CpiInterpolationType.Linear, which the core
+        refuses outright pending the interpolated branch (#847), and on an
+        observation lag the helper's own swap legs cannot be built under."""
+        ...
+
+class PiecewiseYoYInflationCurve(YoYInflationTermStructure):
+    """A year-on-year inflation curve bootstrapped from year-on-year helpers,
+    solving one rate node per helper fixing period.
+
+    Node zero sits on base_date at base_yoy_rate and is kept rather than solved,
+    so times()[0] is negative. Each helper's observed fixing period marks a
+    later segment boundary.
+
+    Lazy: the bootstrap runs on the first read, so the evaluation date must be
+    in place before that read as well as before the helpers were built. A helper
+    quote moving invalidates the cache."""
+
+    def __init__(
+        self,
+        reference_date: Date,
+        base_date: Date,
+        base_yoy_rate: float,
+        frequency: Frequency,
+        day_counter: DayCounter,
+        helpers: list[YoYInflationHelper],
+    ) -> None:
+        """Raises ItofinError on an empty helper list."""
+        ...
+    def calculate(self) -> None: ...
+    def times(self) -> list[float]: ...
+    def dates(self) -> list[Date]: ...
+    def nodes(self) -> list[tuple[Date, float]]: ...
