@@ -17,17 +17,17 @@
 //!
 //! ## Divergences from QuantLib
 //!
-//! C++ ends the builder with `operator Leg()`. The port splits that into
-//! [`YoYInflationLeg::coupons`], which keeps the concrete
-//! [`YoYInflationCoupon`] type, and [`YoYInflationLeg::build`], which erases it
-//! into a [`Leg`]; C++ recovers the concrete type with `dynamic_pointer_cast`,
-//! which the port has no counterpart for.
-//!
-//! `operator Leg()` attaches the default swaplet pricer under the guard
-//! `caps_.empty() && floors_.empty()` (`.cpp:228-229`). With the cap and floor
-//! fields deferred that guard is vacuously true, so the port attaches
-//! unconditionally in [`coupons`](YoYInflationLeg::coupons) rather than carrying
-//! always-empty vectors to evaluate it against.
+//! C++ ends the builder with `operator Leg()`, returning one [`Leg`] that holds
+//! a mix of plain and capped coupons and recovering either with a
+//! `dynamic_pointer_cast`. The port has no downcast, so it splits the paths by
+//! return type, as [`IborLeg`](super::IborLeg) does:
+//! [`coupons`](YoYInflationLeg::coupons) keeps the plain
+//! [`YoYInflationCoupon`]s,
+//! [`capped_floored_coupons`](YoYInflationLeg::capped_floored_coupons) the
+//! wrapped ones, and [`build`](YoYInflationLeg::build) erases whichever the cap
+//! and floor lists select. A leg is therefore capped as a whole rather than
+//! coupon by coupon; C++'s per-coupon mix would need a `Null<Rate>()` entry
+//! inside the cap vector, which no test-suite caller writes.
 //!
 //! The stub reference date uses `calendar.advance_by_period(end, -tenor, bdc)`
 //! where C++ writes `calendar.adjust(end - tenor, bdc)` (`.cpp:179`), as
@@ -35,11 +35,6 @@
 //! years and differ only for one in days, which advances over business days.
 //!
 //! ## Deferred (visible)
-//!
-//! Caps and floors (`withCaps`/`withFloors`, `hpp:112-115`) and the
-//! `CappedFlooredYoYInflationCoupon` branch of the loop (`.cpp:207-222`) belong
-//! to `#838`. Their builder methods are omitted entirely rather than accepted
-//! and ignored, so a capped leg cannot be silently priced as a swaplet one.
 //!
 //! The zero-gearing collapse to a `FixedRateCoupon` (`.cpp:185-192`) is also
 //! deferred, but by *accepting* the gearing rather than by rejecting it - the
@@ -53,6 +48,7 @@
 //! one as an error.
 
 use crate::cashflow::{CashFlow, Leg};
+use crate::cashflows::capflooredyoyinflationcoupon::CappedFlooredYoYInflationCoupon;
 use crate::cashflows::yoyinflationcoupon::{
     SwapletYoYInflationCouponPricer, YoYInflationCoupon, YoYInflationCouponPricer,
 };
@@ -64,7 +60,7 @@ use crate::time::calendar::Calendar;
 use crate::time::daycounter::DayCounter;
 use crate::time::period::Period;
 use crate::time::schedule::Schedule;
-use crate::types::{Natural, Real, Spread};
+use crate::types::{Natural, Rate, Real, Spread};
 use crate::{fail, require};
 
 /// Builds a sequence of [`YoYInflationCoupon`]s from a [`Schedule`].
@@ -81,6 +77,8 @@ pub struct YoYInflationLeg {
     fixing_days: Vec<Natural>,
     gearings: Vec<Real>,
     spreads: Vec<Spread>,
+    caps: Vec<Rate>,
+    floors: Vec<Rate>,
 }
 
 impl YoYInflationLeg {
@@ -107,6 +105,8 @@ impl YoYInflationLeg {
             fixing_days: Vec::new(),
             gearings: Vec::new(),
             spreads: Vec::new(),
+            caps: Vec::new(),
+            floors: Vec::new(),
         }
     }
 
@@ -168,21 +168,40 @@ impl YoYInflationLeg {
         self
     }
 
-    /// The coupons the leg is made of, each carrying the default
-    /// [`SwapletYoYInflationCouponPricer`] (`.cpp:228-229`).
+    /// One cap for every coupon (`withCaps`, `.cpp:125-128`).
+    pub fn with_caps(self, cap: Rate) -> YoYInflationLeg {
+        self.with_caps_per_coupon(vec![cap])
+    }
+
+    /// A cap per coupon; the last one carries over. An empty list, the default,
+    /// leaves the coupons uncapped.
     ///
-    /// That pricer holds no nominal curve, so the coupons answer
-    /// [`rate`](crate::cashflows::Coupon::rate) and
-    /// [`amount`](crate::cashflows::Coupon::amount) but refuse a
-    /// [`swaplet_price`](YoYInflationCouponPricer::swaplet_price) until a
-    /// discounting pricer replaces it.
-    ///
-    /// # Errors
-    ///
-    /// Errors if no payment day counter or no notional was given, if the
-    /// schedule holds fewer than two dates, or if more notionals, gearings or
-    /// spreads were given than the schedule has periods.
-    pub fn coupons(&self) -> QlResult<Vec<Shared<YoYInflationCoupon>>> {
+    /// Setting a cap or a floor makes [`build`](Self::build) and
+    /// [`capped_floored_coupons`](Self::capped_floored_coupons) produce
+    /// [`CappedFlooredYoYInflationCoupon`]s, and withholds the default swaplet
+    /// pricer (`.cpp:226-229`): a capped coupon needs one carrying an optionlet
+    /// volatility, which the caller installs through
+    /// [`set_yoy_coupon_pricer`].
+    pub fn with_caps_per_coupon(mut self, caps: Vec<Rate>) -> YoYInflationLeg {
+        self.caps = caps;
+        self
+    }
+
+    /// One floor for every coupon (`withFloors`, `.cpp:135-138`).
+    pub fn with_floors(self, floor: Rate) -> YoYInflationLeg {
+        self.with_floors_per_coupon(vec![floor])
+    }
+
+    /// A floor per coupon; the last one carries over. An empty list, the
+    /// default, leaves the coupons unfloored. See
+    /// [`with_caps_per_coupon`](Self::with_caps_per_coupon).
+    pub fn with_floors_per_coupon(mut self, floors: Vec<Rate>) -> YoYInflationLeg {
+        self.floors = floors;
+        self
+    }
+
+    /// The coupons the leg is made of, no pricer attached.
+    fn raw_coupons(&self) -> QlResult<Vec<Shared<YoYInflationCoupon>>> {
         let Some(payment_day_counter) = &self.payment_day_counter else {
             fail!("no payment daycounter given");
         };
@@ -204,6 +223,16 @@ impl YoYInflationLeg {
             self.spreads.len() <= periods,
             "too many spreads ({}), only {periods} required",
             self.spreads.len()
+        );
+        require!(
+            self.caps.len() <= periods,
+            "too many caps ({}), only {periods} required",
+            self.caps.len()
+        );
+        require!(
+            self.floors.len() <= periods,
+            "too many floors ({}), only {periods} required",
+            self.floors.len()
         );
 
         let calendar = self.schedule.calendar();
@@ -244,23 +273,136 @@ impl YoYInflationLeg {
                 Some(reference_start),
                 Some(reference_end),
             );
-            coupon.set_pricer(default_pricer());
             coupons.push(shared(coupon));
+        }
+        Ok(coupons)
+    }
+
+    /// The plain coupons the leg is made of, each carrying the default
+    /// [`SwapletYoYInflationCouponPricer`] (`.cpp:226-229`).
+    ///
+    /// That pricer holds no nominal curve, so the coupons answer
+    /// [`rate`](crate::cashflows::Coupon::rate) and
+    /// [`amount`](crate::cashflows::Coupon::amount) but refuse a
+    /// [`swaplet_price`](YoYInflationCouponPricer::swaplet_price) until a
+    /// discounting pricer replaces it.
+    ///
+    /// With a cap or floor set the coupons come back unpriced, the C++ guard
+    /// withholding the default pricer;
+    /// [`capped_floored_coupons`](Self::capped_floored_coupons) is then the
+    /// intended entry.
+    ///
+    /// # Errors
+    ///
+    /// Errors if no payment day counter or no notional was given, if the
+    /// schedule holds fewer than two dates, or if more notionals, gearings,
+    /// spreads, caps or floors were given than the schedule has periods.
+    pub fn coupons(&self) -> QlResult<Vec<Shared<YoYInflationCoupon>>> {
+        let coupons = self.raw_coupons()?;
+        if self.caps.is_empty() && self.floors.is_empty() {
+            for coupon in &coupons {
+                coupon.set_pricer(default_pricer());
+            }
+        }
+        Ok(coupons)
+    }
+
+    /// The coupons wrapped in their per-coupon cap and floor (`.cpp:207-222`),
+    /// no pricer attached: the caller installs one carrying an optionlet
+    /// volatility through [`set_yoy_coupon_pricer`].
+    ///
+    /// # Errors
+    ///
+    /// As [`coupons`](Self::coupons), plus any
+    /// [`CappedFlooredYoYInflationCoupon::new`] precondition (a cap below its
+    /// floor).
+    pub fn capped_floored_coupons(&self) -> QlResult<Vec<Shared<CappedFlooredYoYInflationCoupon>>> {
+        let raw = self.raw_coupons()?;
+        let mut coupons = Vec::with_capacity(raw.len());
+        for (i, underlying) in raw.into_iter().enumerate() {
+            let cap = pick(&self.caps, i);
+            let floor = pick(&self.floors, i);
+            coupons.push(shared(CappedFlooredYoYInflationCoupon::new(
+                underlying, cap, floor,
+            )?));
         }
         Ok(coupons)
     }
 
     /// The coupons as a [`Leg`], with their concrete type erased.
     ///
+    /// The plain path erases [`coupons`](Self::coupons); with a cap or floor set
+    /// it erases [`capped_floored_coupons`](Self::capped_floored_coupons), whose
+    /// coupons carry no pricer, so the caller must install one on the concrete
+    /// coupons through [`set_yoy_coupon_pricer`] before erasing rather than
+    /// through this method.
+    ///
     /// # Errors
     ///
-    /// As [`coupons`](Self::coupons).
+    /// As [`coupons`](Self::coupons) or
+    /// [`capped_floored_coupons`](Self::capped_floored_coupons).
     pub fn build(&self) -> QlResult<Leg> {
-        Ok(self
-            .coupons()?
-            .into_iter()
-            .map(|coupon| coupon as Shared<dyn CashFlow>)
-            .collect())
+        if self.caps.is_empty() && self.floors.is_empty() {
+            Ok(self
+                .coupons()?
+                .into_iter()
+                .map(|coupon| coupon as Shared<dyn CashFlow>)
+                .collect())
+        } else {
+            Ok(self
+                .capped_floored_coupons()?
+                .into_iter()
+                .map(|coupon| coupon as Shared<dyn CashFlow>)
+                .collect())
+        }
+    }
+}
+
+/// A coupon a year-on-year inflation pricer can be attached to (a
+/// [`YoYInflationCoupon`] or a [`CappedFlooredYoYInflationCoupon`]), so
+/// [`set_yoy_coupon_pricer`] spans both.
+pub trait AttachYoYInflationPricer {
+    /// Attaches `pricer` to the coupon.
+    fn attach_pricer(&self, pricer: SharedMut<dyn YoYInflationCouponPricer>);
+}
+
+impl AttachYoYInflationPricer for YoYInflationCoupon {
+    fn attach_pricer(&self, pricer: SharedMut<dyn YoYInflationCouponPricer>) {
+        self.set_pricer(pricer);
+    }
+}
+
+impl AttachYoYInflationPricer for CappedFlooredYoYInflationCoupon {
+    fn attach_pricer(&self, pricer: SharedMut<dyn YoYInflationCouponPricer>) {
+        self.set_pricer(pricer);
+    }
+}
+
+/// Attaches `pricer` to every coupon, overriding any default the builder set.
+///
+/// The free `setCouponPricer(Leg&, pricer)` of `couponpricer.cpp`, taking the
+/// concrete coupons rather than an erased [`Leg`] since the port cannot downcast
+/// a [`CashFlow`] back to a coupon. Generic over the coupon type so a plain or a
+/// capped/floored leg can be priced the same way. The name carries the `yoy`
+/// that C++ leaves to overloading: the crate re-exports its cash-flow items
+/// flat, where [`set_coupon_pricer`](super::set_coupon_pricer) is already the
+/// floating-rate one.
+pub fn set_yoy_coupon_pricer<C: AttachYoYInflationPricer>(
+    coupons: &[Shared<C>],
+    pricer: SharedMut<dyn YoYInflationCouponPricer>,
+) {
+    for coupon in coupons {
+        coupon.attach_pricer(pricer.clone());
+    }
+}
+
+/// The `index`-th rate as a cap/floor, or `None` when the list is empty
+/// (an uncapped or unfloored coupon).
+fn pick(rates: &[Rate], index: usize) -> Option<Rate> {
+    if rates.is_empty() {
+        None
+    } else {
+        Some(broadcast(rates, index, 0.0))
     }
 }
 
@@ -569,6 +711,82 @@ mod tests {
         assert!((amount - expected).abs() < 1e-10, "amount was {amount}");
     }
 
+    /// A cap withholds the default pricer (`.cpp:226-229`), so the plain
+    /// coupons come back unpriced and the capped ones are the intended entry.
+    /// The caps broadcast as the other lists do: two given, the second held over
+    /// the remaining coupons.
+    #[test]
+    fn a_capped_leg_withholds_the_default_pricer_and_broadcasts_its_caps() {
+        let index = published_index(&[]);
+        let schedule = MakeSchedule::new()
+            .from(Date::new(13, August, 2015))
+            .to(Date::new(13, August, 2018))
+            .with_frequency(Frequency::Annual)
+            .with_calendar(uk())
+            .with_convention(BusinessDayConvention::Unadjusted)
+            .forwards()
+            .build();
+        let capped =
+            || leg(schedule.clone(), Shared::clone(&index)).with_caps_per_coupon(vec![0.05, 0.06]);
+
+        let plain = capped().coupons().expect("the leg is fully specified");
+        assert_eq!(plain.len(), 3);
+        for coupon in &plain {
+            assert!(
+                coupon.pricer().is_none(),
+                "a capped leg withholds the pricer"
+            );
+        }
+
+        let coupons = capped()
+            .capped_floored_coupons()
+            .expect("the leg is fully specified");
+        assert_eq!(coupons.len(), 3);
+        let expected_caps = [0.05, 0.06, 0.06];
+        for (i, coupon) in coupons.iter().enumerate() {
+            assert!(coupon.is_capped() && !coupon.is_floored());
+            assert!((coupon.effective_cap() - expected_caps[i]).abs() < 1e-15);
+        }
+    }
+
+    /// `set_yoy_coupon_pricer` installs across a capped leg, which is how the
+    /// pricer the builder withheld arrives. The install lands on the underlying
+    /// coupon, the one instance the wrapper's rate path reads.
+    #[test]
+    fn a_pricer_is_installed_across_a_capped_leg() {
+        let index = published_index(&[]);
+        let schedule = MakeSchedule::new()
+            .from(Date::new(13, August, 2015))
+            .to(Date::new(13, August, 2017))
+            .with_frequency(Frequency::Annual)
+            .with_calendar(uk())
+            .with_convention(BusinessDayConvention::Unadjusted)
+            .forwards()
+            .build();
+
+        let coupons = leg(schedule, index)
+            .with_floors(0.01)
+            .capped_floored_coupons()
+            .expect("the leg is fully specified");
+        assert_eq!(coupons.len(), 2);
+        for coupon in &coupons {
+            assert!(coupon.is_floored() && !coupon.is_capped());
+            assert!(coupon.underlying().pricer().is_none());
+        }
+
+        let pricer = shared_mut(SwapletYoYInflationCouponPricer::new())
+            as SharedMut<dyn YoYInflationCouponPricer>;
+        set_yoy_coupon_pricer(&coupons, pricer.clone());
+
+        for coupon in &coupons {
+            let installed = coupon
+                .underlying()
+                .pricer()
+                .expect("a pricer was installed");
+            assert!(SharedMut::ptr_eq(&installed, &pricer));
+        }
+    }
+
     #[test]
     fn an_underspecified_or_oversized_leg_is_an_error() {
         let index = published_index(&[]);
@@ -617,6 +835,21 @@ mod tests {
         assert!(
             too_many.message().contains("too many gearings (6), only 5"),
             "err was: {too_many}"
+        );
+
+        let Err(too_many_caps) = bare()
+            .with_payment_day_counter(day_counter())
+            .with_notional(NOTIONAL)
+            .with_caps_per_coupon(vec![0.05; 6])
+            .capped_floored_coupons()
+        else {
+            panic!("the schedule has five periods");
+        };
+        assert!(
+            too_many_caps
+                .message()
+                .contains("too many caps (6), only 5"),
+            "err was: {too_many_caps}"
         );
     }
 }
