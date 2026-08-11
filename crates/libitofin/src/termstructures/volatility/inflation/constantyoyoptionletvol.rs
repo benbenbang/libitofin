@@ -10,6 +10,18 @@
 //! Both C++ constructors compute the reference date off the evaluation date;
 //! there is no fixed-reference-date form, so neither is there one here. The
 //! shared [`Settings`] handle is taken explicitly, per D5.
+//!
+//! ## Omitted (visible)
+//!
+//! The C++ constructors also take a `VolatilityType` and a `displacement`
+//! restricted to 0 or 1 (`hpp:158-185`, `.cpp:40-46`), which the surface only
+//! reports back through `volatilityType()`/`displacement()`. Nothing in this
+//! batch reads them: the coupon pricer names its own distribution, as C++'s
+//! three pricer classes do, rather than asking the surface which one to use.
+//! They are omitted rather than accepted and ignored, so a caller cannot quote
+//! a normal volatility here and be silently priced lognormally; the pricer
+//! constructor is where that choice is made. They return with the readers that
+//! need them, the optionlet strippers and the cap/floor engines (`#851`).
 
 use crate::errors::QlResult;
 use crate::handle::Handle;
