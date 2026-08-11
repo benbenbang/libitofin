@@ -4,7 +4,10 @@
 //! [`PyZeroInflationTermStructure`] curve hierarchy, the
 //! [`PyMultiplicativePriceSeasonality`] correction any of its curves can carry,
 //! the [`PyZeroInflationHelper`] bootstrap helpers that fit its piecewise member
-//! and the [`PyZeroCouponInflationSwap`] the rest of them price together.
+//! and the [`PyZeroCouponInflationSwap`] the rest of them price together, plus
+//! the year-on-year family that mirrors it: the
+//! [`PyYoYInflationTermStructure`] curve hierarchy and the
+//! [`PyYoYInflationHelper`] helpers that fit its piecewise member.
 //!
 //! The swap engine is generic rather than inflation-specific - it prices any
 //! swap - but is homed here because the inflation tickets are the first to need
@@ -30,9 +33,12 @@ use libitofin::pricingengine::PricingEngine;
 use libitofin::pricingengines::DiscountingSwapEngine;
 use libitofin::shared::{Shared, SharedMut, shared, shared_mut};
 use libitofin::termstructures::inflation::inflationhelpers::{
-    ZeroCouponInflationSwapHelper, ZeroInflationHelper,
+    YoYInflationHelper, ZeroCouponInflationSwapHelper, ZeroInflationHelper,
 };
-use libitofin::termstructures::inflation::inflationtermstructure::ZeroInflationTermStructure;
+use libitofin::termstructures::inflation::inflationtermstructure::{
+    YoYInflationTermStructure, ZeroInflationTermStructure,
+};
+use libitofin::termstructures::inflation::interpolatedyoyinflationcurve::InterpolatedYoYInflationCurve;
 use libitofin::termstructures::inflation::interpolatedzeroinflationcurve::InterpolatedZeroInflationCurve;
 use libitofin::termstructures::inflation::piecewisezeroinflationcurve::PiecewiseZeroInflationCurve;
 use libitofin::termstructures::inflation::seasonality::{
@@ -1038,5 +1044,282 @@ impl PyZeroCouponInflationSwap {
     /// exist in the core, and the oracle asserts they coincide.
     fn inflation_fixing_date(&self) -> PyDate {
         PyDate::from_inner(self.inner.borrow().inflation_cash_flow().fixing_date())
+    }
+}
+
+/// Python `YoYInflationTermStructure`: the shared base for every year-on-year
+/// inflation curve (`termstructures::inflation::inflationtermstructure`).
+///
+/// Holds the erased `Handle<dyn YoYInflationTermStructure>` and exposes the
+/// query surface every concrete curve inherits, the shape
+/// [`PyZeroInflationTermStructure`] already uses on the zero side. Concrete
+/// curves such as [`PyInterpolatedYoYInflationCurve`] subclass this and supply
+/// only their constructor and node inspectors.
+///
+/// The two rate reads are not interchangeable, exactly as on the zero side.
+/// [`yoy_rate_date`](Self::yoy_rate_date) snaps its date to the start of the
+/// inflation period containing it before the curve sees it, and is the only one
+/// that folds in a seasonality correction;
+/// [`yoy_rate`](Self::yoy_rate) takes a year-fraction already measured under the
+/// curve's own day counter and quantizes nothing.
+///
+/// [`base_rate`](Self::base_rate) is exposed here where the zero base defers it:
+/// a year-on-year curve carries the rate observed over the period ending on its
+/// base date, C++ forwarding `baseYoYRate` into the base constructor's
+/// `baseRate` slot (`inflationtermstructure.rs:198`), so every curve reachable
+/// through this facade answers rather than raising.
+///
+/// Deferred (visible): the core's `seasonality()` getter, for the reason
+/// [`PyZeroInflationTermStructure`] omits it - it hands back an erased
+/// `Shared<dyn Seasonality>` there is no downcast surface to recover the
+/// concrete correction from.
+#[pyclass(name = "YoYInflationTermStructure", subclass, unsendable)]
+pub struct PyYoYInflationTermStructure {
+    inner: Handle<dyn YoYInflationTermStructure>,
+}
+
+#[pymethods]
+impl PyYoYInflationTermStructure {
+    /// The year-on-year inflation rate at year-fraction `t`.
+    ///
+    /// `t` must be measured with the curve's own day counter, and is negative
+    /// for the base period. This is not the year-on-year swap rate, which comes
+    /// from the instrument.
+    #[pyo3(signature = (t, extrapolate = false))]
+    fn yoy_rate(&self, t: f64, extrapolate: bool) -> PyResult<f64> {
+        Ok(self
+            .inner
+            .current_link()
+            .map_err(PyQlError::from)?
+            .yoy_rate(t, extrapolate)
+            .map_err(PyQlError::from)?)
+    }
+
+    /// The year-on-year inflation rate for the inflation period containing
+    /// `date`.
+    ///
+    /// The date is quantized to that period's first day before both the range
+    /// check and the time conversion, so every day inside one period reads the
+    /// same rate. Any seasonality correction is folded in last, at the
+    /// *original* date rather than the period start, as C++ does on this path.
+    #[pyo3(signature = (date, extrapolate = false))]
+    fn yoy_rate_date(&self, date: &PyDate, extrapolate: bool) -> PyResult<f64> {
+        Ok(self
+            .inner
+            .current_link()
+            .map_err(PyQlError::from)?
+            .yoy_rate_date(date.inner(), extrapolate)
+            .map_err(PyQlError::from)?)
+    }
+
+    /// The base date: the last date for which the fixing is known. It precedes
+    /// the reference date, so its year-fraction is negative.
+    fn base_date(&self) -> PyResult<PyDate> {
+        Ok(PyDate::from_inner(
+            self.inner
+                .current_link()
+                .map_err(PyQlError::from)?
+                .base_date(),
+        ))
+    }
+
+    /// The year-on-year rate observed over the period ending on the base date,
+    /// which node zero is seeded with and keeps.
+    fn base_rate(&self) -> PyResult<f64> {
+        Ok(self
+            .inner
+            .current_link()
+            .map_err(PyQlError::from)?
+            .base_rate()
+            .map_err(PyQlError::from)?)
+    }
+
+    /// The frequency of the inflation fixings the curve is built on.
+    fn frequency(&self) -> PyResult<PyFrequency> {
+        PyFrequency::from_inner(
+            self.inner
+                .current_link()
+                .map_err(PyQlError::from)?
+                .frequency(),
+        )
+    }
+
+    /// Installs `seasonality` on the curve, replacing whatever it carried;
+    /// `None` clears it.
+    ///
+    /// # Errors
+    ///
+    /// Reports the consistency gate, and leaves a rejected correction installed
+    /// as C++ does - see [`PyZeroInflationTermStructure::set_seasonality`].
+    #[pyo3(signature = (seasonality))]
+    fn set_seasonality(
+        &self,
+        seasonality: Option<&PyMultiplicativePriceSeasonality>,
+    ) -> PyResult<()> {
+        Ok(self
+            .inner
+            .current_link()
+            .map_err(PyQlError::from)?
+            .set_seasonality(seasonality.map(PyMultiplicativePriceSeasonality::shared))
+            .map_err(PyQlError::from)?)
+    }
+
+    /// Whether the curve carries a seasonality correction.
+    fn has_seasonality(&self) -> PyResult<bool> {
+        Ok(self
+            .inner
+            .current_link()
+            .map_err(PyQlError::from)?
+            .has_seasonality())
+    }
+}
+
+impl PyYoYInflationTermStructure {
+    /// The base half of a concrete curve's [`PyClassInitializer`] chain.
+    pub(crate) fn from_handle(inner: Handle<dyn YoYInflationTermStructure>) -> Self {
+        PyYoYInflationTermStructure { inner }
+    }
+
+    /// A clone of the inner curve handle for the index facade that links one.
+    #[allow(dead_code)]
+    pub(crate) fn handle(&self) -> Handle<dyn YoYInflationTermStructure> {
+        self.inner.clone()
+    }
+}
+
+/// Python `InterpolatedYoYInflationCurve`: a year-on-year inflation curve built
+/// from (date, year-on-year-rate) nodes, interpolating linearly in rate space
+/// (`termstructures::inflation::InterpolatedYoYInflationCurve<Linear>`).
+///
+/// Extends [`PyYoYInflationTermStructure`], which carries the whole query
+/// surface. The first date is the *base* date rather than the reference date,
+/// which is passed separately and normally follows it; the first rate is the
+/// base rate the curve publishes, and node times are measured from the
+/// reference date, so the first one is negative.
+///
+/// The concrete curve is retained alongside the erased handle so the node
+/// inspectors stay reachable, as [`PyInterpolatedZeroInflationCurve`] does.
+///
+/// Fallible: the core rejects fewer than two dates, a dates/rates count
+/// mismatch and, from the second node on, a rate at or below -100 %, the base
+/// rate being left unconstrained
+/// (`interpolatedyoyinflationcurve.rs:100-117`).
+///
+/// `Linear` is pinned at the boundary: it is the interpolator C++'s
+/// `YoYInflationCurve` typedef fixes, so no interpolation argument is offered.
+#[pyclass(
+    name = "InterpolatedYoYInflationCurve",
+    extends = PyYoYInflationTermStructure,
+    unsendable
+)]
+pub struct PyInterpolatedYoYInflationCurve {
+    concrete: Shared<InterpolatedYoYInflationCurve<Linear>>,
+}
+
+#[pymethods]
+impl PyInterpolatedYoYInflationCurve {
+    /// A curve through the `rates` quoted at `dates`, with `dates[0]` as the
+    /// base date and `reference_date` given separately.
+    #[new]
+    fn new(
+        reference_date: &PyDate,
+        dates: Vec<PyRef<PyDate>>,
+        rates: Vec<f64>,
+        frequency: &PyFrequency,
+        day_counter: &PyDayCounter,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        let dates: Vec<_> = dates.iter().map(|date| date.inner()).collect();
+        let concrete = shared(
+            InterpolatedYoYInflationCurve::new(
+                reference_date.inner(),
+                dates,
+                rates,
+                frequency.inner(),
+                day_counter.inner(),
+                Linear,
+                None,
+            )
+            .map_err(PyQlError::from)?,
+        );
+        let erased = Shared::clone(&concrete) as Shared<dyn YoYInflationTermStructure>;
+        Ok(
+            PyClassInitializer::from(PyYoYInflationTermStructure::from_handle(Handle::new(
+                erased,
+            )))
+            .add_subclass(PyInterpolatedYoYInflationCurve { concrete }),
+        )
+    }
+
+    /// The node times, measured from the reference date; the first is negative
+    /// whenever the base date precedes it.
+    fn times(&self) -> Vec<f64> {
+        self.concrete.times().to_vec()
+    }
+
+    /// The node dates, the first of which is the base date.
+    fn dates(&self) -> Vec<PyDate> {
+        self.concrete
+            .dates()
+            .iter()
+            .copied()
+            .map(PyDate::from_inner)
+            .collect()
+    }
+
+    /// The `(date, year-on-year rate)` nodes.
+    fn nodes(&self) -> Vec<(PyDate, f64)> {
+        self.concrete
+            .nodes()
+            .into_iter()
+            .map(|(date, rate)| (PyDate::from_inner(date), rate))
+            .collect()
+    }
+}
+
+/// Python `YoYInflationHelper`: the shared base for every year-on-year
+/// bootstrap helper
+/// (`termstructures::inflation::inflationhelpers::YoYInflationHelper`).
+///
+/// Holds the erased `Shared<dyn YoYInflationHelper>` and exposes the two dates
+/// the bootstrap places a curve node by, the shape [`PyZeroInflationHelper`]
+/// already uses. Concrete helpers such as [`PyYearOnYearInflationSwapHelper`]
+/// subclass this and supply only their constructor.
+///
+/// Deferred (visible): the core trait's `earliest_date`, `maturity_date` and
+/// `latest_relevant_date` are omitted, as on the zero side - on the one
+/// concrete helper reachable here they collapse onto the same fixing-period
+/// start (`inflationhelpers.rs:730-731`), so all three would report what
+/// [`pillar_date`](Self::pillar_date) reports.
+#[pyclass(name = "YoYInflationHelper", subclass, unsendable)]
+pub struct PyYoYInflationHelper {
+    inner: Shared<dyn YoYInflationHelper>,
+}
+
+#[pymethods]
+impl PyYoYInflationHelper {
+    /// The pillar date, at which the curve node this helper sets sits.
+    fn pillar_date(&self) -> PyDate {
+        PyDate::from_inner(self.inner.pillar_date())
+    }
+
+    /// The latest date the helper needs curve data at (equal to the pillar
+    /// date).
+    fn latest_date(&self) -> PyDate {
+        PyDate::from_inner(self.inner.latest_date())
+    }
+}
+
+impl PyYoYInflationHelper {
+    /// The base half of a concrete helper's [`PyClassInitializer`] chain.
+    #[allow(dead_code)]
+    pub(crate) fn from_shared(inner: Shared<dyn YoYInflationHelper>) -> Self {
+        PyYoYInflationHelper { inner }
+    }
+
+    /// A clone of the upcast helper, for the piecewise year-on-year curve
+    /// facade, which threads each helper into the bootstrap.
+    #[allow(dead_code)]
+    pub(crate) fn shared(&self) -> Shared<dyn YoYInflationHelper> {
+        Shared::clone(&self.inner)
     }
 }

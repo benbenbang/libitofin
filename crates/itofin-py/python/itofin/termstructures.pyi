@@ -1085,3 +1085,66 @@ class PiecewiseZeroInflationCurve(ZeroInflationTermStructure):
     def times(self) -> list[float]: ...
     def dates(self) -> list[Date]: ...
     def nodes(self) -> list[tuple[Date, float]]: ...
+
+class YoYInflationTermStructure:
+    """Shared base for every year-on-year inflation curve: the year-on-year
+    rate in a year-fraction and a date form, the base date, the base rate, the
+    fixing frequency and the seasonality correction the curve carries.
+
+    The two rate reads are not interchangeable. yoy_rate_date snaps its date to
+    the start of the inflation period containing it and is the only one that
+    folds in any seasonality; yoy_rate takes a year-fraction already measured
+    under the curve's own day counter and quantizes nothing. Neither is the
+    year-on-year swap rate, which comes from the instrument.
+
+    base_rate is answered here where the zero base defers it: a year-on-year
+    curve carries the rate observed over the period ending on its base date."""
+
+    def yoy_rate(self, t: float, extrapolate: bool = False) -> float: ...
+    def yoy_rate_date(self, date: Date, extrapolate: bool = False) -> float: ...
+    def base_date(self) -> Date: ...
+    def base_rate(self) -> float: ...
+    def frequency(self) -> Frequency: ...
+    def set_seasonality(
+        self, seasonality: MultiplicativePriceSeasonality | None
+    ) -> None:
+        """Installs seasonality on the curve, replacing whatever it carried;
+        None clears it. Raises ItofinError from the consistency gate, leaving a
+        rejected correction installed as C++ does."""
+        ...
+    def has_seasonality(self) -> bool: ...
+
+class InterpolatedYoYInflationCurve(YoYInflationTermStructure):
+    """A year-on-year inflation curve built from (date, year-on-year rate)
+    nodes, interpolating linearly in rate space.
+
+    The first date is the base date rather than the reference date, which is
+    passed separately and normally follows it; the first rate is the base rate
+    the curve publishes, and node times are measured from the reference date, so
+    the first one is negative."""
+
+    def __init__(
+        self,
+        reference_date: Date,
+        dates: list[Date],
+        rates: list[float],
+        frequency: Frequency,
+        day_counter: DayCounter,
+    ) -> None:
+        """Raises ItofinError on fewer than two dates, a dates/rates count
+        mismatch, or a rate at or below -100 % from the second node on - the
+        base rate is left unconstrained."""
+        ...
+    def times(self) -> list[float]: ...
+    def dates(self) -> list[Date]: ...
+    def nodes(self) -> list[tuple[Date, float]]: ...
+
+class YoYInflationHelper:
+    """Shared base for every year-on-year bootstrap helper: the two dates the
+    bootstrap places a curve node by.
+
+    Concrete helpers such as YearOnYearInflationSwapHelper subclass this and
+    supply only their constructor."""
+
+    def pillar_date(self) -> Date: ...
+    def latest_date(self) -> Date: ...
