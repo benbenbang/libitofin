@@ -6,9 +6,12 @@
 //! the surface a `YoYInflationOptionletCouponPricer` prices against, and
 //! [`ConstantYoYOptionletVolatility`] is the flat one.
 //!
-//! Inflation volatility is quoted against *dates*, never times: the observation
-//! lag and the publication period make a date the only unambiguous key, so C++
-//! offers no time-based query and neither does this trait.
+//! Inflation volatility is quoted against *dates*. The observation lag and the
+//! publication period make a date the only unambiguous key, so C++ gives its
+//! lagged queries - `volatility(Date)`, `volatility(Period)` and
+//! `totalVariance` - no time-based form at all, and says so (`hpp:63`, `:91`).
+//! It does carry one raw `volatility(Time, Rate)` (`hpp:75`) that applies no lag
+//! or period adjustment; nothing reads it, so the port omits it too.
 //!
 //! ## Shape
 //!

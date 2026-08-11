@@ -412,6 +412,11 @@ fn a_live_coupon_prices_under_its_own_distribution() {
 /// floor. The coupon comes out *floored*, and the floorlet is struck at the
 /// de-spread, de-geared level computed from the stored floor - which the swap
 /// took from the cap argument - and not from the argument itself.
+///
+/// The wrapper's delegated face rides along: its nominal, accrual dates and
+/// payment date are the underlying's, and [`amount`](Coupon::amount) accrues the
+/// capped rate over them. That path is otherwise untested, and it is the one an
+/// erased [`Leg`](crate::cashflow::Leg) reaches.
 #[test]
 fn a_negative_gearing_floors_a_capped_coupon_at_the_swapped_level() {
     let (gearing, spread, cap_level) = (-1.5, 0.12, 0.10);
@@ -430,6 +435,19 @@ fn a_negative_gearing_floors_a_capped_coupon_at_the_swapped_level() {
     assert!((effective_floor - (cap_level - spread) / gearing).abs() < 1e-15);
 
     let rate = wrapper.rate().expect("the observed month is published");
+    assert_eq!(wrapper.nominal(), NOMINAL);
+    assert_eq!(wrapper.accrual_end_date(), live_end());
+    assert_eq!(
+        wrapper.accrual_start_date(),
+        live_end() - Period::new(1, TimeUnit::Years)
+    );
+    assert_eq!(wrapper.coupon_base().payment_date(), live_end());
+    let amount = wrapper.amount().expect("the observed month is published");
+    assert!(
+        (amount - rate * wrapper.accrual_period() * NOMINAL).abs() < 1e-10,
+        "amount was {amount}"
+    );
+
     let swaplet = gearing * LIVE_FIXING + spread;
     let floorlet = gearing
         * pricer
