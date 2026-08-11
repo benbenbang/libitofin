@@ -53,7 +53,7 @@ pub use simplecashflow::{AmortizingPayment, Redemption, SimpleCashFlow};
 pub use yoyinflationcoupon::{
     SwapletYoYInflationCouponPricer, YoYInflationCoupon, YoYInflationCouponPricer,
 };
-pub use yoyinflationleg::YoYInflationLeg;
+pub use yoyinflationleg::{AttachYoYInflationPricer, YoYInflationLeg, set_yoy_coupon_pricer};
 pub use yoyinflationoptionletpricer::{
     YoYInflationOptionletCouponPricer, YoYOptionletDistribution,
 };
