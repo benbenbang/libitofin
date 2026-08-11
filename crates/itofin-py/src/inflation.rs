@@ -37,13 +37,15 @@ use libitofin::pricingengine::PricingEngine;
 use libitofin::pricingengines::DiscountingSwapEngine;
 use libitofin::shared::{Shared, SharedMut, shared, shared_mut};
 use libitofin::termstructures::inflation::inflationhelpers::{
-    YoYInflationHelper, ZeroCouponInflationSwapHelper, ZeroInflationHelper,
+    YearOnYearInflationSwapHelper, YoYInflationHelper, ZeroCouponInflationSwapHelper,
+    ZeroInflationHelper,
 };
 use libitofin::termstructures::inflation::inflationtermstructure::{
     YoYInflationTermStructure, ZeroInflationTermStructure,
 };
 use libitofin::termstructures::inflation::interpolatedyoyinflationcurve::InterpolatedYoYInflationCurve;
 use libitofin::termstructures::inflation::interpolatedzeroinflationcurve::InterpolatedZeroInflationCurve;
+use libitofin::termstructures::inflation::piecewiseyoyinflationcurve::PiecewiseYoYInflationCurve;
 use libitofin::termstructures::inflation::piecewisezeroinflationcurve::PiecewiseZeroInflationCurve;
 use libitofin::termstructures::inflation::seasonality::{
     MultiplicativePriceSeasonality, Seasonality,
@@ -637,7 +639,6 @@ impl PyZeroInflationHelper {
 
 impl PyZeroInflationHelper {
     /// The base half of a concrete helper's [`PyClassInitializer`] chain.
-    #[allow(dead_code)]
     pub(crate) fn from_shared(inner: Shared<dyn ZeroInflationHelper>) -> Self {
         PyZeroInflationHelper { inner }
     }
@@ -1315,14 +1316,12 @@ impl PyYoYInflationHelper {
 
 impl PyYoYInflationHelper {
     /// The base half of a concrete helper's [`PyClassInitializer`] chain.
-    #[allow(dead_code)]
     pub(crate) fn from_shared(inner: Shared<dyn YoYInflationHelper>) -> Self {
         PyYoYInflationHelper { inner }
     }
 
     /// A clone of the upcast helper, for the piecewise year-on-year curve
     /// facade, which threads each helper into the bootstrap.
-    #[allow(dead_code)]
     pub(crate) fn shared(&self) -> Shared<dyn YoYInflationHelper> {
         Shared::clone(&self.inner)
     }
@@ -1537,8 +1536,201 @@ impl PyYoYInflationIndex {
 
 impl PyYoYInflationIndex {
     /// The wrapped core index, for the helper and swap facades that take one.
-    #[allow(dead_code)]
     pub(crate) fn shared(&self) -> Shared<YoYInflationIndex> {
         Shared::clone(&self.inner)
+    }
+}
+
+/// Python `YearOnYearInflationSwapHelper`: the bootstrap helper fitting a
+/// year-on-year inflation swap quoted as a rate
+/// (`termstructures::inflation::inflationhelpers::YearOnYearInflationSwapHelper`).
+///
+/// The helper prices a unit-notional, zero-strike swap of its own and reports
+/// that contract's fair rate; the bootstrap drives the quoted rate less that
+/// fair rate to zero. Unlike its zero-coupon twin it does need a nominal curve:
+/// the year-on-year legs pay on a schedule of dates rather than one, so their
+/// discount factors do not cancel.
+///
+/// The swap starts at the evaluation date held by `settings` and is rebuilt
+/// whenever that date moves, so the evaluation date must be set *before* the
+/// constructor runs, not merely before the bootstrap. The helper retains the
+/// caller's [`PySimpleQuote`], so a later `set_value` re-drives the bootstrap.
+///
+/// It prices through a *copy* of `index` linked to a handle of its own, which
+/// the bootstrap points at the curve under construction; the caller's index
+/// keeps whatever curve it had and need not be linked at all.
+///
+/// `pillar` is accepted for signature parity but never read: it only ever
+/// discriminates on the interpolated path, which is refused below.
+///
+/// Fallible: [`CpiInterpolationType.Linear`](PyCpiInterpolationType) is refused
+/// outright (`inflationhelpers.rs:701-706`), the interpolated branch of the C++
+/// constructor being deferred with the rest of `CPI::Linear` (#847); and the
+/// swap is built here, so an observation lag its legs cannot be built under
+/// fails at construction. Both raise [`struct@crate::ItofinError`].
+///
+/// Deferred (visible): the zero twin's `inflation_fixing_date` has no
+/// counterpart here - a year-on-year contract observes once per coupon rather
+/// than once at maturity, and there is no cash-flow facade to enumerate them
+/// through (#848).
+#[pyclass(
+    name = "YearOnYearInflationSwapHelper",
+    extends = PyYoYInflationHelper,
+    unsendable
+)]
+pub struct PyYearOnYearInflationSwapHelper;
+
+#[pymethods]
+impl PyYearOnYearInflationSwapHelper {
+    /// A helper fitting `quote` on a swap maturing at `maturity`, discounted on
+    /// `nominal_term_structure`.
+    #[new]
+    #[pyo3(signature = (
+        quote,
+        swap_obs_lag,
+        maturity,
+        calendar,
+        payment_convention,
+        day_counter,
+        index,
+        interpolation,
+        nominal_term_structure,
+        settings,
+        pillar = PyPillar::LastRelevantDate,
+    ))]
+    #[allow(clippy::too_many_arguments)]
+    fn new(
+        quote: &PySimpleQuote,
+        swap_obs_lag: &PyPeriod,
+        maturity: &PyDate,
+        calendar: &PyCalendar,
+        payment_convention: &PyBusinessDayConvention,
+        day_counter: &PyDayCounter,
+        index: &PyYoYInflationIndex,
+        interpolation: &PyCpiInterpolationType,
+        nominal_term_structure: &PyYieldTermStructure,
+        settings: &PySettings,
+        pillar: PyPillar,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        let concrete = YearOnYearInflationSwapHelper::new(
+            quote.handle(),
+            swap_obs_lag.inner(),
+            maturity.inner(),
+            calendar.inner(),
+            payment_convention.inner(),
+            day_counter.inner(),
+            &index.shared(),
+            interpolation.inner(),
+            nominal_term_structure.handle(),
+            pillar.inner(),
+            settings.inner(),
+        )
+        .map_err(PyQlError::from)?;
+        let erased = concrete as Shared<dyn YoYInflationHelper>;
+        Ok(
+            PyClassInitializer::from(PyYoYInflationHelper::from_shared(erased))
+                .add_subclass(PyYearOnYearInflationSwapHelper),
+        )
+    }
+}
+
+/// Python `PiecewiseYoYInflationCurve`: a year-on-year inflation curve
+/// bootstrapped from year-on-year helpers, solving one rate node per helper
+/// (`termstructures::inflation::PiecewiseYoYInflationCurve<Linear>`).
+///
+/// Extends [`PyYoYInflationTermStructure`], which carries the whole query
+/// surface. Node zero sits on `base_date` at `base_yoy_rate` and is kept rather
+/// than solved: the base date is the last date for which a fixing is known and
+/// precedes the reference date, so [`times`](Self::times)`[0]` is negative.
+/// Each helper's observed fixing period marks a later segment boundary, and its
+/// node is solved so the helper reprices its own quote off the curve.
+///
+/// Lazy, like [`PyPiecewiseZeroInflationCurve`]: the constructor only registers
+/// on the helpers, and the bootstrap runs on the first read - a query, an
+/// inspector, or an explicit [`calculate`](Self::calculate). A helper quote
+/// moving invalidates the cache.
+///
+/// Fallible: the core rejects an empty helper set, and every inspector
+/// propagates a bootstrap failure as [`struct@crate::ItofinError`]. `Linear` is
+/// pinned at the boundary, it being the only interpolator the core constructs.
+#[pyclass(
+    name = "PiecewiseYoYInflationCurve",
+    extends = PyYoYInflationTermStructure,
+    unsendable
+)]
+pub struct PyPiecewiseYoYInflationCurve {
+    concrete: Shared<PiecewiseYoYInflationCurve<Linear>>,
+}
+
+#[pymethods]
+impl PyPiecewiseYoYInflationCurve {
+    /// A curve over `helpers` with a fixed `reference_date`, a `base_date`
+    /// preceding it and the `base_yoy_rate` observed over the period ending
+    /// there. `helpers` accepts any [`YoYInflationHelper`](PyYoYInflationHelper)
+    /// subclass.
+    #[new]
+    #[allow(clippy::too_many_arguments)]
+    fn new(
+        reference_date: &PyDate,
+        base_date: &PyDate,
+        base_yoy_rate: f64,
+        frequency: &PyFrequency,
+        day_counter: &PyDayCounter,
+        helpers: Vec<PyRef<PyYoYInflationHelper>>,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        let instruments: Vec<Shared<dyn YoYInflationHelper>> =
+            helpers.iter().map(|helper| helper.shared()).collect();
+        let concrete = PiecewiseYoYInflationCurve::<Linear>::new(
+            reference_date.inner(),
+            base_date.inner(),
+            base_yoy_rate,
+            frequency.inner(),
+            day_counter.inner(),
+            instruments,
+            None,
+        )
+        .map_err(PyQlError::from)?;
+        let erased = Shared::clone(&concrete) as Shared<dyn YoYInflationTermStructure>;
+        Ok(
+            PyClassInitializer::from(PyYoYInflationTermStructure::from_handle(Handle::new(
+                erased,
+            )))
+            .add_subclass(PyPiecewiseYoYInflationCurve { concrete }),
+        )
+    }
+
+    /// Runs the bootstrap if the cache is stale, so a solver failure surfaces
+    /// here rather than inside a later query.
+    fn calculate(&self) -> PyResult<()> {
+        Ok(self.concrete.calculate().map_err(PyQlError::from)?)
+    }
+
+    /// The node times, measured from the reference date in the curve's own day
+    /// count; the first is negative (triggers the bootstrap).
+    fn times(&self) -> PyResult<Vec<f64>> {
+        Ok(self.concrete.times().map_err(PyQlError::from)?)
+    }
+
+    /// The node dates, the first of which is the base date (triggers the
+    /// bootstrap).
+    fn dates(&self) -> PyResult<Vec<PyDate>> {
+        Ok(self
+            .concrete
+            .dates()
+            .map_err(PyQlError::from)?
+            .into_iter()
+            .map(PyDate::from_inner)
+            .collect())
+    }
+
+    /// The solved `(date, year-on-year rate)` nodes (triggers the bootstrap).
+    fn nodes(&self) -> PyResult<Vec<(PyDate, f64)>> {
+        Ok(self
+            .concrete
+            .nodes()
+            .map_err(PyQlError::from)?
+            .into_iter()
+            .map(|(date, rate)| (PyDate::from_inner(date), rate))
+            .collect())
     }
 }
