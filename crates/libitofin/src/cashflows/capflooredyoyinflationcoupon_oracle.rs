@@ -39,6 +39,8 @@ use crate::handle::Handle;
 use crate::indexes::Region;
 use crate::indexes::index::Index;
 use crate::indexes::inflationindex::{CpiInterpolationType, YoYInflationIndex};
+use crate::option::OptionType;
+use crate::pricingengines::blackformula::{bachelier_black_formula, black_formula};
 use crate::settings::Settings;
 use crate::shared::{Shared, SharedMut, shared, shared_mut};
 use crate::termstructures::volatility::{
@@ -283,4 +285,170 @@ fn a_collar_is_its_floor_and_its_cap_less_the_swaplet() {
             );
         }
     }
+}
+
+/// A coupon fixing on or before the surface's base date is determined: its
+/// optionlets are the intrinsic `max(a - b, 0)`, exactly, with no volatility
+/// read. The surface must still be present - the pricer reads its base date to
+/// decide - which the fixture supplies.
+#[test]
+fn a_determined_coupon_pays_its_intrinsic_optionlet() {
+    let gearing = 2.5;
+    for distribution in EVERY_DISTRIBUTION {
+        let cap_level = 0.04;
+        let (wrapper, pricer) = wrapped(
+            distribution,
+            determined_end(),
+            gearing,
+            SPREAD,
+            Some(cap_level),
+            None,
+        )
+        .expect("one level is always consistent");
+        wrapper.rate().expect("the observed month is published");
+
+        let effective_cap = wrapper.effective_cap();
+        let caplet = pricer
+            .borrow()
+            .caplet_rate(effective_cap)
+            .expect("a determined coupon needs no volatility");
+        let expected = gearing * (DETERMINED_FIXING - effective_cap).max(0.0);
+        assert!(
+            (caplet - expected).abs() < 1e-12,
+            "{distribution:?} caplet was {caplet}, expected {expected}"
+        );
+        assert!(caplet > 0.0, "the caplet is in the money");
+
+        let effective_floor = 0.035;
+        let floorlet = pricer
+            .borrow()
+            .floorlet_rate(effective_floor)
+            .expect("a determined coupon needs no volatility");
+        let expected = gearing * (effective_floor - DETERMINED_FIXING).max(0.0);
+        assert!(
+            (floorlet - expected).abs() < 1e-12,
+            "{distribution:?} floorlet was {floorlet}, expected {expected}"
+        );
+        assert!(floorlet > 0.0, "the floorlet is in the money");
+    }
+}
+
+/// A live coupon prices under its distribution, each routing to the formula it
+/// names with the standard deviation the surface implies. The elapsed time is
+/// written out rather than taken from the surface: 1 June 2021 to 1 November
+/// 2021 on `Actual365Fixed`, which re-pins the period snapping at both ends.
+#[test]
+fn a_live_coupon_prices_under_its_own_distribution() {
+    let gearing = 2.5;
+    let cap_level = 0.09;
+    let time =
+        Actual365Fixed::new().year_fraction(Date::new(1, June, 2021), Date::new(1, November, 2021));
+    let std_dev = VOL * time.sqrt();
+    assert!(std_dev > 0.0, "the live coupon carries volatility");
+
+    let mut rates = Vec::new();
+    for distribution in EVERY_DISTRIBUTION {
+        let (wrapper, pricer) = wrapped(
+            distribution,
+            live_end(),
+            gearing,
+            SPREAD,
+            Some(cap_level),
+            None,
+        )
+        .expect("one level is always consistent");
+        wrapper.rate().expect("the observed month is published");
+
+        let effective_cap = wrapper.effective_cap();
+        let caplet = pricer
+            .borrow()
+            .caplet_rate(effective_cap)
+            .expect("the surface carries a volatility");
+
+        let optionlet = match distribution {
+            YoYOptionletDistribution::Black => black_formula(
+                OptionType::Call,
+                effective_cap,
+                LIVE_FIXING,
+                std_dev,
+                1.0,
+                0.0,
+            ),
+            YoYOptionletDistribution::UnitDisplaced => black_formula(
+                OptionType::Call,
+                effective_cap,
+                LIVE_FIXING,
+                std_dev,
+                1.0,
+                1.0,
+            ),
+            YoYOptionletDistribution::Bachelier => {
+                bachelier_black_formula(OptionType::Call, effective_cap, LIVE_FIXING, std_dev, 1.0)
+            }
+        }
+        .expect("the formula prices");
+
+        assert!(
+            (caplet - gearing * optionlet).abs() < 1e-10,
+            "{distribution:?} caplet was {caplet}, expected {}",
+            gearing * optionlet
+        );
+        rates.push(caplet);
+    }
+
+    for (i, left) in rates.iter().enumerate() {
+        for right in &rates[i + 1..] {
+            assert!(
+                (left - right).abs() > 1e-6,
+                "two distributions agree to {}, the fixture cannot tell them apart",
+                (left - right).abs()
+            );
+        }
+    }
+}
+
+/// The gearing-sign role swap, on the fixture `inflationcapflooredcoupon.cpp`
+/// uses for it (`:375-384`): gearing -1.5, spread 0.12, a cap at 0.10 and no
+/// floor. The coupon comes out *floored*, and the floorlet is struck at the
+/// de-spread, de-geared level computed from the stored floor - which the swap
+/// took from the cap argument - and not from the argument itself.
+#[test]
+fn a_negative_gearing_floors_a_capped_coupon_at_the_swapped_level() {
+    let (gearing, spread, cap_level) = (-1.5, 0.12, 0.10);
+    let (wrapper, pricer) = wrapped(
+        YoYOptionletDistribution::Bachelier,
+        live_end(),
+        gearing,
+        spread,
+        Some(cap_level),
+        None,
+    )
+    .expect("one level is always consistent");
+
+    assert!(wrapper.is_floored() && !wrapper.is_capped());
+    let effective_floor = wrapper.effective_floor();
+    assert!((effective_floor - (cap_level - spread) / gearing).abs() < 1e-15);
+
+    let rate = wrapper.rate().expect("the observed month is published");
+    let swaplet = gearing * LIVE_FIXING + spread;
+    let floorlet = gearing
+        * pricer
+            .borrow()
+            .optionlet_rate(OptionType::Put, effective_floor)
+            .expect("the surface carries a volatility");
+    assert!(
+        (rate - (swaplet + floorlet)).abs() < 1e-12,
+        "rate was {rate}, expected {}",
+        swaplet + floorlet
+    );
+
+    let at_the_argument = gearing
+        * pricer
+            .borrow()
+            .optionlet_rate(OptionType::Put, cap_level)
+            .expect("the surface carries a volatility");
+    assert!(
+        (floorlet - at_the_argument).abs() > 1e-6,
+        "the fixture cannot tell the swapped strike from the argument"
+    );
 }
