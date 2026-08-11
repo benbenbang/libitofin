@@ -252,3 +252,161 @@ impl YoYOptionletVolatilitySurface for ConstantYoYOptionletVolatility {
         Ok(volatility * volatility * self.time_from_base(date, obs_lag)?)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    //! QuantLib prices no bare surface: `inflationcapfloor.cpp` reaches one only
+    //! through a cap/floor instrument, whose oracle lands with `#851`. The
+    //! numbers below are therefore the date arithmetic of `.cpp:51-166` read
+    //! directly - which lag is applied, which date it snaps to, and which
+    //! interval the variance accrues over - rather than a C++ premium.
+
+    use super::*;
+    use crate::quotes::SimpleQuote;
+    use crate::shared::shared;
+    use crate::test_support::{Flag, as_observer};
+    use crate::time::calendars::unitedkingdom::{self, UnitedKingdom};
+    use crate::time::date::Month::{April, July, June, March, May};
+    use crate::time::daycounters::actual365fixed::Actual365Fixed;
+    use crate::time::timeunit::TimeUnit;
+
+    const VOL: Volatility = 0.01;
+
+    fn lag() -> Period {
+        Period::new(2, TimeUnit::Months)
+    }
+
+    fn zero_lag() -> Period {
+        Period::new(0, TimeUnit::Days)
+    }
+
+    /// A surface as of 15 June 2026 with a two-month observation lag, monthly
+    /// publication. `settlement_days` is zero, so the reference date is the
+    /// evaluation date itself.
+    fn surface(index_is_interpolated: bool) -> ConstantYoYOptionletVolatility {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(Date::new(15, June, 2026));
+        ConstantYoYOptionletVolatility::new(
+            VOL,
+            0,
+            UnitedKingdom::new(unitedkingdom::Market::Settlement),
+            BusinessDayConvention::ModifiedFollowing,
+            Actual365Fixed::new(),
+            lag(),
+            Frequency::Monthly,
+            index_is_interpolated,
+            -1.0,
+            100.0,
+            settings,
+        )
+    }
+
+    /// `baseDate` is the reference date pulled back by the surface's own lag,
+    /// then snapped to the start of the publication month unless the index
+    /// interpolates (`.cpp:57-63`). 15 June less two months is 15 April, which
+    /// snaps to 1 April.
+    #[test]
+    fn the_base_date_snaps_to_the_publication_period_unless_interpolated() {
+        assert_eq!(
+            surface(false).base_date().unwrap(),
+            Date::new(1, April, 2026)
+        );
+        assert_eq!(
+            surface(true).base_date().unwrap(),
+            Date::new(15, April, 2026)
+        );
+    }
+
+    /// `totalVariance` is `vol * vol * timeFromBase`, and `timeFromBase` applies
+    /// the lag it is *handed*, not the surface's own (`.cpp:136-152`): at the
+    /// zero lag the pricer passes, the variance accrues from the base date to
+    /// the exercise month itself.
+    #[test]
+    fn the_total_variance_accrues_over_the_handed_lag() {
+        let surface = surface(false);
+        let exercise = Date::new(20, July, 2026);
+
+        let time = surface.time_from_base(exercise, zero_lag()).unwrap();
+        let expected = Actual365Fixed::new()
+            .year_fraction(Date::new(1, April, 2026), Date::new(1, July, 2026));
+        assert!((time - expected).abs() < 1e-15, "time was {time}");
+
+        let variance = surface.total_variance(exercise, 0.03, zero_lag()).unwrap();
+        assert!(
+            (variance - VOL * VOL * expected).abs() < 1e-18,
+            "variance was {variance}"
+        );
+
+        let lagged = surface.time_from_base(exercise, lag()).unwrap();
+        let lagged_expected =
+            Actual365Fixed::new().year_fraction(Date::new(1, April, 2026), Date::new(1, May, 2026));
+        assert!(
+            (lagged - lagged_expected).abs() < 1e-15,
+            "the surface's own lag gives {lagged}"
+        );
+    }
+
+    /// Flat in both arguments, and live to its quote.
+    #[test]
+    fn the_volatility_is_flat_and_follows_its_quote() {
+        let surface = surface(false);
+        for date in [Date::new(1, July, 2026), Date::new(20, July, 2030)] {
+            for strike in [-0.5, 0.0, 0.03, 50.0] {
+                assert_eq!(surface.volatility(date, strike, zero_lag()).unwrap(), VOL);
+            }
+        }
+
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(Date::new(15, June, 2026));
+        let quote = make_quote_handle(0.02);
+        let quoted = ConstantYoYOptionletVolatility::with_quote(
+            quote.handle(),
+            0,
+            UnitedKingdom::new(unitedkingdom::Market::Settlement),
+            BusinessDayConvention::ModifiedFollowing,
+            Actual365Fixed::new(),
+            lag(),
+            Frequency::Monthly,
+            false,
+            -1.0,
+            100.0,
+            settings,
+        );
+        let flag = Flag::new();
+        quoted.observable().register_observer(&as_observer(&flag));
+
+        quote.link_to(shared(SimpleQuote::new(0.05)) as Shared<dyn Quote>);
+        assert!(Flag::is_up(&flag));
+        assert_eq!(
+            quoted
+                .volatility(Date::new(20, July, 2026), 0.03, zero_lag())
+                .unwrap(),
+            0.05
+        );
+    }
+
+    /// A date before the base date, and a strike outside the domain, are both
+    /// refused (`checkRange`, `.cpp:67-76`) - unless extrapolation is enabled.
+    #[test]
+    fn a_date_before_the_base_date_or_a_strike_off_the_domain_is_rejected() {
+        let surface = surface(false);
+
+        let early = surface
+            .volatility(Date::new(20, March, 2026), 0.03, zero_lag())
+            .expect_err("March 2026 precedes the April base date");
+        assert!(early.message().contains("before base date"), "err: {early}");
+
+        let wide = surface
+            .volatility(Date::new(20, July, 2026), 200.0, zero_lag())
+            .expect_err("200 is past the 100 maximum strike");
+        assert!(wide.message().contains("outside the curve"), "err: {wide}");
+
+        surface.enable_extrapolation();
+        assert_eq!(
+            surface
+                .volatility(Date::new(20, July, 2026), 200.0, zero_lag())
+                .unwrap(),
+            VOL
+        );
+    }
+}
