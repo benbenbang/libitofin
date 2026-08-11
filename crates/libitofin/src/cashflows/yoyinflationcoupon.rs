@@ -27,10 +27,12 @@
 //! forwarding half is kept: the coupon rebroadcasts its index, its pricer and
 //! the evaluation date to its own observers.
 //!
-//! Deferred, with the cap/floor slice of `#838`: every vol-dependent pricer
-//! (`Black`/`UnitDisplacedBlack`/`Bachelier`) and the `capletRate`,
-//! `floorletRate` and `optionletRate` machinery underneath them. The coupon's
-//! own `adjustedFixing()` (`yoyinflationcoupon.hpp:60`, `:89`) goes with them:
+//! The vol-dependent pricers (`Black`/`UnitDisplacedBlack`/`Bachelier`) and the
+//! `capletRate`, `floorletRate` and `optionletRate` machinery underneath them
+//! landed with `#838`, as
+//! [`YoYInflationOptionletCouponPricer`](super::YoYInflationOptionletCouponPricer);
+//! only the default-erroring halves of the trait are here. The coupon's own
+//! `adjustedFixing()` (`yoyinflationcoupon.hpp:60`, `:89`) stays unported:
 //! nothing in `ql/` or `test-suite/` calls it, so it has no behaviour to pin
 //! and waits for a caller. `price()`
 //! (amount times a discount factor, `inflationcoupon.cpp:91-93`) and the
@@ -254,8 +256,10 @@ impl Coupon for YoYInflationCoupon {
 ///
 /// A coupon registers as an observer of its pricer (via [`AsObservable`]) and,
 /// on each rate query, calls [`initialize`](Self::initialize) then reads
-/// [`swaplet_rate`](Self::swaplet_rate). The cap and floor half of the C++
-/// interface (`inflationcouponpricer.hpp:62-68`) is deferred with `#838`.
+/// [`swaplet_rate`](Self::swaplet_rate). A `CappedFlooredYoYInflationCoupon`
+/// additionally reads [`caplet_rate`](Self::caplet_rate) and
+/// [`floorlet_rate`](Self::floorlet_rate), which only a pricer carrying an
+/// optionlet volatility answers.
 pub trait YoYInflationCouponPricer: AsObservable {
     /// Caches whatever the pricer needs from `coupon` before a rate is read
     /// (`YoYInflationCouponPricer::initialize`).
@@ -266,6 +270,35 @@ pub trait YoYInflationCouponPricer: AsObservable {
 
     /// The swaplet rate accrued and discounted to today (`swapletPrice`).
     fn swaplet_price(&self) -> QlResult<Real>;
+
+    /// The geared rate of a caplet struck at `effective_cap` (`capletRate`,
+    /// `inflationcouponpricer.cpp:75-77`); by default, no rate at all.
+    ///
+    /// # Errors
+    ///
+    /// Unless the pricer carries an optionlet volatility surface. Divergence:
+    /// the C++ base *does* answer a caplet on an already-determined coupon, its
+    /// intrinsic value needing no distribution, and only fails once a fixing in
+    /// the future forces it into `optionletPriceImp` (`.cpp:96-123`). The port
+    /// refuses both from here and prices the intrinsic case in
+    /// [`YoYInflationOptionletCouponPricer`](super::YoYInflationOptionletCouponPricer),
+    /// which is the pricer that knows the surface whose base date decides
+    /// whether the coupon is determined at all. A swaplet-only pricer therefore
+    /// refuses every optionlet, determined or not.
+    fn caplet_rate(&self, _effective_cap: Rate) -> QlResult<Rate> {
+        fail!("this pricer needs a volatility surface to rate an optionlet");
+    }
+
+    /// The geared rate of a floorlet struck at `effective_floor`
+    /// (`floorletRate`, `inflationcouponpricer.cpp:71-73`); by default, no rate
+    /// at all.
+    ///
+    /// # Errors
+    ///
+    /// As [`caplet_rate`](Self::caplet_rate).
+    fn floorlet_rate(&self, _effective_floor: Rate) -> QlResult<Rate> {
+        fail!("this pricer needs a volatility surface to rate an optionlet");
+    }
 }
 
 /// The rate-and-discount pricer: QuantLib's `YoYInflationCouponPricer` with the
