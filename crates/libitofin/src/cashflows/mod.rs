@@ -8,6 +8,8 @@ mod capflooredcoupon;
 #[cfg(test)]
 mod capflooredcoupon_oracle;
 mod capflooredyoyinflationcoupon;
+#[cfg(test)]
+mod capflooredyoyinflationcoupon_oracle;
 #[allow(clippy::module_inception)]
 mod cashflows;
 mod coupon;
