@@ -388,3 +388,155 @@ impl Instrument for YoYInflationCapFloor {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    //! The prices are pinned by the instrument oracle
+    //! (`test-suite/inflationcapfloor.cpp`, ported alongside the engine); what
+    //! is here is the structure the oracle's flat-gearing fixture cannot see -
+    //! the strike padding, the refusals, and the de-gearing.
+
+    use super::*;
+    use crate::cashflows::YoYInflationLeg;
+    use crate::handle::Handle;
+    use crate::indexes::inflation::UkRpi;
+    use crate::indexes::inflationindex::CpiInterpolationType;
+    use crate::shared::shared;
+    use crate::termstructures::inflation::inflationtermstructure::YoYInflationTermStructure;
+    use crate::time::businessdayconvention::BusinessDayConvention;
+    use crate::time::calendars::unitedkingdom::{self, UnitedKingdom};
+    use crate::time::date::Month;
+    use crate::time::daycounters::thirty360::{Convention, Thirty360};
+    use crate::time::frequency::Frequency;
+    use crate::time::schedule::MakeSchedule;
+    use crate::time::timeunit::TimeUnit;
+
+    fn settings_on(today: Date) -> Shared<Settings<Date>> {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(today);
+        settings
+    }
+
+    /// A three-coupon annual leg over an unlinked UK RPI year-on-year index.
+    /// Nothing here prices, so the empty curve handle is never read.
+    fn leg(
+        settings: &Shared<Settings<Date>>,
+        gearing: Real,
+        spread: Real,
+    ) -> Vec<Shared<YoYInflationCoupon>> {
+        let rpi = shared(UkRpi::new(Shared::clone(settings)));
+        let index = shared(
+            YoYInflationIndex::from_underlying(rpi)
+                .with_term_structure(Handle::<dyn YoYInflationTermStructure>::empty()),
+        );
+        let calendar = UnitedKingdom::new(unitedkingdom::Market::Settlement);
+        let schedule = MakeSchedule::new()
+            .from(Date::new(13, Month::August, 2007))
+            .to(Date::new(13, Month::August, 2010))
+            .with_frequency(Frequency::Annual)
+            .with_calendar(calendar.clone())
+            .with_convention(BusinessDayConvention::Unadjusted)
+            .build();
+        YoYInflationLeg::new(
+            schedule,
+            calendar,
+            index,
+            Period::new(2, TimeUnit::Months),
+            CpiInterpolationType::Flat,
+        )
+        .with_notional(1_000_000.0)
+        .with_payment_day_counter(Thirty360::with_convention(Convention::BondBasis))
+        .with_gearing(gearing)
+        .with_spread(spread)
+        .coupons()
+        .expect("a well-formed leg")
+    }
+
+    #[test]
+    fn a_cap_pads_the_strike_to_the_leg_length() {
+        let settings = settings_on(Date::new(13, Month::August, 2007));
+        let coupons = leg(&settings, 1.0, 0.0);
+        let n = coupons.len();
+        let cap = YoYInflationCapFloor::cap(coupons, vec![0.03], settings).unwrap();
+
+        assert_eq!(cap.cap_floor_type(), CapFloorType::Cap);
+        assert_eq!(cap.cap_rates(), vec![0.03; n].as_slice());
+        assert!(cap.floor_rates().is_empty());
+    }
+
+    #[test]
+    fn a_collar_cannot_be_built_from_one_strike_vector() {
+        let settings = settings_on(Date::new(13, Month::August, 2007));
+        let coupons = leg(&settings, 1.0, 0.0);
+        let err =
+            YoYInflationCapFloor::with_strikes(CapFloorType::Collar, coupons, vec![0.03], settings)
+                .err()
+                .expect("a collar needs both vectors");
+        assert_eq!(
+            err.message(),
+            "only Cap/Floor types allowed in this constructor"
+        );
+    }
+
+    #[test]
+    fn a_cap_needs_at_least_one_rate() {
+        let settings = settings_on(Date::new(13, Month::August, 2007));
+        let coupons = leg(&settings, 1.0, 0.0);
+        let err = YoYInflationCapFloor::cap(coupons, Vec::new(), settings)
+            .err()
+            .expect("a cap needs a strike");
+        assert_eq!(err.message(), "no cap rates given");
+    }
+
+    /// `setupArguments` pulls the strike back onto the bare index forward the
+    /// engine prices on, `(rate - spread) / gearing` (`.cpp:170`, `:175`), and
+    /// leaves the unused side `None` (`.cpp:172`, `:177`).
+    #[test]
+    fn setup_arguments_de_gears_the_strike() {
+        let settings = settings_on(Date::new(13, Month::August, 2007));
+        let coupons = leg(&settings, 2.0, 0.01);
+        let cap = YoYInflationCapFloor::cap(coupons, vec![0.05], settings).unwrap();
+
+        let mut args = YoYInflationCapFloorArguments::default();
+        cap.setup_arguments(&mut args).unwrap();
+        args.validate().expect("every vector spans the leg");
+
+        assert!(args.cap_rates.iter().all(|rate| *rate == Some(0.02)));
+        assert!(args.floor_rates.iter().all(Option::is_none));
+        assert!(args.gearings.iter().all(|gearing| *gearing == 2.0));
+    }
+
+    /// `optionlet(n)` keeps the parent's type and carries that coupon's strike.
+    #[test]
+    fn an_optionlet_carries_one_coupon_and_its_own_strike() {
+        let settings = settings_on(Date::new(13, Month::August, 2007));
+        let coupons = leg(&settings, 1.0, 0.0);
+        let collar =
+            YoYInflationCapFloor::collar(coupons, vec![0.06], vec![0.02], settings).unwrap();
+
+        let optionlet = collar.optionlet(1).unwrap();
+        assert_eq!(optionlet.cap_floor_type(), CapFloorType::Collar);
+        assert_eq!(optionlet.yoy_leg().len(), 1);
+        assert_eq!(optionlet.cap_rates(), [0.06].as_slice());
+        assert_eq!(optionlet.floor_rates(), [0.02].as_slice());
+
+        let err = collar.optionlet(3).err().expect("only three coupons");
+        assert!(err.message().contains("does not exist"), "err was: {err}");
+    }
+
+    /// `validate` rejects a per-coupon vector that has desynced from the leg.
+    #[test]
+    fn validate_rejects_a_desynced_nominal_count() {
+        let settings = settings_on(Date::new(13, Month::August, 2007));
+        let coupons = leg(&settings, 1.0, 0.0);
+        let cap = YoYInflationCapFloor::cap(coupons, vec![0.03], settings).unwrap();
+
+        let mut args = YoYInflationCapFloorArguments::default();
+        cap.setup_arguments(&mut args).unwrap();
+        args.nominals.pop();
+        assert_eq!(
+            args.validate().expect_err("a short vector").message(),
+            "nominal count mismatch"
+        );
+    }
+}
