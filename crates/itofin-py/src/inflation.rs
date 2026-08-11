@@ -20,7 +20,7 @@ use crate::market::PySimpleQuote;
 use crate::settings::PySettings;
 use crate::swap::PySwapType;
 use crate::time::{
-    PyBusinessDayConvention, PyCalendar, PyDate, PyDayCounter, PyFrequency, PyPeriod,
+    PyBusinessDayConvention, PyCalendar, PyDate, PyDayCounter, PyFrequency, PyPeriod, PySchedule,
 };
 use libitofin::currency::Currency;
 use libitofin::handle::{Handle, RelinkableHandle};
@@ -31,7 +31,7 @@ use libitofin::indexes::inflationindex::{
 };
 use libitofin::indexes::region::Region;
 use libitofin::instrument::Instrument;
-use libitofin::instruments::ZeroCouponInflationSwap;
+use libitofin::instruments::{YearOnYearInflationSwap, ZeroCouponInflationSwap};
 use libitofin::math::interpolations::linear::Linear;
 use libitofin::pricingengine::PricingEngine;
 use libitofin::pricingengines::DiscountingSwapEngine;
@@ -1732,5 +1732,166 @@ impl PyPiecewiseYoYInflationCurve {
             .into_iter()
             .map(|(date, rate)| (PyDate::from_inner(date), rate))
             .collect())
+    }
+}
+
+/// Python `YearOnYearInflationSwap`: a fixed leg against a leg of year-on-year
+/// inflation coupons, both paid over a schedule
+/// (`instruments::yearonyearinflationswap`).
+///
+/// [`SwapType`](crate::swap::PySwapType) names the *fixed* leg, so a `Payer`
+/// pays fixed and receives inflation - the opposite reading from
+/// [`PyZeroCouponInflationSwap`], where it names the inflation leg.
+///
+/// The two schedules are independent inputs. The fixed leg takes its payment
+/// calendar from its own schedule while the year-on-year leg pays on
+/// `payment_calendar`, the inflation index carrying no calendar of its own;
+/// both legs adjust with `payment_convention`, which C++ defaults to
+/// `ModifiedFollowing` and the port takes explicitly. `spread` is added to
+/// every forecast rate on the year-on-year leg.
+///
+/// Fallible at construction: both leg builds propagate, so a coupon the
+/// observation lag leaves unbuildable fails here.
+///
+/// Pricing needs an engine: call [`set_engine`](Self::set_engine) before
+/// anything else. Every accessor below is `&mut self` where the zero-coupon
+/// swap's [`fair_rate`](PyZeroCouponInflationSwap::fair_rate) is not: this
+/// contract recovers both fair values from a priced result rather than reading
+/// a single indexed flow (`yearonyearinflationswap.rs:311,326`), so each one
+/// drives the calculation.
+///
+/// Deferred (visible): the leg and coupon accessors are not surfaced, there
+/// being no cash-flow facade to hand them back through (#848).
+#[pyclass(name = "YearOnYearInflationSwap", unsendable)]
+pub struct PyYearOnYearInflationSwap {
+    inner: SharedMut<YearOnYearInflationSwap>,
+}
+
+#[pymethods]
+impl PyYearOnYearInflationSwap {
+    #[new]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (
+        swap_type,
+        nominal,
+        fixed_schedule,
+        fixed_rate,
+        fixed_day_count,
+        yoy_schedule,
+        yoy_index,
+        observation_lag,
+        interpolation,
+        spread,
+        yoy_day_count,
+        payment_calendar,
+        payment_convention,
+        settings,
+    ))]
+    fn new(
+        swap_type: &PySwapType,
+        nominal: f64,
+        fixed_schedule: &PySchedule,
+        fixed_rate: f64,
+        fixed_day_count: &PyDayCounter,
+        yoy_schedule: &PySchedule,
+        yoy_index: &PyYoYInflationIndex,
+        observation_lag: &PyPeriod,
+        interpolation: &PyCpiInterpolationType,
+        spread: f64,
+        yoy_day_count: &PyDayCounter,
+        payment_calendar: &PyCalendar,
+        payment_convention: &PyBusinessDayConvention,
+        settings: &PySettings,
+    ) -> PyResult<Self> {
+        Ok(PyYearOnYearInflationSwap {
+            inner: shared_mut(
+                YearOnYearInflationSwap::new(
+                    swap_type.inner(),
+                    nominal,
+                    fixed_schedule.inner(),
+                    fixed_rate,
+                    fixed_day_count.inner(),
+                    yoy_schedule.inner(),
+                    yoy_index.shared(),
+                    observation_lag.inner(),
+                    interpolation.inner(),
+                    spread,
+                    yoy_day_count.inner(),
+                    payment_calendar.inner(),
+                    payment_convention.inner(),
+                    settings.inner(),
+                )
+                .map_err(PyQlError::from)?,
+            ),
+        })
+    }
+
+    /// Attaches a [`PyDiscountingSwapEngine`] so the swap prices.
+    ///
+    /// The engine must resolve its dates against the same `Settings` object
+    /// this swap was built with.
+    fn set_engine(&mut self, engine: &PyDiscountingSwapEngine) {
+        self.inner
+            .borrow_mut()
+            .base_mut()
+            .set_pricing_engine(engine.engine());
+    }
+
+    /// The swap NPV under the attached engine.
+    ///
+    /// Fallible: with no engine attached the core reports `"null pricing
+    /// engine"`, and with no curve linked into the index the coupons cannot be
+    /// forecast.
+    fn npv(&mut self) -> PyResult<f64> {
+        Ok(self.inner.borrow_mut().npv().map_err(PyQlError::from)?)
+    }
+
+    /// The fixed rate that would price the swap at zero, recovered from the NPV
+    /// and the fixed leg's BPS. Prices on demand, so it needs an engine.
+    fn fair_rate(&mut self) -> PyResult<f64> {
+        Ok(self
+            .inner
+            .borrow_mut()
+            .fair_rate()
+            .map_err(PyQlError::from)?)
+    }
+
+    /// The spread over the index that would price the swap at zero, recovered
+    /// off the year-on-year leg. Fallible as [`fair_rate`](Self::fair_rate).
+    fn fair_spread(&mut self) -> PyResult<f64> {
+        Ok(self
+            .inner
+            .borrow_mut()
+            .fair_spread()
+            .map_err(PyQlError::from)?)
+    }
+
+    /// The fixed leg's NPV, priced on demand. Fallible as [`npv`](Self::npv).
+    fn fixed_leg_npv(&mut self) -> PyResult<f64> {
+        Ok(self
+            .inner
+            .borrow_mut()
+            .fixed_leg_npv()
+            .map_err(PyQlError::from)?)
+    }
+
+    /// The year-on-year leg's NPV, priced on demand. Fallible as
+    /// [`npv`](Self::npv).
+    fn yoy_leg_npv(&mut self) -> PyResult<f64> {
+        Ok(self
+            .inner
+            .borrow_mut()
+            .yoy_leg_npv()
+            .map_err(PyQlError::from)?)
+    }
+
+    /// The quoted fixed rate the swap was struck at.
+    fn fixed_rate(&self) -> f64 {
+        self.inner.borrow().fixed_rate()
+    }
+
+    /// The spread the year-on-year coupons carry over the index.
+    fn spread(&self) -> f64 {
+        self.inner.borrow().spread()
     }
 }

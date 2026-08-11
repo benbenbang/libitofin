@@ -57,10 +57,10 @@ use hullwhite::{PyEuribor, PyHullWhite, PySwaptionHelper};
 use inflation::{
     PyCpiInterpolationType, PyDiscountingSwapEngine, PyInterpolatedYoYInflationCurve,
     PyInterpolatedZeroInflationCurve, PyMultiplicativePriceSeasonality,
-    PyPiecewiseYoYInflationCurve, PyPiecewiseZeroInflationCurve, PyYearOnYearInflationSwapHelper,
-    PyYoYInflationHelper, PyYoYInflationIndex, PyYoYInflationTermStructure,
-    PyZeroCouponInflationSwap, PyZeroCouponInflationSwapHelper, PyZeroInflationHelper,
-    PyZeroInflationIndex, PyZeroInflationTermStructure,
+    PyPiecewiseYoYInflationCurve, PyPiecewiseZeroInflationCurve, PyYearOnYearInflationSwap,
+    PyYearOnYearInflationSwapHelper, PyYoYInflationHelper, PyYoYInflationIndex,
+    PyYoYInflationTermStructure, PyZeroCouponInflationSwap, PyZeroCouponInflationSwapHelper,
+    PyZeroInflationHelper, PyZeroInflationIndex, PyZeroInflationTermStructure,
 };
 use libitofin::errors::QlError;
 use market::{PyBlackScholesProcess, PySimpleQuote};
@@ -230,6 +230,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     instruments.add_class::<PyPricingModel>()?;
     instruments.add_class::<PyCreditDefaultSwap>()?;
     instruments.add_class::<PyZeroCouponInflationSwap>()?;
+    instruments.add_class::<PyYearOnYearInflationSwap>()?;
 
     let models = PyModule::new(py, "models")?;
     models.add_class::<PyHestonModel>()?;
