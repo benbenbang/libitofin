@@ -22,10 +22,14 @@ use crate::swap::PySwapType;
 use crate::time::{
     PyBusinessDayConvention, PyCalendar, PyDate, PyDayCounter, PyFrequency, PyPeriod,
 };
+use libitofin::currency::Currency;
 use libitofin::handle::{Handle, RelinkableHandle};
 use libitofin::indexes::index::Index;
 use libitofin::indexes::inflation::{EuHicp, UkHicp, UkRpi};
-use libitofin::indexes::inflationindex::{CpiInterpolationType, ZeroInflationIndex};
+use libitofin::indexes::inflationindex::{
+    CpiInterpolationType, YoYInflationIndex, ZeroInflationIndex,
+};
+use libitofin::indexes::region::Region;
 use libitofin::instrument::Instrument;
 use libitofin::instruments::ZeroCouponInflationSwap;
 use libitofin::math::interpolations::linear::Linear;
@@ -633,6 +637,7 @@ impl PyZeroInflationHelper {
 
 impl PyZeroInflationHelper {
     /// The base half of a concrete helper's [`PyClassInitializer`] chain.
+    #[allow(dead_code)]
     pub(crate) fn from_shared(inner: Shared<dyn ZeroInflationHelper>) -> Self {
         PyZeroInflationHelper { inner }
     }
@@ -1181,7 +1186,6 @@ impl PyYoYInflationTermStructure {
     }
 
     /// A clone of the inner curve handle for the index facade that links one.
-    #[allow(dead_code)]
     pub(crate) fn handle(&self) -> Handle<dyn YoYInflationTermStructure> {
         self.inner.clone()
     }
@@ -1320,6 +1324,221 @@ impl PyYoYInflationHelper {
     /// facade, which threads each helper into the bootstrap.
     #[allow(dead_code)]
     pub(crate) fn shared(&self) -> Shared<dyn YoYInflationHelper> {
+        Shared::clone(&self.inner)
+    }
+}
+
+/// Python `YoYInflationIndex`: an index publishing one year-on-year inflation
+/// rate per period, read back as a stored figure or forecast off its
+/// year-on-year curve (core `indexes::inflationindex::YoYInflationIndex`).
+///
+/// Two forms, as in the core. A **ratio** index
+/// ([`from_underlying`](Self::from_underlying)) derives its rate from two
+/// [`PyZeroInflationIndex`] fixings a year apart and owns no history of its
+/// own; a **quoted** one (the constructor) is published as a rate in its own
+/// right and keeps its own history through [`add_fixing`](Self::add_fixing).
+///
+/// The curve is reached through a [`RelinkableHandle`] the facade owns and both
+/// forms link at construction, for the reason [`PyZeroInflationIndex`]
+/// documents: the core's `with_term_structure` takes a plain
+/// [`Handle`](libitofin::handle::Handle), so an index that did not take this
+/// facade's relinkable handle up front could never be pointed at a curve later
+/// and [`link_to`](Self::link_to) would silently do nothing. The handle starts
+/// empty, so a forecast before any link raises the empty-handle error.
+///
+/// The quoted constructor spells its region and currency out as their component
+/// fields: neither core type has a Python facade, and inventing a name lookup
+/// or defaulting the currency metadata would put made-up values on the index.
+#[pyclass(name = "YoYInflationIndex", unsendable)]
+pub struct PyYoYInflationIndex {
+    inner: Shared<YoYInflationIndex>,
+    curve: RelinkableHandle<dyn YoYInflationTermStructure>,
+    underlying: Option<Py<PyZeroInflationIndex>>,
+}
+
+impl PyYoYInflationIndex {
+    /// Wraps `build` over a fresh empty relinkable handle the index observes.
+    ///
+    /// Both constructors route through here: the core's `from_underlying` and
+    /// `new` alike leave the curve handle empty
+    /// (`inflationindex.rs:661,684`), and it is
+    /// [`with_term_structure`](YoYInflationIndex::with_term_structure) that
+    /// registers the index on a handle it will keep seeing.
+    fn with_curve_handle(
+        underlying: Option<Py<PyZeroInflationIndex>>,
+        build: impl FnOnce(&RelinkableHandle<dyn YoYInflationTermStructure>) -> YoYInflationIndex,
+    ) -> Self {
+        let curve = RelinkableHandle::<dyn YoYInflationTermStructure>::empty();
+        let inner = shared(build(&curve));
+        PyYoYInflationIndex {
+            inner,
+            curve,
+            underlying,
+        }
+    }
+}
+
+#[pymethods]
+impl PyYoYInflationIndex {
+    /// A quoted year-on-year index, published as a rate in its own right and
+    /// keeping its own fixing history.
+    #[new]
+    #[pyo3(signature = (
+        family_name,
+        region_name,
+        region_code,
+        revised,
+        frequency,
+        availability_lag,
+        currency_name,
+        currency_code,
+        currency_numeric_code,
+        currency_symbol,
+        currency_fraction_symbol,
+        currency_fractions_per_unit,
+        settings,
+    ))]
+    #[allow(clippy::too_many_arguments)]
+    fn new(
+        family_name: String,
+        region_name: String,
+        region_code: String,
+        revised: bool,
+        frequency: &PyFrequency,
+        availability_lag: &PyPeriod,
+        currency_name: String,
+        currency_code: String,
+        currency_numeric_code: i32,
+        currency_symbol: String,
+        currency_fraction_symbol: String,
+        currency_fractions_per_unit: i32,
+        settings: &PySettings,
+    ) -> Self {
+        PyYoYInflationIndex::with_curve_handle(None, |curve| {
+            YoYInflationIndex::new(
+                family_name,
+                Region::new(region_name, region_code),
+                revised,
+                frequency.inner(),
+                availability_lag.inner(),
+                Currency::new(
+                    currency_name,
+                    currency_code,
+                    currency_numeric_code,
+                    currency_symbol,
+                    currency_fraction_symbol,
+                    currency_fractions_per_unit,
+                ),
+                settings.inner(),
+            )
+            .with_term_structure(curve.handle())
+        })
+    }
+
+    /// A ratio year-on-year index over `underlying`, dividing that index's
+    /// figure for a period by its figure a year earlier.
+    ///
+    /// The metadata is inherited wholesale bar the family name, which is
+    /// prefixed `YYR_`, so a `"UK RPI"` underlying yields `"UK YYR_RPI"`. The
+    /// index files no fixings of its own and reads the underlying's history
+    /// instead, so [`add_fixing`](Self::add_fixing) belongs on the underlying.
+    #[staticmethod]
+    fn from_underlying(underlying: &Bound<'_, PyZeroInflationIndex>) -> Self {
+        let zero = underlying.borrow().shared();
+        let handle = underlying.clone().unbind();
+        PyYoYInflationIndex::with_curve_handle(Some(handle), |curve| {
+            YoYInflationIndex::from_underlying(zero).with_term_structure(curve.handle())
+        })
+    }
+
+    /// The index name, e.g. `"UK YYR_RPI"`, under which fixings are stored.
+    fn name(&self) -> String {
+        self.inner.name()
+    }
+
+    /// Whether this index is the ratio of two price-index fixings rather than a
+    /// quoted rate.
+    fn ratio(&self) -> bool {
+        self.inner.ratio()
+    }
+
+    /// The price index a ratio index divides, `None` on a quoted one.
+    ///
+    /// This is the very object [`from_underlying`](Self::from_underlying) was
+    /// handed, not a fresh facade around the same core index: a rebuilt one
+    /// would carry a relinkable handle this index never sees, so linking it
+    /// would silently forecast off nothing.
+    fn underlying_index(&self, py: Python<'_>) -> Option<Py<PyZeroInflationIndex>> {
+        self.underlying
+            .as_ref()
+            .map(|underlying| underlying.clone_ref(py))
+    }
+
+    /// Records a published year-on-year rate across the whole inflation period
+    /// it describes. A ratio index reads the underlying's history, so filing
+    /// here records a figure it will never consult.
+    fn add_fixing(&self, fixing_date: &PyDate, value: f64) -> PyResult<()> {
+        Ok(self
+            .inner
+            .add_fixing(fixing_date.inner(), value)
+            .map_err(PyQlError::from)?)
+    }
+
+    /// The rate at `fixing_date`, stored or forecast off the linked curve.
+    ///
+    /// `forecast_todays_fixing` is accepted and ignored, as in the core:
+    /// [`needs_forecast`](Self::needs_forecast) alone decides. A forecast with
+    /// no curve linked raises the empty-handle error.
+    #[pyo3(signature = (fixing_date, forecast_todays_fixing = false))]
+    fn fixing(&self, fixing_date: &PyDate, forecast_todays_fixing: bool) -> PyResult<f64> {
+        Ok(self
+            .inner
+            .fixing(fixing_date.inner(), forecast_todays_fixing)
+            .map_err(PyQlError::from)?)
+    }
+
+    /// The first day of the inflation period the latest figure on record
+    /// describes, read off the underlying on a ratio index. An index with no
+    /// history is an error.
+    fn last_fixing_date(&self) -> PyResult<PyDate> {
+        Ok(PyDate::from_inner(
+            self.inner.last_fixing_date().map_err(PyQlError::from)?,
+        ))
+    }
+
+    /// Points the index at `curve`, so every forecast from here on reads it.
+    ///
+    /// Takes the [`PyYoYInflationTermStructure`] base, so any subclass links.
+    /// It is the curve *behind* `curve`'s handle at call time that is stored,
+    /// not the handle itself.
+    ///
+    /// # Errors
+    ///
+    /// Reports the empty-handle error if `curve` somehow carries no link.
+    fn link_to(&self, curve: &PyYoYInflationTermStructure) -> PyResult<()> {
+        self.curve
+            .link_to(curve.handle().current_link().map_err(PyQlError::from)?);
+        Ok(())
+    }
+
+    /// Whether `fixing_date` has to be forecast rather than read from history,
+    /// a ratio index deferring the question to its underlying.
+    fn needs_forecast(&self, fixing_date: &PyDate) -> PyResult<bool> {
+        Ok(self
+            .inner
+            .needs_forecast(fixing_date.inner())
+            .map_err(PyQlError::from)?)
+    }
+
+    fn __repr__(&self) -> String {
+        format!("YoYInflationIndex({})", self.inner.name())
+    }
+}
+
+impl PyYoYInflationIndex {
+    /// The wrapped core index, for the helper and swap facades that take one.
+    #[allow(dead_code)]
+    pub(crate) fn shared(&self) -> Shared<YoYInflationIndex> {
         Shared::clone(&self.inner)
     }
 }
