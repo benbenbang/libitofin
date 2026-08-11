@@ -7,6 +7,7 @@
 mod capflooredcoupon;
 #[cfg(test)]
 mod capflooredcoupon_oracle;
+mod capflooredyoyinflationcoupon;
 #[allow(clippy::module_inception)]
 mod cashflows;
 mod coupon;
@@ -30,6 +31,7 @@ mod yoyinflationoptionletpricer;
 mod zeroinflationcashflow;
 
 pub use capflooredcoupon::{CappedFlooredCoupon, CappedFlooredIborCoupon};
+pub use capflooredyoyinflationcoupon::CappedFlooredYoYInflationCoupon;
 pub use cashflows::CashFlows;
 pub use coupon::{Coupon, CouponBase};
 pub use couponpricer::{BlackIborCouponPricer, FloatingRateCouponPricer};
