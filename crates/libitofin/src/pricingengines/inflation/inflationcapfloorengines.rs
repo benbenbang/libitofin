@@ -319,3 +319,403 @@ impl PricingEngine for YoYInflationCapFloorEngine {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod instrument_oracle {
+    //! `test-suite/inflationcapfloor.cpp`, the oracle for the whole year-on-year
+    //! cap/floor stack: real UK RPI history and a 5 % nominal curve, fifteen
+    //! market quotes bootstrapped into a `PiecewiseYoYInflationCurve<Linear>`,
+    //! and caps and floors priced off it under all three distributions.
+    //!
+    //! ## Two fixture quirks, both reproduced deliberately
+    //!
+    //! `CommonVars` (`.cpp:89-265`) carries two accidents that nonetheless
+    //! decide its cached values, so the port copies them rather than tidying
+    //! them:
+    //!
+    //! 1. **The RPI history overruns by two months** (`.cpp:126-141`). The
+    //!    schedule runs to 13 August 2007 and is generated *backwards*, so it
+    //!    holds 33 dates - January 2005 twice, then one per month - while only
+    //!    31 figures are real; `fixData` pads with `-999.0`, landing a sentinel
+    //!    in July and August 2007. Neither is ever read as a rate (every fixing
+    //!    date here is 2008 or later, so the ratio index forecasts off the curve
+    //!    and never consults the store), but they move the index's
+    //!    `lastFixingDate`, and hence the curve's base date, from 1 July to
+    //!    **1 August 2007** - the origin every number below is measured from.
+    //! 2. **The observation lag is zero, not two months** (`.cpp:100`, `:150`).
+    //!    `CommonVars` declares a member `Period observationLag` and never
+    //!    assigns it: the `Period observationLag = Period(2,Months)` in the
+    //!    constructor body is a *local* that shadows it. So the bootstrap
+    //!    helpers observe two months back, while the leg, the volatility surface
+    //!    and the parity swap all take the default-constructed `Period()`, zero
+    //!    days. Pricing the leg at two months instead misses every cached value
+    //!    by about 47 (they hold to 0.02 and 0.22 at zero), so the shadowed
+    //!    member is what produced them.
+    //!
+    //! Both are internally consistent between the cap/floor and the swap, so
+    //! parity and collar consistency would pass either way; only the cached
+    //! values discriminate.
+
+    use super::*;
+    use crate::cashflows::{YoYInflationCoupon, YoYInflationLeg};
+    use crate::handle::RelinkableHandle;
+    use crate::indexes::inflation::UkRpi;
+    use crate::indexes::inflationindex::{CpiInterpolationType, InflationIndex};
+    use crate::instrument::Instrument;
+    use crate::instruments::{SwapType, YearOnYearInflationSwap, YoYInflationCapFloor};
+    use crate::interestrate::Compounding;
+    use crate::math::interpolations::linear::Linear;
+    use crate::pricingengines::DiscountingSwapEngine;
+    use crate::quotes::SimpleQuote;
+    use crate::settings::Settings;
+    use crate::shared::{SharedMut, shared_mut};
+    use crate::termstructures::inflation::inflationhelpers::{
+        YearOnYearInflationSwapHelper, YoYInflationHelper,
+    };
+    use crate::termstructures::inflation::inflationtermstructure::YoYInflationTermStructure;
+    use crate::termstructures::inflation::piecewiseyoyinflationcurve::PiecewiseYoYInflationCurve;
+    use crate::termstructures::volatility::ConstantYoYOptionletVolatility;
+    use crate::termstructures::yields::{FlatForward, Pillar};
+    use crate::time::businessdayconvention::BusinessDayConvention;
+    use crate::time::calendar::Calendar;
+    use crate::time::calendars::unitedkingdom::{self, UnitedKingdom};
+    use crate::time::date::Month::{August, January};
+    use crate::time::date::{Date, Day, Month, Year};
+    use crate::time::dategenerationrule::DateGeneration;
+    use crate::time::daycounter::DayCounter;
+    use crate::time::daycounters::actualactual::{
+        ActualActual, Convention as ActualActualConvention,
+    };
+    use crate::time::daycounters::thirty360::{Convention, Thirty360};
+    use crate::time::frequency::Frequency;
+    use crate::time::schedule::MakeSchedule;
+    use crate::types::Volatility;
+
+    /// UK RPI, thirty-one real figures then the two `-999.0` sentinels
+    /// (`.cpp:132-137`). See the module docs.
+    const FIX_DATA: [Real; 33] = [
+        189.9, 189.9, 189.6, 190.5, 191.6, 192.0, 192.2, 192.2, 192.6, 193.1, 193.3, 193.6, 194.1,
+        193.4, 194.2, 195.0, 196.5, 197.7, 198.5, 198.5, 199.2, 200.1, 200.4, 201.1, 202.7, 201.6,
+        203.1, 204.4, 205.4, 206.2, 207.3, -999.0, -999.0,
+    ];
+
+    /// The fifteen quoted year-on-year swap rates, in per cent (`.cpp:152-168`).
+    const YY_DATA: [(Day, Month, Year, Real); 15] = [
+        (13, August, 2008, 2.95),
+        (13, August, 2009, 2.95),
+        (13, August, 2010, 2.93),
+        (15, August, 2011, 2.955),
+        (13, August, 2012, 2.945),
+        (13, August, 2013, 2.985),
+        (13, August, 2014, 3.01),
+        (13, August, 2015, 3.035),
+        (13, August, 2016, 3.055),
+        (13, August, 2017, 3.075),
+        (13, August, 2019, 3.105),
+        (15, August, 2022, 3.135),
+        (13, August, 2027, 3.155),
+        (13, August, 2032, 3.145),
+        (13, August, 2037, 3.145),
+    ];
+
+    const NOTIONAL: Real = 1_000_000.0;
+
+    fn uk() -> Calendar {
+        UnitedKingdom::new(unitedkingdom::Market::Settlement)
+    }
+
+    fn day_counter() -> DayCounter {
+        Thirty360::with_convention(Convention::BondBasis)
+    }
+
+    /// The lag the leg, the surface and the parity swap observe: zero, from the
+    /// shadowed `CommonVars` member. See the module docs.
+    fn observation_lag() -> Period {
+        Period::new(0, TimeUnit::Days)
+    }
+
+    struct Fixture {
+        settings: Shared<Settings<Date>>,
+        index: Shared<YoYInflationIndex>,
+        nominal: Handle<dyn YieldTermStructure>,
+        evaluation_date: Date,
+        base_date: Date,
+        _curve: Shared<PiecewiseYoYInflationCurve<Linear>>,
+        _handle: RelinkableHandle<dyn YoYInflationTermStructure>,
+    }
+
+    /// `CommonVars` (`.cpp:109-187`).
+    fn a_bootstrapped_market() -> Fixture {
+        let settings = shared(Settings::<Date>::new());
+        let evaluation_date = uk().adjust(
+            Date::new(13, August, 2007),
+            BusinessDayConvention::Following,
+        );
+        settings.set_evaluation_date(evaluation_date);
+
+        let rpi_schedule = MakeSchedule::new()
+            .from(Date::new(1, January, 2005))
+            .to(Date::new(13, August, 2007))
+            .with_tenor(Period::new(1, TimeUnit::Months))
+            .with_calendar(uk())
+            .with_convention(BusinessDayConvention::ModifiedFollowing)
+            .build();
+        let rpi = shared(UkRpi::new(Shared::clone(&settings)));
+        for (date, &figure) in rpi_schedule.dates().iter().zip(FIX_DATA.iter()) {
+            rpi.add_fixing(*date, figure).expect("a published figure");
+        }
+
+        let handle = RelinkableHandle::<dyn YoYInflationTermStructure>::empty();
+        let index = shared(
+            YoYInflationIndex::from_underlying(Shared::clone(&rpi))
+                .with_term_structure(handle.handle()),
+        );
+        let nominal = Handle::new(shared(FlatForward::with_rate(
+            evaluation_date,
+            0.05,
+            ActualActual::with_convention(ActualActualConvention::ISDA),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>);
+
+        // Only the helpers see two months (`.cpp:150`, `:174`).
+        let helper_lag = Period::new(2, TimeUnit::Months);
+        let helpers: Vec<Shared<dyn YoYInflationHelper>> = YY_DATA
+            .iter()
+            .map(|&(day, month, year, rate)| {
+                YearOnYearInflationSwapHelper::new(
+                    Handle::new(shared(SimpleQuote::new(Some(rate / 100.0)))),
+                    helper_lag,
+                    Date::new(day, month, year),
+                    uk(),
+                    BusinessDayConvention::ModifiedFollowing,
+                    day_counter(),
+                    &index,
+                    CpiInterpolationType::Flat,
+                    nominal.clone(),
+                    Pillar::LastRelevantDate,
+                    Shared::clone(&settings),
+                )
+                .expect("a well-formed helper") as Shared<dyn YoYInflationHelper>
+            })
+            .collect();
+
+        let base_date = rpi.last_fixing_date().expect("RPI has history");
+        let curve = PiecewiseYoYInflationCurve::<Linear>::new(
+            evaluation_date,
+            base_date,
+            YY_DATA[0].3 / 100.0,
+            index.frequency(),
+            day_counter(),
+            helpers,
+            None,
+        )
+        .expect("fifteen helpers");
+        handle.link_to(Shared::clone(&curve) as Shared<dyn YoYInflationTermStructure>);
+
+        Fixture {
+            settings,
+            index,
+            nominal,
+            evaluation_date,
+            base_date,
+            _curve: curve,
+            _handle: handle,
+        }
+    }
+
+    /// `makeYoYLeg` (`.cpp:190-201`), a plain annual leg.
+    fn a_yoy_leg(fixture: &Fixture, length: i32) -> Vec<Shared<YoYInflationCoupon>> {
+        let start = fixture.evaluation_date;
+        let end = uk().advance_by_period(
+            start,
+            Period::new(length, TimeUnit::Years),
+            BusinessDayConvention::Unadjusted,
+            false,
+        );
+        let schedule = MakeSchedule::new()
+            .from(start)
+            .to(end)
+            .with_frequency(Frequency::Annual)
+            .with_calendar(uk())
+            .with_convention(BusinessDayConvention::Unadjusted)
+            .with_termination_date_convention(BusinessDayConvention::Unadjusted)
+            .with_rule(DateGeneration::Forward)
+            .build();
+        YoYInflationLeg::new(
+            schedule,
+            uk(),
+            Shared::clone(&fixture.index),
+            observation_lag(),
+            CpiInterpolationType::Flat,
+        )
+        .with_notional(NOTIONAL)
+        .with_payment_day_counter(day_counter())
+        .with_payment_adjustment(BusinessDayConvention::ModifiedFollowing)
+        .coupons()
+        .expect("a well-formed leg")
+    }
+
+    /// `makeEngine` (`.cpp:204-241`), a flat surface under one of the three
+    /// distributions.
+    fn an_engine(
+        fixture: &Fixture,
+        volatility: Volatility,
+        distribution: YoYOptionletDistribution,
+    ) -> SharedMut<dyn PricingEngine> {
+        let surface = Handle::new(shared(ConstantYoYOptionletVolatility::new(
+            volatility,
+            0,
+            uk(),
+            BusinessDayConvention::ModifiedFollowing,
+            day_counter(),
+            observation_lag(),
+            Frequency::Annual,
+            false,
+            -1.0,
+            100.0,
+            Shared::clone(&fixture.settings),
+        )) as Shared<dyn YoYOptionletVolatilitySurface>);
+        let index = Shared::clone(&fixture.index);
+        let nominal = fixture.nominal.clone();
+        let engine = match distribution {
+            YoYOptionletDistribution::Black => {
+                YoYInflationCapFloorEngine::black(index, surface, nominal)
+            }
+            YoYOptionletDistribution::UnitDisplaced => {
+                YoYInflationCapFloorEngine::unit_displaced(index, surface, nominal)
+            }
+            YoYOptionletDistribution::Bachelier => {
+                YoYInflationCapFloorEngine::bachelier(index, surface, nominal)
+            }
+        };
+        shared_mut(engine) as SharedMut<dyn PricingEngine>
+    }
+
+    /// `makeYoYCapFloor` (`.cpp:244-264`).
+    fn a_cap_floor(
+        fixture: &Fixture,
+        cap_floor_type: CapFloorType,
+        coupons: Vec<Shared<YoYInflationCoupon>>,
+        strike: Rate,
+        volatility: Volatility,
+        distribution: YoYOptionletDistribution,
+    ) -> YoYInflationCapFloor {
+        let mut instrument = match cap_floor_type {
+            CapFloorType::Floor => {
+                YoYInflationCapFloor::floor(coupons, vec![strike], Shared::clone(&fixture.settings))
+            }
+            _ => YoYInflationCapFloor::cap(coupons, vec![strike], Shared::clone(&fixture.settings)),
+        }
+        .expect("a well-formed cap/floor");
+        instrument
+            .base_mut()
+            .set_pricing_engine(an_engine(fixture, volatility, distribution));
+        instrument
+    }
+
+    const DISTRIBUTIONS: [YoYOptionletDistribution; 3] = [
+        YoYOptionletDistribution::Black,
+        YoYOptionletDistribution::UnitDisplaced,
+        YoYOptionletDistribution::Bachelier,
+    ];
+    const LENGTHS: [i32; 3] = [1, 5, 10];
+    const STRIKES: [Rate; 3] = [0.01, 0.03, 0.07];
+    const VOLS: [Volatility; 2] = [0.001, 0.15];
+
+    /// The `-999.0` sentinels push the curve's time origin from 1 July to
+    /// 1 August 2007. Pinned here so a change names its cause rather than
+    /// surfacing as a cached value drifting by a few units.
+    #[test]
+    fn the_sentinel_fixings_put_the_curve_base_date_in_august() {
+        let fixture = a_bootstrapped_market();
+        assert_eq!(fixture.base_date, Date::new(1, August, 2007));
+    }
+
+    /// `testParity` (`.cpp:388-450`): cap - floor == swap, to `1e-6` on a
+    /// notional of `1e6`. Model-independent, and the reason the year-on-year
+    /// instrument needs no special definition: unlike a nominal cap/floor it
+    /// keeps its first optionlet, so the strip spans the swap exactly. It holds
+    /// under all three distributions because it depends on none of them - the
+    /// option values cancel, leaving the forward against the strike.
+    #[test]
+    fn a_cap_less_a_floor_reprices_the_swap() {
+        let fixture = a_bootstrapped_market();
+        let from = fixture
+            .nominal
+            .current_link()
+            .expect("a linked nominal curve")
+            .reference_date()
+            .expect("a reference date");
+
+        for distribution in DISTRIBUTIONS {
+            for length in LENGTHS {
+                for strike in STRIKES {
+                    for volatility in VOLS {
+                        let coupons = a_yoy_leg(&fixture, length);
+                        let mut cap = a_cap_floor(
+                            &fixture,
+                            CapFloorType::Cap,
+                            coupons.clone(),
+                            strike,
+                            volatility,
+                            distribution,
+                        );
+                        let mut floor = a_cap_floor(
+                            &fixture,
+                            CapFloorType::Floor,
+                            coupons,
+                            strike,
+                            volatility,
+                            distribution,
+                        );
+
+                        let schedule = MakeSchedule::new()
+                            .from(from)
+                            .to(from + Period::new(length, TimeUnit::Years))
+                            .with_tenor(Period::new(1, TimeUnit::Years))
+                            .with_calendar(uk())
+                            .with_convention(BusinessDayConvention::Unadjusted)
+                            .backwards()
+                            .build();
+                        let mut swap = YearOnYearInflationSwap::new(
+                            SwapType::Payer,
+                            NOTIONAL,
+                            schedule.clone(),
+                            strike,
+                            day_counter(),
+                            schedule,
+                            Shared::clone(&fixture.index),
+                            observation_lag(),
+                            CpiInterpolationType::Flat,
+                            0.0,
+                            day_counter(),
+                            uk(),
+                            BusinessDayConvention::ModifiedFollowing,
+                            Shared::clone(&fixture.settings),
+                        )
+                        .expect("both legs are fully specified");
+                        swap.base_mut()
+                            .set_pricing_engine(shared_mut(DiscountingSwapEngine::new(
+                                fixture.nominal.clone(),
+                                None,
+                                None,
+                                None,
+                                Shared::clone(&fixture.settings),
+                            ))
+                                as SharedMut<dyn PricingEngine>);
+
+                        let parity = (cap.npv().expect("the curve prices it")
+                            - floor.npv().expect("the curve prices it"))
+                            - swap.npv().expect("the curve prices it");
+                        assert!(
+                            parity.abs() < 1e-6,
+                            "put/call parity violated by {parity} at {distribution:?}, \
+                             {length}y, strike {strike}, vol {volatility}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
