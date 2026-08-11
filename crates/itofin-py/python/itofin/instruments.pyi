@@ -3,7 +3,12 @@
 # src/inflation.rs (#517).
 
 from itofin import Settings
-from itofin.indexes import CpiInterpolationType, Euribor, ZeroInflationIndex
+from itofin.indexes import (
+    CpiInterpolationType,
+    Euribor,
+    YoYInflationIndex,
+    ZeroInflationIndex,
+)
 from itofin.models import HestonModel, HullWhite
 from itofin.pricingengines import (
     BlackCapFloorEngine,
@@ -373,3 +378,57 @@ class ZeroCouponInflationSwap:
         """The same date as obs_date, read off the indexed flow rather than off
         the swap. Both names are kept because both exist in the core."""
         ...
+
+class YearOnYearInflationSwap:
+    """A fixed leg against a leg of year-on-year inflation coupons, both paid
+    over a schedule.
+
+    SwapType names the fixed leg, so a Payer pays fixed and receives inflation -
+    the opposite reading from ZeroCouponInflationSwap, where it names the
+    inflation leg.
+
+    The two schedules are independent inputs. The fixed leg takes its payment
+    calendar from its own schedule while the year-on-year leg pays on
+    payment_calendar; both adjust with payment_convention. spread is added to
+    every forecast rate on the year-on-year leg.
+
+    Pricing needs an engine: call set_engine first. Every priced accessor drives
+    the calculation, so all of them mutate."""
+
+    def __init__(
+        self,
+        swap_type: SwapType,
+        nominal: float,
+        fixed_schedule: Schedule,
+        fixed_rate: float,
+        fixed_day_count: DayCounter,
+        yoy_schedule: Schedule,
+        yoy_index: YoYInflationIndex,
+        observation_lag: Period,
+        interpolation: CpiInterpolationType,
+        spread: float,
+        yoy_day_count: DayCounter,
+        payment_calendar: Calendar,
+        payment_convention: BusinessDayConvention,
+        settings: Settings,
+    ) -> None:
+        """Raises ItofinError when either leg cannot be built, notably from an
+        observation lag that leaves a coupon unbuildable."""
+        ...
+    def set_engine(self, engine: DiscountingSwapEngine) -> None:
+        """The engine must resolve its dates against the same Settings object
+        this swap was built with."""
+        ...
+    def npv(self) -> float: ...
+    def fair_rate(self) -> float:
+        """The fixed rate that would price the swap at zero, recovered from the
+        NPV and the fixed leg's BPS."""
+        ...
+    def fair_spread(self) -> float:
+        """The spread over the index that would price the swap at zero,
+        recovered off the year-on-year leg."""
+        ...
+    def fixed_leg_npv(self) -> float: ...
+    def yoy_leg_npv(self) -> float: ...
+    def fixed_rate(self) -> float: ...
+    def spread(self) -> float: ...
