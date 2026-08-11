@@ -33,7 +33,7 @@ use crate::errors::QlResult;
 use crate::handle::Handle;
 use crate::option::OptionType;
 use crate::patterns::observable::{AsObservable, Observable, Observer, ResetThenNotify};
-use crate::pricingengines::blackformula::{bachelier_black_formula, black_formula};
+use crate::pricingengines::inflation::yoy_optionlet_price;
 use crate::shared::{Shared, SharedMut};
 use crate::termstructures::volatility::YoYOptionletVolatilitySurface;
 use crate::termstructures::yieldtermstructure::YieldTermStructure;
@@ -204,29 +204,16 @@ impl YoYInflationOptionletCouponPricer {
         let std_dev = surface
             .total_variance(fixing_date, eff_strike, Period::new(0, TimeUnit::Days))?
             .sqrt();
-        self.optionlet_price_imp(option_type, eff_strike, forward, std_dev)
-    }
-
-    /// The undiscounted optionlet value under the pricer's distribution
-    /// (`optionletPriceImp`, `.cpp:180-211`).
-    fn optionlet_price_imp(
-        &self,
-        option_type: OptionType,
-        eff_strike: Rate,
-        forward: Rate,
-        std_dev: Real,
-    ) -> QlResult<Real> {
-        match self.distribution {
-            YoYOptionletDistribution::Black => {
-                black_formula(option_type, eff_strike, forward, std_dev, 1.0, 0.0)
-            }
-            YoYOptionletDistribution::UnitDisplaced => {
-                black_formula(option_type, eff_strike, forward, std_dev, 1.0, 1.0)
-            }
-            YoYOptionletDistribution::Bachelier => {
-                bachelier_black_formula(option_type, eff_strike, forward, std_dev, 1.0)
-            }
-        }
+        // `optionletPriceImp` (`.cpp:180-211`), shared with the cap/floor
+        // engines; a rate rather than a price, so nothing is discounted.
+        yoy_optionlet_price(
+            self.distribution,
+            option_type,
+            eff_strike,
+            forward,
+            std_dev,
+            1.0,
+        )
     }
 
     /// The captured fixing, or the reason there is none.

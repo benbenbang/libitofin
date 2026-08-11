@@ -9,6 +9,7 @@ pub mod blackformula;
 pub mod bond;
 pub mod capfloor;
 pub mod credit;
+pub mod inflation;
 pub mod mclongstaffschwartzengine;
 pub mod swap;
 pub mod swaption;
@@ -18,6 +19,7 @@ pub use blackcalculator::BlackCalculator;
 pub use bond::{BondFunctions, DiscountingBondEngine};
 pub use capfloor::{AnalyticCapFloorEngine, BlackCapFloorEngine};
 pub use credit::{IntegralCdsEngine, MidPointCdsEngine};
+pub use inflation::{YoYInflationCapFloorEngine, yoy_optionlet_price};
 pub use mclongstaffschwartzengine::McLongstaffSchwartzEngineBase;
 pub use swap::DiscountingSwapEngine;
 pub use swaption::{
