@@ -718,4 +718,146 @@ mod instrument_oracle {
             }
         }
     }
+
+    /// `testConsistency` (`.cpp:268-377`): cap - floor == collar, to `1e-6`,
+    /// plus the per-optionlet recomposition.
+    ///
+    /// The recomposition is run *unconditionally* here. In C++ it sits inside
+    /// the `BOOST_FAIL` branch of the collar check (`.cpp:298-368`), so it only
+    /// ever executes once the collar identity has already failed - which is to
+    /// say never, leaving `optionlet(n)` untested. Un-nesting it is what gives
+    /// that accessor real coverage: summing the optionlets has to rebuild the
+    /// whole instrument's NPV, which pins both the strike each optionlet
+    /// carries and the coupon it is written on.
+    #[test]
+    fn a_collar_is_a_cap_less_a_floor_and_each_is_its_optionlets() {
+        let fixture = a_bootstrapped_market();
+
+        for distribution in DISTRIBUTIONS {
+            for length in LENGTHS {
+                for strike in STRIKES {
+                    for volatility in VOLS {
+                        let coupons = a_yoy_leg(&fixture, length);
+                        let mut cap = a_cap_floor(
+                            &fixture,
+                            CapFloorType::Cap,
+                            coupons.clone(),
+                            strike,
+                            volatility,
+                            distribution,
+                        );
+                        let mut floor = a_cap_floor(
+                            &fixture,
+                            CapFloorType::Floor,
+                            coupons.clone(),
+                            strike,
+                            volatility,
+                            distribution,
+                        );
+                        let mut collar = YoYInflationCapFloor::collar(
+                            coupons.clone(),
+                            vec![strike],
+                            vec![strike],
+                            Shared::clone(&fixture.settings),
+                        )
+                        .expect("a well-formed collar");
+                        collar.base_mut().set_pricing_engine(an_engine(
+                            &fixture,
+                            volatility,
+                            distribution,
+                        ));
+
+                        let context = format!(
+                            "{distribution:?}, {length}y, strike {strike}, vol {volatility}"
+                        );
+                        let cap_npv = cap.npv().expect("the curve prices it");
+                        let floor_npv = floor.npv().expect("the curve prices it");
+                        let collar_npv = collar.npv().expect("the curve prices it");
+                        let consistency = (cap_npv - floor_npv) - collar_npv;
+                        assert!(
+                            consistency.abs() < 1e-6,
+                            "collar inconsistent by {consistency} at {context}"
+                        );
+
+                        for instrument in [&mut cap, &mut floor, &mut collar] {
+                            let mut sum = 0.0;
+                            for m in 0..coupons.len() {
+                                let mut optionlet =
+                                    instrument.optionlet(m).expect("m is within the leg");
+                                optionlet.base_mut().set_pricing_engine(an_engine(
+                                    &fixture,
+                                    volatility,
+                                    distribution,
+                                ));
+                                sum += optionlet.npv().expect("the curve prices it");
+                            }
+                            let whole = instrument.npv().expect("the curve prices it");
+                            assert!(
+                                (whole - sum).abs() < 1e-6,
+                                "optionlets sum to {sum}, not {whole}, at {context}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// `testCachedValue` (`.cpp:452-522`): a two-year cap and floor struck at
+    /// 2.95 % on 1 % volatility, against the values QuantLib caches.
+    ///
+    /// These are the only assertions here that would notice the fixture being
+    /// subtly wrong: parity and consistency are internal identities that hold
+    /// whatever the curve says, while these six numbers pin the curve, the base
+    /// date, the observation lag and all three distributions at once. The
+    /// tolerances are QuantLib's own.
+    ///
+    /// The C++ comments alongside them read "N.B. notionals are 10e6"
+    /// (`.cpp:474`, `:493`, `:512`) and are stale: `CommonVars` sets
+    /// `nominals(1,1000000)` (`.cpp:110`), and 1e6 is what reproduces them.
+    #[test]
+    fn a_two_year_cap_and_floor_match_the_cached_values() {
+        let fixture = a_bootstrapped_market();
+        let strike = 0.0295;
+        let coupons = a_yoy_leg(&fixture, 2);
+
+        for (distribution, cached_cap, cached_floor, tolerance) in [
+            (YoYOptionletDistribution::Black, 219.452, 314.641, 0.02),
+            (
+                YoYOptionletDistribution::UnitDisplaced,
+                9114.61,
+                9209.8,
+                0.22,
+            ),
+            (YoYOptionletDistribution::Bachelier, 8852.4, 8947.59, 0.22),
+        ] {
+            let mut cap = a_cap_floor(
+                &fixture,
+                CapFloorType::Cap,
+                coupons.clone(),
+                strike,
+                0.01,
+                distribution,
+            );
+            let mut floor = a_cap_floor(
+                &fixture,
+                CapFloorType::Floor,
+                coupons.clone(),
+                strike,
+                0.01,
+                distribution,
+            );
+
+            let cap_npv = cap.npv().expect("the curve prices it");
+            let floor_npv = floor.npv().expect("the curve prices it");
+            assert!(
+                (cap_npv - cached_cap).abs() < tolerance,
+                "{distribution:?} cap is {cap_npv}, cached {cached_cap}"
+            );
+            assert!(
+                (floor_npv - cached_floor).abs() < tolerance,
+                "{distribution:?} floor is {floor_npv}, cached {cached_floor}"
+            );
+        }
+    }
 }
