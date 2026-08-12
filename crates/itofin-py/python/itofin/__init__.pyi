@@ -4,6 +4,7 @@
 # sys.modules submodule registration (see lib.rs), so these .pyi files are
 # maintained by hand. When a #[pymethods] signature in crates/itofin-py/src/*.rs
 # changes, update the matching stub here. Submodule -> source map:
+#   cashflows     <- src/cashflows.rs
 #   time          <- src/time.rs
 #   quotes        <- src/market.rs
 #   termstructures<- src/curve.rs, src/vol.rs, src/helpers.rs, src/swaptionvol.rs
@@ -15,6 +16,7 @@
 #   optimization  <- src/calibration.rs
 """Python bindings for libitofin, a Rust port of QuantLib."""
 
+from . import cashflows as cashflows
 from . import indexes as indexes
 from . import instruments as instruments
 from . import models as models
