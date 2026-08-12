@@ -63,12 +63,9 @@
 //!
 //! ## Deferred
 //!
-//! Within EPIC Credit (#676), and each omitted visibly rather than accepted and
+//! Within EPIC Credit (#676), and omitted visibly rather than accepted and
 //! ignored:
 //!
-//! - `conventionalSpread` (`creditdefaultswap.cpp:383-428`), which has no
-//!   caller anywhere in `ql/` - not even the upfront rate helper it ships
-//!   with, which quotes `fairUpfront` instead (#790).
 //! - `protectionEndDate` (`creditdefaultswap.cpp:430-432`), which reads the
 //!   accrual end of the last coupon through the `coupon_cast` that
 //!   [`CashFlow::as_coupon`](crate::cashflow::CashFlow::as_coupon) ports.
@@ -844,6 +841,91 @@ impl CreditDefaultSwap {
         };
         let guess = self.running_spread / (1.0 - recovery_rate) * 365.0 / 360.0;
         Brent::new().solve(objective, accuracy, guess, 0.1 * guess)
+    }
+
+    /// The spread that quotes the contract on conventional terms
+    /// (`conventionalSpread`, `creditdefaultswap.cpp:383-423`).
+    ///
+    /// Solves the flat hazard rate that prices the contract - upfront and all -
+    /// to nothing at `conventional_recovery`, then reports the engine's fair
+    /// spread on that curve. Where [`implied_hazard_rate`] returns the rate it
+    /// solved for, this returns the spread read off the results at it: the two
+    /// differ by the upfront, which enters the priced value but not the fair
+    /// spread (`midpointcdsengine.rs:246-247`), so a contract quoted with an
+    /// upfront converts to a running spread away from its own.
+    ///
+    /// The target NPV (`0.0`), the recovery (`conventional_recovery`) and the
+    /// accuracy (`1e-9`) are all fixed by C++ at the call site, so none is a
+    /// parameter.
+    ///
+    /// # Errors
+    ///
+    /// As [`implied_hazard_rate`], and additionally if the engine reports no
+    /// fair spread - which it does for a contract whose premium leg has no
+    /// value left to spread over.
+    ///
+    /// [`implied_hazard_rate`]: CreditDefaultSwap::implied_hazard_rate
+    pub fn conventional_spread(
+        &self,
+        conventional_recovery: Real,
+        discount_curve: &Handle<dyn YieldTermStructure>,
+        day_counter: DayCounter,
+        model: PricingModel,
+    ) -> QlResult<Rate> {
+        let flat_rate = shared(SimpleQuote::new(0.0));
+        let probability = Handle::new(shared(FlatHazardRate::moving(
+            0,
+            WeekendsOnly::new(),
+            Handle::new(Shared::clone(&flat_rate) as Shared<dyn Quote>),
+            day_counter,
+            Shared::clone(&self.settings),
+        )) as Shared<dyn DefaultProbabilityTermStructure>);
+        let mut engine: Box<dyn PricingEngine> = match model {
+            PricingModel::Midpoint => Box::new(MidPointCdsEngine::new(
+                probability,
+                conventional_recovery,
+                discount_curve.clone(),
+                None,
+                Shared::clone(&self.settings),
+            )),
+            PricingModel::Isda => Box::new(
+                IsdaCdsEngine::new(
+                    probability,
+                    conventional_recovery,
+                    discount_curve.clone(),
+                    None,
+                    Shared::clone(&self.settings),
+                )
+                .with_fidelity(
+                    NumericalFix::Taylor,
+                    AccrualBias::HalfDayBias,
+                    ForwardsInCouponPeriod::Piecewise,
+                ),
+            ),
+        };
+        self.setup_arguments(engine.arguments_mut())?;
+        engine.arguments_mut().validate()?;
+
+        let objective = |hazard_rate: Rate| -> Real {
+            flat_rate.set_value(hazard_rate);
+            if engine.calculate().is_err() {
+                return Real::NAN;
+            }
+            match (engine.results() as &dyn Any).downcast_ref::<CdsResults>() {
+                Some(results) => results.instrument.value.unwrap_or(Real::NAN),
+                None => Real::NAN,
+            }
+        };
+        let guess = self.running_spread / (1.0 - conventional_recovery) * 365.0 / 360.0;
+        Brent::new().solve(objective, 1.0e-9, guess, 0.1 * guess)?;
+
+        match (engine.results() as &dyn Any).downcast_ref::<CdsResults>() {
+            Some(results) => match results.fair_spread {
+                Some(fair_spread) => Ok(fair_spread),
+                None => fail!("the engine reported no fair spread at the conventional hazard rate"),
+            },
+            None => fail!("the engine did not report credit-default-swap results"),
+        }
     }
 }
 
@@ -1889,5 +1971,228 @@ mod tests {
                 "the {n}Y implied rate reprices to {reproduced}, not {npv}"
             );
         }
+    }
+
+    /// The fixture the two conventional-spread cases share: an eight-year
+    /// contract whose schedule starts at the evaluation date, so its upfront is
+    /// still unsettled there.
+    ///
+    /// That last part is load-bearing. `midpointcdsengine.rs:155-161` leaves
+    /// `upfront_npv` at zero once the upfront has occurred, and the fair spread
+    /// the engine reports omits `upfront_npv` from its numerator
+    /// (`midpointcdsengine.rs:246-247`); a contract whose upfront already
+    /// settled therefore converts back to its own running spread, and the cases
+    /// below would pass against a `Ok(self.running_spread)` stub.
+    fn conventional_spread_fixture(
+        day_counter: DayCounter,
+    ) -> (
+        Shared<Settings<Date>>,
+        Date,
+        Schedule,
+        Handle<dyn YieldTermStructure>,
+    ) {
+        let calendar = Target::new();
+        let today = Date::new(15, Month::June, 2026);
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(today);
+
+        let discount_curve = Handle::new(shared(FlatForward::with_rate(
+            today,
+            0.03,
+            day_counter,
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>);
+        let maturity = calendar.advance(
+            today,
+            8,
+            TimeUnit::Years,
+            BusinessDayConvention::Following,
+            false,
+        );
+        let schedule = Schedule::new(
+            today,
+            maturity,
+            Period::new(6, TimeUnit::Months),
+            calendar,
+            BusinessDayConvention::ModifiedFollowing,
+            BusinessDayConvention::ModifiedFollowing,
+            DateGeneration::Forward,
+            false,
+            Date::null(),
+            Date::null(),
+        );
+        (settings, today, schedule, discount_curve)
+    }
+
+    const CONVENTIONAL_RECOVERY: Real = 0.4;
+    const CONVENTIONAL_RUNNING: Rate = 0.0120;
+    const CONVENTIONAL_UPFRONT: Rate = 0.05;
+    const CONVENTIONAL_NOTIONAL: Real = 10_000.0;
+
+    /// The contract the conventional spread converts, quoted with an upfront.
+    fn upfront_quoted(schedule: Schedule, settings: &Shared<Settings<Date>>) -> CreditDefaultSwap {
+        CreditDefaultSwap::with_upfront(
+            ProtectionSide::Seller,
+            CONVENTIONAL_NOTIONAL,
+            CONVENTIONAL_UPFRONT,
+            CONVENTIONAL_RUNNING,
+            schedule,
+            BusinessDayConvention::ModifiedFollowing,
+            Actual360::new(),
+            true,
+            true,
+            Shared::clone(settings),
+        )
+        .unwrap()
+    }
+
+    /// A flat hazard-rate curve at `hazard_rate`, the curve the conventional
+    /// spread is quoted off.
+    fn flat_credit(
+        reference: Date,
+        hazard_rate: Rate,
+    ) -> Handle<dyn DefaultProbabilityTermStructure> {
+        Handle::new(shared(FlatHazardRate::new(
+            reference,
+            Handle::new(shared(SimpleQuote::new(hazard_rate)) as Shared<dyn Quote>),
+            Actual365Fixed::new(),
+        )) as Shared<dyn DefaultProbabilityTermStructure>)
+    }
+
+    /// `creditdefaultswap.cpp:383-423` on the mid-point model: the spread that
+    /// quotes a contract carrying an upfront as a running spread alone.
+    ///
+    /// Invented self-consistency, since C++ has no caller and the test suite no
+    /// case. The upfront moves the conventional spread off the running one, and
+    /// the same contract rebuilt at that spread with no upfront prices to
+    /// nothing on the hazard rate the conversion solved for.
+    #[test]
+    fn the_conventional_spread_converts_an_upfront_into_a_running_spread() {
+        let (settings, today, schedule, discount_curve) =
+            conventional_spread_fixture(Actual360::new());
+        let quoted = upfront_quoted(schedule.clone(), &settings);
+
+        let hazard_rate = quoted
+            .implied_hazard_rate(
+                0.0,
+                &discount_curve,
+                Actual365Fixed::new(),
+                CONVENTIONAL_RECOVERY,
+                1.0e-9,
+                PricingModel::Midpoint,
+            )
+            .unwrap();
+        let conventional = quoted
+            .conventional_spread(
+                CONVENTIONAL_RECOVERY,
+                &discount_curve,
+                Actual365Fixed::new(),
+                PricingModel::Midpoint,
+            )
+            .unwrap();
+
+        assert!(
+            (conventional - CONVENTIONAL_RUNNING).abs() > 1.0e-4,
+            "the upfront left the conventional spread {conventional} at the running \
+             {CONVENTIONAL_RUNNING}"
+        );
+
+        let mut converted = CreditDefaultSwap::new(
+            ProtectionSide::Seller,
+            CONVENTIONAL_NOTIONAL,
+            conventional,
+            schedule,
+            BusinessDayConvention::ModifiedFollowing,
+            Actual360::new(),
+            true,
+            true,
+            Shared::clone(&settings),
+        )
+        .unwrap();
+        converted
+            .base_mut()
+            .set_pricing_engine(shared_mut(MidPointCdsEngine::new(
+                flat_credit(today, hazard_rate),
+                CONVENTIONAL_RECOVERY,
+                discount_curve,
+                None,
+                Shared::clone(&settings),
+            )) as SharedMut<dyn PricingEngine>);
+
+        let npv = converted.npv().unwrap();
+        assert!(
+            npv.abs() < 1.0,
+            "the contract converted to {conventional} prices at {npv}, not nothing"
+        );
+    }
+
+    /// The same conversion on the ISDA model, which the port supports wherever
+    /// [`implied_hazard_rate`](CreditDefaultSwap::implied_hazard_rate) does.
+    /// Its discount curve is Act/365(Fixed), the only one the engine accepts
+    /// (`isdacdsengine.rs:452`).
+    #[test]
+    fn the_conventional_spread_converts_an_upfront_on_the_isda_model() {
+        let (settings, today, schedule, discount_curve) =
+            conventional_spread_fixture(Actual365Fixed::new());
+        let quoted = upfront_quoted(schedule.clone(), &settings);
+
+        let hazard_rate = quoted
+            .implied_hazard_rate(
+                0.0,
+                &discount_curve,
+                Actual365Fixed::new(),
+                CONVENTIONAL_RECOVERY,
+                1.0e-9,
+                PricingModel::Isda,
+            )
+            .unwrap();
+        let conventional = quoted
+            .conventional_spread(
+                CONVENTIONAL_RECOVERY,
+                &discount_curve,
+                Actual365Fixed::new(),
+                PricingModel::Isda,
+            )
+            .unwrap();
+
+        assert!(
+            (conventional - CONVENTIONAL_RUNNING).abs() > 1.0e-4,
+            "the upfront left the conventional spread {conventional} at the running \
+             {CONVENTIONAL_RUNNING}"
+        );
+
+        let mut converted = CreditDefaultSwap::new(
+            ProtectionSide::Seller,
+            CONVENTIONAL_NOTIONAL,
+            conventional,
+            schedule,
+            BusinessDayConvention::ModifiedFollowing,
+            Actual360::new(),
+            true,
+            true,
+            Shared::clone(&settings),
+        )
+        .unwrap();
+        converted.base_mut().set_pricing_engine(shared_mut(
+            IsdaCdsEngine::new(
+                flat_credit(today, hazard_rate),
+                CONVENTIONAL_RECOVERY,
+                discount_curve,
+                None,
+                Shared::clone(&settings),
+            )
+            .with_fidelity(
+                NumericalFix::Taylor,
+                AccrualBias::HalfDayBias,
+                ForwardsInCouponPeriod::Piecewise,
+            ),
+        ) as SharedMut<dyn PricingEngine>);
+
+        let npv = converted.npv().unwrap();
+        assert!(
+            npv.abs() < 1.0,
+            "the contract converted to {conventional} prices at {npv}, not nothing"
+        );
     }
 }
