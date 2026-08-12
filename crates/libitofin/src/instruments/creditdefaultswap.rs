@@ -1366,7 +1366,7 @@ mod tests {
         let cds = contract(CdsTerms::default()).unwrap();
 
         assert_eq!(
-            cds.claim().amount(&cds.maturity(), NOTIONAL, 0.4),
+            cds.claim().amount(&cds.maturity(), NOTIONAL, 0.4).unwrap(),
             NOTIONAL * 0.6
         );
     }
@@ -1476,7 +1476,8 @@ mod tests {
                 .claim
                 .as_ref()
                 .unwrap()
-                .amount(&cds.maturity(), NOTIONAL, 0.4),
+                .amount(&cds.maturity(), NOTIONAL, 0.4)
+                .unwrap(),
             NOTIONAL * 0.6
         );
         assert_eq!(

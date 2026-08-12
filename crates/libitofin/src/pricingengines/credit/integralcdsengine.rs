@@ -202,7 +202,7 @@ impl PricingEngine for IntegralCdsEngine {
                     };
                     coupon_leg_npv += accrual * discount_factor * default;
                 }
-                let claim_amount = claim.amount(&d1, notional, self.recovery_rate);
+                let claim_amount = claim.amount(&d1, notional, self.recovery_rate)?;
                 default_leg_npv += claim_amount * discount_factor * default;
                 p0 = p1;
                 d0 = d1;
