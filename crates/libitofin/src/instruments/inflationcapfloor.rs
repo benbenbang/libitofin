@@ -41,9 +41,8 @@
 //! hierarchy that is itself unported; the omission follows
 //! [`CapFloor`](super::CapFloor), `Swaption` and `OneAssetOption`, which all
 //! defer theirs the same way rather than carry an always-failing method.
-//! `lastYoYInflationCoupon` (`.cpp:109-115`) is tracked on `#856`.
 //!
-//! The builder these were deferred alongside is now
+//! The builder it was deferred alongside is now
 //! [`MakeYoYInflationCapFloor`](super::MakeYoYInflationCapFloor).
 
 use std::any::Any;
@@ -256,6 +255,20 @@ impl YoYInflationCapFloor {
     /// The year-on-year coupons the optionlets are written on (`yoyLeg`).
     pub fn yoy_leg(&self) -> &[Shared<YoYInflationCoupon>] {
         &self.coupons
+    }
+
+    /// The leg's last coupon (`lastYoYInflationCoupon`, `.cpp:109-115`).
+    ///
+    /// Infallible where C++ is not: it `dynamic_pointer_cast`s the erased
+    /// flow back and can hand out a null pointer, while the port holds the
+    /// coupons concrete and [`new`](Self::new) refuses an empty leg, so the
+    /// `expect` is unreachable.
+    pub fn last_yoy_inflation_coupon(&self) -> Shared<YoYInflationCoupon> {
+        Shared::clone(
+            self.coupons
+                .last()
+                .expect("leg is non-empty by construction"),
+        )
     }
 
     /// The leg's earliest accrual start (`startDate`).
@@ -488,6 +501,24 @@ mod tests {
         assert_eq!(cap.cap_floor_type(), CapFloorType::Cap);
         assert_eq!(cap.cap_rates(), vec![0.03; n].as_slice());
         assert!(cap.floor_rates().is_empty());
+    }
+
+    /// `lastYoYInflationCoupon` (`.cpp:109-115`) hands back the leg's *last*
+    /// coupon, the same pointee the leg's tail holds. The three-coupon fixture
+    /// and the second assertion are what discriminate it: on a one-coupon leg
+    /// last and first coincide, and an accessor returning the front would pass.
+    #[test]
+    fn the_last_coupon_is_the_tail_of_the_leg() {
+        let settings = settings_on(Date::new(13, Month::August, 2007));
+        let coupons = leg(&settings, 1.0, 0.0);
+        let cap = YoYInflationCapFloor::cap(coupons, vec![0.03], settings).unwrap();
+
+        let last = cap.last_yoy_inflation_coupon();
+        assert!(Shared::ptr_eq(
+            &last,
+            cap.yoy_leg().last().expect("a non-empty leg")
+        ));
+        assert!(!Shared::ptr_eq(&last, &cap.yoy_leg()[0]));
     }
 
     #[test]
