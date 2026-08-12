@@ -324,3 +324,275 @@ impl MakeYoYInflationCapFloor {
         Ok(cap_floor)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    //! QuantLib covers neither this factory nor `YoYInflationCapFloor::atmRate`
+    //! (no test-suite case constructs either), so the oracle is self-authored:
+    //! a factory-built cap has to match the cap the same leg builds by hand, and
+    //! an at-the-money strike has to be the rate that reprices the leg it ends
+    //! up written on.
+    //!
+    //! The curve is deliberately steep - year-on-year swaps quoted 2 % to 4 %
+    //! across 1y to 5y - so that the whole leg's at-the-money rate and the last
+    //! coupon's are far apart. On a flat curve the two coincide and the
+    //! trim-before-fill order (`cpp:69-83`) would be unpinnable.
+
+    use super::*;
+    use crate::cashflows::{Coupon, YoYInflationCoupon};
+    use crate::event::Event;
+    use crate::handle::RelinkableHandle;
+    use crate::indexes::index::Index;
+    use crate::indexes::inflation::UkRpi;
+    use crate::indexes::inflationindex::InflationIndex;
+    use crate::instruments::inflationcapfloor::YoYInflationCapFloor;
+    use crate::interestrate::Compounding;
+    use crate::math::interpolations::linear::Linear;
+    use crate::quotes::SimpleQuote;
+    use crate::shared::shared;
+    use crate::termstructures::inflation::inflationhelpers::{
+        YearOnYearInflationSwapHelper, YoYInflationHelper,
+    };
+    use crate::termstructures::inflation::inflationtermstructure::YoYInflationTermStructure;
+    use crate::termstructures::inflation::piecewiseyoyinflationcurve::PiecewiseYoYInflationCurve;
+    use crate::termstructures::yields::{FlatForward, Pillar};
+    use crate::time::calendars::unitedkingdom::{self, UnitedKingdom};
+    use crate::time::date::Month;
+    use crate::time::daycounters::actualactual::{
+        ActualActual, Convention as ActualActualConvention,
+    };
+
+    const NOTIONAL: Real = 1_000_000.0;
+    const LENGTH: Size = 5;
+
+    fn uk() -> Calendar {
+        UnitedKingdom::new(unitedkingdom::Market::Settlement)
+    }
+
+    fn day_counter() -> DayCounter {
+        Thirty360::with_convention(Convention::BondBasis)
+    }
+
+    fn observation_lag() -> Period {
+        Period::new(2, TimeUnit::Months)
+    }
+
+    struct Fixture {
+        settings: Shared<Settings<Date>>,
+        index: Shared<YoYInflationIndex>,
+        nominal: Handle<dyn YieldTermStructure>,
+        evaluation_date: Date,
+        _curve: Shared<PiecewiseYoYInflationCurve<Linear>>,
+        _handle: RelinkableHandle<dyn YoYInflationTermStructure>,
+    }
+
+    /// A UK RPI index with monthly history, a 5 % nominal curve, and a
+    /// year-on-year curve bootstrapped off five steeply rising swap quotes.
+    ///
+    /// The evaluation date is a UK business day, so a default build's spot date
+    /// is the evaluation date itself and the hand-built comparison leg can start
+    /// there without re-deriving it.
+    fn a_sloped_market() -> Fixture {
+        let settings = shared(Settings::<Date>::new());
+        let evaluation_date = Date::new(13, Month::August, 2007);
+        settings.set_evaluation_date(evaluation_date);
+
+        let rpi_schedule = MakeSchedule::new()
+            .from(Date::new(1, Month::January, 2005))
+            .to(Date::new(1, Month::August, 2007))
+            .with_tenor(Period::new(1, TimeUnit::Months))
+            .with_calendar(uk())
+            .with_convention(BusinessDayConvention::ModifiedFollowing)
+            .with_rule(DateGeneration::Forward)
+            .build();
+        let rpi = shared(UkRpi::new(Shared::clone(&settings)));
+        for (n, date) in rpi_schedule.dates().iter().enumerate() {
+            rpi.add_fixing(*date, 190.0 + n as Real)
+                .expect("a published figure");
+        }
+
+        let handle = RelinkableHandle::<dyn YoYInflationTermStructure>::empty();
+        let index = shared(
+            YoYInflationIndex::from_underlying(Shared::clone(&rpi))
+                .with_term_structure(handle.handle()),
+        );
+        let nominal = Handle::new(shared(FlatForward::with_rate(
+            evaluation_date,
+            0.05,
+            ActualActual::with_convention(ActualActualConvention::ISDA),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>);
+
+        let helpers: Vec<Shared<dyn YoYInflationHelper>> = (1..=5)
+            .map(|year| {
+                let rate = 0.02 + 0.005 * (year - 1) as Real;
+                YearOnYearInflationSwapHelper::new(
+                    Handle::new(shared(SimpleQuote::new(Some(rate)))),
+                    observation_lag(),
+                    uk().advance(
+                        evaluation_date,
+                        year,
+                        TimeUnit::Years,
+                        BusinessDayConvention::Unadjusted,
+                        false,
+                    ),
+                    uk(),
+                    BusinessDayConvention::ModifiedFollowing,
+                    day_counter(),
+                    &index,
+                    CpiInterpolationType::Flat,
+                    nominal.clone(),
+                    Pillar::LastRelevantDate,
+                    Shared::clone(&settings),
+                )
+                .expect("a well-formed helper") as Shared<dyn YoYInflationHelper>
+            })
+            .collect();
+
+        let curve = PiecewiseYoYInflationCurve::<Linear>::new(
+            evaluation_date,
+            rpi.last_fixing_date().expect("RPI has history"),
+            0.02,
+            index.frequency(),
+            day_counter(),
+            helpers,
+            None,
+        )
+        .expect("five helpers");
+        handle.link_to(Shared::clone(&curve) as Shared<dyn YoYInflationTermStructure>);
+
+        Fixture {
+            settings,
+            index,
+            nominal,
+            evaluation_date,
+            _curve: curve,
+            _handle: handle,
+        }
+    }
+
+    /// A builder with the factory defaults, over `LENGTH` years.
+    fn a_builder(fixture: &Fixture) -> MakeYoYInflationCapFloor {
+        MakeYoYInflationCapFloor::new(
+            CapFloorType::Cap,
+            Shared::clone(&fixture.index),
+            LENGTH,
+            uk(),
+            observation_lag(),
+            CpiInterpolationType::Flat,
+            Shared::clone(&fixture.settings),
+        )
+    }
+
+    /// The leg `build` should produce for the default settings, assembled by
+    /// hand off the same schedule.
+    fn a_hand_built_leg(fixture: &Fixture) -> Vec<Shared<YoYInflationCoupon>> {
+        let start = fixture.evaluation_date;
+        let end = uk().advance(
+            start,
+            LENGTH as Integer,
+            TimeUnit::Years,
+            BusinessDayConvention::Unadjusted,
+            false,
+        );
+        let schedule = MakeSchedule::new()
+            .from(start)
+            .to(end)
+            .with_frequency(Frequency::Annual)
+            .with_calendar(uk())
+            .with_convention(BusinessDayConvention::Unadjusted)
+            .with_termination_date_convention(BusinessDayConvention::Unadjusted)
+            .with_rule(DateGeneration::Forward)
+            .build();
+        YoYInflationLeg::new(
+            schedule,
+            uk(),
+            Shared::clone(&fixture.index),
+            observation_lag(),
+            CpiInterpolationType::Flat,
+        )
+        .with_payment_adjustment(BusinessDayConvention::ModifiedFollowing)
+        .with_payment_day_counter(day_counter())
+        .with_notional(NOTIONAL)
+        .coupons()
+        .expect("a well-formed leg")
+    }
+
+    fn pay_dates(cap_floor: &YoYInflationCapFloor) -> Vec<Date> {
+        cap_floor.yoy_leg().iter().map(|c| c.date()).collect()
+    }
+
+    /// The factory's leg is the leg the same schedule builds by hand, coupon for
+    /// coupon (`cpp:58-67`). Structure alone pins this: no engine, no
+    /// volatility, no NPV.
+    #[test]
+    fn the_factory_reproduces_a_hand_built_cap() {
+        let fixture = a_sloped_market();
+        let built = a_builder(&fixture)
+            .with_nominal(NOTIONAL)
+            .with_strike(0.03)
+            .build()
+            .expect("an explicit strike is enough to build");
+        let by_hand = YoYInflationCapFloor::cap(
+            a_hand_built_leg(&fixture),
+            vec![0.03],
+            Shared::clone(&fixture.settings),
+        )
+        .expect("a well-formed cap");
+
+        assert_eq!(built.cap_rates(), by_hand.cap_rates());
+        assert_eq!(built.yoy_leg().len(), by_hand.yoy_leg().len());
+        for (from_factory, by_hand) in built.yoy_leg().iter().zip(by_hand.yoy_leg()) {
+            assert_eq!(from_factory.nominal(), by_hand.nominal());
+            assert_eq!(from_factory.accrual_period(), by_hand.accrual_period());
+            assert_eq!(from_factory.date(), by_hand.date());
+            assert_eq!(from_factory.fixing_date(), by_hand.fixing_date());
+        }
+    }
+
+    /// `atmRate` (`inflationcapfloor.cpp:214-217`) is [`CashFlows::atm_rate`]
+    /// over the instrument's own leg, off the curve's reference date.
+    #[test]
+    fn atm_rate_is_the_leg_repricing_rate() {
+        let fixture = a_sloped_market();
+        let cap = a_builder(&fixture)
+            .with_strike(0.03)
+            .build()
+            .expect("a well-formed cap");
+        let curve = fixture.nominal.current_link().expect("a linked curve");
+
+        let leg: Leg = cap
+            .yoy_leg()
+            .iter()
+            .map(|coupon| Shared::clone(coupon) as Shared<dyn CashFlow>)
+            .collect();
+        let by_hand = CashFlows::atm_rate(
+            &leg,
+            curve.as_ref(),
+            &fixture.settings,
+            Some(false),
+            Some(curve.reference_date().expect("a reference date")),
+            None,
+            None,
+        )
+        .expect("a leg with basis-point sensitivity");
+
+        assert_eq!(cap.atm_rate(curve.as_ref()).expect("an atm rate"), by_hand);
+    }
+
+    /// Every trimming flag reaches the leg (`cpp:69-76`).
+    #[test]
+    fn the_trimming_flags_reach_the_leg() {
+        let fixture = a_sloped_market();
+        let whole = a_builder(&fixture).with_strike(0.03).build().unwrap();
+        let trimmed = a_builder(&fixture)
+            .with_first_caplet_excluded()
+            .with_strike(0.03)
+            .build()
+            .unwrap();
+
+        assert_eq!(trimmed.yoy_leg().len(), whole.yoy_leg().len() - 1);
+        assert_eq!(pay_dates(&trimmed), pay_dates(&whole)[1..]);
+    }
+}
