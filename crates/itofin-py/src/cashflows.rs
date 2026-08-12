@@ -167,9 +167,9 @@ impl PyYoYInflationCoupon {
 /// FFI boundary; this facade takes the whole configuration up front and
 /// assembles the chain inside [`coupons`](Self::coupons), as
 /// [`MakeYoYInflationCapFloor`](crate::inflation::PyMakeYoYInflationCapFloor)
-/// does. An unset optional leaves the core default in place: a unit notional per
-/// coupon, a `ModifiedFollowing` payment roll, no fixing days, a unit gearing
-/// and no spread.
+/// does. An unset optional leaves the core default in place: a
+/// `ModifiedFollowing` payment roll, no fixing days, a unit gearing and no
+/// spread.
 ///
 /// `payment_day_counter` is required here although the core takes it through a
 /// setter: a leg built without one reports `"no payment daycounter given"` from
