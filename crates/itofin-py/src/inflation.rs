@@ -138,7 +138,7 @@ pub enum PyCpiInterpolationType {
 
 impl PyCpiInterpolationType {
     /// The core [`CpiInterpolationType`] this variant stands for.
-    fn inner(&self) -> CpiInterpolationType {
+    pub(crate) fn inner(&self) -> CpiInterpolationType {
         match self {
             PyCpiInterpolationType::Flat => CpiInterpolationType::Flat,
             PyCpiInterpolationType::Linear => CpiInterpolationType::Linear,
