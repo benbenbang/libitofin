@@ -220,7 +220,7 @@ impl PricingEngine for MidPointCdsEngine {
                 }
             }
 
-            let claim_amount = claim.amount(&default_date, notional, self.recovery_rate);
+            let claim_amount = claim.amount(&default_date, notional, self.recovery_rate)?;
             if arguments.pays_at_default_time {
                 default_leg_npv +=
                     default * claim_amount * discount.discount_date(default_date, false)?;

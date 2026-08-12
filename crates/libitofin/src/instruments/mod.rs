@@ -30,7 +30,7 @@ mod zerocouponinflationswap;
 pub use bond::{Bond, BondArguments, BondEngine, BondPrice, BondPriceType, BondResults};
 pub use bonds::FixedRateBond;
 pub use capfloor::{CapFloor, CapFloorArguments, CapFloorType};
-pub use claim::{Claim, FaceValueClaim};
+pub use claim::{Claim, FaceValueAccrualClaim, FaceValueClaim};
 pub use creditdefaultswap::{
     CdsArguments, CdsEngine, CdsResults, CdsTerms, CreditDefaultSwap, PricingModel, cds_maturity,
 };

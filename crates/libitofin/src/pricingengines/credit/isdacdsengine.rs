@@ -292,7 +292,7 @@ impl IsdaCdsEngine {
             index += 1;
         }
 
-        Ok(protection_npv * claim.amount(&Date::null(), notional, context.recovery_rate))
+        Ok(protection_npv * claim.amount(&Date::null(), notional, context.recovery_rate)?)
     }
 
     /// `isdacdsengine.cpp:201-287`: the premium leg - each live coupon carried
@@ -632,8 +632,12 @@ mod tests {
     //! passed.
 
     use super::*;
+    use crate::cashflow::CashFlow;
+    use crate::cashflows::FixedRateCoupon;
     use crate::instrument::Instrument;
-    use crate::instruments::{Claim, CreditDefaultSwap, ProtectionSide};
+    use crate::instruments::{
+        Bond, Claim, CreditDefaultSwap, FaceValueAccrualClaim, ProtectionSide,
+    };
     use crate::interestrate::Compounding;
     use crate::shared::shared;
     use crate::termstructures::credit::flathazardrate::FlatHazardRate;
@@ -678,8 +682,13 @@ mod tests {
     struct WholeNotionalClaim;
 
     impl Claim for WholeNotionalClaim {
-        fn amount(&self, _default_date: &Date, notional: Real, _recovery_rate: Real) -> Real {
-            notional
+        fn amount(
+            &self,
+            _default_date: &Date,
+            notional: Real,
+            _recovery_rate: Real,
+        ) -> QlResult<Real> {
+            Ok(notional)
         }
     }
 
@@ -805,6 +814,42 @@ mod tests {
         assert_eq!(
             compatible(|arguments| {
                 arguments.claim = Some(shared(WholeNotionalClaim) as Shared<dyn Claim>);
+            }),
+            "ISDA engine not compatible with non face value claim"
+        );
+    }
+
+    /// The same guard on the shipped claim the ISDA model does not settle,
+    /// rather than on the stub above: [`FaceValueAccrualClaim`] takes the
+    /// default `as_any`, which is the C++ null-cast arm.
+    #[test]
+    fn a_face_value_accrual_claim_is_refused() {
+        let reference_security = shared(
+            Bond::from_coupons(
+                2,
+                WeekendsOnly::new(),
+                Some(today()),
+                vec![shared(FixedRateCoupon::from_rate(
+                    Date::new(15, Month::June, 2027),
+                    100.0,
+                    0.05,
+                    Actual360::new(),
+                    today(),
+                    Date::new(15, Month::June, 2027),
+                    None,
+                    None,
+                    None,
+                )) as Shared<dyn CashFlow>],
+                shared(Settings::new()),
+            )
+            .unwrap(),
+        );
+
+        assert_eq!(
+            compatible(|arguments| {
+                arguments.claim = Some(
+                    shared(FaceValueAccrualClaim::new(reference_security)) as Shared<dyn Claim>
+                );
             }),
             "ISDA engine not compatible with non face value claim"
         );

@@ -426,6 +426,21 @@ oversight) and is documented at the point of divergence in the source.
   `-0.5`, ITM `-1.0` for the put, and the call mirror), so a regression to the
   `alpha_ >= 0` form is a test failure.
 
+**Credit (EPIC Credit, #676):**
+
+- **`FaceValueAccrualClaim` fails on a zero reference notional where QuantLib
+  returns `NaN`.** `claim.cpp:41-43` forms the accrual as
+  `accruedAmount(d) / notional(d)` with no guard, so a reference security whose
+  notional has been redeemed by the default date yields `0/0`. The port's
+  `Bond::notional` reports a redeemed bond as `Ok(0.0)` rather than throwing,
+  which puts that quotient within reach of ordinary use, so the claim names the
+  condition as an error (D4) instead of letting a `NaN` propagate silently into
+  a protection leg. Every other input reproduces `claim.cpp` exactly.
+- **`Claim::amount` returns `Result` where C++ returns a bare `Real`.**
+  `FaceValueAccrualClaim` reads a fallible `Bond` API, so the trait it shares
+  with `FaceValueClaim` is fallible too (D4); the face-value claim, which cannot
+  fail, simply returns `Ok`.
+
 **Processes (L5):**
 
 - **`HestonProcess::evolve` ports the ctor-default Andersen QE scheme; the
