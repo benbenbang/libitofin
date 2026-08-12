@@ -1,16 +1,18 @@
 //! The UK Retail Price Index.
 //!
-//! Port of `ql/indexes/inflation/ukrpi.hpp:33-39`. [`UkRpi`] is the UK retail
+//! Port of `ql/indexes/inflation/ukrpi.hpp:33-53`. [`UkRpi`] is the UK retail
 //! price inflation index: "RPI" over the [`UK`](Region::uk) region, unrevised,
 //! published [`Monthly`](Frequency::Monthly) with a one-month availability lag
 //! in [`GBP`](Currency::gbp). It adds no behaviour over [`ZeroInflationIndex`],
 //! so [`UkRpi::new`] returns a plain one.
 //!
-//! Deferred: `YYUKRPI` (`ukrpi.hpp:42-53`), the quoted year-on-year sibling,
-//! which needs the `YoYInflationIndex` this batch of #705 does not have.
+//! [`YyUkRpi`] is its quoted year-on-year sibling `YYUKRPI`
+//! (`ukrpi.hpp:42-53`): the same metadata bar the family name, "YY_RPI", and a
+//! [`YoYInflationIndex`] rather than a zero one. Quoted, not a ratio - it is
+//! published as a year-on-year rate in its own right and keeps its own history.
 
 use crate::currency::Currency;
-use crate::indexes::inflationindex::ZeroInflationIndex;
+use crate::indexes::inflationindex::{YoYInflationIndex, ZeroInflationIndex};
 use crate::indexes::region::Region;
 use crate::settings::Settings;
 use crate::shared::Shared;
@@ -32,6 +34,30 @@ impl UkRpi {
     pub fn new(settings: Shared<Settings<Date>>) -> ZeroInflationIndex {
         ZeroInflationIndex::new(
             "RPI".into(),
+            Region::uk(),
+            false,
+            Frequency::Monthly,
+            Period::new(1, TimeUnit::Months),
+            Currency::gbp(),
+            settings,
+        )
+    }
+}
+
+/// The quoted year-on-year UK RPI index (`ql/indexes/inflation/ukrpi.hpp`).
+///
+/// A zero-sized namespace for the YY UK RPI constructor.
+pub struct YyUkRpi;
+
+impl YyUkRpi {
+    /// Builds the quoted year-on-year UK RPI index, mirroring the C++
+    /// `YYUKRPI::YYUKRPI(ts)` constructor (`ukrpi.hpp:44-53`) less the
+    /// year-on-year curve, which
+    /// [`with_term_structure`](YoYInflationIndex::with_term_structure) links.
+    #[allow(clippy::new_ret_no_self)]
+    pub fn new(settings: Shared<Settings<Date>>) -> YoYInflationIndex {
+        YoYInflationIndex::new(
+            "YY_RPI".into(),
             Region::uk(),
             false,
             Frequency::Monthly,
@@ -75,6 +101,23 @@ mod tests {
         assert_eq!(index.name(), "UK RPI");
         assert_eq!(index.frequency(), Frequency::Monthly);
         assert!(!index.revised());
+        assert_eq!(index.availability_lag(), Period::new(1, TimeUnit::Months));
+        assert_eq!(index.currency().code(), "GBP");
+    }
+
+    /// The quoted year-on-year sibling's metadata (`ukrpi.hpp:44-53`), read the
+    /// way `testQuotedYYIndex` (`inflation.cpp:933-953`) reads it on the base
+    /// type. The composed name is what discriminates the family: it is the only
+    /// field separating one named quoted index from another.
+    #[test]
+    fn the_year_on_year_construction_matches_the_cpp_header() {
+        let index = YyUkRpi::new(shared(Settings::<Date>::new()));
+
+        assert_eq!(index.name(), "UK YY_RPI");
+        assert_eq!(index.frequency(), Frequency::Monthly);
+        assert!(!index.revised());
+        assert!(!index.ratio());
+        assert!(index.underlying_index().is_none());
         assert_eq!(index.availability_lag(), Period::new(1, TimeUnit::Months));
         assert_eq!(index.currency().code(), "GBP");
     }
