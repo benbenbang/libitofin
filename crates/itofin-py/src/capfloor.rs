@@ -42,7 +42,7 @@ pub enum PyCapFloorType {
 
 impl PyCapFloorType {
     /// The core [`CapFloorType`] this variant stands for.
-    fn inner(&self) -> CapFloorType {
+    pub(crate) fn inner(&self) -> CapFloorType {
         match self {
             PyCapFloorType::Cap => CapFloorType::Cap,
             PyCapFloorType::Floor => CapFloorType::Floor,
