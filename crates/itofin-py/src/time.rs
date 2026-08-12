@@ -189,6 +189,14 @@ impl PyDayCounter {
     pub(crate) fn inner(&self) -> DayCounter {
         self.inner.clone()
     }
+
+    /// Wraps a core [`DayCounter`] a facade read back off an object it built.
+    ///
+    /// The result carries no factory identity, so it compares only through its
+    /// `repr`.
+    pub(crate) fn from_inner(inner: DayCounter) -> Self {
+        PyDayCounter { inner }
+    }
 }
 
 /// Python `Period`: a signed length in one calendar unit.

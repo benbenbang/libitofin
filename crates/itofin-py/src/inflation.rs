@@ -144,6 +144,15 @@ impl PyCpiInterpolationType {
             PyCpiInterpolationType::Linear => CpiInterpolationType::Linear,
         }
     }
+
+    /// The variant standing for a core [`CpiInterpolationType`] a facade read
+    /// back off an object it built.
+    pub(crate) fn from_inner(inner: CpiInterpolationType) -> Self {
+        match inner {
+            CpiInterpolationType::Flat => PyCpiInterpolationType::Flat,
+            CpiInterpolationType::Linear => PyCpiInterpolationType::Linear,
+        }
+    }
 }
 
 /// Python `ZeroInflationIndex`: a price index publishing one level per period,

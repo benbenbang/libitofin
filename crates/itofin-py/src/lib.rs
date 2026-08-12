@@ -9,6 +9,7 @@ mod calibration;
 mod capfloor;
 mod capfloorengine;
 mod capfloortermvol;
+mod cashflows;
 mod credit;
 mod creditengine;
 mod credithelpers;
@@ -35,6 +36,7 @@ use calibration::{PyCalibrationErrorType, PyEndCriteria, PyLevenbergMarquardt};
 use capfloor::{PyCapFloor, PyCapFloorType};
 use capfloorengine::PyBlackCapFloorEngine;
 use capfloortermvol::PyCapFloorTermVolSurface;
+use cashflows::PyYoYInflationCoupon;
 use credit::{
     PyCreditDefaultSwap, PyDefaultProbabilityTermStructure, PyFlatHazardRate,
     PyInterpolatedHazardRateCurve, PyPiecewiseDefaultCurve, PyPricingModel, PyProtectionSide,
@@ -119,7 +121,7 @@ impl From<PyQlError> for PyErr {
     }
 }
 
-/// Registers the nine `ql/`-faithful submodules on `itofin`.
+/// Registers the ten `ql/`-faithful submodules on `itofin`.
 ///
 /// Nested PyO3 modules give attribute access (`itofin.time.Date`) but do not
 /// form a Python package, so `import itofin.time` / `from itofin.time import
@@ -216,6 +218,9 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     indexes.add_class::<PyZeroInflationIndex>()?;
     indexes.add_class::<PyYoYInflationIndex>()?;
 
+    let cashflows = PyModule::new(py, "cashflows")?;
+    cashflows.add_class::<PyYoYInflationCoupon>()?;
+
     let instruments = PyModule::new(py, "instruments")?;
     instruments.add_class::<PyOptionType>()?;
     instruments.add_class::<PyVanillaOption>()?;
@@ -268,6 +273,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
         ("termstructures", &termstructures),
         ("processes", &processes),
         ("indexes", &indexes),
+        ("cashflows", &cashflows),
         ("instruments", &instruments),
         ("models", &models),
         ("pricingengines", &pricingengines),
