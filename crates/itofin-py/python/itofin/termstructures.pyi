@@ -1220,3 +1220,50 @@ class PiecewiseYoYInflationCurve(YoYInflationTermStructure):
     def times(self) -> list[float]: ...
     def dates(self) -> list[Date]: ...
     def nodes(self) -> list[tuple[Date, float]]: ...
+
+class ConstantYoYOptionletVolatility:
+    """One year-on-year optionlet volatility for every strike and every date.
+
+    The reference date moves with the evaluation date carried by settings,
+    settlement_days business days on from it, so that date must be set before
+    anything is priced off the surface.
+
+    min_strike and max_strike bound the strike domain a query is answered over;
+    C++ defaults them to -1.0 and 100.0 and the port carries no default
+    arguments, so both are passed here too.
+
+    Only the flat surface is bound: the live-quote constructor and the whole
+    stripped/interpolated hierarchy are deferred."""
+
+    def __init__(
+        self,
+        volatility: float,
+        settlement_days: int,
+        calendar: Calendar,
+        business_day_convention: BusinessDayConvention,
+        day_counter: DayCounter,
+        observation_lag: Period,
+        frequency: Frequency,
+        index_is_interpolated: bool,
+        min_strike: float,
+        max_strike: float,
+        settings: Settings,
+    ) -> None: ...
+    def observation_lag(self) -> Period: ...
+    def frequency(self) -> Frequency: ...
+    def index_is_interpolated(self) -> bool: ...
+    def base_date(self) -> Date:
+        """The date the surface measures its variance from. Raises ItofinError
+        on an unset evaluation date, and on a frequency admitting no publication
+        period."""
+        ...
+    def volatility(self, date: Date, strike: float, obs_lag: Period) -> float:
+        """The lag is explicit rather than defaulted: pass observation_lag() for
+        the surface's own. Raises ItofinError when the observed date falls before
+        base_date(), or strike lies outside the strike domain."""
+        ...
+    def total_variance(self, date: Date, strike: float, obs_lag: Period) -> float:
+        """The total integrated variance, the figure that scales time out of the
+        optionlet formulae without committing to a distribution. Raises as
+        volatility()."""
+        ...

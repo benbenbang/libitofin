@@ -7,7 +7,10 @@
 //! and the [`PyZeroCouponInflationSwap`] the rest of them price together, plus
 //! the year-on-year family that mirrors it: the
 //! [`PyYoYInflationTermStructure`] curve hierarchy and the
-//! [`PyYoYInflationHelper`] helpers that fit its piecewise member.
+//! [`PyYoYInflationHelper`] helpers that fit its piecewise member, and the
+//! optionlet stack written over that curve: the flat
+//! [`PyConstantYoYOptionletVolatility`] surface and the
+//! [`PyYoYInflationCapFloorEngine`] pricing against it.
 //!
 //! The swap engine is generic rather than inflation-specific - it prices any
 //! swap - but is homed here because the inflation tickets are the first to need
@@ -22,6 +25,7 @@ use crate::swap::PySwapType;
 use crate::time::{
     PyBusinessDayConvention, PyCalendar, PyDate, PyDayCounter, PyFrequency, PyPeriod, PySchedule,
 };
+use libitofin::cashflows::YoYOptionletDistribution;
 use libitofin::currency::Currency;
 use libitofin::handle::{Handle, RelinkableHandle};
 use libitofin::indexes::index::Index;
@@ -34,7 +38,7 @@ use libitofin::instrument::Instrument;
 use libitofin::instruments::{YearOnYearInflationSwap, ZeroCouponInflationSwap};
 use libitofin::math::interpolations::linear::Linear;
 use libitofin::pricingengine::PricingEngine;
-use libitofin::pricingengines::DiscountingSwapEngine;
+use libitofin::pricingengines::{DiscountingSwapEngine, YoYInflationCapFloorEngine};
 use libitofin::shared::{Shared, SharedMut, shared, shared_mut};
 use libitofin::termstructures::inflation::inflationhelpers::{
     YearOnYearInflationSwapHelper, YoYInflationHelper, ZeroCouponInflationSwapHelper,
@@ -49,6 +53,9 @@ use libitofin::termstructures::inflation::piecewiseyoyinflationcurve::PiecewiseY
 use libitofin::termstructures::inflation::piecewisezeroinflationcurve::PiecewiseZeroInflationCurve;
 use libitofin::termstructures::inflation::seasonality::{
     MultiplicativePriceSeasonality, Seasonality,
+};
+use libitofin::termstructures::volatility::{
+    ConstantYoYOptionletVolatility, YoYOptionletVolatilitySurface,
 };
 use pyo3::prelude::*;
 
@@ -1893,5 +1900,222 @@ impl PyYearOnYearInflationSwap {
     /// The spread the year-on-year coupons carry over the index.
     fn spread(&self) -> f64 {
         self.inner.borrow().spread()
+    }
+}
+
+/// Python `ConstantYoYOptionletVolatility`: one volatility for every strike and
+/// every date (`termstructures::volatility::ConstantYoYOptionletVolatility`).
+///
+/// The reference date moves with the evaluation date carried by `settings`,
+/// `settlement_days` business days on from it, so that date must be set before
+/// anything is priced off the surface.
+///
+/// `min_strike` and `max_strike` bound the strike domain a query is answered
+/// over; C++ defaults them to `-1.0` and `100.0` and the port carries no default
+/// arguments, so both are passed here too.
+///
+/// Deferred (visible): the live-quote constructor
+/// (`constantyoyoptionletvol.rs:122`), whose quote changes notify the surface's
+/// observers, and the whole stripped/interpolated surface hierarchy, which has
+/// no port at all. A flat surface is what the cap/floor engine oracle needs.
+#[pyclass(name = "ConstantYoYOptionletVolatility", unsendable)]
+pub struct PyConstantYoYOptionletVolatility {
+    inner: Shared<ConstantYoYOptionletVolatility>,
+}
+
+#[pymethods]
+impl PyConstantYoYOptionletVolatility {
+    /// A flat surface at `volatility`, observing inflation `observation_lag`
+    /// back on an index publishing at `frequency`.
+    ///
+    /// Infallible, unlike most curve constructors: nothing is resolved here.
+    /// The reference date, the base date and the strike range are all read at
+    /// query time, so an unset evaluation date surfaces then.
+    #[new]
+    #[allow(clippy::too_many_arguments)]
+    fn new(
+        volatility: f64,
+        settlement_days: u32,
+        calendar: &PyCalendar,
+        business_day_convention: &PyBusinessDayConvention,
+        day_counter: &PyDayCounter,
+        observation_lag: &PyPeriod,
+        frequency: &PyFrequency,
+        index_is_interpolated: bool,
+        min_strike: f64,
+        max_strike: f64,
+        settings: &PySettings,
+    ) -> Self {
+        PyConstantYoYOptionletVolatility {
+            inner: shared(ConstantYoYOptionletVolatility::new(
+                volatility,
+                settlement_days,
+                calendar.inner(),
+                business_day_convention.inner(),
+                day_counter.inner(),
+                observation_lag.inner(),
+                frequency.inner(),
+                index_is_interpolated,
+                min_strike,
+                max_strike,
+                settings.inner(),
+            )),
+        }
+    }
+
+    /// The lag the surface itself observes inflation with.
+    fn observation_lag(&self) -> PyPeriod {
+        PyPeriod::from_inner(self.inner.observation_lag())
+    }
+
+    /// How often the observed index publishes.
+    fn frequency(&self) -> PyResult<PyFrequency> {
+        PyFrequency::from_inner(self.inner.frequency())
+    }
+
+    /// Whether the observed index interpolates between publications.
+    fn index_is_interpolated(&self) -> bool {
+        self.inner.index_is_interpolated()
+    }
+
+    /// The date the surface measures its variance from: the reference date
+    /// pulled back by the surface's own observation lag, snapped to the start of
+    /// the publication period unless the index is interpolated.
+    ///
+    /// # Errors
+    ///
+    /// Reports an unset evaluation date, and a frequency admitting no
+    /// publication period.
+    fn base_date(&self) -> PyResult<PyDate> {
+        Ok(PyDate::from_inner(
+            self.inner.base_date().map_err(PyQlError::from)?,
+        ))
+    }
+
+    /// The volatility for an exercise on `date` struck at `strike`, observing
+    /// inflation `obs_lag` back.
+    ///
+    /// The lag is explicit rather than defaulted: C++ substitutes the surface's
+    /// own for a sentinel period, and the port has no sentinel to carry, so a
+    /// caller wanting it passes [`observation_lag`](Self::observation_lag).
+    ///
+    /// # Errors
+    ///
+    /// Reports an observed date before [`base_date`](Self::base_date), and a
+    /// `strike` outside the surface's strike domain.
+    fn volatility(&self, date: &PyDate, strike: f64, obs_lag: &PyPeriod) -> PyResult<f64> {
+        Ok(self
+            .inner
+            .volatility(date.inner(), strike, obs_lag.inner())
+            .map_err(PyQlError::from)?)
+    }
+
+    /// The total integrated variance for an exercise on `date` struck at
+    /// `strike`: the figure that scales time out of the optionlet formulae
+    /// without committing to the distribution reading it.
+    ///
+    /// # Errors
+    ///
+    /// As [`volatility`](Self::volatility).
+    fn total_variance(&self, date: &PyDate, strike: f64, obs_lag: &PyPeriod) -> PyResult<f64> {
+        Ok(self
+            .inner
+            .total_variance(date.inner(), strike, obs_lag.inner())
+            .map_err(PyQlError::from)?)
+    }
+}
+
+impl PyConstantYoYOptionletVolatility {
+    /// The erased surface handle the cap/floor engine constructors take.
+    pub(crate) fn handle(&self) -> Handle<dyn YoYOptionletVolatilitySurface> {
+        Handle::new(Shared::clone(&self.inner) as Shared<dyn YoYOptionletVolatilitySurface>)
+    }
+}
+
+/// Python `YoYInflationCapFloorEngine`: prices a year-on-year cap or floor
+/// optionlet by optionlet (`pricingengines::YoYInflationCapFloorEngine`).
+///
+/// The distribution is chosen by the constructor rather than passed as an
+/// argument, mirroring the core's three constructors and C++'s three engine
+/// classes: [`black`](Self::black) is lognormal, `unit_displaced` lognormal in
+/// `1 + rate` and `bachelier` normal. The core
+/// `YoYOptionletDistribution` enum is not bound - nothing takes one by value -
+/// so [`distribution`](Self::distribution) reads back as a string.
+///
+/// The `settings` behind the volatility surface and behind the cap/floor this
+/// engine prices must be the same object, or the two resolve their dates
+/// against different evaluation dates and the NPV is silently wrong.
+///
+/// An engine carries the arguments and results of the contract it last priced,
+/// so a cap and a floor priced together want one engine each.
+#[pyclass(name = "YoYInflationCapFloorEngine", unsendable)]
+pub struct PyYoYInflationCapFloorEngine {
+    inner: SharedMut<YoYInflationCapFloorEngine>,
+}
+
+#[pymethods]
+impl PyYoYInflationCapFloorEngine {
+    /// Optionlets under the lognormal model (C++
+    /// `YoYInflationBlackCapFloorEngine`), forwards read off `index`,
+    /// volatilities off `volatility` and discounting on `nominal_ts`.
+    #[staticmethod]
+    fn black(
+        index: &PyYoYInflationIndex,
+        volatility: &PyConstantYoYOptionletVolatility,
+        nominal_ts: &PyYieldTermStructure,
+    ) -> Self {
+        PyYoYInflationCapFloorEngine {
+            inner: shared_mut(YoYInflationCapFloorEngine::black(
+                index.shared(),
+                volatility.handle(),
+                nominal_ts.handle(),
+            )),
+        }
+    }
+
+    /// Optionlets under the unit-displaced lognormal model (C++
+    /// `YoYInflationUnitDisplacedBlackCapFloorEngine`), the usual quoting
+    /// convention for a rate that may be negative. See [`black`](Self::black).
+    #[staticmethod]
+    fn unit_displaced(
+        index: &PyYoYInflationIndex,
+        volatility: &PyConstantYoYOptionletVolatility,
+        nominal_ts: &PyYieldTermStructure,
+    ) -> Self {
+        PyYoYInflationCapFloorEngine {
+            inner: shared_mut(YoYInflationCapFloorEngine::unit_displaced(
+                index.shared(),
+                volatility.handle(),
+                nominal_ts.handle(),
+            )),
+        }
+    }
+
+    /// Optionlets under the normal model (C++
+    /// `YoYInflationBachelierCapFloorEngine`). See [`black`](Self::black).
+    #[staticmethod]
+    fn bachelier(
+        index: &PyYoYInflationIndex,
+        volatility: &PyConstantYoYOptionletVolatility,
+        nominal_ts: &PyYieldTermStructure,
+    ) -> Self {
+        PyYoYInflationCapFloorEngine {
+            inner: shared_mut(YoYInflationCapFloorEngine::bachelier(
+                index.shared(),
+                volatility.handle(),
+                nominal_ts.handle(),
+            )),
+        }
+    }
+
+    /// The distribution optionlets are valued under, as `"black"`,
+    /// `"unit_displaced"` or `"bachelier"`.
+    fn distribution(&self) -> String {
+        match self.inner.borrow().distribution() {
+            YoYOptionletDistribution::Black => "black",
+            YoYOptionletDistribution::UnitDisplaced => "unit_displaced",
+            YoYOptionletDistribution::Bachelier => "bachelier",
+        }
+        .to_string()
     }
 }
