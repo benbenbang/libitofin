@@ -16,6 +16,7 @@ mod makecds;
 mod makeois;
 mod makeswaption;
 mod makevanillaswap;
+mod makeyoyinflationcapfloor;
 mod oneassetoption;
 mod overnightindexedswap;
 mod payoffs;
@@ -44,6 +45,7 @@ pub use makecds::MakeCreditDefaultSwap;
 pub use makeois::MakeOis;
 pub use makeswaption::MakeSwaption;
 pub use makevanillaswap::MakeVanillaSwap;
+pub use makeyoyinflationcapfloor::MakeYoYInflationCapFloor;
 pub use oneassetoption::{
     EuropeanOption, Greeks, MoreGreeks, OneAssetOption, OneAssetOptionEngine,
     OneAssetOptionResults, OptionArguments, VanillaOption,
