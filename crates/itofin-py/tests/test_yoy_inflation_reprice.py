@@ -37,6 +37,7 @@ from itofin.quotes import SimpleQuote
 from itofin.termstructures import (
     FlatForward,
     PiecewiseYoYInflationCurve,
+    Pillar,
     YearOnYearInflationSwapHelper,
 )
 from itofin.time import (
@@ -142,6 +143,32 @@ def _helpers(
     ]
 
 
+def _one_helper(
+    settings: Settings,
+    index: YoYInflationIndex,
+    nominal: FlatForward,
+    interpolation: CpiInterpolationType,
+    pillar: Pillar,
+    obs_lag: Period = LAG,
+) -> YearOnYearInflationSwapHelper:
+    """A single helper on the front quote, for the construction-level pins that
+    need a pillar or an observation lag the bootstrap fixture does not vary."""
+    maturity, rate = YY_DATA[0]
+    return YearOnYearInflationSwapHelper(
+        SimpleQuote(rate / 100.0),
+        obs_lag,
+        maturity,
+        Calendar.united_kingdom(),
+        BusinessDayConvention.ModifiedFollowing,
+        DayCounter.thirty360_bond_basis(),
+        index,
+        interpolation,
+        nominal,
+        settings,
+        pillar,
+    )
+
+
 def _bootstrapped(
     settings: Settings, index: YoYInflationIndex, nominal: FlatForward
 ) -> PiecewiseYoYInflationCurve:
@@ -236,17 +263,62 @@ def test_the_first_node_is_the_base_date():
     assert curve.times()[0] < 0.0
 
 
-def test_an_interpolated_helper_is_refused():
-    """CpiInterpolationType.Linear is refused outright by the core helper: the
-    interpolated branch of the C++ constructor is deferred with the rest of
-    CPI::Linear (#847), and refusing is how that stays visible rather than
-    silently pricing as a flat one."""
+def test_an_interpolated_helper_widens_the_window_and_weighs_its_pillar():
+    """CpiInterpolationType.Linear now constructs (#847). The interpolated swap
+    reads the fixings bracketing its observation date, so the helper's window
+    closes a month past the flat collapse, and the pillar goes to whichever end
+    carries the dominant interpolation weight: 13 August sits 12/31 of the way
+    through its month, so the near end wins under Pillar.LastRelevantDate,
+    while Pillar.MaturityDate pins the far end regardless."""
     settings = _settings()
     index = YoYInflationIndex.from_underlying(_rpi(settings))
+    nominal = _nominal_curve()
+
+    flat = _one_helper(
+        settings, index, nominal, CpiInterpolationType.Flat, Pillar.LastRelevantDate
+    )
+    weighted = _one_helper(
+        settings, index, nominal, CpiInterpolationType.Linear, Pillar.LastRelevantDate
+    )
+    far = _one_helper(
+        settings, index, nominal, CpiInterpolationType.Linear, Pillar.MaturityDate
+    )
+
+    assert flat.latest_date() == Date(1, 6, 2008)
+    assert weighted.latest_date() == Date(1, 7, 2008)
+    assert weighted.pillar_date() == Date(1, 6, 2008)
+    assert far.pillar_date() == Date(1, 7, 2008)
+
+
+def test_an_interpolated_lag_short_of_an_index_period_is_rejected():
+    """The interpolated path needs a whole index period of observation lag on
+    top of the index's availability lag: it reads the fixing of the month after
+    the one the lag lands in, and UK RPI publishes a month in arrears. The flat
+    path builds on the same one-month lag - the check is Linear-gated."""
+    settings = _settings()
+    index = YoYInflationIndex.from_underlying(_rpi(settings))
+    nominal = _nominal_curve()
+    short_lag = Period(1, "Months")
 
     with pytest.raises(ItofinError) as raised:
-        _helpers(settings, index, _nominal_curve(), CpiInterpolationType.Linear)
-    assert "not ported yet" in str(raised.value)
+        _one_helper(
+            settings,
+            index,
+            nominal,
+            CpiInterpolationType.Linear,
+            Pillar.LastRelevantDate,
+            short_lag,
+        )
+    assert "need (obsLag-index period) >= availLag" in str(raised.value)
+
+    _one_helper(
+        settings,
+        index,
+        nominal,
+        CpiInterpolationType.Flat,
+        Pillar.LastRelevantDate,
+        short_lag,
+    )
 
 
 def test_the_bootstrapped_curve_reprices_the_quoted_swaps_to_zero():
