@@ -2,9 +2,11 @@
 # src/capfloorengine.rs, src/creditengine.rs, src/inflation.rs and src/mcengine.rs (#517).
 
 from itofin import Settings
+from itofin.indexes import YoYInflationIndex
 from itofin.processes import BlackScholesProcess, HestonProcess
 from itofin.quotes import SimpleQuote
 from itofin.termstructures import (
+    ConstantYoYOptionletVolatility,
     DefaultProbabilityTermStructure,
     OptionletVolatilityStructure,
     SwaptionVolatilityStructure,
@@ -252,4 +254,42 @@ class MCAmericanEngine:
         """Raises ItofinError when neither or both of steps / steps_per_year are
         given, and when both samples and absolute_tolerance are given. The
         polynomial order defaults to 2 and the calibration samples to 2048."""
+        ...
+
+class YoYInflationCapFloorEngine:
+    """Prices a year-on-year inflation cap or floor optionlet by optionlet.
+
+    The distribution is chosen by the constructor rather than passed as an
+    argument, mirroring C++'s three engine classes: black is lognormal,
+    unit_displaced lognormal in 1 + rate and bachelier normal. The core
+    YoYOptionletDistribution enum is not bound, so distribution() reads back as
+    a string.
+
+    The settings behind the volatility surface and behind the cap/floor this
+    engine prices must be the same object, or the two resolve their dates
+    against different evaluation dates and the NPV is silently wrong.
+
+    An engine carries the arguments and results of the contract it last priced,
+    so a cap and a floor priced together want one engine each."""
+
+    @staticmethod
+    def black(
+        index: YoYInflationIndex,
+        volatility: ConstantYoYOptionletVolatility,
+        nominal_ts: YieldTermStructure,
+    ) -> YoYInflationCapFloorEngine: ...
+    @staticmethod
+    def unit_displaced(
+        index: YoYInflationIndex,
+        volatility: ConstantYoYOptionletVolatility,
+        nominal_ts: YieldTermStructure,
+    ) -> YoYInflationCapFloorEngine: ...
+    @staticmethod
+    def bachelier(
+        index: YoYInflationIndex,
+        volatility: ConstantYoYOptionletVolatility,
+        nominal_ts: YieldTermStructure,
+    ) -> YoYInflationCapFloorEngine: ...
+    def distribution(self) -> str:
+        """"black", "unit_displaced" or "bachelier"."""
         ...

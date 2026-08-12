@@ -55,12 +55,13 @@ use helpers::{
 use heston::{PyHestonModel, PyHestonModelHelper, PyHestonProcess};
 use hullwhite::{PyEuribor, PyHullWhite, PySwaptionHelper};
 use inflation::{
-    PyCpiInterpolationType, PyDiscountingSwapEngine, PyInterpolatedYoYInflationCurve,
-    PyInterpolatedZeroInflationCurve, PyMultiplicativePriceSeasonality,
-    PyPiecewiseYoYInflationCurve, PyPiecewiseZeroInflationCurve, PyYearOnYearInflationSwap,
-    PyYearOnYearInflationSwapHelper, PyYoYInflationHelper, PyYoYInflationIndex,
-    PyYoYInflationTermStructure, PyZeroCouponInflationSwap, PyZeroCouponInflationSwapHelper,
-    PyZeroInflationHelper, PyZeroInflationIndex, PyZeroInflationTermStructure,
+    PyConstantYoYOptionletVolatility, PyCpiInterpolationType, PyDiscountingSwapEngine,
+    PyInterpolatedYoYInflationCurve, PyInterpolatedZeroInflationCurve,
+    PyMultiplicativePriceSeasonality, PyPiecewiseYoYInflationCurve, PyPiecewiseZeroInflationCurve,
+    PyYearOnYearInflationSwap, PyYearOnYearInflationSwapHelper, PyYoYInflationCapFloorEngine,
+    PyYoYInflationHelper, PyYoYInflationIndex, PyYoYInflationTermStructure,
+    PyZeroCouponInflationSwap, PyZeroCouponInflationSwapHelper, PyZeroInflationHelper,
+    PyZeroInflationIndex, PyZeroInflationTermStructure,
 };
 use libitofin::errors::QlError;
 use market::{PyBlackScholesProcess, PySimpleQuote};
@@ -201,6 +202,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     termstructures.add_class::<PyYoYInflationHelper>()?;
     termstructures.add_class::<PyYearOnYearInflationSwapHelper>()?;
     termstructures.add_class::<PyPiecewiseYoYInflationCurve>()?;
+    termstructures.add_class::<PyConstantYoYOptionletVolatility>()?;
 
     let processes = PyModule::new(py, "processes")?;
     processes.add_class::<PyBlackScholesProcess>()?;
@@ -249,6 +251,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     pricingengines.add_class::<PyAccrualBias>()?;
     pricingengines.add_class::<PyForwardsInCouponPeriod>()?;
     pricingengines.add_class::<PyDiscountingSwapEngine>()?;
+    pricingengines.add_class::<PyYoYInflationCapFloorEngine>()?;
     pricingengines.add_class::<PyMCEuropeanEngine>()?;
     pricingengines.add_class::<PyMCEuropeanHestonEngine>()?;
     pricingengines.add_class::<PyMCAmericanEngine>()?;
