@@ -358,12 +358,18 @@ mod tests {
     use crate::termstructures::yields::{FlatForward, Pillar};
     use crate::time::calendars::unitedkingdom::{self, UnitedKingdom};
     use crate::time::date::Month;
+    use crate::time::daycounters::actual365fixed::Actual365Fixed;
     use crate::time::daycounters::actualactual::{
         ActualActual, Convention as ActualActualConvention,
     };
 
-    const NOTIONAL: Real = 1_000_000.0;
+    /// Deliberately not the factory's own 1,000,000 default, so that the
+    /// structural round-trip can tell `with_nominal` from a no-op.
+    const NOTIONAL: Real = 2_500_000.0;
     const LENGTH: Size = 5;
+    /// The last point of the quoted 2 % to 4 % year-on-year ramp, which is also
+    /// the maturity a `LENGTH`-year leg runs to.
+    const QUOTED_FIVE_YEAR_RATE: Real = 0.04;
 
     fn uk() -> Calendar {
         UnitedKingdom::new(unitedkingdom::Market::Settlement)
@@ -581,6 +587,72 @@ mod tests {
         assert_eq!(cap.atm_rate(curve.as_ref()).expect("an atm rate"), by_hand);
     }
 
+    /// An unset strike is filled at the money off the nominal curve
+    /// (`cpp:78-83`).
+    ///
+    /// The filled rate is checked twice: against the instrument's own
+    /// `atm_rate`, and against the quoted five-year year-on-year swap rate the
+    /// curve was bootstrapped from. The second is the independent one - a par
+    /// swap rate *is* the rate that reprices its leg, so a five-year leg struck
+    /// at the money has to come back to the five-year quote, off market data
+    /// this code never touches on the way through.
+    #[test]
+    fn an_unset_strike_is_filled_at_the_money() {
+        let fixture = a_sloped_market();
+        let cap = a_builder(&fixture)
+            .with_atm_strike(fixture.nominal.clone())
+            .build()
+            .expect("an atm curve is enough to build");
+        let curve = fixture.nominal.current_link().expect("a linked curve");
+
+        assert!(
+            (cap.cap_rates()[0] - cap.atm_rate(curve.as_ref()).expect("an atm rate")).abs() < 1e-12
+        );
+        assert!(
+            (cap.cap_rates()[0] - QUOTED_FIVE_YEAR_RATE).abs() < 1e-12,
+            "the atm strike {} missed the five-year quote",
+            cap.cap_rates()[0]
+        );
+    }
+
+    /// The load-bearing order pin: `asOptionlet` trims the leg *before* the
+    /// at-the-money fill (`cpp:72-83`), so the strike is the last coupon's rate
+    /// and not the whole leg's. On this upward-sloping curve the two sit about
+    /// 227 basis points apart (4.00 % against 6.27 %); filling the strike first
+    /// would leave the optionlet struck at the full-leg rate.
+    #[test]
+    fn an_optionlet_strikes_at_the_money_on_the_coupon_it_keeps() {
+        let fixture = a_sloped_market();
+        let whole_leg = a_builder(&fixture)
+            .with_atm_strike(fixture.nominal.clone())
+            .build()
+            .expect("a well-formed cap");
+        let optionlet = a_builder(&fixture)
+            .as_optionlet(true)
+            .with_atm_strike(fixture.nominal.clone())
+            .build()
+            .expect("a well-formed optionlet");
+        let curve = fixture.nominal.current_link().expect("a linked curve");
+
+        assert_eq!(whole_leg.yoy_leg().len(), LENGTH);
+        assert_eq!(optionlet.yoy_leg().len(), 1);
+        assert_eq!(
+            optionlet.yoy_leg()[0].date(),
+            whole_leg.yoy_leg()[LENGTH - 1].date()
+        );
+        assert!(
+            (optionlet.cap_rates()[0] - optionlet.atm_rate(curve.as_ref()).expect("an atm rate"))
+                .abs()
+                < 1e-12
+        );
+        assert!(
+            (optionlet.cap_rates()[0] - whole_leg.cap_rates()[0]).abs() > 1e-2,
+            "the tail rate {} is indistinguishable from the whole leg's {}",
+            optionlet.cap_rates()[0],
+            whole_leg.cap_rates()[0]
+        );
+    }
+
     /// Every trimming flag reaches the leg (`cpp:69-76`).
     #[test]
     fn the_trimming_flags_reach_the_leg() {
@@ -594,5 +666,88 @@ mod tests {
 
         assert_eq!(trimmed.yoy_leg().len(), whole.yoy_leg().len() - 1);
         assert_eq!(pay_dates(&trimmed), pay_dates(&whole)[1..]);
+    }
+
+    /// No setter is a silent no-op: each moves the built leg away from the one
+    /// the defaults produce.
+    #[test]
+    fn every_setter_moves_the_built_leg() {
+        let fixture = a_sloped_market();
+        let default = a_builder(&fixture).with_strike(0.03).build().unwrap();
+        let default_dates = pay_dates(&default);
+
+        let shifted = a_builder(&fixture)
+            .with_effective_date(fixture.evaluation_date + Period::new(1, TimeUnit::Months))
+            .with_strike(0.03)
+            .build()
+            .unwrap();
+        assert_ne!(pay_dates(&shifted), default_dates);
+
+        let unadjusted = a_builder(&fixture)
+            .with_payment_adjustment(BusinessDayConvention::Unadjusted)
+            .with_strike(0.03)
+            .build()
+            .unwrap();
+        assert_ne!(pay_dates(&unadjusted), default_dates);
+
+        let actual365 = a_builder(&fixture)
+            .with_payment_day_counter(Actual365Fixed::new())
+            .with_strike(0.03)
+            .build()
+            .unwrap();
+        assert_ne!(
+            actual365.yoy_leg()[0].accrual_period(),
+            default.yoy_leg()[0].accrual_period()
+        );
+
+        let delayed = a_builder(&fixture)
+            .with_fixing_days(5)
+            .with_strike(0.03)
+            .build()
+            .unwrap();
+        assert_ne!(pay_dates(&delayed), default_dates);
+
+        let forward = a_builder(&fixture)
+            .with_forward_start(Period::new(1, TimeUnit::Years))
+            .with_strike(0.03)
+            .build()
+            .unwrap();
+        assert_ne!(pay_dates(&forward), default_dates);
+    }
+
+    /// The strike/at-the-money exclusion C++ guards at its setters (`cpp:133`,
+    /// `cpp:141`) lands at build time here; so does the neither-given case,
+    /// which C++ reaches as an empty-handle dereference. See the module docs.
+    #[test]
+    fn a_strike_and_an_atm_curve_are_mutually_exclusive() {
+        let fixture = a_sloped_market();
+
+        let strike_first = a_builder(&fixture)
+            .with_strike(0.03)
+            .with_atm_strike(fixture.nominal.clone())
+            .build()
+            .err()
+            .expect("both given");
+        assert!(
+            strike_first.message().contains("both given"),
+            "err was: {strike_first}"
+        );
+
+        let curve_first = a_builder(&fixture)
+            .with_atm_strike(fixture.nominal.clone())
+            .with_strike(0.03)
+            .build()
+            .err()
+            .expect("both given");
+        assert!(
+            curve_first.message().contains("both given"),
+            "err was: {curve_first}"
+        );
+
+        let neither = a_builder(&fixture).build().err().expect("neither given");
+        assert!(
+            neither.message().contains("no strike"),
+            "err was: {neither}"
+        );
     }
 }
