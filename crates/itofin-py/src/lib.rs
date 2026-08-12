@@ -56,12 +56,12 @@ use heston::{PyHestonModel, PyHestonModelHelper, PyHestonProcess};
 use hullwhite::{PyEuribor, PyHullWhite, PySwaptionHelper};
 use inflation::{
     PyConstantYoYOptionletVolatility, PyCpiInterpolationType, PyDiscountingSwapEngine,
-    PyInterpolatedYoYInflationCurve, PyInterpolatedZeroInflationCurve,
+    PyInterpolatedYoYInflationCurve, PyInterpolatedZeroInflationCurve, PyMakeYoYInflationCapFloor,
     PyMultiplicativePriceSeasonality, PyPiecewiseYoYInflationCurve, PyPiecewiseZeroInflationCurve,
-    PyYearOnYearInflationSwap, PyYearOnYearInflationSwapHelper, PyYoYInflationCapFloorEngine,
-    PyYoYInflationHelper, PyYoYInflationIndex, PyYoYInflationTermStructure,
-    PyZeroCouponInflationSwap, PyZeroCouponInflationSwapHelper, PyZeroInflationHelper,
-    PyZeroInflationIndex, PyZeroInflationTermStructure,
+    PyYearOnYearInflationSwap, PyYearOnYearInflationSwapHelper, PyYoYInflationCapFloor,
+    PyYoYInflationCapFloorEngine, PyYoYInflationHelper, PyYoYInflationIndex,
+    PyYoYInflationTermStructure, PyZeroCouponInflationSwap, PyZeroCouponInflationSwapHelper,
+    PyZeroInflationHelper, PyZeroInflationIndex, PyZeroInflationTermStructure,
 };
 use libitofin::errors::QlError;
 use market::{PyBlackScholesProcess, PySimpleQuote};
@@ -233,6 +233,8 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     instruments.add_class::<PyCreditDefaultSwap>()?;
     instruments.add_class::<PyZeroCouponInflationSwap>()?;
     instruments.add_class::<PyYearOnYearInflationSwap>()?;
+    instruments.add_class::<PyMakeYoYInflationCapFloor>()?;
+    instruments.add_class::<PyYoYInflationCapFloor>()?;
 
     let models = PyModule::new(py, "models")?;
     models.add_class::<PyHestonModel>()?;

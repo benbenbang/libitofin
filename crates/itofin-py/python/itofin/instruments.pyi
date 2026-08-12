@@ -19,6 +19,7 @@ from itofin.pricingengines import (
     MCEuropeanEngine,
     MCEuropeanHestonEngine,
     MidPointCdsEngine,
+    YoYInflationCapFloorEngine,
 )
 from itofin.processes import BlackScholesProcess
 from itofin.termstructures import YieldTermStructure
@@ -432,3 +433,83 @@ class YearOnYearInflationSwap:
     def yoy_leg_npv(self) -> float: ...
     def fixed_rate(self) -> float: ...
     def spread(self) -> float: ...
+
+class MakeYoYInflationCapFloor:
+    """The standard market builder for a year-on-year inflation cap or floor.
+
+    It derives an annual year-on-year leg from a length in years, trims that leg
+    to the optionlets asked for, and strikes it either at an explicit strike or
+    at the money off atm_strike. Exactly one of the two is required: the core
+    refuses both together and neither at all, at build time rather than at the
+    setters, so both surface from build().
+
+    The core builder is a consumed-self fluent chain, which does not cross the
+    FFI boundary; this facade takes the whole configuration up front and
+    assembles the chain inside build(), as MakeVanillaSwap does. An unset
+    optional leaves the core default in place: a 1,000,000 nominal, a
+    ModifiedFollowing payment roll, a 30/360 bond-basis day counter, no fixing
+    days, every optionlet kept and no forward start.
+
+    Trimming happens before the at-the-money fill, so as_optionlet and
+    first_caplet_excluded change what an unset strike resolves to: the rate that
+    reprices whatever survives, not the whole leg's.
+
+    CapFloorType.Collar has no path here - the builder carries a single strike,
+    and a collar needs two strike vectors over a coupon leg Python cannot build
+    (#848)."""
+
+    def __init__(
+        self,
+        cap_floor_type: CapFloorType,
+        index: YoYInflationIndex,
+        length: int,
+        calendar: Calendar,
+        observation_lag: Period,
+        interpolation: CpiInterpolationType,
+        settings: Settings,
+        nominal: float | None = None,
+        effective_date: Date | None = None,
+        payment_day_counter: DayCounter | None = None,
+        payment_adjustment: BusinessDayConvention | None = None,
+        fixing_days: int | None = None,
+        engine: YoYInflationCapFloorEngine | None = None,
+        as_optionlet: bool = False,
+        forward_start: Period | None = None,
+        first_caplet_excluded: bool = False,
+        strike: float | None = None,
+        atm_strike: YieldTermStructure | None = None,
+    ) -> None: ...
+    def build(self) -> YoYInflationCapFloor:
+        """Raises ItofinError when both strike and atm_strike are given and when
+        neither is; when the start date has to be derived and no evaluation date
+        is set; and on whatever the leg construction and the at-the-money fill
+        report."""
+        ...
+
+class YoYInflationCapFloor:
+    """A cap or floor over a year-on-year inflation leg.
+
+    Built only through MakeYoYInflationCapFloor: the core's raw constructors take
+    a vector of concrete year-on-year coupons, which Python has no facade to
+    build (#848), so there is no direct constructor here.
+
+    Unlike a nominal cap/floor this instrument keeps its first optionlet, so the
+    strip spans its leg exactly and cap - floor is the year-on-year swap.
+
+    Pricing needs an engine: call set_engine before npv."""
+
+    def cap_rates(self) -> list[float]: ...
+    def floor_rates(self) -> list[float]: ...
+    def coupon_count(self) -> int: ...
+    def start_date(self) -> Date: ...
+    def maturity_date(self) -> Date: ...
+    def atm_rate(self, discount_curve: YieldTermStructure) -> float:
+        """The strike at which the leg reprices on discount_curve. Raises
+        ItofinError on an unlinked curve, a curve with no reference date and a
+        leg with no basis-point sensitivity to solve over."""
+        ...
+    def set_engine(self, engine: YoYInflationCapFloorEngine) -> None:
+        """The engine must resolve its dates against the same Settings object
+        this cap/floor was built with."""
+        ...
+    def npv(self) -> float: ...

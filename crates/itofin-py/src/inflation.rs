@@ -9,14 +9,17 @@
 //! [`PyYoYInflationTermStructure`] curve hierarchy and the
 //! [`PyYoYInflationHelper`] helpers that fit its piecewise member, and the
 //! optionlet stack written over that curve: the flat
-//! [`PyConstantYoYOptionletVolatility`] surface and the
-//! [`PyYoYInflationCapFloorEngine`] pricing against it.
+//! [`PyConstantYoYOptionletVolatility`] surface, the
+//! [`PyYoYInflationCapFloorEngine`] pricing against it and the
+//! [`PyYoYInflationCapFloor`] it prices, which
+//! [`PyMakeYoYInflationCapFloor`] is the only way to build.
 //!
 //! The swap engine is generic rather than inflation-specific - it prices any
 //! swap - but is homed here because the inflation tickets are the first to need
 //! it and are its only consumers today.
 
 use crate::PyQlError;
+use crate::capfloor::PyCapFloorType;
 use crate::curve::PyYieldTermStructure;
 use crate::helpers::PyPillar;
 use crate::market::PySimpleQuote;
@@ -35,10 +38,14 @@ use libitofin::indexes::inflationindex::{
 };
 use libitofin::indexes::region::Region;
 use libitofin::instrument::Instrument;
-use libitofin::instruments::{YearOnYearInflationSwap, ZeroCouponInflationSwap};
+use libitofin::instruments::{
+    MakeYoYInflationCapFloor, YearOnYearInflationSwap, YoYInflationCapFloor,
+    ZeroCouponInflationSwap,
+};
 use libitofin::math::interpolations::linear::Linear;
 use libitofin::pricingengine::PricingEngine;
 use libitofin::pricingengines::{DiscountingSwapEngine, YoYInflationCapFloorEngine};
+use libitofin::settings::Settings;
 use libitofin::shared::{Shared, SharedMut, shared, shared_mut};
 use libitofin::termstructures::inflation::inflationhelpers::{
     YearOnYearInflationSwapHelper, YoYInflationHelper, ZeroCouponInflationSwapHelper,
@@ -57,6 +64,12 @@ use libitofin::termstructures::inflation::seasonality::{
 use libitofin::termstructures::volatility::{
     ConstantYoYOptionletVolatility, YoYOptionletVolatilitySurface,
 };
+use libitofin::termstructures::yieldtermstructure::YieldTermStructure;
+use libitofin::time::businessdayconvention::BusinessDayConvention;
+use libitofin::time::calendar::Calendar;
+use libitofin::time::date::Date;
+use libitofin::time::daycounter::DayCounter;
+use libitofin::time::period::Period;
 use pyo3::prelude::*;
 
 /// Python `DiscountingSwapEngine`: discounts each leg of a swap over a single
@@ -2117,5 +2130,294 @@ impl PyYoYInflationCapFloorEngine {
             YoYOptionletDistribution::Bachelier => "bachelier",
         }
         .to_string()
+    }
+}
+
+impl PyYoYInflationCapFloorEngine {
+    /// The erased engine the cap/floor facade installs via `set_pricing_engine`.
+    pub(crate) fn engine(&self) -> SharedMut<dyn PricingEngine> {
+        SharedMut::clone(&self.inner) as SharedMut<dyn PricingEngine>
+    }
+}
+
+/// Python `MakeYoYInflationCapFloor`: the standard market builder for a
+/// year-on-year inflation cap or floor
+/// (`instruments::makeyoyinflationcapfloor`).
+///
+/// It derives an annual year-on-year leg from a length in years, trims that leg
+/// to the optionlets asked for, and strikes it either at an explicit `strike` or
+/// at the money off `atm_strike`. Exactly one of the two is required: the core
+/// refuses both together and neither at all, at build time rather than at the
+/// setters, so both surface from [`build`](Self::build).
+///
+/// The core builder is a consumed-self fluent chain, which does not cross the
+/// FFI boundary; this facade takes the whole configuration up front and
+/// assembles the chain inside [`build`](Self::build), as
+/// [`MakeVanillaSwap`](crate::swap::PyMakeVanillaSwap) does. An unset optional
+/// leaves the core default in place: a 1,000,000 nominal, a `ModifiedFollowing`
+/// payment roll, a 30/360 bond-basis day counter, no fixing days, every
+/// optionlet kept and no forward start.
+///
+/// Trimming happens *before* the at-the-money fill, so `as_optionlet` and
+/// `first_caplet_excluded` change what an unset strike resolves to: the rate
+/// that reprices whatever survives, not the whole leg's.
+///
+/// Deferred (visible): `CapFloorType.Collar` has no path here either - the
+/// builder carries a single strike, and a collar needs two strike vectors over a
+/// coupon leg Python cannot build (#848).
+#[pyclass(name = "MakeYoYInflationCapFloor", unsendable)]
+pub struct PyMakeYoYInflationCapFloor {
+    cap_floor_type: PyCapFloorType,
+    index: Shared<YoYInflationIndex>,
+    length: u64,
+    calendar: Calendar,
+    observation_lag: Period,
+    interpolation: CpiInterpolationType,
+    settings: Shared<Settings<Date>>,
+    nominal: Option<f64>,
+    effective_date: Option<Date>,
+    payment_day_counter: Option<DayCounter>,
+    payment_adjustment: Option<BusinessDayConvention>,
+    fixing_days: Option<u32>,
+    engine: Option<SharedMut<dyn PricingEngine>>,
+    as_optionlet: bool,
+    forward_start: Option<Period>,
+    first_caplet_excluded: bool,
+    strike: Option<f64>,
+    atm_strike: Option<Handle<dyn YieldTermStructure>>,
+}
+
+#[pymethods]
+impl PyMakeYoYInflationCapFloor {
+    /// A builder for a `cap_floor_type` cap/floor of `length` years on `index`,
+    /// observed `observation_lag` back under `interpolation` and paying on
+    /// `calendar`.
+    #[new]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (
+        cap_floor_type,
+        index,
+        length,
+        calendar,
+        observation_lag,
+        interpolation,
+        settings,
+        nominal = None,
+        effective_date = None,
+        payment_day_counter = None,
+        payment_adjustment = None,
+        fixing_days = None,
+        engine = None,
+        as_optionlet = false,
+        forward_start = None,
+        first_caplet_excluded = false,
+        strike = None,
+        atm_strike = None,
+    ))]
+    fn new(
+        cap_floor_type: PyCapFloorType,
+        index: &PyYoYInflationIndex,
+        length: u64,
+        calendar: &PyCalendar,
+        observation_lag: &PyPeriod,
+        interpolation: PyCpiInterpolationType,
+        settings: &PySettings,
+        nominal: Option<f64>,
+        effective_date: Option<&PyDate>,
+        payment_day_counter: Option<&PyDayCounter>,
+        payment_adjustment: Option<&PyBusinessDayConvention>,
+        fixing_days: Option<u32>,
+        engine: Option<&PyYoYInflationCapFloorEngine>,
+        as_optionlet: bool,
+        forward_start: Option<&PyPeriod>,
+        first_caplet_excluded: bool,
+        strike: Option<f64>,
+        atm_strike: Option<&PyYieldTermStructure>,
+    ) -> Self {
+        PyMakeYoYInflationCapFloor {
+            cap_floor_type,
+            index: index.shared(),
+            length,
+            calendar: calendar.inner(),
+            observation_lag: observation_lag.inner(),
+            interpolation: interpolation.inner(),
+            settings: settings.inner(),
+            nominal,
+            effective_date: effective_date.map(PyDate::inner),
+            payment_day_counter: payment_day_counter.map(PyDayCounter::inner),
+            payment_adjustment: payment_adjustment.map(PyBusinessDayConvention::inner),
+            fixing_days,
+            engine: engine.map(PyYoYInflationCapFloorEngine::engine),
+            as_optionlet,
+            forward_start: forward_start.map(PyPeriod::inner),
+            first_caplet_excluded,
+            strike,
+            atm_strike: atm_strike.map(PyYieldTermStructure::handle),
+        }
+    }
+
+    /// Builds the cap/floor, which already carries its engine when one was
+    /// given.
+    ///
+    /// # Errors
+    ///
+    /// Reports both an explicit `strike` and an `atm_strike` given together and
+    /// neither given at all; an unset evaluation date when the start date has to
+    /// be derived; and whatever the leg construction and the at-the-money fill
+    /// report.
+    fn build(&self) -> PyResult<PyYoYInflationCapFloor> {
+        let mut maker = MakeYoYInflationCapFloor::new(
+            self.cap_floor_type.inner(),
+            Shared::clone(&self.index),
+            self.length as usize,
+            self.calendar.clone(),
+            self.observation_lag,
+            self.interpolation,
+            Shared::clone(&self.settings),
+        );
+        if let Some(nominal) = self.nominal {
+            maker = maker.with_nominal(nominal);
+        }
+        if let Some(effective_date) = self.effective_date {
+            maker = maker.with_effective_date(effective_date);
+        }
+        if let Some(day_counter) = &self.payment_day_counter {
+            maker = maker.with_payment_day_counter(day_counter.clone());
+        }
+        if let Some(convention) = self.payment_adjustment {
+            maker = maker.with_payment_adjustment(convention);
+        }
+        if let Some(fixing_days) = self.fixing_days {
+            maker = maker.with_fixing_days(fixing_days);
+        }
+        if let Some(engine) = &self.engine {
+            maker = maker.with_pricing_engine(SharedMut::clone(engine));
+        }
+        if self.as_optionlet {
+            maker = maker.as_optionlet(true);
+        }
+        if let Some(forward_start) = self.forward_start {
+            maker = maker.with_forward_start(forward_start);
+        }
+        if self.first_caplet_excluded {
+            maker = maker.with_first_caplet_excluded();
+        }
+        if let Some(strike) = self.strike {
+            maker = maker.with_strike(strike);
+        }
+        if let Some(atm_strike) = &self.atm_strike {
+            maker = maker.with_atm_strike(atm_strike.clone());
+        }
+        Ok(PyYoYInflationCapFloor::from_inner(shared_mut(
+            maker.build().map_err(PyQlError::from)?,
+        )))
+    }
+}
+
+/// Python `YoYInflationCapFloor`: a cap or floor over a year-on-year inflation
+/// leg (`instruments::inflationcapfloor::YoYInflationCapFloor`).
+///
+/// Built only through [`MakeYoYInflationCapFloor`](PyMakeYoYInflationCapFloor):
+/// the core's raw constructors take a vector of concrete year-on-year coupons,
+/// which Python has no facade to build (#848), so there is no direct
+/// constructor here.
+///
+/// Unlike a nominal cap/floor this instrument keeps its first optionlet, so the
+/// strip spans its leg exactly and cap - floor is the year-on-year swap.
+///
+/// Pricing needs an engine: call [`set_engine`](Self::set_engine) before
+/// [`npv`](Self::npv).
+#[pyclass(name = "YoYInflationCapFloor", unsendable)]
+pub struct PyYoYInflationCapFloor {
+    inner: SharedMut<YoYInflationCapFloor>,
+}
+
+#[pymethods]
+impl PyYoYInflationCapFloor {
+    /// The cap strikes, one per coupon; empty on a floor.
+    fn cap_rates(&self) -> Vec<f64> {
+        self.inner.borrow().cap_rates().to_vec()
+    }
+
+    /// The floor strikes, one per coupon; empty on a cap.
+    fn floor_rates(&self) -> Vec<f64> {
+        self.inner.borrow().floor_rates().to_vec()
+    }
+
+    /// The number of optionlets, one per year-on-year coupon.
+    fn coupon_count(&self) -> usize {
+        self.inner.borrow().yoy_leg().len()
+    }
+
+    /// The leg's earliest accrual start.
+    ///
+    /// # Errors
+    ///
+    /// Reports an empty leg, which the constructors already refuse.
+    fn start_date(&self) -> PyResult<PyDate> {
+        Ok(PyDate::from_inner(
+            self.inner.borrow().start_date().map_err(PyQlError::from)?,
+        ))
+    }
+
+    /// The leg's latest accrual end. Fallible as
+    /// [`start_date`](Self::start_date).
+    fn maturity_date(&self) -> PyResult<PyDate> {
+        Ok(PyDate::from_inner(
+            self.inner
+                .borrow()
+                .maturity_date()
+                .map_err(PyQlError::from)?,
+        ))
+    }
+
+    /// The at-the-money rate: the strike at which the leg reprices on
+    /// `discount_curve`.
+    ///
+    /// The core takes the curve itself rather than a handle, so the link is
+    /// resolved here and held for the call.
+    ///
+    /// # Errors
+    ///
+    /// Reports an unlinked `discount_curve`, a curve with no reference date and
+    /// a leg with no basis-point sensitivity to solve over.
+    fn atm_rate(&self, discount_curve: &PyYieldTermStructure) -> PyResult<f64> {
+        let handle = discount_curve.handle();
+        let link = handle.current_link().map_err(PyQlError::from)?;
+        Ok(self
+            .inner
+            .borrow()
+            .atm_rate(link.as_ref())
+            .map_err(PyQlError::from)?)
+    }
+
+    /// Attaches a [`PyYoYInflationCapFloorEngine`], replacing whatever engine
+    /// the factory installed.
+    ///
+    /// The engine must resolve its dates against the same `Settings` object this
+    /// cap/floor was built with: two different ones would price the leg and the
+    /// optionlets on different dates with no error raised.
+    fn set_engine(&mut self, engine: &PyYoYInflationCapFloorEngine) {
+        self.inner
+            .borrow_mut()
+            .base_mut()
+            .set_pricing_engine(engine.engine());
+    }
+
+    /// The cap/floor NPV under the attached engine.
+    ///
+    /// # Errors
+    ///
+    /// Reports `"null pricing engine"` with no engine attached, and whatever the
+    /// engine reports.
+    fn npv(&mut self) -> PyResult<f64> {
+        Ok(self.inner.borrow_mut().npv().map_err(PyQlError::from)?)
+    }
+}
+
+impl PyYoYInflationCapFloor {
+    /// Wraps the instrument the factory built.
+    pub(crate) fn from_inner(inner: SharedMut<YoYInflationCapFloor>) -> Self {
+        PyYoYInflationCapFloor { inner }
     }
 }
