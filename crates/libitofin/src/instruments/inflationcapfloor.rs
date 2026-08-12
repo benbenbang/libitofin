@@ -35,11 +35,16 @@
 //!
 //! ## Deferred (visible)
 //!
-//! `MakeYoYInflationCapFloor`, `atmRate` and `impliedVolatility` (which C++
-//! leaves as a `QL_FAIL("not implemented yet")`, `hpp:161-170`) are tracked on
-//! `#854`, along with the stripped/interpolated volatility hierarchy the last
-//! would need and `lastYoYInflationCoupon` (`.cpp:109-115`), which only the
-//! deferred factory reads.
+//! `impliedVolatility` is not ported. C++ leaves it a
+//! `QL_FAIL("not implemented yet")` (`hpp:161-170`), so there is no oracle for
+//! it, and the solver it would need rests on a stripped/interpolated volatility
+//! hierarchy that is itself unported; the omission follows
+//! [`CapFloor`](super::CapFloor), `Swaption` and `OneAssetOption`, which all
+//! defer theirs the same way rather than carry an always-failing method.
+//! `lastYoYInflationCoupon` (`.cpp:109-115`) is tracked on `#856`.
+//!
+//! The builder these were deferred alongside is now
+//! [`MakeYoYInflationCapFloor`](super::MakeYoYInflationCapFloor).
 
 use std::any::Any;
 
@@ -54,6 +59,7 @@ use crate::patterns::observable::AsObservable;
 use crate::pricingengine::Arguments;
 use crate::settings::Settings;
 use crate::shared::Shared;
+use crate::termstructures::yieldtermstructure::YieldTermStructure;
 use crate::time::date::Date;
 use crate::time::period::Period;
 use crate::types::{Rate, Real, Time};
@@ -260,6 +266,26 @@ impl YoYInflationCapFloor {
     /// The leg's latest accrual end (`maturityDate`).
     pub fn maturity_date(&self) -> QlResult<Date> {
         CashFlows::maturity_date(&self.cash_flows())
+    }
+
+    /// The at-the-money rate: the strike at which the leg reprices on
+    /// `discount_curve` (`atmRate`, `.cpp:214-217`).
+    ///
+    /// # Errors
+    ///
+    /// As [`CashFlows::atm_rate`] does, and when the curve has no reference
+    /// date.
+    pub fn atm_rate(&self, discount_curve: &dyn YieldTermStructure) -> QlResult<Rate> {
+        let reference = discount_curve.reference_date()?;
+        CashFlows::atm_rate(
+            &self.cash_flows(),
+            discount_curve,
+            &self.settings,
+            Some(false),
+            Some(reference),
+            None,
+            None,
+        )
     }
 
     /// The `n`-th optionlet as a cap/floor over that one coupon (`.cpp:117-131`).
