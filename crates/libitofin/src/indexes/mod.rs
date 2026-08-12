@@ -17,7 +17,7 @@ pub mod swapindex;
 pub use ibor::{Estr, Euribor, Sofr};
 pub use iborindex::{IborIndex, OvernightIndex};
 pub use index::Index;
-pub use inflation::{EuHicp, UkHicp, UkRpi};
+pub use inflation::{EuHicp, UkHicp, UkRpi, YyEuHicp, YyEuHicpXt, YyUkRpi};
 pub use inflationindex::{
     Cpi, CpiInterpolationType, InflationIndex, InflationIndexBase, YoYInflationIndex,
     ZeroInflationIndex, inflation_period,

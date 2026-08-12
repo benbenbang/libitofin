@@ -1,16 +1,22 @@
 //! The EU HICP index.
 //!
-//! Port of `ql/indexes/inflation/euhicp.hpp:33-45`. [`EuHicp`] is the euro-area
+//! Port of `ql/indexes/inflation/euhicp.hpp:33-88`. [`EuHicp`] is the euro-area
 //! harmonised index of consumer prices: "HICP" over the [`EU`](Region::eu)
 //! region, unrevised, published [`Monthly`](Frequency::Monthly) with a
 //! one-month availability lag in [`EUR`](Currency::eur). It adds no behaviour
 //! over [`ZeroInflationIndex`], so [`EuHicp::new`] returns a plain one.
 //!
-//! Deferred: `EUHICPXT` (`euhicp.hpp:48-59`), the ex-tobacco variant, which
-//! differs only in its family name and has no oracle in `inflation.cpp`.
+//! [`YyEuHicp`] and [`YyEuHicpXt`] are the quoted year-on-year siblings
+//! `YYEUHICP` (`euhicp.hpp:62-73`) and `YYEUHICPXT` (`euhicp.hpp:75-88`): the
+//! same metadata bar the family names, "YY_HICP" and "YY_HICPXT", over a
+//! [`YoYInflationIndex`]. Quoted, not ratios - each is published as a
+//! year-on-year rate in its own right and keeps its own history.
+//!
+//! Deferred: `EUHICPXT` (`euhicp.hpp:48-59`), the *zero* ex-tobacco variant,
+//! which differs only in its family name and has no oracle in `inflation.cpp`.
 
 use crate::currency::Currency;
-use crate::indexes::inflationindex::ZeroInflationIndex;
+use crate::indexes::inflationindex::{YoYInflationIndex, ZeroInflationIndex};
 use crate::indexes::region::Region;
 use crate::settings::Settings;
 use crate::shared::Shared;
@@ -42,6 +48,56 @@ impl EuHicp {
     }
 }
 
+/// The quoted year-on-year EU HICP index (`ql/indexes/inflation/euhicp.hpp`).
+///
+/// A zero-sized namespace for the YY EU HICP constructor.
+pub struct YyEuHicp;
+
+impl YyEuHicp {
+    /// Builds the quoted year-on-year EU HICP index, mirroring the C++
+    /// `YYEUHICP::YYEUHICP(ts)` constructor (`euhicp.hpp:64-73`) less the
+    /// year-on-year curve, which
+    /// [`with_term_structure`](YoYInflationIndex::with_term_structure) links.
+    #[allow(clippy::new_ret_no_self)]
+    pub fn new(settings: Shared<Settings<Date>>) -> YoYInflationIndex {
+        YoYInflationIndex::new(
+            "YY_HICP".into(),
+            Region::eu(),
+            false,
+            Frequency::Monthly,
+            Period::new(1, TimeUnit::Months),
+            Currency::eur(),
+            settings,
+        )
+    }
+}
+
+/// The quoted year-on-year EU HICP ex-tobacco index
+/// (`ql/indexes/inflation/euhicp.hpp`).
+///
+/// A zero-sized namespace for the YY EU HICPXT constructor.
+pub struct YyEuHicpXt;
+
+impl YyEuHicpXt {
+    /// Builds the quoted year-on-year EU HICPXT index, mirroring the C++
+    /// `YYEUHICPXT::YYEUHICPXT(ts)` constructor (`euhicp.hpp:77-88`) less the
+    /// year-on-year curve, which
+    /// [`with_term_structure`](YoYInflationIndex::with_term_structure) links.
+    /// It differs from [`YyEuHicp`] in its family name alone.
+    #[allow(clippy::new_ret_no_self)]
+    pub fn new(settings: Shared<Settings<Date>>) -> YoYInflationIndex {
+        YoYInflationIndex::new(
+            "YY_HICPXT".into(),
+            Region::eu(),
+            false,
+            Frequency::Monthly,
+            Period::new(1, TimeUnit::Months),
+            Currency::eur(),
+            settings,
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -58,6 +114,39 @@ mod tests {
         assert_eq!(index.name(), "EU HICP");
         assert_eq!(index.frequency(), Frequency::Monthly);
         assert!(!index.revised());
+        assert_eq!(index.availability_lag(), Period::new(1, TimeUnit::Months));
+        assert_eq!(index.currency().code(), "EUR");
+    }
+
+    /// The quoted year-on-year sibling's metadata (`euhicp.hpp:64-73`), read
+    /// the way `testQuotedYYIndex` (`inflation.cpp:933-953`) reads it on the
+    /// base type. The composed name is what discriminates the family from
+    /// [`YyEuHicpXt`], which is identical in every other field.
+    #[test]
+    fn the_year_on_year_construction_matches_the_cpp_header() {
+        let index = YyEuHicp::new(shared(Settings::<Date>::new()));
+
+        assert_eq!(index.name(), "EU YY_HICP");
+        assert_eq!(index.frequency(), Frequency::Monthly);
+        assert!(!index.revised());
+        assert!(!index.ratio());
+        assert!(index.underlying_index().is_none());
+        assert_eq!(index.availability_lag(), Period::new(1, TimeUnit::Months));
+        assert_eq!(index.currency().code(), "EUR");
+    }
+
+    /// The quoted year-on-year ex-tobacco metadata (`euhicp.hpp:77-88`). Only
+    /// the name separates it from [`YyEuHicp`], so the equality above is what
+    /// makes either test discriminating.
+    #[test]
+    fn the_ex_tobacco_year_on_year_construction_matches_the_cpp_header() {
+        let index = YyEuHicpXt::new(shared(Settings::<Date>::new()));
+
+        assert_eq!(index.name(), "EU YY_HICPXT");
+        assert_eq!(index.frequency(), Frequency::Monthly);
+        assert!(!index.revised());
+        assert!(!index.ratio());
+        assert!(index.underlying_index().is_none());
         assert_eq!(index.availability_lag(), Period::new(1, TimeUnit::Months));
         assert_eq!(index.currency().code(), "EUR");
     }
