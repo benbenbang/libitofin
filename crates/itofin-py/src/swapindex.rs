@@ -5,12 +5,13 @@
 //! read the at-the-money forward off them, so this is the index the cube facades
 //! stack on rather than one the Python user prices with directly.
 //!
-//! Deferred (visible): the currency is hard-coded to EUR. There is no
-//! `PyCurrency` facade yet, and the index's currency is inert for every ported
-//! consumer - `underlying_swap` never reads it, and the cube's at-the-money
-//! forward is a fair rate, not an amount. A `PyCurrency` ticket carries the
-//! general form; until then a non-EUR index is not expressible here. The
-//! `clone` family (re-curving / re-tenoring) is deferred in the core itself.
+//! Deferred (visible): the currency is hard-coded to EUR. A
+//! [`PyCurrency`](crate::currency::PyCurrency) facade now exists (#815), so the
+//! general form is expressible; threading it through this constructor is left to
+//! the follow-up that widens the remaining `PyEuribor` consumers, since the
+//! index's currency is inert for every ported consumer - `underlying_swap` never
+//! reads it, and the cube's at-the-money forward is a fair rate, not an amount.
+//! The `clone` family (re-curving / re-tenoring) is deferred in the core itself.
 
 use crate::PyQlError;
 use crate::curve::PyYieldTermStructure;

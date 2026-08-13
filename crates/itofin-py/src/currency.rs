@@ -64,7 +64,6 @@ impl PyCurrency {
 impl PyCurrency {
     /// A clone of the inner currency for the index facades, whose constructors
     /// take a [`Currency`] by value.
-    #[allow(dead_code)]
     pub(crate) fn inner(&self) -> Currency {
         self.inner.clone()
     }
