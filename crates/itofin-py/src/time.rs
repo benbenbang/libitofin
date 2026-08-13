@@ -4,7 +4,7 @@ use crate::ItofinError;
 use libitofin::time::businessdayconvention::BusinessDayConvention;
 use libitofin::time::calendar::Calendar;
 use libitofin::time::calendars::unitedkingdom::{Market, UnitedKingdom};
-use libitofin::time::calendars::{NullCalendar, Target};
+use libitofin::time::calendars::{NullCalendar, Target, WeekendsOnly};
 use libitofin::time::date::{Date, Month};
 use libitofin::time::dategenerationrule::DateGeneration;
 use libitofin::time::daycounter::DayCounter;
@@ -280,6 +280,19 @@ impl PyCalendar {
     fn null_calendar() -> Self {
         PyCalendar {
             inner: NullCalendar::new(),
+        }
+    }
+
+    /// The weekends-only calendar: every Saturday and Sunday is a holiday and no
+    /// other day is.
+    ///
+    /// The ISDA CDS conventions roll on it, and it is not substitutable by
+    /// [`Self::null_calendar`] (which holds no holidays at all) or by a national
+    /// calendar (which adds public holidays).
+    #[staticmethod]
+    fn weekends_only() -> Self {
+        PyCalendar {
+            inner: WeekendsOnly::new(),
         }
     }
 

@@ -13,6 +13,7 @@ mod cashflows;
 mod credit;
 mod creditengine;
 mod credithelpers;
+mod currency;
 mod curve;
 mod helpers;
 mod heston;
@@ -45,6 +46,7 @@ use creditengine::{
     PyAccrualBias, PyForwardsInCouponPeriod, PyIsdaCdsEngine, PyMidPointCdsEngine, PyNumericalFix,
 };
 use credithelpers::{PyDefaultProbabilityHelper, PySpreadCdsHelper};
+use currency::PyCurrency;
 use curve::{
     PyDiscountCurve, PyFlatForward, PyForwardCurve, PyPiecewiseFlatForward,
     PyPiecewiseLinearForward, PyPiecewiseLinearZero, PyPiecewiseLogLinearDiscount,
@@ -211,6 +213,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     processes.add_class::<PyHestonProcess>()?;
 
     let indexes = PyModule::new(py, "indexes")?;
+    indexes.add_class::<PyCurrency>()?;
     indexes.add_class::<PyEuribor>()?;
     indexes.add_class::<PyEstr>()?;
     indexes.add_class::<PySwapIndex>()?;
