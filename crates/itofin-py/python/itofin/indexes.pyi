@@ -31,7 +31,29 @@ class Currency:
     def code(self) -> str: ...
     def __repr__(self) -> str: ...
 
-class Euribor:
+class IborIndex:
+    """A general Inter-Bank-Offered-Rate index, spelling out every convention.
+
+    The form for an index outside the named families (the USD-3M IsdaIbor the
+    ISDA CDS curve bootstraps off, say). Pass forwarding=None to build it over
+    an empty handle, the form the bootstrap rate helpers need."""
+
+    def __init__(
+        self,
+        family_name: str,
+        tenor: Period,
+        settlement_days: int,
+        currency: Currency,
+        fixing_calendar: Calendar,
+        convention: BusinessDayConvention,
+        end_of_month: bool,
+        day_counter: DayCounter,
+        forwarding: YieldTermStructure | None,
+        settings: Settings,
+    ) -> None: ...
+    def fixing(self, fixing_date: Date, forecast_todays_fixing: bool) -> float: ...
+
+class Euribor(IborIndex):
     """The Euribor IBOR index family."""
 
     def __init__(

@@ -1,12 +1,13 @@
 //! Facades for the Hull-White short-rate stack: [`PyHullWhite`] and the
-//! [`PyEuribor`] index.
+//! [`PyIborIndex`] index base with its [`PyEuribor`] subclass.
 
 use crate::PyQlError;
 use crate::calibration::{PyCalibrationErrorType, PyEndCriteria, PyLevenbergMarquardt};
+use crate::currency::PyCurrency;
 use crate::curve::PyYieldTermStructure;
 use crate::option::PyOptionType;
 use crate::settings::PySettings;
-use crate::time::{PyDate, PyDayCounter, PyPeriod};
+use crate::time::{PyBusinessDayConvention, PyCalendar, PyDate, PyDayCounter, PyPeriod};
 use libitofin::cashflows::RateAveraging;
 use libitofin::handle::Handle;
 use libitofin::indexes::{Euribor, IborIndex, Index};
@@ -18,6 +19,7 @@ use libitofin::pricingengines::JamshidianSwaptionEngine;
 use libitofin::quotes::{Quote, SimpleQuote};
 use libitofin::shared::{Shared, SharedMut, shared, shared_mut};
 use libitofin::termstructures::volatility::VolatilityType;
+use libitofin::types::Natural;
 use pyo3::prelude::*;
 
 /// Python `HullWhite`: the one-factor Hull-White short-rate model
@@ -135,6 +137,97 @@ impl PyHullWhite {
     }
 }
 
+/// Python `IborIndex`: a general Inter-Bank-Offered-Rate index
+/// (`indexes::iborindex::IborIndex`).
+///
+/// The constructor spells out every convention the core ctor takes
+/// (`iborindex.rs:58`), so an index outside the named families - the USD-3M
+/// `IsdaIbor` the ISDA CDS curve bootstraps off, say - is expressible without a
+/// dedicated facade. `forwarding` `None` builds the index over an empty handle,
+/// the form the bootstrap rate helpers need, exactly as the C++ default
+/// `Handle<YieldTermStructure> h = {}` allows.
+///
+/// It is the base of [`PyEuribor`], so the deposit and swap rate helpers take
+/// this type and accept either. Every other index consumer still takes
+/// `PyEuribor` concretely, including two in the rate-helper module itself: the
+/// four `FraRateHelper` constructors and `FuturesRateHelper::from_index`. So do
+/// the swap, swap-index, optionlet-volatility, cap/floor and swaption-helper
+/// facades. Widening them is deferred to its own follow-up; no bootstrap this
+/// ticket serves needs it.
+#[pyclass(name = "IborIndex", subclass, unsendable)]
+pub struct PyIborIndex {
+    inner: Shared<IborIndex>,
+}
+
+#[pymethods]
+impl PyIborIndex {
+    /// An index of `tenor` fixing `settlement_days` before its value date on
+    /// `fixing_calendar`, rolling to maturity under `convention`/`end_of_month`,
+    /// accruing on `day_counter` and forecasting off `forwarding` (or off an
+    /// empty handle when `None`).
+    #[new]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (
+        family_name,
+        tenor,
+        settlement_days,
+        currency,
+        fixing_calendar,
+        convention,
+        end_of_month,
+        day_counter,
+        forwarding,
+        settings,
+    ))]
+    fn new(
+        family_name: String,
+        tenor: &PyPeriod,
+        settlement_days: Natural,
+        currency: &PyCurrency,
+        fixing_calendar: &PyCalendar,
+        convention: &PyBusinessDayConvention,
+        end_of_month: bool,
+        day_counter: &PyDayCounter,
+        forwarding: Option<&PyYieldTermStructure>,
+        settings: &PySettings,
+    ) -> Self {
+        PyIborIndex {
+            inner: shared(IborIndex::new(
+                family_name,
+                tenor.inner(),
+                settlement_days,
+                currency.inner(),
+                fixing_calendar.inner(),
+                convention.inner(),
+                end_of_month,
+                day_counter.inner(),
+                forwarding
+                    .map(|curve| curve.handle())
+                    .unwrap_or_else(Handle::empty),
+                settings.inner(),
+            )),
+        }
+    }
+
+    /// The index's fixing for `fixing_date`, forecast off the forwarding curve
+    /// for a future date or read from stored fixings for a past one. Fallible:
+    /// an empty forwarding handle or an unset evaluation date is an error.
+    fn fixing(&self, fixing_date: &PyDate, forecast_todays_fixing: bool) -> PyResult<f64> {
+        Ok(self
+            .inner
+            .fixing(fixing_date.inner(), forecast_todays_fixing)
+            .map_err(PyQlError::from)?)
+    }
+}
+
+impl PyIborIndex {
+    /// A clone of the inner index for the rate-helper facades, which take a
+    /// `&IborIndex` and are generic over the family.
+    pub(crate) fn inner(&self) -> Shared<IborIndex> {
+        Shared::clone(&self.inner)
+    }
+}
+
 /// Python `Euribor`: the Euribor IBOR index family (`indexes::Euribor`).
 ///
 /// The general constructor takes a tenor, an optional forwarding curve, and the
@@ -144,7 +237,12 @@ impl PyHullWhite {
 /// constructors. `Euribor::new` returns an `IborIndex` by value; it is wrapped
 /// in `shared()` so downstream ctors that take a `Shared<IborIndex>`
 /// (VanillaSwap/SwaptionHelper/rate helpers) can hold the same object.
-#[pyclass(name = "Euribor", unsendable)]
+///
+/// A subclass of [`PyIborIndex`], so a Euribor is accepted wherever the general
+/// index is. It retains its own clone of the index the base holds - the same
+/// object, not a rebuild - so the facades still typed on `PyEuribor` read
+/// exactly what the base reads.
+#[pyclass(name = "Euribor", extends = PyIborIndex, unsendable)]
 pub struct PyEuribor {
     inner: Shared<IborIndex>,
 }
@@ -160,32 +258,36 @@ impl PyEuribor {
         tenor: &PyPeriod,
         curve: Option<&PyYieldTermStructure>,
         settings: &PySettings,
-    ) -> PyResult<Self> {
+    ) -> PyResult<PyClassInitializer<Self>> {
         let forwarding = match curve {
             Some(curve) => curve.handle(),
             None => Handle::empty(),
         };
         let index =
             Euribor::new(tenor.inner(), forwarding, settings.inner()).map_err(PyQlError::from)?;
-        Ok(PyEuribor {
-            inner: shared(index),
-        })
+        Ok(init_euribor(shared(index)))
     }
 
     /// The 3-month Euribor index (`Euribor3M`) forwarding off `curve`.
     #[staticmethod]
-    fn three_months(curve: &PyYieldTermStructure, settings: &PySettings) -> Self {
-        PyEuribor {
-            inner: shared(Euribor::three_months(curve.handle(), settings.inner())),
-        }
+    fn three_months(
+        py: Python<'_>,
+        curve: &PyYieldTermStructure,
+        settings: &PySettings,
+    ) -> PyResult<Py<Self>> {
+        let index = shared(Euribor::three_months(curve.handle(), settings.inner()));
+        Py::new(py, init_euribor(index))
     }
 
     /// The 6-month Euribor index (`Euribor6M`) forwarding off `curve`.
     #[staticmethod]
-    fn six_months(curve: &PyYieldTermStructure, settings: &PySettings) -> Self {
-        PyEuribor {
-            inner: shared(Euribor::six_months(curve.handle(), settings.inner())),
-        }
+    fn six_months(
+        py: Python<'_>,
+        curve: &PyYieldTermStructure,
+        settings: &PySettings,
+    ) -> PyResult<Py<Self>> {
+        let index = shared(Euribor::six_months(curve.handle(), settings.inner()));
+        Py::new(py, init_euribor(index))
     }
 
     /// The index's fixing for `fixing_date`, forecast off the forwarding curve
@@ -204,6 +306,16 @@ impl PyEuribor {
     pub(crate) fn inner(&self) -> Shared<IborIndex> {
         Shared::clone(&self.inner)
     }
+}
+
+/// The base/subclass initializer shared by the three Euribor constructors: one
+/// index object feeds both halves, so the base [`PyIborIndex`] the rate helpers
+/// read and the [`PyEuribor`] the swap facades read are the same core index.
+fn init_euribor(index: Shared<IborIndex>) -> PyClassInitializer<PyEuribor> {
+    let base = PyIborIndex {
+        inner: Shared::clone(&index),
+    };
+    PyClassInitializer::from(base).add_subclass(PyEuribor { inner: index })
 }
 
 /// Python `SwaptionHelper`: a co-terminal swaption calibration instrument

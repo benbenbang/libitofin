@@ -7,6 +7,7 @@ from itofin.indexes import (
     CpiInterpolationType,
     Estr,
     Euribor,
+    IborIndex,
     SwapIndex,
     YoYInflationIndex,
     ZeroInflationIndex,
@@ -230,9 +231,9 @@ class RateHelper:
 class DepositRateHelper(RateHelper):
     """A helper fitting a deposit rate."""
 
-    def __init__(self, quote: SimpleQuote, index: Euribor) -> None: ...
+    def __init__(self, quote: SimpleQuote, index: IborIndex) -> None: ...
     @staticmethod
-    def from_rate(rate: float, index: Euribor) -> DepositRateHelper: ...
+    def from_rate(rate: float, index: IborIndex) -> DepositRateHelper: ...
 
 class SwapRateHelper(RateHelper):
     """A helper fitting a par swap rate (spot-starting, no spread)."""
@@ -245,7 +246,7 @@ class SwapRateHelper(RateHelper):
         fixed_frequency: Frequency,
         fixed_convention: BusinessDayConvention,
         fixed_day_count: DayCounter,
-        ibor_index: Euribor,
+        ibor_index: IborIndex,
     ) -> None: ...
 
 class FuturesType:

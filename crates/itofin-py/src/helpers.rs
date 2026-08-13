@@ -16,7 +16,7 @@
 
 use crate::PyQlError;
 use crate::curve::PyYieldTermStructure;
-use crate::hullwhite::PyEuribor;
+use crate::hullwhite::{PyEuribor, PyIborIndex};
 use crate::market::PySimpleQuote;
 use crate::settings::PySettings;
 use crate::time::{
@@ -120,7 +120,7 @@ impl PyDepositRateHelper {
     /// A deposit helper fitting `quote`, whose schedule comes from `index`. The
     /// caller keeps `quote`; mutating it later invalidates the bootstrap.
     #[new]
-    fn new(quote: &PySimpleQuote, index: &PyEuribor) -> PyClassInitializer<Self> {
+    fn new(quote: &PySimpleQuote, index: &PyIborIndex) -> PyClassInitializer<Self> {
         let idx = index.inner();
         let helper = DepositRateHelper::new(quote.handle(), &idx) as Shared<dyn RateHelper>;
         PyClassInitializer::from(PyRateHelper { inner: helper }).add_subclass(PyDepositRateHelper)
@@ -129,7 +129,7 @@ impl PyDepositRateHelper {
     /// A deposit helper fitting a fixed `rate`, wrapped in an internal quote the
     /// caller cannot later mutate.
     #[staticmethod]
-    fn from_rate(py: Python<'_>, rate: f64, index: &PyEuribor) -> PyResult<Py<Self>> {
+    fn from_rate(py: Python<'_>, rate: f64, index: &PyIborIndex) -> PyResult<Py<Self>> {
         let idx = index.inner();
         let helper = DepositRateHelper::from_rate(rate, &idx) as Shared<dyn RateHelper>;
         Py::new(
@@ -163,7 +163,7 @@ impl PySwapRateHelper {
         fixed_frequency: &PyFrequency,
         fixed_convention: &PyBusinessDayConvention,
         fixed_day_count: &PyDayCounter,
-        ibor_index: &PyEuribor,
+        ibor_index: &PyIborIndex,
     ) -> PyClassInitializer<Self> {
         let idx = ibor_index.inner();
         let helper = SwapRateHelper::new(
