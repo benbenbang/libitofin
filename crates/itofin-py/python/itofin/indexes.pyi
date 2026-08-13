@@ -1,5 +1,5 @@
 # Hand-written stubs for itofin.indexes; sync manually with src/hullwhite.rs, src/helpers.rs,
-# src/swapindex.rs and src/inflation.rs (#517).
+# src/swapindex.rs, src/currency.rs and src/inflation.rs (#517).
 
 from itofin import Settings
 from itofin.termstructures import (
@@ -14,6 +14,22 @@ from itofin.time import (
     DayCounter,
     Period,
 )
+
+class Currency:
+    """An ISO 4217 currency specification.
+
+    Only the three named currencies the core provides are exposed; the general
+    constructor is omitted, as the core ports only the currencies its indexes
+    need and the full catalogue is deferred there."""
+
+    @staticmethod
+    def eur() -> Currency: ...
+    @staticmethod
+    def usd() -> Currency: ...
+    @staticmethod
+    def gbp() -> Currency: ...
+    def code(self) -> str: ...
+    def __repr__(self) -> str: ...
 
 class Euribor:
     """The Euribor IBOR index family."""

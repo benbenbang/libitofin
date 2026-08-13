@@ -39,6 +39,11 @@ class Calendar:
     @staticmethod
     def null_calendar() -> Calendar: ...
     @staticmethod
+    def weekends_only() -> Calendar:
+        """The weekends-only calendar: Saturdays and Sundays are holidays and no
+        other day is. The calendar the ISDA CDS conventions roll on."""
+        ...
+    @staticmethod
     def united_kingdom() -> Calendar:
         """The UK settlement calendar. Only the Settlement market is exposed:
         the Exchange and Metals markets share an identical business-day rule in
