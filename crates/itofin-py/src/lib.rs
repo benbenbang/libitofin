@@ -40,7 +40,8 @@ use capfloortermvol::PyCapFloorTermVolSurface;
 use cashflows::{PyYoYInflationCoupon, PyYoYInflationLeg};
 use credit::{
     PyCreditDefaultSwap, PyDefaultProbabilityTermStructure, PyFlatHazardRate,
-    PyInterpolatedHazardRateCurve, PyPiecewiseDefaultCurve, PyPricingModel, PyProtectionSide,
+    PyInterpolatedHazardRateCurve, PyMakeCreditDefaultSwap, PyPiecewiseDefaultCurve,
+    PyPricingModel, PyProtectionSide,
 };
 use creditengine::{
     PyAccrualBias, PyForwardsInCouponPeriod, PyIsdaCdsEngine, PyMidPointCdsEngine, PyNumericalFix,
@@ -241,6 +242,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     instruments.add_class::<PyProtectionSide>()?;
     instruments.add_class::<PyPricingModel>()?;
     instruments.add_class::<PyCreditDefaultSwap>()?;
+    instruments.add_class::<PyMakeCreditDefaultSwap>()?;
     instruments.add_class::<PyZeroCouponInflationSwap>()?;
     instruments.add_class::<PyYearOnYearInflationSwap>()?;
     instruments.add_class::<PyMakeYoYInflationCapFloor>()?;
