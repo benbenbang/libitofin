@@ -1,7 +1,8 @@
 //! Facades for the credit hierarchy: the [`PyDefaultProbabilityTermStructure`]
 //! base, the concrete [`PyFlatHazardRate`], [`PyInterpolatedHazardRateCurve`]
 //! and [`PyPiecewiseDefaultCurve`] curves, the [`PyProtectionSide`] and
-//! [`PyPricingModel`] flags and the [`PyCreditDefaultSwap`] instrument.
+//! [`PyPricingModel`] flags, the [`PyCreditDefaultSwap`] instrument and its
+//! market-convention builder [`PyMakeCreditDefaultSwap`].
 
 use crate::PyQlError;
 use crate::creditengine::{PyIsdaCdsEngine, PyMidPointCdsEngine};
@@ -12,8 +13,11 @@ use crate::settings::PySettings;
 use crate::time::{PyBusinessDayConvention, PyCalendar, PyDate, PyDayCounter, PySchedule};
 use libitofin::handle::Handle;
 use libitofin::instrument::Instrument;
-use libitofin::instruments::{CdsTerms, CreditDefaultSwap, PricingModel, ProtectionSide};
+use libitofin::instruments::{
+    CdsTerms, CreditDefaultSwap, MakeCreditDefaultSwap, PricingModel, ProtectionSide,
+};
 use libitofin::math::interpolations::flat::BackwardFlat;
+use libitofin::settings::Settings;
 use libitofin::shared::{Shared, SharedMut, shared, shared_mut};
 use libitofin::termstructures::credit::defaultprobabilityhelpers::DefaultProbabilityHelper;
 use libitofin::termstructures::credit::defaulttermstructure::DefaultProbabilityTermStructure;
@@ -21,6 +25,7 @@ use libitofin::termstructures::credit::flathazardrate::FlatHazardRate;
 use libitofin::termstructures::credit::interpolatedhazardratecurve::InterpolatedHazardRateCurve;
 use libitofin::termstructures::credit::piecewisedefaultcurve::PiecewiseDefaultCurve;
 use libitofin::termstructures::credit::probabilitytraits::HazardRate;
+use libitofin::time::date::Date;
 use libitofin::types::Natural;
 use pyo3::prelude::*;
 
@@ -728,5 +733,103 @@ impl PyCreditDefaultSwap {
                 model.inner(),
             )
             .map_err(PyQlError::from)?)
+    }
+}
+
+impl PyCreditDefaultSwap {
+    /// Wraps a contract another facade built, the shape
+    /// [`PyMakeCreditDefaultSwap::build`] hands back.
+    pub(crate) fn from_inner(inner: SharedMut<CreditDefaultSwap>) -> Self {
+        PyCreditDefaultSwap { inner }
+    }
+}
+
+/// Python `MakeCreditDefaultSwap`: the market-convention builder for a
+/// credit-default swap (`instruments::makecds::MakeCreditDefaultSwap`).
+///
+/// It derives the premium schedule from a maturity and the post-Big-Bang CDS
+/// conventions, and takes the trade date from the evaluation date the settings
+/// carry (D5). Only the term-date quotation is exposed here; the tenor and
+/// explicit-schedule quotations (`makecds.rs:111` and `:133`) are deferred.
+///
+/// The core builder is a consumed-self fluent chain, which does not cross the
+/// FFI boundary; this facade takes the whole configuration up front and
+/// assembles the chain inside [`build`](Self::build), as
+/// [`PyMakeYoYInflationCapFloor`](crate::inflation) and
+/// [`PyMakeVanillaSwap`](crate::swap) do. Each `build` runs a fresh chain, so
+/// one builder object cannot carry a setting into a later contract. An unset
+/// optional leaves the core default in place (`makecds.rs:150-171`).
+///
+/// Deferred (visible): three of the core's setters are exposed.
+/// `with_trade_date` and the accrual-rebate flag are #870's; the rest keep
+/// their defaults, notably the 3M coupon tenor, the pre-CDS2015
+/// `DateGeneration::CDS` rule, the `Following` roll, the Act/360 day counter
+/// and the three cash-settlement days.
+#[pyclass(name = "MakeCreditDefaultSwap", unsendable)]
+pub struct PyMakeCreditDefaultSwap {
+    term_date: Date,
+    running_spread: f64,
+    settings: Shared<Settings<Date>>,
+    nominal: Option<f64>,
+    upfront_rate: Option<f64>,
+    side: Option<PyProtectionSide>,
+}
+
+#[pymethods]
+impl PyMakeCreditDefaultSwap {
+    /// A builder for a contract maturing on `term_date` and paying
+    /// `running_spread`.
+    #[new]
+    #[pyo3(signature = (
+        term_date,
+        running_spread,
+        settings,
+        nominal = None,
+        upfront_rate = None,
+        side = None,
+    ))]
+    fn new(
+        term_date: &PyDate,
+        running_spread: f64,
+        settings: &PySettings,
+        nominal: Option<f64>,
+        upfront_rate: Option<f64>,
+        side: Option<PyProtectionSide>,
+    ) -> Self {
+        PyMakeCreditDefaultSwap {
+            term_date: term_date.inner(),
+            running_spread,
+            settings: settings.inner(),
+            nominal,
+            upfront_rate,
+            side,
+        }
+    }
+
+    /// Builds the contract, which carries no engine: attach one with
+    /// [`set_engine`](PyCreditDefaultSwap::set_engine) or
+    /// [`set_isda_engine`](PyCreditDefaultSwap::set_isda_engine) before pricing.
+    ///
+    /// # Errors
+    ///
+    /// Reports an unset evaluation date, which the trade date is derived from
+    /// (`makecds.rs:286-294`), and whatever the contract construction rejects.
+    fn build(&self) -> PyResult<PyCreditDefaultSwap> {
+        let mut maker = MakeCreditDefaultSwap::from_term_date(
+            self.term_date,
+            self.running_spread,
+            Shared::clone(&self.settings),
+        );
+        if let Some(nominal) = self.nominal {
+            maker = maker.with_nominal(nominal);
+        }
+        if let Some(upfront_rate) = self.upfront_rate {
+            maker = maker.with_upfront_rate(upfront_rate);
+        }
+        if let Some(side) = self.side {
+            maker = maker.with_side(side.inner());
+        }
+        let cds = maker.build().map_err(PyQlError::from)?;
+        Ok(PyCreditDefaultSwap::from_inner(shared_mut(cds)))
     }
 }

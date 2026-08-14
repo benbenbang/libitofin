@@ -309,6 +309,31 @@ class CreditDefaultSwap:
         converge, which includes a pricing failure at some hazard rate."""
         ...
 
+class MakeCreditDefaultSwap:
+    """Market-convention builder for a CreditDefaultSwap: derives the premium
+    schedule from a maturity and the post-Big-Bang CDS conventions, and takes
+    the trade date from the evaluation date settings carries.
+
+    An unset optional keeps the core default: a Buyer side, a nominal of 1, no
+    upfront, a 3M coupon tenor, the pre-CDS2015 DateGeneration.CDS rule, a
+    Following roll, an Act/360 day counter and three cash-settlement days. Only
+    the term-date quotation is exposed; the tenor and explicit-schedule ones,
+    the trade date and the accrual-rebate flag are not."""
+
+    def __init__(
+        self,
+        term_date: Date,
+        running_spread: float,
+        settings: Settings,
+        nominal: float | None = None,
+        upfront_rate: float | None = None,
+        side: ProtectionSide | None = None,
+    ) -> None: ...
+    def build(self) -> CreditDefaultSwap:
+        """The built contract, which carries no engine. Raises ItofinError with
+        no evaluation date set, the trade date being derived from it."""
+        ...
+
 class ZeroCouponInflationSwap:
     """One fixed flow against one inflation-indexed flow, both exchanged at
     maturity.
