@@ -293,6 +293,17 @@ class CreditDefaultSwap:
     def notional(self) -> float:
         """The notional the premium and the protection are quoted on."""
         ...
+    def accrual_rebate_amount(self) -> float | None:
+        """The accrued coupon the protection seller rebates, or None when the
+        contract does not rebate accrual at all. A contract traded in the past
+        still carries the flow, with a real amount but a past settlement date
+        that keeps it out of the value, so None means the flag rather than a
+        stale trade."""
+        ...
+    def accrual_rebate_date(self) -> Date | None:
+        """The date the accrual rebate settles on, the same cash-settlement date
+        the upfront pays on. None on the same terms as accrual_rebate_amount."""
+        ...
     def coupon_leg_npv(self) -> float: ...
     def default_leg_npv(self) -> float: ...
     def implied_hazard_rate(
@@ -324,8 +335,9 @@ class MakeCreditDefaultSwap:
     An unset optional keeps the core default: a Buyer side, a nominal of 1, no
     upfront, a 3M coupon tenor, the pre-CDS2015 DateGeneration.CDS rule, a
     Following roll, an Act/360 day counter and three cash-settlement days. Only
-    the term-date quotation is exposed; the tenor and explicit-schedule ones,
-    the trade date and the accrual-rebate flag are not."""
+    the term-date quotation is exposed; the tenor and explicit-schedule ones and
+    the accrual-rebate flag are not, the latter being reachable through
+    CreditDefaultSwap.with_terms."""
 
     def __init__(
         self,
@@ -335,7 +347,11 @@ class MakeCreditDefaultSwap:
         nominal: float | None = None,
         upfront_rate: float | None = None,
         side: ProtectionSide | None = None,
-    ) -> None: ...
+        trade_date: Date | None = None,
+    ) -> None:
+        """trade_date overrides the evaluation date the trade is otherwise dated
+        off, which is how a contract traded in the past is built."""
+        ...
     def build(self) -> CreditDefaultSwap:
         """The built contract, which carries no engine. Raises ItofinError with
         no evaluation date set, the trade date being derived from it."""

@@ -11,6 +11,8 @@ use crate::curve::PyYieldTermStructure;
 use crate::market::PySimpleQuote;
 use crate::settings::PySettings;
 use crate::time::{PyBusinessDayConvention, PyCalendar, PyDate, PyDayCounter, PySchedule};
+use libitofin::cashflow::CashFlow;
+use libitofin::event::Event;
 use libitofin::handle::Handle;
 use libitofin::instrument::Instrument;
 use libitofin::instruments::{
@@ -692,6 +694,37 @@ impl PyCreditDefaultSwap {
         self.inner.borrow().notional()
     }
 
+    /// The accrued coupon the protection seller rebates, or `None` when the
+    /// contract does not rebate accrual at all (`rebates_accrual` false).
+    ///
+    /// A contract traded in the past still carries the flow: the core builds it
+    /// whenever the flag is set, regardless of the trade date
+    /// (`creditdefaultswap.rs:515-544`), so `None` here means the flag, never a
+    /// stale trade. Such a flow carries a real accrued amount but settled on a
+    /// past date, so it no longer reaches the value.
+    ///
+    /// The amount is returned bare rather than behind a cash-flow facade, there
+    /// being none. Fallible in principle, the core's amount being a `Result`.
+    fn accrual_rebate_amount(&self) -> PyResult<Option<f64>> {
+        Ok(self
+            .inner
+            .borrow()
+            .accrual_rebate()
+            .map(|rebate| rebate.amount())
+            .transpose()
+            .map_err(PyQlError::from)?)
+    }
+
+    /// The date the accrual rebate settles on, which is the cash-settlement
+    /// date the upfront also pays on, or `None` on the same terms as
+    /// [`accrual_rebate_amount`](Self::accrual_rebate_amount).
+    fn accrual_rebate_date(&self) -> Option<PyDate> {
+        self.inner
+            .borrow()
+            .accrual_rebate()
+            .map(|rebate| PyDate::from_inner(Event::date(rebate.as_ref())))
+    }
+
     /// The premium leg's NPV. Fallible as [`fair_spread`](Self::fair_spread).
     fn coupon_leg_npv(&mut self) -> PyResult<f64> {
         Ok(self
@@ -775,8 +808,9 @@ impl PyCreditDefaultSwap {
 /// one builder object cannot carry a setting into a later contract. An unset
 /// optional leaves the core default in place (`makecds.rs:150-171`).
 ///
-/// Deferred (visible): three of the core's setters are exposed.
-/// `with_trade_date` and the accrual-rebate flag are #870's; the rest keep
+/// Deferred (visible): four of the core's setters are exposed. The
+/// accrual-rebate flag (`makecds.rs:257`) stays unbound, the `with_terms`
+/// constructor on [`PyCreditDefaultSwap`] already reaching it; the rest keep
 /// their defaults, notably the 3M coupon tenor, the pre-CDS2015
 /// `DateGeneration::CDS` rule, the `Following` roll, the Act/360 day counter
 /// and the three cash-settlement days.
@@ -788,12 +822,17 @@ pub struct PyMakeCreditDefaultSwap {
     nominal: Option<f64>,
     upfront_rate: Option<f64>,
     side: Option<PyProtectionSide>,
+    trade_date: Option<Date>,
 }
 
 #[pymethods]
 impl PyMakeCreditDefaultSwap {
     /// A builder for a contract maturing on `term_date` and paying
     /// `running_spread`.
+    ///
+    /// `trade_date` overrides the evaluation date the trade would otherwise be
+    /// dated off (`makecds.rs:263`), which is how a contract traded in the past
+    /// is built.
     #[new]
     #[pyo3(signature = (
         term_date,
@@ -802,6 +841,7 @@ impl PyMakeCreditDefaultSwap {
         nominal = None,
         upfront_rate = None,
         side = None,
+        trade_date = None,
     ))]
     fn new(
         term_date: &PyDate,
@@ -810,6 +850,7 @@ impl PyMakeCreditDefaultSwap {
         nominal: Option<f64>,
         upfront_rate: Option<f64>,
         side: Option<PyProtectionSide>,
+        trade_date: Option<&PyDate>,
     ) -> Self {
         PyMakeCreditDefaultSwap {
             term_date: term_date.inner(),
@@ -818,6 +859,7 @@ impl PyMakeCreditDefaultSwap {
             nominal,
             upfront_rate,
             side,
+            trade_date: trade_date.map(PyDate::inner),
         }
     }
 
@@ -843,6 +885,9 @@ impl PyMakeCreditDefaultSwap {
         }
         if let Some(side) = self.side {
             maker = maker.with_side(side.inner());
+        }
+        if let Some(trade_date) = self.trade_date {
+            maker = maker.with_trade_date(trade_date);
         }
         let cds = maker.build().map_err(PyQlError::from)?;
         Ok(PyCreditDefaultSwap::from_inner(shared_mut(cds)))
