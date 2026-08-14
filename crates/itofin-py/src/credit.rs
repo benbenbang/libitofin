@@ -677,6 +677,21 @@ impl PyCreditDefaultSwap {
             .map_err(PyQlError::from)?)
     }
 
+    /// The upfront that prices the contract at zero, as a fraction of the
+    /// notional. Fallible as [`fair_spread`](Self::fair_spread).
+    fn fair_upfront(&mut self) -> PyResult<f64> {
+        Ok(self
+            .inner
+            .borrow_mut()
+            .fair_upfront()
+            .map_err(PyQlError::from)?)
+    }
+
+    /// The notional the premium and the protection are quoted on.
+    fn notional(&self) -> f64 {
+        self.inner.borrow().notional()
+    }
+
     /// The premium leg's NPV. Fallible as [`fair_spread`](Self::fair_spread).
     fn coupon_leg_npv(&mut self) -> PyResult<f64> {
         Ok(self
