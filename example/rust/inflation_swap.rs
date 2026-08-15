@@ -30,7 +30,7 @@ use libitofin::termstructures::inflation::inflationhelpers::{
 };
 use libitofin::termstructures::inflation::inflationtermstructure::ZeroInflationTermStructure;
 use libitofin::termstructures::inflation::piecewisezeroinflationcurve::PiecewiseZeroInflationCurve;
-use libitofin::termstructures::yields::FlatForward;
+use libitofin::termstructures::yields::{FlatForward, Pillar};
 use libitofin::termstructures::yieldtermstructure::YieldTermStructure;
 use libitofin::time::businessdayconvention::BusinessDayConvention;
 use libitofin::time::calendar::Calendar;
@@ -117,6 +117,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 day_counter.clone(),
                 &index, // note: &Shared<ZeroInflationIndex>
                 CpiInterpolationType::Flat,
+                Pillar::LastRelevantDate,
                 Shared::clone(&settings),
             )
             .expect("a three-month lag covers UK RPI's availability")
@@ -135,6 +136,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Frequency::Monthly,
         day_counter.clone(),
         helpers,
+        None, // no seasonality correction
     )?;
 
     // Link the index's forecast handle to the freshly bootstrapped curve.
