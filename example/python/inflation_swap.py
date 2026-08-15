@@ -32,7 +32,12 @@ from itofin.indexes import CpiInterpolationType, ZeroInflationIndex
 from itofin.instruments import SwapType, ZeroCouponInflationSwap
 from itofin.pricingengines import DiscountingSwapEngine
 from itofin.quotes import SimpleQuote
-from itofin.termstructures import FlatForward, PiecewiseZeroInflationCurve, ZeroCouponInflationSwapHelper
+from itofin.termstructures import (
+    FlatForward,
+    MultiplicativePriceSeasonality,
+    PiecewiseZeroInflationCurve,
+    ZeroCouponInflationSwapHelper,
+)
 from itofin.time import BusinessDayConvention, Calendar, Date, DayCounter, Frequency, Period
 
 TODAY = Date(13, 8, 2007)
@@ -93,6 +98,17 @@ ZC_DATA = [
     (Date(13, 8, 2047), 3.308),
     (Date(13, 8, 2057), 3.228),
 ]
+
+
+# Twelve monthly seasonal factors (`inflation.cpp:469-483`), anchored on the 31
+# January of the year the curve's base period ends in. They are stationary, so
+# the lookup wrapping modulo twelve reuses them for every later year.
+SEASONALITY_FACTORS = [
+    1.003245, 1.000000, 0.999715, 1.000495, 1.000929, 0.998687,
+    0.995949, 0.994682, 0.995949, 1.000519, 1.003705, 1.004186,
+]
+SEASONALITY_ANCHOR = Date(31, 1, 2007)
+SEASONALITY_PROBE = Date(1, 8, 2012)
 
 
 def _fixing_date(i: int) -> Date:
@@ -157,6 +173,41 @@ def build_swap(settings, index, maturity, fixed_rate):
     return swap
 
 
+def apply_seasonality(settings, index, curve) -> None:
+    """Install a seasonal correction on the solved curve and watch it move.
+
+    A price index does not grow smoothly through the year, so
+    `MultiplicativePriceSeasonality` multiplies the index level by a factor per
+    period. The factors are not applied raw: the one at the queried date is
+    normalized against the one at the curve's base date, so the correction is
+    the identity there and grows away from it.
+
+    Two things worth seeing. The correction reaches everything through the
+    index's own forecast, which is the path every helper and every swap takes;
+    and because the curve re-solves against it, the quoted swaps still reprice
+    to zero afterwards. A correction that were merely stored and never folded
+    into the published rate would also reprice to zero, so the forecast moving
+    is the part that proves it is live."""
+    raw_forecast = index.fixing(SEASONALITY_PROBE, True)
+    raw_rate = curve.zero_rate_date(SEASONALITY_PROBE)
+
+    curve.set_seasonality(MultiplicativePriceSeasonality(SEASONALITY_ANCHOR, Frequency.Monthly, SEASONALITY_FACTORS))
+
+    print(f"\nSeasonality installed (has_seasonality={curve.has_seasonality()}), probed at {SEASONALITY_PROBE}:")
+    print(f"  index forecast  {raw_forecast:.10f} -> {index.fixing(SEASONALITY_PROBE, True):.10f}")
+    print(f"  zero rate       {raw_rate * 100:.6f}% -> {curve.zero_rate_date(SEASONALITY_PROBE) * 100:.6f}%")
+
+    worst = max(abs(build_swap(settings, index, maturity, rate / 100.0).npv()) for maturity, rate in ZC_DATA)
+    print(f"  worst |NPV| after the re-bootstrap = {worst:.3e}   (the quotes still reprice to zero)")
+
+    # Clearing it puts the raw forecast back, which is how it is undone.
+    curve.set_seasonality(None)
+    print(
+        f"  cleared (has_seasonality={curve.has_seasonality()}): "
+        f"forecast back to {index.fixing(SEASONALITY_PROBE, True):.10f}"
+    )
+
+
 def main() -> None:
     # D5: one Settings threaded through index, helpers, swaps and engines.
     settings = Settings()
@@ -195,6 +246,8 @@ def main() -> None:
         worst = max(worst, abs(npv))
         print(f"  {maturity}  NPV={npv:14.6f}")
     print(f"  worst |NPV| = {worst:.3e}  (should be ~1e-8 or smaller)")
+
+    apply_seasonality(settings, index, curve)
 
 
 if __name__ == "__main__":

@@ -5,7 +5,9 @@ Two parts:
 1. Price a single CDS with `MidPointCdsEngine` off a flat hazard-rate curve.
    The engine needs a survival (hazard) curve, a recovery rate and a discount
    curve. This reproduces QuantLib's `creditdefaultswap.cpp` cached value:
-   NPV 295.0153398 and fair spread 0.007517539081.
+   NPV 295.0153398 and fair spread 0.007517539081. Both are matched to 1e-7,
+   the tolerance `test_credit_cds.py` grades them at: the fair spread's
+   difference sits in the eighth decimal place, not in all twelve printed.
 
 2. Bootstrap a `PiecewiseDefaultCurve` from `SpreadCdsHelper` quotes (the
    inverse problem: given market spreads, solve for the hazard curve), then
@@ -30,6 +32,11 @@ from itofin.pricingengines import MidPointCdsEngine
 from itofin.quotes import SimpleQuote
 from itofin.termstructures import FlatForward, FlatHazardRate, PiecewiseDefaultCurve, SpreadCdsHelper
 from itofin.time import BusinessDayConvention, Calendar, Date, DateGeneration, DayCounter, Frequency, Period, Schedule
+
+# The `creditdefaultswap.cpp` cached figures, as transcribed in
+# `crates/itofin-py/tests/test_credit_cds.py`, which grades both at 1e-7.
+CACHED_NPV = 295.0153398
+CACHED_FAIR_SPREAD = 0.007517539081
 
 
 def price_single_cds() -> None:
@@ -65,9 +72,11 @@ def price_single_cds() -> None:
     )
     cds.set_engine(MidPointCdsEngine(hazard, 0.4, discount, settings))
 
+    npv = cds.npv()
+    fair = cds.fair_spread()
     print("10Y CDS (seller, notional 10000, spread 120bp, hazard 1.234%):")
-    print(f"  NPV            = {cds.npv():.7f}")
-    print(f"  fair spread    = {cds.fair_spread():.12f}")
+    print(f"  NPV            = {npv:.7f}      cached={CACHED_NPV}   |diff|={abs(npv - CACHED_NPV):.2e}")
+    print(f"  fair spread    = {fair:.12f}   cached={CACHED_FAIR_SPREAD}   |diff|={abs(fair - CACHED_FAIR_SPREAD):.2e}")
     print(f"  coupon leg NPV = {cds.coupon_leg_npv():.7f}")
     print(f"  default leg NPV= {cds.default_leg_npv():.7f}")
 

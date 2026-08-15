@@ -8,15 +8,26 @@
 //! probabilities at each pillar, and the fair spreads a contract rebuilt off
 //! the curve reproduces (each returns its input quote to ~1e-6).
 //!
+//! Part C settles the protection leg against a `FaceValueAccrualClaim` on a
+//! reference bond instead of the default `FaceValueClaim`: the accrual the
+//! protection buyer no longer collects is surrendered out of the claim, so the
+//! protection leg pays less.
+//!
 //! Every signature below is taken verbatim from the crate's own tests:
-//! `midpointcdsengine.rs` (mod `oracle`) and `piecewisedefaultcurve.rs`
-//! (mod `tests`). Notes on D5 (explicit `Settings`, no global singleton) and
-//! D2 (`Handle`) inline.
+//! `midpointcdsengine.rs` (mod `oracle`), `piecewisedefaultcurve.rs`
+//! (mod `tests`) and `claim.rs` (mod `tests`). Notes on D5 (explicit `Settings`,
+//! no global singleton) and D2 (`Handle`) inline. See `isda_cds.rs` for the ISDA
+//! standard-model engine and the Markit reconciliation flow.
 
+use libitofin::cashflow::{CashFlow, Leg};
+use libitofin::cashflows::FixedRateCoupon;
 use libitofin::errors::QlResult;
 use libitofin::handle::Handle;
 use libitofin::instrument::Instrument; // brings npv(), base_mut(), recalculate()
-use libitofin::instruments::{CdsTerms, CreditDefaultSwap, ProtectionSide};
+use libitofin::instruments::{
+    Bond, CdsTerms, Claim, CreditDefaultSwap, FaceValueAccrualClaim, FaceValueClaim,
+    MakeCreditDefaultSwap, ProtectionSide,
+};
 use libitofin::interestrate::Compounding;
 use libitofin::math::interpolations::flat::BackwardFlat;
 use libitofin::pricingengine::PricingEngine; // needed for the `as SharedMut<dyn PricingEngine>` cast
@@ -55,6 +66,8 @@ fn main() -> QlResult<()> {
     part_a_price_a_cds(today)?;
     println!();
     part_b_bootstrap_a_default_curve(today)?;
+    println!();
+    part_c_settle_against_a_reference_bond(today)?;
     Ok(())
 }
 
@@ -126,7 +139,7 @@ fn part_a_price_a_cds(today: Date) -> QlResult<()> {
 
     let npv = cds.npv()?;
     let fair_spread = cds.fair_spread()?;
-    println!("  maturity              : {:?}", cds.maturity());
+    println!("  maturity              : {}", cds.maturity());
     println!("  NPV (buyer)           : {npv:.4}");
     println!("  fair spread           : {fair_spread:.10}");
 
@@ -204,7 +217,7 @@ fn part_b_bootstrap_a_default_curve(today: Date) -> QlResult<()> {
     // Bootstrapped (date, hazard-rate) nodes. nodes() triggers the bootstrap.
     println!("  bootstrapped hazard-rate nodes:");
     for (date, hazard) in curve.nodes()? {
-        println!("    {date:?}  h = {hazard:.10}");
+        println!("    {date}  h = {hazard:.10}");
     }
 
     // Survival probability at each pillar (the helper's latest/pillar date).
@@ -212,7 +225,7 @@ fn part_b_bootstrap_a_default_curve(today: Date) -> QlResult<()> {
     for (helper, n) in helpers.iter().zip(tenors) {
         let pillar = helper.latest_date();
         let survival = curve.survival_probability_date(pillar, false)?;
-        println!("    {n}Y  pillar {pillar:?}  S = {survival:.10}");
+        println!("    {n}Y  pillar {pillar}  S = {survival:.10}");
     }
 
     // Round trip: rebuild each pillar's CDS and reprice it off the bootstrapped
@@ -248,6 +261,112 @@ fn part_b_bootstrap_a_default_curve(today: Date) -> QlResult<()> {
 
         let fair = cds.fair_spread()?;
         println!("    {n}Y  input {quote:.6}  ->  fair {fair:.10}");
+    }
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Part C: settle the protection leg against a FaceValueAccrualClaim.
+// ---------------------------------------------------------------------------
+fn part_c_settle_against_a_reference_bond(today: Date) -> QlResult<()> {
+    println!("== Part C: FaceValueClaim against FaceValueAccrualClaim ==");
+
+    let settings = shared(Settings::<Date>::new());
+    settings.set_evaluation_date(today);
+
+    // The reference security: two annual 5% coupons on a notional of 100,
+    // running `today` to `today` + 2Y (the `claim.rs` par-bond fixture).
+    let first_period_end = today + Period::new(1, TimeUnit::Years);
+    let redemption = today + Period::new(2, TimeUnit::Years);
+    let coupons: Leg = vec![
+        shared(FixedRateCoupon::from_rate(
+            first_period_end,
+            100.0,
+            0.05,
+            Actual360::new(),
+            today,
+            first_period_end,
+            None,
+            None,
+            None,
+        )) as Shared<dyn CashFlow>,
+        shared(FixedRateCoupon::from_rate(
+            redemption,
+            100.0,
+            0.05,
+            Actual360::new(),
+            first_period_end,
+            redemption,
+            None,
+            None,
+            None,
+        )) as Shared<dyn CashFlow>,
+    ];
+    let reference_security = shared(Bond::from_coupons(
+        2,
+        Target::new(),
+        Some(today),
+        coupons,
+        Shared::clone(&settings),
+    )?);
+
+    // The two claims side by side at a default half way through the first
+    // coupon period: the 5% Actual/360 coupon accrued there, normalised by the
+    // reference notional, is what the accrual claim surrenders.
+    let mid_first_period = today + Period::new(6, TimeUnit::Months);
+    let accrual_claim = FaceValueAccrualClaim::new(Shared::clone(&reference_security));
+    println!(
+        "  face value         claim on 100 at R=0.4 : {:.10}",
+        FaceValueClaim.amount(&mid_first_period, 100.0, RECOVERY)?
+    );
+    println!(
+        "  face value accrual claim on 100 at R=0.4 : {:.10}",
+        accrual_claim.amount(&mid_first_period, 100.0, RECOVERY)?
+    );
+
+    // The same contract priced with each claim. `with_claim` overrides the
+    // default FaceValueClaim the builder fills in.
+    let discount: Handle<dyn YieldTermStructure> = Handle::new(shared(FlatForward::with_rate(
+        today,
+        0.03,
+        Actual360::new(),
+        Compounding::Continuous,
+        Frequency::Annual,
+    ))
+        as Shared<dyn YieldTermStructure>);
+    let hazard: Handle<dyn DefaultProbabilityTermStructure> = Handle::new(shared(
+        FlatHazardRate::with_rate(today, 0.02, Actual360::new()),
+    )
+        as Shared<dyn DefaultProbabilityTermStructure>);
+    let term_date = today + Period::new(18, TimeUnit::Months);
+
+    for (label, claim) in [
+        ("face value        ", None),
+        (
+            "face value accrual",
+            Some(shared(accrual_claim) as Shared<dyn Claim>),
+        ),
+    ] {
+        let mut builder =
+            MakeCreditDefaultSwap::from_term_date(term_date, 0.01, Shared::clone(&settings))
+                .with_nominal(10_000_000.0);
+        if let Some(claim) = claim {
+            builder = builder.with_claim(claim);
+        }
+        let mut cds = builder.build()?;
+        cds.base_mut()
+            .set_pricing_engine(shared_mut(MidPointCdsEngine::new(
+                hazard.clone(),
+                RECOVERY,
+                discount.clone(),
+                None,
+                Shared::clone(&settings),
+            )) as SharedMut<dyn PricingEngine>);
+        println!(
+            "  {label} : protection leg {:>14.4}   NPV {:>12.4}",
+            cds.default_leg_npv()?,
+            cds.npv()?
+        );
     }
     Ok(())
 }
