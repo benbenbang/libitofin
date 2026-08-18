@@ -158,6 +158,13 @@ impl PyYoYInflationCoupon {
     pub(crate) fn from_shared(inner: Shared<YoYInflationCoupon>) -> Self {
         PyYoYInflationCoupon { inner }
     }
+
+    /// The wrapped coupon, which is what the raw
+    /// [`YoYInflationCapFloor`](crate::inflation::PyYoYInflationCapFloor)
+    /// constructors take a vector of.
+    pub(crate) fn shared(&self) -> Shared<YoYInflationCoupon> {
+        Shared::clone(&self.inner)
+    }
 }
 
 /// Python `YoYInflationLeg`: the builder turning a schedule into a sequence of

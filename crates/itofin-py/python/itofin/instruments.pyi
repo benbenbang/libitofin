@@ -3,6 +3,7 @@
 # src/inflation.rs (#517).
 
 from itofin import Settings
+from itofin.cashflows import YoYInflationCoupon
 from itofin.indexes import (
     CpiInterpolationType,
     Euribor,
@@ -506,8 +507,8 @@ class MakeYoYInflationCapFloor:
     reprices whatever survives, not the whole leg's.
 
     CapFloorType.Collar has no path here - the builder carries a single strike,
-    and a collar needs two strike vectors over a coupon leg Python cannot build
-    (#848)."""
+    and a collar needs two strike vectors - so a collar is built through
+    YoYInflationCapFloor.collar over a leg of its own instead."""
 
     def __init__(
         self,
@@ -538,17 +539,63 @@ class MakeYoYInflationCapFloor:
         ...
 
 class YoYInflationCapFloor:
-    """A cap or floor over a year-on-year inflation leg.
+    """A cap, floor or collar over a year-on-year inflation leg.
 
-    Built only through MakeYoYInflationCapFloor: the core's raw constructors take
-    a vector of concrete year-on-year coupons, which Python has no facade to
-    build (#848), so there is no direct constructor here.
+    Built either through MakeYoYInflationCapFloor, the standard market builder,
+    or through the raw constructors below, which take the coupon vector
+    YoYInflationLeg.coupons() hands back (#848). The raw route is the only one
+    that reaches a collar: the builder carries a single strike.
 
     Unlike a nominal cap/floor this instrument keeps its first optionlet, so the
     strip spans its leg exactly and cap - floor is the year-on-year swap.
 
     Pricing needs an engine: call set_engine before npv."""
 
+    @staticmethod
+    def new(
+        cap_floor_type: CapFloorType,
+        coupons: list[YoYInflationCoupon],
+        cap_rates: list[float],
+        floor_rates: list[float],
+        settings: Settings,
+    ) -> YoYInflationCapFloor:
+        """Each strike vector is padded to the leg length by repeating its last
+        entry. Raises ItofinError on an empty leg, and on a strike vector the
+        type needs and did not get: a cap or a collar needs cap rates, a floor
+        or a collar floor rates."""
+        ...
+    @staticmethod
+    def cap(
+        coupons: list[YoYInflationCoupon],
+        strikes: list[float],
+        settings: Settings,
+    ) -> YoYInflationCapFloor: ...
+    @staticmethod
+    def floor(
+        coupons: list[YoYInflationCoupon],
+        strikes: list[float],
+        settings: Settings,
+    ) -> YoYInflationCapFloor: ...
+    @staticmethod
+    def collar(
+        coupons: list[YoYInflationCoupon],
+        cap_rates: list[float],
+        floor_rates: list[float],
+        settings: Settings,
+    ) -> YoYInflationCapFloor:
+        """Long the cap at cap_rates, short the floor at floor_rates."""
+        ...
+    @staticmethod
+    def with_strikes(
+        cap_floor_type: CapFloorType,
+        coupons: list[YoYInflationCoupon],
+        strikes: list[float],
+        settings: Settings,
+    ) -> YoYInflationCapFloor:
+        """strikes are cap rates for a Cap and floor rates for a Floor. Raises
+        ItofinError on an empty strikes and on a Collar, which needs two vectors
+        and has collar() for a constructor."""
+        ...
     def cap_rates(self) -> list[float]: ...
     def floor_rates(self) -> list[float]: ...
     def coupon_count(self) -> int: ...
