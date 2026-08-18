@@ -37,7 +37,10 @@ use calibration::{PyCalibrationErrorType, PyEndCriteria, PyLevenbergMarquardt};
 use capfloor::{PyCapFloor, PyCapFloorType};
 use capfloorengine::PyBlackCapFloorEngine;
 use capfloortermvol::PyCapFloorTermVolSurface;
-use cashflows::{PyYoYInflationCoupon, PyYoYInflationLeg};
+use cashflows::{
+    PyCappedFlooredYoYInflationCoupon, PyYoYInflationCoupon, PyYoYInflationLeg,
+    PyYoYInflationOptionletCouponPricer,
+};
 use credit::{
     PyCreditDefaultSwap, PyDefaultProbabilityTermStructure, PyFlatHazardRate,
     PyInterpolatedHazardRateCurve, PyMakeCreditDefaultSwap, PyPiecewiseDefaultCurve,
@@ -225,6 +228,8 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     let cashflows = PyModule::new(py, "cashflows")?;
     cashflows.add_class::<PyYoYInflationCoupon>()?;
+    cashflows.add_class::<PyCappedFlooredYoYInflationCoupon>()?;
+    cashflows.add_class::<PyYoYInflationOptionletCouponPricer>()?;
     cashflows.add_class::<PyYoYInflationLeg>()?;
 
     let instruments = PyModule::new(py, "instruments")?;

@@ -1,7 +1,11 @@
 # Hand-written stubs for itofin.cashflows; sync manually with src/cashflows.rs
-# (#517, #848).
+# (#517, #848, #863).
 
 from itofin.indexes import CpiInterpolationType, YoYInflationIndex
+from itofin.termstructures import (
+    ConstantYoYOptionletVolatility,
+    YieldTermStructure,
+)
 from itofin.time import (
     BusinessDayConvention,
     Calendar,
@@ -43,6 +47,55 @@ class YoYInflationCoupon:
     def observation_lag(self) -> Period: ...
     def interpolation(self) -> CpiInterpolationType: ...
     def fixing_days(self) -> int: ...
+
+class YoYInflationOptionletCouponPricer:
+    """Values a capped or floored year-on-year coupon's optionlets off a
+    volatility surface.
+
+    The distribution is chosen by the constructor: black is lognormal,
+    unit_displaced lognormal in 1 + rate and bachelier normal. The settings
+    behind volatility and behind the priced coupons' index must be the same
+    object. nominal_ts is optional: only the discounted price path reads it.
+    """
+
+    @staticmethod
+    def black(
+        volatility: ConstantYoYOptionletVolatility,
+        nominal_ts: YieldTermStructure | None = None,
+    ) -> YoYInflationOptionletCouponPricer: ...
+    @staticmethod
+    def unit_displaced(
+        volatility: ConstantYoYOptionletVolatility,
+        nominal_ts: YieldTermStructure | None = None,
+    ) -> YoYInflationOptionletCouponPricer: ...
+    @staticmethod
+    def bachelier(
+        volatility: ConstantYoYOptionletVolatility,
+        nominal_ts: YieldTermStructure | None = None,
+    ) -> YoYInflationOptionletCouponPricer: ...
+
+class CappedFlooredYoYInflationCoupon:
+    """A year-on-year inflation coupon with a cap and/or floor on its rate.
+
+    Built only through YoYInflationLeg.capped_floored_coupons. A negative
+    gearing swaps the two roles, so is_capped and effective_cap answer off the
+    stored level rather than off what the leg was given.
+    """
+
+    def rate(self) -> float:
+        """The swaplet rate plus the floorlet, less the caplet."""
+        ...
+    def amount(self) -> float:
+        """rate() * accrual_period() * nominal()."""
+        ...
+    def is_capped(self) -> bool: ...
+    def is_floored(self) -> bool: ...
+    def effective_cap(self) -> float:
+        """(cap - spread) / gearing, the strike the caplet is struck at."""
+        ...
+    def effective_floor(self) -> float:
+        """(floor - spread) / gearing, the strike the floorlet is struck at."""
+        ...
 
 class YoYInflationLeg:
     """Builds a sequence of year-on-year inflation coupons from a schedule."""

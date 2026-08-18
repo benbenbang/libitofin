@@ -9,14 +9,22 @@
 //! covers the pricing path but not a caller who wants the leg itself.
 
 use crate::PyQlError;
-use crate::inflation::{PyCpiInterpolationType, PyYoYInflationIndex};
+use crate::curve::PyYieldTermStructure;
+use crate::inflation::{
+    PyConstantYoYOptionletVolatility, PyCpiInterpolationType, PyYoYInflationIndex,
+};
 use crate::time::{
     PyBusinessDayConvention, PyCalendar, PyDate, PyDayCounter, PyPeriod, PySchedule,
 };
-use libitofin::cashflows::{Coupon, YoYInflationCoupon, YoYInflationLeg};
+use libitofin::cashflows::{
+    CappedFlooredYoYInflationCoupon, Coupon, YoYInflationCoupon, YoYInflationLeg,
+    YoYInflationOptionletCouponPricer,
+};
 use libitofin::event::Event;
+use libitofin::handle::Handle;
 use libitofin::indexes::inflationindex::{CpiInterpolationType, YoYInflationIndex};
-use libitofin::shared::Shared;
+use libitofin::shared::{Shared, SharedMut, shared_mut};
+use libitofin::termstructures::yieldtermstructure::YieldTermStructure;
 use libitofin::time::businessdayconvention::BusinessDayConvention;
 use libitofin::time::calendar::Calendar;
 use libitofin::time::daycounter::DayCounter;
@@ -164,6 +172,180 @@ impl PyYoYInflationCoupon {
     /// constructors take a vector of.
     pub(crate) fn shared(&self) -> Shared<YoYInflationCoupon> {
         Shared::clone(&self.inner)
+    }
+}
+
+/// Python `YoYInflationOptionletCouponPricer`: the coupon pricer that values a
+/// capped or floored year-on-year coupon's optionlets off a volatility surface
+/// (`cashflows::yoyinflationoptionletpricer`).
+///
+/// The distribution is chosen by the constructor rather than passed as an
+/// argument, mirroring the core's three constructors and C++'s three pricer
+/// classes, as
+/// [`YoYInflationCapFloorEngine`](crate::inflation::PyYoYInflationCapFloorEngine)
+/// does: [`black`](Self::black) is lognormal, [`unit_displaced`](Self::unit_displaced)
+/// lognormal in `1 + rate` and [`bachelier`](Self::bachelier) normal.
+///
+/// The `settings` behind `volatility` and behind the index the priced coupons
+/// observe must be the same object, or the two resolve their dates against
+/// different evaluation dates and the rate is silently wrong.
+///
+/// `nominal_ts` is optional because only the discounted `swaplet_price` path
+/// reads it: a pricer built without one still answers every rate a
+/// [`CappedFlooredYoYInflationCoupon`](PyCappedFlooredYoYInflationCoupon) asks
+/// of it.
+#[pyclass(name = "YoYInflationOptionletCouponPricer", unsendable)]
+pub struct PyYoYInflationOptionletCouponPricer {
+    inner: SharedMut<YoYInflationOptionletCouponPricer>,
+}
+
+#[pymethods]
+impl PyYoYInflationOptionletCouponPricer {
+    /// Optionlets under the lognormal model (C++
+    /// `BlackYoYInflationCouponPricer`).
+    #[staticmethod]
+    #[pyo3(signature = (volatility, nominal_ts = None))]
+    fn black(
+        volatility: &PyConstantYoYOptionletVolatility,
+        nominal_ts: Option<&PyYieldTermStructure>,
+    ) -> Self {
+        PyYoYInflationOptionletCouponPricer {
+            inner: shared_mut(YoYInflationOptionletCouponPricer::black(
+                volatility.handle(),
+                nominal_handle(nominal_ts),
+            )),
+        }
+    }
+
+    /// Optionlets under the unit-displaced lognormal model (C++
+    /// `UnitDisplacedBlackYoYInflationCouponPricer`), the usual quoting
+    /// convention for an inflation rate that may go negative.
+    #[staticmethod]
+    #[pyo3(signature = (volatility, nominal_ts = None))]
+    fn unit_displaced(
+        volatility: &PyConstantYoYOptionletVolatility,
+        nominal_ts: Option<&PyYieldTermStructure>,
+    ) -> Self {
+        PyYoYInflationOptionletCouponPricer {
+            inner: shared_mut(YoYInflationOptionletCouponPricer::unit_displaced(
+                volatility.handle(),
+                nominal_handle(nominal_ts),
+            )),
+        }
+    }
+
+    /// Optionlets under the normal model (C++
+    /// `BachelierYoYInflationCouponPricer`).
+    #[staticmethod]
+    #[pyo3(signature = (volatility, nominal_ts = None))]
+    fn bachelier(
+        volatility: &PyConstantYoYOptionletVolatility,
+        nominal_ts: Option<&PyYieldTermStructure>,
+    ) -> Self {
+        PyYoYInflationOptionletCouponPricer {
+            inner: shared_mut(YoYInflationOptionletCouponPricer::bachelier(
+                volatility.handle(),
+                nominal_handle(nominal_ts),
+            )),
+        }
+    }
+}
+
+impl PyYoYInflationOptionletCouponPricer {
+    /// The pricer the leg installs across its capped coupons.
+    #[allow(dead_code)]
+    pub(crate) fn inner(&self) -> SharedMut<YoYInflationOptionletCouponPricer> {
+        SharedMut::clone(&self.inner)
+    }
+}
+
+/// The discount curve handle a pricer constructor takes, empty when Python
+/// passed none.
+fn nominal_handle(nominal_ts: Option<&PyYieldTermStructure>) -> Handle<dyn YieldTermStructure> {
+    nominal_ts.map_or_else(Handle::empty, PyYieldTermStructure::handle)
+}
+
+/// Python `CappedFlooredYoYInflationCoupon`: a year-on-year coupon with a cap
+/// and/or floor layered on its rate
+/// (`cashflows::capflooredyoyinflationcoupon`).
+///
+/// Built only through
+/// [`YoYInflationLeg.capped_floored_coupons`](PyYoYInflationLeg::capped_floored_coupons),
+/// which is also where the optionlet pricer comes from, as
+/// [`YoYInflationCoupon`](PyYoYInflationCoupon) is built only through
+/// [`coupons`](PyYoYInflationLeg::coupons).
+///
+/// A negative gearing swaps the two roles: the cap the leg was given becomes
+/// this coupon's floor and vice versa, which is why
+/// [`is_capped`](Self::is_capped) and [`effective_cap`](Self::effective_cap)
+/// answer off the stored level rather than off what was passed.
+///
+/// Deferred (visible): the delegated [`Coupon`] face - the nominal, the accrual
+/// dates and the payment date - which is reachable on the plain coupons of the
+/// same leg, and the `underlying` accessor no fixture reads.
+#[pyclass(name = "CappedFlooredYoYInflationCoupon", unsendable)]
+pub struct PyCappedFlooredYoYInflationCoupon {
+    #[allow(dead_code)]
+    inner: Shared<CappedFlooredYoYInflationCoupon>,
+}
+
+#[pymethods]
+impl PyCappedFlooredYoYInflationCoupon {
+    /// The rate the coupon accrues at: the underlying's swaplet rate plus the
+    /// floorlet, less the caplet.
+    ///
+    /// # Errors
+    ///
+    /// Reports a coupon with no pricer attached, whatever resolving the fixing
+    /// reports, and a volatility the surface refuses - a strike outside its
+    /// domain, or an observation before its base date.
+    fn rate(&self) -> PyResult<f64> {
+        Ok(Coupon::rate(&*self.inner).map_err(PyQlError::from)?)
+    }
+
+    /// What the coupon pays on its payment date, undiscounted: the
+    /// [`rate`](Self::rate) over the accrual period on the nominal. Fallible as
+    /// [`rate`](Self::rate).
+    fn amount(&self) -> PyResult<f64> {
+        Ok(Coupon::amount(&*self.inner).map_err(PyQlError::from)?)
+    }
+
+    /// Whether a cap applies.
+    fn is_capped(&self) -> bool {
+        self.inner.is_capped()
+    }
+
+    /// Whether a floor applies.
+    fn is_floored(&self) -> bool {
+        self.inner.is_floored()
+    }
+
+    /// The de-spread, de-geared cap the caplet is struck at,
+    /// `(cap - spread) / gearing`, off the stored level.
+    fn effective_cap(&self) -> f64 {
+        self.inner.effective_cap()
+    }
+
+    /// The de-spread, de-geared floor the floorlet is struck at,
+    /// `(floor - spread) / gearing`, off the stored level.
+    fn effective_floor(&self) -> f64 {
+        self.inner.effective_floor()
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "CappedFlooredYoYInflationCoupon({}, {})",
+            Coupon::accrual_start_date(&*self.inner),
+            Coupon::accrual_end_date(&*self.inner)
+        )
+    }
+}
+
+impl PyCappedFlooredYoYInflationCoupon {
+    /// Wraps a coupon the leg builder produced.
+    #[allow(dead_code)]
+    pub(crate) fn from_shared(inner: Shared<CappedFlooredYoYInflationCoupon>) -> Self {
+        PyCappedFlooredYoYInflationCoupon { inner }
     }
 }
 
