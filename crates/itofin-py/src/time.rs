@@ -19,9 +19,21 @@ use libitofin::time::schedule::{MakeSchedule, Schedule};
 use libitofin::time::timeunit::TimeUnit;
 use pyo3::prelude::*;
 use pyo3::wrap_pyfunction;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 
 const MIN_SERIAL: i64 = 367;
 const MAX_SERIAL: i64 = 109_574;
+
+/// The hash of `value`, for the `__hash__` facades.
+///
+/// Each caller feeds this exactly what its `__eq__` compares, so equal objects
+/// hash equal: `DayCounter` its name, `Period` its canonical (normalized) form.
+fn hash_of<T: Hash>(value: &T) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    value.hash(&mut hasher);
+    hasher.finish()
+}
 
 /// Days in `month` (1-based) for `year`, using the Gregorian leap rule.
 ///
@@ -178,6 +190,19 @@ impl PyDayCounter {
         }
     }
 
+    /// Equality by convention name, delegating to the core `PartialEq`: two
+    /// independently built `Actual360`s are equal, an `Actual360` and an
+    /// `Actual365Fixed` are not.
+    fn __eq__(&self, other: &PyDayCounter) -> bool {
+        self.inner == other.inner
+    }
+
+    /// Hashes the name, the one field [`__eq__`](Self::__eq__) compares, so a
+    /// day counter can key a dict or join a set.
+    fn __hash__(&self) -> u64 {
+        hash_of(&self.inner.name())
+    }
+
     fn __repr__(&self) -> String {
         format!("DayCounter({})", self.inner.name())
     }
@@ -192,8 +217,8 @@ impl PyDayCounter {
 
     /// Wraps a core [`DayCounter`] a facade read back off an object it built.
     ///
-    /// The result carries no factory identity, so it compares only through its
-    /// `repr`.
+    /// The result carries no factory identity, but equality is by convention
+    /// name, so it compares equal to the factory call that built it.
     pub(crate) fn from_inner(inner: DayCounter) -> Self {
         PyDayCounter { inner }
     }
@@ -227,6 +252,21 @@ impl PyPeriod {
         Ok(PyPeriod {
             inner: Period::new(n, units),
         })
+    }
+
+    /// Semantic equality, delegating to the core `PartialEq`: `7 Days` equals
+    /// `1 Week` and `12 Months` equals `1 Year`, while a pair no calendar can
+    /// decide (`30 Days` against `1 Month`) is not equal.
+    fn __eq__(&self, other: &PyPeriod) -> bool {
+        self.inner == other.inner
+    }
+
+    /// Hashes the canonical form, so every decidably equal pair hashes equal:
+    /// normalizing collapses `7 Days` onto `1 Week`, `12 Months` onto `1 Year`
+    /// and every zero length onto `0 Days` before the hash is taken.
+    fn __hash__(&self) -> u64 {
+        let normalized = self.inner.normalized();
+        hash_of(&(normalized.length(), normalized.units()))
     }
 
     fn __repr__(&self) -> String {
