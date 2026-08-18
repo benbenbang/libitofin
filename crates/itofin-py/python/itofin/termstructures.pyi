@@ -1233,8 +1233,8 @@ class ConstantYoYOptionletVolatility:
     C++ defaults them to -1.0 and 100.0 and the port carries no default
     arguments, so both are passed here too.
 
-    Only the flat surface is bound: the live-quote constructor and the whole
-    stripped/interpolated hierarchy are deferred."""
+    Both constructors are bound: __init__ takes a value, with_quote a live
+    quote. The whole stripped/interpolated hierarchy is deferred (#874)."""
 
     def __init__(
         self,
@@ -1250,6 +1250,24 @@ class ConstantYoYOptionletVolatility:
         max_strike: float,
         settings: Settings,
     ) -> None: ...
+    @staticmethod
+    def with_quote(
+        volatility: SimpleQuote,
+        settlement_days: int,
+        calendar: Calendar,
+        business_day_convention: BusinessDayConvention,
+        day_counter: DayCounter,
+        observation_lag: Period,
+        frequency: Frequency,
+        index_is_interpolated: bool,
+        min_strike: float,
+        max_strike: float,
+        settings: Settings,
+    ) -> ConstantYoYOptionletVolatility:
+        """A flat surface quoted by volatility: a later set_value on the quote
+        notifies the surface's observers, so anything priced off it reprices at
+        the new level. Otherwise as __init__."""
+        ...
     def observation_lag(self) -> Period: ...
     def frequency(self) -> Frequency: ...
     def index_is_interpolated(self) -> bool: ...
