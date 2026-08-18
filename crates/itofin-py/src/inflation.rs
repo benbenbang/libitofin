@@ -1937,10 +1937,12 @@ impl PyYearOnYearInflationSwap {
 /// over; C++ defaults them to `-1.0` and `100.0` and the port carries no default
 /// arguments, so both are passed here too.
 ///
-/// Deferred (visible): the live-quote constructor
-/// (`constantyoyoptionletvol.rs:122`), whose quote changes notify the surface's
-/// observers, and the whole stripped/interpolated surface hierarchy, which has
-/// no port at all. A flat surface is what the cap/floor engine oracle needs.
+/// Both constructors are bound: the flat one taking a value, and
+/// [`with_quote`](Self::with_quote) taking a live quote whose changes notify the
+/// surface's observers.
+///
+/// Deferred (visible): the whole stripped/interpolated surface hierarchy, which
+/// has no port at all, tracked as #874.
 #[pyclass(name = "ConstantYoYOptionletVolatility", unsendable)]
 pub struct PyConstantYoYOptionletVolatility {
     inner: Shared<ConstantYoYOptionletVolatility>,
@@ -1972,6 +1974,44 @@ impl PyConstantYoYOptionletVolatility {
         PyConstantYoYOptionletVolatility {
             inner: shared(ConstantYoYOptionletVolatility::new(
                 volatility,
+                settlement_days,
+                calendar.inner(),
+                business_day_convention.inner(),
+                day_counter.inner(),
+                observation_lag.inner(),
+                frequency.inner(),
+                index_is_interpolated,
+                min_strike,
+                max_strike,
+                settings.inner(),
+            )),
+        }
+    }
+
+    /// A flat surface quoted by `volatility`: the quote is retained rather than
+    /// read once, so a later `set_value` on it notifies the surface's observers
+    /// and anything priced off the surface reprices at the new level.
+    ///
+    /// Infallible, and otherwise as [`new`](Self::new), which the arguments
+    /// after the first mirror exactly.
+    #[staticmethod]
+    #[allow(clippy::too_many_arguments)]
+    fn with_quote(
+        volatility: &PySimpleQuote,
+        settlement_days: u32,
+        calendar: &PyCalendar,
+        business_day_convention: &PyBusinessDayConvention,
+        day_counter: &PyDayCounter,
+        observation_lag: &PyPeriod,
+        frequency: &PyFrequency,
+        index_is_interpolated: bool,
+        min_strike: f64,
+        max_strike: f64,
+        settings: &PySettings,
+    ) -> Self {
+        PyConstantYoYOptionletVolatility {
+            inner: shared(ConstantYoYOptionletVolatility::with_quote(
+                volatility.handle(),
                 settlement_days,
                 calendar.inner(),
                 business_day_convention.inner(),
