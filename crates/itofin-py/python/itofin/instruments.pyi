@@ -229,11 +229,12 @@ class CreditDefaultSwap:
     pays_at_default_time quoted; with_terms additionally exposes
     protection_start and rebates_accrual.
 
-    Five of the nine CdsTerms fields are not exposed and keep their core
+    These direct constructors keep the remaining CdsTerms fields at their core
     defaults: claim (a face-value claim, which needs a claim facade that does
-    not exist yet), last_period_day_counter, trade_date, upfront_date and
-    cash_settlement_days. The core's upfront-quoted constructors are not exposed
-    here either, so the contract never carries an upfront."""
+    not exist yet), last_period_day_counter, upfront_date and
+    cash_settlement_days. trade_date and an upfront are not set here but are
+    reachable through MakeCreditDefaultSwap (with_trade_date and the upfront_rate
+    constructor argument)."""
 
     def __init__(
         self,
