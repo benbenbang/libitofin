@@ -17,8 +17,8 @@ use crate::time::{
     PyBusinessDayConvention, PyCalendar, PyDate, PyDayCounter, PyPeriod, PySchedule,
 };
 use libitofin::cashflows::{
-    CappedFlooredYoYInflationCoupon, Coupon, YoYInflationCoupon, YoYInflationLeg,
-    YoYInflationOptionletCouponPricer,
+    CappedFlooredYoYInflationCoupon, Coupon, YoYInflationCoupon, YoYInflationCouponPricer,
+    YoYInflationLeg, YoYInflationOptionletCouponPricer, set_yoy_coupon_pricer,
 };
 use libitofin::event::Event;
 use libitofin::handle::Handle;
@@ -253,7 +253,6 @@ impl PyYoYInflationOptionletCouponPricer {
 
 impl PyYoYInflationOptionletCouponPricer {
     /// The pricer the leg installs across its capped coupons.
-    #[allow(dead_code)]
     pub(crate) fn inner(&self) -> SharedMut<YoYInflationOptionletCouponPricer> {
         SharedMut::clone(&self.inner)
     }
@@ -285,7 +284,6 @@ fn nominal_handle(nominal_ts: Option<&PyYieldTermStructure>) -> Handle<dyn Yield
 /// same leg, and the `underlying` accessor no fixture reads.
 #[pyclass(name = "CappedFlooredYoYInflationCoupon", unsendable)]
 pub struct PyCappedFlooredYoYInflationCoupon {
-    #[allow(dead_code)]
     inner: Shared<CappedFlooredYoYInflationCoupon>,
 }
 
@@ -343,7 +341,6 @@ impl PyCappedFlooredYoYInflationCoupon {
 
 impl PyCappedFlooredYoYInflationCoupon {
     /// Wraps a coupon the leg builder produced.
-    #[allow(dead_code)]
     pub(crate) fn from_shared(inner: Shared<CappedFlooredYoYInflationCoupon>) -> Self {
         PyCappedFlooredYoYInflationCoupon { inner }
     }
@@ -368,11 +365,15 @@ impl PyCappedFlooredYoYInflationCoupon {
 /// `notionals` list is the other way to supply it; giving neither surfaces that
 /// error from [`coupons`](Self::coupons).
 ///
-/// Deferred (visible): `with_caps` / `with_floors` and the
-/// `capped_floored_coupons` they select, which need a pricer carrying an
-/// optionlet volatility that has no facade here, and the erased `build()` whose
-/// `Leg` of `CashFlow`s Python has no wrapper for. The plain swaplet path is
-/// what #848 asks for.
+/// The `caps` and `floors` lists select which of the two coupon types the leg
+/// produces: given either, [`coupons`](Self::coupons) hands back coupons the
+/// core deliberately leaves unpriced and
+/// [`capped_floored_coupons`](Self::capped_floored_coupons) is the intended
+/// entry (#863).
+///
+/// Deferred (visible): the erased `build()`, whose `Leg` of `CashFlow`s Python
+/// has no wrapper for, and the `CashFlows::npv` leg-summing it gates (#878); a
+/// standalone coupon constructor stays with #859's raw-constructor territory.
 #[pyclass(name = "YoYInflationLeg", unsendable)]
 pub struct PyYoYInflationLeg {
     schedule: Schedule,
@@ -389,6 +390,8 @@ pub struct PyYoYInflationLeg {
     gearings: Option<Vec<f64>>,
     spread: Option<f64>,
     spreads: Option<Vec<f64>>,
+    caps: Option<Vec<f64>>,
+    floors: Option<Vec<f64>>,
 }
 
 #[pymethods]
@@ -413,6 +416,8 @@ impl PyYoYInflationLeg {
         gearings = None,
         spread = None,
         spreads = None,
+        caps = None,
+        floors = None,
     ))]
     fn new(
         schedule: &PySchedule,
@@ -429,6 +434,8 @@ impl PyYoYInflationLeg {
         gearings: Option<Vec<f64>>,
         spread: Option<f64>,
         spreads: Option<Vec<f64>>,
+        caps: Option<Vec<f64>>,
+        floors: Option<Vec<f64>>,
     ) -> Self {
         PyYoYInflationLeg {
             schedule: schedule.inner(),
@@ -445,6 +452,8 @@ impl PyYoYInflationLeg {
             gearings,
             spread,
             spreads,
+            caps,
+            floors,
         }
     }
 
@@ -460,7 +469,61 @@ impl PyYoYInflationLeg {
     ///
     /// Reports a leg with no notional, a schedule holding fewer than two dates,
     /// and more notionals, gearings or spreads than the schedule has periods.
+    ///
+    /// With a `caps` or `floors` list given the coupons come back *unpriced*,
+    /// the core withholding the default pricer, so
+    /// [`capped_floored_coupons`](Self::capped_floored_coupons) is the entry
+    /// there and the coupons handed back here answer only what needs no pricer.
     fn coupons(&self) -> PyResult<Vec<PyYoYInflationCoupon>> {
+        Ok(self
+            .leg()
+            .coupons()
+            .map_err(PyQlError::from)?
+            .into_iter()
+            .map(PyYoYInflationCoupon::from_shared)
+            .collect())
+    }
+
+    /// The coupons wrapped in the leg's per-coupon `caps` and `floors`, each
+    /// carrying `pricer`.
+    ///
+    /// The pricer is required rather than optional: the core withholds its
+    /// default swaplet pricer from a capped leg, and a swaplet pricer could not
+    /// value the optionlets anyway, so a coupon handed back without one would
+    /// report `"pricer not set"` from
+    /// [`rate`](PyCappedFlooredYoYInflationCoupon::rate). One pricer is
+    /// installed across every coupon, as the core's own `set_yoy_coupon_pricer`
+    /// does.
+    ///
+    /// Rebuilt on every call, as [`coupons`](Self::coupons) is.
+    ///
+    /// # Errors
+    ///
+    /// As [`coupons`](Self::coupons), plus more caps or floors than the schedule
+    /// has periods, and a cap sitting below its floor.
+    fn capped_floored_coupons(
+        &self,
+        pricer: &PyYoYInflationOptionletCouponPricer,
+    ) -> PyResult<Vec<PyCappedFlooredYoYInflationCoupon>> {
+        let coupons = self
+            .leg()
+            .capped_floored_coupons()
+            .map_err(PyQlError::from)?;
+        set_yoy_coupon_pricer(
+            &coupons,
+            pricer.inner() as SharedMut<dyn YoYInflationCouponPricer>,
+        );
+        Ok(coupons
+            .into_iter()
+            .map(PyCappedFlooredYoYInflationCoupon::from_shared)
+            .collect())
+    }
+}
+
+impl PyYoYInflationLeg {
+    /// The core builder the stored configuration assembles into, which both
+    /// coupon paths start from.
+    fn leg(&self) -> YoYInflationLeg {
         let mut leg = YoYInflationLeg::new(
             self.schedule.clone(),
             self.payment_calendar.clone(),
@@ -493,11 +556,12 @@ impl PyYoYInflationLeg {
         if let Some(spreads) = &self.spreads {
             leg = leg.with_spreads(spreads.clone());
         }
-        Ok(leg
-            .coupons()
-            .map_err(PyQlError::from)?
-            .into_iter()
-            .map(PyYoYInflationCoupon::from_shared)
-            .collect())
+        if let Some(caps) = &self.caps {
+            leg = leg.with_caps_per_coupon(caps.clone());
+        }
+        if let Some(floors) = &self.floors {
+            leg = leg.with_floors_per_coupon(floors.clone());
+        }
+        leg
     }
 }

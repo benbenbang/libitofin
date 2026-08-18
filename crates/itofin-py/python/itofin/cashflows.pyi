@@ -116,11 +116,25 @@ class YoYInflationLeg:
         gearings: list[float] | None = None,
         spread: float | None = None,
         spreads: list[float] | None = None,
+        caps: list[float] | None = None,
+        floors: list[float] | None = None,
     ) -> None: ...
     def coupons(self) -> list[YoYInflationCoupon]:
         """The coupons, each carrying the default swaplet pricer.
 
         Rebuilt on every call, so bind the list once rather than calling this
-        per read.
+        per read. Given caps or floors the coupons come back unpriced, and
+        capped_floored_coupons is the intended entry.
+        """
+        ...
+    def capped_floored_coupons(
+        self, pricer: YoYInflationOptionletCouponPricer
+    ) -> list[CappedFlooredYoYInflationCoupon]:
+        """The coupons wrapped in the leg's per-coupon caps and floors, each
+        carrying pricer.
+
+        The pricer is required: a capped leg withholds the core's default
+        swaplet pricer, and that pricer could not value the optionlets anyway.
+        Rebuilt on every call, as coupons() is.
         """
         ...
