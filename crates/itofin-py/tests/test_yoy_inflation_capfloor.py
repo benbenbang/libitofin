@@ -36,11 +36,19 @@ Fixture, and the four things about it that are load-bearing.
 
 The volatility is 1 %, which is what the cached-value case passes; the 15 % in
 the Rust module's `VOLS` array belongs to the parity sweep.
+
+The raw constructors (#859) are exercised at the end of this file, off the same
+fixture. They are what the Rust oracle itself calls
+(`inflationcapfloorengines.rs:606-608`, over the leg at `:528`), so putting them
+against the same two cached values is a like-for-like reproduction of it: the
+factory path above reaches those numbers through a builder that assembles its own
+leg, this one through a leg Python assembles and hands over coupon by coupon.
 """
 
 import pytest
 
 from itofin import ItofinError, Settings
+from itofin.cashflows import YoYInflationCoupon, YoYInflationLeg
 from itofin.indexes import CpiInterpolationType, YoYInflationIndex, ZeroInflationIndex
 from itofin.instruments import (
     CapFloorType,
@@ -330,3 +338,161 @@ def test_a_strike_and_an_atm_curve_are_mutually_exclusive():
     with pytest.raises(ItofinError) as neither:
         _cap_floor(settings, index, CapFloorType.Cap)
     assert "no strike and no ATM curve given" in str(neither.value)
+
+
+def _raw_coupons(settings: Settings, index: YoYInflationIndex) -> list[YoYInflationCoupon]:
+    """The two-year plain leg the Rust oracle hands its raw constructors
+    (`inflationcapfloorengines.rs:528`), assembled here through the Python leg
+    facade: annual from the evaluation date to an unadjusted two-year
+    anniversary, unadjusted accruals, a ModifiedFollowing payment roll, the zero
+    observation lag and a 1e6 notional.
+
+    Two of those settings are transcribed for fidelity and are inert here, so
+    neither is what this leg is pinned by. The generation rule cannot bite: two
+    whole annual periods leave no stub, so Forward and Backward lay out the same
+    three dates (and the Python facade already defaults to Forward). Nor can the
+    payment roll: 13 August 2007, 2008 and 2009 are all UK business days, so
+    Unadjusted, Following and ModifiedFollowing pay on the same days. What the
+    cached values below do pin is the zero observation lag - two months instead
+    misses them by about 47, per this file's header - and the 1e6 notional, which
+    scales them outright.
+
+    The coupons are bound once and reused across the constructors below. The leg
+    rebuilds them on every call, so a second call would hand back different
+    objects and the collar would no longer be written over the cap's leg."""
+    end = UK.advance(TODAY, 2, "Years", BusinessDayConvention.Unadjusted, False)
+    schedule = Schedule(
+        TODAY,
+        end,
+        Frequency.Annual,
+        UK,
+        BusinessDayConvention.Unadjusted,
+        DateGeneration.Forward,
+    )
+    return YoYInflationLeg(
+        schedule,
+        UK,
+        index,
+        NO_LAG,
+        CpiInterpolationType.Flat,
+        _day_counter(),
+        notional=NOMINAL,
+        payment_adjustment=BusinessDayConvention.ModifiedFollowing,
+    ).coupons()
+
+
+def _with_black_engine(
+    instrument: YoYInflationCapFloor,
+    settings: Settings,
+    index: YoYInflationIndex,
+    nominal: FlatForward,
+) -> YoYInflationCapFloor:
+    """One engine per instrument: an engine carries the arguments and results of
+    the contract it last priced, so a cap, a floor and a collar never share
+    one."""
+    instrument.set_engine(
+        YoYInflationCapFloorEngine.black(index, _surface(settings), nominal)
+    )
+    return instrument
+
+
+def test_the_raw_constructors_reach_the_cached_black_values():
+    """The load-bearing oracle for #859: the same two numbers the factory path
+    reaches, but through the coupon vector Python now assembles itself. It is
+    the accessor and the constructors that are under test - a coupon dropped in
+    the hand-over, a strike vector landing in the wrong slot or a leg the
+    instrument does not actually own would all miss 0.02 on a 1e6 notional,
+    which is QuantLib's own tolerance.
+
+    That tolerance is 1e-4 relative, though, and it is measured against a
+    literal another build produced, so a convention slip could sit inside it.
+    The sharper check is the last one: the same two numbers off the factory,
+    in this process, on this curve. Both routes assemble the same coupons and
+    run the same float sequence over them, so they agree exactly, and anything
+    that moved this leg off the builder's would show there first."""
+    settings, index, nominal = _market()
+    coupons = _raw_coupons(settings, index)
+    assert len(coupons) == 2
+
+    cap = _with_black_engine(
+        YoYInflationCapFloor.cap(coupons, [STRIKE], settings), settings, index, nominal
+    )
+    floor = _with_black_engine(
+        YoYInflationCapFloor.floor(coupons, [STRIKE], settings), settings, index, nominal
+    )
+    cap_npv, floor_npv = cap.npv(), floor.npv()
+
+    print(f"raw cap = {cap_npv:.4f} (cached 219.452), raw floor = {floor_npv:.4f} (cached 314.641)")
+    assert abs(cap_npv - 219.452) < 0.02
+    assert abs(floor_npv - 314.641) < 0.02
+    assert cap.cap_rates() == [STRIKE, STRIKE]
+    assert cap.floor_rates() == []
+
+    assert cap_npv == _priced(settings, index, nominal, CapFloorType.Cap, "black")
+    assert floor_npv == _priced(settings, index, nominal, CapFloorType.Floor, "black")
+
+
+def test_a_collar_is_the_cap_less_the_floor():
+    """A collar is long the cap and short the floor, so on one strike its value
+    is the difference of the two priced separately. This is what the Collar
+    enum arm buys: routed to Cap or Floor instead, the collar would price as one
+    leg of the difference rather than both."""
+    settings, index, nominal = _market()
+    coupons = _raw_coupons(settings, index)
+
+    collar = _with_black_engine(
+        YoYInflationCapFloor.collar(coupons, [STRIKE], [STRIKE], settings),
+        settings,
+        index,
+        nominal,
+    )
+    cap = _with_black_engine(
+        YoYInflationCapFloor.cap(coupons, [STRIKE], settings), settings, index, nominal
+    )
+    floor = _with_black_engine(
+        YoYInflationCapFloor.floor(coupons, [STRIKE], settings), settings, index, nominal
+    )
+
+    print(f"collar = {collar.npv():.6f}, cap - floor = {cap.npv() - floor.npv():.6f}")
+    assert collar.npv() == pytest.approx(cap.npv() - floor.npv(), abs=1e-6)
+    assert collar.cap_rates() == [STRIKE, STRIKE]
+    assert collar.floor_rates() == [STRIKE, STRIKE]
+
+
+def test_the_two_strike_vectors_keep_their_places():
+    """The general constructor takes cap rates before floor rates, and a collar
+    struck at one rate - what the parity check above builds - cannot tell the
+    two apart. Two different strikes can: swapped, the collar would report them
+    the other way round.
+
+    The padding is visible here too: one strike given, one per coupon back."""
+    settings, index, _ = _market()
+    coupons = _raw_coupons(settings, index)
+
+    collar = YoYInflationCapFloor.new(
+        CapFloorType.Collar, coupons, [STRIKE], [0.01], settings
+    )
+
+    assert collar.cap_rates() == [STRIKE, STRIKE]
+    assert collar.floor_rates() == [0.01, 0.01]
+
+
+def test_the_single_vector_constructor_refuses_a_collar():
+    """with_strikes carries one strike vector, which a collar cannot be built
+    from: the core refuses it rather than guessing which side the vector is
+    (`inflationcapfloor.rs:236`). A cap goes through and the vector lands on the
+    cap rates, which is the arm the refusal is measured against."""
+    settings, index, _ = _market()
+    coupons = _raw_coupons(settings, index)
+
+    with pytest.raises(ItofinError) as raised:
+        YoYInflationCapFloor.with_strikes(
+            CapFloorType.Collar, coupons, [STRIKE], settings
+        )
+    assert "only Cap/Floor types allowed" in str(raised.value)
+
+    cap = YoYInflationCapFloor.with_strikes(
+        CapFloorType.Cap, coupons, [STRIKE], settings
+    )
+    assert cap.cap_rates() == [STRIKE, STRIKE]
+    assert cap.floor_rates() == []

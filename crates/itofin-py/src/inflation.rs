@@ -20,6 +20,7 @@
 
 use crate::PyQlError;
 use crate::capfloor::PyCapFloorType;
+use crate::cashflows::PyYoYInflationCoupon;
 use crate::curve::PyYieldTermStructure;
 use crate::helpers::PyPillar;
 use crate::market::PySimpleQuote;
@@ -2171,9 +2172,10 @@ impl PyYoYInflationCapFloorEngine {
 /// `first_caplet_excluded` change what an unset strike resolves to: the rate
 /// that reprices whatever survives, not the whole leg's.
 ///
-/// Deferred (visible): `CapFloorType.Collar` has no path here either - the
-/// builder carries a single strike, and a collar needs two strike vectors over a
-/// coupon leg Python cannot build (#848).
+/// `CapFloorType.Collar` has no path through the builder - it carries a single
+/// strike, and a collar needs two strike vectors - so a collar is built through
+/// [`YoYInflationCapFloor::collar`](PyYoYInflationCapFloor::collar) over a leg
+/// of its own instead.
 #[pyclass(name = "MakeYoYInflationCapFloor", unsendable)]
 pub struct PyMakeYoYInflationCapFloor {
     cap_floor_type: PyCapFloorType,
@@ -2326,10 +2328,13 @@ impl PyMakeYoYInflationCapFloor {
 /// Python `YoYInflationCapFloor`: a cap or floor over a year-on-year inflation
 /// leg (`instruments::inflationcapfloor::YoYInflationCapFloor`).
 ///
-/// Built only through [`MakeYoYInflationCapFloor`](PyMakeYoYInflationCapFloor):
-/// the core's raw constructors take a vector of concrete year-on-year coupons,
-/// which Python has no facade to build (#848), so there is no direct
-/// constructor here.
+/// Built either through [`MakeYoYInflationCapFloor`](PyMakeYoYInflationCapFloor),
+/// the standard market builder, or through the raw constructors
+/// [`new`](Self::new), [`cap`](Self::cap), [`floor`](Self::floor),
+/// [`collar`](Self::collar) and [`with_strikes`](Self::with_strikes), which take
+/// the coupon vector [`YoYInflationLeg`](crate::cashflows::PyYoYInflationLeg)
+/// hands back (#848). The raw route is the only one that reaches a collar: the
+/// builder carries a single strike.
 ///
 /// Unlike a nominal cap/floor this instrument keeps its first optionlet, so the
 /// strip spans its leg exactly and cap - floor is the year-on-year swap.
@@ -2343,6 +2348,118 @@ pub struct PyYoYInflationCapFloor {
 
 #[pymethods]
 impl PyYoYInflationCapFloor {
+    /// A `cap_floor_type` instrument over `coupons`, struck at `cap_rates` and
+    /// `floor_rates` (`inflationcapfloor.rs:141`).
+    ///
+    /// Each strike vector is padded to the leg length by repeating its last
+    /// entry, so a single strike stands for every optionlet.
+    ///
+    /// # Errors
+    ///
+    /// Reports an empty leg, and a strike vector the type needs and did not
+    /// get: a cap or a collar needs cap rates, a floor or a collar floor rates.
+    #[staticmethod]
+    fn new(
+        cap_floor_type: PyCapFloorType,
+        coupons: Vec<PyRef<PyYoYInflationCoupon>>,
+        cap_rates: Vec<f64>,
+        floor_rates: Vec<f64>,
+        settings: &PySettings,
+    ) -> PyResult<Self> {
+        Ok(Self::from_inner(shared_mut(
+            YoYInflationCapFloor::new(
+                cap_floor_type.inner(),
+                coupons.iter().map(|coupon| coupon.shared()).collect(),
+                cap_rates,
+                floor_rates,
+                settings.inner(),
+            )
+            .map_err(PyQlError::from)?,
+        )))
+    }
+
+    /// A cap over `coupons` struck at `strikes`. Fallible as
+    /// [`new`](Self::new).
+    #[staticmethod]
+    fn cap(
+        coupons: Vec<PyRef<PyYoYInflationCoupon>>,
+        strikes: Vec<f64>,
+        settings: &PySettings,
+    ) -> PyResult<Self> {
+        Ok(Self::from_inner(shared_mut(
+            YoYInflationCapFloor::cap(
+                coupons.iter().map(|coupon| coupon.shared()).collect(),
+                strikes,
+                settings.inner(),
+            )
+            .map_err(PyQlError::from)?,
+        )))
+    }
+
+    /// A floor over `coupons` struck at `strikes`. Fallible as
+    /// [`new`](Self::new).
+    #[staticmethod]
+    fn floor(
+        coupons: Vec<PyRef<PyYoYInflationCoupon>>,
+        strikes: Vec<f64>,
+        settings: &PySettings,
+    ) -> PyResult<Self> {
+        Ok(Self::from_inner(shared_mut(
+            YoYInflationCapFloor::floor(
+                coupons.iter().map(|coupon| coupon.shared()).collect(),
+                strikes,
+                settings.inner(),
+            )
+            .map_err(PyQlError::from)?,
+        )))
+    }
+
+    /// A collar over `coupons`, long the cap at `cap_rates` and short the floor
+    /// at `floor_rates`. Fallible as [`new`](Self::new).
+    #[staticmethod]
+    fn collar(
+        coupons: Vec<PyRef<PyYoYInflationCoupon>>,
+        cap_rates: Vec<f64>,
+        floor_rates: Vec<f64>,
+        settings: &PySettings,
+    ) -> PyResult<Self> {
+        Ok(Self::from_inner(shared_mut(
+            YoYInflationCapFloor::collar(
+                coupons.iter().map(|coupon| coupon.shared()).collect(),
+                cap_rates,
+                floor_rates,
+                settings.inner(),
+            )
+            .map_err(PyQlError::from)?,
+        )))
+    }
+
+    /// The single-vector constructor: `strikes` are cap rates for a
+    /// `CapFloorType.Cap` and floor rates for a `CapFloorType.Floor`.
+    ///
+    /// # Errors
+    ///
+    /// Reports an empty `strikes`, a `CapFloorType.Collar` - which needs two
+    /// vectors, so [`collar`](Self::collar) is its constructor - and as
+    /// [`new`](Self::new).
+    #[staticmethod]
+    fn with_strikes(
+        cap_floor_type: PyCapFloorType,
+        coupons: Vec<PyRef<PyYoYInflationCoupon>>,
+        strikes: Vec<f64>,
+        settings: &PySettings,
+    ) -> PyResult<Self> {
+        Ok(Self::from_inner(shared_mut(
+            YoYInflationCapFloor::with_strikes(
+                cap_floor_type.inner(),
+                coupons.iter().map(|coupon| coupon.shared()).collect(),
+                strikes,
+                settings.inner(),
+            )
+            .map_err(PyQlError::from)?,
+        )))
+    }
+
     /// The cap strikes, one per coupon; empty on a floor.
     fn cap_rates(&self) -> Vec<f64> {
         self.inner.borrow().cap_rates().to_vec()
