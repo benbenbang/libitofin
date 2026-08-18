@@ -12,12 +12,15 @@
 //! no historical fixing at the evaluation date, which is what makes it buildable
 //! under the explicit-fixings design (D5/D11).
 //!
-//! Deferred (visible): `CapFloorType.Collar` is not exposed. [`MakeCapFloor`]
-//! rejects a collar - it has no single-strike form
-//! (`makecapfloor.rs:135`) - and the raw-leg `CapFloor::collar` constructor needs
-//! an `IborLeg` facade that does not exist yet, so a collar has no reachable
-//! construction path from Python. Exposing it needs that leg facade first;
-//! tracked as #626.
+//! `CapFloorType.Collar` is exposed, but only the year-on-year inflation
+//! cap/floor can be built as one: its raw constructors take a coupon vector
+//! Python can now assemble (#859).
+//!
+//! Deferred (visible): the ibor-side collar. [`MakeCapFloor`] rejects one - it
+//! has no single-strike form (`makecapfloor.rs:135`) - and the raw-leg
+//! `CapFloor::collar` constructor needs an `IborLeg` facade that does not exist
+//! yet, so a collar over a floating leg still has no reachable construction path
+//! here. Exposing it needs that leg facade first; tracked as #626.
 
 use crate::PyQlError;
 use crate::capfloorengine::PyBlackCapFloorEngine;
@@ -31,13 +34,16 @@ use pyo3::prelude::*;
 /// Python `CapFloorType`: whether the instrument caps or floors its floating leg
 /// (`instruments::capfloor::CapFloorType`).
 ///
-/// A fieldless pyo3 enum. The core enum's third variant, `Collar`, is not
-/// exposed: see the module docs for why it has no construction path here.
+/// A fieldless pyo3 enum. Its third variant, `Collar`, reaches an instrument
+/// only through the raw
+/// [`YoYInflationCapFloor`](crate::inflation::PyYoYInflationCapFloor)
+/// constructors: see the module docs for the ibor-side deferral.
 #[pyclass(name = "CapFloorType", eq, eq_int, from_py_object)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum PyCapFloorType {
     Cap,
     Floor,
+    Collar,
 }
 
 impl PyCapFloorType {
@@ -46,6 +52,7 @@ impl PyCapFloorType {
         match self {
             PyCapFloorType::Cap => CapFloorType::Cap,
             PyCapFloorType::Floor => CapFloorType::Floor,
+            PyCapFloorType::Collar => CapFloorType::Collar,
         }
     }
 }

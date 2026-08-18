@@ -168,14 +168,16 @@ class Swaption:
     def npv(self) -> float: ...
 
 class CapFloorType:
-    """Whether the instrument caps or floors its floating leg.
+    """Whether the instrument caps, floors or collars its floating leg.
 
-    The core enum's third variant, Collar, is not exposed: MakeCapFloor rejects
-    it and the raw-leg constructor needs an IborLeg facade that does not exist
-    yet, so a collar has no construction path from Python."""
+    Collar reaches an instrument only through the raw YoYInflationCapFloor
+    constructors. On the ibor side it is still deferred: MakeCapFloor rejects a
+    collar and the raw-leg constructor needs an IborLeg facade that does not
+    exist yet (#626)."""
 
     Cap: CapFloorType
     Floor: CapFloorType
+    Collar: CapFloorType
 
 class CapFloor:
     """A cap or floor over a floating (ibor) leg, built through the standard

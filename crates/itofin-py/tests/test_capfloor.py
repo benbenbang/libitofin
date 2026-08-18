@@ -22,7 +22,8 @@ B. The two engine constructors agree bit-for-bit. ``with_flat_vol`` wraps the
    what makes the smoke arms construction-pinning without a cached literal.
 C. The engine's displacement guard (``blackcapfloorengine.rs:75-82``) is reachable
    from Python: a displacement that differs from the surface's own is an error.
-D. ``CapFloorType`` exposes Cap and Floor only - Collar is deliberately absent.
+D. ``CapFloorType.Collar`` exists (the year-on-year inflation cap/floor builds
+   one, #859) but is refused here: ``MakeCapFloor`` builds caps and floors only.
 
 Every arm builds its own ``CapFloor``. An ``Instrument`` caches its NPV, so
 reusing one cap across two engines would let arm B pass on a stale number. One
@@ -228,7 +229,17 @@ def test_quote_backed_surface_tracks_its_quote():
     assert surface.volatility(*one_year) == 0.25
 
 
-def test_cap_floor_type_exposes_cap_and_floor_only():
+def test_a_collar_over_an_ibor_leg_is_refused():
+    """``CapFloorType.Collar`` reaches Python for the year-on-year inflation
+    cap/floor (#859), whose raw constructors take a coupon vector. This
+    instrument is built through ``MakeCapFloor``, which carries a single strike
+    and refuses a collar outright (``makecapfloor.rs:135``); the raw
+    ``CapFloor::collar`` needs an ``IborLeg`` facade that does not exist yet
+    (#626). So the enum value arrives here and the build does not."""
     assert hasattr(CapFloorType, "Cap")
     assert hasattr(CapFloorType, "Floor")
-    assert not hasattr(CapFloorType, "Collar")
+    assert hasattr(CapFloorType, "Collar")
+
+    with pytest.raises(ItofinError) as raised:
+        _cap_floor(CapFloorType.Collar, CAP_STRIKE)
+    assert "not collars" in str(raised.value)
