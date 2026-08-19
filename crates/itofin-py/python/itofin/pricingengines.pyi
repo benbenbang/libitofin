@@ -51,6 +51,37 @@ class BlackSwaptionEngine:
         evaluation date. displacement is that surface's lognormal shift."""
         ...
 
+class BachelierSwaptionEngine:
+    """The normal-volatility swaption engine, European-only.
+
+    The Bachelier spec of the template BlackSwaptionEngine instantiates: same
+    constructors, same settings requirement, same silent discounting engine on
+    the underlying swap. The surface's volatility type is checked against the
+    normal formula at pricing time, not construction, so a shifted-lognormal
+    surface raises from Swaption.npv()."""
+
+    def __init__(
+        self,
+        vol: SwaptionVolatilityStructure,
+        discount: YieldTermStructure,
+        settings: Settings,
+        model: CashAnnuityModel = ...,
+    ) -> None: ...
+    @staticmethod
+    def with_flat_vol(
+        discount: YieldTermStructure,
+        vol: SimpleQuote,
+        day_counter: DayCounter,
+        displacement: float,
+        settings: Settings,
+        model: CashAnnuityModel = ...,
+    ) -> BachelierSwaptionEngine:
+        """An engine over a flat normal volatility quote, wrapped internally in
+        a constant surface on a null calendar whose reference date tracks the
+        evaluation date. displacement is kept for parity with the Black engine
+        and is ignored by the normal model."""
+        ...
+
 class BlackCapFloorEngine:
     """The shifted-lognormal Black-formula cap/floor engine, one Black 1976
     optionlet per coupon.

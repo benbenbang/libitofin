@@ -13,6 +13,7 @@ from itofin.indexes import (
 )
 from itofin.models import HestonModel, HullWhite
 from itofin.pricingengines import (
+    BachelierSwaptionEngine,
     BlackCapFloorEngine,
     BlackSwaptionEngine,
     DiscountingSwapEngine,
@@ -199,6 +200,10 @@ class Swaption:
     def set_black_engine(self, engine: BlackSwaptionEngine) -> None:
         """Price off a swaption volatility surface instead of a short-rate
         model. The engine must carry the same Settings object as this swaption."""
+        ...
+    def set_bachelier_engine(self, engine: BachelierSwaptionEngine) -> None:
+        """Price off a normal-volatility swaption surface. The engine must carry
+        the same Settings object as this swaption."""
         ...
     def npv(self) -> float: ...
 
