@@ -399,6 +399,14 @@ impl PyCalendar {
     pub(crate) fn inner(&self) -> Calendar {
         self.inner.clone()
     }
+
+    /// Wraps a core [`Calendar`] a facade read back off an object it built.
+    ///
+    /// The result carries no factory identity; the calendar it stands for is
+    /// readable through [`Self::__repr__`], which prints the core name.
+    pub(crate) fn from_inner(inner: Calendar) -> Self {
+        PyCalendar { inner }
+    }
 }
 
 /// Python `Frequency`: the coupon and fixing frequencies the fixtures need.
@@ -449,17 +457,27 @@ impl PyFrequency {
     }
 }
 
-/// Python `BusinessDayConvention`: the holiday-rolling rules the fixture needs.
+/// Python `BusinessDayConvention`: the holiday-rolling rules.
 ///
-/// A fieldless pyo3 enum exposing the `Following`, `ModifiedFollowing` and
-/// `Unadjusted` variants; the adjustment logic itself lives in the core
-/// calendar.
+/// A fieldless pyo3 enum covering every variant the core enum carries
+/// (`businessdayconvention.rs:11-33`); the adjustment logic itself lives in the
+/// core calendar. Exhaustive coverage is what lets an index report its own
+/// convention back through [`Self::from_inner`], whatever it was built with.
+///
+/// The four non-original variants are appended rather than sorted into the core
+/// order, so the pyo3 discriminants of `ModifiedFollowing`, `Following` and
+/// `Unadjusted` are unchanged: the class is `eq_int`, so Python compares these
+/// by integer and a reorder would silently move them.
 #[pyclass(name = "BusinessDayConvention", eq, eq_int, from_py_object)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum PyBusinessDayConvention {
     ModifiedFollowing,
     Following,
     Unadjusted,
+    Preceding,
+    ModifiedPreceding,
+    HalfMonthModifiedFollowing,
+    Nearest,
 }
 
 impl PyBusinessDayConvention {
@@ -469,6 +487,28 @@ impl PyBusinessDayConvention {
             PyBusinessDayConvention::ModifiedFollowing => BusinessDayConvention::ModifiedFollowing,
             PyBusinessDayConvention::Following => BusinessDayConvention::Following,
             PyBusinessDayConvention::Unadjusted => BusinessDayConvention::Unadjusted,
+            PyBusinessDayConvention::Preceding => BusinessDayConvention::Preceding,
+            PyBusinessDayConvention::ModifiedPreceding => BusinessDayConvention::ModifiedPreceding,
+            PyBusinessDayConvention::HalfMonthModifiedFollowing => {
+                BusinessDayConvention::HalfMonthModifiedFollowing
+            }
+            PyBusinessDayConvention::Nearest => BusinessDayConvention::Nearest,
+        }
+    }
+
+    /// The variant standing for `convention`, for the facades that read one
+    /// back off a core object. Total: every core variant has a counterpart.
+    pub(crate) fn from_inner(convention: BusinessDayConvention) -> Self {
+        match convention {
+            BusinessDayConvention::ModifiedFollowing => PyBusinessDayConvention::ModifiedFollowing,
+            BusinessDayConvention::Following => PyBusinessDayConvention::Following,
+            BusinessDayConvention::Unadjusted => PyBusinessDayConvention::Unadjusted,
+            BusinessDayConvention::Preceding => PyBusinessDayConvention::Preceding,
+            BusinessDayConvention::ModifiedPreceding => PyBusinessDayConvention::ModifiedPreceding,
+            BusinessDayConvention::HalfMonthModifiedFollowing => {
+                PyBusinessDayConvention::HalfMonthModifiedFollowing
+            }
+            BusinessDayConvention::Nearest => PyBusinessDayConvention::Nearest,
         }
     }
 }
