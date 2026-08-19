@@ -90,7 +90,7 @@ use smilesection::PySabrSmileSection;
 use swap::{PyMakeVanillaSwap, PySwapType, PyVanillaSwap};
 use swapindex::PySwapIndex;
 use swaption::{PyEuropeanExercise, PySettlementMethod, PySettlementType, PySwaption};
-use swaptionengine::{PyBlackSwaptionEngine, PyCashAnnuityModel};
+use swaptionengine::{PyBachelierSwaptionEngine, PyBlackSwaptionEngine, PyCashAnnuityModel};
 use swaptionvol::{
     PyConstantSwaptionVolatility, PyInterpolatedSwaptionVolatilityCube,
     PySabrSwaptionVolatilityCube, PySwaptionVolatilityMatrix, PySwaptionVolatilityStructure,
@@ -269,6 +269,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     let pricingengines = PyModule::new(py, "pricingengines")?;
     pricingengines.add_class::<PyCashAnnuityModel>()?;
     pricingengines.add_class::<PyBlackSwaptionEngine>()?;
+    pricingengines.add_class::<PyBachelierSwaptionEngine>()?;
     pricingengines.add_class::<PyBlackCapFloorEngine>()?;
     pricingengines.add_class::<PyMidPointCdsEngine>()?;
     pricingengines.add_class::<PyIsdaCdsEngine>()?;

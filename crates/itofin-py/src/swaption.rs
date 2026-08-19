@@ -15,7 +15,7 @@ use crate::PyQlError;
 use crate::hullwhite::PyHullWhite;
 use crate::settings::PySettings;
 use crate::swap::PyVanillaSwap;
-use crate::swaptionengine::PyBlackSwaptionEngine;
+use crate::swaptionengine::{PyBachelierSwaptionEngine, PyBlackSwaptionEngine};
 use crate::time::PyDate;
 use libitofin::exercise::{EuropeanExercise, Exercise};
 use libitofin::instrument::Instrument;
@@ -163,11 +163,23 @@ impl PySwaption {
         self.inner.base_mut().set_pricing_engine(engine.engine());
     }
 
+    /// Attaches a [`PyBachelierSwaptionEngine`] so the swaption prices off a
+    /// normal-volatility swaption surface.
+    ///
+    /// The same `Settings` requirement as [`set_black_engine`](Self::set_black_engine)
+    /// applies: the engine resolves its own evaluation date, and two different
+    /// settings would price the swap and the option on different dates without
+    /// any error being raised.
+    fn set_bachelier_engine(&mut self, engine: &PyBachelierSwaptionEngine) {
+        self.inner.base_mut().set_pricing_engine(engine.engine());
+    }
+
     /// The swaption NPV under the attached engine.
     ///
-    /// Fallible: an engine must be attached ([`set_jamshidian_engine`](Self::set_jamshidian_engine)
-    /// or [`set_black_engine`](Self::set_black_engine)) and the (settlement type,
-    /// method) pair consistent.
+    /// Fallible: an engine must be attached ([`set_jamshidian_engine`](Self::set_jamshidian_engine),
+    /// [`set_black_engine`](Self::set_black_engine) or
+    /// [`set_bachelier_engine`](Self::set_bachelier_engine)) and the (settlement
+    /// type, method) pair consistent.
     fn npv(&mut self) -> PyResult<f64> {
         Ok(self.inner.npv().map_err(PyQlError::from)?)
     }
