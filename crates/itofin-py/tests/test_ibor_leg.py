@@ -79,8 +79,11 @@ def test_a_leg_without_a_notional_raises():
 
 def test_the_optional_setters_leave_the_coupon_count_alone():
     """They configure how each coupon accrues and fixes, not how many there
-    are: the count is the schedule's. What they do reach is pinned numerically
-    in test_capfloor.py, where the cached NPV moves with all three."""
+    are: the count is the schedule's. That they reach the coupons at all is
+    pinned in test_capfloor.py, and NOT by the cached values there - those are
+    built with each setter given the index's own default, so they are blind to
+    two of the three. The divergence arms beside them carry it: each setter is
+    moved off the index default and the cap NPV has to move with it."""
     configured = (
         _leg()
         .with_payment_day_counter(DayCounter.actual360())
