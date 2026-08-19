@@ -1,5 +1,7 @@
 # Hand-written stubs for itofin.time; sync manually with src/time.rs (#517).
 
+from typing import overload
+
 def is_imm_date(date: Date, main_cycle: bool = False) -> bool:
     """Whether date is an IMM date: the third Wednesday of the month, and of
     March, June, September or December only when main_cycle is set."""
@@ -21,7 +23,13 @@ class Date:
     @property
     def day(self) -> int: ...
     def __add__(self, days: int) -> Date: ...
+    @overload
     def __sub__(self, days: int) -> Date: ...
+    @overload
+    def __sub__(self, other: Date) -> int:
+        """The signed number of days from other to this date."""
+        ...
+
     def __eq__(self, other: object) -> bool: ...
     def __repr__(self) -> str: ...
 
@@ -80,6 +88,10 @@ class DayCounter:
     def actual_actual_isda() -> DayCounter: ...
     @staticmethod
     def thirty360_bond_basis() -> DayCounter: ...
+    def year_fraction(self, d1: Date, d2: Date) -> float:
+        """The period [d1, d2] as a fraction of a year under this convention."""
+        ...
+
     def __eq__(self, other: object) -> bool:
         """Equality by convention name, so two independently built Actual360s
         are equal."""

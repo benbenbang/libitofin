@@ -5,7 +5,7 @@ use libitofin::time::businessdayconvention::BusinessDayConvention;
 use libitofin::time::calendar::Calendar;
 use libitofin::time::calendars::unitedkingdom::{Market, UnitedKingdom};
 use libitofin::time::calendars::{NullCalendar, Target, WeekendsOnly};
-use libitofin::time::date::{Date, Month};
+use libitofin::time::date::{Date, Month, SerialNumber};
 use libitofin::time::dategenerationrule::DateGeneration;
 use libitofin::time::daycounter::DayCounter;
 use libitofin::time::daycounters::actual360::Actual360;
@@ -18,7 +18,7 @@ use libitofin::time::period::Period;
 use libitofin::time::schedule::{MakeSchedule, Schedule};
 use libitofin::time::timeunit::TimeUnit;
 use pyo3::prelude::*;
-use pyo3::wrap_pyfunction;
+use pyo3::{IntoPyObjectExt, wrap_pyfunction};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
@@ -105,8 +105,22 @@ impl PyDate {
         self.shifted(days as i64)
     }
 
-    fn __sub__(&self, days: i32) -> PyResult<Self> {
-        self.shifted(-(days as i64))
+    /// Subtracts either a day count or another date.
+    ///
+    /// `date - int` shifts back by that many calendar days and returns a
+    /// [`PyDate`]; `date - date` returns the signed number of days between them
+    /// as an `int` (core `impl Sub<Date> for Date`, `date.rs:385`). PyO3 cannot
+    /// declare a type-directed overload, so the argument is taken untyped and
+    /// dispatched by downcast; anything else is a `TypeError` from the failed
+    /// `int` extraction.
+    fn __sub__(&self, py: Python<'_>, other: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+        if let Ok(other_date) = other.cast::<PyDate>() {
+            let subtrahend = other_date.borrow().inner;
+            let days: SerialNumber = self.inner - subtrahend;
+            return days.into_py_any(py);
+        }
+        let days: i32 = other.extract()?;
+        self.shifted(-(days as i64))?.into_py_any(py)
     }
 
     fn __eq__(&self, other: &PyDate) -> bool {
@@ -188,6 +202,17 @@ impl PyDayCounter {
         PyDayCounter {
             inner: Thirty360::with_convention(Thirty360Convention::BondBasis),
         }
+    }
+
+    /// The period `[d1, d2]` as a fraction of a year under this convention
+    /// (`daycounter.rs:99`, the two-argument `yearFraction`).
+    ///
+    /// Infallible: the core reads the two dates and divides. The conventions
+    /// that need an explicit reference period (Actual/Actual ISMA) are not
+    /// among the four surfaced here, so the reference-period overload is not
+    /// exposed.
+    fn year_fraction(&self, d1: &PyDate, d2: &PyDate) -> f64 {
+        self.inner.year_fraction(d1.inner(), d2.inner())
     }
 
     /// Equality by convention name, delegating to the core `PartialEq`: two
