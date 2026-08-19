@@ -2,7 +2,7 @@
 # src/hullwhite.rs and src/calibration.rs (#517).
 
 from itofin import Settings
-from itofin.indexes import Euribor
+from itofin.indexes import IborIndex
 from itofin.instruments import OptionType
 from itofin.optimization import EndCriteria, LevenbergMarquardt
 from itofin.processes import HestonProcess
@@ -71,7 +71,7 @@ class SwaptionHelper:
         maturity: Period,
         length: Period,
         volatility: float,
-        index: Euribor,
+        index: IborIndex,
         fixed_leg_tenor: Period,
         fixed_leg_day_counter: DayCounter,
         floating_leg_day_counter: DayCounter,

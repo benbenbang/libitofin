@@ -16,7 +16,7 @@
 
 use crate::PyQlError;
 use crate::curve::PyYieldTermStructure;
-use crate::hullwhite::{PyEuribor, PyIborIndex};
+use crate::hullwhite::PyIborIndex;
 use crate::market::PySimpleQuote;
 use crate::settings::PySettings;
 use crate::time::{
@@ -312,7 +312,7 @@ impl PyFuturesRateHelper {
         py: Python<'_>,
         price: &PySimpleQuote,
         ibor_start_date: &PyDate,
-        index: &PyEuribor,
+        index: &PyIborIndex,
         conv_adj: Option<&PySimpleQuote>,
         futures_type: &PyFuturesType,
     ) -> PyResult<Py<Self>> {
@@ -415,7 +415,7 @@ impl PyFraRateHelper {
     fn new(
         quote: &PySimpleQuote,
         period_to_start: &PyPeriod,
-        index: &PyEuribor,
+        index: &PyIborIndex,
         use_indexed_coupon: bool,
         pillar: PyPillar,
     ) -> PyClassInitializer<Self> {
@@ -444,7 +444,7 @@ impl PyFraRateHelper {
         py: Python<'_>,
         rate: f64,
         period_to_start: &PyPeriod,
-        index: &PyEuribor,
+        index: &PyIborIndex,
         use_indexed_coupon: bool,
         pillar: PyPillar,
     ) -> PyResult<Py<Self>> {
@@ -475,7 +475,7 @@ impl PyFraRateHelper {
         py: Python<'_>,
         quote: &PySimpleQuote,
         months_to_start: Natural,
-        index: &PyEuribor,
+        index: &PyIborIndex,
         use_indexed_coupon: bool,
         pillar: PyPillar,
     ) -> PyResult<Py<Self>> {
@@ -509,7 +509,7 @@ impl PyFraRateHelper {
         quote: &PySimpleQuote,
         start_date: &PyDate,
         end_date: &PyDate,
-        index: &PyEuribor,
+        index: &PyIborIndex,
         use_indexed_coupon: bool,
         pillar: PyPillar,
     ) -> PyResult<Py<Self>> {

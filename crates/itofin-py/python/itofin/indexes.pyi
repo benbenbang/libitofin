@@ -90,22 +90,23 @@ class Estr(OvernightIndex):
 
 class SwapIndex:
     """The index whose fixing is the fair rate of an on-the-fly vanilla swap,
-    assembled from the index tenor, the forecasting Euribor index and the
-    fixed-leg conventions.
+    assembled from the index tenor, the forecasting Ibor index and the fixed-leg
+    conventions.
 
-    The currency is hard-coded to EUR: there is no Currency facade yet, and the
-    currency is inert for every ported consumer."""
+    The currency is inert for every ported consumer, so currency() reading it
+    back off the core index is the only place it shows."""
 
     def __init__(
         self,
         family_name: str,
         tenor: Period,
         settlement_days: int,
+        currency: Currency,
         calendar: Calendar,
         fixed_leg_tenor: Period,
         fixed_leg_convention: BusinessDayConvention,
         fixed_leg_day_counter: DayCounter,
-        ibor_index: Euribor,
+        ibor_index: IborIndex,
         settings: Settings,
     ) -> None:
         """Forecasts and discounts off the ibor index's forwarding curve."""
@@ -115,11 +116,12 @@ class SwapIndex:
         family_name: str,
         tenor: Period,
         settlement_days: int,
+        currency: Currency,
         calendar: Calendar,
         fixed_leg_tenor: Period,
         fixed_leg_convention: BusinessDayConvention,
         fixed_leg_day_counter: DayCounter,
-        ibor_index: Euribor,
+        ibor_index: IborIndex,
         discount: YieldTermStructure,
         settings: Settings,
     ) -> SwapIndex:
@@ -130,6 +132,7 @@ class SwapIndex:
         """The underlying swap's fair rate, the at-the-money forward the
         volatility cubes read."""
         ...
+    def currency(self) -> Currency: ...
     def fixed_leg_tenor(self) -> Period: ...
     def exogenous_discount(self) -> bool: ...
 

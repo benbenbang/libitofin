@@ -24,7 +24,7 @@
 
 use crate::PyQlError;
 use crate::capfloorengine::PyBlackCapFloorEngine;
-use crate::hullwhite::PyEuribor;
+use crate::hullwhite::PyIborIndex;
 use crate::settings::PySettings;
 use crate::time::PyPeriod;
 use libitofin::instrument::Instrument;
@@ -83,7 +83,7 @@ impl PyCapFloor {
     fn new(
         cap_floor_type: PyCapFloorType,
         tenor: &PyPeriod,
-        ibor_index: &PyEuribor,
+        ibor_index: &PyIborIndex,
         strike: f64,
         forward_start: &PyPeriod,
         settings: &PySettings,

@@ -5,21 +5,23 @@
 //! read the at-the-money forward off them, so this is the index the cube facades
 //! stack on rather than one the Python user prices with directly.
 //!
-//! Deferred (visible): the currency is hard-coded to EUR. A
-//! [`PyCurrency`](crate::currency::PyCurrency) facade now exists (#815), so the
-//! general form is expressible; threading it through this constructor is left to
-//! the follow-up that widens the remaining `PyEuribor` consumers, since the
-//! index's currency is inert for every ported consumer - `underlying_swap` never
-//! reads it, and the cube's at-the-money forward is a fair rate, not an amount.
-//! The `clone` family (re-curving / re-tenoring) is deferred in the core itself.
+//! Both constructors take the currency as a [`PyCurrency`](crate::currency::PyCurrency)
+//! and the forecasting index as the general [`PyIborIndex`](crate::hullwhite::PyIborIndex)
+//! (#868). The currency stays inert for every ported consumer - `underlying_swap`
+//! never reads it, and the cube's at-the-money forward is a fair rate, not an
+//! amount - so [`currency`](PySwapIndex::currency) reads it back off the core
+//! index, which is the only place it shows.
+//!
+//! Deferred (visible): the `clone` family (re-curving / re-tenoring) is deferred
+//! in the core itself.
 
 use crate::PyQlError;
+use crate::currency::PyCurrency;
 use crate::curve::PyYieldTermStructure;
-use crate::hullwhite::PyEuribor;
+use crate::hullwhite::PyIborIndex;
 use crate::settings::PySettings;
 use crate::time::{PyBusinessDayConvention, PyCalendar, PyDate, PyDayCounter, PyPeriod};
-use libitofin::currency::Currency;
-use libitofin::indexes::{Index, SwapIndex};
+use libitofin::indexes::{Index, InterestRateIndex, SwapIndex};
 use libitofin::shared::{Shared, shared};
 use libitofin::types::Natural;
 use pyo3::prelude::*;
@@ -27,8 +29,8 @@ use pyo3::prelude::*;
 /// Python `SwapIndex`: the index whose fixing is the fair rate of an on-the-fly
 /// vanilla swap (`indexes::SwapIndex`).
 ///
-/// The swap is assembled from the index tenor, the forecasting `Euribor` index
-/// and the fixed-leg conventions, off the value date the fixing date implies.
+/// The swap is assembled from the index tenor, the forecasting `IborIndex` and
+/// the fixed-leg conventions, off the value date the fixing date implies.
 /// [`new`](PySwapIndex::new) forecasts and discounts off the ibor index's
 /// forwarding curve; [`with_exogenous_discount`](PySwapIndex::with_exogenous_discount)
 /// discounts off a separate curve.
@@ -44,16 +46,17 @@ impl PySwapIndex {
     /// observers.
     #[new]
     #[allow(clippy::too_many_arguments)]
-    #[pyo3(signature = (family_name, tenor, settlement_days, calendar, fixed_leg_tenor, fixed_leg_convention, fixed_leg_day_counter, ibor_index, settings))]
+    #[pyo3(signature = (family_name, tenor, settlement_days, currency, calendar, fixed_leg_tenor, fixed_leg_convention, fixed_leg_day_counter, ibor_index, settings))]
     fn new(
         family_name: String,
         tenor: &PyPeriod,
         settlement_days: Natural,
+        currency: &PyCurrency,
         calendar: &PyCalendar,
         fixed_leg_tenor: &PyPeriod,
         fixed_leg_convention: &PyBusinessDayConvention,
         fixed_leg_day_counter: &PyDayCounter,
-        ibor_index: &PyEuribor,
+        ibor_index: &PyIborIndex,
         settings: &PySettings,
     ) -> Self {
         PySwapIndex {
@@ -61,7 +64,7 @@ impl PySwapIndex {
                 family_name,
                 tenor.inner(),
                 settlement_days,
-                Currency::eur(),
+                currency.inner(),
                 calendar.inner(),
                 fixed_leg_tenor.inner(),
                 fixed_leg_convention.inner(),
@@ -76,16 +79,17 @@ impl PySwapIndex {
     /// discounting off the separate `discount` curve, registering with both.
     #[staticmethod]
     #[allow(clippy::too_many_arguments)]
-    #[pyo3(signature = (family_name, tenor, settlement_days, calendar, fixed_leg_tenor, fixed_leg_convention, fixed_leg_day_counter, ibor_index, discount, settings))]
+    #[pyo3(signature = (family_name, tenor, settlement_days, currency, calendar, fixed_leg_tenor, fixed_leg_convention, fixed_leg_day_counter, ibor_index, discount, settings))]
     fn with_exogenous_discount(
         family_name: String,
         tenor: &PyPeriod,
         settlement_days: Natural,
+        currency: &PyCurrency,
         calendar: &PyCalendar,
         fixed_leg_tenor: &PyPeriod,
         fixed_leg_convention: &PyBusinessDayConvention,
         fixed_leg_day_counter: &PyDayCounter,
-        ibor_index: &PyEuribor,
+        ibor_index: &PyIborIndex,
         discount: &PyYieldTermStructure,
         settings: &PySettings,
     ) -> Self {
@@ -94,7 +98,7 @@ impl PySwapIndex {
                 family_name,
                 tenor.inner(),
                 settlement_days,
-                Currency::eur(),
+                currency.inner(),
                 calendar.inner(),
                 fixed_leg_tenor.inner(),
                 fixed_leg_convention.inner(),
@@ -116,6 +120,11 @@ impl PySwapIndex {
             .inner
             .fixing(fixing_date.inner(), forecast_todays_fixing)
             .map_err(PyQlError::from)?)
+    }
+
+    /// The index currency, read back off the core index.
+    fn currency(&self) -> PyCurrency {
+        PyCurrency::from_inner(self.inner.currency().clone())
     }
 
     /// The fixed-leg tenor.

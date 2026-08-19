@@ -8,7 +8,7 @@
 
 use crate::PyQlError;
 use crate::curve::PyYieldTermStructure;
-use crate::hullwhite::PyEuribor;
+use crate::hullwhite::PyIborIndex;
 use crate::settings::PySettings;
 use crate::time::{PyDate, PyDayCounter, PyPeriod, PySchedule};
 use libitofin::indexes::IborIndex;
@@ -72,7 +72,7 @@ impl PyVanillaSwap {
         fixed_rate: f64,
         fixed_day_count: &PyDayCounter,
         float_schedule: &PySchedule,
-        ibor_index: &PyEuribor,
+        ibor_index: &PyIborIndex,
         spread: f64,
         floating_day_count: &PyDayCounter,
         settings: &PySettings,
@@ -213,7 +213,7 @@ impl PyMakeVanillaSwap {
     ))]
     fn new(
         swap_tenor: &PyPeriod,
-        ibor_index: &PyEuribor,
+        ibor_index: &PyIborIndex,
         settings: &PySettings,
         fixed_rate: Option<f64>,
         forward_start: Option<&PyPeriod>,
