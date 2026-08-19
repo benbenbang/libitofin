@@ -29,6 +29,15 @@ class Period:
     """A signed length in one calendar unit (unit: Days, Weeks, Months, Years)."""
 
     def __init__(self, n: int, unit: str) -> None: ...
+    def __eq__(self, other: object) -> bool:
+        """Semantic equality: 7 Days equals 1 Week and 12 Months equals 1 Year,
+        while an undecidable pair such as 30 Days against 1 Month is not equal."""
+        ...
+
+    def __hash__(self) -> int:
+        """Hashes the canonical form, so equal periods hash equal."""
+        ...
+
     def __repr__(self) -> str: ...
 
 class Calendar:
@@ -71,6 +80,15 @@ class DayCounter:
     def actual_actual_isda() -> DayCounter: ...
     @staticmethod
     def thirty360_bond_basis() -> DayCounter: ...
+    def __eq__(self, other: object) -> bool:
+        """Equality by convention name, so two independently built Actual360s
+        are equal."""
+        ...
+
+    def __hash__(self) -> int:
+        """Hashes the convention name, the field equality compares."""
+        ...
+
     def __repr__(self) -> str: ...
 
 class Frequency:
