@@ -3,7 +3,7 @@
 # src/inflation.rs (#517).
 
 from itofin import Settings
-from itofin.cashflows import YoYInflationCoupon
+from itofin.cashflows import IborLeg, YoYInflationCoupon
 from itofin.indexes import (
     CpiInterpolationType,
     IborIndex,
@@ -205,23 +205,28 @@ class Swaption:
 class CapFloorType:
     """Whether the instrument caps, floors or collars its floating leg.
 
-    Collar reaches an instrument only through the raw YoYInflationCapFloor
-    constructors. On the ibor side it is still deferred: MakeCapFloor rejects a
-    collar and the raw-leg constructor needs an IborLeg facade that does not
-    exist yet (#626)."""
+    Collar reaches an instrument only through a raw coupon-vector constructor:
+    CapFloor.collar here, or the YoYInflationCapFloor ones on the inflation
+    side. MakeCapFloor refuses it, so CapFloor(...) does not accept it."""
 
     Cap: CapFloorType
     Floor: CapFloorType
     Collar: CapFloorType
 
 class CapFloor:
-    """A cap or floor over a floating (ibor) leg, built through the standard
-    market builder MakeCapFloor.
+    """A cap, floor or collar over a floating (ibor) leg.
 
-    The leg carries a unit nominal and one strike, padded across every coupon. A
-    zero forward_start excludes the spot caplet, so the leg is one coupon shorter
-    than the schedule: that is what lets the cap price without a historical index
-    fixing at the evaluation date."""
+    The constructor runs the standard market builder MakeCapFloor: its leg
+    carries a unit nominal and one strike, and a zero forward_start excludes the
+    spot caplet, so the leg is one coupon shorter than the schedule - that is
+    what lets the cap price without a historical index fixing at the evaluation
+    date.
+
+    The cap/floor/collar staticmethods take an IborLeg the caller laid out
+    instead and cap exactly it, spot caplet and all. They are the only route to
+    a collar on this side, and the route a hand-built leg's own notional, day
+    counter and fixing days reach the coupons by. Either way the core pads a
+    short strike list across every coupon by repeating its last entry."""
 
     def __init__(
         self,
@@ -232,6 +237,27 @@ class CapFloor:
         forward_start: Period,
         settings: Settings,
     ) -> None: ...
+    @staticmethod
+    def cap(leg: IborLeg, cap_rates: list[float], settings: Settings) -> CapFloor:
+        """A cap over the coupons leg builds. Raises ItofinError on an empty
+        cap_rates list, or on whatever building the coupons rejects."""
+        ...
+    @staticmethod
+    def floor(
+        leg: IborLeg, floor_rates: list[float], settings: Settings
+    ) -> CapFloor:
+        """A floor over the coupons leg builds. Fallible as cap()."""
+        ...
+    @staticmethod
+    def collar(
+        leg: IborLeg,
+        cap_rates: list[float],
+        floor_rates: list[float],
+        settings: Settings,
+    ) -> CapFloor:
+        """Long the cap at cap_rates, short the floor at floor_rates, so it is
+        worth the one less the other. Both lists are required."""
+        ...
     def cap_rates(self) -> list[float]: ...
     def floor_rates(self) -> list[float]: ...
     def coupon_count(self) -> int: ...
