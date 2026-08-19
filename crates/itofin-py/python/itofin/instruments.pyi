@@ -6,7 +6,7 @@ from itofin import Settings
 from itofin.cashflows import YoYInflationCoupon
 from itofin.indexes import (
     CpiInterpolationType,
-    Euribor,
+    IborIndex,
     OvernightIndex,
     YoYInflationIndex,
     ZeroInflationIndex,
@@ -101,7 +101,7 @@ class VanillaSwap:
         fixed_rate: float,
         fixed_day_count: DayCounter,
         float_schedule: Schedule,
-        ibor_index: Euribor,
+        ibor_index: IborIndex,
         spread: float,
         floating_day_count: DayCounter,
         settings: Settings,
@@ -121,7 +121,7 @@ class MakeVanillaSwap:
     def __init__(
         self,
         swap_tenor: Period,
-        ibor_index: Euribor,
+        ibor_index: IborIndex,
         settings: Settings,
         fixed_rate: float | None = None,
         forward_start: Period | None = None,
@@ -227,7 +227,7 @@ class CapFloor:
         self,
         cap_floor_type: CapFloorType,
         tenor: Period,
-        ibor_index: Euribor,
+        ibor_index: IborIndex,
         strike: float,
         forward_start: Period,
         settings: Settings,

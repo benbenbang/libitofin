@@ -8,9 +8,9 @@
 //! the full `ql/currencies/*` catalogue is deferred there (`currency.rs:9`).
 //!
 //! It is registered under `itofin.indexes` rather than a submodule of its own:
-//! the index constructors are its only consumers today, and
-//! [`PySwapIndex`](crate::swapindex::PySwapIndex) documents that gap as the one
-//! this facade closes.
+//! the index constructors are its only consumers today, both the general
+//! [`PyIborIndex`](crate::hullwhite::PyIborIndex) one and, since #868,
+//! [`PySwapIndex`](crate::swapindex::PySwapIndex), which used to hard-code EUR.
 
 use libitofin::currency::Currency;
 use pyo3::prelude::*;
@@ -66,5 +66,10 @@ impl PyCurrency {
     /// take a [`Currency`] by value.
     pub(crate) fn inner(&self) -> Currency {
         self.inner.clone()
+    }
+
+    /// Wraps a currency read back off a core index, for the facade getters.
+    pub(crate) fn from_inner(inner: Currency) -> Self {
+        PyCurrency { inner }
     }
 }

@@ -25,7 +25,7 @@
 use crate::PyQlError;
 use crate::capfloortermvol::PyCapFloorTermVolSurface;
 use crate::curve::PyYieldTermStructure;
-use crate::hullwhite::PyEuribor;
+use crate::hullwhite::PyIborIndex;
 use crate::market::PySimpleQuote;
 use crate::settings::PySettings;
 use crate::swaptionvol::PyVolatilityType;
@@ -269,7 +269,7 @@ impl PyOptionletStripper1 {
     #[pyo3(signature = (term_vol_surface, ibor_index, volatility_type, accuracy = 1e-6, max_iter = 100, displacement = 0.0, discount = None, optionlet_frequency = None))]
     fn new(
         term_vol_surface: &PyCapFloorTermVolSurface,
-        ibor_index: &PyEuribor,
+        ibor_index: &PyIborIndex,
         volatility_type: PyVolatilityType,
         accuracy: f64,
         max_iter: u32,

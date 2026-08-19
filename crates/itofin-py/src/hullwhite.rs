@@ -147,13 +147,11 @@ impl PyHullWhite {
 /// the form the bootstrap rate helpers need, exactly as the C++ default
 /// `Handle<YieldTermStructure> h = {}` allows.
 ///
-/// It is the base of [`PyEuribor`], so the deposit and swap rate helpers take
-/// this type and accept either. Every other index consumer still takes
-/// `PyEuribor` concretely, including two in the rate-helper module itself: the
-/// four `FraRateHelper` constructors and `FuturesRateHelper::from_index`. So do
-/// the swap, swap-index, optionlet-volatility, cap/floor and swaption-helper
-/// facades. Widening them is deferred to its own follow-up; no bootstrap this
-/// ticket serves needs it.
+/// It is the base of [`PyEuribor`], and since #868 every Ibor-index consumer
+/// takes this type and accepts either: the deposit, swap, FRA and futures rate
+/// helpers, and the swap, swap-index, optionlet-volatility, cap/floor and
+/// swaption-helper facades. The OIS helper is not one of them; it takes the
+/// overnight [`PyEstr`](crate::helpers::PyEstr), which is not an `IborIndex`.
 #[pyclass(name = "IborIndex", subclass, unsendable)]
 pub struct PyIborIndex {
     inner: Shared<IborIndex>,
@@ -298,8 +296,8 @@ impl PyIborIndex {
 ///
 /// A subclass of [`PyIborIndex`], so a Euribor is accepted wherever the general
 /// index is. It retains its own clone of the index the base holds - the same
-/// object, not a rebuild - so the facades still typed on `PyEuribor` read
-/// exactly what the base reads.
+/// object, not a rebuild - so its own `fixing` reads exactly what the base
+/// reads.
 #[pyclass(name = "Euribor", extends = PyIborIndex, unsendable)]
 pub struct PyEuribor {
     inner: Shared<IborIndex>,
@@ -359,16 +357,9 @@ impl PyEuribor {
     }
 }
 
-impl PyEuribor {
-    /// A clone of the inner index for the swap/swaption facades.
-    pub(crate) fn inner(&self) -> Shared<IborIndex> {
-        Shared::clone(&self.inner)
-    }
-}
-
 /// The base/subclass initializer shared by the three Euribor constructors: one
-/// index object feeds both halves, so the base [`PyIborIndex`] the rate helpers
-/// read and the [`PyEuribor`] the swap facades read are the same core index.
+/// index object feeds both halves, so the base [`PyIborIndex`] every consumer
+/// reads and the [`PyEuribor`] the subclass holds are the same core index.
 fn init_euribor(index: Shared<IborIndex>) -> PyClassInitializer<PyEuribor> {
     let base = PyIborIndex {
         inner: Shared::clone(&index),
@@ -400,7 +391,7 @@ impl PySwaptionHelper {
         maturity: &PyPeriod,
         length: &PyPeriod,
         volatility: f64,
-        index: &PyEuribor,
+        index: &PyIborIndex,
         fixed_leg_tenor: &PyPeriod,
         fixed_leg_day_counter: &PyDayCounter,
         floating_leg_day_counter: &PyDayCounter,

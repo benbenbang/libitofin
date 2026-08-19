@@ -45,7 +45,7 @@ ATM grid's last node, so the default would range-check against it.
 import pytest
 
 from itofin import ItofinError, Settings
-from itofin.indexes import Euribor, SwapIndex
+from itofin.indexes import Currency, Euribor, SwapIndex
 from itofin.instruments import (
     EuropeanExercise,
     SettlementMethod,
@@ -166,6 +166,7 @@ def _swap_index(tenor, ibor_index):
         "EuriborSwapIsdaFixA",
         tenor,
         2,
+        Currency.eur(),
         Calendar.target(),
         Period(1, "Years"),
         BDC,

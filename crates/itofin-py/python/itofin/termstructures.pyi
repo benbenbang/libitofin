@@ -5,7 +5,6 @@
 from itofin import Settings
 from itofin.indexes import (
     CpiInterpolationType,
-    Euribor,
     IborIndex,
     OvernightIndex,
     SwapIndex,
@@ -292,7 +291,7 @@ class FuturesRateHelper(RateHelper):
     def from_index(
         price: SimpleQuote,
         ibor_start_date: Date,
-        index: Euribor,
+        index: IborIndex,
         conv_adj: SimpleQuote | None,
         futures_type: FuturesType,
     ) -> FuturesRateHelper: ...
@@ -319,7 +318,7 @@ class FraRateHelper(RateHelper):
         self,
         quote: SimpleQuote,
         period_to_start: Period,
-        index: Euribor,
+        index: IborIndex,
         use_indexed_coupon: bool = True,
         pillar: Pillar = ...,
     ) -> None: ...
@@ -327,7 +326,7 @@ class FraRateHelper(RateHelper):
     def from_rate(
         rate: float,
         period_to_start: Period,
-        index: Euribor,
+        index: IborIndex,
         use_indexed_coupon: bool = True,
         pillar: Pillar = ...,
     ) -> FraRateHelper: ...
@@ -335,7 +334,7 @@ class FraRateHelper(RateHelper):
     def from_months(
         quote: SimpleQuote,
         months_to_start: int,
-        index: Euribor,
+        index: IborIndex,
         use_indexed_coupon: bool = True,
         pillar: Pillar = ...,
     ) -> FraRateHelper: ...
@@ -344,7 +343,7 @@ class FraRateHelper(RateHelper):
         quote: SimpleQuote,
         start_date: Date,
         end_date: Date,
-        index: Euribor,
+        index: IborIndex,
         use_indexed_coupon: bool = True,
         pillar: Pillar = ...,
     ) -> FraRateHelper: ...
@@ -770,7 +769,7 @@ class OptionletStripper1:
     def __init__(
         self,
         term_vol_surface: CapFloorTermVolSurface,
-        ibor_index: Euribor,
+        ibor_index: IborIndex,
         volatility_type: VolatilityType,
         accuracy: float = 1e-6,
         max_iter: int = 100,
