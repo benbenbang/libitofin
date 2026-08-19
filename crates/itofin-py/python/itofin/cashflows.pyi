@@ -1,7 +1,7 @@
 # Hand-written stubs for itofin.cashflows; sync manually with src/cashflows.rs
-# (#517, #848, #863).
+# (#517, #848, #863, #626).
 
-from itofin.indexes import CpiInterpolationType, YoYInflationIndex
+from itofin.indexes import CpiInterpolationType, IborIndex, YoYInflationIndex
 from itofin.termstructures import (
     ConstantYoYOptionletVolatility,
     YieldTermStructure,
@@ -137,4 +137,34 @@ class YoYInflationLeg:
         swaplet pricer, and that pricer could not value the optionlets anyway.
         Rebuilt on every call, as coupons() is.
         """
+        ...
+
+class IborLeg:
+    """Builds a sequence of floating ibor coupons from a schedule.
+
+    The setters keep the core's fluent shape: each returns a NEW leg carrying
+    the extra setting, so a leg bound to a name never changes under a later
+    call. An unset optional leaves the core default in place: a Following
+    payment roll and the index's own fixing days and day counter.
+
+    The coupons themselves are not exposed: they are consumed by the raw
+    CapFloor.cap / floor / collar constructors, which is the reason this leg
+    exists. No caps/floors setter is offered either - a capped leg withholds the
+    default coupon pricer in the core, so the strikes belong on the cap/floor
+    constructor.
+    """
+
+    def __init__(self, schedule: Schedule, index: IborIndex) -> None: ...
+    def with_notional(self, notional: float) -> IborLeg:
+        """Required: a leg with no notional raises from coupon_count()."""
+        ...
+    def with_payment_day_counter(self, day_counter: DayCounter) -> IborLeg: ...
+    def with_payment_adjustment(
+        self, convention: BusinessDayConvention
+    ) -> IborLeg: ...
+    def with_fixing_days(self, fixing_days: int) -> IborLeg: ...
+    def coupon_count(self) -> int:
+        """The number of coupons a construction would produce, one per schedule
+        period. Raises ItofinError with no notional set, or on a schedule
+        holding fewer than two dates."""
         ...

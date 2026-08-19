@@ -1,6 +1,7 @@
 //! Facades for the cash-flow slice: the [`PyYoYInflationCoupon`] a year-on-year
-//! inflation leg pays and the [`PyYoYInflationLeg`] builder producing it
-//! (`cashflows::yoyinflationcoupon`, `cashflows::yoyinflationleg`).
+//! inflation leg pays, the [`PyYoYInflationLeg`] builder producing it
+//! (`cashflows::yoyinflationcoupon`, `cashflows::yoyinflationleg`) and the
+//! floating [`PyIborLeg`] (`cashflows::iborleg`).
 //!
 //! This is the first coupon facade in the crate (#848). Until now the coupons
 //! were reachable only *through* the instruments built over them - a
@@ -10,6 +11,7 @@
 
 use crate::PyQlError;
 use crate::curve::PyYieldTermStructure;
+use crate::hullwhite::PyIborIndex;
 use crate::inflation::{
     PyConstantYoYOptionletVolatility, PyCpiInterpolationType, PyYoYInflationIndex,
 };
@@ -17,11 +19,13 @@ use crate::time::{
     PyBusinessDayConvention, PyCalendar, PyDate, PyDayCounter, PyPeriod, PySchedule,
 };
 use libitofin::cashflows::{
-    CappedFlooredYoYInflationCoupon, Coupon, YoYInflationCoupon, YoYInflationCouponPricer,
-    YoYInflationLeg, YoYInflationOptionletCouponPricer, set_yoy_coupon_pricer,
+    CappedFlooredYoYInflationCoupon, Coupon, IborCoupon, IborLeg, YoYInflationCoupon,
+    YoYInflationCouponPricer, YoYInflationLeg, YoYInflationOptionletCouponPricer,
+    set_yoy_coupon_pricer,
 };
 use libitofin::event::Event;
 use libitofin::handle::Handle;
+use libitofin::indexes::iborindex::IborIndex;
 use libitofin::indexes::inflationindex::{CpiInterpolationType, YoYInflationIndex};
 use libitofin::shared::{Shared, SharedMut, shared_mut};
 use libitofin::termstructures::yieldtermstructure::YieldTermStructure;
@@ -563,5 +567,147 @@ impl PyYoYInflationLeg {
             leg = leg.with_floors_per_coupon(floors.clone());
         }
         leg
+    }
+}
+
+/// Python `IborLeg`: the builder turning a schedule into a sequence of
+/// floating `IborCoupon`s over an ibor index (`cashflows::iborleg`).
+///
+/// The core builder is a consumed-self fluent chain, which does not cross the
+/// FFI boundary; this facade stores the configuration and assembles the chain
+/// afresh on every read, as [`YoYInflationLeg`](PyYoYInflationLeg) does. The
+/// setters keep the core's fluent shape rather than the constructor-kwargs one:
+/// each returns a new leg carrying the extra setting, so a builder bound to a
+/// name never changes under a later call. An unset optional leaves the core
+/// default in place: a `Following` payment roll and the index's own fixing days
+/// and day counter.
+///
+/// The coupons are reachable only as the leg a
+/// [`CapFloor`](crate::capfloor::PyCapFloor) is built over, which is why no
+/// `IborCoupon` facade comes with this one: the coupons the core hands back are
+/// consumed by the raw cap/floor constructors, not read from Python. Only
+/// [`coupon_count`](Self::coupon_count) reads them here.
+///
+/// Deferred (visible): the per-coupon `notionals`, `fixing_days`, `gearings`
+/// and `spreads` lists, the payment lag and calendar, the fixing convention and
+/// the ex-coupon period, none of which the cap/floor fixtures set; the erased
+/// `build() -> Leg`, whose `CashFlow`s Python has no wrapper for; and the
+/// `caps`/`floors` setters, deliberately - see [`coupon_count`](Self::coupon_count).
+#[pyclass(name = "IborLeg", unsendable)]
+pub struct PyIborLeg {
+    schedule: Schedule,
+    index: Shared<IborIndex>,
+    notional: Option<f64>,
+    payment_day_counter: Option<DayCounter>,
+    payment_adjustment: Option<BusinessDayConvention>,
+    fixing_days: Option<u32>,
+}
+
+#[pymethods]
+impl PyIborLeg {
+    /// A leg over `schedule` paying `index`, on the schedule's own calendar.
+    #[new]
+    fn new(schedule: &PySchedule, index: &PyIborIndex) -> Self {
+        PyIborLeg {
+            schedule: schedule.inner(),
+            index: index.inner(),
+            notional: None,
+            payment_day_counter: None,
+            payment_adjustment: None,
+            fixing_days: None,
+        }
+    }
+
+    /// The leg with `notional` on every coupon. Required: a leg built without
+    /// one reports `"no notional given"` from [`coupon_count`](Self::coupon_count).
+    fn with_notional(&self, notional: f64) -> Self {
+        PyIborLeg {
+            notional: Some(notional),
+            ..self.copied()
+        }
+    }
+
+    /// The leg accruing with `day_counter`, overriding the index's.
+    fn with_payment_day_counter(&self, day_counter: &PyDayCounter) -> Self {
+        PyIborLeg {
+            payment_day_counter: Some(day_counter.inner()),
+            ..self.copied()
+        }
+    }
+
+    /// The leg rolling its payment dates with `convention`.
+    fn with_payment_adjustment(&self, convention: &PyBusinessDayConvention) -> Self {
+        PyIborLeg {
+            payment_adjustment: Some(convention.inner()),
+            ..self.copied()
+        }
+    }
+
+    /// The leg fixing `fixing_days` business days before each accrual start,
+    /// overriding the index's own count.
+    fn with_fixing_days(&self, fixing_days: u32) -> Self {
+        PyIborLeg {
+            fixing_days: Some(fixing_days),
+            ..self.copied()
+        }
+    }
+
+    /// The number of coupons the leg builds, one per schedule period.
+    ///
+    /// The leg is rebuilt on every call, here and in the cap/floor
+    /// constructors, so this counts the coupons a construction would produce
+    /// rather than a stored list.
+    ///
+    /// # Errors
+    ///
+    /// Reports a leg with no notional, a schedule holding fewer than two dates,
+    /// and whatever a coupon's own preconditions reject.
+    fn coupon_count(&self) -> PyResult<usize> {
+        Ok(self.coupons()?.len())
+    }
+}
+
+impl PyIborLeg {
+    /// A copy of the stored configuration, which each setter overrides one
+    /// field of. Not a [`Clone`] implementation: deriving one on a `pyclass`
+    /// changes how the type is extracted from Python.
+    fn copied(&self) -> Self {
+        PyIborLeg {
+            schedule: self.schedule.clone(),
+            index: Shared::clone(&self.index),
+            notional: self.notional,
+            payment_day_counter: self.payment_day_counter.clone(),
+            payment_adjustment: self.payment_adjustment,
+            fixing_days: self.fixing_days,
+        }
+    }
+
+    /// The core builder the stored configuration assembles into.
+    fn leg(&self) -> IborLeg {
+        let mut leg = IborLeg::new(self.schedule.clone(), Shared::clone(&self.index));
+        if let Some(notional) = self.notional {
+            leg = leg.with_notional(notional);
+        }
+        if let Some(day_counter) = &self.payment_day_counter {
+            leg = leg.with_payment_day_counter(day_counter.clone());
+        }
+        if let Some(convention) = self.payment_adjustment {
+            leg = leg.with_payment_adjustment(convention);
+        }
+        if let Some(fixing_days) = self.fixing_days {
+            leg = leg.with_fixing_days(fixing_days);
+        }
+        leg
+    }
+
+    /// The coupons a [`CapFloor`](crate::capfloor::PyCapFloor) is built over,
+    /// each already carrying the core's default `BlackIborCouponPricer`.
+    ///
+    /// This is the plain path deliberately. Setting a cap or a floor on the leg
+    /// would switch the core to `capped_floored_coupons`, which withholds that
+    /// pricer (`iborleg.rs:340-348`), so the strikes belong on the cap/floor
+    /// constructors and no `caps`/`floors` setter is exposed here.
+    pub(crate) fn coupons(&self) -> PyResult<Vec<Shared<IborCoupon>>> {
+        Ok(self.leg().coupons().map_err(PyQlError::from)?)
     }
 }
