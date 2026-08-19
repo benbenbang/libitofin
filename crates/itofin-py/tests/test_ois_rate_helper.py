@@ -188,10 +188,16 @@ def test_make_ois_without_a_fixed_rate_prices_at_par():
     temporary swap at zero and writes its fair rate into the fixed leg
     (makeois.rs:461-469), so the built swap prices to a zero NPV by construction.
     Complements the reprice arm, which fixes the rate at 0.0 and reads the fair
-    rate back."""
+    rate back.
+
+    The filled rate is also read back through fixed_rate() and pinned to the
+    bootstrapped quote: a par swap on a curve built from these quotes must have
+    been filled at the quote itself, which ties the None branch to the fill
+    rather than to any rate that happens to zero a mis-built swap."""
     _, curve, settings, settlement = _curve()
 
     for n, unit in [(5, "Years"), (10, "Years")]:
+        quote = next(r for m, u, r in ESTR_SWAP_DATA if (m, u) == (n, unit)) / 100.0
         swap = MakeOis(
             P(n, unit),
             Estr(curve, settings),
@@ -204,6 +210,9 @@ def test_make_ois_without_a_fixed_rate_prices_at_par():
             averaging_method=RateAveraging.Compound,
         ).build()
         assert abs(swap.npv()) < 1.0e-6, f"{n} {unit} par OIS NPV {swap.npv()}"
+        assert abs(swap.fixed_rate() - quote) < 1.0e-8, (
+            f"{n} {unit} par fill {swap.fixed_rate()} vs quote {quote}"
+        )
 
 
 def test_estr_forecasts_a_fixing_off_its_forwarding_curve():
