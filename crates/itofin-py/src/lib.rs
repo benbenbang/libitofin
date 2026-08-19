@@ -58,7 +58,7 @@ use curve::{
 };
 use helpers::{
     PyDepositRateHelper, PyEstr, PyFraRateHelper, PyFuturesRateHelper, PyFuturesType,
-    PyOISRateHelper, PyPillar, PyRateAveraging, PyRateHelper, PySwapRateHelper,
+    PyOISRateHelper, PyOvernightIndex, PyPillar, PyRateAveraging, PyRateHelper, PySwapRateHelper,
 };
 use heston::{PyHestonModel, PyHestonModelHelper, PyHestonProcess};
 use hullwhite::{PyEuribor, PyHullWhite, PyIborIndex, PySwaptionHelper};
@@ -220,6 +220,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     indexes.add_class::<PyCurrency>()?;
     indexes.add_class::<PyIborIndex>()?;
     indexes.add_class::<PyEuribor>()?;
+    indexes.add_class::<PyOvernightIndex>()?;
     indexes.add_class::<PyEstr>()?;
     indexes.add_class::<PySwapIndex>()?;
     indexes.add_class::<PyCpiInterpolationType>()?;

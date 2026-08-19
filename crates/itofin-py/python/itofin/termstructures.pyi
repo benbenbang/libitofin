@@ -5,9 +5,9 @@
 from itofin import Settings
 from itofin.indexes import (
     CpiInterpolationType,
-    Estr,
     Euribor,
     IborIndex,
+    OvernightIndex,
     SwapIndex,
     YoYInflationIndex,
     ZeroInflationIndex,
@@ -374,7 +374,7 @@ class OISRateHelper(RateHelper):
         settlement_days: int,
         tenor: Period,
         quote: SimpleQuote,
-        overnight_index: Estr,
+        overnight_index: OvernightIndex,
         payment_lag: int,
         payment_convention: BusinessDayConvention,
         payment_frequency: Frequency,

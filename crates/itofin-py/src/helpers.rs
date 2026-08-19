@@ -529,6 +529,30 @@ impl PyFraRateHelper {
     }
 }
 
+/// Python `OvernightIndex`: the base of the overnight index families
+/// (`indexes::iborindex::OvernightIndex`).
+///
+/// Abstract from Python: it has no constructor, because the core builds an
+/// overnight index only through a family factory such as [`PyEstr`], which is
+/// what supplies the conventions. It exists so the facades consuming an
+/// overnight index - [`PyOISRateHelper`] and the OIS-swap builder - name one
+/// type and accept any family, mirroring [`PyIborIndex`] under
+/// [`PyEuribor`]. The `fixing` accessor stays on the family facade rather than
+/// being lifted here; nothing reads a fixing off the base yet, so widening it
+/// is deferred.
+#[pyclass(name = "OvernightIndex", subclass, unsendable)]
+pub struct PyOvernightIndex {
+    inner: Shared<OvernightIndex>,
+}
+
+impl PyOvernightIndex {
+    /// A clone of the inner index for the facades that take an overnight index
+    /// and are generic over the family.
+    pub(crate) fn inner(&self) -> Shared<OvernightIndex> {
+        Shared::clone(&self.inner)
+    }
+}
+
 /// Python `Estr`: the Euro Short-Term Rate overnight index (`indexes::Estr`).
 ///
 /// `Estr::new` returns an `OvernightIndex` by value (it adds no behaviour over
@@ -538,7 +562,12 @@ impl PyFraRateHelper {
 /// curve builds the index over an empty forwarding handle, the form the OIS
 /// bootstrap needs. Infallible (unlike `Euribor::new`, which rejects daily
 /// tenors): the overnight tenor is fixed to `1*Days` by the base.
-#[pyclass(name = "Estr", unsendable)]
+///
+/// A subclass of [`PyOvernightIndex`], so an ESTR index is accepted wherever
+/// the general overnight index is. It retains its own clone of the index the
+/// base holds - the same object, not a rebuild - so a facade typed on either
+/// half reads exactly the same core index.
+#[pyclass(name = "Estr", extends = PyOvernightIndex, unsendable)]
 pub struct PyEstr {
     inner: Shared<OvernightIndex>,
 }
@@ -549,14 +578,15 @@ impl PyEstr {
     /// is `None`.
     #[new]
     #[pyo3(signature = (curve, settings))]
-    fn new(curve: Option<&PyYieldTermStructure>, settings: &PySettings) -> Self {
+    fn new(
+        curve: Option<&PyYieldTermStructure>,
+        settings: &PySettings,
+    ) -> PyClassInitializer<Self> {
         let forwarding = match curve {
             Some(curve) => curve.handle(),
             None => Handle::empty(),
         };
-        PyEstr {
-            inner: shared(Estr::new(forwarding, settings.inner())),
-        }
+        init_overnight(shared(Estr::new(forwarding, settings.inner())))
     }
 
     /// The index's fixing for `fixing_date`, forecast off the forwarding curve
@@ -570,12 +600,14 @@ impl PyEstr {
     }
 }
 
-impl PyEstr {
-    /// A clone of the inner overnight index for the OIS helper facade, which
-    /// takes a `&OvernightIndex`.
-    pub(crate) fn inner(&self) -> Shared<OvernightIndex> {
-        Shared::clone(&self.inner)
-    }
+/// The base/subclass initializer the ESTR constructor builds: one index object
+/// feeds both halves, so the base [`PyOvernightIndex`] the OIS facades read and
+/// the [`PyEstr`] its own `fixing` reads are the same core index.
+fn init_overnight(index: Shared<OvernightIndex>) -> PyClassInitializer<PyEstr> {
+    let base = PyOvernightIndex {
+        inner: Shared::clone(&index),
+    };
+    PyClassInitializer::from(base).add_subclass(PyEstr { inner: index })
 }
 
 /// Python `RateAveraging`: how an overnight coupon combines its daily fixings
@@ -642,7 +674,7 @@ impl PyOISRateHelper {
         settlement_days: Natural,
         tenor: &PyPeriod,
         quote: &PySimpleQuote,
-        overnight_index: &PyEstr,
+        overnight_index: &PyOvernightIndex,
         payment_lag: Integer,
         payment_convention: &PyBusinessDayConvention,
         payment_frequency: &PyFrequency,
