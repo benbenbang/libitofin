@@ -65,7 +65,15 @@ class Euribor(IborIndex):
     def six_months(curve: YieldTermStructure, settings: Settings) -> Euribor: ...
     def fixing(self, fixing_date: Date, forecast_todays_fixing: bool) -> float: ...
 
-class Estr:
+class OvernightIndex:
+    """The base of the overnight index families.
+
+    Abstract: it has no constructor, because the core builds an overnight index
+    only through a family factory such as Estr. It exists so OISRateHelper and
+    MakeOis name one type and accept any family. The fixing accessor stays on
+    the family facade; lifting it here is deferred."""
+
+class Estr(OvernightIndex):
     """The Euro Short-Term Rate overnight index. Pass curve=None to build it over
     an empty forwarding handle (the form the OIS bootstrap needs)."""
 
