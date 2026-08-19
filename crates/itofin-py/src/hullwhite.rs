@@ -10,7 +10,7 @@ use crate::settings::PySettings;
 use crate::time::{PyBusinessDayConvention, PyCalendar, PyDate, PyDayCounter, PyPeriod};
 use libitofin::cashflows::RateAveraging;
 use libitofin::handle::Handle;
-use libitofin::indexes::{Euribor, IborIndex, Index};
+use libitofin::indexes::{Euribor, IborIndex, Index, InterestRateIndex};
 use libitofin::models::calibrationhelper::{BlackCalibrationHelper, CalibrationHelper};
 use libitofin::models::shortrate::SwaptionHelper;
 use libitofin::models::{CalibratedModelHolder, HullWhite, calibrate};
@@ -217,6 +217,64 @@ impl PyIborIndex {
             .inner
             .fixing(fixing_date.inner(), forecast_todays_fixing)
             .map_err(PyQlError::from)?)
+    }
+
+    /// The value date of the loan fixed on `fixing_date`: the fixing date moved
+    /// forward `fixing_days` business days on the fixing calendar
+    /// (`interestrateindex.rs:210`). Fallible: the core rejects a `fixing_date`
+    /// that is not a business day there.
+    fn value_date(&self, fixing_date: &PyDate) -> PyResult<PyDate> {
+        Ok(PyDate::from_inner(
+            self.inner
+                .value_date(fixing_date.inner())
+                .map_err(PyQlError::from)?,
+        ))
+    }
+
+    /// The fixing date of the loan starting on `value_date`: the value date
+    /// moved back `fixing_days` business days (`interestrateindex.rs:197`), the
+    /// inverse of [`Self::value_date`].
+    fn fixing_date(&self, value_date: &PyDate) -> PyDate {
+        PyDate::from_inner(self.inner.fixing_date(value_date.inner()))
+    }
+
+    /// The maturity of the loan starting on `value_date`: the value date rolled
+    /// on by the index tenor under the index's own convention and end-of-month
+    /// flag (`iborindex.rs:154`).
+    fn maturity_date(&self, value_date: &PyDate) -> PyResult<PyDate> {
+        Ok(PyDate::from_inner(
+            self.inner
+                .maturity_date(value_date.inner())
+                .map_err(PyQlError::from)?,
+        ))
+    }
+
+    /// The index tenor, normalized at construction
+    /// (`interestrateindex.rs:176`).
+    fn tenor(&self) -> PyPeriod {
+        PyPeriod::from_inner(self.inner.tenor())
+    }
+
+    /// The day counter the index accrues on (`interestrateindex.rs:191`).
+    fn day_counter(&self) -> PyDayCounter {
+        PyDayCounter::from_inner(self.inner.day_counter().clone())
+    }
+
+    /// The calendar the fixing and value dates roll on
+    /// (`interestrateindex.rs:234`).
+    fn fixing_calendar(&self) -> PyCalendar {
+        PyCalendar::from_inner(self.inner.fixing_calendar())
+    }
+
+    /// The convention applied when rolling the value date to maturity
+    /// (`iborindex.rs:89`). Infallible: the core returns the stored field.
+    fn business_day_convention(&self) -> PyBusinessDayConvention {
+        PyBusinessDayConvention::from_inner(self.inner.business_day_convention())
+    }
+
+    /// Whether the maturity roll keeps to month ends (`iborindex.rs:94`).
+    fn end_of_month(&self) -> bool {
+        self.inner.end_of_month()
     }
 }
 

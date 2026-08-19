@@ -100,11 +100,16 @@ class Frequency:
     Monthly: Frequency
 
 class BusinessDayConvention:
-    """A holiday-rolling rule."""
+    """A holiday-rolling rule. Every core variant is covered; the four listed
+    last are appended, so the integer values of the first three are unchanged."""
 
     ModifiedFollowing: BusinessDayConvention
     Following: BusinessDayConvention
     Unadjusted: BusinessDayConvention
+    Preceding: BusinessDayConvention
+    ModifiedPreceding: BusinessDayConvention
+    HalfMonthModifiedFollowing: BusinessDayConvention
+    Nearest: BusinessDayConvention
 
 class DateGeneration:
     """The rule a Schedule generates its dates by."""
