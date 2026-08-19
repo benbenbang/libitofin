@@ -39,17 +39,34 @@ E. The core's cached cap 6.87570026732 and floor 2.65812927959, to 1e-11, over
    on a notional of 100 with two fixing days and the index's own day counter.
    The engine is Black at a flat 20% vol. The par arm is the one pinned:
    ``using_at_par`` defaults true, so no flag is passed.
-F. That the raw-leg path is what produced them. ``MakeCapFloor`` drops the spot
-   caplet and uses a unit nominal, so those literals are unreachable through
-   the pass above: hitting them proves the ``IborLeg`` facade laid every coupon
-   out itself and that the raw constructor consumed exactly that leg. Each of
-   the notional, the payment day counter and the fixing days moves the cap by
-   far more than the tolerance, so all three are pinned by the literal.
+F. That the raw-leg path is what produced them, but only in part. The literal
+   pins the notional (``MakeCapFloor`` uses a unit nominal, so that mis-wire is
+   off by a factor of 100), the schedule the coupons are laid on, and that the
+   default coupon pricer was attached - without it the rate query errors rather
+   than pricing. It does NOT pin everything the leg carries, and the three arms
+   below cover what it misses. Read F as the floor of what E proves, not the
+   ceiling.
 G. The collar, as the cap less the floor, and with it the argument order:
    ``CapFloor.collar`` takes cap rates first, and swapping the lists builds a
    long-3%-cap short-7%-floor instrument nowhere near the pinned value.
 H. That the payment adjustment reaches the coupons, which E cannot show - see
    that test's own docstring.
+I. That the fixing days and the payment day counter reach the coupons, which E
+   also cannot show - see that test's own docstring.
+
+Three things E is blind to, each of which has its own arm above:
+
+- The spot caplet. Dropping the first coupon leaves both cached values bit
+  identical, because that optionlet is worth exactly zero here: its fixing date
+  IS the evaluation date, so it has no time value, and the ~5% forward sits
+  outside both the 7% cap and the 3% floor, so it has no intrinsic value
+  either. What catches a dropped spot coupon is the count arm, not the literal.
+- The fixing days and the payment day counter. The fixture passes each setter
+  the index's own default - Euribor 6M already fixes at two days and accrues
+  Actual/360 - so deleting either setter's wiring entirely leaves all three
+  cached values unchanged. Only moving each OFF the index default discriminates
+  it, which is what arm I does.
+- The payment adjustment, inert here for a different reason: see arm H.
 
 Every arm builds its own ``CapFloor``. An ``Instrument`` caches its NPV, so
 reusing one cap across two engines would let arm B pass on a stale number, and
@@ -439,3 +456,37 @@ def test_the_payment_adjustment_reaches_the_coupons():
     preceding = npv(BusinessDayConvention.Preceding)
     print(f"\nfollowing = {following!r}\npreceding = {preceding!r}")
     assert preceding > following
+
+
+def test_the_fixing_days_and_day_counter_reach_the_coupons():
+    """The cached values cannot pin either setter: the fixture hands each one
+    the index's OWN default, so both calls are no-ops there. Euribor 6M already
+    fixes at two days, and an unset payment day counter falls back to the
+    index's Actual/360, which is exactly what the fixture passes. Delete either
+    setter's wiring and all three cached arms stay bit identical.
+
+    Moving each off the index default is what discriminates it. Two fewer
+    fixing days shifts every optionlet expiry, and Actual/365 rescales every
+    accrual by 360/365, which is the ratio the second pair reproduces.
+
+    The fixing days move DOWN to zero rather than up: a fixing more than two
+    business days before the 18-Mar value date lands before the 14-Mar
+    evaluation date, and under the explicit-fixings design (D5/D11) that demands
+    a historical fixing and errors instead of pricing."""
+    curve = _oracle_curve()
+    leg = _oracle_leg(curve)
+
+    def npv(configured):
+        cap = CapFloor.cap(configured, [CAP_RATE], ORACLE_SETTINGS)
+        cap.set_black_engine(_oracle_engine(curve))
+        return cap.npv()
+
+    two_days = npv(leg)
+    no_days = npv(leg.with_fixing_days(0))
+    print(f"\nfixing_days=2 -> {two_days!r}\nfixing_days=0 -> {no_days!r}")
+    assert abs(two_days - no_days) > 1.0e-6
+
+    act_365 = npv(leg.with_payment_day_counter(DayCounter.actual365_fixed()))
+    print(f"act360 -> {two_days!r}\nact365 -> {act_365!r}")
+    assert abs(two_days - act_365) > 1.0e-3
+    assert act_365 < two_days
