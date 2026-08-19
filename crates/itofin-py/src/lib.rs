@@ -21,6 +21,7 @@ mod hullwhite;
 mod inflation;
 mod market;
 mod mcengine;
+mod ois;
 mod option;
 mod optionletvol;
 mod settings;
@@ -74,6 +75,7 @@ use inflation::{
 use libitofin::errors::QlError;
 use market::{PyBlackScholesProcess, PySimpleQuote};
 use mcengine::{PyMCAmericanEngine, PyMCEuropeanEngine, PyMCEuropeanHestonEngine};
+use ois::{PyMakeOis, PyOvernightIndexedSwap};
 use option::{PyOptionType, PyVanillaOption};
 use optionletvol::{
     PyConstantOptionletVolatility, PyOptionletStripper1, PyOptionletVolatilityStructure,
@@ -239,6 +241,8 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     instruments.add_class::<PySwapType>()?;
     instruments.add_class::<PyVanillaSwap>()?;
     instruments.add_class::<PyMakeVanillaSwap>()?;
+    instruments.add_class::<PyOvernightIndexedSwap>()?;
+    instruments.add_class::<PyMakeOis>()?;
     instruments.add_class::<PyEuropeanExercise>()?;
     instruments.add_class::<PySettlementType>()?;
     instruments.add_class::<PySettlementMethod>()?;

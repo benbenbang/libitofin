@@ -1,5 +1,5 @@
 # Hand-written stubs for itofin.instruments; sync manually with src/option.rs,
-# src/swap.rs, src/swaption.rs, src/capfloor.rs, src/credit.rs and
+# src/swap.rs, src/ois.rs, src/swaption.rs, src/capfloor.rs, src/credit.rs and
 # src/inflation.rs (#517).
 
 from itofin import Settings
@@ -7,6 +7,7 @@ from itofin.cashflows import YoYInflationCoupon
 from itofin.indexes import (
     CpiInterpolationType,
     Euribor,
+    OvernightIndex,
     YoYInflationIndex,
     ZeroInflationIndex,
 )
@@ -23,7 +24,7 @@ from itofin.pricingengines import (
     YoYInflationCapFloorEngine,
 )
 from itofin.processes import BlackScholesProcess
-from itofin.termstructures import YieldTermStructure
+from itofin.termstructures import RateAveraging, YieldTermStructure
 from itofin.time import (
     BusinessDayConvention,
     Calendar,
@@ -130,6 +131,39 @@ class MakeVanillaSwap:
         fixed_leg_day_count: DayCounter | None = None,
     ) -> None: ...
     def build(self) -> VanillaSwap: ...
+
+class OvernightIndexedSwap:
+    """A fixed leg versus a compounded overnight leg.
+
+    Only MakeOis builds one, so it always arrives priced; there is no
+    set_engine and no raw constructor (both deferred with the two-schedule
+    master ctor)."""
+
+    def fair_rate(self) -> float: ...
+    def npv(self) -> float: ...
+    def nominal(self) -> float: ...
+    def fixed_rate(self) -> float: ...
+
+class MakeOis:
+    """Market-convention builder for an OvernightIndexedSwap: derives both
+    schedules and the discounting engine from a swap tenor and an overnight
+    index. ``fixed_rate=None`` builds a par swap. The built swap already carries
+    its DiscountingSwapEngine."""
+
+    def __init__(
+        self,
+        swap_tenor: Period,
+        overnight_index: OvernightIndex,
+        settings: Settings,
+        fixed_rate: float | None = None,
+        forward_start: Period | None = None,
+        effective_date: Date | None = None,
+        nominal: float | None = None,
+        payment_lag: int | None = None,
+        discounting_term_structure: YieldTermStructure | None = None,
+        averaging_method: RateAveraging | None = None,
+    ) -> None: ...
+    def build(self) -> OvernightIndexedSwap: ...
 
 class EuropeanExercise:
     """A single-date exercise schedule."""
