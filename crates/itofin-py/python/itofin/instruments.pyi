@@ -1799,12 +1799,56 @@ class MakeYoYInflationCapFloor:
         first_caplet_excluded: bool = False,
         strike: float | None = None,
         atm_strike: YieldTermStructure | None = None,
-    ) -> None: ...
+    ) -> None:
+        """Store the configuration the chain is assembled from in build().
+
+        Args:
+            cap_floor_type (CapFloorType): Cap or Floor; Collar has no path
+                here.
+            index (YoYInflationIndex): The index the optionlets fix off.
+            length (int): The length of the derived annual leg, in years.
+            calendar (Calendar): The calendar the payments roll on.
+            observation_lag (Period): How far back each coupon's fixings are
+                observed.
+            interpolation (CpiInterpolationType): How the observed fixings are
+                interpolated.
+            settings (Settings): The explicit settings supplying the evaluation
+                date and the stored fixings.
+            nominal (float | None): The notional; None keeps the core default
+                of 1,000,000.
+            effective_date (Date | None): The start date; None derives it from
+                the evaluation date.
+            payment_day_counter (DayCounter | None): The day count; None keeps
+                the core default of 30/360 bond basis.
+            payment_adjustment (BusinessDayConvention | None): The payment
+                roll; None keeps the core default of ModifiedFollowing.
+            fixing_days (int | None): The fixing days of the coupons; None
+                keeps the core default of none.
+            engine (YoYInflationCapFloorEngine | None): An engine installed on
+                the built instrument; None leaves it unpriced.
+            as_optionlet (bool): Whether to keep only the last optionlet.
+            forward_start (Period | None): The delay before the leg starts;
+                None keeps the core default of no forward start.
+            first_caplet_excluded (bool): Whether to drop the front optionlet.
+            strike (float | None): The explicit strike; exactly one of this and
+                atm_strike is required.
+            atm_strike (YieldTermStructure | None): The curve the at-the-money
+                strike is filled off; exactly one of this and strike is
+                required.
+        """
+        ...
     def build(self) -> YoYInflationCapFloor:
-        """Raises ItofinError when both strike and atm_strike are given and when
-        neither is; when the start date has to be derived and no evaluation date
-        is set; and on whatever the leg construction and the at-the-money fill
-        report."""
+        """Build the cap/floor, which already carries its engine when one was given.
+
+        Returns:
+            YoYInflationCapFloor: The built instrument.
+
+        Raises:
+            ItofinError: If both strike and atm_strike are given or neither is;
+                if the start date has to be derived and no evaluation date is
+                set; and on whatever the leg construction and the at-the-money
+                fill report.
+        """
         ...
 
 class YoYInflationCapFloor:
@@ -1828,23 +1872,70 @@ class YoYInflationCapFloor:
         floor_rates: list[float],
         settings: Settings,
     ) -> YoYInflationCapFloor:
-        """Each strike vector is padded to the leg length by repeating its last
-        entry. Raises ItofinError on an empty leg, and on a strike vector the
-        type needs and did not get: a cap or a collar needs cap rates, a floor
-        or a collar floor rates."""
+        """Build an instrument of cap_floor_type over coupons, struck at both vectors.
+
+        Each strike vector is padded to the leg length by repeating its last
+        entry, so a single strike stands for every optionlet.
+
+        Args:
+            cap_floor_type (CapFloorType): Cap, Floor or Collar.
+            coupons (list[YoYInflationCoupon]): The leg the optionlets sit on.
+            cap_rates (list[float]): The cap strikes.
+            floor_rates (list[float]): The floor strikes.
+            settings (Settings): The explicit settings the instrument resolves
+                its dates against.
+
+        Returns:
+            YoYInflationCapFloor: The built instrument.
+
+        Raises:
+            ItofinError: On an empty leg, and on a strike vector the type needs
+                and did not get: a cap or a collar needs cap rates, a floor or
+                a collar floor rates.
+        """
         ...
     @staticmethod
     def cap(
         coupons: list[YoYInflationCoupon],
         strikes: list[float],
         settings: Settings,
-    ) -> YoYInflationCapFloor: ...
+    ) -> YoYInflationCapFloor:
+        """Build a cap over coupons struck at strikes.
+
+        Args:
+            coupons (list[YoYInflationCoupon]): The leg the optionlets sit on.
+            strikes (list[float]): The cap strikes, padded as new() pads.
+            settings (Settings): The explicit settings the instrument resolves
+                its dates against.
+
+        Returns:
+            YoYInflationCapFloor: The cap over that leg.
+
+        Raises:
+            ItofinError: On the same conditions new() reports.
+        """
+        ...
     @staticmethod
     def floor(
         coupons: list[YoYInflationCoupon],
         strikes: list[float],
         settings: Settings,
-    ) -> YoYInflationCapFloor: ...
+    ) -> YoYInflationCapFloor:
+        """Build a floor over coupons struck at strikes.
+
+        Args:
+            coupons (list[YoYInflationCoupon]): The leg the optionlets sit on.
+            strikes (list[float]): The floor strikes, padded as new() pads.
+            settings (Settings): The explicit settings the instrument resolves
+                its dates against.
+
+        Returns:
+            YoYInflationCapFloor: The floor over that leg.
+
+        Raises:
+            ItofinError: On the same conditions new() reports.
+        """
+        ...
     @staticmethod
     def collar(
         coupons: list[YoYInflationCoupon],
@@ -1852,7 +1943,21 @@ class YoYInflationCapFloor:
         floor_rates: list[float],
         settings: Settings,
     ) -> YoYInflationCapFloor:
-        """Long the cap at cap_rates, short the floor at floor_rates."""
+        """Build a collar: long the cap at cap_rates, short the floor at floor_rates.
+
+        Args:
+            coupons (list[YoYInflationCoupon]): The leg the optionlets sit on.
+            cap_rates (list[float]): The cap strikes, padded as new() pads.
+            floor_rates (list[float]): The floor strikes, padded the same way.
+            settings (Settings): The explicit settings the instrument resolves
+                its dates against.
+
+        Returns:
+            YoYInflationCapFloor: The collar over that leg.
+
+        Raises:
+            ItofinError: On the same conditions new() reports.
+        """
         ...
     @staticmethod
     def with_strikes(
@@ -1861,31 +1966,144 @@ class YoYInflationCapFloor:
         strikes: list[float],
         settings: Settings,
     ) -> YoYInflationCapFloor:
-        """strikes are cap rates for a Cap and floor rates for a Floor. Raises
-        ItofinError on an empty strikes and on a Collar, which needs two vectors
-        and has collar() for a constructor."""
+        """Build a cap or a floor from a single strike vector.
+
+        Args:
+            cap_floor_type (CapFloorType): Cap or Floor.
+            coupons (list[YoYInflationCoupon]): The leg the optionlets sit on.
+            strikes (list[float]): Cap rates for a Cap and floor rates for a
+                Floor.
+            settings (Settings): The explicit settings the instrument resolves
+                its dates against.
+
+        Returns:
+            YoYInflationCapFloor: The built instrument.
+
+        Raises:
+            ItofinError: On an empty strikes, on a Collar - which needs two
+                vectors, so collar() is its constructor - and on the same
+                conditions new() reports.
+        """
         ...
-    def cap_rates(self) -> list[float]: ...
-    def floor_rates(self) -> list[float]: ...
-    def coupon_count(self) -> int: ...
-    def start_date(self) -> Date: ...
-    def maturity_date(self) -> Date: ...
+    def cap_rates(self) -> list[float]:
+        """Return the cap strikes, one per coupon.
+
+        Returns:
+            list[float]: The cap strikes; empty on a floor.
+        """
+        ...
+    def floor_rates(self) -> list[float]:
+        """Return the floor strikes, one per coupon.
+
+        Returns:
+            list[float]: The floor strikes; empty on a cap.
+        """
+        ...
+    def coupon_count(self) -> int:
+        """Return the number of optionlets.
+
+        Returns:
+            int: One per year-on-year coupon on the leg.
+        """
+        ...
+    def start_date(self) -> Date:
+        """Return the leg's earliest accrual start.
+
+        Returns:
+            Date: The first accrual start date.
+
+        Raises:
+            ItofinError: On an empty leg, which the constructors already
+                refuse.
+        """
+        ...
+    def maturity_date(self) -> Date:
+        """Return the leg's latest accrual end.
+
+        Returns:
+            Date: The last accrual end date.
+
+        Raises:
+            ItofinError: On the same conditions start_date reports.
+        """
+        ...
     def atm_rate(self, discount_curve: YieldTermStructure) -> float:
-        """The strike at which the leg reprices on discount_curve. Raises
-        ItofinError on an unlinked curve, a curve with no reference date and a
-        leg with no basis-point sensitivity to solve over."""
+        """Return the strike at which the leg reprices on discount_curve.
+
+        The core takes the curve itself rather than a handle, so the link is
+        resolved for the call.
+
+        Args:
+            discount_curve (YieldTermStructure): The curve the leg reprices on.
+
+        Returns:
+            float: The at-the-money rate.
+
+        Raises:
+            ItofinError: On an unlinked discount_curve, a curve with no
+                reference date, and a leg with no basis-point sensitivity to
+                solve over.
+        """
         ...
     def set_engine(self, engine: YoYInflationCapFloorEngine) -> None:
-        """The engine must resolve its dates against the same Settings object
-        this cap/floor was built with."""
+        """Attach an engine, replacing whatever the factory installed.
+
+        Args:
+            engine (YoYInflationCapFloorEngine): The engine, which must resolve
+                its dates against the same Settings object this cap/floor was
+                built with: two different ones would price the leg and the
+                optionlets on different dates with no error raised.
+        """
         ...
     def calculate(self) -> None:
-        """Forces the valuation. Idempotent."""
+        """Force the valuation. Idempotent.
+
+        Raises:
+            ItofinError: If no engine is attached, no evaluation date is set,
+                or the engine refuses the instrument.
+        """
         ...
-    def is_calculated(self) -> bool: ...
+    def is_calculated(self) -> bool:
+        """Return whether the cached results are currently valid.
+
+        Returns:
+            bool: True when the next accessor reads the cache.
+        """
+        ...
     def price(self, engine: YoYInflationCapFloorEngine) -> float:
-        """set_engine followed by npv, in one call, replacing whatever engine
-        the factory installed."""
+        """Attach engine and return the NPV.
+
+        Replaces whatever engine the factory installed.
+
+        Args:
+            engine (YoYInflationCapFloorEngine): The engine to install and
+                price on.
+
+        Returns:
+            float: The cap/floor value.
+
+        Raises:
+            ItofinError: On anything that makes the valuation fail.
+        """
         ...
-    def results(self) -> Results: ...
-    def npv(self) -> float: ...
+    def results(self) -> Results:
+        """Return a frozen snapshot of the valuation, calculating first.
+
+        Returns:
+            Results: A copy of the valuation results.
+
+        Raises:
+            ItofinError: On anything that makes the valuation fail.
+        """
+        ...
+    def npv(self) -> float:
+        """Return the cap/floor NPV under the attached engine.
+
+        Returns:
+            float: The present value.
+
+        Raises:
+            ItofinError: If no engine is attached, which the core reports as
+                "null pricing engine", and on whatever the engine reports.
+        """
+        ...
