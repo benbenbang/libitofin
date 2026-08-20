@@ -20,23 +20,61 @@ class Currency:
 
     Only the three named currencies the core provides are exposed; the general
     constructor is omitted, as the core ports only the currencies its indexes
-    need and the full catalogue is deferred there."""
+    need and the full catalogue is deferred there.
+    """
 
     @staticmethod
-    def eur() -> Currency: ...
+    def eur() -> Currency:
+        """Return the European Euro.
+
+        Returns:
+            Currency: The euro, ISO code "EUR".
+        """
+        ...
     @staticmethod
-    def usd() -> Currency: ...
+    def usd() -> Currency:
+        """Return the U.S. dollar.
+
+        Returns:
+            Currency: The U.S. dollar, ISO code "USD".
+        """
+        ...
     @staticmethod
-    def gbp() -> Currency: ...
-    def code(self) -> str: ...
-    def __repr__(self) -> str: ...
+    def gbp() -> Currency:
+        """Return the British pound sterling.
+
+        Returns:
+            Currency: The pound sterling, ISO code "GBP".
+        """
+        ...
+    def code(self) -> str:
+        """Return the ISO 4217 three-letter code.
+
+        Returns:
+            str: The three-letter code, e.g. "EUR".
+        """
+        ...
+    def __repr__(self) -> str:
+        """Return the printable representation, which prints the ISO code.
+
+        Returns:
+            str: A string of the form Currency(EUR).
+        """
+        ...
 
 class IborIndex:
     """A general Inter-Bank-Offered-Rate index, spelling out every convention.
 
     The form for an index outside the named families (the USD-3M IsdaIbor the
     ISDA CDS curve bootstraps off, say). Pass forwarding=None to build it over
-    an empty handle, the form the bootstrap rate helpers need."""
+    an empty handle, the form the bootstrap rate helpers need.
+
+    It is the base of Euribor, and every Ibor-index consumer takes this type and
+    accepts either: the deposit, swap, FRA and futures rate helpers, and the
+    swap, swap-index, optionlet-volatility, cap/floor and swaption-helper
+    facades. The OIS helper is not one of them; it takes the overnight Estr,
+    which is not an IborIndex.
+    """
 
     def __init__(
         self,
@@ -50,28 +88,204 @@ class IborIndex:
         day_counter: DayCounter,
         forwarding: YieldTermStructure | None,
         settings: Settings,
-    ) -> None: ...
-    def fixing(self, fixing_date: Date, forecast_todays_fixing: bool) -> float: ...
-    def value_date(self, fixing_date: Date) -> Date: ...
-    def fixing_date(self, value_date: Date) -> Date: ...
-    def maturity_date(self, value_date: Date) -> Date: ...
-    def tenor(self) -> Period: ...
-    def day_counter(self) -> DayCounter: ...
-    def fixing_calendar(self) -> Calendar: ...
-    def business_day_convention(self) -> BusinessDayConvention: ...
-    def end_of_month(self) -> bool: ...
+    ) -> None:
+        """Build an index spelling out every convention the core constructor takes.
+
+        The index fixes settlement_days before its value date on the fixing
+        calendar, rolls to maturity under convention and end_of_month, accrues
+        on day_counter and forecasts off forwarding.
+
+        Args:
+            family_name (str): The index family the fixings are stored under.
+            tenor (Period): The index tenor, normalized at construction.
+            settlement_days (int): The business days between the fixing date and
+                the value date.
+            currency (Currency): The currency the index is quoted in.
+            fixing_calendar (Calendar): The calendar the fixing and value dates
+                roll on.
+            convention (BusinessDayConvention): The convention applied when
+                rolling the value date to maturity.
+            end_of_month (bool): Whether the maturity roll keeps to month ends.
+            day_counter (DayCounter): The day count the index accrues on.
+            forwarding (YieldTermStructure | None): The curve fixings are
+                forecast off; None builds the index over an empty handle, the
+                form the bootstrap rate helpers need.
+            settings (Settings): The explicit settings supplying the evaluation
+                date and the stored fixings.
+        """
+        ...
+    def fixing(self, fixing_date: Date, forecast_todays_fixing: bool) -> float:
+        """Return the index fixing for fixing_date.
+
+        Forecast off the forwarding curve for a future date, or read from the
+        stored fixings for a past one.
+
+        Args:
+            fixing_date (Date): The date the fixing is read or forecast for.
+            forecast_todays_fixing (bool): Whether a fixing dated today is
+                forecast rather than looked up.
+
+        Returns:
+            float: The fixing rate.
+
+        Raises:
+            ItofinError: If the forwarding handle is empty or the evaluation
+                date is unset.
+        """
+        ...
+    def value_date(self, fixing_date: Date) -> Date:
+        """Return the value date of the loan fixed on fixing_date.
+
+        The fixing date moved forward by the index's fixing days on the fixing
+        calendar.
+
+        Args:
+            fixing_date (Date): The fixing date to advance.
+
+        Returns:
+            Date: The value date.
+
+        Raises:
+            ItofinError: If fixing_date is not a business day on the fixing
+                calendar.
+        """
+        ...
+    def fixing_date(self, value_date: Date) -> Date:
+        """Return the fixing date of the loan starting on value_date.
+
+        The value date moved back by the index's fixing days, the inverse of
+        value_date.
+
+        Args:
+            value_date (Date): The value date to step back from.
+
+        Returns:
+            Date: The fixing date.
+        """
+        ...
+    def maturity_date(self, value_date: Date) -> Date:
+        """Return the maturity of the loan starting on value_date.
+
+        The value date rolled on by the index tenor under the index's own
+        convention and end-of-month flag.
+
+        Args:
+            value_date (Date): The date the loan starts on.
+
+        Returns:
+            Date: The maturity date.
+
+        Raises:
+            ItofinError: If the core rejects the roll.
+        """
+        ...
+    def tenor(self) -> Period:
+        """Return the index tenor, normalized at construction.
+
+        Returns:
+            Period: The index tenor.
+        """
+        ...
+    def day_counter(self) -> DayCounter:
+        """Return the day counter the index accrues on.
+
+        Returns:
+            DayCounter: The index day count.
+        """
+        ...
+    def fixing_calendar(self) -> Calendar:
+        """Return the calendar the fixing and value dates roll on.
+
+        Returns:
+            Calendar: The fixing calendar.
+        """
+        ...
+    def business_day_convention(self) -> BusinessDayConvention:
+        """Return the convention applied when rolling the value date to maturity.
+
+        Returns:
+            BusinessDayConvention: The stored convention.
+        """
+        ...
+    def end_of_month(self) -> bool:
+        """Return whether the maturity roll keeps to month ends.
+
+        Returns:
+            bool: True if the roll is end-of-month.
+        """
+        ...
 
 class Euribor(IborIndex):
-    """The Euribor IBOR index family."""
+    """The Euribor IBOR index family.
+
+    A subclass of IborIndex, so a Euribor is accepted wherever the general index
+    is. It retains its own clone of the index the base holds - the same object,
+    not a rebuild - so its own fixing reads exactly what the base reads.
+    """
 
     def __init__(
         self, tenor: Period, curve: YieldTermStructure | None, settings: Settings
-    ) -> None: ...
+    ) -> None:
+        """Build a Euribor index of the given tenor.
+
+        Args:
+            tenor (Period): The index tenor.
+            curve (YieldTermStructure | None): The forwarding curve; None builds
+                the index over an empty handle, the form the bootstrap rate
+                helpers need.
+            settings (Settings): The explicit settings supplying the evaluation
+                date and the stored fixings.
+
+        Raises:
+            ItofinError: If tenor is a daily tenor, which needs the dedicated
+                daily-tenor constructor the core keeps separate.
+        """
+        ...
     @staticmethod
-    def three_months(curve: YieldTermStructure, settings: Settings) -> Euribor: ...
+    def three_months(curve: YieldTermStructure, settings: Settings) -> Euribor:
+        """Return the 3-month Euribor index forwarding off curve.
+
+        Args:
+            curve (YieldTermStructure): The forwarding curve.
+            settings (Settings): The explicit settings supplying the evaluation
+                date and the stored fixings.
+
+        Returns:
+            Euribor: The Euribor3M index.
+        """
+        ...
     @staticmethod
-    def six_months(curve: YieldTermStructure, settings: Settings) -> Euribor: ...
-    def fixing(self, fixing_date: Date, forecast_todays_fixing: bool) -> float: ...
+    def six_months(curve: YieldTermStructure, settings: Settings) -> Euribor:
+        """Return the 6-month Euribor index forwarding off curve.
+
+        Args:
+            curve (YieldTermStructure): The forwarding curve.
+            settings (Settings): The explicit settings supplying the evaluation
+                date and the stored fixings.
+
+        Returns:
+            Euribor: The Euribor6M index.
+        """
+        ...
+    def fixing(self, fixing_date: Date, forecast_todays_fixing: bool) -> float:
+        """Return the index fixing for fixing_date.
+
+        Forecast off the forwarding curve for a future date, or read from the
+        stored fixings for a past one.
+
+        Args:
+            fixing_date (Date): The date the fixing is read or forecast for.
+            forecast_todays_fixing (bool): Whether a fixing dated today is
+                forecast rather than looked up.
+
+        Returns:
+            float: The fixing rate.
+
+        Raises:
+            ItofinError: If the forwarding handle is empty or the evaluation
+                date is unset.
+        """
+        ...
 
 class OvernightIndex:
     """The base of the overnight index families.
@@ -79,22 +293,66 @@ class OvernightIndex:
     Abstract: it has no constructor, because the core builds an overnight index
     only through a family factory such as Estr. It exists so OISRateHelper and
     MakeOis name one type and accept any family. The fixing accessor stays on
-    the family facade; lifting it here is deferred."""
+    the family facade; lifting it here is deferred.
+    """
 
 class Estr(OvernightIndex):
-    """The Euro Short-Term Rate overnight index. Pass curve=None to build it over
-    an empty forwarding handle (the form the OIS bootstrap needs)."""
+    """The Euro Short-Term Rate overnight index.
 
-    def __init__(self, curve: YieldTermStructure | None, settings: Settings) -> None: ...
-    def fixing(self, fixing_date: Date, forecast_todays_fixing: bool) -> float: ...
+    A subclass of OvernightIndex, so an ESTR index is accepted wherever the
+    general overnight index is. It retains its own clone of the index the base
+    holds - the same object, not a rebuild - so a facade typed on either half
+    reads exactly the same core index.
+    """
+
+    def __init__(self, curve: YieldTermStructure | None, settings: Settings) -> None:
+        """Build an ESTR index forwarding off curve.
+
+        Infallible, unlike the Euribor constructor: the overnight tenor is fixed
+        to one day by the base rather than taken from the caller.
+
+        Args:
+            curve (YieldTermStructure | None): The forwarding curve; None builds
+                the index over an empty forwarding handle, the form the OIS
+                bootstrap needs.
+            settings (Settings): The explicit settings supplying the evaluation
+                date and the stored fixings.
+        """
+        ...
+    def fixing(self, fixing_date: Date, forecast_todays_fixing: bool) -> float:
+        """Return the index fixing for fixing_date.
+
+        Forecast off the forwarding curve for a future date, or read from the
+        stored fixings for a past one.
+
+        Args:
+            fixing_date (Date): The date the fixing is read or forecast for.
+            forecast_todays_fixing (bool): Whether a fixing dated today is
+                forecast rather than looked up.
+
+        Returns:
+            float: The fixing rate.
+
+        Raises:
+            ItofinError: If the forwarding handle is empty or the evaluation
+                date is unset.
+        """
+        ...
 
 class SwapIndex:
     """The index whose fixing is the fair rate of an on-the-fly vanilla swap,
     assembled from the index tenor, the forecasting Ibor index and the fixed-leg
     conventions.
 
+    The swap is assembled off the value date the fixing date implies. The
+    swaption volatility cubes take two of these (a long and a short base) and
+    read the at-the-money forward off them, so this is the index the cube
+    facades stack on rather than one priced with directly.
+
     The currency is inert for every ported consumer, so currency() reading it
-    back off the core index is the only place it shows."""
+    back off the core index is the only place it shows. Deferred (visible): the
+    clone family (re-curving / re-tenoring) is deferred in the core itself.
+    """
 
     def __init__(
         self,
@@ -109,7 +367,28 @@ class SwapIndex:
         ibor_index: IborIndex,
         settings: Settings,
     ) -> None:
-        """Forecasts and discounts off the ibor index's forwarding curve."""
+        """Build a swap index forecasting and discounting off one curve.
+
+        Both legs use the ibor index's forwarding curve. The index registers
+        with that index, so a relinked curve notifies observers.
+
+        Args:
+            family_name (str): The index family the fixings are stored under.
+            tenor (Period): The tenor of the underlying swap.
+            settlement_days (int): The business days between the fixing date and
+                the swap's start.
+            currency (Currency): The index currency, inert for every ported
+                consumer and read back only by currency().
+            calendar (Calendar): The calendar the swap's dates roll on.
+            fixed_leg_tenor (Period): The fixed leg's payment tenor.
+            fixed_leg_convention (BusinessDayConvention): The fixed leg's
+                business-day convention.
+            fixed_leg_day_counter (DayCounter): The fixed leg's day count.
+            ibor_index (IborIndex): The index forecasting the floating leg,
+                whose forwarding curve also discounts.
+            settings (Settings): The explicit settings supplying the evaluation
+                date and the stored fixings.
+        """
         ...
     @staticmethod
     def with_exogenous_discount(
@@ -125,16 +404,72 @@ class SwapIndex:
         discount: YieldTermStructure,
         settings: Settings,
     ) -> SwapIndex:
-        """Forecasts off the ibor index's forwarding curve but discounts off the
-        separate discount curve."""
+        """Build a swap index discounting off a separate curve.
+
+        The floating leg is still forecast off the ibor index's forwarding
+        curve, but discounting uses discount. The index registers with both.
+
+        Args:
+            family_name (str): The index family the fixings are stored under.
+            tenor (Period): The tenor of the underlying swap.
+            settlement_days (int): The business days between the fixing date and
+                the swap's start.
+            currency (Currency): The index currency, inert for every ported
+                consumer and read back only by currency().
+            calendar (Calendar): The calendar the swap's dates roll on.
+            fixed_leg_tenor (Period): The fixed leg's payment tenor.
+            fixed_leg_convention (BusinessDayConvention): The fixed leg's
+                business-day convention.
+            fixed_leg_day_counter (DayCounter): The fixed leg's day count.
+            ibor_index (IborIndex): The index forecasting the floating leg.
+            discount (YieldTermStructure): The separate curve both legs are
+                discounted on.
+            settings (Settings): The explicit settings supplying the evaluation
+                date and the stored fixings.
+
+        Returns:
+            SwapIndex: The index discounting off the exogenous curve.
+        """
         ...
     def fixing(self, fixing_date: Date, forecast_todays_fixing: bool = False) -> float:
-        """The underlying swap's fair rate, the at-the-money forward the
-        volatility cubes read."""
+        """Return the underlying swap's fair rate for fixing_date.
+
+        This is the at-the-money forward the volatility cubes read.
+
+        Args:
+            fixing_date (Date): The date the underlying swap is struck off.
+            forecast_todays_fixing (bool): Whether a fixing dated today is
+                forecast rather than looked up.
+
+        Returns:
+            float: The fair rate of the underlying swap.
+
+        Raises:
+            ItofinError: If the forwarding handle is empty, the evaluation date
+                is unset, or the fixing date is invalid.
+        """
         ...
-    def currency(self) -> Currency: ...
-    def fixed_leg_tenor(self) -> Period: ...
-    def exogenous_discount(self) -> bool: ...
+    def currency(self) -> Currency:
+        """Return the index currency, read back off the core index.
+
+        Returns:
+            Currency: The currency the index was built with.
+        """
+        ...
+    def fixed_leg_tenor(self) -> Period:
+        """Return the fixed leg's payment tenor.
+
+        Returns:
+            Period: The fixed-leg tenor.
+        """
+        ...
+    def exogenous_discount(self) -> bool:
+        """Return whether the index discounts off a separate curve.
+
+        Returns:
+            bool: True if the index was built by with_exogenous_discount.
+        """
+        ...
 
 class CpiInterpolationType:
     """How a CPI observation interpolates between the index fixings bracketing
