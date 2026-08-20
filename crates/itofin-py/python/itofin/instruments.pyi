@@ -1057,7 +1057,31 @@ class CreditDefaultSwap:
         settles_accrual: bool,
         pays_at_default_time: bool,
         settings: Settings,
-    ) -> None: ...
+    ) -> None:
+        """Build a contract on the C++ default terms.
+
+        Args:
+            side (ProtectionSide): Whether protection is bought or sold.
+            notional (float): The notional the premium and protection are
+                quoted on.
+            spread (float): The running spread the premium leg pays.
+            schedule (Schedule): The premium leg's payment schedule.
+            payment_convention (BusinessDayConvention): The roll applied to the
+                premium payment dates.
+            day_counter (DayCounter): The day count the premium accrues on.
+            settles_accrual (bool): Whether the accrued coupon settles on
+                default.
+            pays_at_default_time (bool): Whether the protection pays at default
+                rather than at maturity.
+            settings (Settings): The explicit settings supplying the evaluation
+                date the contract prices against.
+
+        Raises:
+            ItofinError: If the schedule is empty, if the protection start
+                follows the first accrual date under a pre-Big-Bang
+                date-generation rule, or if the premium leg cannot be built.
+        """
+        ...
     @staticmethod
     def with_terms(
         side: ProtectionSide,
@@ -1072,60 +1096,189 @@ class CreditDefaultSwap:
         pays_at_default_time: bool = True,
         rebates_accrual: bool = True,
     ) -> CreditDefaultSwap:
-        """A contract quoting the terms __init__ defaults. protection_start is
-        the first date a default triggers the contract; None takes the
-        schedule's first date, which is what __init__ does. settings precedes
-        the defaulted terms because a required argument cannot follow an
-        optional one."""
+        """Build a contract quoting the terms __init__ defaults.
+
+        The three flags carry the core defaults verbatim, so calling this with
+        only the positional arguments builds exactly what __init__ builds.
+
+        Args:
+            side (ProtectionSide): Whether protection is bought or sold.
+            notional (float): The notional the premium and protection are
+                quoted on.
+            spread (float): The running spread the premium leg pays.
+            schedule (Schedule): The premium leg's payment schedule.
+            payment_convention (BusinessDayConvention): The roll applied to the
+                premium payment dates.
+            day_counter (DayCounter): The day count the premium accrues on.
+            settings (Settings): The explicit settings; it precedes the
+                defaulted terms because a Python signature cannot put a
+                required argument after an optional one.
+            protection_start (Date | None): The first date a default triggers
+                the contract; None takes the schedule's first date, which is
+                what __init__ does.
+            settles_accrual (bool): Whether the accrued coupon settles on
+                default.
+            pays_at_default_time (bool): Whether the protection pays at default
+                rather than at maturity.
+            rebates_accrual (bool): Whether the protection seller rebates the
+                accrued current coupon.
+
+        Returns:
+            CreditDefaultSwap: The contract on those terms.
+
+        Raises:
+            ItofinError: On the same conditions __init__ reports.
+        """
         ...
     def set_engine(self, engine: MidPointCdsEngine) -> None:
-        """Price the contract off a default-probability and a discount curve.
-        The engine must resolve its dates against the same Settings object as
-        this contract."""
+        """Attach a mid-point engine so the contract prices.
+
+        The engine is built separately, so one engine can be shared across
+        contracts. It must resolve its dates against the same Settings object
+        as this contract.
+
+        Args:
+            engine (MidPointCdsEngine): The engine and its default-probability
+                and discount curves.
+        """
         ...
     def set_isda_engine(self, engine: IsdaCdsEngine) -> None:
-        """Price the contract under the ISDA standard model. A separate setter
-        because the two engine classes are unrelated; the same same-Settings
-        rule applies, and the ISDA engine additionally refuses curves outside
-        its specification when the contract prices."""
+        """Attach an ISDA engine so the contract prices under the standard model.
+
+        A separate setter rather than a widened set_engine: the two engine
+        facades are unrelated classes, so one argument cannot name both. The
+        same sharing and same-Settings rules apply, and the ISDA engine
+        additionally refuses curves outside its specification when the contract
+        prices.
+
+        Args:
+            engine (IsdaCdsEngine): The ISDA engine and its curves.
+        """
         ...
     def calculate(self) -> None:
-        """Forces the valuation. Idempotent."""
+        """Force the valuation. Idempotent.
+
+        Raises:
+            ItofinError: If no engine is attached, no evaluation date is set,
+                or the engine refuses the contract.
+        """
         ...
-    def is_calculated(self) -> bool: ...
+    def is_calculated(self) -> bool:
+        """Return whether the cached results are currently valid.
+
+        Returns:
+            bool: True when the next accessor reads the cache.
+        """
+        ...
     def price(self, engine: MidPointCdsEngine) -> float:
-        """set_engine followed by npv, in one call. The mid-point engine is the
-        primary; set_isda_engine stays a separate setter."""
+        """Attach the mid-point engine and return the NPV.
+
+        set_engine followed by npv, in one call. The mid-point engine is the
+        primary because it is the core's own default CDS engine;
+        set_isda_engine stays a separate setter.
+
+        Args:
+            engine (MidPointCdsEngine): The engine to install and price on.
+
+        Returns:
+            float: The contract value.
+
+        Raises:
+            ItofinError: On anything that makes the valuation fail.
+        """
         ...
-    def results(self) -> Results: ...
+    def results(self) -> Results:
+        """Return a frozen snapshot of the valuation, calculating first.
+
+        Returns:
+            Results: A copy of the valuation results.
+
+        Raises:
+            ItofinError: On anything that makes the valuation fail.
+        """
+        ...
     def npv(self) -> float:
-        """Raises ItofinError with no engine attached."""
+        """Return the contract NPV under the attached engine.
+
+        Returns:
+            float: The present value.
+
+        Raises:
+            ItofinError: If no engine is attached, which the core reports as
+                "null pricing engine".
+        """
         ...
     def fair_spread(self) -> float:
-        """The running spread that prices the contract at zero. Raises
-        ItofinError with no engine attached, and when the engine priced a
-        worthless premium leg and so provided no fair spread."""
+        """Return the running spread that prices the contract at zero.
+
+        Returns:
+            float: The fair running spread.
+
+        Raises:
+            ItofinError: If no engine is attached, and when the engine priced a
+                worthless premium leg and so provided no fair spread.
+        """
         ...
     def fair_upfront(self) -> float:
-        """The upfront that prices the contract at zero, as a fraction of the
-        notional. Raises ItofinError as fair_spread does."""
+        """Return the upfront that prices the contract at zero.
+
+        Returns:
+            float: The fair upfront, as a fraction of the notional.
+
+        Raises:
+            ItofinError: On the same conditions fair_spread reports.
+        """
         ...
     def notional(self) -> float:
-        """The notional the premium and the protection are quoted on."""
+        """Return the notional the premium and the protection are quoted on.
+
+        Returns:
+            float: The contract notional.
+        """
         ...
     def accrual_rebate_amount(self) -> float | None:
-        """The accrued coupon the protection seller rebates, or None when the
-        contract does not rebate accrual at all. A contract traded in the past
-        still carries the flow, with a real amount but a past settlement date
-        that keeps it out of the value, so None means the flag rather than a
-        stale trade."""
+        """Return the accrued coupon the protection seller rebates.
+
+        A contract traded in the past still carries the flow: the core builds
+        it whenever the flag is set, regardless of the trade date, so None here
+        means the flag was off, never a stale trade. Such a flow carries a real
+        accrued amount but settled on a past date, so it no longer reaches the
+        value. The amount is returned bare rather than behind a cash-flow
+        facade, there being none.
+
+        Returns:
+            float | None: The rebated amount, or None when the contract does
+                not rebate accrual at all.
+        """
         ...
     def accrual_rebate_date(self) -> Date | None:
-        """The date the accrual rebate settles on, the same cash-settlement date
-        the upfront pays on. None on the same terms as accrual_rebate_amount."""
+        """Return the date the accrual rebate settles on.
+
+        Returns:
+            Date | None: The cash-settlement date the upfront also pays on, or
+                None on the same terms as accrual_rebate_amount.
+        """
         ...
-    def coupon_leg_npv(self) -> float: ...
-    def default_leg_npv(self) -> float: ...
+    def coupon_leg_npv(self) -> float:
+        """Return the premium leg's NPV.
+
+        Returns:
+            float: The present value of the premium leg.
+
+        Raises:
+            ItofinError: On the same conditions fair_spread reports.
+        """
+        ...
+    def default_leg_npv(self) -> float:
+        """Return the protection leg's NPV.
+
+        Returns:
+            float: The present value of the protection leg.
+
+        Raises:
+            ItofinError: On the same conditions fair_spread reports.
+        """
+        ...
     def implied_hazard_rate(
         self,
         target_npv: float,
@@ -1135,16 +1288,32 @@ class CreditDefaultSwap:
         accuracy: float,
         model: PricingModel,
     ) -> float:
-        """The flat hazard rate at which this contract is worth target_npv.
+        """Return the flat hazard rate at which this contract is worth target_npv.
 
         The solve stands on its own engine rather than on whichever one
-        set_engine attached, so there is no probability-curve argument:
-        day_counter counts the flat curve the solve builds, not the contract.
-        Under PricingModel.Isda both it and discount must count Act/365 (Fixed),
-        which is what the ISDA engine requires of its curves.
+        set_engine attached: it builds a flat, quote-backed probability curve
+        and prices on model against discount. There is therefore no
+        probability-curve argument - the curve being solved for is the one the
+        core builds.
 
-        Raises ItofinError on a malformed contract and when the solve does not
-        converge, which includes a pricing failure at some hazard rate."""
+        Args:
+            target_npv (float): The value the contract is solved to.
+            discount (YieldTermStructure): The curve the flows discount on.
+            day_counter (DayCounter): The day count of the internal flat curve,
+                not of the contract. Under PricingModel.Isda both it and
+                discount must count Act/365 (Fixed), which is what the ISDA
+                engine requires of its curves.
+            recovery_rate (float): The recovery assumed on default.
+            accuracy (float): The tolerance the solve stops at, on the rate.
+            model (PricingModel): The model the contract is inverted under.
+
+        Returns:
+            float: The flat hazard rate.
+
+        Raises:
+            ItofinError: On a malformed contract, and when the solve does not
+                converge, which includes a pricing failure at some hazard rate.
+        """
         ...
 
 class MakeCreditDefaultSwap:
@@ -1169,12 +1338,41 @@ class MakeCreditDefaultSwap:
         side: ProtectionSide | None = None,
         trade_date: Date | None = None,
     ) -> None:
-        """trade_date overrides the evaluation date the trade is otherwise dated
-        off, which is how a contract traded in the past is built."""
+        """Store the configuration the chain is assembled from in build().
+
+        Each build() runs a fresh chain, so one builder object cannot carry a
+        setting into a later contract.
+
+        Args:
+            term_date (Date): The maturity the premium schedule is derived
+                from.
+            running_spread (float): The running spread the premium leg pays.
+            settings (Settings): The explicit settings supplying the evaluation
+                date the trade is dated off.
+            nominal (float | None): The notional; None keeps the core default
+                of 1.
+            upfront_rate (float | None): The upfront as a fraction of the
+                notional; None keeps the core default of none.
+            side (ProtectionSide | None): Which side the contract holds; None
+                keeps the core default of Buyer.
+            trade_date (Date | None): Overrides the evaluation date the trade
+                is otherwise dated off, which is how a contract traded in the
+                past is built.
+        """
         ...
     def build(self) -> CreditDefaultSwap:
-        """The built contract, which carries no engine. Raises ItofinError with
-        no evaluation date set, the trade date being derived from it."""
+        """Build the contract, which carries no engine.
+
+        Attach one with set_engine or set_isda_engine before pricing.
+
+        Returns:
+            CreditDefaultSwap: The contract on the market conventions.
+
+        Raises:
+            ItofinError: If no evaluation date is set, the trade date being
+                derived from it, and on whatever the contract construction
+                rejects.
+        """
         ...
 
 class ZeroCouponInflationSwap:
