@@ -23,17 +23,105 @@ from itofin.time import (
 )
 
 class YieldTermStructure:
-    """Shared base for every yield curve: discount factors, zero and forward rates."""
+    """Shared base for every yield curve: discount factors, zero and forward rates.
 
-    def discount(self, t: float, extrapolate: bool = False) -> float: ...
-    def discount_date(self, date: Date, extrapolate: bool = False) -> float: ...
-    def zero_rate(self, t: float, extrapolate: bool = False) -> float: ...
-    def forward_rate(self, t1: float, t2: float, extrapolate: bool = False) -> float: ...
-    def reference_date(self) -> Date: ...
-    def max_date(self) -> Date: ...
-    def allows_extrapolation(self) -> bool: ...
-    def enable_extrapolation(self) -> None: ...
-    def disable_extrapolation(self) -> None: ...
+    Concrete curves subclass this and supply only their constructor; the whole
+    query surface below is inherited.
+    """
+
+    def discount(self, t: float, extrapolate: bool = False) -> float:
+        """Return the discount factor at year-fraction t.
+
+        Args:
+            t (float): The year fraction, in the curve's own day count.
+            extrapolate (bool): Whether to answer past the curve's max date.
+
+        Returns:
+            float: The discount factor.
+
+        Raises:
+            ItofinError: If t is past the curve's range and neither extrapolate
+                nor the curve's own extrapolation flag allows it.
+        """
+        ...
+    def discount_date(self, date: Date, extrapolate: bool = False) -> float:
+        """Return the discount factor from date back to the reference date.
+
+        Args:
+            date (Date): The date discounted from.
+            extrapolate (bool): Whether to answer past the curve's max date.
+
+        Returns:
+            float: The discount factor.
+
+        Raises:
+            ItofinError: If date is past the curve's range and extrapolation is
+                not allowed.
+        """
+        ...
+    def zero_rate(self, t: float, extrapolate: bool = False) -> float:
+        """Return the continuously-compounded zero rate at year-fraction t.
+
+        Args:
+            t (float): The year fraction, in the curve's own day count.
+            extrapolate (bool): Whether to answer past the curve's max date.
+
+        Returns:
+            float: The zero rate, continuously compounded at annual frequency.
+
+        Raises:
+            ItofinError: If t is past the curve's range and extrapolation is
+                not allowed.
+        """
+        ...
+    def forward_rate(self, t1: float, t2: float, extrapolate: bool = False) -> float:
+        """Return the continuously-compounded forward rate between t1 and t2.
+
+        Args:
+            t1 (float): The start year fraction.
+            t2 (float): The end year fraction.
+            extrapolate (bool): Whether to answer past the curve's max date.
+
+        Returns:
+            float: The forward rate, continuously compounded at annual
+                frequency.
+
+        Raises:
+            ItofinError: If either time is past the curve's range and
+                extrapolation is not allowed.
+        """
+        ...
+    def reference_date(self) -> Date:
+        """Return the date at which the discount factor is 1.0.
+
+        Returns:
+            Date: The curve's reference date.
+
+        Raises:
+            ItofinError: On a curve whose reference date moves with an
+                evaluation date that is not set.
+        """
+        ...
+    def max_date(self) -> Date:
+        """Return the latest date for which the curve can return values.
+
+        Returns:
+            Date: The curve's maximum date.
+        """
+        ...
+    def allows_extrapolation(self) -> bool:
+        """Return whether the curve answers dates and times beyond its maximum.
+
+        Returns:
+            bool: True when extrapolation is enabled on the curve itself.
+        """
+        ...
+    def enable_extrapolation(self) -> None:
+        """Allow extrapolation past the maximum date and time."""
+        ...
+    def disable_extrapolation(self) -> None:
+        """Forbid extrapolation past the maximum date and time."""
+        ...
 
 class BlackVolTermStructure:
     """Shared base for every Black-volatility surface: spot and forward vol/variance."""
@@ -52,14 +140,30 @@ class BlackVolTermStructure:
     def disable_extrapolation(self) -> None: ...
 
 class FlatForward(YieldTermStructure):
-    """A flat continuously-compounded yield curve behind a Handle."""
+    """A flat continuously-compounded yield curve behind a Handle.
 
-    def __init__(self, reference_date: Date, rate: float, day_counter: DayCounter) -> None: ...
+    Built at annual frequency with continuous compounding, the convention every
+    downstream Heston and Hull-White oracle assumes.
+    """
+
+    def __init__(self, reference_date: Date, rate: float, day_counter: DayCounter) -> None:
+        """Build the flat curve.
+
+        Args:
+            reference_date (Date): The date at which the discount factor is
+                1.0.
+            rate (float): The flat rate, continuously compounded at annual
+                frequency.
+            day_counter (DayCounter): The day count times are measured in.
+        """
+        ...
 
 class ZeroCurve(YieldTermStructure):
-    """A yield curve interpolating continuously-compounded zero rates between
-    nodes. The first date is the reference date; finite in time. interpolation is
-    "Linear" (default) or "Cubic"."""
+    """A yield curve interpolating continuously-compounded zero rates between nodes.
+
+    The first date is the reference date. Finite in time: queries past the last
+    node require enable_extrapolation() or extrapolate=True.
+    """
 
     def __init__(
         self,
@@ -67,12 +171,30 @@ class ZeroCurve(YieldTermStructure):
         yields: list[float],
         day_counter: DayCounter,
         interpolation: str = "Linear",
-    ) -> None: ...
+    ) -> None:
+        """Build the curve over its (date, zero-rate) nodes.
+
+        Args:
+            dates (list[Date]): The node dates, the first being the reference
+                date.
+            yields (list[float]): The continuously-compounded zero rate at each
+                node.
+            day_counter (DayCounter): The day count turning dates into times.
+            interpolation (str): "Linear", the shipped behaviour, or "Cubic",
+                the Kruger cubic factory, which is non-monotonic.
+
+        Raises:
+            ItofinError: On an unknown interpolation name, and on whatever the
+                core rejects about the nodes.
+        """
+        ...
 
 class DiscountCurve(YieldTermStructure):
-    """A yield curve interpolating discount factors between nodes. The first date
-    is the reference date and its discount must be 1.0. interpolation is
-    "LogLinear" (default, piecewise-constant forwards) or "Cubic"."""
+    """A yield curve interpolating discount factors between nodes.
+
+    The first date is the reference date and its discount must be 1.0. Finite
+    in time: queries past the last node require extrapolation.
+    """
 
     def __init__(
         self,
@@ -81,23 +203,68 @@ class DiscountCurve(YieldTermStructure):
         day_counter: DayCounter,
         calendar: Calendar | None = None,
         interpolation: str = "LogLinear",
-    ) -> None: ...
+    ) -> None:
+        """Build the curve over its (date, discount-factor) nodes.
+
+        Args:
+            dates (list[Date]): The node dates, the first being the reference
+                date.
+            discounts (list[float]): The discount factor at each node; the
+                first must be 1.0.
+            day_counter (DayCounter): The day count turning dates into times.
+            calendar (Calendar | None): The curve's calendar; unlike the other
+                two node curves this constructor accepts one.
+            interpolation (str): "LogLinear", the shipped behaviour, giving
+                piecewise-constant forwards, or "Cubic", which is
+                non-monotonic.
+
+        Raises:
+            ItofinError: On an unknown interpolation name, and on whatever the
+                core rejects about the nodes.
+        """
+        ...
 
 class ForwardCurve(YieldTermStructure):
     """A yield curve interpolating instantaneous forward rates backward-flat.
-    The first date is the reference date; finite in time."""
+
+    The first date is the reference date. Finite in time. Unlike ZeroCurve and
+    DiscountCurve this curve offers no cubic option, QuantLib-SWIG exposing its
+    cubic curve on the zero and discount curves only.
+    """
 
     def __init__(
         self,
         dates: list[Date],
         forwards: list[float],
         day_counter: DayCounter,
-    ) -> None: ...
+    ) -> None:
+        """Build the curve over its (date, forward-rate) nodes.
+
+        Args:
+            dates (list[Date]): The node dates, the first being the reference
+                date.
+            forwards (list[float]): The instantaneous forward rate at each
+                node.
+            day_counter (DayCounter): The day count turning dates into times.
+
+        Raises:
+            ItofinError: On whatever the core rejects about the nodes.
+        """
+        ...
 
 class PiecewiseYieldCurve(YieldTermStructure):
-    """A yield curve bootstrapped from a strip of rate helpers, one node per
-    helper maturity. The bootstrap is lazy: it runs on the first query, not at
-    construction. interpolation is "LogLinear" (default) or "Linear"."""
+    """A yield curve bootstrapped from a strip of rate helpers, one node per maturity.
+
+    Every helper is solved so it reprices its own market quote off the curve.
+    This string-dispatch alias covers the Discount convention; the other
+    bootstrap conventions are reached through the named Piecewise* classes,
+    which also expose node introspection.
+
+    The bootstrap is lazy: construction only rejects an empty helper list, and
+    the solver runs on the first query, re-running after a helper-quote or
+    evaluation-date change. A bootstrap failure therefore surfaces from the
+    query methods, not from the constructor.
+    """
 
     def __init__(
         self,
@@ -105,63 +272,212 @@ class PiecewiseYieldCurve(YieldTermStructure):
         helpers: list[RateHelper],
         day_counter: DayCounter,
         interpolation: str = "LogLinear",
-    ) -> None: ...
+    ) -> None:
+        """Build the curve over helpers with a fixed reference date.
+
+        Args:
+            reference_date (Date): The curve's reference date, typically the
+                settlement date the caller computed.
+            helpers (list[RateHelper]): The bootstrap instruments; any
+                RateHelper subclass is accepted.
+            day_counter (DayCounter): The day count turning dates into times.
+            interpolation (str): "LogLinear" or "Linear". "Cubic" is refused: a
+                global interpolator cannot converge under the single-pass
+                bootstrap, and it is available on ZeroCurve and DiscountCurve
+                instead.
+
+        Raises:
+            ItofinError: On an empty helper list and on an unknown or refused
+                interpolation name.
+        """
+        ...
 
 class PiecewiseLogLinearDiscount(YieldTermStructure):
-    """A curve bootstrapped in discount-factor space with log-linear interpolation
-    (PiecewiseYieldCurve<Discount, LogLinear>). data() are discount factors, so
-    data()[0] is the reference node's 1.0."""
+    """A curve bootstrapped in discount-factor space with log-linear interpolation.
+
+    The verbatim QuantLib-SWIG name for the blessed (Discount, LogLinear)
+    combination. Unlike the PiecewiseYieldCurve alias, the named class retains
+    the concrete curve so it can expose the node introspection the erased
+    handle discards. data() are discount factors, so data()[0] is the reference
+    node's 1.0.
+    """
 
     def __init__(
         self,
         reference_date: Date,
         helpers: list[RateHelper],
         day_counter: DayCounter,
-    ) -> None: ...
-    def dates(self) -> list[Date]: ...
-    def data(self) -> list[float]: ...
+    ) -> None:
+        """Build the curve over helpers with a fixed reference date.
+
+        Args:
+            reference_date (Date): The curve's reference date.
+            helpers (list[RateHelper]): The bootstrap instruments; any
+                RateHelper subclass is accepted.
+            day_counter (DayCounter): The day count turning dates into times.
+
+        Raises:
+            ItofinError: On an empty helper list.
+        """
+        ...
+    def dates(self) -> list[Date]:
+        """Return the bootstrapped node dates, triggering the lazy bootstrap.
+
+        Returns:
+            list[Date]: One date per helper maturity, plus the reference node.
+
+        Raises:
+            ItofinError: On a bootstrap failure.
+        """
+        ...
+    def data(self) -> list[float]:
+        """Return the bootstrapped node values, triggering the lazy bootstrap.
+
+        Returns:
+            list[float]: The discount factors, the first being 1.0.
+
+        Raises:
+            ItofinError: On a bootstrap failure.
+        """
+        ...
 
 class PiecewiseLinearZero(YieldTermStructure):
-    """A curve bootstrapped in zero-rate space with linear interpolation
-    (PiecewiseYieldCurve<ZeroYield, Linear>). data() are zero rates."""
+    """A curve bootstrapped in zero-rate space with linear interpolation.
+
+    The verbatim QuantLib-SWIG name for the blessed (ZeroYield, Linear)
+    combination. data() are continuously-compounded zero rates, so data()[0]
+    mirrors the first solved pillar's rate rather than a 1.0 discount.
+    """
 
     def __init__(
         self,
         reference_date: Date,
         helpers: list[RateHelper],
         day_counter: DayCounter,
-    ) -> None: ...
-    def dates(self) -> list[Date]: ...
-    def data(self) -> list[float]: ...
+    ) -> None:
+        """Build the curve over helpers with a fixed reference date.
+
+        Args:
+            reference_date (Date): The curve's reference date.
+            helpers (list[RateHelper]): The bootstrap instruments.
+            day_counter (DayCounter): The day count turning dates into times.
+
+        Raises:
+            ItofinError: On an empty helper list.
+        """
+        ...
+    def dates(self) -> list[Date]:
+        """Return the bootstrapped node dates, triggering the lazy bootstrap.
+
+        Returns:
+            list[Date]: One date per helper maturity, plus the reference node.
+
+        Raises:
+            ItofinError: On a bootstrap failure.
+        """
+        ...
+    def data(self) -> list[float]:
+        """Return the bootstrapped node values, triggering the lazy bootstrap.
+
+        Returns:
+            list[float]: The zero rates at the nodes.
+
+        Raises:
+            ItofinError: On a bootstrap failure.
+        """
+        ...
 
 class PiecewiseLinearForward(YieldTermStructure):
-    """A curve bootstrapped in instantaneous forward-rate space with linear
-    interpolation (PiecewiseYieldCurve<ForwardRate, Linear>). data() are forward
-    rates."""
+    """A curve bootstrapped in instantaneous forward-rate space, interpolating linearly.
+
+    The verbatim QuantLib-SWIG name for the blessed (ForwardRate, Linear)
+    combination. data() are instantaneous forward rates.
+    """
 
     def __init__(
         self,
         reference_date: Date,
         helpers: list[RateHelper],
         day_counter: DayCounter,
-    ) -> None: ...
-    def dates(self) -> list[Date]: ...
-    def data(self) -> list[float]: ...
+    ) -> None:
+        """Build the curve over helpers with a fixed reference date.
+
+        Args:
+            reference_date (Date): The curve's reference date.
+            helpers (list[RateHelper]): The bootstrap instruments.
+            day_counter (DayCounter): The day count turning dates into times.
+
+        Raises:
+            ItofinError: On an empty helper list.
+        """
+        ...
+    def dates(self) -> list[Date]:
+        """Return the bootstrapped node dates, triggering the lazy bootstrap.
+
+        Returns:
+            list[Date]: One date per helper maturity, plus the reference node.
+
+        Raises:
+            ItofinError: On a bootstrap failure.
+        """
+        ...
+    def data(self) -> list[float]:
+        """Return the bootstrapped node values, triggering the lazy bootstrap.
+
+        Returns:
+            list[float]: The instantaneous forward rates at the nodes.
+
+        Raises:
+            ItofinError: On a bootstrap failure.
+        """
+        ...
 
 class PiecewiseFlatForward(YieldTermStructure):
-    """A curve bootstrapped in instantaneous forward-rate space with backward-flat
-    interpolation (PiecewiseYieldCurve<ForwardRate, BackwardFlat>). Numerically
-    identical to PiecewiseLogLinearDiscount under every query; only data() (forward
-    rates vs discount factors) tells them apart."""
+    """A curve bootstrapped in forward-rate space, interpolating backward-flat.
+
+    The verbatim QuantLib-SWIG name for the blessed (ForwardRate, BackwardFlat)
+    combination. Piecewise-constant instantaneous forwards make it numerically
+    identical to PiecewiseLogLinearDiscount under every query; only data(),
+    forward rates against discount factors, tells the two apart.
+    """
 
     def __init__(
         self,
         reference_date: Date,
         helpers: list[RateHelper],
         day_counter: DayCounter,
-    ) -> None: ...
-    def dates(self) -> list[Date]: ...
-    def data(self) -> list[float]: ...
+    ) -> None:
+        """Build the curve over helpers with a fixed reference date.
+
+        Args:
+            reference_date (Date): The curve's reference date.
+            helpers (list[RateHelper]): The bootstrap instruments.
+            day_counter (DayCounter): The day count turning dates into times.
+
+        Raises:
+            ItofinError: On an empty helper list.
+        """
+        ...
+    def dates(self) -> list[Date]:
+        """Return the bootstrapped node dates, triggering the lazy bootstrap.
+
+        Returns:
+            list[Date]: One date per helper maturity, plus the reference node.
+
+        Raises:
+            ItofinError: On a bootstrap failure.
+        """
+        ...
+    def data(self) -> list[float]:
+        """Return the bootstrapped node values, triggering the lazy bootstrap.
+
+        Returns:
+            list[float]: The instantaneous forward rates at the nodes.
+
+        Raises:
+            ItofinError: On a bootstrap failure.
+        """
+        ...
 
 class BlackConstantVol(BlackVolTermStructure):
     """A flat Black volatility, constant in strike and time."""
