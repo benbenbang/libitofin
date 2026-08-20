@@ -472,10 +472,13 @@ class SwapIndex:
         ...
 
 class CpiInterpolationType:
-    """How a CPI observation interpolates between the index fixings bracketing
-    it. Flat reads the fixing of the lagged period outright; Linear advances
-    from it to the next period's fixing by how far the observation date has run
-    into its own period."""
+    """How a CPI observation interpolates between the index fixings bracketing it.
+
+    Flat reads the fixing of the lagged period outright; Linear advances from it
+    to the next period's fixing by how far the observation date has run into its
+    own period. The core's deprecated AsIndex variant is not ported and so has
+    no counterpart here.
+    """
 
     Flat: CpiInterpolationType
     Linear: CpiInterpolationType
@@ -487,52 +490,135 @@ class ZeroInflationIndex:
     The curve is reached through a relinkable handle the index owns, so an
     index can be built before the curve it forecasts off exists. The handle
     starts empty and a forecast before any link raises ItofinError; link_to
-    fills it."""
+    fills it.
+    """
 
     @staticmethod
     def uk_rpi(settings: Settings) -> ZeroInflationIndex:
-        """The UK Retail Price Index: monthly, one-month availability lag."""
+        """Return the UK Retail Price Index: monthly, one-month availability lag.
+
+        Args:
+            settings (Settings): The explicit settings supplying the evaluation
+                date and the stored fixings.
+
+        Returns:
+            ZeroInflationIndex: The "UK RPI" index, over an empty curve handle.
+        """
         ...
     @staticmethod
     def uk_hicp(settings: Settings) -> ZeroInflationIndex:
-        """The UK harmonised index of consumer prices."""
+        """Return the UK harmonised index of consumer prices.
+
+        Args:
+            settings (Settings): The explicit settings supplying the evaluation
+                date and the stored fixings.
+
+        Returns:
+            ZeroInflationIndex: The UK HICP index, over an empty curve handle.
+        """
         ...
     @staticmethod
     def eu_hicp(settings: Settings) -> ZeroInflationIndex:
-        """The euro-area harmonised index of consumer prices."""
+        """Return the euro-area harmonised index of consumer prices.
+
+        Args:
+            settings (Settings): The explicit settings supplying the evaluation
+                date and the stored fixings.
+
+        Returns:
+            ZeroInflationIndex: The EU HICP index, over an empty curve handle.
+        """
         ...
-    def name(self) -> str: ...
+    def name(self) -> str:
+        """Return the index name, under which fixings are stored.
+
+        Returns:
+            str: The name, e.g. "UK RPI".
+        """
+        ...
     def add_fixing(self, fixing_date: Date, value: float) -> None:
-        """Records a published figure across the whole inflation period it
-        describes, so a later read on any day inside that period finds it."""
+        """Record a published figure across the whole inflation period.
+
+        The figure is stored on every date of the period fixing_date falls in,
+        so a later read on any day inside that period finds it.
+
+        Args:
+            fixing_date (Date): Any date inside the inflation period the figure
+                describes.
+            value (float): The published index level.
+
+        Raises:
+            ItofinError: If the index frequency has no expressible inflation
+                period, or a different figure is already stored on a date in
+                that period.
+        """
         ...
     def fixing(self, fixing_date: Date, forecast_todays_fixing: bool = False) -> float:
-        """The fixing at fixing_date, stored or forecast off the linked curve.
+        """Return the fixing at fixing_date, stored or forecast off the linked curve.
 
-        forecast_todays_fixing is accepted and ignored, as in the core:
-        needs_forecast alone decides between history and forecast. A date the
-        store should cover but does not is an error, and a forecast with no
-        curve linked raises the empty-handle error."""
+        Args:
+            fixing_date (Date): The date the level is read or forecast for.
+            forecast_todays_fixing (bool): Accepted and ignored, as in the core:
+                needs_forecast alone decides between history and forecast.
+
+        Returns:
+            float: The index level.
+
+        Raises:
+            ItofinError: If a date the store should cover has no figure, or a
+                forecast is asked for with no curve linked.
+        """
         ...
     def last_fixing_date(self) -> Date:
-        """The first day of the inflation period the latest stored figure
-        describes. Raises ItofinError on an index with no history."""
+        """Return the first day of the period the latest stored figure describes.
+
+        Returns:
+            Date: The start of that inflation period.
+
+        Raises:
+            ItofinError: If the index has no fixing history.
+        """
         ...
     def link_to(self, curve: ZeroInflationTermStructure) -> None:
-        """Points the index at curve, so every forecast from here on compounds
-        off it.
+        """Point the index at curve, so every forecast from here on compounds off it.
 
         Takes the ZeroInflationTermStructure base, so any subclass links. It is
         the curve behind that facade's handle at call time that is stored, not
         the handle itself: relinking the facade afterwards leaves this index on
-        the curve it was given, and a later link_to is how it moves."""
+        the curve it was given, and a later link_to is how it moves.
+
+        Args:
+            curve (ZeroInflationTermStructure): The curve forecasts compound
+                off.
+
+        Raises:
+            ItofinError: If curve somehow carries no link.
+        """
         ...
     def needs_forecast(self, fixing_date: Date) -> bool:
-        """Whether fixing_date has to be forecast rather than read from
-        history, decided against the latest period that could have been
-        published by the settings' evaluation date."""
+        """Return whether fixing_date has to be forecast rather than read from history.
+
+        Decided against the latest period that could have been published by the
+        settings' evaluation date.
+
+        Args:
+            fixing_date (Date): The date in question.
+
+        Returns:
+            bool: True if the date has to be forecast off the curve.
+
+        Raises:
+            ItofinError: If the evaluation date is unset, or the index frequency
+                has no expressible inflation period.
+        """
         ...
-    def __repr__(self) -> str: ...
+    def __repr__(self) -> str:
+        """Return the printable representation.
+
+        Returns:
+            str: A string of the form ZeroInflationIndex(UK RPI).
+        """
+        ...
 
 class YoYInflationIndex:
     """An index publishing one year-on-year inflation rate per period, read
@@ -549,7 +635,8 @@ class YoYInflationIndex:
 
     The quoted constructor spells its region and currency out as their component
     fields: neither core type has a Python facade, and defaulting the currency
-    metadata would put made-up values on the index."""
+    metadata would put made-up values on the index.
+    """
 
     def __init__(
         self,
@@ -566,42 +653,153 @@ class YoYInflationIndex:
         currency_fraction_symbol: str,
         currency_fractions_per_unit: int,
         settings: Settings,
-    ) -> None: ...
+    ) -> None:
+        """Build a quoted year-on-year index, keeping its own fixing history.
+
+        The rate is published in its own right rather than derived from a price
+        index, so fixings are filed here through add_fixing.
+
+        Args:
+            family_name (str): The index family the fixings are stored under.
+            region_name (str): The name of the region the index measures.
+            region_code (str): The region's code.
+            revised (bool): Whether the published figures are subject to
+                revision.
+            frequency (Frequency): How often the index publishes.
+            availability_lag (Period): How long after a period ends its figure
+                is published.
+            currency_name (str): The currency's name.
+            currency_code (str): The currency's ISO 4217 three-letter code.
+            currency_numeric_code (int): The currency's ISO 4217 numeric code.
+            currency_symbol (str): The currency's symbol.
+            currency_fraction_symbol (str): The symbol of the currency's
+                fractional unit.
+            currency_fractions_per_unit (int): How many fractional units make
+                one currency unit.
+            settings (Settings): The explicit settings supplying the evaluation
+                date and the stored fixings.
+        """
+        ...
     @staticmethod
     def from_underlying(underlying: ZeroInflationIndex) -> YoYInflationIndex:
-        """A ratio index over underlying, dividing that index's figure for a
-        period by its figure a year earlier. The metadata is inherited bar the
-        family name, which is prefixed YYR_, so a "UK RPI" underlying yields
-        "UK YYR_RPI"; fixings belong on the underlying."""
+        """Build a ratio index dividing a price index's figure by its figure a year earlier.
+
+        The metadata is inherited bar the family name, which is prefixed YYR_,
+        so a "UK RPI" underlying yields "UK YYR_RPI"; fixings belong on the
+        underlying.
+
+        Args:
+            underlying (ZeroInflationIndex): The price index whose consecutive
+                figures the rate is derived from.
+
+        Returns:
+            YoYInflationIndex: The ratio index, over an empty curve handle.
+        """
         ...
-    def name(self) -> str: ...
-    def ratio(self) -> bool: ...
+    def name(self) -> str:
+        """Return the index name, under which fixings are stored.
+
+        Returns:
+            str: The name, e.g. "UK YYR_RPI".
+        """
+        ...
+    def ratio(self) -> bool:
+        """Return whether this index is the ratio of two price-index fixings.
+
+        Returns:
+            bool: True for a ratio index, False for a quoted rate.
+        """
+        ...
     def underlying_index(self) -> ZeroInflationIndex | None:
-        """The price index a ratio index divides, None on a quoted one. This is
-        the very object from_underlying was handed, not a fresh facade around
-        the same core index."""
+        """Return the price index a ratio index divides, None on a quoted one.
+
+        This is the very object from_underlying was handed, not a fresh facade
+        around the same core index: a rebuilt one would carry a relinkable
+        handle this index never sees, so linking it would silently forecast off
+        nothing.
+
+        Returns:
+            ZeroInflationIndex | None: The underlying price index, or None.
+        """
         ...
     def add_fixing(self, fixing_date: Date, value: float) -> None:
-        """Records a published year-on-year rate across the whole inflation
-        period it describes. A ratio index reads the underlying's history, so
-        filing here records a figure it will never consult."""
+        """Record a published year-on-year rate across the whole inflation period.
+
+        A ratio index reads the underlying's history, so filing here records a
+        figure it will never consult.
+
+        Args:
+            fixing_date (Date): Any date inside the inflation period the rate
+                describes.
+            value (float): The published year-on-year rate.
+
+        Raises:
+            ItofinError: If the index frequency has no expressible inflation
+                period, or a different figure is already stored on a date in
+                that period.
+        """
         ...
     def fixing(self, fixing_date: Date, forecast_todays_fixing: bool = False) -> float:
-        """The rate at fixing_date, stored or forecast off the linked curve.
-        forecast_todays_fixing is accepted and ignored, as in the core."""
+        """Return the rate at fixing_date, stored or forecast off the linked curve.
+
+        Args:
+            fixing_date (Date): The date the rate is read or forecast for.
+            forecast_todays_fixing (bool): Accepted and ignored, as in the core:
+                needs_forecast alone decides between history and forecast.
+
+        Returns:
+            float: The year-on-year inflation rate.
+
+        Raises:
+            ItofinError: If a forecast is asked for with no curve linked.
+        """
         ...
     def last_fixing_date(self) -> Date:
-        """The first day of the inflation period the latest figure on record
-        describes, read off the underlying on a ratio index. Raises ItofinError
-        on an index with no history."""
+        """Return the first day of the period the latest figure on record describes.
+
+        Read off the underlying on a ratio index.
+
+        Returns:
+            Date: The start of that inflation period.
+
+        Raises:
+            ItofinError: If the index has no fixing history.
+        """
         ...
     def link_to(self, curve: YoYInflationTermStructure) -> None:
-        """Points the index at curve, so every forecast from here on reads it.
-        It is the curve behind that facade's handle at call time that is stored,
-        not the handle itself."""
+        """Point the index at curve, so every forecast from here on reads it.
+
+        Takes the YoYInflationTermStructure base, so any subclass links. It is
+        the curve behind that facade's handle at call time that is stored, not
+        the handle itself.
+
+        Args:
+            curve (YoYInflationTermStructure): The curve forecasts are read off.
+
+        Raises:
+            ItofinError: If curve somehow carries no link.
+        """
         ...
     def needs_forecast(self, fixing_date: Date) -> bool:
-        """Whether fixing_date has to be forecast rather than read from history,
-        a ratio index deferring the question to its underlying."""
+        """Return whether fixing_date has to be forecast rather than read from history.
+
+        A ratio index defers the question to its underlying.
+
+        Args:
+            fixing_date (Date): The date in question.
+
+        Returns:
+            bool: True if the date has to be forecast off the curve.
+
+        Raises:
+            ItofinError: If the evaluation date is unset, or the index frequency
+                has no expressible inflation period.
+        """
         ...
-    def __repr__(self) -> str: ...
+    def __repr__(self) -> str:
+        """Return the printable representation.
+
+        Returns:
+            str: A string of the form YoYInflationIndex(UK YYR_RPI).
+        """
+        ...
