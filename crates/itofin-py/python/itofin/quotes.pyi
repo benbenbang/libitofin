@@ -11,7 +11,7 @@ class SimpleQuote:
         """Initialize the quote.
 
         Args:
-            value: The initial market value.
+            value (float): The initial market value.
         """
         ...
 
@@ -19,7 +19,7 @@ class SimpleQuote:
         """Return the current value.
 
         Returns:
-            The quote's current market value.
+            float: The quote's current market value.
         """
         ...
 
@@ -27,7 +27,7 @@ class SimpleQuote:
         """Set a new value and notify observers.
 
         Args:
-            value: The new value; observers are notified when it actually
+            value (float): The new value; observers are notified when it actually
                 changes, so dependent valuations recompute on next access.
         """
         ...

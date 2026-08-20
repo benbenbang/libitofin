@@ -9,12 +9,12 @@ def is_imm_date(date: Date, main_cycle: bool = False) -> bool:
     September or December only when main_cycle is set.
 
     Args:
-        date: The date to test.
-        main_cycle: Restrict the test to the March/June/September/December
+        date (Date): The date to test.
+        main_cycle (bool): Restrict the test to the March/June/September/December
             cycle.
 
     Returns:
-        True when date is an IMM date under the selected cycle.
+        bool: True when date is an IMM date under the selected cycle.
     """
     ...
 
@@ -22,12 +22,12 @@ def next_imm_date(date: Date, main_cycle: bool = False) -> Date:
     """The next IMM date strictly following date.
 
     Args:
-        date: The date to start from; the result is strictly after it.
-        main_cycle: Restrict the result to the March/June/September/December
+        date (Date): The date to start from; the result is strictly after it.
+        main_cycle (bool): Restrict the result to the March/June/September/December
             cycle.
 
     Returns:
-        The next IMM date under the selected cycle.
+        Date: The next IMM date under the selected cycle.
     """
     ...
 
@@ -42,9 +42,9 @@ class Date:
         """Build a date from its three components.
 
         Args:
-            day: The day of the month, within the length of that month.
-            month: The month, from 1 to 12.
-            year: The year, from 1901 to 2199.
+            day (int): The day of the month, within the length of that month.
+            month (int): The month, from 1 to 12.
+            year (int): The year, from 1901 to 2199.
 
         Raises:
             ItofinError: If month is outside [1, 12], year is outside
@@ -71,10 +71,10 @@ class Date:
         """Shift the date forward by a number of calendar days.
 
         Args:
-            days: The number of calendar days to add.
+            days (int): The number of calendar days to add.
 
         Returns:
-            The shifted date.
+            Date: The shifted date.
 
         Raises:
             ItofinError: If the result falls outside the representable date
@@ -87,10 +87,10 @@ class Date:
         """Shift the date back by a number of calendar days.
 
         Args:
-            days: The number of calendar days to subtract.
+            days (int): The number of calendar days to subtract.
 
         Returns:
-            The shifted date.
+            Date: The shifted date.
 
         Raises:
             ItofinError: If the result falls outside the representable date
@@ -103,10 +103,10 @@ class Date:
         """The signed number of days from other to this date.
 
         Args:
-            other: The date to measure from.
+            other (Date): The date to measure from.
 
         Returns:
-            The signed day count between the two dates.
+            int: The signed day count between the two dates.
         """
         ...
 
@@ -114,10 +114,10 @@ class Date:
         """Whether the two dates are the same calendar day.
 
         Args:
-            other: The date to compare against.
+            other (object): The date to compare against.
 
         Returns:
-            True when both stand for the same day.
+            bool: True when both stand for the same day.
         """
         ...
 
@@ -125,7 +125,7 @@ class Date:
         """Return the constructor form of the date.
 
         Returns:
-            The date as Date(day, month, year).
+            str: The date as Date(day, month, year).
         """
         ...
 
@@ -136,8 +136,8 @@ class Period:
         """Build a period of n units.
 
         Args:
-            n: The length, which may be negative.
-            unit: One of "Days", "Weeks", "Months", "Years".
+            n (int): The length, which may be negative.
+            unit (str): One of "Days", "Weeks", "Months", "Years".
 
         Raises:
             ItofinError: If unit is not one of the four accepted strings.
@@ -149,10 +149,10 @@ class Period:
         while an undecidable pair such as 30 Days against 1 Month is not equal.
 
         Args:
-            other: The period to compare against.
+            other (object): The period to compare against.
 
         Returns:
-            True when the two lengths are decidably the same.
+            bool: True when the two lengths are decidably the same.
         """
         ...
 
@@ -163,7 +163,7 @@ class Period:
         every zero length onto 0 Days before the hash is taken.
 
         Returns:
-            The hash of the normalized length and unit.
+            int: The hash of the normalized length and unit.
         """
         ...
 
@@ -171,7 +171,7 @@ class Period:
         """Return the constructor form of the period.
 
         Returns:
-            The period as Period(length, unit).
+            str: The period as Period(length, unit).
         """
         ...
 
@@ -183,7 +183,7 @@ class Calendar:
         """The TARGET calendar.
 
         Returns:
-            The TARGET business-day calendar.
+            Calendar: The TARGET business-day calendar.
         """
         ...
 
@@ -192,7 +192,7 @@ class Calendar:
         """The calendar holding no holidays at all.
 
         Returns:
-            The null calendar, on which every day is a business day.
+            Calendar: The null calendar, on which every day is a business day.
         """
         ...
 
@@ -205,7 +205,7 @@ class Calendar:
         all, nor by a national calendar, which adds public holidays.
 
         Returns:
-            The weekends-only calendar.
+            Calendar: The weekends-only calendar.
         """
         ...
 
@@ -216,7 +216,7 @@ class Calendar:
         the core and differ solely in their name.
 
         Returns:
-            The UK settlement calendar.
+            Calendar: The UK settlement calendar.
         """
         ...
 
@@ -224,11 +224,11 @@ class Calendar:
         """Roll a date to the nearest business day.
 
         Args:
-            date: The date to roll.
-            convention: The rolling rule to apply.
+            date (Date): The date to roll.
+            convention (BusinessDayConvention): The rolling rule to apply.
 
         Returns:
-            The adjusted date, unchanged when it is already a business day.
+            Date: The adjusted date, unchanged when it is already a business day.
         """
         ...
 
@@ -243,15 +243,15 @@ class Calendar:
         """Advance a date by n units and adjust the result.
 
         Args:
-            date: The date to advance from.
-            n: The number of units to advance, which may be negative.
-            unit: One of "Days", "Weeks", "Months", "Years".
-            convention: The rule the advanced date is rolled under.
-            end_of_month: Keep the result on the month end when the starting
+            date (Date): The date to advance from.
+            n (int): The number of units to advance, which may be negative.
+            unit (str): One of "Days", "Weeks", "Months", "Years".
+            convention (BusinessDayConvention): The rule the advanced date is rolled under.
+            end_of_month (bool): Keep the result on the month end when the starting
                 date is one.
 
         Returns:
-            The advanced and adjusted date.
+            Date: The advanced and adjusted date.
 
         Raises:
             ItofinError: If unit is not one of the four accepted strings.
@@ -262,7 +262,7 @@ class Calendar:
         """Return the calendar and its name.
 
         Returns:
-            The calendar as Calendar(name).
+            str: The calendar as Calendar(name).
         """
         ...
 
@@ -274,7 +274,7 @@ class DayCounter:
         """The Actual/360 convention.
 
         Returns:
-            An Actual/360 day counter.
+            DayCounter: An Actual/360 day counter.
         """
         ...
 
@@ -283,7 +283,7 @@ class DayCounter:
         """The Actual/365 (Fixed) convention.
 
         Returns:
-            An Actual/365 (Fixed) day counter.
+            DayCounter: An Actual/365 (Fixed) day counter.
         """
         ...
 
@@ -292,7 +292,7 @@ class DayCounter:
         """The Actual/Actual (ISDA) convention.
 
         Returns:
-            An Actual/Actual day counter on the ISDA convention.
+            DayCounter: An Actual/Actual day counter on the ISDA convention.
         """
         ...
 
@@ -301,7 +301,7 @@ class DayCounter:
         """The 30/360 (Bond Basis) convention.
 
         Returns:
-            A 30/360 day counter on the bond-basis convention.
+            DayCounter: A 30/360 day counter on the bond-basis convention.
         """
         ...
 
@@ -309,11 +309,11 @@ class DayCounter:
         """The period [d1, d2] as a fraction of a year under this convention.
 
         Args:
-            d1: The start of the period.
-            d2: The end of the period.
+            d1 (Date): The start of the period.
+            d2 (Date): The end of the period.
 
         Returns:
-            The year fraction between the two dates.
+            float: The year fraction between the two dates.
         """
         ...
 
@@ -322,10 +322,10 @@ class DayCounter:
         are equal.
 
         Args:
-            other: The day counter to compare against.
+            other (object): The day counter to compare against.
 
         Returns:
-            True when both carry the same convention name.
+            bool: True when both carry the same convention name.
         """
         ...
 
@@ -333,7 +333,7 @@ class DayCounter:
         """Hashes the convention name, the field equality compares.
 
         Returns:
-            The hash of the convention name, so equal day counters hash equal.
+            int: The hash of the convention name, so equal day counters hash equal.
         """
         ...
 
@@ -341,7 +341,7 @@ class DayCounter:
         """Return the day counter and its convention name.
 
         Returns:
-            The day counter as DayCounter(name).
+            str: The day counter as DayCounter(name).
         """
         ...
 
@@ -410,13 +410,13 @@ class Schedule:
         """Build the schedule.
 
         Args:
-            start: The effective date, which must be strictly before end.
-            end: The termination date.
-            frequency: The coupon frequency the interior dates are spaced at.
-            calendar: The calendar the dates roll on.
-            convention: The rule every date but the last is rolled under.
-            rule: The date-generation rule; defaults to Forward.
-            termination_convention: The rule the last date is rolled under;
+            start (Date): The effective date, which must be strictly before end.
+            end (Date): The termination date.
+            frequency (Frequency): The coupon frequency the interior dates are spaced at.
+            calendar (Calendar): The calendar the dates roll on.
+            convention (BusinessDayConvention): The rule every date but the last is rolled under.
+            rule (DateGeneration): The date-generation rule; defaults to Forward.
+            termination_convention (BusinessDayConvention | None): The rule the last date is rolled under;
                 None applies convention to it as well.
 
         Raises:
@@ -428,7 +428,7 @@ class Schedule:
         """The number of dates in the schedule.
 
         Returns:
-            The date count, one more than the number of periods.
+            int: The date count, one more than the number of periods.
         """
         ...
 
@@ -436,10 +436,10 @@ class Schedule:
         """The i-th date in the schedule.
 
         Args:
-            i: The zero-based index into the dates.
+            i (int): The zero-based index into the dates.
 
         Returns:
-            The date at that index.
+            Date: The date at that index.
 
         Raises:
             ItofinError: If i is out of range.
@@ -450,6 +450,6 @@ class Schedule:
         """All the schedule dates.
 
         Returns:
-            The dates in order, from the effective date to the termination date.
+            list[Date]: The dates in order, from the effective date to the termination date.
         """
         ...

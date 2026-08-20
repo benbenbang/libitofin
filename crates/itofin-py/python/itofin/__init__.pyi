@@ -57,7 +57,7 @@ class Settings:
         observer that recomputes on the update reads the date that triggered it.
 
         Args:
-            date: The new evaluation date. Observers are notified only when this
+            date (time.Date): The new evaluation date. Observers are notified only when this
                 differs from the date already set.
         """
         ...
@@ -68,7 +68,7 @@ class Settings:
         The flag is three-valued, as in the core.
 
         Args:
-            value: True or False decides the question outright; None clears it,
+            value (bool | None): True or False decides the question outright; None clears it,
                 restoring the unset state in which each pricing site applies its
                 own default. The argument is required, so clearing is always
                 deliberate.
@@ -79,7 +79,7 @@ class Settings:
         """Return the current setting, or None while it is unset.
 
         Returns:
-            The three-valued flag last set, or None if it has never been set or
+            bool | None: The three-valued flag last set, or None if it has never been set or
             was cleared.
         """
         ...

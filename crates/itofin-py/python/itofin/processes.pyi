@@ -25,14 +25,14 @@ class BlackScholesProcess:
         """Build a flat-market process from scalar inputs.
 
         Args:
-            spot: The spot level, held as a quote.
-            risk_free_rate: The flat risk-free rate, made into a curve
+            spot (float): The spot level, held as a quote.
+            risk_free_rate (float): The flat risk-free rate, made into a curve
                 compounded continuously on an annual frequency.
-            dividend_yield: The flat dividend yield, made into a curve on the
+            dividend_yield (float): The flat dividend yield, made into a curve on the
                 same convention as the risk-free rate.
-            volatility: The flat Black volatility.
-            reference_date: The date the three flat curves are anchored on.
-            day_counter: The day count the curves accrue on.
+            volatility (float): The flat Black volatility.
+            reference_date (Date): The date the three flat curves are anchored on.
+            day_counter (DayCounter): The day count the curves accrue on.
         """
         ...
 
@@ -50,13 +50,13 @@ class BlackScholesProcess:
         scalar constructor guards against.
 
         Args:
-            spot: The spot level, held as a quote.
-            risk_free: The risk-free discount curve.
-            dividend: The dividend curve.
-            vol: The Black volatility surface.
+            spot (float): The spot level, held as a quote.
+            risk_free (YieldTermStructure): The risk-free discount curve.
+            dividend (YieldTermStructure): The dividend curve.
+            vol (BlackVolTermStructure): The Black volatility surface.
 
         Returns:
-            A process over the three supplied term structures.
+            BlackScholesProcess: A process over the three supplied term structures.
         """
         ...
 
@@ -64,7 +64,7 @@ class BlackScholesProcess:
         """Return the risk-free rate carried by the process.
 
         Returns:
-            The continuously compounded zero rate on the risk-free curve at the
+            float: The continuously compounded zero rate on the risk-free curve at the
             reference date.
         """
         ...
@@ -73,7 +73,7 @@ class BlackScholesProcess:
         """Return the dividend yield carried by the process.
 
         Returns:
-            The continuously compounded zero rate on the dividend curve at the
+            float: The continuously compounded zero rate on the dividend curve at the
             reference date.
         """
         ...
@@ -101,18 +101,18 @@ class HestonProcess:
         """Build the process from scalar market inputs and the five parameters.
 
         Args:
-            risk_free_rate: The flat risk-free rate, made into a curve
+            risk_free_rate (float): The flat risk-free rate, made into a curve
                 compounded continuously on an annual frequency.
-            dividend_yield: The flat dividend yield, made into a curve on the
+            dividend_yield (float): The flat dividend yield, made into a curve on the
                 same convention as the risk-free rate.
-            spot: The spot level, held as a quote.
-            v0: The initial variance.
-            kappa: The mean-reversion speed.
-            theta: The long-run variance.
-            sigma: The volatility of variance.
-            rho: The spot/variance correlation.
-            reference_date: The date the two flat curves are anchored on.
-            day_counter: The day count the curves accrue on.
+            spot (float): The spot level, held as a quote.
+            v0 (float): The initial variance.
+            kappa (float): The mean-reversion speed.
+            theta (float): The long-run variance.
+            sigma (float): The volatility of variance.
+            rho (float): The spot/variance correlation.
+            reference_date (Date): The date the two flat curves are anchored on.
+            day_counter (DayCounter): The day count the curves accrue on.
         """
         ...
 
@@ -120,7 +120,7 @@ class HestonProcess:
         """Return the initial variance.
 
         Returns:
-            The initial variance v0.
+            float: The initial variance v0.
         """
         ...
 
@@ -128,7 +128,7 @@ class HestonProcess:
         """Return the mean-reversion speed.
 
         Returns:
-            The mean-reversion speed kappa.
+            float: The mean-reversion speed kappa.
         """
         ...
 
@@ -136,7 +136,7 @@ class HestonProcess:
         """Return the long-run variance.
 
         Returns:
-            The long-run variance theta.
+            float: The long-run variance theta.
         """
         ...
 
@@ -144,7 +144,7 @@ class HestonProcess:
         """Return the volatility of variance.
 
         Returns:
-            The volatility of variance sigma.
+            float: The volatility of variance sigma.
         """
         ...
 
@@ -152,6 +152,6 @@ class HestonProcess:
         """Return the spot/variance correlation.
 
         Returns:
-            The spot/variance correlation rho.
+            float: The spot/variance correlation rho.
         """
         ...

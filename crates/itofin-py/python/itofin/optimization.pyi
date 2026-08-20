@@ -18,11 +18,11 @@ class LevenbergMarquardt:
         """Initialize the optimizer; the defaults are QuantLib's.
 
         Args:
-            epsfcn: The finite-difference step seed used when the Jacobian is
+            epsfcn (float): The finite-difference step seed used when the Jacobian is
                 computed by differences.
-            xtol: The tolerance on the independent variable.
-            gtol: The tolerance on the gradient.
-            use_cost_functions_jacobian: Use the cost function's own jacobian
+            xtol (float): The tolerance on the independent variable.
+            gtol (float): The tolerance on the gradient.
+            use_cost_functions_jacobian (bool): Use the cost function's own jacobian
                 method (a central difference, order 2 but costlier) instead of
                 the built-in forward-difference scheme.
         """
@@ -46,16 +46,16 @@ class EndCriteria:
         """Initialize the criteria.
 
         Args:
-            max_iterations: The iteration count at which the run stops.
-            max_stationary_state_iterations: How many consecutive stationary
+            max_iterations (int): The iteration count at which the run stops.
+            max_stationary_state_iterations (int | None): How many consecutive stationary
                 iterations are tolerated before the run is called converged;
                 None defaults to min(max_iterations / 2, 100).
-            root_epsilon: The variation of the independent variable below which
+            root_epsilon (float): The variation of the independent variable below which
                 an iteration counts as stationary.
-            function_epsilon: The variation of the function value below which an
+            function_epsilon (float): The variation of the function value below which an
                 iteration counts as stationary, and, for a cost function known
                 to be positive, the value below which the run has converged.
-            gradient_norm_epsilon: The gradient norm below which the run has
+            gradient_norm_epsilon (float | None): The gradient norm below which the run has
                 converged; None defaults to function_epsilon.
 
         Raises:

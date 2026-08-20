@@ -20,7 +20,7 @@ class HestonModel:
         """Seed the model from a process.
 
         Args:
-            process: The process whose five parameters seed the model.
+            process (HestonProcess): The process whose five parameters seed the model.
 
         Raises:
             ItofinError: If a seeded parameter violates its constraint: theta,
@@ -33,7 +33,7 @@ class HestonModel:
         """Return the long-run variance.
 
         Returns:
-            The current value of theta.
+            float: The current value of theta.
         """
         ...
 
@@ -41,7 +41,7 @@ class HestonModel:
         """Return the mean-reversion speed.
 
         Returns:
-            The current value of kappa.
+            float: The current value of kappa.
         """
         ...
 
@@ -49,7 +49,7 @@ class HestonModel:
         """Return the volatility of variance.
 
         Returns:
-            The current value of sigma.
+            float: The current value of sigma.
         """
         ...
 
@@ -57,7 +57,7 @@ class HestonModel:
         """Return the spot/variance correlation.
 
         Returns:
-            The current value of rho.
+            float: The current value of rho.
         """
         ...
 
@@ -65,7 +65,7 @@ class HestonModel:
         """Return the initial variance.
 
         Returns:
-            The current value of v0.
+            float: The current value of v0.
         """
         ...
 
@@ -84,10 +84,10 @@ class HestonModel:
         through the getters afterwards.
 
         Args:
-            helpers: The calibration instruments to fit; must not be empty.
-            method: The optimizer driving the fit.
-            end_criteria: The stopping rule handed to the optimizer.
-            integration_order: The order of the Gauss-Laguerre integration the
+            helpers (list[HestonModelHelper]): The calibration instruments to fit; must not be empty.
+            method (LevenbergMarquardt): The optimizer driving the fit.
+            end_criteria (EndCriteria): The stopping rule handed to the optimizer.
+            integration_order (int): The order of the Gauss-Laguerre integration the
                 engine uses; at most 192.
 
         Raises:
@@ -107,11 +107,11 @@ class HullWhite:
         """Fit the model to a term structure.
 
         Args:
-            curve: The term structure the model fits; its forward rate at 0 is
+            curve (YieldTermStructure): The term structure the model fits; its forward rate at 0 is
                 read at construction.
-            a: The mean-reversion speed, under the Vasicek positivity
+            a (float): The mean-reversion speed, under the Vasicek positivity
                 constraint.
-            sigma: The short-rate volatility, under the same constraint.
+            sigma (float): The short-rate volatility, under the same constraint.
 
         Raises:
             ItofinError: If the curve is empty or a parameter violates its
@@ -123,7 +123,7 @@ class HullWhite:
         """Return the mean-reversion speed.
 
         Returns:
-            The current value of a, read as the first calibrated-model
+            float: The current value of a, read as the first calibrated-model
             parameter.
         """
         ...
@@ -132,7 +132,7 @@ class HullWhite:
         """Return the short-rate volatility.
 
         Returns:
-            The current value of sigma, read as the second calibrated-model
+            float: The current value of sigma, read as the second calibrated-model
             parameter.
         """
         ...
@@ -141,7 +141,7 @@ class HullWhite:
         """Return the fitted initial short rate.
 
         Returns:
-            The short rate r0 implied by the fitted term structure.
+            float: The short rate r0 implied by the fitted term structure.
         """
         ...
 
@@ -151,14 +151,14 @@ class HullWhite:
         """Price a European option on a zero-coupon bond.
 
         Args:
-            option_type: Call or put.
-            strike: The option strike, as a bond price.
-            maturity: The option expiry, as a time in years.
-            bond_maturity: The maturity of the underlying zero-coupon bond, as a
+            option_type (OptionType): Call or put.
+            strike (float): The option strike, as a bond price.
+            maturity (float): The option expiry, as a time in years.
+            bond_maturity (float): The maturity of the underlying zero-coupon bond, as a
                 time in years.
 
         Returns:
-            The option price.
+            float: The option price.
 
         Raises:
             ItofinError: If the fitted curve is not linked or the arguments are
@@ -180,10 +180,10 @@ class HullWhite:
         the optimizer drives.
 
         Args:
-            helpers: The calibration instruments to fit; must not be empty.
-            method: The optimizer driving the fit.
-            end_criteria: The stopping rule handed to the optimizer.
-            fix_reversion: Pin the mean reversion a and free only sigma; when
+            helpers (list[SwaptionHelper]): The calibration instruments to fit; must not be empty.
+            method (LevenbergMarquardt): The optimizer driving the fit.
+            end_criteria (EndCriteria): The stopping rule handed to the optimizer.
+            fix_reversion (bool): Pin the mean reversion a and free only sigma; when
                 False both parameters are free.
 
         Raises:
@@ -215,20 +215,20 @@ class HestonModelHelper:
         """Build the helper from scalar market inputs.
 
         Args:
-            maturity: The option tenor.
-            calendar: The calendar the maturity rolls on.
-            s0: The spot level.
-            strike: The option strike.
-            volatility: The market Black volatility, held as a quote.
-            risk_free_rate: The flat risk-free rate, made into a curve compounded
+            maturity (Period): The option tenor.
+            calendar (Calendar): The calendar the maturity rolls on.
+            s0 (float): The spot level.
+            strike (float): The option strike.
+            volatility (float): The market Black volatility, held as a quote.
+            risk_free_rate (float): The flat risk-free rate, made into a curve compounded
                 continuously on an annual frequency.
-            dividend_yield: The flat dividend yield, made into a curve on the
+            dividend_yield (float): The flat dividend yield, made into a curve on the
                 same convention as the risk-free rate.
-            error_type: How the market and model prices are compared.
-            reference_date: The date the two flat curves are anchored on; it is
+            error_type (CalibrationErrorType): How the market and model prices are compared.
+            reference_date (Date): The date the two flat curves are anchored on; it is
                 used only to assemble them, not forwarded to the core.
-            day_counter: The day count the curves accrue on, used the same way.
-            settings: The evaluation-date store the helper reads.
+            day_counter (DayCounter): The day count the curves accrue on, used the same way.
+            settings (Settings): The evaluation-date store the helper reads.
         """
         ...
 
@@ -239,7 +239,7 @@ class HestonModelHelper:
         helper; the comparison follows the helper's error type.
 
         Returns:
-            The calibration error under the configured error type.
+            float: The calibration error under the configured error type.
 
         Raises:
             ItofinError: If the market or model valuation fails, or the implied
@@ -272,16 +272,16 @@ class SwaptionHelper:
         """Build the helper and the swaption underlying it.
 
         Args:
-            maturity: The option tenor, the time to the swaption expiry.
-            length: The tenor of the underlying swap.
-            volatility: The market volatility, held as a quote.
-            index: The index the floating leg fixes on.
-            fixed_leg_tenor: The payment tenor of the fixed leg.
-            fixed_leg_day_counter: The day count the fixed leg accrues on.
-            floating_leg_day_counter: The day count the floating leg accrues on.
-            curve: The discount curve.
-            error_type: How the market and model prices are compared.
-            nominal: The notional of the underlying swap.
+            maturity (Period): The option tenor, the time to the swaption expiry.
+            length (Period): The tenor of the underlying swap.
+            volatility (float): The market volatility, held as a quote.
+            index (IborIndex): The index the floating leg fixes on.
+            fixed_leg_tenor (Period): The payment tenor of the fixed leg.
+            fixed_leg_day_counter (DayCounter): The day count the fixed leg accrues on.
+            floating_leg_day_counter (DayCounter): The day count the floating leg accrues on.
+            curve (YieldTermStructure): The discount curve.
+            error_type (CalibrationErrorType): How the market and model prices are compared.
+            nominal (float): The notional of the underlying swap.
         """
         ...
 
@@ -292,7 +292,7 @@ class SwaptionHelper:
         helper; the comparison follows the helper's error type.
 
         Returns:
-            The calibration error under the configured error type.
+            float: The calibration error under the configured error type.
 
         Raises:
             ItofinError: If the market or model valuation fails, or the implied
