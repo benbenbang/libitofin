@@ -2182,14 +2182,128 @@ class DefaultProbabilityTermStructure:
     the default density and the hazard rate, each in a year-fraction and a date
     form."""
 
-    def survival_probability(self, t: float, extrapolate: bool = False) -> float: ...
-    def survival_probability_date(self, date: Date, extrapolate: bool = False) -> float: ...
-    def default_probability(self, t: float, extrapolate: bool = False) -> float: ...
-    def default_probability_date(self, date: Date, extrapolate: bool = False) -> float: ...
-    def default_density(self, t: float, extrapolate: bool = False) -> float: ...
-    def default_density_date(self, date: Date, extrapolate: bool = False) -> float: ...
-    def hazard_rate(self, t: float, extrapolate: bool = False) -> float: ...
-    def hazard_rate_date(self, date: Date, extrapolate: bool = False) -> float: ...
+    def survival_probability(self, t: float, extrapolate: bool = False) -> float:
+        """Return the survival probability from the reference date to year-fraction t.
+
+        Args:
+            t (float): The year fraction, in the curve's own day count.
+            extrapolate (bool): Whether to answer past the curve's max date.
+
+        Returns:
+            float: The probability of surviving to t.
+
+        Raises:
+            ItofinError: If t is past the curve's range and extrapolation is
+                not allowed.
+        """
+        ...
+    def survival_probability_date(self, date: Date, extrapolate: bool = False) -> float:
+        """Return the survival probability from the reference date to date.
+
+        Args:
+            date (Date): The date survived to.
+            extrapolate (bool): Whether to answer past the curve's max date.
+
+        Returns:
+            float: The survival probability.
+
+        Raises:
+            ItofinError: If date is past the curve's range and extrapolation is
+                not allowed.
+        """
+        ...
+    def default_probability(self, t: float, extrapolate: bool = False) -> float:
+        """Return the default probability from the reference date to year-fraction t.
+
+        Args:
+            t (float): The year fraction, in the curve's own day count.
+            extrapolate (bool): Whether to answer past the curve's max date.
+
+        Returns:
+            float: The probability of defaulting by t.
+
+        Raises:
+            ItofinError: If t is past the curve's range and extrapolation is
+                not allowed.
+        """
+        ...
+    def default_probability_date(self, date: Date, extrapolate: bool = False) -> float:
+        """Return the default probability from the reference date to date.
+
+        Args:
+            date (Date): The date defaulted by.
+            extrapolate (bool): Whether to answer past the curve's max date.
+
+        Returns:
+            float: The default probability.
+
+        Raises:
+            ItofinError: If date is past the curve's range and extrapolation is
+                not allowed.
+        """
+        ...
+    def default_density(self, t: float, extrapolate: bool = False) -> float:
+        """Return the default density at year-fraction t.
+
+        Args:
+            t (float): The year fraction, in the curve's own day count.
+            extrapolate (bool): Whether to answer past the curve's max date.
+
+        Returns:
+            float: The default density.
+
+        Raises:
+            ItofinError: If t is past the curve's range and extrapolation is
+                not allowed.
+        """
+        ...
+    def default_density_date(self, date: Date, extrapolate: bool = False) -> float:
+        """Return the default density at date.
+
+        Args:
+            date (Date): The date the density is read at.
+            extrapolate (bool): Whether to answer past the curve's max date.
+
+        Returns:
+            float: The default density.
+
+        Raises:
+            ItofinError: If date is past the curve's range and extrapolation is
+                not allowed.
+        """
+        ...
+    def hazard_rate(self, t: float, extrapolate: bool = False) -> float:
+        """Return the hazard rate at year-fraction t.
+
+        Args:
+            t (float): The year fraction, in the curve's own day count.
+            extrapolate (bool): Whether to answer past the curve's max date.
+
+        Returns:
+            float: The hazard rate, at annual frequency and continuous
+                compounding.
+
+        Raises:
+            ItofinError: If t is past the curve's range and extrapolation is
+                not allowed.
+        """
+        ...
+    def hazard_rate_date(self, date: Date, extrapolate: bool = False) -> float:
+        """Return the hazard rate at date.
+
+        Args:
+            date (Date): The date the rate is read at.
+            extrapolate (bool): Whether to answer past the curve's max date.
+
+        Returns:
+            float: The hazard rate, at annual frequency and continuous
+                compounding.
+
+        Raises:
+            ItofinError: If date is past the curve's range and extrapolation is
+                not allowed.
+        """
+        ...
 
 class FlatHazardRate(DefaultProbabilityTermStructure):
     """A credit curve quoting one hazard rate for every maturity, whose survival
@@ -2202,11 +2316,32 @@ class FlatHazardRate(DefaultProbabilityTermStructure):
 
     def __init__(
         self, reference_date: Date, hazard_rate: SimpleQuote, day_counter: DayCounter
-    ) -> None: ...
+    ) -> None:
+        """Build a curve reading its hazard rate live, on a pinned reference date.
+
+        Args:
+            reference_date (Date): The date times are measured from.
+            hazard_rate (SimpleQuote): The hazard rate; the caller keeps it, so
+                a later set_value moves the curve.
+            day_counter (DayCounter): The day count turning dates into times.
+        """
+        ...
     @staticmethod
     def with_rate(
         reference_date: Date, rate: float, day_counter: DayCounter
-    ) -> FlatHazardRate: ...
+    ) -> FlatHazardRate:
+        """Build a curve at a fixed rate, on a pinned reference date.
+
+        Args:
+            reference_date (Date): The date times are measured from.
+            rate (float): The hazard rate, wrapped in a fresh, un-retained
+                quote.
+            day_counter (DayCounter): The day count turning dates into times.
+
+        Returns:
+            FlatHazardRate: The curve at that rate.
+        """
+        ...
     @staticmethod
     def moving(
         settlement_days: int,
@@ -2215,8 +2350,25 @@ class FlatHazardRate(DefaultProbabilityTermStructure):
         day_counter: DayCounter,
         settings: Settings,
     ) -> FlatHazardRate:
-        """Raises ItofinError on any query made before settings carries an
-        evaluation date."""
+        """Build a curve reading its hazard rate live, on a floating reference date.
+
+        The reference date sits settlement_days business days past the
+        evaluation date, so a query made before settings carries one raises
+        rather than falling back to a system clock.
+
+        Args:
+            settlement_days (int): The business days the reference date sits
+                past the evaluation date.
+            calendar (Calendar): The calendar those days are counted on.
+            hazard_rate (SimpleQuote): The hazard rate; the caller keeps it, so
+                a later set_value moves the curve.
+            day_counter (DayCounter): The day count turning dates into times.
+            settings (Settings): The explicit settings supplying the evaluation
+                date.
+
+        Returns:
+            FlatHazardRate: The moving curve.
+        """
         ...
     @staticmethod
     def moving_with_rate(
@@ -2226,8 +2378,24 @@ class FlatHazardRate(DefaultProbabilityTermStructure):
         day_counter: DayCounter,
         settings: Settings,
     ) -> FlatHazardRate:
-        """Raises ItofinError on any query made before settings carries an
-        evaluation date."""
+        """Build a curve at a fixed rate, on a floating reference date.
+
+        As moving(), a query made before settings carries an evaluation date
+        raises rather than falling back to a system clock.
+
+        Args:
+            settlement_days (int): The business days the reference date sits
+                past the evaluation date.
+            calendar (Calendar): The calendar those days are counted on.
+            rate (float): The hazard rate, wrapped in a fresh, un-retained
+                quote.
+            day_counter (DayCounter): The day count turning dates into times.
+            settings (Settings): The explicit settings supplying the evaluation
+                date.
+
+        Returns:
+            FlatHazardRate: The moving curve at that rate.
+        """
         ...
 
 class InterpolatedHazardRateCurve(DefaultProbabilityTermStructure):
@@ -2246,21 +2414,75 @@ class InterpolatedHazardRateCurve(DefaultProbabilityTermStructure):
         hazard_rates: list[float],
         day_counter: DayCounter,
     ) -> None:
-        """Raises ItofinError on too few dates, a dates/hazard_rates count
-        mismatch, a negative hazard rate or unsorted dates."""
+        """Build the curve over its (date, hazard-rate) nodes.
+
+        Backward-flat is pinned at the boundary: it is the only interpolator
+        the credit side wires, so no interpolation argument is offered.
+
+        Args:
+            dates (list[Date]): The node dates, the first being the reference
+                date.
+            hazard_rates (list[float]): The hazard rate at each node.
+            day_counter (DayCounter): The day count turning dates into times.
+
+        Raises:
+            ItofinError: On too few dates, a dates and hazard_rates count
+                mismatch, a negative hazard rate, or unsorted dates.
+        """
         ...
-    def dates(self) -> list[Date]: ...
-    def hazard_rates(self) -> list[float]: ...
-    def nodes(self) -> list[tuple[Date, float]]: ...
+    def dates(self) -> list[Date]:
+        """Return the node dates.
+
+        Returns:
+            list[Date]: The nodes, the first of which is the reference date.
+        """
+        ...
+    def hazard_rates(self) -> list[float]:
+        """Return the node hazard rates.
+
+        Returns:
+            list[float]: The rate at each node.
+        """
+        ...
+    def nodes(self) -> list[tuple[Date, float]]:
+        """Return the curve's nodes as pairs.
+
+        Returns:
+            list[tuple[Date, float]]: One (date, hazard rate) pair per node.
+        """
+        ...
 
 class DefaultProbabilityHelper:
-    """Shared base for every credit bootstrap helper."""
+    """Shared base for every credit bootstrap helper.
 
-    def pillar_date(self) -> Date: ...
-    def latest_date(self) -> Date: ...
+    A credit helper fits a default-probability curve rather than a yield curve,
+    so it is a separate hierarchy from RateHelper. It exposes the two dates the
+    bootstrap places a curve node by.
+    """
+
+    def pillar_date(self) -> Date:
+        """Return the date the curve node this helper sets sits at.
+
+        Returns:
+            Date: The pillar date.
+        """
+        ...
+    def latest_date(self) -> Date:
+        """Return the latest date the helper needs curve data at.
+
+        Returns:
+            Date: The latest date, equal to the pillar date.
+        """
+        ...
 
 class SpreadCdsHelper(DefaultProbabilityHelper):
-    """Bootstrap helper fitting a CDS quoted as a running spread."""
+    """Bootstrap helper fitting a CDS quoted as a running spread.
+
+    The helper rebuilds its schedule and its contract off the evaluation date
+    held by settings, so it tracks that date rather than freezing a maturity at
+    construction. It retains the caller's quote, so a later set_value re-drives
+    the bootstrap, and it observes the discount curve.
+    """
 
     def __init__(
         self,
@@ -2276,8 +2498,32 @@ class SpreadCdsHelper(DefaultProbabilityHelper):
         discount_curve: YieldTermStructure,
         settings: Settings,
     ) -> None:
-        """Raises ItofinError on the post-Big-Bang rules DateGeneration.OldCDS,
-        .CDS and .CDS2015, whose maturity rule the core has not ported."""
+        """Build the helper on the C++ default CDS terms.
+
+        Args:
+            running_spread (SimpleQuote): The quoted spread the helper fits.
+            tenor (Period): The length of the contract.
+            settlement_days (int): The days between the evaluation date and the
+                contract's start.
+            calendar (Calendar): The calendar the schedule rolls on.
+            frequency (Frequency): The premium payment frequency.
+            payment_convention (BusinessDayConvention): The roll applied to the
+                payment dates.
+            rule (DateGeneration): The schedule generation rule.
+            day_counter (DayCounter): The day count the premium accrues on.
+            recovery_rate (float): The recovery assumed on default.
+            discount_curve (YieldTermStructure): The curve the flows discount
+                on; the helper observes it.
+            settings (Settings): The explicit settings supplying the evaluation
+                date the schedule is rebuilt off.
+
+        Raises:
+            ItofinError: Under the three post-Big-Bang rules OldCDS, CDS and
+                CDS2015, whose maturity is rolled by the CDS maturity rule: it
+                refuses a tenor it cannot roll, or one it rolls to a contract
+                that has already matured, rather than building a schedule that
+                ends on the wrong date.
+        """
         ...
 
 class PiecewiseDefaultCurve(DefaultProbabilityTermStructure):
@@ -2294,13 +2540,68 @@ class PiecewiseDefaultCurve(DefaultProbabilityTermStructure):
         helpers: list[DefaultProbabilityHelper],
         day_counter: DayCounter,
     ) -> None:
-        """Raises ItofinError on an empty helper list."""
+        """Build the curve over helpers with a fixed reference date.
+
+        Args:
+            reference_date (Date): The curve's reference date.
+            helpers (list[DefaultProbabilityHelper]): The bootstrap
+                instruments; any subclass is accepted.
+            day_counter (DayCounter): The day count turning dates into times.
+
+        Raises:
+            ItofinError: On an empty helper list.
+        """
         ...
-    def calculate(self) -> None: ...
-    def times(self) -> list[float]: ...
-    def dates(self) -> list[Date]: ...
-    def data(self) -> list[float]: ...
-    def nodes(self) -> list[tuple[Date, float]]: ...
+    def calculate(self) -> None:
+        """Run the bootstrap if the cache is stale.
+
+        Calling it explicitly makes a solver failure surface here rather than
+        inside a later query.
+
+        Raises:
+            ItofinError: On a bootstrap failure.
+        """
+        ...
+    def times(self) -> list[float]:
+        """Return the node times, triggering the bootstrap.
+
+        Returns:
+            list[float]: The nodes in the curve's own day count.
+
+        Raises:
+            ItofinError: On a bootstrap failure.
+        """
+        ...
+    def dates(self) -> list[Date]:
+        """Return the node dates, triggering the bootstrap.
+
+        Returns:
+            list[Date]: The nodes, the first of which is the reference date.
+
+        Raises:
+            ItofinError: On a bootstrap failure.
+        """
+        ...
+    def data(self) -> list[float]:
+        """Return the solved node hazard rates, triggering the bootstrap.
+
+        Returns:
+            list[float]: The rate solved at each node.
+
+        Raises:
+            ItofinError: On a bootstrap failure.
+        """
+        ...
+    def nodes(self) -> list[tuple[Date, float]]:
+        """Return the solved nodes as pairs, triggering the bootstrap.
+
+        Returns:
+            list[tuple[Date, float]]: One (date, hazard rate) pair per node.
+
+        Raises:
+            ItofinError: On a bootstrap failure.
+        """
+        ...
 
 class MultiplicativePriceSeasonality:
     """The seasonal correction a price index carries, whose factors multiply
