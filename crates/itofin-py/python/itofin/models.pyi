@@ -10,42 +10,193 @@ from itofin.termstructures import YieldTermStructure
 from itofin.time import Calendar, Date, DayCounter, Period
 
 class HestonModel:
-    """The five-parameter calibrated Heston model."""
+    """The five-parameter calibrated Heston model.
 
-    def __init__(self, process: HestonProcess) -> None: ...
-    def theta(self) -> float: ...
-    def kappa(self) -> float: ...
-    def sigma(self) -> float: ...
-    def rho(self) -> float: ...
-    def v0(self) -> float: ...
+    The parameters are seeded from the process it is built on and overwritten in
+    place by a calibration, so the getters read the fitted values afterwards.
+    """
+
+    def __init__(self, process: HestonProcess) -> None:
+        """Seed the model from a process.
+
+        Args:
+            process: The process whose five parameters seed the model.
+
+        Raises:
+            ItofinError: If a seeded parameter violates its constraint: theta,
+                kappa, sigma and v0 must be strictly positive and rho must lie
+                in [-1, 1].
+        """
+        ...
+
+    def theta(self) -> float:
+        """Return the long-run variance.
+
+        Returns:
+            The current value of theta.
+        """
+        ...
+
+    def kappa(self) -> float:
+        """Return the mean-reversion speed.
+
+        Returns:
+            The current value of kappa.
+        """
+        ...
+
+    def sigma(self) -> float:
+        """Return the volatility of variance.
+
+        Returns:
+            The current value of sigma.
+        """
+        ...
+
+    def rho(self) -> float:
+        """Return the spot/variance correlation.
+
+        Returns:
+            The current value of rho.
+        """
+        ...
+
+    def v0(self) -> float:
+        """Return the initial variance.
+
+        Returns:
+            The current value of v0.
+        """
+        ...
+
     def calibrate(
         self,
         helpers: list[HestonModelHelper],
         method: LevenbergMarquardt,
         end_criteria: EndCriteria,
         integration_order: int,
-    ) -> None: ...
+    ) -> None:
+        """Fit the five parameters to the helpers and write them back.
+
+        One analytic Heston engine of the given integration order is built on
+        this model and installed on every helper, so all helpers price through
+        the same engine the optimizer drives. The fitted parameters are readable
+        through the getters afterwards.
+
+        Args:
+            helpers: The calibration instruments to fit; must not be empty.
+            method: The optimizer driving the fit.
+            end_criteria: The stopping rule handed to the optimizer.
+            integration_order: The order of the Gauss-Laguerre integration the
+                engine uses; at most 192.
+
+        Raises:
+            ItofinError: If integration_order exceeds 192, if helpers is empty,
+                or if the optimization itself fails.
+        """
+        ...
 
 class HullWhite:
-    """The one-factor Hull-White short-rate model."""
+    """The one-factor Hull-White short-rate model.
 
-    def __init__(self, curve: YieldTermStructure, a: float, sigma: float) -> None: ...
-    def a(self) -> float: ...
-    def sigma(self) -> float: ...
-    def r0(self) -> float: ...
+    Fitted to the term structure it is built on; a calibration overwrites a and
+    sigma in place, so the getters read the fitted values afterwards.
+    """
+
+    def __init__(self, curve: YieldTermStructure, a: float, sigma: float) -> None:
+        """Fit the model to a term structure.
+
+        Args:
+            curve: The term structure the model fits; its forward rate at 0 is
+                read at construction.
+            a: The mean-reversion speed, under the Vasicek positivity
+                constraint.
+            sigma: The short-rate volatility, under the same constraint.
+
+        Raises:
+            ItofinError: If the curve is empty or a parameter violates its
+                constraint.
+        """
+        ...
+
+    def a(self) -> float:
+        """Return the mean-reversion speed.
+
+        Returns:
+            The current value of a, read as the first calibrated-model
+            parameter.
+        """
+        ...
+
+    def sigma(self) -> float:
+        """Return the short-rate volatility.
+
+        Returns:
+            The current value of sigma, read as the second calibrated-model
+            parameter.
+        """
+        ...
+
+    def r0(self) -> float:
+        """Return the fitted initial short rate.
+
+        Returns:
+            The short rate r0 implied by the fitted term structure.
+        """
+        ...
+
     def discount_bond_option(
         self, option_type: OptionType, strike: float, maturity: float, bond_maturity: float
-    ) -> float: ...
+    ) -> float:
+        """Price a European option on a zero-coupon bond.
+
+        Args:
+            option_type: Call or put.
+            strike: The option strike, as a bond price.
+            maturity: The option expiry, as a time in years.
+            bond_maturity: The maturity of the underlying zero-coupon bond, as a
+                time in years.
+
+        Returns:
+            The option price.
+
+        Raises:
+            ItofinError: If the fitted curve is not linked or the arguments are
+                rejected by the underlying Black formula.
+        """
+        ...
+
     def calibrate(
         self,
         helpers: list[SwaptionHelper],
         method: LevenbergMarquardt,
         end_criteria: EndCriteria,
         fix_reversion: bool,
-    ) -> None: ...
+    ) -> None:
+        """Fit a and sigma to the helpers and write them back.
+
+        One Jamshidian swaption engine is built on this model and installed on
+        every helper, so all swaptions price through the same analytic engine
+        the optimizer drives.
+
+        Args:
+            helpers: The calibration instruments to fit; must not be empty.
+            method: The optimizer driving the fit.
+            end_criteria: The stopping rule handed to the optimizer.
+            fix_reversion: Pin the mean reversion a and free only sigma; when
+                False both parameters are free.
+
+        Raises:
+            ItofinError: If helpers is empty or the optimization itself fails.
+        """
+        ...
 
 class HestonModelHelper:
-    """A Black-vol calibration helper over a flat-vol surface."""
+    """A Black-vol calibration helper over a flat-vol surface.
+
+    Assembles its own volatility quote and two flat curves from the scalar
+    market inputs, so no handle crosses the binding boundary.
+    """
 
     def __init__(
         self,
@@ -60,11 +211,50 @@ class HestonModelHelper:
         reference_date: Date,
         day_counter: DayCounter,
         settings: Settings,
-    ) -> None: ...
-    def calibration_error(self) -> float: ...
+    ) -> None:
+        """Build the helper from scalar market inputs.
+
+        Args:
+            maturity: The option tenor.
+            calendar: The calendar the maturity rolls on.
+            s0: The spot level.
+            strike: The option strike.
+            volatility: The market Black volatility, held as a quote.
+            risk_free_rate: The flat risk-free rate, made into a curve compounded
+                continuously on an annual frequency.
+            dividend_yield: The flat dividend yield, made into a curve on the
+                same convention as the risk-free rate.
+            error_type: How the market and model prices are compared.
+            reference_date: The date the two flat curves are anchored on; it is
+                used only to assemble them, not forwarded to the core.
+            day_counter: The day count the curves accrue on, used the same way.
+            settings: The evaluation-date store the helper reads.
+        """
+        ...
+
+    def calibration_error(self) -> float:
+        """Return the error between the market and model values.
+
+        Meaningful once a calibration has installed a pricing engine on the
+        helper; the comparison follows the helper's error type.
+
+        Returns:
+            The calibration error under the configured error type.
+
+        Raises:
+            ItofinError: If the market or model valuation fails, or the implied
+                volatility solve does.
+        """
+        ...
 
 class SwaptionHelper:
-    """A co-terminal swaption calibration instrument."""
+    """A co-terminal swaption calibration instrument.
+
+    Builds its own European swaption from the maturity, length and index, so no
+    swap or swaption object is needed. The swaption is struck at the forward on
+    shifted-lognormal volatility with zero shift, takes the index's own
+    settlement days, and compounds its averaging.
+    """
 
     def __init__(
         self,
@@ -78,11 +268,44 @@ class SwaptionHelper:
         curve: YieldTermStructure,
         error_type: CalibrationErrorType,
         nominal: float,
-    ) -> None: ...
-    def calibration_error(self) -> float: ...
+    ) -> None:
+        """Build the helper and the swaption underlying it.
+
+        Args:
+            maturity: The option tenor, the time to the swaption expiry.
+            length: The tenor of the underlying swap.
+            volatility: The market volatility, held as a quote.
+            index: The index the floating leg fixes on.
+            fixed_leg_tenor: The payment tenor of the fixed leg.
+            fixed_leg_day_counter: The day count the fixed leg accrues on.
+            floating_leg_day_counter: The day count the floating leg accrues on.
+            curve: The discount curve.
+            error_type: How the market and model prices are compared.
+            nominal: The notional of the underlying swap.
+        """
+        ...
+
+    def calibration_error(self) -> float:
+        """Return the error between the market and model values.
+
+        Meaningful once a calibration has installed a pricing engine on the
+        helper; the comparison follows the helper's error type.
+
+        Returns:
+            The calibration error under the configured error type.
+
+        Raises:
+            ItofinError: If the market or model valuation fails, or the implied
+                volatility solve does.
+        """
+        ...
 
 class CalibrationErrorType:
-    """How market and model prices are compared during calibration."""
+    """How market and model prices are compared during calibration.
+
+    RelativePriceError is |market - model| / market, PriceError is
+    market - model, and ImpliedVolError compares the two implied volatilities.
+    """
 
     RelativePriceError: CalibrationErrorType
     PriceError: CalibrationErrorType
