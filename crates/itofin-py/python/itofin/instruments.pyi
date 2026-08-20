@@ -291,13 +291,20 @@ class VanillaOption:
         ...
 
 class SwapType:
-    """Which side of the named leg the swap is seen from."""
+    """Which side of the named leg the swap is seen from.
+
+    A fieldless enum; the signed leg multiplier the two variants stand for
+    stays in the core.
+    """
 
     Payer: SwapType
     Receiver: SwapType
 
 class VanillaSwap:
-    """A fixed-vs-Ibor interest-rate swap."""
+    """A fixed-vs-Ibor interest-rate swap.
+
+    Pricing needs an engine: call set_engine before fair_rate or npv.
+    """
 
     def __init__(
         self,
@@ -311,27 +318,137 @@ class VanillaSwap:
         spread: float,
         floating_day_count: DayCounter,
         settings: Settings,
-    ) -> None: ...
-    def set_engine(self, curve: YieldTermStructure, settings: Settings) -> None: ...
+    ) -> None:
+        """Build the swap from both schedules spelled out.
+
+        Args:
+            swap_type (SwapType): Whether the fixed leg is paid or received.
+            nominal (float): The notional both legs accrue on.
+            fixed_schedule (Schedule): The fixed leg's payment schedule.
+            fixed_rate (float): The rate the fixed leg accrues at.
+            fixed_day_count (DayCounter): The day count of the fixed leg.
+            float_schedule (Schedule): The floating leg's payment schedule.
+            ibor_index (IborIndex): The index the floating leg fixes off.
+            spread (float): The spread added to every floating fixing.
+            floating_day_count (DayCounter): The day count of the floating leg.
+            settings (Settings): The explicit settings supplying the evaluation
+                date and the stored fixings.
+
+        Raises:
+            ItofinError: If the floating leg cannot be built, a degenerate leg
+                being the usual cause.
+        """
+        ...
+    def set_engine(self, curve: YieldTermStructure, settings: Settings) -> None:
+        """Attach a discounting engine over curve so the swap prices.
+
+        The engine is built with the settings-driven flow defaults, leaving the
+        settlement date, the NPV date and the settlement-date-flows flag unset.
+
+        Args:
+            curve (YieldTermStructure): The curve the flows discount on.
+            settings (Settings): The settings the engine resolves its dates
+                against.
+        """
+        ...
     def calculate(self) -> None:
-        """Forces the valuation. Idempotent."""
+        """Force the valuation. Idempotent.
+
+        Raises:
+            ItofinError: If no engine is attached, no evaluation date is set,
+                or the attached engine refuses the swap.
+        """
         ...
-    def is_calculated(self) -> bool: ...
+    def is_calculated(self) -> bool:
+        """Return whether the cached results are currently valid.
+
+        Returns:
+            bool: True when the next accessor reads the cache.
+        """
+        ...
     def price(self, curve: YieldTermStructure, settings: Settings) -> float:
-        """set_engine followed by npv, in one call, and it takes the same two
-        arguments for the same reason."""
+        """Attach a discounting engine over curve and return the NPV.
+
+        set_engine followed by npv, in one call, and it takes the same two
+        arguments for the same reason.
+
+        Args:
+            curve (YieldTermStructure): The curve the flows discount on.
+            settings (Settings): The settings the engine resolves its dates
+                against.
+
+        Returns:
+            float: The swap value under the freshly built engine.
+
+        Raises:
+            ItofinError: On anything that makes the valuation fail.
+        """
         ...
-    def results(self) -> Results: ...
-    def fair_rate(self) -> float: ...
-    def npv(self) -> float: ...
-    def nominal(self) -> float: ...
-    def fixed_rate(self) -> float: ...
+    def results(self) -> Results:
+        """Return a frozen snapshot of the valuation, calculating first.
+
+        Returns:
+            Results: A copy of the valuation results.
+
+        Raises:
+            ItofinError: On anything that makes the valuation fail.
+        """
+        ...
+    def fair_rate(self) -> float:
+        """Return the fixed rate that zeroes the swap NPV.
+
+        Returns:
+            float: The fair fixed rate.
+
+        Raises:
+            ItofinError: If no engine is attached or the swap has expired.
+        """
+        ...
+    def npv(self) -> float:
+        """Return the swap NPV under the attached engine.
+
+        Returns:
+            float: The present value.
+
+        Raises:
+            ItofinError: If no engine is attached.
+        """
+        ...
+    def nominal(self) -> float:
+        """Return the notional both legs accrue on.
+
+        Returns:
+            float: The single nominal.
+
+        Raises:
+            ItofinError: If the legs carry per-coupon nominals, which leaves no
+                single one to report.
+        """
+        ...
+    def fixed_rate(self) -> float:
+        """Return the fixed-leg rate.
+
+        Returns:
+            float: The rate the fixed leg accrues at.
+        """
+        ...
 
 class MakeVanillaSwap:
-    """Market-convention builder for a VanillaSwap: derives both schedules, the
-    fixed-leg tenor and day count and the discounting engine from a swap tenor
-    and an Ibor index. ``fixed_rate=None`` builds a par swap. The built swap
-    already carries its DiscountingSwapEngine."""
+    """Market-convention builder for a VanillaSwap.
+
+    Derives the start and end dates, both schedules, the fixed-leg tenor and
+    day count and the discounting engine from a swap tenor and an Ibor index,
+    so the caller states conventions instead of hand-building two schedules.
+    ``fixed_rate=None`` builds a par swap: the fair rate is computed and written
+    into the fixed leg, so the result prices to a zero NPV.
+
+    The core builder is a consumed-self fluent chain, which does not cross the
+    FFI boundary; this facade takes the overrides as constructor keywords and
+    assembles the chain inside build(). Only four overrides are exposed; every
+    other core one keeps its default, so the discounting curve is always the
+    index's forwarding curve. The built swap already carries its
+    DiscountingSwapEngine.
+    """
 
     def __init__(
         self,
@@ -344,8 +461,41 @@ class MakeVanillaSwap:
         nominal: float | None = None,
         fixed_leg_tenor: Period | None = None,
         fixed_leg_day_count: DayCounter | None = None,
-    ) -> None: ...
-    def build(self) -> VanillaSwap: ...
+    ) -> None:
+        """Store the configuration the chain is assembled from in build().
+
+        Args:
+            swap_tenor (Period): The length of the swap.
+            ibor_index (IborIndex): The index the floating leg fixes off, and
+                whose forwarding curve discounts.
+            settings (Settings): The explicit settings supplying the evaluation
+                date and the stored fixings.
+            fixed_rate (float | None): The rate of the fixed leg; None builds a
+                par swap.
+            forward_start (Period | None): The delay before the swap starts;
+                None starts it spot, at a zero-day period.
+            effective_date (Date | None): The start date; None derives it from
+                the evaluation date.
+            nominal (float | None): The notional; None keeps the core default.
+            fixed_leg_tenor (Period | None): The fixed-leg payment tenor; None
+                takes the currency's market convention.
+            fixed_leg_day_count (DayCounter | None): The fixed-leg day count;
+                None takes the currency's market convention.
+        """
+        ...
+    def build(self) -> VanillaSwap:
+        """Build the priced swap.
+
+        Returns:
+            VanillaSwap: The swap, already carrying its discounting engine.
+
+        Raises:
+            ItofinError: If effective_date is unset and no evaluation date is
+                set to derive the start from; if the index is neither EUR nor
+                USD, the two the fixed-leg defaults are known for; or if the
+                par-rate fill fails to price.
+        """
+        ...
 
 class OvernightIndexedSwap:
     """A fixed leg versus a compounded overnight leg.
@@ -354,25 +504,103 @@ class OvernightIndexedSwap:
     set_engine and no raw constructor (both deferred with the two-schedule
     master ctor)."""
 
-    def fair_rate(self) -> float: ...
+    def fair_rate(self) -> float:
+        """Return the fixed rate that zeroes the swap NPV.
+
+        Returns:
+            float: The fair fixed rate, read through the swap's base.
+
+        Raises:
+            ItofinError: If the swap has expired or its engine fails to price.
+        """
+        ...
     def calculate(self) -> None:
-        """Forces the valuation. Idempotent."""
+        """Force the valuation. Idempotent.
+
+        Raises:
+            ItofinError: If no evaluation date is set or the engine refuses the
+                swap.
+        """
         ...
-    def is_calculated(self) -> bool: ...
+    def is_calculated(self) -> bool:
+        """Return whether the cached results are currently valid.
+
+        Returns:
+            bool: True when the next accessor reads the cache.
+        """
+        ...
     def price(self) -> float:
-        """Prices and returns the NPV. The only no-argument price(): MakeOis
-        already attached the discounting engine, so none is left to install."""
+        """Price the swap and return the NPV.
+
+        The only no-argument price(): MakeOis already attached the discounting
+        engine, so none is left to install.
+
+        Returns:
+            float: The present value.
+
+        Raises:
+            ItofinError: On anything that makes the valuation fail, including
+                the "null pricing engine" a swap that somehow arrived without
+                one reports.
+        """
         ...
-    def results(self) -> Results: ...
-    def npv(self) -> float: ...
-    def nominal(self) -> float: ...
-    def fixed_rate(self) -> float: ...
+    def results(self) -> Results:
+        """Return a frozen snapshot of the valuation, calculating first.
+
+        Returns:
+            Results: A copy of the valuation results.
+
+        Raises:
+            ItofinError: On anything that makes the valuation fail.
+        """
+        ...
+    def npv(self) -> float:
+        """Return the swap NPV under the engine the builder attached.
+
+        Returns:
+            float: The present value.
+
+        Raises:
+            ItofinError: On anything that makes the valuation fail.
+        """
+        ...
+    def nominal(self) -> float:
+        """Return the notional both legs accrue on.
+
+        Returns:
+            float: The single nominal, read through the swap's base.
+
+        Raises:
+            ItofinError: If the legs carry per-coupon nominals, which leaves no
+                single one to report.
+        """
+        ...
+    def fixed_rate(self) -> float:
+        """Return the fixed-leg rate.
+
+        Returns:
+            float: The rate given to the builder, or the fair rate it filled in
+                for a par swap.
+        """
+        ...
 
 class MakeOis:
-    """Market-convention builder for an OvernightIndexedSwap: derives both
-    schedules and the discounting engine from a swap tenor and an overnight
-    index. ``fixed_rate=None`` builds a par swap. The built swap already carries
-    its DiscountingSwapEngine."""
+    """Market-convention builder for an OvernightIndexedSwap.
+
+    Derives the start and end dates, both schedules and the discounting engine
+    from a swap tenor and an overnight index, so the caller states conventions
+    instead of hand-building two schedules. ``fixed_rate=None`` builds a par
+    swap: the fair rate is computed off a temporary swap and written into the
+    fixed leg, so the result prices to a zero NPV.
+
+    The core builder is a consumed-self fluent chain, which does not cross the
+    FFI boundary; this facade takes the overrides as constructor keywords and
+    assembles the chain inside build(). Only five overrides are exposed; every
+    other core one keeps its default, and the four the core rejects outright
+    (telescopic value dates, lookback, lockout and observation shift) are
+    unreachable from here by construction. The built swap already carries its
+    DiscountingSwapEngine.
+    """
 
     def __init__(
         self,
@@ -386,8 +614,43 @@ class MakeOis:
         payment_lag: int | None = None,
         discounting_term_structure: YieldTermStructure | None = None,
         averaging_method: RateAveraging | None = None,
-    ) -> None: ...
-    def build(self) -> OvernightIndexedSwap: ...
+    ) -> None:
+        """Store the configuration the chain is assembled from in build().
+
+        Args:
+            swap_tenor (Period): The length of the swap.
+            overnight_index (OvernightIndex): The index the overnight leg
+                compounds.
+            settings (Settings): The explicit settings supplying the evaluation
+                date and the stored fixings.
+            fixed_rate (float | None): The rate of the fixed leg; None builds a
+                par swap.
+            forward_start (Period | None): The delay before the swap starts;
+                None starts it spot, at a zero-day period.
+            effective_date (Date | None): The start date; None derives it from
+                the evaluation date.
+            nominal (float | None): The notional; None keeps the core default.
+            payment_lag (int | None): The days between accrual end and payment;
+                None keeps the core default.
+            discounting_term_structure (YieldTermStructure | None): The curve
+                the flows discount on; None keeps the core default.
+            averaging_method (RateAveraging | None): Whether the overnight
+                fixings compound or are averaged; None keeps the core default.
+        """
+        ...
+    def build(self) -> OvernightIndexedSwap:
+        """Build the priced swap.
+
+        Returns:
+            OvernightIndexedSwap: The swap, already carrying its discounting
+                engine.
+
+        Raises:
+            ItofinError: If effective_date is unset and no evaluation date is
+                set to derive the start from; if the schedule or the overnight
+                leg is degenerate; or if the par-rate fill fails to price.
+        """
+        ...
 
 class EuropeanExercise:
     """A single-date exercise schedule."""
