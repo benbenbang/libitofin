@@ -3025,19 +3025,91 @@ class YoYInflationTermStructure:
     base_rate is answered here where the zero base defers it: a year-on-year
     curve carries the rate observed over the period ending on its base date."""
 
-    def yoy_rate(self, t: float, extrapolate: bool = False) -> float: ...
-    def yoy_rate_date(self, date: Date, extrapolate: bool = False) -> float: ...
-    def base_date(self) -> Date: ...
-    def base_rate(self) -> float: ...
-    def frequency(self) -> Frequency: ...
+    def yoy_rate(self, t: float, extrapolate: bool = False) -> float:
+        """Return the year-on-year inflation rate at year-fraction t.
+
+        Args:
+            t (float): The year fraction, measured with the curve's own day
+                counter; it is negative for the base period.
+            extrapolate (bool): Whether to answer past the curve's range.
+
+        Returns:
+            float: The year-on-year rate, which is not the year-on-year swap
+                rate: that comes from the instrument.
+
+        Raises:
+            ItofinError: If t is past the curve's range and extrapolation is
+                not allowed.
+        """
+        ...
+    def yoy_rate_date(self, date: Date, extrapolate: bool = False) -> float:
+        """Return the year-on-year rate for the inflation period containing date.
+
+        The date is quantized to that period's first day before both the range
+        check and the time conversion. Any seasonality correction is folded in
+        last, at the original date rather than the period start, as C++ does on
+        this path.
+
+        Args:
+            date (Date): The date the rate is read at.
+            extrapolate (bool): Whether to answer past the curve's range.
+
+        Returns:
+            float: The year-on-year rate for that period.
+
+        Raises:
+            ItofinError: If the period is past the curve's range and
+                extrapolation is not allowed.
+        """
+        ...
+    def base_date(self) -> Date:
+        """Return the base date, the last date for which the fixing is known.
+
+        Returns:
+            Date: The base date; it precedes the reference date, so its year
+                fraction is negative.
+        """
+        ...
+    def base_rate(self) -> float:
+        """Return the rate observed over the period ending on the base date.
+
+        Returns:
+            float: The base rate, which node zero is seeded with and keeps.
+
+        Raises:
+            ItofinError: On a curve that carries no base rate.
+        """
+        ...
+    def frequency(self) -> Frequency:
+        """Return the frequency of the inflation fixings the curve is built on.
+
+        Returns:
+            Frequency: The fixing frequency.
+        """
+        ...
     def set_seasonality(
         self, seasonality: MultiplicativePriceSeasonality | None
     ) -> None:
-        """Installs seasonality on the curve, replacing whatever it carried;
-        None clears it. Raises ItofinError from the consistency gate, leaving a
-        rejected correction installed as C++ does."""
+        """Install seasonality on the curve, replacing whatever it carried.
+
+        Args:
+            seasonality (MultiplicativePriceSeasonality | None): The correction
+                to install; None clears it.
+
+        Raises:
+            ItofinError: From the consistency gate, which leaves a rejected
+                correction installed as C++ does; see the zero-curve base for
+                the full account.
+        """
         ...
-    def has_seasonality(self) -> bool: ...
+    def has_seasonality(self) -> bool:
+        """Return whether the curve carries a seasonality correction.
+
+        Returns:
+            bool: True also for a correction left installed by a
+                set_seasonality that raised.
+        """
+        ...
 
 class InterpolatedYoYInflationCurve(YoYInflationTermStructure):
     """A year-on-year inflation curve built from (date, year-on-year rate)
@@ -3056,13 +3128,46 @@ class InterpolatedYoYInflationCurve(YoYInflationTermStructure):
         frequency: Frequency,
         day_counter: DayCounter,
     ) -> None:
-        """Raises ItofinError on fewer than two dates, a dates/rates count
-        mismatch, or a rate at or below -100 % from the second node on - the
-        base rate is left unconstrained."""
+        """Build the curve through the rates quoted at dates.
+
+        Args:
+            reference_date (Date): The curve's reference date, given separately
+                and normally following the base date.
+            dates (list[Date]): The node dates, the first being the base date.
+            rates (list[float]): The year-on-year rate at each node; the first
+                is the base rate the curve publishes.
+            frequency (Frequency): The frequency of the inflation fixings.
+            day_counter (DayCounter): The day count turning dates into times.
+
+        Raises:
+            ItofinError: On fewer than two dates, a dates and rates count
+                mismatch, or a rate at or below -100 per cent from the second
+                node on; the base rate is left unconstrained.
+        """
         ...
-    def times(self) -> list[float]: ...
-    def dates(self) -> list[Date]: ...
-    def nodes(self) -> list[tuple[Date, float]]: ...
+    def times(self) -> list[float]:
+        """Return the node times, measured from the reference date.
+
+        Returns:
+            list[float]: The node times; the first is negative whenever the
+                base date precedes the reference date.
+        """
+        ...
+    def dates(self) -> list[Date]:
+        """Return the node dates.
+
+        Returns:
+            list[Date]: The nodes, the first of which is the base date.
+        """
+        ...
+    def nodes(self) -> list[tuple[Date, float]]:
+        """Return the curve's nodes as pairs.
+
+        Returns:
+            list[tuple[Date, float]]: One (date, year-on-year rate) pair per
+                node.
+        """
+        ...
 
 class YoYInflationHelper:
     """Shared base for every year-on-year bootstrap helper: the two dates the
@@ -3071,8 +3176,20 @@ class YoYInflationHelper:
     Concrete helpers such as YearOnYearInflationSwapHelper subclass this and
     supply only their constructor."""
 
-    def pillar_date(self) -> Date: ...
-    def latest_date(self) -> Date: ...
+    def pillar_date(self) -> Date:
+        """Return the date the curve node this helper sets sits at.
+
+        Returns:
+            Date: The pillar date.
+        """
+        ...
+    def latest_date(self) -> Date:
+        """Return the latest date the helper needs curve data at.
+
+        Returns:
+            Date: The latest date, equal to the pillar date.
+        """
+        ...
 
 class YearOnYearInflationSwapHelper(YoYInflationHelper):
     """The bootstrap helper fitting a year-on-year inflation swap quoted as a
@@ -3106,9 +3223,37 @@ class YearOnYearInflationSwapHelper(YoYInflationHelper):
         settings: Settings,
         pillar: Pillar = ...,
     ) -> None:
-        """Raises ItofinError on CpiInterpolationType.Linear, which the core
-        refuses outright pending the interpolated branch (#847), and on an
-        observation lag the helper's own swap legs cannot be built under."""
+        """Build the helper on a swap maturing at maturity.
+
+        Args:
+            quote (SimpleQuote): The quoted swap rate; the caller keeps it, so
+                a later set_value re-drives the bootstrap.
+            swap_obs_lag (Period): How far back each coupon's fixings are
+                observed.
+            maturity (Date): The swap's maturity.
+            calendar (Calendar): The calendar the payments roll on.
+            payment_convention (BusinessDayConvention): The roll applied to the
+                payment dates.
+            day_counter (DayCounter): The day count the legs accrue on.
+            index (YoYInflationIndex): The index observed; the helper prices
+                through a copy linked to a handle of its own, so the caller's
+                index need not be linked to any curve.
+            interpolation (CpiInterpolationType): How the observed fixings are
+                interpolated.
+            nominal_term_structure (YieldTermStructure): The discount curve,
+                which this helper does need: its legs pay on a schedule of
+                dates rather than one, so their discount factors do not cancel.
+            settings (Settings): The explicit settings supplying the evaluation
+                date the swap starts at, which must be set before this
+                constructor runs.
+            pillar (Pillar): Accepted for signature parity but never read; it
+                only ever discriminates on the interpolated path.
+
+        Raises:
+            ItofinError: On Linear interpolation, which the core refuses
+                outright pending the interpolated branch, and on an observation
+                lag the helper's own swap legs cannot be built under.
+        """
         ...
 
 class PiecewiseYoYInflationCurve(YoYInflationTermStructure):
@@ -3132,12 +3277,64 @@ class PiecewiseYoYInflationCurve(YoYInflationTermStructure):
         day_counter: DayCounter,
         helpers: list[YoYInflationHelper],
     ) -> None:
-        """Raises ItofinError on an empty helper list."""
+        """Build the curve over helpers, registering on them without solving.
+
+        Args:
+            reference_date (Date): The curve's reference date.
+            base_date (Date): The last date for which a fixing is known, where
+                node zero sits.
+            base_yoy_rate (float): The rate node zero is seeded with and keeps,
+                rather than solved for.
+            frequency (Frequency): The frequency of the inflation fixings.
+            day_counter (DayCounter): The day count turning dates into times.
+            helpers (list[YoYInflationHelper]): The bootstrap instruments.
+
+        Raises:
+            ItofinError: On an empty helper list.
+        """
         ...
-    def calculate(self) -> None: ...
-    def times(self) -> list[float]: ...
-    def dates(self) -> list[Date]: ...
-    def nodes(self) -> list[tuple[Date, float]]: ...
+    def calculate(self) -> None:
+        """Run the bootstrap if the cache is stale.
+
+        Calling it explicitly makes a solver failure surface here rather than
+        inside a later query.
+
+        Raises:
+            ItofinError: On a bootstrap failure.
+        """
+        ...
+    def times(self) -> list[float]:
+        """Return the node times, triggering the bootstrap.
+
+        Returns:
+            list[float]: The nodes measured from the reference date; the first
+                is negative, node zero sitting on the base date.
+
+        Raises:
+            ItofinError: On a bootstrap failure.
+        """
+        ...
+    def dates(self) -> list[Date]:
+        """Return the node dates, triggering the bootstrap.
+
+        Returns:
+            list[Date]: The nodes, the first of which is the base date.
+
+        Raises:
+            ItofinError: On a bootstrap failure.
+        """
+        ...
+    def nodes(self) -> list[tuple[Date, float]]:
+        """Return the solved nodes as pairs, triggering the bootstrap.
+
+        Returns:
+            list[tuple[Date, float]]: One (date, year-on-year rate) pair per
+                node.
+
+        Raises:
+            ItofinError: On a bootstrap failure.
+        """
+        ...
 
 class ConstantYoYOptionletVolatility:
     """One year-on-year optionlet volatility for every strike and every date.
