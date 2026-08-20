@@ -1694,22 +1694,89 @@ class OptionletVolatilityStructure:
 
     def volatility(
         self, option_tenor: Period, strike: float, extrapolate: bool = False
-    ) -> float: ...
+    ) -> float:
+        """Return the caplet volatility for an option tenor and strike.
+
+        Args:
+            option_tenor (Period): The option's tenor, resolved against the
+                surface's reference date and calendar.
+            strike (float): The strike the volatility is read at.
+            extrapolate (bool): Whether to answer outside the surface's grid.
+
+        Returns:
+            float: The caplet volatility.
+
+        Raises:
+            ItofinError: If the query falls outside the grid and extrapolation
+                is not allowed.
+        """
+        ...
     def volatility_date(
         self, option_date: Date, strike: float, extrapolate: bool = False
-    ) -> float: ...
+    ) -> float:
+        """Return the caplet volatility for an option date and strike.
+
+        The date form the optionlet stripper and the cap/floor engine use, both
+        addressing the surface by a coupon's fixing date.
+
+        Args:
+            option_date (Date): The option date the volatility is read at.
+            strike (float): The strike the volatility is read at.
+            extrapolate (bool): Whether to answer outside the surface's grid.
+
+        Returns:
+            float: The caplet volatility.
+
+        Raises:
+            ItofinError: If the query falls outside the grid and extrapolation
+                is not allowed.
+        """
+        ...
     def black_variance(
         self, option_tenor: Period, strike: float, extrapolate: bool = False
-    ) -> float: ...
-    def allows_extrapolation(self) -> bool: ...
-    def enable_extrapolation(self) -> None:
-        """A stripped surface ends at its last optionlet fixing, so a cap whose
-        own last caplet fixes there queries the boundary."""
+    ) -> float:
+        """Return the Black variance, the squared volatility times option time.
+
+        Args:
+            option_tenor (Period): The option's tenor.
+            strike (float): The strike the variance is read at.
+            extrapolate (bool): Whether to answer outside the surface's grid.
+
+        Returns:
+            float: The Black variance.
+
+        Raises:
+            ItofinError: If the query falls outside the grid and extrapolation
+                is not allowed.
+        """
         ...
-    def disable_extrapolation(self) -> None: ...
+    def allows_extrapolation(self) -> bool:
+        """Return whether the surface answers dates and times beyond its maximum.
+
+        Returns:
+            bool: True when extrapolation is enabled on the surface itself.
+        """
+        ...
+    def enable_extrapolation(self) -> None:
+        """Allow extrapolation past the maximum date and time.
+
+        A stripped surface ends at its last optionlet fixing, so a cap whose
+        own last caplet fixes there queries the boundary.
+        """
+        ...
+    def disable_extrapolation(self) -> None:
+        """Forbid extrapolation past the maximum date and time."""
+        ...
     def displacement(self) -> float:
-        """The lognormal shift applied to forwards and strikes. This is what
-        BlackCapFloorEngine checks a caller-supplied displacement against."""
+        """Return the lognormal shift applied to forwards and strikes.
+
+        This is what BlackCapFloorEngine checks a caller-supplied displacement
+        against, so it is the number to read before pinning one on the engine.
+
+        Returns:
+            float: The shift; zero for the unshifted lognormal and the normal
+                model.
+        """
         ...
 
 class ConstantOptionletVolatility(OptionletVolatilityStructure):
@@ -1728,7 +1795,25 @@ class ConstantOptionletVolatility(OptionletVolatilityStructure):
         day_counter: DayCounter,
         volatility_type: VolatilityType,
         displacement: float = 0.0,
-    ) -> None: ...
+    ) -> None:
+        """Build the surface at a fixed volatility.
+
+        Args:
+            reference_date (Date): The date every query's option time runs
+                from.
+            calendar (Calendar): The calendar option tenors resolve on.
+            business_day_convention (BusinessDayConvention): The roll applied
+                when resolving a tenor to a date.
+            volatility (float): The single volatility answered everywhere,
+                wrapped in an internal quote the caller cannot later mutate.
+            day_counter (DayCounter): The day count option times are measured
+                in.
+            volatility_type (VolatilityType): Whether the quote is
+                shifted-lognormal or normal.
+            displacement (float): The lognormal shift applied to forwards and
+                strikes.
+        """
+        ...
     @staticmethod
     def with_quote(
         reference_date: Date,
@@ -1739,8 +1824,26 @@ class ConstantOptionletVolatility(OptionletVolatilityStructure):
         volatility_type: VolatilityType,
         displacement: float = 0.0,
     ) -> ConstantOptionletVolatility:
-        """Reads the volatility from the caller's quote; a later set_value
-        notifies the surface's observers."""
+        """Build the surface reading its volatility from a live quote.
+
+        Args:
+            reference_date (Date): The date every query's option time runs
+                from.
+            calendar (Calendar): The calendar option tenors resolve on.
+            business_day_convention (BusinessDayConvention): The roll applied
+                when resolving a tenor to a date.
+            volatility (SimpleQuote): The volatility; a later set_value
+                notifies the surface's observers.
+            day_counter (DayCounter): The day count option times are measured
+                in.
+            volatility_type (VolatilityType): Whether the quote is
+                shifted-lognormal or normal.
+            displacement (float): The lognormal shift applied to forwards and
+                strikes.
+
+        Returns:
+            ConstantOptionletVolatility: The surface over that quote.
+        """
         ...
 
 class CapFloorTermVolSurface:
@@ -1772,9 +1875,30 @@ class CapFloorTermVolSurface:
         volatilities: list[list[float]],
         day_counter: DayCounter,
     ) -> None:
-        """Raises ItofinError on an empty or ragged grid, on a grid whose shape
-        does not match the tenors and strikes, and on a non-increasing tenor or
-        strike axis."""
+        """Build the surface on a pinned reference date over fixed volatilities.
+
+        Every query's option time runs from reference_date, not from the
+        evaluation date, and no later mutation can reach the grid.
+
+        Args:
+            reference_date (Date): The date option times run from.
+            calendar (Calendar): The calendar cap tenors resolve on.
+            business_day_convention (BusinessDayConvention): The roll applied
+                when resolving a tenor to a date.
+            option_tenors (list[Period]): The cap-length axis, one per grid
+                row; strictly increasing.
+            strikes (list[float]): The strike axis, one per grid column;
+                strictly increasing.
+            volatilities (list[list[float]]): The flat cap volatilities, one
+                row per option tenor.
+            day_counter (DayCounter): The day count option times are measured
+                in.
+
+        Raises:
+            ItofinError: On an empty or ragged grid, on a grid whose shape does
+                not match the tenors and strikes, and on a non-increasing tenor
+                or strike axis.
+        """
         ...
     @staticmethod
     def with_quotes(
@@ -1786,8 +1910,28 @@ class CapFloorTermVolSurface:
         volatilities: list[list[SimpleQuote]],
         day_counter: DayCounter,
     ) -> CapFloorTermVolSurface:
-        """Reads each node from the caller's quote; a later set_value rebuilds
-        the interpolation and notifies the surface's observers."""
+        """Build the pinned-reference surface over live quotes.
+
+        Args:
+            reference_date (Date): The date option times run from.
+            calendar (Calendar): The calendar cap tenors resolve on.
+            business_day_convention (BusinessDayConvention): The roll applied
+                when resolving a tenor to a date.
+            option_tenors (list[Period]): The cap-length axis, strictly
+                increasing.
+            strikes (list[float]): The strike axis, strictly increasing.
+            volatilities (list[list[SimpleQuote]]): The volatility quotes, one
+                row per option tenor; a later set_value rebuilds the
+                interpolation and notifies the surface's observers.
+            day_counter (DayCounter): The day count option times are measured
+                in.
+
+        Returns:
+            CapFloorTermVolSurface: The surface over those quotes.
+
+        Raises:
+            ItofinError: On the same conditions __init__ reports.
+        """
         ...
     @staticmethod
     def moving(
@@ -1800,9 +1944,34 @@ class CapFloorTermVolSurface:
         day_counter: DayCounter,
         settings: Settings,
     ) -> CapFloorTermVolSurface:
-        """The reference date floats settlement_days business days off the
-        evaluation date. This is the form OptionletStripper1 and
-        StrippedOptionletAdapter need."""
+        """Build a surface whose reference date floats off the evaluation date.
+
+        This is the form the optionlet stripping pipeline needs: unlike the
+        pinned-reference constructors, it carries the settlement days
+        StrippedOptionletAdapter reads back off the stripper.
+
+        Args:
+            settlement_days (int): The business days the reference date sits
+                past the evaluation date.
+            calendar (Calendar): The calendar cap tenors resolve on.
+            business_day_convention (BusinessDayConvention): The roll applied
+                when resolving a tenor to a date.
+            option_tenors (list[Period]): The cap-length axis, strictly
+                increasing.
+            strikes (list[float]): The strike axis, strictly increasing.
+            volatilities (list[list[float]]): The flat cap volatilities, one
+                row per option tenor.
+            day_counter (DayCounter): The day count option times are measured
+                in.
+            settings (Settings): The explicit settings supplying the evaluation
+                date the reference date floats off.
+
+        Returns:
+            CapFloorTermVolSurface: The floating-reference surface.
+
+        Raises:
+            ItofinError: On the same conditions __init__ reports.
+        """
         ...
     @staticmethod
     def moving_with_quotes(
@@ -1815,19 +1984,90 @@ class CapFloorTermVolSurface:
         day_counter: DayCounter,
         settings: Settings,
     ) -> CapFloorTermVolSurface:
-        """The floating-reference surface over the caller's quotes."""
+        """Build the floating-reference surface over live quotes.
+
+        Args:
+            settlement_days (int): The business days the reference date sits
+                past the evaluation date.
+            calendar (Calendar): The calendar cap tenors resolve on.
+            business_day_convention (BusinessDayConvention): The roll applied
+                when resolving a tenor to a date.
+            option_tenors (list[Period]): The cap-length axis, strictly
+                increasing.
+            strikes (list[float]): The strike axis, strictly increasing.
+            volatilities (list[list[SimpleQuote]]): The volatility quotes, one
+                row per option tenor.
+            day_counter (DayCounter): The day count option times are measured
+                in.
+            settings (Settings): The explicit settings supplying the evaluation
+                date the reference date floats off.
+
+        Returns:
+            CapFloorTermVolSurface: The floating-reference surface over those
+                quotes.
+
+        Raises:
+            ItofinError: On the same conditions __init__ reports.
+        """
         ...
     def volatility(
         self, option_tenor: Period, strike: float, extrapolate: bool = False
-    ) -> float: ...
+    ) -> float:
+        """Return the flat cap volatility for a cap tenor and strike.
+
+        The tenor form resolves against the surface's own calendar and
+        business-day convention, so it is the one to reach for unless a date is
+        already in hand.
+
+        Args:
+            option_tenor (Period): The cap's length.
+            strike (float): The strike the volatility is read at.
+            extrapolate (bool): Whether to answer outside the surface's grid.
+
+        Returns:
+            float: The flat cap volatility.
+
+        Raises:
+            ItofinError: If the query falls outside the grid and extrapolation
+                is not allowed.
+        """
+        ...
     def volatility_date(
         self, end_date: Date, strike: float, extrapolate: bool = False
-    ) -> float: ...
+    ) -> float:
+        """Return the flat cap volatility for a cap end date and strike.
+
+        Args:
+            end_date (Date): The cap's end date.
+            strike (float): The strike the volatility is read at.
+            extrapolate (bool): Whether to answer outside the surface's grid.
+
+        Returns:
+            float: The flat cap volatility.
+
+        Raises:
+            ItofinError: If the query falls outside the grid and extrapolation
+                is not allowed.
+        """
+        ...
     def volatility_time(
         self, length: float, strike: float, extrapolate: bool = False
     ) -> float:
-        """length is a year fraction off the reference date in the surface's own
-        day count."""
+        """Return the flat cap volatility for a cap end time and strike.
+
+        Args:
+            length (float): A year fraction off the reference date, in the
+                surface's own day count.
+            strike (float): The strike the volatility is read at.
+            extrapolate (bool): Whether to answer outside the surface's grid.
+
+        Returns:
+            float: The flat cap volatility.
+
+        Raises:
+            ItofinError: If the query falls outside the grid and extrapolation
+                is not allowed.
+        """
         ...
 
 class OptionletStripper1:
