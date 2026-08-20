@@ -5,7 +5,13 @@ from itofin.termstructures import BlackVolTermStructure, YieldTermStructure
 from itofin.time import Date, DayCounter
 
 class BlackScholesProcess:
-    """A generalized Black-Scholes process, built from scalars or curve objects."""
+    """A generalized Black-Scholes process, built from scalars or curve objects.
+
+    The Handle plumbing is assembled internally, so no handle crosses the
+    binding boundary. The constructor takes the conventional
+    (risk_free_rate, dividend_yield) order and places the two curves in the
+    core's own order at a single call site.
+    """
 
     def __init__(
         self,
@@ -15,19 +21,69 @@ class BlackScholesProcess:
         volatility: float,
         reference_date: Date,
         day_counter: DayCounter,
-    ) -> None: ...
+    ) -> None:
+        """Build a flat-market process from scalar inputs.
+
+        Args:
+            spot: The spot level, held as a quote.
+            risk_free_rate: The flat risk-free rate, made into a curve
+                compounded continuously on an annual frequency.
+            dividend_yield: The flat dividend yield, made into a curve on the
+                same convention as the risk-free rate.
+            volatility: The flat Black volatility.
+            reference_date: The date the three flat curves are anchored on.
+            day_counter: The day count the curves accrue on.
+        """
+        ...
+
     @staticmethod
     def from_curves(
         spot: float,
         risk_free: YieldTermStructure,
         dividend: YieldTermStructure,
         vol: BlackVolTermStructure,
-    ) -> BlackScholesProcess: ...
-    def risk_free_rate(self) -> float: ...
-    def dividend_yield(self) -> float: ...
+    ) -> BlackScholesProcess:
+        """Build a process from term-structure objects instead of scalars.
+
+        The three legs are bound by name and placed in the core's order at a
+        single call site, the same risk-free/dividend argument-order footgun the
+        scalar constructor guards against.
+
+        Args:
+            spot: The spot level, held as a quote.
+            risk_free: The risk-free discount curve.
+            dividend: The dividend curve.
+            vol: The Black volatility surface.
+
+        Returns:
+            A process over the three supplied term structures.
+        """
+        ...
+
+    def risk_free_rate(self) -> float:
+        """Return the risk-free rate carried by the process.
+
+        Returns:
+            The continuously compounded zero rate on the risk-free curve at the
+            reference date.
+        """
+        ...
+
+    def dividend_yield(self) -> float:
+        """Return the dividend yield carried by the process.
+
+        Returns:
+            The continuously compounded zero rate on the dividend curve at the
+            reference date.
+        """
+        ...
 
 class HestonProcess:
-    """The square-root stochastic-variance process."""
+    """The square-root stochastic-variance process.
+
+    The two flat yield curves and the spot quote are assembled behind their
+    handles internally, so no handle crosses the binding boundary.
+    """
 
     def __init__(
         self,
@@ -41,9 +97,61 @@ class HestonProcess:
         rho: float,
         reference_date: Date,
         day_counter: DayCounter,
-    ) -> None: ...
-    def v0(self) -> float: ...
-    def kappa(self) -> float: ...
-    def theta(self) -> float: ...
-    def sigma(self) -> float: ...
-    def rho(self) -> float: ...
+    ) -> None:
+        """Build the process from scalar market inputs and the five parameters.
+
+        Args:
+            risk_free_rate: The flat risk-free rate, made into a curve
+                compounded continuously on an annual frequency.
+            dividend_yield: The flat dividend yield, made into a curve on the
+                same convention as the risk-free rate.
+            spot: The spot level, held as a quote.
+            v0: The initial variance.
+            kappa: The mean-reversion speed.
+            theta: The long-run variance.
+            sigma: The volatility of variance.
+            rho: The spot/variance correlation.
+            reference_date: The date the two flat curves are anchored on.
+            day_counter: The day count the curves accrue on.
+        """
+        ...
+
+    def v0(self) -> float:
+        """Return the initial variance.
+
+        Returns:
+            The initial variance v0.
+        """
+        ...
+
+    def kappa(self) -> float:
+        """Return the mean-reversion speed.
+
+        Returns:
+            The mean-reversion speed kappa.
+        """
+        ...
+
+    def theta(self) -> float:
+        """Return the long-run variance.
+
+        Returns:
+            The long-run variance theta.
+        """
+        ...
+
+    def sigma(self) -> float:
+        """Return the volatility of variance.
+
+        Returns:
+            The volatility of variance sigma.
+        """
+        ...
+
+    def rho(self) -> float:
+        """Return the spot/variance correlation.
+
+        Returns:
+            The spot/variance correlation rho.
+        """
+        ...
