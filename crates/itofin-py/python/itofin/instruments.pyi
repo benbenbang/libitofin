@@ -25,6 +25,7 @@ from itofin.pricingengines import (
     YoYInflationCapFloorEngine,
 )
 from itofin.processes import BlackScholesProcess
+from itofin.results import Results
 from itofin.termstructures import RateAveraging, YieldTermStructure
 from itofin.time import (
     BusinessDayConvention,
@@ -67,6 +68,20 @@ class VanillaOption:
     def set_mc_american_engine(self, engine: MCAmericanEngine) -> None:
         """Attaches the Monte Carlo American engine. A European-exercise option
         raises ItofinError ("wrong exercise given") when priced on it."""
+        ...
+    def calculate(self) -> None:
+        """Forces the valuation. Idempotent: the option reprices only once an
+        observed input notified it."""
+        ...
+    def is_calculated(self) -> bool:
+        """Whether the cached results are currently valid."""
+        ...
+    def price(self, process: BlackScholesProcess) -> float:
+        """Attaches an analytic European engine on process and returns the NPV:
+        set_engine followed by npv, in one call."""
+        ...
+    def results(self) -> Results:
+        """A frozen snapshot of the valuation, calculating first."""
         ...
     def npv(self) -> float: ...
     def delta(self) -> float: ...

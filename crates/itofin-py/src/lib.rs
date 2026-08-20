@@ -24,6 +24,7 @@ mod mcengine;
 mod ois;
 mod option;
 mod optionletvol;
+mod results;
 mod settings;
 mod smilesection;
 mod swap;
@@ -85,6 +86,7 @@ use pyo3::create_exception;
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
+use results::Results;
 use settings::PySettings;
 use smilesection::PySabrSmileSection;
 use swap::{PyMakeVanillaSwap, PySwapType, PyVanillaSwap};
@@ -129,7 +131,7 @@ impl From<PyQlError> for PyErr {
     }
 }
 
-/// Registers the ten `ql/`-faithful submodules on `itofin`.
+/// Registers the eleven `ql/`-faithful submodules on `itofin`.
 ///
 /// Nested PyO3 modules give attribute access (`itofin.time.Date`) but do not
 /// form a Python package, so `import itofin.time` / `from itofin.time import
@@ -286,6 +288,9 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     optimization.add_class::<PyLevenbergMarquardt>()?;
     optimization.add_class::<PyEndCriteria>()?;
 
+    let results = PyModule::new(py, "results")?;
+    results.add_class::<Results>()?;
+
     let submodules = [
         ("time", &time),
         ("quotes", &quotes),
@@ -297,6 +302,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
         ("models", &models),
         ("pricingengines", &pricingengines),
         ("optimization", &optimization),
+        ("results", &results),
     ];
 
     let sys_modules = PyModule::import(py, "sys")?.getattr("modules")?;
