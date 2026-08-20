@@ -24,6 +24,7 @@ use crate::cashflows::PyYoYInflationCoupon;
 use crate::curve::PyYieldTermStructure;
 use crate::helpers::PyPillar;
 use crate::market::PySimpleQuote;
+use crate::results::Results;
 use crate::settings::PySettings;
 use crate::swap::PySwapType;
 use crate::time::{
@@ -1010,6 +1011,36 @@ impl PyZeroCouponInflationSwap {
             .set_pricing_engine(engine.engine());
     }
 
+    /// Forces the valuation, idempotent and fallible as
+    /// [`VanillaOption.calculate`](crate::option::PyVanillaOption::calculate).
+    fn calculate(&mut self) -> PyResult<()> {
+        Ok(self
+            .inner
+            .borrow_mut()
+            .calculate()
+            .map_err(PyQlError::from)?)
+    }
+
+    /// Whether the cached results are currently valid.
+    fn is_calculated(&self) -> bool {
+        self.inner.borrow().base().is_calculated()
+    }
+
+    /// Attaches `engine` and returns the NPV, the one-shot form of
+    /// [`set_engine`](Self::set_engine) followed by [`npv`](Self::npv).
+    fn price(&mut self, engine: &PyDiscountingSwapEngine) -> PyResult<f64> {
+        self.set_engine(engine);
+        self.calculate()?;
+        self.npv()
+    }
+
+    /// A frozen [`Results`] copy of the valuation, calculating first.
+    fn results(&mut self) -> PyResult<Results> {
+        self.calculate()?;
+        let inner = self.inner.borrow();
+        Ok(Results::snapshot(inner.base()))
+    }
+
     /// The swap NPV under the attached engine.
     ///
     /// Fallible: with no engine attached the core reports `"null pricing
@@ -1867,6 +1898,36 @@ impl PyYearOnYearInflationSwap {
             .set_pricing_engine(engine.engine());
     }
 
+    /// Forces the valuation, idempotent and fallible as
+    /// [`VanillaOption.calculate`](crate::option::PyVanillaOption::calculate).
+    fn calculate(&mut self) -> PyResult<()> {
+        Ok(self
+            .inner
+            .borrow_mut()
+            .calculate()
+            .map_err(PyQlError::from)?)
+    }
+
+    /// Whether the cached results are currently valid.
+    fn is_calculated(&self) -> bool {
+        self.inner.borrow().base().is_calculated()
+    }
+
+    /// Attaches `engine` and returns the NPV, the one-shot form of
+    /// [`set_engine`](Self::set_engine) followed by [`npv`](Self::npv).
+    fn price(&mut self, engine: &PyDiscountingSwapEngine) -> PyResult<f64> {
+        self.set_engine(engine);
+        self.calculate()?;
+        self.npv()
+    }
+
+    /// A frozen [`Results`] copy of the valuation, calculating first.
+    fn results(&mut self) -> PyResult<Results> {
+        self.calculate()?;
+        let inner = self.inner.borrow();
+        Ok(Results::snapshot(inner.base()))
+    }
+
     /// The swap NPV under the attached engine.
     ///
     /// Fallible: with no engine attached the core reports `"null pricing
@@ -2568,6 +2629,37 @@ impl PyYoYInflationCapFloor {
             .borrow_mut()
             .base_mut()
             .set_pricing_engine(engine.engine());
+    }
+
+    /// Forces the valuation, idempotent and fallible as
+    /// [`VanillaOption.calculate`](crate::option::PyVanillaOption::calculate).
+    fn calculate(&mut self) -> PyResult<()> {
+        Ok(self
+            .inner
+            .borrow_mut()
+            .calculate()
+            .map_err(PyQlError::from)?)
+    }
+
+    /// Whether the cached results are currently valid.
+    fn is_calculated(&self) -> bool {
+        self.inner.borrow().base().is_calculated()
+    }
+
+    /// Attaches `engine`, replacing whatever the factory installed, and returns
+    /// the NPV: the one-shot form of [`set_engine`](Self::set_engine) followed
+    /// by [`npv`](Self::npv).
+    fn price(&mut self, engine: &PyYoYInflationCapFloorEngine) -> PyResult<f64> {
+        self.set_engine(engine);
+        self.calculate()?;
+        self.npv()
+    }
+
+    /// A frozen [`Results`] copy of the valuation, calculating first.
+    fn results(&mut self) -> PyResult<Results> {
+        self.calculate()?;
+        let inner = self.inner.borrow();
+        Ok(Results::snapshot(inner.base()))
     }
 
     /// The cap/floor NPV under the attached engine.

@@ -40,12 +40,20 @@ import pytest
 
 from itofin import ItofinError, Settings
 from itofin.cashflows import IborLeg
-from itofin.indexes import Estr, Euribor
+from itofin.indexes import (
+    CpiInterpolationType,
+    Estr,
+    Euribor,
+    YoYInflationIndex,
+    ZeroInflationIndex,
+)
 from itofin.instruments import (
     CapFloor,
+    CapFloorType,
     CreditDefaultSwap,
     EuropeanExercise,
     MakeOis,
+    MakeYoYInflationCapFloor,
     OptionType,
     ProtectionSide,
     SettlementMethod,
@@ -54,20 +62,31 @@ from itofin.instruments import (
     SwapType,
     VanillaOption,
     VanillaSwap,
+    YearOnYearInflationSwap,
+    ZeroCouponInflationSwap,
 )
 from itofin.pricingengines import (
     BlackCapFloorEngine,
     BlackSwaptionEngine,
     CashAnnuityModel,
+    DiscountingSwapEngine,
     MidPointCdsEngine,
+    YoYInflationCapFloorEngine,
 )
 from itofin.processes import BlackScholesProcess
 from itofin.quotes import SimpleQuote
-from itofin.termstructures import FlatForward, FlatHazardRate
+from itofin.termstructures import (
+    ConstantYoYOptionletVolatility,
+    FlatForward,
+    FlatHazardRate,
+    InterpolatedYoYInflationCurve,
+    InterpolatedZeroInflationCurve,
+)
 from itofin.time import (
     BusinessDayConvention,
     Calendar,
     Date,
+    DateGeneration,
     DayCounter,
     Frequency,
     Period,
@@ -573,3 +592,211 @@ def test_cds_calculating_without_an_engine_raises():
     with pytest.raises(ItofinError) as raised:
         contract.calculate()
     assert "null pricing engine" in str(raised.value)
+
+
+INFLATION_TODAY = Date(13, 8, 2007)
+INFLATION_BASE = Date(1, 7, 2007)
+UK = Calendar.united_kingdom()
+THIRTY_360 = DayCounter.thirty360_bond_basis()
+FLAT_YOY = 0.03
+
+
+def _inflation_settings():
+    settings = Settings()
+    settings.set_evaluation_date(INFLATION_TODAY)
+    return settings
+
+
+def _nominal_engine(settings):
+    return DiscountingSwapEngine(
+        FlatForward(INFLATION_TODAY, 0.05, DayCounter.actual360()), settings
+    )
+
+
+def _zcis_fixture():
+    """The #750 zero-coupon inflation swap: a payer on UK RPI over one year,
+    forecasting off a directly built zero-inflation curve and discounted at a
+    flat 5%."""
+    settings = _inflation_settings()
+    index = ZeroInflationIndex.uk_rpi(settings)
+    index.add_fixing(Date(1, 5, 2007), 205.0)
+    index.add_fixing(INFLATION_BASE, 207.3)
+    index.link_to(
+        InterpolatedZeroInflationCurve(
+            INFLATION_TODAY,
+            [INFLATION_BASE, Date(1, 1, 2008), Date(1, 7, 2009)],
+            [0.02, 0.025, 0.030],
+            Frequency.Monthly,
+            THIRTY_360,
+        )
+    )
+    swap = ZeroCouponInflationSwap(
+        SwapType.Payer,
+        1_000_000.0,
+        INFLATION_TODAY,
+        Date(13, 8, 2008),
+        UK,
+        BusinessDayConvention.ModifiedFollowing,
+        THIRTY_360,
+        0.025,
+        index,
+        Period(3, "Months"),
+        CpiInterpolationType.Flat,
+        None,
+        None,
+        settings,
+    )
+    return swap, _nominal_engine(settings)
+
+
+def test_zcis_price_is_set_engine_plus_npv():
+    one_shot, engine = _zcis_fixture()
+    long_hand, other_engine = _zcis_fixture()
+    long_hand.set_engine(other_engine)
+
+    priced = one_shot.price(engine)
+    print(f"\nZCIS price = {priced!r}")
+    assert priced == long_hand.npv()
+    assert one_shot.results().npv == priced
+
+
+def test_zcis_calculating_without_an_engine_raises():
+    swap, _ = _zcis_fixture()
+
+    with pytest.raises(ItofinError) as raised:
+        swap.calculate()
+    assert "null pricing engine" in str(raised.value)
+
+
+def _yoy_index(settings):
+    """A quoted year-on-year index on UK RPI's metadata, linked to a two-node
+    flat 3% curve: linear interpolation between equal rates is that rate
+    everywhere. Shared by the two year-on-year facades below."""
+    index = YoYInflationIndex(
+        "YY_RPI",
+        "UK",
+        "GB",
+        False,
+        Frequency.Monthly,
+        Period(1, "Months"),
+        "British pound sterling",
+        "GBP",
+        826,
+        "£",
+        "p",
+        100,
+        settings,
+    )
+    index.link_to(
+        InterpolatedYoYInflationCurve(
+            INFLATION_TODAY,
+            [INFLATION_BASE, Date(1, 1, 2040)],
+            [FLAT_YOY, FLAT_YOY],
+            Frequency.Monthly,
+            THIRTY_360,
+        )
+    )
+    return index
+
+
+def _yoy_swap_fixture(fixed_rate=FLAT_YOY + 0.005):
+    """The #822 year-on-year swap, struck fifty basis points off the curve so it
+    is worth something: a swap struck AT the flat rate prices to zero, and a
+    zero would let a price() that returned a constant pass."""
+    settings = _inflation_settings()
+    schedule = Schedule(
+        INFLATION_TODAY,
+        Date(13, 8, 2012),
+        Frequency.Annual,
+        UK,
+        BusinessDayConvention.Unadjusted,
+        DateGeneration.Backward,
+    )
+    swap = YearOnYearInflationSwap(
+        SwapType.Payer,
+        1_000_000.0,
+        schedule,
+        fixed_rate,
+        THIRTY_360,
+        schedule,
+        _yoy_index(settings),
+        Period(2, "Months"),
+        CpiInterpolationType.Flat,
+        0.0,
+        THIRTY_360,
+        UK,
+        BusinessDayConvention.ModifiedFollowing,
+        settings,
+    )
+    return swap, _nominal_engine(settings)
+
+
+def test_yoy_swap_price_is_set_engine_plus_npv():
+    one_shot, engine = _yoy_swap_fixture()
+    long_hand, other_engine = _yoy_swap_fixture()
+    long_hand.set_engine(other_engine)
+
+    priced = one_shot.price(engine)
+    print(f"\nYoY swap price = {priced!r}")
+    assert priced == long_hand.npv()
+    assert abs(priced) > 1.0
+    assert one_shot.results().npv == priced
+
+
+def test_yoy_swap_calculating_without_an_engine_raises():
+    swap, _ = _yoy_swap_fixture()
+
+    with pytest.raises(ItofinError) as raised:
+        swap.calculate()
+    assert "null pricing engine" in str(raised.value)
+
+
+def _yoy_cap_fixture():
+    """A two-year year-on-year cap struck under the flat 3% curve, so it is in
+    the money and worth something. price() here REPLACES the engine the factory
+    installed, which is what the arm below turns on."""
+    settings = _inflation_settings()
+    no_lag = Period(0, "Days")
+    index = _yoy_index(settings)
+    cap = MakeYoYInflationCapFloor(
+        CapFloorType.Cap,
+        index,
+        2,
+        UK,
+        no_lag,
+        CpiInterpolationType.Flat,
+        settings,
+        nominal=1_000_000.0,
+        strike=0.0295,
+    ).build()
+    surface = ConstantYoYOptionletVolatility(
+        0.01,
+        0,
+        UK,
+        BusinessDayConvention.ModifiedFollowing,
+        THIRTY_360,
+        no_lag,
+        Frequency.Annual,
+        False,
+        -1.0,
+        100.0,
+        settings,
+    )
+    nominal = FlatForward(INFLATION_TODAY, 0.05, DayCounter.actual360())
+    return cap, YoYInflationCapFloorEngine.black(index, surface, nominal)
+
+
+def test_yoy_cap_floor_price_is_set_engine_plus_npv():
+    """Each arm builds its own engine: an engine carries the arguments and
+    results of the contract it last priced, so a shared one would let this pass
+    on a stale number."""
+    one_shot, engine = _yoy_cap_fixture()
+    long_hand, other_engine = _yoy_cap_fixture()
+    long_hand.set_engine(other_engine)
+
+    priced = one_shot.price(engine)
+    print(f"\nYoY cap price = {priced!r}")
+    assert priced == long_hand.npv()
+    assert priced > 0.0
+    assert one_shot.is_calculated()
+    assert one_shot.results().npv == priced
