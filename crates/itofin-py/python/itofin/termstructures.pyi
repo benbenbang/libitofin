@@ -2094,15 +2094,56 @@ class OptionletStripper1:
         discount: YieldTermStructure | None = None,
         optionlet_frequency: Period | None = None,
     ) -> None:
-        """discount None falls back to the index's own forwarding curve;
-        optionlet_frequency None uses the index tenor as the caplet step."""
+        """Build the stripper over a term-volatility surface and an index.
+
+        It prices a cap at each of its own lengths off term_vol_surface,
+        differences consecutive prices into a single caplet price, and inverts
+        that for the caplet's implied volatility.
+
+        Args:
+            term_vol_surface (CapFloorTermVolSurface): The market term
+                volatilities; it must be one of the moving forms, a
+                pinned-reference surface carrying no settlement days.
+            ibor_index (IborIndex): The index the caplets fix off.
+            volatility_type (VolatilityType): The quoting convention; Normal is
+                deferred and fails at the strip, not here.
+            accuracy (float): The tolerance of the implied-volatility solve.
+            max_iter (int): The iteration cap of that solve.
+            displacement (float): The lognormal shift applied to forwards and
+                strikes.
+            discount (YieldTermStructure | None): The curve the caps are priced
+                on; None falls back to the index's own forwarding curve.
+            optionlet_frequency (Period | None): The caplet step; None uses the
+                index tenor.
+
+        Raises:
+            ItofinError: On whatever the core rejects about the surface, the
+                index or the solve parameters.
+        """
         ...
     def switch_strike(self) -> float:
-        """The mean at-the-money caplet rate, which decides whether each strike
-        is stripped out of caps or out of floors. The first call strips."""
+        """Return the floating switch strike, the mean at-the-money caplet rate.
+
+        It decides whether each strike is stripped out of caps or out of
+        floors. The first call triggers the strip.
+
+        Returns:
+            float: The switch strike.
+
+        Raises:
+            ItofinError: On a stripping failure, which a Normal volatility_type
+                always is.
+        """
         ...
     def atm_optionlet_rates(self) -> list[float]:
-        """The at-the-money forward rate of each caplet, one per maturity."""
+        """Return the at-the-money forward rate of each caplet.
+
+        Returns:
+            list[float]: One rate per maturity.
+
+        Raises:
+            ItofinError: On a stripping failure.
+        """
         ...
 
 class StrippedOptionletAdapter(OptionletVolatilityStructure):
@@ -2118,9 +2159,22 @@ class StrippedOptionletAdapter(OptionletVolatilityStructure):
     enable_extrapolation()."""
 
     def __init__(self, stripper: OptionletStripper1, settings: Settings) -> None:
-        """Strips eagerly, to snapshot the strike domain and maximum date.
-        Raises ItofinError on a stripper whose term-volatility surface carries
-        no settlement days."""
+        """Build the interpolated surface over a stripper.
+
+        It strips eagerly: the constructor reads the caplet strikes and fixing
+        dates to snapshot its strike domain and maximum date.
+
+        Args:
+            stripper (OptionletStripper1): The stripper whose caplet grid is
+                served.
+            settings (Settings): The explicit settings supplying the evaluation
+                date the reference date floats off.
+
+        Raises:
+            ItofinError: On a stripper whose term-volatility surface carries no
+                settlement days, which is every pinned-reference surface, and
+                on a stripping failure.
+        """
         ...
 
 class DefaultProbabilityTermStructure:
