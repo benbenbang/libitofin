@@ -25,27 +25,17 @@ through `QL_CHECK_CLOSE`: its 1e-6 is a *percentage*, so the bound is a relative
 operands. `pytest.approx` is neither, hence the helper below.
 """
 
+# pypi/conda library
 import pytest
 
+# itofin library
 from itofin import ItofinError, Settings
 from itofin.indexes import Currency, IborIndex
 from itofin.instruments import MakeCreditDefaultSwap, PricingModel, ProtectionSide
 from itofin.pricingengines import IsdaCdsEngine
 from itofin.quotes import SimpleQuote
-from itofin.termstructures import (
-    DepositRateHelper,
-    FlatHazardRate,
-    PiecewiseLogLinearDiscount,
-    SwapRateHelper,
-)
-from itofin.time import (
-    BusinessDayConvention,
-    Calendar,
-    Date,
-    DayCounter,
-    Frequency,
-    Period,
-)
+from itofin.termstructures import DepositRateHelper, FlatHazardRate, PiecewiseLogLinearDiscount, SwapRateHelper
+from itofin.time import BusinessDayConvention, Calendar, Date, DayCounter, Frequency, Period
 
 TRADE_DATE = Date(21, 5, 2009)
 NOTIONAL = 10000000.0

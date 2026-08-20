@@ -18,6 +18,7 @@ Run it with:
     python example/python/vanilla_swap.py
 """
 
+# plugins
 # itofin library
 from itofin import Settings
 from itofin.indexes import Euribor

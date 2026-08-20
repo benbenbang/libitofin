@@ -21,20 +21,15 @@ C. The setters return a NEW leg and leave the receiver alone. This is the shape
    silently change under a later call.
 """
 
+# pypi/conda library
 import pytest
 
+# itofin library
 from itofin import ItofinError, Settings
 from itofin.cashflows import IborLeg
 from itofin.indexes import Euribor
 from itofin.termstructures import FlatForward
-from itofin.time import (
-    BusinessDayConvention,
-    Calendar,
-    Date,
-    DayCounter,
-    Frequency,
-    Schedule,
-)
+from itofin.time import BusinessDayConvention, Calendar, Date, DayCounter, Frequency, Schedule
 
 EVAL = Date(15, 1, 2026)
 END = Date(15, 1, 2031)

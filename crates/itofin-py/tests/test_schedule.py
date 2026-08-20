@@ -7,16 +7,12 @@ under TARGET + ModifiedFollowing they roll forward to Monday 17-Jan. The oracle
 therefore pins 17-Jan, not the naive 15th quoted in the issue body.
 """
 
+# pypi/conda library
 import pytest
 
+# itofin library
 from itofin import ItofinError
-from itofin.time import (
-    BusinessDayConvention,
-    Calendar,
-    Date,
-    Frequency,
-    Schedule,
-)
+from itofin.time import BusinessDayConvention, Calendar, Date, Frequency, Schedule
 
 START = Date(15, 1, 2028)
 END = Date(15, 1, 2033)

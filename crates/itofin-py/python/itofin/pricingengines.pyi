@@ -1,6 +1,7 @@
 # Hand-written stubs for itofin.pricingengines; sync manually with src/swaptionengine.rs,
 # src/capfloorengine.rs, src/creditengine.rs, src/inflation.rs and src/mcengine.rs (#517).
 
+# itofin library
 from itofin import Settings
 from itofin.indexes import YoYInflationIndex
 from itofin.processes import BlackScholesProcess, HestonProcess

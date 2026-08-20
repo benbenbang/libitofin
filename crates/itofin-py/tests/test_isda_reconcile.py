@@ -26,31 +26,14 @@ The tolerance is Boost's `BOOST_CHECK_CLOSE`, a *percentage*, so the bound is a
 relative 1e-5 and it is two-sided against both operands.
 """
 
+# itofin library
 from itofin import Settings
 from itofin.indexes import Currency, IborIndex
-from itofin.instruments import (
-    CreditDefaultSwap,
-    MakeCreditDefaultSwap,
-    PricingModel,
-    ProtectionSide,
-)
+from itofin.instruments import CreditDefaultSwap, MakeCreditDefaultSwap, PricingModel, ProtectionSide
 from itofin.pricingengines import IsdaCdsEngine
 from itofin.quotes import SimpleQuote
-from itofin.termstructures import (
-    DepositRateHelper,
-    FlatHazardRate,
-    PiecewiseLogLinearDiscount,
-    SwapRateHelper,
-)
-from itofin.time import (
-    BusinessDayConvention,
-    Calendar,
-    Date,
-    DayCounter,
-    Frequency,
-    Period,
-    Schedule,
-)
+from itofin.termstructures import DepositRateHelper, FlatHazardRate, PiecewiseLogLinearDiscount, SwapRateHelper
+from itofin.time import BusinessDayConvention, Calendar, Date, DayCounter, Frequency, Period, Schedule
 
 # creditdefaultswap.cpp:765 and :869: today, on both records.
 VALUE_DATE = Date(26, 7, 2021)

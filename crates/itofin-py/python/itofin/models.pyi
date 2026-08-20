@@ -1,6 +1,7 @@
 # Hand-written stubs for itofin.models; sync manually with src/heston.rs,
 # src/hullwhite.rs and src/calibration.rs (#517).
 
+# itofin library
 from itofin import Settings
 from itofin.indexes import IborIndex
 from itofin.instruments import OptionType

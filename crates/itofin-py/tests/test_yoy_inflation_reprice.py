@@ -27,29 +27,17 @@ Omitted visibly: seasonality on a year-on-year curve, which the zero side covers
 inherits.
 """
 
+# pypi/conda library
 import pytest
 
+# itofin library
 from itofin import ItofinError, Settings
 from itofin.indexes import CpiInterpolationType, YoYInflationIndex, ZeroInflationIndex
 from itofin.instruments import SwapType, YearOnYearInflationSwap
 from itofin.pricingengines import DiscountingSwapEngine
 from itofin.quotes import SimpleQuote
-from itofin.termstructures import (
-    FlatForward,
-    PiecewiseYoYInflationCurve,
-    Pillar,
-    YearOnYearInflationSwapHelper,
-)
-from itofin.time import (
-    BusinessDayConvention,
-    Calendar,
-    Date,
-    DateGeneration,
-    DayCounter,
-    Frequency,
-    Period,
-    Schedule,
-)
+from itofin.termstructures import FlatForward, PiecewiseYoYInflationCurve, Pillar, YearOnYearInflationSwapHelper
+from itofin.time import BusinessDayConvention, Calendar, Date, DateGeneration, DayCounter, Frequency, Period, Schedule
 
 TODAY = Calendar.united_kingdom().adjust(
     Date(13, 8, 2007), BusinessDayConvention.Following

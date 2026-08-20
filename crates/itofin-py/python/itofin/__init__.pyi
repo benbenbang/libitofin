@@ -17,6 +17,7 @@
 #   results       <- src/results.rs
 """Python bindings for libitofin, a Rust port of QuantLib."""
 
+# itofin library
 from itofin import cashflows as cashflows
 from itofin import indexes as indexes
 from itofin import instruments as instruments

@@ -16,8 +16,10 @@ still compiles, and both a USD and a EUR arm run, so a fresh hard-code of
 either currency fails one of them.
 """
 
+# pypi/conda library
 import pytest
 
+# itofin library
 from itofin import Settings
 from itofin.indexes import Currency, Euribor, IborIndex, SwapIndex
 from itofin.instruments import MakeVanillaSwap

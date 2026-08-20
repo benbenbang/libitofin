@@ -1,5 +1,6 @@
 # Hand-written stubs for itofin.time; sync manually with src/time.rs (#517).
 
+# standard library
 from typing import overload
 
 def is_imm_date(date: Date, main_cycle: bool = False) -> bool:

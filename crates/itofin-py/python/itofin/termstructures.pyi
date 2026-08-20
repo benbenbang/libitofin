@@ -2,6 +2,7 @@
 # src/helpers.rs, src/swaptionvol.rs, src/optionletvol.rs, src/smilesection.rs and
 # src/credit.rs, src/credithelpers.rs and src/inflation.rs (#517).
 
+# itofin library
 from itofin import Settings
 from itofin.indexes import (
     CpiInterpolationType,
@@ -12,15 +13,7 @@ from itofin.indexes import (
     ZeroInflationIndex,
 )
 from itofin.quotes import SimpleQuote
-from itofin.time import (
-    BusinessDayConvention,
-    Calendar,
-    Date,
-    DateGeneration,
-    DayCounter,
-    Frequency,
-    Period,
-)
+from itofin.time import BusinessDayConvention, Calendar, Date, DateGeneration, DayCounter, Frequency, Period
 
 class YieldTermStructure:
     """Shared base for every yield curve: discount factors, zero and forward rates.

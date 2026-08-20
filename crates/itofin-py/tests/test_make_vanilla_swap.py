@@ -23,21 +23,15 @@ apples-to-apples.
 pinned Rust-probe constants for the same fixture at a 3% fixed rate.
 """
 
+# pypi/conda library
 import pytest
 
+# itofin library
 from itofin import ItofinError, Settings
 from itofin.indexes import Euribor
 from itofin.instruments import MakeVanillaSwap, SwapType, VanillaSwap
 from itofin.termstructures import FlatForward
-from itofin.time import (
-    BusinessDayConvention,
-    Calendar,
-    Date,
-    DayCounter,
-    Frequency,
-    Period,
-    Schedule,
-)
+from itofin.time import BusinessDayConvention, Calendar, Date, DayCounter, Frequency, Period, Schedule
 
 PROBE_FAIR = 0.03048844643136293
 PROBE_NPV = 0.21033895380698553

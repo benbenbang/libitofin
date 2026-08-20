@@ -1,5 +1,7 @@
+# pypi/conda library
 import pytest
 
+# itofin library
 from itofin import ItofinError, Settings
 from itofin.indexes import Euribor
 from itofin.instruments import OptionType

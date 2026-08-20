@@ -80,30 +80,21 @@ every instrument and every engine, or the leg and the optionlets date
 differently with no error raised.
 """
 
+# standard library
 import math
 
+# pypi/conda library
 import pytest
 
+# itofin library
 from itofin import ItofinError, Settings
 from itofin.cashflows import IborLeg
 from itofin.indexes import Euribor
 from itofin.instruments import CapFloor, CapFloorType
 from itofin.pricingengines import BlackCapFloorEngine
 from itofin.quotes import SimpleQuote
-from itofin.termstructures import (
-    ConstantOptionletVolatility,
-    FlatForward,
-    VolatilityType,
-)
-from itofin.time import (
-    BusinessDayConvention,
-    Calendar,
-    Date,
-    DayCounter,
-    Frequency,
-    Period,
-    Schedule,
-)
+from itofin.termstructures import ConstantOptionletVolatility, FlatForward, VolatilityType
+from itofin.time import BusinessDayConvention, Calendar, Date, DayCounter, Frequency, Period, Schedule
 
 EVAL = Date(15, 1, 2026)
 

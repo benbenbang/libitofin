@@ -25,22 +25,16 @@ Three things the milestone depends on and that a looser fixture would hide:
   schedule's first date, which the twentieth-IMM rule puts ten days later.
 """
 
+# pypi/conda library
 import pytest
+
+# itofin library
 from itofin import ItofinError, Settings
 from itofin.instruments import CreditDefaultSwap, ProtectionSide
 from itofin.pricingengines import MidPointCdsEngine
 from itofin.quotes import SimpleQuote
 from itofin.termstructures import FlatForward, PiecewiseDefaultCurve, SpreadCdsHelper
-from itofin.time import (
-    BusinessDayConvention,
-    Calendar,
-    Date,
-    DateGeneration,
-    DayCounter,
-    Frequency,
-    Period,
-    Schedule,
-)
+from itofin.time import BusinessDayConvention, Calendar, Date, DateGeneration, DayCounter, Frequency, Period, Schedule
 
 TODAY = Date(9, 6, 2006)
 QUOTES = [0.005, 0.006, 0.007, 0.009]

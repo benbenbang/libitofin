@@ -22,28 +22,16 @@ fixture (``jamshidianswaptionengine.rs:344``, which never attaches a swap engine
     RECEIVER_NPV = 1.3562383202325612   (jamshidianswaptionengine.rs:517)
 """
 
+# pypi/conda library
 import pytest
 
+# itofin library
 from itofin import ItofinError, Settings
 from itofin.indexes import Euribor
-from itofin.instruments import (
-    EuropeanExercise,
-    SettlementMethod,
-    SettlementType,
-    Swaption,
-    SwapType,
-    VanillaSwap,
-)
+from itofin.instruments import EuropeanExercise, SettlementMethod, SettlementType, Swaption, SwapType, VanillaSwap
 from itofin.models import HullWhite
 from itofin.termstructures import FlatForward
-from itofin.time import (
-    BusinessDayConvention,
-    Calendar,
-    Date,
-    DayCounter,
-    Frequency,
-    Schedule,
-)
+from itofin.time import BusinessDayConvention, Calendar, Date, DayCounter, Frequency, Schedule
 
 PAYER_NPV = 1.5666103955750414
 RECEIVER_NPV = 1.3562383202325612

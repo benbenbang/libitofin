@@ -1,19 +1,10 @@
 # Hand-written stubs for itofin.indexes; sync manually with src/hullwhite.rs, src/helpers.rs,
 # src/swapindex.rs, src/currency.rs and src/inflation.rs (#517).
 
+# itofin library
 from itofin import Settings
-from itofin.termstructures import (
-    YieldTermStructure,
-    YoYInflationTermStructure,
-    ZeroInflationTermStructure,
-)
-from itofin.time import (
-    BusinessDayConvention,
-    Calendar,
-    Date,
-    DayCounter,
-    Period,
-)
+from itofin.termstructures import YieldTermStructure, YoYInflationTermStructure, ZeroInflationTermStructure
+from itofin.time import BusinessDayConvention, Calendar, Date, DayCounter, Period
 
 class Currency:
     """An ISO 4217 currency specification.

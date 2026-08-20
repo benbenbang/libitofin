@@ -23,6 +23,7 @@ delegates to the same core PartialEq either way, so the fixture is not worth its
 cost here.
 """
 
+# itofin library
 from itofin.time import DayCounter, Period
 
 

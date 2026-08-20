@@ -15,19 +15,15 @@ OWN root (bootstraphelper.rs:317) and so re-asserted the solver residual rather
 than discriminating a mis-wire.
 """
 
+# pypi/conda library
 import pytest
 
+# itofin library
 from itofin import Settings
 from itofin.indexes import Estr
 from itofin.instruments import MakeOis
 from itofin.quotes import SimpleQuote
-from itofin.termstructures import (
-    FlatForward,
-    OISRateHelper,
-    PiecewiseLogLinearDiscount,
-    Pillar,
-    RateAveraging,
-)
+from itofin.termstructures import FlatForward, OISRateHelper, PiecewiseLogLinearDiscount, Pillar, RateAveraging
 from itofin.time import BusinessDayConvention, Calendar, Date, DayCounter, Frequency
 from itofin.time import Period as P
 

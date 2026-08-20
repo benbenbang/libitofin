@@ -32,24 +32,16 @@ hazard guess fails to price, and Brent reports an opaque non-convergence.
 15-Jun-2026 is a Monday and no TARGET holiday.
 """
 
+# pypi/conda library
 import pytest
+
+# itofin library
 from itofin import ItofinError, Settings
 from itofin.instruments import CreditDefaultSwap, PricingModel, ProtectionSide
 from itofin.pricingengines import IsdaCdsEngine, MidPointCdsEngine
 from itofin.quotes import SimpleQuote
-from itofin.termstructures import (
-    FlatForward,
-    FlatHazardRate,
-    InterpolatedHazardRateCurve,
-)
-from itofin.time import (
-    BusinessDayConvention,
-    Calendar,
-    Date,
-    DayCounter,
-    Frequency,
-    Schedule,
-)
+from itofin.termstructures import FlatForward, FlatHazardRate, InterpolatedHazardRateCurve
+from itofin.time import BusinessDayConvention, Calendar, Date, DayCounter, Frequency, Schedule
 
 TODAY = Date(15, 6, 2026)
 H1 = 0.30

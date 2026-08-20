@@ -19,6 +19,7 @@ required because `PyEuribor.six_months(curve, settings)` takes a NON-optional
 curve (hullwhite.rs:183-189), so an empty handle is unreachable through it.
 """
 
+# itofin library
 from itofin import Settings
 from itofin.indexes import Euribor
 from itofin.quotes import SimpleQuote
@@ -27,8 +28,8 @@ from itofin.termstructures import (
     FraRateHelper,
     FuturesRateHelper,
     FuturesType,
-    Pillar,
     PiecewiseLogLinearDiscount,
+    Pillar,
     SwapRateHelper,
 )
 from itofin.time import BusinessDayConvention, Calendar, Date, DayCounter, Frequency

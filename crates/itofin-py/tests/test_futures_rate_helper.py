@@ -10,24 +10,18 @@ exact Actual360 fraction the core bootstrap uses (integer day count / 360), so i
 reproduces the same f64 rather than a rounded literal.
 """
 
+# standard library
 import datetime
 
+# pypi/conda library
 import pytest
 
+# itofin library
 from itofin import ItofinError, Settings
 from itofin.indexes import Euribor
 from itofin.quotes import SimpleQuote
-from itofin.termstructures import (
-    FuturesRateHelper,
-    FuturesType,
-    PiecewiseYieldCurve,
-)
-from itofin.time import (
-    BusinessDayConvention,
-    Calendar,
-    Date,
-    DayCounter,
-)
+from itofin.termstructures import FuturesRateHelper, FuturesType, PiecewiseYieldCurve
+from itofin.time import BusinessDayConvention, Calendar, Date, DayCounter
 from itofin.time import Period as P
 from itofin.time import is_imm_date, next_imm_date
 

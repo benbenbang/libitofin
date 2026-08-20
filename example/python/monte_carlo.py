@@ -21,6 +21,7 @@ Run it with:
     python example/python/monte_carlo.py
 """
 
+# plugins
 # itofin library
 from itofin import Settings
 from itofin.instruments import OptionType, VanillaOption

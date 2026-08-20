@@ -60,8 +60,10 @@ One shared Settings drives everything: the instruments and the engines must
 agree on the evaluation date or the NPVs are silently wrong.
 """
 
+# pypi/conda library
 import pytest
 
+# itofin library
 from itofin import ItofinError, Settings
 from itofin.indexes import Euribor
 from itofin.instruments import CapFloor, CapFloorType
@@ -74,7 +76,7 @@ from itofin.termstructures import (
     StrippedOptionletAdapter,
     VolatilityType,
 )
-from itofin.time import BusinessDayConvention, Calendar, DayCounter, Date, Period
+from itofin.time import BusinessDayConvention, Calendar, Date, DayCounter, Period
 
 EVAL = Date(28, 10, 2013)
 CURVE_RATE = 0.04

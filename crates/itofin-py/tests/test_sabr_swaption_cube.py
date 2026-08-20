@@ -45,18 +45,13 @@ The cube is calibrated once for the whole module: a Levenberg-Marquardt fit per
 node plus the dense pass is the expensive part, and no arm mutates a quote.
 """
 
+# pypi/conda library
 import pytest
 
+# itofin library
 from itofin import ItofinError, Settings
 from itofin.indexes import Currency, Euribor, SwapIndex
-from itofin.instruments import (
-    EuropeanExercise,
-    SettlementMethod,
-    SettlementType,
-    Swaption,
-    SwapType,
-    VanillaSwap,
-)
+from itofin.instruments import EuropeanExercise, SettlementMethod, SettlementType, Swaption, SwapType, VanillaSwap
 from itofin.pricingengines import BlackSwaptionEngine, CashAnnuityModel
 from itofin.quotes import SimpleQuote
 from itofin.termstructures import (
@@ -66,15 +61,7 @@ from itofin.termstructures import (
     SwaptionVolatilityMatrix,
     VolatilityType,
 )
-from itofin.time import (
-    BusinessDayConvention,
-    Calendar,
-    Date,
-    DayCounter,
-    Frequency,
-    Period,
-    Schedule,
-)
+from itofin.time import BusinessDayConvention, Calendar, Date, DayCounter, Frequency, Period, Schedule
 
 EVAL = Date(15, 6, 2026)
 BDC = BusinessDayConvention.ModifiedFollowing

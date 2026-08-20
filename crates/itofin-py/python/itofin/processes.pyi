@@ -1,6 +1,7 @@
 # Hand-written stubs for itofin.processes; sync manually with src/market.rs and
 # src/heston.rs (#517).
 
+# itofin library
 from itofin.termstructures import BlackVolTermStructure, YieldTermStructure
 from itofin.time import Date, DayCounter
 

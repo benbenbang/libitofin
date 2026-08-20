@@ -40,35 +40,20 @@ prices, so reusing one swaption across the engines would let arm A pass on a
 stale cached number.
 """
 
+# standard library
 import math
 
+# pypi/conda library
 import pytest
 
+# itofin library
 from itofin import ItofinError, Settings
 from itofin.indexes import Euribor
-from itofin.instruments import (
-    EuropeanExercise,
-    SettlementMethod,
-    SettlementType,
-    Swaption,
-    SwapType,
-    VanillaSwap,
-)
+from itofin.instruments import EuropeanExercise, SettlementMethod, SettlementType, Swaption, SwapType, VanillaSwap
 from itofin.pricingengines import BachelierSwaptionEngine, CashAnnuityModel
 from itofin.quotes import SimpleQuote
-from itofin.termstructures import (
-    ConstantSwaptionVolatility,
-    FlatForward,
-    VolatilityType,
-)
-from itofin.time import (
-    BusinessDayConvention,
-    Calendar,
-    Date,
-    DayCounter,
-    Frequency,
-    Schedule,
-)
+from itofin.termstructures import ConstantSwaptionVolatility, FlatForward, VolatilityType
+from itofin.time import BusinessDayConvention, Calendar, Date, DayCounter, Frequency, Schedule
 
 EVAL = Date(15, 1, 2026)
 EXERCISE = Date(15, 1, 2027)

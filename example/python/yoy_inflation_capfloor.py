@@ -42,6 +42,7 @@ Run it with:
     python example/python/yoy_inflation_capfloor.py
 """
 
+# plugins
 # itofin library
 from itofin import ItofinError, Settings
 from itofin.indexes import CpiInterpolationType, YoYInflationIndex, ZeroInflationIndex

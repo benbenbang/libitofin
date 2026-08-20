@@ -22,25 +22,15 @@ facades on this machine; each is recorded against the Rust test whose mechanism
 it mirrors, in crates/libitofin/src/pricingengines/credit/isdacdsengine.rs.
 """
 
+# standard library
 import math
 
+# itofin library
 from itofin import Settings
 from itofin.instruments import CreditDefaultSwap, ProtectionSide
-from itofin.pricingengines import (
-    AccrualBias,
-    ForwardsInCouponPeriod,
-    IsdaCdsEngine,
-    NumericalFix,
-)
+from itofin.pricingengines import AccrualBias, ForwardsInCouponPeriod, IsdaCdsEngine, NumericalFix
 from itofin.termstructures import DiscountCurve, FlatForward, FlatHazardRate
-from itofin.time import (
-    BusinessDayConvention,
-    Calendar,
-    Date,
-    DayCounter,
-    Frequency,
-    Schedule,
-)
+from itofin.time import BusinessDayConvention, Calendar, Date, DayCounter, Frequency, Schedule
 
 TODAY = Date(15, 6, 2026)
 NOTIONAL = 10000000.0

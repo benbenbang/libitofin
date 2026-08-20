@@ -26,13 +26,10 @@ cached value exactly as well as a live one does, so only re-pricing the same
 instrument after the quote moves tells the two apart.
 """
 
+# itofin library
 from itofin import Settings
 from itofin.indexes import CpiInterpolationType, YoYInflationIndex, ZeroInflationIndex
-from itofin.instruments import (
-    CapFloorType,
-    MakeYoYInflationCapFloor,
-    YoYInflationCapFloor,
-)
+from itofin.instruments import CapFloorType, MakeYoYInflationCapFloor, YoYInflationCapFloor
 from itofin.pricingengines import YoYInflationCapFloorEngine
 from itofin.quotes import SimpleQuote
 from itofin.termstructures import (
@@ -41,16 +38,7 @@ from itofin.termstructures import (
     PiecewiseYoYInflationCurve,
     YearOnYearInflationSwapHelper,
 )
-from itofin.time import (
-    BusinessDayConvention,
-    Calendar,
-    Date,
-    DateGeneration,
-    DayCounter,
-    Frequency,
-    Period,
-    Schedule,
-)
+from itofin.time import BusinessDayConvention, Calendar, Date, DateGeneration, DayCounter, Frequency, Period, Schedule
 
 UK = Calendar.united_kingdom()
 TODAY = UK.adjust(Date(13, 8, 2007), BusinessDayConvention.Following)

@@ -16,7 +16,10 @@ period, so a node read reaches that node's time exactly and returns its rate
 with no interpolation.
 """
 
+# pypi/conda library
 import pytest
+
+# itofin library
 from itofin import ItofinError
 from itofin.termstructures import InterpolatedZeroInflationCurve, ZeroInflationTermStructure
 from itofin.time import Date, DayCounter, Frequency

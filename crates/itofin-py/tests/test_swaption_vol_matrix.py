@@ -41,35 +41,17 @@ C. Engine integration. The same swaption priced on the matrix and on a
    independent check of that number. Arm A and the core's 1e-16 test cover that.
 """
 
+# pypi/conda library
 import pytest
 
+# itofin library
 from itofin import Settings
 from itofin.indexes import Euribor
-from itofin.instruments import (
-    EuropeanExercise,
-    SettlementMethod,
-    SettlementType,
-    Swaption,
-    SwapType,
-    VanillaSwap,
-)
+from itofin.instruments import EuropeanExercise, SettlementMethod, SettlementType, Swaption, SwapType, VanillaSwap
 from itofin.pricingengines import BlackSwaptionEngine, CashAnnuityModel
 from itofin.quotes import SimpleQuote
-from itofin.termstructures import (
-    ConstantSwaptionVolatility,
-    FlatForward,
-    SwaptionVolatilityMatrix,
-    VolatilityType,
-)
-from itofin.time import (
-    BusinessDayConvention,
-    Calendar,
-    Date,
-    DayCounter,
-    Frequency,
-    Period,
-    Schedule,
-)
+from itofin.termstructures import ConstantSwaptionVolatility, FlatForward, SwaptionVolatilityMatrix, VolatilityType
+from itofin.time import BusinessDayConvention, Calendar, Date, DayCounter, Frequency, Period, Schedule
 
 EVAL = Date(15, 6, 2026)
 BDC = BusinessDayConvention.ModifiedFollowing

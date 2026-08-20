@@ -14,21 +14,13 @@ a bootstrapped curve are the reprice oracle's job
 (test_yoy_inflation_reprice.py).
 """
 
+# itofin library
 from itofin import Settings
 from itofin.indexes import CpiInterpolationType, YoYInflationIndex
 from itofin.instruments import SwapType, YearOnYearInflationSwap
 from itofin.pricingengines import DiscountingSwapEngine
 from itofin.termstructures import FlatForward, InterpolatedYoYInflationCurve
-from itofin.time import (
-    BusinessDayConvention,
-    Calendar,
-    Date,
-    DateGeneration,
-    DayCounter,
-    Frequency,
-    Period,
-    Schedule,
-)
+from itofin.time import BusinessDayConvention, Calendar, Date, DateGeneration, DayCounter, Frequency, Period, Schedule
 
 TODAY = Date(13, 8, 2007)
 CURVE_BASE = Date(1, 7, 2007)

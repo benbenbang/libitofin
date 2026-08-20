@@ -14,6 +14,7 @@ Run it with:
     python example/python/yield_curve.py
 """
 
+# plugins
 # itofin library
 from itofin import Settings
 from itofin.indexes import Euribor

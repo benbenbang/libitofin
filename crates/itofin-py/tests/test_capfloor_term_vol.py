@@ -47,14 +47,17 @@ E. The two MOVING constructors (#623), whose reference date floats
    REFERENCE, so they must recover exactly the pinned surface's nodes.
 """
 
+# standard library
 import datetime
 
+# pypi/conda library
 import pytest
 
+# itofin library
 from itofin import ItofinError, Settings
 from itofin.quotes import SimpleQuote
 from itofin.termstructures import CapFloorTermVolSurface
-from itofin.time import BusinessDayConvention, Calendar, DayCounter, Date, Period
+from itofin.time import BusinessDayConvention, Calendar, Date, DayCounter, Period
 
 REFERENCE = Date(15, 6, 2026)
 BDC = BusinessDayConvention.ModifiedFollowing
