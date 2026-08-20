@@ -1501,8 +1501,8 @@ class SabrSmileSection:
 
         Raises:
             ItofinError: On a non-zero shift or a Normal volatility_type, both
-                deferred; on a non-positive shifted forward; and on SABR
-                parameters outside their admissible ranges.
+                deferred to #586; on a non-positive shifted forward; and on
+                SABR parameters outside their admissible ranges.
         """
         ...
     def volatility(self, strike: float) -> float:
@@ -2761,10 +2761,10 @@ class ZeroInflationTermStructure:
 
         Raises:
             ItofinError: From the consistency gate, which a multi-year factor
-                set fails, that comparison being a documented core deferral.
-                The store happens before the gate runs, as C++'s does, so a
-                rejected correction is left installed and unannounced: clear it
-                with None before reading the curve again.
+                set fails, that comparison being a documented core deferral
+                (#807). The store happens before the gate runs, as C++'s does,
+                so a rejected correction is left installed and unannounced:
+                clear it with None before reading the curve again.
         """
         ...
     def has_seasonality(self) -> bool:
@@ -3251,8 +3251,9 @@ class YearOnYearInflationSwapHelper(YoYInflationHelper):
 
         Raises:
             ItofinError: On Linear interpolation, which the core refuses
-                outright pending the interpolated branch, and on an observation
-                lag the helper's own swap legs cannot be built under.
+                outright pending the interpolated branch (#847), and on an
+                observation lag the helper's own swap legs cannot be built
+                under.
         """
         ...
 
