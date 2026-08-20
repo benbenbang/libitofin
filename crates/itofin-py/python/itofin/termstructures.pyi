@@ -1481,24 +1481,105 @@ class SabrSmileSection:
         shift: float = 0.0,
         volatility_type: VolatilityType = ...,
     ) -> None:
-        """Raises ItofinError on a non-zero shift or a Normal volatility_type
-        (both deferred to #586), on a non-positive shifted forward, and on SABR
-        parameters outside alpha > 0, beta in [0, 1], nu >= 0, rho^2 < 1."""
+        """Build the smile at a given exercise time and forward.
+
+        Only the exercise-time form is wrapped; the date-anchored one differs
+        from it only in computing that time from a reference date and a day
+        counter, which a caller can do with DayCounter.year_fraction.
+
+        Args:
+            exercise_time (float): The option's exercise time, in years.
+            forward (float): The forward the smile is centred on.
+            alpha (float): The SABR alpha, which must be positive.
+            beta (float): The SABR beta, which must lie in [0, 1].
+            nu (float): The SABR nu, which must be non-negative.
+            rho (float): The SABR rho, whose square must be below 1.
+            shift (float): The lognormal shift; a non-zero shift is deferred
+                and refused.
+            volatility_type (VolatilityType): The quoting convention; Normal is
+                deferred and refused.
+
+        Raises:
+            ItofinError: On a non-zero shift or a Normal volatility_type, both
+                deferred; on a non-positive shifted forward; and on SABR
+                parameters outside their admissible ranges.
+        """
         ...
-    def volatility(self, strike: float) -> float: ...
-    def variance(self, strike: float) -> float: ...
+    def volatility(self, strike: float) -> float:
+        """Return the volatility at strike.
+
+        Args:
+            strike (float): The strike; strikes below the shifted domain floor
+                are clamped to it rather than rejected, as the core does.
+
+        Returns:
+            float: The Hagan SABR volatility.
+
+        Raises:
+            ItofinError: On whatever the closed-form evaluation rejects.
+        """
+        ...
+    def variance(self, strike: float) -> float:
+        """Return the Black variance at strike.
+
+        Args:
+            strike (float): The strike the variance is read at.
+
+        Returns:
+            float: The squared volatility times the exercise time.
+
+        Raises:
+            ItofinError: On whatever the closed-form evaluation rejects.
+        """
+        ...
     @property
-    def exercise_time(self) -> float: ...
+    def exercise_time(self) -> float:
+        """The exercise time the smile was built for.
+
+        Returns:
+            float: The exercise time, in years.
+        """
+        ...
     @property
-    def atm_level(self) -> float: ...
+    def atm_level(self) -> float:
+        """The at-the-money level.
+
+        Returns:
+            float: The forward the smile is centred on.
+        """
+        ...
     @property
-    def alpha(self) -> float: ...
+    def alpha(self) -> float:
+        """The SABR alpha parameter.
+
+        Returns:
+            float: The alpha the smile was built with.
+        """
+        ...
     @property
-    def beta(self) -> float: ...
+    def beta(self) -> float:
+        """The SABR beta parameter.
+
+        Returns:
+            float: The beta the smile was built with.
+        """
+        ...
     @property
-    def nu(self) -> float: ...
+    def nu(self) -> float:
+        """The SABR nu parameter.
+
+        Returns:
+            float: The nu the smile was built with.
+        """
+        ...
     @property
-    def rho(self) -> float: ...
+    def rho(self) -> float:
+        """The SABR rho parameter.
+
+        Returns:
+            float: The rho the smile was built with.
+        """
+        ...
 
 class SabrSwaptionVolatilityCube(SwaptionVolatilityStructure):
     """A smile cube whose every node is a SABR smile fitted to the at-the-money
@@ -1542,10 +1623,66 @@ class SabrSwaptionVolatilityCube(SwaptionVolatilityStructure):
         use_max_error: bool = False,
         max_guesses: int = 50,
         cutoff_strike: float = 0.0001,
-    ) -> None: ...
+    ) -> None:
+        """Build the cube, calibrating every node on construction.
+
+        The end criteria, the maximum error tolerance, the optimisation method
+        and the accepted error are left at the core's C++ defaults.
+
+        Args:
+            atm_vol (SwaptionVolatilityStructure): The at-the-money surface the
+                fitted smiles are anchored on.
+            option_tenors (list[Period]): The option axis of the node grid.
+            swap_tenors (list[Period]): The swap axis of the node grid.
+            strike_spreads (list[float]): The moneyness offsets each smile is
+                quoted at.
+            vol_spreads (list[list[SimpleQuote]]): The spread quotes, row-major
+                over the nodes with one quote per strike spread.
+            swap_index_base (SwapIndex): The long base swap index.
+            short_swap_index_base (SwapIndex): The short base swap index.
+            parameters_guess (list[list[SimpleQuote]]): The SABR starting
+                values, row-major over the nodes, each row holding alpha, beta,
+                nu and rho in that order.
+            is_parameter_fixed (list[bool]): Which of the four parameters are
+                pinned at their guess across every node, in that same order.
+            is_atm_calibrated (bool): Whether a second dense pass re-anchors
+                the fitted smiles on the at-the-money surface.
+            settings (Settings): The explicit settings supplying the evaluation
+                date and the stored fixings.
+            vega_weighted_smile_fit (bool): Whether the smile fit is
+                vega-weighted.
+            use_max_error (bool): Whether the fit is judged on the maximum
+                error rather than the aggregate one.
+            max_guesses (int): How many starting guesses a node may try.
+            cutoff_strike (float): The strike floor the fit is evaluated above.
+
+        Raises:
+            ItofinError: On an empty or ragged vol_spreads or parameters_guess
+                grid, on a row count that is not one per node, on an
+                is_parameter_fixed list that is not four entries long, on a
+                normal at-the-money surface, which needs the deferred normal
+                SABR formula, and on a calibration failure.
+        """
+        ...
     def atm_strike_from_tenor(self, option_tenor: Period, swap_tenor: Period) -> float:
-        """The at-the-money strike for an option tenor and swap tenor: the strike
-        the fitted smile is centred on."""
+        """Return the at-the-money strike for an option tenor and swap tenor.
+
+        The fixing of whichever base swap index the swap tenor selects, and the
+        strike the fitted smile is centred on, so it is what a caller needs to
+        place a query at a given moneyness.
+
+        Args:
+            option_tenor (Period): The option's tenor.
+            swap_tenor (Period): The underlying swap's tenor, which selects the
+                base index.
+
+        Returns:
+            float: The at-the-money strike.
+
+        Raises:
+            ItofinError: On whatever the selected index's fixing reports, an
+                unset evaluation date or an unlinked forwarding curve included.
+        """
         ...
 
 class OptionletVolatilityStructure:
