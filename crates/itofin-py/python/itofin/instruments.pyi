@@ -653,9 +653,19 @@ class MakeOis:
         ...
 
 class EuropeanExercise:
-    """A single-date exercise schedule."""
+    """A single-date exercise schedule.
 
-    def __init__(self, date: Date) -> None: ...
+    Held as the exercise trait object the swaption constructor takes, so the
+    same value reaches the instrument.
+    """
+
+    def __init__(self, date: Date) -> None:
+        """Build the exercise schedule.
+
+        Args:
+            date (Date): The single date the option may be exercised on.
+        """
+        ...
 
 class SettlementType:
     """How a swaption settles on exercise."""
@@ -664,7 +674,13 @@ class SettlementType:
     Cash: SettlementType
 
 class SettlementMethod:
-    """The settlement mechanics under a settlement type."""
+    """The settlement mechanics under a settlement type.
+
+    Physical pairs with PhysicalOTC or PhysicalCleared, cash with
+    CollateralizedCashPrice or ParYieldCurve. The consistency check runs at
+    pricing time, not construction, so a mismatched pair only surfaces from
+    npv().
+    """
 
     PhysicalOTC: SettlementMethod
     PhysicalCleared: SettlementMethod
@@ -672,7 +688,12 @@ class SettlementMethod:
     ParYieldCurve: SettlementMethod
 
 class Swaption:
-    """A European option to enter a vanilla swap."""
+    """A European option to enter a vanilla swap.
+
+    The swaption registers with the underlying swap and with the evaluation
+    date on the Settings it was built with (D5). Pricing needs an engine: call
+    one of the three setters before npv.
+    """
 
     def __init__(
         self,
@@ -681,29 +702,109 @@ class Swaption:
         settlement_type: SettlementType,
         settlement_method: SettlementMethod,
         settings: Settings,
-    ) -> None: ...
-    def set_jamshidian_engine(self, model: HullWhite) -> None: ...
+    ) -> None:
+        """Build the swaption over swap.
+
+        Args:
+            swap (VanillaSwap): The swap the option enters; it needs no
+                discounting engine of its own, the swaption engine reading its
+                arguments instead.
+            exercise (EuropeanExercise): The single exercise date.
+            settlement_type (SettlementType): Whether exercise settles
+                physically or in cash.
+            settlement_method (SettlementMethod): The mechanics under that
+                type; an inconsistent pair surfaces from npv(), not here.
+            settings (Settings): The explicit settings supplying the evaluation
+                date the swaption prices against.
+        """
+        ...
+    def set_jamshidian_engine(self, model: HullWhite) -> None:
+        """Attach a Jamshidian engine so the swaption prices off Hull-White.
+
+        The engine is European-only: a non-European exercise errors at pricing
+        time.
+
+        Args:
+            model (HullWhite): The short-rate model supplying the dynamics.
+        """
+        ...
     def set_black_engine(self, engine: BlackSwaptionEngine) -> None:
-        """Price off a swaption volatility surface instead of a short-rate
-        model. The engine must carry the same Settings object as this swaption."""
+        """Attach a Black engine, pricing off a swaption volatility surface.
+
+        The engine is built separately, so the same one can be shared across
+        swaptions. It must carry the same Settings object as this swaption: two
+        different settings would price the swap and the option on different
+        dates with no error raised.
+
+        Args:
+            engine (BlackSwaptionEngine): The engine and its volatility
+                surface.
+        """
         ...
     def set_bachelier_engine(self, engine: BachelierSwaptionEngine) -> None:
-        """Price off a normal-volatility swaption surface. The engine must carry
-        the same Settings object as this swaption."""
+        """Attach a Bachelier engine, pricing off a normal-volatility surface.
+
+        The same-Settings requirement as set_black_engine applies.
+
+        Args:
+            engine (BachelierSwaptionEngine): The engine and its
+                normal-volatility surface.
+        """
         ...
     def calculate(self) -> None:
-        """Forces the valuation, which also surfaces an inconsistent (settlement
-        type, method) pair."""
+        """Force the valuation. Idempotent.
+
+        Raises:
+            ItofinError: If no engine is attached, no evaluation date is set,
+                or the (settlement type, method) pair is inconsistent, which
+                the core checks here rather than at construction.
+        """
         ...
-    def is_calculated(self) -> bool: ...
+    def is_calculated(self) -> bool:
+        """Return whether the cached results are currently valid.
+
+        Returns:
+            bool: True when the next accessor reads the cache.
+        """
+        ...
     def price(self, engine: BlackSwaptionEngine) -> float:
-        """set_black_engine followed by npv, in one call. Black is the primary;
-        the Jamshidian and Bachelier engines keep their own setters."""
+        """Attach the Black engine and return the NPV.
+
+        set_black_engine followed by npv, in one call. Black is the primary
+        because it is the standard swaption engine; the Jamshidian and
+        Bachelier engines keep their own setters.
+
+        Args:
+            engine (BlackSwaptionEngine): The engine to install and price on.
+
+        Returns:
+            float: The swaption value.
+
+        Raises:
+            ItofinError: On anything that makes the valuation fail.
+        """
         ...
     def results(self) -> Results:
-        """A frozen snapshot of the valuation, calculating first."""
+        """Return a frozen snapshot of the valuation, calculating first.
+
+        Returns:
+            Results: A copy of the valuation results.
+
+        Raises:
+            ItofinError: On anything that makes the valuation fail.
+        """
         ...
-    def npv(self) -> float: ...
+    def npv(self) -> float:
+        """Return the swaption NPV under the attached engine.
+
+        Returns:
+            float: The present value.
+
+        Raises:
+            ItofinError: If no engine is attached or the (settlement type,
+                method) pair is inconsistent.
+        """
+        ...
 
 class CapFloorType:
     """Whether the instrument caps, floors or collars its floating leg.
@@ -739,17 +840,68 @@ class CapFloor:
         strike: float,
         forward_start: Period,
         settings: Settings,
-    ) -> None: ...
+    ) -> None:
+        """Build a standard market cap or floor through MakeCapFloor.
+
+        Args:
+            cap_floor_type (CapFloorType): Cap or Floor; the builder refuses
+                Collar.
+            tenor (Period): The length of the capped leg.
+            ibor_index (IborIndex): The index the floating leg fixes off.
+            strike (float): The single strike, padded across every coupon.
+            forward_start (Period): The delay before the leg starts; a zero
+                period excludes the spot caplet.
+            settings (Settings): The explicit settings supplying the evaluation
+                date and the stored fixings.
+
+        Raises:
+            ItofinError: If cap_floor_type is Collar, if the derived schedule
+                is degenerate, or if the start has to be derived and no
+                evaluation date is set.
+        """
+        ...
     @staticmethod
     def cap(leg: IborLeg, cap_rates: list[float], settings: Settings) -> CapFloor:
-        """A cap over the coupons leg builds. Raises ItofinError on an empty
-        cap_rates list, or on whatever building the coupons rejects."""
+        """Build a cap over the coupons leg builds, struck at cap_rates.
+
+        Unlike the constructor this keeps whatever leg it is given: the spot
+        caplet stays, and the leg's own notional, day counter and fixing days
+        reach the coupons.
+
+        Args:
+            leg (IborLeg): The leg whose coupons are capped.
+            cap_rates (list[float]): The cap strikes, padded to the leg length
+                by repeating the last entry.
+            settings (Settings): The explicit settings the instrument resolves
+                its dates against.
+
+        Returns:
+            CapFloor: The cap over that leg.
+
+        Raises:
+            ItofinError: On an empty cap_rates list, or on whatever building
+                the leg's coupons reports, a missing notional above all.
+        """
         ...
     @staticmethod
     def floor(
         leg: IborLeg, floor_rates: list[float], settings: Settings
     ) -> CapFloor:
-        """A floor over the coupons leg builds. Fallible as cap()."""
+        """Build a floor over the coupons leg builds, struck at floor_rates.
+
+        Args:
+            leg (IborLeg): The leg whose coupons are floored.
+            floor_rates (list[float]): The floor strikes, padded as cap() pads.
+            settings (Settings): The explicit settings the instrument resolves
+                its dates against.
+
+        Returns:
+            CapFloor: The floor over that leg.
+
+        Raises:
+            ItofinError: Fallible as cap(), on an empty list or a leg whose
+                coupons cannot be built.
+        """
         ...
     @staticmethod
     def collar(
@@ -758,32 +910,111 @@ class CapFloor:
         floor_rates: list[float],
         settings: Settings,
     ) -> CapFloor:
-        """Long the cap at cap_rates, short the floor at floor_rates, so it is
-        worth the one less the other. Both lists are required."""
+        """Build a collar: long the cap at cap_rates, short the floor at floor_rates.
+
+        The collar is worth the one less the other, and this is the only route
+        to one over a floating leg.
+
+        Args:
+            leg (IborLeg): The leg whose coupons are collared.
+            cap_rates (list[float]): The cap strikes, padded as cap() pads.
+            floor_rates (list[float]): The floor strikes, padded the same way.
+            settings (Settings): The explicit settings the instrument resolves
+                its dates against.
+
+        Returns:
+            CapFloor: The collar over that leg.
+
+        Raises:
+            ItofinError: On either list being empty, both being required, or on
+                a leg whose coupons cannot be built.
+        """
         ...
-    def cap_rates(self) -> list[float]: ...
-    def floor_rates(self) -> list[float]: ...
-    def coupon_count(self) -> int: ...
+    def cap_rates(self) -> list[float]:
+        """Return the cap strikes, one per coupon.
+
+        Returns:
+            list[float]: The cap strikes; empty for a floor.
+        """
+        ...
+    def floor_rates(self) -> list[float]:
+        """Return the floor strikes, one per coupon.
+
+        Returns:
+            list[float]: The floor strikes; empty for a cap.
+        """
+        ...
+    def coupon_count(self) -> int:
+        """Return the number of optionlets.
+
+        Returns:
+            int: One per floating coupon on the leg.
+        """
+        ...
     def set_black_engine(self, engine: BlackCapFloorEngine) -> None:
-        """Price each optionlet off an optionlet volatility surface. The engine
-        must resolve its dates against the same Settings object as this
-        cap/floor."""
+        """Attach a Black engine, pricing each optionlet off a volatility surface.
+
+        The engine is built separately, so the same one can be shared across
+        instruments. It must resolve its dates against the same Settings object
+        as this cap/floor: two different settings would price the leg and the
+        optionlets on different dates with no error raised.
+
+        Args:
+            engine (BlackCapFloorEngine): The engine and its optionlet
+                volatility surface.
+        """
         ...
     def calculate(self) -> None:
-        """Forces the valuation. Idempotent."""
+        """Force the valuation. Idempotent.
+
+        Raises:
+            ItofinError: If no engine is attached, no evaluation date is set,
+                or the engine refuses the instrument.
+        """
         ...
     def is_calculated(self) -> bool:
-        """Whether the cached results are currently valid. Moving a quote the
-        attached engine was built over flips this back to False."""
+        """Return whether the cached results are currently valid.
+
+        The Black engine observes its volatility handle, so moving a quote the
+        engine was built over reaches the cap and flips this back to False.
+
+        Returns:
+            bool: True when the next accessor reads the cache.
+        """
         ...
     def price(self, engine: BlackCapFloorEngine) -> float:
-        """set_black_engine followed by npv, in one call."""
+        """Attach engine and return the NPV.
+
+        Args:
+            engine (BlackCapFloorEngine): The engine to install and price on.
+
+        Returns:
+            float: The cap/floor value.
+
+        Raises:
+            ItofinError: On anything that makes the valuation fail.
+        """
         ...
     def results(self) -> Results:
-        """A frozen snapshot of the valuation, calculating first."""
+        """Return a frozen snapshot of the valuation, calculating first.
+
+        Returns:
+            Results: A copy of the valuation results.
+
+        Raises:
+            ItofinError: On anything that makes the valuation fail.
+        """
         ...
     def npv(self) -> float:
-        """Raises ItofinError with no engine attached."""
+        """Return the cap/floor NPV under the attached engine.
+
+        Returns:
+            float: The present value.
+
+        Raises:
+            ItofinError: If no engine is attached, which the core reports as
+                "null pricing engine".
+        """
         ...
 
 class ProtectionSide:
