@@ -32,18 +32,54 @@ from . import time as time
 __version__: str
 
 class ItofinError(Exception):
-    """Error raised by the itofin API, carrying the located message."""
+    """Error raised by the itofin API, carrying the located message.
+
+    Every fallible core call surfaces as this exception, whose message is the
+    located form "file:line: message".
+    """
 
 class Settings:
-    """The explicit, non-global evaluation-date store (D5)."""
+    """The explicit, non-global evaluation-date store (D5).
 
-    def __init__(self) -> None: ...
+    There is no global singleton: the exact settings object passed to a
+    construction is the one it reads, so instruments built against different
+    Settings do not see each other's evaluation date.
+    """
+
+    def __init__(self) -> None:
+        """Create settings with no evaluation date set."""
+        ...
+
     def set_evaluation_date(self, date: time.Date) -> None:
-        """Set the evaluation date, notifying observers if it changed."""
+        """Set the evaluation date, notifying observers if it changed.
+
+        The new date is in place before the notification goes out, so an
+        observer that recomputes on the update reads the date that triggered it.
+
+        Args:
+            date: The new evaluation date. Observers are notified only when this
+                differs from the date already set.
+        """
         ...
+
     def set_include_todays_cash_flows(self, value: bool | None) -> None:
-        """Set whether cash flows on today's date enter an NPV; None clears."""
+        """Set whether cash flows on today's date enter an NPV; None clears.
+
+        The flag is three-valued, as in the core.
+
+        Args:
+            value: True or False decides the question outright; None clears it,
+                restoring the unset state in which each pricing site applies its
+                own default. The argument is required, so clearing is always
+                deliberate.
+        """
         ...
+
     def include_todays_cash_flows(self) -> bool | None:
-        """The current setting, or None while it is unset."""
+        """Return the current setting, or None while it is unset.
+
+        Returns:
+            The three-valued flag last set, or None if it has never been set or
+            was cleared.
+        """
         ...
