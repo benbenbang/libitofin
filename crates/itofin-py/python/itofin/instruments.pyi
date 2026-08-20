@@ -1376,8 +1376,7 @@ class MakeCreditDefaultSwap:
         ...
 
 class ZeroCouponInflationSwap:
-    """One fixed flow against one inflation-indexed flow, both exchanged at
-    maturity.
+    """One fixed flow against one inflation-indexed flow, both exchanged at maturity.
 
     fixed_rate is the K that at inception matches the inflation growth.
     SwapType names the inflation leg, so a Payer pays inflation and receives
@@ -1409,54 +1408,174 @@ class ZeroCouponInflationSwap:
         inflation_convention: BusinessDayConvention | None,
         settings: Settings,
     ) -> None:
-        """Raises ItofinError when the observation lag is too short for the
-        index to observe fixings that exist."""
+        """Build the swap from its two exchanged flows.
+
+        Args:
+            swap_type (SwapType): Which side the inflation leg is seen from; a
+                Payer pays inflation and receives fixed.
+            nominal (float): The notional both flows are quoted on.
+            start_date (Date): The inception the index ratio is measured from.
+            maturity (Date): The raw, pre-adjustment maturity.
+            fixed_calendar (Calendar): The calendar the fixed payment rolls on.
+            fixed_convention (BusinessDayConvention): The roll applied to the
+                fixed payment date.
+            day_counter (DayCounter): The day count behind the fixed amount,
+                which stays on the raw maturity.
+            fixed_rate (float): The K that at inception matches the inflation
+                growth.
+            inflation_index (ZeroInflationIndex): The index the indexed flow
+                observes.
+            observation_lag (Period): How far back the maturity fixing is
+                observed.
+            observation_interpolation (CpiInterpolationType): How the observed
+                fixing is interpolated.
+            inflation_calendar (Calendar | None): The calendar the inflation
+                payment rolls on; None falls back to fixed_calendar.
+            inflation_convention (BusinessDayConvention | None): The roll
+                applied to the inflation payment date; None falls back to
+                fixed_convention.
+            settings (Settings): The explicit settings supplying the evaluation
+                date and the stored fixings.
+
+        Raises:
+            ItofinError: If the observation lag is too short for the index to
+                observe fixings that exist, which under Linear interpolation
+                costs a further publication period.
+        """
         ...
     def set_engine(self, engine: DiscountingSwapEngine) -> None:
-        """Price the swap off a discount curve. The engine must resolve its
-        dates against the same Settings object as this swap."""
+        """Attach a discounting engine so the swap prices.
+
+        Args:
+            engine (DiscountingSwapEngine): The engine, which must resolve its
+                dates against the same Settings object as this swap.
+        """
         ...
     def calculate(self) -> None:
-        """Forces the valuation. Idempotent."""
+        """Force the valuation. Idempotent.
+
+        Raises:
+            ItofinError: If no engine is attached, no evaluation date is set,
+                or the engine refuses the swap.
+        """
         ...
-    def is_calculated(self) -> bool: ...
+    def is_calculated(self) -> bool:
+        """Return whether the cached results are currently valid.
+
+        Returns:
+            bool: True when the next accessor reads the cache.
+        """
+        ...
     def price(self, engine: DiscountingSwapEngine) -> float:
-        """set_engine followed by npv, in one call."""
+        """Attach engine and return the NPV.
+
+        Args:
+            engine (DiscountingSwapEngine): The engine to install and price on.
+
+        Returns:
+            float: The swap value.
+
+        Raises:
+            ItofinError: On anything that makes the valuation fail.
+        """
         ...
-    def results(self) -> Results: ...
+    def results(self) -> Results:
+        """Return a frozen snapshot of the valuation, calculating first.
+
+        Returns:
+            Results: A copy of the valuation results.
+
+        Raises:
+            ItofinError: On anything that makes the valuation fail.
+        """
+        ...
     def npv(self) -> float:
-        """Raises ItofinError with no engine attached, and with no curve linked
-        into the index."""
+        """Return the swap NPV under the attached engine.
+
+        Returns:
+            float: The present value.
+
+        Raises:
+            ItofinError: If no engine is attached, and if no curve is linked
+                into the index, which leaves the indexed flow unforecastable.
+        """
         ...
     def fair_rate(self) -> float:
-        """The index ratio de-compounded over the swap's own year fraction.
+        """Return the index ratio de-compounded over the swap's own year fraction.
 
         Needs no engine - it reads the indexed flow rather than any priced
-        result - but does need the index linked to a curve."""
+        result.
+
+        Returns:
+            float: The rate that would price the swap at zero.
+
+        Raises:
+            ItofinError: If no curve is linked into the index, the flow's
+                amount being a forecast off the inflation curve.
+        """
         ...
-    def fixed_leg_npv(self) -> float: ...
-    def inflation_leg_npv(self) -> float: ...
+    def fixed_leg_npv(self) -> float:
+        """Return the fixed leg's NPV, priced on demand.
+
+        Returns:
+            float: The present value of the fixed flow.
+
+        Raises:
+            ItofinError: On the same conditions npv reports.
+        """
+        ...
+    def inflation_leg_npv(self) -> float:
+        """Return the inflation leg's NPV, priced on demand.
+
+        Returns:
+            float: The present value of the indexed flow.
+
+        Raises:
+            ItofinError: On the same conditions npv reports.
+        """
+        ...
     def fixed_leg_bps(self) -> float:
-        """The fixed leg's sensitivity to a basis point on the quoted rate,
-        computed in closed form rather than read off the engine, whose own leg
-        BPS is zero for a non-coupon flow."""
+        """Return the fixed leg's sensitivity to a basis point on the quoted rate.
+
+        Computed in closed form rather than read off the engine, whose own leg
+        BPS is zero for a non-coupon flow.
+
+        Returns:
+            float: The basis-point value of the fixed flow.
+
+        Raises:
+            ItofinError: On the same conditions npv reports, the calculation
+                needing the engine's discount factor at the fixed leg's end
+                date.
+        """
         ...
     def maturity_date(self) -> Date:
-        """The contract maturity, raw and pre-adjustment - not either leg's
-        payment date."""
+        """Return the contract maturity, raw and pre-adjustment.
+
+        Returns:
+            Date: The maturity, which is not either leg's payment date.
+        """
         ...
     def obs_date(self) -> Date:
-        """The date the maturity fixing is observed at, maturity less the
-        observation lag, unsnapped."""
+        """Return the date the maturity fixing is observed at.
+
+        Returns:
+            Date: The maturity less the observation lag, unsnapped.
+        """
         ...
     def inflation_fixing_date(self) -> Date:
-        """The same date as obs_date, read off the indexed flow rather than off
-        the swap. Both names are kept because both exist in the core."""
+        """Return the observation date, read off the indexed flow.
+
+        Both names are kept because both exist in the core, and the oracle
+        asserts they coincide.
+
+        Returns:
+            Date: The same date as obs_date.
+        """
         ...
 
 class YearOnYearInflationSwap:
-    """A fixed leg against a leg of year-on-year inflation coupons, both paid
-    over a schedule.
+    """A fixed leg against a leg of year-on-year inflation coupons, both paid over a schedule.
 
     SwapType names the fixed leg, so a Payer pays fixed and receives inflation -
     the opposite reading from ZeroCouponInflationSwap, where it names the
@@ -1487,34 +1606,154 @@ class YearOnYearInflationSwap:
         payment_convention: BusinessDayConvention,
         settings: Settings,
     ) -> None:
-        """Raises ItofinError when either leg cannot be built, notably from an
-        observation lag that leaves a coupon unbuildable."""
+        """Build the swap from its two schedules.
+
+        Args:
+            swap_type (SwapType): Which side the fixed leg is seen from; a
+                Payer pays fixed and receives inflation.
+            nominal (float): The notional both legs accrue on.
+            fixed_schedule (Schedule): The fixed leg's payment schedule, which
+                also supplies its payment calendar.
+            fixed_rate (float): The rate the fixed leg accrues at.
+            fixed_day_count (DayCounter): The day count of the fixed leg.
+            yoy_schedule (Schedule): The year-on-year leg's schedule.
+            yoy_index (YoYInflationIndex): The index the coupons fix off.
+            observation_lag (Period): How far back each coupon's fixings are
+                observed.
+            interpolation (CpiInterpolationType): How the observed fixings are
+                interpolated.
+            spread (float): Added to every forecast rate on the year-on-year
+                leg.
+            yoy_day_count (DayCounter): The day count of the year-on-year leg.
+            payment_calendar (Calendar): The calendar the year-on-year leg pays
+                on.
+            payment_convention (BusinessDayConvention): The roll both legs
+                adjust their payment dates with.
+            settings (Settings): The explicit settings supplying the evaluation
+                date and the stored fixings.
+
+        Raises:
+            ItofinError: If either leg cannot be built, notably from an
+                observation lag that leaves a coupon unbuildable.
+        """
         ...
     def set_engine(self, engine: DiscountingSwapEngine) -> None:
-        """The engine must resolve its dates against the same Settings object
-        this swap was built with."""
+        """Attach a discounting engine so the swap prices.
+
+        Args:
+            engine (DiscountingSwapEngine): The engine, which must resolve its
+                dates against the same Settings object this swap was built
+                with.
+        """
         ...
     def calculate(self) -> None:
-        """Forces the valuation. Idempotent."""
+        """Force the valuation. Idempotent.
+
+        Raises:
+            ItofinError: If no engine is attached, no evaluation date is set,
+                or the engine refuses the swap.
+        """
         ...
-    def is_calculated(self) -> bool: ...
+    def is_calculated(self) -> bool:
+        """Return whether the cached results are currently valid.
+
+        Returns:
+            bool: True when the next accessor reads the cache.
+        """
+        ...
     def price(self, engine: DiscountingSwapEngine) -> float:
-        """set_engine followed by npv, in one call."""
+        """Attach engine and return the NPV.
+
+        Args:
+            engine (DiscountingSwapEngine): The engine to install and price on.
+
+        Returns:
+            float: The swap value.
+
+        Raises:
+            ItofinError: On anything that makes the valuation fail.
+        """
         ...
-    def results(self) -> Results: ...
-    def npv(self) -> float: ...
+    def results(self) -> Results:
+        """Return a frozen snapshot of the valuation, calculating first.
+
+        Returns:
+            Results: A copy of the valuation results.
+
+        Raises:
+            ItofinError: On anything that makes the valuation fail.
+        """
+        ...
+    def npv(self) -> float:
+        """Return the swap NPV under the attached engine.
+
+        Returns:
+            float: The present value.
+
+        Raises:
+            ItofinError: If no engine is attached, and if no curve is linked
+                into the index, which leaves the coupons unforecastable.
+        """
+        ...
     def fair_rate(self) -> float:
-        """The fixed rate that would price the swap at zero, recovered from the
-        NPV and the fixed leg's BPS."""
+        """Return the fixed rate that would price the swap at zero.
+
+        Recovered from the NPV and the fixed leg's BPS, so it prices on demand
+        and needs an engine.
+
+        Returns:
+            float: The fair fixed rate.
+
+        Raises:
+            ItofinError: On the same conditions npv reports.
+        """
         ...
     def fair_spread(self) -> float:
-        """The spread over the index that would price the swap at zero,
-        recovered off the year-on-year leg."""
+        """Return the spread over the index that would price the swap at zero.
+
+        Recovered off the year-on-year leg.
+
+        Returns:
+            float: The fair spread.
+
+        Raises:
+            ItofinError: On the same conditions fair_rate reports.
+        """
         ...
-    def fixed_leg_npv(self) -> float: ...
-    def yoy_leg_npv(self) -> float: ...
-    def fixed_rate(self) -> float: ...
-    def spread(self) -> float: ...
+    def fixed_leg_npv(self) -> float:
+        """Return the fixed leg's NPV, priced on demand.
+
+        Returns:
+            float: The present value of the fixed leg.
+
+        Raises:
+            ItofinError: On the same conditions npv reports.
+        """
+        ...
+    def yoy_leg_npv(self) -> float:
+        """Return the year-on-year leg's NPV, priced on demand.
+
+        Returns:
+            float: The present value of the inflation leg.
+
+        Raises:
+            ItofinError: On the same conditions npv reports.
+        """
+        ...
+    def fixed_rate(self) -> float:
+        """Return the quoted fixed rate the swap was struck at.
+
+        Returns:
+            float: The fixed-leg rate.
+        """
+        ...
+    def spread(self) -> float:
+        """Return the spread the year-on-year coupons carry over the index.
+
+        Returns:
+            float: The quoted spread.
+        """
+        ...
 
 class MakeYoYInflationCapFloor:
     """The standard market builder for a year-on-year inflation cap or floor.
