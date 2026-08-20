@@ -220,6 +220,18 @@ class Swaption:
         """Price off a normal-volatility swaption surface. The engine must carry
         the same Settings object as this swaption."""
         ...
+    def calculate(self) -> None:
+        """Forces the valuation, which also surfaces an inconsistent (settlement
+        type, method) pair."""
+        ...
+    def is_calculated(self) -> bool: ...
+    def price(self, engine: BlackSwaptionEngine) -> float:
+        """set_black_engine followed by npv, in one call. Black is the primary;
+        the Jamshidian and Bachelier engines keep their own setters."""
+        ...
+    def results(self) -> Results:
+        """A frozen snapshot of the valuation, calculating first."""
+        ...
     def npv(self) -> float: ...
 
 class CapFloorType:
@@ -285,6 +297,19 @@ class CapFloor:
         """Price each optionlet off an optionlet volatility surface. The engine
         must resolve its dates against the same Settings object as this
         cap/floor."""
+        ...
+    def calculate(self) -> None:
+        """Forces the valuation. Idempotent."""
+        ...
+    def is_calculated(self) -> bool:
+        """Whether the cached results are currently valid. Moving a quote the
+        attached engine was built over flips this back to False."""
+        ...
+    def price(self, engine: BlackCapFloorEngine) -> float:
+        """set_black_engine followed by npv, in one call."""
+        ...
+    def results(self) -> Results:
+        """A frozen snapshot of the valuation, calculating first."""
         ...
     def npv(self) -> float:
         """Raises ItofinError with no engine attached."""
