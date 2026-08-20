@@ -26,6 +26,7 @@ use crate::PyQlError;
 use crate::capfloorengine::PyBlackCapFloorEngine;
 use crate::cashflows::PyIborLeg;
 use crate::hullwhite::PyIborIndex;
+use crate::results::Results;
 use crate::settings::PySettings;
 use crate::time::PyPeriod;
 use libitofin::instrument::Instrument;
@@ -181,6 +182,36 @@ impl PyCapFloor {
     /// error being raised.
     fn set_black_engine(&mut self, engine: &PyBlackCapFloorEngine) {
         self.inner.base_mut().set_pricing_engine(engine.engine());
+    }
+
+    /// Forces the valuation, idempotent and fallible as
+    /// [`VanillaOption.calculate`](crate::option::PyVanillaOption::calculate).
+    fn calculate(&mut self) -> PyResult<()> {
+        Ok(self.inner.calculate().map_err(PyQlError::from)?)
+    }
+
+    /// Whether the cached results are currently valid.
+    ///
+    /// This one has a live lever behind it: the Black engine observes its
+    /// volatility handle (`blackcapfloorengine.rs:88-89`), so moving a quote the
+    /// engine was built over reaches the cap and flips this back to `False`.
+    fn is_calculated(&self) -> bool {
+        self.inner.base().is_calculated()
+    }
+
+    /// Attaches `engine` and returns the NPV: the one-shot form of
+    /// [`set_black_engine`](Self::set_black_engine) followed by
+    /// [`npv`](Self::npv).
+    fn price(&mut self, engine: &PyBlackCapFloorEngine) -> PyResult<f64> {
+        self.set_black_engine(engine);
+        self.calculate()?;
+        self.npv()
+    }
+
+    /// A frozen [`Results`] copy of the valuation, calculating first.
+    fn results(&mut self) -> PyResult<Results> {
+        self.calculate()?;
+        Ok(Results::snapshot(self.inner.base()))
     }
 
     /// The cap/floor NPV under the attached engine.

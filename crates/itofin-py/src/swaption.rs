@@ -13,6 +13,7 @@
 
 use crate::PyQlError;
 use crate::hullwhite::PyHullWhite;
+use crate::results::Results;
 use crate::settings::PySettings;
 use crate::swap::PyVanillaSwap;
 use crate::swaptionengine::{PyBachelierSwaptionEngine, PyBlackSwaptionEngine};
@@ -172,6 +173,37 @@ impl PySwaption {
     /// any error being raised.
     fn set_bachelier_engine(&mut self, engine: &PyBachelierSwaptionEngine) {
         self.inner.base_mut().set_pricing_engine(engine.engine());
+    }
+
+    /// Forces the valuation, idempotent and fallible as
+    /// [`VanillaOption.calculate`](crate::option::PyVanillaOption::calculate);
+    /// here it also surfaces an inconsistent (settlement type, method) pair.
+    fn calculate(&mut self) -> PyResult<()> {
+        Ok(self.inner.calculate().map_err(PyQlError::from)?)
+    }
+
+    /// Whether the cached results are currently valid.
+    fn is_calculated(&self) -> bool {
+        self.inner.base().is_calculated()
+    }
+
+    /// Attaches the Black engine `engine` and returns the NPV, the one-shot
+    /// form of [`set_black_engine`](Self::set_black_engine) followed by
+    /// [`npv`](Self::npv).
+    ///
+    /// Black is the primary because it is the standard swaption engine; the
+    /// Jamshidian and Bachelier engines keep their own setters and compose with
+    /// [`calculate`](Self::calculate) and [`results`](Self::results) as before.
+    fn price(&mut self, engine: &PyBlackSwaptionEngine) -> PyResult<f64> {
+        self.set_black_engine(engine);
+        self.calculate()?;
+        self.npv()
+    }
+
+    /// A frozen [`Results`] copy of the valuation, calculating first.
+    fn results(&mut self) -> PyResult<Results> {
+        self.calculate()?;
+        Ok(Results::snapshot(self.inner.base()))
     }
 
     /// The swaption NPV under the attached engine.
