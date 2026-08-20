@@ -1,10 +1,17 @@
 # Hand-written stubs for itofin.indexes; sync manually with src/hullwhite.rs, src/helpers.rs,
 # src/swapindex.rs, src/currency.rs and src/inflation.rs (#517).
 
+# standard library
+from typing import TYPE_CHECKING
+
 # itofin library
 from itofin import Settings
 from itofin.termstructures import YieldTermStructure, YoYInflationTermStructure, ZeroInflationTermStructure
 from itofin.time import BusinessDayConvention, Calendar, Date, DayCounter, Period
+
+if TYPE_CHECKING:
+    # itofin library
+    from itofin.time import Frequency
 
 class Currency:
     """An ISO 4217 currency specification.
@@ -212,9 +219,7 @@ class Euribor(IborIndex):
     not a rebuild - so its own fixing reads exactly what the base reads.
     """
 
-    def __init__(
-        self, tenor: Period, curve: YieldTermStructure | None, settings: Settings
-    ) -> None:
+    def __init__(self, tenor: Period, curve: YieldTermStructure | None, settings: Settings) -> None:
         """Build a Euribor index of the given tenor.
 
         Args:

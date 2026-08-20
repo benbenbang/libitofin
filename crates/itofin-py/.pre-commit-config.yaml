@@ -1,0 +1,17 @@
+repos:
+    - repo: https://github.com/timothycrosley/isort
+      rev: 9.0.0b5
+      hooks:
+        - id: isort
+          name: isort
+          args:
+            - --settings-path=.isort.cfg
+    - repo: https://github.com/astral-sh/ruff-pre-commit
+      rev: v0.15.12
+      hooks:
+        - id: ruff
+          args:
+            - --fix
+          exclude: "tests/|scripts/"
+        - id: ruff-format
+          exclude: "tests/|scripts/"

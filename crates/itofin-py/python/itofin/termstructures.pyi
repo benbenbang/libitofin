@@ -1188,9 +1188,7 @@ class SwaptionVolatilityStructure:
                 is not allowed.
         """
         ...
-    def shift(
-        self, option_date: Date, swap_length: float, extrapolate: bool = False
-    ) -> float:
+    def shift(self, option_date: Date, swap_length: float, extrapolate: bool = False) -> float:
         """Return the lognormal shift, in the date form.
 
         Taken in the date form because the core trait has no tenor overload for
@@ -1685,9 +1683,7 @@ class OptionletVolatilityStructure:
     A single option axis, unlike the swaption surfaces: a query takes one option
     tenor (or date) and a strike."""
 
-    def volatility(
-        self, option_tenor: Period, strike: float, extrapolate: bool = False
-    ) -> float:
+    def volatility(self, option_tenor: Period, strike: float, extrapolate: bool = False) -> float:
         """Return the caplet volatility for an option tenor and strike.
 
         Args:
@@ -1704,9 +1700,7 @@ class OptionletVolatilityStructure:
                 is not allowed.
         """
         ...
-    def volatility_date(
-        self, option_date: Date, strike: float, extrapolate: bool = False
-    ) -> float:
+    def volatility_date(self, option_date: Date, strike: float, extrapolate: bool = False) -> float:
         """Return the caplet volatility for an option date and strike.
 
         The date form the optionlet stripper and the cap/floor engine use, both
@@ -1725,9 +1719,7 @@ class OptionletVolatilityStructure:
                 is not allowed.
         """
         ...
-    def black_variance(
-        self, option_tenor: Period, strike: float, extrapolate: bool = False
-    ) -> float:
+    def black_variance(self, option_tenor: Period, strike: float, extrapolate: bool = False) -> float:
         """Return the Black variance, the squared volatility times option time.
 
         Args:
@@ -2003,9 +1995,7 @@ class CapFloorTermVolSurface:
             ItofinError: On the same conditions __init__ reports.
         """
         ...
-    def volatility(
-        self, option_tenor: Period, strike: float, extrapolate: bool = False
-    ) -> float:
+    def volatility(self, option_tenor: Period, strike: float, extrapolate: bool = False) -> float:
         """Return the flat cap volatility for a cap tenor and strike.
 
         The tenor form resolves against the surface's own calendar and
@@ -2025,9 +2015,7 @@ class CapFloorTermVolSurface:
                 is not allowed.
         """
         ...
-    def volatility_date(
-        self, end_date: Date, strike: float, extrapolate: bool = False
-    ) -> float:
+    def volatility_date(self, end_date: Date, strike: float, extrapolate: bool = False) -> float:
         """Return the flat cap volatility for a cap end date and strike.
 
         Args:
@@ -2043,9 +2031,7 @@ class CapFloorTermVolSurface:
                 is not allowed.
         """
         ...
-    def volatility_time(
-        self, length: float, strike: float, extrapolate: bool = False
-    ) -> float:
+    def volatility_time(self, length: float, strike: float, extrapolate: bool = False) -> float:
         """Return the flat cap volatility for a cap end time and strike.
 
         Args:
@@ -2307,9 +2293,7 @@ class FlatHazardRate(DefaultProbabilityTermStructure):
     quote. The moving forms fix the reference date settlement_days business days
     past the evaluation date carried by settings."""
 
-    def __init__(
-        self, reference_date: Date, hazard_rate: SimpleQuote, day_counter: DayCounter
-    ) -> None:
+    def __init__(self, reference_date: Date, hazard_rate: SimpleQuote, day_counter: DayCounter) -> None:
         """Build a curve reading its hazard rate live, on a pinned reference date.
 
         Args:
@@ -2320,9 +2304,7 @@ class FlatHazardRate(DefaultProbabilityTermStructure):
         """
         ...
     @staticmethod
-    def with_rate(
-        reference_date: Date, rate: float, day_counter: DayCounter
-    ) -> FlatHazardRate:
+    def with_rate(reference_date: Date, rate: float, day_counter: DayCounter) -> FlatHazardRate:
         """Build a curve at a fixed rate, on a pinned reference date.
 
         Args:
@@ -2739,9 +2721,7 @@ class ZeroInflationTermStructure:
             Frequency: The fixing frequency.
         """
         ...
-    def set_seasonality(
-        self, seasonality: MultiplicativePriceSeasonality | None
-    ) -> None:
+    def set_seasonality(self, seasonality: MultiplicativePriceSeasonality | None) -> None:
         """Install seasonality on the curve, replacing whatever it carried.
 
         A curve that caches anything derived from the correction - every
@@ -3080,9 +3060,7 @@ class YoYInflationTermStructure:
             Frequency: The fixing frequency.
         """
         ...
-    def set_seasonality(
-        self, seasonality: MultiplicativePriceSeasonality | None
-    ) -> None:
+    def set_seasonality(self, seasonality: MultiplicativePriceSeasonality | None) -> None:
         """Install seasonality on the curve, replacing whatever it carried.
 
         Args:

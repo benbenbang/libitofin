@@ -147,7 +147,11 @@ class HullWhite:
         ...
 
     def discount_bond_option(
-        self, option_type: OptionType, strike: float, maturity: float, bond_maturity: float
+        self,
+        option_type: OptionType,
+        strike: float,
+        maturity: float,
+        bond_maturity: float,
     ) -> float:
         """Price a European option on a zero-coupon bond.
 

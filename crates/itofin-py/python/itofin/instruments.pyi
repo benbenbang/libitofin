@@ -42,9 +42,7 @@ class VanillaOption:
     registered with - has notified it.
     """
 
-    def __init__(
-        self, option_type: OptionType, strike: float, expiry: Date, settings: Settings
-    ) -> None:
+    def __init__(self, option_type: OptionType, strike: float, expiry: Date, settings: Settings) -> None:
         """Build the European-exercise option, exercisable only at expiry.
 
         Args:
@@ -872,9 +870,7 @@ class CapFloor:
         """
         ...
     @staticmethod
-    def floor(
-        leg: IborLeg, floor_rates: list[float], settings: Settings
-    ) -> CapFloor:
+    def floor(leg: IborLeg, floor_rates: list[float], settings: Settings) -> CapFloor:
         """Build a floor over the coupons leg builds, struck at floor_rates.
 
         Args:
