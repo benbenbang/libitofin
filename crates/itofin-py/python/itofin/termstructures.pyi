@@ -2624,18 +2624,61 @@ class MultiplicativePriceSeasonality:
         frequency: Frequency,
         seasonality_factors: list[float],
     ) -> None:
-        """Raises ItofinError on a frequency outside semiannual-through-daily
-        (Frequency.Annual among them), an empty factor set, or a factor count
-        that is not a whole multiple of the frequency."""
+        """Build the correction from a factor set anchored on a base date.
+
+        Args:
+            seasonality_base_date (Date): The date the factor set is anchored
+                on.
+            frequency (Frequency): The frequency the factors step at.
+            seasonality_factors (list[float]): The factors, in order from the
+                base date.
+
+        Raises:
+            ItofinError: On a frequency outside semiannual-through-daily,
+                Frequency.Annual among them; on an empty factor set; and on a
+                factor count that is not a whole multiple of the frequency.
+        """
         ...
-    def seasonality_base_date(self) -> Date: ...
-    def frequency(self) -> Frequency: ...
-    def seasonality_factors(self) -> list[float]: ...
+    def seasonality_base_date(self) -> Date:
+        """Return the date the factor set is anchored on.
+
+        Returns:
+            Date: The seasonality base date.
+        """
+        ...
+    def frequency(self) -> Frequency:
+        """Return the frequency the factors step at.
+
+        Returns:
+            Frequency: The stepping frequency.
+        """
+        ...
+    def seasonality_factors(self) -> list[float]:
+        """Return the factors, in order from the seasonality base date.
+
+        Returns:
+            list[float]: The factor set as given.
+        """
+        ...
     def seasonality_factor(self, to: Date) -> float:
-        """The raw factor covering `to`, before any normalization against a
-        reference date - not the correction the curve applies. The offset is
-        counted in whole factor periods from the seasonality base date and
-        wraps modulo the factor count, in both directions."""
+        """Return the raw factor covering to, before any normalization.
+
+        This is not the correction the curve applies, which is normalized
+        against a reference date. The offset from the seasonality base date is
+        counted in whole factor periods and wrapped modulo the factor count, so
+        a set shorter than the span repeats and dates before the anchor wrap
+        backwards.
+
+        Args:
+            to (Date): The date the factor is read at.
+
+        Returns:
+            float: The raw seasonality factor.
+
+        Raises:
+            ItofinError: On a year-based factor period, which cannot express
+                seasonality.
+        """
         ...
 
 class ZeroInflationTermStructure:
@@ -2649,23 +2692,89 @@ class ZeroInflationTermStructure:
     under the curve's own day counter and quantizes nothing. Only the first
     folds in any seasonality."""
 
-    def zero_rate(self, t: float, extrapolate: bool = False) -> float: ...
-    def zero_rate_date(self, date: Date, extrapolate: bool = False) -> float: ...
-    def base_date(self) -> Date: ...
-    def frequency(self) -> Frequency: ...
+    def zero_rate(self, t: float, extrapolate: bool = False) -> float:
+        """Return the zero-coupon inflation rate at year-fraction t.
+
+        Quoted on the yearly compounding zero-coupon swaps assume. Nothing here
+        accounts for observation lags or period interpolation: the caller
+        manages those.
+
+        Args:
+            t (float): The year fraction, measured with the curve's own day
+                counter; it is negative for the base period.
+            extrapolate (bool): Whether to answer past the curve's range.
+
+        Returns:
+            float: The zero-coupon inflation rate.
+
+        Raises:
+            ItofinError: If t is past the curve's range and extrapolation is
+                not allowed.
+        """
+        ...
+    def zero_rate_date(self, date: Date, extrapolate: bool = False) -> float:
+        """Return the zero-coupon inflation rate for the period containing date.
+
+        The date is quantized to that period's first day before both the range
+        check and the time conversion, so every day inside one period reads the
+        same rate. This is the only form that folds in seasonality.
+
+        Args:
+            date (Date): The date the rate is read at.
+            extrapolate (bool): Whether to answer past the curve's range.
+
+        Returns:
+            float: The zero-coupon inflation rate for that period.
+
+        Raises:
+            ItofinError: If the period is past the curve's range and
+                extrapolation is not allowed.
+        """
+        ...
+    def base_date(self) -> Date:
+        """Return the base date, the last date for which the fixing is known.
+
+        Returns:
+            Date: The base date; it precedes the reference date, so its year
+                fraction is negative.
+        """
+        ...
+    def frequency(self) -> Frequency:
+        """Return the frequency of the inflation fixings the curve is built on.
+
+        Returns:
+            Frequency: The fixing frequency.
+        """
+        ...
     def set_seasonality(
         self, seasonality: MultiplicativePriceSeasonality | None
     ) -> None:
-        """Installs seasonality on the curve, replacing whatever it carried;
-        None clears it. A bootstrapped curve is invalidated here, so the next
-        read re-solves against the new correction.
+        """Install seasonality on the curve, replacing whatever it carried.
 
-        Raises ItofinError from the consistency gate, which a multi-year factor
-        set fails (a documented core deferral, #807). The store happens before
-        the gate runs, as C++'s does, so a rejected correction is left
-        installed - clear it with None before reading the curve again."""
+        A curve that caches anything derived from the correction - every
+        bootstrapped one does - is invalidated here, so the next read re-solves
+        against the new correction.
+
+        Args:
+            seasonality (MultiplicativePriceSeasonality | None): The correction
+                to install; None clears it.
+
+        Raises:
+            ItofinError: From the consistency gate, which a multi-year factor
+                set fails, that comparison being a documented core deferral.
+                The store happens before the gate runs, as C++'s does, so a
+                rejected correction is left installed and unannounced: clear it
+                with None before reading the curve again.
+        """
         ...
-    def has_seasonality(self) -> bool: ...
+    def has_seasonality(self) -> bool:
+        """Return whether the curve carries a seasonality correction.
+
+        Returns:
+            bool: True also for a correction left installed by a
+                set_seasonality that raised.
+        """
+        ...
 
 class InterpolatedZeroInflationCurve(ZeroInflationTermStructure):
     """A zero-coupon inflation curve built from (date, zero-rate) nodes,
@@ -2683,13 +2792,47 @@ class InterpolatedZeroInflationCurve(ZeroInflationTermStructure):
         frequency: Frequency,
         day_counter: DayCounter,
     ) -> None:
-        """Raises ItofinError on fewer than two dates, a dates/rates count
-        mismatch, a rate at or below -100 % from the second node on, or
-        unsorted dates."""
+        """Build the curve through the rates quoted at dates.
+
+        Linear is pinned at the boundary: it is the interpolator the C++ zero
+        inflation curve typedef fixes, so no interpolation argument is offered.
+
+        Args:
+            reference_date (Date): The curve's reference date, given separately
+                and normally following the base date.
+            dates (list[Date]): The node dates, the first being the base date.
+            rates (list[float]): The zero rate at each node.
+            frequency (Frequency): The frequency of the inflation fixings.
+            day_counter (DayCounter): The day count turning dates into times.
+
+        Raises:
+            ItofinError: On fewer than two dates, a dates and rates count
+                mismatch, a rate at or below -100 per cent from the second node
+                on, or unsorted dates.
+        """
         ...
-    def times(self) -> list[float]: ...
-    def dates(self) -> list[Date]: ...
-    def nodes(self) -> list[tuple[Date, float]]: ...
+    def times(self) -> list[float]:
+        """Return the node times, measured from the reference date.
+
+        Returns:
+            list[float]: The node times; the first is negative whenever the
+                base date precedes the reference date.
+        """
+        ...
+    def dates(self) -> list[Date]:
+        """Return the node dates.
+
+        Returns:
+            list[Date]: The nodes, the first of which is the base date.
+        """
+        ...
+    def nodes(self) -> list[tuple[Date, float]]:
+        """Return the curve's nodes as pairs.
+
+        Returns:
+            list[tuple[Date, float]]: One (date, zero rate) pair per node.
+        """
+        ...
 
 class ZeroInflationHelper:
     """Shared base for every zero-inflation bootstrap helper: the two dates the
@@ -2698,8 +2841,20 @@ class ZeroInflationHelper:
     Concrete helpers such as ZeroCouponInflationSwapHelper subclass this and
     supply only their constructor."""
 
-    def pillar_date(self) -> Date: ...
-    def latest_date(self) -> Date: ...
+    def pillar_date(self) -> Date:
+        """Return the date the curve node this helper sets sits at.
+
+        Returns:
+            Date: The pillar date.
+        """
+        ...
+    def latest_date(self) -> Date:
+        """Return the latest date the helper needs curve data at.
+
+        Returns:
+            Date: The latest date, equal to the pillar date.
+        """
+        ...
 
 class ZeroCouponInflationSwapHelper(ZeroInflationHelper):
     """The bootstrap helper fitting a zero-coupon inflation swap quoted as a
@@ -2729,14 +2884,56 @@ class ZeroCouponInflationSwapHelper(ZeroInflationHelper):
         settings: Settings,
         pillar: Pillar = ...,
     ) -> None:
-        """Raises ItofinError on an observation lag the index cannot observe
-        through, and under CpiInterpolationType.Linear on one that leaves less
-        than a whole index period over the index's availability lag."""
+        """Build the helper on a swap maturing at maturity.
+
+        It needs no nominal curve, building itself a flat zero-rate one,
+        because both legs pay on the same adjusted maturity and their discount
+        factors cancel out of the fair rate.
+
+        Args:
+            quote (SimpleQuote): The quoted swap rate; the caller keeps it, so
+                a later set_value re-drives the bootstrap.
+            swap_obs_lag (Period): How far back the maturity fixing is
+                observed.
+            maturity (Date): The swap's maturity.
+            calendar (Calendar): The calendar the payment rolls on.
+            payment_convention (BusinessDayConvention): The roll applied to the
+                payment date.
+            day_counter (DayCounter): The day count the fixed amount accrues
+                on.
+            index (ZeroInflationIndex): The index observed; the helper prices
+                through a copy linked to a handle of its own, so the caller's
+                index need not be linked to any curve.
+            observation_interpolation (CpiInterpolationType): How the observed
+                fixing is interpolated.
+            settings (Settings): The explicit settings supplying the evaluation
+                date the swap starts at, which must be set before this
+                constructor runs.
+            pillar (Pillar): Which of the two nodes an interpolated swap
+                straddles the helper fits; a flat swap reads a single fixing
+                and ignores it.
+
+        Raises:
+            ItofinError: On an observation lag the index cannot observe
+                through, and under Linear interpolation on one that leaves less
+                than a whole index period over the index's availability lag.
+        """
         ...
     def inflation_fixing_date(self) -> Date:
-        """The maturity observation date on the helper's own swap: maturity less
-        the observation lag, unsnapped. Not pillar_date, which is the first day
-        of the period containing it."""
+        """Return the maturity observation date on the helper's own swap.
+
+        Read off the cached contract's indexed flow, so it reports the date the
+        helper actually prices at rather than one recomputed here. It is not
+        pillar_date, which is the first day of the period containing it, that
+        quantization being the helper's rounding and not the contract's.
+
+        Returns:
+            Date: The maturity less the observation lag, unsnapped.
+
+        Raises:
+            ItofinError: If the cached swap carries the error that stopped it
+                being built, notably an evaluation date that was never set.
+        """
         ...
 
 class PiecewiseZeroInflationCurve(ZeroInflationTermStructure):
@@ -2758,12 +2955,61 @@ class PiecewiseZeroInflationCurve(ZeroInflationTermStructure):
         day_counter: DayCounter,
         helpers: list[ZeroInflationHelper],
     ) -> None:
-        """Raises ItofinError on an empty helper list."""
+        """Build the curve over helpers, registering on them without solving.
+
+        Args:
+            reference_date (Date): The curve's reference date.
+            base_date (Date): The last date for which a fixing is known, where
+                node zero sits.
+            frequency (Frequency): The frequency of the inflation fixings.
+            day_counter (DayCounter): The day count turning dates into times.
+            helpers (list[ZeroInflationHelper]): The bootstrap instruments.
+
+        Raises:
+            ItofinError: On an empty helper list.
+        """
         ...
-    def calculate(self) -> None: ...
-    def times(self) -> list[float]: ...
-    def dates(self) -> list[Date]: ...
-    def nodes(self) -> list[tuple[Date, float]]: ...
+    def calculate(self) -> None:
+        """Run the bootstrap if the cache is stale.
+
+        Calling it explicitly makes a solver failure surface here rather than
+        inside a later query.
+
+        Raises:
+            ItofinError: On a bootstrap failure.
+        """
+        ...
+    def times(self) -> list[float]:
+        """Return the node times, triggering the bootstrap.
+
+        Returns:
+            list[float]: The nodes measured from the reference date; the first
+                is negative, node zero sitting on the base date.
+
+        Raises:
+            ItofinError: On a bootstrap failure.
+        """
+        ...
+    def dates(self) -> list[Date]:
+        """Return the node dates, triggering the bootstrap.
+
+        Returns:
+            list[Date]: The nodes, the first of which is the base date.
+
+        Raises:
+            ItofinError: On a bootstrap failure.
+        """
+        ...
+    def nodes(self) -> list[tuple[Date, float]]:
+        """Return the solved nodes as pairs, triggering the bootstrap.
+
+        Returns:
+            list[tuple[Date, float]]: One (date, zero rate) pair per node.
+
+        Raises:
+            ItofinError: On a bootstrap failure.
+        """
+        ...
 
 class YoYInflationTermStructure:
     """Shared base for every year-on-year inflation curve: the year-on-year
