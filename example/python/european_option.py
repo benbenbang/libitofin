@@ -12,6 +12,7 @@ Run it with:
     python example/python/european_option.py
 """
 
+# plugins
 # itofin library
 from itofin import Settings
 from itofin.instruments import OptionType, VanillaOption

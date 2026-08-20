@@ -20,25 +20,15 @@ still distinct from the mid-point engine's period-by-period integration - hence
 the discriminator below.
 """
 
+# pypi/conda library
 import pytest
+
+# itofin library
 from itofin import ItofinError, Settings
 from itofin.instruments import CreditDefaultSwap, ProtectionSide
-from itofin.pricingengines import (
-    AccrualBias,
-    ForwardsInCouponPeriod,
-    IsdaCdsEngine,
-    MidPointCdsEngine,
-    NumericalFix,
-)
+from itofin.pricingengines import AccrualBias, ForwardsInCouponPeriod, IsdaCdsEngine, MidPointCdsEngine, NumericalFix
 from itofin.termstructures import FlatForward, FlatHazardRate
-from itofin.time import (
-    BusinessDayConvention,
-    Calendar,
-    Date,
-    DayCounter,
-    Frequency,
-    Schedule,
-)
+from itofin.time import BusinessDayConvention, Calendar, Date, DayCounter, Frequency, Schedule
 
 TODAY = Date(15, 6, 2026)
 MATURITY = Date(15, 6, 2029)

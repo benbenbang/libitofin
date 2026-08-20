@@ -20,6 +20,7 @@ matching the autofix hook convention.
 
 from __future__ import annotations
 
+# standard library
 import sys
 from pathlib import Path
 

@@ -1,19 +1,10 @@
 # Hand-written stubs for itofin.cashflows; sync manually with src/cashflows.rs
 # (#517, #848, #863, #626).
 
+# itofin library
 from itofin.indexes import CpiInterpolationType, IborIndex, YoYInflationIndex
-from itofin.termstructures import (
-    ConstantYoYOptionletVolatility,
-    YieldTermStructure,
-)
-from itofin.time import (
-    BusinessDayConvention,
-    Calendar,
-    Date,
-    DayCounter,
-    Period,
-    Schedule,
-)
+from itofin.termstructures import ConstantYoYOptionletVolatility, YieldTermStructure
+from itofin.time import BusinessDayConvention, Calendar, Date, DayCounter, Period, Schedule
 
 class YoYInflationCoupon:
     """One coupon of a year-on-year inflation leg.

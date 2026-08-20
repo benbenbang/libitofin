@@ -21,20 +21,15 @@ to Monday 17-Jan under TARGET + ModifiedFollowing; the facade Schedule
 reproduces the core exactly, so the fixture stays apples-to-apples.
 """
 
+# pypi/conda library
 import pytest
 
+# itofin library
 from itofin import ItofinError, Settings
 from itofin.indexes import Euribor
 from itofin.instruments import SwapType, VanillaSwap
 from itofin.termstructures import FlatForward
-from itofin.time import (
-    BusinessDayConvention,
-    Calendar,
-    Date,
-    DayCounter,
-    Frequency,
-    Schedule,
-)
+from itofin.time import BusinessDayConvention, Calendar, Date, DayCounter, Frequency, Schedule
 
 PROBE_FAIR = 0.03048844643136293
 PROBE_NPV = 0.21033895380698553

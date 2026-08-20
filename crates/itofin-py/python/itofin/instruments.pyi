@@ -2,15 +2,10 @@
 # src/swap.rs, src/ois.rs, src/swaption.rs, src/capfloor.rs, src/credit.rs and
 # src/inflation.rs (#517).
 
+# itofin library
 from itofin import Settings
 from itofin.cashflows import IborLeg, YoYInflationCoupon
-from itofin.indexes import (
-    CpiInterpolationType,
-    IborIndex,
-    OvernightIndex,
-    YoYInflationIndex,
-    ZeroInflationIndex,
-)
+from itofin.indexes import CpiInterpolationType, IborIndex, OvernightIndex, YoYInflationIndex, ZeroInflationIndex
 from itofin.models import HestonModel, HullWhite
 from itofin.pricingengines import (
     BachelierSwaptionEngine,
@@ -27,14 +22,7 @@ from itofin.pricingengines import (
 from itofin.processes import BlackScholesProcess
 from itofin.results import Results
 from itofin.termstructures import RateAveraging, YieldTermStructure
-from itofin.time import (
-    BusinessDayConvention,
-    Calendar,
-    Date,
-    DayCounter,
-    Period,
-    Schedule,
-)
+from itofin.time import BusinessDayConvention, Calendar, Date, DayCounter, Period, Schedule
 
 class OptionType:
     """The call/put flag.

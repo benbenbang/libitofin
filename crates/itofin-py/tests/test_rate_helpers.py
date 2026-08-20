@@ -9,26 +9,18 @@ Python's stdlib or from the documented Euribor conventions, never read back off
 the helper.
 """
 
+# standard library
 import datetime
 
+# pypi/conda library
 import pytest
 
+# itofin library
 from itofin import ItofinError, Settings
 from itofin.indexes import Euribor
 from itofin.quotes import SimpleQuote
-from itofin.termstructures import (
-    DepositRateHelper,
-    FlatForward,
-    SwapRateHelper,
-)
-from itofin.time import (
-    BusinessDayConvention,
-    Calendar,
-    Date,
-    DayCounter,
-    Frequency,
-    Period,
-)
+from itofin.termstructures import DepositRateHelper, FlatForward, SwapRateHelper
+from itofin.time import BusinessDayConvention, Calendar, Date, DayCounter, Frequency, Period
 
 
 def _settings_today():

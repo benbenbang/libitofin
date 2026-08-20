@@ -33,8 +33,10 @@ observation reads from history, and July 2007, which the forecast compounds off
 covered by count alone.
 """
 
+# pypi/conda library
 import pytest
 
+# itofin library
 from itofin import ItofinError, Settings
 from itofin.indexes import CpiInterpolationType, ZeroInflationIndex
 from itofin.instruments import SwapType, ZeroCouponInflationSwap
@@ -46,14 +48,7 @@ from itofin.termstructures import (
     PiecewiseZeroInflationCurve,
     ZeroCouponInflationSwapHelper,
 )
-from itofin.time import (
-    BusinessDayConvention,
-    Calendar,
-    Date,
-    DayCounter,
-    Frequency,
-    Period,
-)
+from itofin.time import BusinessDayConvention, Calendar, Date, DayCounter, Frequency, Period
 
 TODAY = Date(13, 8, 2007)
 CURVE_BASE = Date(1, 7, 2007)

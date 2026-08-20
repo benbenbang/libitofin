@@ -14,24 +14,15 @@ those flags bite, and test_wrong_conventions_do_diverge proves they bite by
 showing a deliberately mis-specified index diverging at exactly those dates.
 """
 
+# pypi/conda library
 import pytest
 
+# itofin library
 from itofin import Settings
 from itofin.indexes import Currency, Euribor, IborIndex
 from itofin.quotes import SimpleQuote
-from itofin.termstructures import (
-    DepositRateHelper,
-    PiecewiseLogLinearDiscount,
-    SwapRateHelper,
-)
-from itofin.time import (
-    BusinessDayConvention,
-    Calendar,
-    Date,
-    DayCounter,
-    Frequency,
-    Period,
-)
+from itofin.termstructures import DepositRateHelper, PiecewiseLogLinearDiscount, SwapRateHelper
+from itofin.time import BusinessDayConvention, Calendar, Date, DayCounter, Frequency, Period
 
 DEPOSIT_RATE = 0.04557
 

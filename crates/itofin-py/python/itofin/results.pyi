@@ -1,5 +1,6 @@
 # Hand-written stubs for itofin.results; sync manually with src/results.rs (#517).
 
+# itofin library
 from itofin.time import Date
 
 class Results:

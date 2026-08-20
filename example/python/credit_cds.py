@@ -25,6 +25,7 @@ Run it with:
     python example/python/credit_cds.py
 """
 
+# plugins
 # itofin library
 from itofin import Settings
 from itofin.instruments import CreditDefaultSwap, ProtectionSide

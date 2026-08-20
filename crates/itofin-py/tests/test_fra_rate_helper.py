@@ -16,17 +16,14 @@ bug inside advance itself is not caught here (the deposit and futures tests acce
 the same limitation); the Rust oracles pin that math directly.
 """
 
+# standard library
 import datetime
 
+# itofin library
 from itofin import Settings
 from itofin.indexes import Euribor
 from itofin.quotes import SimpleQuote
-from itofin.termstructures import (
-    DepositRateHelper,
-    FraRateHelper,
-    PiecewiseLogLinearDiscount,
-    Pillar,
-)
+from itofin.termstructures import DepositRateHelper, FraRateHelper, PiecewiseLogLinearDiscount, Pillar
 from itofin.time import BusinessDayConvention as BDC
 from itofin.time import Calendar, Date, DayCounter, Period
 

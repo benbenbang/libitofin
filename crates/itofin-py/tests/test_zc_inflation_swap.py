@@ -23,20 +23,16 @@ strictly between the 1 Jan and 1 Jul 2008 nodes, so it reads an interpolated
 rate rather than a node outright.
 """
 
+# pypi/conda library
 import pytest
+
+# itofin library
 from itofin import ItofinError, Settings
 from itofin.indexes import CpiInterpolationType, ZeroInflationIndex
 from itofin.instruments import SwapType, ZeroCouponInflationSwap
 from itofin.pricingengines import DiscountingSwapEngine
 from itofin.termstructures import FlatForward, InterpolatedZeroInflationCurve
-from itofin.time import (
-    BusinessDayConvention,
-    Calendar,
-    Date,
-    DayCounter,
-    Frequency,
-    Period,
-)
+from itofin.time import BusinessDayConvention, Calendar, Date, DayCounter, Frequency, Period
 
 TODAY = Date(13, 8, 2007)
 MATURITY = Date(13, 8, 2008)

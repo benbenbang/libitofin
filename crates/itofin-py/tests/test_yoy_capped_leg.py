@@ -36,22 +36,15 @@ sum-identity and collar-identity the Rust oracle also carries are deliberately
 NOT ported: both are blind to a consistently mis-wired strike.
 """
 
+# pypi/conda library
 import pytest
 
+# itofin library
 from itofin import Settings
 from itofin.cashflows import YoYInflationLeg, YoYInflationOptionletCouponPricer
 from itofin.indexes import CpiInterpolationType, YoYInflationIndex
 from itofin.termstructures import ConstantYoYOptionletVolatility
-from itofin.time import (
-    BusinessDayConvention,
-    Calendar,
-    Date,
-    DateGeneration,
-    DayCounter,
-    Frequency,
-    Period,
-    Schedule,
-)
+from itofin.time import BusinessDayConvention, Calendar, Date, DateGeneration, DayCounter, Frequency, Period, Schedule
 
 UK = Calendar.united_kingdom()
 TODAY = Date(10, 2, 2022)

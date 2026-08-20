@@ -7,8 +7,10 @@ the end-of-month flag each change the answer; the divergence guards keep those
 reconstructions from going inert if the core roll ever changes.
 """
 
+# pypi/conda library
 import pytest
 
+# itofin library
 from itofin import Settings
 from itofin.indexes import Currency, Euribor, IborIndex
 from itofin.time import BusinessDayConvention, Calendar, Date, DayCounter, Period

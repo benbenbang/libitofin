@@ -10,32 +10,17 @@ flat-scalar constructor's European NPV to 1e-12; a mis-wired handle (or a
 swapped r/q) would not.
 """
 
+# pypi/conda library
 import pytest
 
+# itofin library
 from itofin import ItofinError, Settings
 from itofin.indexes import Euribor
-from itofin.instruments import (
-    OptionType,
-    SwapType,
-    VanillaOption,
-    VanillaSwap,
-)
+from itofin.instruments import OptionType, SwapType, VanillaOption, VanillaSwap
 from itofin.models import HullWhite
 from itofin.processes import BlackScholesProcess
-from itofin.termstructures import (
-    BlackVarianceSurface,
-    FlatForward,
-    YieldTermStructure,
-    ZeroCurve,
-)
-from itofin.time import (
-    BusinessDayConvention,
-    Calendar,
-    Date,
-    DayCounter,
-    Frequency,
-    Schedule,
-)
+from itofin.termstructures import BlackVarianceSurface, FlatForward, YieldTermStructure, ZeroCurve
+from itofin.time import BusinessDayConvention, Calendar, Date, DayCounter, Frequency, Schedule
 
 REF = Date(15, 6, 2026)
 R = 0.05

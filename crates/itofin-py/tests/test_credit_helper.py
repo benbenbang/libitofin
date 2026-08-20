@@ -20,20 +20,14 @@ repricing oracle would not discriminate:
   the flag moves a price is A5's.
 """
 
+# pypi/conda library
 import pytest
+
+# itofin library
 from itofin import Settings
 from itofin.quotes import SimpleQuote
 from itofin.termstructures import FlatForward, SpreadCdsHelper
-from itofin.time import (
-    BusinessDayConvention,
-    Calendar,
-    Date,
-    DateGeneration,
-    DayCounter,
-    Frequency,
-    Period,
-    Schedule,
-)
+from itofin.time import BusinessDayConvention, Calendar, Date, DateGeneration, DayCounter, Frequency, Period, Schedule
 
 TODAY = Date(15, 5, 2007)
 END = Date(15, 5, 2012)

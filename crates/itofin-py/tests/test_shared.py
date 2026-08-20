@@ -1,7 +1,10 @@
+# standard library
 import math
 
+# pypi/conda library
 import pytest
 
+# itofin library
 from itofin import ItofinError
 from itofin.models import CalibrationErrorType
 from itofin.optimization import EndCriteria, LevenbergMarquardt

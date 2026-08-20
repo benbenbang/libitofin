@@ -17,20 +17,16 @@ the same 21 dates and price identically, so the Python path is the same
 contract, not a lookalike.
 """
 
+# pypi/conda library
 import pytest
+
+# itofin library
 from itofin import ItofinError, Settings
 from itofin.instruments import CreditDefaultSwap, ProtectionSide
 from itofin.pricingengines import MidPointCdsEngine
 from itofin.quotes import SimpleQuote
 from itofin.termstructures import FlatForward, FlatHazardRate
-from itofin.time import (
-    BusinessDayConvention,
-    Calendar,
-    Date,
-    DayCounter,
-    Frequency,
-    Schedule,
-)
+from itofin.time import BusinessDayConvention, Calendar, Date, DayCounter, Frequency, Schedule
 
 TODAY = Date(9, 6, 2006)
 ISSUE = Date(9, 6, 2005)

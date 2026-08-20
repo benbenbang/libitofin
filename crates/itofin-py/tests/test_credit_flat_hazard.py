@@ -14,9 +14,13 @@ year fraction 1.0 exactly and the date-form methods are comparable to the same
 closed form.
 """
 
+# standard library
 import math
 
+# pypi/conda library
 import pytest
+
+# itofin library
 from itofin import ItofinError, Settings
 from itofin.instruments import ProtectionSide
 from itofin.quotes import SimpleQuote

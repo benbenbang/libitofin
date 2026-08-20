@@ -12,8 +12,10 @@ piecewiseyieldcurve.cpp). Tolerance 1e-9 (:322), checked with a bare
 1e-9 to ~4.5e-8.
 """
 
+# pypi/conda library
 import pytest
 
+# itofin library
 from itofin import ItofinError, Settings
 from itofin.indexes import Euribor
 from itofin.quotes import SimpleQuote
@@ -26,13 +28,7 @@ from itofin.termstructures import (
     PiecewiseYieldCurve,
     SwapRateHelper,
 )
-from itofin.time import (
-    BusinessDayConvention,
-    Calendar,
-    Date,
-    DayCounter,
-    Frequency,
-)
+from itofin.time import BusinessDayConvention, Calendar, Date, DayCounter, Frequency
 from itofin.time import Period as P
 
 # (n, unit, rate-in-percent), transcribed from piecewiseyieldcurve.cpp deposits.

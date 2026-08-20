@@ -17,9 +17,13 @@ Backward-flat reads the RIGHT-hand node on each segment, so the hazard rate is
 exp(-integral) over that step function.
 """
 
+# standard library
 import math
 
+# pypi/conda library
 import pytest
+
+# itofin library
 from itofin import ItofinError
 from itofin.termstructures import InterpolatedHazardRateCurve
 from itofin.time import Date, DayCounter

@@ -36,6 +36,7 @@ Run it with:
     python example/python/yoy_inflation_swap.py
 """
 
+# plugins
 # itofin library
 from itofin import Settings
 from itofin.cashflows import YoYInflationLeg

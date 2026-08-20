@@ -22,7 +22,10 @@ chosen so they cannot be confused. 13 August 2008 less three months is 13 May
 the first day of its monthly inflation period, and puts its curve node there.
 """
 
+# pypi/conda library
 import pytest
+
+# itofin library
 from itofin import ItofinError, Settings
 from itofin.indexes import CpiInterpolationType, ZeroInflationIndex
 from itofin.quotes import SimpleQuote
@@ -33,14 +36,7 @@ from itofin.termstructures import (
     ZeroInflationHelper,
     ZeroInflationTermStructure,
 )
-from itofin.time import (
-    BusinessDayConvention,
-    Calendar,
-    Date,
-    DayCounter,
-    Frequency,
-    Period,
-)
+from itofin.time import BusinessDayConvention, Calendar, Date, DayCounter, Frequency, Period
 
 TODAY = Date(13, 8, 2007)
 MATURITY = Date(13, 8, 2008)

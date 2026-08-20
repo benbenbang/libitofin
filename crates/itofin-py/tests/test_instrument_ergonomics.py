@@ -36,17 +36,13 @@ strike and the spot - are checked against the numbers the fixture was built
 with, so a snapshot that copied the keys but garbled the values fails.
 """
 
+# pypi/conda library
 import pytest
 
+# itofin library
 from itofin import ItofinError, Settings
 from itofin.cashflows import IborLeg
-from itofin.indexes import (
-    CpiInterpolationType,
-    Estr,
-    Euribor,
-    YoYInflationIndex,
-    ZeroInflationIndex,
-)
+from itofin.indexes import CpiInterpolationType, Estr, Euribor, YoYInflationIndex, ZeroInflationIndex
 from itofin.instruments import (
     CapFloor,
     CapFloorType,
@@ -82,16 +78,7 @@ from itofin.termstructures import (
     InterpolatedYoYInflationCurve,
     InterpolatedZeroInflationCurve,
 )
-from itofin.time import (
-    BusinessDayConvention,
-    Calendar,
-    Date,
-    DateGeneration,
-    DayCounter,
-    Frequency,
-    Period,
-    Schedule,
-)
+from itofin.time import BusinessDayConvention, Calendar, Date, DateGeneration, DayCounter, Frequency, Period, Schedule
 
 REF = Date(15, 1, 2026)
 EXPIRY = Date(15, 1, 2027)
