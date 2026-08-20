@@ -426,9 +426,7 @@ class IborLeg:
             IborLeg: A new leg carrying the day counter.
         """
         ...
-    def with_payment_adjustment(
-        self, convention: BusinessDayConvention
-    ) -> IborLeg:
+    def with_payment_adjustment(self, convention: BusinessDayConvention) -> IborLeg:
         """Return the leg rolling its payment dates with convention.
 
         Args:
