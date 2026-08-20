@@ -9,6 +9,7 @@
 use crate::PyQlError;
 use crate::curve::PyYieldTermStructure;
 use crate::hullwhite::PyIborIndex;
+use crate::results::Results;
 use crate::settings::PySettings;
 use crate::time::{PyDate, PyDayCounter, PyPeriod, PySchedule};
 use libitofin::indexes::IborIndex;
@@ -114,6 +115,37 @@ impl PyVanillaSwap {
             .borrow_mut()
             .base_mut()
             .set_pricing_engine(engine);
+    }
+
+    /// Forces the valuation, idempotent and fallible as
+    /// [`VanillaOption.calculate`](crate::option::PyVanillaOption::calculate).
+    fn calculate(&mut self) -> PyResult<()> {
+        Ok(self
+            .inner
+            .borrow_mut()
+            .calculate()
+            .map_err(PyQlError::from)?)
+    }
+
+    /// Whether the cached results are currently valid.
+    fn is_calculated(&self) -> bool {
+        self.inner.borrow().base().is_calculated()
+    }
+
+    /// Builds a discounting engine over `curve` and returns the NPV: the
+    /// one-shot form of [`set_engine`](Self::set_engine) plus [`npv`](Self::npv),
+    /// and it takes the same two arguments for the same reason.
+    fn price(&mut self, curve: &PyYieldTermStructure, settings: &PySettings) -> PyResult<f64> {
+        self.set_engine(curve, settings);
+        self.calculate()?;
+        self.npv()
+    }
+
+    /// A frozen [`Results`] copy of the valuation, calculating first.
+    fn results(&mut self) -> PyResult<Results> {
+        self.calculate()?;
+        let inner = self.inner.borrow();
+        Ok(Results::snapshot(inner.base()))
     }
 
     /// The fair fixed rate that zeroes the swap NPV (`fairRate()`).

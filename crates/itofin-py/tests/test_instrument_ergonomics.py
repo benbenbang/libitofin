@@ -40,11 +40,14 @@ import pytest
 
 from itofin import ItofinError, Settings
 from itofin.cashflows import IborLeg
-from itofin.indexes import Euribor
+from itofin.indexes import Estr, Euribor
 from itofin.instruments import (
     CapFloor,
+    CreditDefaultSwap,
     EuropeanExercise,
+    MakeOis,
     OptionType,
+    ProtectionSide,
     SettlementMethod,
     SettlementType,
     Swaption,
@@ -56,16 +59,18 @@ from itofin.pricingengines import (
     BlackCapFloorEngine,
     BlackSwaptionEngine,
     CashAnnuityModel,
+    MidPointCdsEngine,
 )
 from itofin.processes import BlackScholesProcess
 from itofin.quotes import SimpleQuote
-from itofin.termstructures import FlatForward
+from itofin.termstructures import FlatForward, FlatHazardRate
 from itofin.time import (
     BusinessDayConvention,
     Calendar,
     Date,
     DayCounter,
     Frequency,
+    Period,
     Schedule,
 )
 
@@ -409,4 +414,162 @@ def test_swaption_calculating_without_an_engine_raises():
 
     with pytest.raises(ItofinError) as raised:
         swaption.calculate()
+    assert "null pricing engine" in str(raised.value)
+
+
+SWAP_START = Date(15, 1, 2028)
+SWAP_END = Date(15, 1, 2033)
+
+
+def _vanilla_swap_fixture():
+    """The #500 swap: a 5Y payer at 3% on a flat 3% curve. Its engine takes two
+    arguments rather than an engine object, which is why this facade's price()
+    takes the same two."""
+    settings = Settings()
+    settings.set_evaluation_date(SWAPTION_EVAL)
+    modified_following = BusinessDayConvention.ModifiedFollowing
+    curve = FlatForward(SWAPTION_EVAL, 0.03, DayCounter.actual365_fixed())
+    fixed = Schedule(
+        SWAP_START, SWAP_END, Frequency.Annual, Calendar.target(), modified_following
+    )
+    floating = Schedule(
+        SWAP_START, SWAP_END, Frequency.Semiannual, Calendar.target(), modified_following
+    )
+    swap = VanillaSwap(
+        SwapType.Payer,
+        100.0,
+        fixed,
+        0.03,
+        DayCounter.thirty360_bond_basis(),
+        floating,
+        Euribor.six_months(curve, settings),
+        0.0,
+        DayCounter.actual360(),
+        settings,
+    )
+    return swap, curve, settings
+
+
+def test_vanilla_swap_price_is_set_engine_plus_npv():
+    one_shot, curve, settings = _vanilla_swap_fixture()
+    long_hand, other_curve, other_settings = _vanilla_swap_fixture()
+    long_hand.set_engine(other_curve, other_settings)
+
+    assert one_shot.price(curve, settings) == long_hand.npv()
+
+
+def test_the_vanilla_swap_snapshot_reports_the_priced_npv():
+    swap, curve, settings = _vanilla_swap_fixture()
+    assert not swap.is_calculated()
+    priced = swap.price(curve, settings)
+
+    assert swap.is_calculated()
+    assert swap.results().npv == priced
+
+
+def test_vanilla_swap_calculating_without_an_engine_raises():
+    swap, _, _ = _vanilla_swap_fixture()
+
+    with pytest.raises(ItofinError) as raised:
+        swap.calculate()
+    assert "null pricing engine" in str(raised.value)
+
+
+def _ois_fixture(fixed_rate=0.03):
+    """A 5Y ESTR OIS off a flat 3% curve. MakeOis.build attaches the discounting
+    engine itself, which is why this is the one facade whose price() takes no
+    argument at all."""
+    settings = Settings()
+    settings.set_evaluation_date(SWAPTION_EVAL)
+    curve = FlatForward(SWAPTION_EVAL, 0.03, DayCounter.actual365_fixed())
+    return MakeOis(
+        Period(5, "Years"),
+        Estr(curve, settings),
+        settings,
+        fixed_rate=fixed_rate,
+        nominal=100.0,
+    ).build()
+
+
+def test_the_no_argument_ois_price_is_its_npv():
+    """The engine arrived with the instrument, so price() and npv() can only
+    differ by the forced calculate() - which is exactly the point: price()
+    reads the same on this facade as on the eight that install an engine."""
+    swap = _ois_fixture()
+    priced = swap.price()
+
+    assert swap.is_calculated()
+    assert priced == swap.npv()
+    assert priced == swap.results().npv
+
+
+def test_the_ois_price_moves_with_its_fixed_rate():
+    """Guards the no-argument price() against reporting a constant: a swap paying
+    3% and one paying 5% off the same 3% curve are not worth the same."""
+    at_market = _ois_fixture(0.03)
+    off_market = _ois_fixture(0.05)
+
+    print(f"\nOIS @3% = {at_market.price()!r}\nOIS @5% = {off_market.price()!r}")
+    assert at_market.price() != off_market.price()
+
+
+CDS_TODAY = Date(9, 6, 2006)
+CDS_ISSUE = Date(9, 6, 2005)
+CDS_MATURITY = Date(9, 6, 2015)
+CACHED_CDS_NPV = 295.0153398
+
+
+def _cds_fixture():
+    """The #739 contract: ten years of protection sold on a flat 1.234% hazard
+    rate, discounted at a flat 6%, worth 295.0153398."""
+    settings = Settings()
+    settings.set_evaluation_date(CDS_TODAY)
+    calendar = Calendar.target()
+    day_counter = DayCounter.actual360()
+    convention = BusinessDayConvention.ModifiedFollowing
+    hazard = FlatHazardRate.moving(
+        0, calendar, SimpleQuote(0.01234), day_counter, settings
+    )
+    discount = FlatForward(CDS_TODAY, 0.06, day_counter)
+    schedule = Schedule(
+        CDS_ISSUE, CDS_MATURITY, Frequency.Semiannual, calendar, convention
+    )
+    contract = CreditDefaultSwap(
+        ProtectionSide.Seller,
+        10000.0,
+        0.0120,
+        schedule,
+        convention,
+        day_counter,
+        True,
+        True,
+        settings,
+    )
+    return contract, MidPointCdsEngine(hazard, 0.4, discount, settings)
+
+
+def test_cds_price_is_set_engine_plus_npv_and_hits_the_cached_value():
+    one_shot, engine = _cds_fixture()
+    long_hand, other_engine = _cds_fixture()
+    long_hand.set_engine(other_engine)
+
+    priced = one_shot.price(engine)
+    assert priced == long_hand.npv()
+    assert abs(priced - CACHED_CDS_NPV) <= 1e-7
+
+
+def test_the_cds_snapshot_reports_the_priced_npv():
+    contract, engine = _cds_fixture()
+    assert not contract.is_calculated()
+    priced = contract.price(engine)
+
+    assert contract.is_calculated()
+    assert contract.results().npv == priced
+
+
+def test_cds_calculating_without_an_engine_raises():
+    contract, _ = _cds_fixture()
+
+    with pytest.raises(ItofinError) as raised:
+        contract.calculate()
     assert "null pricing engine" in str(raised.value)
