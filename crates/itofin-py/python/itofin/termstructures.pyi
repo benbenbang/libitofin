@@ -3363,7 +3363,34 @@ class ConstantYoYOptionletVolatility:
         min_strike: float,
         max_strike: float,
         settings: Settings,
-    ) -> None: ...
+    ) -> None:
+        """Build a flat surface at a fixed volatility.
+
+        Nothing is resolved here: the reference date, the base date and the
+        strike range are all read at query time, so an unset evaluation date
+        surfaces then rather than now.
+
+        Args:
+            volatility (float): The single volatility answered everywhere.
+            settlement_days (int): The business days the reference date sits
+                past the evaluation date.
+            calendar (Calendar): The calendar those days are counted on.
+            business_day_convention (BusinessDayConvention): The roll applied
+                when resolving a date.
+            day_counter (DayCounter): The day count times are measured in.
+            observation_lag (Period): The lag the surface itself observes
+                inflation with.
+            frequency (Frequency): How often the observed index publishes.
+            index_is_interpolated (bool): Whether the observed index
+                interpolates between publications.
+            min_strike (float): The lower bound of the strike domain; C++
+                defaults it to -1.0 and the port carries no default arguments.
+            max_strike (float): The upper bound of the strike domain; C++
+                defaults it to 100.0.
+            settings (Settings): The explicit settings supplying the evaluation
+                date the reference date moves with.
+        """
+        ...
     @staticmethod
     def with_quote(
         volatility: SimpleQuote,
@@ -3378,25 +3405,106 @@ class ConstantYoYOptionletVolatility:
         max_strike: float,
         settings: Settings,
     ) -> ConstantYoYOptionletVolatility:
-        """A flat surface quoted by volatility: a later set_value on the quote
-        notifies the surface's observers, so anything priced off it reprices at
-        the new level. Otherwise as __init__."""
+        """Build a flat surface reading its volatility from a live quote.
+
+        The quote is retained rather than read once, so a later set_value on it
+        notifies the surface's observers and anything priced off the surface
+        reprices at the new level. Otherwise as __init__, which the arguments
+        after the first mirror exactly.
+
+        Args:
+            volatility (SimpleQuote): The volatility answered everywhere.
+            settlement_days (int): The business days the reference date sits
+                past the evaluation date.
+            calendar (Calendar): The calendar those days are counted on.
+            business_day_convention (BusinessDayConvention): The roll applied
+                when resolving a date.
+            day_counter (DayCounter): The day count times are measured in.
+            observation_lag (Period): The lag the surface itself observes
+                inflation with.
+            frequency (Frequency): How often the observed index publishes.
+            index_is_interpolated (bool): Whether the observed index
+                interpolates between publications.
+            min_strike (float): The lower bound of the strike domain.
+            max_strike (float): The upper bound of the strike domain.
+            settings (Settings): The explicit settings supplying the evaluation
+                date the reference date moves with.
+
+        Returns:
+            ConstantYoYOptionletVolatility: The surface over that quote.
+        """
         ...
-    def observation_lag(self) -> Period: ...
-    def frequency(self) -> Frequency: ...
-    def index_is_interpolated(self) -> bool: ...
+    def observation_lag(self) -> Period:
+        """Return the lag the surface itself observes inflation with.
+
+        Returns:
+            Period: The observation lag, which is what to pass as obs_lag for
+                the surface's own.
+        """
+        ...
+    def frequency(self) -> Frequency:
+        """Return how often the observed index publishes.
+
+        Returns:
+            Frequency: The publication frequency.
+        """
+        ...
+    def index_is_interpolated(self) -> bool:
+        """Return whether the observed index interpolates between publications.
+
+        Returns:
+            bool: True when the index interpolates.
+        """
+        ...
     def base_date(self) -> Date:
-        """The date the surface measures its variance from. Raises ItofinError
-        on an unset evaluation date, and on a frequency admitting no publication
-        period."""
+        """Return the date the surface measures its variance from.
+
+        The reference date pulled back by the surface's own observation lag,
+        snapped to the start of the publication period unless the index is
+        interpolated.
+
+        Returns:
+            Date: The base date.
+
+        Raises:
+            ItofinError: On an unset evaluation date, and on a frequency
+                admitting no publication period.
+        """
         ...
     def volatility(self, date: Date, strike: float, obs_lag: Period) -> float:
-        """The lag is explicit rather than defaulted: pass observation_lag() for
-        the surface's own. Raises ItofinError when the observed date falls before
-        base_date(), or strike lies outside the strike domain."""
+        """Return the volatility for an exercise on date struck at strike.
+
+        Args:
+            date (Date): The exercise date.
+            strike (float): The strike the volatility is read at.
+            obs_lag (Period): How far back inflation is observed; the lag is
+                explicit rather than defaulted, because C++ substitutes the
+                surface's own for a sentinel period and the port has no
+                sentinel to carry. Pass observation_lag() for that behaviour.
+
+        Returns:
+            float: The optionlet volatility.
+
+        Raises:
+            ItofinError: On an observed date before base_date(), and on a
+                strike outside the surface's strike domain.
+        """
         ...
     def total_variance(self, date: Date, strike: float, obs_lag: Period) -> float:
-        """The total integrated variance, the figure that scales time out of the
-        optionlet formulae without committing to a distribution. Raises as
-        volatility()."""
+        """Return the total integrated variance for an exercise on date.
+
+        The figure that scales time out of the optionlet formulae without
+        committing to the distribution reading it.
+
+        Args:
+            date (Date): The exercise date.
+            strike (float): The strike the variance is read at.
+            obs_lag (Period): How far back inflation is observed.
+
+        Returns:
+            float: The total integrated variance.
+
+        Raises:
+            ItofinError: On the same conditions volatility() reports.
+        """
         ...
