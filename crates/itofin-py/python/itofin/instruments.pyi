@@ -37,18 +37,36 @@ from itofin.time import (
 )
 
 class OptionType:
-    """The call/put flag."""
+    """The call/put flag.
+
+    A fieldless enum mirroring the core option type; the signed discriminant
+    convention behind the two variants stays in the core.
+    """
 
     Call: OptionType
     Put: OptionType
 
 class VanillaOption:
-    """A single-asset vanilla option: European by construction, American
-    through the american classmethod."""
+    """A single-asset vanilla option: European by construction, American through american().
+
+    Valuation is lazy: an accessor reprices only once an observed input - the
+    attached engine, or the evaluation date on the Settings the option
+    registered with - has notified it.
+    """
 
     def __init__(
         self, option_type: OptionType, strike: float, expiry: Date, settings: Settings
-    ) -> None: ...
+    ) -> None:
+        """Build the European-exercise option, exercisable only at expiry.
+
+        Args:
+            option_type (OptionType): Whether the payoff is a call or a put.
+            strike (float): The strike of the plain vanilla payoff.
+            expiry (Date): The single date the option may be exercised on.
+            settings (Settings): The explicit settings supplying the evaluation
+                date the option prices against.
+        """
+        ...
     @classmethod
     def american(
         cls,
@@ -58,46 +76,218 @@ class VanillaOption:
         latest: Date,
         settings: Settings,
     ) -> VanillaOption:
-        """The option exercisable at any time over [earliest, latest], paying on
-        exercise. Raises ItofinError when earliest is after latest."""
+        """Build the option exercisable at any time over [earliest, latest].
+
+        The option pays on exercise rather than at expiry. This is the exercise
+        the Monte Carlo American engine requires; the analytic European engine
+        rejects it.
+
+        Args:
+            option_type (OptionType): Whether the payoff is a call or a put.
+            strike (float): The strike of the plain vanilla payoff.
+            earliest (Date): The first date the option may be exercised on.
+            latest (Date): The last date the option may be exercised on.
+            settings (Settings): The explicit settings supplying the evaluation
+                date the option prices against.
+
+        Returns:
+            VanillaOption: The American-exercise option.
+
+        Raises:
+            ItofinError: If earliest is after latest.
+        """
         ...
-    def set_engine(self, process: BlackScholesProcess) -> None: ...
-    def set_heston_engine(self, model: HestonModel, integration_order: int) -> None: ...
-    def set_mc_engine(self, engine: MCEuropeanEngine) -> None: ...
-    def set_mc_heston_engine(self, engine: MCEuropeanHestonEngine) -> None: ...
+    def set_engine(self, process: BlackScholesProcess) -> None:
+        """Attach an analytic European engine built on process.
+
+        Args:
+            process (BlackScholesProcess): The process the engine prices on;
+                the exact object this Python instance holds is threaded in.
+        """
+        ...
+    def set_heston_engine(self, model: HestonModel, integration_order: int) -> None:
+        """Attach an analytic Heston engine built on model.
+
+        The analytic Heston engine fills only the value, so npv() works but the
+        greeks raise on this path.
+
+        Args:
+            model (HestonModel): The calibrated Heston model to price under.
+            integration_order (int): The order of the Gauss-Laguerre
+                integration.
+
+        Raises:
+            ItofinError: If integration_order exceeds 192.
+        """
+        ...
+    def set_mc_engine(self, engine: MCEuropeanEngine) -> None:
+        """Attach the Monte Carlo European engine.
+
+        Args:
+            engine (MCEuropeanEngine): The engine, which already holds the
+                process it prices on.
+        """
+        ...
+    def set_mc_heston_engine(self, engine: MCEuropeanHestonEngine) -> None:
+        """Attach the Monte Carlo Heston engine.
+
+        Args:
+            engine (MCEuropeanHestonEngine): The engine, which already holds
+                the Heston process it prices on.
+        """
+        ...
     def set_mc_american_engine(self, engine: MCAmericanEngine) -> None:
-        """Attaches the Monte Carlo American engine. A European-exercise option
-        raises ItofinError ("wrong exercise given") when priced on it."""
+        """Attach the Monte Carlo American engine.
+
+        The option must have been built through american(): a European-exercise
+        option raises ItofinError ("wrong exercise given") from npv().
+
+        Args:
+            engine (MCAmericanEngine): The engine, which already holds the
+                process it prices on.
+        """
         ...
     def calculate(self) -> None:
-        """Forces the valuation. Idempotent: the option reprices only once an
-        observed input notified it."""
+        """Force the valuation, so a later accessor reads a warm cache.
+
+        Idempotent: the core short-circuits on a valid cache, and the option
+        reprices only once an observed input notified it.
+
+        Raises:
+            ItofinError: If no engine is attached, no evaluation date is set,
+                or the attached engine refuses the option.
+        """
         ...
     def is_calculated(self) -> bool:
-        """Whether the cached results are currently valid."""
+        """Return whether the cached results are currently valid.
+
+        Returns:
+            bool: True when the next accessor reads the cache rather than
+                repricing.
+        """
         ...
     def price(self, process: BlackScholesProcess) -> float:
-        """Attaches an analytic European engine on process and returns the NPV:
-        set_engine followed by npv, in one call."""
+        """Attach an analytic European engine on process and return the NPV.
+
+        The one-shot form of set_engine followed by npv. The other engines keep
+        their own setters and compose with calculate and npv as before.
+
+        Args:
+            process (BlackScholesProcess): The process the engine prices on.
+
+        Returns:
+            float: The present value under the analytic European engine.
+
+        Raises:
+            ItofinError: If no evaluation date is set or the engine refuses the
+                option.
+        """
         ...
     def results(self) -> Results:
-        """A frozen snapshot of the valuation, calculating first."""
+        """Return a frozen snapshot of the valuation, calculating first.
+
+        The snapshot does not track the option: once taken, an evaluation-date
+        or engine change reprices the live accessors and leaves it alone.
+
+        Returns:
+            Results: A copy of the valuation results.
+
+        Raises:
+            ItofinError: On anything that makes the valuation fail.
+        """
         ...
-    def npv(self) -> float: ...
-    def delta(self) -> float: ...
-    def gamma(self) -> float: ...
-    def theta(self) -> float: ...
-    def vega(self) -> float: ...
-    def rho(self) -> float: ...
-    def dividend_rho(self) -> float: ...
+    def npv(self) -> float:
+        """Return the present value.
+
+        Returns:
+            float: The option value under the attached engine.
+
+        Raises:
+            ItofinError: If no evaluation date or no engine is set.
+        """
+        ...
+    def delta(self) -> float:
+        """Return the option delta.
+
+        Returns:
+            float: The sensitivity to the underlying spot.
+
+        Raises:
+            ItofinError: If the attached engine does not provide it, which the
+                analytic Heston engine does not.
+        """
+        ...
+    def gamma(self) -> float:
+        """Return the option gamma.
+
+        Returns:
+            float: The second-order sensitivity to the underlying spot.
+
+        Raises:
+            ItofinError: If the attached engine does not provide it.
+        """
+        ...
+    def theta(self) -> float:
+        """Return the option theta.
+
+        Returns:
+            float: The sensitivity to the passage of time.
+
+        Raises:
+            ItofinError: If the attached engine does not provide it.
+        """
+        ...
+    def vega(self) -> float:
+        """Return the option vega.
+
+        Returns:
+            float: The sensitivity to the volatility.
+
+        Raises:
+            ItofinError: If the attached engine does not provide it.
+        """
+        ...
+    def rho(self) -> float:
+        """Return the option rho.
+
+        Returns:
+            float: The sensitivity to the risk-free rate.
+
+        Raises:
+            ItofinError: If the attached engine does not provide it.
+        """
+        ...
+    def dividend_rho(self) -> float:
+        """Return the option dividend rho.
+
+        Returns:
+            float: The sensitivity to the dividend yield.
+
+        Raises:
+            ItofinError: If the attached engine does not provide it.
+        """
+        ...
     def error_estimate(self) -> float:
-        """The standard error on the present value. Raises ItofinError on the
-        engines that do not produce one, which is every analytic engine here."""
+        """Return the standard error on the present value.
+
+        Returns:
+            float: The Monte Carlo standard error.
+
+        Raises:
+            ItofinError: On the engines that do not produce one, which is every
+                analytic engine here.
+        """
         ...
     def exercise_probability(self) -> float:
-        """The fraction of simulated paths exercised before expiry. Raises
-        ItofinError on every engine that does not report it - only
-        MCAmericanEngine does."""
+        """Return the fraction of simulated paths exercised before expiry.
+
+        Returns:
+            float: The exercise probability reported by the engine.
+
+        Raises:
+            ItofinError: On every engine that does not report it - only
+                MCAmericanEngine does.
+        """
         ...
 
 class SwapType:
