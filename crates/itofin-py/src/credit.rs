@@ -9,6 +9,7 @@ use crate::creditengine::{PyIsdaCdsEngine, PyMidPointCdsEngine};
 use crate::credithelpers::PyDefaultProbabilityHelper;
 use crate::curve::PyYieldTermStructure;
 use crate::market::PySimpleQuote;
+use crate::results::Results;
 use crate::settings::PySettings;
 use crate::time::{PyBusinessDayConvention, PyCalendar, PyDate, PyDayCounter, PySchedule};
 use libitofin::cashflow::CashFlow;
@@ -657,6 +658,41 @@ impl PyCreditDefaultSwap {
             .borrow_mut()
             .base_mut()
             .set_pricing_engine(engine.engine());
+    }
+
+    /// Forces the valuation, idempotent and fallible as
+    /// [`VanillaOption.calculate`](crate::option::PyVanillaOption::calculate).
+    fn calculate(&mut self) -> PyResult<()> {
+        Ok(self
+            .inner
+            .borrow_mut()
+            .calculate()
+            .map_err(PyQlError::from)?)
+    }
+
+    /// Whether the cached results are currently valid.
+    fn is_calculated(&self) -> bool {
+        self.inner.borrow().base().is_calculated()
+    }
+
+    /// Attaches the mid-point engine `engine` and returns the NPV, the one-shot
+    /// form of [`set_engine`](Self::set_engine) followed by [`npv`](Self::npv).
+    ///
+    /// The mid-point engine is the primary because it is the core's own default
+    /// CDS engine; [`set_isda_engine`](Self::set_isda_engine) stays a separate
+    /// setter and composes with [`calculate`](Self::calculate) and
+    /// [`results`](Self::results) as before.
+    fn price(&mut self, engine: &PyMidPointCdsEngine) -> PyResult<f64> {
+        self.set_engine(engine);
+        self.calculate()?;
+        self.npv()
+    }
+
+    /// A frozen [`Results`] copy of the valuation, calculating first.
+    fn results(&mut self) -> PyResult<Results> {
+        self.calculate()?;
+        let inner = self.inner.borrow();
+        Ok(Results::snapshot(inner.base()))
     }
 
     /// The contract NPV under the attached engine.

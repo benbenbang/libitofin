@@ -10,6 +10,7 @@
 use crate::PyQlError;
 use crate::curve::PyYieldTermStructure;
 use crate::helpers::{PyOvernightIndex, PyRateAveraging};
+use crate::results::Results;
 use crate::settings::PySettings;
 use crate::time::{PyDate, PyPeriod};
 use libitofin::cashflows::RateAveraging;
@@ -60,6 +61,39 @@ impl PyOvernightIndexedSwap {
             .fixed_vs_floating_mut()
             .fair_rate()
             .map_err(PyQlError::from)?)
+    }
+
+    /// Forces the valuation, idempotent and fallible as
+    /// [`VanillaOption.calculate`](crate::option::PyVanillaOption::calculate).
+    fn calculate(&mut self) -> PyResult<()> {
+        Ok(self
+            .inner
+            .borrow_mut()
+            .calculate()
+            .map_err(PyQlError::from)?)
+    }
+
+    /// Whether the cached results are currently valid.
+    fn is_calculated(&self) -> bool {
+        self.inner.borrow().base().is_calculated()
+    }
+
+    /// Prices and returns the NPV.
+    ///
+    /// The only no-argument `price()` of the nine facades: [`PyMakeOis::build`]
+    /// attaches the discounting engine, so there is no engine left to install
+    /// here. A swap that somehow reached Python without one surfaces the core's
+    /// `"null pricing engine"`, exactly as [`npv`](Self::npv) does.
+    fn price(&mut self) -> PyResult<f64> {
+        self.calculate()?;
+        self.npv()
+    }
+
+    /// A frozen [`Results`] copy of the valuation, calculating first.
+    fn results(&mut self) -> PyResult<Results> {
+        self.calculate()?;
+        let inner = self.inner.borrow();
+        Ok(Results::snapshot(inner.base()))
     }
 
     /// The swap NPV under the engine [`PyMakeOis::build`] attached.
