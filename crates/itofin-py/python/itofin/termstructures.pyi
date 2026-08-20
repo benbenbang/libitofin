@@ -993,7 +993,21 @@ class FraRateHelper(RateHelper):
         index: IborIndex,
         use_indexed_coupon: bool = True,
         pillar: Pillar = ...,
-    ) -> None: ...
+    ) -> None:
+        """Build the helper over the window period_to_start past spot.
+
+        Args:
+            quote (SimpleQuote): The FRA rate; the caller keeps it, so a later
+                set_value re-drives the bootstrap.
+            period_to_start (Period): How long after spot the window starts.
+            index (IborIndex): The index whose tenor the window spans.
+            use_indexed_coupon (bool): True selects the indexed implied-quote
+                mode, the index fixing forecast off the curve; False is the par
+                simple forward over the raw window.
+            pillar (Pillar): The date the curve node sits at; defaults to
+                LastRelevantDate.
+        """
+        ...
     @staticmethod
     def from_rate(
         rate: float,
@@ -1001,7 +1015,21 @@ class FraRateHelper(RateHelper):
         index: IborIndex,
         use_indexed_coupon: bool = True,
         pillar: Pillar = ...,
-    ) -> FraRateHelper: ...
+    ) -> FraRateHelper:
+        """Build the helper over a fixed rate.
+
+        Args:
+            rate (float): The FRA rate, wrapped in an internal quote the caller
+                cannot later mutate.
+            period_to_start (Period): How long after spot the window starts.
+            index (IborIndex): The index whose tenor the window spans.
+            use_indexed_coupon (bool): The implied-quote mode; see __init__.
+            pillar (Pillar): The date the curve node sits at.
+
+        Returns:
+            FraRateHelper: The helper fitting that rate.
+        """
+        ...
     @staticmethod
     def from_months(
         quote: SimpleQuote,
@@ -1009,7 +1037,21 @@ class FraRateHelper(RateHelper):
         index: IborIndex,
         use_indexed_coupon: bool = True,
         pillar: Pillar = ...,
-    ) -> FraRateHelper: ...
+    ) -> FraRateHelper:
+        """Build the helper with a start given in months after spot.
+
+        Args:
+            quote (SimpleQuote): The FRA rate the helper fits.
+            months_to_start (int): How many months after spot the window
+                starts.
+            index (IborIndex): The index whose tenor the window spans.
+            use_indexed_coupon (bool): The implied-quote mode; see __init__.
+            pillar (Pillar): The date the curve node sits at.
+
+        Returns:
+            FraRateHelper: The helper over that window.
+        """
+        ...
     @staticmethod
     def from_dates(
         quote: SimpleQuote,
@@ -1018,7 +1060,24 @@ class FraRateHelper(RateHelper):
         index: IborIndex,
         use_indexed_coupon: bool = True,
         pillar: Pillar = ...,
-    ) -> FraRateHelper: ...
+    ) -> FraRateHelper:
+        """Build the helper over an explicit window.
+
+        The schedule is fixed at construction and does not shift when the
+        evaluation date changes.
+
+        Args:
+            quote (SimpleQuote): The FRA rate the helper fits.
+            start_date (Date): The window's start.
+            end_date (Date): The window's end.
+            index (IborIndex): The index the forward is read off.
+            use_indexed_coupon (bool): The implied-quote mode; see __init__.
+            pillar (Pillar): The date the curve node sits at.
+
+        Returns:
+            FraRateHelper: The helper over that window.
+        """
+        ...
 
 class RateAveraging:
     """How an overnight coupon combines its daily fixings.
@@ -1055,7 +1114,35 @@ class OISRateHelper(RateHelper):
         overnight_spread: SimpleQuote | None = None,
         pillar: Pillar = ...,
         averaging_method: RateAveraging = ...,
-    ) -> None: ...
+    ) -> None:
+        """Build the helper over the schedule of a spot-starting OIS.
+
+        Args:
+            settlement_days (int): The days after the evaluation date the swap
+                starts.
+            tenor (Period): The length of the swap.
+            quote (SimpleQuote): The OIS rate; the caller keeps it, so a later
+                set_value re-drives the bootstrap.
+            overnight_index (OvernightIndex): The index the floating leg
+                compounds.
+            payment_lag (int): The days between accrual end and payment.
+            payment_convention (BusinessDayConvention): The roll applied to the
+                payment dates.
+            payment_frequency (Frequency): The payment frequency.
+            forward_start (Period): How long after spot the swap starts.
+            settings (Settings): The explicit settings supplying the evaluation
+                date and the stored fixings.
+            discounting_curve (YieldTermStructure | None): The curve the flows
+                discount on; None discounts off the bootstrapping curve.
+            overnight_spread (SimpleQuote | None): The spread over the index;
+                None leaves it empty, so zero. The caller keeps it, and
+                mutating it re-drives the bootstrap.
+            pillar (Pillar): The date the curve node sits at; defaults to
+                LastRelevantDate.
+            averaging_method (RateAveraging): How the daily fixings combine;
+                defaults to Compound.
+        """
+        ...
 
 class SwaptionVolatilityStructure:
     """Shared base for every swaption volatility surface: volatility, Black
