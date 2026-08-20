@@ -17,17 +17,17 @@
 #   results       <- src/results.rs
 """Python bindings for libitofin, a Rust port of QuantLib."""
 
-from . import cashflows as cashflows
-from . import indexes as indexes
-from . import instruments as instruments
-from . import models as models
-from . import optimization as optimization
-from . import pricingengines as pricingengines
-from . import processes as processes
-from . import quotes as quotes
-from . import results as results
-from . import termstructures as termstructures
-from . import time as time
+from itofin import cashflows as cashflows
+from itofin import indexes as indexes
+from itofin import instruments as instruments
+from itofin import models as models
+from itofin import optimization as optimization
+from itofin import pricingengines as pricingengines
+from itofin import processes as processes
+from itofin import quotes as quotes
+from itofin import results as results
+from itofin import termstructures as termstructures
+from itofin import time as time
 
 __version__: str
 
