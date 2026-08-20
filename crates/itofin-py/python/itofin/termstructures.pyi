@@ -124,20 +124,145 @@ class YieldTermStructure:
         ...
 
 class BlackVolTermStructure:
-    """Shared base for every Black-volatility surface: spot and forward vol/variance."""
+    """Shared base for every Black-volatility surface: spot and forward vol/variance.
 
-    def black_vol(self, t: float, strike: float, extrapolate: bool = False) -> float: ...
-    def black_vol_date(self, date: Date, strike: float, extrapolate: bool = False) -> float: ...
-    def black_variance(self, t: float, strike: float, extrapolate: bool = False) -> float: ...
-    def black_variance_date(self, date: Date, strike: float, extrapolate: bool = False) -> float: ...
-    def black_forward_vol(self, t1: float, t2: float, strike: float, extrapolate: bool = False) -> float: ...
-    def black_forward_variance(self, t1: float, t2: float, strike: float, extrapolate: bool = False) -> float: ...
-    def min_strike(self) -> float: ...
-    def max_strike(self) -> float: ...
-    def max_date(self) -> Date: ...
-    def allows_extrapolation(self) -> bool: ...
-    def enable_extrapolation(self) -> None: ...
-    def disable_extrapolation(self) -> None: ...
+    Concrete surfaces subclass this and supply only their constructor; the
+    whole query surface below is inherited, along with the strike domain and
+    the extrapolation toggles.
+    """
+
+    def black_vol(self, t: float, strike: float, extrapolate: bool = False) -> float:
+        """Return the spot Black volatility at year-fraction t and strike.
+
+        Args:
+            t (float): The year fraction, in the surface's own day count.
+            strike (float): The strike the volatility is read at.
+            extrapolate (bool): Whether to answer outside the surface's grid.
+
+        Returns:
+            float: The Black volatility.
+
+        Raises:
+            ItofinError: If the query falls outside the grid and extrapolation
+                is not allowed.
+        """
+        ...
+    def black_vol_date(self, date: Date, strike: float, extrapolate: bool = False) -> float:
+        """Return the spot Black volatility at date and strike.
+
+        Args:
+            date (Date): The expiry the volatility is read at.
+            strike (float): The strike the volatility is read at.
+            extrapolate (bool): Whether to answer outside the surface's grid.
+
+        Returns:
+            float: The Black volatility.
+
+        Raises:
+            ItofinError: If the query falls outside the grid and extrapolation
+                is not allowed.
+        """
+        ...
+    def black_variance(self, t: float, strike: float, extrapolate: bool = False) -> float:
+        """Return the spot Black variance at year-fraction t and strike.
+
+        Args:
+            t (float): The year fraction, in the surface's own day count.
+            strike (float): The strike the variance is read at.
+            extrapolate (bool): Whether to answer outside the surface's grid.
+
+        Returns:
+            float: The Black variance.
+
+        Raises:
+            ItofinError: If the query falls outside the grid and extrapolation
+                is not allowed.
+        """
+        ...
+    def black_variance_date(self, date: Date, strike: float, extrapolate: bool = False) -> float:
+        """Return the spot Black variance at date and strike.
+
+        Args:
+            date (Date): The expiry the variance is read at.
+            strike (float): The strike the variance is read at.
+            extrapolate (bool): Whether to answer outside the surface's grid.
+
+        Returns:
+            float: The Black variance.
+
+        Raises:
+            ItofinError: If the query falls outside the grid and extrapolation
+                is not allowed.
+        """
+        ...
+    def black_forward_vol(self, t1: float, t2: float, strike: float, extrapolate: bool = False) -> float:
+        """Return the forward Black volatility between year-fractions t1 and t2.
+
+        Args:
+            t1 (float): The start year fraction.
+            t2 (float): The end year fraction.
+            strike (float): The strike the volatility is read at.
+            extrapolate (bool): Whether to answer outside the surface's grid.
+
+        Returns:
+            float: The forward Black volatility.
+
+        Raises:
+            ItofinError: If the query falls outside the grid and extrapolation
+                is not allowed.
+        """
+        ...
+    def black_forward_variance(self, t1: float, t2: float, strike: float, extrapolate: bool = False) -> float:
+        """Return the forward Black variance between year-fractions t1 and t2.
+
+        Args:
+            t1 (float): The start year fraction.
+            t2 (float): The end year fraction.
+            strike (float): The strike the variance is read at.
+            extrapolate (bool): Whether to answer outside the surface's grid.
+
+        Returns:
+            float: The forward Black variance.
+
+        Raises:
+            ItofinError: If the query falls outside the grid and extrapolation
+                is not allowed.
+        """
+        ...
+    def min_strike(self) -> float:
+        """Return the minimum strike for which the surface can return volatilities.
+
+        Returns:
+            float: The lower bound of the strike domain.
+        """
+        ...
+    def max_strike(self) -> float:
+        """Return the maximum strike for which the surface can return volatilities.
+
+        Returns:
+            float: The upper bound of the strike domain.
+        """
+        ...
+    def max_date(self) -> Date:
+        """Return the latest date for which the surface can return values.
+
+        Returns:
+            Date: The surface's maximum date.
+        """
+        ...
+    def allows_extrapolation(self) -> bool:
+        """Return whether the surface answers dates and times beyond its maximum.
+
+        Returns:
+            bool: True when extrapolation is enabled on the surface itself.
+        """
+        ...
+    def enable_extrapolation(self) -> None:
+        """Allow extrapolation past the maximum date and time."""
+        ...
+    def disable_extrapolation(self) -> None:
+        """Forbid extrapolation past the maximum date and time."""
+        ...
 
 class FlatForward(YieldTermStructure):
     """A flat continuously-compounded yield curve behind a Handle.
@@ -480,7 +605,11 @@ class PiecewiseFlatForward(YieldTermStructure):
         ...
 
 class BlackConstantVol(BlackVolTermStructure):
-    """A flat Black volatility, constant in strike and time."""
+    """A flat Black volatility, constant in strike and time.
+
+    Unbounded in both time and strike, so queries never need extrapolation
+    enabled.
+    """
 
     def __init__(
         self,
@@ -488,7 +617,16 @@ class BlackConstantVol(BlackVolTermStructure):
         volatility: float,
         day_counter: DayCounter,
         calendar: Calendar | None = None,
-    ) -> None: ...
+    ) -> None:
+        """Build the flat surface.
+
+        Args:
+            reference_date (Date): The date times are measured from.
+            volatility (float): The single volatility answered everywhere.
+            day_counter (DayCounter): The day count turning dates into times.
+            calendar (Calendar | None): The surface's calendar, if any.
+        """
+        ...
 
 class BlackVolTimeExtrapolation:
     """How a variance curve extrapolates past its last node.
@@ -503,9 +641,13 @@ class BlackVolTimeExtrapolation:
     LinearVariance: BlackVolTimeExtrapolation
 
 class BlackVarianceCurve(BlackVolTermStructure):
-    """A term structure of Black volatility (no strike dimension), interpolating
-    linearly on variance. Finite in time: enable extrapolation past the last date,
-    where ``time_extrapolation`` picks the rule."""
+    """A term structure of Black volatility with no strike dimension.
+
+    Interpolates linearly on variance. Finite in time: the last date is the
+    maximum, so queries past it require enable_extrapolation(), and
+    time_extrapolation picks the rule applied there. The interpolation itself
+    stays linear; only the extrapolation axis is exposed.
+    """
 
     def __init__(
         self,
@@ -515,11 +657,33 @@ class BlackVarianceCurve(BlackVolTermStructure):
         day_counter: DayCounter,
         force_monotone_variance: bool,
         time_extrapolation: BlackVolTimeExtrapolation = ...,
-    ) -> None: ...
+    ) -> None:
+        """Build the variance curve over its (date, volatility) nodes.
+
+        Args:
+            reference_date (Date): The date times are measured from.
+            dates (list[Date]): The node dates.
+            black_vol_curve (list[float]): The Black volatility at each node.
+            day_counter (DayCounter): The day count turning dates into times.
+            force_monotone_variance (bool): Whether to require the implied
+                variance to increase across the nodes.
+            time_extrapolation (BlackVolTimeExtrapolation): The rule applied
+                past the last node; defaults to FlatVolatility, the C++
+                default. Selecting UseInterpolator constructs fine and answers
+                in-range queries, then errors on an extrapolating one.
+
+        Raises:
+            ItofinError: On whatever the core rejects about the nodes, a
+                non-monotone variance under force_monotone_variance included.
+        """
+        ...
 
 class BlackVarianceSurface(BlackVolTermStructure):
-    """A Black volatility surface in strike and expiry, interpolating bilinearly
-    on variance. black_vol_matrix has one row per strike and one column per date."""
+    """A Black volatility surface in strike and expiry, interpolating bilinearly.
+
+    Finite in both time and strike, so out-of-grid queries require
+    enable_extrapolation().
+    """
 
     def __init__(
         self,
@@ -529,7 +693,23 @@ class BlackVarianceSurface(BlackVolTermStructure):
         black_vol_matrix: list[list[float]],
         day_counter: DayCounter,
         calendar: Calendar | None = None,
-    ) -> None: ...
+    ) -> None:
+        """Build the surface over its strike-by-expiry grid.
+
+        Args:
+            reference_date (Date): The date times are measured from.
+            dates (list[Date]): The expiry grid, one per matrix column.
+            strikes (list[float]): The strike grid, one per matrix row.
+            black_vol_matrix (list[list[float]]): The volatilities, one row per
+                strike and one column per date.
+            day_counter (DayCounter): The day count turning dates into times.
+            calendar (Calendar | None): The surface's calendar, if any.
+
+        Raises:
+            ItofinError: On an empty or ragged matrix, and on whatever the core
+                rejects about the grid dimensions.
+        """
+        ...
 
 class RateHelper:
     """Shared base for every bootstrap helper: implied/market quotes and dates."""
