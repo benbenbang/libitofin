@@ -4,6 +4,7 @@ use crate::PyQlError;
 use crate::heston::PyHestonModel;
 use crate::market::PyBlackScholesProcess;
 use crate::mcengine::{PyMCAmericanEngine, PyMCEuropeanEngine, PyMCEuropeanHestonEngine};
+use crate::results::Results;
 use crate::settings::PySettings;
 use crate::time::PyDate;
 use libitofin::exercise::{AmericanExercise, EuropeanExercise, Exercise};
@@ -140,6 +141,46 @@ impl PyVanillaOption {
     /// exercise given") from `npv()`.
     fn set_mc_american_engine(&mut self, engine: &PyMCAmericanEngine) {
         self.inner.base_mut().set_pricing_engine(engine.engine());
+    }
+
+    /// Forces the valuation, so a later accessor reads a cache that is already
+    /// warm.
+    ///
+    /// Idempotent: the core short-circuits on a valid cache, and the option
+    /// only reprices once an observed input - the engine, or the settings
+    /// evaluation date it registered with - has notified it.
+    ///
+    /// Fallible for everything a pricing accessor is: no engine attached, no
+    /// evaluation date set, an engine that refuses the option.
+    fn calculate(&mut self) -> PyResult<()> {
+        Ok(self.inner.calculate().map_err(PyQlError::from)?)
+    }
+
+    /// Whether the cached results are currently valid, that is, whether the
+    /// next accessor reads the cache or reprices.
+    fn is_calculated(&self) -> bool {
+        self.inner.base().is_calculated()
+    }
+
+    /// Attaches an analytic European engine on `process` and returns the NPV,
+    /// the one-shot form of [`set_engine`](Self::set_engine) followed by
+    /// [`npv`](Self::npv).
+    ///
+    /// The other engines keep their own `set_*_engine` and compose with
+    /// [`calculate`](Self::calculate) and [`npv`](Self::npv) as before.
+    fn price(&mut self, process: &PyBlackScholesProcess) -> PyResult<f64> {
+        self.set_engine(process);
+        self.calculate()?;
+        self.npv()
+    }
+
+    /// A frozen [`Results`] copy of the valuation, calculating first.
+    ///
+    /// The snapshot does not track the option: once taken, an evaluation-date
+    /// or engine change reprices the live accessors and leaves it alone.
+    fn results(&mut self) -> PyResult<Results> {
+        self.calculate()?;
+        Ok(Results::snapshot(self.inner.base()))
     }
 
     /// The present value, erroring when no evaluation date or engine is set.

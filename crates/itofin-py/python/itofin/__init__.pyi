@@ -14,6 +14,7 @@
 #   models        <- src/heston.rs, src/hullwhite.rs, src/calibration.rs
 #   pricingengines<- src/swaptionengine.rs
 #   optimization  <- src/calibration.rs
+#   results       <- src/results.rs
 """Python bindings for libitofin, a Rust port of QuantLib."""
 
 from . import cashflows as cashflows
@@ -24,6 +25,7 @@ from . import optimization as optimization
 from . import pricingengines as pricingengines
 from . import processes as processes
 from . import quotes as quotes
+from . import results as results
 from . import termstructures as termstructures
 from . import time as time
 
