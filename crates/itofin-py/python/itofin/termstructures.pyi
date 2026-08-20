@@ -712,26 +712,114 @@ class BlackVarianceSurface(BlackVolTermStructure):
         ...
 
 class RateHelper:
-    """Shared base for every bootstrap helper: implied/market quotes and dates."""
+    """Shared base for every bootstrap helper: implied/market quotes and dates.
 
-    def implied_quote(self) -> float: ...
-    def quote_error(self) -> float: ...
-    def quote_value(self) -> float: ...
-    def maturity_date(self) -> Date: ...
-    def pillar_date(self) -> Date: ...
-    def earliest_date(self) -> Date: ...
-    def latest_date(self) -> Date: ...
-    def latest_relevant_date(self) -> Date: ...
+    A rate helper wraps a market quote plus the schedule of a single
+    instrument; a piecewise curve is bootstrapped so every helper reprices its
+    own quote. Concrete helpers subclass this and supply only their
+    constructor.
+    """
+
+    def implied_quote(self) -> float:
+        """Return the quote implied by the curve the helper is linked to.
+
+        Returns:
+            float: The curve-implied quote.
+
+        Raises:
+            ItofinError: With no curve set, the pre-bootstrap state, there
+                being nothing to imply from.
+        """
+        ...
+    def quote_error(self) -> float:
+        """Return the bootstrap root: market quote minus implied quote.
+
+        Returns:
+            float: The residual the solver drives to zero.
+
+        Raises:
+            ItofinError: On the same condition implied_quote reports.
+        """
+        ...
+    def quote_value(self) -> float:
+        """Return the current value of the market quote the helper fits.
+
+        Reads back through the retained quote handle, so a set_value on the
+        SimpleQuote passed to the constructor is observed here: the same-object
+        wiring the laziness contract relies on.
+
+        Returns:
+            float: The market quote's current value.
+        """
+        ...
+    def maturity_date(self) -> Date:
+        """Return the instrument's maturity date.
+
+        Returns:
+            Date: The maturity.
+        """
+        ...
+    def pillar_date(self) -> Date:
+        """Return the date the curve node this helper sets sits at.
+
+        Returns:
+            Date: The pillar date.
+        """
+        ...
+    def earliest_date(self) -> Date:
+        """Return the earliest date the helper needs curve data at.
+
+        Returns:
+            Date: The earliest relevant date.
+        """
+        ...
+    def latest_date(self) -> Date:
+        """Return the latest date the helper needs curve data at.
+
+        Returns:
+            Date: The latest date, equal to the pillar date.
+        """
+        ...
+    def latest_relevant_date(self) -> Date:
+        """Return the latest date whose data the helper is relevant for.
+
+        Returns:
+            Date: The latest relevant date.
+        """
+        ...
 
 class DepositRateHelper(RateHelper):
     """A helper fitting a deposit rate."""
 
-    def __init__(self, quote: SimpleQuote, index: IborIndex) -> None: ...
+    def __init__(self, quote: SimpleQuote, index: IborIndex) -> None:
+        """Build the helper over a live quote.
+
+        Args:
+            quote (SimpleQuote): The deposit rate; the caller keeps it, and
+                mutating it later invalidates the bootstrap.
+            index (IborIndex): The index supplying the deposit's schedule.
+        """
+        ...
     @staticmethod
-    def from_rate(rate: float, index: IborIndex) -> DepositRateHelper: ...
+    def from_rate(rate: float, index: IborIndex) -> DepositRateHelper:
+        """Build the helper over a fixed rate.
+
+        Args:
+            rate (float): The deposit rate, wrapped in an internal quote the
+                caller cannot later mutate.
+            index (IborIndex): The index supplying the deposit's schedule.
+
+        Returns:
+            DepositRateHelper: The helper fitting that rate.
+        """
+        ...
 
 class SwapRateHelper(RateHelper):
-    """A helper fitting a par swap rate (spot-starting, no spread)."""
+    """A helper fitting a par swap rate (spot-starting, no spread).
+
+    The spot-starting form the curve-consistency oracle builds: no spread, no
+    forward start, no exogenous discounting curve, and the default pillar.
+    """
 
     def __init__(
         self,
@@ -742,7 +830,19 @@ class SwapRateHelper(RateHelper):
         fixed_convention: BusinessDayConvention,
         fixed_day_count: DayCounter,
         ibor_index: IborIndex,
-    ) -> None: ...
+    ) -> None:
+        """Build the helper over the schedule of a spot-starting swap.
+
+        Args:
+            quote (SimpleQuote): The par swap rate the helper fits.
+            tenor (Period): The length of the swap.
+            calendar (Calendar): The calendar the schedule rolls on.
+            fixed_frequency (Frequency): The fixed leg's payment frequency.
+            fixed_convention (BusinessDayConvention): The fixed leg's roll.
+            fixed_day_count (DayCounter): The fixed leg's day count.
+            ibor_index (IborIndex): The index the floating leg fixes off.
+        """
+        ...
 
 class FuturesType:
     """The date convention an interest-rate future settles on.
@@ -757,10 +857,13 @@ class FuturesType:
     Custom: FuturesType
 
 class FuturesRateHelper(RateHelper):
-    """A helper fitting an exchange-traded interest-rate future's quoted price at
-    a fixed IMM/ASX window. The window is absolute (never rebuilt on an
-    evaluation-date change). Pass conv_adj=None for an empty (zero) convexity
-    adjustment."""
+    """A helper fitting an exchange-traded interest-rate future's quoted price.
+
+    Unlike the deposit and swap helpers the window is absolute: it is computed
+    once from the supplied dates and never rebuilt on an evaluation-date
+    change. The convexity adjustment is usually absent; pass conv_adj=None to
+    leave it empty, which reports a zero adjustment.
+    """
 
     def __init__(
         self,
@@ -773,7 +876,29 @@ class FuturesRateHelper(RateHelper):
         day_counter: DayCounter,
         conv_adj: SimpleQuote | None,
         futures_type: FuturesType,
-    ) -> None: ...
+    ) -> None:
+        """Build the helper over a length-in-months window off the start date.
+
+        Args:
+            price (SimpleQuote): The future's quoted price.
+            ibor_start_date (Date): The window's start.
+            length_in_months (int): The months the start is advanced by to
+                reach maturity.
+            calendar (Calendar): The calendar the maturity rolls on.
+            convention (BusinessDayConvention): The roll applied to the
+                maturity.
+            end_of_month (bool): Whether the maturity roll keeps to month ends.
+            day_counter (DayCounter): The day count the year fraction uses.
+            conv_adj (SimpleQuote | None): The convexity quote, or None for an
+                empty, zero adjustment.
+            futures_type (FuturesType): The date convention the future settles
+                on.
+
+        Raises:
+            ItofinError: If an Imm or Asx start is not a valid date of that
+                convention.
+        """
+        ...
     @staticmethod
     def from_end_date(
         price: SimpleQuote,
@@ -782,7 +907,30 @@ class FuturesRateHelper(RateHelper):
         day_counter: DayCounter,
         conv_adj: SimpleQuote | None,
         futures_type: FuturesType,
-    ) -> FuturesRateHelper: ...
+    ) -> FuturesRateHelper:
+        """Build the helper over an explicit window.
+
+        Args:
+            price (SimpleQuote): The future's quoted price.
+            ibor_start_date (Date): The window's start.
+            ibor_end_date (Date | None): The window's end, which must be past
+                the start; None puts the maturity three IMM/ASX periods past
+                the start.
+            day_counter (DayCounter): The day count the year fraction uses.
+            conv_adj (SimpleQuote | None): The convexity quote, or None for an
+                empty, zero adjustment.
+            futures_type (FuturesType): The date convention the future settles
+                on.
+
+        Returns:
+            FuturesRateHelper: The helper over that window.
+
+        Raises:
+            ItofinError: On a Custom helper with no end date - a divergence
+                from C++, which builds a null-maturity helper instead - and on
+                a start that is not a valid date of the chosen convention.
+        """
+        ...
     @staticmethod
     def from_index(
         price: SimpleQuote,
@@ -790,8 +938,36 @@ class FuturesRateHelper(RateHelper):
         index: IborIndex,
         conv_adj: SimpleQuote | None,
         futures_type: FuturesType,
-    ) -> FuturesRateHelper: ...
-    def convexity_adjustment(self) -> float: ...
+    ) -> FuturesRateHelper:
+        """Build the helper with a window following the index's conventions.
+
+        The maturity is the start advanced by the index tenor on the index's
+        fixing calendar, and the year fraction uses the index day counter.
+
+        Args:
+            price (SimpleQuote): The future's quoted price.
+            ibor_start_date (Date): The window's start.
+            index (IborIndex): The index supplying the conventions.
+            conv_adj (SimpleQuote | None): The convexity quote, or None for an
+                empty, zero adjustment.
+            futures_type (FuturesType): The date convention the future settles
+                on.
+
+        Returns:
+            FuturesRateHelper: The helper over that window.
+
+        Raises:
+            ItofinError: If the start is not a valid date of the chosen
+                convention.
+        """
+        ...
+    def convexity_adjustment(self) -> float:
+        """Return the convexity adjustment applied to the forward.
+
+        Returns:
+            float: The convexity quote's value, or zero when none was supplied.
+        """
+        ...
 
 class Pillar:
     """The date the curve node a helper fits sits at.
