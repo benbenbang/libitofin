@@ -129,8 +129,9 @@ class IborIndex:
             float: The fixing rate.
 
         Raises:
-            ItofinError: If the forwarding handle is empty or the evaluation
-                date is unset.
+            ItofinError: If the fixing date is not a valid one, the evaluation
+                date is unset, a past fixing is missing from the store, or the
+                forwarding handle is empty on a forecast.
         """
         ...
     def value_date(self, fixing_date: Date) -> Date:
@@ -174,9 +175,6 @@ class IborIndex:
 
         Returns:
             Date: The maturity date.
-
-        Raises:
-            ItofinError: If the core rejects the roll.
         """
         ...
     def tenor(self) -> Period:
@@ -282,8 +280,9 @@ class Euribor(IborIndex):
             float: The fixing rate.
 
         Raises:
-            ItofinError: If the forwarding handle is empty or the evaluation
-                date is unset.
+            ItofinError: If the fixing date is not a valid one, the evaluation
+                date is unset, a past fixing is missing from the store, or the
+                forwarding handle is empty on a forecast.
         """
         ...
 
@@ -334,8 +333,9 @@ class Estr(OvernightIndex):
             float: The fixing rate.
 
         Raises:
-            ItofinError: If the forwarding handle is empty or the evaluation
-                date is unset.
+            ItofinError: If the fixing date is not a valid one, the evaluation
+                date is unset, a past fixing is missing from the store, or the
+                forwarding handle is empty on a forecast.
         """
         ...
 
