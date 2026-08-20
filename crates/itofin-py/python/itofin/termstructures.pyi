@@ -1154,19 +1154,67 @@ class SwaptionVolatilityStructure:
         swap_tenor: Period,
         strike: float,
         extrapolate: bool = False,
-    ) -> float: ...
+    ) -> float:
+        """Return the volatility for an option tenor, swap tenor and strike.
+
+        Args:
+            option_tenor (Period): The option's tenor, resolved against the
+                surface's reference date and calendar.
+            swap_tenor (Period): The underlying swap's tenor.
+            strike (float): The strike the volatility is read at.
+            extrapolate (bool): Whether to answer outside the surface's grid.
+
+        Returns:
+            float: The volatility, in whichever type the surface quotes.
+
+        Raises:
+            ItofinError: If the query falls outside the grid and extrapolation
+                is not allowed.
+        """
+        ...
     def black_variance(
         self,
         option_tenor: Period,
         swap_tenor: Period,
         strike: float,
         extrapolate: bool = False,
-    ) -> float: ...
+    ) -> float:
+        """Return the Black variance, the squared volatility times option time.
+
+        Args:
+            option_tenor (Period): The option's tenor.
+            swap_tenor (Period): The underlying swap's tenor.
+            strike (float): The strike the variance is read at.
+            extrapolate (bool): Whether to answer outside the surface's grid.
+
+        Returns:
+            float: The Black variance.
+
+        Raises:
+            ItofinError: If the query falls outside the grid and extrapolation
+                is not allowed.
+        """
+        ...
     def shift(
         self, option_date: Date, swap_length: float, extrapolate: bool = False
     ) -> float:
-        """The lognormal shift, in the date form: the core has no tenor overload
-        for the shift. Errors on a normal-volatility surface."""
+        """Return the lognormal shift, in the date form.
+
+        Taken in the date form because the core trait has no tenor overload for
+        the shift, unlike the volatility and variance queries above.
+
+        Args:
+            option_date (Date): The option date the shift is read at.
+            swap_length (float): The underlying swap's length, in years.
+            extrapolate (bool): Whether to answer outside the surface's grid.
+
+        Returns:
+            float: The lognormal shift.
+
+        Raises:
+            ItofinError: On a normal-volatility surface, where a shift has no
+                meaning, and on an out-of-grid query without extrapolation.
+        """
         ...
 
 class VolatilityType:
@@ -1192,7 +1240,24 @@ class ConstantSwaptionVolatility(SwaptionVolatilityStructure):
         day_counter: DayCounter,
         volatility_type: VolatilityType,
         shift: float = 0.0,
-    ) -> None: ...
+    ) -> None:
+        """Build the surface at a fixed volatility.
+
+        Args:
+            reference_date (Date): The date every query's option time runs
+                from.
+            calendar (Calendar): The calendar option tenors resolve on.
+            business_day_convention (BusinessDayConvention): The roll applied
+                when resolving a tenor to a date.
+            volatility (float): The single volatility answered everywhere,
+                wrapped in an internal quote the caller cannot later mutate.
+            day_counter (DayCounter): The day count option times are measured
+                in.
+            volatility_type (VolatilityType): Whether the quote is
+                shifted-lognormal or normal.
+            shift (float): The lognormal shift.
+        """
+        ...
     @staticmethod
     def with_quote(
         reference_date: Date,
@@ -1203,8 +1268,25 @@ class ConstantSwaptionVolatility(SwaptionVolatilityStructure):
         volatility_type: VolatilityType,
         shift: float = 0.0,
     ) -> ConstantSwaptionVolatility:
-        """Reads the volatility from the caller's quote; a later set_value
-        notifies the surface's observers."""
+        """Build the surface reading its volatility from a live quote.
+
+        Args:
+            reference_date (Date): The date every query's option time runs
+                from.
+            calendar (Calendar): The calendar option tenors resolve on.
+            business_day_convention (BusinessDayConvention): The roll applied
+                when resolving a tenor to a date.
+            volatility (SimpleQuote): The volatility; a later set_value
+                notifies the surface's observers.
+            day_counter (DayCounter): The day count option times are measured
+                in.
+            volatility_type (VolatilityType): Whether the quote is
+                shifted-lognormal or normal.
+            shift (float): The lognormal shift.
+
+        Returns:
+            ConstantSwaptionVolatility: The surface over that quote.
+        """
         ...
 
 class SwaptionVolatilityMatrix(SwaptionVolatilityStructure):
@@ -1230,8 +1312,35 @@ class SwaptionVolatilityMatrix(SwaptionVolatilityStructure):
         shifts: list[list[float]] | None = None,
         flat_extrapolation: bool = False,
     ) -> None:
-        """Pins the reference date, so every query's option time runs from
-        reference_date rather than the evaluation date."""
+        """Build the grid on a pinned reference date over fixed volatilities.
+
+        Every query's option time runs from reference_date rather than from the
+        evaluation date.
+
+        Args:
+            reference_date (Date): The date option times run from.
+            calendar (Calendar): The calendar option tenors resolve on.
+            business_day_convention (BusinessDayConvention): The roll applied
+                when resolving a tenor to a date.
+            option_tenors (list[Period]): The option axis, one per grid row.
+            swap_tenors (list[Period]): The swap axis, one per grid column.
+            volatilities (list[list[float]]): The at-the-money volatilities,
+                one row per option tenor.
+            day_counter (DayCounter): The day count option times are measured
+                in.
+            volatility_type (VolatilityType): Whether the grid is
+                shifted-lognormal or normal.
+            shifts (list[list[float]] | None): The lognormal shifts in the same
+                shape as volatilities; None means all-zero shifts.
+            flat_extrapolation (bool): Whether a query past the grid clamps to
+                the nearest edge or corner vol instead of extending the
+                boundary surface.
+
+        Raises:
+            ItofinError: On an empty or ragged grid, a shifts grid that does
+                not match the volatilities shape, and on whatever the core
+                rejects about the axes.
+        """
         ...
     @staticmethod
     def moving(
@@ -1246,9 +1355,38 @@ class SwaptionVolatilityMatrix(SwaptionVolatilityStructure):
         shifts: list[list[float]] | None = None,
         flat_extrapolation: bool = False,
     ) -> SwaptionVolatilityMatrix:
-        """A grid whose reference date floats off the evaluation date, reading
-        each node from the caller's quote: a later set_value on any of them
-        rebuilds the interpolation and notifies the grid's observers."""
+        """Build a grid whose reference date floats off the evaluation date.
+
+        The reference date sits at zero settlement days from the evaluation
+        date, and each node is read from the caller's quote.
+
+        Args:
+            calendar (Calendar): The calendar option tenors resolve on.
+            business_day_convention (BusinessDayConvention): The roll applied
+                when resolving a tenor to a date.
+            option_tenors (list[Period]): The option axis, one per grid row.
+            swap_tenors (list[Period]): The swap axis, one per grid column.
+            volatilities (list[list[SimpleQuote]]): The at-the-money volatility
+                quotes; a later set_value on any of them rebuilds the
+                interpolation and notifies the grid's observers.
+            day_counter (DayCounter): The day count option times are measured
+                in.
+            volatility_type (VolatilityType): Whether the grid is
+                shifted-lognormal or normal.
+            settings (Settings): The explicit settings supplying the evaluation
+                date the reference date floats off.
+            shifts (list[list[float]] | None): The lognormal shifts in the same
+                shape as volatilities; None means all-zero shifts.
+            flat_extrapolation (bool): Whether a query past the grid clamps to
+                the nearest edge or corner vol.
+
+        Returns:
+            SwaptionVolatilityMatrix: The moving grid.
+
+        Raises:
+            ItofinError: On an empty or ragged grid, a mismatched shifts shape,
+                and on whatever the core rejects about the axes.
+        """
         ...
 
 class InterpolatedSwaptionVolatilityCube(SwaptionVolatilityStructure):
@@ -1275,10 +1413,53 @@ class InterpolatedSwaptionVolatilityCube(SwaptionVolatilityStructure):
         short_swap_index_base: SwapIndex,
         settings: Settings,
         vega_weighted_smile_fit: bool = False,
-    ) -> None: ...
+    ) -> None:
+        """Build the cube over an at-the-money surface and its vol spreads.
+
+        Args:
+            atm_vol (SwaptionVolatilityStructure): The at-the-money surface the
+                spreads are added to.
+            option_tenors (list[Period]): The option axis of the node grid.
+            swap_tenors (list[Period]): The swap axis of the node grid.
+            strike_spreads (list[float]): The moneyness offsets each smile is
+                quoted at.
+            vol_spreads (list[list[SimpleQuote]]): The spread quotes, row-major
+                over the nodes with one quote per strike spread; a later
+                set_value rebuilds the per-strike interpolators.
+            swap_index_base (SwapIndex): The long base swap index.
+            short_swap_index_base (SwapIndex): The short base swap index, whose
+                tenor must not exceed the long one's.
+            settings (Settings): The explicit settings supplying the evaluation
+                date and the stored fixings.
+            vega_weighted_smile_fit (bool): Whether the smile fit is
+                vega-weighted.
+
+        Raises:
+            ItofinError: On an empty or ragged vol_spreads grid, on a row count
+                that is not one per node or a row length that is not one per
+                strike spread, and on whatever the core rejects.
+        """
+        ...
     def atm_strike_from_tenor(self, option_tenor: Period, swap_tenor: Period) -> float:
-        """The at-the-money strike for an option tenor and swap tenor: the fixing
-        of whichever base swap index the swap tenor selects."""
+        """Return the at-the-money strike for an option tenor and swap tenor.
+
+        The fixing of whichever base swap index the swap tenor selects, off the
+        option date the tenor resolves to against the cube's reference date and
+        calendar. It lives on the concrete cube rather than the inherited base
+        because it belongs to the cube framework, not the volatility structure.
+
+        Args:
+            option_tenor (Period): The option's tenor.
+            swap_tenor (Period): The underlying swap's tenor, which selects the
+                base index.
+
+        Returns:
+            float: The at-the-money strike a query is centred on.
+
+        Raises:
+            ItofinError: On whatever the selected index's fixing reports, an
+                unset evaluation date or an unlinked forwarding curve included.
+        """
         ...
 
 class SabrSmileSection:
