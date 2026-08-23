@@ -16,14 +16,14 @@ on:
       - ".github/workflows/docs.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: docs-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build:
+  docs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -33,21 +33,7 @@ jobs:
       - name: Build site (strict)
         working-directory: docs
         run: uv run --frozen mkdocs build --strict
-      - uses: actions/upload-pages-artifact@v3
+      - name: Deploy to gh-pages
         if: github.ref == 'refs/heads/main'
-        with:
-          path: docs/site
-
-  deploy:
-    if: github.ref == 'refs/heads/main'
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - uses: actions/deploy-pages@v4
-        id: deployment
+        working-directory: docs
+        run: uv run --frozen mkdocs gh-deploy --force
