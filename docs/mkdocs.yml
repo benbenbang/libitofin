@@ -1,8 +1,8 @@
 site_name: itofin
 site_description: Python API reference for itofin, the Rust QuantLib port (libitofin).
-site_url: https://benbenbang.github.io/ito-fin/
-repo_url: https://github.com/benbenbang/ito-fin
-repo_name: benbenbang/ito-fin
+site_url: https://benbenbang.github.io/libitofin/
+repo_url: https://github.com/benbenbang/libitofin
+repo_name: benbenbang/libitofin
 edit_uri: ""
 
 theme:
