@@ -1,0 +1,88 @@
+site_name: itofin
+site_description: Python API reference for itofin, the Rust QuantLib port (libitofin).
+site_url: https://benbenbang.github.io/ito-fin/
+repo_url: https://github.com/benbenbang/ito-fin
+repo_name: benbenbang/ito-fin
+edit_uri: ""
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - content.code.copy
+    - content.tabs.link
+    - toc.follow
+    - search.suggest
+
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.inlinehilite
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify {kwds: {case: lower}}
+  - pymdownx.snippets:
+      base_path: [".."]
+      check_paths: true
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths: ["../crates/itofin-py/python"]
+          options:
+            docstring_style: google
+            docstring_section_style: table
+            show_source: false
+            show_root_heading: true
+            show_root_full_path: false
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            members_order: source
+            separate_signature: true
+            show_signature_annotations: true
+            signature_crossrefs: true
+            merge_init_into_class: true
+            filters: ["!^_"]
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - Python API:
+      - Core: api/core.md
+      - Time: api/time.md
+      - Quotes: api/quotes.md
+      - Term structures: api/termstructures.md
+      - Processes: api/processes.md
+      - Indexes: api/indexes.md
+      - Instruments: api/instruments.md
+      - Cashflows: api/cashflows.md
+      - Pricing engines: api/pricingengines.md
+      - Models: api/models.md
+      - Optimization: api/optimization.md
+      - Results: api/results.md
+  - Rust API: rust.md
