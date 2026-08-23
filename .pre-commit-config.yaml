@@ -1,11 +1,4 @@
 repos:
-    - repo: https://github.com/timothycrosley/isort
-      rev: 9.0.0b5
-      hooks:
-        - id: isort
-          name: isort
-          args:
-            - --settings-path=.isort.cfg
     - repo: https://github.com/benbenbang/pre-commit-rust
       rev: v1.0.0
       hooks:
@@ -22,6 +15,7 @@ repos:
             - --unsafe
         - id: end-of-file-fixer
         - id: trailing-whitespace
+          exclude: '\.md$'
         - id: check-added-large-files
           args:
             - --maxkb=1024
