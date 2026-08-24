@@ -1,7 +1,8 @@
 # Hand-written stubs for itofin.cashflows; sync manually with src/cashflows.rs
-# (#517, #848, #863, #626).
+# (#517, #848, #863, #626, #878).
 
 # itofin library
+from itofin import Settings
 from itofin.indexes import CpiInterpolationType, IborIndex, YoYInflationIndex
 from itofin.termstructures import ConstantYoYOptionletVolatility, YieldTermStructure
 from itofin.time import BusinessDayConvention, Calendar, Date, DayCounter, Period, Schedule
@@ -378,6 +379,108 @@ class YoYInflationLeg:
                 schedule has periods, and a cap sitting below its floor.
         """
         ...
+    def build(self) -> Leg:
+        """Return the leg with its coupon type erased, the form npv() sums.
+
+        The plain path erases coupons already carrying the default swaplet
+        pricer. With a caps or floors list the erased coupons carry NO pricer,
+        and because every call rebuilds the leg a pricer installed through
+        capped_floored_coupons() does not reach them: a capped erased leg
+        reports "pricer not set" from CashFlow.amount(), and the priced capped
+        path stays capped_floored_coupons(). Rebuilt on every call.
+
+        Returns:
+            Leg: The freshly built erased leg.
+
+        Raises:
+            ItofinError: As coupons().
+        """
+        ...
+
+class CashFlow:
+    """One erased flow of a Leg, read-only.
+
+    It answers what it pays and when, which is all the leg-summing npv() needs;
+    the concrete coupon accessors stay on the typed coupon wrappers."""
+
+    def amount(self) -> float:
+        """Return what the flow pays on its date, undiscounted.
+
+        Returns:
+            float: The undiscounted payment amount.
+
+        Raises:
+            ItofinError: On a coupon with no pricer attached, and on whatever
+                resolving its fixing reports - a missing history entry, or a
+                forecast off an index with no curve linked.
+        """
+        ...
+    def date(self) -> Date:
+        """Return the date the flow pays on.
+
+        Returns:
+            Date: The payment date.
+        """
+        ...
+
+class Leg:
+    """A sequence of erased cash flows, built by a leg builder's build().
+
+    Indexable and sized, which with CashFlow's two accessors is enough to
+    hand-check what npv() sums."""
+
+    def __len__(self) -> int:
+        """Return the number of flows on the leg.
+
+        Returns:
+            int: The flow count.
+        """
+        ...
+    def __getitem__(self, index: int) -> CashFlow:
+        """Return the flow at index, counting from the end when negative.
+
+        Args:
+            index (int): The position, negative to count from the end.
+
+        Returns:
+            CashFlow: The flow at that position.
+
+        Raises:
+            IndexError: If index is out of range.
+        """
+        ...
+
+def npv(
+    leg: Leg,
+    discount_curve: YieldTermStructure,
+    settings: Settings,
+    include_settlement_date_flows: bool | None = None,
+    settlement_date: Date | None = None,
+    npv_date: Date | None = None,
+) -> float:
+    """Return the NPV of leg: every surviving flow discounted on discount_curve.
+
+    Args:
+        leg (Leg): The erased flows to sum.
+        discount_curve (YieldTermStructure): The curve the flows discount on.
+        settings (Settings): The evaluation context deciding which flows have
+            occurred.
+        include_settlement_date_flows (bool | None): Whether a flow paying
+            exactly on the settlement date counts; None defers to the settings'
+            include_todays_cash_flows policy.
+        settlement_date (Date | None): The date deciding which flows have
+            occurred; None uses the evaluation date, which must then be set.
+        npv_date (Date | None): The date the sum is discounted to; None uses
+            settlement_date.
+
+    Returns:
+        float: The discounted sum; exactly 0.0 for an empty leg.
+
+    Raises:
+        ItofinError: On a flow or curve lookup failure, and without a
+            settlement_date when the evaluation date is unset.
+    """
+    ...
 
 class IborLeg:
     """Builds a sequence of floating ibor coupons from a schedule.
