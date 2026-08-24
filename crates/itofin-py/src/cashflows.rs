@@ -1,7 +1,8 @@
 //! Facades for the cash-flow slice: the [`PyYoYInflationCoupon`] a year-on-year
 //! inflation leg pays, the [`PyYoYInflationLeg`] builder producing it
-//! (`cashflows::yoyinflationcoupon`, `cashflows::yoyinflationleg`) and the
-//! floating [`PyIborLeg`] (`cashflows::iborleg`).
+//! (`cashflows::yoyinflationcoupon`, `cashflows::yoyinflationleg`), the
+//! floating [`PyIborLeg`] (`cashflows::iborleg`), and the erased
+//! [`PyCashFlow`]/[`PyLeg`] pair with the leg-summing [`npv`] (#878).
 //!
 //! This is the first coupon facade in the crate (#848). Until now the coupons
 //! were reachable only *through* the instruments built over them - a
@@ -15,11 +16,13 @@ use crate::hullwhite::PyIborIndex;
 use crate::inflation::{
     PyConstantYoYOptionletVolatility, PyCpiInterpolationType, PyYoYInflationIndex,
 };
+use crate::settings::PySettings;
 use crate::time::{
     PyBusinessDayConvention, PyCalendar, PyDate, PyDayCounter, PyPeriod, PySchedule,
 };
+use libitofin::cashflow::{CashFlow, Leg};
 use libitofin::cashflows::{
-    CappedFlooredYoYInflationCoupon, Coupon, IborCoupon, IborLeg, YoYInflationCoupon,
+    CappedFlooredYoYInflationCoupon, CashFlows, Coupon, IborCoupon, IborLeg, YoYInflationCoupon,
     YoYInflationCouponPricer, YoYInflationLeg, YoYInflationOptionletCouponPricer,
     set_yoy_coupon_pricer,
 };
@@ -375,9 +378,10 @@ impl PyCappedFlooredYoYInflationCoupon {
 /// [`capped_floored_coupons`](Self::capped_floored_coupons) is the intended
 /// entry (#863).
 ///
-/// Deferred (visible): the erased `build()`, whose `Leg` of `CashFlow`s Python
-/// has no wrapper for, and the `CashFlows::npv` leg-summing it gates (#878); a
-/// standalone coupon constructor stays with #859's raw-constructor territory.
+/// The erased [`build`](Self::build) hands the leg back as a [`PyLeg`] of
+/// [`PyCashFlow`]s, which the module-level [`npv`] sums (#878). A standalone
+/// coupon constructor stays with #859's raw-constructor territory (deferred,
+/// visible).
 #[pyclass(name = "YoYInflationLeg", unsendable)]
 pub struct PyYoYInflationLeg {
     schedule: Schedule,
@@ -521,6 +525,28 @@ impl PyYoYInflationLeg {
             .into_iter()
             .map(PyCappedFlooredYoYInflationCoupon::from_shared)
             .collect())
+    }
+
+    /// The leg with its coupon type erased, the form [`npv`] sums.
+    ///
+    /// The plain path erases coupons already carrying the default swaplet
+    /// pricer. With a `caps` or `floors` list the core erases capped/floored
+    /// coupons *without* a pricer, and because every call rebuilds the leg a
+    /// pricer installed through
+    /// [`capped_floored_coupons`](Self::capped_floored_coupons) reaches that
+    /// call's coupons, not these: a capped erased leg therefore reports
+    /// `"pricer not set"` from [`amount`](PyCashFlow::amount), and the priced
+    /// capped path stays the concrete one.
+    ///
+    /// Rebuilt on every call, as [`coupons`](Self::coupons) is.
+    ///
+    /// # Errors
+    ///
+    /// As [`coupons`](Self::coupons).
+    fn build(&self) -> PyResult<PyLeg> {
+        Ok(PyLeg {
+            inner: self.leg().build().map_err(PyQlError::from)?,
+        })
     }
 }
 
@@ -710,4 +736,100 @@ impl PyIborLeg {
     pub(crate) fn coupons(&self) -> PyResult<Vec<Shared<IborCoupon>>> {
         Ok(self.leg().coupons().map_err(PyQlError::from)?)
     }
+}
+
+/// Python `CashFlow`: one erased flow of a [`Leg`](PyLeg)
+/// (`cashflow::CashFlow`).
+///
+/// A read-only view: it answers what it pays and when, which is all the
+/// leg-summing [`npv`] needs. The concrete coupon accessors (rate, accrual,
+/// fixing) stay on the typed coupon wrappers the leg builders hand back.
+#[pyclass(name = "CashFlow", unsendable)]
+pub struct PyCashFlow {
+    inner: Shared<dyn CashFlow>,
+}
+
+#[pymethods]
+impl PyCashFlow {
+    /// What the flow pays on its [`date`](Self::date), undiscounted.
+    ///
+    /// # Errors
+    ///
+    /// Reports a coupon with no pricer attached, and whatever resolving its
+    /// fixing reports - a missing history entry, or a forecast off an index
+    /// with no curve linked.
+    fn amount(&self) -> PyResult<f64> {
+        Ok(self.inner.amount().map_err(PyQlError::from)?)
+    }
+
+    /// The date the flow pays on.
+    fn date(&self) -> PyDate {
+        PyDate::from_inner(self.inner.date())
+    }
+}
+
+/// Python `Leg`: a sequence of erased cash flows
+/// (`cashflow::Leg`, a `Vec<Shared<dyn CashFlow>>`).
+///
+/// Built by a leg builder's `build()`; indexable and sized, which with
+/// [`PyCashFlow`]'s two accessors is enough to hand-check what [`npv`] sums.
+#[pyclass(name = "Leg", unsendable)]
+pub struct PyLeg {
+    inner: Leg,
+}
+
+#[pymethods]
+impl PyLeg {
+    /// The number of flows on the leg.
+    fn __len__(&self) -> usize {
+        self.inner.len()
+    }
+
+    /// The flow at `index`, counting from the end when negative.
+    fn __getitem__(&self, index: isize) -> PyResult<PyCashFlow> {
+        let len = self.inner.len() as isize;
+        let resolved = if index < 0 { index + len } else { index };
+        if resolved < 0 || resolved >= len {
+            return Err(pyo3::exceptions::PyIndexError::new_err(format!(
+                "leg index {index} out of range for {len} flows"
+            )));
+        }
+        Ok(PyCashFlow {
+            inner: Shared::clone(&self.inner[resolved as usize]),
+        })
+    }
+}
+
+/// The NPV of `leg`: every surviving flow discounted on `discount_curve`
+/// (`cashflows::CashFlows::npv`).
+///
+/// `settlement_date` decides which flows have occurred and defaults to the
+/// evaluation date, which must then be set on `settings`; `npv_date`, the date
+/// the sum is discounted to, defaults to `settlement_date`.
+/// `include_settlement_date_flows` defaults to the settings'
+/// `include_todays_cash_flows` policy. An empty leg is worth exactly zero.
+#[pyfunction]
+#[pyo3(signature = (leg, discount_curve, settings, include_settlement_date_flows = None, settlement_date = None, npv_date = None))]
+pub(crate) fn npv(
+    leg: &PyLeg,
+    discount_curve: &PyYieldTermStructure,
+    settings: &PySettings,
+    include_settlement_date_flows: Option<bool>,
+    settlement_date: Option<&PyDate>,
+    npv_date: Option<&PyDate>,
+) -> PyResult<f64> {
+    let curve = discount_curve
+        .handle()
+        .current_link()
+        .map_err(PyQlError::from)?;
+    let settings = settings.inner();
+    Ok(CashFlows::npv(
+        &leg.inner,
+        &*curve,
+        &settings,
+        include_settlement_date_flows,
+        settlement_date.map(PyDate::inner),
+        npv_date.map(PyDate::inner),
+    )
+    .map_err(PyQlError::from)?)
 }
