@@ -127,6 +127,12 @@ impl PyDate {
         self.inner == other.inner
     }
 
+    /// Hashes the core date, the one field [`__eq__`](Self::__eq__) compares,
+    /// so a date can key a dict or join a set.
+    fn __hash__(&self) -> u64 {
+        hash_of(&self.inner)
+    }
+
     fn __repr__(&self) -> String {
         format!(
             "Date({}, {}, {})",

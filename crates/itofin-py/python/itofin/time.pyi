@@ -122,6 +122,14 @@ class Date:
         """
         ...
 
+    def __hash__(self) -> int:
+        """Hashes the calendar day, the field equality compares.
+
+        Returns:
+            int: The hash of the date, so equal dates hash equal.
+        """
+        ...
+
     def __repr__(self) -> str:
         """Return the constructor form of the date.
 
