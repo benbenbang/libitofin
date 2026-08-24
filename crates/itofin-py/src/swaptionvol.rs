@@ -12,11 +12,10 @@
 //! struct literal, so the later surfaces in this file (and the matrix/cube
 //! facades stacking on it) never need access to the private field.
 //!
-//! Deferred (visible): the MOVING `ConstantSwaptionVolatility` constructors
-//! (`moving` / `moving_with_quote`, whose reference date floats off the
-//! evaluation date) are not exposed; only the fixed-reference-date `new` and
-//! `with_quote` are. `BlackSwaptionEngine.with_flat_vol` builds a moving
-//! surface internally, but that is the engine's business, not this facade's.
+//! The constant surface exposes both reference-date families (#627): `new` and
+//! `with_quote` pin the reference date, while `moving` and `moving_with_quote`
+//! float it off the `Settings` evaluation date by a settlement-day count on a
+//! calendar, the shape live market data wants.
 
 use crate::PyQlError;
 use crate::market::PySimpleQuote;
@@ -111,6 +110,21 @@ impl PySwaptionVolatilityStructure {
             .shift(option_date.inner(), swap_length, extrapolate)
             .map_err(PyQlError::from)?)
     }
+
+    /// The date every option time is measured from.
+    ///
+    /// Pinned at construction on the fixed-reference surfaces; derived from the
+    /// `Settings` evaluation date (settlement days on the calendar) on the
+    /// moving ones, so it follows a later `set_evaluation_date`.
+    fn reference_date(&self) -> PyResult<PyDate> {
+        Ok(PyDate::from_inner(
+            self.inner
+                .current_link()
+                .map_err(PyQlError::from)?
+                .reference_date()
+                .map_err(PyQlError::from)?,
+        ))
+    }
 }
 
 impl PySwaptionVolatilityStructure {
@@ -159,9 +173,10 @@ impl PyVolatilityType {
 ///
 /// Extends [`PySwaptionVolatilityStructure`] and supplies only the constructors;
 /// the query surface is inherited. Unbounded in time and strike, so queries
-/// never need extrapolation enabled. Both forms pin the reference date, so the
-/// option time every query measures runs from `reference_date`, not from the
-/// evaluation date.
+/// never need extrapolation enabled. [`new`](Self::new) and
+/// [`with_quote`](Self::with_quote) pin the reference date;
+/// [`moving`](Self::moving) and [`moving_with_quote`](Self::moving_with_quote)
+/// float it off the `Settings` evaluation date (#627).
 #[pyclass(name = "ConstantSwaptionVolatility", extends = PySwaptionVolatilityStructure, unsendable)]
 pub struct PyConstantSwaptionVolatility;
 
@@ -218,6 +233,78 @@ impl PyConstantSwaptionVolatility {
             day_counter.inner(),
             volatility_type.inner(),
             shift,
+        )) as Shared<dyn SwaptionVolatilityStructure>;
+        Py::new(
+            py,
+            PyClassInitializer::from(PySwaptionVolatilityStructure::from_handle(Handle::new(
+                surface,
+            )))
+            .add_subclass(PyConstantSwaptionVolatility),
+        )
+    }
+
+    /// A constant surface whose reference date floats off `settings`'
+    /// evaluation date by `settlement_days` on `calendar`, at a fixed
+    /// `volatility` wrapped in an internal quote the caller cannot later mutate.
+    #[staticmethod]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (settlement_days, calendar, business_day_convention, volatility, day_counter, volatility_type, settings, shift = 0.0))]
+    fn moving(
+        py: Python<'_>,
+        settlement_days: u32,
+        calendar: &PyCalendar,
+        business_day_convention: &PyBusinessDayConvention,
+        volatility: f64,
+        day_counter: &PyDayCounter,
+        volatility_type: PyVolatilityType,
+        settings: &PySettings,
+        shift: f64,
+    ) -> PyResult<Py<Self>> {
+        let surface = shared(ConstantSwaptionVolatility::moving(
+            settlement_days,
+            calendar.inner(),
+            business_day_convention.inner(),
+            volatility,
+            day_counter.inner(),
+            volatility_type.inner(),
+            shift,
+            settings.inner(),
+        )) as Shared<dyn SwaptionVolatilityStructure>;
+        Py::new(
+            py,
+            PyClassInitializer::from(PySwaptionVolatilityStructure::from_handle(Handle::new(
+                surface,
+            )))
+            .add_subclass(PyConstantSwaptionVolatility),
+        )
+    }
+
+    /// A constant surface whose reference date floats off `settings`'
+    /// evaluation date, reading `volatility` from the caller's quote; a later
+    /// `set_value` on that quote notifies the surface's observers.
+    #[staticmethod]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (settlement_days, calendar, business_day_convention, volatility, day_counter, volatility_type, settings, shift = 0.0))]
+    fn moving_with_quote(
+        py: Python<'_>,
+        settlement_days: u32,
+        calendar: &PyCalendar,
+        business_day_convention: &PyBusinessDayConvention,
+        volatility: &PySimpleQuote,
+        day_counter: &PyDayCounter,
+        volatility_type: PyVolatilityType,
+        settings: &PySettings,
+        shift: f64,
+    ) -> PyResult<Py<Self>> {
+        let surface = shared(ConstantSwaptionVolatility::moving_with_quote(
+            settlement_days,
+            calendar.inner(),
+            business_day_convention.inner(),
+            volatility.handle(),
+            day_counter.inner(),
+            volatility_type.inner(),
+            shift,
+            settings.inner(),
         )) as Shared<dyn SwaptionVolatilityStructure>;
         Py::new(
             py,
