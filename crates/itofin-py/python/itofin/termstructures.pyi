@@ -1208,6 +1208,22 @@ class SwaptionVolatilityStructure:
         """
         ...
 
+    def reference_date(self) -> Date:
+        """Return the date every option time is measured from.
+
+        Pinned at construction on the fixed-reference surfaces; derived from
+        the Settings evaluation date (settlement days on the calendar) on the
+        moving ones, so it follows a later set_evaluation_date.
+
+        Returns:
+            Date: The surface's reference date.
+
+        Raises:
+            ItofinError: On a moving surface whose Settings has no evaluation
+                date set.
+        """
+        ...
+
 class VolatilityType:
     """Whether a surface quotes shifted-lognormal (Black) or normal (Bachelier)
     volatilities. A mismatch with the engine's formula surfaces at pricing time."""
@@ -1218,9 +1234,10 @@ class VolatilityType:
 class ConstantSwaptionVolatility(SwaptionVolatilityStructure):
     """A single volatility with no option-time, swap-length or strike dependence.
 
-    Both constructors pin the reference date, so every query's option time runs
-    from reference_date rather than the evaluation date. The moving (floating
-    reference date) forms are not exposed."""
+    The constructor and with_quote pin the reference date, so every query's
+    option time runs from reference_date rather than the evaluation date. The
+    moving and moving_with_quote forms float the reference date off the
+    Settings evaluation date instead (#627)."""
 
     def __init__(
         self,
@@ -1277,6 +1294,77 @@ class ConstantSwaptionVolatility(SwaptionVolatilityStructure):
 
         Returns:
             ConstantSwaptionVolatility: The surface over that quote.
+        """
+        ...
+    @staticmethod
+    def moving(
+        settlement_days: int,
+        calendar: Calendar,
+        business_day_convention: BusinessDayConvention,
+        volatility: float,
+        day_counter: DayCounter,
+        volatility_type: VolatilityType,
+        settings: Settings,
+        shift: float = 0.0,
+    ) -> ConstantSwaptionVolatility:
+        """Build the surface with a reference date floating off the evaluation date.
+
+        The reference date is the evaluation date advanced by settlement_days
+        business days on calendar, so it follows a later set_evaluation_date.
+
+        Args:
+            settlement_days (int): Business days between the evaluation date
+                and the reference date.
+            calendar (Calendar): The calendar the reference date is derived on
+                and option tenors resolve on.
+            business_day_convention (BusinessDayConvention): The roll applied
+                when resolving a tenor to a date.
+            volatility (float): The single volatility answered everywhere,
+                wrapped in an internal quote the caller cannot later mutate.
+            day_counter (DayCounter): The day count option times are measured
+                in.
+            volatility_type (VolatilityType): Whether the quote is
+                shifted-lognormal or normal.
+            settings (Settings): The evaluation context the reference date
+                floats off.
+            shift (float): The lognormal shift.
+
+        Returns:
+            ConstantSwaptionVolatility: The moving surface.
+        """
+        ...
+    @staticmethod
+    def moving_with_quote(
+        settlement_days: int,
+        calendar: Calendar,
+        business_day_convention: BusinessDayConvention,
+        volatility: SimpleQuote,
+        day_counter: DayCounter,
+        volatility_type: VolatilityType,
+        settings: Settings,
+        shift: float = 0.0,
+    ) -> ConstantSwaptionVolatility:
+        """Build the moving surface reading its volatility from a live quote.
+
+        Args:
+            settlement_days (int): Business days between the evaluation date
+                and the reference date.
+            calendar (Calendar): The calendar the reference date is derived on
+                and option tenors resolve on.
+            business_day_convention (BusinessDayConvention): The roll applied
+                when resolving a tenor to a date.
+            volatility (SimpleQuote): The volatility; a later set_value
+                notifies the surface's observers.
+            day_counter (DayCounter): The day count option times are measured
+                in.
+            volatility_type (VolatilityType): Whether the quote is
+                shifted-lognormal or normal.
+            settings (Settings): The evaluation context the reference date
+                floats off.
+            shift (float): The lognormal shift.
+
+        Returns:
+            ConstantSwaptionVolatility: The moving surface over that quote.
         """
         ...
 
@@ -1764,12 +1852,29 @@ class OptionletVolatilityStructure:
         """
         ...
 
+    def reference_date(self) -> Date:
+        """Return the date every option time is measured from.
+
+        Pinned at construction on the fixed-reference surfaces; derived from
+        the Settings evaluation date (settlement days on the calendar) on the
+        moving ones, so it follows a later set_evaluation_date.
+
+        Returns:
+            Date: The surface's reference date.
+
+        Raises:
+            ItofinError: On a moving surface whose Settings has no evaluation
+                date set.
+        """
+        ...
+
 class ConstantOptionletVolatility(OptionletVolatilityStructure):
     """A single caplet volatility with no option-time or strike dependence.
 
-    Both constructors pin the reference date, so every query's option time runs
-    from reference_date rather than the evaluation date. The moving (floating
-    reference date) forms are not exposed; tracked as #627."""
+    The constructor and with_quote pin the reference date, so every query's
+    option time runs from reference_date rather than the evaluation date. The
+    moving and moving_with_quote forms float the reference date off the
+    Settings evaluation date instead (#627)."""
 
     def __init__(
         self,
@@ -1828,6 +1933,79 @@ class ConstantOptionletVolatility(OptionletVolatilityStructure):
 
         Returns:
             ConstantOptionletVolatility: The surface over that quote.
+        """
+        ...
+    @staticmethod
+    def moving(
+        settlement_days: int,
+        calendar: Calendar,
+        business_day_convention: BusinessDayConvention,
+        volatility: float,
+        day_counter: DayCounter,
+        volatility_type: VolatilityType,
+        settings: Settings,
+        displacement: float = 0.0,
+    ) -> ConstantOptionletVolatility:
+        """Build the surface with a reference date floating off the evaluation date.
+
+        The reference date is the evaluation date advanced by settlement_days
+        business days on calendar, so it follows a later set_evaluation_date.
+
+        Args:
+            settlement_days (int): Business days between the evaluation date
+                and the reference date.
+            calendar (Calendar): The calendar the reference date is derived on
+                and option tenors resolve on.
+            business_day_convention (BusinessDayConvention): The roll applied
+                when resolving a tenor to a date.
+            volatility (float): The single volatility answered everywhere,
+                wrapped in an internal quote the caller cannot later mutate.
+            day_counter (DayCounter): The day count option times are measured
+                in.
+            volatility_type (VolatilityType): Whether the quote is
+                shifted-lognormal or normal.
+            settings (Settings): The evaluation context the reference date
+                floats off.
+            displacement (float): The lognormal shift applied to forwards and
+                strikes.
+
+        Returns:
+            ConstantOptionletVolatility: The moving surface.
+        """
+        ...
+    @staticmethod
+    def moving_with_quote(
+        settlement_days: int,
+        calendar: Calendar,
+        business_day_convention: BusinessDayConvention,
+        volatility: SimpleQuote,
+        day_counter: DayCounter,
+        volatility_type: VolatilityType,
+        settings: Settings,
+        displacement: float = 0.0,
+    ) -> ConstantOptionletVolatility:
+        """Build the moving surface reading its volatility from a live quote.
+
+        Args:
+            settlement_days (int): Business days between the evaluation date
+                and the reference date.
+            calendar (Calendar): The calendar the reference date is derived on
+                and option tenors resolve on.
+            business_day_convention (BusinessDayConvention): The roll applied
+                when resolving a tenor to a date.
+            volatility (SimpleQuote): The volatility; a later set_value
+                notifies the surface's observers.
+            day_counter (DayCounter): The day count option times are measured
+                in.
+            volatility_type (VolatilityType): Whether the quote is
+                shifted-lognormal or normal.
+            settings (Settings): The evaluation context the reference date
+                floats off.
+            displacement (float): The lognormal shift applied to forwards and
+                strikes.
+
+        Returns:
+            ConstantOptionletVolatility: The moving surface over that quote.
         """
         ...
 
