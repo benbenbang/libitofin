@@ -1,4 +1,4 @@
-"""Value equality and hashing for Period and DayCounter (#864).
+"""Value equality and hashing for Period, DayCounter (#864) and Date (#879).
 
 Both facades wrap a core type that defines equality, but neither exposed it, so
 Python compared them by identity and neither could key a dict or join a set.
@@ -24,7 +24,7 @@ cost here.
 """
 
 # itofin library
-from itofin.time import DayCounter, Period
+from itofin.time import Date, DayCounter, Period
 
 
 def test_days_and_weeks_compare_and_hash_across_units():
@@ -96,3 +96,18 @@ def test_a_day_counter_keys_a_dict_by_value():
 
 def test_a_day_counter_is_not_equal_to_a_non_day_counter():
     assert DayCounter.actual360() != "Actual/360"
+
+
+def test_equal_dates_collapse_in_a_set_and_unequal_ones_do_not():
+    """Date had __eq__ without __hash__ (#879), so equal dates hashed by
+    identity and missed each other as set members. The unequal pair guards
+    hash-routing separately from equality, per the #864 lesson."""
+    assert len({Date(15, 6, 2026), Date(15, 6, 2026)}) == 1
+    assert Date(15, 6, 2026) != Date(16, 6, 2026)
+    assert len({Date(15, 6, 2026), Date(16, 6, 2026)}) == 2
+
+
+def test_a_date_keys_a_dict_by_value():
+    fixings = {Date(15, 6, 2026): 0.0421}
+    assert fixings[Date(15, 6, 2026)] == 0.0421
+    assert Date(16, 6, 2026) not in fixings
