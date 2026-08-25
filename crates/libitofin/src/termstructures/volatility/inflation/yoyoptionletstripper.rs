@@ -425,3 +425,158 @@ impl YoYOptionletStripper for InterpolatedYoYOptionletStripper<Linear> {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    //! The stripper's numeric oracle (`testYoYPriceSurfaceToVol`) closes with
+    //! the K-interpolated surface in the next commit; this module pins the
+    //! mechanism everything rests on - the retained-link repointing - and the
+    //! uninitialised refusals.
+
+    use super::*;
+    use crate::handle::Handle;
+    use crate::instrument::Instrument;
+    use crate::interestrate::Compounding;
+    use crate::math::interpolations::linear::Linear;
+    use crate::settings::Settings;
+    use crate::shared::shared_mut;
+    use crate::termstructures::inflation::inflationtermstructure::YoYInflationTermStructure;
+    use crate::termstructures::inflation::interpolatedyoyinflationcurve::InterpolatedYoYInflationCurve;
+    use crate::termstructures::yields::FlatForward;
+    use crate::termstructures::yieldtermstructure::YieldTermStructure;
+    use crate::time::businessdayconvention::BusinessDayConvention;
+    use crate::time::date::Month::{April, June};
+    use crate::time::frequency::Frequency;
+    use crate::types::Natural;
+
+    /// The pin behind the whole stripping design, demanded by the #874 gate:
+    /// pricing an instrument, re-pointing the engine's retained volatility
+    /// link at a *different* surface, and pricing again must move the NPV -
+    /// relink, engine notification, instrument invalidation, recompute. The
+    /// precedent it guards against is #387, where a term-structure relink did
+    /// *not* auto-fire recalculation in another hierarchy: with a cached NPV
+    /// the Brent objective would be constant, the solver would converge on
+    /// anything, and the numeric oracle could pass green on wrong volatilities.
+    #[test]
+    fn relinking_the_engines_volatility_handle_moves_the_npv() {
+        let settings = shared(Settings::<Date>::new());
+        let eval = Date::new(15, June, 2026);
+        settings.set_evaluation_date(eval);
+
+        let yoy_curve = shared(
+            InterpolatedYoYInflationCurve::<Linear>::new(
+                eval,
+                vec![Date::new(1, April, 2026), Date::new(1, June, 2032)],
+                vec![0.02, 0.02],
+                Frequency::Monthly,
+                Actual365Fixed::new(),
+                Linear,
+                None,
+            )
+            .expect("two well-ordered nodes"),
+        ) as Shared<dyn YoYInflationTermStructure>;
+        let index = shared(
+            YyGenericCpi::new(
+                Frequency::Monthly,
+                false,
+                Period::new(2, TimeUnit::Months),
+                Currency::eur(),
+                Shared::clone(&settings),
+            )
+            .with_term_structure(Handle::new(yoy_curve)),
+        );
+        let nominal_curve = Handle::new(shared(FlatForward::with_rate(
+            eval,
+            0.05,
+            Actual365Fixed::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>);
+
+        let flat_at = |vol: Volatility| -> Shared<dyn YoYOptionletVolatilitySurface> {
+            shared(ConstantYoYOptionletVolatility::new(
+                vol,
+                0 as Natural,
+                Target::new(),
+                BusinessDayConvention::ModifiedFollowing,
+                Actual365Fixed::new(),
+                Period::new(0, TimeUnit::Days),
+                Frequency::Monthly,
+                false,
+                -1.0,
+                3.0,
+                Shared::clone(&settings),
+            ))
+        };
+
+        let vol_handle = RelinkableHandle::<dyn YoYOptionletVolatilitySurface>::empty();
+        vol_handle.link_to(flat_at(0.01));
+        let pricer = shared_mut(YoYInflationCapFloorEngine::unit_displaced(
+            Shared::clone(&index),
+            vol_handle.handle(),
+            nominal_curve,
+        ));
+
+        let mut capfloor = MakeYoYInflationCapFloor::new(
+            CapFloorType::Cap,
+            Shared::clone(&index),
+            3,
+            Target::new(),
+            Period::new(0, TimeUnit::Days),
+            CpiInterpolationType::Flat,
+            Shared::clone(&settings),
+        )
+        .with_nominal(10_000.0)
+        .with_strike(0.02)
+        .with_pricing_engine(SharedMut::clone(&pricer) as SharedMut<dyn PricingEngine>)
+        .build()
+        .expect("a well-formed cap");
+
+        let quiet = capfloor.npv().expect("the 1 % surface prices it");
+        assert!(capfloor.base().is_calculated());
+
+        vol_handle.link_to(flat_at(0.10));
+        let noisy = capfloor.npv().expect("the 10 % surface prices it");
+
+        assert!(
+            (noisy - quiet).abs() > 1e-4,
+            "the relink did not move the NPV ({quiet} vs {noisy}): a cached value \
+             would let the stripper's Brent solve converge on a constant"
+        );
+        assert!(
+            noisy > quiet,
+            "an at-the-money cap must gain value with volatility ({quiet} -> {noisy})"
+        );
+    }
+
+    /// Every accessor refuses before `initialize` (`hpp:52-56` dereference a
+    /// null surface there).
+    #[test]
+    fn the_accessors_refuse_before_initialize() {
+        let stripper = InterpolatedYoYOptionletStripper::<Linear>::new();
+        for message in [
+            stripper
+                .min_strike()
+                .expect_err("no surface yet")
+                .message()
+                .to_string(),
+            stripper
+                .max_strike()
+                .expect_err("no surface yet")
+                .message()
+                .to_string(),
+            stripper
+                .strikes()
+                .expect_err("no surface yet")
+                .message()
+                .to_string(),
+            stripper
+                .slice(Date::new(15, June, 2027))
+                .expect_err("no surface yet")
+                .message()
+                .to_string(),
+        ] {
+            assert!(message.contains("stripper not initialized"), "{message}");
+        }
+    }
+}
