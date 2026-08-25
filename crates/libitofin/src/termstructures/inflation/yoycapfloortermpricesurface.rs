@@ -416,6 +416,26 @@ pub trait YoYCapFloorTermPriceSurface: TermStructure {
     /// The ATM year-on-year swap rate at `d`, off the intersection curve
     /// (`hpp:88-89`; C++ defaults `extrapolate` to `true`).
     fn atm_yoy_swap_rate(&self, d: Date, extrapolate: bool) -> QlResult<Rate>;
+
+    /// The price a tenor quotes (`cpp:108-110`).
+    fn price_by_tenor(&self, p: Period, k: Rate) -> QlResult<Real> {
+        self.price(self.yoy_option_date_from_tenor(p)?, k)
+    }
+
+    /// The cap price a tenor quotes (`cpp:112-114`).
+    fn cap_price_by_tenor(&self, p: Period, k: Rate) -> QlResult<Real> {
+        self.cap_price(self.yoy_option_date_from_tenor(p)?, k)
+    }
+
+    /// The floor price a tenor quotes (`cpp:116-118`).
+    fn floor_price_by_tenor(&self, p: Period, k: Rate) -> QlResult<Real> {
+        self.floor_price(self.yoy_option_date_from_tenor(p)?, k)
+    }
+
+    /// The ATM year-on-year swap rate a tenor quotes (`cpp:120-123`).
+    fn atm_yoy_swap_rate_by_tenor(&self, p: Period, extrapolate: bool) -> QlResult<Rate> {
+        self.atm_yoy_swap_rate(self.yoy_option_date_from_tenor(p)?, extrapolate)
+    }
 }
 
 /// The results of [`intersect`](InterpolatedYoYCapFloorTermPriceSurface::intersect)
@@ -1172,6 +1192,17 @@ mod yoy_price_surface_to_atm_oracle {
         Fixture { settings, surface }
     }
 
+    /// The cached ATM year-on-year swap curve rates (`crv[]`, `:366-367`) and
+    /// the swap rates read back through the intersection curve at the same
+    /// dates (`swaps[]`, `:368-369`), both to `eps = 2e-5` (`:372`).
+    const CRV: [Real; 7] = [
+        0.024586, 0.0247575, 0.0249396, 0.0252596, 0.0258498, 0.0262883, 0.0267915,
+    ];
+    const SWAPS: [Real; 7] = [
+        0.024586, 0.0247575, 0.0249396, 0.0252596, 0.0258498, 0.0262883, 0.0267915,
+    ];
+    const EPS: Real = 2e-5;
+
     /// Construction smoke: the fixture builds, its inspectors read the EU data
     /// back, and the moving reference date sits on the evaluation date.
     /// Construction runs no calculation (the C++ constructor's eager
@@ -1217,5 +1248,62 @@ mod yoy_price_surface_to_atm_oracle {
         let nominal = eur_nominal_curve();
         let reference = nominal.current_link().unwrap().reference_date().unwrap();
         assert_eq!(reference, eval_date() + 3);
+    }
+
+    /// The first oracle loop (`:373-377`): the intersection's cached (time,
+    /// rate) swap curve reproduces `crv[]`. Every one of the seven maturities
+    /// intersects validly, so the heuristic fallback never fires here.
+    #[test]
+    fn the_atm_yoy_swap_time_rates_reproduce_the_cached_curve() {
+        let fixture = a_price_surface();
+        let (times, rates) = fixture.surface.atm_yoy_swap_time_rates().unwrap();
+
+        assert_eq!(times.len(), 7);
+        assert_eq!(rates.len(), 7);
+        for (i, (rate, expected)) in rates.iter().zip(CRV).enumerate() {
+            assert!(
+                (rate - expected).abs() < EPS,
+                "could not recover cached yoy swap curve at {i}: {rate} vs {expected}"
+            );
+        }
+    }
+
+    /// The second oracle loop (`:379-383`): the ATM swap rate read back
+    /// through the cubic intersection curve at each cached date reproduces
+    /// `swaps[]`.
+    #[test]
+    fn the_atm_yoy_swap_rates_reproduce_the_cached_swaps() {
+        let fixture = a_price_surface();
+        let (dates, _) = fixture.surface.atm_yoy_swap_date_rates().unwrap();
+
+        assert_eq!(dates.len(), 7);
+        for (i, (date, expected)) in dates.iter().zip(SWAPS).enumerate() {
+            let rate = fixture.surface.atm_yoy_swap_rate(*date, true).unwrap();
+            assert!(
+                (rate - expected).abs() < EPS,
+                "could not recover yoy swap curve at {i} ({date}): {rate} vs {expected}"
+            );
+        }
+    }
+
+    /// The intersection is computed lazily on the first read and cached: the
+    /// cubic curve answers its own nodes back, and the internal read rejects
+    /// an out-of-range time unless extrapolation is asked for (the
+    /// `extrapolate` argument of `hpp:188-190`, whose C++ default is `true`).
+    #[test]
+    fn the_intersection_is_cached_and_extrapolation_gated() {
+        let fixture = a_price_surface();
+        let surface = &fixture.surface;
+
+        assert!(surface.intersection.borrow().is_none());
+        let (dates, rates) = surface.atm_yoy_swap_date_rates().unwrap();
+        assert!(surface.intersection.borrow().is_some());
+
+        for (date, rate) in dates.iter().zip(&rates) {
+            let read = surface.atm_yoy_swap_rate(*date, true).unwrap();
+            assert!((read - rate).abs() < 1e-14);
+        }
+        let early = surface.atm_yoy_swap_rate(eval_date() + Period::new(1, TimeUnit::Years), false);
+        assert!(early.is_err(), "below the first node needs extrapolation");
     }
 }
