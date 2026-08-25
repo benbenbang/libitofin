@@ -69,7 +69,7 @@ pub use piecewiseyoyoptionletvol::{
 pub use yoyoptionlethelpers::{
     YoYOptionletHelper, YoYOptionletVolHelperBase, YoYOptionletVolatilityHelper,
 };
-pub use yoyoptionletstripper::YoYOptionletStripper;
+pub use yoyoptionletstripper::{InterpolatedYoYOptionletStripper, YoYOptionletStripper};
 pub use yoyoptionletvolsurfacebase::YoYOptionletVolatilitySurfaceBase;
 
 use crate::errors::QlResult;
