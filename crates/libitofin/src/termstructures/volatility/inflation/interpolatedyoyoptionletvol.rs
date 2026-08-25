@@ -252,3 +252,180 @@ impl<I: Interpolator> YoYOptionletVolatilitySurface for InterpolatedYoYOptionlet
         self.base.base_level()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    //! QuantLib builds this curve only inside the stripper, whose numeric
+    //! oracle closes with the K-interpolated surface; what is pinned here is
+    //! the curve's own arithmetic, every figure a hand-computable function of
+    //! the explicit nodes.
+
+    use super::*;
+    use crate::math::interpolations::linear::Linear;
+    use crate::shared::shared;
+    use crate::time::calendars::target::Target;
+    use crate::time::date::Month::{April, July, June, March, May};
+    use crate::time::daycounters::actual365fixed::Actual365Fixed;
+
+    fn settings() -> Shared<Settings<Date>> {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(Date::new(15, June, 2026));
+        settings
+    }
+
+    fn build(
+        index_is_interpolated: bool,
+        dates: Vec<Date>,
+        volatilities: Vec<Volatility>,
+    ) -> QlResult<InterpolatedYoYOptionletVolatilityCurve<Linear>> {
+        InterpolatedYoYOptionletVolatilityCurve::new(
+            0,
+            Target::new(),
+            BusinessDayConvention::ModifiedFollowing,
+            Actual365Fixed::new(),
+            Period::new(2, TimeUnit::Months),
+            Frequency::Monthly,
+            index_is_interpolated,
+            dates,
+            volatilities,
+            -1.0,
+            3.0,
+            Linear,
+            settings(),
+        )
+    }
+
+    /// Nodes starting on the non-interpolated base date itself: 15 June less
+    /// two months snaps to 1 April.
+    fn sample_dates() -> Vec<Date> {
+        vec![
+            Date::new(1, April, 2026),
+            Date::new(1, April, 2027),
+            Date::new(1, April, 2028),
+        ]
+    }
+
+    fn sample_vols() -> Vec<Volatility> {
+        vec![0.010, 0.014, 0.012]
+    }
+
+    fn sample() -> InterpolatedYoYOptionletVolatilityCurve<Linear> {
+        build(false, sample_dates(), sample_vols()).unwrap()
+    }
+
+    /// The base date runs on the shared holder's arithmetic: snapped to the
+    /// publication period unless the index interpolates (`.cpp:57-63`).
+    #[test]
+    fn the_base_date_snaps_to_the_publication_period_unless_interpolated() {
+        assert_eq!(sample().base_date().unwrap(), Date::new(1, April, 2026));
+        let interpolated = build(true, sample_dates(), sample_vols()).unwrap();
+        assert_eq!(
+            YoYOptionletVolatilitySurface::base_date(&interpolated).unwrap(),
+            Date::new(15, April, 2026)
+        );
+    }
+
+    /// The base level is the interpolation at the base time (`hpp:149-152`):
+    /// on the first node when the base date is the first date, and on the
+    /// first segment's backward extension when it precedes it - where the flat
+    /// surface, which never sets one, keeps the trait's unset error.
+    #[test]
+    fn the_base_level_reads_the_interpolation_at_the_base_time() {
+        let curve = sample();
+        assert_eq!(curve.base_level().unwrap(), 0.010);
+
+        let shifted = build(
+            false,
+            vec![
+                Date::new(1, May, 2026),
+                Date::new(1, April, 2027),
+                Date::new(1, April, 2028),
+            ],
+            sample_vols(),
+        )
+        .unwrap();
+        let times = shifted.times().to_vec();
+        let base_time = shifted
+            .time_from_reference(Date::new(1, April, 2026))
+            .unwrap();
+        let slope = (0.014 - 0.010) / (times[1] - times[0]);
+        let expected = 0.010 + slope * (base_time - times[0]);
+        let level = shifted.base_level().unwrap();
+        assert!(
+            (level - expected).abs() < 1e-15,
+            "extended base level was {level}, expected {expected}"
+        );
+    }
+
+    /// Interpolated in time, constant in strike: every node answers its own
+    /// volatility at any strike, and a mid-period query lands on the linear
+    /// interpolant of the bracketing nodes.
+    #[test]
+    fn the_curve_interpolates_in_time_and_ignores_the_strike() {
+        let curve = sample();
+        let zero_lag = Period::new(0, TimeUnit::Days);
+
+        for (date, vol) in curve.nodes() {
+            for strike in [-0.5, 0.0, 0.02] {
+                let read = curve.volatility(date, strike, zero_lag).unwrap();
+                assert!((read - vol).abs() < 1e-15, "node {date} read {read}");
+            }
+        }
+
+        let times = curve.times().to_vec();
+        let t = curve.time_from_reference(Date::new(1, July, 2027)).unwrap();
+        let expected = 0.014 + (0.012 - 0.014) * (t - times[1]) / (times[2] - times[1]);
+        let read = curve
+            .volatility(Date::new(20, July, 2027), 0.02, zero_lag)
+            .unwrap();
+        assert!(
+            (read - expected).abs() < 1e-15,
+            "mid-period read {read}, expected {expected}"
+        );
+    }
+
+    /// `totalVariance` is `vol * vol * timeFromBase` under the handed lag.
+    #[test]
+    fn the_total_variance_accrues_from_the_base_date() {
+        let curve = sample();
+        let zero_lag = Period::new(0, TimeUnit::Days);
+        let exercise = Date::new(20, July, 2027);
+
+        let vol = curve.volatility(exercise, 0.02, zero_lag).unwrap();
+        let time = Actual365Fixed::new()
+            .year_fraction(Date::new(1, April, 2026), Date::new(1, July, 2027));
+        let variance = curve.total_variance(exercise, 0.02, zero_lag).unwrap();
+        assert!(
+            (variance - vol * vol * time).abs() < 1e-18,
+            "variance was {variance}"
+        );
+    }
+
+    /// The C++ `QL_REQUIRE`s of the constructor, and `checkRange`'s date and
+    /// strike refusals on a query.
+    #[test]
+    fn construction_and_queries_reject_inconsistent_input() {
+        let err = match build(false, sample_dates(), vec![0.01, 0.014]) {
+            Ok(_) => panic!("expected a construction error"),
+            Err(err) => err,
+        };
+        assert!(err.message().contains("same number of dates and vols"));
+
+        let err = match build(false, vec![Date::new(1, April, 2026)], vec![0.01]) {
+            Ok(_) => panic!("expected a construction error"),
+            Err(err) => err,
+        };
+        assert!(err.message().contains("at least two dates"));
+
+        let curve = sample();
+        let zero_lag = Period::new(0, TimeUnit::Days);
+        let early = curve
+            .volatility(Date::new(20, March, 2026), 0.02, zero_lag)
+            .expect_err("March 2026 precedes the April base date");
+        assert!(early.message().contains("before base date"), "err: {early}");
+        let wide = curve
+            .volatility(Date::new(20, July, 2027), 5.0, zero_lag)
+            .expect_err("5.0 is past the 3.0 maximum strike");
+        assert!(wide.message().contains("outside the curve"), "err: {wide}");
+    }
+}
