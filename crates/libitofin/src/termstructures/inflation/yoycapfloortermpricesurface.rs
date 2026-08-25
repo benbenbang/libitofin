@@ -1,14 +1,15 @@
 //! Year-on-year cap/floor term price surface.
 //!
 //! Port of `ql/experimental/inflation/yoycapfloortermpricesurface.{hpp,cpp}`:
-//! [`YoYCapFloorTermPriceSurfaceBase`] holds the abstract base's members
-//! (`hpp:127-144`) behind its constructor (`cpp:25-101`), a term structure
-//! over quoted year-on-year cap and floor price *matrices* - the prices are
-//! input and interpolated, no cap/floor is ever priced. The abstract-base
-//! trait and the concrete `InterpolatedYoYCapFloorTermPriceSurface`, whose
-//! calculations intersect the two price surfaces into ATM year-on-year swap
-//! rates and bootstrap a year-on-year curve from them, land with the follow-up
-//! commits of #907.
+//! [`YoYCapFloorTermPriceSurface`] is the abstract base (`hpp:42-145`), a
+//! [`TermStructure`] over quoted year-on-year cap and floor price *matrices* -
+//! the prices are input and interpolated, no cap/floor is ever priced - with
+//! [`YoYCapFloorTermPriceSurfaceBase`] holding its members (`hpp:127-144`)
+//! behind the base constructor (`cpp:25-101`).
+//! [`InterpolatedYoYCapFloorTermPriceSurface`] is the concrete surface
+//! (`hpp:148-232`), whose calculations intersect the two price surfaces into
+//! ATM year-on-year swap rates and bootstrap a year-on-year curve from them;
+//! the calculations land with the follow-up commits of #907.
 //!
 //! ## Divergences from QuantLib
 //!
@@ -31,17 +32,19 @@
 
 use crate::errors::QlResult;
 use crate::handle::Handle;
-use crate::indexes::inflationindex::{CpiInterpolationType, YoYInflationIndex};
+use crate::indexes::inflationindex::{CpiInterpolationType, InflationIndex, YoYInflationIndex};
 use crate::math::matrix::Matrix;
+use crate::patterns::observable::{AsObservable, Observable};
 use crate::require;
 use crate::settings::Settings;
 use crate::shared::Shared;
-use crate::termstructures::TermStructureBase;
 use crate::termstructures::yieldtermstructure::YieldTermStructure;
+use crate::termstructures::{TermStructure, TermStructureBase};
 use crate::time::businessdayconvention::BusinessDayConvention;
 use crate::time::calendar::Calendar;
 use crate::time::date::Date;
 use crate::time::daycounter::DayCounter;
+use crate::time::frequency::Frequency;
 use crate::time::period::Period;
 use crate::time::timeunit::TimeUnit;
 use crate::types::{Natural, Rate};
@@ -276,6 +279,207 @@ impl YoYCapFloorTermPriceSurfaceBase {
     }
 }
 
+/// Abstract base for year-on-year cap/floor term price surfaces
+/// (`YoYCapFloorTermPriceSurface`, `hpp:42-145`).
+///
+/// Downstream consumers (the stripped optionlet surfaces of #874) hold a
+/// `Shared<dyn YoYCapFloorTermPriceSurface>` and read the quoted grid and the
+/// interpolated prices through it. Note the C++ caveats (`hpp:74-80`): a
+/// `price` alone does not say cap or floor without the ATM level, and ATM
+/// prices are generally inaccurate, coming from extrapolation and
+/// intersection.
+pub trait YoYCapFloorTermPriceSurface: TermStructure {
+    /// The embedded shared holder.
+    fn surface_base(&self) -> &YoYCapFloorTermPriceSurfaceBase;
+
+    /// Whether the observations interpolate the index (`hpp:237-239`).
+    fn index_is_interpolated(&self) -> bool {
+        self.surface_base().index_is_interpolated()
+    }
+
+    /// The observation lag of the quoted instruments (`hpp:241-243`).
+    fn observation_lag(&self) -> Period {
+        self.surface_base().observation_lag()
+    }
+
+    /// The frequency of the index the surface is quoted on (`hpp:245-247`).
+    fn frequency(&self) -> Frequency {
+        self.surface_base().yoy_index().frequency()
+    }
+
+    /// The business day convention of the quoted instruments (`hpp:82`).
+    fn business_day_convention(&self) -> BusinessDayConvention {
+        self.surface_base().business_day_convention()
+    }
+
+    /// The fixing days of the quoted instruments (`hpp:83`).
+    fn fixing_days(&self) -> Natural {
+        self.surface_base().fixing_days()
+    }
+
+    /// The year-on-year index the surface is quoted on (`hpp:72`).
+    fn yoy_index(&self) -> &Shared<YoYInflationIndex> {
+        self.surface_base().yoy_index()
+    }
+
+    /// The cap/floor strike union: every floor strike, then the cap strikes
+    /// above them (`hpp:103`).
+    fn strikes(&self) -> &[Rate] {
+        self.surface_base().strikes()
+    }
+
+    /// The quoted cap strikes (`hpp:104`).
+    fn cap_strikes(&self) -> &[Rate] {
+        self.surface_base().cap_strikes()
+    }
+
+    /// The quoted floor strikes (`hpp:105`).
+    fn floor_strikes(&self) -> &[Rate] {
+        self.surface_base().floor_strikes()
+    }
+
+    /// The quoted maturities (`hpp:106`).
+    fn maturities(&self) -> &[Period] {
+        self.surface_base().maturities()
+    }
+
+    /// The lowest strike of the union (`hpp:107`).
+    fn min_strike(&self) -> Rate {
+        self.surface_base().strikes()[0]
+    }
+
+    /// The highest strike of the union (`hpp:108`).
+    fn max_strike(&self) -> Rate {
+        *self
+            .surface_base()
+            .strikes()
+            .last()
+            .expect("the union carries more than two strikes")
+    }
+
+    /// The first quoted maturity off the reference date (`hpp:109`, with its
+    /// index-interpolation `\TODO` still open upstream).
+    fn min_maturity(&self) -> QlResult<Date> {
+        Ok(self.reference_date()? + self.surface_base().maturities()[0])
+    }
+
+    /// The last quoted maturity off the reference date (`hpp:110`).
+    fn max_maturity(&self) -> QlResult<Date> {
+        Ok(self.reference_date()?
+            + *self
+                .surface_base()
+                .maturities()
+                .last()
+                .expect("more than one maturity"))
+    }
+
+    /// The option date a tenor quotes: the reference date advanced by it
+    /// (`cpp:103-106`).
+    fn yoy_option_date_from_tenor(&self, p: Period) -> QlResult<Date> {
+        Ok(self.reference_date()? + p)
+    }
+
+    /// Whether `strike` lies within the quoted strike union (`hpp:116-118`).
+    fn check_strike(&self, strike: Rate) -> bool {
+        self.min_strike() <= strike && strike <= self.max_strike()
+    }
+
+    /// Whether `date` lies within the quoted maturities (`hpp:119-121`).
+    fn check_maturity(&self, date: Date) -> QlResult<bool> {
+        Ok(self.min_maturity()? <= date && date <= self.max_maturity()?)
+    }
+}
+
+/// The concrete surface, C++'s
+/// `InterpolatedYoYCapFloorTermPriceSurface<Bicubic, Cubic>` (`hpp:148-232`):
+/// bicubic-spline price surfaces over the quoted grid and a cubic ATM
+/// year-on-year swap rate curve through their intersections.
+///
+/// The calculations - `intersect()` and `calculateYoYTermStructure()`
+/// (`hpp:288-298`) - land with the follow-up commits of #907; construction
+/// only validates and stores the quotes.
+pub struct InterpolatedYoYCapFloorTermPriceSurface {
+    base: YoYCapFloorTermPriceSurfaceBase,
+}
+
+impl InterpolatedYoYCapFloorTermPriceSurface {
+    /// Builds the surface over quoted cap and floor prices by strike (rows)
+    /// and maturity (columns) (`hpp:252-277`, less the eager
+    /// `performCalculations()` per the module divergences).
+    ///
+    /// # Errors
+    ///
+    /// The data-consistency gate of
+    /// [`YoYCapFloorTermPriceSurfaceBase::new`].
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        fixing_days: Natural,
+        yy_lag: Period,
+        yoy_index: Shared<YoYInflationIndex>,
+        interpolation: CpiInterpolationType,
+        nominal_term_structure: Handle<dyn YieldTermStructure>,
+        day_counter: DayCounter,
+        calendar: Calendar,
+        business_day_convention: BusinessDayConvention,
+        c_strikes: Vec<Rate>,
+        f_strikes: Vec<Rate>,
+        cf_maturities: Vec<Period>,
+        c_price: Matrix,
+        f_price: Matrix,
+        settings: Shared<Settings<Date>>,
+    ) -> QlResult<InterpolatedYoYCapFloorTermPriceSurface> {
+        Ok(InterpolatedYoYCapFloorTermPriceSurface {
+            base: YoYCapFloorTermPriceSurfaceBase::new(
+                fixing_days,
+                yy_lag,
+                yoy_index,
+                interpolation,
+                nominal_term_structure,
+                day_counter,
+                calendar,
+                business_day_convention,
+                c_strikes,
+                f_strikes,
+                cf_maturities,
+                c_price,
+                f_price,
+                settings,
+            )?,
+        })
+    }
+}
+
+impl AsObservable for InterpolatedYoYCapFloorTermPriceSurface {
+    fn observable(&self) -> &Observable {
+        self.base.term_structure_base().observable()
+    }
+}
+
+impl TermStructure for InterpolatedYoYCapFloorTermPriceSurface {
+    fn base(&self) -> &TermStructureBase {
+        self.base.term_structure_base()
+    }
+
+    /// C++ answers the bootstrapped curve's maximum date (`hpp:171`); until
+    /// that curve lands (#907 follow-up commits) the reference date stands in,
+    /// with the null date as last resort, on the
+    /// [`PiecewiseYoYInflationCurve`] fallback pattern.
+    ///
+    /// [`PiecewiseYoYInflationCurve`]: super::piecewiseyoyinflationcurve::PiecewiseYoYInflationCurve
+    fn max_date(&self) -> Date {
+        self.base
+            .term_structure_base()
+            .reference_date()
+            .unwrap_or_else(|_| Date::null())
+    }
+}
+
+impl YoYCapFloorTermPriceSurface for InterpolatedYoYCapFloorTermPriceSurface {
+    fn surface_base(&self) -> &YoYCapFloorTermPriceSurfaceBase {
+        &self.base
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -383,5 +587,73 @@ mod tests {
             matrix_from(&[&[3.0, 4.0], &[2.0, 3.0], &[1.0, 2.0]]),
         ));
         assert!(err.message().contains("non-increasing floor prices"));
+    }
+
+    /// The concrete surface over the same fixture, read through the
+    /// abstract-base trait as #874's consumers will read it.
+    fn a_surface_with(
+        interpolation: CpiInterpolationType,
+    ) -> InterpolatedYoYCapFloorTermPriceSurface {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(eval_date());
+        let index = shared(YoYInflationIndex::from_underlying(shared(EuHicp::new(
+            Shared::clone(&settings),
+        ))));
+        InterpolatedYoYCapFloorTermPriceSurface::new(
+            0,
+            Period::new(3, TimeUnit::Months),
+            index,
+            interpolation,
+            Handle::empty(),
+            Actual365Fixed::new(),
+            Target::new(),
+            BusinessDayConvention::ModifiedFollowing,
+            vec![0.01, 0.02, 0.03],
+            vec![-0.01, 0.00, 0.02],
+            vec![years(1), years(2)],
+            matrix_from(&[&[3.0, 4.0], &[2.0, 3.0], &[1.0, 2.0]]),
+            matrix_from(&[&[1.0, 2.0], &[2.0, 3.0], &[3.0, 4.0]]),
+            settings,
+        )
+        .expect("a consistent surface")
+    }
+
+    /// The inspectors report the constructor arguments, and the maturity and
+    /// tenor dates move off the evaluation date the settings carry (D5).
+    #[test]
+    fn inspectors_report_the_constructor_arguments() {
+        let surface = a_surface_with(CpiInterpolationType::Linear);
+
+        assert_eq!(surface.reference_date().unwrap(), eval_date());
+        assert_eq!(surface.observation_lag(), Period::new(3, TimeUnit::Months));
+        assert_eq!(surface.frequency(), Frequency::Monthly);
+        assert_eq!(surface.fixing_days(), 0);
+        assert_eq!(
+            surface.business_day_convention(),
+            BusinessDayConvention::ModifiedFollowing
+        );
+        assert_eq!(surface.strikes(), &[-0.01, 0.00, 0.02, 0.03]);
+        assert_eq!(surface.min_strike(), -0.01);
+        assert_eq!(surface.max_strike(), 0.03);
+        assert_eq!(surface.maturities(), &[years(1), years(2)]);
+        assert_eq!(surface.min_maturity().unwrap(), eval_date() + years(1));
+        assert_eq!(surface.max_maturity().unwrap(), eval_date() + years(2));
+        assert_eq!(
+            surface.yoy_option_date_from_tenor(years(7)).unwrap(),
+            eval_date() + years(7)
+        );
+        assert!(surface.check_strike(0.0));
+        assert!(!surface.check_strike(0.05));
+        assert!(surface.check_maturity(eval_date() + years(1)).unwrap());
+        assert!(!surface.check_maturity(eval_date() + years(3)).unwrap());
+        assert!(surface.index_is_interpolated());
+    }
+
+    /// The `AsIndex` arm being unported, the flag is the interpolation choice
+    /// alone (`inflationindex.cpp:428-431`).
+    #[test]
+    fn a_flat_interpolation_choice_reads_back_as_not_interpolated() {
+        let surface = a_surface_with(CpiInterpolationType::Flat);
+        assert!(!surface.index_is_interpolated());
     }
 }
