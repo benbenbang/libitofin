@@ -263,10 +263,26 @@ impl<I: Interpolator + 'static> InflationTermStructure for PiecewiseZeroInflatio
 }
 
 impl<I: Interpolator + 'static> ZeroInflationTermStructure for PiecewiseZeroInflationCurve<I> {
+    /// C++ evaluates with extrapolation allowed at the interpolation level,
+    /// `interpolation_(t, true)` (`interpolatedzeroinflationcurve.hpp:137`);
+    /// range policy lives in the callers above, and this impl must assume
+    /// extrapolation is required. That is load-bearing *mid-bootstrap*: an
+    /// interpolated (CPI Linear) helper reads one node past its own pillar, so
+    /// while node `i` is being solved the interpolation spans the prefix
+    /// `[0, i]` and the helper's far fixing lands beyond it. Past the last node
+    /// the last segment continues on its own slope, which for the one
+    /// constructible interpolator ([`Linear`]) is exactly C++'s extension.
     fn zero_rate_impl(&self, t: Time) -> QlResult<Rate> {
         self.calculate()?;
         let data = self.data.borrow();
-        data.interpolation()?.value(t)
+        let interpolation = data.interpolation()?;
+        let t_max = interpolation.x_max();
+        if t <= t_max {
+            return interpolation.value(t);
+        }
+        let value_max = interpolation.value(t_max)?;
+        let slope_max = interpolation.derivative(t_max)?;
+        Ok(value_max + slope_max * (t - t_max))
     }
 }
 
@@ -951,5 +967,244 @@ mod zero_term_structure_oracle {
             schedule.len()
         );
         assert!(worst < EPS, "worst forecast error {worst}");
+    }
+}
+
+#[cfg(test)]
+mod us_cpi_linear_bootstrap_oracles {
+    //! The two CPI::Linear bootstrap robustness loops of
+    //! `test-suite/inflation.cpp` (#806): `testUsCpiLinearBootstrapAtMonthStart`
+    //! (`:1728-1806`) and `testPillarCollisionWithDifferentMonthLengths`
+    //! (`:2072-2160`). Both sweep the evaluation date day by day, rebuild the US
+    //! CPI market off fixed-date helpers each day, bootstrap, query a zero rate,
+    //! and assert no day failed (`BOOST_CHECK_EQUAL(failureCount, 0)`,
+    //! `:1804`/`:2158`) - no numerical literals, only the no-throw sweep that
+    //! reproduces QuantLib issue #2454's "root not bracketed" collisions when
+    //! the interpolated pillar is weighed on the maturity instead of the shared
+    //! start date.
+    //!
+    //! Two strengthenings over the C++ count (per the #806 gate): the queried
+    //! zero rate must be finite, and every helper must reprice its own quote off
+    //! the bootstrapped curve - so a stub that swallowed errors, or a bootstrap
+    //! that converged to garbage, cannot pass on the count alone. The repricing
+    //! tolerance is 1e-3, not the solver's 1e-14: an interpolated helper's far
+    //! fixing reads the node *after* its own pillar, and the single-pass
+    //! bootstrap (C++ loops only for global interpolators) solves node `i`
+    //! before node `i+1` takes its final value, leaving a genuine residual on
+    //! the shortest tenors - worst observed 4.4e-4, identically in C++, which
+    //! is why the upstream tests assert only the count.
+
+    use super::*;
+    use crate::handle::{Handle, RelinkableHandle};
+    use crate::indexes::Index;
+    use crate::indexes::inflation::UsCpi;
+    use crate::indexes::inflationindex::CpiInterpolationType;
+    use crate::quotes::{Quote, SimpleQuote};
+    use crate::settings::Settings;
+    use crate::shared::shared;
+    use crate::termstructures::inflation::inflationhelpers::ZeroCouponInflationSwapHelper;
+    use crate::termstructures::yields::Pillar;
+    use crate::time::businessdayconvention::BusinessDayConvention;
+    use crate::time::calendar::Calendar;
+    use crate::time::calendars::NullCalendar;
+    use crate::time::calendars::unitedstates::{Market, UnitedStates};
+    use crate::time::date::Month;
+    use crate::time::daycounters::thirty360::{Convention, Thirty360};
+    use crate::time::period::Period;
+    use crate::time::timeunit::TimeUnit;
+
+    /// The quoted swap tenors and rates both loops share (`:1743-1752`); the
+    /// pillar-collision loop inserts the 13-month tenor (`:2106`) whose maturity
+    /// month differs in length from its neighbours'.
+    fn swap_data(with_thirteen_month_tenor: bool) -> Vec<(Period, Real)> {
+        let mut data = vec![
+            (Period::new(3, TimeUnit::Months), 0.0285),
+            (Period::new(4, TimeUnit::Months), 0.0268),
+            (Period::new(5, TimeUnit::Months), 0.0252),
+            (Period::new(6, TimeUnit::Months), 0.0241),
+            (Period::new(7, TimeUnit::Months), 0.0237),
+            (Period::new(8, TimeUnit::Months), 0.0232),
+            (Period::new(9, TimeUnit::Months), 0.0229),
+            (Period::new(10, TimeUnit::Months), 0.0225),
+            (Period::new(11, TimeUnit::Months), 0.0223),
+            (Period::new(1, TimeUnit::Years), 0.0221),
+            (Period::new(18, TimeUnit::Months), 0.0230),
+            (Period::new(2, TimeUnit::Years), 0.0238),
+            (Period::new(5, TimeUnit::Years), 0.0245),
+            (Period::new(10, TimeUnit::Years), 0.0252),
+            (Period::new(30, TimeUnit::Years), 0.0260),
+        ];
+        if with_thirteen_month_tenor {
+            data.insert(10, (Period::new(13, TimeUnit::Months), 0.0220));
+        }
+        data
+    }
+
+    /// US CPI-U (NSA) monthly figures for 2025, approximate (`:1760-1767`).
+    fn fixings_2025() -> Vec<(Date, Real)> {
+        vec![
+            (Date::new(1, Month::January, 2025), 309.685),
+            (Date::new(1, Month::February, 2025), 310.326),
+            (Date::new(1, Month::March, 2025), 311.054),
+            (Date::new(1, Month::April, 2025), 311.538),
+            (Date::new(1, Month::May, 2025), 311.862),
+            (Date::new(1, Month::June, 2025), 312.104),
+            (Date::new(1, Month::July, 2025), 312.332),
+            (Date::new(1, Month::August, 2025), 312.558),
+            (Date::new(1, Month::September, 2025), 312.816),
+            (Date::new(1, Month::October, 2025), 313.025),
+            (Date::new(1, Month::November, 2025), 313.314),
+            (Date::new(1, Month::December, 2025), 313.580),
+        ]
+    }
+
+    /// The C++ loop body (`:1774-1802`/`:2126-2156`), one settlement convention
+    /// per caller: each evaluation date rebuilds the fixed-date helper set from
+    /// `start_date = calendar.advance(eval, settlement_days)` (T+0 when zero,
+    /// as `startDate = evalDate` reads), bootstraps a monthly piecewise curve
+    /// off the 1 November 2025 base date, links the index's handle to it and
+    /// queries the one-year zero rate inside the failure-collecting region; the
+    /// fixings are cleared before the date moves on, as C++'s `clearFixings()`.
+    /// Helper construction sits outside that region, exactly where the C++ try
+    /// begins: a throw there would abort the whole test, not count a failure.
+    #[allow(clippy::too_many_arguments)]
+    fn failures_across_evaluation_dates(
+        first_eval: Date,
+        last_eval: Date,
+        calendar: Calendar,
+        payment_convention: BusinessDayConvention,
+        settlement_days: i32,
+        fixings: &[(Date, Real)],
+        swap_data: &[(Period, Real)],
+    ) -> Vec<String> {
+        let settings = shared(Settings::<Date>::new());
+        let base_date = Date::new(1, Month::November, 2025);
+        let day_counter = Thirty360::with_convention(Convention::BondBasis);
+        let observation_lag = Period::new(3, TimeUnit::Months);
+
+        let mut failures = Vec::new();
+        let mut eval_date = first_eval;
+        while eval_date <= last_eval {
+            settings.set_evaluation_date(eval_date);
+
+            let hz = RelinkableHandle::empty();
+            let index = shared(UsCpi::new(Shared::clone(&settings)).clone_linked_to(hz.handle()));
+            for (date, value) in fixings {
+                index.add_fixing(*date, *value).expect("a published figure");
+            }
+
+            let start_date = if settlement_days == 0 {
+                eval_date
+            } else {
+                calendar.advance(
+                    eval_date,
+                    settlement_days,
+                    TimeUnit::Days,
+                    BusinessDayConvention::Following,
+                    false,
+                )
+            };
+            let helpers: Vec<Shared<dyn ZeroInflationHelper>> = swap_data
+                .iter()
+                .map(|(tenor, rate)| {
+                    ZeroCouponInflationSwapHelper::with_start_date(
+                        Handle::new(shared(SimpleQuote::new(Some(*rate))) as Shared<dyn Quote>),
+                        observation_lag,
+                        start_date,
+                        start_date + *tenor,
+                        calendar.clone(),
+                        payment_convention,
+                        day_counter.clone(),
+                        &index,
+                        CpiInterpolationType::Linear,
+                        Pillar::LastRelevantDate,
+                        Shared::clone(&settings),
+                    )
+                    .expect("helper construction sits outside the C++ try")
+                        as Shared<dyn ZeroInflationHelper>
+                })
+                .collect();
+
+            let outcome = (|| -> QlResult<()> {
+                let curve = PiecewiseZeroInflationCurve::new(
+                    eval_date,
+                    base_date,
+                    Frequency::Monthly,
+                    day_counter.clone(),
+                    helpers.clone(),
+                    None,
+                )?;
+                hz.link_to(Shared::clone(&curve) as Shared<dyn ZeroInflationTermStructure>);
+                let zero_rate =
+                    curve.zero_rate_date(eval_date + Period::new(1, TimeUnit::Years), false)?;
+                require!(zero_rate.is_finite(), "zero rate {zero_rate} is not finite");
+                for (helper, (_, rate)) in helpers.iter().zip(swap_data) {
+                    let implied = helper.implied_quote()?;
+                    let residual = (implied - rate).abs();
+                    require!(
+                        residual
+                            .partial_cmp(&1.0e-3)
+                            .is_some_and(std::cmp::Ordering::is_lt),
+                        "the {rate} helper reprices to {implied}"
+                    );
+                }
+                Ok(())
+            })();
+            if let Err(error) = outcome {
+                failures.push(format!("{eval_date}: {error}"));
+            }
+
+            index.clear_fixings();
+            eval_date += 1;
+        }
+        failures
+    }
+
+    /// `testUsCpiLinearBootstrapAtMonthStart` (`inflation.cpp:1728-1806`):
+    /// every February 2026 evaluation date bootstraps under TIPS conventions -
+    /// T+2 settlement on the US government-bond calendar, three-month lag,
+    /// modified-following payments. At month start the interpolation weight of
+    /// sub-annual helpers sits near the left node, where a maturity-weighed
+    /// pillar produced "root not bracketed" failures (QuantLib issue #2454).
+    #[test]
+    fn us_cpi_linear_bootstrap_succeeds_at_every_february_evaluation_date() {
+        let failures = failures_across_evaluation_dates(
+            Date::new(1, Month::February, 2026),
+            Date::new(28, Month::February, 2026),
+            UnitedStates::new(Market::GovernmentBond),
+            BusinessDayConvention::ModifiedFollowing,
+            2,
+            &fixings_2025(),
+            &swap_data(false),
+        );
+        assert!(failures.is_empty(), "failing dates: {failures:#?}");
+    }
+
+    /// `testPillarCollisionWithDifferentMonthLengths` (`inflation.cpp:2072-2160`):
+    /// T+0 settlement and a 13-month tenor make consecutive helpers mature in
+    /// months of different length, so near mid-month a maturity-weighed pillar
+    /// crosses the 0.5 threshold in one month but not the other - two helpers
+    /// then collide on one node and the bootstrap fails. Weighing on the shared
+    /// start date keeps every helper on the same side; the relative-date helper,
+    /// whose weight date is the maturity, reproduces the collision this loop is
+    /// built to catch.
+    #[test]
+    fn pillar_assignment_survives_months_of_different_length() {
+        let mut fixings = fixings_2025();
+        fixings.extend([
+            (Date::new(1, Month::January, 2026), 314.012),
+            (Date::new(1, Month::February, 2026), 314.382),
+            (Date::new(1, Month::March, 2026), 314.715),
+        ]);
+        let failures = failures_across_evaluation_dates(
+            Date::new(1, Month::February, 2026),
+            Date::new(31, Month::March, 2026),
+            NullCalendar::new(),
+            BusinessDayConvention::Unadjusted,
+            0,
+            &fixings,
+            &swap_data(true),
+        );
+        assert!(failures.is_empty(), "failing dates: {failures:#?}");
     }
 }
