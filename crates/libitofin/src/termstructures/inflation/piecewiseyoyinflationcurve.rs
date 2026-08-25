@@ -273,10 +273,31 @@ impl<I: Interpolator + 'static> InflationTermStructure for PiecewiseYoYInflation
 }
 
 impl<I: Interpolator + 'static> YoYInflationTermStructure for PiecewiseYoYInflationCurve<I> {
+    /// C++ evaluates with extrapolation allowed at the interpolation level,
+    /// `interpolation_(t, true)` (`interpolatedyoyinflationcurve.hpp:148`);
+    /// range policy lives in the callers above, and this impl must assume
+    /// extrapolation is required. That is load-bearing *mid-bootstrap*: a
+    /// year-on-year helper whose [`Pillar::LastRelevantDate`] lands on the
+    /// *near* node of its interpolated fixing still reads the far fixing one
+    /// node past it, so while node `i` is being solved the interpolation spans
+    /// the prefix `[0, i]` and that read lands beyond it. Past the last node
+    /// the last segment continues on its own slope, which for the one
+    /// constructible interpolator ([`Linear`]) is exactly C++'s extension -
+    /// the same gap #806 closed on
+    /// [`PiecewiseZeroInflationCurve`](super::piecewisezeroinflationcurve::PiecewiseZeroInflationCurve).
+    ///
+    /// [`Pillar::LastRelevantDate`]: crate::termstructures::yields::Pillar::LastRelevantDate
     fn yoy_rate_impl(&self, t: Time) -> QlResult<Rate> {
         self.calculate()?;
         let data = self.data.borrow();
-        data.interpolation()?.value(t)
+        let interpolation = data.interpolation()?;
+        let t_max = interpolation.x_max();
+        if t <= t_max {
+            return interpolation.value(t);
+        }
+        let value_max = interpolation.value(t_max)?;
+        let slope_max = interpolation.derivative(t_max)?;
+        Ok(value_max + slope_max * (t - t_max))
     }
 }
 

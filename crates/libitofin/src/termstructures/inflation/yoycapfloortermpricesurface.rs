@@ -566,7 +566,7 @@ impl InterpolatedYoYCapFloorTermPriceSurface {
         self.intersect()?;
         if self.yoy.borrow().is_none() {
             let curve = self.calculate_yoy_term_structure()?;
-            *self.yoy.borrow_mut() = Some(curve);
+            *self.yoy.borrow_mut() = Some(curve as Shared<dyn YoYInflationTermStructure>);
         }
         Ok(())
     }
@@ -835,7 +835,7 @@ impl InterpolatedYoYCapFloorTermPriceSurface {
     /// and not only of its tests: every helper's implied quote must come back
     /// within `1e-5` of the rate it was quoted at.
     #[allow(clippy::neg_cmp_op_on_partial_ord)]
-    fn calculate_yoy_term_structure(&self) -> QlResult<Shared<dyn YoYInflationTermStructure>> {
+    fn calculate_yoy_term_structure(&self) -> QlResult<Shared<PiecewiseYoYInflationCurve<Linear>>> {
         let base = &self.base;
         let nominal = base.nominal_term_structure().current_link()?;
         let nominal_reference = nominal.reference_date()?;
@@ -904,7 +904,7 @@ impl InterpolatedYoYCapFloorTermPriceSurface {
             );
         }
 
-        Ok(curve as Shared<dyn YoYInflationTermStructure>)
+        Ok(curve)
     }
 }
 
@@ -1234,6 +1234,7 @@ mod yoy_price_surface_to_atm_oracle {
     //! `YoYInflationIndex(EUHICP, ...)` of `:98`, not the quoted `YYEUHICP`.
 
     use super::*;
+    use crate::indexes::Index;
     use crate::indexes::inflation::EuHicp;
     use crate::math::interpolations::cubic::Cubic;
     use crate::shared::shared;
@@ -1310,8 +1311,7 @@ mod yoy_price_surface_to_atm_oracle {
     /// The EUR nominal curve (`:129-140`): each time is split into whole years
     /// plus truncated 365ths exactly as the C++ loop casts do, and the nodes
     /// feed a cubic-interpolated zero curve.
-    fn eur_nominal_curve() -> Handle<dyn YieldTermStructure> {
-        let eval = eval_date();
+    fn eur_nominal_curve_at(eval: Date) -> Handle<dyn YieldTermStructure> {
         let dates: Vec<Date> = TIMES_EUR
             .iter()
             .map(|&t| {
@@ -1339,8 +1339,12 @@ mod yoy_price_surface_to_atm_oracle {
     /// interpolated EU index needs 3), Actual/365F, TARGET, modified
     /// following, `CPI::Linear`, over the EU strike and price data.
     fn a_price_surface() -> Fixture {
+        a_price_surface_at(eval_date())
+    }
+
+    fn a_price_surface_at(eval: Date) -> Fixture {
         let settings = shared(Settings::<Date>::new());
-        settings.set_evaluation_date(eval_date());
+        settings.set_evaluation_date(eval);
         let index = shared(YoYInflationIndex::from_underlying(shared(EuHicp::new(
             Shared::clone(&settings),
         ))));
@@ -1349,7 +1353,7 @@ mod yoy_price_surface_to_atm_oracle {
             Period::new(3, TimeUnit::Months),
             index,
             CpiInterpolationType::Linear,
-            eur_nominal_curve(),
+            eur_nominal_curve_at(eval),
             Actual365Fixed::new(),
             Target::new(),
             BusinessDayConvention::ModifiedFollowing,
@@ -1423,7 +1427,7 @@ mod yoy_price_surface_to_atm_oracle {
     /// every nominal discount read off the C++ fixture.
     #[test]
     fn the_nominal_dates_truncate_the_day_fraction_as_the_cpp_casts_do() {
-        let nominal = eur_nominal_curve();
+        let nominal = eur_nominal_curve_at(eval_date());
         let reference = nominal.current_link().unwrap().reference_date().unwrap();
         assert_eq!(reference, eval_date() + 3);
     }
@@ -1501,6 +1505,54 @@ mod yoy_price_surface_to_atm_oracle {
             assert!(
                 (rate - expected).abs() < EPS,
                 "could not recover cached yoy curve at {i} ({date}): {rate} vs {expected}"
+            );
+        }
+    }
+
+    /// The pillar wire (`Pillar::LastRelevantDate`, C++'s implicit default
+    /// `inflationhelpers.hpp:130`) pinned where the main fixture cannot see
+    /// it: its maturities land on day 26 of November, where the interpolation
+    /// weight passes 0.5 and the last-relevant choice falls back to the very
+    /// node `Pillar::MaturityDate` picks - a mis-wire leaves all three cached
+    /// arrays untouched. Evaluated at 1 November 2007 instead, the nominal
+    /// reference lands on day 4 (weight 3/30 on every yearly maturity), so
+    /// each helper's node is its fixing period's *start*,
+    /// `inflation_period(4-Nov-(2007+i) - 3M, Monthly).first = 1-Aug-(2007+i)`;
+    /// the maturity pillar would put every node on the 1 September after it.
+    /// The bootstrap node dates are read off the concrete curve, which the
+    /// same-module test can take from the private phase directly.
+    ///
+    /// Unlike the C++ fixture date, this one prices a first coupon whose
+    /// fixing is already historical, so the underlying index is given a
+    /// smooth monthly history; and the near-node pillar makes the mid
+    /// bootstrap read land past the solved prefix, which is what forced
+    /// [`PiecewiseYoYInflationCurve`]'s extrapolation gap closed (the
+    /// same fix #806 made on the zero side, invisible at the C++ fixture
+    /// date whose far-node pillar covers the read).
+    #[test]
+    fn an_early_month_fixture_pins_the_last_relevant_date_pillar() {
+        let fixture = a_price_surface_at(Date::new(1, November, 2007));
+        let index = fixture
+            .surface
+            .yoy_index()
+            .underlying_index()
+            .expect("a ratio index carries its underlying");
+        for k in 0..16 {
+            let date = Date::new(1, crate::time::date::Month::July, 2006)
+                + Period::new(k, TimeUnit::Months);
+            index
+                .add_fixing(date, 100.0 + 0.2 * Real::from(k))
+                .expect("a published figure");
+        }
+
+        let curve = fixture.surface.calculate_yoy_term_structure().unwrap();
+        let dates = curve.dates().unwrap();
+        assert_eq!(dates.len(), 31);
+        for (k, date) in dates.iter().enumerate() {
+            assert_eq!(
+                *date,
+                Date::new(1, crate::time::date::Month::August, 2007 + k as i32),
+                "node {k}"
             );
         }
     }
