@@ -8,8 +8,7 @@
 //! behind the base constructor (`cpp:25-101`).
 //! [`InterpolatedYoYCapFloorTermPriceSurface`] is the concrete surface
 //! (`hpp:148-232`), whose calculations intersect the two price surfaces into
-//! ATM year-on-year swap rates and bootstrap a year-on-year curve from them;
-//! the calculations land with the follow-up commits of #907.
+//! ATM year-on-year swap rates and bootstrap a year-on-year curve from them.
 //!
 //! ## Divergences from QuantLib
 //!
@@ -34,16 +33,26 @@ use std::cell::RefCell;
 
 use crate::errors::QlResult;
 use crate::handle::Handle;
-use crate::indexes::inflationindex::{CpiInterpolationType, InflationIndex, YoYInflationIndex};
+use crate::indexes::inflationindex::{
+    CpiInterpolationType, InflationIndex, YoYInflationIndex, inflation_period,
+};
 use crate::math::interpolations::bicubic::{Bicubic, BicubicSpline};
 use crate::math::interpolations::cubic::{Cubic, CubicInterpolation};
+use crate::math::interpolations::linear::Linear;
 use crate::math::interpolations::{Interpolation, Interpolation2D, Interpolator, Interpolator2D};
 use crate::math::matrix::Matrix;
 use crate::math::solver1d::Solver1D;
 use crate::math::solvers1d::brent::Brent;
 use crate::patterns::observable::{AsObservable, Observable};
+use crate::quotes::{Quote, SimpleQuote};
 use crate::settings::Settings;
-use crate::shared::Shared;
+use crate::shared::{Shared, shared};
+use crate::termstructures::inflation::inflationhelpers::{
+    YearOnYearInflationSwapHelper, YoYInflationHelper,
+};
+use crate::termstructures::inflation::inflationtermstructure::YoYInflationTermStructure;
+use crate::termstructures::inflation::piecewiseyoyinflationcurve::PiecewiseYoYInflationCurve;
+use crate::termstructures::yields::Pillar;
 use crate::termstructures::yieldtermstructure::YieldTermStructure;
 use crate::termstructures::{TermStructure, TermStructureBase};
 use crate::time::businessdayconvention::BusinessDayConvention;
@@ -417,6 +426,20 @@ pub trait YoYCapFloorTermPriceSurface: TermStructure {
     /// (`hpp:88-89`; C++ defaults `extrapolate` to `true`).
     fn atm_yoy_swap_rate(&self, d: Date, extrapolate: bool) -> QlResult<Rate>;
 
+    /// The ATM year-on-year rate at `d` (`hpp:90-92`, `hpp:191-198`): the
+    /// bootstrapped year-on-year curve read at `d` less the lag - the
+    /// surface's own observation lag when `obs_lag` is `None`, C++'s
+    /// `Period(-1, Days)` sentinel default.
+    fn atm_yoy_rate(&self, d: Date, obs_lag: Option<Period>, extrapolate: bool) -> QlResult<Rate>;
+
+    /// The year-on-year term structure derived from the ATM swap rates
+    /// (`YoYTS`, `hpp:70`, `hpp:184`).
+    fn yoy_ts(&self) -> QlResult<Shared<dyn YoYInflationTermStructure>>;
+
+    /// The bootstrapped curve's base date (`hpp:84`, `hpp:172`); a `Result`
+    /// because the bootstrap it reads runs on first use.
+    fn base_date(&self) -> QlResult<Date>;
+
     /// The price a tenor quotes (`cpp:108-110`).
     fn price_by_tenor(&self, p: Period, k: Rate) -> QlResult<Real> {
         self.price(self.yoy_option_date_from_tenor(p)?, k)
@@ -435,6 +458,16 @@ pub trait YoYCapFloorTermPriceSurface: TermStructure {
     /// The ATM year-on-year swap rate a tenor quotes (`cpp:120-123`).
     fn atm_yoy_swap_rate_by_tenor(&self, p: Period, extrapolate: bool) -> QlResult<Rate> {
         self.atm_yoy_swap_rate(self.yoy_option_date_from_tenor(p)?, extrapolate)
+    }
+
+    /// The ATM year-on-year rate a tenor quotes (`cpp:125-129`).
+    fn atm_yoy_rate_by_tenor(
+        &self,
+        p: Period,
+        obs_lag: Option<Period>,
+        extrapolate: bool,
+    ) -> QlResult<Rate> {
+        self.atm_yoy_rate(self.yoy_option_date_from_tenor(p)?, obs_lag, extrapolate)
     }
 }
 
@@ -459,13 +492,12 @@ struct Intersection {
 /// bicubic-spline price surfaces over the quoted grid and a cubic ATM
 /// year-on-year swap rate curve through their intersections.
 ///
-/// The second calculation phase, `calculateYoYTermStructure()` (`hpp:288-298`),
-/// lands with the last commit of #907; construction only validates and stores
-/// the quotes, the calculations running on first use per the module
-/// divergences.
+/// Construction only validates and stores the quotes; the calculations run on
+/// first use per the module divergences.
 pub struct InterpolatedYoYCapFloorTermPriceSurface {
     base: YoYCapFloorTermPriceSurfaceBase,
     intersection: RefCell<Option<Intersection>>,
+    yoy: RefCell<Option<Shared<dyn YoYInflationTermStructure>>>,
 }
 
 impl InterpolatedYoYCapFloorTermPriceSurface {
@@ -512,20 +544,31 @@ impl InterpolatedYoYCapFloorTermPriceSurface {
                 settings,
             )?,
             intersection: RefCell::new(None),
+            yoy: RefCell::new(None),
         })
     }
 
     /// Runs the calculations if they have not run yet (`performCalculations`,
-    /// `hpp:288-298`): the cap/floor intersection now, the year-on-year
-    /// bootstrap once the last commit of #907 lands it.
+    /// `hpp:288-298`): the cap/floor intersection, then the year-on-year
+    /// bootstrap over its ATM swap rates.
+    ///
+    /// C++ runs this once, from the constructor, and `update()` only notifies
+    /// (`hpp:281-285`); this port runs it once, on first use, and never again
+    /// either - an evaluation date move afterwards leaves the cached results
+    /// stale on both sides, a deferral the module divergences record.
     ///
     /// # Errors
     ///
-    /// Whatever stops the intersection: a failed crossover solve, or an
-    /// intersection outside its arbitrage bounds past the extrapolation
-    /// horizon.
+    /// Whatever stops either phase: a failed crossover solve, an intersection
+    /// outside its arbitrage bounds past the extrapolation horizon, a helper
+    /// that cannot be built or bootstrapped, or the `1e-5` reprice gate.
     pub fn calculate(&self) -> QlResult<()> {
-        self.intersect()
+        self.intersect()?;
+        if self.yoy.borrow().is_none() {
+            let curve = self.calculate_yoy_term_structure()?;
+            *self.yoy.borrow_mut() = Some(curve);
+        }
+        Ok(())
     }
 
     /// The intersection of the cap and floor price surfaces (`hpp:344-518`).
@@ -768,6 +811,101 @@ impl InterpolatedYoYCapFloorTermPriceSurface {
         );
         curve.value(t)
     }
+
+    /// The year-on-year bootstrap over the intersection's ATM swap rates
+    /// (`calculateYoYTermStructure`, `hpp:521-570`): one
+    /// [`YearOnYearInflationSwapHelper`] per year out to the last quoted
+    /// maturity, each quoting the intersection curve's rate at the nominal
+    /// curve's reference date advanced by that many years, bootstrapped into a
+    /// [`PiecewiseYoYInflationCurve`] - `Linear` regardless of this surface's
+    /// 1-D interpolator, hardcoded as C++ hardcodes it (`hpp:553-556`,
+    /// "Linear is OK because we have every year"). The base date is the start
+    /// of the inflation period one observation lag before the nominal
+    /// reference date; the base rate is the ATM swap rate at this surface's
+    /// own reference date, the curve end chosen for self-consistency
+    /// (`hpp:544-550`).
+    ///
+    /// The Rust helper takes two arguments the C++ constructor lacks: the
+    /// pillar choice, [`Pillar::LastRelevantDate`] here as C++ defaults it
+    /// (`inflationhelpers.hpp:130`), and the settings handle (D5). The curve
+    /// constructor likewise takes a seasonality the C++ six-argument one
+    /// lacks: `None`.
+    ///
+    /// Closes with C++'s own reprice gate (`hpp:560-569`), part of the port
+    /// and not only of its tests: every helper's implied quote must come back
+    /// within `1e-5` of the rate it was quoted at.
+    #[allow(clippy::neg_cmp_op_on_partial_ord)]
+    fn calculate_yoy_term_structure(&self) -> QlResult<Shared<dyn YoYInflationTermStructure>> {
+        let base = &self.base;
+        let nominal = base.nominal_term_structure().current_link()?;
+        let nominal_reference = nominal.reference_date()?;
+        let reference = self.reference_date()?;
+        let frequency = base.yoy_index().frequency();
+        let day_counter = self.require_day_counter()?;
+        let Some(calendar) = self.calendar() else {
+            fail!("the surface holds a calendar by construction");
+        };
+        let last_maturity = *base.maturities().last().expect("more than one maturity");
+        let n_years = self.time_from_reference(reference + last_maturity)?.round() as i32;
+        let interpolation = if base.index_is_interpolated() {
+            CpiInterpolationType::Linear
+        } else {
+            CpiInterpolationType::Flat
+        };
+
+        let mut helpers: Vec<Shared<YearOnYearInflationSwapHelper>> = Vec::new();
+        for i in 1..=n_years {
+            let maturity = nominal_reference + Period::new(i, TimeUnit::Years);
+            let quote = shared(SimpleQuote::new(Some(
+                self.atm_yoy_swap_rate_impl(maturity, true)?,
+            )));
+            helpers.push(YearOnYearInflationSwapHelper::new(
+                Handle::new(quote as Shared<dyn Quote>),
+                base.observation_lag(),
+                maturity,
+                calendar.clone(),
+                base.business_day_convention(),
+                day_counter.clone(),
+                base.yoy_index(),
+                interpolation,
+                base.nominal_term_structure().clone(),
+                Pillar::LastRelevantDate,
+                Shared::clone(base.settings()),
+            )?);
+        }
+
+        let base_date = inflation_period(nominal_reference - base.observation_lag(), frequency)?.0;
+        let base_yoy_rate = self.atm_yoy_swap_rate_impl(reference, true)?;
+
+        let curve = PiecewiseYoYInflationCurve::<Linear>::new(
+            nominal_reference,
+            base_date,
+            base_yoy_rate,
+            frequency,
+            day_counter,
+            helpers
+                .iter()
+                .map(|helper| Shared::clone(helper) as Shared<dyn YoYInflationHelper>)
+                .collect(),
+            None,
+        )?;
+        curve.calculate()?;
+
+        let eps = 1e-5;
+        for (i, helper) in helpers.iter().enumerate() {
+            let original = self.atm_yoy_swap_rate_impl(
+                self.yoy_option_date_from_tenor(Period::new(i as i32 + 1, TimeUnit::Years))?,
+                true,
+            )?;
+            let implied = helper.implied_quote()?;
+            require!(
+                (implied - original).abs() < eps,
+                "could not reprice helper {i}, data {original}, implied quote {implied}"
+            );
+        }
+
+        Ok(curve as Shared<dyn YoYInflationTermStructure>)
+    }
 }
 
 impl AsObservable for InterpolatedYoYCapFloorTermPriceSurface {
@@ -781,17 +919,20 @@ impl TermStructure for InterpolatedYoYCapFloorTermPriceSurface {
         self.base.term_structure_base()
     }
 
-    /// C++ answers the bootstrapped curve's maximum date (`hpp:171`); until
-    /// that curve lands (#907 follow-up commits) the reference date stands in,
-    /// with the null date as last resort, on the
-    /// [`PiecewiseYoYInflationCurve`] fallback pattern.
-    ///
-    /// [`PiecewiseYoYInflationCurve`]: super::piecewiseyoyinflationcurve::PiecewiseYoYInflationCurve
+    /// The bootstrapped curve's maximum date (`hpp:171`), triggering the
+    /// calculations first as [`PiecewiseYoYInflationCurve`]'s own `max_date`
+    /// does; should they fail, the reference date stands in, with the null
+    /// date as last resort, on that curve's fallback pattern.
     fn max_date(&self) -> Date {
-        self.base
-            .term_structure_base()
-            .reference_date()
-            .unwrap_or_else(|_| Date::null())
+        let _ = self.calculate();
+        match self.yoy.borrow().as_ref() {
+            Some(yoy) => yoy.max_date(),
+            None => self
+                .base
+                .term_structure_base()
+                .reference_date()
+                .unwrap_or_else(|_| Date::null()),
+        }
     }
 }
 
@@ -863,6 +1004,37 @@ impl YoYCapFloorTermPriceSurface for InterpolatedYoYCapFloorTermPriceSurface {
     fn atm_yoy_swap_rate(&self, d: Date, extrapolate: bool) -> QlResult<Rate> {
         self.calculate()?;
         self.atm_yoy_swap_rate_impl(d, extrapolate)
+    }
+
+    /// `hpp:191-198`: work in terms of the maturity of the instruments, so
+    /// the curve is asked at the date less the observation lag.
+    fn atm_yoy_rate(&self, d: Date, obs_lag: Option<Period>, extrapolate: bool) -> QlResult<Rate> {
+        self.calculate()?;
+        let p = obs_lag.unwrap_or_else(|| self.base.observation_lag());
+        let guard = self.yoy.borrow();
+        guard
+            .as_ref()
+            .expect("calculate bootstrapped the curve")
+            .yoy_rate_date(d - p, extrapolate)
+    }
+
+    /// `hpp:184`.
+    fn yoy_ts(&self) -> QlResult<Shared<dyn YoYInflationTermStructure>> {
+        self.calculate()?;
+        let guard = self.yoy.borrow();
+        Ok(Shared::clone(
+            guard.as_ref().expect("calculate bootstrapped the curve"),
+        ))
+    }
+
+    /// `hpp:172`: the bootstrapped curve's own base date.
+    fn base_date(&self) -> QlResult<Date> {
+        self.calculate()?;
+        let guard = self.yoy.borrow();
+        Ok(guard
+            .as_ref()
+            .expect("calculate bootstrapped the curve")
+            .base_date())
     }
 }
 
@@ -1201,6 +1373,12 @@ mod yoy_price_surface_to_atm_oracle {
     const SWAPS: [Real; 7] = [
         0.024586, 0.0247575, 0.0249396, 0.0252596, 0.0258498, 0.0262883, 0.0267915,
     ];
+
+    /// The cached ATM year-on-year curve rates (`ayoy[]`, `:370-371`), read
+    /// back through the bootstrapped year-on-year term structure.
+    const AYOY: [Real; 7] = [
+        0.0247659, 0.0251437, 0.0255945, 0.0265015, 0.0280457, 0.0285534, 0.0295884,
+    ];
     const EPS: Real = 2e-5;
 
     /// Construction smoke: the fixture builds, its inspectors read the EU data
@@ -1305,5 +1483,43 @@ mod yoy_price_surface_to_atm_oracle {
         }
         let early = surface.atm_yoy_swap_rate(eval_date() + Period::new(1, TimeUnit::Years), false);
         assert!(early.is_err(), "below the first node needs extrapolation");
+    }
+
+    /// The third oracle loop (`:384-388`): the ATM year-on-year rate at each
+    /// cached date - the bootstrapped curve read one observation lag back -
+    /// reproduces `ayoy[]`. This is the loop that exercises the whole
+    /// `calculateYoYTermStructure()` phase: thirty swap helpers, the Linear
+    /// piecewise bootstrap, and its internal `1e-5` reprice gate.
+    #[test]
+    fn the_atm_yoy_rates_reproduce_the_cached_yoy_curve() {
+        let fixture = a_price_surface();
+        let (dates, _) = fixture.surface.atm_yoy_swap_date_rates().unwrap();
+
+        assert_eq!(dates.len(), 7);
+        for (i, (date, expected)) in dates.iter().zip(AYOY).enumerate() {
+            let rate = fixture.surface.atm_yoy_rate(*date, None, true).unwrap();
+            assert!(
+                (rate - expected).abs() < EPS,
+                "could not recover cached yoy curve at {i} ({date}): {rate} vs {expected}"
+            );
+        }
+    }
+
+    /// The bootstrap's frame (`hpp:527-556`): the base date is the start of
+    /// the inflation period one 3-month lag before the nominal reference date
+    /// (which itself sits 3 days after the evaluation date, the fixture's
+    /// first node time truncating so), and the curve is exposed whole through
+    /// `YoYTS`.
+    #[test]
+    fn the_bootstrap_exposes_its_base_date_and_term_structure() {
+        let fixture = a_price_surface();
+
+        assert_eq!(
+            fixture.surface.base_date().unwrap(),
+            Date::new(1, crate::time::date::Month::August, 2007)
+        );
+        let yoy = fixture.surface.yoy_ts().unwrap();
+        assert_eq!(yoy.reference_date().unwrap(), eval_date() + 3);
+        assert_eq!(fixture.surface.max_date(), yoy.max_date());
     }
 }
