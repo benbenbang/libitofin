@@ -30,12 +30,18 @@
 //!
 //! [`PiecewiseYoYInflationCurve`]: super::piecewiseyoyinflationcurve::PiecewiseYoYInflationCurve
 
+use std::cell::RefCell;
+
 use crate::errors::QlResult;
 use crate::handle::Handle;
 use crate::indexes::inflationindex::{CpiInterpolationType, InflationIndex, YoYInflationIndex};
+use crate::math::interpolations::bicubic::{Bicubic, BicubicSpline};
+use crate::math::interpolations::cubic::{Cubic, CubicInterpolation};
+use crate::math::interpolations::{Interpolation, Interpolation2D, Interpolator, Interpolator2D};
 use crate::math::matrix::Matrix;
+use crate::math::solver1d::Solver1D;
+use crate::math::solvers1d::brent::Brent;
 use crate::patterns::observable::{AsObservable, Observable};
-use crate::require;
 use crate::settings::Settings;
 use crate::shared::Shared;
 use crate::termstructures::yieldtermstructure::YieldTermStructure;
@@ -47,7 +53,8 @@ use crate::time::daycounter::DayCounter;
 use crate::time::frequency::Frequency;
 use crate::time::period::Period;
 use crate::time::timeunit::TimeUnit;
-use crate::types::{Natural, Rate};
+use crate::types::{Natural, Rate, Real, Time};
+use crate::{fail, require};
 
 /// Shared holder for year-on-year cap/floor price surfaces: the base-class
 /// members (`hpp:127-144`) plus the validated strike union, behind the
@@ -388,6 +395,43 @@ pub trait YoYCapFloorTermPriceSurface: TermStructure {
     fn check_maturity(&self, date: Date) -> QlResult<bool> {
         Ok(self.min_maturity()? <= date && date <= self.max_maturity()?)
     }
+
+    /// ATM year-on-year swap rates from put-call parity on the cap/floor
+    /// data, as (time, rate) vectors on yearly maturities (`hpp:64-65`).
+    fn atm_yoy_swap_time_rates(&self) -> QlResult<(Vec<Time>, Vec<Rate>)>;
+
+    /// ATM year-on-year swap rates as (date, rate) vectors (`hpp:66-67`).
+    fn atm_yoy_swap_date_rates(&self) -> QlResult<(Vec<Date>, Vec<Rate>)>;
+
+    /// The interpolated price at `(d, k)` (`hpp:85`): the cap price above the
+    /// ATM swap level, the floor price below it.
+    fn price(&self, d: Date, k: Rate) -> QlResult<Real>;
+
+    /// The interpolated cap price at `(d, k)` (`hpp:86`).
+    fn cap_price(&self, d: Date, k: Rate) -> QlResult<Real>;
+
+    /// The interpolated floor price at `(d, k)` (`hpp:87`).
+    fn floor_price(&self, d: Date, k: Rate) -> QlResult<Real>;
+
+    /// The ATM year-on-year swap rate at `d`, off the intersection curve
+    /// (`hpp:88-89`; C++ defaults `extrapolate` to `true`).
+    fn atm_yoy_swap_rate(&self, d: Date, extrapolate: bool) -> QlResult<Rate>;
+}
+
+/// The results of [`intersect`](InterpolatedYoYCapFloorTermPriceSurface::intersect)
+/// (C++'s mutable members `capPrice_`/`floorPrice_`/`atmYoYSwapTimeRates_`/
+/// `atmYoYSwapDateRates_`/`atmYoYSwapRateCurve_`, `hpp:223-231` and `:143-144`).
+///
+/// Both price splines carry `enableExtrapolation()` (`hpp:368,375`); the 1-D
+/// swap rate curve extrapolates too, C++ passing `extrapolate` per query with
+/// a `true` default - the range check lives in
+/// [`atm_yoy_swap_rate`](YoYCapFloorTermPriceSurface::atm_yoy_swap_rate).
+struct Intersection {
+    cap_price: BicubicSpline,
+    floor_price: BicubicSpline,
+    atm_yoy_swap_time_rates: (Vec<Time>, Vec<Rate>),
+    atm_yoy_swap_date_rates: (Vec<Date>, Vec<Rate>),
+    atm_yoy_swap_rate_curve: CubicInterpolation,
 }
 
 /// The concrete surface, C++'s
@@ -395,11 +439,13 @@ pub trait YoYCapFloorTermPriceSurface: TermStructure {
 /// bicubic-spline price surfaces over the quoted grid and a cubic ATM
 /// year-on-year swap rate curve through their intersections.
 ///
-/// The calculations - `intersect()` and `calculateYoYTermStructure()`
-/// (`hpp:288-298`) - land with the follow-up commits of #907; construction
-/// only validates and stores the quotes.
+/// The second calculation phase, `calculateYoYTermStructure()` (`hpp:288-298`),
+/// lands with the last commit of #907; construction only validates and stores
+/// the quotes, the calculations running on first use per the module
+/// divergences.
 pub struct InterpolatedYoYCapFloorTermPriceSurface {
     base: YoYCapFloorTermPriceSurfaceBase,
+    intersection: RefCell<Option<Intersection>>,
 }
 
 impl InterpolatedYoYCapFloorTermPriceSurface {
@@ -445,7 +491,262 @@ impl InterpolatedYoYCapFloorTermPriceSurface {
                 f_price,
                 settings,
             )?,
+            intersection: RefCell::new(None),
         })
+    }
+
+    /// Runs the calculations if they have not run yet (`performCalculations`,
+    /// `hpp:288-298`): the cap/floor intersection now, the year-on-year
+    /// bootstrap once the last commit of #907 lands it.
+    ///
+    /// # Errors
+    ///
+    /// Whatever stops the intersection: a failed crossover solve, or an
+    /// intersection outside its arbitrage bounds past the extrapolation
+    /// horizon.
+    pub fn calculate(&self) -> QlResult<()> {
+        self.intersect()
+    }
+
+    /// The intersection of the cap and floor price surfaces (`hpp:344-518`).
+    ///
+    /// Bicubic surfaces are fitted over the quoted prices with extrapolation
+    /// enabled; per maturity, the strike where cap and floor prices cross is
+    /// bracketed by stepping from the top floor strike and solved by Brent to
+    /// `1e-7` - that crossover strike is the ATM year-on-year swap rate by
+    /// put-call parity. A maturity whose bracket search runs out of trials or
+    /// whose solution violates the arbitrage lower bound is only an error past
+    /// `maxExtrapolationMaturity`; before it, the rate is replaced by the
+    /// `intrinsicValueAddOn` heuristic over the bound (`hpp:496-502`). A cubic
+    /// curve through the (time, rate) pairs closes the phase (`hpp:514-517`).
+    ///
+    /// The valid arm of the fill loop reads `cfMaturities_.at(counter)` where
+    /// the invalid arm reads `[i]` (`hpp:507` against `hpp:493-494`); the
+    /// `counter` indexing is ported faithfully rather than normalised to `i` -
+    /// unobservable while every maturity is valid (`counter == i`), divergent
+    /// in the general case (#262 class).
+    fn intersect(&self) -> QlResult<()> {
+        if self.intersection.borrow().is_some() {
+            return Ok(());
+        }
+
+        const MAX_SEARCH_RANGE: Real = 0.0201;
+        const MAX_EXTRAPOLATION_MATURITY: Real = 5.01;
+        const SEARCH_STEP: Real = 0.0050;
+        const INTRINSIC_VALUE_ADD_ON: Real = 0.001;
+
+        let base = &self.base;
+        let maturities = base.maturities();
+        let f_strikes = base.floor_strikes();
+        let c_strikes = base.cap_strikes();
+        let n = maturities.len();
+        let mut valid_maturity = vec![false; n];
+
+        let mut cf_maturity_times: Vec<Time> = Vec::with_capacity(n);
+        for &maturity in maturities {
+            cf_maturity_times
+                .push(self.time_from_reference(self.yoy_option_date_from_tenor(maturity)?)?);
+        }
+
+        let rows_of = |m: &Matrix| (0..m.rows()).map(|i| m.row(i).to_vec()).collect();
+        let cap_price = Bicubic
+            .interpolate(
+                cf_maturity_times.clone(),
+                c_strikes.to_vec(),
+                rows_of(base.cap_price_matrix()),
+            )?
+            .with_extrapolation(true);
+        let floor_price = Bicubic
+            .interpolate(
+                cf_maturity_times.clone(),
+                f_strikes.to_vec(),
+                rows_of(base.floor_price_matrix()),
+            )?
+            .with_extrapolation(true);
+
+        let nominal = base.nominal_term_structure().current_link()?;
+        let solver_tolerance = 1e-7;
+        let mut min_swap_rate_intersection = vec![0.0; n];
+        let mut max_swap_rate_intersection = vec![0.0; n];
+        let mut tmp_swap_maturities: Vec<Time> = Vec::new();
+        let mut tmp_swap_rates: Vec<Rate> = Vec::new();
+        for i in 0..n {
+            let t = cf_maturity_times[i];
+            let num_years = t.round() as usize;
+            let mut sum_discount = 0.0;
+            for j in 0..num_years {
+                sum_discount += nominal.discount(j as Real + 1.0, false)?;
+            }
+            let mut tmp_min_swap_rate_intersection = -1.0e10;
+            let mut tmp_max_swap_rate_intersection = 1.0e10;
+            for &strike in f_strikes {
+                let price = floor_price.value(t, strike)?;
+                let min_swap_rate = strike - price / (sum_discount * 10_000.0);
+                if min_swap_rate > tmp_min_swap_rate_intersection {
+                    tmp_min_swap_rate_intersection = min_swap_rate;
+                }
+            }
+            for &strike in c_strikes {
+                let price = cap_price.value(t, strike)?;
+                let max_swap_rate = strike + price / (sum_discount * 10_000.0);
+                if max_swap_rate < tmp_max_swap_rate_intersection {
+                    tmp_max_swap_rate_intersection = max_swap_rate;
+                }
+            }
+            max_swap_rate_intersection[i] = tmp_max_swap_rate_intersection;
+            min_swap_rate_intersection[i] = tmp_min_swap_rate_intersection;
+
+            // Find the interval where the intersection lies (`hpp:413-452`).
+            let top_strike = *f_strikes.last().expect("more than one floor strike");
+            let mut trials_exceeded = false;
+            let num_trials = (MAX_SEARCH_RANGE / SEARCH_STEP) as i32;
+            let (lo, hi);
+            if floor_price.value(t, top_strike)? > cap_price.value(t, top_strike)? {
+                let mut counter = 1;
+                let mut stop = false;
+                let mut strike = 0.0;
+                while !stop {
+                    strike = top_strike - Real::from(counter) * SEARCH_STEP;
+                    if floor_price.value(t, strike)? < cap_price.value(t, strike)? {
+                        stop = true;
+                    }
+                    counter += 1;
+                    if counter == num_trials + 1 && !stop {
+                        stop = true;
+                        trials_exceeded = true;
+                    }
+                }
+                lo = strike;
+                hi = strike + SEARCH_STEP;
+            } else {
+                let mut counter = 1;
+                let mut stop = false;
+                let mut strike = 0.0;
+                while !stop {
+                    strike = top_strike + Real::from(counter) * SEARCH_STEP;
+                    if floor_price.value(t, strike)? > cap_price.value(t, strike)? {
+                        stop = true;
+                    }
+                    counter += 1;
+                    if counter == num_trials + 1 && !stop {
+                        stop = true;
+                        trials_exceeded = true;
+                    }
+                }
+                lo = strike - SEARCH_STEP;
+                hi = strike;
+            }
+
+            let guess = (hi + lo) / 2.0;
+
+            if !trials_exceeded {
+                // The objective allows extrapolation because the strike
+                // overlap is typically insufficient (`hpp:336-341`); both
+                // splines already extrapolate, and a failed read poisons the
+                // solve as NaN, which surfaces as the solver's error.
+                let objective = |k: Real| match (cap_price.value(t, k), floor_price.value(t, k)) {
+                    (Ok(cap), Ok(floor)) => cap - floor,
+                    _ => Real::NAN,
+                };
+                let k_i = match Brent::new().solve_bracketed(
+                    objective,
+                    solver_tolerance,
+                    guess,
+                    lo,
+                    hi,
+                ) {
+                    Ok(k_i) => k_i,
+                    Err(error) => fail!(
+                        "cap/floor intersection finding failed at t = {t}, error msg: {error}"
+                    ),
+                };
+                if k_i <= min_swap_rate_intersection[i] {
+                    if t > MAX_EXTRAPOLATION_MATURITY {
+                        fail!(
+                            "cap/floor intersection finding failed at t = {t}, error msg: \
+                             intersection value is below the arbitrage free lower bound {}",
+                            min_swap_rate_intersection[i]
+                        );
+                    }
+                } else {
+                    tmp_swap_maturities.push(t);
+                    tmp_swap_rates.push(k_i);
+                    valid_maturity[i] = true;
+                }
+            } else if t > MAX_EXTRAPOLATION_MATURITY {
+                fail!(
+                    "cap/floor intersection finding failed at t = {t}, error msg: no \
+                     intersection found inside the admissible range"
+                );
+            }
+        }
+
+        let reference = self.reference_date()?;
+        let mut atm_yoy_swap_time_rates: (Vec<Time>, Vec<Rate>) = (Vec::new(), Vec::new());
+        let mut atm_yoy_swap_date_rates: (Vec<Date>, Vec<Rate>) = (Vec::new(), Vec::new());
+        let mut counter = 0;
+        for i in 0..n {
+            if !valid_maturity[i] {
+                atm_yoy_swap_date_rates.0.push(reference + maturities[i]);
+                atm_yoy_swap_time_rates
+                    .0
+                    .push(self.time_from_reference(reference + maturities[i])?);
+                // Heuristic (`hpp:495-500`): a swap rate keeping every
+                // option's intrinsic value below its price.
+                let mut new_swap_rate = min_swap_rate_intersection[i] + INTRINSIC_VALUE_ADD_ON;
+                if new_swap_rate > max_swap_rate_intersection[i] {
+                    new_swap_rate =
+                        0.5 * (min_swap_rate_intersection[i] + max_swap_rate_intersection[i]);
+                }
+                atm_yoy_swap_time_rates.1.push(new_swap_rate);
+                atm_yoy_swap_date_rates.1.push(new_swap_rate);
+            } else {
+                atm_yoy_swap_time_rates.0.push(tmp_swap_maturities[counter]);
+                atm_yoy_swap_time_rates.1.push(tmp_swap_rates[counter]);
+                // `.at(counter)`, not `[i]` (`hpp:507`); see the method docs.
+                atm_yoy_swap_date_rates
+                    .0
+                    .push(self.yoy_option_date_from_tenor(maturities[counter])?);
+                atm_yoy_swap_date_rates.1.push(tmp_swap_rates[counter]);
+                counter += 1;
+            }
+        }
+
+        let atm_yoy_swap_rate_curve = Cubic
+            .interpolate(&atm_yoy_swap_time_rates.0, &atm_yoy_swap_time_rates.1)?
+            .with_extrapolation(true);
+
+        *self.intersection.borrow_mut() = Some(Intersection {
+            cap_price,
+            floor_price,
+            atm_yoy_swap_time_rates,
+            atm_yoy_swap_date_rates,
+            atm_yoy_swap_rate_curve,
+        });
+        Ok(())
+    }
+
+    /// `atmYoYSwapRate` off the intersection alone (`hpp:188-190`), for the
+    /// bootstrap phase to read without re-entering
+    /// [`calculate`](Self::calculate). The range check is C++'s
+    /// `Interpolation::checkRange` with the curve's own extrapolation flag
+    /// unset: the `extrapolate` argument decides.
+    fn atm_yoy_swap_rate_impl(&self, d: Date, extrapolate: bool) -> QlResult<Rate> {
+        self.intersect()?;
+        let t = self.time_from_reference(d)?;
+        let guard = self.intersection.borrow();
+        let curve = &guard
+            .as_ref()
+            .expect("intersect just filled the cache")
+            .atm_yoy_swap_rate_curve;
+        require!(
+            extrapolate || (curve.x_min() <= t && t <= curve.x_max()),
+            "atm yoy swap rate time ({t}) outside the curve range [{}, {}]: extrapolation not \
+             allowed",
+            curve.x_min(),
+            curve.x_max()
+        );
+        curve.value(t)
     }
 }
 
@@ -477,6 +778,71 @@ impl TermStructure for InterpolatedYoYCapFloorTermPriceSurface {
 impl YoYCapFloorTermPriceSurface for InterpolatedYoYCapFloorTermPriceSurface {
     fn surface_base(&self) -> &YoYCapFloorTermPriceSurfaceBase {
         &self.base
+    }
+
+    /// `hpp:178-180`, running the calculations first as the C++ constructor
+    /// already had.
+    fn atm_yoy_swap_time_rates(&self) -> QlResult<(Vec<Time>, Vec<Rate>)> {
+        self.calculate()?;
+        let guard = self.intersection.borrow();
+        Ok(guard
+            .as_ref()
+            .expect("calculate filled the intersection")
+            .atm_yoy_swap_time_rates
+            .clone())
+    }
+
+    /// `hpp:181-183`.
+    fn atm_yoy_swap_date_rates(&self) -> QlResult<(Vec<Date>, Vec<Rate>)> {
+        self.calculate()?;
+        let guard = self.intersection.borrow();
+        Ok(guard
+            .as_ref()
+            .expect("calculate filled the intersection")
+            .atm_yoy_swap_date_rates
+            .clone())
+    }
+
+    /// `hpp:311-316`: the cap price above the ATM swap level (read with
+    /// extrapolation, C++'s default there), the floor price at or below it.
+    fn price(&self, d: Date, k: Rate) -> QlResult<Real> {
+        let atm = self.atm_yoy_swap_rate(d, true)?;
+        if k > atm {
+            self.cap_price(d, k)
+        } else {
+            self.floor_price(d, k)
+        }
+    }
+
+    /// `hpp:319-324`: a pure surface lookup at `timeFromReference(d)`; the
+    /// spline extrapolates, as C++ enables on it.
+    fn cap_price(&self, d: Date, k: Rate) -> QlResult<Real> {
+        self.calculate()?;
+        let t = self.time_from_reference(d)?;
+        let guard = self.intersection.borrow();
+        guard
+            .as_ref()
+            .expect("calculate filled the intersection")
+            .cap_price
+            .value(t, k)
+    }
+
+    /// `hpp:327-332`.
+    fn floor_price(&self, d: Date, k: Rate) -> QlResult<Real> {
+        self.calculate()?;
+        let t = self.time_from_reference(d)?;
+        let guard = self.intersection.borrow();
+        guard
+            .as_ref()
+            .expect("calculate filled the intersection")
+            .floor_price
+            .value(t, k)
+    }
+
+    /// `hpp:188-190`.
+    fn atm_yoy_swap_rate(&self, d: Date, extrapolate: bool) -> QlResult<Rate> {
+        self.calculate()?;
+        self.atm_yoy_swap_rate_impl(d, extrapolate)
     }
 }
 
@@ -808,11 +1174,15 @@ mod yoy_price_surface_to_atm_oracle {
 
     /// Construction smoke: the fixture builds, its inspectors read the EU data
     /// back, and the moving reference date sits on the evaluation date.
+    /// Construction runs no calculation (the C++ constructor's eager
+    /// `performCalculations()` is deferred to first use per the module
+    /// divergences).
     #[test]
     fn the_eu_fixture_builds_and_reads_back() {
         let fixture = a_price_surface();
         let surface = &fixture.surface;
 
+        assert!(surface.intersection.borrow().is_none());
         assert_eq!(surface.reference_date().unwrap(), eval_date());
         assert_eq!(surface.maturities(), cf_maturities_eu().as_slice());
         assert_eq!(
