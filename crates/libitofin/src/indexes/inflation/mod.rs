@@ -2,9 +2,9 @@
 //!
 //! Port of `ql/indexes/inflation/`. The concrete named index family lands here,
 //! one file per C++ header as in [`ibor`](crate::indexes::ibor): the zero
-//! indexes [`UkRpi`], [`UkHicp`] and [`EuHicp`], and the quoted year-on-year
-//! siblings [`YyUkRpi`], [`YyEuHicp`] and [`YyEuHicpXt`], each beside the zero
-//! index sharing its header. Items are re-exported flat, so the index is
+//! indexes [`UkRpi`], [`UkHicp`], [`EuHicp`] and [`UsCpi`], and the quoted
+//! year-on-year siblings [`YyUkRpi`], [`YyEuHicp`], [`YyEuHicpXt`] and
+//! [`YyUsCpi`], each beside the zero index sharing its header. Items are re-exported flat, so the index is
 //! `indexes::inflation::UkRpi` rather than `indexes::inflation::ukrpi::UkRpi`.
 //!
 //! Each is pure configuration over [`ZeroInflationIndex`] or
@@ -28,7 +28,9 @@
 pub mod euhicp;
 pub mod ukhicp;
 pub mod ukrpi;
+pub mod uscpi;
 
 pub use euhicp::{EuHicp, YyEuHicp, YyEuHicpXt};
 pub use ukhicp::UkHicp;
 pub use ukrpi::{UkRpi, YyUkRpi};
+pub use uscpi::{UsCpi, YyUsCpi};
