@@ -231,6 +231,18 @@ impl<T: ?Sized> RelinkableHandle<T> {
     }
 }
 
+/// Copies share the one underlying link, as C++ `RelinkableHandle` copies do:
+/// relinking any copy re-points them all and notifies their common observers.
+/// The optionlet stripper leans on this, its helpers re-pointing the same link
+/// the cap/floor engine reads (`yoyoptionlethelpers.cpp:74-89`).
+impl<T: ?Sized> Clone for RelinkableHandle<T> {
+    fn clone(&self) -> Self {
+        RelinkableHandle {
+            handle: self.handle.clone(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
