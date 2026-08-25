@@ -19,11 +19,12 @@
 //!   only content is the constructor. Rust gets associated constructor
 //!   functions on the one concrete [`Region`] type instead; nothing in the
 //!   library upcasts a region, so the subclass hierarchy buys nothing.
-//! - **Only the regions batch 1 needs.** `AustraliaRegion`, `FranceRegion`,
-//!   `USRegion` and `ZARegion` (`region.cpp:31-59`) are deliberately not
+//! - **Only the regions the ported indexes need.** `AustraliaRegion`,
+//!   `FranceRegion` and `ZARegion` (`region.cpp:31-59`) are deliberately not
 //!   ported yet; they arrive with the inflation indexes that use them.
-//!   [`Region::new`] ports `CustomRegion` and can express any of them
-//!   meanwhile.
+//!   `USRegion` arrived with [`UsCpi`](crate::indexes::inflation::UsCpi)
+//!   (#806). [`Region::new`] ports `CustomRegion` and can express any of the
+//!   others meanwhile.
 
 /// Geographical or economic region, used for inflation applicability.
 ///
@@ -61,6 +62,14 @@ impl Region {
         Region::new("UK", "UK")
     }
 
+    /// The United States as a region (name `"USA"`, code `"US"`).
+    ///
+    /// Values match `USRegion` in `ql/indexes/region.cpp:51-54`. The name is
+    /// what composes index names, so US CPI reads `"USA CPI"`.
+    pub fn us() -> Self {
+        Region::new("USA", "US")
+    }
+
     /// Region name, e.g. `"UK"`.
     pub fn name(&self) -> &str {
         &self.name
@@ -96,6 +105,13 @@ mod tests {
         let eu = Region::eu();
         assert_eq!(eu.name(), "EU");
         assert_eq!(eu.code(), "EU");
+    }
+
+    #[test]
+    fn us_fields_match_quantlib() {
+        let us = Region::us();
+        assert_eq!(us.name(), "USA");
+        assert_eq!(us.code(), "US");
     }
 
     #[test]
