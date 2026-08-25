@@ -16,5 +16,6 @@ pub mod interpolatedzeroinflationcurve;
 pub mod piecewiseyoyinflationcurve;
 pub mod piecewisezeroinflationcurve;
 pub mod seasonality;
+pub mod yoycapfloortermpricesurface;
 
 pub use seasonality::{MultiplicativePriceSeasonality, Seasonality};
