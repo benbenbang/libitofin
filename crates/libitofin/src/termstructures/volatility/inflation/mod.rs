@@ -58,6 +58,7 @@ mod constantyoyoptionletvol;
 mod interpolatedyoyoptionletvol;
 mod piecewiseyoyoptionletvol;
 mod yoyoptionlethelpers;
+mod yoyoptionletstripper;
 mod yoyoptionletvolsurfacebase;
 
 pub use constantyoyoptionletvol::ConstantYoYOptionletVolatility;
@@ -68,6 +69,7 @@ pub use piecewiseyoyoptionletvol::{
 pub use yoyoptionlethelpers::{
     YoYOptionletHelper, YoYOptionletVolHelperBase, YoYOptionletVolatilityHelper,
 };
+pub use yoyoptionletstripper::YoYOptionletStripper;
 pub use yoyoptionletvolsurfacebase::YoYOptionletVolatilitySurfaceBase;
 
 use crate::errors::QlResult;
