@@ -62,7 +62,9 @@ mod yoyoptionletvolsurfacebase;
 
 pub use constantyoyoptionletvol::ConstantYoYOptionletVolatility;
 pub use interpolatedyoyoptionletvol::InterpolatedYoYOptionletVolatilityCurve;
-pub use piecewiseyoyoptionletvol::YoYInflationVolatilityTraits;
+pub use piecewiseyoyoptionletvol::{
+    PiecewiseYoYOptionletVolatilityCurve, YoYInflationVolatilityTraits,
+};
 pub use yoyoptionlethelpers::{
     YoYOptionletHelper, YoYOptionletVolHelperBase, YoYOptionletVolatilityHelper,
 };
