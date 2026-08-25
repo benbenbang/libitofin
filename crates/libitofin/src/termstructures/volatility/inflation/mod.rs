@@ -42,17 +42,18 @@
 //! which under D10 refuses rather than inventing one when no evaluation date is
 //! set, and the period snapping refuses a frequency finer than monthly.
 //!
-//! ## Deferred (visible)
+//! ## The stripped hierarchy (#874)
 //!
-//! The flat surface and, from #874, the stripped and interpolated hierarchy of
-//! `ql/experimental/inflation/` land here: the shared
-//! [`YoYOptionletVolatilitySurfaceBase`] holder first, with `baseLevel` -
-//! which exists to seed the stripping bootstraps - as the trait's
-//! [`base_level`](YoYOptionletVolatilitySurface::base_level), then
-//! `InterpolatedYoYOptionletVolatilityCurve`,
-//! `PiecewiseYoYOptionletVolatilityCurve` and its helpers, the optionlet
-//! strippers and `KInterpolatedYoYOptionletVolatilitySurface`, one commit
-//! apiece on the same branch.
+//! The stripped and interpolated hierarchy of `ql/experimental/inflation/`
+//! lands here beside the flat surface: the shared
+//! [`YoYOptionletVolatilitySurfaceBase`] holder - with `baseLevel`, which
+//! exists to seed the stripping bootstraps, as the trait's defaulted
+//! [`base_level`](YoYOptionletVolatilitySurface::base_level) -
+//! [`InterpolatedYoYOptionletVolatilityCurve`],
+//! [`PiecewiseYoYOptionletVolatilityCurve`] and its [`YoYOptionletHelper`]s,
+//! the [`YoYOptionletStripper`]s and
+//! [`KInterpolatedYoYOptionletVolatilitySurface`], whose `Dslice` oracle
+//! (`test-suite/inflationvolatility.cpp:271-352`) closes the stack.
 
 mod constantyoyoptionletvol;
 mod interpolatedyoyoptionletvol;
