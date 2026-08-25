@@ -26,11 +26,13 @@
 //! [`YoYInflationIndex`]: crate::indexes::inflationindex::YoYInflationIndex
 
 pub mod euhicp;
+pub mod genericindexes;
 pub mod ukhicp;
 pub mod ukrpi;
 pub mod uscpi;
 
 pub use euhicp::{EuHicp, YyEuHicp, YyEuHicpXt};
+pub use genericindexes::YyGenericCpi;
 pub use ukhicp::UkHicp;
 pub use ukrpi::{UkRpi, YyUkRpi};
 pub use uscpi::{UsCpi, YyUsCpi};
