@@ -52,8 +52,8 @@ pub use flatsmilesection::FlatSmileSection;
 pub use inflation::{
     ConstantYoYOptionletVolatility, InterpolatedYoYOptionletVolatilityCurve,
     PiecewiseYoYOptionletVolatilityCurve, YoYInflationVolatilityTraits, YoYOptionletHelper,
-    YoYOptionletVolHelperBase, YoYOptionletVolatilityHelper, YoYOptionletVolatilitySurface,
-    YoYOptionletVolatilitySurfaceBase,
+    YoYOptionletStripper, YoYOptionletVolHelperBase, YoYOptionletVolatilityHelper,
+    YoYOptionletVolatilitySurface, YoYOptionletVolatilitySurfaceBase,
 };
 pub use interpolatedsmilesection::InterpolatedSmileSection;
 pub use localconstantvol::LocalConstantVol;
