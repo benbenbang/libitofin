@@ -56,6 +56,7 @@
 
 mod constantyoyoptionletvol;
 mod interpolatedyoyoptionletvol;
+mod kinterpolatedyoyoptionletvol;
 mod piecewiseyoyoptionletvol;
 mod yoyoptionlethelpers;
 mod yoyoptionletstripper;
@@ -63,6 +64,7 @@ mod yoyoptionletvolsurfacebase;
 
 pub use constantyoyoptionletvol::ConstantYoYOptionletVolatility;
 pub use interpolatedyoyoptionletvol::InterpolatedYoYOptionletVolatilityCurve;
+pub use kinterpolatedyoyoptionletvol::KInterpolatedYoYOptionletVolatilitySurface;
 pub use piecewiseyoyoptionletvol::{
     PiecewiseYoYOptionletVolatilityCurve, YoYInflationVolatilityTraits,
 };
