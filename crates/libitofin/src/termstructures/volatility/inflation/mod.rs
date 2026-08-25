@@ -16,7 +16,9 @@
 //! ## Shape
 //!
 //! The trait carries the three members the pricer calls
-//! (`inflationcouponpricer.cpp:99`, `:114-117`) and nothing else. C++ reaches
+//! (`inflationcouponpricer.cpp:99`, `:114-117`), plus the defaulted
+//! [`base_level`](YoYOptionletVolatilitySurface::base_level) whose default *is*
+//! C++'s unset state, and nothing else. C++ reaches
 //! them through `VolatilityTermStructure`, whose `timeFromBase`, `baseLevel`,
 //! `checkRange` and tenor-keyed overloads serve the stripping hierarchy rather
 //! than the coupon; [`ConstantYoYOptionletVolatility`] implements
@@ -42,17 +44,21 @@
 //!
 //! ## Deferred (visible)
 //!
-//! Only the flat surface lands here. The stripped and interpolated hierarchy -
+//! The flat surface and, from #874, the stripped and interpolated hierarchy of
+//! `ql/experimental/inflation/` land here: the shared
+//! [`YoYOptionletVolatilitySurfaceBase`] holder first, with `baseLevel` -
+//! which exists to seed the stripping bootstraps - as the trait's
+//! [`base_level`](YoYOptionletVolatilitySurface::base_level), then
 //! `InterpolatedYoYOptionletVolatilityCurve`,
-//! `KInterpolatedYoYOptionletVolatilitySurface`, the optionlet strippers and
-//! `PiecewiseYoYOptionletVolatilityCurve`, all of `ql/experimental/inflation/` -
-//! has no port, and neither do the `YoYInflationCapFloor` engines that consume
-//! it (`#851`). `baseLevel`, which exists to seed those bootstraps, goes with
-//! them.
+//! `PiecewiseYoYOptionletVolatilityCurve` and its helpers, the optionlet
+//! strippers and `KInterpolatedYoYOptionletVolatilitySurface`, one commit
+//! apiece on the same branch.
 
 mod constantyoyoptionletvol;
+mod yoyoptionletvolsurfacebase;
 
 pub use constantyoyoptionletvol::ConstantYoYOptionletVolatility;
+pub use yoyoptionletvolsurfacebase::YoYOptionletVolatilitySurfaceBase;
 
 use crate::errors::QlResult;
 use crate::patterns::observable::AsObservable;
@@ -100,4 +106,21 @@ pub trait YoYOptionletVolatilitySurface: AsObservable {
     /// As [`volatility`](Self::volatility), plus a surface carrying no day
     /// counter to measure the elapsed time with.
     fn total_variance(&self, date: Date, strike: Rate, obs_lag: Period) -> QlResult<Real>;
+
+    /// The volatility acting as the zero-time value for a stripping bootstrap
+    /// (`baseLevel`, `hpp:123-128`).
+    ///
+    /// C++ initialises the member to the `Null<Volatility>` sentinel and throws
+    /// on an unset read; under D4/D10 the unset state is this default `Err`.
+    /// The stripped surfaces of #874 override it with the level their
+    /// constructors or interpolations set (`setBaseLevel`, `hpp:141`, which
+    /// stays on the concrete types); the flat surface, which no bootstrap
+    /// seeds from, keeps the unset answer.
+    ///
+    /// # Errors
+    ///
+    /// When no base level has been set.
+    fn base_level(&self) -> QlResult<Volatility> {
+        crate::fail!("base volatility, for base_date(), not set")
+    }
 }
