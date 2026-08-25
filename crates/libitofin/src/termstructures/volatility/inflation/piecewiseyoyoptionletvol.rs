@@ -425,3 +425,247 @@ impl<I: Interpolator + 'static> PiecewiseCurve for PiecewiseYoYOptionletVolatili
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    //! The C++ suite reaches this curve only through the stripper, whose
+    //! numeric oracle closes with the K-interpolated surface; what is checked
+    //! here is what the curve decides on its own, against a helper written to
+    //! make those decisions visible. The mock reprices off *two* points of the
+    //! surface, its pillar and the base date, so its solved node is
+    //! `2 * quote - base_level`: a curve seeded from anything but its own base
+    //! level lands every node somewhere else while still repricing perfectly.
+
+    use super::super::yoyoptionlethelpers::YoYOptionletVolHelperBase;
+    use super::*;
+    use crate::handle::Handle;
+    use crate::quotes::{Quote, SimpleQuote};
+    use crate::shared::shared;
+    use crate::time::calendars::target::Target;
+    use crate::time::date::Month::{April, June};
+    use crate::time::daycounters::actual365fixed::Actual365Fixed;
+
+    /// Distinct from every solved pillar and from the traits' guesses.
+    const BASE_LEVEL: Volatility = 0.01;
+    const QUOTES: [Real; 3] = [0.012, 0.013, 0.011];
+    const MATURITY_YEARS: [i32; 3] = [1, 2, 3];
+
+    fn zero_lag() -> Period {
+        Period::new(0, TimeUnit::Days)
+    }
+
+    /// A helper whose implied quote is the mean of the surface's volatility at
+    /// its pillar and at the base date, both read at the quoted strike with no
+    /// further lag; the fixture's index interpolates, so the observed date is
+    /// the query date itself and the reads land on nodes.
+    struct MeanVolHelper {
+        base: YoYOptionletVolHelperBase,
+    }
+
+    impl MeanVolHelper {
+        fn new(quote: &Shared<SimpleQuote>, pillar: Date) -> Shared<MeanVolHelper> {
+            let base = YoYOptionletVolHelperBase::new(Handle::new(
+                Shared::clone(quote) as Shared<dyn Quote>
+            ));
+            base.set_pillar_date(pillar);
+            base.set_latest_relevant_date(pillar);
+            base.set_maturity_date(pillar);
+            shared(MeanVolHelper { base })
+        }
+    }
+
+    impl AsObservable for MeanVolHelper {
+        fn observable(&self) -> &Observable {
+            self.base.observable()
+        }
+    }
+
+    impl YoYOptionletVolatilityHelper for MeanVolHelper {
+        fn base(&self) -> &YoYOptionletVolHelperBase {
+            &self.base
+        }
+
+        fn implied_quote(&self) -> QlResult<Real> {
+            let surface = self.base.term_structure()?;
+            let at_pillar = surface.volatility(self.base.pillar_date(), 0.02, zero_lag())?;
+            let at_base = surface.volatility(surface.base_date()?, 0.02, zero_lag())?;
+            Ok(0.5 * (at_pillar + at_base))
+        }
+    }
+
+    struct Fixture {
+        helpers: Vec<Shared<dyn YoYOptionletVolatilityHelper>>,
+        curve: Shared<PiecewiseYoYOptionletVolatilityCurve<Linear>>,
+        quotes: Vec<Shared<SimpleQuote>>,
+    }
+
+    /// Settlement days 0 and a 2-month lag on an interpolated monthly index:
+    /// the base date is 15 April 2026, two months before the reference, at a
+    /// negative time.
+    fn a_curve() -> Fixture {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(Date::new(15, June, 2026));
+        let quotes: Vec<Shared<SimpleQuote>> = QUOTES
+            .iter()
+            .map(|quote| shared(SimpleQuote::new(Some(*quote))))
+            .collect();
+        let helpers: Vec<Shared<dyn YoYOptionletVolatilityHelper>> = quotes
+            .iter()
+            .zip(MATURITY_YEARS)
+            .map(|(quote, years)| {
+                MeanVolHelper::new(
+                    quote,
+                    Date::new(15, June, 2026) + Period::new(years, TimeUnit::Years),
+                ) as Shared<dyn YoYOptionletVolatilityHelper>
+            })
+            .collect();
+        let curve = PiecewiseYoYOptionletVolatilityCurve::new(
+            0,
+            Target::new(),
+            BusinessDayConvention::ModifiedFollowing,
+            Actual365Fixed::new(),
+            Period::new(2, TimeUnit::Months),
+            Frequency::Monthly,
+            true,
+            0.018,
+            0.022,
+            BASE_LEVEL,
+            helpers.clone(),
+            settings,
+        )
+        .unwrap();
+        Fixture {
+            helpers,
+            curve,
+            quotes,
+        }
+    }
+
+    /// Every helper reprices its quote off the bootstrapped curve, the pillars
+    /// land where the helpers put them, and node zero sits at the base date's
+    /// negative time.
+    #[test]
+    fn the_bootstrapped_curve_reproduces_every_helpers_quote() {
+        let fixture = a_curve();
+        fixture.curve.calculate().unwrap();
+
+        for (helper, quote) in fixture.helpers.iter().zip(QUOTES) {
+            let error = helper.quote_error().unwrap();
+            assert!(
+                error.abs() < 1.0e-10,
+                "quote error {error} on the {quote} helper"
+            );
+        }
+
+        let dates = fixture.curve.dates().unwrap();
+        assert_eq!(dates.len(), 4);
+        assert_eq!(dates[0], Date::new(15, April, 2026));
+        for (i, helper) in fixture.helpers.iter().enumerate() {
+            assert_eq!(dates[i + 1], helper.pillar_date());
+        }
+        assert!(fixture.curve.times().unwrap()[0] < 0.0);
+    }
+
+    /// The two halves of the traits transcription: node zero is seeded from
+    /// the curve's own base level through the `initial_value` hook, and
+    /// `update_guess` never writes to it, so it holds that level bit for bit
+    /// once every pillar is solved to `2 * quote - base_level`.
+    #[test]
+    fn the_base_node_keeps_the_curves_own_base_level_through_the_bootstrap() {
+        let fixture = a_curve();
+        let data = fixture.curve.data().unwrap();
+
+        assert_eq!(data[0], BASE_LEVEL);
+        for (i, quote) in QUOTES.iter().enumerate() {
+            let expected = 2.0 * quote - BASE_LEVEL;
+            assert!(
+                (data[i + 1] - expected).abs() < 1.0e-10,
+                "node {} solved to {} against {expected}",
+                i + 1,
+                data[i + 1]
+            );
+        }
+        assert_eq!(
+            fixture.curve.base_level().unwrap(),
+            BASE_LEVEL,
+            "the surface reports the level it was seeded with"
+        );
+    }
+
+    /// The traits' statics against `hpp:54-95`: the two fresh-pass guesses,
+    /// the vol-cannot-be-negative floor on the lower bracket, and the
+    /// one-node-only write.
+    #[test]
+    fn the_traits_statics_match_the_cpp_header() {
+        let times = [0.0, 1.0, 2.0];
+        let data = [0.01, 0.005, 0.0];
+        assert_eq!(
+            YoYInflationVolatilityTraits::guess(1, &times, &data, false),
+            0.005
+        );
+        assert_eq!(
+            YoYInflationVolatilityTraits::guess(2, &times, &data, false),
+            0.002
+        );
+        assert_eq!(
+            YoYInflationVolatilityTraits::guess(2, &times, &data, true),
+            0.0
+        );
+        assert_eq!(
+            YoYInflationVolatilityTraits::min_value_after(1, &times, &data, false),
+            0.0,
+            "0.01 - 0.02 floors at zero"
+        );
+        assert_eq!(
+            YoYInflationVolatilityTraits::max_value_after(1, &times, &data, false),
+            0.03
+        );
+        let mut nodes = [0.01, 0.0, 0.0];
+        YoYInflationVolatilityTraits::update_guess(&mut nodes, 0.007, 1);
+        assert_eq!(nodes, [0.01, 0.007, 0.0]);
+        assert_eq!(YoYInflationVolatilityTraits::max_iterations(), 25);
+    }
+
+    /// Construction lays down no nodes; the first read bootstraps; a quote
+    /// move invalidates the cache and the next read re-solves.
+    #[test]
+    fn the_bootstrap_is_lazy_and_reruns_on_a_quote_change() {
+        let fixture = a_curve();
+        assert!(!fixture.curve.lazy.borrow().is_calculated());
+
+        let first = fixture.curve.data().unwrap()[1];
+        assert!(fixture.curve.lazy.borrow().is_calculated());
+
+        fixture.quotes[0].set_value(Some(0.015));
+        assert!(!fixture.curve.lazy.borrow().is_calculated());
+        assert!(
+            fixture.curve.data().unwrap()[1] > first,
+            "a higher quoted price must lift the curve"
+        );
+    }
+
+    #[test]
+    fn an_empty_helper_set_is_rejected() {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(Date::new(15, June, 2026));
+        let built = PiecewiseYoYOptionletVolatilityCurve::new(
+            0,
+            Target::new(),
+            BusinessDayConvention::ModifiedFollowing,
+            Actual365Fixed::new(),
+            Period::new(2, TimeUnit::Months),
+            Frequency::Monthly,
+            true,
+            0.018,
+            0.022,
+            BASE_LEVEL,
+            Vec::new(),
+            settings,
+        );
+        let err = match built {
+            Ok(_) => panic!("expected a construction error"),
+            Err(err) => err,
+        };
+        assert!(err.message().contains("no bootstrap helpers"));
+    }
+}
