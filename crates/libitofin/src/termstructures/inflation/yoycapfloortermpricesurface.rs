@@ -657,3 +657,195 @@ mod tests {
         assert!(!surface.index_is_interpolated());
     }
 }
+
+#[cfg(test)]
+mod yoy_price_surface_to_atm_oracle {
+    //! `test-suite/inflationvolatility.cpp`'s `testYoYPriceSurfaceToATM`
+    //! (`:354-390`), the numeric oracle of this port: the EU fixture of
+    //! `setup()` (`:91-240`) and `setupPriceSurface()` (`:243-268`) - a
+    //! 25-node cubic EUR nominal curve, the EU HICP year-on-year index, and
+    //! 6x7 cap and floor price matrices - built into the surface, whose ATM
+    //! year-on-year swap and curve rates are then pinned against the C++
+    //! arrays `crv[]`/`swaps[]`/`ayoy[]` to `2e-5`.
+    //!
+    //! `setup()`'s GBP curve and its `InterpolatedYoYInflationCurve<Linear>`
+    //! over `yoyEUrates` (`:112-123`, `:164-190`) are consumed only by
+    //! `testYoYPriceSurfaceToVol` (the #874 stripper oracle), never by the ATM
+    //! test: the surface prices through index copies linked to its own
+    //! bootstrap, so neither is built here. The index itself is the *ratio*
+    //! `YoYInflationIndex(EUHICP, ...)` of `:98`, not the quoted `YYEUHICP`.
+
+    use super::*;
+    use crate::indexes::inflation::EuHicp;
+    use crate::math::interpolations::cubic::Cubic;
+    use crate::shared::shared;
+    use crate::termstructures::yields::InterpolatedZeroCurve;
+    use crate::time::calendars::target::Target;
+    use crate::time::date::Month::November;
+    use crate::time::daycounters::actual365fixed::Actual365Fixed;
+    use crate::types::Real;
+
+    /// EUR nominal zero times, in years of 365 days (`:101-105`).
+    const TIMES_EUR: [Real; 25] = [
+        0.0109589, 0.0684932, 0.263014, 0.317808, 0.567123, 0.816438, 1.06575, 1.31507, 1.56438,
+        2.0137, 3.01918, 4.01644, 5.01644, 6.01644, 7.01644, 8.01644, 9.02192, 10.0192, 12.0192,
+        15.0247, 20.0301, 25.0356, 30.0329, 40.0384, 50.0466,
+    ];
+
+    /// EUR nominal zero rates (`:106-110`).
+    const RATES_EUR: [Real; 25] = [
+        0.0415600, 0.0426840, 0.0470980, 0.0458506, 0.0449550, 0.0439784, 0.0431887, 0.0426604,
+        0.0422925, 0.0424591, 0.0421477, 0.0421853, 0.0424016, 0.0426969, 0.0430804, 0.0435011,
+        0.0439368, 0.0443825, 0.0452589, 0.0463389, 0.0472636, 0.0473401, 0.0470629, 0.0461092,
+        0.0450794,
+    ];
+
+    /// EU cap strikes (`:196`).
+    const C_STRIKES_EU: [Real; 6] = [0.02, 0.025, 0.03, 0.035, 0.04, 0.05];
+
+    /// EU floor strikes (`:207`).
+    const F_STRIKES_EU: [Real; 6] = [-0.01, 0.00, 0.005, 0.01, 0.015, 0.02];
+
+    /// EU cap prices by strike (rows) and maturity (columns) (`:199-205`).
+    const C_PRICES_EU: [[Real; 7]; 6] = [
+        [116.225, 204.945, 296.285, 434.29, 654.47, 844.775, 1132.33],
+        [34.305, 71.575, 114.1, 184.33, 307.595, 421.395, 602.35],
+        [6.37, 19.085, 35.635, 66.42, 127.69, 189.685, 296.195],
+        [1.325, 5.745, 12.585, 26.945, 58.95, 94.08, 158.985],
+        [0.501, 2.37, 5.38, 13.065, 31.91, 53.95, 96.97],
+        [0.501, 0.695, 1.47, 4.415, 12.86, 23.75, 46.7],
+    ];
+
+    /// EU floor prices by strike (rows) and maturity (columns) (`:208-214`).
+    const F_PRICES_EU: [[Real; 7]; 6] = [
+        [0.501, 0.851, 2.44, 6.645, 16.23, 26.85, 46.365],
+        [0.501, 2.236, 5.555, 13.075, 28.46, 44.525, 73.08],
+        [1.025, 3.935, 9.095, 19.64, 39.93, 60.375, 96.02],
+        [2.465, 7.885, 16.155, 31.6, 59.34, 86.21, 132.045],
+        [6.9, 17.92, 32.085, 56.08, 95.95, 132.85, 194.18],
+        [23.52, 47.625, 74.085, 114.355, 175.72, 229.565, 316.285],
+    ];
+
+    /// The evaluation date `setup()` fixes (`:94-95`).
+    fn eval_date() -> Date {
+        Date::new(23, November, 2007)
+    }
+
+    /// EU cap/floor maturities (`:197-198`).
+    fn cf_maturities_eu() -> Vec<Period> {
+        [3, 5, 7, 10, 15, 20, 30]
+            .into_iter()
+            .map(|n| Period::new(n, TimeUnit::Years))
+            .collect()
+    }
+
+    fn matrix_of(rows: &[[Real; 7]; 6]) -> Matrix {
+        let mut m = Matrix::with_size(6, 7);
+        for (i, row) in rows.iter().enumerate() {
+            for (j, &value) in row.iter().enumerate() {
+                m[(i, j)] = value;
+            }
+        }
+        m
+    }
+
+    /// The EUR nominal curve (`:129-140`): each time is split into whole years
+    /// plus truncated 365ths exactly as the C++ loop casts do, and the nodes
+    /// feed a cubic-interpolated zero curve.
+    fn eur_nominal_curve() -> Handle<dyn YieldTermStructure> {
+        let eval = eval_date();
+        let dates: Vec<Date> = TIMES_EUR
+            .iter()
+            .map(|&t| {
+                let ys = t.floor() as i32;
+                let ds = ((t - Real::from(ys)) * 365.0) as i32;
+                eval + Period::new(ys, TimeUnit::Years) + Period::new(ds, TimeUnit::Days)
+            })
+            .collect();
+        let curve = InterpolatedZeroCurve::<Cubic>::new(
+            dates,
+            RATES_EUR.to_vec(),
+            Actual365Fixed::new(),
+            Cubic,
+        )
+        .expect("25 well-ordered nodes");
+        Handle::new(shared(curve) as Shared<dyn YieldTermStructure>)
+    }
+
+    struct Fixture {
+        settings: Shared<Settings<Date>>,
+        surface: InterpolatedYoYCapFloorTermPriceSurface,
+    }
+
+    /// `setupPriceSurface()` (`:243-268`): fixing days 0, a 3-month lag (the
+    /// interpolated EU index needs 3), Actual/365F, TARGET, modified
+    /// following, `CPI::Linear`, over the EU strike and price data.
+    fn a_price_surface() -> Fixture {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(eval_date());
+        let index = shared(YoYInflationIndex::from_underlying(shared(EuHicp::new(
+            Shared::clone(&settings),
+        ))));
+        let surface = InterpolatedYoYCapFloorTermPriceSurface::new(
+            0,
+            Period::new(3, TimeUnit::Months),
+            index,
+            CpiInterpolationType::Linear,
+            eur_nominal_curve(),
+            Actual365Fixed::new(),
+            Target::new(),
+            BusinessDayConvention::ModifiedFollowing,
+            C_STRIKES_EU.to_vec(),
+            F_STRIKES_EU.to_vec(),
+            cf_maturities_eu(),
+            matrix_of(&C_PRICES_EU),
+            matrix_of(&F_PRICES_EU),
+            Shared::clone(&settings),
+        )
+        .expect("the EU fixture is consistent");
+        Fixture { settings, surface }
+    }
+
+    /// Construction smoke: the fixture builds, its inspectors read the EU data
+    /// back, and the moving reference date sits on the evaluation date.
+    #[test]
+    fn the_eu_fixture_builds_and_reads_back() {
+        let fixture = a_price_surface();
+        let surface = &fixture.surface;
+
+        assert_eq!(surface.reference_date().unwrap(), eval_date());
+        assert_eq!(surface.maturities(), cf_maturities_eu().as_slice());
+        assert_eq!(
+            surface.strikes(),
+            &[
+                -0.01, 0.00, 0.005, 0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.05
+            ]
+        );
+        assert_eq!(surface.cap_strikes(), C_STRIKES_EU.as_slice());
+        assert_eq!(surface.floor_strikes(), F_STRIKES_EU.as_slice());
+        assert_eq!(
+            surface.min_maturity().unwrap(),
+            eval_date() + Period::new(3, TimeUnit::Years)
+        );
+        assert_eq!(
+            surface.max_maturity().unwrap(),
+            eval_date() + Period::new(30, TimeUnit::Years)
+        );
+        assert_eq!(surface.observation_lag(), Period::new(3, TimeUnit::Months));
+        assert_eq!(surface.frequency(), Frequency::Monthly);
+        assert!(surface.index_is_interpolated());
+
+        let _ = fixture.settings;
+    }
+
+    /// The C++ loop truncates the day fraction (`:131-132`): the first node
+    /// time, 0.0109589, is a hair under 4/365, so the first curve date lands 3
+    /// days after the evaluation date, not 4. A rounding rewrite would move
+    /// every nominal discount read off the C++ fixture.
+    #[test]
+    fn the_nominal_dates_truncate_the_day_fraction_as_the_cpp_casts_do() {
+        let nominal = eur_nominal_curve();
+        let reference = nominal.current_link().unwrap().reference_date().unwrap();
+        assert_eq!(reference, eval_date() + 3);
+    }
+}
