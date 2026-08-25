@@ -24,9 +24,10 @@
 //!
 //! ## Deferred within EPIC Inflation (#705)
 //!
-//! - The **start/end-date constructor** (`cpp:52-69`, #806), so every helper here
-//!   rebuilds its schedule off the evaluation date, and the deprecated
-//!   nominal-curve constructor (`cpp:71-86`).
+//! - The zero-coupon helper's **start/end-date constructor** (`cpp:52-69`)
+//!   landed with #806 as [`with_start_date`](ZeroCouponInflationSwapHelper::with_start_date);
+//!   the year-on-year helper stays relative-date only, and the deprecated
+//!   nominal-curve constructor (`cpp:71-86`) stays out.
 //! - The `Pillar::CustomDate` choice, on both helpers (`cpp:140-150` and
 //!   `cpp:271-281`, #808), which needs an explicit pillar date threaded through
 //!   construction plus its bounds check.
@@ -320,6 +321,7 @@ impl BootstrapHelperShared for dyn YoYInflationHelper {
 pub struct ZeroCouponInflationSwapHelper {
     base: ZeroInflationHelperBase,
     swap_obs_lag: Period,
+    start_date: Option<Date>,
     maturity: Date,
     calendar: Calendar,
     payment_convention: BusinessDayConvention,
@@ -353,7 +355,7 @@ impl ZeroCouponInflationSwapHelper {
     /// helpers sharing a start date all pick the same side. This constructor is
     /// the relative-date one, whose start date is the moving evaluation date and
     /// not a schedule input, so it is always the maturity arm - the fixed-date
-    /// constructor that would supply the other is #806.
+    /// [`with_start_date`](Self::with_start_date) supplies the other.
     ///
     /// # Errors
     ///
@@ -377,9 +379,87 @@ impl ZeroCouponInflationSwapHelper {
         pillar: Pillar,
         settings: Shared<Settings<Date>>,
     ) -> QlResult<Shared<ZeroCouponInflationSwapHelper>> {
+        Self::build(
+            quote,
+            swap_obs_lag,
+            None,
+            maturity,
+            calendar,
+            payment_convention,
+            day_counter,
+            zii,
+            observation_interpolation,
+            pillar,
+            settings,
+        )
+    }
+
+    /// A helper on a swap running from `start_date` to `end_date`, the port of
+    /// the public fixed-date constructor (`cpp:52-69`, #806).
+    ///
+    /// C++ marks a helper relative iff its start date is null,
+    /// `updateDates_ = (startDate == Date())` (`cpp:100`); this constructor
+    /// always has a real `start_date`, so the helper never registers with the
+    /// evaluation date and its swap starts at `start_date` rather than at the
+    /// moving evaluation date (`cpp:193`). On the interpolated
+    /// [`Pillar::LastRelevantDate`] path the pillar weight is read off
+    /// `start_date` (`cpp:132`), so helpers sharing a start date all make the
+    /// same left/right choice however long their maturity months are.
+    ///
+    /// # Errors
+    ///
+    /// As for [`new`](Self::new): the swap is built here and an observation lag
+    /// the index cannot cover fails at construction.
+    #[allow(clippy::too_many_arguments)]
+    pub fn with_start_date(
+        quote: Handle<dyn Quote>,
+        swap_obs_lag: Period,
+        start_date: Date,
+        end_date: Date,
+        calendar: Calendar,
+        payment_convention: BusinessDayConvention,
+        day_counter: DayCounter,
+        zii: &Shared<ZeroInflationIndex>,
+        observation_interpolation: CpiInterpolationType,
+        pillar: Pillar,
+        settings: Shared<Settings<Date>>,
+    ) -> QlResult<Shared<ZeroCouponInflationSwapHelper>> {
+        Self::build(
+            quote,
+            swap_obs_lag,
+            Some(start_date),
+            end_date,
+            calendar,
+            payment_convention,
+            day_counter,
+            zii,
+            observation_interpolation,
+            pillar,
+            settings,
+        )
+    }
+
+    /// The shared body of the two constructors (the C++ main constructor,
+    /// `cpp:87-176`): `start_date` is `None` on the relative-date path, where
+    /// C++ passes a null start date.
+    #[allow(clippy::too_many_arguments)]
+    fn build(
+        quote: Handle<dyn Quote>,
+        swap_obs_lag: Period,
+        start_date: Option<Date>,
+        maturity: Date,
+        calendar: Calendar,
+        payment_convention: BusinessDayConvention,
+        day_counter: DayCounter,
+        zii: &Shared<ZeroInflationIndex>,
+        observation_interpolation: CpiInterpolationType,
+        pillar: Pillar,
+        settings: Shared<Settings<Date>>,
+    ) -> QlResult<Shared<ZeroCouponInflationSwapHelper>> {
         let fixing_period = inflation_period(maturity - swap_obs_lag, zii.frequency())?;
         let (earliest_date, latest_date, pillar_date) = Self::dates(
             fixing_period,
+            start_date,
             maturity,
             zii,
             observation_interpolation,
@@ -418,7 +498,7 @@ impl ZeroCouponInflationSwapHelper {
             let base = ZeroInflationHelperBase::new_relative(
                 quote,
                 Shared::clone(&settings),
-                true,
+                start_date.is_none(),
                 on_eval_change,
             );
             let term_structure_handle = RelinkableHandle::empty();
@@ -438,6 +518,7 @@ impl ZeroCouponInflationSwapHelper {
             let helper = ZeroCouponInflationSwapHelper {
                 base,
                 swap_obs_lag,
+                start_date,
                 maturity,
                 calendar,
                 payment_convention,
@@ -478,8 +559,14 @@ impl ZeroCouponInflationSwapHelper {
     /// [`BootstrapHelperBase::pillar_date`](crate::termstructures::bootstraphelper::BootstrapHelperBase::pillar_date)
     /// answers with the latest date exactly as `bootstraphelper.hpp:193-197`
     /// does.
+    ///
+    /// On the weighted choice C++ reads the interpolation weight off
+    /// `startDate_` where it has one, falling back to the maturity (`cpp:132`):
+    /// `start_date` is the fixed-date constructor's schedule start, `None` on
+    /// the relative-date path.
     fn dates(
         fixing_period: (Date, Date),
+        start_date: Option<Date>,
         maturity: Date,
         zii: &Shared<ZeroInflationIndex>,
         observation_interpolation: CpiInterpolationType,
@@ -494,9 +581,10 @@ impl ZeroCouponInflationSwapHelper {
                 let pillar_date = match pillar {
                     Pillar::MaturityDate => Some(latest_date),
                     Pillar::LastRelevantDate => {
-                        let weight_period = inflation_period(maturity, zii.frequency())?;
+                        let weight_date = start_date.unwrap_or(maturity);
+                        let weight_period = inflation_period(weight_date, zii.frequency())?;
                         let dp = Real::from(weight_period.1 + 1 - weight_period.0);
-                        let dt = Real::from(maturity - weight_period.0);
+                        let dt = Real::from(weight_date - weight_period.0);
                         (dt / dp <= 0.5).then_some(fixing_period.0)
                     }
                 };
@@ -530,14 +618,18 @@ impl ZeroCouponInflationSwapHelper {
     /// The unit-notional, zero-strike swap the helper quotes, under a discounting
     /// engine over the flat 0 % curve (`initializeDates`, `cpp:186-195`).
     ///
-    /// The start date is the evaluation date, which a relative-date helper always
-    /// tracks; C++ reads its own `evaluationDate_` there. An evaluation date that
-    /// was never set is an error rather than a panic (D10), surfaced when the
-    /// cached result is next read.
+    /// The start date is the swap's, `updateDates_ ? evaluationDate_ :
+    /// startDate_` (`cpp:193`): the fixed-date helper's own schedule start, and
+    /// on the relative-date path the evaluation date, which that helper always
+    /// tracks. An evaluation date that was never set is an error rather than a
+    /// panic (D10), surfaced when the cached result is next read.
     fn build_swap(&self) -> QlResult<ZeroCouponInflationSwap> {
-        let start_date = match self.base.evaluation_date() {
+        let start_date = match self.start_date {
             Some(date) => date,
-            None => crate::fail!("no evaluation date set: the helper's swap starts at it"),
+            None => match self.base.evaluation_date() {
+                Some(date) => date,
+                None => crate::fail!("no evaluation date set: the helper's swap starts at it"),
+            },
         };
         let mut swap = ZeroCouponInflationSwap::new(
             SwapType::Payer,
@@ -678,7 +770,8 @@ impl YearOnYearInflationSwapHelper {
     /// helpers sharing a start date all pick the same side. This constructor is
     /// the relative-date one, whose start date is the moving evaluation date and
     /// not a schedule input, so it is always the maturity arm - the fixed-date
-    /// constructor that would supply the other is #806.
+    /// constructor that would supply the other is not ported (see the module
+    /// deferrals).
     ///
     /// # Errors
     ///
@@ -1124,7 +1217,7 @@ mod tests {
         use crate::test_support::{Flag, as_observer};
         use crate::time::businessdayconvention::BusinessDayConvention;
         use crate::time::calendars::unitedkingdom::{Market, UnitedKingdom};
-        use crate::time::date::Month::{August, June, May};
+        use crate::time::date::Month::{August, June, May, September};
         use crate::time::daycounters::actual365fixed::Actual365Fixed;
         use crate::time::period::Period;
         use crate::time::timeunit::TimeUnit;
@@ -1254,6 +1347,83 @@ mod tests {
             assert_eq!(swap.maturity_date(), maturity());
             assert_eq!(swap.fixed_rate(), 0.0);
             assert_eq!(swap.nominal(), 1.0);
+        }
+
+        /// The fixed-date helper's inversion of
+        /// `moving_the_evaluation_date_rebuilds_the_swap`: its swap starts at
+        /// the given start date, not the evaluation date, and stays there when
+        /// that date moves - `updateDates_` is false, so the helper never
+        /// registers with the evaluation date (`cpp:100`, `cpp:193`). The #806
+        /// bootstrap oracles only count no-throws and are blind to this arm: a
+        /// port that wrongly stayed eval-date-registered would rebuild off the
+        /// moving date, never collide, and still pass them.
+        #[test]
+        fn a_fixed_date_helper_ignores_a_moving_evaluation_date() {
+            let settings = settings_today();
+            let start = Date::new(15, August, 2007);
+            let helper = ZeroCouponInflationSwapHelper::with_start_date(
+                Handle::new(shared(SimpleQuote::new(Some(0.03))) as Shared<dyn Quote>),
+                lag(),
+                start,
+                maturity(),
+                UnitedKingdom::new(Market::Settlement),
+                BusinessDayConvention::ModifiedFollowing,
+                Actual365Fixed::new(),
+                &an_index(&settings),
+                CpiInterpolationType::Flat,
+                Pillar::LastRelevantDate,
+                Shared::clone(&settings),
+            )
+            .expect("a three-month lag covers the index's availability");
+            assert_eq!(
+                helper
+                    .swap()
+                    .as_ref()
+                    .expect("the swap builds")
+                    .start_date(),
+                start
+            );
+            let pillar = helper.pillar_date();
+
+            settings.set_evaluation_date(Date::new(14, September, 2007));
+
+            assert_eq!(
+                helper
+                    .swap()
+                    .as_ref()
+                    .expect("the swap was not rebuilt")
+                    .start_date(),
+                start
+            );
+            assert_eq!(helper.pillar_date(), pillar);
+        }
+
+        /// The fixed-date helper weighs the [`Pillar::LastRelevantDate`] choice
+        /// on its start date, not its maturity (`cpp:132`). The maturity is the
+        /// one `the_weighted_pillar_takes_the_windows_far_end_late_in_the_month`
+        /// pins to the far end on the relative path; with a start date early in
+        /// its month (13 August 2007, `dt/dp` = 12/31), the near end wins
+        /// instead.
+        #[test]
+        fn the_fixed_date_helper_weighs_the_pillar_on_its_start_date() {
+            let settings = settings_today();
+            let helper = ZeroCouponInflationSwapHelper::with_start_date(
+                Handle::new(shared(SimpleQuote::new(Some(0.03))) as Shared<dyn Quote>),
+                lag(),
+                today(),
+                Date::new(25, August, 2008),
+                UnitedKingdom::new(Market::Settlement),
+                BusinessDayConvention::ModifiedFollowing,
+                Actual365Fixed::new(),
+                &an_index(&settings),
+                CpiInterpolationType::Linear,
+                Pillar::LastRelevantDate,
+                Shared::clone(&settings),
+            )
+            .expect("a valid lag");
+
+            assert_eq!(helper.earliest_date(), Date::new(1, May, 2008));
+            assert_eq!(helper.pillar_date(), Date::new(1, May, 2008));
         }
 
         /// The contract starts at the evaluation date and follows it, which is
