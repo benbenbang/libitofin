@@ -50,8 +50,8 @@ pub use blackvariancesurface::{BlackVarianceSurface, Extrapolation};
 pub use capfloor::{CapFloorTermVolSurface, CapFloorTermVolatilityStructure};
 pub use flatsmilesection::FlatSmileSection;
 pub use inflation::{
-    ConstantYoYOptionletVolatility, YoYOptionletVolatilitySurface,
-    YoYOptionletVolatilitySurfaceBase,
+    ConstantYoYOptionletVolatility, InterpolatedYoYOptionletVolatilityCurve,
+    YoYOptionletVolatilitySurface, YoYOptionletVolatilitySurfaceBase,
 };
 pub use interpolatedsmilesection::InterpolatedSmileSection;
 pub use localconstantvol::LocalConstantVol;

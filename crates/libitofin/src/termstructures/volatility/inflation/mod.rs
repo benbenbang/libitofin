@@ -55,9 +55,11 @@
 //! apiece on the same branch.
 
 mod constantyoyoptionletvol;
+mod interpolatedyoyoptionletvol;
 mod yoyoptionletvolsurfacebase;
 
 pub use constantyoyoptionletvol::ConstantYoYOptionletVolatility;
+pub use interpolatedyoyoptionletvol::InterpolatedYoYOptionletVolatilityCurve;
 pub use yoyoptionletvolsurfacebase::YoYOptionletVolatilitySurfaceBase;
 
 use crate::errors::QlResult;
