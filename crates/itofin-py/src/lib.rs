@@ -66,7 +66,8 @@ use heston::{PyHestonModel, PyHestonModelHelper, PyHestonProcess};
 use hullwhite::{PyEuribor, PyHullWhite, PyIborIndex, PySwaptionHelper};
 use inflation::{
     PyConstantYoYOptionletVolatility, PyCpiInterpolationType, PyDiscountingSwapEngine,
-    PyInterpolatedYoYInflationCurve, PyInterpolatedZeroInflationCurve, PyMakeYoYInflationCapFloor,
+    PyInterpolatedYoYInflationCurve, PyInterpolatedZeroInflationCurve,
+    PyKInterpolatedYoYOptionletVolatilitySurface, PyMakeYoYInflationCapFloor,
     PyMultiplicativePriceSeasonality, PyPiecewiseYoYInflationCurve, PyPiecewiseZeroInflationCurve,
     PyYearOnYearInflationSwap, PyYearOnYearInflationSwapHelper, PyYoYCapFloorTermPriceSurface,
     PyYoYInflationCapFloor, PyYoYInflationCapFloorEngine, PyYoYInflationHelper,
@@ -217,6 +218,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     termstructures.add_class::<PyPiecewiseYoYInflationCurve>()?;
     termstructures.add_class::<PyConstantYoYOptionletVolatility>()?;
     termstructures.add_class::<PyYoYCapFloorTermPriceSurface>()?;
+    termstructures.add_class::<PyKInterpolatedYoYOptionletVolatilitySurface>()?;
 
     let processes = PyModule::new(py, "processes")?;
     processes.add_class::<PyBlackScholesProcess>()?;
