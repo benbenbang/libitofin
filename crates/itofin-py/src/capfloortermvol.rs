@@ -256,7 +256,7 @@ fn check_grid<T>(rows: &[Vec<T>]) -> PyResult<usize> {
 }
 
 /// A `list[list[float]]` as a core [`Matrix`], one row per option tenor.
-fn matrix_from_rows(rows: &[Vec<f64>]) -> PyResult<Matrix> {
+pub(crate) fn matrix_from_rows(rows: &[Vec<f64>]) -> PyResult<Matrix> {
     let columns = check_grid(rows)?;
     let mut matrix = Matrix::with_size(rows.len(), columns);
     for (i, row) in rows.iter().enumerate() {

@@ -12,7 +12,9 @@
 //! [`PyConstantYoYOptionletVolatility`] surface, the
 //! [`PyYoYInflationCapFloorEngine`] pricing against it and the
 //! [`PyYoYInflationCapFloor`] it prices, which
-//! [`PyMakeYoYInflationCapFloor`] is the only way to build.
+//! [`PyMakeYoYInflationCapFloor`] is the only way to build, and the quoted
+//! [`PyYoYCapFloorTermPriceSurface`] cap/floor price grid the optionlet
+//! strippers read.
 //!
 //! The swap engine is generic rather than inflation-specific - it prices any
 //! swap - but is homed here because the inflation tickets are the first to need
@@ -62,6 +64,9 @@ use libitofin::termstructures::inflation::piecewiseyoyinflationcurve::PiecewiseY
 use libitofin::termstructures::inflation::piecewisezeroinflationcurve::PiecewiseZeroInflationCurve;
 use libitofin::termstructures::inflation::seasonality::{
     MultiplicativePriceSeasonality, Seasonality,
+};
+use libitofin::termstructures::inflation::yoycapfloortermpricesurface::{
+    InterpolatedYoYCapFloorTermPriceSurface, YoYCapFloorTermPriceSurface,
 };
 use libitofin::termstructures::volatility::{
     ConstantYoYOptionletVolatility, YoYOptionletVolatilitySurface,
@@ -2677,5 +2682,149 @@ impl PyYoYInflationCapFloor {
     /// Wraps the instrument the factory built.
     pub(crate) fn from_inner(inner: SharedMut<YoYInflationCapFloor>) -> Self {
         PyYoYInflationCapFloor { inner }
+    }
+}
+
+/// Python `YoYCapFloorTermPriceSurface`: the quoted year-on-year cap/floor
+/// price grid, bicubic-interpolated over strike and maturity with a cubic ATM
+/// swap rate curve through the cap/floor intersections (core
+/// `termstructures::inflation::yoycapfloortermpricesurface`, C++'s
+/// `InterpolatedYoYCapFloorTermPriceSurface<Bicubic, Cubic>`).
+///
+/// The facade holds the concrete interpolated surface; the K-interpolated
+/// optionlet stripping pipeline (#910) reads it back erased through a
+/// crate-internal upcast accessor, the same seam the engine facades use.
+///
+/// Construction only validates and stores the quotes. The calculations - the
+/// cap/floor intersection and the year-on-year bootstrap over its ATM swap
+/// rates - run on the first read and are cached, so a bad grid surfaces at the
+/// constructor and a failed solve at the first price or rate query. The
+/// reference date moves with the evaluation date carried by `settings`, which
+/// must be set before construction: the maturity checks resolve against it.
+///
+/// Deferred (visible): the remaining trait surface - `price` and the by-tenor
+/// query forms, `atm_yoy_rate`, the `atm_yoy_swap_time_rates`/`date_rates`
+/// vectors, the cap/floor strike splits, `yoy_ts` and `base_date` - is not
+/// exposed; nothing downstream of #909/#910 reads it from Python yet.
+#[pyclass(name = "YoYCapFloorTermPriceSurface", unsendable)]
+pub struct PyYoYCapFloorTermPriceSurface {
+    inner: Shared<InterpolatedYoYCapFloorTermPriceSurface>,
+}
+
+#[pymethods]
+impl PyYoYCapFloorTermPriceSurface {
+    /// A surface over quoted cap and floor prices by strike (rows) and
+    /// maturity (columns).
+    ///
+    /// # Errors
+    ///
+    /// Reports an empty or ragged price grid, and the core's data-consistency
+    /// gate: mismatched strike/maturity/grid dimensions, a non-increasing
+    /// axis, or a cap/floor strike union that overlaps the wrong way round.
+    #[new]
+    #[allow(clippy::too_many_arguments)]
+    fn new(
+        fixing_days: u32,
+        yy_lag: &PyPeriod,
+        yoy_index: &PyYoYInflationIndex,
+        interpolation: &PyCpiInterpolationType,
+        nominal_term_structure: &PyYieldTermStructure,
+        day_counter: &PyDayCounter,
+        calendar: &PyCalendar,
+        business_day_convention: &PyBusinessDayConvention,
+        c_strikes: Vec<f64>,
+        f_strikes: Vec<f64>,
+        cf_maturities: Vec<PyRef<'_, PyPeriod>>,
+        c_price: Vec<Vec<f64>>,
+        f_price: Vec<Vec<f64>>,
+        settings: &PySettings,
+    ) -> PyResult<Self> {
+        let inner = InterpolatedYoYCapFloorTermPriceSurface::new(
+            fixing_days,
+            yy_lag.inner(),
+            yoy_index.shared(),
+            interpolation.inner(),
+            nominal_term_structure.handle(),
+            day_counter.inner(),
+            calendar.inner(),
+            business_day_convention.inner(),
+            c_strikes,
+            f_strikes,
+            cf_maturities.iter().map(|period| period.inner()).collect(),
+            crate::capfloortermvol::matrix_from_rows(&c_price)?,
+            crate::capfloortermvol::matrix_from_rows(&f_price)?,
+            settings.inner(),
+        )
+        .map_err(PyQlError::from)?;
+        Ok(PyYoYCapFloorTermPriceSurface {
+            inner: shared(inner),
+        })
+    }
+
+    /// The interpolated cap price at `date` struck at `strike`, a pure surface
+    /// lookup with the spline's extrapolation enabled as in C++.
+    ///
+    /// # Errors
+    ///
+    /// Reports an unset evaluation date, and whatever stops the first-read
+    /// calculations: a failed intersection solve, an intersection outside its
+    /// arbitrage bounds past the extrapolation horizon, or a bootstrap that
+    /// cannot reprice its helpers.
+    fn cap_price(&self, date: &PyDate, strike: f64) -> PyResult<f64> {
+        Ok(self
+            .inner
+            .cap_price(date.inner(), strike)
+            .map_err(PyQlError::from)?)
+    }
+
+    /// The interpolated floor price at `date` struck at `strike`. See
+    /// [`cap_price`](Self::cap_price).
+    fn floor_price(&self, date: &PyDate, strike: f64) -> PyResult<f64> {
+        Ok(self
+            .inner
+            .floor_price(date.inner(), strike)
+            .map_err(PyQlError::from)?)
+    }
+
+    /// The ATM year-on-year swap rate at `date`, read off the cubic curve
+    /// through the cap/floor intersections. `extrapolate` defaults `True` as
+    /// in C++; passed `False`, a date outside the quoted maturities is an
+    /// error instead.
+    ///
+    /// # Errors
+    ///
+    /// As [`cap_price`](Self::cap_price), plus the range check when
+    /// `extrapolate` is `False`.
+    #[pyo3(signature = (date, extrapolate = true))]
+    fn atm_yoy_swap_rate(&self, date: &PyDate, extrapolate: bool) -> PyResult<f64> {
+        Ok(self
+            .inner
+            .atm_yoy_swap_rate(date.inner(), extrapolate)
+            .map_err(PyQlError::from)?)
+    }
+
+    /// The cap/floor strike union: every floor strike, then the cap strikes
+    /// above them.
+    fn strikes(&self) -> Vec<f64> {
+        self.inner.strikes().to_vec()
+    }
+
+    /// The quoted maturities, one per grid column.
+    fn maturities(&self) -> Vec<PyPeriod> {
+        self.inner
+            .maturities()
+            .iter()
+            .map(|&period| PyPeriod::from_inner(period))
+            .collect()
+    }
+}
+
+impl PyYoYCapFloorTermPriceSurface {
+    /// The erased surface the optionlet stripper facades (#910) take: the
+    /// concrete surface is held so the constructor's type survives, and the
+    /// upcast happens here (the newtype-loses-shared_ptr-upcast pattern).
+    #[allow(dead_code)]
+    pub(crate) fn shared(&self) -> Shared<dyn YoYCapFloorTermPriceSurface> {
+        Shared::clone(&self.inner) as Shared<dyn YoYCapFloorTermPriceSurface>
     }
 }
