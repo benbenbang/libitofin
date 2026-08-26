@@ -345,4 +345,55 @@ mod tests {
             );
         }
     }
+
+    /// The composition-trap pin (no C++ oracle covers it: the test above has
+    /// no curve): `forecastFixing` lives on `IborIndex` but calls
+    /// `valueDate`/`maturityDate` virtually, so the forecast must read the
+    /// curve between this subclass's three-calendar dates (23 Jan / 24 Apr for
+    /// a 20 Jan fixing), not the inner index's single-calendar ones
+    /// (22 Jan / 22 Apr). Over a steep zero curve the two pairs give visibly
+    /// different simple forwards, so a plain delegation cannot pass.
+    #[test]
+    fn forecast_fixing_reads_the_curve_between_the_overridden_dates() {
+        use crate::math::interpolations::linear::Linear;
+        use crate::termstructures::yields::InterpolatedZeroCurve;
+
+        let curve = shared(
+            InterpolatedZeroCurve::new(
+                vec![
+                    Date::new(2, Month::January, 2025),
+                    Date::new(1, Month::July, 2025),
+                ],
+                vec![0.02, 0.10],
+                Actual360::new(),
+                Linear,
+            )
+            .expect("two well-ordered nodes"),
+        ) as Shared<dyn YieldTermStructure>;
+
+        let (index, _, _, _) = custom_ibor();
+        let index = index.clone_with(Handle::new(Shared::clone(&curve)));
+
+        let fixing = Date::new(20, Month::January, 2025);
+        let d1 = index.value_date(fixing).unwrap();
+        let d2 = index.maturity_date(d1).unwrap();
+        assert_eq!(d1, Date::new(23, Month::January, 2025));
+        assert_eq!(d2, Date::new(24, Month::April, 2025));
+
+        let simple_forward = |d1: Date, d2: Date| {
+            let disc1 = curve.discount_date(d1, false).unwrap();
+            let disc2 = curve.discount_date(d2, false).unwrap();
+            (disc1 / disc2 - 1.0) / Actual360::new().year_fraction(d1, d2)
+        };
+        let expected = simple_forward(d1, d2);
+        let single_calendar = simple_forward(
+            Date::new(22, Month::January, 2025),
+            Date::new(22, Month::April, 2025),
+        );
+        assert!(
+            (expected - single_calendar).abs() > 1.0e-4,
+            "the fixture no longer discriminates the date pairs"
+        );
+        assert!((index.forecast_fixing(fixing).unwrap() - expected).abs() < 1.0e-15);
+    }
 }
