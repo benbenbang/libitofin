@@ -12,9 +12,10 @@
 //! [`PyConstantYoYOptionletVolatility`] surface, the
 //! [`PyYoYInflationCapFloorEngine`] pricing against it and the
 //! [`PyYoYInflationCapFloor`] it prices, which
-//! [`PyMakeYoYInflationCapFloor`] is the only way to build, and the quoted
+//! [`PyMakeYoYInflationCapFloor`] is the only way to build, the quoted
 //! [`PyYoYCapFloorTermPriceSurface`] cap/floor price grid the optionlet
-//! strippers read.
+//! strippers read, and the [`PyKInterpolatedYoYOptionletVolatilitySurface`]
+//! stripping that grid into an optionlet volatility surface.
 //!
 //! The swap engine is generic rather than inflation-specific - it prices any
 //! swap - but is homed here because the inflation tickets are the first to need
@@ -51,6 +52,7 @@ use libitofin::pricingengine::PricingEngine;
 use libitofin::pricingengines::{DiscountingSwapEngine, YoYInflationCapFloorEngine};
 use libitofin::settings::Settings;
 use libitofin::shared::{Shared, SharedMut, shared, shared_mut};
+use libitofin::termstructures::TermStructure;
 use libitofin::termstructures::inflation::inflationhelpers::{
     YearOnYearInflationSwapHelper, YoYInflationHelper, ZeroCouponInflationSwapHelper,
     ZeroInflationHelper,
@@ -69,7 +71,9 @@ use libitofin::termstructures::inflation::yoycapfloortermpricesurface::{
     InterpolatedYoYCapFloorTermPriceSurface, YoYCapFloorTermPriceSurface,
 };
 use libitofin::termstructures::volatility::{
-    ConstantYoYOptionletVolatility, YoYOptionletVolatilitySurface,
+    ConstantYoYOptionletVolatility, InterpolatedYoYOptionletStripper,
+    KInterpolatedYoYOptionletVolatilitySurface, VolatilityTermStructure, YoYOptionletStripper,
+    YoYOptionletVolatilitySurface,
 };
 use libitofin::termstructures::yieldtermstructure::YieldTermStructure;
 use libitofin::time::businessdayconvention::BusinessDayConvention;
@@ -2007,8 +2011,8 @@ impl PyYearOnYearInflationSwap {
 /// [`with_quote`](Self::with_quote) taking a live quote whose changes notify the
 /// surface's observers.
 ///
-/// Deferred (visible): the whole stripped/interpolated surface hierarchy, which
-/// has no port at all, tracked as #874.
+/// The stripped side of the hierarchy is bound as
+/// [`PyKInterpolatedYoYOptionletVolatilitySurface`] (#874/#910).
 #[pyclass(name = "ConstantYoYOptionletVolatility", unsendable)]
 pub struct PyConstantYoYOptionletVolatility {
     inner: Shared<ConstantYoYOptionletVolatility>,
@@ -2823,8 +2827,156 @@ impl PyYoYCapFloorTermPriceSurface {
     /// The erased surface the optionlet stripper facades (#910) take: the
     /// concrete surface is held so the constructor's type survives, and the
     /// upcast happens here (the newtype-loses-shared_ptr-upcast pattern).
-    #[allow(dead_code)]
     pub(crate) fn shared(&self) -> Shared<dyn YoYCapFloorTermPriceSurface> {
         Shared::clone(&self.inner) as Shared<dyn YoYCapFloorTermPriceSurface>
+    }
+}
+
+/// Python `KInterpolatedYoYOptionletVolatilitySurface`: the year-on-year
+/// optionlet volatility surface stripped out of a quoted
+/// [`PyYoYCapFloorTermPriceSurface`], interpolating linearly across the quoted
+/// strikes of each date's slice (core
+/// `termstructures::volatility::KInterpolatedYoYOptionletVolatilitySurface<Linear>`).
+///
+/// The stripping pipeline is built *inside* the constructor rather than passed
+/// in: the stripper reprices each optionlet through an engine whose volatility
+/// link it relinks every solver iteration, so engine and stripper must share
+/// one relinkable handle that starts empty. A caller-supplied engine would
+/// carry a handle the stripper never touches and the stripping would silently
+/// solve against nothing (the #387 cached-NPV trap the core test pins). The
+/// constructor therefore takes the `index` and `nominal_term_structure` the
+/// engine needs and wires the handle itself.
+///
+/// Construction runs the stripping, C++'s constructor-run
+/// `performCalculations`, so it is fallible and the evaluation date carried by
+/// `settings` must be set first.
+///
+/// [`volatility`](Self::volatility) observes inflation the surface's own
+/// `observation_lag` back, C++'s default-lag behaviour; the flat surface's
+/// explicit-lag form is not offered here because the K-surface's lag is fixed
+/// by the price surface it strips.
+///
+/// Deferred (visible): the pricer is pinned to the unit-displaced lognormal
+/// model, the one the oracle strips under; a standard-Black or Bachelier
+/// variant would need a distribution argument nothing reads from Python yet.
+/// `total_variance` is likewise not exposed.
+#[pyclass(name = "KInterpolatedYoYOptionletVolatilitySurface", unsendable)]
+pub struct PyKInterpolatedYoYOptionletVolatilitySurface {
+    inner: Shared<KInterpolatedYoYOptionletVolatilitySurface<Linear>>,
+    observation_lag: Period,
+}
+
+#[pymethods]
+impl PyKInterpolatedYoYOptionletVolatilitySurface {
+    /// A surface stripped from `cap_floor_prices`, optionlets repriced
+    /// through a unit-displaced engine forecasting off `index` and
+    /// discounting on `nominal_term_structure`; `slope` is the assumed
+    /// proportional change per year of the unobserved initial caplet
+    /// volatility.
+    ///
+    /// `index` must be linked to a year-on-year curve: the engine forecasts
+    /// each optionlet's forward off the index's own curve, not the price
+    /// surface's bootstrapped one.
+    ///
+    /// # Errors
+    ///
+    /// Reports whatever stops the stripping: an unset evaluation date, an
+    /// unlinked index, or a Brent solve that cannot bracket an optionlet
+    /// volatility.
+    #[new]
+    #[allow(clippy::too_many_arguments)]
+    fn new(
+        settlement_days: u32,
+        calendar: &PyCalendar,
+        business_day_convention: &PyBusinessDayConvention,
+        day_counter: &PyDayCounter,
+        observation_lag: &PyPeriod,
+        cap_floor_prices: &PyYoYCapFloorTermPriceSurface,
+        index: &PyYoYInflationIndex,
+        nominal_term_structure: &PyYieldTermStructure,
+        slope: f64,
+        settings: &PySettings,
+    ) -> PyResult<Self> {
+        let vol_handle = RelinkableHandle::<dyn YoYOptionletVolatilitySurface>::empty();
+        let pricer = shared_mut(YoYInflationCapFloorEngine::unit_displaced(
+            index.shared(),
+            vol_handle.handle(),
+            nominal_term_structure.handle(),
+        ));
+        let stripper = shared(InterpolatedYoYOptionletStripper::<Linear>::new())
+            as Shared<dyn YoYOptionletStripper>;
+        let inner = KInterpolatedYoYOptionletVolatilitySurface::<Linear>::new(
+            settlement_days,
+            calendar.inner(),
+            business_day_convention.inner(),
+            day_counter.inner(),
+            observation_lag.inner(),
+            cap_floor_prices.shared(),
+            &pricer,
+            &vol_handle,
+            stripper,
+            slope,
+            settings.inner(),
+        )
+        .map_err(PyQlError::from)?;
+        Ok(PyKInterpolatedYoYOptionletVolatilitySurface {
+            inner: shared(inner),
+            observation_lag: observation_lag.inner(),
+        })
+    }
+
+    /// The stripped (strikes, volatilities) profile at `date`, C++'s `Dslice`:
+    /// one volatility per strike of the price surface's cap/floor union.
+    ///
+    /// # Errors
+    ///
+    /// Reports a date the stripper cannot price a slice at.
+    fn d_slice(&self, date: &PyDate) -> PyResult<(Vec<f64>, Vec<f64>)> {
+        Ok(self.inner.d_slice(date.inner()).map_err(PyQlError::from)?)
+    }
+
+    /// The date the surface measures its variance from: the reference date
+    /// pulled back by the surface's own observation lag, snapped to the start
+    /// of the publication period.
+    ///
+    /// # Errors
+    ///
+    /// Reports an unset evaluation date, and a frequency admitting no
+    /// publication period.
+    fn base_date(&self) -> PyResult<PyDate> {
+        Ok(PyDate::from_inner(
+            self.inner.base_date().map_err(PyQlError::from)?,
+        ))
+    }
+
+    /// The volatility for an exercise on `date` struck at `strike`, observing
+    /// inflation the surface's own observation lag back: the slice at the
+    /// observed date interpolated across its strikes.
+    ///
+    /// # Errors
+    ///
+    /// Reports an observed date before [`base_date`](Self::base_date), and a
+    /// `strike` outside the surface's strike domain.
+    fn volatility(&self, date: &PyDate, strike: f64) -> PyResult<f64> {
+        Ok(self
+            .inner
+            .volatility(date.inner(), strike, self.observation_lag)
+            .map_err(PyQlError::from)?)
+    }
+
+    /// The lowest quoted strike of the price surface's cap/floor union.
+    fn min_strike(&self) -> f64 {
+        self.inner.min_strike()
+    }
+
+    /// The highest quoted strike of the price surface's cap/floor union.
+    fn max_strike(&self) -> f64 {
+        self.inner.max_strike()
+    }
+
+    /// The last date the surface answers for: the reference date advanced by
+    /// the price surface's last quoted maturity.
+    fn max_date(&self) -> PyDate {
+        PyDate::from_inner(self.inner.max_date())
     }
 }
