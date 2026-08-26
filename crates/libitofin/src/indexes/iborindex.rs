@@ -282,12 +282,11 @@ impl InterestRateIndex for OvernightIndex {
 mod tests {
     //! Oracles for the plain single-calendar `IborIndex`.
     //!
-    //! `indexes.cpp testCustomIborIndex` (:152) exercises `CustomIborIndex`, a
-    //! three-calendar variant (separate fixing/value/maturity calendars) that is
-    //! not ported here; its hard-coded bespoke-holiday date assertions (e.g.
-    //! `valueDate(7 Jan 2025) == 9 Jan 2025`) apply when that subclass lands.
-    //! Plain `IborIndex` has one calendar, so these tests cover only the
-    //! single-calendar subset.
+    //! `indexes.cpp testCustomIborIndex` (:152) exercises `CustomIborIndex`, the
+    //! three-calendar variant ported in
+    //! [`ibor::custom`](crate::indexes::ibor::custom), whose tests carry that
+    //! oracle's date assertions. Plain `IborIndex` has one calendar, so these
+    //! tests cover only the single-calendar subset.
 
     use super::*;
     use crate::handle::RelinkableHandle;
