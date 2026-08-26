@@ -62,6 +62,21 @@
     ],
     "@semantic-release/release-notes-generator",
     [
+      "@semantic-release/exec",
+      {
+        "prepareCmd": "sh scripts/set-version.sh ${nextRelease.version}"
+      }
+    ],
+    [
+      "@semantic-release/git",
+      {
+        "assets": [
+          "Cargo.toml"
+        ],
+        "message": "chore(release): update version to ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
+      }
+    ],
+    [
       "@semantic-release/github",
       {
         "failComment": false,
