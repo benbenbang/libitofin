@@ -37,19 +37,6 @@
 //! - C++ reads `dates.at(0)` in the initializer list *before* checking the
 //!   size, throwing `out_of_range` on an empty vector; here the size check
 //!   runs first and every input problem is a `QlError` per D4.
-//! - [`yoy_rate_impl`](YoYInflationTermStructure::yoy_rate_impl) evaluates the
-//!   interpolation without extrapolation where C++ always extrapolates
-//!   (`interpolatedyoyinflationcurve.hpp:149` passes `true`): the extrapolation
-//!   flag is carried per interpolation object and set at construction, so it
-//!   cannot be flipped through a generic [`Interpolator::Output`] - the
-//!   limitation already documented on the zero curve. The gap is bounded
-//!   exactly as it is there: the inflation range checks admit
-//!   `[base_date, max_date]`, whose ends are the interpolation's own `x_min`
-//!   (the base date *is* the first node) and `x_max` (the maximum date *is* the
-//!   last node), so every non-extrapolating query matches C++ and only an
-//!   explicit `extrapolate = true` or an
-//!   [`enable_extrapolation`](TermStructure::enable_extrapolation) past the
-//!   last node errors where C++ extends the end segment.
 
 use crate::errors::QlResult;
 use crate::math::interpolations::linear::Linear;
@@ -204,8 +191,22 @@ impl<I: Interpolator> InflationTermStructure for InterpolatedYoYInflationCurve<I
 }
 
 impl<I: Interpolator> YoYInflationTermStructure for InterpolatedYoYInflationCurve<I> {
+    /// C++ evaluates with extrapolation allowed at the interpolation level,
+    /// `interpolation_(t, true)` (`interpolatedyoyinflationcurve.hpp:149`);
+    /// range policy lives in the callers above, and this impl must assume
+    /// extrapolation is required. Past the last node the last segment
+    /// continues on its own slope, which for [`Linear`] is exactly C++'s
+    /// extension - the same extension #907 applied to
+    /// [`PiecewiseYoYInflationCurve`](super::piecewiseyoyinflationcurve::PiecewiseYoYInflationCurve).
     fn yoy_rate_impl(&self, t: Time) -> QlResult<Rate> {
-        self.curve.interpolation()?.value(t)
+        let interpolation = self.curve.interpolation()?;
+        let t_max = interpolation.x_max();
+        if t <= t_max {
+            return interpolation.value(t);
+        }
+        let value_max = interpolation.value(t_max)?;
+        let slope_max = interpolation.derivative(t_max)?;
+        Ok(value_max + slope_max * (t - t_max))
     }
 }
 
@@ -408,13 +409,26 @@ mod tests {
         assert!(!sample().has_seasonality());
     }
 
+    /// Past the last node the last segment continues on its own slope, as
+    /// C++'s `interpolation_(t, true)` extends it; the range check still gates
+    /// until extrapolation is requested, and the base date still bounds below.
     #[test]
-    fn extrapolating_past_the_last_node_errors_where_cpp_extends_the_end_segment() {
+    fn extrapolating_past_the_last_node_extends_the_end_segment_as_cpp_does() {
         let curve = sample();
         let beyond = curve.max_date() + Period::new(1, TimeUnit::Years);
 
-        let err = curve.yoy_rate_date(beyond, true).unwrap_err();
-        assert!(err.message().contains("extrapolation"));
+        let gated = curve.yoy_rate_date(beyond, false).unwrap_err();
+        assert!(gated.message().contains("is past max curve date"));
+
+        let (t_lo, t_hi) = (curve.times()[2], curve.times()[3]);
+        assert_eq!(t_lo, 673.0 / 360.0);
+        assert_eq!(t_hi, 1039.0 / 360.0);
+        let t = curve.time_from_reference(beyond).unwrap();
+        assert_eq!(t, 1404.0 / 360.0);
+        let expected = 0.026 + (0.026 - 0.024) / (t_hi - t_lo) * (t - t_hi);
+
+        let extended = curve.yoy_rate_date(beyond, true).unwrap();
+        assert!((extended - expected).abs() < 1.0e-12);
 
         let before = curve
             .yoy_rate_date(Date::new(15, Month::November, 2021), false)
