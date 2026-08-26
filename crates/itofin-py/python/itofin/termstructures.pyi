@@ -3658,3 +3658,141 @@ class ConstantYoYOptionletVolatility:
             ItofinError: On the same conditions volatility() reports.
         """
         ...
+
+class YoYCapFloorTermPriceSurface:
+    """The quoted year-on-year cap/floor price grid, bicubic-interpolated over
+    strike and maturity with a cubic ATM swap rate curve through the cap/floor
+    intersections.
+
+    Construction only validates and stores the quotes; the calculations - the
+    cap/floor intersection and the year-on-year bootstrap over its ATM swap
+    rates - run on the first read and are cached. The reference date moves with
+    the evaluation date carried by settings, which must be set before
+    construction.
+
+    A price alone does not say cap or floor without the ATM level, and ATM
+    prices are generally inaccurate, coming from extrapolation and
+    intersection: the quoted grid is the data, the ATM curve a derived read.
+    """
+
+    def __init__(
+        self,
+        fixing_days: int,
+        yy_lag: Period,
+        yoy_index: YoYInflationIndex,
+        interpolation: CpiInterpolationType,
+        nominal_term_structure: YieldTermStructure,
+        day_counter: DayCounter,
+        calendar: Calendar,
+        business_day_convention: BusinessDayConvention,
+        c_strikes: list[float],
+        f_strikes: list[float],
+        cf_maturities: list[Period],
+        c_price: list[list[float]],
+        f_price: list[list[float]],
+        settings: Settings,
+    ) -> None:
+        """Build the surface over quoted cap and floor prices.
+
+        Args:
+            fixing_days (int): The fixing days of the quoted instruments.
+            yy_lag (Period): The observation lag of the quoted instruments.
+            yoy_index (YoYInflationIndex): The year-on-year index the surface
+                is quoted on.
+            interpolation (CpiInterpolationType): How an observation
+                interpolates between the index fixings bracketing it.
+            nominal_term_structure (YieldTermStructure): The nominal discount
+                curve the derived year-on-year bootstrap prices against.
+            day_counter (DayCounter): The day count times are measured in.
+            calendar (Calendar): The calendar maturities resolve on.
+            business_day_convention (BusinessDayConvention): The roll applied
+                when resolving a date.
+            c_strikes (list[float]): The quoted cap strikes, one per cap grid
+                row; strictly increasing.
+            f_strikes (list[float]): The quoted floor strikes, one per floor
+                grid row; strictly increasing.
+            cf_maturities (list[Period]): The quoted maturities, one per grid
+                column; shared by both grids.
+            c_price (list[list[float]]): The cap prices, one row per cap
+                strike and one column per maturity.
+            f_price (list[list[float]]): The floor prices, one row per floor
+                strike and one column per maturity.
+            settings (Settings): The explicit settings supplying the
+                evaluation date the reference date moves with.
+
+        Raises:
+            ItofinError: On an empty or ragged price grid, on grid dimensions
+                that do not match the strikes and maturities, on a
+                non-increasing axis, and on a cap/floor strike union that
+                overlaps the wrong way round.
+        """
+        ...
+    def cap_price(self, date: Date, strike: float) -> float:
+        """Return the interpolated cap price at date struck at strike.
+
+        A pure surface lookup with the spline's extrapolation enabled, as in
+        C++.
+
+        Args:
+            date (Date): The maturity the price is read at.
+            strike (float): The strike the price is read at.
+
+        Returns:
+            float: The interpolated cap price.
+
+        Raises:
+            ItofinError: On an unset evaluation date, and on whatever stops
+                the first-read calculations: a failed intersection solve, an
+                intersection outside its arbitrage bounds past the
+                extrapolation horizon, or a bootstrap that cannot reprice its
+                helpers.
+        """
+        ...
+    def floor_price(self, date: Date, strike: float) -> float:
+        """Return the interpolated floor price at date struck at strike.
+
+        Args:
+            date (Date): The maturity the price is read at.
+            strike (float): The strike the price is read at.
+
+        Returns:
+            float: The interpolated floor price.
+
+        Raises:
+            ItofinError: On the same conditions cap_price() reports.
+        """
+        ...
+    def atm_yoy_swap_rate(self, date: Date, extrapolate: bool = True) -> float:
+        """Return the ATM year-on-year swap rate at date.
+
+        Read off the cubic curve through the cap/floor intersections.
+
+        Args:
+            date (Date): The maturity the rate is read at.
+            extrapolate (bool): Whether to answer outside the quoted
+                maturities; defaults True as in C++.
+
+        Returns:
+            float: The ATM year-on-year swap rate.
+
+        Raises:
+            ItofinError: On the same conditions cap_price() reports, and on a
+                date outside the quoted maturities when extrapolate is False.
+        """
+        ...
+    def strikes(self) -> list[float]:
+        """Return the cap/floor strike union.
+
+        Every floor strike, then the cap strikes above them.
+
+        Returns:
+            list[float]: The strike union, strictly increasing.
+        """
+        ...
+    def maturities(self) -> list[Period]:
+        """Return the quoted maturities, one per grid column.
+
+        Returns:
+            list[Period]: The maturities.
+        """
+        ...
