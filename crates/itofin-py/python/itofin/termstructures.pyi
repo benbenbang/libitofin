@@ -3796,3 +3796,141 @@ class YoYCapFloorTermPriceSurface:
             list[Period]: The maturities.
         """
         ...
+
+class KInterpolatedYoYOptionletVolatilitySurface:
+    """The year-on-year optionlet volatility surface stripped out of a quoted
+    YoYCapFloorTermPriceSurface, interpolating linearly across the quoted
+    strikes of each date's slice.
+
+    The stripping pipeline is built inside the constructor rather than passed
+    in: the stripper reprices each optionlet through an engine whose
+    volatility link it relinks every solver iteration, so engine and stripper
+    must share one relinkable handle that starts empty. The constructor
+    therefore takes the index and nominal curve the engine needs and wires the
+    handle itself; a caller-supplied engine would silently strip against
+    nothing.
+
+    Construction runs the stripping, so it is fallible and the evaluation date
+    carried by settings must be set first. The pricer is pinned to the
+    unit-displaced lognormal model.
+    """
+
+    def __init__(
+        self,
+        settlement_days: int,
+        calendar: Calendar,
+        business_day_convention: BusinessDayConvention,
+        day_counter: DayCounter,
+        observation_lag: Period,
+        cap_floor_prices: YoYCapFloorTermPriceSurface,
+        index: YoYInflationIndex,
+        nominal_term_structure: YieldTermStructure,
+        slope: float,
+        settings: Settings,
+    ) -> None:
+        """Strip cap_floor_prices into an optionlet volatility surface.
+
+        Args:
+            settlement_days (int): Days from the evaluation date to the
+                surface's reference date.
+            calendar (Calendar): The calendar the reference date resolves on.
+            business_day_convention (BusinessDayConvention): The roll applied
+                when resolving a date.
+            day_counter (DayCounter): The day count times are measured in.
+            observation_lag (Period): The lag the surface observes inflation
+                with, normally the price surface's own.
+            cap_floor_prices (YoYCapFloorTermPriceSurface): The quoted
+                cap/floor price grid to strip.
+            index (YoYInflationIndex): The year-on-year index the internal
+                engine forecasts off; it must be linked to a year-on-year
+                curve, which is the index's own rather than the price
+                surface's bootstrapped one.
+            nominal_term_structure (YieldTermStructure): The nominal discount
+                curve the internal engine discounts on.
+            slope (float): The assumed proportional change per year of the
+                unobserved initial caplet volatility, which the stripper
+                extends each strike's first observable volatility back with.
+            settings (Settings): The explicit settings supplying the
+                evaluation date; it must match the one behind index and
+                cap_floor_prices.
+
+        Raises:
+            ItofinError: On whatever stops the stripping: an unset evaluation
+                date, an unlinked index, or a solve that cannot bracket an
+                optionlet volatility.
+        """
+        ...
+    def d_slice(self, date: Date) -> tuple[list[float], list[float]]:
+        """Return the stripped (strikes, volatilities) profile at date.
+
+        C++'s Dslice: one volatility per strike of the price surface's
+        cap/floor union.
+
+        Args:
+            date (Date): The date the slice is stripped at.
+
+        Returns:
+            tuple[list[float], list[float]]: The quoted strike union and the
+                volatility stripped at each strike.
+
+        Raises:
+            ItofinError: On a date the stripper cannot price a slice at.
+        """
+        ...
+    def base_date(self) -> Date:
+        """Return the date the surface measures its variance from.
+
+        The reference date pulled back by the surface's own observation lag,
+        snapped to the start of the publication period.
+
+        Returns:
+            Date: The base date.
+
+        Raises:
+            ItofinError: On an unset evaluation date, and on a frequency
+                admitting no publication period.
+        """
+        ...
+    def volatility(self, date: Date, strike: float) -> float:
+        """Return the volatility for an exercise on date struck at strike.
+
+        Observes inflation the surface's own observation lag back, C++'s
+        default-lag behaviour: the slice at the observed date interpolated
+        across its strikes.
+
+        Args:
+            date (Date): The exercise date.
+            strike (float): The strike the volatility is read at.
+
+        Returns:
+            float: The optionlet volatility.
+
+        Raises:
+            ItofinError: On an observed date before base_date(), and on a
+                strike outside the surface's strike domain.
+        """
+        ...
+    def min_strike(self) -> float:
+        """Return the lowest quoted strike of the cap/floor union.
+
+        Returns:
+            float: The lowest strike the surface answers for.
+        """
+        ...
+    def max_strike(self) -> float:
+        """Return the highest quoted strike of the cap/floor union.
+
+        Returns:
+            float: The highest strike the surface answers for.
+        """
+        ...
+    def max_date(self) -> Date:
+        """Return the last date the surface answers for.
+
+        The reference date advanced by the price surface's last quoted
+        maturity.
+
+        Returns:
+            Date: The last queryable date.
+        """
+        ...
