@@ -29,20 +29,6 @@
 //! - C++ reads `dates.at(0)` in the initializer list *before* checking the
 //!   size, throwing `out_of_range` on an empty vector; here the size check
 //!   runs first and every input problem is a `QlError` per D4.
-//! - [`zero_rate_impl`](ZeroInflationTermStructure::zero_rate_impl) evaluates
-//!   the interpolation without extrapolation where C++ always extrapolates
-//!   (`interpolatedzeroinflationcurve.hpp:137` passes `true`): the
-//!   extrapolation flag is carried per interpolation object and set at
-//!   construction, so it cannot be flipped through a generic
-//!   [`Interpolator::Output`] - the limitation already documented on
-//!   [`BlackVarianceCurve`](crate::termstructures::volatility::BlackVarianceCurve).
-//!   The gap is exactly bounded: the inflation range checks admit
-//!   `[base_date, max_date]`, whose ends are the interpolation's own `x_min`
-//!   (the base date *is* the first node) and `x_max` (the maximum date *is*
-//!   the last node), so every non-extrapolating query matches C++ and only an
-//!   explicit `extrapolate = true` or an
-//!   [`enable_extrapolation`](TermStructure::enable_extrapolation) past the
-//!   last node errors where C++ extends the end segment.
 
 use crate::errors::QlResult;
 use crate::math::interpolations::linear::Linear;
@@ -194,8 +180,22 @@ impl<I: Interpolator> InflationTermStructure for InterpolatedZeroInflationCurve<
 }
 
 impl<I: Interpolator> ZeroInflationTermStructure for InterpolatedZeroInflationCurve<I> {
+    /// C++ evaluates with extrapolation allowed at the interpolation level,
+    /// `interpolation_(t, true)` (`interpolatedzeroinflationcurve.hpp:137`);
+    /// range policy lives in the callers above, and this impl must assume
+    /// extrapolation is required. Past the last node the last segment
+    /// continues on its own slope, which for [`Linear`] is exactly C++'s
+    /// extension - the same extension #806 applied to
+    /// [`PiecewiseZeroInflationCurve`](super::piecewisezeroinflationcurve::PiecewiseZeroInflationCurve).
     fn zero_rate_impl(&self, t: Time) -> QlResult<Rate> {
-        self.curve.interpolation()?.value(t)
+        let interpolation = self.curve.interpolation()?;
+        let t_max = interpolation.x_max();
+        if t <= t_max {
+            return interpolation.value(t);
+        }
+        let value_max = interpolation.value(t_max)?;
+        let slope_max = interpolation.derivative(t_max)?;
+        Ok(value_max + slope_max * (t - t_max))
     }
 }
 
@@ -357,16 +357,36 @@ mod tests {
         assert!(before.message().contains("is before base date"));
     }
 
+    /// Past the last node the last segment continues on its own slope, as
+    /// C++'s `interpolation_(t, true)` extends it; the range check still gates
+    /// until extrapolation is requested. The fixture's last segment is flat
+    /// (`0.03` to `0.03`), which a clamping bug would reproduce, so the last
+    /// rate is bumped to make the continuation discriminating.
     #[test]
-    fn extrapolating_past_the_last_node_errors_where_cpp_extends_the_end_segment() {
-        let curve = sample();
+    fn extrapolating_past_the_last_node_extends_the_end_segment_as_cpp_does() {
+        let mut rates = sample_rates();
+        let last = rates.len() - 1;
+        rates[last] = 0.032;
+        let curve = build(sample_dates(), rates).unwrap();
         let beyond = curve.max_date() + Period::new(1, TimeUnit::Years);
 
-        let err = curve.zero_rate_date(beyond, true).unwrap_err();
-        assert!(err.message().contains("extrapolation"));
+        let gated = curve.zero_rate_date(beyond, false).unwrap_err();
+        assert!(gated.message().contains("is past max curve date"));
+
+        let (t_lo, t_hi) = (curve.times()[last - 1], curve.times()[last]);
+        assert_eq!(t_lo, 1826.0 / 360.0);
+        assert_eq!(t_hi, 3652.0 / 360.0);
+        let t = curve
+            .time_from_reference(Date::new(1, Month::January, 2033))
+            .unwrap();
+        assert_eq!(t, 3992.0 / 360.0);
+        let expected = 0.032 + (0.032 - 0.03) / (t_hi - t_lo) * (t - t_hi);
+
+        let extended = curve.zero_rate_date(beyond, true).unwrap();
+        assert!((extended - expected).abs() < 1.0e-12);
 
         curve.enable_extrapolation();
-        assert!(curve.zero_rate_date(beyond, false).is_err());
+        assert_eq!(curve.zero_rate_date(beyond, false).unwrap(), extended);
     }
 
     fn build_err(dates: Vec<Date>, rates: Vec<Rate>) -> String {
