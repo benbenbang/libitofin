@@ -35,19 +35,19 @@
 //! (`isdacdsengine.cpp:128-129` on the yield side, `:146-147` on the credit
 //! side) - the rejection is the ported behaviour, not a missing feature.
 //!
-//! ## Deferred (#799)
+//! ## Deferred (#915)
 //!
-//! `InterpolatedForwardCurve<ForwardFlat>` (`isdacdsengine.cpp:121-124`) and
-//! `InterpolatedSurvivalProbabilityCurve<LogLinear>` (`:132-136`) are the two
-//! ISDA curve variants absent from this port: there is no `ForwardFlat`
-//! interpolator factory and no survival-probability curve yet. Their arms are
-//! simply missing, so such a curve reports the same error as any other
-//! unsupported shape.
+//! `InterpolatedSurvivalProbabilityCurve<LogLinear>` (`isdacdsengine.cpp:132-136`)
+//! is the one ISDA curve variant still absent from this port: there is no
+//! survival-probability curve yet. Its arm is simply missing, so such a curve
+//! reports the same error as any other unsupported shape.
+//! (`InterpolatedForwardCurve<ForwardFlat>`, the other variant #799 deferred,
+//! landed with the `ForwardFlat` factory.)
 
 use crate::errors::QlResult;
 use crate::fail;
 use crate::handle::Handle;
-use crate::math::interpolations::flat::BackwardFlat;
+use crate::math::interpolations::flat::{BackwardFlat, ForwardFlat};
 use crate::math::interpolations::loglinear::LogLinear;
 use crate::termstructures::bootstraptraits::{Discount, ForwardRate};
 use crate::termstructures::credit::defaulttermstructure::DefaultProbabilityTermStructure;
@@ -118,6 +118,9 @@ fn yield_curve_dates(curve: &dyn YieldTermStructure) -> QlResult<Vec<Date>> {
     }
     if let Some(curve) = any.downcast_ref::<PiecewiseYieldCurve<ForwardRate, BackwardFlat>>() {
         return curve.dates();
+    }
+    if let Some(curve) = any.downcast_ref::<InterpolatedForwardCurve<ForwardFlat>>() {
+        return Ok(curve.dates().to_vec());
     }
     if any.is::<FlatForward>() {
         return Ok(Vec::new());
@@ -281,6 +284,38 @@ mod tests {
             maturity(),
         )
         .expect("a backward-flat forward curve is supported");
+        assert_eq!(
+            grid, dates,
+            "the arm is reached through the grid, not only directly"
+        );
+    }
+
+    /// `isdacdsengine.cpp:121-124` (arm `castY3`): the forward-flat sibling of
+    /// the backward-flat arm above.
+    #[test]
+    fn forward_flat_curve_is_downcastable_to_its_pillar_dates() {
+        let dates = dates_at(&YIELD_OFFSETS);
+        let curve = shared(
+            InterpolatedForwardCurve::new(
+                dates.clone(),
+                vec![0.02, 0.021, 0.022, 0.023],
+                day_counter(),
+                ForwardFlat,
+            )
+            .expect("the forward nodes are well formed"),
+        );
+        let any = YieldTermStructure::as_any(&*curve).expect("the curve opts into the seam");
+        let recovered = any
+            .downcast_ref::<InterpolatedForwardCurve<ForwardFlat>>()
+            .expect("the curve is forward-flat interpolated");
+        assert_eq!(recovered.dates(), dates);
+
+        let grid = isda_node_grid(
+            &yield_handle(curve),
+            &credit_handle(flat_hazard_rate()),
+            maturity(),
+        )
+        .expect("a forward-flat forward curve is supported");
         assert_eq!(
             grid, dates,
             "the arm is reached through the grid, not only directly"

@@ -28,6 +28,20 @@ impl Interpolator for BackwardFlat {
     }
 }
 
+/// Factory for [`ForwardFlatInterpolation`] (QuantLib's `ForwardFlat` traits
+/// class); unlike backward-flat, two nodes are required (`requiredPoints = 2`,
+/// the trait default).
+#[derive(Clone, Copy, Default)]
+pub struct ForwardFlat;
+
+impl Interpolator for ForwardFlat {
+    type Output = ForwardFlatInterpolation;
+
+    fn interpolate(&self, x: &[Real], y: &[Real]) -> QlResult<ForwardFlatInterpolation> {
+        ForwardFlatInterpolation::new(x.to_vec(), y.to_vec())
+    }
+}
+
 /// Validate the `(x, y)` nodes: equal length of at least `min_points`, finite,
 /// strictly increasing `x`. QuantLib requires 1 point for backward-flat and 2 for
 /// forward-flat (`requiredPoints`), so the minimum is passed in.
@@ -325,6 +339,16 @@ mod tests {
         assert_eq!(f.value(0.5).unwrap(), 4.0);
         assert_eq!(BackwardFlat.required_points(), 1);
         assert!(BackwardFlat.interpolate(&[1.0], &[2.5]).is_ok());
+    }
+
+    #[test]
+    fn forward_flat_factory_takes_the_left_node_and_requires_two() {
+        let f = ForwardFlat
+            .interpolate(&[0.0, 1.0, 3.0], &[5.0, 4.0, 2.0])
+            .unwrap();
+        assert_eq!(f.value(0.5).unwrap(), 5.0);
+        assert_eq!(ForwardFlat.required_points(), 2);
+        assert!(ForwardFlat.interpolate(&[1.0], &[2.5]).is_err());
     }
 
     #[test]

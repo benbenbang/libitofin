@@ -205,6 +205,7 @@ where
 mod tests {
     use super::*;
     use crate::interestrate::Compounding;
+    use crate::math::interpolations::flat::ForwardFlat;
     use crate::math::interpolations::linear::Linear;
     use crate::time::date::Month;
     use crate::time::daycounters::actual360::Actual360;
@@ -359,6 +360,29 @@ mod tests {
 
         let df = curve.discount(2.0, false).unwrap();
         assert!((df - (-0.10_f64).exp()).abs() < 1.0e-15);
+    }
+
+    // The forward-flat twin of the test above, on the same nodes: a segment
+    // takes the LEFT node (`forward_flat_matches_oracle`, flat.rs), so a
+    // backward-flat mis-wire of the `ForwardFlat` factory shifts every zero.
+    #[test]
+    fn forward_flat_forwards_average_into_zeros() {
+        let curve = InterpolatedForwardCurve::new(
+            vec![reference(), reference() + 360, reference() + 720],
+            vec![0.03, 0.04, 0.06],
+            Actual360::new(),
+            ForwardFlat,
+        )
+        .unwrap();
+        // Segment forwards are the left nodes: 0.03 on [0,1), 0.04 on [1,2)
+        // (backward-flat would give 0.04 and 0.06).
+        assert!((curve.zero_yield_impl(1.0).unwrap() - 0.03).abs() < 1.0e-15);
+        assert!((curve.zero_yield_impl(2.0).unwrap() - 0.035).abs() < 1.0e-15);
+        assert!((curve.zero_yield_impl(0.5).unwrap() - 0.03).abs() < 1.0e-15);
+        assert_eq!(curve.zero_yield_impl(0.0).unwrap(), 0.03);
+
+        let df = curve.discount(2.0, false).unwrap();
+        assert!((df - (-0.07_f64).exp()).abs() < 1.0e-15);
     }
 
     #[test]
