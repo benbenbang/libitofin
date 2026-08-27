@@ -1322,6 +1322,7 @@ mod analytics_tests {
     use crate::time::date::{Month, Year};
     use crate::time::daycounters::actual360::Actual360;
     use crate::time::daycounters::actual365fixed::Actual365Fixed;
+    use crate::time::daycounters::actualactual::{ActualActual, Convention};
     use crate::time::frequency::Frequency;
     use crate::time::schedule::MakeSchedule;
     use crate::types::Rate;
@@ -2208,6 +2209,169 @@ mod analytics_tests {
             CashFlows::atm_rate(&leg, &curve, &settings, None, None, None, None).unwrap(),
             0.0
         );
+    }
+
+    /// A semiannual yield on `Actual360`, so a flow `days` after today sits at
+    /// `t = days / 360` and the first compounding period ends at `t = 0.5`.
+    fn semiannual_360(rate: Rate, compounding: Compounding) -> InterestRate {
+        InterestRate::new(rate, Actual360::new(), compounding, Frequency::Semiannual).unwrap()
+    }
+
+    /// A single plain flow `days` after today.
+    fn single_flow_leg(days: i32) -> Leg {
+        vec![shared(SimpleCashFlow::new(NOMINAL, today() + days).unwrap()) as Shared<dyn CashFlow>]
+    }
+
+    /// **Self-consistency.** No `bonds.cpp` case quotes a hybrid yield, so the
+    /// convention switch of `effective_compounding` has no C++ oracle. Away
+    /// from `t = 1/n` a hybrid yield *is* the matching pure convention: the
+    /// discount factor and the derivative formula follow the same code paths,
+    /// so duration and convexity must match to the bit. Below the first
+    /// semiannual period (`t = 150/360`) `SimpleThenCompounded` is `Simple`
+    /// and `CompoundedThenSimple` is `Compounded`; above it (`t = 210/360`)
+    /// the roles swap. The cross-convention inequalities pin that the two
+    /// pure results really differ, so each equality picks out one arm.
+    #[test]
+    fn a_hybrid_yield_is_the_pure_convention_on_each_side_of_the_switch() {
+        let settings = settings();
+        let dur = |leg: &Leg, rate: &InterestRate| {
+            CashFlows::duration(leg, rate, Duration::Modified, &settings, None, None, None).unwrap()
+        };
+        let conv = |leg: &Leg, rate: &InterestRate| {
+            CashFlows::convexity(leg, rate, &settings, None, None, None).unwrap()
+        };
+        let rate = |compounding| semiannual_360(0.04, compounding);
+        let stc = rate(Compounding::SimpleThenCompounded);
+        let cts = rate(Compounding::CompoundedThenSimple);
+        let simple = rate(Compounding::Simple);
+        let compounded = rate(Compounding::Compounded);
+
+        let below = single_flow_leg(150);
+        assert_eq!(dur(&below, &stc), dur(&below, &simple));
+        assert_eq!(conv(&below, &stc), conv(&below, &simple));
+        assert_eq!(dur(&below, &cts), dur(&below, &compounded));
+        assert_eq!(conv(&below, &cts), conv(&below, &compounded));
+        assert_ne!(dur(&below, &simple), dur(&below, &compounded));
+
+        let above = single_flow_leg(210);
+        assert_eq!(dur(&above, &stc), dur(&above, &compounded));
+        assert_eq!(conv(&above, &stc), conv(&above, &compounded));
+        assert_eq!(dur(&above, &cts), dur(&above, &simple));
+        assert_eq!(conv(&above, &cts), conv(&above, &simple));
+        assert_ne!(dur(&above, &simple), dur(&above, &compounded));
+    }
+
+    /// **Self-consistency**, as above. At exactly `t = 1/n` the two
+    /// conventions price identically - `1 + r t` equals `(1 + r/n)^(n t)`
+    /// there, and so do the duration and convexity formulas - which is what
+    /// makes the hybrid switch seamless; the last pair of assertions pins that
+    /// seam. The branches are still asymmetric: `SimpleThenCompounded` keeps
+    /// `Simple` at the boundary (`t <= 1/n` is inclusive) while
+    /// `CompoundedThenSimple` keeps `Compounded` (`t > 1/n` is strict), and
+    /// each must land on its own pure convention to the bit. The rate is
+    /// chosen so that the two convexity arms round differently in the last
+    /// place: a hybrid sent down the wrong arm at the boundary would not
+    /// reproduce its own convention's bits.
+    #[test]
+    fn the_hybrid_yield_switch_is_exact_at_the_first_period_boundary() {
+        let settings = settings();
+        let dur = |leg: &Leg, rate: &InterestRate| {
+            CashFlows::duration(leg, rate, Duration::Modified, &settings, None, None, None).unwrap()
+        };
+        let conv = |leg: &Leg, rate: &InterestRate| {
+            CashFlows::convexity(leg, rate, &settings, None, None, None).unwrap()
+        };
+        let rate = |compounding| semiannual_360(0.04, compounding);
+        let stc = rate(Compounding::SimpleThenCompounded);
+        let cts = rate(Compounding::CompoundedThenSimple);
+        let simple = rate(Compounding::Simple);
+        let compounded = rate(Compounding::Compounded);
+
+        let boundary = single_flow_leg(180);
+        assert_eq!(dur(&boundary, &stc), dur(&boundary, &simple));
+        assert_eq!(conv(&boundary, &stc), conv(&boundary, &simple));
+        assert_eq!(dur(&boundary, &cts), dur(&boundary, &compounded));
+        assert_eq!(conv(&boundary, &cts), conv(&boundary, &compounded));
+
+        assert!((dur(&boundary, &stc) - dur(&boundary, &cts)).abs() < 1e-15);
+        assert!((conv(&boundary, &stc) - conv(&boundary, &cts)).abs() < 1e-15);
+    }
+
+    /// **Self-consistency.** The `bonds.cpp` oracle legs are all-coupon, so
+    /// the non-coupon arms of `stepwise_discount_time` - the faked reference
+    /// periods - have no C++ oracle. Under the reference-date
+    /// `ActualActual (ISMA)` counter the reference period is load-bearing,
+    /// and the ladder is hand-computed from the arms' own rules:
+    ///
+    /// - the redemption, with no flow before it, is measured against the year
+    ///   ending at its payment date: `t1 = 90/365` (15 Jan to 15 Apr 2026
+    ///   over the 365-day year up to 15 Apr 2026);
+    /// - the coupon spans its own accrual period, 15 Apr to 15 Oct 2026, a
+    ///   6-month reference period: a step of exactly `0.5`;
+    /// - the trailing plain flow is measured against the gap from the flow
+    ///   before it, 90 days rounding to a 3-month period: a step of `0.25`,
+    ///   not the `90/365` the faked year would give.
+    ///
+    /// A continuously compounded yield discounts each flow by `exp(-y t)`, so
+    /// the simple duration must be the discounted-time average of the ladder
+    /// and the convexity its squared average.
+    #[test]
+    fn the_non_coupon_flows_are_stepped_over_faked_reference_periods() {
+        let settings = settings();
+        let first = day(Month::April, 2026);
+        let accrual_end = day(Month::October, 2026);
+        let leg: Leg = vec![
+            shared(Redemption::new(30.0, first).unwrap()) as Shared<dyn CashFlow>,
+            shared(FixedRateCoupon::from_rate(
+                accrual_end,
+                NOMINAL,
+                RATE,
+                Actual360::new(),
+                first,
+                accrual_end,
+                None,
+                None,
+                None,
+            )) as Shared<dyn CashFlow>,
+            shared(SimpleCashFlow::new(20.0, accrual_end + 90).unwrap()) as Shared<dyn CashFlow>,
+        ];
+        let yield_rate = InterestRate::new(
+            FORWARD,
+            ActualActual::with_convention(Convention::ISMA),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )
+        .unwrap();
+
+        let t1 = 90.0 / 365.0;
+        let t2 = t1 + 0.5;
+        let t3 = t2 + 0.25;
+        let amounts = [30.0, NOMINAL * RATE * 183.0 / 360.0, 20.0];
+        let mut present_value = 0.0;
+        let mut weighted_time = 0.0;
+        let mut weighted_time_squared = 0.0;
+        for (amount, t) in amounts.iter().zip([t1, t2, t3]) {
+            let discounted = amount * (-FORWARD * t).exp();
+            present_value += discounted;
+            weighted_time += t * discounted;
+            weighted_time_squared += t * t * discounted;
+        }
+
+        let duration = CashFlows::duration(
+            &leg,
+            &yield_rate,
+            Duration::Simple,
+            &settings,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        assert!((duration - weighted_time / present_value).abs() < 1e-14);
+
+        let convexity =
+            CashFlows::convexity(&leg, &yield_rate, &settings, None, None, None).unwrap();
+        assert!((convexity - weighted_time_squared / present_value).abs() < 1e-14);
     }
 }
 
