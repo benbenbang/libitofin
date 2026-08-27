@@ -29,9 +29,8 @@ use pyo3::prelude::*;
 /// `ItofinError`: exactly one of `steps` / `steps_per_year` must be given, and
 /// `samples` and `absolute_tolerance` are mutually exclusive.
 ///
-/// `antithetic` is accepted but not yet supported by the core engine, so
-/// passing `True` raises `ItofinError` at construction rather than silently
-/// pricing without the variance reduction (#772).
+/// `antithetic` enables the antithetic-variate variance reduction in the core
+/// engine (#772 lifted the former construction-time rejection).
 ///
 /// Pricing is seeded and deterministic: the same `seed` reproduces the NPV
 /// bitwise, and the resulting standard error is read back through
