@@ -71,7 +71,8 @@
       "@semantic-release/git",
       {
         "assets": [
-          "Cargo.toml"
+          "Cargo.toml",
+          "Cargo.lock"
         ],
         "message": "chore(release): update version to ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
       }
