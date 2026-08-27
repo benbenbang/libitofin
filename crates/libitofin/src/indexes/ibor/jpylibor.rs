@@ -60,18 +60,28 @@ impl JpyLibor {
 
 #[cfg(test)]
 mod tests {
-    //! Oracles for `JPYLibor`: the `jpylibor.hpp:44-53` configuration table
-    //! plus a maturity pin over the actual joint calendar, mirroring the
-    //! `usdlibor.rs` oracles.
+    //! Oracles for `JPYLibor`: the `jpylibor.hpp:44-53` configuration table,
+    //! a maturity pin over the actual joint calendar mirroring the
+    //! `usdlibor.rs` oracles, and the `testJpyLibor` bootstrap round-trip
+    //! (`piecewiseyieldcurve.cpp:964`).
 
     use super::*;
     use crate::indexes::index::Index;
     use crate::indexes::interestrateindex::InterestRateIndex;
+    use crate::instruments::MakeVanillaSwap;
+    use crate::math::interpolations::loglinear::LogLinear;
+    use crate::quotes::{Quote, SimpleQuote};
     use crate::shared::shared;
+    use crate::termstructures::bootstraphelper::RateHelper;
+    use crate::termstructures::bootstraptraits::Discount;
+    use crate::termstructures::yields::{PiecewiseYieldCurve, SwapRateHelper};
     use crate::time::businessdayconvention::BusinessDayConvention;
     use crate::time::calendars::unitedkingdom::{Market as UkMarket, UnitedKingdom};
     use crate::time::date::Month;
+    use crate::time::daycounters::thirty360::{Convention, Thirty360};
+    use crate::time::frequency::Frequency;
     use crate::time::timeunit::TimeUnit;
+    use crate::types::Rate;
 
     fn jpy_libor_6m(settings: Shared<Settings<Date>>) -> IborIndex {
         JpyLibor::new(Period::new(6, TimeUnit::Months), Handle::empty(), settings)
@@ -147,5 +157,111 @@ mod tests {
 
         let clone = index.clone_with(Handle::empty());
         assert_eq!(clone.maturity_date(v).unwrap(), maturity);
+    }
+
+    // (n-in-years, rate-in-percent), transcribed from the shared `swapData`
+    // table of piecewiseyieldcurve.cpp.
+    const SWAP_DATA: [(i32, Rate); 15] = [
+        (1, 4.54),
+        (2, 4.63),
+        (3, 4.75),
+        (4, 4.86),
+        (5, 4.99),
+        (6, 5.11),
+        (7, 5.23),
+        (8, 5.33),
+        (9, 5.41),
+        (10, 5.47),
+        (12, 5.60),
+        (15, 5.75),
+        (20, 5.89),
+        (25, 5.95),
+        (30, 5.96),
+    ];
+
+    /// `testJpyLibor` (`piecewiseyieldcurve.cpp:964`): on 4 October 2007 a
+    /// `PiecewiseYieldCurve<Discount, LogLinear>` is bootstrapped from
+    /// JPYLibor6M swap helpers on the Japan calendar (spot two Japan business
+    /// days after today, skipping the 8 October Health and Sports Day), and
+    /// each input swap repriced off the curve is at par within 1e-9. The
+    /// fixed-leg conventions are the C++ `CommonVars` defaults: annual,
+    /// unadjusted, Thirty360 BondBasis. The `nodes()` call pins that the
+    /// solved curve is introspectable without error.
+    #[test]
+    fn jpy_libor_swap_curve_reprices_its_input_swaps() {
+        let settings = shared(Settings::<Date>::new());
+        let today = Date::new(4, Month::October, 2007);
+        settings.set_evaluation_date(today);
+        let calendar = Japan::new();
+        let settlement = calendar.advance(
+            today,
+            2,
+            TimeUnit::Days,
+            BusinessDayConvention::Following,
+            false,
+        );
+
+        let index = jpy_libor_6m(settings.clone());
+        let mut instruments: Vec<Shared<dyn RateHelper>> = Vec::new();
+        for (n, rate) in SWAP_DATA {
+            let quote = Handle::new(shared(SimpleQuote::new(rate / 100.0)) as Shared<dyn Quote>);
+            instruments.push(SwapRateHelper::new(
+                quote,
+                Period::new(n, TimeUnit::Years),
+                calendar.clone(),
+                Frequency::Annual,
+                BusinessDayConvention::Unadjusted,
+                Thirty360::with_convention(Convention::BondBasis),
+                &index,
+            ) as Shared<dyn RateHelper>);
+        }
+
+        let curve = PiecewiseYieldCurve::<Discount, LogLinear>::new(
+            settlement,
+            instruments,
+            Actual360::new(),
+            LogLinear,
+        )
+        .unwrap();
+        curve
+            .nodes()
+            .expect("the bootstrapped curve exposes its nodes");
+        let handle: Handle<dyn YieldTermStructure> =
+            Handle::new(curve as Shared<dyn YieldTermStructure>);
+
+        let jpylibor6m = shared(
+            JpyLibor::new(
+                Period::new(6, TimeUnit::Months),
+                handle.clone(),
+                settings.clone(),
+            )
+            .expect("a 6M JPYLibor tenor is valid"),
+        );
+        for (n, rate) in SWAP_DATA {
+            let mut swap = MakeVanillaSwap::new(
+                Period::new(n, TimeUnit::Years),
+                Shared::clone(&jpylibor6m),
+                Some(0.0),
+                Period::new(0, TimeUnit::Days),
+                settings.clone(),
+            )
+            .with_effective_date(settlement)
+            .with_discounting_term_structure(handle.clone())
+            .with_fixed_leg_day_count(Thirty360::with_convention(Convention::BondBasis))
+            .with_fixed_leg_tenor(Period::try_from(Frequency::Annual).unwrap())
+            .with_fixed_leg_convention(BusinessDayConvention::Unadjusted)
+            .with_fixed_leg_termination_date_convention(BusinessDayConvention::Unadjusted)
+            .with_fixed_leg_calendar(calendar.clone())
+            .with_floating_leg_calendar(calendar.clone())
+            .build()
+            .unwrap();
+
+            let estimated = swap.fixed_vs_floating_mut().fair_rate().unwrap();
+            let expected = rate / 100.0;
+            assert!(
+                (estimated - expected).abs() <= 1.0e-9,
+                "{n} year(s) swap: estimated {estimated} vs expected {expected}"
+            );
+        }
     }
 }
