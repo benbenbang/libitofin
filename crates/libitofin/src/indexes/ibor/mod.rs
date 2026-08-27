@@ -14,10 +14,12 @@ pub mod custom;
 pub mod eonia;
 pub mod estr;
 pub mod euribor;
+pub mod libor;
 pub mod sofr;
 
 pub use custom::CustomIborIndex;
 pub use eonia::Eonia;
 pub use estr::Estr;
 pub use euribor::Euribor;
+pub use libor::Libor;
 pub use sofr::Sofr;

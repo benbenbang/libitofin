@@ -127,6 +127,16 @@ impl IborIndex {
         self.maturity_calendar.clone()
     }
 
+    /// Points the value roll at `calendar` (used by the Libor constructor).
+    pub(crate) fn set_value_calendar(&mut self, calendar: Calendar) {
+        self.value_calendar = calendar;
+    }
+
+    /// Points the maturity roll at `calendar` (used by the Libor constructor).
+    pub(crate) fn set_maturity_calendar(&mut self, calendar: Calendar) {
+        self.maturity_calendar = calendar;
+    }
+
     /// Rebuilds this index onto a different forwarding curve, copying every
     /// other configuration field verbatim (`clone`, `iborindex.cpp:85-93`).
     ///
