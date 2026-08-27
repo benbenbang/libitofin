@@ -46,6 +46,7 @@ jobs:
         run: |
           VER="${{ needs.semantic-release.outputs.new_release_tag }}"
           sed -i -E "s/^version = \"[0-9]+\.[0-9]+\.[0-9]+\"/version = \"${VER}\"/" Cargo.toml
+          grep -qF "version = \"${VER}\"" Cargo.toml || { echo "version sync failed: workspace version does not match ${VER}"; exit 1; }
           grep -E "^version" Cargo.toml
       - name: authenticate to crates.io via OIDC trusted publishing
         uses: rust-lang/crates-io-auth-action@v1
