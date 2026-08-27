@@ -11,8 +11,13 @@
 //! and off month-end, `Months`/`Years` roll `ModifiedFollowing` and on month-end
 //! (`euriborConvention` / `euriborEOM` in `euribor.cpp`).
 //!
-//! Deferred (separate tickets, per #301): `Euribor365` (the Actual/365 variant),
-//! the daily-tenor `DailyTenor` constructors, and the rest of the Libor family.
+//! [`Euribor365`] is the same configuration with an [`Actual365Fixed`] day
+//! counter: the rate adjusted for the mismatch between the actual/360
+//! convention used for Euribor and the actual/365 convention previously used by
+//! a few pre-EUR currencies.
+//!
+//! Deferred (separate tickets, per #301): the daily-tenor `DailyTenor`
+//! constructors and the rest of the Libor family.
 
 use crate::currency::Currency;
 use crate::errors::QlResult;
@@ -26,6 +31,7 @@ use crate::time::businessdayconvention::BusinessDayConvention;
 use crate::time::calendars::target::Target;
 use crate::time::date::Date;
 use crate::time::daycounters::actual360::Actual360;
+use crate::time::daycounters::actual365fixed::Actual365Fixed;
 use crate::time::period::Period;
 use crate::time::timeunit::TimeUnit;
 use crate::{fail, require};
@@ -122,6 +128,51 @@ impl Euribor {
     }
 }
 
+/// The Actual/365 Euribor index (`ql/indexes/ibor/euribor.hpp`).
+///
+/// A zero-sized namespace for the Euribor365 constructor: the Euribor rate
+/// adjusted for the mismatch between the actual/360 convention used for
+/// Euribor and the actual/365 convention previously used by a few pre-EUR
+/// currencies.
+pub struct Euribor365;
+
+impl Euribor365 {
+    /// Builds a Euribor365 index of the given `tenor` over the `forwarding`
+    /// curve.
+    ///
+    /// Mirrors the C++ `Euribor365::Euribor365(tenor, h)` constructor: family
+    /// name "Euribor365", two settlement days, [`EUR`](Currency::eur), the
+    /// [`Target`] calendar, the tenor-dependent convention and end-of-month
+    /// flag, and an [`Actual365Fixed`] day counter. Daily tenors are rejected
+    /// with the C++ message (they need the dedicated `DailyTenor` constructor,
+    /// not ported yet).
+    #[allow(clippy::new_ret_no_self)]
+    pub fn new(
+        tenor: Period,
+        forwarding: Handle<dyn YieldTermStructure>,
+        settings: Shared<Settings<Date>>,
+    ) -> QlResult<IborIndex> {
+        let index = IborIndex::new(
+            "Euribor365".into(),
+            tenor,
+            2,
+            Currency::eur(),
+            Target::new(),
+            euribor_convention(tenor)?,
+            euribor_eom(tenor)?,
+            Actual365Fixed::new(),
+            forwarding,
+            settings,
+        );
+        require!(
+            index.tenor().units() != TimeUnit::Days,
+            "for daily tenors ({}) dedicated DailyTenor constructor must be used",
+            index.tenor()
+        );
+        Ok(index)
+    }
+}
+
 /// The tenor-dependent business-day convention (`euriborConvention`).
 fn euribor_convention(tenor: Period) -> QlResult<BusinessDayConvention> {
     match tenor.units() {
@@ -187,6 +238,43 @@ mod tests {
             BusinessDayConvention::ModifiedFollowing
         );
         assert!(index.end_of_month());
+    }
+
+    /// `euribor.cpp` construction: a 6-month `Euribor365` composes the name,
+    /// carries two fixing days, EUR, TARGET, and Actual/365 (Fixed), and (a
+    /// `Months` tenor) rolls `ModifiedFollowing` on month-end.
+    #[test]
+    fn euribor365_matches_the_quantlib_construction_table() {
+        let settings = shared(Settings::<Date>::new());
+        let index =
+            Euribor365::new(Period::new(6, TimeUnit::Months), Handle::empty(), settings).unwrap();
+
+        assert_eq!(index.name(), "Euribor3656M Actual/365 (Fixed)");
+        assert_eq!(index.fixing_days(), 2);
+        assert_eq!(*index.currency(), Currency::eur());
+        assert_eq!(index.fixing_calendar().name(), "TARGET");
+        assert_eq!(index.day_counter().name(), "Actual/365 (Fixed)");
+        assert_eq!(
+            index.business_day_convention(),
+            BusinessDayConvention::ModifiedFollowing
+        );
+        assert!(index.end_of_month());
+    }
+
+    /// The `euribor.cpp` guard on `Euribor365`: a daily tenor is an error
+    /// carrying the C++ message, not a panic (the `DailyTenor` constructor is
+    /// not ported).
+    #[test]
+    fn a_daily_tenor_euribor365_is_rejected_with_the_quantlib_message() {
+        let settings = shared(Settings::<Date>::new());
+        let Err(err) = Euribor365::new(Period::new(1, TimeUnit::Days), Handle::empty(), settings)
+        else {
+            panic!("a daily tenor must be rejected");
+        };
+        assert!(
+            err.to_string()
+                .contains("for daily tenors (1D) dedicated DailyTenor constructor must be used")
+        );
     }
 
     /// The `euriborConvention` / `euriborEOM` switch (`euribor.cpp`): a `Weeks`
