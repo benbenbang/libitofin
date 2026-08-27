@@ -18,9 +18,8 @@
 //!
 //! Deferred visibly: `DailyTenorLibor` (the O/N-S/N constructors need the
 //! dedicated daily-tenor semantics) and the non-USD Libor currencies (#306).
-//! `EurLibor` and `GBPLibor` are separate C++ subclasses with their own spot
-//! lag, not a branch of `libor.cpp` - it only guards against EUR
-//! (`libor.cpp:82-84`).
+//! `EurLibor` is a separate C++ subclass with its own spot lag, not a
+//! branch of `libor.cpp` - it only guards against EUR (`libor.cpp:82-84`).
 //!
 //! [`Euribor`]: crate::indexes::ibor::Euribor
 //! [`SwapRateHelper`]: crate::termstructures::yields::SwapRateHelper
