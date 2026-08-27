@@ -1,7 +1,7 @@
 """MC-vs-analytic oracle for the Python MCEuropeanEngine facade.
 
 Mirrors the core oracle in
-crates/libitofin/src/pricingengines/vanilla/mceuropeanengine.rs:435-484, itself
+crates/libitofin/src/pricingengines/vanilla/mceuropeanengine.rs:425-533, itself
 a port of test-suite/europeanoption.cpp:1269 testMcEngines: a European call on
 the flat Actual360 market, priced with withSteps(1).withSamples(40000)
 .withSeed(42) and checked against the AnalyticEuropeanEngine. The band is the
@@ -65,10 +65,16 @@ def test_same_seed_reproduces_bitwise_and_another_seed_differs():
     assert first != other
 
 
-def test_antithetic_variate_is_rejected():
-    _settings, process = _market()
-    with pytest.raises(ItofinError, match="antithetic variate not yet supported"):
-        MCEuropeanEngine(process, steps=1, samples=1000, antithetic=True)
+def test_antithetic_flag_reaches_the_core():
+    settings, process = _market()
+    option = VanillaOption(OptionType.Call, 100.0, EXPIRY, settings)
+    option.set_mc_engine(
+        MCEuropeanEngine(process, steps=1, samples=40000, seed=42, antithetic=True)
+    )
+    antithetic = option.npv()
+    plain = _mc_option(settings, process, 100.0, 42).npv()
+
+    assert antithetic != plain
 
 
 def test_missing_and_overspecified_steps_are_rejected():

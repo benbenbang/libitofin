@@ -401,21 +401,18 @@ class MCEuropeanEngine:
                 tolerance.
             seed (int | None): The RNG seed; the same seed reproduces the NPV
                 bitwise.
-            antithetic (bool | None): The antithetic variate, not yet supported
-                by the core engine (#772).
+            antithetic (bool | None): The antithetic variate, supported since
+                #772 lifted the former construction-time rejection.
 
         Raises:
             ItofinError: If neither or both of steps and steps_per_year are
-                given, if both samples and absolute_tolerance are given, or if
-                antithetic is True.
+                given, or if both samples and absolute_tolerance are given.
         """
         ...
 
 class MCEuropeanHestonEngine:
     """The Monte Carlo engine for European payoffs on a Heston process, over the
     pseudo-random RNG policy. The low-discrepancy policy is not exposed (#454).
-
-    Unlike MCEuropeanEngine, the antithetic variate is supported here.
 
     Pricing is seeded and deterministic: the same seed reproduces the NPV
     bitwise, and the standard error is read back through
