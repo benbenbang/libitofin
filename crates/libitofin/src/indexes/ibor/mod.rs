@@ -16,6 +16,7 @@ pub mod estr;
 pub mod euribor;
 pub mod libor;
 pub mod sofr;
+pub mod usdlibor;
 
 pub use custom::CustomIborIndex;
 pub use eonia::Eonia;
@@ -23,3 +24,4 @@ pub use estr::Estr;
 pub use euribor::Euribor;
 pub use libor::Libor;
 pub use sofr::Sofr;
+pub use usdlibor::UsdLibor;
