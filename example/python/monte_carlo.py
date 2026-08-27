@@ -43,11 +43,11 @@ def mc_european() -> None:
     analytic.set_engine(process)
 
     # MC: single time step is enough for a path-independent European payoff.
-    # NB: MCEuropeanEngine does not accept the antithetic variate.
+    # MCEuropeanEngine now accepts the antithetic variate (#772).
     mc = VanillaOption(OptionType.Call, 100.0, expiry, settings)
-    mc.set_mc_engine(MCEuropeanEngine(process, steps=1, samples=40000, seed=42))
+    mc.set_mc_engine(MCEuropeanEngine(process, steps=1, samples=40000, antithetic=True, seed=42))
 
-    print("MC European call (K=100, 1y, 40000 paths, seed 42):")
+    print("MC European call (K=100, 1y, 40000 paths, antithetic, seed 42):")
     print(f"  analytic NPV = {analytic.npv():.6f}")
     print(f"  MC NPV       = {mc.npv():.6f}  +/- {mc.error_estimate():.6f} (std err)")
 
