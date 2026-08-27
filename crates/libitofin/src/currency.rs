@@ -92,6 +92,15 @@ impl Currency {
         Currency::new("British pound sterling", "GBP", 826, "\u{a3}", "p", 100)
     }
 
+    /// The Japanese yen (ISO code `JPY`, numeric `392`, 100 sen per unit).
+    ///
+    /// Values match `JPYCurrency` in QuantLib's `ql/currencies/asia.cpp`
+    /// (`:106-108`). Its default `Rounding()` convention is dropped along with
+    /// the `rounding` field (see the module divergences).
+    pub fn jpy() -> Self {
+        Currency::new("Japanese yen", "JPY", 392, "\u{a5}", "", 100)
+    }
+
     /// Currency name, e.g. `"European Euro"`.
     pub fn name(&self) -> &str {
         &self.name
@@ -172,6 +181,17 @@ mod tests {
         assert_eq!(gbp.symbol(), "\u{a3}");
         assert_eq!(gbp.fraction_symbol(), "p");
         assert_eq!(gbp.fractions_per_unit(), 100);
+    }
+
+    #[test]
+    fn jpy_fields_match_quantlib() {
+        let jpy = Currency::jpy();
+        assert_eq!(jpy.name(), "Japanese yen");
+        assert_eq!(jpy.code(), "JPY");
+        assert_eq!(jpy.numeric_code(), 392);
+        assert_eq!(jpy.symbol(), "\u{a5}");
+        assert_eq!(jpy.fraction_symbol(), "");
+        assert_eq!(jpy.fractions_per_unit(), 100);
     }
 
     #[test]
