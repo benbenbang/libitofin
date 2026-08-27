@@ -10,7 +10,7 @@
 //!     testAmericanOption, i=j=0), so the numbers reproduce ~2.0544 +/- ~0.0178.
 //!
 //! Run as a binary in a crate that depends on `libitofin` (e.g. add
-//! `libitofin = "0.2"` to Cargo.toml).
+//! `libitofin = "0.16"` to Cargo.toml).
 
 use libitofin::exercise::{AmericanExercise, EuropeanExercise, Exercise};
 use libitofin::handle::Handle;
