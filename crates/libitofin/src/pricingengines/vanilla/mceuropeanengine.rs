@@ -22,14 +22,13 @@
 //!   [`calculate`](MCEuropeanEngine::calculate), mirroring
 //!   [`AnalyticEuropeanEngine`](crate::pricingengines::vanilla::AnalyticEuropeanEngine).
 //!
+//! The antithetic-variate variance reduction (`mceuropeanengine.hpp:81`) is
+//! live: it was deferred as an Err-at-build (#262 class) until #762 ported the
+//! single-factor antithetic draw, and #772 lifted the stale rejection, so
+//! [`with_antithetic_variate`](MakeMcEuropeanEngine::with_antithetic_variate)
+//! now threads the flag through to the engine.
+//!
 //! Deferred, rejected visibly rather than silently ignored:
-//! - **antithetic variate**: the C++ builder's `withAntitheticVariate`
-//!   (`mceuropeanengine.hpp:81`) is kept as
-//!   [`with_antithetic_variate`](MakeMcEuropeanEngine::with_antithetic_variate),
-//!   but requesting it makes [`build`](MakeMcEuropeanEngine::build) return `Err`
-//!   (the underlying [`McSimulation`](crate::methods::montecarlo) defers it).
-//!   This is an Err-at-build, one step earlier than the base's Err-at-run
-//!   precedent; the failure is visible either way (#262 class).
 //! - **Brownian bridge / control variate**: the C++ builder's
 //!   `withBrownianBridge` (`mceuropeanengine.hpp:76`) and the control-variate
 //!   machinery are omitted from the builder entirely; the base is always driven
@@ -275,8 +274,7 @@ impl<RNG: McRngTraits> MakeMcEuropeanEngine<RNG> {
     }
 
     /// Requests the antithetic-variate variance reduction
-    /// (`mceuropeanengine.hpp:220`). Deferred: setting `true` makes
-    /// [`build`](MakeMcEuropeanEngine::build) return `Err`.
+    /// (`mceuropeanengine.hpp:220`).
     #[must_use]
     pub fn with_antithetic_variate(mut self, antithetic: bool) -> Self {
         self.antithetic = antithetic;
@@ -290,9 +288,8 @@ impl<RNG: McRngTraits> MakeMcEuropeanEngine<RNG> {
     ///
     /// Errors if neither or both of `steps`/`steps_per_year` are set
     /// (`mceuropeanengine.hpp:229-232`), if both `samples` and `tolerance` are
-    /// set (`mceuropeanengine.hpp:179,188`), if a tolerance is set on an RNG
-    /// policy without an error estimate (`mceuropeanengine.hpp:190`), or if the
-    /// deferred antithetic variate is requested.
+    /// set (`mceuropeanengine.hpp:179,188`), or if a tolerance is set on an RNG
+    /// policy without an error estimate (`mceuropeanengine.hpp:190`).
     pub fn build(self) -> QlResult<MCEuropeanEngine<RNG>> {
         require!(
             self.steps.is_some() || self.steps_per_year.is_some(),
@@ -312,14 +309,12 @@ impl<RNG: McRngTraits> MakeMcEuropeanEngine<RNG> {
                 "chosen random generator policy does not allow an error estimate"
             );
         }
-        require!(!self.antithetic, "antithetic variate not yet supported");
-
         MCEuropeanEngine::new(
             self.process,
             self.steps,
             self.steps_per_year,
             false,
-            false,
+            self.antithetic,
             self.samples,
             self.tolerance,
             self.max_samples,
@@ -331,8 +326,8 @@ impl<RNG: McRngTraits> MakeMcEuropeanEngine<RNG> {
 #[cfg(test)]
 mod builder_tests {
     //! Guards on [`MakeMcEuropeanEngine::build`] validation
-    //! (`mceuropeanengine.hpp:179,188,190,229-232`), including the visible
-    //! antithetic-variate deferral (#262 class).
+    //! (`mceuropeanengine.hpp:179,188,190,229-232`), plus the antithetic-variate
+    //! configuration building live since #772 lifted the former deferral.
 
     use super::MakeMcEuropeanEngine;
     use crate::math::randomnumbers::rngtraits::PseudoRandom;
@@ -372,14 +367,14 @@ mod builder_tests {
     }
 
     #[test]
-    fn antithetic_variate_is_rejected_as_deferred() {
+    fn antithetic_variate_config_builds() {
         assert!(
             maker()
                 .with_steps(1)
                 .with_samples(1_000)
                 .with_antithetic_variate(true)
                 .build()
-                .is_err()
+                .is_ok()
         );
     }
 
@@ -427,7 +422,13 @@ mod oracle {
     use crate::time::date::Date;
     use crate::types::Real;
 
-    fn mc_option(market: &Market, strike: Real, expiry: Date, seed: u32) -> EuropeanOption {
+    fn mc_option(
+        market: &Market,
+        strike: Real,
+        expiry: Date,
+        seed: u32,
+        antithetic: bool,
+    ) -> EuropeanOption {
         let payoff = shared(PlainVanillaPayoff::new(OptionType::Call, strike));
         let exercise = shared(EuropeanExercise::new(expiry));
         let mut option = EuropeanOption::new(payoff, exercise, Shared::clone(&market.settings));
@@ -435,6 +436,7 @@ mod oracle {
             MakeMcEuropeanEngine::<PseudoRandom>::new(Shared::clone(&market.process))
                 .with_steps(1)
                 .with_samples(40_000)
+                .with_antithetic_variate(antithetic)
                 .with_seed(seed)
                 .build()
                 .unwrap(),
@@ -456,7 +458,7 @@ mod oracle {
                 .option(OptionType::Call, strike, expiry)
                 .npv()
                 .unwrap();
-            let mut mc = mc_option(&market, strike, expiry, 42);
+            let mut mc = mc_option(&market, strike, expiry, 42, false);
             let mc_npv = mc.npv().unwrap();
             let se = mc.error_estimate().unwrap();
 
@@ -470,17 +472,63 @@ mod oracle {
         }
     }
 
+    /// Antithetic-variate oracle (#772). Provenance: no C++ fixture pins an MC
+    /// European antithetic price - `testMcEngines`
+    /// (`test-suite/europeanoption.cpp:1269`) drives its PseudoMonteCarlo case
+    /// without `withAntitheticVariate` (`europeanoption.cpp:168-171`), and no
+    /// other test-suite file constructs an MC European engine with the flag
+    /// (the antithetic fixtures live on other engines, e.g.
+    /// `mclongstaffschwartzengine.cpp:169`). Per the #772 fallback the pin is
+    /// therefore the module's `|mc - analytic| < 3 * error_estimate()`
+    /// convergence band with the flag on, plus the stream check: at the same
+    /// seed the antithetic price and standard error must differ from the plain
+    /// run's, proving the flag reaches the path generator instead of a
+    /// hardcoded `false`.
+    #[test]
+    fn antithetic_variate_prices_within_band_and_changes_the_stream() {
+        let market = market();
+        market.set(100.0, 0.02, 0.05, 0.20);
+        let expiry = today() + time_to_days(1.0);
+
+        let analytic = market
+            .option(OptionType::Call, 100.0, expiry)
+            .npv()
+            .unwrap();
+        let mut plain = mc_option(&market, 100.0, expiry, 42, false);
+        let plain_npv = plain.npv().unwrap();
+        let plain_se = plain.error_estimate().unwrap();
+        let mut antithetic = mc_option(&market, 100.0, expiry, 42, true);
+        let antithetic_npv = antithetic.npv().unwrap();
+        let antithetic_se = antithetic.error_estimate().unwrap();
+
+        assert!(antithetic_se > 0.0, "error estimate must be positive");
+        let diff = (antithetic_npv - analytic).abs();
+        assert!(
+            diff < 3.0 * antithetic_se,
+            "|mc - analytic|={diff} not within 3*se={}",
+            3.0 * antithetic_se
+        );
+        assert_ne!(
+            antithetic_npv, plain_npv,
+            "antithetic must change the sampled stream at the same seed"
+        );
+        assert_ne!(
+            antithetic_se, plain_se,
+            "antithetic must change the error estimate at the same seed"
+        );
+    }
+
     #[test]
     fn same_seed_is_bitwise_deterministic() {
         let market = market();
         market.set(100.0, 0.02, 0.05, 0.20);
         let expiry = today() + time_to_days(1.0);
 
-        let first = mc_option(&market, 100.0, expiry, 42).npv().unwrap();
-        let second = mc_option(&market, 100.0, expiry, 42).npv().unwrap();
+        let first = mc_option(&market, 100.0, expiry, 42, false).npv().unwrap();
+        let second = mc_option(&market, 100.0, expiry, 42, false).npv().unwrap();
         assert_eq!(first, second, "seed 42 must reproduce the NPV bitwise");
 
-        let other = mc_option(&market, 100.0, expiry, 43).npv().unwrap();
+        let other = mc_option(&market, 100.0, expiry, 43, false).npv().unwrap();
         assert_ne!(first, other, "a different seed must change the NPV");
     }
 
