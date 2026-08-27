@@ -9,6 +9,7 @@ mod capfloor;
 mod claim;
 mod creditdefaultswap;
 mod fixedvsfloatingswap;
+mod forwardrateagreement;
 mod futures;
 mod inflationcapfloor;
 mod makecapfloor;
@@ -38,6 +39,7 @@ pub use fixedvsfloatingswap::{
     FixedVsFloatingSwap, FixedVsFloatingSwapArguments, FixedVsFloatingSwapEngine,
     FixedVsFloatingSwapResults, FloatingArgumentsFn,
 };
+pub use forwardrateagreement::ForwardRateAgreement;
 pub use futures::FuturesType;
 pub use inflationcapfloor::{YoYInflationCapFloor, YoYInflationCapFloorArguments};
 pub use makecapfloor::MakeCapFloor;
