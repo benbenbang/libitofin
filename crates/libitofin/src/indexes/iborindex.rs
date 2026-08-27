@@ -31,7 +31,7 @@ use crate::time::date::Date;
 use crate::time::daycounter::DayCounter;
 use crate::time::period::Period;
 use crate::time::timeunit::TimeUnit;
-use crate::types::{Natural, Rate, Time};
+use crate::types::{Integer, Natural, Rate, Time};
 use crate::{currency::Currency, require};
 
 /// A concrete Inter-Bank-Offered-Rate index (e.g. Libor, Euribor).
@@ -40,11 +40,22 @@ use crate::{currency::Currency, require};
 /// convention the maturity calculation needs. Built with a possibly empty curve
 /// handle, exactly as the C++ default `Handle<YieldTermStructure> h = {}`
 /// allows; a fixing forecast on an empty handle is an error, not a panic (D4).
+///
+/// The value and maturity calendars carry the C++ `Libor` subclass's joint
+/// date roll (`libor.cpp:86-113`) as data rather than as a subtype: both
+/// default to the fixing calendar (making the rolls byte-identical to the
+/// single-calendar index), and the Libor constructor points the maturity
+/// calendar at the UK-plus-financial-center joint calendar. Folding the
+/// calendars in keeps the roll dispatching through every site holding a
+/// concrete `IborIndex` (`makevanillaswap.rs:440`), where a newtype override
+/// would be bypassed.
 pub struct IborIndex {
     base: InterestRateIndexBase,
     convention: BusinessDayConvention,
     end_of_month: bool,
     term_structure: Handle<dyn YieldTermStructure>,
+    value_calendar: Calendar,
+    maturity_calendar: Calendar,
 }
 
 impl IborIndex {
@@ -67,6 +78,8 @@ impl IborIndex {
         forwarding: Handle<dyn YieldTermStructure>,
         settings: Shared<Settings<Date>>,
     ) -> IborIndex {
+        let value_calendar = fixing_calendar.clone();
+        let maturity_calendar = fixing_calendar.clone();
         let base = InterestRateIndexBase::new(
             family_name,
             tenor,
@@ -82,6 +95,8 @@ impl IborIndex {
             convention,
             end_of_month,
             term_structure: forwarding,
+            value_calendar,
+            maturity_calendar,
         }
     }
 
@@ -100,6 +115,18 @@ impl IborIndex {
         &self.term_structure
     }
 
+    /// The calendar value dates are computed on (the fixing calendar unless a
+    /// Libor-style constructor pointed it elsewhere).
+    pub fn value_calendar(&self) -> Calendar {
+        self.value_calendar.clone()
+    }
+
+    /// The calendar maturity dates are advanced on (the fixing calendar unless
+    /// a Libor-style constructor pointed it at a joint calendar).
+    pub fn maturity_calendar(&self) -> Calendar {
+        self.maturity_calendar.clone()
+    }
+
     /// Rebuilds this index onto a different forwarding curve, copying every
     /// other configuration field verbatim (`clone`, `iborindex.cpp:85-93`).
     ///
@@ -110,7 +137,7 @@ impl IborIndex {
     /// [`Settings`], so it shares the original's fixing history (keyed on name)
     /// and evaluation date.
     pub fn clone_with(&self, forwarding: Handle<dyn YieldTermStructure>) -> IborIndex {
-        IborIndex::new(
+        let mut clone = IborIndex::new(
             self.family_name().to_string(),
             self.tenor(),
             self.fixing_days(),
@@ -121,7 +148,10 @@ impl IborIndex {
             self.day_counter().clone(),
             forwarding,
             self.base.settings().clone(),
-        )
+        );
+        clone.value_calendar = self.value_calendar.clone();
+        clone.maturity_calendar = self.maturity_calendar.clone();
+        clone
     }
 
     /// The simple forward rate over `[d1, d2]` with year fraction `t`, read off
@@ -151,8 +181,29 @@ impl InterestRateIndex for IborIndex {
         &self.base
     }
 
+    /// The value date rolled as `Libor::valueDate` (`libor.cpp:86-100`): the
+    /// fixing-calendar advance of the trait default, then an adjust on the
+    /// maturity calendar. With the default calendars the adjust lands on the
+    /// business day the advance produced, reducing to the trait default.
+    fn value_date(&self, fixing_date: Date) -> QlResult<Date> {
+        require!(
+            self.is_valid_fixing_date(fixing_date),
+            "{fixing_date:?} is not a valid fixing date"
+        );
+        let d = self.fixing_calendar().advance(
+            fixing_date,
+            self.fixing_days() as Integer,
+            TimeUnit::Days,
+            BusinessDayConvention::Following,
+            false,
+        );
+        Ok(self
+            .maturity_calendar
+            .adjust(d, BusinessDayConvention::Following))
+    }
+
     fn maturity_date(&self, value_date: Date) -> QlResult<Date> {
-        Ok(self.fixing_calendar().advance_by_period(
+        Ok(self.maturity_calendar.advance_by_period(
             value_date,
             self.tenor(),
             self.convention,
