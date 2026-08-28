@@ -38,6 +38,7 @@ pub mod credit;
 pub mod inflation;
 pub mod interpolatedcurve;
 pub mod iterativebootstrap;
+pub mod localbootstrap;
 pub mod volatility;
 pub mod yields;
 pub mod yieldtermstructure;
