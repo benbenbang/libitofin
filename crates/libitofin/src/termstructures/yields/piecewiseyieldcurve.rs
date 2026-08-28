@@ -46,7 +46,7 @@ use crate::require;
 use crate::shared::{Shared, SharedMut, shared_mut};
 use crate::termstructures::bootstraphelper::RateHelper;
 use crate::termstructures::bootstraptraits::{CurveData, YieldBootstrapTraits};
-use crate::termstructures::iterativebootstrap::{IterativeBootstrap, PiecewiseCurve};
+use crate::termstructures::iterativebootstrap::{Bootstrap, IterativeBootstrap, PiecewiseCurve};
 use crate::termstructures::yieldtermstructure::YieldTermStructure;
 use crate::termstructures::{TermStructure, TermStructureBase};
 use crate::time::date::Date;
@@ -71,10 +71,15 @@ impl Observer for CurveUpdater {
 /// Yield term structure bootstrapped from rate helpers.
 ///
 /// `T` is the curve-shape traits (`Discount`, `ZeroYield`, `ForwardRate`); `I`
-/// is the interpolation factory (`LogLinear`, `Linear`, `BackwardFlat`). The
-/// node data lives in a `RefCell` the bootstrap mutates and the discount lookup
-/// reads back.
-pub struct PiecewiseYieldCurve<T: YieldBootstrapTraits, I: Interpolator> {
+/// is the interpolation factory (`LogLinear`, `Linear`, `BackwardFlat`); `B`
+/// is the bootstrap algorithm ([`IterativeBootstrap`] by default, or
+/// [`LocalBootstrap`](crate::termstructures::localbootstrap::LocalBootstrap)),
+/// mirroring the C++ `Bootstrap` template parameter. `B` is deliberately
+/// unbounded here - the `where B: Bootstrap<Self>` obligation lives on the
+/// impl blocks that call it, so the struct's `T`/`I` inference stays free of
+/// the recursive bound. The node data lives in a `RefCell` the bootstrap
+/// mutates and the discount lookup reads back.
+pub struct PiecewiseYieldCurve<T: YieldBootstrapTraits, I: Interpolator, B = IterativeBootstrap> {
     base: TermStructureBase,
     instruments: Vec<Shared<dyn RateHelper>>,
     interpolator: I,
@@ -82,25 +87,50 @@ pub struct PiecewiseYieldCurve<T: YieldBootstrapTraits, I: Interpolator> {
     lazy: SharedMut<LazyObject>,
     observable: Shared<Observable>,
     updater: SharedMut<CurveUpdater>,
-    bootstrap: IterativeBootstrap,
+    bootstrap: B,
     accuracy: Real,
     self_weak: Weak<dyn YieldTermStructure>,
     _traits: PhantomData<fn() -> T>,
 }
 
-impl<T: YieldBootstrapTraits + 'static, I: Interpolator + 'static> PiecewiseYieldCurve<T, I> {
+impl<T: YieldBootstrapTraits + 'static, I: Interpolator + 'static, B: 'static>
+    PiecewiseYieldCurve<T, I, B>
+where
+    B: Bootstrap<Self>,
+{
     /// Builds a curve over `instruments` with a fixed `reference_date` (the C++
-    /// reference-date constructor). Construction is cheap; the bootstrap runs
-    /// on first use.
+    /// reference-date constructor) and a default-configured bootstrap.
+    /// Construction is cheap; the bootstrap runs on first use.
     pub fn new(
         reference_date: Date,
         instruments: Vec<Shared<dyn RateHelper>>,
         day_counter: DayCounter,
         interpolator: I,
-    ) -> QlResult<Shared<PiecewiseYieldCurve<T, I>>> {
+    ) -> QlResult<Shared<PiecewiseYieldCurve<T, I, B>>>
+    where
+        B: Default,
+    {
+        Self::with_bootstrap(
+            reference_date,
+            instruments,
+            day_counter,
+            interpolator,
+            B::default(),
+        )
+    }
+
+    /// Builds the curve with an explicitly configured bootstrap (the C++
+    /// constructor's trailing `bootstrap` argument).
+    pub fn with_bootstrap(
+        reference_date: Date,
+        instruments: Vec<Shared<dyn RateHelper>>,
+        day_counter: DayCounter,
+        interpolator: I,
+        bootstrap: B,
+    ) -> QlResult<Shared<PiecewiseYieldCurve<T, I, B>>> {
         require!(!instruments.is_empty(), "no bootstrap helpers given");
 
-        let curve = Shared::new_cyclic(|weak: &Weak<PiecewiseYieldCurve<T, I>>| {
+        let curve = Shared::new_cyclic(|weak: &Weak<PiecewiseYieldCurve<T, I, B>>| {
             let self_weak: Weak<dyn YieldTermStructure> = weak.clone();
             let lazy = shared_mut(LazyObject::new(true));
             let observable = lazy.borrow().observable_handle();
@@ -119,7 +149,7 @@ impl<T: YieldBootstrapTraits + 'static, I: Interpolator + 'static> PiecewiseYiel
                 lazy,
                 observable,
                 updater,
-                bootstrap: IterativeBootstrap::new(),
+                bootstrap,
                 accuracy: 1.0e-12,
                 self_weak,
                 _traits: PhantomData,
@@ -181,14 +211,16 @@ impl<T: YieldBootstrapTraits + 'static, I: Interpolator + 'static> PiecewiseYiel
     }
 }
 
-impl<T: YieldBootstrapTraits, I: Interpolator> AsObservable for PiecewiseYieldCurve<T, I> {
+impl<T: YieldBootstrapTraits, I: Interpolator, B> AsObservable for PiecewiseYieldCurve<T, I, B> {
     fn observable(&self) -> &Observable {
         &self.observable
     }
 }
 
-impl<T: YieldBootstrapTraits + 'static, I: Interpolator + 'static> TermStructure
-    for PiecewiseYieldCurve<T, I>
+impl<T: YieldBootstrapTraits + 'static, I: Interpolator + 'static, B: 'static> TermStructure
+    for PiecewiseYieldCurve<T, I, B>
+where
+    B: Bootstrap<Self>,
 {
     fn base(&self) -> &TermStructureBase {
         &self.base
@@ -206,8 +238,10 @@ impl<T: YieldBootstrapTraits + 'static, I: Interpolator + 'static> TermStructure
     }
 }
 
-impl<T: YieldBootstrapTraits + 'static, I: Interpolator + 'static> YieldTermStructure
-    for PiecewiseYieldCurve<T, I>
+impl<T: YieldBootstrapTraits + 'static, I: Interpolator + 'static, B: 'static> YieldTermStructure
+    for PiecewiseYieldCurve<T, I, B>
+where
+    B: Bootstrap<Self>,
 {
     /// Opts the bootstrapped curve into the downcast seam.
     ///
@@ -237,8 +271,8 @@ impl<T: YieldBootstrapTraits + 'static, I: Interpolator + 'static> YieldTermStru
     }
 }
 
-impl<T: YieldBootstrapTraits + 'static, I: Interpolator + 'static> PiecewiseCurve
-    for PiecewiseYieldCurve<T, I>
+impl<T: YieldBootstrapTraits + 'static, I: Interpolator + 'static, B: 'static> PiecewiseCurve
+    for PiecewiseYieldCurve<T, I, B>
 {
     type Traits = T;
     type Interp = I;
@@ -265,8 +299,16 @@ impl<T: YieldBootstrapTraits + 'static, I: Interpolator + 'static> PiecewiseCurv
         self.base.reference_date()
     }
 
+    /// Computed off the base directly rather than through
+    /// [`TermStructure::time_from_reference`]: the `TermStructure` impl
+    /// carries the `B: Bootstrap<Self>` obligation (its `max_date` runs the
+    /// bootstrap), and routing through it would put that recursive bound on
+    /// this impl too, which every `Bootstrap<C>` implementation depends on.
     fn time_from_reference(&self, date: Date) -> QlResult<Time> {
-        TermStructure::time_from_reference(self, date)
+        let Some(day_counter) = self.base.day_counter() else {
+            crate::fail!("no day counter provided for this term structure");
+        };
+        Ok(day_counter.year_fraction(self.base.reference_date()?, date))
     }
 
     fn term_structure_shared(&self) -> QlResult<Shared<dyn YieldTermStructure>> {
