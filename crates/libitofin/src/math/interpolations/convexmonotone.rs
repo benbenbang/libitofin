@@ -10,6 +10,9 @@
 //! QuantLib 1.43.0 (`libQuantLib.dylib`) by constructing the C++ classes
 //! directly.
 
+use crate::errors::QlResult;
+use crate::fail;
+use crate::math::interpolations::Interpolation;
 use crate::types::Real;
 
 /// One section of a piecewise convex-monotone curve (QuantLib's
@@ -692,6 +695,350 @@ impl SectionHelper for ComboHelper {
     }
 }
 
+/// Convex-monotone interpolation over strictly increasing `x` nodes
+/// (QuantLib's `ConvexMonotoneInterpolation`).
+///
+/// The `y` values are reinterpreted as the discrete forwards over each node
+/// interval, so **the first `y` value is ignored** and the curve does not pass
+/// through `y[0]` (`convexmonotoneinterpolation.hpp:172`); the boundary
+/// forward is derived as `f[0] = 1.5 * y[1] - 0.5 * f[1]` instead. Each
+/// interval `(x[i-1], x[i]]` is covered by the section helper the Hagan-West
+/// region logic picks for it, and evaluation past the last node continues
+/// flat at the curve's terminal value.
+///
+/// The incremental build path over pre-existing helpers (`localInterpolate` /
+/// `getExistingHelpers` and the `constantLastPeriod` flag), used only by
+/// QuantLib's `LocalBootstrap`, is deferred; this port always builds the full
+/// section set (the main `interpolate()` path, which passes no pre-existing
+/// helpers and `flatFinalPeriod = false`).
+pub struct ConvexMonotoneInterpolation {
+    x: Vec<Real>,
+    section_helpers: Vec<Box<dyn SectionHelper>>,
+    extrapolation_helper: Box<dyn SectionHelper>,
+    allow_extrapolation: bool,
+}
+
+impl ConvexMonotoneInterpolation {
+    /// Builds an interpolation through the forwards `y` over the nodes `x`.
+    /// The `x` values must be strictly increasing with at least two points
+    /// (the first `y` is ignored, so a single point carries no data), and
+    /// `quadraticity` and `monotonicity` must both lie in `[0, 1]`.
+    pub fn new(
+        x: Vec<Real>,
+        y: Vec<Real>,
+        quadraticity: Real,
+        monotonicity: Real,
+        force_positive: bool,
+    ) -> QlResult<Self> {
+        if x.len() != y.len() {
+            fail!(
+                "x and y must have equal length ({} vs {})",
+                x.len(),
+                y.len()
+            );
+        }
+        if !(0.0..=1.0).contains(&monotonicity) {
+            fail!("monotonicity must lie between 0 and 1, got {monotonicity}");
+        }
+        if !(0.0..=1.0).contains(&quadraticity) {
+            fail!("quadraticity must lie between 0 and 1, got {quadraticity}");
+        }
+        if x.len() < 2 {
+            fail!(
+                "single point provided, not supported by convex monotone method as first point is ignored"
+            );
+        }
+        for &xi in &x {
+            if !xi.is_finite() {
+                fail!("x values must be finite, got {xi}");
+            }
+        }
+        for &yi in &y {
+            if !yi.is_finite() {
+                fail!("y values must be finite, got {yi}");
+            }
+        }
+        for w in x.windows(2) {
+            if w[1] <= w[0] {
+                fail!("x values must be strictly increasing");
+            }
+        }
+
+        let (section_helpers, extrapolation_helper) =
+            build_sections(&x, &y, quadraticity, monotonicity, force_positive);
+        Ok(ConvexMonotoneInterpolation {
+            x,
+            section_helpers,
+            extrapolation_helper,
+            allow_extrapolation: false,
+        })
+    }
+
+    /// Sets whether evaluation outside `[x_min, x_max]` is permitted (flat
+    /// beyond the last node) rather than an error.
+    pub fn with_extrapolation(mut self, allow: bool) -> Self {
+        self.allow_extrapolation = allow;
+        self
+    }
+
+    /// Whether extrapolation is currently permitted.
+    pub fn allows_extrapolation(&self) -> bool {
+        self.allow_extrapolation
+    }
+
+    /// The section covering `x`: the first whose right endpoint is above it,
+    /// clamped to the first section below the domain (the port of the
+    /// `sectionHelpers_.upper_bound(x)` dispatch). Only called for
+    /// `x < x[last]`; above that the extrapolation helper takes over.
+    fn section(&self, x: Real) -> &dyn SectionHelper {
+        let i = self.x[1..self.x.len() - 1].partition_point(|&k| k <= x);
+        self.section_helpers[i].as_ref()
+    }
+
+    fn check_range(&self, x: Real) -> QlResult<()> {
+        if x.is_nan() {
+            fail!("interpolation cannot be evaluated at NaN");
+        }
+        if !self.allow_extrapolation && !self.is_in_range(x) {
+            fail!(
+                "interpolation range is [{}, {}]: extrapolation at {x} not allowed",
+                self.x_min(),
+                self.x_max()
+            );
+        }
+        Ok(())
+    }
+}
+
+impl Interpolation for ConvexMonotoneInterpolation {
+    fn value(&self, x: Real) -> QlResult<Real> {
+        self.check_range(x)?;
+        if x >= self.x[self.x.len() - 1] {
+            Ok(self.extrapolation_helper.value(x))
+        } else {
+            Ok(self.section(x).value(x))
+        }
+    }
+
+    /// A faithful port of the C++ `QL_FAIL("Convex-monotone spline derivative
+    /// not implemented")`: the derivative is not defined for this method, so
+    /// this is a deliberate `Err`, not an unfinished stub. (The C++
+    /// `secondDerivative` fails the same way; the Rust trait has no second
+    /// derivative, so there is nothing to port for it.)
+    fn derivative(&self, _x: Real) -> QlResult<Real> {
+        fail!("Convex-monotone spline derivative not implemented")
+    }
+
+    fn primitive(&self, x: Real) -> QlResult<Real> {
+        self.check_range(x)?;
+        if x >= self.x[self.x.len() - 1] {
+            Ok(self.extrapolation_helper.primitive(x))
+        } else {
+            Ok(self.section(x).primitive(x))
+        }
+    }
+
+    fn x_min(&self) -> Real {
+        self.x[0]
+    }
+
+    fn x_max(&self) -> Real {
+        self.x[self.x.len() - 1]
+    }
+
+    fn is_in_range(&self, x: Real) -> bool {
+        x >= self.x_min() && x <= self.x_max()
+    }
+}
+
+/// The section-building algorithm (`ConvexMonotoneImpl::update()`): derives
+/// the boundary forwards from the discrete ones, then covers each interval
+/// with the section the Hagan-West region logic picks. Returns the sections
+/// (one per interval, in node order) and the flat extrapolation section.
+fn build_sections(
+    x: &[Real],
+    y: &[Real],
+    quadraticity_param: Real,
+    monotonicity: Real,
+    force_positive: bool,
+) -> (Vec<Box<dyn SectionHelper>>, Box<dyn SectionHelper>) {
+    let n = x.len();
+    if n == 2 {
+        let section: Box<dyn SectionHelper> =
+            Box::new(EverywhereConstantHelper::new(y[1], 0.0, x[0]));
+        let extrapolation = Box::new(EverywhereConstantHelper::new(y[1], 0.0, x[0]));
+        return (vec![section], extrapolation);
+    }
+
+    let mut f = vec![0.0; n];
+    for i in 1..n - 1 {
+        let dx_prev = x[i] - x[i - 1];
+        let dx = x[i + 1] - x[i];
+        f[i] = dx / (dx + dx_prev) * y[i] + dx_prev / (dx + dx_prev) * y[i + 1];
+    }
+    f[0] = 1.5 * y[1] - 0.5 * f[1];
+    f[n - 1] = 1.5 * y[n - 1] - 0.5 * f[n - 2];
+    if force_positive {
+        if f[0] < 0.0 {
+            f[0] = 0.0;
+        }
+        if f[n - 1] < 0.0 {
+            f[n - 1] = 0.0;
+        }
+    }
+
+    let mut primitive = 0.0;
+    let mut section_helpers: Vec<Box<dyn SectionHelper>> = Vec::with_capacity(n - 1);
+    for i in 1..n {
+        let g_prev = f[i - 1] - y[i];
+        let g_next = f[i] - y[i];
+        let helper = if g_prev.abs() < 1.0e-14 && g_next.abs() < 1.0e-14 {
+            Box::new(ConstantGradHelper::new(
+                f[i - 1],
+                primitive,
+                x[i - 1],
+                x[i],
+                f[i],
+            )) as Box<dyn SectionHelper>
+        } else {
+            let quadratic = |min: bool| -> Box<dyn SectionHelper> {
+                if min {
+                    Box::new(QuadraticMinHelper::new(
+                        x[i - 1],
+                        x[i],
+                        f[i - 1],
+                        f[i],
+                        y[i],
+                        primitive,
+                    ))
+                } else {
+                    Box::new(QuadraticHelper::new(
+                        x[i - 1],
+                        x[i],
+                        f[i - 1],
+                        f[i],
+                        y[i],
+                        primitive,
+                    ))
+                }
+            };
+            let convex4 = |eta: Real| -> Box<dyn SectionHelper> {
+                if force_positive {
+                    Box::new(ConvexMonotone4MinHelper::new(
+                        x[i - 1],
+                        x[i],
+                        g_prev,
+                        g_next,
+                        y[i],
+                        eta,
+                        primitive,
+                    ))
+                } else {
+                    Box::new(ConvexMonotone4Helper::new(
+                        x[i - 1],
+                        x[i],
+                        g_prev,
+                        g_next,
+                        y[i],
+                        eta,
+                        primitive,
+                    ))
+                }
+            };
+
+            let mut quadraticity = quadraticity_param;
+            let mut quadratic_helper: Option<Box<dyn SectionHelper>> = None;
+            let mut conv_mono_helper: Option<Box<dyn SectionHelper>> = None;
+            if quadraticity_param > 0.0 {
+                quadratic_helper = Some(quadratic(
+                    g_prev >= -2.0 * g_next && g_prev > -0.5 * g_next && force_positive,
+                ));
+            }
+            if quadraticity_param < 1.0 {
+                if (g_prev > 0.0 && -0.5 * g_prev >= g_next && g_next >= -2.0 * g_prev)
+                    || (g_prev < 0.0 && -0.5 * g_prev <= g_next && g_next <= -2.0 * g_prev)
+                {
+                    quadraticity = 1.0;
+                    if quadraticity_param == 0.0 {
+                        quadratic_helper = Some(quadratic(force_positive));
+                    }
+                } else if (g_prev < 0.0 && g_next > -2.0 * g_prev)
+                    || (g_prev > 0.0 && g_next < -2.0 * g_prev)
+                {
+                    let eta = (g_next + 2.0 * g_prev) / (g_next - g_prev);
+                    let b2 = (1.0 + monotonicity) / 2.0;
+                    if eta < b2 {
+                        conv_mono_helper = Some(Box::new(ConvexMonotone2Helper::new(
+                            x[i - 1],
+                            x[i],
+                            g_prev,
+                            g_next,
+                            y[i],
+                            eta,
+                            primitive,
+                        )));
+                    } else {
+                        conv_mono_helper = Some(convex4(b2));
+                    }
+                } else if (g_prev > 0.0 && g_next < 0.0 && g_next > -0.5 * g_prev)
+                    || (g_prev < 0.0 && g_next > 0.0 && g_next < -0.5 * g_prev)
+                {
+                    let eta = g_next / (g_next - g_prev) * 3.0;
+                    let b3 = (1.0 - monotonicity) / 2.0;
+                    if eta > b3 {
+                        conv_mono_helper = Some(Box::new(ConvexMonotone3Helper::new(
+                            x[i - 1],
+                            x[i],
+                            g_prev,
+                            g_next,
+                            y[i],
+                            eta,
+                            primitive,
+                        )));
+                    } else {
+                        conv_mono_helper = Some(convex4(b3));
+                    }
+                } else {
+                    let mut eta = g_next / (g_prev + g_next);
+                    let b2 = (1.0 + monotonicity) / 2.0;
+                    let b3 = (1.0 - monotonicity) / 2.0;
+                    if eta > b2 {
+                        eta = b2;
+                    }
+                    if eta < b3 {
+                        eta = b3;
+                    }
+                    conv_mono_helper = Some(convex4(eta));
+                }
+            }
+
+            if quadraticity == 1.0 {
+                quadratic_helper.expect("a quadratic helper is built whenever quadraticity is 1")
+            } else if quadraticity == 0.0 {
+                conv_mono_helper
+                    .expect("a convex-monotone helper is built whenever quadraticity is 0")
+            } else {
+                Box::new(ComboHelper::new(
+                    quadratic_helper.expect("a quadratic helper is built for a mixed quadraticity"),
+                    conv_mono_helper
+                        .expect("a convex-monotone helper is built for a mixed quadraticity"),
+                    quadraticity,
+                ))
+            }
+        };
+        section_helpers.push(helper);
+        primitive += y[i] * (x[i] - x[i - 1]);
+    }
+
+    let last_value = section_helpers[n - 2].value(x[n - 1]);
+    let extrapolation = Box::new(EverywhereConstantHelper::new(
+        last_value,
+        primitive,
+        x[n - 1],
+    ));
+    (section_helpers, extrapolation)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -847,5 +1194,50 @@ mod tests {
             &[(1.6, 4.104_444_444_444_444e-2, 1.281_451_851_851_852e-1)],
         );
         assert!((h.f_next() - -8.999_999_999_999_998e-3).abs() < 1e-14);
+    }
+
+    // The reference fixture of #943: extracted from the built QuantLib 1.43.0
+    // dylib with the default settings (quadraticity 0.3, monotonicity 0.7,
+    // forcePositive true). The dip to 0.0084 exercises the positive-preserving
+    // sections, the rise to 0.0528 a convex-monotone/quadratic combination.
+    fn sample() -> ConvexMonotoneInterpolation {
+        ConvexMonotoneInterpolation::new(
+            vec![0.0, 1.0, 2.0, 3.5, 4.0, 6.0],
+            vec![0.02, 0.04, 0.015, 0.05, 0.048, 0.03],
+            0.3,
+            0.7,
+            true,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn reference_values_match_quantlib() {
+        let f = sample();
+        let expected: [(Real, Real, Real); 11] = [
+            (0.0, 0.04625, 0.0),
+            (0.5, 0.0415625, 0.02234375),
+            (1.0, 0.0275, 0.04),
+            (1.5, 0.008428236607143, 0.047486997767857),
+            (2.0, 0.029, 0.055),
+            (2.75, 0.052795631487889, 0.091268923010381),
+            (3.5, 0.0485, 0.13),
+            (3.75, 0.0485825, 0.142164375),
+            (4.0, 0.0444, 0.154),
+            (5.0, 0.0282, 0.1894),
+            (6.0, 0.0228, 0.214),
+        ];
+        for (x, value, primitive) in expected {
+            assert!(
+                (f.value(x).unwrap() - value).abs() < 1e-12,
+                "value({x}): {} vs {value}",
+                f.value(x).unwrap()
+            );
+            assert!(
+                (f.primitive(x).unwrap() - primitive).abs() < 1e-12,
+                "primitive({x}): {} vs {primitive}",
+                f.primitive(x).unwrap()
+            );
+        }
     }
 }
