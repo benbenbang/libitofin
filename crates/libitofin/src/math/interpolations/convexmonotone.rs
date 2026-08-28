@@ -28,10 +28,9 @@ pub trait SectionHelper {
 
     /// The forward at the section's right endpoint.
     ///
-    /// Consumed by the incremental (pre-existing helpers) build path used by
-    /// `LocalBootstrap`, which is deferred; kept so each helper's surface is
-    /// complete.
-    #[allow(dead_code)]
+    /// Seeds the boundary forward at the seam when the incremental
+    /// (pre-existing helpers) build path grows the curve
+    /// (`convexmonotoneinterpolation.hpp:612-613`).
     fn f_next(&self) -> Real;
 }
 
@@ -708,14 +707,20 @@ impl SectionHelper for ComboHelper {
 ///
 /// The incremental build path over pre-existing helpers (`localInterpolate` /
 /// `getExistingHelpers` and the `constantLastPeriod` flag), used only by
-/// QuantLib's `LocalBootstrap`, is deferred; this port always builds the full
-/// section set (the main `interpolate()` path, which passes no pre-existing
-/// helpers and `flatFinalPeriod = false`).
+/// QuantLib's `LocalBootstrap`, is ported as a recompute: where QuantLib
+/// shares section objects between the previous and the grown interpolation,
+/// [`ConvexMonotone::local_interpolate`] rebuilds every section from the
+/// current data and carries forward only the seam state the numbers depend on
+/// (the retained-section count and the last retained section's `f_next`, the
+/// `f[startPoint - 1]` seed of `convexmonotoneinterpolation.hpp:612-613`).
+/// Rebuilt sections are bit-identical to the ones QuantLib reuses, so the
+/// grown curve matches the one-shot build digit for digit.
 pub struct ConvexMonotoneInterpolation {
     x: Vec<Real>,
     section_helpers: Vec<Box<dyn SectionHelper>>,
     extrapolation_helper: Box<dyn SectionHelper>,
     allow_extrapolation: bool,
+    constant_last_period: bool,
 }
 
 impl ConvexMonotoneInterpolation {
@@ -729,6 +734,30 @@ impl ConvexMonotoneInterpolation {
         quadraticity: Real,
         monotonicity: Real,
         force_positive: bool,
+    ) -> QlResult<Self> {
+        ConvexMonotoneInterpolation::new_impl(
+            x,
+            y,
+            quadraticity,
+            monotonicity,
+            force_positive,
+            false,
+            None,
+        )
+    }
+
+    /// The full constructor behind [`ConvexMonotoneInterpolation::new`] and
+    /// [`ConvexMonotone::local_interpolate`], mirroring the
+    /// `ConvexMonotoneImpl` constructor checks including the pre-existing
+    /// helper cap (`convexmonotoneinterpolation.hpp:208-209`).
+    fn new_impl(
+        x: Vec<Real>,
+        y: Vec<Real>,
+        quadraticity: Real,
+        monotonicity: Real,
+        force_positive: bool,
+        constant_last_period: bool,
+        pre_existing: Option<(usize, Real)>,
     ) -> QlResult<Self> {
         if x.len() != y.len() {
             fail!(
@@ -763,15 +792,44 @@ impl ConvexMonotoneInterpolation {
                 fail!("x values must be strictly increasing");
             }
         }
+        if let Some((count, _)) = pre_existing
+            && x.len() <= count + 1
+        {
+            fail!("too many existing helpers have been supplied");
+        }
 
-        let (section_helpers, extrapolation_helper) =
-            build_sections(&x, &y, quadraticity, monotonicity, force_positive);
+        let (section_helpers, extrapolation_helper) = build_sections(
+            &x,
+            &y,
+            quadraticity,
+            monotonicity,
+            force_positive,
+            constant_last_period,
+            pre_existing,
+        );
         Ok(ConvexMonotoneInterpolation {
             x,
             section_helpers,
             extrapolation_helper,
             allow_extrapolation: false,
+            constant_last_period,
         })
+    }
+
+    /// The seam state a subsequent [`ConvexMonotone::local_interpolate`] call
+    /// carries forward, the recompute analogue of QuantLib's
+    /// `getExistingHelpers` (`convexmonotoneinterpolation.hpp:224-229`): the
+    /// number of retained sections and the last retained section's `f_next`.
+    /// Under `constant_last_period` the final flat section is excluded,
+    /// mirroring the erase at `:226-228`; `None` when nothing is retained
+    /// (the single-period curve).
+    fn existing_seam(&self) -> Option<(usize, Real)> {
+        let retained = self.section_helpers.len() - usize::from(self.constant_last_period);
+        if retained == 0 {
+            None
+        } else {
+            Some((retained, self.section_helpers[retained - 1].f_next()))
+        }
     }
 
     /// Sets whether evaluation outside `[x_min, x_max]` is permitted (flat
@@ -855,12 +913,23 @@ impl Interpolation for ConvexMonotoneInterpolation {
 /// the boundary forwards from the discrete ones, then covers each interval
 /// with the section the Hagan-West region logic picks. Returns the sections
 /// (one per interval, in node order) and the flat extrapolation section.
+///
+/// The incremental arm recomputes the sections QuantLib would reuse: the
+/// boundary-forward loop runs over the full range and `f[count]` is then
+/// overridden with the carried seam `f_next` (the `:612-613` seed), which the
+/// `f[0]` boundary formula reads back when the seam sits at `f[1]`, so every
+/// rebuilt section is bit-identical to its retained original. Under
+/// `constant_last_period` the final interval takes a flat section at
+/// `y[n - 1]` (`:815-821`) instead of the region logic, and the boundary
+/// forward `f[n - 1]` goes unused (`:633-634`).
 fn build_sections(
     x: &[Real],
     y: &[Real],
     quadraticity_param: Real,
     monotonicity: Real,
     force_positive: bool,
+    constant_last_period: bool,
+    pre_existing: Option<(usize, Real)>,
 ) -> (Vec<Box<dyn SectionHelper>>, Box<dyn SectionHelper>) {
     let n = x.len();
     if n == 2 {
@@ -876,6 +945,9 @@ fn build_sections(
         let dx = x[i + 1] - x[i];
         f[i] = dx / (dx + dx_prev) * y[i] + dx_prev / (dx + dx_prev) * y[i + 1];
     }
+    if let Some((count, seam_f_next)) = pre_existing {
+        f[count] = seam_f_next;
+    }
     f[0] = 1.5 * y[1] - 0.5 * f[1];
     f[n - 1] = 1.5 * y[n - 1] - 0.5 * f[n - 2];
     if force_positive {
@@ -887,9 +959,10 @@ fn build_sections(
         }
     }
 
+    let end_point = if constant_last_period { n - 1 } else { n };
     let mut primitive = 0.0;
     let mut section_helpers: Vec<Box<dyn SectionHelper>> = Vec::with_capacity(n - 1);
-    for i in 1..n {
+    for i in 1..end_point {
         let g_prev = f[i - 1] - y[i];
         let g_next = f[i] - y[i];
         let helper = if g_prev.abs() < 1.0e-14 && g_next.abs() < 1.0e-14 {
@@ -1030,6 +1103,16 @@ fn build_sections(
         primitive += y[i] * (x[i] - x[i - 1]);
     }
 
+    if constant_last_period {
+        section_helpers.push(Box::new(EverywhereConstantHelper::new(
+            y[n - 1],
+            primitive,
+            x[n - 2],
+        )));
+        let extrapolation = Box::new(EverywhereConstantHelper::new(y[n - 1], primitive, x[n - 2]));
+        return (section_helpers, extrapolation);
+    }
+
     let last_value = section_helpers[n - 2].value(x[n - 1]);
     let extrapolation = Box::new(EverywhereConstantHelper::new(
         last_value,
@@ -1063,6 +1146,52 @@ impl ConvexMonotone {
             monotonicity,
             force_positive,
         }
+    }
+
+    /// The incremental build used by QuantLib's `LocalBootstrap`
+    /// (`ConvexMonotone::localInterpolate`,
+    /// `convexmonotoneinterpolation.hpp:112-155`): grows the curve one node
+    /// at a time, covering the final period with a flat section at the last
+    /// forward until the data reaches `final_size`. `prev` is the previous
+    /// step's interpolation; it is ignored on the first call
+    /// (`x.len() == localisation + 1`) and required afterwards, when its seam
+    /// state carries forward and the sections QuantLib would reuse from it
+    /// are recomputed bit-identically from the data (see
+    /// [`ConvexMonotoneInterpolation`]).
+    pub fn local_interpolate(
+        &self,
+        x: &[Real],
+        y: &[Real],
+        localisation: usize,
+        prev: Option<&ConvexMonotoneInterpolation>,
+        final_size: usize,
+    ) -> QlResult<ConvexMonotoneInterpolation> {
+        let constant_last_period = x.len() != final_size;
+        if x.len() == localisation + 1 {
+            return ConvexMonotoneInterpolation::new_impl(
+                x.to_vec(),
+                y.to_vec(),
+                self.quadraticity,
+                self.monotonicity,
+                self.force_positive,
+                constant_last_period,
+                None,
+            );
+        }
+        let Some(prev) = prev else {
+            fail!(
+                "a previous interpolation is required to grow the curve past the first localisation window"
+            );
+        };
+        ConvexMonotoneInterpolation::new_impl(
+            x.to_vec(),
+            y.to_vec(),
+            self.quadraticity,
+            self.monotonicity,
+            self.force_positive,
+            constant_last_period,
+            prev.existing_seam(),
+        )
     }
 }
 
@@ -1260,10 +1389,10 @@ mod tests {
         .unwrap()
     }
 
-    #[test]
-    fn reference_values_match_quantlib() {
-        let f = sample();
-        let expected: [(Real, Real, Real); 11] = [
+    // The (x, value, primitive) reference table for the sample fixture with
+    // the default settings, extracted from the built QuantLib 1.43.0 dylib.
+    fn reference_table() -> [(Real, Real, Real); 11] {
+        [
             (0.0, 0.04625, 0.0),
             (0.5, 0.0415625, 0.02234375),
             (1.0, 0.0275, 0.04),
@@ -1275,8 +1404,13 @@ mod tests {
             (4.0, 0.0444, 0.154),
             (5.0, 0.0282, 0.1894),
             (6.0, 0.0228, 0.214),
-        ];
-        for (x, value, primitive) in expected {
+        ]
+    }
+
+    #[test]
+    fn reference_values_match_quantlib() {
+        let f = sample();
+        for (x, value, primitive) in reference_table() {
             assert!(
                 (f.value(x).unwrap() - value).abs() < 1e-12,
                 "value({x}): {} vs {value}",
@@ -1414,5 +1548,142 @@ mod tests {
             )
             .unwrap();
         assert_eq!(f.value(2.75).unwrap(), sample().value(2.75).unwrap());
+    }
+
+    const SAMPLE_X: [Real; 6] = [0.0, 1.0, 2.0, 3.5, 4.0, 6.0];
+    const SAMPLE_Y: [Real; 6] = [0.02, 0.04, 0.015, 0.05, 0.048, 0.03];
+
+    // Mirrors the LocalBootstrap grow loop (localbootstrap.hpp:222-227):
+    // iInst runs from localisation - 1, the data spans iInst + 2 points, and
+    // each step passes the previous step's interpolation.
+    fn grow_locally(
+        factory: &ConvexMonotone,
+        x: &[Real],
+        y: &[Real],
+        localisation: usize,
+    ) -> ConvexMonotoneInterpolation {
+        let final_size = x.len();
+        let mut interp: Option<ConvexMonotoneInterpolation> = None;
+        for len in (localisation + 1)..=final_size {
+            interp = Some(
+                factory
+                    .local_interpolate(
+                        &x[..len],
+                        &y[..len],
+                        localisation,
+                        interp.as_ref(),
+                        final_size,
+                    )
+                    .unwrap(),
+            );
+        }
+        interp.unwrap()
+    }
+
+    #[test]
+    fn local_interpolate_grown_curve_matches_one_shot_and_reference() {
+        let factory = ConvexMonotone::default();
+        let grown = grow_locally(&factory, &SAMPLE_X, &SAMPLE_Y, 2);
+        let one_shot = factory.interpolate(&SAMPLE_X, &SAMPLE_Y).unwrap();
+        for (x, value, primitive) in reference_table() {
+            assert!(
+                (grown.value(x).unwrap() - value).abs() < 1e-12,
+                "value({x}): {} vs {value}",
+                grown.value(x).unwrap()
+            );
+            assert!(
+                (grown.primitive(x).unwrap() - primitive).abs() < 1e-12,
+                "primitive({x}): {} vs {primitive}",
+                grown.primitive(x).unwrap()
+            );
+            assert!(
+                (grown.value(x).unwrap() - one_shot.value(x).unwrap()).abs() < 1e-12,
+                "value({x}) incremental vs one-shot: {} vs {}",
+                grown.value(x).unwrap(),
+                one_shot.value(x).unwrap()
+            );
+            assert!(
+                (grown.primitive(x).unwrap() - one_shot.primitive(x).unwrap()).abs() < 1e-12,
+                "primitive({x}) incremental vs one-shot: {} vs {}",
+                grown.primitive(x).unwrap(),
+                one_shot.primitive(x).unwrap()
+            );
+        }
+    }
+
+    #[test]
+    fn local_interpolate_with_localisation_one_matches_one_shot() {
+        let factory = ConvexMonotone::default();
+        let grown = grow_locally(&factory, &SAMPLE_X, &SAMPLE_Y, 1);
+        let one_shot = factory.interpolate(&SAMPLE_X, &SAMPLE_Y).unwrap();
+        for (x, _, _) in reference_table() {
+            assert!(
+                (grown.value(x).unwrap() - one_shot.value(x).unwrap()).abs() < 1e-12,
+                "value({x}) incremental vs one-shot: {} vs {}",
+                grown.value(x).unwrap(),
+                one_shot.value(x).unwrap()
+            );
+            assert!(
+                (grown.primitive(x).unwrap() - one_shot.primitive(x).unwrap()).abs() < 1e-12,
+                "primitive({x}) incremental vs one-shot: {} vs {}",
+                grown.primitive(x).unwrap(),
+                one_shot.primitive(x).unwrap()
+            );
+        }
+    }
+
+    #[test]
+    fn local_interpolate_stages_keep_settled_sections_and_flatten_the_last_period() {
+        let factory = ConvexMonotone::default();
+        let final_size = SAMPLE_X.len();
+        let mut interp: Option<ConvexMonotoneInterpolation> = None;
+        let mut settled_probe: Option<Real> = None;
+        for len in 3..=final_size {
+            let cur = factory
+                .local_interpolate(
+                    &SAMPLE_X[..len],
+                    &SAMPLE_Y[..len],
+                    2,
+                    interp.as_ref(),
+                    final_size,
+                )
+                .unwrap();
+            if len < final_size {
+                let mid = 0.5 * (SAMPLE_X[len - 2] + SAMPLE_X[len - 1]);
+                assert_eq!(cur.value(mid).unwrap(), SAMPLE_Y[len - 1]);
+            }
+            if let Some(settled) = settled_probe {
+                assert_eq!(cur.value(0.5).unwrap(), settled);
+            }
+            settled_probe = Some(cur.value(0.5).unwrap());
+            interp = Some(cur);
+        }
+    }
+
+    #[test]
+    fn local_interpolate_error_paths() {
+        let factory = ConvexMonotone::default();
+        // Past the first localisation window a previous interpolation is
+        // required.
+        assert!(
+            factory
+                .local_interpolate(&SAMPLE_X[..4], &SAMPLE_Y[..4], 2, None, 6)
+                .is_err()
+        );
+        // A curve grown to five nodes retains three sections, more than a
+        // four-node rebuild can accept (the :208-209 cap).
+        let mut interp: Option<ConvexMonotoneInterpolation> = None;
+        for len in 3..=5 {
+            interp = Some(
+                factory
+                    .local_interpolate(&SAMPLE_X[..len], &SAMPLE_Y[..len], 2, interp.as_ref(), 6)
+                    .unwrap(),
+            );
+        }
+        assert!(
+            factory
+                .local_interpolate(&SAMPLE_X[..4], &SAMPLE_Y[..4], 2, interp.as_ref(), 6)
+                .is_err()
+        );
     }
 }
