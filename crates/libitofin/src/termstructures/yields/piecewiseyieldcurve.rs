@@ -499,6 +499,38 @@ mod tests {
         );
     }
 
+    /// `testSplineZeroConsistency` -> `<ZeroYield, Cubic>`
+    /// (`piecewiseyieldcurve.cpp:709,716`). The BMA half (`:721`) is skipped.
+    /// The bootstrap runs the convergence loop here: `Cubic` is global, so
+    /// every pillar solve moves the whole curve and the driver re-solves all
+    /// nodes until the largest per-pass change is within the bootstrap
+    /// accuracy.
+    ///
+    /// D10 divergence: C++ runs `Cubic(Spline, monotonic, SecondDerivative 0)`
+    /// (`:718-720`) - a monotone-filtered natural spline - while the Rust
+    /// `Cubic` interpolator is the Kruger scheme, non-monotonic
+    /// (`cubic.rs:712,736`). Both are *global* cubics, so both drive the
+    /// bootstrap through the convergence loop this test exercises, and the
+    /// oracle is a self-repricing round-trip with no cached C++ number, so the
+    /// scheme choice is fidelity-neutral here. A Spline-monotonic interpolator
+    /// is deliberately not added.
+    ///
+    /// The node `[0]` assertion has the same rationale as
+    /// [`linear_zero_consistency`]: `ZeroYield::update_guess` mirrors the
+    /// first solved rate into the reference node and no repriced instrument
+    /// covers `(0, t1)` to catch a missing mirror.
+    #[test]
+    fn spline_zero_consistency() {
+        use crate::math::interpolations::cubic::Cubic;
+
+        let curve = check_curve_consistency::<ZeroYield, Cubic>();
+        let data = curve.data().unwrap();
+        assert_eq!(
+            data[0], data[1],
+            "the reference zero rate must mirror the first solved pillar"
+        );
+    }
+
     /// `testLinearForwardConsistency` -> `<ForwardRate, Linear>`
     /// (`piecewiseyieldcurve.cpp:728,735`). The BMA half (`:736`) is skipped.
     /// The node `[0]` assertion has the same rationale as
@@ -726,6 +758,38 @@ mod tests {
                 "cubic mixed strip reprice: implied {implied} vs quote {quote} (err {error})"
             );
         }
+    }
+
+    /// `testSplineForwardConsistency` (`piecewiseyieldcurve.cpp:750-769`) is
+    /// NOT ported: upstream keeps it commented out as `//Unstable`, and this
+    /// port reproduces exactly that instability, documented here visibly
+    /// rather than silently dropped. In its place this test pins the
+    /// iteration-cap exit of the convergence loop (`iterativebootstrap.hpp:
+    /// 376-383`, the `dontThrow=false` branch): the mixed strip under
+    /// `<ForwardRate, Cubic>` settles into a period-2 cycle (the per-pass
+    /// change plateaus near 2.2e-3 and never converges), so the bootstrap
+    /// exhausts `Traits::max_iterations` passes and returns the ported
+    /// non-convergence error instead of a silently mispriced curve.
+    #[test]
+    fn unstable_forward_cubic_hits_the_iteration_cap() {
+        use crate::math::interpolations::cubic::Cubic;
+
+        let (settlement, helpers) = build_mixed_strip();
+
+        let curve = PiecewiseYieldCurve::<ForwardRate, Cubic>::new(
+            settlement,
+            helpers,
+            Actual360::new(),
+            Cubic,
+        )
+        .unwrap();
+
+        let err = curve.dates().unwrap_err();
+        assert!(
+            err.message().contains("convergence not reached after"),
+            "expected the ported non-convergence error, got: {}",
+            err.message()
+        );
     }
 
     /// A genuine duplicate pillar - two 3M deposits on the same index reduce to
