@@ -532,6 +532,166 @@ impl SectionHelper for QuadraticHelper {
 /// (`detail::QuadraticMinHelper`): when the quadratic would go negative, the
 /// section is rescaled to the interval ends with a flat zero region in
 /// between.
+pub struct QuadraticMinHelper {
+    split_region: bool,
+    x1: Real,
+    x2: Real,
+    x3: Real,
+    x4: Real,
+    a: Real,
+    b: Real,
+    c: Real,
+    primitive1: Real,
+    primitive2: Real,
+    f_next: Real,
+    x_scaling: Real,
+    x_ratio: Real,
+}
+
+impl QuadraticMinHelper {
+    /// Builds the quadratic through `f_prev` at `x_prev` and `f_next` at
+    /// `x_next` whose average over the interval is `f_average`.
+    pub fn new(
+        x_prev: Real,
+        x_next: Real,
+        f_prev: Real,
+        f_next: Real,
+        f_average: Real,
+        prev_primitive: Real,
+    ) -> Self {
+        let mut split_region = false;
+        let mut a = 3.0 * f_prev + 3.0 * f_next - 6.0 * f_average;
+        let mut b = -(4.0 * f_prev + 2.0 * f_next - 6.0 * f_average);
+        let mut c = f_prev;
+        let d = b * b - 4.0 * a * c;
+        let mut x_scaling = x_next - x_prev;
+        let mut x_ratio = 1.0;
+        let mut x2 = 0.0;
+        let mut x3 = 0.0;
+        let mut primitive2 = 0.0;
+        if d > 0.0 {
+            let a_av = 36.0;
+            let b_av = -24.0 * (f_prev + f_next);
+            let c_av = 4.0 * (f_prev * f_prev + f_prev * f_next + f_next * f_next);
+            let d_av = b_av * b_av - 4.0 * a_av * c_av;
+            if d_av >= 0.0 {
+                split_region = true;
+                let av_root = (-b_av - d_av.sqrt()) / (2.0 * a_av);
+
+                x_ratio = f_average / av_root;
+                x_scaling *= x_ratio;
+
+                a = 3.0 * f_prev + 3.0 * f_next - 6.0 * av_root;
+                b = -(4.0 * f_prev + 2.0 * f_next - 6.0 * av_root);
+                c = f_prev;
+                let x_root = -b / (2.0 * a);
+                x2 = x_prev + x_ratio * (x_next - x_prev) * x_root;
+                x3 = x_next - x_ratio * (x_next - x_prev) * (1.0 - x_root);
+                primitive2 = prev_primitive
+                    + x_scaling * (a / 3.0 * x_root * x_root + b / 2.0 * x_root + c) * x_root;
+            }
+        }
+        QuadraticMinHelper {
+            split_region,
+            x1: x_prev,
+            x2,
+            x3,
+            x4: x_next,
+            a,
+            b,
+            c,
+            primitive1: prev_primitive,
+            primitive2,
+            f_next,
+            x_scaling,
+            x_ratio,
+        }
+    }
+}
+
+impl SectionHelper for QuadraticMinHelper {
+    fn value(&self, x: Real) -> Real {
+        let mut x_val = (x - self.x1) / (self.x4 - self.x1);
+        if self.split_region {
+            if x <= self.x2 {
+                x_val /= self.x_ratio;
+            } else if x < self.x3 {
+                return 0.0;
+            } else {
+                x_val = 1.0 - (1.0 - x_val) / self.x_ratio;
+            }
+        }
+        self.c + self.b * x_val + self.a * x_val * x_val
+    }
+
+    fn primitive(&self, x: Real) -> Real {
+        let mut x_val = (x - self.x1) / (self.x4 - self.x1);
+        if self.split_region {
+            if x < self.x2 {
+                x_val /= self.x_ratio;
+            } else if x < self.x3 {
+                return self.primitive2;
+            } else {
+                x_val = 1.0 - (1.0 - x_val) / self.x_ratio;
+            }
+        }
+        self.primitive1
+            + self.x_scaling
+                * (self.a / 3.0 * x_val * x_val + self.b / 2.0 * x_val + self.c)
+                * x_val
+    }
+
+    fn f_next(&self) -> Real {
+        self.f_next
+    }
+}
+
+/// A convex combination of a quadratic section and a convex-monotone section
+/// (`detail::ComboHelper`), weighted by the quadraticity.
+pub struct ComboHelper {
+    quadraticity: Real,
+    quadratic_helper: Box<dyn SectionHelper>,
+    conv_mono_helper: Box<dyn SectionHelper>,
+}
+
+impl ComboHelper {
+    /// Combines `quadraticity` parts of `quadratic_helper` with
+    /// `1 - quadraticity` parts of `conv_mono_helper`; `quadraticity` must lie
+    /// strictly between 0 and 1 (the pure cases store a single helper).
+    pub fn new(
+        quadratic_helper: Box<dyn SectionHelper>,
+        conv_mono_helper: Box<dyn SectionHelper>,
+        quadraticity: Real,
+    ) -> Self {
+        debug_assert!(
+            quadraticity < 1.0 && quadraticity > 0.0,
+            "quadratic value must lie between 0 and 1"
+        );
+        ComboHelper {
+            quadraticity,
+            quadratic_helper,
+            conv_mono_helper,
+        }
+    }
+}
+
+impl SectionHelper for ComboHelper {
+    fn value(&self, x: Real) -> Real {
+        self.quadraticity * self.quadratic_helper.value(x)
+            + (1.0 - self.quadraticity) * self.conv_mono_helper.value(x)
+    }
+
+    fn primitive(&self, x: Real) -> Real {
+        self.quadraticity * self.quadratic_helper.primitive(x)
+            + (1.0 - self.quadraticity) * self.conv_mono_helper.primitive(x)
+    }
+
+    fn f_next(&self) -> Real {
+        self.quadraticity * self.quadratic_helper.f_next()
+            + (1.0 - self.quadraticity) * self.conv_mono_helper.f_next()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -649,5 +809,43 @@ mod tests {
             ],
         );
         assert_eq!(h.f_next(), 0.04);
+    }
+
+    #[test]
+    fn quadratic_min_helper_split_region() {
+        // The quadratic through 0.05/0.05 with average 0.01 dips below zero:
+        // rescaled to the ends around a flat zero region on [1.3, 1.7].
+        let h = QuadraticMinHelper::new(1.0, 2.0, 0.05, 0.05, 0.01, 0.0);
+        check(
+            &h,
+            &[
+                (1.1, 2.222_222_222_222_22e-2, 3.518_518_518_518_52e-3),
+                (1.5, 0.0, 4.999_999_999_999_997_5e-3),
+                (1.9, 2.222_222_222_222_218_5e-2, 6.481_481_481_481_481e-3),
+            ],
+        );
+    }
+
+    #[test]
+    fn quadratic_min_helper_stays_quadratic_when_positive() {
+        let h = QuadraticMinHelper::new(1.0, 2.0, 0.05, 0.05, 0.045, 0.0);
+        check(
+            &h,
+            &[(1.4, 4.279_999_999_999_999e-2, 1.823_999_999_999_999_2e-2)],
+        );
+    }
+
+    #[test]
+    fn combo_helper_weights_its_parts() {
+        let quadratic = Box::new(QuadraticHelper::new(1.0, 2.0, 0.02, 0.04, 0.05, 0.1));
+        let conv_mono = Box::new(ConvexMonotone2Helper::new(
+            1.0, 2.0, 0.02, -0.06, 0.03, 0.25, 0.1,
+        ));
+        let h = ComboHelper::new(quadratic, conv_mono, 0.3);
+        check(
+            &h,
+            &[(1.6, 4.104_444_444_444_444e-2, 1.281_451_851_851_852e-1)],
+        );
+        assert!((h.f_next() - -8.999_999_999_999_998e-3).abs() < 1e-14);
     }
 }
