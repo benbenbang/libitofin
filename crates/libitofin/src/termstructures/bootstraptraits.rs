@@ -108,6 +108,32 @@ pub trait YieldBootstrapTraits: BootstrapTraits {
         interpolation: &I,
         t: Time,
     ) -> QlResult<DiscountFactor>;
+
+    /// Maps an unconstrained optimizer variable into a curve node value
+    /// (`Traits::transformDirect`). The global bootstrap searches all interior
+    /// nodes simultaneously in an unconstrained space, and this transform is
+    /// what keeps each trial node admissible - `exp` keeps a trial discount
+    /// factor positive where the iterative bootstrap would have bracketed it.
+    ///
+    /// The C++ signature takes the node index and the curve
+    /// (`transformDirect(x, i, c)`), but the three standard traits ignore
+    /// both, so the port is parameterless; the index-dependent
+    /// `SimpleZeroYield` transform (`bootstraptraits.hpp:385-393`) rides with
+    /// the deferred additional-restrictions slice (see the module docs).
+    /// Identity by default - `ZeroYield` (`:197-204`) and `ForwardRate`
+    /// (`:290-295`) are identity upstream - and `Discount` overrides with
+    /// `exp` (`:106-109`).
+    fn transform_direct(x: Real) -> Real {
+        x
+    }
+
+    /// The inverse of [`transform_direct`](Self::transform_direct)
+    /// (`Traits::transformInverse`): maps a node value into the optimizer
+    /// space, so `transform_direct(transform_inverse(x)) == x`. Identity by
+    /// default; `Discount` overrides with `log` (`bootstraptraits.hpp:110-113`).
+    fn transform_inverse(x: Real) -> Real {
+        x
+    }
 }
 
 /// Discount-factor bootstrap traits (`struct Discount`,
@@ -172,6 +198,17 @@ impl YieldBootstrapTraits for Discount {
         let d_max = interpolation.value(t_max)?;
         let inst_fwd_max = -interpolation.derivative(t_max)? / d_max;
         Ok(d_max * (-inst_fwd_max * (t - t_max)).exp())
+    }
+
+    /// `exp` (`bootstraptraits.hpp:106-109`): the optimizer variable is the
+    /// log-discount, so every trial discount factor stays positive.
+    fn transform_direct(x: Real) -> Real {
+        x.exp()
+    }
+
+    /// `log` (`bootstraptraits.hpp:110-113`).
+    fn transform_inverse(x: Real) -> Real {
+        x.ln()
     }
 }
 
@@ -545,6 +582,30 @@ mod tests {
         let mut data = [1.0, 0.98, 1.0];
         Discount::update_guess(&mut data, 0.95, 2);
         assert_eq!(data[2], 0.95);
+    }
+
+    /// The `Discount` optimizer transforms are `exp`/`log`
+    /// (`bootstraptraits.hpp:106-113`): a mutually inverse pair whose direct
+    /// image is always a positive discount factor.
+    #[test]
+    fn discount_transforms_are_exp_and_log() {
+        assert_eq!(Discount::transform_direct(0.0), 1.0);
+        let df = 0.97;
+        assert_eq!(Discount::transform_inverse(df), df.ln());
+        let x = Discount::transform_inverse(df);
+        assert!((Discount::transform_direct(x) - df).abs() < 1e-15);
+        assert!(Discount::transform_direct(-40.0) > 0.0);
+    }
+
+    /// The rate-storing conventions keep the default identity transforms
+    /// (`bootstraptraits.hpp:197-204` for `ZeroYield`, `:290-295` for
+    /// `ForwardRate`).
+    #[test]
+    fn rate_convention_transforms_are_identity() {
+        assert_eq!(ZeroYield::transform_direct(0.05), 0.05);
+        assert_eq!(ZeroYield::transform_inverse(-0.01), -0.01);
+        assert_eq!(ForwardRate::transform_direct(0.05), 0.05);
+        assert_eq!(ForwardRate::transform_inverse(-0.01), -0.01);
     }
 
     #[test]
