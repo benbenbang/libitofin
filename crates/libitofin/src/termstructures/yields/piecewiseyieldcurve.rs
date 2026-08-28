@@ -663,6 +663,66 @@ mod tests {
         check_curve_consistency_with::<ForwardRate, ConvexMonotone, LocalBootstrap>(1.0e-6);
     }
 
+    /// The `GlobalBootstrap` arm of the consistency harness:
+    /// `<Discount, LogLinear, GlobalBootstrap>` at 1e-9 (and a
+    /// `<ZeroYield, Linear>` arm below). The minimal single-curve core has no
+    /// direct C++ oracle - the three upstream tests
+    /// (`piecewiseyieldcurve.cpp:1306/1388/1486`) all exercise the deferred
+    /// additional restrictions - so the vs-consistency round-trip stands in.
+    /// Unlike [`local_bootstrap_consistency`] this oracle is NOT vacuous: the
+    /// system is exactly determined (21 helper residuals over 21 interior
+    /// nodes, no free window parameter), so the zero-residual root is locally
+    /// unique and repricing every helper to 1e-9 pins the full simultaneous
+    /// solve - the grid layout, the cost wiring, the guess mapping and the
+    /// transform round trip.
+    ///
+    /// What it does NOT pin (the transcription-note precedent of
+    /// [`local_bootstrap_consistency`]): the oracle is blind to the transform
+    /// SPACE. A self-consistent wrong pair (identity for BOTH
+    /// `transform_direct` and `transform_inverse` on `Discount`) converges to
+    /// the same correct discount factors and still passes, so the exp/log
+    /// pair is transcription-verified against `bootstraptraits.hpp:106-113`
+    /// rather than oracle-verified. Confirmed by stubbing (#949), one
+    /// transform at a time:
+    ///
+    /// - `transform_direct` alone broken (exp -> identity, inverse kept log):
+    ///   the log-space guess is written into the node vector as-is, node 1
+    ///   goes negative (`ln` of the 1W discount, about -0.00097), and this
+    ///   arm FAILS with "log-linear interpolation requires positive y values,
+    ///   got y[1] = -0.0009717..." - the oracle sees `transform_direct` on
+    ///   every cost evaluation.
+    /// - `transform_inverse` alone broken (log -> identity, direct kept exp):
+    ///   the arm still PASSES. The inverse only seeds the start point, so the
+    ///   ~0.99-discount guesses land at exp(0.99) ~ 2.69 - a bad start, not a
+    ///   broken mapping - and the unconstrained LM walks back to the same
+    ///   root within its 1000-iteration budget. `transform_inverse` is
+    ///   therefore transcription-verified only, like the space choice.
+    #[test]
+    fn global_bootstrap_discount_consistency() {
+        use crate::termstructures::globalbootstrap::GlobalBootstrap;
+
+        check_curve_consistency_with::<Discount, LogLinear, GlobalBootstrap>(TOLERANCE);
+    }
+
+    /// The rate-storing `GlobalBootstrap` arm: `<ZeroYield, Linear>` at 1e-9.
+    /// The `ZeroYield` transforms are identity upstream
+    /// (`bootstraptraits.hpp:197-204`), so this arm pins the driver on a
+    /// convention where the optimizer works directly in node space. The node
+    /// `[0]` assertion has the same rationale as [`linear_zero_consistency`]:
+    /// `update_guess` must mirror the first solved rate into the reference
+    /// node under the global solve too.
+    #[test]
+    fn global_bootstrap_zero_consistency() {
+        use crate::termstructures::globalbootstrap::GlobalBootstrap;
+
+        let curve = check_curve_consistency_with::<ZeroYield, Linear, GlobalBootstrap>(TOLERANCE);
+        let data = curve.data().unwrap();
+        assert_eq!(
+            data[0], data[1],
+            "the reference zero rate must mirror the first solved pillar"
+        );
+    }
+
     /// The bootstrapped forward curve must be introspectable through the
     /// downcast seam (`isdacdsengine.cpp:117-120`), the arm a
     /// `PiecewiseYieldCurve<ForwardRate, BackwardFlat>` reaches in C++ by
