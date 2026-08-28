@@ -685,36 +685,47 @@ mod tests {
         );
     }
 
-    /// The negative control for `mixed_strip_bootstraps`: the SAME mixed strip
-    /// under a global interpolator (`Cubic`) must fail LOUDLY at bootstrap time
-    /// rather than return a silently mispriced curve. `Cubic` is global (every
-    /// node depends on all others), which the single-pass `IterativeBootstrap`
-    /// cannot converge, so `calculate` rejects it up front (mirroring C++'s
-    /// `loopRequired_ = Interpolator::global`, `iterativebootstrap.hpp:136`).
-    /// The deferral pointer to the convergence loop (#543) is pinned in the
-    /// message. The discriminating pair is `LogLinear` -> Ok (the positive test)
-    /// versus `Cubic` -> Err here; a deposits-only strip cannot detect the
-    /// difference (deposits read the curve only at their own pillar).
+    /// The global-interpolator counterpart of `mixed_strip_bootstraps`,
+    /// converted from the pre-#543 rejection pin: the SAME mixed strip under
+    /// `Cubic` now bootstraps through the ported convergence loop
+    /// (`iterativebootstrap.hpp:257,363-387`) and every instrument reprices
+    /// its own quote off the solved curve. Before the loop landed this strip
+    /// was rejected up front with a deferral pointer at #543.
+    ///
+    /// The traits are `Discount` rather than the original `ForwardRate`: a
+    /// piecewise cubic on instantaneous forwards is the configuration upstream
+    /// itself disables as unstable (`testSplineForwardConsistency`,
+    /// `piecewiseyieldcurve.cpp:750-769`, commented out `//Unstable`), and the
+    /// port reproduces that instability faithfully - see
+    /// [`unstable_forward_cubic_hits_the_iteration_cap`]. The original test
+    /// only needed *some* traits to pin the rejection; the positive claim
+    /// needs a configuration that genuinely converges.
     #[test]
-    fn global_interpolator_is_rejected() {
+    fn global_interpolator_bootstraps_through_the_convergence_loop() {
         use crate::math::interpolations::cubic::Cubic;
 
         let (settlement, helpers) = build_mixed_strip();
 
-        let curve = PiecewiseYieldCurve::<ForwardRate, Cubic>::new(
+        let curve = PiecewiseYieldCurve::<Discount, Cubic>::new(
             settlement,
-            helpers,
+            helpers.clone(),
             Actual360::new(),
             Cubic,
         )
         .unwrap();
 
-        let err = curve.dates().unwrap_err();
-        assert!(
-            err.message().contains("#543"),
-            "the rejection must point at the unported convergence loop (#543): {}",
-            err.message()
-        );
+        let nodes = curve.dates().unwrap();
+        assert_eq!(nodes.len(), helpers.len() + 1);
+
+        for helper in &helpers {
+            let implied = helper.implied_quote().unwrap();
+            let quote = helper.base().quote_value().unwrap();
+            let error = (implied - quote).abs();
+            assert!(
+                error <= TOLERANCE,
+                "cubic mixed strip reprice: implied {implied} vs quote {quote} (err {error})"
+            );
+        }
     }
 
     /// A genuine duplicate pillar - two 3M deposits on the same index reduce to

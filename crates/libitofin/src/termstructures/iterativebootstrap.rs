@@ -5,29 +5,38 @@
 //! helper repricing off the curve reproduces its market quote
 //! (`helper.quote_error() == 0`).
 //!
-//! ## What is ported, and what is provably dead for this path
+//! ## What is ported, and what is deferred
 //!
-//! The wired conventions (`Discount`, `ZeroYield`, `ForwardRate`) all run on
-//! *local* interpolators - `LogLinear`, `Linear`, `BackwardFlat` - whose value
-//! at a point depends only on the bracketing nodes. Several branches of the C++
-//! algorithm exist only for *global* interpolators (splines) and are dead here:
+//! The driver mirrors `IterativeBootstrap::calculate`: a forward pass solves
+//! the curve node at each pillar in maturity order, and an outer convergence
+//! loop (`iterativebootstrap.hpp:257,363-387`) repeats that pass when the
+//! interpolator is *global* (`Interpolator::GLOBAL`, true for `Cubic`) or when
+//! a pillar date precedes its helper's latest-relevant date (`:205-207`).
+//! Under a global interpolator every node depends on all others, so one pass
+//! leaves the curve mispriced; the loop re-solves every node - each against
+//! the full-range interpolation seeded by the previous pass - until the
+//! largest node change of a pass is within the bootstrap accuracy. Exhausting
+//! `Traits::max_iterations` passes without converging is an explicit `Err`
+//! (the C++ `dontThrow=false` branch, `:376-383`). For the local
+//! interpolators (`Linear`, `LogLinear`, `BackwardFlat`), whose wired helpers
+//! pin the pillar at the latest-relevant date, neither condition fires and the
+//! bootstrap stays a single forward pass.
 //!
-//! - **The outer convergence loop** (`iterativebootstrap.hpp:363-387`). It
-//!   re-solves every node until the curve stops moving, and runs only when
-//!   `loopRequired_` is set. `loopRequired_` starts as `Interpolator::global`
-//!   (false for local) and is only forced true when a pillar date precedes the
-//!   helper's latest-relevant date (`:206`). Every helper in scope here pins
-//!   its pillar at its latest-relevant date, so the loop never runs: the
-//!   bootstrap is a single forward pass. This port makes that single pass
-//!   explicit.
-//! - **The `Linear` interpolation fallback** (`:296-308`). When the target
-//!   interpolation cannot yet span the solved prefix, a *global* interpolator
-//!   falls back to `Linear`; a *local* one rethrows (`:302-303`). `LogLinear`
-//!   and `Linear` need only two points and always span a prefix of length
-//!   >= 2, so the fallback is unreachable. Not ported.
-//! - **Bound-widening retries and `dontThrow`** (`maxAttempts > 1`, `:336-351`).
-//!   Optional robustness features off by default; non-convergence is instead an
-//!   explicit `Err` (D10), never a silent partial curve.
+//! Two branches of the C++ algorithm are deliberately not ported:
+//!
+//! - **The `Linear` interpolation fallback** (`:296-308`), which substitutes
+//!   `Linear` while a global interpolation cannot yet span the solved prefix.
+//!   It is unreachable for the wired `Cubic` (`required_points()` is 2, so
+//!   every prefix of length >= 2 builds) and type-incompatible with the
+//!   monomorphized holder: `CurveData<I>` stores `Option<I::Output>`, which
+//!   cannot hold a `LinearInterpolation` where a `CubicInterpolation` is
+//!   expected - C++ only manages the swap through its type-erased
+//!   `Interpolation`. Only an interpolator needing >= 4 points (Akima,
+//!   Lagrange), none of which is wired, could ever reach it.
+//! - **The robustness fallbacks** - `dontThrow`, `maxAttempts` bound-widening
+//!   retries and the `validCurve_` invalidate-and-retry recursion
+//!   (`:318-358`) - deferred to #941. Every solve failure and non-convergence
+//!   here is an explicit `Err` (D4), never a silent partial curve.
 //!
 //! Both solvers the C++ uses are wired: `Brent` runs the first (fresh) pass and
 //! `FiniteDifferenceNewtonSafe` runs a re-bootstrap seeded from a still-valid
@@ -46,8 +55,8 @@
 //! dropping a helper. So there is nothing to port. This corrects the original
 //! #532 premise that the bootstrap "should prune redundant helpers"; the correct
 //! behaviour for a genuine duplicate is the error, and callers must supply a
-//! strip with distinct pillars. The `GlobalBootstrap` convergence loop is
-//! deferred to #543.
+//! strip with distinct pillars. `GlobalBootstrap` itself (a global
+//! least-squares fit) is a separate, still-unported slice.
 
 use std::cell::RefCell;
 
@@ -154,18 +163,11 @@ impl IterativeBootstrap {
     }
 
     /// Bootstraps `curve` in place, solving every alive pillar (C++'s
-    /// `calculate`, single-pass for the local-interpolator scope).
+    /// `calculate`): one forward pass for a local interpolator, passes to
+    /// convergence for a global one.
     pub fn calculate<C: PiecewiseCurve>(&self, curve: &C) -> QlResult<()> {
         let mut helpers: Vec<Shared<C::Helper>> = curve.instruments().to_vec();
         let n = helpers.len();
-        require!(
-            !C::Interp::GLOBAL,
-            "global interpolators cannot be bootstrapped by the single-pass \
-             IterativeBootstrap: every node depends on all others, so one pass \
-             leaves the curve mispriced. The convergence loop (C++'s \
-             loopRequired_) is unported (#543); use a local interpolator \
-             (Linear, LogLinear, BackwardFlat) until it lands."
-        );
         require!(n > 0, "no bootstrap helpers given");
         sort_by_pillar_date(&mut helpers);
 
@@ -193,6 +195,7 @@ impl IterativeBootstrap {
         dates.push(first_date);
         times.push(curve.time_from_reference(first_date)?);
         let mut max_date = first_date;
+        let mut loop_required = C::Interp::GLOBAL;
         for (i, j) in (1..).zip(first_alive..n) {
             let pillar = helpers[j].pillar_date();
             require!(
@@ -208,12 +211,17 @@ impl IterativeBootstrap {
             dates.push(pillar);
             times.push(curve.time_from_reference(pillar)?);
             max_date = pillar.max(latest_relevant);
+            // A pillar before the last relevant date forces the convergence
+            // loop even for a local interpolator (`:205-207`).
+            if pillar < latest_relevant {
+                loop_required = true;
+            }
         }
 
         // Install the pillars, seeding the values from a still-valid previous
         // solution when its shape matches, otherwise resetting to the curve's
         // initial value (`:212-218`).
-        let valid_data = {
+        let mut valid_data = {
             let mut cd = curve.curve_data().borrow_mut();
             let reuse = cd.is_valid() && cd.data().len() == nodes;
             cd.set_pillars(dates, times);
@@ -232,61 +240,103 @@ impl IterativeBootstrap {
         }
 
         let accuracy = self.accuracy.unwrap_or_else(|| curve.accuracy());
+        let max_iterations = C::Traits::max_iterations() - 1;
+        let mut previous_data: Vec<Real> = Vec::new();
 
-        for (i, j) in (1..).zip(first_alive..n) {
-            let (min, max, guess) = {
+        for iteration in 0.. {
+            // Snapshot the previous pass so the exit condition can measure how
+            // much the curve moved (`:258-259`).
+            if loop_required && valid_data {
+                previous_data = curve.curve_data().borrow().data().to_vec();
+            }
+
+            for (i, j) in (1..).zip(first_alive..n) {
+                let (min, max, guess) = {
+                    let cd = curve.curve_data().borrow();
+                    let min = C::Traits::min_value_after(i, cd.times(), cd.data(), valid_data);
+                    let max = C::Traits::max_value_after(i, cd.times(), cd.data(), valid_data);
+                    let mut guess = C::Traits::guess(i, cd.times(), cd.data(), valid_data);
+                    // Nudge a guess that sits on or past a bracket end back
+                    // inside it (`:290-293`).
+                    if guess >= max {
+                        guess = max - (max - min) / 5.0;
+                    } else if guess <= min {
+                        guess = min + (max - min) / 5.0;
+                    }
+                    (min, max, guess)
+                };
+
+                // On a fresh pass the interpolation is extended a point at a
+                // time over the solved prefix; with valid data C++ keeps the
+                // full-range interpolation and only updates it (`:295-309`),
+                // so every re-solve spans all nodes.
+                let upto = if valid_data { alive } else { i };
+                let helper = &helpers[j];
+                let error_slot: RefCell<Option<QlError>> = RefCell::new(None);
+                let error = |g: Real| -> Real {
+                    match node_error::<C>(curve, i, upto, helper, g) {
+                        Ok(value) => value,
+                        Err(err) => {
+                            *error_slot.borrow_mut() = Some(err);
+                            Real::NAN
+                        }
+                    }
+                };
+
+                let solved = if valid_data {
+                    FiniteDifferenceNewtonSafe::new()
+                        .solve_bracketed(error, accuracy, guess, min, max)
+                } else {
+                    Brent::new().solve_bracketed(error, accuracy, guess, min, max)
+                };
+
+                let root = match solved {
+                    Ok(root) => root,
+                    Err(solver_err) => {
+                        if let Some(inner) = error_slot.into_inner() {
+                            return Err(inner);
+                        }
+                        fail!(
+                            "bootstrap failed at pillar {} (maturity {}): {}",
+                            helper.pillar_date(),
+                            helper.maturity_date(),
+                            solver_err.message()
+                        );
+                    }
+                };
+
+                // Pin the solved value and rebuild so the final curve holds
+                // the root exactly, not the solver's last trial point.
+                let mut cd = curve.curve_data().borrow_mut();
+                C::Traits::update_guess(cd.data_mut(), root, i);
+                cd.rebuild(curve.interpolator(), upto)?;
+            }
+
+            if !loop_required {
+                break;
+            }
+
+            // Exit condition (`:363-387`): converged when the largest node
+            // move of a full pass is within the bootstrap accuracy.
+            let mut change: Real = 0.0;
+            if valid_data {
                 let cd = curve.curve_data().borrow();
-                let min = C::Traits::min_value_after(i, cd.times(), cd.data(), valid_data);
-                let max = C::Traits::max_value_after(i, cd.times(), cd.data(), valid_data);
-                let mut guess = C::Traits::guess(i, cd.times(), cd.data(), valid_data);
-                // Nudge a guess that sits on or past a bracket end back inside
-                // it (`:290-293`).
-                if guess >= max {
-                    guess = max - (max - min) / 5.0;
-                } else if guess <= min {
-                    guess = min + (max - min) / 5.0;
+                let data = cd.data();
+                for i in 1..=alive {
+                    change = change.max((data[i] - previous_data[i]).abs());
                 }
-                (min, max, guess)
-            };
-
-            let helper = &helpers[j];
-            let error_slot: RefCell<Option<QlError>> = RefCell::new(None);
-            let error = |g: Real| -> Real {
-                match node_error::<C>(curve, i, helper, g) {
-                    Ok(value) => value,
-                    Err(err) => {
-                        *error_slot.borrow_mut() = Some(err);
-                        Real::NAN
-                    }
+                if change <= accuracy {
+                    break;
                 }
-            };
+            }
 
-            let solved = if valid_data {
-                FiniteDifferenceNewtonSafe::new().solve_bracketed(error, accuracy, guess, min, max)
-            } else {
-                Brent::new().solve_bracketed(error, accuracy, guess, min, max)
-            };
+            require!(
+                iteration != max_iterations,
+                "convergence not reached after {iteration} iterations; \
+                 last improvement {change}, required accuracy {accuracy}"
+            );
 
-            let root = match solved {
-                Ok(root) => root,
-                Err(solver_err) => {
-                    if let Some(inner) = error_slot.into_inner() {
-                        return Err(inner);
-                    }
-                    fail!(
-                        "bootstrap failed at pillar {} (maturity {}): {}",
-                        helper.pillar_date(),
-                        helper.maturity_date(),
-                        solver_err.message()
-                    );
-                }
-            };
-
-            // Pin the solved value and rebuild the prefix so the final curve
-            // holds the root exactly, not the solver's last trial point.
-            let mut cd = curve.curve_data().borrow_mut();
-            C::Traits::update_guess(cd.data_mut(), root, i);
-            cd.rebuild(curve.interpolator(), i)?;
+            valid_data = true;
         }
 
         curve.curve_data().borrow_mut().set_valid(true);
@@ -294,20 +344,23 @@ impl IterativeBootstrap {
     }
 }
 
-/// Writes a trial value into node `i`, rebuilds the solved prefix, and returns
-/// the helper's quote error. The mutable borrow of the node storage is dropped
-/// before the helper reprices, so the helper can read the same curve back
-/// without a `RefCell` conflict.
+/// Writes a trial value into node `i`, rebuilds the interpolation over
+/// `[0, upto]`, and returns the helper's quote error. `upto` is `i` on a fresh
+/// pass (the solved prefix) and the last node when reusing valid data, where
+/// C++ only updates the already full-range interpolation. The mutable borrow
+/// of the node storage is dropped before the helper reprices, so the helper
+/// can read the same curve back without a `RefCell` conflict.
 fn node_error<C: PiecewiseCurve>(
     curve: &C,
     i: Size,
+    upto: Size,
     helper: &Shared<C::Helper>,
     guess: Real,
 ) -> QlResult<Real> {
     {
         let mut cd = curve.curve_data().borrow_mut();
         C::Traits::update_guess(cd.data_mut(), guess, i);
-        cd.rebuild(curve.interpolator(), i)?;
+        cd.rebuild(curve.interpolator(), upto)?;
     }
     helper.quote_error()
 }
