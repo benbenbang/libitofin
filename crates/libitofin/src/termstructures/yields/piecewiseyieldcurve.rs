@@ -454,8 +454,23 @@ mod tests {
         T: YieldBootstrapTraits + 'static,
         I: Interpolator + Default + 'static,
     >() -> Shared<PiecewiseYieldCurve<T, I>> {
+        check_curve_consistency_with::<T, I, IterativeBootstrap>(TOLERANCE)
+    }
+
+    /// The fully generic `testCurveConsistency<Traits, I, Bootstrap>`: also
+    /// names the bootstrap algorithm and the repricing tolerance (the C++
+    /// harness takes both; `LocalBootstrap` runs at 1e-6 where the iterative
+    /// arms run at 1e-9).
+    fn check_curve_consistency_with<T, I, B>(
+        tolerance: Real,
+    ) -> Shared<PiecewiseYieldCurve<T, I, B>>
+    where
+        T: YieldBootstrapTraits + 'static,
+        I: Interpolator + Default + 'static,
+        B: Bootstrap<PiecewiseYieldCurve<T, I, B>> + Default + 'static,
+    {
         let vars = common_vars();
-        let curve = PiecewiseYieldCurve::<T, I>::new(
+        let curve = PiecewiseYieldCurve::<T, I, B>::new(
             vars.settlement,
             vars.instruments.clone(),
             Actual360::new(),
@@ -472,7 +487,7 @@ mod tests {
             let estimated = index.fixing(vars.today, false).unwrap();
             let expected = rate / 100.0;
             assert!(
-                (estimated - expected).abs() <= TOLERANCE,
+                (estimated - expected).abs() <= tolerance,
                 "{n} {units:?} deposit: estimated {estimated} vs expected {expected}"
             );
         }
@@ -499,7 +514,7 @@ mod tests {
             let estimated = swap.fixed_vs_floating_mut().fair_rate().unwrap();
             let expected = rate / 100.0;
             assert!(
-                (estimated - expected).abs() <= TOLERANCE,
+                (estimated - expected).abs() <= tolerance,
                 "{n} {units:?} swap: estimated {estimated} vs expected {expected}"
             );
         }
@@ -603,9 +618,7 @@ mod tests {
 
     /// `testConvexMonotoneForwardConsistency` -> `<ForwardRate, ConvexMonotone>`
     /// (`piecewiseyieldcurve.cpp:772,777`). The BMA half (`:779`) needs
-    /// `BMASwapRateHelper` (#343) and is skipped. `testLocalBootstrapConsistency`
-    /// (`:783`) needs `LocalBootstrap` and is deferred with the incremental
-    /// build path.
+    /// `BMASwapRateHelper` (#343) and is skipped.
     ///
     /// The first non-Cubic global interpolator through the convergence loop:
     /// `ConvexMonotone` reads the solved nodes as discrete forwards (ignoring
@@ -623,6 +636,31 @@ mod tests {
             data[0], data[1],
             "the reference forward must mirror the first solved pillar"
         );
+    }
+
+    /// `testLocalBootstrapConsistency` ->
+    /// `<ForwardRate, ConvexMonotone, LocalBootstrap>` at tolerance 1e-6
+    /// (`piecewiseyieldcurve.cpp:783,788`). The BMA half (`:790-791`) needs
+    /// `BMASwapRateHelper` (#343) and is skipped.
+    ///
+    /// The looser tolerance is the C++ harness's own: each localised
+    /// least-squares window stops at the bootstrap accuracy rather than at a
+    /// per-node root. Note the limits of this oracle: each grow step solves a
+    /// square `localisation x localisation` system, so the curve reprices its
+    /// own strip under ANY window size and the test cannot discriminate the
+    /// localisation choice, the solver start point or the `EndCriteria`
+    /// literals - those are transcription-verified against
+    /// `localbootstrap.hpp` instead. What it does pin is the window/node
+    /// bookkeeping (`initial_data_pt`, the window slice, the
+    /// `DATA_SIZE_ADJUSTMENT` offset): corrupting any of those leaves an
+    /// already-final node revised by a later window, and an earlier helper
+    /// de-reprices past 1e-6.
+    #[test]
+    fn local_bootstrap_consistency() {
+        use crate::math::interpolations::convexmonotone::ConvexMonotone;
+        use crate::termstructures::localbootstrap::LocalBootstrap;
+
+        check_curve_consistency_with::<ForwardRate, ConvexMonotone, LocalBootstrap>(1.0e-6);
     }
 
     /// The bootstrapped forward curve must be introspectable through the
