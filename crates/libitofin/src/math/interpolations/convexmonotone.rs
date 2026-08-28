@@ -12,7 +12,7 @@
 
 use crate::errors::QlResult;
 use crate::fail;
-use crate::math::interpolations::Interpolation;
+use crate::math::interpolations::{Interpolation, Interpolator};
 use crate::types::Real;
 
 /// One section of a piecewise convex-monotone curve (QuantLib's
@@ -1039,6 +1039,55 @@ fn build_sections(
     (section_helpers, extrapolation)
 }
 
+/// Factory for [`ConvexMonotoneInterpolation`] (QuantLib's `ConvexMonotone`
+/// traits class), carrying the quadraticity, monotonicity and force-positive
+/// settings with the QuantLib defaults `0.3` / `0.7` / `true`.
+///
+/// A global interpolator: every section depends on neighbouring forwards, so
+/// a bootstrap re-solves the whole curve to convergence. QuantLib's
+/// `dataSizeAdjustment` constant is consumed only by `LocalBootstrap`
+/// (deferred) and is deliberately not ported.
+#[derive(Clone, Copy)]
+pub struct ConvexMonotone {
+    quadraticity: Real,
+    monotonicity: Real,
+    force_positive: bool,
+}
+
+impl ConvexMonotone {
+    /// Builds the factory with explicit settings; `quadraticity` and
+    /// `monotonicity` must lie in `[0, 1]` (checked when interpolating).
+    pub fn new(quadraticity: Real, monotonicity: Real, force_positive: bool) -> Self {
+        ConvexMonotone {
+            quadraticity,
+            monotonicity,
+            force_positive,
+        }
+    }
+}
+
+impl Default for ConvexMonotone {
+    fn default() -> Self {
+        ConvexMonotone::new(0.3, 0.7, true)
+    }
+}
+
+impl Interpolator for ConvexMonotone {
+    type Output = ConvexMonotoneInterpolation;
+
+    const GLOBAL: bool = true;
+
+    fn interpolate(&self, x: &[Real], y: &[Real]) -> QlResult<ConvexMonotoneInterpolation> {
+        ConvexMonotoneInterpolation::new(
+            x.to_vec(),
+            y.to_vec(),
+            self.quadraticity,
+            self.monotonicity,
+            self.force_positive,
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1239,5 +1288,131 @@ mod tests {
                 f.primitive(x).unwrap()
             );
         }
+    }
+
+    #[test]
+    fn the_first_forward_is_ignored() {
+        // f[1] = 0.5 * 0.04 + 0.5 * 0.015 = 0.0275, so the boundary forward is
+        // f[0] = 1.5 * 0.04 - 0.5 * 0.0275 = 0.04625: the curve starts there,
+        // not at y[0] = 0.02.
+        let f = sample();
+        assert!((f.value(0.0).unwrap() - 0.04625).abs() < 1e-15);
+    }
+
+    #[test]
+    fn derivative_is_a_faithful_error() {
+        let f = sample();
+        assert!(f.derivative(1.5).is_err());
+    }
+
+    // The same nodes with quadraticity 0, monotonicity 1, forcePositive false:
+    // the basic Hagan-West method, built through the factory so the explicit
+    // settings path is covered too. Reference values extracted from the built
+    // QuantLib 1.43.0 dylib.
+    #[test]
+    fn basic_hagan_west_reference_values_match_quantlib() {
+        let f = ConvexMonotone::new(0.0, 1.0, false)
+            .interpolate(
+                &[0.0, 1.0, 2.0, 3.5, 4.0, 6.0],
+                &[0.02, 0.04, 0.015, 0.05, 0.048, 0.03],
+            )
+            .unwrap();
+        let expected: [(Real, Real, Real); 11] = [
+            (0.0, 0.04625, 0.0),
+            (0.5, 0.0415625, 0.02234375),
+            (1.0, 0.0275, 0.04),
+            (1.5, 0.008451052295918, 0.047561782525510),
+            (2.0, 0.029, 0.055),
+            (2.75, 0.050774872448980, 0.092667889030612),
+            (3.5, 0.0485, 0.13),
+            (3.75, 0.0485, 0.142125),
+            (4.0, 0.0444, 0.154),
+            (5.0, 0.0282, 0.1894),
+            (6.0, 0.0228, 0.214),
+        ];
+        for (x, value, primitive) in expected {
+            assert!(
+                (f.value(x).unwrap() - value).abs() < 1e-12,
+                "value({x}): {} vs {value}",
+                f.value(x).unwrap()
+            );
+            assert!(
+                (f.primitive(x).unwrap() - primitive).abs() < 1e-12,
+                "primitive({x}): {} vs {primitive}",
+                f.primitive(x).unwrap()
+            );
+        }
+    }
+
+    #[test]
+    fn equal_forwards_build_constant_grad_sections() {
+        // Every boundary forward equals the discrete forwards, so each
+        // interval takes the zero-gradient branch and the curve is flat.
+        let f = ConvexMonotoneInterpolation::new(
+            vec![0.0, 1.0, 2.0, 3.0],
+            vec![0.04, 0.04, 0.04, 0.04],
+            0.3,
+            0.7,
+            true,
+        )
+        .unwrap();
+        assert!((f.value(0.5).unwrap() - 0.04).abs() < 1e-15);
+        assert!((f.value(2.5).unwrap() - 0.04).abs() < 1e-15);
+        assert!((f.primitive(3.0).unwrap() - 0.12).abs() < 1e-15);
+    }
+
+    #[test]
+    fn two_points_give_a_constant_curve() {
+        // The single-period case: one EverywhereConstantHelper carrying y[1]
+        // (y[0] is ignored as always), anchored at x[0].
+        let f = ConvexMonotoneInterpolation::new(vec![0.0, 2.0], vec![0.02, 0.05], 0.3, 0.7, true)
+            .unwrap();
+        assert_eq!(f.value(1.0).unwrap(), 0.05);
+        assert_eq!(f.value(2.0).unwrap(), 0.05);
+        assert_eq!(f.primitive(2.0).unwrap(), 0.1);
+    }
+
+    #[test]
+    fn extrapolation_disabled_errors_out_of_range() {
+        let f = sample();
+        assert!(f.value(7.0).is_err());
+        assert!(f.primitive(-0.5).is_err());
+        assert!(f.value(Real::NAN).is_err());
+    }
+
+    #[test]
+    fn extrapolation_continues_flat_past_the_last_node() {
+        let f = sample().with_extrapolation(true);
+        assert!(f.allows_extrapolation());
+        assert!((f.value(7.0).unwrap() - 0.0228).abs() < 1e-12);
+        assert!((f.primitive(7.0).unwrap() - (0.214 + 0.0228)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn invalid_inputs_rejected() {
+        let build = |x: Vec<Real>, y: Vec<Real>, q: Real, m: Real| {
+            ConvexMonotoneInterpolation::new(x, y, q, m, true)
+        };
+        assert!(build(vec![0.0, 1.0], vec![0.0], 0.3, 0.7).is_err());
+        assert!(build(vec![0.0], vec![0.0], 0.3, 0.7).is_err());
+        assert!(build(vec![0.0, 0.0], vec![1.0, 2.0], 0.3, 0.7).is_err());
+        assert!(build(vec![0.0, Real::NAN], vec![1.0, 2.0], 0.3, 0.7).is_err());
+        assert!(build(vec![0.0, 1.0], vec![1.0, Real::NAN], 0.3, 0.7).is_err());
+        assert!(build(vec![0.0, 1.0], vec![1.0, 2.0], 1.5, 0.7).is_err());
+        assert!(build(vec![0.0, 1.0], vec![1.0, 2.0], 0.3, -0.1).is_err());
+    }
+
+    #[test]
+    fn factory_carries_the_quantlib_defaults() {
+        let factory = ConvexMonotone::default();
+        const { assert!(ConvexMonotone::GLOBAL) };
+        assert_eq!(factory.required_points(), 2);
+        let f = factory
+            .interpolate(
+                &[0.0, 1.0, 2.0, 3.5, 4.0, 6.0],
+                &[0.02, 0.04, 0.015, 0.05, 0.048, 0.03],
+            )
+            .unwrap();
+        assert_eq!(f.value(2.75).unwrap(), sample().value(2.75).unwrap());
     }
 }
