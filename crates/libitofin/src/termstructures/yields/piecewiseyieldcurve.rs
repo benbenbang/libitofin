@@ -559,6 +559,30 @@ mod tests {
         );
     }
 
+    /// `testConvexMonotoneForwardConsistency` -> `<ForwardRate, ConvexMonotone>`
+    /// (`piecewiseyieldcurve.cpp:772,777`). The BMA half (`:779`) needs
+    /// `BMASwapRateHelper` (#343) and is skipped. `testLocalBootstrapConsistency`
+    /// (`:783`) needs `LocalBootstrap` and is deferred with the incremental
+    /// build path.
+    ///
+    /// The first non-Cubic global interpolator through the convergence loop:
+    /// `ConvexMonotone` reads the solved nodes as discrete forwards (ignoring
+    /// node `[0]`), so every pillar solve re-shapes the neighbouring sections
+    /// and the bootstrap re-solves to convergence. The node `[0]` assertion
+    /// pins the `update_guess` mirror as in [`linear_forward_consistency`];
+    /// the interpolation itself never reads that node.
+    #[test]
+    fn convex_monotone_forward_consistency() {
+        use crate::math::interpolations::convexmonotone::ConvexMonotone;
+
+        let curve = check_curve_consistency::<ForwardRate, ConvexMonotone>();
+        let data = curve.data().unwrap();
+        assert_eq!(
+            data[0], data[1],
+            "the reference forward must mirror the first solved pillar"
+        );
+    }
+
     /// The bootstrapped forward curve must be introspectable through the
     /// downcast seam (`isdacdsengine.cpp:117-120`), the arm a
     /// `PiecewiseYieldCurve<ForwardRate, BackwardFlat>` reaches in C++ by
