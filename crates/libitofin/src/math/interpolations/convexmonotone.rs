@@ -12,7 +12,7 @@
 
 use crate::errors::QlResult;
 use crate::fail;
-use crate::math::interpolations::{Interpolation, Interpolator};
+use crate::math::interpolations::{Interpolation, Interpolator, LocalInterpolator};
 use crate::types::Real;
 
 /// One section of a piecewise convex-monotone curve (QuantLib's
@@ -1127,9 +1127,10 @@ fn build_sections(
 /// settings with the QuantLib defaults `0.3` / `0.7` / `true`.
 ///
 /// A global interpolator: every section depends on neighbouring forwards, so
-/// a bootstrap re-solves the whole curve to convergence. QuantLib's
-/// `dataSizeAdjustment` constant is consumed only by `LocalBootstrap`
-/// (deferred) and is deliberately not ported.
+/// a bootstrap re-solves the whole curve to convergence. The
+/// [`LocalInterpolator`] impl (QuantLib's `localInterpolate` +
+/// `dataSizeAdjustment`) additionally lets `LocalBootstrap` grow the curve
+/// one localisation window at a time.
 #[derive(Clone, Copy)]
 pub struct ConvexMonotone {
     quadraticity: Real,
@@ -1214,6 +1215,24 @@ impl Interpolator for ConvexMonotone {
             self.monotonicity,
             self.force_positive,
         )
+    }
+}
+
+impl LocalInterpolator for ConvexMonotone {
+    /// QuantLib's `ConvexMonotone::dataSizeAdjustment = 1`: the interpolation
+    /// ignores the first data point, so the bootstrap's solver vector carries
+    /// one fewer unknown than the localisation window has nodes.
+    const DATA_SIZE_ADJUSTMENT: usize = 1;
+
+    fn local_interpolate(
+        &self,
+        x: &[Real],
+        y: &[Real],
+        localisation: usize,
+        prev: Option<&ConvexMonotoneInterpolation>,
+        final_size: usize,
+    ) -> QlResult<ConvexMonotoneInterpolation> {
+        ConvexMonotone::local_interpolate(self, x, y, localisation, prev, final_size)
     }
 }
 

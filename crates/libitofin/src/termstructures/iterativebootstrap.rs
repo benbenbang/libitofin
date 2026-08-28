@@ -146,6 +146,19 @@ pub trait PiecewiseCurve {
     fn term_structure_shared(&self) -> QlResult<Shared<Self::TS>>;
 }
 
+/// A bootstrap algorithm driving a piecewise curve (the Rust counterpart of
+/// C++'s `Bootstrap` template parameter of `PiecewiseYieldCurve`).
+///
+/// A curve stores its bootstrapper as a type parameter and hands itself to
+/// [`calculate`](Self::calculate) from its lazy recalculation; the
+/// implementations are [`IterativeBootstrap`] (the per-node root search) and
+/// [`LocalBootstrap`](crate::termstructures::localbootstrap::LocalBootstrap)
+/// (the localised least-squares fit for the convex-monotone spline).
+pub trait Bootstrap<C: PiecewiseCurve> {
+    /// Bootstraps `curve` in place (C++'s `Bootstrap::calculate`).
+    fn calculate(&self, curve: &C) -> QlResult<()>;
+}
+
 /// The iterative bootstrap (`IterativeBootstrap`).
 ///
 /// Carries the stopping accuracy override; the solvers and the traits come from
@@ -341,6 +354,15 @@ impl IterativeBootstrap {
 
         curve.curve_data().borrow_mut().set_valid(true);
         Ok(())
+    }
+}
+
+impl<C: PiecewiseCurve> Bootstrap<C> for IterativeBootstrap {
+    /// Delegates to the inherent [`IterativeBootstrap::calculate`], so the
+    /// concrete curves that name their bootstrapper keep calling it without
+    /// importing the trait.
+    fn calculate(&self, curve: &C) -> QlResult<()> {
+        IterativeBootstrap::calculate(self, curve)
     }
 }
 

@@ -67,6 +67,38 @@ pub trait Interpolator {
     }
 }
 
+/// An [`Interpolator`] that additionally supports the incremental build of
+/// QuantLib's `LocalBootstrap` (a `localInterpolate` method plus the
+/// `dataSizeAdjustment` constant).
+///
+/// C++ constrains `LocalBootstrap` to such interpolators structurally: the
+/// template only compiles against a traits class that has both members. This
+/// trait is the Rust spelling of that constraint - `LocalBootstrap`'s
+/// [`Bootstrap`](crate::termstructures::iterativebootstrap::Bootstrap) impl
+/// requires it, so a curve wired with any other interpolator fails to compile
+/// rather than erroring at runtime. Only
+/// [`ConvexMonotone`](convexmonotone::ConvexMonotone) implements it.
+pub trait LocalInterpolator: Interpolator {
+    /// The number of curve nodes the bootstrap's solver vector is shortened by
+    /// (QuantLib's `dataSizeAdjustment`): 1 for the convex-monotone method,
+    /// whose interpolation ignores the first data point.
+    const DATA_SIZE_ADJUSTMENT: usize = 0;
+
+    /// Grows the interpolation one node at a time (QuantLib's
+    /// `localInterpolate`): builds over the `(x, y)` prefix, reusing the seam
+    /// state of `prev` (the previous step's interpolation, required past the
+    /// first localisation window) and covering the remaining span up to
+    /// `final_size` nodes with the method's boundary approximation.
+    fn local_interpolate(
+        &self,
+        x: &[Real],
+        y: &[Real],
+        localisation: usize,
+        prev: Option<&Self::Output>,
+        final_size: usize,
+    ) -> QlResult<Self::Output>;
+}
+
 /// A two-dimensional interpolation over sorted `x` and `y` node grids and a
 /// tabulated `z` matrix, where `z[j][i]` is the value at `(x[i], y[j])`.
 ///

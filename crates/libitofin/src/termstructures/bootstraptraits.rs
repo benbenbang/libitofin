@@ -456,6 +456,15 @@ impl<I: Interpolator> CurveData<I> {
         Ok(())
     }
 
+    /// Replaces the interpolation wholesale (C++'s `ts_->interpolation_ =
+    /// ...` assignment in `LocalBootstrap::calculate`), for a bootstrap that
+    /// builds each interpolation itself - through
+    /// [`LocalInterpolator::local_interpolate`](crate::math::interpolations::LocalInterpolator::local_interpolate) -
+    /// rather than through [`rebuild`](Self::rebuild).
+    pub fn set_interpolation(&mut self, interpolation: I::Output) {
+        self.interpolation = Some(interpolation);
+    }
+
     /// The interpolation rebuilt over the solved prefix, for a trait's
     /// [`discount_from_nodes`](YieldBootstrapTraits::discount_from_nodes) to read the
     /// node value, derivative or antiderivative at a time. Errors before the
