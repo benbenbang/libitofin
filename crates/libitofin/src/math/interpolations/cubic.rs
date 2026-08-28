@@ -713,14 +713,11 @@ impl Interpolation for CubicInterpolation {
 /// filter), with natural `SecondDerivative` boundaries of value 0.
 ///
 /// This backs *standalone* interpolated curves ([`InterpolatedZeroCurve<Cubic>`],
-/// [`InterpolatedDiscountCurve<Cubic>`], ...). It is deliberately NOT usable for
-/// bootstrapping `PiecewiseYieldCurve<_, Cubic>`: `Cubic` is a *global*
-/// interpolator (every node depends on all others), but the ported
-/// `IterativeBootstrap` is single-pass - the global convergence loop is unported
-/// (documented at `termstructures::iterativebootstrap`, module docs). Bootstrapping
-/// against it would silently run one incorrect pass, so `Cubic` is not wired into
-/// any `PiecewiseYieldCurve` instantiation; the convergence loop is tracked
-/// separately (#543).
+/// [`InterpolatedDiscountCurve<Cubic>`], ...) and, since #543, bootstrapped
+/// `PiecewiseYieldCurve<_, Cubic>` curves: `Cubic` is a *global* interpolator
+/// (every node depends on all others), so `IterativeBootstrap` re-solves the
+/// whole curve to convergence instead of running a single pass (documented at
+/// `termstructures::iterativebootstrap`, module docs).
 ///
 /// [`InterpolatedZeroCurve<Cubic>`]: crate::termstructures::yields::InterpolatedZeroCurve
 /// [`InterpolatedDiscountCurve<Cubic>`]: crate::termstructures::yields::InterpolatedDiscountCurve
