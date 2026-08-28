@@ -2,6 +2,7 @@
 
 pub mod bicubic;
 pub mod bilinear;
+pub mod convexmonotone;
 pub mod cubic;
 pub mod flat;
 pub mod flatextrapolator2d;
