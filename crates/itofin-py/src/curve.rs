@@ -6,6 +6,7 @@ use crate::time::{PyCalendar, PyDate, PyDayCounter};
 use crate::{ItofinError, PyQlError};
 use libitofin::handle::Handle;
 use libitofin::interestrate::Compounding;
+use libitofin::math::interpolations::convexmonotone::ConvexMonotone;
 use libitofin::math::interpolations::cubic::Cubic;
 use libitofin::math::interpolations::flat::BackwardFlat;
 use libitofin::math::interpolations::linear::Linear;
@@ -318,14 +319,21 @@ impl PyForwardCurve {
 ///
 /// Extends [`PyYieldTermStructure`]; every helper is solved so it reprices its
 /// own market quote off the curve. This ergonomic string-dispatch alias covers
-/// the `Discount` convention over the `LogLinear` (default) or `Linear`
-/// interpolator selected by the `interpolation` string; both erase to the same
-/// `Handle<dyn YieldTermStructure>`, so no discriminant is stored. The other
-/// bootstrap conventions (`ZeroYield`, `ForwardRate`) are reached through the
-/// named [`PyPiecewiseLinearZero`], [`PyPiecewiseLinearForward`] and
+/// the `Discount` convention over the `LogLinear` (default), `Linear` or
+/// `Cubic` interpolator selected by the `interpolation` string; all erase to
+/// the same `Handle<dyn YieldTermStructure>`, so no discriminant is stored.
+/// `Cubic` is a global interpolator, so its bootstrap runs the multi-pass
+/// convergence loop (#543) instead of a single pass. The other bootstrap
+/// conventions (`ZeroYield`, `ForwardRate`) are reached through the named
+/// [`PyPiecewiseLinearZero`], [`PyPiecewiseCubicZero`],
+/// [`PyPiecewiseLinearForward`], [`PyPiecewiseConvexMonotoneForward`] and
 /// [`PyPiecewiseFlatForward`] classes, which also expose node introspection.
 /// `(Discount, Linear)` deliberately gets no named class - QuantLib-SWIG has no
 /// equivalent - so it stays reachable only through this alias's `"Linear"` arm.
+/// `(ForwardRate, Cubic)` is deliberately not reachable at all: a piecewise
+/// cubic on instantaneous forwards settles into a period-2 cycle and never
+/// converges (the configuration upstream itself disables as unstable), so no
+/// named class offers it.
 ///
 /// The bootstrap is lazy: construction only rejects an empty helper list, and
 /// the solver runs on the first query (a `discount`/`zero_rate`), re-running
@@ -340,8 +348,8 @@ impl PyPiecewiseYieldCurve {
     /// A curve over `helpers` with a fixed `reference_date` (typically the
     /// settlement date the caller computed via `Calendar.advance`). `helpers`
     /// accepts any [`RateHelper`](PyRateHelper) subclass; `interpolation` is
-    /// `"LogLinear"` or `"Linear"`. Fallible: an empty helper list is rejected
-    /// here, an unknown interpolation name too.
+    /// `"LogLinear"`, `"Linear"` or `"Cubic"`. Fallible: an empty helper list
+    /// is rejected here, an unknown interpolation name too.
     #[new]
     #[pyo3(signature = (reference_date, helpers, day_counter, interpolation = "LogLinear"))]
     fn new(
@@ -367,18 +375,16 @@ impl PyPiecewiseYieldCurve {
                 Linear,
             )
             .map_err(PyQlError::from)?,
-            "Cubic" => {
-                return Err(ItofinError::new_err(
-                    "Cubic is a global interpolator (every node depends on all others), \
-                     which the single-pass IterativeBootstrap cannot converge; the global \
-                     convergence loop is unported (#543) and the core-side guard that would \
-                     reject it is tracked separately (#552). Cubic is available on the \
-                     standalone ZeroCurve and DiscountCurve instead.",
-                ));
-            }
+            "Cubic" => PiecewiseYieldCurve::<Discount, Cubic>::new(
+                reference_date.inner(),
+                instruments,
+                day_counter.inner(),
+                Cubic,
+            )
+            .map_err(PyQlError::from)?,
             other => {
                 return Err(ItofinError::new_err(format!(
-                    "unknown interpolation {other:?}, expected LogLinear or Linear"
+                    "unknown interpolation {other:?}, expected LogLinear, Linear or Cubic"
                 )));
             }
         };
@@ -504,6 +510,63 @@ impl PyPiecewiseLinearZero {
     }
 }
 
+/// Python `PiecewiseCubicZero`: a curve bootstrapped in zero-rate space with
+/// Kruger cubic interpolation (`PiecewiseYieldCurve<ZeroYield, Cubic>`).
+///
+/// The QuantLib-SWIG name for the `(ZeroYield, Cubic)` combination. `Cubic` is
+/// a global interpolator (every node depends on all others), so the bootstrap
+/// runs the multi-pass convergence loop (#543) instead of a single pass. Its
+/// stored `data()` are continuously-compounded zero rates, so `data()[0]`
+/// mirrors the first solved pillar's rate rather than a `1.0` discount.
+#[pyclass(name = "PiecewiseCubicZero", extends = PyYieldTermStructure, unsendable)]
+pub struct PyPiecewiseCubicZero {
+    concrete: Shared<PiecewiseYieldCurve<ZeroYield, Cubic>>,
+}
+
+#[pymethods]
+impl PyPiecewiseCubicZero {
+    /// A curve over `helpers` with a fixed `reference_date`. Fallible: an empty
+    /// helper list is rejected here.
+    #[new]
+    fn new(
+        reference_date: &PyDate,
+        helpers: Vec<PyRef<PyRateHelper>>,
+        day_counter: &PyDayCounter,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        let instruments: Vec<Shared<dyn RateHelper>> =
+            helpers.iter().map(|helper| helper.inner()).collect();
+        let concrete = PiecewiseYieldCurve::<ZeroYield, Cubic>::new(
+            reference_date.inner(),
+            instruments,
+            day_counter.inner(),
+            Cubic,
+        )
+        .map_err(PyQlError::from)?;
+        let erased = Shared::clone(&concrete) as Shared<dyn YieldTermStructure>;
+        Ok(PyClassInitializer::from(PyYieldTermStructure {
+            inner: Handle::new(erased),
+        })
+        .add_subclass(PyPiecewiseCubicZero { concrete }))
+    }
+
+    /// The bootstrapped node dates (triggers the lazy bootstrap).
+    fn dates(&self) -> PyResult<Vec<PyDate>> {
+        Ok(self
+            .concrete
+            .dates()
+            .map_err(PyQlError::from)?
+            .into_iter()
+            .map(PyDate::from_inner)
+            .collect())
+    }
+
+    /// The bootstrapped node values, zero rates here (triggers the lazy
+    /// bootstrap).
+    fn data(&self) -> PyResult<Vec<f64>> {
+        Ok(self.concrete.data().map_err(PyQlError::from)?)
+    }
+}
+
 /// Python `PiecewiseLinearForward`: a curve bootstrapped in instantaneous
 /// forward-rate space with linear interpolation
 /// (`PiecewiseYieldCurve<ForwardRate, Linear>`).
@@ -539,6 +602,66 @@ impl PyPiecewiseLinearForward {
             inner: Handle::new(erased),
         })
         .add_subclass(PyPiecewiseLinearForward { concrete }))
+    }
+
+    /// The bootstrapped node dates (triggers the lazy bootstrap).
+    fn dates(&self) -> PyResult<Vec<PyDate>> {
+        Ok(self
+            .concrete
+            .dates()
+            .map_err(PyQlError::from)?
+            .into_iter()
+            .map(PyDate::from_inner)
+            .collect())
+    }
+
+    /// The bootstrapped node values, forward rates here (triggers the lazy
+    /// bootstrap).
+    fn data(&self) -> PyResult<Vec<f64>> {
+        Ok(self.concrete.data().map_err(PyQlError::from)?)
+    }
+}
+
+/// Python `PiecewiseConvexMonotoneForward`: a curve bootstrapped in
+/// instantaneous forward-rate space with convex-monotone interpolation
+/// (`PiecewiseYieldCurve<ForwardRate, ConvexMonotone>`).
+///
+/// The QuantLib-SWIG name for the `(ForwardRate, ConvexMonotone)` combination,
+/// built with QuantLib's defaults (quadraticity 0.3, monotonicity 0.7, forced
+/// positive). `ConvexMonotone` is a global interpolator that reads the solved
+/// nodes as discrete forwards, so the bootstrap runs the multi-pass
+/// convergence loop (#543). Its stored `data()` are instantaneous forward
+/// rates; the interpolation itself ignores node `[0]`, which only mirrors the
+/// first solved pillar.
+#[pyclass(name = "PiecewiseConvexMonotoneForward", extends = PyYieldTermStructure, unsendable)]
+pub struct PyPiecewiseConvexMonotoneForward {
+    concrete: Shared<PiecewiseYieldCurve<ForwardRate, ConvexMonotone>>,
+}
+
+#[pymethods]
+impl PyPiecewiseConvexMonotoneForward {
+    /// A curve over `helpers` with a fixed `reference_date`. Fallible: an empty
+    /// helper list is rejected here.
+    #[new]
+    fn new(
+        reference_date: &PyDate,
+        helpers: Vec<PyRef<PyRateHelper>>,
+        day_counter: &PyDayCounter,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        let instruments: Vec<Shared<dyn RateHelper>> =
+            helpers.iter().map(|helper| helper.inner()).collect();
+        let concrete = PiecewiseYieldCurve::<ForwardRate, ConvexMonotone>::new(
+            reference_date.inner(),
+            instruments,
+            day_counter.inner(),
+            ConvexMonotone::default(),
+        )
+        .map_err(PyQlError::from)?;
+        let erased = Shared::clone(&concrete) as Shared<dyn YieldTermStructure>;
+        Ok(PyClassInitializer::from(PyYieldTermStructure {
+            inner: Handle::new(erased),
+        })
+        .add_subclass(PyPiecewiseConvexMonotoneForward { concrete }))
     }
 
     /// The bootstrapped node dates (triggers the lazy bootstrap).

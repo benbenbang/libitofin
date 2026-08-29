@@ -399,13 +399,12 @@ class PiecewiseYieldCurve(YieldTermStructure):
             helpers (list[RateHelper]): The bootstrap instruments; any
                 RateHelper subclass is accepted.
             day_counter (DayCounter): The day count turning dates into times.
-            interpolation (str): "LogLinear" or "Linear". "Cubic" is refused: a
-                global interpolator cannot converge under the single-pass
-                bootstrap, and it is available on ZeroCurve and DiscountCurve
-                instead.
+            interpolation (str): "LogLinear", "Linear" or "Cubic". Cubic is a
+                global interpolator, so its bootstrap runs the multi-pass
+                convergence loop instead of a single pass.
 
         Raises:
-            ItofinError: On an empty helper list and on an unknown or refused
+            ItofinError: On an empty helper list and on an unknown
                 interpolation name.
         """
         ...
@@ -505,11 +504,107 @@ class PiecewiseLinearZero(YieldTermStructure):
         """
         ...
 
+class PiecewiseCubicZero(YieldTermStructure):
+    """A curve bootstrapped in zero-rate space with Kruger cubic interpolation.
+
+    The QuantLib-SWIG name for the (ZeroYield, Cubic) combination. Cubic is a
+    global interpolator, so the bootstrap runs the multi-pass convergence loop
+    instead of a single pass. data() are continuously-compounded zero rates, so
+    data()[0] mirrors the first solved pillar's rate rather than a 1.0 discount.
+    """
+
+    def __init__(
+        self,
+        reference_date: Date,
+        helpers: list[RateHelper],
+        day_counter: DayCounter,
+    ) -> None:
+        """Build the curve over helpers with a fixed reference date.
+
+        Args:
+            reference_date (Date): The curve's reference date.
+            helpers (list[RateHelper]): The bootstrap instruments.
+            day_counter (DayCounter): The day count turning dates into times.
+
+        Raises:
+            ItofinError: On an empty helper list.
+        """
+        ...
+    def dates(self) -> list[Date]:
+        """Return the bootstrapped node dates, triggering the lazy bootstrap.
+
+        Returns:
+            list[Date]: One date per helper maturity, plus the reference node.
+
+        Raises:
+            ItofinError: On a bootstrap failure.
+        """
+        ...
+    def data(self) -> list[float]:
+        """Return the bootstrapped node values, triggering the lazy bootstrap.
+
+        Returns:
+            list[float]: The zero rates at the nodes.
+
+        Raises:
+            ItofinError: On a bootstrap failure.
+        """
+        ...
+
 class PiecewiseLinearForward(YieldTermStructure):
     """A curve bootstrapped in instantaneous forward-rate space, interpolating linearly.
 
     The verbatim QuantLib-SWIG name for the blessed (ForwardRate, Linear)
     combination. data() are instantaneous forward rates.
+    """
+
+    def __init__(
+        self,
+        reference_date: Date,
+        helpers: list[RateHelper],
+        day_counter: DayCounter,
+    ) -> None:
+        """Build the curve over helpers with a fixed reference date.
+
+        Args:
+            reference_date (Date): The curve's reference date.
+            helpers (list[RateHelper]): The bootstrap instruments.
+            day_counter (DayCounter): The day count turning dates into times.
+
+        Raises:
+            ItofinError: On an empty helper list.
+        """
+        ...
+    def dates(self) -> list[Date]:
+        """Return the bootstrapped node dates, triggering the lazy bootstrap.
+
+        Returns:
+            list[Date]: One date per helper maturity, plus the reference node.
+
+        Raises:
+            ItofinError: On a bootstrap failure.
+        """
+        ...
+    def data(self) -> list[float]:
+        """Return the bootstrapped node values, triggering the lazy bootstrap.
+
+        Returns:
+            list[float]: The instantaneous forward rates at the nodes.
+
+        Raises:
+            ItofinError: On a bootstrap failure.
+        """
+        ...
+
+class PiecewiseConvexMonotoneForward(YieldTermStructure):
+    """A curve bootstrapped in forward-rate space with convex-monotone interpolation.
+
+    The QuantLib-SWIG name for the (ForwardRate, ConvexMonotone) combination,
+    built with QuantLib's defaults (quadraticity 0.3, monotonicity 0.7, forced
+    positive). ConvexMonotone is a global interpolator that reads the solved
+    nodes as discrete forwards, so the bootstrap runs the multi-pass
+    convergence loop. data() are instantaneous forward rates; the interpolation
+    ignores node [0], which only mirrors the first solved pillar.
     """
 
     def __init__(

@@ -16,11 +16,13 @@ piecewiseyieldcurve.cpp). Tolerance 1e-9 (:322), checked with a bare
 import pytest
 
 # itofin library
-from itofin import ItofinError, Settings
+from itofin import ItofinError, Settings, termstructures
 from itofin.indexes import Euribor
 from itofin.quotes import SimpleQuote
 from itofin.termstructures import (
     DepositRateHelper,
+    PiecewiseConvexMonotoneForward,
+    PiecewiseCubicZero,
     PiecewiseFlatForward,
     PiecewiseLinearForward,
     PiecewiseLinearZero,
@@ -100,11 +102,13 @@ def _fixture():
     return settings, calendar, today, settlement, deposits, swaps
 
 
-@pytest.mark.parametrize("interpolation", ["LogLinear", "Linear"])
+@pytest.mark.parametrize("interpolation", ["LogLinear", "Linear", "Cubic"])
 def test_bootstrapped_curve_reprices_its_strip(interpolation):
     """The port of `testCurveConsistency<Discount, I, IterativeBootstrap>`,
-    deposits + swaps, parametrized over both exposed interpolators
-    (log_linear_discount_consistency :441, linear_discount_consistency :449).
+    deposits + swaps, parametrized over all three exposed interpolators
+    (log_linear_discount_consistency :441, linear_discount_consistency :449,
+    global_interpolator_bootstraps_through_the_convergence_loop :905). The
+    Cubic arm bootstraps through the multi-pass convergence loop (#543).
     """
     settings, _, today, settlement, deposits, swaps = _fixture()
     instruments = deposits + swaps
@@ -210,22 +214,26 @@ def test_unknown_interpolation_raises():
         PiecewiseYieldCurve(settlement, deposits, DayCounter.actual360(), "Spline")
 
 
-def test_cubic_is_rejected_by_piecewise_with_reason():
-    """Scope C guard (#547): PiecewiseYieldCurve<_, Cubic> COMPILES AND RUNS AND
-    IS SILENTLY WRONG (Cubic is a global interpolator, but IterativeBootstrap is
-    single-pass; on the merged mixed strip <ForwardRate, Cubic> mis-reprices by
-    130bp while raising nothing). The named classes never offer Cubic and the
-    string-dispatch arm rejects it with a reason that cites the unported
-    convergence loop (#543) and the core-side guard (#552). A deposits-only strip
-    would pass green even with Cubic (deposits read the curve only at their own
-    pillar), so the rejection itself is the assertion here."""
+def test_cubic_alias_no_longer_rejected():
+    """The #547 scope-C guard is retired (#955): the stale rejection cited the
+    convergence loop as unported (#543), but #543 is merged (Cubic::GLOBAL, the
+    multi-pass IterativeBootstrap loop), so the "Cubic" arm now constructs the
+    real <Discount, Cubic> curve. Construction and an in-range query must both
+    succeed where the old guard raised at construction; the full repricing
+    oracle is the "Cubic" arm of test_bootstrapped_curve_reprices_its_strip."""
     _, _, _, settlement, deposits, _ = _fixture()
-    with pytest.raises(ItofinError) as excinfo:
-        PiecewiseYieldCurve(settlement, deposits, DayCounter.actual360(), "Cubic")
-    message = str(excinfo.value)
-    assert "Cubic" in message
-    assert "#543" in message
-    assert "#552" in message
+    curve = PiecewiseYieldCurve(settlement, deposits, DayCounter.actual360(), "Cubic")
+    assert 0.0 < curve.discount(0.5) < 1.0
+
+
+def test_forward_cubic_stays_unreachable():
+    """<ForwardRate, Cubic> stays rejected (#955): the core reproduces the
+    upstream `//Unstable` period-2 cycle (piecewiseyieldcurve.rs:943, the
+    bootstrap exhausts its iteration cap), so no facade offers the combination.
+    The alias is Discount-only and no named class exists under any plausible
+    SWIG-style name - the visible omission IS the guard."""
+    for name in ("PiecewiseCubicForward", "PiecewiseKrugerForward"):
+        assert not hasattr(termstructures, name), name
 
 
 def test_bootstrap_failure_surfaces_at_query_not_construction():
@@ -390,3 +398,104 @@ def test_named_classes_expose_node_dates_and_data():
     for name, curve in curves.items():
         assert len(curve.dates()) == expected, name
         assert len(curve.data()) == expected, name
+
+
+# --- Cubic / ConvexMonotone named classes (#955) ------------------------------
+#
+# The two global-interpolator conventions with green core oracles, bootstrapped
+# through the multi-pass convergence loop (#543).
+
+
+def _reprice_strip(curve, settings, today, swaps):
+    """The alias test's two arms at 1e-9: deposits repriced by a FRESH index on
+    the curve (the independent oracle) and swaps via implied_quote (the wiring
+    smoke-test; see test_bootstrapped_curve_reprices_its_strip)."""
+    curve.discount(0.5)
+    for n, unit, rate in DEPOSIT_DATA:
+        index = Euribor(P(n, unit), curve, settings)
+        estimated = index.fixing(today, False)
+        expected = rate / 100.0
+        assert abs(estimated - expected) <= TOLERANCE, (
+            f"{n} {unit} deposit: {estimated} vs {expected}"
+        )
+    for (n, rate), helper in zip(SWAP_DATA, swaps):
+        estimated = helper.implied_quote()
+        expected = rate / 100.0
+        assert abs(estimated - expected) <= TOLERANCE, (
+            f"{n}Y swap: {estimated} vs {expected}"
+        )
+
+
+def test_cubic_zero_reprices_its_strip():
+    """The pytest mirror of spline_zero_consistency
+    (piecewiseyieldcurve.rs:583): <ZeroYield, Cubic> over the mixed strip
+    reprices every quote to 1e-9, and data[0] mirrors the first solved pillar
+    (the update_guess mirror the core pins at :585)."""
+    settings, _, today, settlement, deposits, swaps = _fixture()
+    instruments = deposits + swaps
+    curve = PiecewiseCubicZero(settlement, instruments, DayCounter.actual360())
+    _reprice_strip(curve, settings, today, swaps)
+    data = curve.data()
+    assert data[0] == data[1], "the reference zero rate must mirror the first pillar"
+    assert len(curve.dates()) == len(instruments) + 1
+
+
+def test_convex_monotone_forward_reprices_its_strip():
+    """The pytest mirror of convex_monotone_forward_consistency
+    (piecewiseyieldcurve.rs:633): <ForwardRate, ConvexMonotone> over the mixed
+    strip reprices every quote to 1e-9, and data[0] mirrors the first solved
+    pillar (the interpolation itself ignores that node)."""
+    settings, _, today, settlement, deposits, swaps = _fixture()
+    instruments = deposits + swaps
+    curve = PiecewiseConvexMonotoneForward(
+        settlement, instruments, DayCounter.actual360()
+    )
+    _reprice_strip(curve, settings, today, swaps)
+    data = curve.data()
+    assert data[0] == data[1], "the reference forward must mirror the first pillar"
+    assert len(curve.dates()) == len(instruments) + 1
+
+
+def test_new_named_classes_differ_from_their_linear_siblings():
+    """Anti-miswiring arm: a copy-paste that wired either new class to Linear
+    would produce a curve BIT-IDENTICAL to its linear sibling (same solve), and
+    the reprice arms above would stay green. The interpolator genuinely reshapes
+    the curve between pillars, so the off-pillar discounts must separate."""
+    _, _, _, settlement, deposits, swaps = _fixture()
+    instruments = deposits + swaps
+    dc = DayCounter.actual360()
+    pairs = [
+        (
+            "cubic_zero",
+            PiecewiseCubicZero(settlement, instruments, dc),
+            PiecewiseLinearZero(settlement, instruments, dc),
+        ),
+        (
+            "convex_monotone_forward",
+            PiecewiseConvexMonotoneForward(settlement, instruments, dc),
+            PiecewiseLinearForward(settlement, instruments, dc),
+        ),
+    ]
+    times = [0.6, 0.9, 1.5, 3.5, 7.5]
+    for name, new, linear in pairs:
+        separation = max(abs(new.discount(t) - linear.discount(t)) for t in times)
+        assert separation > 1.0e-12, f"{name}: identical to its linear sibling"
+
+
+def test_cubic_alias_differs_from_its_linear_siblings():
+    """Anti-miswiring arm for the ALIAS's "Cubic" match arm: mis-wired to
+    <Discount, Linear> (or LogLinear) it would produce a curve BIT-IDENTICAL to
+    that sibling arm, and the parametrized reprice test would stay green (it is
+    self-consistent). The interpolator genuinely reshapes the curve between
+    pillars, so the off-pillar discounts must separate from BOTH other arms."""
+    _, _, _, settlement, deposits, swaps = _fixture()
+    instruments = deposits + swaps
+    dc = DayCounter.actual360()
+    cubic = PiecewiseYieldCurve(settlement, instruments, dc, "Cubic")
+    linear = PiecewiseYieldCurve(settlement, instruments, dc, "Linear")
+    log_linear = PiecewiseYieldCurve(settlement, instruments, dc, "LogLinear")
+
+    times = [0.6, 0.9, 1.5, 3.5, 7.5]
+    for name, sibling in [("Linear", linear), ("LogLinear", log_linear)]:
+        separation = max(abs(cubic.discount(t) - sibling.discount(t)) for t in times)
+        assert separation > 1.0e-12, f"Cubic identical to the {name} arm"
