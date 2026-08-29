@@ -55,9 +55,9 @@ use creditengine::{
 use credithelpers::{PyDefaultProbabilityHelper, PySpreadCdsHelper};
 use currency::PyCurrency;
 use curve::{
-    PyDiscountCurve, PyFlatForward, PyForwardCurve, PyPiecewiseFlatForward,
-    PyPiecewiseLinearForward, PyPiecewiseLinearZero, PyPiecewiseLogLinearDiscount,
-    PyPiecewiseYieldCurve, PyYieldTermStructure, PyZeroCurve,
+    PyDiscountCurve, PyFlatForward, PyForwardCurve, PyPiecewiseConvexMonotoneForward,
+    PyPiecewiseCubicZero, PyPiecewiseFlatForward, PyPiecewiseLinearForward, PyPiecewiseLinearZero,
+    PyPiecewiseLogLinearDiscount, PyPiecewiseYieldCurve, PyYieldTermStructure, PyZeroCurve,
 };
 use fra::{PyForwardRateAgreement, PyPosition};
 use helpers::{
@@ -189,7 +189,9 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     termstructures.add_class::<PyPiecewiseYieldCurve>()?;
     termstructures.add_class::<PyPiecewiseLogLinearDiscount>()?;
     termstructures.add_class::<PyPiecewiseLinearZero>()?;
+    termstructures.add_class::<PyPiecewiseCubicZero>()?;
     termstructures.add_class::<PyPiecewiseLinearForward>()?;
+    termstructures.add_class::<PyPiecewiseConvexMonotoneForward>()?;
     termstructures.add_class::<PyPiecewiseFlatForward>()?;
     termstructures.add_class::<PySwaptionVolatilityStructure>()?;
     termstructures.add_class::<PyVolatilityType>()?;
