@@ -63,7 +63,9 @@ use helpers::{
     PyOISRateHelper, PyOvernightIndex, PyPillar, PyRateAveraging, PyRateHelper, PySwapRateHelper,
 };
 use heston::{PyHestonModel, PyHestonModelHelper, PyHestonProcess};
-use hullwhite::{PyEuribor, PyHullWhite, PyIborIndex, PySwaptionHelper};
+use hullwhite::{
+    PyEuribor, PyGbpLibor, PyHullWhite, PyIborIndex, PyJpyLibor, PySwaptionHelper, PyUsdLibor,
+};
 use inflation::{
     PyConstantYoYOptionletVolatility, PyCpiInterpolationType, PyDiscountingSwapEngine,
     PyInterpolatedYoYInflationCurve, PyInterpolatedZeroInflationCurve,
@@ -228,6 +230,9 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     indexes.add_class::<PyCurrency>()?;
     indexes.add_class::<PyIborIndex>()?;
     indexes.add_class::<PyEuribor>()?;
+    indexes.add_class::<PyUsdLibor>()?;
+    indexes.add_class::<PyJpyLibor>()?;
+    indexes.add_class::<PyGbpLibor>()?;
     indexes.add_class::<PyOvernightIndex>()?;
     indexes.add_class::<PyEstr>()?;
     indexes.add_class::<PySwapIndex>()?;
