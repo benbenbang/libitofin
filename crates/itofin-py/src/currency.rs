@@ -1,7 +1,7 @@
 //! Facade for the currency specification [`PyCurrency`] (`currency::Currency`).
 //!
 //! An index carries a currency, so the general [`PyIborIndex`](crate::hullwhite::PyIborIndex)
-//! constructor cannot be called without one. Only the three named currencies the
+//! constructor cannot be called without one. Only the four named currencies the
 //! core provides are exposed as staticmethods; the general
 //! [`Currency::new`](libitofin::currency::Currency::new) form is deliberately
 //! omitted, since the core itself ports only the currencies the indexes need and
@@ -48,6 +48,14 @@ impl PyCurrency {
     fn gbp() -> Self {
         PyCurrency {
             inner: Currency::gbp(),
+        }
+    }
+
+    /// The Japanese yen (ISO `JPY`).
+    #[staticmethod]
+    fn jpy() -> Self {
+        PyCurrency {
+            inner: Currency::jpy(),
         }
     }
 

@@ -1,5 +1,6 @@
 //! Facades for the Hull-White short-rate stack: [`PyHullWhite`] and the
-//! [`PyIborIndex`] index base with its [`PyEuribor`] subclass.
+//! [`PyIborIndex`] index base with its [`PyEuribor`], [`PyUsdLibor`],
+//! [`PyJpyLibor`] and [`PyGbpLibor`] subclasses.
 
 use crate::PyQlError;
 use crate::calibration::{PyCalibrationErrorType, PyEndCriteria, PyLevenbergMarquardt};
@@ -10,7 +11,8 @@ use crate::settings::PySettings;
 use crate::time::{PyBusinessDayConvention, PyCalendar, PyDate, PyDayCounter, PyPeriod};
 use libitofin::cashflows::RateAveraging;
 use libitofin::handle::Handle;
-use libitofin::indexes::{Euribor, IborIndex, Index, InterestRateIndex};
+use libitofin::indexes::ibor::{GbpLibor, JpyLibor};
+use libitofin::indexes::{Euribor, IborIndex, Index, InterestRateIndex, UsdLibor};
 use libitofin::models::calibrationhelper::{BlackCalibrationHelper, CalibrationHelper};
 use libitofin::models::shortrate::SwaptionHelper;
 use libitofin::models::{CalibratedModelHolder, HullWhite, calibrate};
@@ -274,6 +276,17 @@ impl PyIborIndex {
     fn end_of_month(&self) -> bool {
         self.inner.end_of_month()
     }
+
+    /// The composed index name the fixings are stored under
+    /// (`interestrateindex.rs:230`), e.g. `Euribor6M Actual/360`.
+    fn name(&self) -> String {
+        self.inner.name()
+    }
+
+    /// The currency the index is quoted in (`interestrateindex.rs:186`).
+    fn currency(&self) -> PyCurrency {
+        PyCurrency::from_inner(self.inner.currency().clone())
+    }
 }
 
 impl PyIborIndex {
@@ -365,6 +378,168 @@ fn init_euribor(index: Shared<IborIndex>) -> PyClassInitializer<PyEuribor> {
         inner: Shared::clone(&index),
     };
     PyClassInitializer::from(base).add_subclass(PyEuribor { inner: index })
+}
+
+/// Python `UsdLibor`: the USD Libor index family (`indexes::UsdLibor`).
+///
+/// The constructor takes a tenor, an optional forwarding curve, and the
+/// settings; passing `None` for the curve builds the index over an empty
+/// handle, the form the bootstrap rate helpers need. `UsdLibor::new` returns
+/// a plain `IborIndex` by value (`usdlibor.rs:42`); it is wrapped in
+/// `shared()` exactly as the Euribor facade wraps its family.
+///
+/// A subclass of [`PyIborIndex`], so a USD Libor is accepted wherever the
+/// general index is. It retains its own clone of the index the base holds -
+/// the same object, not a rebuild - so its own `fixing` reads exactly what
+/// the base reads.
+#[pyclass(name = "UsdLibor", extends = PyIborIndex, unsendable)]
+pub struct PyUsdLibor {
+    inner: Shared<IborIndex>,
+}
+
+#[pymethods]
+impl PyUsdLibor {
+    /// A USD Libor index of `tenor` forwarding off `curve`, or off an empty
+    /// handle when `curve` is `None`. Fallible: the Libor base rejects daily
+    /// tenors (`libor.rs:89`), which need a dedicated `DailyTenor`
+    /// constructor the core has not ported.
+    #[new]
+    #[pyo3(signature = (tenor, curve, settings))]
+    fn new(
+        tenor: &PyPeriod,
+        curve: Option<&PyYieldTermStructure>,
+        settings: &PySettings,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        let forwarding = match curve {
+            Some(curve) => curve.handle(),
+            None => Handle::empty(),
+        };
+        let index =
+            UsdLibor::new(tenor.inner(), forwarding, settings.inner()).map_err(PyQlError::from)?;
+        let index = shared(index);
+        let base = PyIborIndex {
+            inner: Shared::clone(&index),
+        };
+        Ok(PyClassInitializer::from(base).add_subclass(PyUsdLibor { inner: index }))
+    }
+
+    /// The index's fixing for `fixing_date`, forecast off the forwarding curve
+    /// for a future date or read from stored fixings for a past one. Fallible:
+    /// an empty forwarding handle or an unset evaluation date is an error.
+    fn fixing(&self, fixing_date: &PyDate, forecast_todays_fixing: bool) -> PyResult<f64> {
+        Ok(self
+            .inner
+            .fixing(fixing_date.inner(), forecast_todays_fixing)
+            .map_err(PyQlError::from)?)
+    }
+}
+
+/// Python `JpyLibor`: the JPY Libor index family (`indexes::ibor::JpyLibor`).
+///
+/// The constructor takes a tenor, an optional forwarding curve, and the
+/// settings; passing `None` for the curve builds the index over an empty
+/// handle, the form the bootstrap rate helpers need. `JpyLibor::new` returns
+/// a plain `IborIndex` by value (`jpylibor.rs:43`); it is wrapped in
+/// `shared()` exactly as the Euribor facade wraps its family.
+///
+/// A subclass of [`PyIborIndex`], so a JPY Libor is accepted wherever the
+/// general index is. It retains its own clone of the index the base holds -
+/// the same object, not a rebuild - so its own `fixing` reads exactly what
+/// the base reads.
+#[pyclass(name = "JpyLibor", extends = PyIborIndex, unsendable)]
+pub struct PyJpyLibor {
+    inner: Shared<IborIndex>,
+}
+
+#[pymethods]
+impl PyJpyLibor {
+    /// A JPY Libor index of `tenor` forwarding off `curve`, or off an empty
+    /// handle when `curve` is `None`. Fallible: the Libor base rejects daily
+    /// tenors (`libor.rs:89`), which need a dedicated `DailyTenor`
+    /// constructor the core has not ported.
+    #[new]
+    #[pyo3(signature = (tenor, curve, settings))]
+    fn new(
+        tenor: &PyPeriod,
+        curve: Option<&PyYieldTermStructure>,
+        settings: &PySettings,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        let forwarding = match curve {
+            Some(curve) => curve.handle(),
+            None => Handle::empty(),
+        };
+        let index =
+            JpyLibor::new(tenor.inner(), forwarding, settings.inner()).map_err(PyQlError::from)?;
+        let index = shared(index);
+        let base = PyIborIndex {
+            inner: Shared::clone(&index),
+        };
+        Ok(PyClassInitializer::from(base).add_subclass(PyJpyLibor { inner: index }))
+    }
+
+    /// The index's fixing for `fixing_date`, forecast off the forwarding curve
+    /// for a future date or read from stored fixings for a past one. Fallible:
+    /// an empty forwarding handle or an unset evaluation date is an error.
+    fn fixing(&self, fixing_date: &PyDate, forecast_todays_fixing: bool) -> PyResult<f64> {
+        Ok(self
+            .inner
+            .fixing(fixing_date.inner(), forecast_todays_fixing)
+            .map_err(PyQlError::from)?)
+    }
+}
+
+/// Python `GbpLibor`: the GBP Libor index family (`indexes::ibor::GbpLibor`).
+///
+/// The constructor takes a tenor, an optional forwarding curve, and the
+/// settings; passing `None` for the curve builds the index over an empty
+/// handle, the form the bootstrap rate helpers need. `GbpLibor::new` returns
+/// a plain `IborIndex` by value (`gbplibor.rs:45`); it is wrapped in
+/// `shared()` exactly as the Euribor facade wraps its family.
+///
+/// A subclass of [`PyIborIndex`], so a GBP Libor is accepted wherever the
+/// general index is. It retains its own clone of the index the base holds -
+/// the same object, not a rebuild - so its own `fixing` reads exactly what
+/// the base reads.
+#[pyclass(name = "GbpLibor", extends = PyIborIndex, unsendable)]
+pub struct PyGbpLibor {
+    inner: Shared<IborIndex>,
+}
+
+#[pymethods]
+impl PyGbpLibor {
+    /// A GBP Libor index of `tenor` forwarding off `curve`, or off an empty
+    /// handle when `curve` is `None`. Fallible: the Libor base rejects daily
+    /// tenors (`libor.rs:89`), which need a dedicated `DailyTenor`
+    /// constructor the core has not ported.
+    #[new]
+    #[pyo3(signature = (tenor, curve, settings))]
+    fn new(
+        tenor: &PyPeriod,
+        curve: Option<&PyYieldTermStructure>,
+        settings: &PySettings,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        let forwarding = match curve {
+            Some(curve) => curve.handle(),
+            None => Handle::empty(),
+        };
+        let index =
+            GbpLibor::new(tenor.inner(), forwarding, settings.inner()).map_err(PyQlError::from)?;
+        let index = shared(index);
+        let base = PyIborIndex {
+            inner: Shared::clone(&index),
+        };
+        Ok(PyClassInitializer::from(base).add_subclass(PyGbpLibor { inner: index }))
+    }
+
+    /// The index's fixing for `fixing_date`, forecast off the forwarding curve
+    /// for a future date or read from stored fixings for a past one. Fallible:
+    /// an empty forwarding handle or an unset evaluation date is an error.
+    fn fixing(&self, fixing_date: &PyDate, forecast_todays_fixing: bool) -> PyResult<f64> {
+        Ok(self
+            .inner
+            .fixing(fixing_date.inner(), forecast_todays_fixing)
+            .map_err(PyQlError::from)?)
+    }
 }
 
 /// Python `SwaptionHelper`: a co-terminal swaption calibration instrument

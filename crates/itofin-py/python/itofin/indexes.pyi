@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 class Currency:
     """An ISO 4217 currency specification.
 
-    Only the three named currencies the core provides are exposed; the general
+    Only the four named currencies the core provides are exposed; the general
     constructor is omitted, as the core ports only the currencies its indexes
     need and the full catalogue is deferred there.
     """
@@ -43,6 +43,14 @@ class Currency:
 
         Returns:
             Currency: The pound sterling, ISO code "GBP".
+        """
+        ...
+    @staticmethod
+    def jpy() -> Currency:
+        """Return the Japanese yen.
+
+        Returns:
+            Currency: The yen, ISO code "JPY".
         """
         ...
     def code(self) -> str:
@@ -210,6 +218,20 @@ class IborIndex:
             bool: True if the roll is end-of-month.
         """
         ...
+    def name(self) -> str:
+        """Return the composed index name, e.g. "Euribor6M Actual/360".
+
+        Returns:
+            str: The name the fixings are stored under.
+        """
+        ...
+    def currency(self) -> Currency:
+        """Return the currency the index is quoted in.
+
+        Returns:
+            Currency: The index currency.
+        """
+        ...
 
 class Euribor(IborIndex):
     """The Euribor IBOR index family.
@@ -259,6 +281,141 @@ class Euribor(IborIndex):
 
         Returns:
             Euribor: The Euribor6M index.
+        """
+        ...
+    def fixing(self, fixing_date: Date, forecast_todays_fixing: bool) -> float:
+        """Return the index fixing for fixing_date.
+
+        Forecast off the forwarding curve for a future date, or read from the
+        stored fixings for a past one.
+
+        Args:
+            fixing_date (Date): The date the fixing is read or forecast for.
+            forecast_todays_fixing (bool): Whether a fixing dated today is
+                forecast rather than looked up.
+
+        Returns:
+            float: The fixing rate.
+
+        Raises:
+            ItofinError: If the fixing date is not a valid one, the evaluation
+                date is unset, a past fixing is missing from the store, or the
+                forwarding handle is empty on a forecast.
+        """
+        ...
+
+class UsdLibor(IborIndex):
+    """The USD Libor index family.
+
+    A subclass of IborIndex, so a USD Libor is accepted wherever the general
+    index is. It retains its own clone of the index the base holds - the same
+    object, not a rebuild - so its own fixing reads exactly what the base reads.
+    """
+
+    def __init__(self, tenor: Period, curve: YieldTermStructure | None, settings: Settings) -> None:
+        """Build a USD Libor index of the given tenor.
+
+        Args:
+            tenor (Period): The index tenor.
+            curve (YieldTermStructure | None): The forwarding curve; None builds
+                the index over an empty handle, the form the bootstrap rate
+                helpers need.
+            settings (Settings): The explicit settings supplying the evaluation
+                date and the stored fixings.
+
+        Raises:
+            ItofinError: If tenor is a daily tenor, which needs a dedicated
+                daily-tenor constructor the core has not ported.
+        """
+        ...
+    def fixing(self, fixing_date: Date, forecast_todays_fixing: bool) -> float:
+        """Return the index fixing for fixing_date.
+
+        Forecast off the forwarding curve for a future date, or read from the
+        stored fixings for a past one.
+
+        Args:
+            fixing_date (Date): The date the fixing is read or forecast for.
+            forecast_todays_fixing (bool): Whether a fixing dated today is
+                forecast rather than looked up.
+
+        Returns:
+            float: The fixing rate.
+
+        Raises:
+            ItofinError: If the fixing date is not a valid one, the evaluation
+                date is unset, a past fixing is missing from the store, or the
+                forwarding handle is empty on a forecast.
+        """
+        ...
+
+class JpyLibor(IborIndex):
+    """The JPY Libor index family.
+
+    A subclass of IborIndex, so a JPY Libor is accepted wherever the general
+    index is. It retains its own clone of the index the base holds - the same
+    object, not a rebuild - so its own fixing reads exactly what the base reads.
+    """
+
+    def __init__(self, tenor: Period, curve: YieldTermStructure | None, settings: Settings) -> None:
+        """Build a JPY Libor index of the given tenor.
+
+        Args:
+            tenor (Period): The index tenor.
+            curve (YieldTermStructure | None): The forwarding curve; None builds
+                the index over an empty handle, the form the bootstrap rate
+                helpers need.
+            settings (Settings): The explicit settings supplying the evaluation
+                date and the stored fixings.
+
+        Raises:
+            ItofinError: If tenor is a daily tenor, which needs a dedicated
+                daily-tenor constructor the core has not ported.
+        """
+        ...
+    def fixing(self, fixing_date: Date, forecast_todays_fixing: bool) -> float:
+        """Return the index fixing for fixing_date.
+
+        Forecast off the forwarding curve for a future date, or read from the
+        stored fixings for a past one.
+
+        Args:
+            fixing_date (Date): The date the fixing is read or forecast for.
+            forecast_todays_fixing (bool): Whether a fixing dated today is
+                forecast rather than looked up.
+
+        Returns:
+            float: The fixing rate.
+
+        Raises:
+            ItofinError: If the fixing date is not a valid one, the evaluation
+                date is unset, a past fixing is missing from the store, or the
+                forwarding handle is empty on a forecast.
+        """
+        ...
+
+class GbpLibor(IborIndex):
+    """The GBP Libor index family.
+
+    A subclass of IborIndex, so a GBP Libor is accepted wherever the general
+    index is. It retains its own clone of the index the base holds - the same
+    object, not a rebuild - so its own fixing reads exactly what the base reads.
+    """
+
+    def __init__(self, tenor: Period, curve: YieldTermStructure | None, settings: Settings) -> None:
+        """Build a GBP Libor index of the given tenor.
+
+        Args:
+            tenor (Period): The index tenor.
+            curve (YieldTermStructure | None): The forwarding curve; None builds
+                the index over an empty handle, the form the bootstrap rate
+                helpers need.
+            settings (Settings): The explicit settings supplying the evaluation
+                date and the stored fixings.
+
+        Raises:
+            ItofinError: If tenor is a daily tenor, which needs a dedicated
+                daily-tenor constructor the core has not ported.
         """
         ...
     def fixing(self, fixing_date: Date, forecast_todays_fixing: bool) -> float:
