@@ -483,6 +483,145 @@ class MakeVanillaSwap:
         """
         ...
 
+class Position:
+    """The side taken in a contract.
+
+    A fieldless enum; Long is an FRA purchase (a future long loan, short
+    deposit), Short an FRA sale. The signed settlement multiplier the two
+    variants stand for stays in the core.
+    """
+
+    Long: Position
+    Short: Position
+
+class ForwardRateAgreement:
+    """A forward rate agreement over an Ibor index.
+
+    The FRA prices without an engine, so the valuation accessors work as soon
+    as it is built. It settles and expires on its value date - the day the
+    underlying loan begins - not on the later maturity date.
+    """
+
+    def __init__(
+        self,
+        index: IborIndex,
+        value_date: Date,
+        fra_type: Position,
+        strike_forward_rate: float,
+        notional_amount: float,
+        discount_curve: YieldTermStructure | None,
+    ) -> None:
+        """Build the indexed-coupon FRA.
+
+        The maturity is the index's own maturity of the value date and the
+        forward rate is the index fixing.
+
+        Args:
+            index (IborIndex): The index the forward rate is forecast by.
+            value_date (Date): The day the underlying loan begins.
+            fra_type (Position): The side taken, Long or Short.
+            strike_forward_rate (float): The simple rate agreed on.
+            notional_amount (float): The notional the settlement accrues on.
+            discount_curve (YieldTermStructure | None): The curve the
+                settlement discounts on; None discounts on the index's
+                forwarding curve instead.
+
+        Raises:
+            ItofinError: If the notional is not positive or the maturity
+                cannot be derived from the value date.
+        """
+        ...
+    @staticmethod
+    def with_maturity(
+        index: IborIndex,
+        value_date: Date,
+        maturity_date: Date,
+        fra_type: Position,
+        strike_forward_rate: float,
+        notional_amount: float,
+        discount_curve: YieldTermStructure | None,
+    ) -> ForwardRateAgreement:
+        """Build the FRA over an explicit [value_date, maturity_date] window.
+
+        The forward rate is the par approximation off the index's forwarding
+        curve; the maturity is adjusted on the index's fixing calendar under
+        the index's convention.
+
+        Args:
+            index (IborIndex): The index supplying the forwarding curve and
+                the conventions.
+            value_date (Date): The day the underlying loan begins.
+            maturity_date (Date): The day the underlying loan ends, before
+                adjustment.
+            fra_type (Position): The side taken, Long or Short.
+            strike_forward_rate (float): The simple rate agreed on.
+            notional_amount (float): The notional the settlement accrues on.
+            discount_curve (YieldTermStructure | None): The curve the
+                settlement discounts on; None discounts on the index's
+                forwarding curve instead.
+
+        Returns:
+            ForwardRateAgreement: The explicit-window FRA.
+
+        Raises:
+            ItofinError: If the notional is not positive or the value date is
+                not earlier than the adjusted maturity date.
+        """
+        ...
+    def forward_rate(self) -> float:
+        """Return the forward rate associated with the FRA term.
+
+        Returns:
+            float: The simple forward rate over the FRA window.
+
+        Raises:
+            ItofinError: If the index has no forwarding curve or fixing
+                covering the term.
+        """
+        ...
+    def amount(self) -> float:
+        """Return the payoff on the value date.
+
+        Returns:
+            float: The settlement amount, signed by the position.
+
+        Raises:
+            ItofinError: On an expired FRA, which has no settlement amount.
+        """
+        ...
+    def npv(self) -> float:
+        """Return the settlement amount discounted to the value date.
+
+        Discounts on the discount curve, or on the index's forwarding curve
+        when none was given.
+
+        Returns:
+            float: The present value.
+
+        Raises:
+            ItofinError: If no evaluation date is set or the curves cannot
+                cover the term.
+        """
+        ...
+    def value_date(self) -> Date:
+        """Return the day the underlying loan begins.
+
+        The FRA settles and expires on this date.
+
+        Returns:
+            Date: The value date.
+        """
+        ...
+    def maturity_date(self) -> Date:
+        """Return the day the underlying loan ends.
+
+        Adjusted on the index's fixing calendar under the index's convention.
+
+        Returns:
+            Date: The adjusted maturity date.
+        """
+        ...
+
 class OvernightIndexedSwap:
     """A fixed leg versus a compounded overnight leg.
 

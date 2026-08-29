@@ -15,6 +15,7 @@ mod creditengine;
 mod credithelpers;
 mod currency;
 mod curve;
+mod fra;
 mod helpers;
 mod heston;
 mod hullwhite;
@@ -58,6 +59,7 @@ use curve::{
     PyPiecewiseLinearForward, PyPiecewiseLinearZero, PyPiecewiseLogLinearDiscount,
     PyPiecewiseYieldCurve, PyYieldTermStructure, PyZeroCurve,
 };
+use fra::{PyForwardRateAgreement, PyPosition};
 use helpers::{
     PyDepositRateHelper, PyEstr, PyFraRateHelper, PyFuturesRateHelper, PyFuturesType,
     PyOISRateHelper, PyOvernightIndex, PyPillar, PyRateAveraging, PyRateHelper, PySwapRateHelper,
@@ -256,6 +258,8 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     instruments.add_class::<PySwapType>()?;
     instruments.add_class::<PyVanillaSwap>()?;
     instruments.add_class::<PyMakeVanillaSwap>()?;
+    instruments.add_class::<PyPosition>()?;
+    instruments.add_class::<PyForwardRateAgreement>()?;
     instruments.add_class::<PyOvernightIndexedSwap>()?;
     instruments.add_class::<PyMakeOis>()?;
     instruments.add_class::<PyEuropeanExercise>()?;
