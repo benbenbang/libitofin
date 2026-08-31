@@ -19,9 +19,7 @@ use crate::currency::Currency;
 use crate::errors::QlResult;
 use crate::handle::Handle;
 use crate::indexes::iborindex::IborIndex;
-use crate::indexes::index::Index;
 use crate::indexes::interestrateindex::{InterestRateIndex, InterestRateIndexBase};
-use crate::require;
 use crate::settings::Settings;
 use crate::shared::{Shared, shared};
 use crate::termstructures::yieldtermstructure::YieldTermStructure;
@@ -30,37 +28,38 @@ use crate::time::calendar::Calendar;
 use crate::time::date::Date;
 use crate::time::daycounter::DayCounter;
 use crate::time::period::Period;
-use crate::time::timeunit::TimeUnit;
-use crate::types::{Integer, Natural, Rate};
+use crate::types::{Natural, Rate};
 
 /// An [`IborIndex`] with separate fixing, value, and maturity calendars
 /// (`ql/indexes/ibor/custom.hpp:28`).
 ///
 /// The port keeps the C++ "is-an-`IborIndex`" relation as a newtype embedding
-/// the configured [`IborIndex`] (the [`OvernightIndex`] precedent), carrying
-/// the two extra calendars alongside; the base's single calendar plays the
-/// fixing-calendar role. The three date methods C++ overrides
-/// (`custom.cpp:23-41`) are overridden here on [`InterestRateIndex`].
+/// the configured [`IborIndex`] (the [`OvernightIndex`] precedent); the base's
+/// single calendar plays the fixing-calendar role. The inner index carries the
+/// other two calendars and the separate-calendar roll rule as data
+/// ([`with_separate_calendars`](IborIndex::with_separate_calendars)), so the
+/// three date methods C++ overrides (`custom.cpp:23-41`) are pure delegations
+/// here and [`upcast`](Self::upcast) hands out an `IborIndex` that still rolls
+/// on all three calendars.
 ///
-/// [`forecast_fixing`](InterestRateIndex::forecast_fixing) cannot simply
-/// delegate to the inner index: the C++ body lives on `IborIndex` but calls
+/// [`forecast_fixing`](InterestRateIndex::forecast_fixing) delegates for the
+/// same reason. The C++ body lives on `IborIndex` but calls
 /// `valueDate`/`maturityDate` virtually, resolving to this subclass's
-/// three-calendar overrides. The override here re-derives both dates through
-/// the overridden methods and delegates only the curve read
-/// ([`forecast_fixing_between`](IborIndex::forecast_fixing_between)).
+/// three-calendar overrides; folding the roll into the inner index makes its
+/// own body resolve to those same dates, closing the composition trap at the
+/// data level rather than by re-deriving both dates here.
 ///
 /// [`OvernightIndex`]: crate::indexes::iborindex::OvernightIndex
 pub struct CustomIborIndex {
     ibor: Shared<IborIndex>,
-    value_calendar: Calendar,
-    maturity_calendar: Calendar,
 }
 
 impl CustomIborIndex {
     /// Builds the index over `forwarding`, mirroring the C++ constructor
     /// (`custom.cpp:8-21`): the base [`IborIndex`] takes `fixing_calendar` as
-    /// its single calendar, and the value and maturity calendars are stored
-    /// alongside.
+    /// its single calendar, then takes the value and maturity calendars and
+    /// the separate-calendar roll rule, which together reproduce the C++
+    /// subclass's three date overrides.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         family_name: String,
@@ -77,31 +76,44 @@ impl CustomIborIndex {
         settings: Shared<Settings<Date>>,
     ) -> CustomIborIndex {
         CustomIborIndex {
-            ibor: shared(IborIndex::new(
-                family_name,
-                tenor,
-                settlement_days,
-                currency,
-                fixing_calendar,
-                convention,
-                end_of_month,
-                day_counter,
-                forwarding,
-                settings,
-            )),
-            value_calendar,
-            maturity_calendar,
+            ibor: shared(
+                IborIndex::new(
+                    family_name,
+                    tenor,
+                    settlement_days,
+                    currency,
+                    fixing_calendar,
+                    convention,
+                    end_of_month,
+                    day_counter,
+                    forwarding,
+                    settings,
+                )
+                .with_separate_calendars(value_calendar, maturity_calendar),
+            ),
         }
+    }
+
+    /// The inner [`IborIndex`] this index configures, sharing its identity (the
+    /// C++ upcast of the same `shared_ptr`).
+    ///
+    /// The upcast is safe because the roll lives on the inner index as data:
+    /// the returned index reproduces the three-calendar fixing, value, and
+    /// maturity dates rather than the base's single-calendar ones, so a
+    /// consumer taking a plain `IborIndex` (a rate helper, a coupon) prices
+    /// this index the way C++ does.
+    pub fn upcast(&self) -> Shared<IborIndex> {
+        self.ibor.clone()
     }
 
     /// The calendar value dates are advanced on (`valueCalendar`).
     pub fn value_calendar(&self) -> Calendar {
-        self.value_calendar.clone()
+        self.ibor.value_calendar()
     }
 
     /// The calendar maturity dates are advanced on (`maturityCalendar`).
     pub fn maturity_calendar(&self) -> Calendar {
-        self.maturity_calendar.clone()
+        self.ibor.maturity_calendar()
     }
 
     /// The convention applied when rolling the value date to maturity.
@@ -116,12 +128,11 @@ impl CustomIborIndex {
 
     /// Rebuilds this index onto a different forwarding curve, re-threading all
     /// three calendars along with every other configuration field (the C++
-    /// `clone` override, `custom.cpp:43-49`).
+    /// `clone` override, `custom.cpp:43-49`). The calendars and the roll rule
+    /// ride along inside [`IborIndex::clone_with`].
     pub fn clone_with(&self, forwarding: Handle<dyn YieldTermStructure>) -> CustomIborIndex {
         CustomIborIndex {
             ibor: shared(self.ibor.clone_with(forwarding)),
-            value_calendar: self.value_calendar.clone(),
-            maturity_calendar: self.maturity_calendar.clone(),
         }
     }
 }
@@ -131,66 +142,30 @@ impl InterestRateIndex for CustomIborIndex {
         self.ibor.base()
     }
 
-    /// The three-calendar fixing date (`custom.cpp:23-27`): back
-    /// `fixing_days` business days on the value calendar, then a `Preceding`
-    /// adjust on the fixing calendar - not the base's single `Following`
-    /// advance.
+    /// The three-calendar fixing date (`custom.cpp:23-27`), answered by the
+    /// inner index's separate-calendar roll: back `fixing_days` business days
+    /// on the value calendar, then a `Preceding` adjust on the fixing calendar.
     fn fixing_date(&self, value_date: Date) -> Date {
-        let fixing_date = self.value_calendar.advance(
-            value_date,
-            -(self.fixing_days() as Integer),
-            TimeUnit::Days,
-            BusinessDayConvention::Following,
-            false,
-        );
-        self.fixing_calendar()
-            .adjust(fixing_date, BusinessDayConvention::Preceding)
+        self.ibor.fixing_date(value_date)
     }
 
-    /// The three-calendar value date (`custom.cpp:29-36`): requires a valid
-    /// fixing date on the fixing calendar, advances `fixing_days` business
-    /// days on the value calendar, then adjusts `Following` on the maturity
-    /// calendar.
+    /// The three-calendar value date (`custom.cpp:29-36`), answered by the
+    /// inner index's separate-calendar roll: a valid fixing date on the fixing
+    /// calendar, `fixing_days` business days forward on the value calendar,
+    /// then a `Following` adjust on the maturity calendar.
     fn value_date(&self, fixing_date: Date) -> QlResult<Date> {
-        require!(
-            self.is_valid_fixing_date(fixing_date),
-            "{fixing_date:?} is not a valid fixing date"
-        );
-        let d = self.value_calendar.advance(
-            fixing_date,
-            self.fixing_days() as Integer,
-            TimeUnit::Days,
-            BusinessDayConvention::Following,
-            false,
-        );
-        Ok(self
-            .maturity_calendar
-            .adjust(d, BusinessDayConvention::Following))
+        self.ibor.value_date(fixing_date)
     }
 
     /// The three-calendar maturity date (`custom.cpp:38-41`): the value date
     /// advanced by the tenor on the maturity calendar under the index's stored
     /// convention and end-of-month flag.
     fn maturity_date(&self, value_date: Date) -> QlResult<Date> {
-        Ok(self.maturity_calendar.advance_by_period(
-            value_date,
-            self.tenor(),
-            self.ibor.business_day_convention(),
-            self.ibor.end_of_month(),
-        ))
+        self.ibor.maturity_date(value_date)
     }
 
     fn forecast_fixing(&self, fixing_date: Date) -> QlResult<Rate> {
-        let d1 = self.value_date(fixing_date)?;
-        let d2 = self.maturity_date(d1)?;
-        let t = self.day_counter().year_fraction(d1, d2);
-        let positive_time = t > 0.0;
-        require!(
-            positive_time,
-            "cannot calculate forward rate between {d1:?} and {d2:?}: non positive time ({t}) using {} daycounter",
-            self.day_counter().name()
-        );
-        self.ibor.forecast_fixing_between(d1, d2, t)
+        self.ibor.forecast_fixing(fixing_date)
     }
 }
 
@@ -203,9 +178,11 @@ mod tests {
     //! three-calendar logic from a single-calendar mis-port.
 
     use super::*;
+    use crate::indexes::index::Index;
     use crate::time::calendars::bespokecalendar::BespokeCalendar;
     use crate::time::date::Month;
     use crate::time::daycounters::actual360::Actual360;
+    use crate::time::timeunit::TimeUnit;
 
     /// The `testCustomIborIndex` fixture (indexes.cpp:155-170): three bespoke
     /// calendars with hand-placed holidays and the "Custom Ibor" index over
@@ -316,6 +293,32 @@ mod tests {
                 Date::new(7, Month::January, 2025)
             );
         }
+    }
+
+    /// The safe-upcast pin (no C++ oracle: C++ upcasts a `shared_ptr` for
+    /// free). The plain `IborIndex` [`upcast`](CustomIborIndex::upcast) hands
+    /// out must reproduce all three date tables above, since a consumer taking
+    /// a concrete `IborIndex` gets exactly this index and nothing re-routes
+    /// the calls back through the newtype.
+    #[test]
+    fn the_upcast_ibor_index_reproduces_the_three_calendar_dates() {
+        let (index, _, _, _) = custom_ibor();
+        let ibor = index.upcast();
+
+        assert_eq!(
+            ibor.value_date(Date::new(20, Month::January, 2025))
+                .unwrap(),
+            Date::new(23, Month::January, 2025)
+        );
+        assert_eq!(
+            ibor.fixing_date(Date::new(23, Month::January, 2025)),
+            Date::new(20, Month::January, 2025)
+        );
+        assert_eq!(
+            ibor.maturity_date(Date::new(23, Month::January, 2025))
+                .unwrap(),
+            Date::new(24, Month::April, 2025)
+        );
     }
 
     /// The maturity-date table (indexes.cpp:197-202): advance by the tenor on
