@@ -189,6 +189,16 @@ impl ForwardRateAgreement {
         &self.discount_curve
     }
 
+    /// The value date the forward rate accrues from.
+    pub fn value_date(&self) -> Date {
+        self.value_date
+    }
+
+    /// The maturity date the forward rate accrues to (adjusted at construction).
+    pub fn maturity_date(&self) -> Date {
+        self.maturity_date
+    }
+
     /// The index's fixing date for the value date.
     pub fn fixing_date(&self) -> Date {
         self.index.fixing_date(self.value_date)
@@ -553,6 +563,33 @@ mod tests {
             (undiscounted.npv().unwrap() - expected_fallback_npv).abs() < 1.0e-12,
             "an empty discount handle must fall back to the forwarding curve"
         );
+    }
+
+    /// The stored value/maturity dates are surfaced verbatim (#958): the
+    /// indexed constructor derives the maturity from the index, and both
+    /// getters return exactly what construction computed - `value_date()` the
+    /// input and `maturity_date()` the index's own maturity of it.
+    #[test]
+    fn value_and_maturity_dates_are_exposed() {
+        let today = Date::new(15, Month::June, 2026);
+        let settings = settings_on(today);
+        let index = shared(Euribor::three_months(flat_curve(today, 0.04), settings));
+
+        let value_date = Date::new(17, Month::August, 2026);
+        let expected_maturity = index.maturity_date(value_date).unwrap();
+
+        let fra = ForwardRateAgreement::new(
+            Shared::clone(&index),
+            value_date,
+            Position::Long,
+            0.02,
+            100.0,
+            Handle::empty(),
+        )
+        .unwrap();
+
+        assert_eq!(fra.value_date(), value_date);
+        assert_eq!(fra.maturity_date(), expected_maturity);
     }
 
     /// The constructor guards (`forwardrateagreement.cpp:57-58`) as `Result`
