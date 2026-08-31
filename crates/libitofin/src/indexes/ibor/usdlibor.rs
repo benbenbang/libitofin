@@ -191,4 +191,21 @@ mod tests {
         let clone = index.clone_with(Handle::empty());
         assert_eq!(clone.maturity_date(v).unwrap(), maturity);
     }
+
+    /// The single-calendar regression pin for the #963 roll-rule fold: a
+    /// `Libor` keeps `valueCalendar == fixingCalendar == UK Exchange`
+    /// (`libor.cpp:98`), so now that `IborIndex` overrides `fixing_date` its
+    /// answer must still be the plain UK roll-back.
+    ///
+    /// Off Friday 13 November 2020 that is Wednesday the 11th - Veterans Day,
+    /// a US LiborImpact holiday and a UK business day, so a roll-back on the
+    /// joint maturity calendar would give Tuesday the 10th instead.
+    #[test]
+    fn fixing_date_rolls_back_on_the_uk_calendar_alone() {
+        let index = usd_libor_3m(shared(Settings::<Date>::new()));
+        assert_eq!(
+            index.fixing_date(Date::new(13, Month::November, 2020)),
+            Date::new(11, Month::November, 2020)
+        );
+    }
 }
