@@ -353,9 +353,11 @@ mod tests {
     /// no curve): `forecastFixing` lives on `IborIndex` but calls
     /// `valueDate`/`maturityDate` virtually, so the forecast must read the
     /// curve between this subclass's three-calendar dates (23 Jan / 24 Apr for
-    /// a 20 Jan fixing), not the inner index's single-calendar ones
-    /// (22 Jan / 22 Apr). Over a steep zero curve the two pairs give visibly
-    /// different simple forwards, so a plain delegation cannot pass.
+    /// a 20 Jan fixing), never single-calendar ones (22 Jan / 22 Apr). Over a
+    /// steep zero curve the two pairs give visibly different simple forwards,
+    /// so an inner index left on the single-calendar roll cannot pass; the
+    /// #963 fold puts the separate-calendar roll on the inner index itself,
+    /// which is what lets the plain delegation satisfy this pin.
     #[test]
     fn forecast_fixing_reads_the_curve_between_the_overridden_dates() {
         use crate::math::interpolations::linear::Linear;
