@@ -61,8 +61,9 @@ use curve::{
 };
 use fra::{PyForwardRateAgreement, PyPosition};
 use helpers::{
-    PyDepositRateHelper, PyEstr, PyFraRateHelper, PyFuturesRateHelper, PyFuturesType,
-    PyOISRateHelper, PyOvernightIndex, PyPillar, PyRateAveraging, PyRateHelper, PySwapRateHelper,
+    PyBondPriceType, PyDepositRateHelper, PyEstr, PyFixedRateBondHelper, PyFraRateHelper,
+    PyFuturesRateHelper, PyFuturesType, PyOISRateHelper, PyOvernightIndex, PyPillar,
+    PyRateAveraging, PyRateHelper, PySwapRateHelper,
 };
 use heston::{PyHestonModel, PyHestonModelHelper, PyHestonProcess};
 use hullwhite::{
@@ -187,6 +188,8 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     termstructures.add_class::<PyFraRateHelper>()?;
     termstructures.add_class::<PyRateAveraging>()?;
     termstructures.add_class::<PyOISRateHelper>()?;
+    termstructures.add_class::<PyBondPriceType>()?;
+    termstructures.add_class::<PyFixedRateBondHelper>()?;
     termstructures.add_class::<PyPiecewiseYieldCurve>()?;
     termstructures.add_class::<PyPiecewiseLogLinearDiscount>()?;
     termstructures.add_class::<PyPiecewiseLinearZero>()?;
