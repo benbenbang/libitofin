@@ -759,6 +759,9 @@ impl PyBondPriceType {
 ///   calendar other than its schedule's is not constructible from Python yet.
 /// - The generic `BondHelper`, over an arbitrary pre-built bond, is not faced at
 ///   all: it needs a bond-instrument facade, which does not exist.
+/// - [`PySchedule`] exposes no `end_of_month` knob (its builder leaves the core
+///   default `false`), so an end-of-month coupon schedule is not constructible
+///   from Python yet. Deferred with the schedule facade rather than here.
 ///
 /// `issue_date` is the one core argument moved out of position: it is optional,
 /// so it trails the required `price_type` and `settings` rather than sitting
