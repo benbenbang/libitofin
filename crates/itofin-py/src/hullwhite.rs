@@ -1,6 +1,7 @@
 //! Facades for the Hull-White short-rate stack: [`PyHullWhite`] and the
 //! [`PyIborIndex`] index base with its [`PyEuribor`], [`PyUsdLibor`],
-//! [`PyJpyLibor`], [`PyGbpLibor`] and [`PyEurLibor`] subclasses.
+//! [`PyJpyLibor`], [`PyGbpLibor`], [`PyEurLibor`] and [`PyCustomIborIndex`]
+//! subclasses.
 
 use crate::PyQlError;
 use crate::calibration::{PyCalibrationErrorType, PyEndCriteria, PyLevenbergMarquardt};
@@ -11,7 +12,7 @@ use crate::settings::PySettings;
 use crate::time::{PyBusinessDayConvention, PyCalendar, PyDate, PyDayCounter, PyPeriod};
 use libitofin::cashflows::RateAveraging;
 use libitofin::handle::Handle;
-use libitofin::indexes::ibor::{EurLibor, GbpLibor, JpyLibor};
+use libitofin::indexes::ibor::{CustomIborIndex, EurLibor, GbpLibor, JpyLibor};
 use libitofin::indexes::{Euribor, IborIndex, Index, InterestRateIndex, UsdLibor};
 use libitofin::models::calibrationhelper::{BlackCalibrationHelper, CalibrationHelper};
 use libitofin::models::shortrate::SwaptionHelper;
@@ -294,6 +295,94 @@ impl PyIborIndex {
     /// `&IborIndex` and are generic over the family.
     pub(crate) fn inner(&self) -> Shared<IborIndex> {
         Shared::clone(&self.inner)
+    }
+}
+
+/// Python `CustomIborIndex`: an Ibor index with three separate calendars
+/// (`indexes::ibor::CustomIborIndex`).
+///
+/// The general form of what [`PyEurLibor`] configures: fixing dates roll back
+/// on the value calendar and adjust `Preceding` on the fixing calendar, value
+/// dates advance on the value calendar, and maturity dates advance on the
+/// maturity calendar (`custom.rs:5-13`). Passing the same calendar three times
+/// reproduces a plain [`PyIborIndex`], so this is the escape hatch for a
+/// LIBOR-like index outside the named families.
+///
+/// `CustomIborIndex::new` returns the newtype; `upcast()` (`custom.rs:105`)
+/// hands out the inner `IborIndex` carrying the three-calendar roll as data, so
+/// a consumer taking the base half rolls all three dates the way C++ does.
+#[pyclass(name = "CustomIborIndex", extends = PyIborIndex, unsendable)]
+pub struct PyCustomIborIndex {
+    inner: Shared<IborIndex>,
+}
+
+#[pymethods]
+impl PyCustomIborIndex {
+    /// An index of `tenor` fixing `settlement_days` before its value date,
+    /// with each of the three date calculations rolling on its own calendar,
+    /// accruing on `day_counter` and forecasting off `forwarding` (or off an
+    /// empty handle when `None`).
+    #[new]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (
+        family_name,
+        tenor,
+        settlement_days,
+        currency,
+        fixing_calendar,
+        value_calendar,
+        maturity_calendar,
+        convention,
+        end_of_month,
+        day_counter,
+        forwarding,
+        settings,
+    ))]
+    fn new(
+        family_name: String,
+        tenor: &PyPeriod,
+        settlement_days: Natural,
+        currency: &PyCurrency,
+        fixing_calendar: &PyCalendar,
+        value_calendar: &PyCalendar,
+        maturity_calendar: &PyCalendar,
+        convention: &PyBusinessDayConvention,
+        end_of_month: bool,
+        day_counter: &PyDayCounter,
+        forwarding: Option<&PyYieldTermStructure>,
+        settings: &PySettings,
+    ) -> PyClassInitializer<Self> {
+        let index = CustomIborIndex::new(
+            family_name,
+            tenor.inner(),
+            settlement_days,
+            currency.inner(),
+            fixing_calendar.inner(),
+            value_calendar.inner(),
+            maturity_calendar.inner(),
+            convention.inner(),
+            end_of_month,
+            day_counter.inner(),
+            forwarding
+                .map(|curve| curve.handle())
+                .unwrap_or_else(Handle::empty),
+            settings.inner(),
+        )
+        .upcast();
+        let base = PyIborIndex {
+            inner: Shared::clone(&index),
+        };
+        PyClassInitializer::from(base).add_subclass(PyCustomIborIndex { inner: index })
+    }
+
+    /// The index's fixing for `fixing_date`, forecast off the forwarding curve
+    /// for a future date or read from stored fixings for a past one. Fallible:
+    /// an empty forwarding handle or an unset evaluation date is an error.
+    fn fixing(&self, fixing_date: &PyDate, forecast_todays_fixing: bool) -> PyResult<f64> {
+        Ok(self
+            .inner
+            .fixing(fixing_date.inner(), forecast_todays_fixing)
+            .map_err(PyQlError::from)?)
     }
 }
 

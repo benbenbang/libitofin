@@ -488,6 +488,79 @@ class EurLibor(IborIndex):
         """
         ...
 
+class CustomIborIndex(IborIndex):
+    """An Ibor index with three separate calendars.
+
+    The general form of what EurLibor configures: fixing dates roll back on the
+    value calendar and adjust Preceding on the fixing calendar, value dates
+    advance on the value calendar, and maturity dates advance on the maturity
+    calendar. Passing the same calendar three times reproduces a plain
+    IborIndex, so this is the escape hatch for a Libor-like index outside the
+    named families. A subclass of IborIndex, so it is accepted wherever the
+    general index is, and the base half carries the three-calendar roll.
+    """
+
+    def __init__(
+        self,
+        family_name: str,
+        tenor: Period,
+        settlement_days: int,
+        currency: Currency,
+        fixing_calendar: Calendar,
+        value_calendar: Calendar,
+        maturity_calendar: Calendar,
+        convention: BusinessDayConvention,
+        end_of_month: bool,
+        day_counter: DayCounter,
+        forwarding: YieldTermStructure | None,
+        settings: Settings,
+    ) -> None:
+        """Build a three-calendar Ibor index.
+
+        Args:
+            family_name (str): The family name the composed index name is built
+                from.
+            tenor (Period): The index tenor.
+            settlement_days (int): The business days between a fixing and its
+                value date.
+            currency (Currency): The currency the index is quoted in.
+            fixing_calendar (Calendar): The calendar fixing dates are adjusted
+                Preceding on.
+            value_calendar (Calendar): The calendar value dates are advanced on.
+            maturity_calendar (Calendar): The calendar maturity dates are
+                advanced on.
+            convention (BusinessDayConvention): The convention the roll to
+                maturity applies.
+            end_of_month (bool): Whether the maturity roll keeps to month ends.
+            day_counter (DayCounter): The day counter the index accrues on.
+            forwarding (YieldTermStructure | None): The forwarding curve; None
+                builds the index over an empty handle, the form the bootstrap
+                rate helpers need.
+            settings (Settings): The explicit settings supplying the evaluation
+                date and the stored fixings.
+        """
+        ...
+    def fixing(self, fixing_date: Date, forecast_todays_fixing: bool) -> float:
+        """Return the index fixing for fixing_date.
+
+        Forecast off the forwarding curve for a future date, or read from the
+        stored fixings for a past one.
+
+        Args:
+            fixing_date (Date): The date the fixing is read or forecast for.
+            forecast_todays_fixing (bool): Whether a fixing dated today is
+                forecast rather than looked up.
+
+        Returns:
+            float: The fixing rate.
+
+        Raises:
+            ItofinError: If the fixing date is not a valid one, the evaluation
+                date is unset, a past fixing is missing from the store, or the
+                forwarding handle is empty on a forecast.
+        """
+        ...
+
 class OvernightIndex:
     """The base of the overnight index families.
 
