@@ -439,6 +439,55 @@ class GbpLibor(IborIndex):
         """
         ...
 
+class EurLibor(IborIndex):
+    """The EUR Libor index family, the Euro ICE Libor fixed in London.
+
+    Three calendars, not one: fixing dates roll on the joint UK-Exchange plus
+    TARGET calendar while value and maturity dates roll on TARGET alone. A
+    subclass of IborIndex, so a EUR Libor is accepted wherever the general index
+    is, and the base half carries the three-calendar roll rather than a
+    single-calendar approximation of it. It retains its own clone of the index
+    the base holds - the same object, not a rebuild - so its own fixing reads
+    exactly what the base reads.
+    """
+
+    def __init__(self, tenor: Period, curve: YieldTermStructure | None, settings: Settings) -> None:
+        """Build a EUR Libor index of the given tenor.
+
+        Args:
+            tenor (Period): The index tenor.
+            curve (YieldTermStructure | None): The forwarding curve; None builds
+                the index over an empty handle, the form the bootstrap rate
+                helpers need.
+            settings (Settings): The explicit settings supplying the evaluation
+                date and the stored fixings.
+
+        Raises:
+            ItofinError: If tenor is a daily tenor, which needs a dedicated
+                daily-tenor constructor the core has not ported.
+        """
+        ...
+    def fixing(self, fixing_date: Date, forecast_todays_fixing: bool) -> float:
+        """Return the index fixing for fixing_date.
+
+        Forecast off the forwarding curve for a future date, or read from the
+        stored fixings for a past one.
+
+        Args:
+            fixing_date (Date): The date the fixing is read or forecast for.
+            forecast_todays_fixing (bool): Whether a fixing dated today is
+                forecast rather than looked up.
+
+        Returns:
+            float: The fixing rate.
+
+        Raises:
+            ItofinError: If the fixing date is not a valid one, the evaluation
+                date is unset, a past fixing is missing from the store, or the
+                forwarding handle is empty on a forecast.
+        """
+        ...
+
 class OvernightIndex:
     """The base of the overnight index families.
 
