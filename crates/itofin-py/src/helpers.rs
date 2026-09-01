@@ -8,11 +8,11 @@
 //! the concrete subclasses supply only their constructors, mirroring the
 //! [`crate::curve::PyYieldTermStructure`] base/subclass idiom.
 //!
-//! The `Bond`/`FixedRateBond` helpers still need instrument facades that do not
-//! exist yet and are deferred to their own follow-up ticket (#530); they are
-//! omitted here rather than stubbed. The `OIS` helper, with its [`PyEstr`]
-//! overnight index and [`PyRateAveraging`] convention, lands in this module
-//! (#551).
+//! The `OIS` helper, with its [`PyEstr`] overnight index and
+//! [`PyRateAveraging`] convention, lands in this module (#551), as does
+//! [`PyFixedRateBondHelper`], which builds its own bond internally and so needs
+//! no bond facade (#530). The generic `BondHelper`, over an arbitrary pre-built
+//! bond, stays deferred: there is no bond-instrument facade to hand it one.
 
 use crate::PyQlError;
 use crate::curve::PyYieldTermStructure;
@@ -20,19 +20,22 @@ use crate::hullwhite::PyIborIndex;
 use crate::market::PySimpleQuote;
 use crate::settings::PySettings;
 use crate::time::{
-    PyBusinessDayConvention, PyCalendar, PyDate, PyDayCounter, PyFrequency, PyPeriod,
+    PyBusinessDayConvention, PyCalendar, PyDate, PyDayCounter, PyFrequency, PyPeriod, PySchedule,
 };
 use libitofin::cashflows::RateAveraging;
 use libitofin::handle::Handle;
 use libitofin::indexes::{Estr, Index, OvernightIndex};
-use libitofin::instruments::FuturesType;
+use libitofin::instruments::{BondPriceType, FuturesType};
 use libitofin::quotes::Quote;
 use libitofin::shared::{Shared, shared};
 use libitofin::termstructures::RateHelper;
 use libitofin::termstructures::yields::{
-    DepositRateHelper, FraRateHelper, FuturesRateHelper, OISRateHelper, Pillar, SwapRateHelper,
+    DepositRateHelper, FixedRateBondHelper, FraRateHelper, FuturesRateHelper, OISRateHelper,
+    Pillar, SwapRateHelper,
 };
-use libitofin::types::{Integer, Natural};
+use libitofin::time::businessdayconvention::BusinessDayConvention;
+use libitofin::time::calendars::nullcalendar::NullCalendar;
+use libitofin::types::{Integer, Natural, Real};
 use pyo3::prelude::*;
 
 /// Python `RateHelper`: the shared base for every bootstrap helper
@@ -704,5 +707,122 @@ impl PyOISRateHelper {
             settings.inner(),
         ) as Shared<dyn RateHelper>;
         PyClassInitializer::from(PyRateHelper { inner: helper }).add_subclass(PyOISRateHelper)
+    }
+}
+
+/// Python `BondPriceType`: the price convention a bond helper fits
+/// (`instruments::BondPriceType`).
+///
+/// A fieldless pyo3 enum exposing `Clean`, the quoted price with the accrued
+/// interest stripped out, and `Dirty`, the full settlement price. The two differ
+/// by exactly the bond's accrued amount at settlement (`bondhelpers.rs:367`), so
+/// the choice moves the bootstrapped curve for any bond settling mid-coupon and
+/// is a no-op for one settling on a coupon date.
+#[pyclass(name = "BondPriceType", eq, eq_int, from_py_object)]
+#[derive(Clone, Copy, PartialEq)]
+pub enum PyBondPriceType {
+    Clean,
+    Dirty,
+}
+
+impl PyBondPriceType {
+    /// The core [`BondPriceType`] this variant stands for.
+    pub(crate) fn inner(&self) -> BondPriceType {
+        match self {
+            PyBondPriceType::Clean => BondPriceType::Clean,
+            PyBondPriceType::Dirty => BondPriceType::Dirty,
+        }
+    }
+}
+
+/// Python `FixedRateBondHelper`: a helper fitting the quoted price of a
+/// fixed-coupon bond it builds internally
+/// (`termstructures::yields::bondhelpers::FixedRateBondHelper`).
+///
+/// Unlike the schedule-derived helpers this one is a fixed-date helper: its bond
+/// and its dates are built once and do not shift when the evaluation date moves.
+/// The pillar is the bond's last cash-flow date, which rolls past the maturity
+/// whenever the final payment is date-adjusted (`bondhelpers.rs:84-88`), so read
+/// it off [`PyRateHelper::pillar_date`] rather than assuming the maturity.
+///
+/// The Python constructor is contained: it takes eleven of the core's sixteen
+/// arguments and defaults the rest, which are documented deferrals rather than
+/// silent omissions.
+///
+/// - The four ex-coupon knobs (`ex_coupon_period`, `ex_coupon_calendar`,
+///   `ex_coupon_convention`, `ex_coupon_end_of_month`) take the no-ex-coupon
+///   defaults the core oracle passes (`bondhelpers.rs:536-541`): no period, a
+///   null calendar, `Unadjusted`, and `false`. An ex-coupon bond is not
+///   constructible from Python yet.
+/// - `payment_calendar` is defaulted to `None`, so the schedule's own calendar
+///   rolls the payment dates, again as the core oracle does. A bond paying on a
+///   calendar other than its schedule's is not constructible from Python yet.
+/// - The generic `BondHelper`, over an arbitrary pre-built bond, is not faced at
+///   all: it needs a bond-instrument facade, which does not exist.
+///
+/// `issue_date` is the one core argument moved out of position: it is optional,
+/// so it trails the required `price_type` and `settings` rather than sitting
+/// between `redemption` and them as it does in the core signature.
+#[pyclass(name = "FixedRateBondHelper", extends = PyRateHelper, unsendable)]
+pub struct PyFixedRateBondHelper;
+
+#[pymethods]
+impl PyFixedRateBondHelper {
+    /// A bond helper fitting `price` - read as a clean or dirty quote per
+    /// `price_type` - for the fixed-coupon bond built from `schedule`. The caller
+    /// keeps `price`; mutating it later re-drives the bootstrap. Fallible: the
+    /// bond build and the helper's next-cash-flow date both resolve off the
+    /// evaluation date, which must be set on `settings`.
+    #[new]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (
+        price,
+        settlement_days,
+        face_amount,
+        schedule,
+        coupons,
+        day_counter,
+        payment_convention,
+        redemption,
+        price_type,
+        settings,
+        issue_date = None,
+    ))]
+    fn new(
+        price: &PySimpleQuote,
+        settlement_days: Natural,
+        face_amount: Real,
+        schedule: &PySchedule,
+        coupons: Vec<Real>,
+        day_counter: &PyDayCounter,
+        payment_convention: &PyBusinessDayConvention,
+        redemption: Real,
+        price_type: &PyBondPriceType,
+        settings: &PySettings,
+        issue_date: Option<&PyDate>,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        let helper = FixedRateBondHelper::new(
+            price.handle(),
+            settlement_days,
+            face_amount,
+            schedule.inner(),
+            coupons,
+            day_counter.inner(),
+            payment_convention.inner(),
+            redemption,
+            issue_date.map(PyDate::inner),
+            None,
+            None,
+            NullCalendar::new(),
+            BusinessDayConvention::Unadjusted,
+            false,
+            price_type.inner(),
+            settings.inner(),
+        )
+        .map_err(PyQlError::from)?;
+        Ok(PyClassInitializer::from(PyRateHelper {
+            inner: helper as Shared<dyn RateHelper>,
+        })
+        .add_subclass(PyFixedRateBondHelper))
     }
 }

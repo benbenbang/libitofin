@@ -13,7 +13,7 @@ from itofin.indexes import (
     ZeroInflationIndex,
 )
 from itofin.quotes import SimpleQuote
-from itofin.time import BusinessDayConvention, Calendar, Date, DateGeneration, DayCounter, Frequency, Period
+from itofin.time import BusinessDayConvention, Calendar, Date, DateGeneration, DayCounter, Frequency, Period, Schedule
 
 class YieldTermStructure:
     """Shared base for every yield curve: discount factors, zero and forward rates.
@@ -1229,6 +1229,92 @@ class OISRateHelper(RateHelper):
                 LastRelevantDate.
             averaging_method (RateAveraging): How the daily fixings combine;
                 defaults to Compound.
+        """
+        ...
+
+class BondPriceType:
+    """The price convention a bond helper fits.
+
+    Clean is the quoted price with the accrued interest stripped out; Dirty is
+    the full settlement price. The two differ by exactly the bond's accrued
+    amount at settlement, so the choice moves the bootstrapped curve for any
+    bond settling mid-coupon and is a no-op for one settling on a coupon date.
+    """
+
+    Clean: BondPriceType
+    Dirty: BondPriceType
+
+class FixedRateBondHelper(RateHelper):
+    """A helper fitting the quoted price of a fixed-coupon bond it builds itself.
+
+    Unlike the schedule-derived helpers this one is a fixed-date helper: its
+    bond and its dates are built once and do not shift when the evaluation date
+    moves. The pillar is the bond's last cash-flow date, which rolls past the
+    maturity whenever the final payment is date-adjusted, so read pillar_date()
+    rather than assuming the maturity.
+
+    The constructor is contained: it takes eleven of the core's sixteen
+    arguments and defaults the rest. Those defaults are deferrals, not
+    oversights:
+
+    - The four ex-coupon knobs (period, calendar, convention, end-of-month) take
+      the no-ex-coupon defaults the core oracle passes: no period, a null
+      calendar, Unadjusted, and False. An ex-coupon bond is not constructible
+      from Python yet.
+    - payment_calendar is defaulted to None, so the schedule's own calendar
+      rolls the payment dates, again as the core oracle does. A bond paying on a
+      calendar other than its schedule's is not constructible from Python yet.
+    - The generic BondHelper, over an arbitrary pre-built bond, is not faced at
+      all: it needs a bond-instrument facade, which does not exist.
+    - Schedule takes no end_of_month knob, so an end-of-month bond schedule is
+      not constructible from Python yet.
+
+    issue_date is the one core argument moved out of position: it is optional,
+    so it trails the required price_type and settings.
+    """
+
+    def __init__(
+        self,
+        price: SimpleQuote,
+        settlement_days: int,
+        face_amount: float,
+        schedule: Schedule,
+        coupons: list[float],
+        day_counter: DayCounter,
+        payment_convention: BusinessDayConvention,
+        redemption: float,
+        price_type: BondPriceType,
+        settings: Settings,
+        issue_date: Date | None = None,
+    ) -> None:
+        """Build the helper over a fixed-coupon bond assembled from the schedule.
+
+        Args:
+            price (SimpleQuote): The bond's quoted price, read as clean or dirty
+                per price_type. The caller keeps it, so a later set_value
+                re-drives the bootstrap.
+            settlement_days (int): The days between the evaluation date and the
+                bond's settlement date.
+            face_amount (float): The notional the coupons accrue on.
+            schedule (Schedule): The coupon schedule; its calendar also rolls
+                the payment dates.
+            coupons (list[float]): The coupon rates, one per period or a single
+                rate applied to every period.
+            day_counter (DayCounter): The day count the coupons accrue under.
+            payment_convention (BusinessDayConvention): The roll applied to the
+                payment dates.
+            redemption (float): The redemption amount, per 100 of face.
+            price_type (BondPriceType): Whether price is a clean or a dirty
+                quote.
+            settings (Settings): The explicit settings supplying the evaluation
+                date.
+            issue_date (Date | None): The bond's issue date; None leaves it
+                unset.
+
+        Raises:
+            ItofinError: On whatever the core rejects about the bond, and when
+                the evaluation date is unset, since the helper resolves the
+                bond's next cash-flow date off it.
         """
         ...
 
