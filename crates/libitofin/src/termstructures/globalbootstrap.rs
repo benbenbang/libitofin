@@ -564,6 +564,7 @@ mod tests {
     use crate::quotes::{Quote, SimpleQuote};
     use crate::settings::Settings;
     use crate::shared::shared;
+    use crate::termstructures::TermStructure;
     use crate::termstructures::bootstraphelper::RateHelper;
     use crate::termstructures::bootstraptraits::{ForwardRate, SimpleZeroYield};
     use crate::termstructures::yields::{
@@ -1299,5 +1300,132 @@ mod tests {
         ] {
             assert!(!dates.contains(&stale), "{stale} precedes the first date");
         }
+    }
+
+    /// ARM E: at the solution BOTH residual families vanish - the 32 helpers'
+    /// quote errors and the five penalty terms alike (the dylib reaches 6.6e-16
+    /// and 4.7e-16).
+    ///
+    /// This is what makes the enlarged system square: 37 variables answered by
+    /// 32 + 5 residuals. It also exercises the additional helpers' own
+    /// `set_term_structure` loop (`hpp:347-352`) - an additional helper that
+    /// was never handed the curve cannot imply a quote at all, and the penalty
+    /// evaluated here would fail rather than come out small.
+    #[test]
+    fn global_bootstrap_zeroes_both_residual_families() {
+        let fixture = fixture();
+        let helpers = additional_helpers(&fixture);
+        let curve = PiecewiseYieldCurve::<SimpleZeroYield, Linear, _>::with_bootstrap(
+            fixture.reference_date,
+            fixture.helpers.clone(),
+            Actual365Fixed::new(),
+            Linear,
+            GlobalBootstrap::with_grid_independent_penalties(
+                helpers.clone(),
+                Some(additional_dates(&fixture)),
+                Some(1.0e-12),
+                None,
+                Vec::new(),
+                additional_errors(helpers.clone()),
+            ),
+        )
+        .expect("the 32-helper strip builds a curve");
+        curve.dates().expect("the strip solves");
+
+        for (i, helper) in fixture.helpers.iter().enumerate() {
+            let error = helper
+                .quote_error()
+                .expect("every helper reprices off the solved curve");
+            assert!(error.abs() < 1.0e-9, "helper {i} does not reprice: {error}");
+        }
+        for (k, error) in additional_errors(helpers)().iter().enumerate() {
+            assert!(
+                error.abs() < 1.0e-9,
+                "penalty term {k} does not vanish: {error}"
+            );
+        }
+    }
+
+    /// ARM F, the under-determined pin: the same additional dates with NO
+    /// penalty leave 32 residuals against 37 variables, and the least-squares
+    /// solver refuses the system (`levenbergmarquardt.rs:167-170`; the C++ LM
+    /// raises the identical text).
+    ///
+    /// This is the arm that proves the surviving dates became free VARIABLES
+    /// rather than decoration, and it proves it without the dylib: a port that
+    /// inserted the dates into the grid but not into the optimizer's argument
+    /// vector would solve happily here. An empty penalty vector stands in for
+    /// the C++ null `additionalPenalties_`, which contributes no residual
+    /// either.
+    #[test]
+    fn global_bootstrap_additional_dates_need_penalty_terms() {
+        let fixture = fixture();
+        let curve = PiecewiseYieldCurve::<SimpleZeroYield, Linear, _>::with_bootstrap(
+            fixture.reference_date,
+            fixture.helpers.clone(),
+            Actual365Fixed::new(),
+            Linear,
+            GlobalBootstrap::with_penalties(
+                Vec::new(),
+                Some(additional_dates(&fixture)),
+                Some(1.0e-12),
+                None,
+                Vec::new(),
+                |_, _| Vec::new(),
+            ),
+        )
+        .expect("construction is lazy");
+
+        let message = curve
+            .dates()
+            .expect_err("32 residuals cannot pin 37 variables")
+            .to_string();
+        assert!(
+            message.contains("less functions (32) than available variables (37)"),
+            "unexpected failure: {message}"
+        );
+    }
+
+    /// ARM G, the maxDate extension over the additional helpers
+    /// (`globalbootstrap.hpp:305-306`).
+    ///
+    /// HONEST NEGATIVE: the oracle fixture is BLIND to this line. Its
+    /// additional FRAs all mature in 2021, far inside the 2069 last pillar, so
+    /// the dylib's MAX_DATE is the last pillar either way. The arm is therefore
+    /// built deliberately: the deposit and twelve FRAs of the fixture, whose
+    /// grid ends on 31 Mar 2021, plus one additional helper reaching 30 Sep
+    /// 2021. Without the extension the curve would stop at the last pillar and
+    /// the discount query below would fall outside its range.
+    #[test]
+    fn global_bootstrap_max_date_covers_an_additional_helper() {
+        let fixture = fixture();
+        let additional = Shared::clone(&additional_helpers(&fixture)[6]);
+        let curve = PiecewiseYieldCurve::<SimpleZeroYield, Linear, _>::with_bootstrap(
+            fixture.reference_date,
+            fixture.helpers[..13].to_vec(),
+            Actual365Fixed::new(),
+            Linear,
+            GlobalBootstrap::with_penalties(
+                vec![Shared::clone(&additional)],
+                None,
+                Some(1.0e-12),
+                None,
+                Vec::new(),
+                |_, _| Vec::new(),
+            ),
+        )
+        .expect("the front of the strip builds a curve");
+
+        let last_pillar = fixture.helpers[12].pillar_date();
+        let max_date = curve.max_date();
+        assert_ne!(
+            max_date, last_pillar,
+            "the additional helper must push the maximum past the last pillar"
+        );
+        assert_eq!(max_date, additional.latest_relevant_date());
+        assert!(
+            curve.discount_date(max_date, false).is_ok(),
+            "the extended range must be queryable without extrapolation"
+        );
     }
 }
