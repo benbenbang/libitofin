@@ -392,8 +392,8 @@ fn simple_zero_floor(t: Time) -> Real {
 /// `1/(1 + z*t)` rather than `exp(-z*t)`. The pole that conversion has at
 /// `z = -1/t` is the whole difference in the traits: the guess, bracket and
 /// update are the shared rate forms, with the lower bracket and both
-/// transforms shifted up by [`simple_zero_floor`] to keep every trial node on
-/// the admissible side of it.
+/// transforms shifted up by the shared `simple_zero_floor` to keep every trial
+/// node on the admissible side of it.
 pub struct SimpleZeroYield;
 
 impl BootstrapTraits for SimpleZeroYield {
@@ -405,7 +405,7 @@ impl BootstrapTraits for SimpleZeroYield {
         rate_guess(i, data, valid_data)
     }
 
-    /// The shared rate bracket floored at [`simple_zero_floor`]
+    /// The shared rate bracket floored at `simple_zero_floor`
     /// (`bootstraptraits.hpp:352-367`). The `max` is applied to both branches,
     /// after the if/else, exactly as upstream: on a fresh pass it raises the
     /// unconstrained `-maxRate` for every node past `t = 1`, and on a reused
