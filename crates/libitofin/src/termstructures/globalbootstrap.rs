@@ -457,12 +457,16 @@ mod tests {
     //! upstream gradient penalty.
     //!
     //! The reference numbers are NOT the literals printed in the `.cpp`: they
-    //! are reproduced to 17 digits by a C++ harness that rebuilds this fixture
-    //! against a locally built QuantLib 1.43-dev dylib, with
+    //! are reproduced at full precision by a C++ harness that rebuilds this
+    //! fixture against a locally built QuantLib 1.43-dev dylib, with
     //! `IborCoupon::Settings::instance().createAtParCoupons()` set so that
     //! `usingAtParCoupons()` - the test's own precondition - holds. The `.cpp`
     //! literals agree with the harness to within 8.9e-9, which is the
     //! truncation of their own 8-decimal printing, so they are not stale.
+    //!
+    //! The asserts keep the C++ tolerance of 1e-6, but the port is far tighter
+    //! than that: every one of the 64 rates matches the dylib to better than
+    //! 1e-9, and the worst node parts company only at 1e-12.
 
     use std::cell::Cell;
 
@@ -482,7 +486,7 @@ mod tests {
     use crate::termstructures::yieldtermstructure::YieldTermStructure;
     use crate::time::businessdayconvention::BusinessDayConvention;
     use crate::time::calendars::target::Target;
-    use crate::time::date::{Date, Month};
+    use crate::time::date::{Date, Day, Month, Year};
     use crate::time::daycounters::actual360::Actual360;
     use crate::time::daycounters::actual365fixed::Actual365Fixed;
     use crate::time::daycounters::thirty360::{Convention, Thirty360};
@@ -491,7 +495,7 @@ mod tests {
     use crate::time::timeunit::TimeUnit;
     use crate::types::Natural;
 
-    /// The market quotes in percent (`piecewiseyieldcurve.cpp:1392-1398`):
+    /// The market quotes in percent (`piecewiseyieldcurve.cpp:1393-1397`):
     /// the 6M deposit, then the twelve FRAs, then the nineteen swaps.
     const REF_MKT_RATE: [Real; 32] = [
         -0.373, -0.388, -0.402, -0.418, -0.431, -0.441, -0.45, -0.457, -0.463, -0.469, -0.461,
@@ -500,16 +504,128 @@ mod tests {
         0.0644,
     ];
 
-    /// The swap tenors in years (`:1435`).
+    /// The swap tenors in years (`:1436`).
     const SWAP_TENORS: [i32; 19] = [
         2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 15, 20, 25, 30, 35, 40, 45, 50,
+    ];
+
+    /// The 32 pillar dates (`piecewiseyieldcurve.cpp:1401-1409`).
+    const REF_DATE: [(Day, Month, Year); 32] = [
+        (31, Month::March, 2020),
+        (30, Month::April, 2020),
+        (29, Month::May, 2020),
+        (30, Month::June, 2020),
+        (31, Month::July, 2020),
+        (31, Month::August, 2020),
+        (30, Month::September, 2020),
+        (30, Month::October, 2020),
+        (30, Month::November, 2020),
+        (31, Month::December, 2020),
+        (29, Month::January, 2021),
+        (26, Month::February, 2021),
+        (31, Month::March, 2021),
+        (30, Month::September, 2021),
+        (30, Month::September, 2022),
+        (29, Month::September, 2023),
+        (30, Month::September, 2024),
+        (30, Month::September, 2025),
+        (30, Month::September, 2026),
+        (30, Month::September, 2027),
+        (29, Month::September, 2028),
+        (28, Month::September, 2029),
+        (30, Month::September, 2030),
+        (30, Month::September, 2031),
+        (29, Month::September, 2034),
+        (30, Month::September, 2039),
+        (30, Month::September, 2044),
+        (30, Month::September, 2049),
+        (30, Month::September, 2054),
+        (30, Month::September, 2059),
+        (30, Month::September, 2064),
+        (30, Month::September, 2069),
+    ];
+
+    /// The no-penalty pillar zero rates, reproduced from the C++ dylib and
+    /// written in their shortest round-tripping form; `:1410-1415` prints the
+    /// same values truncated to 8 decimals.
+    const REF_ZERO_RATE_NP: [Real; 32] = [
+        -0.00373354067173059,
+        -0.0038619401591129116,
+        -0.003952053377431906,
+        -0.004033031764634922,
+        -0.004080332294683344,
+        -0.00410875148971975,
+        -0.004119347704602793,
+        -0.004191606489573042,
+        -0.0042481675261172285,
+        -0.004299228525952772,
+        -0.004280288678277469,
+        -0.0042917785223669895,
+        -0.00434401190355896,
+        -0.0044524306053832785,
+        -0.004485055406658176,
+        -0.004336901365743163,
+        -0.004074010693284356,
+        -0.0037275150355157486,
+        -0.0033005022038937737,
+        -0.002791390998101853,
+        -0.0022547726443914143,
+        -0.0017342152462374019,
+        -0.001236880404786612,
+        -0.0007723647126770113,
+        0.0003855052397250581,
+        0.0014420799596420013,
+        0.001759470920941431,
+        0.00172834231444819,
+        0.0015075667291268061,
+        0.0012113127300807914,
+        0.0009338400348746001,
+        0.0006289189187075171,
+    ];
+
+    /// The gradient-penalty pillar zero rates, reproduced from the C++ dylib and
+    /// written in their shortest round-tripping form; `:1417-1422` prints the
+    /// same values truncated to 8 decimals.
+    const REF_ZERO_RATE_GP: [Real; 32] = [
+        -0.0037789204343363957,
+        -0.003861265918257509,
+        -0.003947374024601186,
+        -0.0040291352443265075,
+        -0.004095413491332919,
+        -0.0041325177094445505,
+        -0.00415463322202404,
+        -0.004194838278258465,
+        -0.004242382682770642,
+        -0.004278749680844317,
+        -0.0042971214597928705,
+        -0.00431898196411309,
+        -0.004360271377797676,
+        -0.00445296974357845,
+        -0.004485023476300989,
+        -0.004336935907495182,
+        -0.0040740612083099365,
+        -0.0037275506595484164,
+        -0.003300180655052014,
+        -0.0027913299732067252,
+        -0.002254907688857512,
+        -0.0017342855088808304,
+        -0.0012364330378685168,
+        -0.0007729806599035981,
+        0.0003854725793177982,
+        0.001442061640980936,
+        0.001759475820307776,
+        0.0017283380850002651,
+        0.0015075606415153413,
+        0.0012113489415541431,
+        0.0009337950842231714,
+        0.0006289530535829015,
     ];
 
     /// The curve under test.
     type PenaltyCurve = PiecewiseYieldCurve<ForwardRate, BackwardFlat, GlobalBootstrap>;
 
     /// The shared fixture: evaluation date 26 Sep 2019 (`:1390`) and the
-    /// 32 helpers of `:1425-1441`, all reading one empty-forwarding Euribor 6M.
+    /// 32 helpers of `:1428-1441`, all reading one empty-forwarding Euribor 6M.
     struct Fixture {
         reference_date: Date,
         helpers: Vec<Shared<dyn RateHelper>>,
@@ -522,7 +638,7 @@ mod tests {
     ///
     /// The deposit takes its schedule from the index rather than from the
     /// explicit `(6M, 2, TARGET(), ModifiedFollowing, true, Actual360())` of
-    /// `:1425-1426`: Euribor 6M carries exactly those six conventions.
+    /// `:1428-1429`: Euribor 6M carries exactly those six conventions.
     fn fixture() -> Fixture {
         let calendar = Target::new();
         let today = Date::new(26, Month::September, 2019);
@@ -570,7 +686,7 @@ mod tests {
         }
     }
 
-    /// The curve of `:1444-1448`, with the explicit 1.0e-12 accuracy both arms
+    /// The curve of `:1445-1448`, with the explicit 1.0e-12 accuracy both arms
     /// pass.
     fn curve_with(fixture: &Fixture, bootstrap: GlobalBootstrap) -> Shared<PenaltyCurve> {
         PiecewiseYieldCurve::with_bootstrap(
@@ -583,7 +699,7 @@ mod tests {
         .expect("the 32-helper strip builds a curve")
     }
 
-    /// The continuous Actual/360 zero rate at every pillar (`:1478-1482`).
+    /// The continuous Actual/360 zero rate at every pillar (`:1459`/`:1481`).
     fn zero_rates(curve: &Shared<PenaltyCurve>, fixture: &Fixture) -> Vec<Real> {
         fixture
             .helpers
@@ -688,5 +804,89 @@ mod tests {
             fired.get() > 0,
             "the no-argument penalty never reached the residual vector"
         );
+    }
+    /// ARM 0 of `testGlobalBootstrapPenalty` (`:1450-1453`): the 32 pillar
+    /// dates. External truth that stands on its own - it fixes the helper
+    /// construction (index conventions, FRA start offsets, swap tenors and the
+    /// `Pillar::LastRelevantDate` choice) without any reference to the solve,
+    /// so a mis-specified strip fails here rather than smearing into the rates.
+    #[test]
+    fn global_bootstrap_penalty_pillar_dates() {
+        let fixture = fixture();
+        assert_eq!(
+            fixture.reference_date,
+            Date::new(30, Month::September, 2019)
+        );
+        for (i, (day, month, year)) in REF_DATE.iter().enumerate() {
+            assert_eq!(
+                fixture.helpers[i].pillar_date(),
+                Date::new(*day, *month, *year),
+                "helper {i} sits on the wrong pillar"
+            );
+        }
+    }
+
+    /// The two rate arms of `testGlobalBootstrapPenalty` at the C++ tolerance
+    /// of 1e-6 (0.01 basis points): the no-penalty curve of `:1445-1448` and
+    /// the gradient-penalty curve of `:1472-1475`, whose penalty
+    /// `0.01 * (data[i + 1] - data[i]) / (times[i + 1] - times[i])` over
+    /// `times.len() - 1` terms (`:1464-1470`) reads the FULL node grid,
+    /// node 0 included.
+    ///
+    /// The C++ no-penalty arm passes an EMPTY `std::function<Array()>`, which
+    /// constructor #3 turns into no penalty at all rather than into a
+    /// zero-length one, so it is [`GlobalBootstrap::new`] here.
+    ///
+    /// VACUITY GUARD: a port that accepted the penalty and then ignored it
+    /// would solve ONE curve and hand it to both arms, and both tables would
+    /// still pass at 1e-6 for the 20 pillars where they agree. The two tables
+    /// are therefore asserted to DIFFER first: the gradient penalty moves the
+    /// short end by 4.5e-5, forty-five times the assert tolerance.
+    #[test]
+    fn global_bootstrap_penalty_zero_rates() {
+        let fixture = fixture();
+        let no_penalty = zero_rates(
+            &curve_with(
+                &fixture,
+                GlobalBootstrap::new(Some(1.0e-12), None, Vec::new()),
+            ),
+            &fixture,
+        );
+        let gradient_penalty = zero_rates(
+            &curve_with(
+                &fixture,
+                GlobalBootstrap::with_penalties(Some(1.0e-12), None, Vec::new(), |times, data| {
+                    (0..times.len() - 1)
+                        .map(|i| 0.01 * (data[i + 1] - data[i]) / (times[i + 1] - times[i]))
+                        .collect()
+                }),
+            ),
+            &fixture,
+        );
+
+        let separation = no_penalty
+            .iter()
+            .zip(&gradient_penalty)
+            .map(|(np, gp)| (np - gp).abs())
+            .fold(0.0, Real::max);
+        assert!(
+            separation > 1.0e-5,
+            "the penalty did not move the solve: the two arms agree to {separation}"
+        );
+
+        for (i, expected) in REF_ZERO_RATE_NP.iter().enumerate() {
+            assert!(
+                (no_penalty[i] - expected).abs() < 1.0e-6,
+                "no-penalty zero rate {i}: {} vs {expected}",
+                no_penalty[i]
+            );
+        }
+        for (i, expected) in REF_ZERO_RATE_GP.iter().enumerate() {
+            assert!(
+                (gradient_penalty[i] - expected).abs() < 1.0e-6,
+                "gradient-penalty zero rate {i}: {} vs {expected}",
+                gradient_penalty[i]
+            );
+        }
     }
 }
