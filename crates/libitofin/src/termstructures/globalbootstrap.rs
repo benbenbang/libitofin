@@ -22,7 +22,7 @@
 //! visibly, each as its own follow-up issue referencing #949:
 //!
 //! - **Additional variables** (`additionalVariables`, plus the
-//!   `SimpleQuoteVariables` helper): the extra optimizer coordinates the
+//!   `SimpleQuoteVariables` helper, #977): the extra optimizer coordinates the
 //!   futures-convexity oracle test (`piecewiseyieldcurve.cpp:1486`) exercises.
 //! - **Multi-curve orchestration** (`MultiCurveBootstrap`,
 //!   `MultiCurveBootstrapContributor`, `setParentBootstrapper`/`setToValid`,
@@ -139,10 +139,12 @@ pub type AdditionalDates = dyn Fn() -> Vec<Date>;
 /// The global bootstrap (`GlobalBootstrap`, single-curve core).
 ///
 /// Carries the stopping-accuracy override, the `EndCriteria` override, the
-/// per-instrument residual weights and the additional penalty terms; defaults
+/// per-instrument residual weights, the additional penalty terms, and the
+/// additional helpers and dates those penalties are built around; defaults
 /// mirror the C++ constructor (`accuracy = Null`, `endCriteria = nullptr`,
-/// `instrumentWeights = {}`, no penalties, `globalbootstrap.hpp:112-115`), with
-/// everything resolved from the curve at calculation time.
+/// `instrumentWeights = {}`, no penalties, no additional restrictions,
+/// `globalbootstrap.hpp:112-115`), with everything resolved from the curve at
+/// calculation time.
 ///
 /// The boxed penalty closure is neither `Clone` nor `Debug`, so those two
 /// derives are gone; `Default` is hand-rolled because a curve built through
@@ -551,6 +553,24 @@ mod tests {
     //! The asserts keep the C++ tolerance of 1e-6, but the port is far tighter
     //! than that: every one of the 64 rates matches the dylib to better than
     //! 1e-9, and the worst node parts company only at 1e-12.
+    //!
+    //! Second oracle: `testGlobalBootstrap` (`:1306-1386`) - the same strip
+    //! under `PiecewiseYieldCurve<SimpleZeroYield, Linear, GlobalBootstrap>`,
+    //! now with the seven additional helpers, the additional dates and the
+    //! penalty that ties the helpers' implied quotes to a line. Its 32 rates
+    //! come from the same harness and match it to 1.9e-16.
+    //!
+    //! HONEST NEGATIVES, neither faked into an arm. Both concern branches the
+    //! upstream fixture never reaches:
+    //!
+    //! - The **alive filter on additional helpers** (`hpp:256-262`): all seven
+    //!   start twelve months out, so all seven are alive and the drop branch is
+    //!   unexercised. Its instrument-side twin is the same line of code the
+    //!   32 instruments already run.
+    //! - The **invalid-quote guard on additional helpers** (`hpp:348-351`):
+    //!   every additional quote is a valid `SimpleQuote`, so the guard is
+    //!   unexercised. Reaching it needs an empty quote handle, which no
+    //!   upstream test builds here.
 
     use std::cell::Cell;
 
