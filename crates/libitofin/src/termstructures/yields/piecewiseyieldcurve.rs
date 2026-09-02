@@ -666,8 +666,9 @@ mod tests {
     /// The `GlobalBootstrap` arm of the consistency harness:
     /// `<Discount, LogLinear, GlobalBootstrap>` at 1e-9 (and a
     /// `<ZeroYield, Linear>` arm below). The minimal single-curve core has no
-    /// direct C++ oracle - the three upstream tests
-    /// (`piecewiseyieldcurve.cpp:1306/1388/1486`) all exercise the deferred
+    /// direct C++ oracle - `testGlobalBootstrapPenalty` is ported alongside the
+    /// penalty terms in `globalbootstrap.rs`, and the two remaining upstream
+    /// tests (`piecewiseyieldcurve.cpp:1306/1486`) exercise the still-deferred
     /// additional restrictions - so the vs-consistency round-trip stands in.
     /// Unlike [`local_bootstrap_consistency`] this oracle is NOT vacuous: the
     /// system is exactly determined (21 helper residuals over 21 interior

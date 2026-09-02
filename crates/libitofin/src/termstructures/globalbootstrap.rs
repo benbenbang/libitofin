@@ -14,16 +14,16 @@
 //!
 //! ## What is ported, and what is deferred
 //!
-//! Only the single-curve path is ported; it equals the C++ path with every
-//! `additional*` argument empty and `parentBootstrapper_` null. Deferred
+//! The single-curve path is ported, together with the `additionalPenalties`
+//! residual terms (#974); it equals the C++ path with the remaining
+//! `additional*` arguments empty and `parentBootstrapper_` null. Deferred
 //! visibly, each as its own follow-up issue referencing #949:
 //!
 //! - **Additional restrictions** (`additionalHelpers`/`additionalDates`/
-//!   `additionalPenalties`/`additionalVariables`, plus the
-//!   `SimpleQuoteVariables` helper and the `SimpleZeroYield` traits): the
-//!   machinery the three upstream oracle tests
-//!   (`piecewiseyieldcurve.cpp:1306/1388/1486`) exercise - futures convexity
-//!   adjustments, penalty terms, model variables.
+//!   `additionalVariables`, plus the `SimpleQuoteVariables` helper and the
+//!   `SimpleZeroYield` traits): the machinery the two remaining upstream
+//!   oracle tests (`piecewiseyieldcurve.cpp:1306/1486`) exercise - futures
+//!   convexity adjustments, model variables.
 //! - **Multi-curve orchestration** (`MultiCurveBootstrap`,
 //!   `MultiCurveBootstrapContributor`, `setParentBootstrapper`/`setToValid`,
 //!   the `parentBootstrapper_` branch of `calculate`).
@@ -74,6 +74,16 @@
 //! because there is no frozen prefix: every node is a variable of the one
 //! global solve.
 //!
+//! ## Where the penalty terms run
+//!
+//! C++ splits the trial write (`setCostFunctionArgument`, `:379-390`) from the
+//! residual assembly (`evaluateCostFunction`, `:392-403`), so the penalty
+//! closure runs with no mutable state alive. This port keeps that separation
+//! deliberately: the penalty is invoked only after the `borrow_mut` that
+//! rewrites the nodes has dropped. A penalty may read the curve back - the
+//! upstream one reprices an additional helper - which takes a shared borrow of
+//! the same `RefCell`, and a live `borrow_mut` would panic there.
+//!
 //! ## Traits bound
 //!
 //! The driver requires
@@ -82,7 +92,7 @@
 //! known to work with the `Discount`/`ZeroYield`/`ForwardRate` IR traits
 //! (`globalbootstrap.hpp:100-103`).
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 
 use crate::errors::{QlError, QlResult};
 use crate::math::array::Array;
@@ -98,26 +108,48 @@ use crate::shared::Shared;
 use crate::termstructures::bootstraphelper::BootstrapHelperShared;
 use crate::termstructures::bootstraptraits::{BootstrapTraits, YieldBootstrapTraits};
 use crate::termstructures::iterativebootstrap::{Bootstrap, PiecewiseCurve};
-use crate::types::{Real, Size};
+use crate::types::{Real, Size, Time};
+
+/// The additional penalty terms (`AdditionalPenalties`,
+/// `globalbootstrap.hpp:108-109`).
+///
+/// Extra least-squares residuals, appended after the alive helpers' weighted
+/// quote errors. The closure is handed the FULL node grid of the trial curve -
+/// times and values INCLUDING node 0 (`hpp:395`) - not the interior slice the
+/// optimizer varies, so a penalty over `times.len() - 1` differences indexes
+/// `data[i + 1] - data[i]` directly.
+pub type AdditionalPenalties = dyn Fn(&[Time], &[Real]) -> Vec<Real>;
 
 /// The global bootstrap (`GlobalBootstrap`, single-curve core).
 ///
-/// Carries the stopping-accuracy override, the `EndCriteria` override and the
-/// per-instrument residual weights; defaults mirror the C++ constructor
-/// (`accuracy = Null`, `endCriteria = nullptr`, `instrumentWeights = {}`,
-/// `globalbootstrap.hpp:112-115`), with everything resolved from the curve at
-/// calculation time.
-#[derive(Clone, Debug, Default)]
+/// Carries the stopping-accuracy override, the `EndCriteria` override, the
+/// per-instrument residual weights and the additional penalty terms; defaults
+/// mirror the C++ constructor (`accuracy = Null`, `endCriteria = nullptr`,
+/// `instrumentWeights = {}`, no penalties, `globalbootstrap.hpp:112-115`), with
+/// everything resolved from the curve at calculation time.
+///
+/// The boxed penalty closure is neither `Clone` nor `Debug`, so those two
+/// derives are gone; `Default` is hand-rolled because a curve built through
+/// [`PiecewiseYieldCurve::new`](crate::termstructures::yields::PiecewiseYieldCurve::new)
+/// still needs the empty configuration.
 pub struct GlobalBootstrap {
     accuracy: Option<Real>,
     end_criteria: Option<EndCriteria>,
     instrument_weights: Vec<Real>,
+    penalties: Option<Box<AdditionalPenalties>>,
+}
+
+impl Default for GlobalBootstrap {
+    fn default() -> GlobalBootstrap {
+        GlobalBootstrap::new(None, None, Vec::new())
+    }
 }
 
 impl GlobalBootstrap {
     /// A global bootstrap with an optional accuracy override, an optional
     /// stopping-criteria override and optional per-instrument weights (empty
-    /// weights resolve to 1.0 for every instrument).
+    /// weights resolve to 1.0 for every instrument), and no penalty terms
+    /// (C++ constructor #1, `globalbootstrap.hpp:112-115`).
     pub fn new(
         accuracy: Option<Real>,
         end_criteria: Option<EndCriteria>,
@@ -127,15 +159,59 @@ impl GlobalBootstrap {
             accuracy,
             end_criteria,
             instrument_weights,
+            penalties: None,
         }
+    }
+
+    /// The same configuration plus [`AdditionalPenalties`] over the trial
+    /// curve's node grid (the penalty argument of C++ constructor #2,
+    /// `globalbootstrap.hpp:116-123`, definition `:169-186`).
+    ///
+    /// That constructor also carries `additionalHelpers`, `additionalDates` and
+    /// `additionalVariables`; those are still deferred, so this form takes the
+    /// penalty alone.
+    pub fn with_penalties<F>(
+        accuracy: Option<Real>,
+        end_criteria: Option<EndCriteria>,
+        instrument_weights: Vec<Real>,
+        penalties: F,
+    ) -> GlobalBootstrap
+    where
+        F: Fn(&[Time], &[Real]) -> Vec<Real> + 'static,
+    {
+        GlobalBootstrap {
+            accuracy,
+            end_criteria,
+            instrument_weights,
+            penalties: Some(Box::new(penalties)),
+        }
+    }
+
+    /// The same, for a penalty that does not read the node grid (C++
+    /// constructor #3's `std::function<Array()>` form,
+    /// `globalbootstrap.hpp:124-131`, definition `:196-206`, which wraps the
+    /// no-argument closure into the two-argument one and delegates).
+    pub fn with_grid_independent_penalties<F>(
+        accuracy: Option<Real>,
+        end_criteria: Option<EndCriteria>,
+        instrument_weights: Vec<Real>,
+        penalties: F,
+    ) -> GlobalBootstrap
+    where
+        F: Fn() -> Vec<Real> + 'static,
+    {
+        Self::with_penalties(accuracy, end_criteria, instrument_weights, move |_, _| {
+            penalties()
+        })
     }
 }
 
 /// The global cost (`setCostFunctionArgument` + `evaluateCostFunction`,
 /// `globalbootstrap.hpp:379-403`): writes every interior trial node into the
 /// node vector through `transform_direct`, rebuilds the full-grid
-/// interpolation, and returns the alive helpers' weighted quote errors as the
-/// residual vector.
+/// interpolation, and returns the alive helpers' weighted quote errors -
+/// followed by the [`AdditionalPenalties`] terms, if any - as the residual
+/// vector.
 ///
 /// The [`CostFunction`] trait is infallible, so a failed rebuild or reprice
 /// parks its error in `error` and returns NaN residuals, which the solver
@@ -149,9 +225,14 @@ where
     curve: &'a C,
     alive: &'a [Shared<C::Helper>],
     alive_weights: &'a [Real],
+    penalties: Option<&'a AdditionalPenalties>,
     /// The number of interior nodes, `times.len() - 1`; residual count is
-    /// `alive.len()`, at least `interior` (the grid dedup can only shrink it).
+    /// `alive.len()` plus the penalty terms, at least `interior` (the grid
+    /// dedup can only shrink the helper half).
     interior: Size,
+    /// The penalty-term count of the last evaluation, so a failed evaluation's
+    /// NaN vector has the length the solver sized itself on.
+    penalty_len: Cell<Size>,
     error: RefCell<Option<QlError>>,
 }
 
@@ -168,9 +249,23 @@ where
             }
             cd.rebuild(self.curve.interpolator(), self.interior)?;
         }
-        let mut residuals = Array::with_size(self.alive.len());
+        // Only now that the `borrow_mut` above has dropped, so a penalty that
+        // reads the curve back can take its own shared borrow (`:392-395`).
+        let penalty_errors = match self.penalties {
+            Some(penalties) => {
+                let cd = self.curve.curve_data().borrow();
+                penalties(cd.times(), cd.data())
+            }
+            None => Vec::new(),
+        };
+        self.penalty_len.set(penalty_errors.len());
+
+        let mut residuals = Array::with_size(self.alive.len() + penalty_errors.len());
         for (i, helper) in self.alive.iter().enumerate() {
             residuals[i] = helper.quote_error()? * self.alive_weights[i];
+        }
+        for (i, penalty_error) in penalty_errors.into_iter().enumerate() {
+            residuals[self.alive.len() + i] = penalty_error;
         }
         Ok(residuals)
     }
@@ -188,7 +283,8 @@ where
                 if slot.is_none() {
                     *slot = Some(err);
                 }
-                std::iter::repeat_n(Real::NAN, self.alive.len()).collect()
+                let residuals = self.alive.len() + self.penalty_len.get();
+                std::iter::repeat_n(Real::NAN, residuals).collect()
             }
         }
     }
@@ -314,7 +410,9 @@ where
             curve,
             alive: &alive,
             alive_weights: &alive_weights,
+            penalties: self.penalties.as_deref(),
             interior,
+            penalty_len: Cell::new(0),
             error: RefCell::new(None),
         };
         let no_constraint = NoConstraint;
@@ -347,5 +445,248 @@ where
             cd.set_valid(true);
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    //! Oracle: `piecewiseyieldcurve.cpp` `testGlobalBootstrapPenalty`
+    //! (`:1388-1483`) - a 32-instrument EUR strip (one 6M deposit, twelve
+    //! FRAs, nineteen swaps) bootstrapped as `PiecewiseYieldCurve<ForwardRate,
+    //! BackwardFlat, GlobalBootstrap>` once with no penalty and once under the
+    //! upstream gradient penalty.
+    //!
+    //! The reference numbers are NOT the literals printed in the `.cpp`: they
+    //! are reproduced to 17 digits by a C++ harness that rebuilds this fixture
+    //! against a locally built QuantLib 1.43-dev dylib, with
+    //! `IborCoupon::Settings::instance().createAtParCoupons()` set so that
+    //! `usingAtParCoupons()` - the test's own precondition - holds. The `.cpp`
+    //! literals agree with the harness to within 8.9e-9, which is the
+    //! truncation of their own 8-decimal printing, so they are not stale.
+
+    use std::cell::Cell;
+
+    use super::*;
+    use crate::handle::Handle;
+    use crate::indexes::ibor::euribor::Euribor;
+    use crate::interestrate::Compounding;
+    use crate::math::interpolations::flat::BackwardFlat;
+    use crate::quotes::{Quote, SimpleQuote};
+    use crate::settings::Settings;
+    use crate::shared::shared;
+    use crate::termstructures::bootstraphelper::RateHelper;
+    use crate::termstructures::bootstraptraits::ForwardRate;
+    use crate::termstructures::yields::{
+        DepositRateHelper, FraRateHelper, PiecewiseYieldCurve, Pillar, SwapRateHelper,
+    };
+    use crate::termstructures::yieldtermstructure::YieldTermStructure;
+    use crate::time::businessdayconvention::BusinessDayConvention;
+    use crate::time::calendars::target::Target;
+    use crate::time::date::{Date, Month};
+    use crate::time::daycounters::actual360::Actual360;
+    use crate::time::daycounters::actual365fixed::Actual365Fixed;
+    use crate::time::daycounters::thirty360::{Convention, Thirty360};
+    use crate::time::frequency::Frequency;
+    use crate::time::period::Period;
+    use crate::time::timeunit::TimeUnit;
+    use crate::types::Natural;
+
+    /// The market quotes in percent (`piecewiseyieldcurve.cpp:1392-1398`):
+    /// the 6M deposit, then the twelve FRAs, then the nineteen swaps.
+    const REF_MKT_RATE: [Real; 32] = [
+        -0.373, -0.388, -0.402, -0.418, -0.431, -0.441, -0.45, -0.457, -0.463, -0.469, -0.461,
+        -0.463, -0.479, -0.4511, -0.45418, -0.439, -0.4124, -0.37703, -0.3335, -0.28168, -0.22725,
+        -0.1745, -0.12425, -0.07746, 0.0385, 0.1435, 0.17525, 0.17275, 0.1515, 0.1225, 0.095,
+        0.0644,
+    ];
+
+    /// The swap tenors in years (`:1435`).
+    const SWAP_TENORS: [i32; 19] = [
+        2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 15, 20, 25, 30, 35, 40, 45, 50,
+    ];
+
+    /// The curve under test.
+    type PenaltyCurve = PiecewiseYieldCurve<ForwardRate, BackwardFlat, GlobalBootstrap>;
+
+    /// The shared fixture: evaluation date 26 Sep 2019 (`:1390`) and the
+    /// 32 helpers of `:1425-1441`, all reading one empty-forwarding Euribor 6M.
+    struct Fixture {
+        reference_date: Date,
+        helpers: Vec<Shared<dyn RateHelper>>,
+    }
+
+    /// C++ builds the curve from `(2, TARGET())`, a moving reference two
+    /// business days after the evaluation date; nothing in this test moves that
+    /// date, so the equivalent fixed reference (30 Sep 2019) is computed here
+    /// and handed to the reference-date constructor.
+    ///
+    /// The deposit takes its schedule from the index rather than from the
+    /// explicit `(6M, 2, TARGET(), ModifiedFollowing, true, Actual360())` of
+    /// `:1425-1426`: Euribor 6M carries exactly those six conventions.
+    fn fixture() -> Fixture {
+        let calendar = Target::new();
+        let today = Date::new(26, Month::September, 2019);
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(today);
+        let reference_date = calendar.advance(
+            today,
+            2,
+            TimeUnit::Days,
+            BusinessDayConvention::Following,
+            false,
+        );
+        let euribor6m = Euribor::six_months(Handle::empty(), settings);
+
+        let mut helpers: Vec<Shared<dyn RateHelper>> = Vec::new();
+        helpers.push(
+            DepositRateHelper::from_rate(REF_MKT_RATE[0] / 100.0, &euribor6m)
+                as Shared<dyn RateHelper>,
+        );
+        for (i, rate) in REF_MKT_RATE[1..=12].iter().enumerate() {
+            let quote = Handle::new(shared(SimpleQuote::new(rate / 100.0)) as Shared<dyn Quote>);
+            helpers.push(FraRateHelper::from_months(
+                quote,
+                i as Natural + 1,
+                &euribor6m,
+                true,
+                Pillar::LastRelevantDate,
+            ) as Shared<dyn RateHelper>);
+        }
+        for (i, tenor) in SWAP_TENORS.iter().enumerate() {
+            helpers.push(SwapRateHelper::from_rate(
+                REF_MKT_RATE[13 + i] / 100.0,
+                Period::new(*tenor, TimeUnit::Years),
+                calendar.clone(),
+                Frequency::Annual,
+                BusinessDayConvention::ModifiedFollowing,
+                Thirty360::with_convention(Convention::BondBasis),
+                &euribor6m,
+            ) as Shared<dyn RateHelper>);
+        }
+
+        Fixture {
+            reference_date,
+            helpers,
+        }
+    }
+
+    /// The curve of `:1444-1448`, with the explicit 1.0e-12 accuracy both arms
+    /// pass.
+    fn curve_with(fixture: &Fixture, bootstrap: GlobalBootstrap) -> Shared<PenaltyCurve> {
+        PiecewiseYieldCurve::with_bootstrap(
+            fixture.reference_date,
+            fixture.helpers.clone(),
+            Actual365Fixed::new(),
+            BackwardFlat,
+            bootstrap,
+        )
+        .expect("the 32-helper strip builds a curve")
+    }
+
+    /// The continuous Actual/360 zero rate at every pillar (`:1478-1482`).
+    fn zero_rates(curve: &Shared<PenaltyCurve>, fixture: &Fixture) -> Vec<Real> {
+        fixture
+            .helpers
+            .iter()
+            .map(|helper| {
+                curve
+                    .zero_rate_date(
+                        helper.pillar_date(),
+                        Actual360::new(),
+                        Compounding::Continuous,
+                        Frequency::Annual,
+                        false,
+                    )
+                    .expect("the bootstrapped curve prices every pillar")
+                    .rate()
+            })
+            .collect()
+    }
+
+    /// The re-entrancy pin of the penalty slice: a penalty that READS THE
+    /// CURVE mid-solve, the shape the deferred `additionalHelpers` penalty
+    /// takes upstream (`globalbootstrap.hpp:392-395` reprices additional
+    /// helpers off the trial curve).
+    ///
+    /// The residual is a tiny multiple of the first helper's own quote error,
+    /// which is driven to zero by the helper residual anyway, so the argmin is
+    /// unmoved and the strip still reprices; what the arm pins is that the
+    /// shared borrow inside `implied_quote` is reachable at all. Invoking the
+    /// penalty while the node-rewriting `borrow_mut` is still live panics with
+    /// "already mutably borrowed", and neither the upstream gradient penalty
+    /// nor the no-argument one would notice: they never touch the `RefCell`.
+    #[test]
+    fn a_penalty_that_reprices_a_helper_solves() {
+        let fixture = fixture();
+        let probe = Shared::clone(&fixture.helpers[0]);
+        let fired = shared(Cell::new(0_usize));
+        let counter = Shared::clone(&fired);
+        let curve = curve_with(
+            &fixture,
+            GlobalBootstrap::with_penalties(Some(1.0e-12), None, Vec::new(), move |_, _| {
+                counter.set(counter.get() + 1);
+                let error = probe
+                    .quote_error()
+                    .expect("the probe helper reprices off the trial curve");
+                vec![1.0e-8 * error]
+            }),
+        );
+
+        let rates = zero_rates(&curve, &fixture);
+        assert!(
+            rates.iter().all(|rate| rate.is_finite()),
+            "the solved curve must carry finite zero rates"
+        );
+        assert!(
+            fired.get() > 0,
+            "the curve-reading penalty was never invoked"
+        );
+        for (i, helper) in fixture.helpers.iter().enumerate() {
+            let error = helper
+                .quote_error()
+                .expect("every helper reprices off the solved curve");
+            assert!(
+                error.abs() < 1.0e-9,
+                "helper {i} does not reprice under a curve-reading penalty: {error}"
+            );
+        }
+    }
+
+    /// The no-argument penalty adapter (C++ constructor #3,
+    /// `globalbootstrap.hpp:196-206`), pinned by its call count.
+    ///
+    /// HONEST NEGATIVE: this ctor cannot be pinned through the curve. A penalty
+    /// that ignores the node grid returns the same residual at every trial
+    /// point, so it cannot move the argmin; and a ZERO one cannot move the
+    /// stopping point either, since it adds nothing to the cost. The count is
+    /// therefore the only evidence the adapter reaches the residual vector -
+    /// which it must, since the residual length the solver sizes itself on
+    /// grows from 32 to 33.
+    #[test]
+    fn the_no_argument_penalty_adapter_is_invoked() {
+        let fixture = fixture();
+        let fired = shared(Cell::new(0_usize));
+        let counter = Shared::clone(&fired);
+        let curve = curve_with(
+            &fixture,
+            GlobalBootstrap::with_grid_independent_penalties(
+                Some(1.0e-12),
+                None,
+                Vec::new(),
+                move || {
+                    counter.set(counter.get() + 1);
+                    vec![0.0]
+                },
+            ),
+        );
+
+        assert!(
+            zero_rates(&curve, &fixture).iter().all(|r| r.is_finite()),
+            "a zero constant penalty must leave the strip solvable"
+        );
+        assert!(
+            fired.get() > 0,
+            "the no-argument penalty never reached the residual vector"
+        );
     }
 }
