@@ -19,9 +19,9 @@
 //!
 //! ## Scope
 //!
-//! The `Discount`, `ZeroYield` and `ForwardRate` traits are ported.
-//! `SimpleZeroYield` (`bootstraptraits.hpp:312`) is a documented deferral: it
-//! adds a `-1/t` rate floor and exp/log transforms this port does not need yet.
+//! All four upstream yield conventions are ported: `Discount`, `ZeroYield`,
+//! `ForwardRate` and `SimpleZeroYield` (`bootstraptraits.hpp:312`), the last
+//! adding the `-1/t` rate floor its simply compounded nodes need.
 //!
 //! ## The trait split
 //!
@@ -93,7 +93,8 @@ pub trait BootstrapTraits {
 pub trait YieldBootstrapTraits: BootstrapTraits {
     /// Converts an interpolated node at time `t` into a discount factor,
     /// applying this convention's node meaning (a discount factor for
-    /// `Discount`, `exp(-z*t)` for a zero rate, `exp(-primitive)` for an
+    /// `Discount`, `exp(-z*t)` for a continuously compounded zero rate,
+    /// `1/(1 + z*t)` for a simply compounded one, `exp(-primitive)` for an
     /// instantaneous forward). This is the seam that lets one `CurveData`
     /// holder serve every convention: the holder stays convention-agnostic and
     /// the traits interpret its nodes.
@@ -215,9 +216,11 @@ impl YieldBootstrapTraits for Discount {
 }
 
 /// The per-node guess the rate-storing conventions share (`ZeroYield`/
-/// `ForwardRate` `guess`, `bootstraptraits.hpp:147-163`/`:246-256`). The C++
-/// extrapolation branch reprices the partial curve's own `zeroRate`/
-/// `forwardRate`; the Rust trait only receives the node slices, so this returns
+/// `ForwardRate`/`SimpleZeroYield` `guess`, `bootstraptraits.hpp:147-163`/
+/// `:246-256`/`:332-348`). The C++ extrapolation branch reprices the partial
+/// curve's own `zeroRate`/`forwardRate` (`zeroRate(d, dc, Simple, Annual,
+/// true)` for `SimpleZeroYield`, `:344-347`); the Rust trait only receives
+/// the node slices, so this returns
 /// the last solved node instead. That is benign by construction: the guess only
 /// seeds a bracketed solver whose converged root is independent of it, and the
 /// caller already clamps the guess into `[min, max]`
@@ -371,6 +374,92 @@ impl YieldBootstrapTraits for ForwardRate {
             interpolation.primitive(t_max)? + last_forward * (t - t_max)
         };
         Ok((-integral).exp())
+    }
+}
+
+/// The `-1/t + 1e-8` rate floor `SimpleZeroYield` shares between its lower
+/// bracket (`bootstraptraits.hpp:366`) and its optimizer transforms
+/// (`:385-393`). A simply compounded rate at `z = -1/t` sends the discount
+/// factor `1/(1 + z*t)` through a pole, so every admissible node sits strictly
+/// above it and the `1e-8` is the margin that keeps it strict.
+fn simple_zero_floor(t: Time) -> Real {
+    -1.0 / t + 1e-8
+}
+
+/// Simply compounded zero-yield bootstrap traits (`struct SimpleZeroYield`,
+/// `bootstraptraits.hpp:313`). The nodes are zero rates like [`ZeroYield`]'s,
+/// but read with `Simple` compounding, so the node-to-discount conversion is
+/// `1/(1 + z*t)` rather than `exp(-z*t)`. The pole that conversion has at
+/// `z = -1/t` is the whole difference in the traits: the guess, bracket and
+/// update are the shared rate forms, with the lower bracket and both
+/// transforms shifted up by [`simple_zero_floor`] to keep every trial node on
+/// the admissible side of it.
+pub struct SimpleZeroYield;
+
+impl BootstrapTraits for SimpleZeroYield {
+    fn initial_value() -> Real {
+        AVG_RATE
+    }
+
+    fn guess(i: Size, _times: &[Time], data: &[Real], valid_data: bool) -> Real {
+        rate_guess(i, data, valid_data)
+    }
+
+    /// The shared rate bracket floored at [`simple_zero_floor`]
+    /// (`bootstraptraits.hpp:352-367`). The `max` is applied to both branches,
+    /// after the if/else, exactly as upstream: on a fresh pass it raises the
+    /// unconstrained `-maxRate` for every node past `t = 1`, and on a reused
+    /// solution it raises a doubled negative minimum.
+    fn min_value_after(i: Size, times: &[Time], data: &[Real], valid_data: bool) -> Real {
+        rate_min_value_after(data, valid_data).max(simple_zero_floor(times[i]))
+    }
+
+    /// The shared rate bracket unchanged (`bootstraptraits.hpp:369-381`): the
+    /// pole is below every admissible rate, so only the lower bound moves.
+    fn max_value_after(_i: Size, _times: &[Time], data: &[Real], valid_data: bool) -> Real {
+        rate_max_value_after(data, valid_data)
+    }
+
+    fn update_guess(data: &mut [Real], value: Real, i: Size) {
+        rate_update_guess(data, value, i);
+    }
+
+    fn max_iterations() -> Size {
+        100
+    }
+}
+
+impl YieldBootstrapTraits for SimpleZeroYield {
+    /// The node is a simply compounded zero rate `z(t)`, so the discount
+    /// factor is `1/(1 + z*t)` (`interpolatedsimplezerocurve.hpp:114-129`).
+    /// The rate itself is read exactly as [`ZeroYield`] reads it - interpolated
+    /// in range, the last instantaneous forward continued flat past the last
+    /// solved node - and only the final conversion differs.
+    fn discount_from_nodes<I: Interpolation>(
+        interpolation: &I,
+        t: Time,
+    ) -> QlResult<DiscountFactor> {
+        let t_max = interpolation.x_max();
+        let z = if t <= t_max {
+            interpolation.value(t)?
+        } else {
+            let z_max = interpolation.value(t_max)?;
+            let inst_fwd_max = z_max + t_max * interpolation.derivative(t_max)?;
+            (z_max * t_max + inst_fwd_max * (t - t_max)) / t
+        };
+        Ok(1.0 / (1.0 + z * t))
+    }
+
+    /// `exp(x) + (-1/t + 1e-8)` (`bootstraptraits.hpp:385-388`): the `Discount`
+    /// exponential shifted onto the admissible half-line, so the optimizer's
+    /// image is exactly `(simple_zero_floor(t), inf)`.
+    fn transform_direct(x: Real, t: Time) -> Real {
+        x.exp() + simple_zero_floor(t)
+    }
+
+    /// `log(x - (-1/t + 1e-8))` (`bootstraptraits.hpp:389-393`).
+    fn transform_inverse(x: Real, t: Time) -> Real {
+        (x - simple_zero_floor(t)).ln()
     }
 }
 
@@ -625,6 +714,76 @@ mod tests {
             ForwardRate::transform_inverse(-0.01, 0.25),
             ForwardRate::transform_inverse(-0.01, 30.0)
         );
+    }
+
+    /// `SimpleZeroYield`'s transforms are the `Discount` exp/log pair shifted
+    /// by the node-time floor `-1/t + 1e-8` (`bootstraptraits.hpp:385-393`),
+    /// so the optimizer's image is exactly the admissible half-line
+    /// `(-1/t + 1e-8, inf)`.
+    ///
+    /// What each half of this test can see: the round trip alone is VACUOUS
+    /// about the constant, because `inverse(direct(x, t), t) == x` holds for
+    /// any shared shift - a dropped `1e-8`, a flipped sign, `1/t` for `-1/t`
+    /// all survive it. The literal value pins are what discriminate those, and
+    /// they are transcription pins, not behavioural ones: the end-to-end
+    /// global-solve oracle for the transform is #976's `testGlobalBootstrap`,
+    /// the only upstream test that runs `SimpleZeroYield` under
+    /// `GlobalBootstrap`.
+    #[test]
+    fn simple_zero_transforms_shift_exp_log_by_the_node_floor() {
+        for t in [0.25, 1.0, 2.0, 30.0] {
+            for x in [-3.0, -0.5, 0.0, 1.5] {
+                let round =
+                    SimpleZeroYield::transform_inverse(SimpleZeroYield::transform_direct(x, t), t);
+                assert!((round - x).abs() < 1e-12, "t {t}, x {x}: got {round}");
+            }
+        }
+
+        // exp(0) = 1 shifted by the floor, at two node times so a transform
+        // ignoring `t` cannot pass both
+        assert!((SimpleZeroYield::transform_direct(0.0, 2.0) - 0.50000001).abs() < 1e-15);
+        assert!((SimpleZeroYield::transform_direct(0.0, 0.25) - -2.99999999).abs() < 1e-15);
+        assert!((SimpleZeroYield::transform_inverse(2.0, 4.0) - 2.24999999_f64.ln()).abs() < 1e-15);
+    }
+
+    /// `SimpleZeroYield::minValueAfter` floors the shared rate bracket at
+    /// `-1/t + 1e-8` (`bootstraptraits.hpp:352-367`) in BOTH branches, and
+    /// `maxValueAfter` (`:369-381`) is unfloored.
+    #[test]
+    fn simple_zero_bracket_floors_only_its_lower_bound() {
+        let times = [0.0, 0.5, 2.0];
+
+        // fresh curve: the floor beats -maxRate at t = 2 and loses at t = 0.5
+        let fresh = [AVG_RATE; 3];
+        assert!(
+            (SimpleZeroYield::min_value_after(2, &times, &fresh, false) - -0.49999999).abs()
+                < 1e-15
+        );
+        assert_eq!(
+            SimpleZeroYield::min_value_after(1, &times, &fresh, false),
+            -MAX_RATE
+        );
+
+        // reused solution: the floor still applies after the if/else, so a
+        // doubled negative minimum below it is raised, and one above it is not
+        let deep = [-0.3, -0.3, -0.3];
+        assert!(
+            (SimpleZeroYield::min_value_after(2, &times, &deep, true) - -0.49999999).abs() < 1e-15
+        );
+        let shallow = [0.04, 0.05, 0.06];
+        assert!((SimpleZeroYield::min_value_after(2, &times, &shallow, true) - 0.02).abs() < 1e-15);
+
+        // the upper bound is never floored: -1.2/2 stays below the floor
+        let negative = [-1.2, -1.2, -1.2];
+        assert!(
+            (SimpleZeroYield::max_value_after(2, &times, &negative, true) - -0.6).abs() < 1e-15
+        );
+        assert_eq!(
+            SimpleZeroYield::max_value_after(2, &times, &fresh, false),
+            MAX_RATE
+        );
+        assert_eq!(SimpleZeroYield::initial_value(), AVG_RATE);
+        assert_eq!(SimpleZeroYield::max_iterations(), 100);
     }
 
     #[test]

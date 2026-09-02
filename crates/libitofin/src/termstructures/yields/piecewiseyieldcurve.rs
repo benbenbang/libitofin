@@ -342,7 +342,9 @@ mod tests {
     use crate::quotes::{Quote, SimpleQuote};
     use crate::settings::Settings;
     use crate::shared::shared;
-    use crate::termstructures::bootstraptraits::{Discount, ForwardRate, ZeroYield};
+    use crate::termstructures::bootstraptraits::{
+        Discount, ForwardRate, SimpleZeroYield, ZeroYield,
+    };
     use crate::termstructures::credit::defaulttermstructure::DefaultProbabilityTermStructure;
     use crate::termstructures::credit::flathazardrate::FlatHazardRate;
     use crate::termstructures::yields::{DepositRateHelper, SwapRateHelper};
@@ -556,6 +558,45 @@ mod tests {
         );
     }
 
+    /// The `SimpleZeroYield` arm of the same harness: `<SimpleZeroYield,
+    /// Linear>` under `IterativeBootstrap`. Upstream has no
+    /// `testSimpleZeroConsistency` - `SimpleZeroYield` only appears in
+    /// `testGlobalBootstrap` (`piecewiseyieldcurve.cpp:1486`) - so this arm is
+    /// the harness applied to a fourth convention rather than a named port.
+    ///
+    /// What it sees: the whole `BootstrapTraits` surface the driver calls -
+    /// `initial_value`, `guess`, `update_guess`, and both bracket bounds,
+    /// whose lower one is floored at `-1/t + 1e-8` for every pillar past a
+    /// year on this fresh pass (the floor sets the bracket edge there; the
+    /// solved rates themselves never approach it).
+    ///
+    /// What it does NOT see: `transform_direct`/`transform_inverse`, which
+    /// `IterativeBootstrap` never calls, and - on its own - the SIMPLE in
+    /// simply compounded. A repricing round trip only constrains the curve's
+    /// discount function at the helper dates, and the bootstrap would reach
+    /// the same discounts through `exp(-z*t)` by solving for different node
+    /// values. The pillar assertion below is what pins the conversion: it
+    /// reads the raw node back and requires the curve's own discount to be
+    /// `1/(1 + z*t)` of it.
+    #[test]
+    fn linear_simple_zero_consistency() {
+        let curve = check_curve_consistency::<SimpleZeroYield, Linear>();
+        let data = curve.data().unwrap();
+        let times = curve.times().unwrap();
+        assert_eq!(
+            data[0], data[1],
+            "the reference zero rate must mirror the first solved pillar"
+        );
+        for k in [1, 5, times.len() - 1] {
+            let discount = curve.discount(times[k], false).unwrap();
+            let expected = 1.0 / (1.0 + data[k] * times[k]);
+            assert!(
+                (discount - expected).abs() < 1.0e-12,
+                "pillar {k}: discount {discount} vs simple 1/(1 + z*t) {expected}"
+            );
+        }
+    }
+
     /// `testSplineZeroConsistency` -> `<ZeroYield, Cubic>`
     /// (`piecewiseyieldcurve.cpp:709,716`). The BMA half (`:721`) is skipped.
     /// The bootstrap runs the convergence loop here: `Cubic` is global, so
@@ -717,6 +758,35 @@ mod tests {
         use crate::termstructures::globalbootstrap::GlobalBootstrap;
 
         let curve = check_curve_consistency_with::<ZeroYield, Linear, GlobalBootstrap>(TOLERANCE);
+        let data = curve.data().unwrap();
+        assert_eq!(
+            data[0], data[1],
+            "the reference zero rate must mirror the first solved pillar"
+        );
+    }
+
+    /// The `SimpleZeroYield` arm of the global harness: `<SimpleZeroYield,
+    /// Linear, GlobalBootstrap>` at 1e-9. This is the only combination in the
+    /// suite whose transforms actually depend on the node time, so it is what
+    /// pins the `times[i + 1]` plumbing through all three call sites
+    /// (`globalbootstrap.rs`'s cost evaluation, guess build and solution pin):
+    /// an off-by-one there reaches `times[0] == 0`, the floor `-1/t` is
+    /// infinite, and the solve breaks rather than converging elsewhere.
+    ///
+    /// It also pins that the transform pair is a working bijection on a real
+    /// solve - the guess `ln(z - floor)` is well defined and the direct map
+    /// lands back on admissible rates. It does NOT pin the C++ numbers: the
+    /// behavioural oracle for `SimpleZeroYield` under `GlobalBootstrap` is
+    /// `testGlobalBootstrap` (`piecewiseyieldcurve.cpp:1486`), which arrives
+    /// with the additional restrictions in #976. Like the two arms above, the
+    /// round trip is also blind to a self-consistent wrong transform SPACE;
+    /// the constant is pinned in `bootstraptraits.rs`'s transform test.
+    #[test]
+    fn global_bootstrap_simple_zero_consistency() {
+        use crate::termstructures::globalbootstrap::GlobalBootstrap;
+
+        let curve =
+            check_curve_consistency_with::<SimpleZeroYield, Linear, GlobalBootstrap>(TOLERANCE);
         let data = curve.data().unwrap();
         assert_eq!(
             data[0], data[1],

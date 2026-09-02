@@ -20,8 +20,8 @@
 //! visibly, each as its own follow-up issue referencing #949:
 //!
 //! - **Additional restrictions** (`additionalHelpers`/`additionalDates`/
-//!   `additionalVariables`, plus the `SimpleQuoteVariables` helper and the
-//!   `SimpleZeroYield` traits): the machinery the two remaining upstream
+//!   `additionalVariables`, plus the `SimpleQuoteVariables` helper): the
+//!   machinery the two remaining upstream
 //!   oracle tests (`piecewiseyieldcurve.cpp:1306/1486`) exercise - futures
 //!   convexity adjustments, model variables.
 //! - **Multi-curve orchestration** (`MultiCurveBootstrap`,
