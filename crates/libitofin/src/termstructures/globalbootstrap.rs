@@ -556,14 +556,16 @@ mod tests {
 
     use super::*;
     use crate::handle::Handle;
+    use crate::indexes::IborIndex;
     use crate::indexes::ibor::euribor::Euribor;
     use crate::interestrate::Compounding;
     use crate::math::interpolations::flat::BackwardFlat;
+    use crate::math::interpolations::linear::Linear;
     use crate::quotes::{Quote, SimpleQuote};
     use crate::settings::Settings;
     use crate::shared::shared;
     use crate::termstructures::bootstraphelper::RateHelper;
-    use crate::termstructures::bootstraptraits::ForwardRate;
+    use crate::termstructures::bootstraptraits::{ForwardRate, SimpleZeroYield};
     use crate::termstructures::yields::{
         DepositRateHelper, FraRateHelper, PiecewiseYieldCurve, Pillar, SwapRateHelper,
     };
@@ -667,6 +669,44 @@ mod tests {
         0.0006289189187075171,
     ];
 
+    /// The `testGlobalBootstrap` pillar zero rates, reproduced from the C++
+    /// dylib and written in their shortest round-tripping form; `:1337-1342`
+    /// prints the same values to 8 decimals.
+    const REF_ZERO_RATE_AD: [Real; 32] = [
+        -0.00373354067173059,
+        -0.003810050775257402,
+        -0.0038768926341334457,
+        -0.0039412379977853225,
+        -0.0040770590967655115,
+        -0.004136329462812865,
+        -0.004119347704602793,
+        -0.004163696290681206,
+        -0.004205570570898868,
+        -0.004244312604300202,
+        -0.004278238728862865,
+        -0.004309771141705333,
+        -0.00434401190355896,
+        -0.0044524306053832785,
+        -0.004485055406658101,
+        -0.0043369013657431075,
+        -0.0040740106932843105,
+        -0.0037275150355157113,
+        -0.003300502203893726,
+        -0.002791390998101797,
+        -0.0022547726443913644,
+        -0.0017342152462374019,
+        -0.0012368804047865718,
+        -0.0007723647126769745,
+        0.00038554381038254917,
+        0.0014424807165811571,
+        0.001759949836190311,
+        0.0017287285812646173,
+        0.0015078180913406802,
+        0.0012114528819535877,
+        0.000933912094611891,
+        0.0006289461592278805,
+    ];
+
     /// The gradient-penalty pillar zero rates, reproduced from the C++ dylib and
     /// written in their shortest round-tripping form; `:1417-1422` prints the
     /// same values printed to 8 decimals.
@@ -708,11 +748,18 @@ mod tests {
     /// The curve under test.
     type PenaltyCurve = PiecewiseYieldCurve<ForwardRate, BackwardFlat, GlobalBootstrap>;
 
-    /// The shared fixture: evaluation date 26 Sep 2019 (`:1390`) and the
-    /// 32 helpers of `:1428-1441`, all reading one empty-forwarding Euribor 6M.
+    /// The shared fixture: evaluation date 26 Sep 2019 (`:1390`/`:1309`) and
+    /// the 32 helpers of `:1428-1441` (`:1339-1352`), all reading one
+    /// empty-forwarding Euribor 6M.
+    ///
+    /// The settings and the index are carried too: `testGlobalBootstrap` builds
+    /// its additional helpers off the same index (`:1362`) and reads the
+    /// evaluation date from its additional-dates functor (`:1290`).
     struct Fixture {
         reference_date: Date,
         helpers: Vec<Shared<dyn RateHelper>>,
+        settings: Shared<Settings<Date>>,
+        index: IborIndex,
     }
 
     /// C++ builds the curve from `(2, TARGET())`, a moving reference two
@@ -735,7 +782,7 @@ mod tests {
             BusinessDayConvention::Following,
             false,
         );
-        let euribor6m = Euribor::six_months(Handle::empty(), settings);
+        let euribor6m = Euribor::six_months(Handle::empty(), Shared::clone(&settings));
 
         let mut helpers: Vec<Shared<dyn RateHelper>> = Vec::new();
         helpers.push(
@@ -767,6 +814,8 @@ mod tests {
         Fixture {
             reference_date,
             helpers,
+            settings,
+            index: euribor6m,
         }
     }
 
@@ -783,8 +832,10 @@ mod tests {
         .expect("the 32-helper strip builds a curve")
     }
 
-    /// The continuous Actual/360 zero rate at every pillar (`:1459`/`:1481`).
-    fn zero_rates(curve: &Shared<PenaltyCurve>, fixture: &Fixture) -> Vec<Real> {
+    /// The continuous Actual/360 zero rate at every pillar (`:1459`/`:1481`,
+    /// `:1383`). Taken through the term-structure trait so both oracle curves
+    /// share it.
+    fn zero_rates(curve: &dyn YieldTermStructure, fixture: &Fixture) -> Vec<Real> {
         fixture
             .helpers
             .iter()
@@ -839,7 +890,7 @@ mod tests {
             ),
         );
 
-        let rates = zero_rates(&curve, &fixture);
+        let rates = zero_rates(curve.as_ref(), &fixture);
         assert!(
             rates.iter().all(|rate| rate.is_finite()),
             "the solved curve must carry finite zero rates"
@@ -890,7 +941,9 @@ mod tests {
         );
 
         assert!(
-            zero_rates(&curve, &fixture).iter().all(|r| r.is_finite()),
+            zero_rates(curve.as_ref(), &fixture)
+                .iter()
+                .all(|r| r.is_finite()),
             "a zero constant penalty must leave the strip solvable"
         );
         assert!(
@@ -934,7 +987,11 @@ mod tests {
             ),
         );
 
-        assert!(zero_rates(&curve, &fixture).iter().all(|r| r.is_finite()));
+        assert!(
+            zero_rates(curve.as_ref(), &fixture)
+                .iter()
+                .all(|r| r.is_finite())
+        );
         let (times_len, data_len, first_time, node0, node1) = seen.get();
         assert_eq!(
             times_len,
@@ -987,14 +1044,15 @@ mod tests {
     fn global_bootstrap_penalty_zero_rates() {
         let fixture = fixture();
         let no_penalty = zero_rates(
-            &curve_with(
+            curve_with(
                 &fixture,
                 GlobalBootstrap::new(Some(1.0e-12), None, Vec::new()),
-            ),
+            )
+            .as_ref(),
             &fixture,
         );
         let gradient_penalty = zero_rates(
-            &curve_with(
+            curve_with(
                 &fixture,
                 GlobalBootstrap::with_penalties(
                     Vec::new(),
@@ -1008,7 +1066,8 @@ mod tests {
                             .collect()
                     },
                 ),
-            ),
+            )
+            .as_ref(),
             &fixture,
         );
 
@@ -1035,6 +1094,210 @@ mod tests {
                 "gradient-penalty zero rate {i}: {} vs {expected}",
                 gradient_penalty[i]
             );
+        }
+    }
+
+    /// The curve of `testGlobalBootstrap` (`piecewiseyieldcurve.cpp:1367-1372`):
+    /// the same 32-helper strip under the simply compounded zero-yield traits
+    /// and a linear interpolation.
+    type AdditionalCurve = PiecewiseYieldCurve<SimpleZeroYield, Linear, GlobalBootstrap>;
+
+    /// The seven additional helpers of `:1357-1364`: FRAs on the strip's own
+    /// index, at a flat -0.004, starting 12 to 18 months out. They add neither
+    /// a pillar nor a residual; the penalty below is the only thing that reads
+    /// them.
+    fn additional_helpers(fixture: &Fixture) -> Vec<Shared<dyn RateHelper>> {
+        (0..7)
+            .map(|i| {
+                let quote = Handle::new(shared(SimpleQuote::new(-0.004)) as Shared<dyn Quote>);
+                FraRateHelper::from_months(
+                    quote,
+                    12 + i,
+                    &fixture.index,
+                    true,
+                    Pillar::LastRelevantDate,
+                ) as Shared<dyn RateHelper>
+            })
+            .collect()
+    }
+
+    /// The `additionalDates` functor of `:1287-1303`: the five monthly dates
+    /// past spot, with the evaluation date minus one day pushed to the FRONT
+    /// and minus two days appended at the BACK. Both of those precede the
+    /// curve's first date and must be dropped; the vector is deliberately left
+    /// unsorted, since the grid sorts it.
+    fn additional_dates(fixture: &Fixture) -> Box<AdditionalDates> {
+        let settings = Shared::clone(&fixture.settings);
+        Box::new(move || {
+            let calendar = Target::new();
+            let today = settings
+                .evaluation_date()
+                .expect("the fixture sets an evaluation date");
+            let settlement = calendar.advance(
+                today,
+                2,
+                TimeUnit::Days,
+                BusinessDayConvention::Following,
+                false,
+            );
+            let mut dates: Vec<Date> = (1..=5)
+                .map(|i| {
+                    calendar.advance(
+                        settlement,
+                        i,
+                        TimeUnit::Months,
+                        BusinessDayConvention::Following,
+                        false,
+                    )
+                })
+                .collect();
+            dates.insert(0, today - 1);
+            dates.push(today - 2);
+            dates
+        })
+    }
+
+    /// The `additionalErrors` functor of `:1271-1285`: the seven additional
+    /// helpers' implied quotes forced onto a straight line, so the five
+    /// interior ones are pinned by the two ends. These are the residuals that
+    /// answer for the five extra variables the additional dates create.
+    fn additional_errors(helpers: Vec<Shared<dyn RateHelper>>) -> impl Fn() -> Vec<Real> {
+        move || {
+            let implied = |i: usize| {
+                helpers[i]
+                    .implied_quote()
+                    .expect("an additional helper reprices off the trial curve")
+            };
+            let a = implied(0);
+            let b = implied(6);
+            (0..5)
+                .map(|k| (5.0 - k as Real) / 6.0 * a + (1.0 + k as Real) / 6.0 * b - implied(1 + k))
+                .collect()
+        }
+    }
+
+    /// The full `testGlobalBootstrap` configuration, over the shared fixture.
+    fn additional_curve(fixture: &Fixture) -> Shared<AdditionalCurve> {
+        let helpers = additional_helpers(fixture);
+        PiecewiseYieldCurve::with_bootstrap(
+            fixture.reference_date,
+            fixture.helpers.clone(),
+            Actual365Fixed::new(),
+            Linear,
+            GlobalBootstrap::with_grid_independent_penalties(
+                helpers.clone(),
+                Some(additional_dates(fixture)),
+                Some(1.0e-12),
+                None,
+                Vec::new(),
+                additional_errors(helpers),
+            ),
+        )
+        .expect("the 32-helper strip builds a curve")
+    }
+
+    /// ARM A of `testGlobalBootstrap` (`:1376-1378`): the pillar dates, both
+    /// families. External truth that stands on its own - no reference to the
+    /// solve - so a mis-specified strip or a mis-specified additional helper
+    /// fails here rather than smearing into the rates. The seven additional
+    /// pillars are the dylib's, and they also establish that all seven are
+    /// alive (each is past the 30 Sep 2019 first date).
+    #[test]
+    fn global_bootstrap_pillar_dates() {
+        let fixture = fixture();
+        for (i, (day, month, year)) in REF_DATE.iter().enumerate() {
+            assert_eq!(
+                fixture.helpers[i].pillar_date(),
+                Date::new(*day, *month, *year),
+                "helper {i} sits on the wrong pillar"
+            );
+        }
+
+        let expected = [
+            Date::new(31, Month::March, 2021),
+            Date::new(30, Month::April, 2021),
+            Date::new(31, Month::May, 2021),
+            Date::new(30, Month::June, 2021),
+            Date::new(30, Month::July, 2021),
+            Date::new(31, Month::August, 2021),
+            Date::new(30, Month::September, 2021),
+        ];
+        for (i, helper) in additional_helpers(&fixture).iter().enumerate() {
+            assert_eq!(
+                helper.pillar_date(),
+                expected[i],
+                "additional helper {i} sits on the wrong pillar"
+            );
+            assert!(helper.pillar_date() > fixture.reference_date);
+        }
+    }
+
+    /// ARM B, the headline oracle of `testGlobalBootstrap` (`:1381-1385`): the
+    /// 32 pillar zero rates at the C++ tolerance of 1e-6 (0.01 basis points).
+    ///
+    /// The reference numbers are NOT the `.cpp` literals: they are reproduced
+    /// at full precision by a C++ harness rebuilding this fixture against a
+    /// locally built QuantLib dylib with
+    /// `IborCoupon::Settings::instance().createAtParCoupons()` set, so that the
+    /// test's own `usingAtParCoupons()` precondition holds. The literals agree
+    /// with the harness to 5.3e-9, inside their 8-decimal printing.
+    ///
+    /// VACUITY GUARD: the numbers depend on the additional dates. Dropping the
+    /// `additionalDates` functor leaves a 33-node grid whose solution moves 14
+    /// of these 32 rates past the assert tolerance (worst 7.8e-5, dylib-
+    /// measured), so this table cannot be reproduced by the #974 machinery
+    /// alone.
+    #[test]
+    fn global_bootstrap_zero_rates() {
+        let fixture = fixture();
+        let rates = zero_rates(additional_curve(&fixture).as_ref(), &fixture);
+
+        let worst = rates
+            .iter()
+            .zip(&REF_ZERO_RATE_AD)
+            .map(|(rate, expected)| (rate - expected).abs())
+            .fold(0.0, Real::max);
+        assert!(
+            worst < 1.0e-6,
+            "the strip parts company with the dylib by {worst}"
+        );
+    }
+
+    /// ARM C, the stale-date drop (`globalbootstrap.hpp:268-274`): the two
+    /// dates before the curve's first date never reach the grid.
+    ///
+    /// The count is the discriminating half - 38 nodes is the reference date
+    /// plus 32 pillars plus the FIVE surviving dates, and a port that kept the
+    /// stale pair would carry 40 and would not solve, since the two extra
+    /// variables have no residual answering for them. The membership asserts
+    /// name which five survived.
+    #[test]
+    fn global_bootstrap_drops_stale_additional_dates() {
+        let fixture = fixture();
+        let dates = additional_curve(&fixture)
+            .dates()
+            .expect("the solved curve exposes its nodes");
+
+        assert_eq!(
+            dates.len(),
+            38,
+            "reference + 32 pillars + 5 surviving dates"
+        );
+        assert_eq!(dates[0], fixture.reference_date);
+        for date in [
+            Date::new(30, Month::October, 2019),
+            Date::new(2, Month::December, 2019),
+            Date::new(30, Month::December, 2019),
+            Date::new(30, Month::January, 2020),
+            Date::new(2, Month::March, 2020),
+        ] {
+            assert!(dates.contains(&date), "{date} should be a node");
+        }
+        for stale in [
+            Date::new(25, Month::September, 2019),
+            Date::new(24, Month::September, 2019),
+        ] {
+            assert!(!dates.contains(&stale), "{stale} precedes the first date");
         }
     }
 }
