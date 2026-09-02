@@ -353,7 +353,7 @@ mod tests {
     use crate::termstructures::credit::defaulttermstructure::DefaultProbabilityTermStructure;
     use crate::termstructures::credit::flathazardrate::FlatHazardRate;
     use crate::termstructures::yields::{
-        DepositRateHelper, InterpolatedSimpleZeroCurve, SwapRateHelper,
+        DepositRateHelper, FraRateHelper, InterpolatedSimpleZeroCurve, Pillar, SwapRateHelper,
     };
     use crate::time::businessdayconvention::BusinessDayConvention;
     use crate::time::calendars::target::Target;
@@ -759,10 +759,11 @@ mod tests {
     /// The `GlobalBootstrap` arm of the consistency harness:
     /// `<Discount, LogLinear, GlobalBootstrap>` at 1e-9 (and a
     /// `<ZeroYield, Linear>` arm below). The minimal single-curve core has no
-    /// direct C++ oracle - `testGlobalBootstrapPenalty` is ported alongside the
-    /// penalty terms in `globalbootstrap.rs`, and the two remaining upstream
-    /// tests (`piecewiseyieldcurve.cpp:1306/1486`) exercise the still-deferred
-    /// additional restrictions - so the vs-consistency round-trip stands in.
+    /// direct C++ oracle - `testGlobalBootstrapPenalty` and
+    /// `testGlobalBootstrap` are ported alongside the penalty terms and the
+    /// additional restrictions in `globalbootstrap.rs`, and the one remaining
+    /// upstream test (`piecewiseyieldcurve.cpp:1486`) exercises the
+    /// still-deferred additional variables - so the round-trip stands in.
     /// Unlike [`local_bootstrap_consistency`] this oracle is NOT vacuous: the
     /// system is exactly determined (21 helper residuals over 21 interior
     /// nodes, no free window parameter), so the zero-residual root is locally
@@ -1179,5 +1180,88 @@ mod tests {
             df2 < df1,
             "a higher deposit rate discounts more: {df2} vs {df1}"
         );
+    }
+
+    /// D1 for the helpers the BOOTSTRAP owns rather than fits
+    /// (`globalbootstrap.hpp:219-220`): a `GlobalBootstrap` additional helper
+    /// is registered with the curve through
+    /// [`Bootstrap::additional_observables`], so a change to its quote
+    /// invalidates the cache exactly as an instrument's does.
+    ///
+    /// The re-bootstrapped curve is then IDENTICAL, and deliberately so: an
+    /// additional helper contributes no residual, and the driver only
+    /// validates its quote (`hpp:348`) before handing it the curve. Its market
+    /// quote reaches the solve solely through whatever the penalty reads, and
+    /// here there is no penalty. So the pair of assertions is the whole
+    /// contract - the notification must arrive, and it must not move the
+    /// answer. The quote is moved from -0.004 to 0.05, orders of magnitude
+    /// more than the 1e-12 agreement asserted, so a port that let it into the
+    /// residual vector could not pass the second half.
+    ///
+    /// Bit-equality is not asserted: the second solve warm-restarts from the
+    /// stored solution and rewrites every node through the transform pair, so
+    /// the last digits may differ.
+    #[test]
+    fn a_global_bootstrap_additional_helper_is_observed() {
+        use crate::termstructures::globalbootstrap::GlobalBootstrap;
+
+        let calendar = Target::new();
+        let today = calendar.adjust(
+            Date::new(15, Month::June, 2026),
+            BusinessDayConvention::Following,
+        );
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(today);
+        let settlement = calendar.advance(
+            today,
+            2,
+            TimeUnit::Days,
+            BusinessDayConvention::Following,
+            false,
+        );
+        let index = Euribor::new(Period::new(3, TimeUnit::Months), Handle::empty(), settings)
+            .expect("deposit tenor is valid");
+
+        let quote = shared(SimpleQuote::new(-0.004));
+        let additional = FraRateHelper::from_months(
+            Handle::new(Shared::clone(&quote) as Shared<dyn Quote>),
+            6,
+            &index,
+            true,
+            Pillar::LastRelevantDate,
+        ) as Shared<dyn RateHelper>;
+        let curve = PiecewiseYieldCurve::<Discount, LogLinear, _>::with_bootstrap(
+            settlement,
+            vec![DepositRateHelper::from_rate(0.04557, &index) as Shared<dyn RateHelper>],
+            Actual360::new(),
+            LogLinear,
+            GlobalBootstrap::with_penalties(
+                vec![additional],
+                None,
+                None,
+                None,
+                Vec::new(),
+                |_, _| Vec::new(),
+            ),
+        )
+        .expect("a one-deposit strip builds a curve");
+
+        let before = curve.data().expect("the strip solves");
+        assert!(curve.lazy.borrow().is_calculated());
+
+        quote.set_value(0.05);
+        assert!(
+            !curve.lazy.borrow().is_calculated(),
+            "an additional helper's quote must invalidate the curve"
+        );
+
+        let after = curve.data().expect("the strip re-solves");
+        assert_eq!(before.len(), after.len());
+        for (i, (old, new)) in before.iter().zip(&after).enumerate() {
+            assert!(
+                (old - new).abs() < 1.0e-12,
+                "node {i} moved on an additional helper's quote: {old} vs {new}"
+            );
+        }
     }
 }
