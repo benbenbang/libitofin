@@ -65,6 +65,7 @@ use crate::math::interpolations::Interpolator;
 use crate::math::solver1d::Solver1D;
 use crate::math::solvers1d::brent::Brent;
 use crate::math::solvers1d::finitedifferencenewtonsafe::FiniteDifferenceNewtonSafe;
+use crate::patterns::observable::Observable;
 use crate::shared::Shared;
 use crate::termstructures::bootstraphelper::{BootstrapHelperShared, sort_by_pillar_date};
 use crate::termstructures::bootstraptraits::{BootstrapTraits, CurveData};
@@ -157,6 +158,22 @@ pub trait PiecewiseCurve {
 pub trait Bootstrap<C: PiecewiseCurve> {
     /// Bootstraps `curve` in place (C++'s `Bootstrap::calculate`).
     fn calculate(&self, curve: &C) -> QlResult<()>;
+
+    /// Observables the curve must register with beyond its own instruments,
+    /// the second registration loop of C++'s `setup`
+    /// (`globalbootstrap.hpp:219-220`).
+    ///
+    /// A bootstrap holding helpers of its own - only
+    /// [`GlobalBootstrap`](crate::termstructures::globalbootstrap::GlobalBootstrap)
+    /// and its additional helpers - returns their observables here, and the
+    /// curve constructor registers them alongside the instruments. The default
+    /// is empty, so the bootstraps that own no helpers are untouched.
+    ///
+    /// Registration is unconditional upstream: the alive filter applies only
+    /// inside the solve, not to observability.
+    fn additional_observables(&self) -> Vec<Shared<Observable>> {
+        Vec::new()
+    }
 }
 
 /// The iterative bootstrap (`IterativeBootstrap`).

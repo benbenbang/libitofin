@@ -163,6 +163,11 @@ where
         for helper in &curve.instruments {
             helper.observable().register_observer(&observer);
         }
+        // Helpers the bootstrap owns rather than fits - GlobalBootstrap's
+        // additional helpers - register too (`globalbootstrap.hpp:219-220`).
+        for observable in curve.bootstrap.additional_observables() {
+            observable.register_observer(&observer);
+        }
         Ok(curve)
     }
 

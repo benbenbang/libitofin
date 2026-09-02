@@ -298,6 +298,14 @@ impl<TS: ?Sized> BootstrapHelperBase<TS> {
         &self.observable
     }
 
+    /// The same observable as an owned handle, for a caller that must keep it
+    /// past the borrow - a bootstrap collecting the observables of helpers it
+    /// owns, handing them to the curve to register with
+    /// ([`Bootstrap::additional_observables`](crate::termstructures::iterativebootstrap::Bootstrap::additional_observables)).
+    pub fn observable_shared(&self) -> Shared<Observable> {
+        Shared::clone(&self.observable)
+    }
+
     /// The helper's forwarding observer, for registering with further
     /// observables.
     pub fn observer(&self) -> SharedMut<dyn Observer> {
