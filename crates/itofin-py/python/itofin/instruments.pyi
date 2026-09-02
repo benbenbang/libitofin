@@ -155,8 +155,9 @@ class VanillaOption:
     def price(self, process: BlackScholesProcess) -> float:
         """Attach an analytic European engine on process and return the NPV.
 
-        The one-shot form of set_engine followed by npv. The other engines keep
-        their own setters and compose with calculate and npv as before.
+        The one-shot form of set_engine followed by npv. The other engines have
+        their own one-shots: price_heston, price_mc, price_mc_heston and
+        price_mc_american.
 
         Args:
             process (BlackScholesProcess): The process the engine prices on.
@@ -167,6 +168,78 @@ class VanillaOption:
         Raises:
             ItofinError: If no evaluation date is set or the engine refuses the
                 option.
+        """
+        ...
+    def price_heston(self, model: HestonModel, integration_order: int) -> float:
+        """Attach an analytic Heston engine on model and return the NPV.
+
+        The one-shot form of set_heston_engine followed by npv. The greeks stay
+        unavailable on this path.
+
+        Args:
+            model (HestonModel): The calibrated Heston model to price under.
+            integration_order (int): The order of the Gauss-Laguerre
+                integration.
+
+        Returns:
+            float: The present value under the analytic Heston engine.
+
+        Raises:
+            ItofinError: If integration_order exceeds 192, no evaluation date is
+                set, or the engine refuses the option.
+        """
+        ...
+    def price_mc(self, engine: MCEuropeanEngine) -> float:
+        """Attach the Monte Carlo European engine and return the NPV.
+
+        The one-shot form of set_mc_engine followed by npv.
+
+        Args:
+            engine (MCEuropeanEngine): The engine, which already holds the
+                process it prices on.
+
+        Returns:
+            float: The present value under the Monte Carlo European engine.
+
+        Raises:
+            ItofinError: If no evaluation date is set or the engine refuses the
+                option.
+        """
+        ...
+    def price_mc_heston(self, engine: MCEuropeanHestonEngine) -> float:
+        """Attach the Monte Carlo Heston engine and return the NPV.
+
+        The one-shot form of set_mc_heston_engine followed by npv.
+
+        Args:
+            engine (MCEuropeanHestonEngine): The engine, which already holds
+                the Heston process it prices on.
+
+        Returns:
+            float: The present value under the Monte Carlo Heston engine.
+
+        Raises:
+            ItofinError: If no evaluation date is set or the engine refuses the
+                option.
+        """
+        ...
+    def price_mc_american(self, engine: MCAmericanEngine) -> float:
+        """Attach the Monte Carlo American engine and return the NPV.
+
+        The one-shot form of set_mc_american_engine followed by npv. The option
+        must have been built through american(): a European-exercise option
+        raises ItofinError ("wrong exercise given").
+
+        Args:
+            engine (MCAmericanEngine): The engine, which already holds the
+                process it prices on.
+
+        Returns:
+            float: The present value under the Monte Carlo American engine.
+
+        Raises:
+            ItofinError: If the option is not American-exercise, no evaluation
+                date is set, or the engine refuses the option.
         """
         ...
     def results(self) -> Results:

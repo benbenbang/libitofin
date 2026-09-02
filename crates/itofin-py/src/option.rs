@@ -166,10 +166,58 @@ impl PyVanillaOption {
     /// the one-shot form of [`set_engine`](Self::set_engine) followed by
     /// [`npv`](Self::npv).
     ///
-    /// The other engines keep their own `set_*_engine` and compose with
-    /// [`calculate`](Self::calculate) and [`npv`](Self::npv) as before.
+    /// The other engines have their own one-shots:
+    /// [`price_heston`](Self::price_heston), [`price_mc`](Self::price_mc),
+    /// [`price_mc_heston`](Self::price_mc_heston) and
+    /// [`price_mc_american`](Self::price_mc_american).
     fn price(&mut self, process: &PyBlackScholesProcess) -> PyResult<f64> {
         self.set_engine(process);
+        self.calculate()?;
+        self.npv()
+    }
+
+    /// Attaches an analytic Heston engine on `model` at `integration_order` and
+    /// returns the NPV, the one-shot form of
+    /// [`set_heston_engine`](Self::set_heston_engine) followed by
+    /// [`npv`](Self::npv).
+    ///
+    /// Fallible where the setter is: an `integration_order` above 192 raises
+    /// `ItofinError` before any engine is attached. The greeks stay unavailable
+    /// on this path.
+    fn price_heston(&mut self, model: &PyHestonModel, integration_order: usize) -> PyResult<f64> {
+        self.set_heston_engine(model, integration_order)?;
+        self.calculate()?;
+        self.npv()
+    }
+
+    /// Attaches the Monte Carlo European engine `engine` and returns the NPV,
+    /// the one-shot form of [`set_mc_engine`](Self::set_mc_engine) followed by
+    /// [`npv`](Self::npv).
+    fn price_mc(&mut self, engine: &PyMCEuropeanEngine) -> PyResult<f64> {
+        self.set_mc_engine(engine);
+        self.calculate()?;
+        self.npv()
+    }
+
+    /// Attaches the Monte Carlo Heston engine `engine` and returns the NPV, the
+    /// one-shot form of
+    /// [`set_mc_heston_engine`](Self::set_mc_heston_engine) followed by
+    /// [`npv`](Self::npv).
+    fn price_mc_heston(&mut self, engine: &PyMCEuropeanHestonEngine) -> PyResult<f64> {
+        self.set_mc_heston_engine(engine);
+        self.calculate()?;
+        self.npv()
+    }
+
+    /// Attaches the Monte Carlo American engine `engine` and returns the NPV,
+    /// the one-shot form of
+    /// [`set_mc_american_engine`](Self::set_mc_american_engine) followed by
+    /// [`npv`](Self::npv).
+    ///
+    /// The option must have been built through `american`: a European-exercise
+    /// option raises `ItofinError` ("wrong exercise given").
+    fn price_mc_american(&mut self, engine: &PyMCAmericanEngine) -> PyResult<f64> {
+        self.set_mc_american_engine(engine);
         self.calculate()?;
         self.npv()
     }

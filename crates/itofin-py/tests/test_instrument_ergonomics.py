@@ -61,15 +61,19 @@ from itofin.instruments import (
     YearOnYearInflationSwap,
     ZeroCouponInflationSwap,
 )
+from itofin.models import HestonModel
 from itofin.pricingengines import (
     BlackCapFloorEngine,
     BlackSwaptionEngine,
     CashAnnuityModel,
     DiscountingSwapEngine,
+    MCAmericanEngine,
+    MCEuropeanEngine,
+    MCEuropeanHestonEngine,
     MidPointCdsEngine,
     YoYInflationCapFloorEngine,
 )
-from itofin.processes import BlackScholesProcess
+from itofin.processes import BlackScholesProcess, HestonProcess
 from itofin.quotes import SimpleQuote
 from itofin.termstructures import (
     ConstantYoYOptionletVolatility,
@@ -230,6 +234,144 @@ def test_calculating_without_an_engine_raises():
 
     with pytest.raises(ItofinError):
         option.results()
+
+
+MC_SAMPLES = 2048
+MC_SEED = 42
+
+AMERICAN_EVAL = Date(15, 5, 1998)
+AMERICAN_SETTLEMENT = Date(17, 5, 1998)
+AMERICAN_MATURITY = Date(17, 5, 1999)
+
+HESTON_EVAL = Date(27, 12, 2004)
+HESTON_EXERCISE = Date(28, 3, 2005)
+HESTON_ORDER = 64
+OVER_MAX_ORDER = 193
+
+
+def _mc_european_engine():
+    return MCEuropeanEngine(_process(), steps=1, samples=MC_SAMPLES, seed=MC_SEED)
+
+
+def _american_market():
+    """The test_mc_american.py market: the 36-strike American put on a flat
+    Actual365Fixed curve, on the fixed-sample engine form that file already
+    proves reproduces bitwise across fresh objects."""
+    settings = Settings()
+    settings.set_evaluation_date(AMERICAN_EVAL)
+    process = BlackScholesProcess(
+        36.0, 0.06, 0.0, 0.20, AMERICAN_SETTLEMENT, DayCounter.actual365_fixed()
+    )
+    return settings, process
+
+
+def _mc_american_engine(process):
+    return MCAmericanEngine(
+        process, steps=75, samples=MC_SAMPLES, seed=MC_SEED, polynomial_order=3
+    )
+
+
+def _mc_heston_engine():
+    """The test_mc_heston.py process on the small-sample seeded form."""
+    process = HestonProcess(
+        0.7, 0.4, 1.05, 0.3, 1.16, 0.2, 0.8, 0.8, HESTON_EVAL, DayCounter.actual_actual_isda()
+    )
+    return MCEuropeanHestonEngine(
+        process, steps_per_year=11, samples=MC_SAMPLES, seed=1234
+    )
+
+
+def _heston_option_and_model():
+    """The test_heston_pricing.py arm-1 model: the call struck at 1.05 that the
+    analytic engine prices at 0.0404774515 on integration order 64."""
+    settings = Settings()
+    settings.set_evaluation_date(HESTON_EVAL)
+    process = HestonProcess(
+        0.0225, 0.02, 1.0, 0.1, 3.16, 0.09, 0.4, -0.2, HESTON_EVAL, DayCounter.actual_actual_isda()
+    )
+    option = VanillaOption(OptionType.Call, 1.05, HESTON_EXERCISE, settings)
+    return option, HestonModel(process)
+
+
+def test_price_mc_is_set_mc_engine_plus_npv():
+    """There is NO numerical oracle on these four arms: the one-shots are pure
+    forwarding sugar, so the only honest assertion is that each reproduces its
+    own verbose form exactly. Cross-engine mis-wiring is compile-pinned by the
+    distinct argument types, not testable from Python.
+
+    Each form gets a FRESH option and a FRESH engine, so the arm cannot pass on
+    a cache that survived a re-attach. Equality is exact rather than banded:
+    the engines rebuild the path generator from the stored seed on every run
+    (mcvanillaengine.rs:192-213), which the three test_mc_*.py
+    same-seed-reproduces-bitwise arms already pin."""
+    settings = _settings()
+    one_shot = _option(settings)
+    long_hand = _option(settings)
+    long_hand.set_mc_engine(_mc_european_engine())
+
+    priced = one_shot.price_mc(_mc_european_engine())
+    assert priced == long_hand.npv()
+    assert one_shot.is_calculated()
+
+
+def test_price_mc_heston_is_set_mc_heston_engine_plus_npv():
+    settings = Settings()
+    settings.set_evaluation_date(HESTON_EVAL)
+    one_shot = VanillaOption(OptionType.Put, 1.05, HESTON_EXERCISE, settings)
+    long_hand = VanillaOption(OptionType.Put, 1.05, HESTON_EXERCISE, settings)
+    long_hand.set_mc_heston_engine(_mc_heston_engine())
+
+    priced = one_shot.price_mc_heston(_mc_heston_engine())
+    assert priced == long_hand.npv()
+    assert one_shot.is_calculated()
+
+
+def test_price_mc_american_is_set_mc_american_engine_plus_npv():
+    settings, process = _american_market()
+    one_shot = VanillaOption.american(
+        OptionType.Put, 36.0, AMERICAN_SETTLEMENT, AMERICAN_MATURITY, settings
+    )
+    long_hand = VanillaOption.american(
+        OptionType.Put, 36.0, AMERICAN_SETTLEMENT, AMERICAN_MATURITY, settings
+    )
+    long_hand.set_mc_american_engine(_mc_american_engine(process))
+
+    priced = one_shot.price_mc_american(_mc_american_engine(process))
+    assert priced == long_hand.npv()
+    assert one_shot.is_calculated()
+
+
+def test_price_heston_is_set_heston_engine_plus_npv():
+    one_shot, model = _heston_option_and_model()
+    long_hand, other_model = _heston_option_and_model()
+    long_hand.set_heston_engine(other_model, HESTON_ORDER)
+
+    priced = one_shot.price_heston(model, HESTON_ORDER)
+    assert priced == long_hand.npv()
+    assert one_shot.is_calculated()
+
+
+def test_price_mc_american_rejects_a_european_exercise():
+    """THE arm pinning which engine the one-shot attached: the check fires
+    inside the American engine's own calculate from the option's exercise
+    (mcamericanengine.rs:190-196), so only an American engine can raise it. It
+    surfaces through the one-shot's calculate(), not lazily from npv()."""
+    settings, process = _american_market()
+    option = VanillaOption(OptionType.Put, 36.0, AMERICAN_MATURITY, settings)
+
+    with pytest.raises(ItofinError, match="wrong exercise given"):
+        option.price_mc_american(_mc_american_engine(process))
+
+
+def test_price_heston_propagates_the_integration_order_limit():
+    """The fallibility arm: the order check lives in the engine constructor
+    (analytichestonengine.rs:239-240), so the one-shot raises before anything
+    is attached and the option is left untouched."""
+    option, model = _heston_option_and_model()
+
+    with pytest.raises(ItofinError, match="maximum integration order"):
+        option.price_heston(model, OVER_MAX_ORDER)
+    assert not option.is_calculated()
 
 
 CAP_EVAL = Date(14, 3, 2002)
