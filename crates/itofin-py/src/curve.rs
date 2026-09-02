@@ -643,8 +643,9 @@ enum ConvexMonotoneCurve {
 /// `bootstrap` selects the bootstrap algorithm: `"iterative"` (default, the
 /// shipped behaviour) solves one node at a time, while `"local"`
 /// least-squares-fits a trailing window of nodes at each step so the
-/// non-local interpolation keeps a localised risk profile. The two agree at
-/// every pillar and diverge between them.
+/// non-local interpolation keeps a localised risk profile. The two reprice
+/// every pillar (the local solve to its own tolerance, about 1e-7 on the
+/// oracle strip) and diverge between them.
 #[pyclass(name = "PiecewiseConvexMonotoneForward", extends = PyYieldTermStructure, unsendable)]
 pub struct PyPiecewiseConvexMonotoneForward {
     concrete: ConvexMonotoneCurve,
