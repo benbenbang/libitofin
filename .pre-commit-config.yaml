@@ -30,6 +30,12 @@ repos:
             - --indent=2
     - repo: local
       hooks:
+        - id: cargo-check-examples
+          name: cargo check --examples
+          entry: cargo check --examples -p libitofin
+          language: system
+          types: [rust]
+          pass_filenames: false
         - id: itofin-submodule-shims
           name: itofin submodule .py shims in sync with .pyi
           entry: python3 crates/itofin-py/scripts/gen_submodule_shims.py
