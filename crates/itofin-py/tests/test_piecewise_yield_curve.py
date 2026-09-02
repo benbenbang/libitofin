@@ -576,3 +576,22 @@ def test_local_bootstrap_exposes_its_nodes():
     )
     assert len(local.dates()) == len(instruments) + 1
     assert len(local.data()) == len(instruments) + 1
+
+
+def test_local_bootstrap_nodes_come_from_the_local_solve():
+    """The class holds the curve twice, once typed (behind dates()/data()) and
+    once erased (behind discount()), each wired by its own match. The
+    discrimination arm only reads the erased side, so a Local variant whose
+    typed side was built iteratively would pass it. The solved node forwards
+    separate the two algorithms as well (measured max 3.461058e-07 at node
+    20), which pins data() to the local solve."""
+    _, _, _, settlement, deposits, swaps = _fixture()
+    _, _, _, settlement_again, deposits_again, swaps_again = _fixture()
+    dc = DayCounter.actual360()
+    iterative = PiecewiseConvexMonotoneForward(settlement, deposits + swaps, dc)
+    local = PiecewiseConvexMonotoneForward(
+        settlement_again, deposits_again + swaps_again, dc, "local"
+    )
+
+    separation = max(abs(a - b) for a, b in zip(iterative.data(), local.data()))
+    assert separation > 1.0e-8, f"local data() identical to iterative: {separation}"

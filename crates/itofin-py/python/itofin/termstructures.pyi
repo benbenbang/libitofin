@@ -623,8 +623,9 @@ class PiecewiseConvexMonotoneForward(YieldTermStructure):
             bootstrap (str): "iterative", the shipped behaviour, solving one
                 node at a time, or "local", least-squares-fitting a trailing
                 window of nodes at each step so the non-local interpolation
-                keeps a localised risk profile. The two agree at every pillar
-                and diverge between them.
+                keeps a localised risk profile. The two reprice every pillar
+                (the local solve to its own tolerance, about 1e-7 on the
+                oracle strip) and diverge between them.
 
         Raises:
             ItofinError: On an empty helper list, and on an unknown bootstrap
