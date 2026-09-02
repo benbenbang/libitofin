@@ -11,19 +11,19 @@
 //!
 //! [`IterativeBootstrap`]: crate::termstructures::iterativebootstrap::IterativeBootstrap
 //! [`Bootstrap::calculate`]: crate::termstructures::iterativebootstrap::Bootstrap::calculate
+//! [`Bootstrap::additional_observables`]: crate::termstructures::iterativebootstrap::Bootstrap::additional_observables
 //!
 //! ## What is ported, and what is deferred
 //!
 //! The single-curve path is ported, together with the `additionalPenalties`
-//! residual terms (#974); it equals the C++ path with the remaining
-//! `additional*` arguments empty and `parentBootstrapper_` null. Deferred
+//! residual terms (#974) and the `additionalHelpers`/`additionalDates`
+//! restrictions (#976); it equals the C++ path with the remaining
+//! `additional*` argument empty and `parentBootstrapper_` null. Deferred
 //! visibly, each as its own follow-up issue referencing #949:
 //!
-//! - **Additional restrictions** (`additionalHelpers`/`additionalDates`/
-//!   `additionalVariables`, plus the `SimpleQuoteVariables` helper): the
-//!   machinery the two remaining upstream
-//!   oracle tests (`piecewiseyieldcurve.cpp:1306/1486`) exercise - futures
-//!   convexity adjustments, model variables.
+//! - **Additional variables** (`additionalVariables`, plus the
+//!   `SimpleQuoteVariables` helper): the extra optimizer coordinates the
+//!   futures-convexity oracle test (`piecewiseyieldcurve.cpp:1486`) exercises.
 //! - **Multi-curve orchestration** (`MultiCurveBootstrap`,
 //!   `MultiCurveBootstrapContributor`, `setParentBootstrapper`/`setToValid`,
 //!   the `parentBootstrapper_` branch of `calculate`).
@@ -34,7 +34,7 @@
 //! [`OptimizationMethod`](crate::math::optimization::method::OptimizationMethod)
 //! `minimize` takes `&mut self`, which a stored trait object cannot offer
 //! from the `&self` [`Bootstrap::calculate`]; an override can ride with the
-//! deferred additional-restrictions slice if a use case needs it. The
+//! deferred additional-variables slice if a use case needs it. The
 //! `EndCriteria` override is carried (it is `Copy`), defaulting to
 //! `EndCriteria(1000, 10, accuracy, accuracy, accuracy)`
 //! (`globalbootstrap.hpp:228`) - deliberately different literals from
@@ -50,8 +50,11 @@
 //! - The `setup()` D1 half, registering the curve as an observer of every
 //!   instrument (`globalbootstrap.hpp:217-218`), is performed - for any
 //!   bootstrap - by the curve constructor (`PiecewiseYieldCurve::
-//!   with_bootstrap`), which registers all instruments unconditionally. Its
-//!   guards (the weights check, `:232-236`) run at the start of `calculate`.
+//!   with_bootstrap`), which registers all instruments unconditionally. The
+//!   additional helpers of `:219-220` reach the same loop through
+//!   [`Bootstrap::additional_observables`], the trait hook a bootstrap owning
+//!   helpers of its own overrides. Its guards (the weights check, `:232-236`)
+//!   run at the start of `calculate`.
 //! - `initialize()` re-runs on every calculation. C++ caches it behind
 //!   `initialized_` and repeats it only for a moving curve
 //!   (`globalbootstrap.hpp:331-332`); the Rust curve is lazily recalculated
@@ -103,11 +106,14 @@ use crate::math::optimization::endcriteria::EndCriteria;
 use crate::math::optimization::levenbergmarquardt::LevenbergMarquardt;
 use crate::math::optimization::method::OptimizationMethod;
 use crate::math::optimization::problem::Problem;
+use crate::patterns::observable::Observable;
 use crate::require;
 use crate::shared::Shared;
-use crate::termstructures::bootstraphelper::BootstrapHelperShared;
+use crate::termstructures::bootstraphelper::{BootstrapHelperShared, RateHelper};
 use crate::termstructures::bootstraptraits::{BootstrapTraits, YieldBootstrapTraits};
 use crate::termstructures::iterativebootstrap::{Bootstrap, PiecewiseCurve};
+use crate::termstructures::yieldtermstructure::YieldTermStructure;
+use crate::time::date::Date;
 use crate::types::{Real, Size, Time};
 
 /// The additional penalty terms (`AdditionalPenalties`,
@@ -119,6 +125,16 @@ use crate::types::{Real, Size, Time};
 /// optimizer varies, so a penalty over `times.len() - 1` differences indexes
 /// `data[i + 1] - data[i]` directly.
 pub type AdditionalPenalties = dyn Fn(&[Time], &[Real]) -> Vec<Real>;
+
+/// The additional node dates (`additionalDates`, `globalbootstrap.hpp:117`).
+///
+/// Extra grid dates, re-read on every calculation because the upstream functor
+/// is evaluation-date relative (`hpp:266-267`). Each surviving date is one more
+/// interior node - one more free variable of the solve - carrying no residual
+/// of its own, so a system made under-determined this way needs the
+/// [`AdditionalPenalties`] terms to stay solvable. Dates at or before the first
+/// curve date are dropped (`hpp:268-274`).
+pub type AdditionalDates = dyn Fn() -> Vec<Date>;
 
 /// The global bootstrap (`GlobalBootstrap`, single-curve core).
 ///
@@ -133,6 +149,8 @@ pub type AdditionalPenalties = dyn Fn(&[Time], &[Real]) -> Vec<Real>;
 /// [`PiecewiseYieldCurve::new`](crate::termstructures::yields::PiecewiseYieldCurve::new)
 /// still needs the empty configuration.
 pub struct GlobalBootstrap {
+    additional_helpers: Vec<Shared<dyn RateHelper>>,
+    additional_dates: Option<Box<AdditionalDates>>,
     accuracy: Option<Real>,
     end_criteria: Option<EndCriteria>,
     instrument_weights: Vec<Real>,
@@ -156,6 +174,8 @@ impl GlobalBootstrap {
         instrument_weights: Vec<Real>,
     ) -> GlobalBootstrap {
         GlobalBootstrap {
+            additional_helpers: Vec::new(),
+            additional_dates: None,
             accuracy,
             end_criteria,
             instrument_weights,
@@ -163,14 +183,19 @@ impl GlobalBootstrap {
         }
     }
 
-    /// The same configuration plus [`AdditionalPenalties`] over the trial
-    /// curve's node grid (the penalty argument of C++ constructor #2,
-    /// `globalbootstrap.hpp:116-123`, definition `:169-186`).
+    /// The additional-restrictions constructor (C++ constructor #2,
+    /// `globalbootstrap.hpp:116-123`, definition `:169-186`): the
+    /// [`AdditionalPenalties`] over the trial curve's node grid, plus the
+    /// `additionalHelpers` the penalty reprices and the [`AdditionalDates`] the
+    /// grid gains.
     ///
-    /// That constructor also carries `additionalHelpers`, `additionalDates` and
-    /// `additionalVariables`; those are still deferred, so this form takes the
-    /// penalty alone.
+    /// The additional helpers are handed the curve and registered with it, but
+    /// contribute neither a pillar date nor a residual: they exist so a penalty
+    /// can read their `implied_quote`. Its `additionalVariables` argument is
+    /// still deferred.
     pub fn with_penalties<F>(
+        additional_helpers: Vec<Shared<dyn RateHelper>>,
+        additional_dates: Option<Box<AdditionalDates>>,
         accuracy: Option<Real>,
         end_criteria: Option<EndCriteria>,
         instrument_weights: Vec<Real>,
@@ -180,6 +205,8 @@ impl GlobalBootstrap {
         F: Fn(&[Time], &[Real]) -> Vec<Real> + 'static,
     {
         GlobalBootstrap {
+            additional_helpers,
+            additional_dates,
             accuracy,
             end_criteria,
             instrument_weights,
@@ -192,6 +219,8 @@ impl GlobalBootstrap {
     /// `globalbootstrap.hpp:124-131`, definition `:196-206`, which wraps the
     /// no-argument closure into the two-argument one and delegates).
     pub fn with_grid_independent_penalties<F>(
+        additional_helpers: Vec<Shared<dyn RateHelper>>,
+        additional_dates: Option<Box<AdditionalDates>>,
         accuracy: Option<Real>,
         end_criteria: Option<EndCriteria>,
         instrument_weights: Vec<Real>,
@@ -200,9 +229,14 @@ impl GlobalBootstrap {
     where
         F: Fn() -> Vec<Real> + 'static,
     {
-        Self::with_penalties(accuracy, end_criteria, instrument_weights, move |_, _| {
-            penalties()
-        })
+        Self::with_penalties(
+            additional_helpers,
+            additional_dates,
+            accuracy,
+            end_criteria,
+            instrument_weights,
+            move |_, _| penalties(),
+        )
     }
 }
 
@@ -226,9 +260,12 @@ where
     alive: &'a [Shared<C::Helper>],
     alive_weights: &'a [Real],
     penalties: Option<&'a AdditionalPenalties>,
-    /// The number of interior nodes, `times.len() - 1`; residual count is
-    /// `alive.len()` plus the penalty terms, at least `interior` (the grid
-    /// dedup can only shrink the helper half).
+    /// The number of interior nodes, `times.len() - 1`, and the number of
+    /// variables the solve carries; the residual count is `alive.len()` plus
+    /// the penalty terms. The two are equal for a strip of distinct pillars
+    /// and no additional dates; each additional date adds one variable the
+    /// penalty terms have to answer for, and the least-squares solver rejects
+    /// a system left with fewer residuals than variables.
     interior: Size,
     /// The penalty-term count of the last evaluation, so a failed evaluation's
     /// NaN vector has the length the solver sized itself on.
@@ -291,10 +328,20 @@ where
     }
 }
 
-impl<C: PiecewiseCurve> Bootstrap<C> for GlobalBootstrap
+impl<C> Bootstrap<C> for GlobalBootstrap
 where
+    C: PiecewiseCurve<Helper = dyn RateHelper, TS = dyn YieldTermStructure>,
     C::Traits: YieldBootstrapTraits,
 {
+    /// The additional helpers, all of them: the alive filter of `calculate`
+    /// governs the solve, never observability (`globalbootstrap.hpp:219-220`).
+    fn additional_observables(&self) -> Vec<Shared<Observable>> {
+        self.additional_helpers
+            .iter()
+            .map(|helper| helper.base().observable_shared())
+            .collect()
+    }
+
     fn calculate(&self, curve: &C) -> QlResult<()> {
         let instruments = curve.instruments();
         let n = instruments.len();
@@ -324,13 +371,34 @@ where
             }
         }
 
+        // The alive additional helpers (`:256-262`), on the same threshold as
+        // the instruments; they carry no pillar and no residual.
+        let alive_additional: Vec<&Shared<dyn RateHelper>> = self
+            .additional_helpers
+            .iter()
+            .filter(|helper| helper.pillar_date() > first_date)
+            .collect();
+
+        // The additional dates (`:264-274`), re-read on every calculation
+        // because the upstream functor is evaluation-date relative, with the
+        // expired ones dropped before they can reach the grid.
+        let additional_dates: Vec<Date> = match &self.additional_dates {
+            Some(dates) => dates()
+                .into_iter()
+                .filter(|date| *date > first_date)
+                .collect(),
+            None => Vec::new(),
+        };
+
         // The pillar grid (`:280-294`): the first date plus every alive
-        // pillar, sorted with duplicates merged - the one dedup in QuantLib's
-        // bootstraps. A duplicate pillar leaves the least-squares system
-        // overdetermined rather than rejected, unlike IterativeBootstrap.
-        let mut dates = Vec::with_capacity(alive.len() + 1);
+        // pillar plus the surviving additional dates, sorted with duplicates
+        // merged - the one dedup in QuantLib's bootstraps. A duplicate pillar
+        // leaves the least-squares system overdetermined rather than rejected,
+        // unlike IterativeBootstrap.
+        let mut dates = Vec::with_capacity(alive.len() + additional_dates.len() + 1);
         dates.push(first_date);
         dates.extend(alive.iter().map(|helper| helper.pillar_date()));
+        dates.extend(additional_dates);
         dates.sort_unstable();
         dates.dedup();
 
@@ -346,9 +414,10 @@ where
             times.push(curve.time_from_reference(*date)?);
         }
 
-        // maxDate covers every alive helper (`:301-306`).
+        // maxDate covers every alive helper, additional helpers included
+        // (`:301-306`).
         let mut max_date = *dates.last().expect("the grid holds the first date");
-        for helper in &alive {
+        for helper in alive.iter().chain(alive_additional.iter().copied()) {
             max_date = max_date.max(helper.latest_relevant_date());
         }
 
@@ -378,6 +447,18 @@ where
                     "instrument (maturity: {}, pillar: {}) has an invalid quote",
                     helper.maturity_date(),
                     helper.pillar_date()
+                );
+            }
+            helper.set_term_structure(&term_structure);
+        }
+
+        // The same for the alive additional helpers, after the instruments and
+        // under their own message (`:347-352`).
+        for helper in &alive_additional {
+            if helper.quote_value().is_err() {
+                crate::fail!(
+                    "additional instrument (maturity: {}) has an invalid quote",
+                    helper.maturity_date()
                 );
             }
             helper.set_term_structure(&term_structure);
@@ -723,8 +804,8 @@ mod tests {
     }
 
     /// The re-entrancy pin of the penalty slice: a penalty that READS THE
-    /// CURVE mid-solve, the shape the deferred `additionalHelpers` penalty
-    /// takes upstream (`globalbootstrap.hpp:392-395` reprices additional
+    /// CURVE mid-solve, the shape the `additionalHelpers` penalty takes
+    /// upstream (`globalbootstrap.hpp:392-395` reprices additional
     /// helpers off the trial curve).
     ///
     /// The residual is a tiny multiple of the first helper's own quote error,
@@ -742,13 +823,20 @@ mod tests {
         let counter = Shared::clone(&fired);
         let curve = curve_with(
             &fixture,
-            GlobalBootstrap::with_penalties(Some(1.0e-12), None, Vec::new(), move |_, _| {
-                counter.set(counter.get() + 1);
-                let error = probe
-                    .quote_error()
-                    .expect("the probe helper reprices off the trial curve");
-                vec![1.0e-8 * error]
-            }),
+            GlobalBootstrap::with_penalties(
+                Vec::new(),
+                None,
+                Some(1.0e-12),
+                None,
+                Vec::new(),
+                move |_, _| {
+                    counter.set(counter.get() + 1);
+                    let error = probe
+                        .quote_error()
+                        .expect("the probe helper reprices off the trial curve");
+                    vec![1.0e-8 * error]
+                },
+            ),
         );
 
         let rates = zero_rates(&curve, &fixture);
@@ -789,6 +877,8 @@ mod tests {
         let curve = curve_with(
             &fixture,
             GlobalBootstrap::with_grid_independent_penalties(
+                Vec::new(),
+                None,
                 Some(1.0e-12),
                 None,
                 Vec::new(),
@@ -831,10 +921,17 @@ mod tests {
         let record = Shared::clone(&seen);
         let curve = curve_with(
             &fixture,
-            GlobalBootstrap::with_penalties(Some(1.0e-12), None, Vec::new(), move |times, data| {
-                record.set((times.len(), data.len(), times[0], data[0], data[1]));
-                Vec::new()
-            }),
+            GlobalBootstrap::with_penalties(
+                Vec::new(),
+                None,
+                Some(1.0e-12),
+                None,
+                Vec::new(),
+                move |times, data| {
+                    record.set((times.len(), data.len(), times[0], data[0], data[1]));
+                    Vec::new()
+                },
+            ),
         );
 
         assert!(zero_rates(&curve, &fixture).iter().all(|r| r.is_finite()));
@@ -899,11 +996,18 @@ mod tests {
         let gradient_penalty = zero_rates(
             &curve_with(
                 &fixture,
-                GlobalBootstrap::with_penalties(Some(1.0e-12), None, Vec::new(), |times, data| {
-                    (0..times.len() - 1)
-                        .map(|i| 0.01 * (data[i + 1] - data[i]) / (times[i + 1] - times[i]))
-                        .collect()
-                }),
+                GlobalBootstrap::with_penalties(
+                    Vec::new(),
+                    None,
+                    Some(1.0e-12),
+                    None,
+                    Vec::new(),
+                    |times, data| {
+                        (0..times.len() - 1)
+                            .map(|i| 0.01 * (data[i + 1] - data[i]) / (times[i + 1] - times[i]))
+                            .collect()
+                    },
+                ),
             ),
             &fixture,
         );
