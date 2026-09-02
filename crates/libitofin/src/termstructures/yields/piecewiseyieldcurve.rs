@@ -1201,6 +1201,11 @@ mod tests {
     /// Bit-equality is not asserted: the second solve warm-restarts from the
     /// stored solution and rewrites every node through the transform pair, so
     /// the last digits may differ.
+    ///
+    /// Two additional helpers are registered and the quote moved is the
+    /// SECOND one's: with a single helper the arm cannot tell "all of them"
+    /// from "the first of them" (gate-probed - a registration truncated to
+    /// the first helper passed the single-helper form).
     #[test]
     fn a_global_bootstrap_additional_helper_is_observed() {
         use crate::termstructures::globalbootstrap::GlobalBootstrap;
@@ -1222,8 +1227,15 @@ mod tests {
         let index = Euribor::new(Period::new(3, TimeUnit::Months), Handle::empty(), settings)
             .expect("deposit tenor is valid");
 
+        let first = FraRateHelper::from_months(
+            Handle::new(shared(SimpleQuote::new(-0.004)) as Shared<dyn Quote>),
+            3,
+            &index,
+            true,
+            Pillar::LastRelevantDate,
+        ) as Shared<dyn RateHelper>;
         let quote = shared(SimpleQuote::new(-0.004));
-        let additional = FraRateHelper::from_months(
+        let second = FraRateHelper::from_months(
             Handle::new(Shared::clone(&quote) as Shared<dyn Quote>),
             6,
             &index,
@@ -1236,7 +1248,7 @@ mod tests {
             Actual360::new(),
             LogLinear,
             GlobalBootstrap::with_penalties(
-                vec![additional],
+                vec![first, second],
                 None,
                 None,
                 None,
@@ -1252,7 +1264,7 @@ mod tests {
         quote.set_value(0.05);
         assert!(
             !curve.lazy.borrow().is_calculated(),
-            "an additional helper's quote must invalidate the curve"
+            "the second additional helper's quote must invalidate the curve"
         );
 
         let after = curve.data().expect("the strip re-solves");
