@@ -116,22 +116,23 @@ pub trait YieldBootstrapTraits: BootstrapTraits {
     /// factor positive where the iterative bootstrap would have bracketed it.
     ///
     /// The C++ signature takes the node index and the curve
-    /// (`transformDirect(x, i, c)`), but the three standard traits ignore
-    /// both, so the port is parameterless; the index-dependent
-    /// `SimpleZeroYield` transform (`bootstraptraits.hpp:385-393`) rides with
-    /// the deferred additional-restrictions slice (see the module docs).
-    /// Identity by default - `ZeroYield` (`:197-204`) and `ForwardRate`
-    /// (`:290-295`) are identity upstream - and `Discount` overrides with
-    /// `exp` (`:106-109`).
-    fn transform_direct(x: Real) -> Real {
+    /// (`transformDirect(x, i, c)`), and the only thing any trait reads
+    /// through them is `c->times()[i]`, so the port passes that node time `t`
+    /// directly. `Discount`, `ZeroYield` and `ForwardRate` ignore it;
+    /// `SimpleZeroYield` (`bootstraptraits.hpp:385-393`) shifts its image by
+    /// the same `-1/t` rate floor its bracket applies. Identity by default -
+    /// `ZeroYield` (`:197-204`) and `ForwardRate` (`:290-295`) are identity
+    /// upstream - and `Discount` overrides with `exp` (`:106-109`).
+    fn transform_direct(x: Real, _t: Time) -> Real {
         x
     }
 
     /// The inverse of [`transform_direct`](Self::transform_direct)
-    /// (`Traits::transformInverse`): maps a node value into the optimizer
-    /// space, so `transform_direct(transform_inverse(x)) == x`. Identity by
-    /// default; `Discount` overrides with `log` (`bootstraptraits.hpp:110-113`).
-    fn transform_inverse(x: Real) -> Real {
+    /// (`Traits::transformInverse`): maps a node value at node time `t` into
+    /// the optimizer space, so `transform_direct(transform_inverse(x, t), t)
+    /// == x`. Identity by default; `Discount` overrides with `log`
+    /// (`bootstraptraits.hpp:110-113`).
+    fn transform_inverse(x: Real, _t: Time) -> Real {
         x
     }
 }
@@ -201,13 +202,14 @@ impl YieldBootstrapTraits for Discount {
     }
 
     /// `exp` (`bootstraptraits.hpp:106-109`): the optimizer variable is the
-    /// log-discount, so every trial discount factor stays positive.
-    fn transform_direct(x: Real) -> Real {
+    /// log-discount, so every trial discount factor stays positive. The node
+    /// time is unused, as it is upstream.
+    fn transform_direct(x: Real, _t: Time) -> Real {
         x.exp()
     }
 
     /// `log` (`bootstraptraits.hpp:110-113`).
-    fn transform_inverse(x: Real) -> Real {
+    fn transform_inverse(x: Real, _t: Time) -> Real {
         x.ln()
     }
 }
@@ -586,26 +588,43 @@ mod tests {
 
     /// The `Discount` optimizer transforms are `exp`/`log`
     /// (`bootstraptraits.hpp:106-113`): a mutually inverse pair whose direct
-    /// image is always a positive discount factor.
+    /// image is always a positive discount factor, and which ignores the node
+    /// time the signature now threads.
     #[test]
     fn discount_transforms_are_exp_and_log() {
-        assert_eq!(Discount::transform_direct(0.0), 1.0);
+        assert_eq!(Discount::transform_direct(0.0, 1.0), 1.0);
         let df = 0.97;
-        assert_eq!(Discount::transform_inverse(df), df.ln());
-        let x = Discount::transform_inverse(df);
-        assert!((Discount::transform_direct(x) - df).abs() < 1e-15);
-        assert!(Discount::transform_direct(-40.0) > 0.0);
+        assert_eq!(Discount::transform_inverse(df, 1.0), df.ln());
+        let x = Discount::transform_inverse(df, 1.0);
+        assert!((Discount::transform_direct(x, 1.0) - df).abs() < 1e-15);
+        assert!(Discount::transform_direct(-40.0, 1.0) > 0.0);
+        assert_eq!(
+            Discount::transform_direct(0.5, 0.25),
+            Discount::transform_direct(0.5, 30.0)
+        );
+        assert_eq!(
+            Discount::transform_inverse(df, 0.25),
+            Discount::transform_inverse(df, 30.0)
+        );
     }
 
     /// The rate-storing conventions keep the default identity transforms
     /// (`bootstraptraits.hpp:197-204` for `ZeroYield`, `:290-295` for
-    /// `ForwardRate`).
+    /// `ForwardRate`), node time included.
     #[test]
     fn rate_convention_transforms_are_identity() {
-        assert_eq!(ZeroYield::transform_direct(0.05), 0.05);
-        assert_eq!(ZeroYield::transform_inverse(-0.01), -0.01);
-        assert_eq!(ForwardRate::transform_direct(0.05), 0.05);
-        assert_eq!(ForwardRate::transform_inverse(-0.01), -0.01);
+        assert_eq!(ZeroYield::transform_direct(0.05, 1.0), 0.05);
+        assert_eq!(ZeroYield::transform_inverse(-0.01, 1.0), -0.01);
+        assert_eq!(ForwardRate::transform_direct(0.05, 1.0), 0.05);
+        assert_eq!(ForwardRate::transform_inverse(-0.01, 1.0), -0.01);
+        assert_eq!(
+            ZeroYield::transform_direct(0.05, 0.25),
+            ZeroYield::transform_direct(0.05, 30.0)
+        );
+        assert_eq!(
+            ForwardRate::transform_inverse(-0.01, 0.25),
+            ForwardRate::transform_inverse(-0.01, 30.0)
+        );
     }
 
     #[test]

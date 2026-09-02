@@ -244,7 +244,8 @@ where
         {
             let mut cd = self.curve.curve_data().borrow_mut();
             for i in 0..self.interior {
-                let value = C::Traits::transform_direct(x[i]);
+                let t = cd.times()[i + 1];
+                let value = C::Traits::transform_direct(x[i], t);
                 C::Traits::update_guess(cd.data_mut(), value, i + 1);
             }
             cd.rebuild(self.curve.interpolator(), self.interior)?;
@@ -391,7 +392,7 @@ where
             for i in 0..interior {
                 let g = C::Traits::guess(i + 1, cd.times(), cd.data(), valid_data);
                 C::Traits::update_guess(cd.data_mut(), g, i + 1);
-                guess[i] = C::Traits::transform_inverse(cd.data()[i + 1]);
+                guess[i] = C::Traits::transform_inverse(cd.data()[i + 1], cd.times()[i + 1]);
             }
             cd.rebuild(curve.interpolator(), interior)?;
         }
@@ -438,7 +439,8 @@ where
         {
             let mut cd = curve.curve_data().borrow_mut();
             for i in 0..interior {
-                let value = C::Traits::transform_direct(solution[i]);
+                let t = cd.times()[i + 1];
+                let value = C::Traits::transform_direct(solution[i], t);
                 C::Traits::update_guess(cd.data_mut(), value, i + 1);
             }
             cd.rebuild(curve.interpolator(), interior)?;
