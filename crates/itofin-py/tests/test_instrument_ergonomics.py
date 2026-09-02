@@ -354,8 +354,12 @@ def test_price_heston_is_set_heston_engine_plus_npv():
 def test_price_mc_american_rejects_a_european_exercise():
     """THE arm pinning which engine the one-shot attached: the check fires
     inside the American engine's own calculate from the option's exercise
-    (mcamericanengine.rs:190-196), so only an American engine can raise it. It
-    surfaces through the one-shot's calculate(), not lazily from npv()."""
+    (mcamericanengine.rs:190-196), so only an American engine can raise it.
+
+    Not pinned here: whether the one-shot's own calculate() or its npv() raised
+    it. Core npv() calls calculate() first (instrument.rs:349-350) and surfaces
+    the identical error, so the calculate() line in every one-shot is a style
+    mirror of the sibling facades that no Python test can tell apart."""
     settings, process = _american_market()
     option = VanillaOption(OptionType.Put, 36.0, AMERICAN_MATURITY, settings)
 
