@@ -390,6 +390,21 @@ oversight) and is documented at the point of divergence in the source.
   rejects it, so `with_gearing(0.0)` surfaces that `Err` rather than a silent
   fixed coupon.
 
+**Term structures (EPIC-4):**
+
+- **The `Cubic` interpolator is the Kruger scheme, not QuantLib's
+  monotone-filtered natural spline.** QuantLib bootstraps its spline curves with
+  `Cubic(Spline, monotonic, SecondDerivative 0)` - a natural cubic spline under a
+  monotonicity filter - whereas this port's `Cubic` is the non-monotonic Kruger
+  scheme (`math/interpolations/cubic.rs`). Both are *global* cubics, so both
+  drive the bootstrap's convergence loop identically and reprice every pillar to
+  the same quote; the schemes differ only in the shape interpolated *between*
+  nodes, so bootstrapped node values and off-pillar queries can differ. The
+  consistency oracle is a self-repricing round-trip with no cached C++ number, so
+  the choice is fidelity-neutral there; a Spline-monotonic interpolator is
+  deliberately not added (documented at
+  `termstructures/yields/piecewiseyieldcurve.rs`).
+
 **Indexes (EPIC-6):**
 
 - **`Currency` is always valid; there is no empty placeholder.** QuantLib's
