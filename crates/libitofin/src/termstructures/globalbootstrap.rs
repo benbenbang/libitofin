@@ -461,8 +461,9 @@ mod tests {
     //! fixture against a locally built QuantLib 1.43-dev dylib, with
     //! `IborCoupon::Settings::instance().createAtParCoupons()` set so that
     //! `usingAtParCoupons()` - the test's own precondition - holds. The `.cpp`
-    //! literals agree with the harness to within 8.9e-9, which is the
-    //! truncation of their own 8-decimal printing, so they are not stale.
+    //! literals agree with the harness to within 8.9e-9, inside their own
+    //! 8-decimal printing (61 of the 64 are the dylib value rounded to 8
+    //! decimals, the rest truncated), so they are not stale.
     //!
     //! The asserts keep the C++ tolerance of 1e-6, but the port is far tighter
     //! than that: every one of the 64 rates matches the dylib to better than
@@ -547,7 +548,7 @@ mod tests {
 
     /// The no-penalty pillar zero rates, reproduced from the C++ dylib and
     /// written in their shortest round-tripping form; `:1410-1415` prints the
-    /// same values truncated to 8 decimals.
+    /// same values printed to 8 decimals.
     const REF_ZERO_RATE_NP: [Real; 32] = [
         -0.00373354067173059,
         -0.0038619401591129116,
@@ -585,7 +586,7 @@ mod tests {
 
     /// The gradient-penalty pillar zero rates, reproduced from the C++ dylib and
     /// written in their shortest round-tripping form; `:1417-1422` prints the
-    /// same values truncated to 8 decimals.
+    /// same values printed to 8 decimals.
     const REF_ZERO_RATE_GP: [Real; 32] = [
         -0.0037789204343363957,
         -0.003861265918257509,
@@ -805,6 +806,47 @@ mod tests {
             "the no-argument penalty never reached the residual vector"
         );
     }
+    /// The penalty-argument contract (`globalbootstrap.hpp:395`): the closure
+    /// is handed the FULL node grid, node 0 included, not the interior slice
+    /// the optimizer varies.
+    ///
+    /// HONEST NEGATIVE: `testGlobalBootstrapPenalty` cannot pin this. The
+    /// `ForwardRate` traits mirror node 0 onto node 1, so the gradient
+    /// penalty's first term is identically zero and an interior-only slice
+    /// solves to the same curve (probe-confirmed at gate). The contract is
+    /// therefore pinned directly: 33 nodes for 32 helpers, a zero time at the
+    /// front, and the mirrored node the oracle's blindness rests on.
+    #[test]
+    fn the_penalty_sees_the_full_node_grid() {
+        let fixture = fixture();
+        let seen = shared(Cell::new((
+            0_usize,
+            0_usize,
+            Real::NAN,
+            Real::NAN,
+            Real::NAN,
+        )));
+        let record = Shared::clone(&seen);
+        let curve = curve_with(
+            &fixture,
+            GlobalBootstrap::with_penalties(Some(1.0e-12), None, Vec::new(), move |times, data| {
+                record.set((times.len(), data.len(), times[0], data[0], data[1]));
+                Vec::new()
+            }),
+        );
+
+        assert!(zero_rates(&curve, &fixture).iter().all(|r| r.is_finite()));
+        let (times_len, data_len, first_time, node0, node1) = seen.get();
+        assert_eq!(
+            times_len,
+            fixture.helpers.len() + 1,
+            "the closure must see every node"
+        );
+        assert_eq!(data_len, times_len);
+        assert_eq!(first_time, 0.0, "node 0 is the reference-date node");
+        assert_eq!(node0, node1, "ForwardRate mirrors node 0 onto node 1");
+    }
+
     /// ARM 0 of `testGlobalBootstrapPenalty` (`:1450-1453`): the 32 pillar
     /// dates. External truth that stands on its own - it fixes the helper
     /// construction (index conventions, FRA start offsets, swap tenors and the
