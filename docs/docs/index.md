@@ -45,4 +45,4 @@ The full walk-through, in both languages, is on the [Getting started](getting-st
 |---------|-------|
 | Python API reference | This site (see the **Python API** section) |
 | Rust API reference | [docs.rs/libitofin](https://docs.rs/libitofin) - see [Rust API](rust.md) |
-| Worked examples | [`example/python`](https://github.com/benbenbang/libitofin/tree/main/example/python) and [`example/rust`](https://github.com/benbenbang/libitofin/tree/main/example/rust) |
+| Worked examples | [`example/python`](https://github.com/benbenbang/libitofin/tree/main/example/python) and [`crates/libitofin/examples`](https://github.com/benbenbang/libitofin/tree/main/crates/libitofin/examples) |

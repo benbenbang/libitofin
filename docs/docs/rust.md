@@ -31,5 +31,5 @@ use libitofin::settings::Settings;
 // analytic option engines, curves and CDS pricing are available today - see docs.rs.
 ```
 
-Runnable Rust examples live in [`example/rust`](https://github.com/benbenbang/libitofin/tree/main/example/rust);
+Runnable Rust examples live in [`crates/libitofin/examples`](https://github.com/benbenbang/libitofin/tree/main/crates/libitofin/examples);
 their Python counterparts are on the [Getting started](getting-started.md) page.
