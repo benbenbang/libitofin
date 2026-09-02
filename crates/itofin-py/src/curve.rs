@@ -14,6 +14,7 @@ use libitofin::math::interpolations::loglinear::LogLinear;
 use libitofin::shared::{Shared, shared};
 use libitofin::termstructures::RateHelper;
 use libitofin::termstructures::bootstraptraits::{Discount, ForwardRate, ZeroYield};
+use libitofin::termstructures::localbootstrap::LocalBootstrap;
 use libitofin::termstructures::yields::{
     DiscountCurve, FlatForward, ForwardCurve, InterpolatedDiscountCurve, InterpolatedZeroCurve,
     PiecewiseYieldCurve, ZeroCurve,
@@ -622,6 +623,11 @@ impl PyPiecewiseLinearForward {
     }
 }
 
+enum ConvexMonotoneCurve {
+    Iterative(Shared<PiecewiseYieldCurve<ForwardRate, ConvexMonotone>>),
+    Local(Shared<PiecewiseYieldCurve<ForwardRate, ConvexMonotone, LocalBootstrap>>),
+}
+
 /// Python `PiecewiseConvexMonotoneForward`: a curve bootstrapped in
 /// instantaneous forward-rate space with convex-monotone interpolation
 /// (`PiecewiseYieldCurve<ForwardRate, ConvexMonotone>`).
@@ -633,31 +639,65 @@ impl PyPiecewiseLinearForward {
 /// convergence loop (#543). Its stored `data()` are instantaneous forward
 /// rates; the interpolation itself ignores node `[0]`, which only mirrors the
 /// first solved pillar.
+///
+/// `bootstrap` selects the bootstrap algorithm: `"iterative"` (default, the
+/// shipped behaviour) solves one node at a time, while `"local"`
+/// least-squares-fits a trailing window of nodes at each step so the
+/// non-local interpolation keeps a localised risk profile. The two agree at
+/// every pillar and diverge between them.
 #[pyclass(name = "PiecewiseConvexMonotoneForward", extends = PyYieldTermStructure, unsendable)]
 pub struct PyPiecewiseConvexMonotoneForward {
-    concrete: Shared<PiecewiseYieldCurve<ForwardRate, ConvexMonotone>>,
+    concrete: ConvexMonotoneCurve,
 }
 
 #[pymethods]
 impl PyPiecewiseConvexMonotoneForward {
-    /// A curve over `helpers` with a fixed `reference_date`. Fallible: an empty
-    /// helper list is rejected here.
+    /// A curve over `helpers` with a fixed `reference_date`, bootstrapped by
+    /// the algorithm `bootstrap` names. Fallible: an empty helper list and an
+    /// unknown bootstrap name are both rejected here.
     #[new]
+    #[pyo3(signature = (reference_date, helpers, day_counter, bootstrap = "iterative"))]
     fn new(
         reference_date: &PyDate,
         helpers: Vec<PyRef<PyRateHelper>>,
         day_counter: &PyDayCounter,
+        bootstrap: &str,
     ) -> PyResult<PyClassInitializer<Self>> {
         let instruments: Vec<Shared<dyn RateHelper>> =
             helpers.iter().map(|helper| helper.inner()).collect();
-        let concrete = PiecewiseYieldCurve::<ForwardRate, ConvexMonotone>::new(
-            reference_date.inner(),
-            instruments,
-            day_counter.inner(),
-            ConvexMonotone::default(),
-        )
-        .map_err(PyQlError::from)?;
-        let erased = Shared::clone(&concrete) as Shared<dyn YieldTermStructure>;
+        let concrete = match bootstrap {
+            "iterative" => ConvexMonotoneCurve::Iterative(
+                PiecewiseYieldCurve::<ForwardRate, ConvexMonotone>::new(
+                    reference_date.inner(),
+                    instruments,
+                    day_counter.inner(),
+                    ConvexMonotone::default(),
+                )
+                .map_err(PyQlError::from)?,
+            ),
+            "local" => ConvexMonotoneCurve::Local(
+                PiecewiseYieldCurve::<ForwardRate, ConvexMonotone, LocalBootstrap>::new(
+                    reference_date.inner(),
+                    instruments,
+                    day_counter.inner(),
+                    ConvexMonotone::default(),
+                )
+                .map_err(PyQlError::from)?,
+            ),
+            other => {
+                return Err(ItofinError::new_err(format!(
+                    "unknown bootstrap {other:?}, expected iterative or local"
+                )));
+            }
+        };
+        let erased: Shared<dyn YieldTermStructure> = match &concrete {
+            ConvexMonotoneCurve::Iterative(curve) => {
+                Shared::clone(curve) as Shared<dyn YieldTermStructure>
+            }
+            ConvexMonotoneCurve::Local(curve) => {
+                Shared::clone(curve) as Shared<dyn YieldTermStructure>
+            }
+        };
         Ok(PyClassInitializer::from(PyYieldTermStructure {
             inner: Handle::new(erased),
         })
@@ -666,9 +706,11 @@ impl PyPiecewiseConvexMonotoneForward {
 
     /// The bootstrapped node dates (triggers the lazy bootstrap).
     fn dates(&self) -> PyResult<Vec<PyDate>> {
-        Ok(self
-            .concrete
-            .dates()
+        let dates = match &self.concrete {
+            ConvexMonotoneCurve::Iterative(curve) => curve.dates(),
+            ConvexMonotoneCurve::Local(curve) => curve.dates(),
+        };
+        Ok(dates
             .map_err(PyQlError::from)?
             .into_iter()
             .map(PyDate::from_inner)
@@ -678,7 +720,11 @@ impl PyPiecewiseConvexMonotoneForward {
     /// The bootstrapped node values, forward rates here (triggers the lazy
     /// bootstrap).
     fn data(&self) -> PyResult<Vec<f64>> {
-        Ok(self.concrete.data().map_err(PyQlError::from)?)
+        let data = match &self.concrete {
+            ConvexMonotoneCurve::Iterative(curve) => curve.data(),
+            ConvexMonotoneCurve::Local(curve) => curve.data(),
+        };
+        Ok(data.map_err(PyQlError::from)?)
     }
 }
 
