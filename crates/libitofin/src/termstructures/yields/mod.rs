@@ -13,6 +13,7 @@ mod forwardstructure;
 mod impliedtermstructure;
 mod piecewiseyieldcurve;
 mod ratehelpers;
+mod simplezerocurve;
 mod zerocurve;
 mod zerospreadedtermstructure;
 mod zeroyieldstructure;
@@ -28,6 +29,7 @@ pub use piecewiseyieldcurve::PiecewiseYieldCurve;
 pub use ratehelpers::{
     DepositRateHelper, FraRateHelper, FuturesRateHelper, OISRateHelper, Pillar, SwapRateHelper,
 };
+pub use simplezerocurve::{InterpolatedSimpleZeroCurve, SimpleZeroCurve};
 pub use zerocurve::{InterpolatedZeroCurve, ZeroCurve};
 pub use zerospreadedtermstructure::ZeroSpreadedTermStructure;
 pub use zeroyieldstructure::ZeroYieldStructure;

@@ -347,7 +347,9 @@ mod tests {
     };
     use crate::termstructures::credit::defaulttermstructure::DefaultProbabilityTermStructure;
     use crate::termstructures::credit::flathazardrate::FlatHazardRate;
-    use crate::termstructures::yields::{DepositRateHelper, SwapRateHelper};
+    use crate::termstructures::yields::{
+        DepositRateHelper, InterpolatedSimpleZeroCurve, SwapRateHelper,
+    };
     use crate::time::businessdayconvention::BusinessDayConvention;
     use crate::time::calendars::target::Target;
     use crate::time::date::Month;
@@ -568,7 +570,11 @@ mod tests {
     /// `initial_value`, `guess`, `update_guess`, and both bracket bounds,
     /// whose lower one is floored at `-1/t + 1e-8` for every pillar past a
     /// year on this fresh pass (the floor sets the bracket edge there; the
-    /// solved rates themselves never approach it).
+    /// solved rates themselves never approach it). That floor is load-bearing
+    /// for this arm, not decoration: stripping the `max` drops the 3Y pillar's
+    /// lower bound back to `-maxRate = -1`, where `1/(1 + z*t)` has already
+    /// passed its pole, and the bootstrap fails with "root not bracketed:
+    /// f[-1, 1] -> [-1.0299..., -0.3081...]".
     ///
     /// What it does NOT see: `transform_direct`/`transform_inverse`, which
     /// `IterativeBootstrap` never calls, and - on its own - the SIMPLE in
@@ -593,6 +599,47 @@ mod tests {
             assert!(
                 (discount - expected).abs() < 1.0e-12,
                 "pillar {k}: discount {discount} vs simple 1/(1 + z*t) {expected}"
+            );
+        }
+    }
+
+    /// Ties [`InterpolatedSimpleZeroCurve`] to the traits that name it
+    /// (`bootstraptraits.hpp:317`). The piecewise curve never instantiates the
+    /// module - it hands its own node holder to
+    /// `SimpleZeroYield::discount_from_nodes` - so nothing else in the suite
+    /// would catch the two drifting apart. Rebuilt from the bootstrapped
+    /// nodes, the module must reproduce the same discount factors at a pillar,
+    /// between pillars, and past the last node, where both continue the last
+    /// instantaneous forward flat. Both sides are queried with extrapolation
+    /// allowed: the piecewise curve's maximum date is the latest helper date
+    /// and the module's is its last pillar, so a far probe is in range on
+    /// neither reliably.
+    #[test]
+    fn the_curve_module_reproduces_the_bootstrapped_simple_zero_nodes() {
+        let bootstrapped = check_curve_consistency::<SimpleZeroYield, Linear>();
+        let module = InterpolatedSimpleZeroCurve::<Linear>::new(
+            bootstrapped.dates().unwrap(),
+            bootstrapped.data().unwrap(),
+            Actual360::new(),
+            None,
+        )
+        .unwrap();
+
+        let times = bootstrapped.times().unwrap();
+        let last = *times.last().unwrap();
+        let probes = [
+            times[1] * 0.5,
+            times[1],
+            (times[3] + times[4]) / 2.0,
+            last,
+            last + 5.0,
+        ];
+        for t in probes {
+            let expected = bootstrapped.discount(t, true).unwrap();
+            let discount = module.discount(t, true).unwrap();
+            assert!(
+                (discount - expected).abs() < 1.0e-12,
+                "t {t}: module {discount} vs bootstrapped {expected}"
             );
         }
     }
