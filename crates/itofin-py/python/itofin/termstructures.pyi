@@ -612,6 +612,7 @@ class PiecewiseConvexMonotoneForward(YieldTermStructure):
         reference_date: Date,
         helpers: list[RateHelper],
         day_counter: DayCounter,
+        bootstrap: str = "iterative",
     ) -> None:
         """Build the curve over helpers with a fixed reference date.
 
@@ -619,9 +620,15 @@ class PiecewiseConvexMonotoneForward(YieldTermStructure):
             reference_date (Date): The curve's reference date.
             helpers (list[RateHelper]): The bootstrap instruments.
             day_counter (DayCounter): The day count turning dates into times.
+            bootstrap (str): "iterative", the shipped behaviour, solving one
+                node at a time, or "local", least-squares-fitting a trailing
+                window of nodes at each step so the non-local interpolation
+                keeps a localised risk profile. The two agree at every pillar
+                and diverge between them.
 
         Raises:
-            ItofinError: On an empty helper list.
+            ItofinError: On an empty helper list, and on an unknown bootstrap
+                name.
         """
         ...
     def dates(self) -> list[Date]:

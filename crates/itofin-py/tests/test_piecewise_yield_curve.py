@@ -499,3 +499,80 @@ def test_cubic_alias_differs_from_its_linear_siblings():
     for name, sibling in [("Linear", linear), ("LogLinear", log_linear)]:
         separation = max(abs(cubic.discount(t) - sibling.discount(t)) for t in times)
         assert separation > 1.0e-12, f"Cubic identical to the {name} arm"
+
+
+def test_local_bootstrap_differs_from_iterative_off_pillar():
+    """DISCRIMINATION ARM for the bootstrap= selector (#967): the SAME helper
+    strip bootstrapped iteratively and locally reprices every pillar to the
+    same quote, so a reprice-only oracle is vacuous. The two algorithms only
+    separate BETWEEN pillars: at settlement + 9000 days (6-Feb-2051, between
+    the 20Y and 25Y swap pillars) the discount factors differ by a measured
+    3.146438e-07, seven orders above the machine noise floor arm 2 pins. A
+    "local" arm silently wired to the iterative curve would give 0.0 here."""
+    _, _, _, settlement, deposits, swaps = _fixture()
+    instruments = deposits + swaps
+    dc = DayCounter.actual360()
+    iterative = PiecewiseConvexMonotoneForward(
+        settlement, instruments, dc, bootstrap="iterative"
+    )
+    local = PiecewiseConvexMonotoneForward(settlement, instruments, dc, bootstrap="local")
+
+    off_pillar = settlement + 9000
+    gap = abs(iterative.discount_date(off_pillar) - local.discount_date(off_pillar))
+    assert gap > 1.0e-8, f"bootstrap= did not switch the algorithm: gap {gap}"
+
+
+def test_local_bootstrap_is_deterministic():
+    """NON-VACUITY GUARD for the arm above: "local" built twice off freshly
+    built helpers agrees with itself to well under 1e-12 (measured exactly
+    0.0), so the 3.1e-7 separation is the algorithm, not run-to-run noise."""
+    _, _, _, settlement, deposits, swaps = _fixture()
+    _, _, _, settlement_again, deposits_again, swaps_again = _fixture()
+    dc = DayCounter.actual360()
+    first = PiecewiseConvexMonotoneForward(settlement, deposits + swaps, dc, "local")
+    second = PiecewiseConvexMonotoneForward(
+        settlement_again, deposits_again + swaps_again, dc, "local"
+    )
+
+    off_pillar = settlement + 9000
+    gap = abs(first.discount_date(off_pillar) - second.discount_date(off_pillar))
+    assert gap < 1.0e-12, f"LocalBootstrap is not deterministic: gap {gap}"
+
+
+def test_unknown_bootstrap_name_is_rejected():
+    """The unknown-string arm, mirroring the interpolation selectors: an
+    unrecognised bootstrap name is an ItofinError, not a silently accepted
+    no-op (the accept-and-ignore class)."""
+    _, _, _, settlement, deposits, swaps = _fixture()
+    with pytest.raises(ItofinError, match="unknown bootstrap"):
+        PiecewiseConvexMonotoneForward(
+            settlement, deposits + swaps, DayCounter.actual360(), "nope"
+        )
+
+
+def test_default_bootstrap_is_iterative():
+    """DEFAULT-PIN ARM: the omitted argument must build the iterative curve.
+    Every other arm here and the reprice test above are blind to which
+    algorithm the default names, so this pins it EXACTLY (both curves are the
+    same deterministic solve) at the off-pillar date where the two algorithms
+    provably separate."""
+    _, _, _, settlement, deposits, swaps = _fixture()
+    instruments = deposits + swaps
+    dc = DayCounter.actual360()
+    omitted = PiecewiseConvexMonotoneForward(settlement, instruments, dc)
+    explicit = PiecewiseConvexMonotoneForward(settlement, instruments, dc, "iterative")
+
+    off_pillar = settlement + 9000
+    assert omitted.discount_date(off_pillar) == explicit.discount_date(off_pillar)
+
+
+def test_local_bootstrap_exposes_its_nodes():
+    """dates()/data() dispatch across the new enum's Local variant, returning
+    one node per helper plus the reference node."""
+    _, _, _, settlement, deposits, swaps = _fixture()
+    instruments = deposits + swaps
+    local = PiecewiseConvexMonotoneForward(
+        settlement, instruments, DayCounter.actual360(), "local"
+    )
+    assert len(local.dates()) == len(instruments) + 1
+    assert len(local.data()) == len(instruments) + 1
