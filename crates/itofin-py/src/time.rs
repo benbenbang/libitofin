@@ -129,6 +129,9 @@ impl PyDate {
 
     /// The signed number of days from other to this date.
     ///
+    /// The other operand may also be an int, which shifts the date back by that
+    /// many calendar days and returns a Date. Anything else raises TypeError.
+    ///
     /// Args:
     ///     other (Date): The date to measure from.
     ///

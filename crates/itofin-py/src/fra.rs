@@ -49,6 +49,9 @@ impl PyPosition {
 /// The FRA prices without an engine, so the valuation accessors work as soon
 /// as it is built. It settles and expires on its value date - the day the
 /// underlying loan begins - not on the later maturity date.
+///
+/// Passing None for the discount curve discounts on the forwarding curve
+/// instead.
 #[pyclass(name = "ForwardRateAgreement", unsendable)]
 pub struct PyForwardRateAgreement {
     inner: ForwardRateAgreement,

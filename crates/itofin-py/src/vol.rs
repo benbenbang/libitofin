@@ -320,6 +320,9 @@ impl PyBlackVolTimeExtrapolation {
 /// maximum, so queries past it require enable_extrapolation(), and
 /// time_extrapolation picks the rule applied there. The interpolation itself
 /// stays linear; only the extrapolation axis is exposed.
+///
+/// Selecting UseInterpolator constructs fine and answers in-range queries, then
+/// errors on an extrapolating one.
 #[pyclass(name = "BlackVarianceCurve", extends = PyBlackVolTermStructure, unsendable)]
 pub struct PyBlackVarianceCurve {
     #[allow(dead_code)]

@@ -891,6 +891,9 @@ impl PyZeroCouponInflationSwapHelper {
 /// Lazy: the bootstrap runs on the first read, so the evaluation date must be
 /// in place before that read as well as before the helpers were built. A helper
 /// quote moving invalidates the cache.
+///
+/// A seasonality installed later through set_seasonality() invalidates the
+/// bootstrap, so the next read re-solves every node against the correction.
 #[pyclass(
     name = "PiecewiseZeroInflationCurve",
     extends = PyZeroInflationTermStructure,
@@ -1014,6 +1017,10 @@ impl PyPiecewiseZeroInflationCurve {
 /// The core omits adjust_inf_obs_dates from its own signature, so there is
 /// nothing to expose here; the leg and cash-flow accessors are not surfaced
 /// either, there being no cash-flow facade.
+///
+/// Pricing needs an engine: call set_engine() before npv(). fair_rate() is the
+/// exception, reading the indexed flow directly and pricing with no engine at
+/// all, though it does need the index linked to a curve.
 #[pyclass(name = "ZeroCouponInflationSwap", unsendable)]
 pub struct PyZeroCouponInflationSwap {
     inner: SharedMut<ZeroCouponInflationSwap>,
@@ -1881,6 +1888,10 @@ impl PyYoYInflationIndex {
 ///
 /// pillar is accepted for signature parity but never read: it only ever
 /// discriminates on the interpolated path, which is refused.
+///
+/// Fallible: CpiInterpolationType.Linear is refused outright, and the swap is
+/// built here, so an observation lag its legs cannot be built under fails at
+/// construction.
 #[pyclass(
     name = "YearOnYearInflationSwapHelper",
     extends = PyYoYInflationHelper,

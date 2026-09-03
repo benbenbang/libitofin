@@ -670,6 +670,9 @@ impl PyOvernightIndex {
 /// general overnight index is. It retains its own clone of the index the base
 /// holds - the same object, not a rebuild - so a facade typed on either half
 /// reads exactly the same core index.
+///
+/// Construction is infallible, unlike the Euribor one that rejects daily
+/// tenors: the overnight tenor is fixed to one day by the base.
 #[pyclass(name = "Estr", extends = PyOvernightIndex, unsendable)]
 pub struct PyEstr {
     inner: Shared<OvernightIndex>,
