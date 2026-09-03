@@ -70,6 +70,8 @@ impl PyCapFloorType {
 /// a collar on this side, and the route a hand-built leg's own notional, day
 /// counter and fixing days reach the coupons by. Either way the core pads a
 /// short strike list across every coupon by repeating its last entry.
+///
+/// Pricing needs an engine: call set_black_engine() before npv().
 #[pyclass(name = "CapFloor", unsendable)]
 pub struct PyCapFloor {
     inner: CapFloor,

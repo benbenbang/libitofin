@@ -434,6 +434,9 @@ impl PyFlatHazardRate {
 /// function and the survival probability is exp(-integral) over those steps.
 /// Finite in time: queries past the last node need extrapolate=True, which
 /// continues at the last node's rate.
+///
+/// No interpolation argument is offered, and the curve carries no calendar: the
+/// calendar-taking constructor is not exposed.
 #[pyclass(name = "InterpolatedHazardRateCurve", extends = PyDefaultProbabilityTermStructure, unsendable)]
 pub struct PyInterpolatedHazardRateCurve {
     concrete: Shared<InterpolatedHazardRateCurve<BackwardFlat>>,
@@ -641,6 +644,9 @@ impl PyPiecewiseDefaultCurve {
 /// cash_settlement_days. trade_date and an upfront are not set here but are
 /// reachable through MakeCreditDefaultSwap (with_trade_date and the upfront_rate
 /// constructor argument).
+///
+/// Pricing needs an engine: call set_engine() or set_isda_engine() before
+/// npv().
 #[pyclass(name = "CreditDefaultSwap", unsendable)]
 pub struct PyCreditDefaultSwap {
     inner: SharedMut<CreditDefaultSwap>,
@@ -1054,6 +1060,9 @@ impl PyCreditDefaultSwap {
 /// the term-date quotation is exposed; the tenor and explicit-schedule ones and
 /// the accrual-rebate flag are not, the latter being reachable through
 /// CreditDefaultSwap.with_terms.
+///
+/// Each build() runs a fresh chain, so one builder object cannot carry a
+/// setting into a later contract.
 #[pyclass(name = "MakeCreditDefaultSwap", unsendable)]
 pub struct PyMakeCreditDefaultSwap {
     term_date: Date,

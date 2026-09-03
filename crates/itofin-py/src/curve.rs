@@ -363,6 +363,8 @@ impl PyDiscountCurve {
 /// The first date is the reference date. Finite in time. Unlike ZeroCurve and
 /// DiscountCurve this curve offers no cubic option, QuantLib-SWIG exposing its
 /// cubic curve on the zero and discount curves only.
+///
+/// A query past the last node needs enable_extrapolation() or extrapolate=True.
 #[pyclass(name = "ForwardCurve", extends = PyYieldTermStructure, unsendable)]
 pub struct PyForwardCurve;
 
@@ -423,6 +425,9 @@ impl PyForwardCurve {
 /// the solver runs on the first query, re-running after a helper-quote or
 /// evaluation-date change. A bootstrap failure therefore surfaces from the
 /// query methods, not from the constructor.
+///
+/// max_date is the exception: it swallows a bootstrap failure and falls back to
+/// the last helper's date.
 #[pyclass(name = "PiecewiseYieldCurve", extends = PyYieldTermStructure, unsendable)]
 pub struct PyPiecewiseYieldCurve;
 

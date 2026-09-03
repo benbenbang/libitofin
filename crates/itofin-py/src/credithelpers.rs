@@ -76,6 +76,11 @@ impl PyDefaultProbabilityHelper {
 /// held by settings, so it tracks that date rather than freezing a maturity at
 /// construction. It retains the caller's quote, so a later set_value re-drives
 /// the bootstrap, and it observes the discount curve.
+///
+/// Fallible: under the three post-Big-Bang date-generation rules the maturity
+/// is rolled by the CDS maturity convention, which raises ItofinError on a
+/// tenor it cannot roll rather than building a schedule that ends on the wrong
+/// date.
 #[pyclass(name = "SpreadCdsHelper", extends = PyDefaultProbabilityHelper, unsendable)]
 pub struct PySpreadCdsHelper;
 

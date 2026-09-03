@@ -39,6 +39,8 @@ impl PySimpleQuote {
 
     /// Return the current value.
     ///
+    /// Fallible: a quote whose value was never set raises ItofinError.
+    ///
     /// Returns:
     ///     float: The quote's current market value.
     fn value(&self) -> PyResult<f64> {

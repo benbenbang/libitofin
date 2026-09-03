@@ -600,6 +600,9 @@ impl PySwaptionVolatilityMatrix {
 /// i * len(swap_tenors) + j is the smile at (option_tenors[i], swap_tenors[j]),
 /// holding one quote per entry of strike_spreads. A later set_value on any of
 /// those quotes rebuilds the per-strike interpolators.
+///
+/// swap_index_base is the long base index and short_swap_index_base the short
+/// one; the cube picks between them per query by swap tenor.
 #[pyclass(name = "InterpolatedSwaptionVolatilityCube", extends = PySwaptionVolatilityStructure, unsendable)]
 pub struct PyInterpolatedSwaptionVolatilityCube {
     concrete: Shared<InterpolatedSwaptionVolatilityCube>,
