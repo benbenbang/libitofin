@@ -15,15 +15,13 @@
 //!
 //! ## What is ported, and what is deferred
 //!
-//! The single-curve path is ported, together with the `additionalPenalties`
-//! residual terms (#974) and the `additionalHelpers`/`additionalDates`
-//! restrictions (#976); it equals the C++ path with the remaining
-//! `additional*` argument empty and `parentBootstrapper_` null. Deferred
-//! visibly, each as its own follow-up issue referencing #949:
+//! The single-curve path is ported in full: the `additionalPenalties`
+//! residual terms (#974), the `additionalHelpers`/`additionalDates`
+//! restrictions (#976) and the `additionalVariables` optimizer coordinates
+//! with their `SimpleQuoteVariables` implementation (#977). It equals the C++
+//! path with `parentBootstrapper_` null. Deferred visibly, as its own
+//! follow-up issue referencing #949:
 //!
-//! - **Additional variables** (`additionalVariables`, plus the
-//!   `SimpleQuoteVariables` helper, #977): the extra optimizer coordinates the
-//!   futures-convexity oracle test (`piecewiseyieldcurve.cpp:1486`) exercises.
 //! - **Multi-curve orchestration** (`MultiCurveBootstrap`,
 //!   `MultiCurveBootstrapContributor`, `setParentBootstrapper`/`setToValid`,
 //!   the `parentBootstrapper_` branch of `calculate`).
@@ -33,8 +31,8 @@
 //! accuracy)` (`globalbootstrap.hpp:225`) is built per run. The Rust
 //! [`OptimizationMethod`](crate::math::optimization::method::OptimizationMethod)
 //! `minimize` takes `&mut self`, which a stored trait object cannot offer
-//! from the `&self` [`Bootstrap::calculate`]; an override can ride with the
-//! deferred additional-variables slice if a use case needs it. The
+//! from the `&self` [`Bootstrap::calculate`]; an override can be added if a
+//! use case needs it. The
 //! `EndCriteria` override is carried (it is `Copy`), defaulting to
 //! `EndCriteria(1000, 10, accuracy, accuracy, accuracy)`
 //! (`globalbootstrap.hpp:228`) - deliberately different literals from
@@ -136,13 +134,53 @@ pub type AdditionalPenalties = dyn Fn(&[Time], &[Real]) -> Vec<Real>;
 /// curve date are dropped (`hpp:268-274`).
 pub type AdditionalDates = dyn Fn() -> Vec<Date>;
 
+/// The additional optimizer variables (`AdditionalBootstrapVariables`,
+/// `globalbootstrap.hpp:69-76`).
+///
+/// Coordinates the global solve varies alongside the curve nodes, living
+/// OUTSIDE the curve: they are appended after the node coordinates in the
+/// optimizer's vector, and each trial point's tail is written back into
+/// whatever the implementation drives - upstream, external quotes the rate
+/// helpers read ([`SimpleQuoteVariables`]).
+///
+/// A variable adds a degree of freedom without adding a residual, so a system
+/// that gains variables this way needs matching [`AdditionalPenalties`] terms
+/// to stay solvable.
+///
+/// Both methods take `&self`, as the driver holds the variables behind a shared
+/// reference through the solve, and both return [`QlResult`] (D4): reading a
+/// quote back is fallible.
+///
+/// [`SimpleQuoteVariables`]: crate::termstructures::globalbootstrapvars::SimpleQuoteVariables
+pub trait AdditionalBootstrapVariables {
+    /// The initial guesses, in optimizer space, one per variable.
+    ///
+    /// `valid_data` is the driver's warm-restart flag: on a re-solve over an
+    /// unchanged grid the previous solution is still in place, and an
+    /// implementation may seed itself from it rather than from its configured
+    /// guesses.
+    ///
+    /// # Errors
+    ///
+    /// Implementation-defined; the driver propagates it out of `calculate`.
+    fn initialize(&self, valid_data: bool) -> QlResult<Vec<Real>>;
+
+    /// Writes a trial point, in optimizer space, back into the variables.
+    ///
+    /// # Errors
+    ///
+    /// Implementation-defined; the driver parks it like a failed reprice.
+    fn update(&self, x: &[Real]) -> QlResult<()>;
+}
+
 /// The global bootstrap (`GlobalBootstrap`, single-curve core).
 ///
 /// Carries the stopping-accuracy override, the `EndCriteria` override, the
 /// per-instrument residual weights, the additional penalty terms, and the
-/// additional helpers and dates those penalties are built around; defaults
-/// mirror the C++ constructor (`accuracy = Null`, `endCriteria = nullptr`,
-/// `instrumentWeights = {}`, no penalties, no additional restrictions,
+/// additional helpers and dates those penalties are built around, and the
+/// additional optimizer variables; defaults mirror the C++ constructor
+/// (`accuracy = Null`, `endCriteria = nullptr`, `instrumentWeights = {}`, no
+/// penalties, no additional restrictions, no additional variables,
 /// `globalbootstrap.hpp:112-115`), with everything resolved from the curve at
 /// calculation time.
 ///
@@ -157,6 +195,7 @@ pub struct GlobalBootstrap {
     end_criteria: Option<EndCriteria>,
     instrument_weights: Vec<Real>,
     penalties: Option<Box<AdditionalPenalties>>,
+    additional_variables: Option<Box<dyn AdditionalBootstrapVariables>>,
 }
 
 impl Default for GlobalBootstrap {
@@ -182,6 +221,7 @@ impl GlobalBootstrap {
             end_criteria,
             instrument_weights,
             penalties: None,
+            additional_variables: None,
         }
     }
 
@@ -193,8 +233,8 @@ impl GlobalBootstrap {
     ///
     /// The additional helpers are handed the curve and registered with it, but
     /// contribute neither a pillar date nor a residual: they exist so a penalty
-    /// can read their `implied_quote`. Its `additionalVariables` argument is
-    /// still deferred.
+    /// can read their `implied_quote`. Its `additionalVariables` argument is a
+    /// separate step, [`with_additional_variables`](Self::with_additional_variables).
     pub fn with_penalties<F>(
         additional_helpers: Vec<Shared<dyn RateHelper>>,
         additional_dates: Option<Box<AdditionalDates>>,
@@ -213,6 +253,7 @@ impl GlobalBootstrap {
             end_criteria,
             instrument_weights,
             penalties: Some(Box::new(penalties)),
+            additional_variables: None,
         }
     }
 
@@ -240,14 +281,32 @@ impl GlobalBootstrap {
             move |_, _| penalties(),
         )
     }
+
+    /// Attaches the [`AdditionalBootstrapVariables`] the solve varies alongside
+    /// the curve nodes (the `additionalVariables` argument of C++ constructors
+    /// #2 and #3, `globalbootstrap.hpp:122`/`:130`).
+    ///
+    /// A consuming builder rather than a further constructor parameter: the
+    /// C++ argument is trailing and defaulted, so every existing call site
+    /// means "no additional variables", and a builder step keeps them
+    /// unchanged.
+    #[must_use]
+    pub fn with_additional_variables(
+        mut self,
+        variables: Box<dyn AdditionalBootstrapVariables>,
+    ) -> GlobalBootstrap {
+        self.additional_variables = Some(variables);
+        self
+    }
 }
 
 /// The global cost (`setCostFunctionArgument` + `evaluateCostFunction`,
 /// `globalbootstrap.hpp:379-403`): writes every interior trial node into the
 /// node vector through `transform_direct`, rebuilds the full-grid
-/// interpolation, and returns the alive helpers' weighted quote errors -
-/// followed by the [`AdditionalPenalties`] terms, if any - as the residual
-/// vector.
+/// interpolation, hands the remaining tail of the trial point to the
+/// [`AdditionalBootstrapVariables`], and returns the alive helpers' weighted
+/// quote errors - followed by the [`AdditionalPenalties`] terms, if any - as
+/// the residual vector.
 ///
 /// The [`CostFunction`] trait is infallible, so a failed rebuild or reprice
 /// parks its error in `error` and returns NaN residuals, which the solver
@@ -262,6 +321,7 @@ where
     alive: &'a [Shared<C::Helper>],
     alive_weights: &'a [Real],
     penalties: Option<&'a AdditionalPenalties>,
+    variables: Option<&'a dyn AdditionalBootstrapVariables>,
     /// The number of interior nodes, `times.len() - 1`, and the number of
     /// variables the solve carries; the residual count is `alive.len()` plus
     /// the penalty terms. The two are equal for a strip of distinct pillars
@@ -289,6 +349,18 @@ where
             }
             cd.rebuild(self.curve.interpolator(), self.interior)?;
         }
+        // The trial point's tail goes to the additional variables (`:386-388`),
+        // still inside the C++ `setCostFunctionArgument` step and so before the
+        // penalties. It writes no curve cell - upstream it writes external
+        // quotes - but it does notify, which is why the helpers reaching those
+        // quotes must hold them through an unregistered handle
+        // (`Handle::new_unregistered`); an observing one would invalidate the
+        // curve on every evaluation.
+        if let Some(variables) = self.variables {
+            let trial: &[Real] = x;
+            variables.update(&trial[self.interior..])?;
+        }
+
         // Only now that the `borrow_mut` above has dropped, so a penalty that
         // reads the curve back can take its own shared borrow (`:392-395`).
         let penalty_errors = match self.penalties {
@@ -466,10 +538,17 @@ where
             helper.set_term_structure(&term_structure);
         }
 
-        // The initial guess (`:360-372`): update each interior node through
-        // Traits::guess - which depends on the previously updated nodes, so
-        // the writes are sequential - then map it into the optimizer space.
-        let mut guess = Array::with_size(interior);
+        // The initial guess (`:360-374`): the additional variables initialize
+        // FIRST, then each interior node is updated through Traits::guess -
+        // which depends on the previously updated nodes, so the writes are
+        // sequential - and mapped into the optimizer space. The additional
+        // guesses are APPENDED after the node guesses, which is the layout the
+        // cost function's `x[interior..]` split relies on.
+        let additional_guesses = match &self.additional_variables {
+            Some(variables) => variables.initialize(valid_data)?,
+            None => Vec::new(),
+        };
+        let mut guess = Array::with_size(interior + additional_guesses.len());
         {
             let mut cd = curve.curve_data().borrow_mut();
             for i in 0..interior {
@@ -478,6 +557,9 @@ where
                 guess[i] = C::Traits::transform_inverse(cd.data()[i + 1], cd.times()[i + 1]);
             }
             cd.rebuild(curve.interpolator(), interior)?;
+        }
+        for (i, additional_guess) in additional_guesses.into_iter().enumerate() {
+            guess[interior + i] = additional_guess;
         }
 
         // Solver configuration (`:222-229`): the LM tolerances and the
@@ -495,6 +577,7 @@ where
             alive: &alive,
             alive_weights: &alive_weights,
             penalties: self.penalties.as_deref(),
+            variables: self.additional_variables.as_deref(),
             interior,
             penalty_len: Cell::new(0),
             error: RefCell::new(None),
@@ -528,6 +611,15 @@ where
             }
             cd.rebuild(curve.interpolator(), interior)?;
             cd.set_valid(true);
+        }
+        // The additional variables are pinned to the solution too, after that
+        // `borrow_mut` has dropped. C++ has no pin loop at all and simply
+        // leaves the quotes at the optimizer's last trial point; this port
+        // rewrites the nodes from the returned solution, so the quotes are
+        // rewritten from the same vector and the two stay consistent.
+        if let Some(variables) = &self.additional_variables {
+            let solved: &[Real] = &solution;
+            variables.update(&solved[interior..])?;
         }
         Ok(())
     }
@@ -587,6 +679,7 @@ mod tests {
     use crate::termstructures::TermStructure;
     use crate::termstructures::bootstraphelper::RateHelper;
     use crate::termstructures::bootstraptraits::{ForwardRate, SimpleZeroYield};
+    use crate::termstructures::globalbootstrapvars::SimpleQuoteVariables;
     use crate::termstructures::yields::{
         DepositRateHelper, FraRateHelper, PiecewiseYieldCurve, Pillar, SwapRateHelper,
     };
