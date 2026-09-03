@@ -1,10 +1,10 @@
-//! Facades for the plain-vanilla swap stack: [`PySwapType`], [`PyVanillaSwap`]
-//! and the [`PyMakeVanillaSwap`] builder.
+//! Facades for the plain-vanilla swap stack: SwapType, VanillaSwap and the
+//! MakeVanillaSwap builder.
 //!
-//! [`PyVanillaSwap`] wraps a `SharedMut<FixedVsFloatingSwap>` (the shape a
-//! swaption underlying needs, X3) and is priced with a [`DiscountingSwapEngine`]
-//! attached through [`set_engine`](PyVanillaSwap::set_engine), so the facade
-//! pins a real number rather than a construction-only object.
+//! VanillaSwap wraps the fixed-vs-floating swap a swaption underlying needs
+//! (X3) and is priced with a DiscountingSwapEngine attached through
+//! set_engine(), so the facade pins a real number rather than a
+//! construction-only object.
 
 use crate::PyQlError;
 use crate::curve::PyYieldTermStructure;
@@ -37,7 +37,7 @@ pub enum PySwapType {
 }
 
 impl PySwapType {
-    /// The core [`SwapType`] this variant stands for.
+    /// The core SwapType this variant stands for.
     pub(crate) fn inner(&self) -> SwapType {
         match self {
             PySwapType::Payer => SwapType::Payer,
@@ -239,8 +239,8 @@ impl PyVanillaSwap {
         SharedMut::clone(&self.inner)
     }
 
-    /// Wraps an already-lowered swap, the shape [`PyMakeVanillaSwap::build`]
-    /// hands back.
+    /// Wraps an already-lowered swap, the shape MakeVanillaSwap.build() hands
+    /// back.
     fn from_inner(inner: SharedMut<FixedVsFloatingSwap>) -> PyVanillaSwap {
         PyVanillaSwap { inner }
     }

@@ -1,4 +1,4 @@
-//! Facades for the time primitives: [`PyDate`], [`PyDayCounter`], [`PyCalendar`].
+//! Facades for the time primitives: Date, DayCounter, Calendar.
 
 use crate::ItofinError;
 use libitofin::time::businessdayconvention::BusinessDayConvention;
@@ -181,12 +181,12 @@ impl PyDate {
 }
 
 impl PyDate {
-    /// The wrapped core [`Date`] (cheaply `Copy`).
+    /// The wrapped core Date (cheaply `Copy`).
     pub(crate) fn inner(&self) -> Date {
         self.inner
     }
 
-    /// Wraps a core [`Date`] returned from a term-structure query.
+    /// Wraps a core Date returned from a term-structure query.
     pub(crate) fn from_inner(inner: Date) -> Self {
         PyDate { inner }
     }
@@ -301,13 +301,13 @@ impl PyDayCounter {
 }
 
 impl PyDayCounter {
-    /// The wrapped core [`DayCounter`] (cheap `Rc` clone).
+    /// The wrapped core DayCounter (cheap `Rc` clone).
     #[allow(dead_code)]
     pub(crate) fn inner(&self) -> DayCounter {
         self.inner.clone()
     }
 
-    /// Wraps a core [`DayCounter`] a facade read back off an object it built.
+    /// Wraps a core DayCounter a facade read back off an object it built.
     ///
     /// The result carries no factory identity, but equality is by convention
     /// name, so it compares equal to the factory call that built it.
@@ -384,20 +384,20 @@ impl PyPeriod {
 }
 
 impl PyPeriod {
-    /// The wrapped core [`Period`] (cheaply `Copy`).
+    /// The wrapped core Period (cheaply `Copy`).
     pub(crate) fn inner(&self) -> Period {
         self.inner
     }
 
-    /// A facade over a core [`Period`], for the inspectors that return one.
+    /// A facade over a core Period, for the inspectors that return one.
     pub(crate) fn from_inner(inner: Period) -> Self {
         PyPeriod { inner }
     }
 }
 
-/// Maps a `{"Days", "Weeks", "Months", "Years"}` string to a [`TimeUnit`],
-/// the same set [`PyPeriod`] accepts; an unknown unit returns
-/// [`struct@ItofinError`] rather than reaching the core.
+/// Maps a `{"Days", "Weeks", "Months", "Years"}` string to a TimeUnit, the same
+/// set Period accepts; an unknown unit returns ItofinError rather than reaching
+/// the core.
 fn parse_time_unit(unit: &str) -> PyResult<TimeUnit> {
     match unit {
         "Days" => Ok(TimeUnit::Days),
@@ -531,15 +531,15 @@ impl PyCalendar {
 }
 
 impl PyCalendar {
-    /// The wrapped core [`Calendar`] (cheap `Rc` clone).
+    /// The wrapped core Calendar (cheap `Rc` clone).
     pub(crate) fn inner(&self) -> Calendar {
         self.inner.clone()
     }
 
-    /// Wraps a core [`Calendar`] a facade read back off an object it built.
+    /// Wraps a core Calendar a facade read back off an object it built.
     ///
     /// The result carries no factory identity; the calendar it stands for is
-    /// readable through [`Self::__repr__`], which prints the core name.
+    /// readable through Self.__repr__(), which prints the core name.
     pub(crate) fn from_inner(inner: Calendar) -> Self {
         PyCalendar { inner }
     }
@@ -559,7 +559,7 @@ pub enum PyFrequency {
 }
 
 impl PyFrequency {
-    /// The core [`Frequency`] this variant stands for.
+    /// The core Frequency this variant stands for.
     pub(crate) fn inner(&self) -> Frequency {
         match self {
             PyFrequency::Annual => Frequency::Annual,
@@ -574,7 +574,7 @@ impl PyFrequency {
     ///
     /// The core enum carries thirteen values against the four surfaced here, so
     /// this is partial: a frequency with no counterpart is reported as
-    /// [`struct@ItofinError`] rather than mapped onto a neighbour.
+    /// ItofinError rather than mapped onto a neighbour.
     pub(crate) fn from_inner(frequency: Frequency) -> PyResult<PyFrequency> {
         match frequency {
             Frequency::Annual => Ok(PyFrequency::Annual),
@@ -603,7 +603,7 @@ pub enum PyBusinessDayConvention {
 }
 
 impl PyBusinessDayConvention {
-    /// The core [`BusinessDayConvention`] this variant stands for.
+    /// The core BusinessDayConvention this variant stands for.
     pub(crate) fn inner(&self) -> BusinessDayConvention {
         match self {
             PyBusinessDayConvention::ModifiedFollowing => BusinessDayConvention::ModifiedFollowing,
@@ -659,7 +659,7 @@ pub enum PyDateGeneration {
 }
 
 impl PyDateGeneration {
-    /// The core [`DateGeneration`] this variant stands for.
+    /// The core DateGeneration this variant stands for.
     pub(crate) fn inner(self) -> DateGeneration {
         match self {
             PyDateGeneration::Backward => DateGeneration::Backward,
@@ -787,7 +787,7 @@ impl PySchedule {
 }
 
 impl PySchedule {
-    /// The wrapped core [`Schedule`] (clone), for the swap facades in X2.
+    /// The wrapped core Schedule (clone), for the swap facades in X2.
     #[allow(dead_code)]
     pub(crate) fn inner(&self) -> Schedule {
         self.inner.clone()

@@ -1,13 +1,12 @@
-//! Facades for the credit bootstrap helpers: the [`PyDefaultProbabilityHelper`]
-//! base and the concrete [`PySpreadCdsHelper`].
+//! Facades for the credit bootstrap helpers: the DefaultProbabilityHelper base
+//! and the concrete SpreadCdsHelper.
 //!
-//! The credit twin of [`crate::helpers`], which carries the yield-side rate
-//! helpers, split the same way the core splits them: a credit helper fits a
+//! The credit twin of helpers(), which carries the yield-side rate helpers,
+//! split the same way the core splits them: a credit helper fits a
 //! default-probability curve, not a yield curve, so it implements a separate
-//! trait (`defaultprobabilityhelpers.rs:66`) and cannot share the `dyn
-//! RateHelper` base. The base holds the already-upcast
-//! `Shared<dyn DefaultProbabilityHelper>` and the concrete subclasses supply
-//! only their constructors, mirroring the [`crate::credit`] base/subclass idiom.
+//! trait and cannot share the RateHelper base. The base holds the helper
+//! already upcast and type-erased, and the concrete subclasses supply only
+//! their constructors, mirroring the credit() base/subclass idiom.
 //!
 //! `UpfrontCdsHelper` (`defaultprobabilityhelpers.hpp:170`) has no core port yet
 //! and is omitted here rather than stubbed; it follows within EPIC Credit
@@ -58,7 +57,7 @@ impl PyDefaultProbabilityHelper {
 }
 
 impl PyDefaultProbabilityHelper {
-    /// The base half of a concrete helper's [`PyClassInitializer`] chain.
+    /// The base half of a concrete helper's initializer chain.
     pub(crate) fn from_shared(inner: Shared<dyn DefaultProbabilityHelper>) -> Self {
         PyDefaultProbabilityHelper { inner }
     }

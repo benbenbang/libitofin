@@ -1,18 +1,17 @@
-//! Facades for the two credit-default-swap engines: [`PyMidPointCdsEngine`] and
-//! [`PyIsdaCdsEngine`].
+//! Facades for the two credit-default-swap engines: MidPointCdsEngine and
+//! IsdaCdsEngine.
 //!
-//! The mid-point engine prices each live premium period of a
-//! [`CreditDefaultSwap`](crate::credit::PyCreditDefaultSwap) against the default
-//! probability over that period, placing the default at the period's mid-point,
-//! and discounts on a separate yield curve. The ISDA engine prices the same
-//! contract the way the ISDA standard model does, integrating both legs over the
-//! pillar dates of the two curves rather than over the premium schedule alone.
+//! The mid-point engine prices each live premium period of a CreditDefaultSwap
+//! against the default probability over that period, placing the default at the
+//! period's mid-point, and discounts on a separate yield curve. The ISDA engine
+//! prices the same contract the way the ISDA standard model does, integrating
+//! both legs over the pillar dates of the two curves rather than over the
+//! premium schedule alone.
 //!
-//! Deferred (visible): the core's `include_settlement_date_flows` override
-//! (`midpointcdsengine.rs:73`, `isdacdsengine.rs:127`) is not exposed on either
-//! engine and is always passed as `None`, so the settlement-date flow decision
-//! follows the settings' own flags - the shape the C++ cached-value fixture uses
-//! (`creditdefaultswap.cpp:96`).
+//! Deferred (visible): the core's `include_settlement_date_flows` override is
+//! not exposed on either engine and is always passed as `None`, so the
+//! settlement-date flow decision follows the settings' own flags - the shape
+//! the C++ cached-value fixture uses (`creditdefaultswap.cpp:96`).
 
 use crate::credit::PyDefaultProbabilityTermStructure;
 use crate::curve::PyYieldTermStructure;
@@ -92,7 +91,7 @@ pub enum PyNumericalFix {
 }
 
 impl PyNumericalFix {
-    /// The core [`NumericalFix`] this variant stands for.
+    /// The core NumericalFix this variant stands for.
     pub(crate) fn inner(self) -> NumericalFix {
         match self {
             PyNumericalFix::NoFix => NumericalFix::NoFix,
@@ -114,7 +113,7 @@ pub enum PyAccrualBias {
 }
 
 impl PyAccrualBias {
-    /// The core [`AccrualBias`] this variant stands for.
+    /// The core AccrualBias this variant stands for.
     pub(crate) fn inner(self) -> AccrualBias {
         match self {
             PyAccrualBias::HalfDayBias => AccrualBias::HalfDayBias,
@@ -137,7 +136,7 @@ pub enum PyForwardsInCouponPeriod {
 }
 
 impl PyForwardsInCouponPeriod {
-    /// The core [`ForwardsInCouponPeriod`] this variant stands for.
+    /// The core ForwardsInCouponPeriod this variant stands for.
     pub(crate) fn inner(self) -> ForwardsInCouponPeriod {
         match self {
             PyForwardsInCouponPeriod::Flat => ForwardsInCouponPeriod::Flat,

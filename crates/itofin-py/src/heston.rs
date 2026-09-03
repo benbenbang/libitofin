@@ -1,5 +1,5 @@
-//! Facades for the Heston stack: [`PyHestonProcess`], [`PyHestonModel`] and
-//! [`PyHestonModelHelper`].
+//! Facades for the Heston stack: HestonProcess, HestonModel and
+//! HestonModelHelper.
 
 use crate::PyQlError;
 use crate::calibration::{PyCalibrationErrorType, PyEndCriteria, PyLevenbergMarquardt};

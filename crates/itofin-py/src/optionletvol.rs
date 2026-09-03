@@ -1,15 +1,14 @@
 //! Facades for the optionlet (caplet/floorlet) volatility stack: the
-//! [`PyOptionletVolatilityStructure`] base, the constant surface
-//! [`PyConstantOptionletVolatility`], and the stripping pair
-//! [`PyOptionletStripper1`] / [`PyStrippedOptionletAdapter`] that turns market
-//! cap term volatilities into a caplet surface.
+//! OptionletVolatilityStructure base, the constant surface
+//! ConstantOptionletVolatility, and the stripping pair OptionletStripper1 /
+//! StrippedOptionletAdapter that turns market cap term volatilities into a
+//! caplet surface.
 //!
-//! The base holds the erased `Handle<dyn OptionletVolatilityStructure>` and
-//! exposes the queries every concrete surface inherits; concrete surfaces
+//! The base holds the surface type-erased and exposes the queries every
+//! concrete surface inherits; concrete surfaces
 //! subclass it and supply only their constructor. They build the base through
-//! [`from_handle`](PyOptionletVolatilityStructure::from_handle) rather than a
-//! struct literal, so the surfaces stacking on it in later tickets never need
-//! access to the private field.
+//! from_handle() rather than a struct literal, so the surfaces stacking on it
+//! in later tickets never need access to the private field.
 //!
 //! Unlike the swaption surfaces, an optionlet surface has a single option axis:
 //! a query takes one option tenor (or date) and a strike, not an option/swap

@@ -1,21 +1,18 @@
-//! Facades for the inflation slice: the [`PyDiscountingSwapEngine`] every
-//! inflation swap prices through, the [`PyCpiInterpolationType`] observation
-//! flag, the [`PyZeroInflationIndex`] family, the
-//! [`PyZeroInflationTermStructure`] curve hierarchy, the
-//! [`PyMultiplicativePriceSeasonality`] correction any of its curves can carry,
-//! the [`PyZeroInflationHelper`] bootstrap helpers that fit its piecewise member
-//! and the [`PyZeroCouponInflationSwap`] the rest of them price together, plus
-//! the year-on-year family that mirrors it: the
-//! [`PyYoYInflationTermStructure`] curve hierarchy and the
-//! [`PyYoYInflationHelper`] helpers that fit its piecewise member, and the
-//! optionlet stack written over that curve: the flat
-//! [`PyConstantYoYOptionletVolatility`] surface, the
-//! [`PyYoYInflationCapFloorEngine`] pricing against it and the
-//! [`PyYoYInflationCapFloor`] it prices, which
-//! [`PyMakeYoYInflationCapFloor`] is the only way to build, the quoted
-//! [`PyYoYCapFloorTermPriceSurface`] cap/floor price grid the optionlet
-//! strippers read, and the [`PyKInterpolatedYoYOptionletVolatilitySurface`]
-//! stripping that grid into an optionlet volatility surface.
+//! Facades for the inflation slice: the DiscountingSwapEngine every inflation
+//! swap prices through, the CpiInterpolationType observation flag, the
+//! ZeroInflationIndex family, the ZeroInflationTermStructure curve hierarchy,
+//! the MultiplicativePriceSeasonality correction any of its curves can carry,
+//! the ZeroInflationHelper bootstrap helpers that fit its piecewise member and
+//! the ZeroCouponInflationSwap the rest of them price together, plus the
+//! year-on-year family that mirrors it: the YoYInflationTermStructure curve
+//! hierarchy and the YoYInflationHelper helpers that fit its piecewise member,
+//! and the optionlet stack written over that curve: the flat
+//! ConstantYoYOptionletVolatility surface, the YoYInflationCapFloorEngine
+//! pricing against it and the YoYInflationCapFloor it prices, which
+//! MakeYoYInflationCapFloor is the only way to build, the quoted
+//! YoYCapFloorTermPriceSurface cap/floor price grid the optionlet strippers
+//! read, and the KInterpolatedYoYOptionletVolatilitySurface stripping that grid
+//! into an optionlet volatility surface.
 //!
 //! The swap engine is generic rather than inflation-specific - it prices any
 //! swap - but is homed here because the inflation tickets are the first to need
@@ -143,7 +140,7 @@ pub enum PyCpiInterpolationType {
 }
 
 impl PyCpiInterpolationType {
-    /// The core [`CpiInterpolationType`] this variant stands for.
+    /// The core CpiInterpolationType this variant stands for.
     pub(crate) fn inner(&self) -> CpiInterpolationType {
         match self {
             PyCpiInterpolationType::Flat => CpiInterpolationType::Flat,
@@ -151,8 +148,8 @@ impl PyCpiInterpolationType {
         }
     }
 
-    /// The variant standing for a core [`CpiInterpolationType`] a facade read
-    /// back off an object it built.
+    /// The variant standing for a core CpiInterpolationType a facade read back
+    /// off an object it built.
     pub(crate) fn from_inner(inner: CpiInterpolationType) -> Self {
         match inner {
             CpiInterpolationType::Flat => PyCpiInterpolationType::Flat,
@@ -346,7 +343,7 @@ impl PyZeroInflationIndex {
 impl PyZeroInflationIndex {
     /// Points the internal handle at `curve`, so the index forecasts off it.
     ///
-    /// The seam [`link_to`](Self::link_to) dereferences a curve facade into.
+    /// The seam link_to() dereferences a curve facade into.
     pub(crate) fn relink(&self, curve: Shared<dyn ZeroInflationTermStructure>) {
         self.curve.link_to(curve);
     }
@@ -604,7 +601,7 @@ impl PyZeroInflationTermStructure {
 }
 
 impl PyZeroInflationTermStructure {
-    /// The base half of a concrete curve's [`PyClassInitializer`] chain.
+    /// The base half of a concrete curve's initializer chain.
     pub(crate) fn from_handle(inner: Handle<dyn ZeroInflationTermStructure>) -> Self {
         PyZeroInflationTermStructure { inner }
     }
@@ -745,7 +742,7 @@ impl PyZeroInflationHelper {
 }
 
 impl PyZeroInflationHelper {
-    /// The base half of a concrete helper's [`PyClassInitializer`] chain.
+    /// The base half of a concrete helper's initializer chain.
     pub(crate) fn from_shared(inner: Shared<dyn ZeroInflationHelper>) -> Self {
         PyZeroInflationHelper { inner }
     }
@@ -1436,7 +1433,7 @@ impl PyYoYInflationTermStructure {
 }
 
 impl PyYoYInflationTermStructure {
-    /// The base half of a concrete curve's [`PyClassInitializer`] chain.
+    /// The base half of a concrete curve's initializer chain.
     pub(crate) fn from_handle(inner: Handle<dyn YoYInflationTermStructure>) -> Self {
         PyYoYInflationTermStructure { inner }
     }
@@ -1576,7 +1573,7 @@ impl PyYoYInflationHelper {
 }
 
 impl PyYoYInflationHelper {
-    /// The base half of a concrete helper's [`PyClassInitializer`] chain.
+    /// The base half of a concrete helper's initializer chain.
     pub(crate) fn from_shared(inner: Shared<dyn YoYInflationHelper>) -> Self {
         PyYoYInflationHelper { inner }
     }
@@ -1614,10 +1611,9 @@ impl PyYoYInflationIndex {
     /// Wraps `build` over a fresh empty relinkable handle the index observes.
     ///
     /// Both constructors route through here: the core's `from_underlying` and
-    /// `new` alike leave the curve handle empty
-    /// (`inflationindex.rs:661,684`), and it is
-    /// [`with_term_structure`](YoYInflationIndex::with_term_structure) that
-    /// registers the index on a handle it will keep seeing.
+    /// `new` alike leave the curve handle empty, and it is
+    /// with_term_structure() that registers the index on a handle it will keep
+    /// seeing.
     fn with_curve_handle(
         underlying: Option<Py<PyZeroInflationIndex>>,
         build: impl FnOnce(&RelinkableHandle<dyn YoYInflationTermStructure>) -> YoYInflationIndex,

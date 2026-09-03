@@ -1,11 +1,10 @@
-//! Facades for the overnight-indexed-swap stack: [`PyOvernightIndexedSwap`]
-//! and the [`PyMakeOis`] builder.
+//! Facades for the overnight-indexed-swap stack: OvernightIndexedSwap and the
+//! MakeOis builder.
 //!
-//! The OIS analogue of [`crate::swap`]: the builder derives both schedules and
-//! the discounting engine from a swap tenor and an overnight index, and
-//! [`PyMakeOis::build`] returns a swap that already carries its
-//! [`DiscountingSwapEngine`] (`makeois.rs:508-516`), so it prices straight
-//! away.
+//! The OIS analogue of swap(): the builder derives both schedules and the
+//! discounting engine from a swap tenor and an overnight index, and
+//! MakeOis.build() returns a swap that already carries its
+//! DiscountingSwapEngine, so it prices straight away.
 
 use crate::PyQlError;
 use crate::curve::PyYieldTermStructure;
@@ -145,7 +144,7 @@ impl PyOvernightIndexedSwap {
 }
 
 impl PyOvernightIndexedSwap {
-    /// Wraps the swap [`PyMakeOis::build`] hands back.
+    /// Wraps the swap MakeOis.build() hands back.
     fn from_inner(inner: SharedMut<OvernightIndexedSwap>) -> PyOvernightIndexedSwap {
         PyOvernightIndexedSwap { inner }
     }

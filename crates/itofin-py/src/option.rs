@@ -1,4 +1,4 @@
-//! Facades for the option instrument: [`PyOptionType`] and [`PyVanillaOption`].
+//! Facades for the option instrument: OptionType and VanillaOption.
 
 use crate::PyQlError;
 use crate::heston::PyHestonModel;
@@ -31,7 +31,7 @@ pub enum PyOptionType {
 }
 
 impl PyOptionType {
-    /// The core [`OptionType`] this variant stands for.
+    /// The core OptionType this variant stands for.
     pub(crate) fn inner(self) -> OptionType {
         match self {
             PyOptionType::Call => OptionType::Call,

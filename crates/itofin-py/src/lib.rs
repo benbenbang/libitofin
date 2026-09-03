@@ -1,9 +1,9 @@
 //! Python bindings for `libitofin`, published as the `itofin` extension module.
 //!
 //! This crate is the walking skeleton (issue #484): it builds an `abi3-py313`
-//! wheel, imports as `itofin`, and bridges [`QlError`] to the Python-visible
-//! [`struct@ItofinError`] exception. The pricing facades land in follow-up
-//! tickets (#485-#487).
+//! wheel, imports as `itofin`, and bridges QlError to the Python-visible
+//! ItofinError exception. The pricing facades land in follow-up tickets
+//! (#485-#487).
 
 mod calibration;
 mod capfloor;
@@ -117,14 +117,13 @@ use vol::{
 
 create_exception!(itofin, ItofinError, PyException);
 
-/// Newtype bridging [`QlError`] to [`PyErr`] across the crate boundary.
+/// Newtype bridging QlError to Err across the crate boundary.
 ///
-/// A direct `impl From<QlError> for PyErr` is an orphan-rule violation
-/// (E0117): both types are foreign to this crate. This wrapper carries the
-/// two conversions instead, so fallible facades can return
-/// `Result<T, PyQlError>` and use `?` on any `QlResult`. The Python-visible
-/// contract is unchanged: the error surfaces as an [`struct@ItofinError`]
-/// carrying the located `Display` form (`"file:line: message"`).
+/// A direct conversion cannot be written here, both the core error and the
+/// binding error type being foreign to this crate. This wrapper carries the two
+/// conversions instead, so fallible facades can propagate any core result. The
+/// Python-visible contract is unchanged: the error surfaces as an ItofinError
+/// carrying the located message.
 pub struct PyQlError(QlError);
 
 impl From<QlError> for PyQlError {
@@ -141,7 +140,7 @@ impl From<PyQlError> for PyErr {
 
 /// Registers the eleven `ql/`-faithful submodules on `itofin`.
 ///
-/// Nested PyO3 modules give attribute access (`itofin.time.Date`) but do not
+/// Nested native modules give attribute access (`itofin.time.Date`) but do not
 /// form a Python package, so `import itofin.time` / `from itofin.time import
 /// Date` fail unless each submodule is also inserted into `sys.modules` under
 /// its dotted name. The loop below does both: `add_submodule` for attribute

@@ -1,5 +1,5 @@
-//! Facades for the yield term-structure hierarchy: the [`PyYieldTermStructure`]
-//! base and the concrete [`PyFlatForward`] curve.
+//! Facades for the yield term-structure hierarchy: the YieldTermStructure base
+//! and the concrete FlatForward curve.
 
 use crate::helpers::PyRateHelper;
 use crate::time::{PyCalendar, PyDate, PyDayCounter};

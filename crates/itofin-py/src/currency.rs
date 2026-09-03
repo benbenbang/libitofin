@@ -1,16 +1,14 @@
-//! Facade for the currency specification [`PyCurrency`] (`currency::Currency`).
+//! Facade for the currency specification Currency.
 //!
-//! An index carries a currency, so the general [`PyIborIndex`](crate::hullwhite::PyIborIndex)
-//! constructor cannot be called without one. Only the four named currencies the
-//! core provides are exposed as staticmethods; the general
-//! [`Currency::new`](libitofin::currency::Currency::new) form is deliberately
-//! omitted, since the core itself ports only the currencies the indexes need and
-//! the full `ql/currencies/*` catalogue is deferred there (`currency.rs:9`).
+//! An index carries a currency, so the general IborIndex constructor cannot be
+//! called without one. Only the four named currencies the core provides are
+//! exposed as staticmethods; the general Currency.new() form is deliberately
+//! omitted, since the core itself ports only the currencies the indexes need
+//! and the full `ql/currencies/*` catalogue is deferred there.
 //!
 //! It is registered under `itofin.indexes` rather than a submodule of its own:
 //! the index constructors are its only consumers today, both the general
-//! [`PyIborIndex`](crate::hullwhite::PyIborIndex) one and, since #868,
-//! [`PySwapIndex`](crate::swapindex::PySwapIndex), which used to hard-code EUR.
+//! IborIndex one and, since #868, SwapIndex, which used to hard-code EUR.
 
 use libitofin::currency::Currency;
 use pyo3::prelude::*;
@@ -90,7 +88,7 @@ impl PyCurrency {
 
 impl PyCurrency {
     /// A clone of the inner currency for the index facades, whose constructors
-    /// take a [`Currency`] by value.
+    /// take a Currency by value.
     pub(crate) fn inner(&self) -> Currency {
         self.inner.clone()
     }

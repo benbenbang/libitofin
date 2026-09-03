@@ -1,16 +1,15 @@
-//! Facades for the swaption volatility stack: the [`PySwaptionVolatilityStructure`]
-//! base, the [`PyVolatilityType`] flag, the constant surface
-//! [`PyConstantSwaptionVolatility`], the at-the-money grid
-//! [`PySwaptionVolatilityMatrix`], the spread cube over it,
-//! [`PyInterpolatedSwaptionVolatilityCube`], and the calibrated
-//! [`PySabrSwaptionVolatilityCube`].
+//! Facades for the swaption volatility stack: the SwaptionVolatilityStructure
+//! base, the VolatilityType flag, the constant surface
+//! ConstantSwaptionVolatility, the at-the-money grid SwaptionVolatilityMatrix,
+//! the spread cube over it, InterpolatedSwaptionVolatilityCube, and the
+//! calibrated SabrSwaptionVolatilityCube.
 //!
-//! The base holds the erased `Handle<dyn SwaptionVolatilityStructure>` and
-//! exposes the queries every concrete surface inherits; concrete surfaces
+//! The base holds the surface type-erased and exposes the queries every
+//! concrete surface inherits; concrete surfaces
 //! subclass it and supply only their constructor. They build the base through
-//! [`from_handle`](PySwaptionVolatilityStructure::from_handle) rather than a
-//! struct literal, so the later surfaces in this file (and the matrix/cube
-//! facades stacking on it) never need access to the private field.
+//! from_handle() rather than a struct literal, so the later surfaces in this
+//! file (and the matrix/cube facades stacking on it) never need access to the
+//! private field.
 //!
 //! The constant surface exposes both reference-date families (#627): `new` and
 //! `with_quote` pin the reference date, while `moving` and `moving_with_quote`
@@ -191,7 +190,7 @@ pub enum PyVolatilityType {
 }
 
 impl PyVolatilityType {
-    /// The core [`VolatilityType`] this variant stands for.
+    /// The core VolatilityType this variant stands for.
     pub(crate) fn inner(&self) -> VolatilityType {
         match self {
             PyVolatilityType::ShiftedLognormal => VolatilityType::ShiftedLognormal,
@@ -950,7 +949,7 @@ fn node_grid(
         .collect())
 }
 
-/// A `list[list[float]]` as a core [`Matrix`], one row per option tenor.
+/// A `list[list[float]]` as a core Matrix, one row per option tenor.
 fn matrix_from_rows(rows: &[Vec<f64>], label: &str) -> PyResult<Matrix> {
     let columns = check_grid(rows, label)?;
     let mut matrix = Matrix::with_size(rows.len(), columns);

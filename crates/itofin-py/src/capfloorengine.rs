@@ -1,19 +1,17 @@
-//! Facade for the Black cap/floor pricing engine: [`PyBlackCapFloorEngine`].
+//! Facade for the Black cap/floor pricing engine: BlackCapFloorEngine.
 //!
-//! The engine prices each optionlet of a [`CapFloor`](crate::capfloor::PyCapFloor)
-//! with the Black 1976 formula over an optionlet volatility surface, discounting
-//! on a separate yield curve.
+//! The engine prices each optionlet of a CapFloor with the Black 1976 formula
+//! over an optionlet volatility surface, discounting on a separate yield curve.
 //!
 //! Both core constructors are exposed. The surface form takes a
-//! [`PyOptionletVolatilityStructure`] and an optional displacement; the flat-vol
-//! form takes a single quote and wraps it in a moving constant surface with zero
+//! OptionletVolatilityStructure and an optional displacement; the flat-vol form
+//! takes a single quote and wraps it in a moving constant surface with zero
 //! settlement days on a null calendar, so that surface's reference date IS the
 //! evaluation date carried by `settings`.
 //!
 //! Deferred (visible): the Bachelier cap/floor engine is not exposed - the core
-//! prices only the shifted-lognormal path
-//! (`blackcapfloorengine.rs:22-25`), so a normal-volatility surface is rejected
-//! by the constructor rather than bound to a second engine here.
+//! prices only the shifted-lognormal path, so a normal-volatility surface is
+//! rejected by the constructor rather than bound to a second engine here.
 
 use crate::PyQlError;
 use crate::curve::PyYieldTermStructure;

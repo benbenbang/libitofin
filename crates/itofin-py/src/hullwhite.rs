@@ -1,7 +1,6 @@
-//! Facades for the Hull-White short-rate stack: [`PyHullWhite`] and the
-//! [`PyIborIndex`] index base with its [`PyEuribor`], [`PyUsdLibor`],
-//! [`PyJpyLibor`], [`PyGbpLibor`], [`PyEurLibor`] and [`PyCustomIborIndex`]
-//! subclasses.
+//! Facades for the Hull-White short-rate stack: HullWhite and the IborIndex
+//! index base with its Euribor, UsdLibor, JpyLibor, GbpLibor, EurLibor and
+//! CustomIborIndex subclasses.
 
 use crate::PyQlError;
 use crate::calibration::{PyCalibrationErrorType, PyEndCriteria, PyLevenbergMarquardt};
@@ -621,8 +620,8 @@ impl PyEuribor {
 }
 
 /// The base/subclass initializer shared by the three Euribor constructors: one
-/// index object feeds both halves, so the base [`PyIborIndex`] every consumer
-/// reads and the [`PyEuribor`] the subclass holds are the same core index.
+/// index object feeds both halves, so the base IborIndex every consumer reads
+/// and the Euribor the subclass holds are the same core index.
 fn init_euribor(index: Shared<IborIndex>) -> PyClassInitializer<PyEuribor> {
     let base = PyIborIndex {
         inner: Shared::clone(&index),

@@ -1,5 +1,5 @@
-//! Facades for the calibration machinery: [`PyLevenbergMarquardt`],
-//! [`PyEndCriteria`] and [`PyCalibrationErrorType`].
+//! Facades for the calibration machinery: LevenbergMarquardt, EndCriteria and
+//! CalibrationErrorType.
 //!
 //! These are the optimizer, stopping rule and error measure shared by the
 //! Heston and Hull-White calibrations (follow-up tickets H2/W2).
@@ -125,7 +125,7 @@ pub enum PyCalibrationErrorType {
 }
 
 impl PyCalibrationErrorType {
-    /// The core [`CalibrationErrorType`] this variant stands for.
+    /// The core CalibrationErrorType this variant stands for.
     pub(crate) fn inner(self) -> CalibrationErrorType {
         match self {
             PyCalibrationErrorType::RelativePriceError => CalibrationErrorType::RelativePriceError,

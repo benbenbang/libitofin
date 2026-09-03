@@ -1,8 +1,8 @@
-//! Facades for the credit hierarchy: the [`PyDefaultProbabilityTermStructure`]
-//! base, the concrete [`PyFlatHazardRate`], [`PyInterpolatedHazardRateCurve`]
-//! and [`PyPiecewiseDefaultCurve`] curves, the [`PyProtectionSide`] and
-//! [`PyPricingModel`] flags, the [`PyCreditDefaultSwap`] instrument and its
-//! market-convention builder [`PyMakeCreditDefaultSwap`].
+//! Facades for the credit hierarchy: the DefaultProbabilityTermStructure base,
+//! the concrete FlatHazardRate, InterpolatedHazardRateCurve and
+//! PiecewiseDefaultCurve curves, the ProtectionSide and PricingModel flags, the
+//! CreditDefaultSwap instrument and its market-convention builder
+//! MakeCreditDefaultSwap.
 
 use crate::PyQlError;
 use crate::creditengine::{PyIsdaCdsEngine, PyMidPointCdsEngine};
@@ -42,7 +42,7 @@ pub enum PyProtectionSide {
 }
 
 impl PyProtectionSide {
-    /// The core [`ProtectionSide`] this variant stands for.
+    /// The core ProtectionSide this variant stands for.
     pub(crate) fn inner(self) -> ProtectionSide {
         match self {
             PyProtectionSide::Buyer => ProtectionSide::Buyer,
@@ -62,7 +62,7 @@ pub enum PyPricingModel {
 }
 
 impl PyPricingModel {
-    /// The core [`PricingModel`] this variant stands for.
+    /// The core PricingModel this variant stands for.
     pub(crate) fn inner(self) -> PricingModel {
         match self {
             PyPricingModel::Midpoint => PricingModel::Midpoint,
@@ -261,7 +261,7 @@ impl PyDefaultProbabilityTermStructure {
 }
 
 impl PyDefaultProbabilityTermStructure {
-    /// The base half of a concrete curve's [`PyClassInitializer`] chain.
+    /// The base half of a concrete curve's initializer chain.
     pub(crate) fn from_handle(inner: Handle<dyn DefaultProbabilityTermStructure>) -> Self {
         PyDefaultProbabilityTermStructure { inner }
     }
@@ -1044,7 +1044,7 @@ impl PyCreditDefaultSwap {
 
 impl PyCreditDefaultSwap {
     /// Wraps a contract another facade built, the shape
-    /// [`PyMakeCreditDefaultSwap::build`] hands back.
+    /// MakeCreditDefaultSwap.build() hands back.
     pub(crate) fn from_inner(inner: SharedMut<CreditDefaultSwap>) -> Self {
         PyCreditDefaultSwap { inner }
     }

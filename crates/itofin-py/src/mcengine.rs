@@ -1,5 +1,5 @@
-//! Facades for the Monte Carlo pricing engines: [`PyMCEuropeanEngine`],
-//! [`PyMCEuropeanHestonEngine`] and [`PyMCAmericanEngine`].
+//! Facades for the Monte Carlo pricing engines: MCEuropeanEngine,
+//! MCEuropeanHestonEngine and MCAmericanEngine.
 //!
 //! The core engines are generic over their RNG policy, which does not cross FFI
 //! (D7), so the facades pin `PseudoRandom` - the policy that carries an error

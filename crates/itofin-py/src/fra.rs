@@ -1,12 +1,11 @@
-//! Facades for the forward rate agreement: [`PyPosition`] and
-//! [`PyForwardRateAgreement`].
+//! Facades for the forward rate agreement: Position and ForwardRateAgreement.
 //!
-//! The FRA prices without an engine (`forwardrateagreement.rs`), so the facade
-//! exposes the valuation accessors directly; no `set_engine` step exists. The
-//! core keeps its value and maturity dates private with no accessors, so the
-//! facade stores both at construction - they are immutable on the core
-//! instrument too - with the maturity adjusted through the instrument's own
-//! calendar and convention, the same computation the core constructor runs.
+//! The FRA prices without an engine, so the facade exposes the valuation
+//! accessors directly; no `set_engine` step exists. The core keeps its value
+//! and maturity dates private with no accessors, so the facade stores both at
+//! construction - they are immutable on the core instrument too - with the
+//! maturity adjusted through the instrument's own calendar and convention, the
+//! same computation the core constructor runs.
 
 use crate::PyQlError;
 use crate::curve::PyYieldTermStructure;
@@ -35,7 +34,7 @@ pub enum PyPosition {
 }
 
 impl PyPosition {
-    /// The core [`Position`] this variant stands for.
+    /// The core Position this variant stands for.
     pub(crate) fn inner(self) -> Position {
         match self {
             PyPosition::Long => Position::Long,

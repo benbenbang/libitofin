@@ -1,16 +1,15 @@
-//! Facade for the swap-rate index [`PySwapIndex`] (`indexes::SwapIndex`), the
-//! index whose fixing is a vanilla swap's fair rate.
+//! Facade for the swap-rate index SwapIndex, the index whose fixing is a
+//! vanilla swap's fair rate.
 //!
 //! The swaption volatility cubes take two of these (a long and a short base) and
 //! read the at-the-money forward off them, so this is the index the cube facades
 //! stack on rather than one the Python user prices with directly.
 //!
-//! Both constructors take the currency as a [`PyCurrency`](crate::currency::PyCurrency)
-//! and the forecasting index as the general [`PyIborIndex`](crate::hullwhite::PyIborIndex)
-//! (#868). The currency stays inert for every ported consumer - `underlying_swap`
-//! never reads it, and the cube's at-the-money forward is a fair rate, not an
-//! amount - so [`currency`](PySwapIndex::currency) reads it back off the core
-//! index, which is the only place it shows.
+//! Both constructors take the currency as a Currency and the forecasting index
+//! as the general IborIndex (#868). The currency stays inert for every ported
+//! consumer - `underlying_swap` never reads it, and the cube's at-the-money
+//! forward is a fair rate, not an amount - so currency() reads it back off the
+//! core index, which is the only place it shows.
 //!
 //! Deferred (visible): the `clone` family (re-curving / re-tenoring) is deferred
 //! in the core itself.

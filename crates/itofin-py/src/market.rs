@@ -1,4 +1,4 @@
-//! Facades for the market inputs: [`PySimpleQuote`] and [`PyBlackScholesProcess`].
+//! Facades for the market inputs: SimpleQuote and BlackScholesProcess.
 
 use crate::PyQlError;
 use crate::curve::PyYieldTermStructure;
@@ -58,10 +58,10 @@ impl PySimpleQuote {
 }
 
 impl PySimpleQuote {
-    /// A `Handle` wrapping the retained quote, for the rate-helper facades
-    /// (#528) whose ctors take `Handle<dyn Quote>`. The handle clones the same
-    /// inner `Shared`, so a later `set_value` on this `PySimpleQuote` is
-    /// observed by any helper built from it (the laziness contract T5 checks).
+    /// A handle wrapping the retained quote, for the rate-helper facades (#528)
+    /// that take one. The handle shares the same quote, so a later `set_value`
+    /// on this SimpleQuote is observed by any helper built from it (the
+    /// laziness contract T5 checks).
     #[allow(dead_code)]
     pub(crate) fn handle(&self) -> Handle<dyn Quote> {
         Handle::new(Shared::clone(&self.inner) as Shared<dyn Quote>)
