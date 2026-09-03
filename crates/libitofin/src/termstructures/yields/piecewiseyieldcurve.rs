@@ -344,7 +344,7 @@ mod tests {
     use crate::math::interpolations::linear::Linear;
     use crate::math::interpolations::loglinear::LogLinear;
     use crate::pricingengines::credit::isda_node_grid;
-    use crate::quotes::{Quote, SimpleQuote};
+    use crate::quotes::{FuturesConvAdjustmentQuote, Quote, SimpleQuote, make_quote_handle};
     use crate::settings::Settings;
     use crate::shared::shared;
     use crate::termstructures::bootstraptraits::{
@@ -353,14 +353,17 @@ mod tests {
     use crate::termstructures::credit::defaulttermstructure::DefaultProbabilityTermStructure;
     use crate::termstructures::credit::flathazardrate::FlatHazardRate;
     use crate::termstructures::yields::{
-        DepositRateHelper, FraRateHelper, InterpolatedSimpleZeroCurve, Pillar, SwapRateHelper,
+        DepositRateHelper, FraRateHelper, FuturesRateHelper, InterpolatedSimpleZeroCurve, Pillar,
+        SwapRateHelper,
     };
     use crate::time::businessdayconvention::BusinessDayConvention;
     use crate::time::calendars::target::Target;
     use crate::time::date::Month;
     use crate::time::daycounters::actual360::Actual360;
+    use crate::time::daycounters::actual365fixed::Actual365Fixed;
     use crate::time::daycounters::thirty360::{Convention, Thirty360};
     use crate::time::frequency::Frequency;
+    use crate::time::imm;
     use crate::time::period::Period;
     use crate::time::timeunit::TimeUnit;
     use crate::types::Rate;
@@ -1275,5 +1278,104 @@ mod tests {
                 "node {i} moved on an additional helper's quote: {old} vs {new}"
             );
         }
+    }
+    /// The curve-level half of the `registerAsObserver = false` contract
+    /// (`piecewiseyieldcurve.cpp:1516-1519`): a futures helper holding its
+    /// convexity quote through [`Handle::new_unregistered`] does not let a
+    /// volatility change invalidate the bootstrapped curve, while the SAME
+    /// setup through the ordinary [`Handle::new`] does.
+    ///
+    /// This is what makes a joint solve over the volatility possible at all -
+    /// an observing handle clears the lazy flag on every optimizer step, and
+    /// the penalty's reprice then re-enters `calculate`.
+    ///
+    /// The pair is built with a FIXED volatility and no additional variables,
+    /// deliberately: the observing arm cannot be run under a variables solve,
+    /// because that is precisely the configuration the C++ comment says breaks
+    /// bootstrapping. Only the handle constructor differs between the two
+    /// halves.
+    fn futures_curve_on(
+        observing: bool,
+    ) -> (
+        Shared<SimpleQuote>,
+        Shared<PiecewiseYieldCurve<Discount, LogLinear>>,
+    ) {
+        use crate::instruments::FuturesType;
+
+        let calendar = Target::new();
+        let today = calendar.adjust(
+            Date::new(25, Month::September, 2019),
+            BusinessDayConvention::Following,
+        );
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(today);
+        let settlement = calendar.advance(
+            today,
+            2,
+            TimeUnit::Days,
+            BusinessDayConvention::Following,
+            false,
+        );
+        let index = shared(Euribor::three_months(Handle::empty(), settings.clone()));
+        let futures_date = imm::next_date(today, true);
+        let price = Handle::new(shared(SimpleQuote::new(95.419)) as Shared<dyn Quote>);
+        let volatility = shared(SimpleQuote::new(0.2));
+        let conv_adj = shared(
+            FuturesConvAdjustmentQuote::new(
+                &index,
+                futures_date,
+                price.clone(),
+                Handle::new(Shared::clone(&volatility) as Shared<dyn Quote>),
+                make_quote_handle(0.03).handle(),
+                settings,
+            )
+            .expect("the index resolves the maturity of an IMM date"),
+        ) as Shared<dyn Quote>;
+        let conv_adj = if observing {
+            Handle::new(conv_adj)
+        } else {
+            Handle::new_unregistered(conv_adj)
+        };
+        let helper =
+            FuturesRateHelper::from_index(price, futures_date, &index, conv_adj, FuturesType::Imm)
+                .expect("an IMM date builds a futures helper")
+                as Shared<dyn RateHelper>;
+
+        let curve = PiecewiseYieldCurve::<Discount, LogLinear>::new(
+            settlement,
+            vec![helper],
+            Actual365Fixed::new(),
+            LogLinear,
+        )
+        .expect("a one-futures strip builds a curve");
+        (volatility, curve)
+    }
+
+    #[test]
+    fn an_unregistered_convexity_handle_survives_a_volatility_change() {
+        let (volatility, curve) = futures_curve_on(false);
+        curve.data().expect("the one-futures strip solves");
+        assert!(curve.lazy.borrow().is_calculated());
+
+        volatility.set_value(0.3);
+
+        assert!(
+            curve.lazy.borrow().is_calculated(),
+            "an unregistered convexity handle must not invalidate the curve"
+        );
+    }
+
+    #[test]
+    fn an_observing_convexity_handle_invalidates_the_curve() {
+        let (volatility, curve) = futures_curve_on(true);
+        curve.data().expect("the one-futures strip solves");
+        assert!(curve.lazy.borrow().is_calculated());
+
+        volatility.set_value(0.3);
+
+        assert!(
+            !curve.lazy.borrow().is_calculated(),
+            "an observing convexity handle must invalidate the curve"
+        );
     }
 }

@@ -1541,4 +1541,164 @@ mod tests {
             "the extended range must be queryable without extrapolation"
         );
     }
+    /// The recording [`AdditionalBootstrapVariables`] of the arm below: it
+    /// delegates to a real [`SimpleQuoteVariables`] and records what the driver
+    /// hands it.
+    struct RecordingVariables {
+        inner: SimpleQuoteVariables,
+        valid_data_flags: RefCell<Vec<bool>>,
+        trial_lengths: RefCell<Vec<Size>>,
+        trial_firsts: RefCell<Vec<Real>>,
+    }
+
+    /// Lets the test keep reading the recordings after the boxed trait object
+    /// has been handed to the bootstrap.
+    impl AdditionalBootstrapVariables for Shared<RecordingVariables> {
+        fn initialize(&self, valid_data: bool) -> QlResult<Vec<Real>> {
+            self.as_ref().initialize(valid_data)
+        }
+
+        fn update(&self, x: &[Real]) -> QlResult<()> {
+            self.as_ref().update(x)
+        }
+    }
+
+    impl AdditionalBootstrapVariables for RecordingVariables {
+        fn initialize(&self, valid_data: bool) -> QlResult<Vec<Real>> {
+            self.valid_data_flags.borrow_mut().push(valid_data);
+            self.inner.initialize(valid_data)
+        }
+
+        fn update(&self, x: &[Real]) -> QlResult<()> {
+            self.trial_lengths.borrow_mut().push(x.len());
+            self.trial_firsts.borrow_mut().push(x[0]);
+            self.inner.update(x)
+        }
+    }
+
+    /// The three additional-variable splices - the appended guess, the
+    /// `x[interior..]` argument tail and the solution pin - end to end, plus
+    /// what only a recording implementation can see.
+    ///
+    /// The system is deliberately minimal and SQUARE: a one-deposit strip is
+    /// two nodes, so one interior node, and one external quote is one more
+    /// variable; the residuals are the deposit's quote error and one penalty
+    /// `q - 0.5`. The two halves are independent, so the solved answer is known
+    /// in closed form - the deposit reprices and `q` lands on 0.5 - which is
+    /// what pins the splices without a dylib. The variable is FLOORED at 0.0
+    /// and guessed at 2.0, so it also travels through the `exp`/`ln` transform
+    /// pair. The first recorded trial point is what pins that: the solver
+    /// evaluates the guess first, so `x[interior]` must arrive as the value
+    /// `initialize` returned, `ln(2 - 0)`. A guess appended in QUOTE space
+    /// would arrive as 2, and one written before the nodes rather than after
+    /// them would arrive as the node coordinate 0. The guess of 2.0 is what
+    /// separates those three - a guess of 1.0 maps to 0 in optimizer space,
+    /// which is also this strip's node coordinate, and the misplacement arm
+    /// goes vacuous (probed both ways). The converged answer alone is blind to
+    /// all of it: a guess is a start point, and the solve converges from any of
+    /// them.
+    ///
+    /// The recorded flags are the ONLY way the warm-restart branch of
+    /// `initialize` is observable: the converged answer is the same whether the
+    /// second solve seeds itself from the previous solution or from the
+    /// configured guess. Likewise the recorded lengths are the only direct
+    /// evidence of where the argument vector is split.
+    ///
+    /// HONEST NEGATIVE: the solution-pin `update` is NOT pinned here, and is
+    /// not pinnable through any converged value. The optimizer's last trial
+    /// point already sits within the stopping accuracy of the solution it
+    /// returns, so rewriting the variables from that solution moves them by
+    /// less than the tolerance any assert can use (probed - dropping the pin
+    /// leaves every arm green). It is carried for consistency with the node
+    /// pin, which rewrites the curve from the same vector.
+    #[test]
+    fn the_additional_variables_receive_the_guess_the_trial_tail_and_the_solution() {
+        let calendar = Target::new();
+        let today = calendar.adjust(
+            Date::new(15, Month::June, 2026),
+            BusinessDayConvention::Following,
+        );
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(today);
+        let index = Euribor::new(Period::new(3, TimeUnit::Months), Handle::empty(), settings)
+            .expect("a 3M tenor is valid");
+        let deposit_quote = shared(SimpleQuote::new(0.04557));
+        let deposit = DepositRateHelper::new(
+            Handle::new(Shared::clone(&deposit_quote) as Shared<dyn Quote>),
+            &index,
+        ) as Shared<dyn RateHelper>;
+
+        let solved = shared(SimpleQuote::new(None));
+        let variables = Shared::new(RecordingVariables {
+            inner: SimpleQuoteVariables::new(vec![Shared::clone(&solved)], vec![2.0], vec![0.0])
+                .expect("one guess and one bound for one quote"),
+            valid_data_flags: RefCell::new(Vec::new()),
+            trial_lengths: RefCell::new(Vec::new()),
+            trial_firsts: RefCell::new(Vec::new()),
+        });
+        let penalty_quote = Shared::clone(&solved);
+        let curve = PiecewiseYieldCurve::<SimpleZeroYield, Linear, _>::with_bootstrap(
+            calendar.advance(
+                today,
+                2,
+                TimeUnit::Days,
+                BusinessDayConvention::Following,
+                false,
+            ),
+            vec![deposit],
+            Actual365Fixed::new(),
+            Linear,
+            GlobalBootstrap::with_grid_independent_penalties(
+                Vec::new(),
+                None,
+                Some(1.0e-12),
+                None,
+                Vec::new(),
+                move || {
+                    let value = penalty_quote
+                        .value()
+                        .expect("the variable holds a trial value");
+                    vec![value - 0.5]
+                },
+            )
+            .with_additional_variables(Box::new(Shared::clone(&variables))),
+        )
+        .expect("a one-deposit strip builds a curve");
+
+        curve.data().expect("the square system solves");
+
+        let value = solved.value().expect("the variable is solved");
+        assert!(
+            (value - 0.5).abs() < 1.0e-8,
+            "the additional variable solved to {value}, not 0.5"
+        );
+        assert_eq!(
+            *variables.valid_data_flags.borrow(),
+            vec![false],
+            "the first solve is a cold start"
+        );
+
+        deposit_quote.set_value(0.05);
+        curve.data().expect("the strip re-solves on the same grid");
+
+        assert_eq!(
+            *variables.valid_data_flags.borrow(),
+            vec![false, true],
+            "a re-solve over an unchanged grid must warm-restart"
+        );
+        let lengths = variables.trial_lengths.borrow();
+        assert!(
+            !lengths.is_empty(),
+            "the trial tail never reached the variables"
+        );
+        assert!(
+            lengths.iter().all(|length| *length == 1),
+            "the argument vector was split at the wrong index: {lengths:?}"
+        );
+        let first_trial = variables.trial_firsts.borrow()[0];
+        assert!(
+            (first_trial - Real::ln(2.0)).abs() < 1.0e-15,
+            "the solver's first trial point is {first_trial}, not the appended guess"
+        );
+    }
 }
