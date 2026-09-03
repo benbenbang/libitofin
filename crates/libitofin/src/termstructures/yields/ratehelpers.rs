@@ -243,9 +243,10 @@ fn determine_maturity(
 /// curve (`ratehelpers.cpp:157`): the simple forward over the window is
 /// `(discount(earliest)/discount(maturity) - 1)/year_fraction`, and the price is
 /// `100 * (1 - (forward + convexity_adjustment))`. The convexity adjustment is a
-/// plain [`Handle<Quote>`](Handle) value with no convexity model (the C++
-/// `FuturesConvAdjustmentQuote` is not ported); it may be negative, as futures
-/// margining can push the futures rate either side of the forward.
+/// plain [`Handle<Quote>`](Handle) value, whatever quote the caller supplies -
+/// a [`FuturesConvAdjustmentQuote`](crate::quotes::FuturesConvAdjustmentQuote)
+/// prices one off a Hull-White model; it may be negative, as futures margining
+/// can push the futures rate either side of the forward.
 pub struct FuturesRateHelper {
     base: BootstrapHelperBase,
     year_fraction: Real,

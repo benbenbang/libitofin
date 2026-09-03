@@ -13,19 +13,20 @@
 //!
 //! The remaining `ql/quotes/` classes depend on layers not yet ported and
 //! follow with them: `ForwardValueQuote` and `LastFixingQuote` (Index),
-//! `ForwardSwapQuote` (SwapIndex/VanillaSwap), `FuturesConvAdjustmentQuote`
-//! (IborIndex), `ImpliedStdDevQuote` and
+//! `ForwardSwapQuote` (SwapIndex/VanillaSwap), `ImpliedStdDevQuote` and
 //! `EurodollarFuturesImpliedStdDevQuote` (`blackFormulaImpliedStdDev`).
 
 mod compositequote;
 mod deltavolquote;
 mod derivedquote;
+mod futuresconvadjustmentquote;
 mod multicompositequote;
 mod simplequote;
 
 pub use compositequote::CompositeQuote;
 pub use deltavolquote::{AtmType, DeltaType, DeltaVolQuote};
 pub use derivedquote::DerivedQuote;
+pub use futuresconvadjustmentquote::FuturesConvAdjustmentQuote;
 pub use multicompositequote::MultiCompositeQuote;
 pub use simplequote::{SimpleQuote, make_quote_handle};
 
