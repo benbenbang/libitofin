@@ -617,7 +617,8 @@ def _additional_helper(settings, calendar):
     )
 
 
-def test_global_additional_helper_extends_max_date():
+@pytest.mark.parametrize("interpolation", ["LogLinear", "Linear"])
+def test_global_additional_helper_extends_max_date(interpolation):
     """DISCRIMINATION ARM for additional_helpers (#970, the port of
     globalbootstrap.rs:1420 `global_bootstrap_max_date_covers_an_additional_helper`).
     The additional helper contributes no pillar and no residual, so every
@@ -626,18 +627,24 @@ def test_global_additional_helper_extends_max_date():
     max_date moves from the 30Y pillar (19-Jun-2056) out to the helper's
     latest_relevant_date (17-Jun-2061), which makes 19-Jun-2057 queryable
     WITHOUT extrapolation. The (a) leg is what stops (b) being vacuous: on the
-    same strip without the helper that same date raises."""
+    same strip without the helper that same date raises.
+
+    Parametrized because the facade threads the helpers through a SEPARATE
+    with_penalties call per interpolator: a LogLinear-only arm would leave a
+    Linear arm that drops the list on the floor entirely unpinned. The reach
+    itself is interpolator-independent (bootstraptraits.rs:192-201 puts the
+    past-the-last-node discount on one shared path), so the same dates hold."""
     settings, calendar, _, settlement, deposits, swaps = _fixture()
     instruments = deposits + swaps
     dc = DayCounter.actual360()
     additional = _additional_helper(settings, calendar)
 
-    plain = PiecewiseYieldCurve(settlement, instruments, dc, "LogLinear", "global")
+    plain = PiecewiseYieldCurve(settlement, instruments, dc, interpolation, "global")
     extended = PiecewiseYieldCurve(
         settlement,
         instruments,
         dc,
-        "LogLinear",
+        interpolation,
         "global",
         additional_helpers=[additional],
     )
