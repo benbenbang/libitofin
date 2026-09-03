@@ -378,6 +378,21 @@ class PiecewiseYieldCurve(YieldTermStructure):
     bootstrap conventions are reached through the named Piecewise* classes,
     which also expose node introspection.
 
+    bootstrap selects the algorithm: "iterative" (the default) solves one node
+    at a time, "global" solves every node at once through a
+    Levenberg-Marquardt fit of all helper residuals. The two are exactly
+    determined on a plain strip and agree at every pillar to about 1e-13, so
+    "global" is a faithful superset rather than a divergent algorithm. It is
+    offered for "LogLinear" and "Linear" only.
+
+    What the global bootstrap adds is additional_helpers: instruments handed to
+    the curve and registered with it that contribute neither a pillar nor a
+    residual. Their quote is inert (reading it takes a penalty term, and
+    penalties, additional dates and additional variables from Python are
+    deferred), so all they do is extend the curve's max_date to their own
+    latest_relevant_date, making dates past the last pillar queryable without
+    extrapolation.
+
     The bootstrap is lazy: construction only rejects an empty helper list, and
     the solver runs on the first query, re-running after a helper-quote or
     evaluation-date change. A bootstrap failure therefore surfaces from the
@@ -390,6 +405,8 @@ class PiecewiseYieldCurve(YieldTermStructure):
         helpers: list[RateHelper],
         day_counter: DayCounter,
         interpolation: str = "LogLinear",
+        bootstrap: str = "iterative",
+        additional_helpers: list[RateHelper] | None = None,
     ) -> None:
         """Build the curve over helpers with a fixed reference date.
 
@@ -402,10 +419,17 @@ class PiecewiseYieldCurve(YieldTermStructure):
             interpolation (str): "LogLinear", "Linear" or "Cubic". Cubic is a
                 global interpolator, so its bootstrap runs the multi-pass
                 convergence loop instead of a single pass.
+            bootstrap (str): "iterative" (the default) or "global". "global"
+                supports "LogLinear" and "Linear" only.
+            additional_helpers (list[RateHelper] | None): Instruments the
+                global bootstrap registers without giving them a pillar or a
+                residual. They only extend the curve's max_date to their
+                latest_relevant_date; "iterative" rejects them.
 
         Raises:
-            ItofinError: On an empty helper list and on an unknown
-                interpolation name.
+            ItofinError: On an empty helper list, on an unknown interpolation
+                or bootstrap name, on additional helpers under "iterative",
+                and on "Cubic" under "global".
         """
         ...
 

@@ -14,6 +14,7 @@ use libitofin::math::interpolations::loglinear::LogLinear;
 use libitofin::shared::{Shared, shared};
 use libitofin::termstructures::RateHelper;
 use libitofin::termstructures::bootstraptraits::{Discount, ForwardRate, ZeroYield};
+use libitofin::termstructures::globalbootstrap::GlobalBootstrap;
 use libitofin::termstructures::localbootstrap::LocalBootstrap;
 use libitofin::termstructures::yields::{
     DiscountCurve, FlatForward, ForwardCurve, InterpolatedDiscountCurve, InterpolatedZeroCurve,
@@ -336,6 +337,24 @@ impl PyForwardCurve {
 /// converges (the configuration upstream itself disables as unstable), so no
 /// named class offers it.
 ///
+/// `bootstrap` selects the bootstrap algorithm: `"iterative"` (the default)
+/// solves one node at a time, while `"global"` solves every node at once
+/// through a Levenberg-Marquardt fit of all helper residuals. The two are
+/// exactly determined on a plain strip, so they agree at every pillar to
+/// about 1e-13; `"global"` is a faithful superset, not a divergent algorithm.
+/// It is offered for `"LogLinear"` and `"Linear"` only - `(Discount, Cubic)`
+/// under the global solve has no core oracle, so it is rejected rather than
+/// shipped unverified.
+///
+/// What the global bootstrap adds is `additional_helpers`: instruments handed
+/// to the curve and registered with it that contribute neither a pillar date
+/// nor a residual. Their quote is inert here (reading it takes a penalty term,
+/// and penalties, additional dates and additional variables from Python are
+/// deferred to #981); what they do is extend the curve's `max_date` to their
+/// own `latest_relevant_date`, so a date past the last pillar becomes
+/// queryable without extrapolation. `"iterative"` cannot take them at all and
+/// rejects a non-empty list rather than silently ignoring it.
+///
 /// The bootstrap is lazy: construction only rejects an empty helper list, and
 /// the solver runs on the first query (a `discount`/`zero_rate`), re-running
 /// after a helper-quote or evaluation-date change. A bootstrap failure surfaces
@@ -349,43 +368,119 @@ impl PyPiecewiseYieldCurve {
     /// A curve over `helpers` with a fixed `reference_date` (typically the
     /// settlement date the caller computed via `Calendar.advance`). `helpers`
     /// accepts any [`RateHelper`](PyRateHelper) subclass; `interpolation` is
-    /// `"LogLinear"`, `"Linear"` or `"Cubic"`. Fallible: an empty helper list
-    /// is rejected here, an unknown interpolation name too.
+    /// `"LogLinear"`, `"Linear"` or `"Cubic"`; `bootstrap` is `"iterative"` or
+    /// `"global"`, and only the latter accepts `additional_helpers` (which
+    /// extend the curve's reach without adding a pillar). Fallible: an empty
+    /// helper list is rejected here, an unknown interpolation or bootstrap
+    /// name too, as are additional helpers under `"iterative"` and `"Cubic"`
+    /// under `"global"`.
     #[new]
-    #[pyo3(signature = (reference_date, helpers, day_counter, interpolation = "LogLinear"))]
+    #[pyo3(signature = (
+        reference_date,
+        helpers,
+        day_counter,
+        interpolation = "LogLinear",
+        bootstrap = "iterative",
+        additional_helpers = None,
+    ))]
     fn new(
         reference_date: &PyDate,
         helpers: Vec<PyRef<PyRateHelper>>,
         day_counter: &PyDayCounter,
         interpolation: &str,
+        bootstrap: &str,
+        additional_helpers: Option<Vec<PyRef<PyRateHelper>>>,
     ) -> PyResult<PyClassInitializer<Self>> {
         let instruments: Vec<Shared<dyn RateHelper>> =
             helpers.iter().map(|helper| helper.inner()).collect();
-        let curve: Shared<dyn YieldTermStructure> = match interpolation {
-            "LogLinear" => PiecewiseYieldCurve::<Discount, LogLinear>::new(
-                reference_date.inner(),
-                instruments,
-                day_counter.inner(),
-                LogLinear,
-            )
-            .map_err(PyQlError::from)?,
-            "Linear" => PiecewiseYieldCurve::<Discount, Linear>::new(
-                reference_date.inner(),
-                instruments,
-                day_counter.inner(),
-                Linear,
-            )
-            .map_err(PyQlError::from)?,
-            "Cubic" => PiecewiseYieldCurve::<Discount, Cubic>::new(
-                reference_date.inner(),
-                instruments,
-                day_counter.inner(),
-                Cubic,
-            )
-            .map_err(PyQlError::from)?,
+        let additional: Vec<Shared<dyn RateHelper>> = additional_helpers
+            .map(|extra| extra.iter().map(|helper| helper.inner()).collect())
+            .unwrap_or_default();
+        let curve: Shared<dyn YieldTermStructure> = match bootstrap {
+            "iterative" => {
+                if !additional.is_empty() {
+                    return Err(ItofinError::new_err(
+                        "additional_helpers requires bootstrap=\"global\"",
+                    ));
+                }
+                match interpolation {
+                    "LogLinear" => PiecewiseYieldCurve::<Discount, LogLinear>::new(
+                        reference_date.inner(),
+                        instruments,
+                        day_counter.inner(),
+                        LogLinear,
+                    )
+                    .map_err(PyQlError::from)?,
+                    "Linear" => PiecewiseYieldCurve::<Discount, Linear>::new(
+                        reference_date.inner(),
+                        instruments,
+                        day_counter.inner(),
+                        Linear,
+                    )
+                    .map_err(PyQlError::from)?,
+                    "Cubic" => PiecewiseYieldCurve::<Discount, Cubic>::new(
+                        reference_date.inner(),
+                        instruments,
+                        day_counter.inner(),
+                        Cubic,
+                    )
+                    .map_err(PyQlError::from)?,
+                    other => {
+                        return Err(ItofinError::new_err(format!(
+                            "unknown interpolation {other:?}, expected LogLinear, Linear or Cubic"
+                        )));
+                    }
+                }
+            }
+            "global" => match interpolation {
+                "LogLinear" => {
+                    PiecewiseYieldCurve::<Discount, LogLinear, GlobalBootstrap>::with_bootstrap(
+                        reference_date.inner(),
+                        instruments,
+                        day_counter.inner(),
+                        LogLinear,
+                        GlobalBootstrap::with_penalties(
+                            additional,
+                            None,
+                            None,
+                            None,
+                            Vec::new(),
+                            |_, _| Vec::new(),
+                        ),
+                    )
+                    .map_err(PyQlError::from)?
+                }
+                "Linear" => {
+                    PiecewiseYieldCurve::<Discount, Linear, GlobalBootstrap>::with_bootstrap(
+                        reference_date.inner(),
+                        instruments,
+                        day_counter.inner(),
+                        Linear,
+                        GlobalBootstrap::with_penalties(
+                            additional,
+                            None,
+                            None,
+                            None,
+                            Vec::new(),
+                            |_, _| Vec::new(),
+                        ),
+                    )
+                    .map_err(PyQlError::from)?
+                }
+                "Cubic" => {
+                    return Err(ItofinError::new_err(
+                        "bootstrap=\"global\" supports LogLinear or Linear",
+                    ));
+                }
+                other => {
+                    return Err(ItofinError::new_err(format!(
+                        "unknown interpolation {other:?}, expected LogLinear, Linear or Cubic"
+                    )));
+                }
+            },
             other => {
                 return Err(ItofinError::new_err(format!(
-                    "unknown interpolation {other:?}, expected LogLinear, Linear or Cubic"
+                    "unknown bootstrap {other:?}, expected iterative or global"
                 )));
             }
         };
