@@ -9,5 +9,5 @@ members = ["crates/*"]
 exclude = ["crates/worktrees", "crates/graphify-out"]
 
 [workspace.package]
-version = "0.18.0"
+version = "0.19.0"
 edition = "2024"
