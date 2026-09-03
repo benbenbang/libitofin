@@ -595,3 +595,153 @@ def test_local_bootstrap_nodes_come_from_the_local_solve():
 
     separation = max(abs(a - b) for a, b in zip(iterative.data(), local.data()))
     assert separation > 1.0e-8, f"local data() identical to iterative: {separation}"
+
+
+# --- bootstrap="global" + additional_helpers (#970) ---------------------------
+
+
+def _additional_helper(settings, calendar):
+    """A 35Y swap helper maturing five years past the strip's 30Y pillar, built
+    exactly like the fixture's swaps. Its quote is INERT under #970: an
+    additional helper carries no residual without a penalty term (penalties are
+    deferred to #981), so only its latest_relevant_date matters here."""
+    euribor6m = Euribor(P(6, "Months"), None, settings)
+    return SwapRateHelper(
+        SimpleQuote(0.0597),
+        P(35, "Years"),
+        calendar,
+        Frequency.Annual,
+        BusinessDayConvention.Unadjusted,
+        DayCounter.thirty360_bond_basis(),
+        euribor6m,
+    )
+
+
+def test_global_additional_helper_extends_max_date():
+    """DISCRIMINATION ARM for additional_helpers (#970, the port of
+    globalbootstrap.rs:1420 `global_bootstrap_max_date_covers_an_additional_helper`).
+    The additional helper contributes no pillar and no residual, so every
+    repricing and every in-range discount is IDENTICAL with and without it - a
+    value oracle here is vacuous. What it does change is the curve's reach:
+    max_date moves from the 30Y pillar (19-Jun-2056) out to the helper's
+    latest_relevant_date (17-Jun-2061), which makes 19-Jun-2057 queryable
+    WITHOUT extrapolation. The (a) leg is what stops (b) being vacuous: on the
+    same strip without the helper that same date raises."""
+    settings, calendar, _, settlement, deposits, swaps = _fixture()
+    instruments = deposits + swaps
+    dc = DayCounter.actual360()
+    additional = _additional_helper(settings, calendar)
+
+    plain = PiecewiseYieldCurve(settlement, instruments, dc, "LogLinear", "global")
+    extended = PiecewiseYieldCurve(
+        settlement,
+        instruments,
+        dc,
+        "LogLinear",
+        "global",
+        additional_helpers=[additional],
+    )
+    last_pillar = swaps[-1].pillar_date()
+    probe = last_pillar + 365
+
+    # (a) without the additional helper the probe date is out of range.
+    with pytest.raises(ItofinError):
+        plain.discount_date(probe, False)
+
+    # (b) with it the same query resolves, no extrapolation flag.
+    df = extended.discount_date(probe, False)
+    assert 0.0 < df < 1.0, f"discount out of (0, 1) at {probe}: {df}"
+
+    # (c) the reach itself: the plain curve stops at the last pillar, the
+    # extended one reaches the additional helper.
+    assert plain.max_date() == last_pillar
+    assert extended.max_date() == additional.latest_relevant_date()
+    # Date has no ordering, so the strict bracketing is written as day counts.
+    assert probe - plain.max_date() > 0
+    assert extended.max_date() - probe > 0
+
+
+def test_iterative_rejects_additional_helpers():
+    """ANTI-#262 ARM: IterativeBootstrap has no additional-helper surface, so
+    passing them must be a hard error rather than an accepted-and-ignored
+    argument. Without this arm the facade could quietly drop the list and the
+    caller would get a curve that stops at the last pillar with no signal."""
+    settings, calendar, _, settlement, deposits, swaps = _fixture()
+    additional = _additional_helper(settings, calendar)
+    with pytest.raises(ItofinError, match="additional_helpers"):
+        PiecewiseYieldCurve(
+            settlement,
+            deposits + swaps,
+            DayCounter.actual360(),
+            "LogLinear",
+            "iterative",
+            additional_helpers=[additional],
+        )
+
+
+def test_default_bootstrap_rejects_additional_helpers():
+    """DEFAULT-PIN ARM: values cannot pin which algorithm the omitted argument
+    names, because iterative and global agree at every pillar to ~1.1e-13 (the
+    agreement arm below) and off-pillar too on this Discount strip. The
+    rejection above IS the discriminator: a default silently flipped to
+    "global" would accept this call and build a curve instead of raising."""
+    settings, calendar, _, settlement, deposits, swaps = _fixture()
+    additional = _additional_helper(settings, calendar)
+    with pytest.raises(ItofinError, match="additional_helpers"):
+        PiecewiseYieldCurve(
+            settlement,
+            deposits + swaps,
+            DayCounter.actual360(),
+            additional_helpers=[additional],
+        )
+
+
+@pytest.mark.parametrize("interpolation", ["LogLinear", "Linear"])
+def test_global_agrees_with_iterative_at_every_pillar(interpolation):
+    """AGREEMENT ARM: on a plain strip the global solve is exactly determined
+    (21 helper residuals over 21 interior nodes), so its root is the iterative
+    solution. Measured max pillar gap 1.098011e-13 (LogLinear) and 1.101341e-13
+    (Linear), pinning that "global" is a faithful superset rather than a
+    divergent algorithm - a mis-wired global arm would move the whole curve,
+    not just the range. This is also the only coverage of
+    <Discount, Linear, GlobalBootstrap>, which the core harness does not
+    exercise (it covers <Discount, LogLinear>, <ZeroYield, Linear> and
+    <SimpleZeroYield, Linear>)."""
+    _, _, _, settlement, deposits, swaps = _fixture()
+    instruments = deposits + swaps
+    dc = DayCounter.actual360()
+    glob = PiecewiseYieldCurve(settlement, instruments, dc, interpolation, "global")
+    iterative = PiecewiseYieldCurve(settlement, instruments, dc, interpolation)
+
+    gap = max(
+        abs(
+            glob.discount_date(helper.pillar_date())
+            - iterative.discount_date(helper.pillar_date())
+        )
+        for helper in instruments
+    )
+    assert gap < 1.0e-10, f"{interpolation}: global diverges from iterative by {gap}"
+
+
+def test_unknown_bootstrap_name_is_rejected_on_the_alias():
+    """The unknown-string arm for the alias's new selector: a name outside
+    {iterative, global} is an ItofinError, not a silent fallback to the
+    default."""
+    _, _, _, settlement, deposits, _ = _fixture()
+    with pytest.raises(ItofinError, match="unknown bootstrap"):
+        PiecewiseYieldCurve(
+            settlement, deposits, DayCounter.actual360(), "LogLinear", "nope"
+        )
+
+
+def test_cubic_under_global_is_rejected():
+    """<Discount, Cubic, GlobalBootstrap> has NO core oracle (the harness
+    covers LogLinear and the two rate-storing Linear arms only), so the facade
+    refuses the combination rather than shipping an unverified path. This arm
+    is the only thing standing between the caller and that path: without it a
+    Cubic+global wiring would compile and quietly run."""
+    _, _, _, settlement, deposits, _ = _fixture()
+    with pytest.raises(ItofinError, match="LogLinear or Linear"):
+        PiecewiseYieldCurve(
+            settlement, deposits, DayCounter.actual360(), "Cubic", "global"
+        )
