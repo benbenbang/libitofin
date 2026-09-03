@@ -466,6 +466,23 @@ mod tests {
         );
     }
 
+    /// The OWNING half of the contract: the handle is the pointee's only
+    /// holder here, so a non-owning (weak) implementation would leave it
+    /// empty. Pinned directly because the futures helper reads an empty
+    /// convexity handle as a ZERO adjustment (`ratehelpers.rs`) - a dangling
+    /// handle there prices silently rather than failing (gate-probed: only the
+    /// convexity oracle's solved-vol pin caught a weak variant).
+    #[test]
+    fn an_unregistered_handle_keeps_its_pointee_alive() {
+        let h: Handle<dyn Quote> = Handle::new_unregistered(shared(SimpleQuote::new(0.25)));
+
+        assert!(
+            !h.is_empty(),
+            "the unregistered handle must own its pointee"
+        );
+        assert_eq!(h.current_link().unwrap().value().unwrap(), 0.25);
+    }
+
     /// Port of `testObservableHandle` (test-suite/quotes.cpp), extended with
     /// the subscription-move asserts: the detached pointee must stop notifying
     /// and the newly linked one must start.
