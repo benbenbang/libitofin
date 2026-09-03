@@ -83,23 +83,14 @@ use libitofin::time::daycounter::DayCounter;
 use libitofin::time::period::Period;
 use pyo3::prelude::*;
 
-/// Python `DiscountingSwapEngine`: discounts each leg of a swap over a single
-/// yield curve (`pricingengines::swap::discountingswapengine`).
+/// Discounts every leg of a swap over a single yield curve.
 ///
-/// Infallible at construction: it stores the discount handle and the settings
-/// and registers as an observer of the curve. Every precondition (an empty
-/// handle, an unset evaluation date) is reported when the swap is priced.
-///
-/// Deferred (visible): the core's `include_settlement_date_flows`,
-/// `settlement_date` and `npv_date` overrides
-/// (`discountingswapengine.rs:58-63`) are not exposed and are always passed as
-/// `None`, so the flow decision follows the settings' own flags and both dates
-/// fall back to the curve reference date. That is the shape every ported
-/// fixture uses.
-///
-/// The `settings` passed here must be the same object the swap this engine
-/// prices was built with, or the two resolve their dates against different
-/// evaluation dates and the NPV is silently wrong.
+/// Infallible at construction - every precondition (an empty curve handle, an
+/// unset evaluation date) is reported when the swap is priced. The core's
+/// include_settlement_date_flows, settlement_date and npv_date overrides are
+/// not exposed and are always None, so the flow decision follows the settings'
+/// own flags and both dates fall back to the curve reference date. The swap
+/// this engine prices must carry the same Settings object.
 #[pyclass(name = "DiscountingSwapEngine", unsendable)]
 pub struct PyDiscountingSwapEngine {
     inner: SharedMut<DiscountingSwapEngine>,
@@ -107,7 +98,15 @@ pub struct PyDiscountingSwapEngine {
 
 #[pymethods]
 impl PyDiscountingSwapEngine {
-    /// An engine discounting every leg on `discount`.
+    /// Build an engine discounting every leg on discount.
+    ///
+    /// Args:
+    ///     discount (YieldTermStructure): The curve every leg is discounted on;
+    ///         the engine registers as an observer of it.
+    ///     settings (Settings): The explicit settings; must be the same object
+    ///         the swap this engine prices was built with, or the two resolve
+    ///         their dates against different evaluation dates and the NPV is
+    ///         silently wrong.
     #[new]
     fn new(discount: &PyYieldTermStructure, settings: &PySettings) -> Self {
         PyDiscountingSwapEngine {
@@ -130,16 +129,12 @@ impl PyDiscountingSwapEngine {
     }
 }
 
-/// Python `CpiInterpolationType`: how an observation interpolates between the
-/// index fixings bracketing it (core `indexes::CpiInterpolationType`).
+/// How a CPI observation interpolates between the index fixings bracketing it.
 ///
-/// A fieldless pyo3 enum exposing `CpiInterpolationType.Flat` /
-/// `CpiInterpolationType.Linear`: `Flat` reads the fixing of the lagged period
-/// outright, `Linear` advances from it to the next period's fixing by how far
-/// the observation date has run into its own period.
-///
-/// The core's deprecated `AsIndex` variant is not ported and so has no
-/// counterpart here.
+/// Flat reads the fixing of the lagged period outright; Linear advances from it
+/// to the next period's fixing by how far the observation date has run into its
+/// own period. The core's deprecated AsIndex variant is not ported and so has
+/// no counterpart here.
 #[pyclass(name = "CpiInterpolationType", eq, eq_int, from_py_object)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum PyCpiInterpolationType {
@@ -166,18 +161,13 @@ impl PyCpiInterpolationType {
     }
 }
 
-/// Python `ZeroInflationIndex`: a price index publishing one level per period,
-/// reading back either a stored figure or a forecast off its inflation curve
-/// (core `indexes::inflationindex::ZeroInflationIndex`).
+/// A price index publishing one level per period, reading back either a
+/// stored figure or a forecast off its inflation curve.
 ///
-/// The curve is reached through a [`RelinkableHandle`] the facade owns. The
-/// core's `with_term_structure` consumes the index and takes a plain
-/// [`Handle`](libitofin::handle::Handle), so an index built against a curve
-/// that does not exist yet could never be pointed at one later; linking the
-/// index to this facade's own relinkable handle at construction moves that
-/// choice to `link_to`, which is how the bootstrapped-curve fixtures need it.
-/// The handle starts empty, exactly as the core's own constructor leaves it, so
-/// a forecast before any link raises the empty-handle error.
+/// The curve is reached through a relinkable handle the index owns, so an
+/// index can be built before the curve it forecasts off exists. The handle
+/// starts empty and a forecast before any link raises ItofinError; link_to
+/// fills it.
 #[pyclass(name = "ZeroInflationIndex", unsendable)]
 pub struct PyZeroInflationIndex {
     inner: Shared<ZeroInflationIndex>,
@@ -197,7 +187,14 @@ impl PyZeroInflationIndex {
 
 #[pymethods]
 impl PyZeroInflationIndex {
-    /// The UK Retail Price Index: "RPI", monthly, one-month availability lag.
+    /// Return the UK Retail Price Index: monthly, one-month availability lag.
+    ///
+    /// Args:
+    ///     settings (Settings): The explicit settings supplying the evaluation
+    ///         date and the stored fixings.
+    ///
+    /// Returns:
+    ///     ZeroInflationIndex: The "UK RPI" index, over an empty curve handle.
     #[staticmethod]
     fn uk_rpi(settings: &PySettings) -> Self {
         PyZeroInflationIndex::with_curve_handle(|curve| {
@@ -205,7 +202,14 @@ impl PyZeroInflationIndex {
         })
     }
 
-    /// The UK harmonised index of consumer prices.
+    /// Return the UK harmonised index of consumer prices.
+    ///
+    /// Args:
+    ///     settings (Settings): The explicit settings supplying the evaluation
+    ///         date and the stored fixings.
+    ///
+    /// Returns:
+    ///     ZeroInflationIndex: The UK HICP index, over an empty curve handle.
     #[staticmethod]
     fn uk_hicp(settings: &PySettings) -> Self {
         PyZeroInflationIndex::with_curve_handle(|curve| {
@@ -213,7 +217,14 @@ impl PyZeroInflationIndex {
         })
     }
 
-    /// The euro-area harmonised index of consumer prices.
+    /// Return the euro-area harmonised index of consumer prices.
+    ///
+    /// Args:
+    ///     settings (Settings): The explicit settings supplying the evaluation
+    ///         date and the stored fixings.
+    ///
+    /// Returns:
+    ///     ZeroInflationIndex: The EU HICP index, over an empty curve handle.
     #[staticmethod]
     fn eu_hicp(settings: &PySettings) -> Self {
         PyZeroInflationIndex::with_curve_handle(|curve| {
@@ -221,13 +232,28 @@ impl PyZeroInflationIndex {
         })
     }
 
-    /// The index name, e.g. `"UK RPI"`, under which fixings are stored.
+    /// Return the index name, under which fixings are stored.
+    ///
+    /// Returns:
+    ///     str: The name, e.g. "UK RPI".
     fn name(&self) -> String {
         self.inner.name()
     }
 
-    /// Records a published figure across the whole inflation period it
-    /// describes, so a later read on any day inside that period finds it.
+    /// Record a published figure across the whole inflation period.
+    ///
+    /// The figure is stored on every date of the period fixing_date falls in,
+    /// so a later read on any day inside that period finds it.
+    ///
+    /// Args:
+    ///     fixing_date (Date): Any date inside the inflation period the figure
+    ///         describes.
+    ///     value (float): The published index level.
+    ///
+    /// Raises:
+    ///     ItofinError: If the index frequency has no expressible inflation
+    ///         period, or a different figure is already stored on a date in
+    ///         that period.
     fn add_fixing(&self, fixing_date: &PyDate, value: f64) -> PyResult<()> {
         Ok(self
             .inner
@@ -235,13 +261,19 @@ impl PyZeroInflationIndex {
             .map_err(PyQlError::from)?)
     }
 
-    /// The fixing at `fixing_date`, stored or forecast off the linked curve.
+    /// Return the fixing at fixing_date, stored or forecast off the linked curve.
     ///
-    /// `forecast_todays_fixing` is accepted and ignored, as in the core: the
-    /// choice between history and forecast is made by
-    /// [`needs_forecast`](Self::needs_forecast) alone. A date the store should
-    /// cover but does not is an error rather than a forecast, and a forecast
-    /// with no curve linked raises the empty-handle error.
+    /// Args:
+    ///     fixing_date (Date): The date the level is read or forecast for.
+    ///     forecast_todays_fixing (bool): Accepted and ignored, as in the core:
+    ///         needs_forecast alone decides between history and forecast.
+    ///
+    /// Returns:
+    ///     float: The index level.
+    ///
+    /// Raises:
+    ///     ItofinError: If a date the store should cover has no figure, or a
+    ///         forecast is asked for with no curve linked.
     #[pyo3(signature = (fixing_date, forecast_todays_fixing = false))]
     fn fixing(&self, fixing_date: &PyDate, forecast_todays_fixing: bool) -> PyResult<f64> {
         Ok(self
@@ -250,37 +282,51 @@ impl PyZeroInflationIndex {
             .map_err(PyQlError::from)?)
     }
 
-    /// The first day of the inflation period the latest stored figure
-    /// describes. An index with no history is an error.
+    /// Return the first day of the period the latest stored figure describes.
+    ///
+    /// Returns:
+    ///     Date: The start of that inflation period.
+    ///
+    /// Raises:
+    ///     ItofinError: If the index has no fixing history.
     fn last_fixing_date(&self) -> PyResult<PyDate> {
         Ok(PyDate::from_inner(
             self.inner.last_fixing_date().map_err(PyQlError::from)?,
         ))
     }
 
-    /// Points the index at `curve`, so every forecast from here on compounds
-    /// off it.
+    /// Point the index at curve, so every forecast from here on compounds off it.
     ///
-    /// Takes the [`PyZeroInflationTermStructure`] base, so any subclass links:
-    /// the directly-built [`PyInterpolatedZeroInflationCurve`] as much as the
-    /// bootstrapped curves that follow. The base's handle is filled at
-    /// construction, so it always dereferences here.
+    /// Takes the ZeroInflationTermStructure base, so any subclass links. It is
+    /// the curve behind that facade's handle at call time that is stored, not
+    /// the handle itself: relinking the facade afterwards leaves this index on
+    /// the curve it was given, and a later link_to is how it moves.
     ///
-    /// It is the curve *behind* `curve`'s handle at call time that is stored,
-    /// not the handle itself: relinking the facade afterwards leaves this index
-    /// on the curve it was given, and a later `link_to` is how it moves.
+    /// Args:
+    ///     curve (ZeroInflationTermStructure): The curve forecasts compound
+    ///         off.
     ///
-    /// # Errors
-    ///
-    /// Reports the empty-handle error if `curve` somehow carries no link.
+    /// Raises:
+    ///     ItofinError: If curve somehow carries no link.
     fn link_to(&self, curve: &PyZeroInflationTermStructure) -> PyResult<()> {
         self.relink(curve.handle().current_link().map_err(PyQlError::from)?);
         Ok(())
     }
 
-    /// Whether `fixing_date` has to be forecast rather than read from history,
-    /// decided against the latest period that could have been published by the
+    /// Return whether fixing_date has to be forecast rather than read from history.
+    ///
+    /// Decided against the latest period that could have been published by the
     /// settings' evaluation date.
+    ///
+    /// Args:
+    ///     fixing_date (Date): The date in question.
+    ///
+    /// Returns:
+    ///     bool: True if the date has to be forecast off the curve.
+    ///
+    /// Raises:
+    ///     ItofinError: If the evaluation date is unset, or the index frequency
+    ///         has no expressible inflation period.
     fn needs_forecast(&self, fixing_date: &PyDate) -> PyResult<bool> {
         Ok(self
             .inner
@@ -288,6 +334,10 @@ impl PyZeroInflationIndex {
             .map_err(PyQlError::from)?)
     }
 
+    /// Return the printable representation.
+    ///
+    /// Returns:
+    ///     str: A string of the form ZeroInflationIndex(UK RPI).
     fn __repr__(&self) -> String {
         format!("ZeroInflationIndex({})", self.inner.name())
     }
@@ -307,34 +357,19 @@ impl PyZeroInflationIndex {
     }
 }
 
-/// Python `MultiplicativePriceSeasonality`: the seasonal correction a price
-/// index carries, whose factors multiply the index level itself
-/// (`termstructures::inflation::seasonality::MultiplicativePriceSeasonality`).
+/// The seasonal correction a price index carries, whose factors multiply
+/// the index level itself.
 ///
-/// Seasonality fills an inflation curve in between the integer-year maturities
-/// the market quotes. The factors are given in whole multiples of the count the
-/// frequency dictates - twelve for [`Frequency.Monthly`](crate::time::PyFrequency)
-/// - and are reused as long as needed, so twelve of them are stationary and
-/// twenty-four repeat every two years. They are not applied raw: the factor at
-/// the queried date is normalized against the one at a reference date, which for
-/// a zero rate is the curve's own base date, so the correction is the identity
-/// there.
+/// The factors are given in whole multiples of the count the frequency
+/// dictates - twelve for Frequency.Monthly - and are reused as long as needed,
+/// so twelve of them are stationary and twenty-four repeat every two years.
+/// They are not applied raw: the factor at the queried date is normalized
+/// against the one at a reference date, which for a zero rate is the curve's
+/// own base date, so the correction is the identity there.
 ///
-/// Install it with
-/// [`ZeroInflationTermStructure.set_seasonality`](PyZeroInflationTermStructure::set_seasonality).
-/// Only the date-taking rate query folds the correction in; the year-fraction
-/// one cannot, a time not naming the date the factors are a function of.
-///
-/// Fallible at construction: the core rejects a frequency outside
-/// semiannual-through-daily - `Frequency.Annual` among them - an empty factor
-/// set, and a factor count that is not a whole multiple of the frequency, each
-/// as [`struct@crate::ItofinError`].
-///
-/// Deferred (visible): the core's `set`, which replaces the whole
-/// specification in place, is not exposed - building a new object and
-/// installing it says the same thing without a second mutation path. The core's
-/// `is_consistent` is not exposed either: it is what `set_seasonality` runs as
-/// its gate, and is reported from there.
+/// Install it with ZeroInflationTermStructure.set_seasonality. Only the
+/// date-taking rate query folds the correction in; the year-fraction one
+/// cannot, a time not naming the date the factors are a function of.
 #[pyclass(name = "MultiplicativePriceSeasonality", unsendable)]
 pub struct PyMultiplicativePriceSeasonality {
     inner: Shared<MultiplicativePriceSeasonality>,
@@ -342,8 +377,19 @@ pub struct PyMultiplicativePriceSeasonality {
 
 #[pymethods]
 impl PyMultiplicativePriceSeasonality {
-    /// The seasonality whose `seasonality_factors` start at
-    /// `seasonality_base_date` and step at `frequency`.
+    /// Build the correction from a factor set anchored on a base date.
+    ///
+    /// Args:
+    ///     seasonality_base_date (Date): The date the factor set is anchored
+    ///         on.
+    ///     frequency (Frequency): The frequency the factors step at.
+    ///     seasonality_factors (list[float]): The factors, in order from the
+    ///         base date.
+    ///
+    /// Raises:
+    ///     ItofinError: On a frequency outside semiannual-through-daily,
+    ///         Frequency.Annual among them; on an empty factor set; and on a
+    ///         factor count that is not a whole multiple of the frequency.
     #[new]
     fn new(
         seasonality_base_date: &PyDate,
@@ -362,31 +408,47 @@ impl PyMultiplicativePriceSeasonality {
         })
     }
 
-    /// The date the factor set is anchored on.
+    /// Return the date the factor set is anchored on.
+    ///
+    /// Returns:
+    ///     Date: The seasonality base date.
     fn seasonality_base_date(&self) -> PyDate {
         PyDate::from_inner(self.inner.seasonality_base_date())
     }
 
-    /// The frequency the factors step at.
+    /// Return the frequency the factors step at.
+    ///
+    /// Returns:
+    ///     Frequency: The stepping frequency.
     fn frequency(&self) -> PyResult<PyFrequency> {
         PyFrequency::from_inner(self.inner.frequency())
     }
 
-    /// The factors, in order from the seasonality base date.
+    /// Return the factors, in order from the seasonality base date.
+    ///
+    /// Returns:
+    ///     list[float]: The factor set as given.
     fn seasonality_factors(&self) -> Vec<f64> {
         self.inner.seasonality_factors().to_vec()
     }
 
-    /// The raw factor covering `to`, before any normalization against a
-    /// reference date - not the correction the curve applies.
+    /// Return the raw factor covering to, before any normalization.
     ///
-    /// The offset from the seasonality base date is counted in whole factor
-    /// periods and wrapped modulo the factor count, so a set shorter than the
-    /// span repeats and dates before the anchor wrap backwards.
+    /// This is not the correction the curve applies, which is normalized
+    /// against a reference date. The offset from the seasonality base date is
+    /// counted in whole factor periods and wrapped modulo the factor count, so
+    /// a set shorter than the span repeats and dates before the anchor wrap
+    /// backwards.
     ///
-    /// # Errors
+    /// Args:
+    ///     to (Date): The date the factor is read at.
     ///
-    /// Reports a year-based factor period, which cannot express seasonality.
+    /// Returns:
+    ///     float: The raw seasonality factor.
+    ///
+    /// Raises:
+    ///     ItofinError: On a year-based factor period, which cannot express
+    ///         seasonality.
     fn seasonality_factor(&self, to: &PyDate) -> PyResult<f64> {
         Ok(self
             .inner
@@ -402,38 +464,15 @@ impl PyMultiplicativePriceSeasonality {
     }
 }
 
-/// Python `ZeroInflationTermStructure`: the shared base for every zero-coupon
-/// inflation curve (`termstructures::inflation::inflationtermstructure`).
+/// Shared base for every zero-coupon inflation curve: the zero-coupon
+/// inflation rate in a year-fraction and a date form, the base date, the
+/// fixing frequency and the seasonality correction the curve carries.
 ///
-/// Holds the erased `Handle<dyn ZeroInflationTermStructure>` and exposes the
-/// query surface every concrete curve inherits, the shape
-/// [`PyDefaultProbabilityTermStructure`](crate::credit) already uses on the
-/// credit side. Concrete curves such as [`PyInterpolatedZeroInflationCurve`]
-/// subclass this and supply only their constructor and node inspectors.
-///
-/// The two rate reads are not interchangeable.
-/// [`zero_rate_date`](Self::zero_rate_date) snaps its date to the start of the
-/// inflation period containing it before the curve sees it, because a fixing
-/// applies to a whole period; [`zero_rate`](Self::zero_rate) takes a
-/// year-fraction already measured under the curve's own day counter and
-/// quantizes nothing. A mid-period date therefore reads that period's rate
-/// through the first and an interpolated one through the second.
-///
-/// [`set_seasonality`](Self::set_seasonality) lives here rather than on either
-/// concrete curve: it is an `InflationTermStructure` method reached through the
-/// erased handle, and the handle holds the very object the subclass wraps, so
-/// the one method serves both.
-///
-/// Deferred (visible): `base_rate()` is not exposed. A zero curve carries no
-/// base rate, so the core accessor is an error on every curve reachable here
-/// (`inflationtermstructure.rs:159-166`); it follows with the year-on-year
-/// structures that do carry one. The core's `seasonality()` getter is omitted
-/// too: it hands back an erased `Shared<dyn Seasonality>`, and the trait carries
-/// no downcast surface to recover the concrete
-/// [`PyMultiplicativePriceSeasonality`] from, so the getter could only return
-/// something lossy. [`has_seasonality`](Self::has_seasonality) answers the
-/// question the fixtures ask, and the caller already holds the object it
-/// installed.
+/// The two rate reads are not interchangeable. zero_rate_date snaps its date
+/// to the start of the inflation period containing it, because a fixing
+/// applies to a whole period; zero_rate takes a year-fraction already measured
+/// under the curve's own day counter and quantizes nothing. Only the first
+/// folds in any seasonality.
 #[pyclass(name = "ZeroInflationTermStructure", subclass, unsendable)]
 pub struct PyZeroInflationTermStructure {
     inner: Handle<dyn ZeroInflationTermStructure>,
@@ -441,12 +480,23 @@ pub struct PyZeroInflationTermStructure {
 
 #[pymethods]
 impl PyZeroInflationTermStructure {
-    /// The zero-coupon inflation rate at year-fraction `t`, on the yearly
-    /// compounding ZCIIS quotes assume.
+    /// Return the zero-coupon inflation rate at year-fraction t.
     ///
-    /// `t` must be measured with the curve's own day counter, and is negative
-    /// for the base period. Nothing here accounts for observation lags or
-    /// period interpolation: the caller manages those.
+    /// Quoted on the yearly compounding zero-coupon swaps assume. Nothing here
+    /// accounts for observation lags or period interpolation: the caller
+    /// manages those.
+    ///
+    /// Args:
+    ///     t (float): The year fraction, measured with the curve's own day
+    ///         counter; it is negative for the base period.
+    ///     extrapolate (bool): Whether to answer past the curve's range.
+    ///
+    /// Returns:
+    ///     float: The zero-coupon inflation rate.
+    ///
+    /// Raises:
+    ///     ItofinError: If t is past the curve's range and extrapolation is
+    ///         not allowed.
     #[pyo3(signature = (t, extrapolate = false))]
     fn zero_rate(&self, t: f64, extrapolate: bool) -> PyResult<f64> {
         Ok(self
@@ -457,12 +507,22 @@ impl PyZeroInflationTermStructure {
             .map_err(PyQlError::from)?)
     }
 
-    /// The zero-coupon inflation rate for the inflation period containing
-    /// `date`.
+    /// Return the zero-coupon inflation rate for the period containing date.
     ///
     /// The date is quantized to that period's first day before both the range
     /// check and the time conversion, so every day inside one period reads the
-    /// same rate.
+    /// same rate. This is the only form that folds in seasonality.
+    ///
+    /// Args:
+    ///     date (Date): The date the rate is read at.
+    ///     extrapolate (bool): Whether to answer past the curve's range.
+    ///
+    /// Returns:
+    ///     float: The zero-coupon inflation rate for that period.
+    ///
+    /// Raises:
+    ///     ItofinError: If the period is past the curve's range and
+    ///         extrapolation is not allowed.
     #[pyo3(signature = (date, extrapolate = false))]
     fn zero_rate_date(&self, date: &PyDate, extrapolate: bool) -> PyResult<f64> {
         Ok(self
@@ -473,8 +533,11 @@ impl PyZeroInflationTermStructure {
             .map_err(PyQlError::from)?)
     }
 
-    /// The base date: the last date for which the fixing is known. It precedes
-    /// the reference date, so its year-fraction is negative.
+    /// Return the base date, the last date for which the fixing is known.
+    ///
+    /// Returns:
+    ///     Date: The base date; it precedes the reference date, so its year
+    ///         fraction is negative.
     fn base_date(&self) -> PyResult<PyDate> {
         Ok(PyDate::from_inner(
             self.inner
@@ -484,7 +547,10 @@ impl PyZeroInflationTermStructure {
         ))
     }
 
-    /// The frequency of the inflation fixings the curve is built on.
+    /// Return the frequency of the inflation fixings the curve is built on.
+    ///
+    /// Returns:
+    ///     Frequency: The fixing frequency.
     fn frequency(&self) -> PyResult<PyFrequency> {
         PyFrequency::from_inner(
             self.inner
@@ -494,20 +560,22 @@ impl PyZeroInflationTermStructure {
         )
     }
 
-    /// Installs `seasonality` on the curve, replacing whatever it carried;
-    /// `None` clears it.
+    /// Install seasonality on the curve, replacing whatever it carried.
     ///
     /// A curve that caches anything derived from the correction - every
     /// bootstrapped one does - is invalidated here, so the next read re-solves
     /// against the new correction.
     ///
-    /// # Errors
+    /// Args:
+    ///     seasonality (MultiplicativePriceSeasonality | None): The correction
+    ///         to install; None clears it.
     ///
-    /// Reports the consistency gate, which a multi-year factor set fails: the
-    /// whole-year comparison deciding those is a documented core deferral
-    /// (#807). The store happens *before* the gate runs, as C++'s does, so a
-    /// rejected correction is left installed and unannounced - clear it with
-    /// `None` before reading the curve again.
+    /// Raises:
+    ///     ItofinError: From the consistency gate, which a multi-year factor
+    ///         set fails, that comparison being a documented core deferral
+    ///         (#807). The store happens before the gate runs, as C++'s does,
+    ///         so a rejected correction is left installed and unannounced:
+    ///         clear it with None before reading the curve again.
     #[pyo3(signature = (seasonality))]
     fn set_seasonality(
         &self,
@@ -521,8 +589,11 @@ impl PyZeroInflationTermStructure {
             .map_err(PyQlError::from)?)
     }
 
-    /// Whether the curve carries a seasonality correction. Reports one left
-    /// installed by a [`set_seasonality`](Self::set_seasonality) that raised.
+    /// Return whether the curve carries a seasonality correction.
+    ///
+    /// Returns:
+    ///     bool: True also for a correction left installed by a
+    ///         set_seasonality that raised.
     fn has_seasonality(&self) -> PyResult<bool> {
         Ok(self
             .inner
@@ -545,33 +616,12 @@ impl PyZeroInflationTermStructure {
     }
 }
 
-/// Python `InterpolatedZeroInflationCurve`: a zero-coupon inflation curve built
-/// from (date, zero-rate) nodes, interpolating linearly in zero-rate space
-/// (`termstructures::inflation::InterpolatedZeroInflationCurve<Linear>`).
+/// A zero-coupon inflation curve built from (date, zero-rate) nodes,
+/// interpolating linearly in zero-rate space.
 ///
-/// Extends [`PyZeroInflationTermStructure`], which carries the whole query
-/// surface. The first date is the *base* date rather than the reference date,
-/// which is passed separately and normally follows it; node times are measured
-/// from the reference date, so the first one is negative. That is the
-/// divergence from the yield-side [`ZeroCurve`](crate::curve::PyZeroCurve),
-/// whose first node is its own reference date at time zero.
-///
-/// The concrete curve is retained alongside the erased handle so the node
-/// inspectors [`times`](Self::times), [`dates`](Self::dates) and
-/// [`nodes`](Self::nodes) stay reachable, the shape
-/// [`PyInterpolatedHazardRateCurve`](crate::credit) uses.
-///
-/// Fallible: the core rejects fewer than two dates, a dates/rates count
-/// mismatch, a rate at or below -100 % from the second node on, and unsorted
-/// dates (`interpolatedzeroinflationcurve.rs:95-106`), each as
-/// [`struct@crate::ItofinError`].
-///
-/// `Linear` is pinned at the boundary: it is the interpolator C++'s
-/// `ZeroInflationCurve` typedef fixes (`interpolatedzeroinflationcurve.rs:74`),
-/// so no interpolation argument is offered.
-///
-/// Deferred (visible): the core's `rates()` / `data()` inspectors are omitted,
-/// both being the rate half of [`nodes`](Self::nodes).
+/// The first date is the base date rather than the reference date, which is
+/// passed separately and normally follows it; node times are measured from the
+/// reference date, so the first one is negative.
 #[pyclass(
     name = "InterpolatedZeroInflationCurve",
     extends = PyZeroInflationTermStructure,
@@ -583,8 +633,23 @@ pub struct PyInterpolatedZeroInflationCurve {
 
 #[pymethods]
 impl PyInterpolatedZeroInflationCurve {
-    /// A curve through the `rates` quoted at `dates`, with `dates[0]` as the
-    /// base date and `reference_date` given separately.
+    /// Build the curve through the rates quoted at dates.
+    ///
+    /// Linear is pinned at the boundary: it is the interpolator the C++ zero
+    /// inflation curve typedef fixes, so no interpolation argument is offered.
+    ///
+    /// Args:
+    ///     reference_date (Date): The curve's reference date, given separately
+    ///         and normally following the base date.
+    ///     dates (list[Date]): The node dates, the first being the base date.
+    ///     rates (list[float]): The zero rate at each node.
+    ///     frequency (Frequency): The frequency of the inflation fixings.
+    ///     day_counter (DayCounter): The day count turning dates into times.
+    ///
+    /// Raises:
+    ///     ItofinError: On fewer than two dates, a dates and rates count
+    ///         mismatch, a rate at or below -100 per cent from the second node
+    ///         on, or unsorted dates.
     #[new]
     fn new(
         reference_date: &PyDate,
@@ -615,13 +680,19 @@ impl PyInterpolatedZeroInflationCurve {
         )
     }
 
-    /// The node times, measured from the reference date; the first is negative
-    /// whenever the base date precedes it.
+    /// Return the node times, measured from the reference date.
+    ///
+    /// Returns:
+    ///     list[float]: The node times; the first is negative whenever the
+    ///         base date precedes the reference date.
     fn times(&self) -> Vec<f64> {
         self.concrete.times().to_vec()
     }
 
-    /// The node dates, the first of which is the base date.
+    /// Return the node dates.
+    ///
+    /// Returns:
+    ///     list[Date]: The nodes, the first of which is the base date.
     fn dates(&self) -> Vec<PyDate> {
         self.concrete
             .dates()
@@ -631,7 +702,10 @@ impl PyInterpolatedZeroInflationCurve {
             .collect()
     }
 
-    /// The `(date, zero-rate)` nodes.
+    /// Return the curve's nodes as pairs.
+    ///
+    /// Returns:
+    ///     list[tuple[Date, float]]: One (date, zero rate) pair per node.
     fn nodes(&self) -> Vec<(PyDate, f64)> {
         self.concrete
             .nodes()
@@ -641,23 +715,11 @@ impl PyInterpolatedZeroInflationCurve {
     }
 }
 
-/// Python `ZeroInflationHelper`: the shared base for every zero-inflation
-/// bootstrap helper
-/// (`termstructures::inflation::inflationhelpers::ZeroInflationHelper`).
+/// Shared base for every zero-inflation bootstrap helper: the two dates the
+/// bootstrap places a curve node by.
 ///
-/// Holds the erased `Shared<dyn ZeroInflationHelper>` and exposes the two dates
-/// the bootstrap places a curve node by, the shape
-/// [`PyDefaultProbabilityHelper`](crate::credithelpers::PyDefaultProbabilityHelper)
-/// already uses on the credit side. Concrete helpers such as
-/// [`PyZeroCouponInflationSwapHelper`] subclass this and supply only their
-/// constructor.
-///
-/// Deferred (visible): the core trait's `earliest_date`, `maturity_date` and
-/// `latest_relevant_date` are not exposed. On the one concrete helper reachable
-/// here all five dates collapse onto the same fixing-period start
-/// (`inflationhelpers.rs:288-290`), so the three would report exactly what
-/// [`pillar_date`](Self::pillar_date) reports; they follow with a helper whose
-/// dates straddle a period.
+/// Concrete helpers such as ZeroCouponInflationSwapHelper subclass this and
+/// supply only their constructor.
 #[pyclass(name = "ZeroInflationHelper", subclass, unsendable)]
 pub struct PyZeroInflationHelper {
     inner: Shared<dyn ZeroInflationHelper>,
@@ -665,13 +727,18 @@ pub struct PyZeroInflationHelper {
 
 #[pymethods]
 impl PyZeroInflationHelper {
-    /// The pillar date, at which the curve node this helper sets sits.
+    /// Return the date the curve node this helper sets sits at.
+    ///
+    /// Returns:
+    ///     Date: The pillar date.
     fn pillar_date(&self) -> PyDate {
         PyDate::from_inner(self.inner.pillar_date())
     }
 
-    /// The latest date the helper needs curve data at (equal to the pillar
-    /// date).
+    /// Return the latest date the helper needs curve data at.
+    ///
+    /// Returns:
+    ///     Date: The latest date, equal to the pillar date.
     fn latest_date(&self) -> PyDate {
         PyDate::from_inner(self.inner.latest_date())
     }
@@ -690,34 +757,19 @@ impl PyZeroInflationHelper {
     }
 }
 
-/// Python `ZeroCouponInflationSwapHelper`: the bootstrap helper fitting a
-/// zero-coupon inflation swap quoted as a rate
-/// (`termstructures::inflation::inflationhelpers::ZeroCouponInflationSwapHelper`).
+/// The bootstrap helper fitting a zero-coupon inflation swap quoted as a
+/// rate.
 ///
 /// The helper prices a unit-notional, zero-strike swap of its own and reports
 /// that contract's fair rate; the bootstrap drives the quoted rate less that
-/// fair rate to zero. It needs no nominal curve, building itself a flat 0 % one,
-/// because both legs pay on the same adjusted maturity and their discount
-/// factors cancel out of the fair rate.
+/// fair rate to zero. The swap starts at the evaluation date, so that date must
+/// be set before this constructor runs, not merely before the bootstrap.
 ///
-/// The swap starts at the evaluation date held by `settings` and is rebuilt
-/// whenever that date moves, so the evaluation date must be set *before* the
-/// constructor runs, not merely before the bootstrap. The helper retains the
-/// caller's [`PySimpleQuote`], so a later `set_value` re-drives the bootstrap.
+/// It prices through a copy of index linked to a handle of its own, so the
+/// caller's index need not be linked to any curve.
 ///
-/// It prices through a *copy* of `index` linked to a handle of its own, which
-/// the bootstrap points at the curve under construction; the caller's index
-/// keeps whatever curve it had and need not be linked at all.
-///
-/// `pillar` picks which of the two nodes an interpolated swap straddles the
-/// helper fits; a flat swap reads a single fixing and ignores it.
-///
-/// Fallible: the core rejects an observation lag the index cannot observe
-/// through, the swap being built here too, and under
-/// [`CpiInterpolationType.Linear`](PyCpiInterpolationType) one that leaves less
-/// than a whole index period over the index's availability lag, interpolation
-/// reading the month after the one the lag lands in. Both raise
-/// [`struct@crate::ItofinError`].
+/// pillar picks which of the two nodes an interpolated swap straddles the helper
+/// fits; a flat swap reads a single fixing and ignores it.
 #[pyclass(
     name = "ZeroCouponInflationSwapHelper",
     extends = PyZeroInflationHelper,
@@ -729,7 +781,39 @@ pub struct PyZeroCouponInflationSwapHelper {
 
 #[pymethods]
 impl PyZeroCouponInflationSwapHelper {
-    /// A helper fitting `quote` on a swap maturing at `maturity`.
+    /// Build the helper on a swap maturing at maturity.
+    ///
+    /// It needs no nominal curve, building itself a flat zero-rate one,
+    /// because both legs pay on the same adjusted maturity and their discount
+    /// factors cancel out of the fair rate.
+    ///
+    /// Args:
+    ///     quote (SimpleQuote): The quoted swap rate; the caller keeps it, so
+    ///         a later set_value re-drives the bootstrap.
+    ///     swap_obs_lag (Period): How far back the maturity fixing is
+    ///         observed.
+    ///     maturity (Date): The swap's maturity.
+    ///     calendar (Calendar): The calendar the payment rolls on.
+    ///     payment_convention (BusinessDayConvention): The roll applied to the
+    ///         payment date.
+    ///     day_counter (DayCounter): The day count the fixed amount accrues
+    ///         on.
+    ///     index (ZeroInflationIndex): The index observed; the helper prices
+    ///         through a copy linked to a handle of its own, so the caller's
+    ///         index need not be linked to any curve.
+    ///     observation_interpolation (CpiInterpolationType): How the observed
+    ///         fixing is interpolated.
+    ///     settings (Settings): The explicit settings supplying the evaluation
+    ///         date the swap starts at, which must be set before this
+    ///         constructor runs.
+    ///     pillar (Pillar): Which of the two nodes an interpolated swap
+    ///         straddles the helper fits; a flat swap reads a single fixing
+    ///         and ignores it.
+    ///
+    /// Raises:
+    ///     ItofinError: On an observation lag the index cannot observe
+    ///         through, and under Linear interpolation on one that leaves less
+    ///         than a whole index period over the index's availability lag.
     #[new]
     #[pyo3(signature = (
         quote,
@@ -776,17 +860,19 @@ impl PyZeroCouponInflationSwapHelper {
         )
     }
 
-    /// The date the maturity fixing is observed at on the helper's own swap:
-    /// `maturity` less the observation lag, unsnapped to its inflation period.
+    /// Return the maturity observation date on the helper's own swap.
     ///
     /// Read off the cached contract's indexed flow, so it reports the date the
-    /// helper actually prices at rather than one recomputed here. It is *not*
-    /// [`pillar_date`](PyZeroInflationHelper::pillar_date), which is the first
-    /// day of the period containing it - the quantization being the helper's
-    /// rounding and not the contract's.
+    /// helper actually prices at rather than one recomputed here. It is not
+    /// pillar_date, which is the first day of the period containing it, that
+    /// quantization being the helper's rounding and not the contract's.
     ///
-    /// Fallible: the cached swap carries the error that stopped it being built,
-    /// notably an evaluation date that was never set.
+    /// Returns:
+    ///     Date: The maturity less the observation lag, unsnapped.
+    ///
+    /// Raises:
+    ///     ItofinError: If the cached swap carries the error that stopped it
+    ///         being built, notably an evaluation date that was never set.
     fn inflation_fixing_date(&self) -> PyResult<PyDate> {
         let swap = self.concrete.swap();
         let swap = swap
@@ -796,48 +882,15 @@ impl PyZeroCouponInflationSwapHelper {
     }
 }
 
-/// Python `PiecewiseZeroInflationCurve`: a zero-coupon inflation curve
-/// bootstrapped from inflation helpers, solving one zero-rate node per helper
-/// (`termstructures::inflation::PiecewiseZeroInflationCurve<Linear>`).
+/// A zero-coupon inflation curve bootstrapped from inflation helpers,
+/// solving one zero-rate node per helper fixing period.
 ///
-/// Extends [`PyZeroInflationTermStructure`], which carries the whole query
-/// surface. Each helper's observed fixing period marks a segment boundary, and
-/// its node is solved so the helper reprices its own quote off the curve.
+/// Node zero sits on base_date, not on reference_date, so times()[0] is
+/// negative - the one structural difference from every other piecewise curve.
 ///
-/// Node zero sits on `base_date`, not on `reference_date`: the base date is the
-/// last date for which a fixing is known - in practice
-/// [`ZeroInflationIndex.last_fixing_date`](PyZeroInflationIndex::last_fixing_date)
-/// - and precedes the reference date, so [`times`](Self::times)`[0]` is
-/// negative. That is the one structural difference from every other piecewise
-/// curve, whose first node is its own reference date at time zero.
-///
-/// Lazy, like the credit-side [`PyPiecewiseDefaultCurve`](crate::credit): the
-/// constructor only registers on the helpers, and the bootstrap runs on the
-/// first read - a query, an inspector, or an explicit
-/// [`calculate`](Self::calculate). A helper quote moving invalidates the cache,
-/// so the next read re-bootstraps. The evaluation date must therefore be in
-/// place before that first read as well as before the helpers were built.
-///
-/// The concrete curve is retained alongside the erased handle so the node
-/// inspectors stay reachable, as [`PyInterpolatedZeroInflationCurve`] and
-/// [`PyPiecewiseDefaultCurve`](crate::credit) both do.
-///
-/// Fallible: the core rejects an empty helper set, and every inspector
-/// propagates a bootstrap failure as [`struct@crate::ItofinError`].
-///
-/// `Linear` is pinned at the boundary: it is the only interpolator the core
-/// constructs (`piecewisezeroinflationcurve.rs:105-125`), so no interpolation
-/// argument is offered.
-///
-/// A seasonality installed through
-/// [`set_seasonality`](PyZeroInflationTermStructure::set_seasonality)
-/// invalidates the bootstrap, so the next read re-solves every node against the
-/// correction and the quoted swaps still reprice to nothing.
-///
-/// Deferred (visible): the core's `data()` inspector is omitted, being the rate
-/// half of [`nodes`](Self::nodes) - the choice
-/// [`PyInterpolatedZeroInflationCurve`] already made on this side, where the
-/// credit curve exposes both.
+/// Lazy: the bootstrap runs on the first read, so the evaluation date must be
+/// in place before that read as well as before the helpers were built. A helper
+/// quote moving invalidates the cache.
 #[pyclass(
     name = "PiecewiseZeroInflationCurve",
     extends = PyZeroInflationTermStructure,
@@ -849,9 +902,18 @@ pub struct PyPiecewiseZeroInflationCurve {
 
 #[pymethods]
 impl PyPiecewiseZeroInflationCurve {
-    /// A curve over `helpers` with a fixed `reference_date` and a `base_date`
-    /// preceding it. `helpers` accepts any
-    /// [`ZeroInflationHelper`](PyZeroInflationHelper) subclass.
+    /// Build the curve over helpers, registering on them without solving.
+    ///
+    /// Args:
+    ///     reference_date (Date): The curve's reference date.
+    ///     base_date (Date): The last date for which a fixing is known, where
+    ///         node zero sits.
+    ///     frequency (Frequency): The frequency of the inflation fixings.
+    ///     day_counter (DayCounter): The day count turning dates into times.
+    ///     helpers (list[ZeroInflationHelper]): The bootstrap instruments.
+    ///
+    /// Raises:
+    ///     ItofinError: On an empty helper list.
     #[new]
     fn new(
         reference_date: &PyDate,
@@ -880,20 +942,36 @@ impl PyPiecewiseZeroInflationCurve {
         )
     }
 
-    /// Runs the bootstrap if the cache is stale, so a solver failure surfaces
-    /// here rather than inside a later query.
+    /// Run the bootstrap if the cache is stale.
+    ///
+    /// Calling it explicitly makes a solver failure surface here rather than
+    /// inside a later query.
+    ///
+    /// Raises:
+    ///     ItofinError: On a bootstrap failure.
     fn calculate(&self) -> PyResult<()> {
         Ok(self.concrete.calculate().map_err(PyQlError::from)?)
     }
 
-    /// The node times, measured from the reference date in the curve's own day
-    /// count; the first is negative (triggers the bootstrap).
+    /// Return the node times, triggering the bootstrap.
+    ///
+    /// Returns:
+    ///     list[float]: The nodes measured from the reference date; the first
+    ///         is negative, node zero sitting on the base date.
+    ///
+    /// Raises:
+    ///     ItofinError: On a bootstrap failure.
     fn times(&self) -> PyResult<Vec<f64>> {
         Ok(self.concrete.times().map_err(PyQlError::from)?)
     }
 
-    /// The node dates, the first of which is the base date (triggers the
-    /// bootstrap).
+    /// Return the node dates, triggering the bootstrap.
+    ///
+    /// Returns:
+    ///     list[Date]: The nodes, the first of which is the base date.
+    ///
+    /// Raises:
+    ///     ItofinError: On a bootstrap failure.
     fn dates(&self) -> PyResult<Vec<PyDate>> {
         Ok(self
             .concrete
@@ -904,7 +982,13 @@ impl PyPiecewiseZeroInflationCurve {
             .collect())
     }
 
-    /// The solved `(date, zero-rate)` nodes (triggers the bootstrap).
+    /// Return the solved nodes as pairs, triggering the bootstrap.
+    ///
+    /// Returns:
+    ///     list[tuple[Date, float]]: One (date, zero rate) pair per node.
+    ///
+    /// Raises:
+    ///     ItofinError: On a bootstrap failure.
     fn nodes(&self) -> PyResult<Vec<(PyDate, f64)>> {
         Ok(self
             .concrete
@@ -916,35 +1000,20 @@ impl PyPiecewiseZeroInflationCurve {
     }
 }
 
-/// Python `ZeroCouponInflationSwap`: one fixed flow against one
-/// inflation-indexed flow, both exchanged at maturity
-/// (`instruments::zerocouponinflationswap`).
+/// One fixed flow against one inflation-indexed flow, both exchanged at maturity.
 ///
-/// The quoted `fixed_rate` is the `K` that at inception matches the inflation
-/// growth. [`SwapType`](crate::swap::PySwapType) names the *inflation* leg, so a
-/// `Payer` pays inflation and receives fixed.
+/// fixed_rate is the K that at inception matches the inflation growth.
+/// SwapType names the inflation leg, so a Payer pays inflation and receives
+/// fixed.
 ///
-/// `maturity` is pre-adjustment: each leg's payment date is it rolled on that
+/// maturity is pre-adjustment: each leg's payment date is it rolled on that
 /// leg's calendar and convention, while the year fraction behind the fixed
-/// amount stays on the raw date. `inflation_calendar` and
-/// `inflation_convention` fall back to the fixed-leg ones when `None`, and are
-/// stored resolved.
+/// amount stays on the raw date. inflation_calendar and inflation_convention
+/// fall back to the fixed-leg ones when None.
 ///
-/// Fallible at construction: the observation lag must let the index observe
-/// fixings that exist, which under
-/// [`Linear`](PyCpiInterpolationType::Linear) costs a further publication
-/// period (`zerocouponinflationswap.rs:156-176`).
-///
-/// Pricing needs an engine: call [`set_engine`](Self::set_engine) before
-/// [`npv`](Self::npv). [`fair_rate`](Self::fair_rate) is the exception - it
-/// reads the indexed flow directly and prices with no engine at all - but it
-/// does need the index linked to a curve.
-///
-/// Deferred (visible): the core omits `adjust_inf_obs_dates` from its own
-/// signature, so there is nothing to expose here; the leg and cash-flow
-/// accessors are not surfaced either, there being no cash-flow facade, and
-/// [`inflation_fixing_date`](Self::inflation_fixing_date) carries the one datum
-/// off the indexed flow that the fixtures read.
+/// The core omits adjust_inf_obs_dates from its own signature, so there is
+/// nothing to expose here; the leg and cash-flow accessors are not surfaced
+/// either, there being no cash-flow facade.
 #[pyclass(name = "ZeroCouponInflationSwap", unsendable)]
 pub struct PyZeroCouponInflationSwap {
     inner: SharedMut<ZeroCouponInflationSwap>,
@@ -952,6 +1021,39 @@ pub struct PyZeroCouponInflationSwap {
 
 #[pymethods]
 impl PyZeroCouponInflationSwap {
+    /// Build the swap from its two exchanged flows.
+    ///
+    /// Args:
+    ///     swap_type (SwapType): Which side the inflation leg is seen from; a
+    ///         Payer pays inflation and receives fixed.
+    ///     nominal (float): The notional both flows are quoted on.
+    ///     start_date (Date): The inception the index ratio is measured from.
+    ///     maturity (Date): The raw, pre-adjustment maturity.
+    ///     fixed_calendar (Calendar): The calendar the fixed payment rolls on.
+    ///     fixed_convention (BusinessDayConvention): The roll applied to the
+    ///         fixed payment date.
+    ///     day_counter (DayCounter): The day count behind the fixed amount,
+    ///         which stays on the raw maturity.
+    ///     fixed_rate (float): The K that at inception matches the inflation
+    ///         growth.
+    ///     inflation_index (ZeroInflationIndex): The index the indexed flow
+    ///         observes.
+    ///     observation_lag (Period): How far back the maturity fixing is
+    ///         observed.
+    ///     observation_interpolation (CpiInterpolationType): How the observed
+    ///         fixing is interpolated.
+    ///     inflation_calendar (Calendar | None): The calendar the inflation
+    ///         payment rolls on; None falls back to fixed_calendar.
+    ///     inflation_convention (BusinessDayConvention | None): The roll
+    ///         applied to the inflation payment date; None falls back to
+    ///         fixed_convention.
+    ///     settings (Settings): The explicit settings supplying the evaluation
+    ///         date and the stored fixings.
+    ///
+    /// Raises:
+    ///     ItofinError: If the observation lag is too short for the index to
+    ///         observe fixings that exist, which under Linear interpolation
+    ///         costs a further publication period.
     #[new]
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (
@@ -1009,10 +1111,11 @@ impl PyZeroCouponInflationSwap {
         })
     }
 
-    /// Attaches a [`PyDiscountingSwapEngine`] so the swap prices.
+    /// Attach a discounting engine so the swap prices.
     ///
-    /// The engine must resolve its dates against the same `Settings` object
-    /// this swap was built with.
+    /// Args:
+    ///     engine (DiscountingSwapEngine): The engine, which must resolve its
+    ///         dates against the same Settings object as this swap.
     fn set_engine(&mut self, engine: &PyDiscountingSwapEngine) {
         self.inner
             .borrow_mut()
@@ -1020,8 +1123,11 @@ impl PyZeroCouponInflationSwap {
             .set_pricing_engine(engine.engine());
     }
 
-    /// Forces the valuation, idempotent and fallible as
-    /// [`VanillaOption.calculate`](crate::option::PyVanillaOption::calculate).
+    /// Force the valuation. Idempotent.
+    ///
+    /// Raises:
+    ///     ItofinError: If no engine is attached, no evaluation date is set,
+    ///         or the engine refuses the swap.
     fn calculate(&mut self) -> PyResult<()> {
         Ok(self
             .inner
@@ -1030,46 +1136,77 @@ impl PyZeroCouponInflationSwap {
             .map_err(PyQlError::from)?)
     }
 
-    /// Whether the cached results are currently valid.
+    /// Return whether the cached results are currently valid.
+    ///
+    /// Returns:
+    ///     bool: True when the next accessor reads the cache.
     fn is_calculated(&self) -> bool {
         self.inner.borrow().base().is_calculated()
     }
 
-    /// Attaches `engine` and returns the NPV, the one-shot form of
-    /// [`set_engine`](Self::set_engine) followed by [`npv`](Self::npv).
+    /// Attach engine and return the NPV.
+    ///
+    /// Args:
+    ///     engine (DiscountingSwapEngine): The engine to install and price on.
+    ///
+    /// Returns:
+    ///     float: The swap value.
+    ///
+    /// Raises:
+    ///     ItofinError: On anything that makes the valuation fail.
     fn price(&mut self, engine: &PyDiscountingSwapEngine) -> PyResult<f64> {
         self.set_engine(engine);
         self.calculate()?;
         self.npv()
     }
 
-    /// A frozen [`Results`] copy of the valuation, calculating first.
+    /// Return a frozen snapshot of the valuation, calculating first.
+    ///
+    /// Returns:
+    ///     Results: A copy of the valuation results.
+    ///
+    /// Raises:
+    ///     ItofinError: On anything that makes the valuation fail.
     fn results(&mut self) -> PyResult<Results> {
         self.calculate()?;
         let inner = self.inner.borrow();
         Ok(Results::snapshot(inner.base()))
     }
 
-    /// The swap NPV under the attached engine.
+    /// Return the swap NPV under the attached engine.
     ///
-    /// Fallible: with no engine attached the core reports `"null pricing
-    /// engine"`, and with no curve linked into the index the indexed flow
-    /// cannot be forecast.
+    /// Returns:
+    ///     float: The present value.
+    ///
+    /// Raises:
+    ///     ItofinError: If no engine is attached, and if no curve is linked
+    ///         into the index, which leaves the indexed flow unforecastable.
     fn npv(&mut self) -> PyResult<f64> {
         Ok(self.inner.borrow_mut().npv().map_err(PyQlError::from)?)
     }
 
-    /// The rate that would price the swap at zero: the index ratio
-    /// `I(T)/I(0)` de-compounded over the swap's own year fraction.
+    /// Return the index ratio de-compounded over the swap's own year fraction.
     ///
     /// Needs no engine - it reads the indexed flow rather than any priced
-    /// result - but does need the index linked, the flow's amount being a
-    /// forecast off the inflation curve.
+    /// result.
+    ///
+    /// Returns:
+    ///     float: The rate that would price the swap at zero.
+    ///
+    /// Raises:
+    ///     ItofinError: If no curve is linked into the index, the flow's
+    ///         amount being a forecast off the inflation curve.
     fn fair_rate(&self) -> PyResult<f64> {
         Ok(self.inner.borrow().fair_rate().map_err(PyQlError::from)?)
     }
 
-    /// The fixed leg's NPV, priced on demand. Fallible as [`npv`](Self::npv).
+    /// Return the fixed leg's NPV, priced on demand.
+    ///
+    /// Returns:
+    ///     float: The present value of the fixed flow.
+    ///
+    /// Raises:
+    ///     ItofinError: On the same conditions npv reports.
     fn fixed_leg_npv(&mut self) -> PyResult<f64> {
         Ok(self
             .inner
@@ -1078,8 +1215,13 @@ impl PyZeroCouponInflationSwap {
             .map_err(PyQlError::from)?)
     }
 
-    /// The inflation leg's NPV, priced on demand. Fallible as
-    /// [`npv`](Self::npv).
+    /// Return the inflation leg's NPV, priced on demand.
+    ///
+    /// Returns:
+    ///     float: The present value of the indexed flow.
+    ///
+    /// Raises:
+    ///     ItofinError: On the same conditions npv reports.
     fn inflation_leg_npv(&mut self) -> PyResult<f64> {
         Ok(self
             .inner
@@ -1088,12 +1230,18 @@ impl PyZeroCouponInflationSwap {
             .map_err(PyQlError::from)?)
     }
 
-    /// The fixed leg's sensitivity to a basis point on the quoted rate,
-    /// computed in closed form rather than read off the engine, whose own leg
+    /// Return the fixed leg's sensitivity to a basis point on the quoted rate.
+    ///
+    /// Computed in closed form rather than read off the engine, whose own leg
     /// BPS is zero for a non-coupon flow.
     ///
-    /// Fallible as [`npv`](Self::npv): it needs the engine's discount factor at
-    /// the fixed leg's end date.
+    /// Returns:
+    ///     float: The basis-point value of the fixed flow.
+    ///
+    /// Raises:
+    ///     ItofinError: On the same conditions npv reports, the calculation
+    ///         needing the engine's discount factor at the fixed leg's end
+    ///         date.
     fn fixed_leg_bps(&mut self) -> PyResult<f64> {
         Ok(self
             .inner
@@ -1102,53 +1250,46 @@ impl PyZeroCouponInflationSwap {
             .map_err(PyQlError::from)?)
     }
 
-    /// The contract maturity, raw and pre-adjustment - not either leg's
-    /// payment date.
+    /// Return the contract maturity, raw and pre-adjustment.
+    ///
+    /// Returns:
+    ///     Date: The maturity, which is not either leg's payment date.
     fn maturity_date(&self) -> PyDate {
         PyDate::from_inner(self.inner.borrow().maturity_date())
     }
 
-    /// The date the maturity fixing is observed at, `maturity` less the
-    /// observation lag, unsnapped.
+    /// Return the date the maturity fixing is observed at.
+    ///
+    /// Returns:
+    ///     Date: The maturity less the observation lag, unsnapped.
     fn obs_date(&self) -> PyDate {
         PyDate::from_inner(self.inner.borrow().obs_date())
     }
 
-    /// The same date as [`obs_date`](Self::obs_date), read off the indexed flow
-    /// rather than off the swap: the core's `obs_date()` is that call
-    /// (`zerocouponinflationswap.rs:315-317`). Both names are kept because both
-    /// exist in the core, and the oracle asserts they coincide.
+    /// Return the observation date, read off the indexed flow.
+    ///
+    /// Both names are kept because both exist in the core, and the oracle
+    /// asserts they coincide.
+    ///
+    /// Returns:
+    ///     Date: The same date as obs_date.
     fn inflation_fixing_date(&self) -> PyDate {
         PyDate::from_inner(self.inner.borrow().inflation_cash_flow().fixing_date())
     }
 }
 
-/// Python `YoYInflationTermStructure`: the shared base for every year-on-year
-/// inflation curve (`termstructures::inflation::inflationtermstructure`).
+/// Shared base for every year-on-year inflation curve: the year-on-year
+/// rate in a year-fraction and a date form, the base date, the base rate, the
+/// fixing frequency and the seasonality correction the curve carries.
 ///
-/// Holds the erased `Handle<dyn YoYInflationTermStructure>` and exposes the
-/// query surface every concrete curve inherits, the shape
-/// [`PyZeroInflationTermStructure`] already uses on the zero side. Concrete
-/// curves such as [`PyInterpolatedYoYInflationCurve`] subclass this and supply
-/// only their constructor and node inspectors.
+/// The two rate reads are not interchangeable. yoy_rate_date snaps its date to
+/// the start of the inflation period containing it and is the only one that
+/// folds in any seasonality; yoy_rate takes a year-fraction already measured
+/// under the curve's own day counter and quantizes nothing. Neither is the
+/// year-on-year swap rate, which comes from the instrument.
 ///
-/// The two rate reads are not interchangeable, exactly as on the zero side.
-/// [`yoy_rate_date`](Self::yoy_rate_date) snaps its date to the start of the
-/// inflation period containing it before the curve sees it, and is the only one
-/// that folds in a seasonality correction;
-/// [`yoy_rate`](Self::yoy_rate) takes a year-fraction already measured under the
-/// curve's own day counter and quantizes nothing.
-///
-/// [`base_rate`](Self::base_rate) is exposed here where the zero base defers it:
-/// a year-on-year curve carries the rate observed over the period ending on its
-/// base date, C++ forwarding `baseYoYRate` into the base constructor's
-/// `baseRate` slot (`inflationtermstructure.rs:198`), so every curve reachable
-/// through this facade answers rather than raising.
-///
-/// Deferred (visible): the core's `seasonality()` getter, for the reason
-/// [`PyZeroInflationTermStructure`] omits it - it hands back an erased
-/// `Shared<dyn Seasonality>` there is no downcast surface to recover the
-/// concrete correction from.
+/// base_rate is answered here where the zero base defers it: a year-on-year
+/// curve carries the rate observed over the period ending on its base date.
 #[pyclass(name = "YoYInflationTermStructure", subclass, unsendable)]
 pub struct PyYoYInflationTermStructure {
     inner: Handle<dyn YoYInflationTermStructure>,
@@ -1156,11 +1297,20 @@ pub struct PyYoYInflationTermStructure {
 
 #[pymethods]
 impl PyYoYInflationTermStructure {
-    /// The year-on-year inflation rate at year-fraction `t`.
+    /// Return the year-on-year inflation rate at year-fraction t.
     ///
-    /// `t` must be measured with the curve's own day counter, and is negative
-    /// for the base period. This is not the year-on-year swap rate, which comes
-    /// from the instrument.
+    /// Args:
+    ///     t (float): The year fraction, measured with the curve's own day
+    ///         counter; it is negative for the base period.
+    ///     extrapolate (bool): Whether to answer past the curve's range.
+    ///
+    /// Returns:
+    ///     float: The year-on-year rate, which is not the year-on-year swap
+    ///         rate: that comes from the instrument.
+    ///
+    /// Raises:
+    ///     ItofinError: If t is past the curve's range and extrapolation is
+    ///         not allowed.
     #[pyo3(signature = (t, extrapolate = false))]
     fn yoy_rate(&self, t: f64, extrapolate: bool) -> PyResult<f64> {
         Ok(self
@@ -1171,13 +1321,23 @@ impl PyYoYInflationTermStructure {
             .map_err(PyQlError::from)?)
     }
 
-    /// The year-on-year inflation rate for the inflation period containing
-    /// `date`.
+    /// Return the year-on-year rate for the inflation period containing date.
     ///
     /// The date is quantized to that period's first day before both the range
-    /// check and the time conversion, so every day inside one period reads the
-    /// same rate. Any seasonality correction is folded in last, at the
-    /// *original* date rather than the period start, as C++ does on this path.
+    /// check and the time conversion. Any seasonality correction is folded in
+    /// last, at the original date rather than the period start, as C++ does on
+    /// this path.
+    ///
+    /// Args:
+    ///     date (Date): The date the rate is read at.
+    ///     extrapolate (bool): Whether to answer past the curve's range.
+    ///
+    /// Returns:
+    ///     float: The year-on-year rate for that period.
+    ///
+    /// Raises:
+    ///     ItofinError: If the period is past the curve's range and
+    ///         extrapolation is not allowed.
     #[pyo3(signature = (date, extrapolate = false))]
     fn yoy_rate_date(&self, date: &PyDate, extrapolate: bool) -> PyResult<f64> {
         Ok(self
@@ -1188,8 +1348,11 @@ impl PyYoYInflationTermStructure {
             .map_err(PyQlError::from)?)
     }
 
-    /// The base date: the last date for which the fixing is known. It precedes
-    /// the reference date, so its year-fraction is negative.
+    /// Return the base date, the last date for which the fixing is known.
+    ///
+    /// Returns:
+    ///     Date: The base date; it precedes the reference date, so its year
+    ///         fraction is negative.
     fn base_date(&self) -> PyResult<PyDate> {
         Ok(PyDate::from_inner(
             self.inner
@@ -1199,8 +1362,13 @@ impl PyYoYInflationTermStructure {
         ))
     }
 
-    /// The year-on-year rate observed over the period ending on the base date,
-    /// which node zero is seeded with and keeps.
+    /// Return the rate observed over the period ending on the base date.
+    ///
+    /// Returns:
+    ///     float: The base rate, which node zero is seeded with and keeps.
+    ///
+    /// Raises:
+    ///     ItofinError: On a curve that carries no base rate.
     fn base_rate(&self) -> PyResult<f64> {
         Ok(self
             .inner
@@ -1210,7 +1378,10 @@ impl PyYoYInflationTermStructure {
             .map_err(PyQlError::from)?)
     }
 
-    /// The frequency of the inflation fixings the curve is built on.
+    /// Return the frequency of the inflation fixings the curve is built on.
+    ///
+    /// Returns:
+    ///     Frequency: The fixing frequency.
     fn frequency(&self) -> PyResult<PyFrequency> {
         PyFrequency::from_inner(
             self.inner
@@ -1220,13 +1391,16 @@ impl PyYoYInflationTermStructure {
         )
     }
 
-    /// Installs `seasonality` on the curve, replacing whatever it carried;
-    /// `None` clears it.
+    /// Install seasonality on the curve, replacing whatever it carried.
     ///
-    /// # Errors
+    /// Args:
+    ///     seasonality (MultiplicativePriceSeasonality | None): The correction
+    ///         to install; None clears it.
     ///
-    /// Reports the consistency gate, and leaves a rejected correction installed
-    /// as C++ does - see [`PyZeroInflationTermStructure::set_seasonality`].
+    /// Raises:
+    ///     ItofinError: From the consistency gate, which leaves a rejected
+    ///         correction installed as C++ does; see the zero-curve base for
+    ///         the full account.
     #[pyo3(signature = (seasonality))]
     fn set_seasonality(
         &self,
@@ -1240,7 +1414,11 @@ impl PyYoYInflationTermStructure {
             .map_err(PyQlError::from)?)
     }
 
-    /// Whether the curve carries a seasonality correction.
+    /// Return whether the curve carries a seasonality correction.
+    ///
+    /// Returns:
+    ///     bool: True also for a correction left installed by a
+    ///         set_seasonality that raised.
     fn has_seasonality(&self) -> PyResult<bool> {
         Ok(self
             .inner
@@ -1262,26 +1440,13 @@ impl PyYoYInflationTermStructure {
     }
 }
 
-/// Python `InterpolatedYoYInflationCurve`: a year-on-year inflation curve built
-/// from (date, year-on-year-rate) nodes, interpolating linearly in rate space
-/// (`termstructures::inflation::InterpolatedYoYInflationCurve<Linear>`).
+/// A year-on-year inflation curve built from (date, year-on-year rate)
+/// nodes, interpolating linearly in rate space.
 ///
-/// Extends [`PyYoYInflationTermStructure`], which carries the whole query
-/// surface. The first date is the *base* date rather than the reference date,
-/// which is passed separately and normally follows it; the first rate is the
-/// base rate the curve publishes, and node times are measured from the
-/// reference date, so the first one is negative.
-///
-/// The concrete curve is retained alongside the erased handle so the node
-/// inspectors stay reachable, as [`PyInterpolatedZeroInflationCurve`] does.
-///
-/// Fallible: the core rejects fewer than two dates, a dates/rates count
-/// mismatch and, from the second node on, a rate at or below -100 %, the base
-/// rate being left unconstrained
-/// (`interpolatedyoyinflationcurve.rs:100-117`).
-///
-/// `Linear` is pinned at the boundary: it is the interpolator C++'s
-/// `YoYInflationCurve` typedef fixes, so no interpolation argument is offered.
+/// The first date is the base date rather than the reference date, which is
+/// passed separately and normally follows it; the first rate is the base rate
+/// the curve publishes, and node times are measured from the reference date, so
+/// the first one is negative.
 #[pyclass(
     name = "InterpolatedYoYInflationCurve",
     extends = PyYoYInflationTermStructure,
@@ -1293,8 +1458,21 @@ pub struct PyInterpolatedYoYInflationCurve {
 
 #[pymethods]
 impl PyInterpolatedYoYInflationCurve {
-    /// A curve through the `rates` quoted at `dates`, with `dates[0]` as the
-    /// base date and `reference_date` given separately.
+    /// Build the curve through the rates quoted at dates.
+    ///
+    /// Args:
+    ///     reference_date (Date): The curve's reference date, given separately
+    ///         and normally following the base date.
+    ///     dates (list[Date]): The node dates, the first being the base date.
+    ///     rates (list[float]): The year-on-year rate at each node; the first
+    ///         is the base rate the curve publishes.
+    ///     frequency (Frequency): The frequency of the inflation fixings.
+    ///     day_counter (DayCounter): The day count turning dates into times.
+    ///
+    /// Raises:
+    ///     ItofinError: On fewer than two dates, a dates and rates count
+    ///         mismatch, or a rate at or below -100 per cent from the second
+    ///         node on; the base rate is left unconstrained.
     #[new]
     fn new(
         reference_date: &PyDate,
@@ -1325,13 +1503,19 @@ impl PyInterpolatedYoYInflationCurve {
         )
     }
 
-    /// The node times, measured from the reference date; the first is negative
-    /// whenever the base date precedes it.
+    /// Return the node times, measured from the reference date.
+    ///
+    /// Returns:
+    ///     list[float]: The node times; the first is negative whenever the
+    ///         base date precedes the reference date.
     fn times(&self) -> Vec<f64> {
         self.concrete.times().to_vec()
     }
 
-    /// The node dates, the first of which is the base date.
+    /// Return the node dates.
+    ///
+    /// Returns:
+    ///     list[Date]: The nodes, the first of which is the base date.
     fn dates(&self) -> Vec<PyDate> {
         self.concrete
             .dates()
@@ -1341,7 +1525,11 @@ impl PyInterpolatedYoYInflationCurve {
             .collect()
     }
 
-    /// The `(date, year-on-year rate)` nodes.
+    /// Return the curve's nodes as pairs.
+    ///
+    /// Returns:
+    ///     list[tuple[Date, float]]: One (date, year-on-year rate) pair per
+    ///         node.
     fn nodes(&self) -> Vec<(PyDate, f64)> {
         self.concrete
             .nodes()
@@ -1351,20 +1539,11 @@ impl PyInterpolatedYoYInflationCurve {
     }
 }
 
-/// Python `YoYInflationHelper`: the shared base for every year-on-year
-/// bootstrap helper
-/// (`termstructures::inflation::inflationhelpers::YoYInflationHelper`).
+/// Shared base for every year-on-year bootstrap helper: the two dates the
+/// bootstrap places a curve node by.
 ///
-/// Holds the erased `Shared<dyn YoYInflationHelper>` and exposes the two dates
-/// the bootstrap places a curve node by, the shape [`PyZeroInflationHelper`]
-/// already uses. Concrete helpers such as [`PyYearOnYearInflationSwapHelper`]
-/// subclass this and supply only their constructor.
-///
-/// Deferred (visible): the core trait's `earliest_date`, `maturity_date` and
-/// `latest_relevant_date` are omitted, as on the zero side - on the one
-/// concrete helper reachable here they collapse onto the same fixing-period
-/// start (`inflationhelpers.rs:730-731`), so all three would report what
-/// [`pillar_date`](Self::pillar_date) reports.
+/// Concrete helpers such as YearOnYearInflationSwapHelper subclass this and
+/// supply only their constructor.
 #[pyclass(name = "YoYInflationHelper", subclass, unsendable)]
 pub struct PyYoYInflationHelper {
     inner: Shared<dyn YoYInflationHelper>,
@@ -1372,13 +1551,18 @@ pub struct PyYoYInflationHelper {
 
 #[pymethods]
 impl PyYoYInflationHelper {
-    /// The pillar date, at which the curve node this helper sets sits.
+    /// Return the date the curve node this helper sets sits at.
+    ///
+    /// Returns:
+    ///     Date: The pillar date.
     fn pillar_date(&self) -> PyDate {
         PyDate::from_inner(self.inner.pillar_date())
     }
 
-    /// The latest date the helper needs curve data at (equal to the pillar
-    /// date).
+    /// Return the latest date the helper needs curve data at.
+    ///
+    /// Returns:
+    ///     Date: The latest date, equal to the pillar date.
     fn latest_date(&self) -> PyDate {
         PyDate::from_inner(self.inner.latest_date())
     }
@@ -1397,27 +1581,21 @@ impl PyYoYInflationHelper {
     }
 }
 
-/// Python `YoYInflationIndex`: an index publishing one year-on-year inflation
-/// rate per period, read back as a stored figure or forecast off its
-/// year-on-year curve (core `indexes::inflationindex::YoYInflationIndex`).
+/// An index publishing one year-on-year inflation rate per period, read
+/// back as a stored figure or forecast off its year-on-year curve.
 ///
-/// Two forms, as in the core. A **ratio** index
-/// ([`from_underlying`](Self::from_underlying)) derives its rate from two
-/// [`PyZeroInflationIndex`] fixings a year apart and owns no history of its
-/// own; a **quoted** one (the constructor) is published as a rate in its own
-/// right and keeps its own history through [`add_fixing`](Self::add_fixing).
+/// Two forms. A ratio index (from_underlying) derives its rate from two
+/// ZeroInflationIndex fixings a year apart and owns no history of its own; a
+/// quoted one (the constructor) is published as a rate in its own right and
+/// keeps its own history through add_fixing.
 ///
-/// The curve is reached through a [`RelinkableHandle`] the facade owns and both
-/// forms link at construction, for the reason [`PyZeroInflationIndex`]
-/// documents: the core's `with_term_structure` takes a plain
-/// [`Handle`](libitofin::handle::Handle), so an index that did not take this
-/// facade's relinkable handle up front could never be pointed at a curve later
-/// and [`link_to`](Self::link_to) would silently do nothing. The handle starts
-/// empty, so a forecast before any link raises the empty-handle error.
+/// Both forms link to a relinkable handle the index owns, so an index can be
+/// built before the curve it forecasts off exists. The handle starts empty and
+/// a forecast before any link raises ItofinError; link_to fills it.
 ///
 /// The quoted constructor spells its region and currency out as their component
-/// fields: neither core type has a Python facade, and inventing a name lookup
-/// or defaulting the currency metadata would put made-up values on the index.
+/// fields: neither core type has a Python facade, and defaulting the currency
+/// metadata would put made-up values on the index.
 #[pyclass(name = "YoYInflationIndex", unsendable)]
 pub struct PyYoYInflationIndex {
     inner: Shared<YoYInflationIndex>,
@@ -1449,8 +1627,30 @@ impl PyYoYInflationIndex {
 
 #[pymethods]
 impl PyYoYInflationIndex {
-    /// A quoted year-on-year index, published as a rate in its own right and
-    /// keeping its own fixing history.
+    /// Build a quoted year-on-year index, keeping its own fixing history.
+    ///
+    /// The rate is published in its own right rather than derived from a price
+    /// index, so fixings are filed here through add_fixing.
+    ///
+    /// Args:
+    ///     family_name (str): The index family the fixings are stored under.
+    ///     region_name (str): The name of the region the index measures.
+    ///     region_code (str): The region's code.
+    ///     revised (bool): Whether the published figures are subject to
+    ///         revision.
+    ///     frequency (Frequency): How often the index publishes.
+    ///     availability_lag (Period): How long after a period ends its figure
+    ///         is published.
+    ///     currency_name (str): The currency's name.
+    ///     currency_code (str): The currency's ISO 4217 three-letter code.
+    ///     currency_numeric_code (int): The currency's ISO 4217 numeric code.
+    ///     currency_symbol (str): The currency's symbol.
+    ///     currency_fraction_symbol (str): The symbol of the currency's
+    ///         fractional unit.
+    ///     currency_fractions_per_unit (int): How many fractional units make
+    ///         one currency unit.
+    ///     settings (Settings): The explicit settings supplying the evaluation
+    ///         date and the stored fixings.
     #[new]
     #[pyo3(signature = (
         family_name,
@@ -1504,13 +1704,18 @@ impl PyYoYInflationIndex {
         })
     }
 
-    /// A ratio year-on-year index over `underlying`, dividing that index's
-    /// figure for a period by its figure a year earlier.
+    /// Build a ratio index dividing a price index's figure by its figure a year earlier.
     ///
-    /// The metadata is inherited wholesale bar the family name, which is
-    /// prefixed `YYR_`, so a `"UK RPI"` underlying yields `"UK YYR_RPI"`. The
-    /// index files no fixings of its own and reads the underlying's history
-    /// instead, so [`add_fixing`](Self::add_fixing) belongs on the underlying.
+    /// The metadata is inherited bar the family name, which is prefixed YYR_,
+    /// so a "UK RPI" underlying yields "UK YYR_RPI"; fixings belong on the
+    /// underlying.
+    ///
+    /// Args:
+    ///     underlying (ZeroInflationIndex): The price index whose consecutive
+    ///         figures the rate is derived from.
+    ///
+    /// Returns:
+    ///     YoYInflationIndex: The ratio index, over an empty curve handle.
     #[staticmethod]
     fn from_underlying(underlying: &Bound<'_, PyZeroInflationIndex>) -> Self {
         let zero = underlying.borrow().shared();
@@ -1520,32 +1725,51 @@ impl PyYoYInflationIndex {
         })
     }
 
-    /// The index name, e.g. `"UK YYR_RPI"`, under which fixings are stored.
+    /// Return the index name, under which fixings are stored.
+    ///
+    /// Returns:
+    ///     str: The name, e.g. "UK YYR_RPI".
     fn name(&self) -> String {
         self.inner.name()
     }
 
-    /// Whether this index is the ratio of two price-index fixings rather than a
-    /// quoted rate.
+    /// Return whether this index is the ratio of two price-index fixings.
+    ///
+    /// Returns:
+    ///     bool: True for a ratio index, False for a quoted rate.
     fn ratio(&self) -> bool {
         self.inner.ratio()
     }
 
-    /// The price index a ratio index divides, `None` on a quoted one.
+    /// Return the price index a ratio index divides, None on a quoted one.
     ///
-    /// This is the very object [`from_underlying`](Self::from_underlying) was
-    /// handed, not a fresh facade around the same core index: a rebuilt one
-    /// would carry a relinkable handle this index never sees, so linking it
-    /// would silently forecast off nothing.
+    /// This is the very object from_underlying was handed, not a fresh facade
+    /// around the same core index: a rebuilt one would carry a relinkable
+    /// handle this index never sees, so linking it would silently forecast off
+    /// nothing.
+    ///
+    /// Returns:
+    ///     ZeroInflationIndex | None: The underlying price index, or None.
     fn underlying_index(&self, py: Python<'_>) -> Option<Py<PyZeroInflationIndex>> {
         self.underlying
             .as_ref()
             .map(|underlying| underlying.clone_ref(py))
     }
 
-    /// Records a published year-on-year rate across the whole inflation period
-    /// it describes. A ratio index reads the underlying's history, so filing
-    /// here records a figure it will never consult.
+    /// Record a published year-on-year rate across the whole inflation period.
+    ///
+    /// A ratio index reads the underlying's history, so filing here records a
+    /// figure it will never consult.
+    ///
+    /// Args:
+    ///     fixing_date (Date): Any date inside the inflation period the rate
+    ///         describes.
+    ///     value (float): The published year-on-year rate.
+    ///
+    /// Raises:
+    ///     ItofinError: If the index frequency has no expressible inflation
+    ///         period, or a different figure is already stored on a date in
+    ///         that period.
     fn add_fixing(&self, fixing_date: &PyDate, value: f64) -> PyResult<()> {
         Ok(self
             .inner
@@ -1553,11 +1777,18 @@ impl PyYoYInflationIndex {
             .map_err(PyQlError::from)?)
     }
 
-    /// The rate at `fixing_date`, stored or forecast off the linked curve.
+    /// Return the rate at fixing_date, stored or forecast off the linked curve.
     ///
-    /// `forecast_todays_fixing` is accepted and ignored, as in the core:
-    /// [`needs_forecast`](Self::needs_forecast) alone decides. A forecast with
-    /// no curve linked raises the empty-handle error.
+    /// Args:
+    ///     fixing_date (Date): The date the rate is read or forecast for.
+    ///     forecast_todays_fixing (bool): Accepted and ignored, as in the core:
+    ///         needs_forecast alone decides between history and forecast.
+    ///
+    /// Returns:
+    ///     float: The year-on-year inflation rate.
+    ///
+    /// Raises:
+    ///     ItofinError: If a forecast is asked for with no curve linked.
     #[pyo3(signature = (fixing_date, forecast_todays_fixing = false))]
     fn fixing(&self, fixing_date: &PyDate, forecast_todays_fixing: bool) -> PyResult<f64> {
         Ok(self
@@ -1566,32 +1797,51 @@ impl PyYoYInflationIndex {
             .map_err(PyQlError::from)?)
     }
 
-    /// The first day of the inflation period the latest figure on record
-    /// describes, read off the underlying on a ratio index. An index with no
-    /// history is an error.
+    /// Return the first day of the period the latest figure on record describes.
+    ///
+    /// Read off the underlying on a ratio index.
+    ///
+    /// Returns:
+    ///     Date: The start of that inflation period.
+    ///
+    /// Raises:
+    ///     ItofinError: If the index has no fixing history.
     fn last_fixing_date(&self) -> PyResult<PyDate> {
         Ok(PyDate::from_inner(
             self.inner.last_fixing_date().map_err(PyQlError::from)?,
         ))
     }
 
-    /// Points the index at `curve`, so every forecast from here on reads it.
+    /// Point the index at curve, so every forecast from here on reads it.
     ///
-    /// Takes the [`PyYoYInflationTermStructure`] base, so any subclass links.
-    /// It is the curve *behind* `curve`'s handle at call time that is stored,
-    /// not the handle itself.
+    /// Takes the YoYInflationTermStructure base, so any subclass links. It is
+    /// the curve behind that facade's handle at call time that is stored, not
+    /// the handle itself.
     ///
-    /// # Errors
+    /// Args:
+    ///     curve (YoYInflationTermStructure): The curve forecasts are read off.
     ///
-    /// Reports the empty-handle error if `curve` somehow carries no link.
+    /// Raises:
+    ///     ItofinError: If curve somehow carries no link.
     fn link_to(&self, curve: &PyYoYInflationTermStructure) -> PyResult<()> {
         self.curve
             .link_to(curve.handle().current_link().map_err(PyQlError::from)?);
         Ok(())
     }
 
-    /// Whether `fixing_date` has to be forecast rather than read from history,
-    /// a ratio index deferring the question to its underlying.
+    /// Return whether fixing_date has to be forecast rather than read from history.
+    ///
+    /// A ratio index defers the question to its underlying.
+    ///
+    /// Args:
+    ///     fixing_date (Date): The date in question.
+    ///
+    /// Returns:
+    ///     bool: True if the date has to be forecast off the curve.
+    ///
+    /// Raises:
+    ///     ItofinError: If the evaluation date is unset, or the index frequency
+    ///         has no expressible inflation period.
     fn needs_forecast(&self, fixing_date: &PyDate) -> PyResult<bool> {
         Ok(self
             .inner
@@ -1599,6 +1849,10 @@ impl PyYoYInflationIndex {
             .map_err(PyQlError::from)?)
     }
 
+    /// Return the printable representation.
+    ///
+    /// Returns:
+    ///     str: A string of the form YoYInflationIndex(UK YYR_RPI).
     fn __repr__(&self) -> String {
         format!("YoYInflationIndex({})", self.inner.name())
     }
@@ -1611,9 +1865,8 @@ impl PyYoYInflationIndex {
     }
 }
 
-/// Python `YearOnYearInflationSwapHelper`: the bootstrap helper fitting a
-/// year-on-year inflation swap quoted as a rate
-/// (`termstructures::inflation::inflationhelpers::YearOnYearInflationSwapHelper`).
+/// The bootstrap helper fitting a year-on-year inflation swap quoted as a
+/// rate.
 ///
 /// The helper prices a unit-notional, zero-strike swap of its own and reports
 /// that contract's fair rate; the bootstrap drives the quoted rate less that
@@ -1621,28 +1874,13 @@ impl PyYoYInflationIndex {
 /// the year-on-year legs pay on a schedule of dates rather than one, so their
 /// discount factors do not cancel.
 ///
-/// The swap starts at the evaluation date held by `settings` and is rebuilt
-/// whenever that date moves, so the evaluation date must be set *before* the
-/// constructor runs, not merely before the bootstrap. The helper retains the
-/// caller's [`PySimpleQuote`], so a later `set_value` re-drives the bootstrap.
+/// The swap starts at the evaluation date, so that date must be set before this
+/// constructor runs, not merely before the bootstrap. It prices through a copy
+/// of index linked to a handle of its own, so the caller's index need not be
+/// linked to any curve.
 ///
-/// It prices through a *copy* of `index` linked to a handle of its own, which
-/// the bootstrap points at the curve under construction; the caller's index
-/// keeps whatever curve it had and need not be linked at all.
-///
-/// `pillar` is accepted for signature parity but never read: it only ever
-/// discriminates on the interpolated path, which is refused below.
-///
-/// Fallible: [`CpiInterpolationType.Linear`](PyCpiInterpolationType) is refused
-/// outright (`inflationhelpers.rs:701-706`), the interpolated branch of the C++
-/// constructor being deferred with the rest of `CPI::Linear` (#847); and the
-/// swap is built here, so an observation lag its legs cannot be built under
-/// fails at construction. Both raise [`struct@crate::ItofinError`].
-///
-/// Deferred (visible): the zero twin's `inflation_fixing_date` has no
-/// counterpart here - a year-on-year contract observes once per coupon rather
-/// than once at maturity, and there is no cash-flow facade to enumerate them
-/// through (#848).
+/// pillar is accepted for signature parity but never read: it only ever
+/// discriminates on the interpolated path, which is refused.
 #[pyclass(
     name = "YearOnYearInflationSwapHelper",
     extends = PyYoYInflationHelper,
@@ -1652,8 +1890,37 @@ pub struct PyYearOnYearInflationSwapHelper;
 
 #[pymethods]
 impl PyYearOnYearInflationSwapHelper {
-    /// A helper fitting `quote` on a swap maturing at `maturity`, discounted on
-    /// `nominal_term_structure`.
+    /// Build the helper on a swap maturing at maturity.
+    ///
+    /// Args:
+    ///     quote (SimpleQuote): The quoted swap rate; the caller keeps it, so
+    ///         a later set_value re-drives the bootstrap.
+    ///     swap_obs_lag (Period): How far back each coupon's fixings are
+    ///         observed.
+    ///     maturity (Date): The swap's maturity.
+    ///     calendar (Calendar): The calendar the payments roll on.
+    ///     payment_convention (BusinessDayConvention): The roll applied to the
+    ///         payment dates.
+    ///     day_counter (DayCounter): The day count the legs accrue on.
+    ///     index (YoYInflationIndex): The index observed; the helper prices
+    ///         through a copy linked to a handle of its own, so the caller's
+    ///         index need not be linked to any curve.
+    ///     interpolation (CpiInterpolationType): How the observed fixings are
+    ///         interpolated.
+    ///     nominal_term_structure (YieldTermStructure): The discount curve,
+    ///         which this helper does need: its legs pay on a schedule of
+    ///         dates rather than one, so their discount factors do not cancel.
+    ///     settings (Settings): The explicit settings supplying the evaluation
+    ///         date the swap starts at, which must be set before this
+    ///         constructor runs.
+    ///     pillar (Pillar): Accepted for signature parity but never read; it
+    ///         only ever discriminates on the interpolated path.
+    ///
+    /// Raises:
+    ///     ItofinError: On Linear interpolation, which the core refuses
+    ///         outright pending the interpolated branch (#847), and on an
+    ///         observation lag the helper's own swap legs cannot be built
+    ///         under.
     #[new]
     #[pyo3(signature = (
         quote,
@@ -1704,25 +1971,16 @@ impl PyYearOnYearInflationSwapHelper {
     }
 }
 
-/// Python `PiecewiseYoYInflationCurve`: a year-on-year inflation curve
-/// bootstrapped from year-on-year helpers, solving one rate node per helper
-/// (`termstructures::inflation::PiecewiseYoYInflationCurve<Linear>`).
+/// A year-on-year inflation curve bootstrapped from year-on-year helpers,
+/// solving one rate node per helper fixing period.
 ///
-/// Extends [`PyYoYInflationTermStructure`], which carries the whole query
-/// surface. Node zero sits on `base_date` at `base_yoy_rate` and is kept rather
-/// than solved: the base date is the last date for which a fixing is known and
-/// precedes the reference date, so [`times`](Self::times)`[0]` is negative.
-/// Each helper's observed fixing period marks a later segment boundary, and its
-/// node is solved so the helper reprices its own quote off the curve.
+/// Node zero sits on base_date at base_yoy_rate and is kept rather than solved,
+/// so times()[0] is negative. Each helper's observed fixing period marks a
+/// later segment boundary.
 ///
-/// Lazy, like [`PyPiecewiseZeroInflationCurve`]: the constructor only registers
-/// on the helpers, and the bootstrap runs on the first read - a query, an
-/// inspector, or an explicit [`calculate`](Self::calculate). A helper quote
-/// moving invalidates the cache.
-///
-/// Fallible: the core rejects an empty helper set, and every inspector
-/// propagates a bootstrap failure as [`struct@crate::ItofinError`]. `Linear` is
-/// pinned at the boundary, it being the only interpolator the core constructs.
+/// Lazy: the bootstrap runs on the first read, so the evaluation date must be
+/// in place before that read as well as before the helpers were built. A helper
+/// quote moving invalidates the cache.
 #[pyclass(
     name = "PiecewiseYoYInflationCurve",
     extends = PyYoYInflationTermStructure,
@@ -1734,10 +1992,20 @@ pub struct PyPiecewiseYoYInflationCurve {
 
 #[pymethods]
 impl PyPiecewiseYoYInflationCurve {
-    /// A curve over `helpers` with a fixed `reference_date`, a `base_date`
-    /// preceding it and the `base_yoy_rate` observed over the period ending
-    /// there. `helpers` accepts any [`YoYInflationHelper`](PyYoYInflationHelper)
-    /// subclass.
+    /// Build the curve over helpers, registering on them without solving.
+    ///
+    /// Args:
+    ///     reference_date (Date): The curve's reference date.
+    ///     base_date (Date): The last date for which a fixing is known, where
+    ///         node zero sits.
+    ///     base_yoy_rate (float): The rate node zero is seeded with and keeps,
+    ///         rather than solved for.
+    ///     frequency (Frequency): The frequency of the inflation fixings.
+    ///     day_counter (DayCounter): The day count turning dates into times.
+    ///     helpers (list[YoYInflationHelper]): The bootstrap instruments.
+    ///
+    /// Raises:
+    ///     ItofinError: On an empty helper list.
     #[new]
     #[allow(clippy::too_many_arguments)]
     fn new(
@@ -1769,20 +2037,36 @@ impl PyPiecewiseYoYInflationCurve {
         )
     }
 
-    /// Runs the bootstrap if the cache is stale, so a solver failure surfaces
-    /// here rather than inside a later query.
+    /// Run the bootstrap if the cache is stale.
+    ///
+    /// Calling it explicitly makes a solver failure surface here rather than
+    /// inside a later query.
+    ///
+    /// Raises:
+    ///     ItofinError: On a bootstrap failure.
     fn calculate(&self) -> PyResult<()> {
         Ok(self.concrete.calculate().map_err(PyQlError::from)?)
     }
 
-    /// The node times, measured from the reference date in the curve's own day
-    /// count; the first is negative (triggers the bootstrap).
+    /// Return the node times, triggering the bootstrap.
+    ///
+    /// Returns:
+    ///     list[float]: The nodes measured from the reference date; the first
+    ///         is negative, node zero sitting on the base date.
+    ///
+    /// Raises:
+    ///     ItofinError: On a bootstrap failure.
     fn times(&self) -> PyResult<Vec<f64>> {
         Ok(self.concrete.times().map_err(PyQlError::from)?)
     }
 
-    /// The node dates, the first of which is the base date (triggers the
-    /// bootstrap).
+    /// Return the node dates, triggering the bootstrap.
+    ///
+    /// Returns:
+    ///     list[Date]: The nodes, the first of which is the base date.
+    ///
+    /// Raises:
+    ///     ItofinError: On a bootstrap failure.
     fn dates(&self) -> PyResult<Vec<PyDate>> {
         Ok(self
             .concrete
@@ -1793,7 +2077,14 @@ impl PyPiecewiseYoYInflationCurve {
             .collect())
     }
 
-    /// The solved `(date, year-on-year rate)` nodes (triggers the bootstrap).
+    /// Return the solved nodes as pairs, triggering the bootstrap.
+    ///
+    /// Returns:
+    ///     list[tuple[Date, float]]: One (date, year-on-year rate) pair per
+    ///         node.
+    ///
+    /// Raises:
+    ///     ItofinError: On a bootstrap failure.
     fn nodes(&self) -> PyResult<Vec<(PyDate, f64)>> {
         Ok(self
             .concrete
@@ -1805,33 +2096,19 @@ impl PyPiecewiseYoYInflationCurve {
     }
 }
 
-/// Python `YearOnYearInflationSwap`: a fixed leg against a leg of year-on-year
-/// inflation coupons, both paid over a schedule
-/// (`instruments::yearonyearinflationswap`).
+/// A fixed leg against a leg of year-on-year inflation coupons, both paid over a schedule.
 ///
-/// [`SwapType`](crate::swap::PySwapType) names the *fixed* leg, so a `Payer`
-/// pays fixed and receives inflation - the opposite reading from
-/// [`PyZeroCouponInflationSwap`], where it names the inflation leg.
+/// SwapType names the fixed leg, so a Payer pays fixed and receives inflation -
+/// the opposite reading from ZeroCouponInflationSwap, where it names the
+/// inflation leg.
 ///
 /// The two schedules are independent inputs. The fixed leg takes its payment
 /// calendar from its own schedule while the year-on-year leg pays on
-/// `payment_calendar`, the inflation index carrying no calendar of its own;
-/// both legs adjust with `payment_convention`, which C++ defaults to
-/// `ModifiedFollowing` and the port takes explicitly. `spread` is added to
+/// payment_calendar; both adjust with payment_convention. spread is added to
 /// every forecast rate on the year-on-year leg.
 ///
-/// Fallible at construction: both leg builds propagate, so a coupon the
-/// observation lag leaves unbuildable fails here.
-///
-/// Pricing needs an engine: call [`set_engine`](Self::set_engine) before
-/// anything else. Every accessor below is `&mut self` where the zero-coupon
-/// swap's [`fair_rate`](PyZeroCouponInflationSwap::fair_rate) is not: this
-/// contract recovers both fair values from a priced result rather than reading
-/// a single indexed flow (`yearonyearinflationswap.rs:311,326`), so each one
-/// drives the calculation.
-///
-/// Deferred (visible): the leg and coupon accessors are not surfaced, there
-/// being no cash-flow facade to hand them back through (#848).
+/// Pricing needs an engine: call set_engine first. Every priced accessor drives
+/// the calculation, so all of them mutate.
 #[pyclass(name = "YearOnYearInflationSwap", unsendable)]
 pub struct PyYearOnYearInflationSwap {
     inner: SharedMut<YearOnYearInflationSwap>,
@@ -1839,6 +2116,35 @@ pub struct PyYearOnYearInflationSwap {
 
 #[pymethods]
 impl PyYearOnYearInflationSwap {
+    /// Build the swap from its two schedules.
+    ///
+    /// Args:
+    ///     swap_type (SwapType): Which side the fixed leg is seen from; a
+    ///         Payer pays fixed and receives inflation.
+    ///     nominal (float): The notional both legs accrue on.
+    ///     fixed_schedule (Schedule): The fixed leg's payment schedule, which
+    ///         also supplies its payment calendar.
+    ///     fixed_rate (float): The rate the fixed leg accrues at.
+    ///     fixed_day_count (DayCounter): The day count of the fixed leg.
+    ///     yoy_schedule (Schedule): The year-on-year leg's schedule.
+    ///     yoy_index (YoYInflationIndex): The index the coupons fix off.
+    ///     observation_lag (Period): How far back each coupon's fixings are
+    ///         observed.
+    ///     interpolation (CpiInterpolationType): How the observed fixings are
+    ///         interpolated.
+    ///     spread (float): Added to every forecast rate on the year-on-year
+    ///         leg.
+    ///     yoy_day_count (DayCounter): The day count of the year-on-year leg.
+    ///     payment_calendar (Calendar): The calendar the year-on-year leg pays
+    ///         on.
+    ///     payment_convention (BusinessDayConvention): The roll both legs
+    ///         adjust their payment dates with.
+    ///     settings (Settings): The explicit settings supplying the evaluation
+    ///         date and the stored fixings.
+    ///
+    /// Raises:
+    ///     ItofinError: If either leg cannot be built, notably from an
+    ///         observation lag that leaves a coupon unbuildable.
     #[new]
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (
@@ -1896,10 +2202,12 @@ impl PyYearOnYearInflationSwap {
         })
     }
 
-    /// Attaches a [`PyDiscountingSwapEngine`] so the swap prices.
+    /// Attach a discounting engine so the swap prices.
     ///
-    /// The engine must resolve its dates against the same `Settings` object
-    /// this swap was built with.
+    /// Args:
+    ///     engine (DiscountingSwapEngine): The engine, which must resolve its
+    ///         dates against the same Settings object this swap was built
+    ///         with.
     fn set_engine(&mut self, engine: &PyDiscountingSwapEngine) {
         self.inner
             .borrow_mut()
@@ -1907,8 +2215,11 @@ impl PyYearOnYearInflationSwap {
             .set_pricing_engine(engine.engine());
     }
 
-    /// Forces the valuation, idempotent and fallible as
-    /// [`VanillaOption.calculate`](crate::option::PyVanillaOption::calculate).
+    /// Force the valuation. Idempotent.
+    ///
+    /// Raises:
+    ///     ItofinError: If no engine is attached, no evaluation date is set,
+    ///         or the engine refuses the swap.
     fn calculate(&mut self) -> PyResult<()> {
         Ok(self
             .inner
@@ -1917,37 +2228,65 @@ impl PyYearOnYearInflationSwap {
             .map_err(PyQlError::from)?)
     }
 
-    /// Whether the cached results are currently valid.
+    /// Return whether the cached results are currently valid.
+    ///
+    /// Returns:
+    ///     bool: True when the next accessor reads the cache.
     fn is_calculated(&self) -> bool {
         self.inner.borrow().base().is_calculated()
     }
 
-    /// Attaches `engine` and returns the NPV, the one-shot form of
-    /// [`set_engine`](Self::set_engine) followed by [`npv`](Self::npv).
+    /// Attach engine and return the NPV.
+    ///
+    /// Args:
+    ///     engine (DiscountingSwapEngine): The engine to install and price on.
+    ///
+    /// Returns:
+    ///     float: The swap value.
+    ///
+    /// Raises:
+    ///     ItofinError: On anything that makes the valuation fail.
     fn price(&mut self, engine: &PyDiscountingSwapEngine) -> PyResult<f64> {
         self.set_engine(engine);
         self.calculate()?;
         self.npv()
     }
 
-    /// A frozen [`Results`] copy of the valuation, calculating first.
+    /// Return a frozen snapshot of the valuation, calculating first.
+    ///
+    /// Returns:
+    ///     Results: A copy of the valuation results.
+    ///
+    /// Raises:
+    ///     ItofinError: On anything that makes the valuation fail.
     fn results(&mut self) -> PyResult<Results> {
         self.calculate()?;
         let inner = self.inner.borrow();
         Ok(Results::snapshot(inner.base()))
     }
 
-    /// The swap NPV under the attached engine.
+    /// Return the swap NPV under the attached engine.
     ///
-    /// Fallible: with no engine attached the core reports `"null pricing
-    /// engine"`, and with no curve linked into the index the coupons cannot be
-    /// forecast.
+    /// Returns:
+    ///     float: The present value.
+    ///
+    /// Raises:
+    ///     ItofinError: If no engine is attached, and if no curve is linked
+    ///         into the index, which leaves the coupons unforecastable.
     fn npv(&mut self) -> PyResult<f64> {
         Ok(self.inner.borrow_mut().npv().map_err(PyQlError::from)?)
     }
 
-    /// The fixed rate that would price the swap at zero, recovered from the NPV
-    /// and the fixed leg's BPS. Prices on demand, so it needs an engine.
+    /// Return the fixed rate that would price the swap at zero.
+    ///
+    /// Recovered from the NPV and the fixed leg's BPS, so it prices on demand
+    /// and needs an engine.
+    ///
+    /// Returns:
+    ///     float: The fair fixed rate.
+    ///
+    /// Raises:
+    ///     ItofinError: On the same conditions npv reports.
     fn fair_rate(&mut self) -> PyResult<f64> {
         Ok(self
             .inner
@@ -1956,8 +2295,15 @@ impl PyYearOnYearInflationSwap {
             .map_err(PyQlError::from)?)
     }
 
-    /// The spread over the index that would price the swap at zero, recovered
-    /// off the year-on-year leg. Fallible as [`fair_rate`](Self::fair_rate).
+    /// Return the spread over the index that would price the swap at zero.
+    ///
+    /// Recovered off the year-on-year leg.
+    ///
+    /// Returns:
+    ///     float: The fair spread.
+    ///
+    /// Raises:
+    ///     ItofinError: On the same conditions fair_rate reports.
     fn fair_spread(&mut self) -> PyResult<f64> {
         Ok(self
             .inner
@@ -1966,7 +2312,13 @@ impl PyYearOnYearInflationSwap {
             .map_err(PyQlError::from)?)
     }
 
-    /// The fixed leg's NPV, priced on demand. Fallible as [`npv`](Self::npv).
+    /// Return the fixed leg's NPV, priced on demand.
+    ///
+    /// Returns:
+    ///     float: The present value of the fixed leg.
+    ///
+    /// Raises:
+    ///     ItofinError: On the same conditions npv reports.
     fn fixed_leg_npv(&mut self) -> PyResult<f64> {
         Ok(self
             .inner
@@ -1975,8 +2327,13 @@ impl PyYearOnYearInflationSwap {
             .map_err(PyQlError::from)?)
     }
 
-    /// The year-on-year leg's NPV, priced on demand. Fallible as
-    /// [`npv`](Self::npv).
+    /// Return the year-on-year leg's NPV, priced on demand.
+    ///
+    /// Returns:
+    ///     float: The present value of the inflation leg.
+    ///
+    /// Raises:
+    ///     ItofinError: On the same conditions npv reports.
     fn yoy_leg_npv(&mut self) -> PyResult<f64> {
         Ok(self
             .inner
@@ -1985,34 +2342,35 @@ impl PyYearOnYearInflationSwap {
             .map_err(PyQlError::from)?)
     }
 
-    /// The quoted fixed rate the swap was struck at.
+    /// Return the quoted fixed rate the swap was struck at.
+    ///
+    /// Returns:
+    ///     float: The fixed-leg rate.
     fn fixed_rate(&self) -> f64 {
         self.inner.borrow().fixed_rate()
     }
 
-    /// The spread the year-on-year coupons carry over the index.
+    /// Return the spread the year-on-year coupons carry over the index.
+    ///
+    /// Returns:
+    ///     float: The quoted spread.
     fn spread(&self) -> f64 {
         self.inner.borrow().spread()
     }
 }
 
-/// Python `ConstantYoYOptionletVolatility`: one volatility for every strike and
-/// every date (`termstructures::volatility::ConstantYoYOptionletVolatility`).
+/// One year-on-year optionlet volatility for every strike and every date.
 ///
-/// The reference date moves with the evaluation date carried by `settings`,
-/// `settlement_days` business days on from it, so that date must be set before
+/// The reference date moves with the evaluation date carried by settings,
+/// settlement_days business days on from it, so that date must be set before
 /// anything is priced off the surface.
 ///
-/// `min_strike` and `max_strike` bound the strike domain a query is answered
-/// over; C++ defaults them to `-1.0` and `100.0` and the port carries no default
+/// min_strike and max_strike bound the strike domain a query is answered over;
+/// C++ defaults them to -1.0 and 100.0 and the port carries no default
 /// arguments, so both are passed here too.
 ///
-/// Both constructors are bound: the flat one taking a value, and
-/// [`with_quote`](Self::with_quote) taking a live quote whose changes notify the
-/// surface's observers.
-///
-/// The stripped side of the hierarchy is bound as
-/// [`PyKInterpolatedYoYOptionletVolatilitySurface`] (#874/#910).
+/// Both constructors are bound: __init__ takes a value, with_quote a live
+/// quote. The whole stripped/interpolated hierarchy is deferred (#874).
 #[pyclass(name = "ConstantYoYOptionletVolatility", unsendable)]
 pub struct PyConstantYoYOptionletVolatility {
     inner: Shared<ConstantYoYOptionletVolatility>,
@@ -2020,12 +2378,31 @@ pub struct PyConstantYoYOptionletVolatility {
 
 #[pymethods]
 impl PyConstantYoYOptionletVolatility {
-    /// A flat surface at `volatility`, observing inflation `observation_lag`
-    /// back on an index publishing at `frequency`.
+    /// Build a flat surface at a fixed volatility.
     ///
-    /// Infallible, unlike most curve constructors: nothing is resolved here.
-    /// The reference date, the base date and the strike range are all read at
-    /// query time, so an unset evaluation date surfaces then.
+    /// Nothing is resolved here: the reference date, the base date and the
+    /// strike range are all read at query time, so an unset evaluation date
+    /// surfaces then rather than now.
+    ///
+    /// Args:
+    ///     volatility (float): The single volatility answered everywhere.
+    ///     settlement_days (int): The business days the reference date sits
+    ///         past the evaluation date.
+    ///     calendar (Calendar): The calendar those days are counted on.
+    ///     business_day_convention (BusinessDayConvention): The roll applied
+    ///         when resolving a date.
+    ///     day_counter (DayCounter): The day count times are measured in.
+    ///     observation_lag (Period): The lag the surface itself observes
+    ///         inflation with.
+    ///     frequency (Frequency): How often the observed index publishes.
+    ///     index_is_interpolated (bool): Whether the observed index
+    ///         interpolates between publications.
+    ///     min_strike (float): The lower bound of the strike domain; C++
+    ///         defaults it to -1.0 and the port carries no default arguments.
+    ///     max_strike (float): The upper bound of the strike domain; C++
+    ///         defaults it to 100.0.
+    ///     settings (Settings): The explicit settings supplying the evaluation
+    ///         date the reference date moves with.
     #[new]
     #[allow(clippy::too_many_arguments)]
     fn new(
@@ -2058,12 +2435,33 @@ impl PyConstantYoYOptionletVolatility {
         }
     }
 
-    /// A flat surface quoted by `volatility`: the quote is retained rather than
-    /// read once, so a later `set_value` on it notifies the surface's observers
-    /// and anything priced off the surface reprices at the new level.
+    /// Build a flat surface reading its volatility from a live quote.
     ///
-    /// Infallible, and otherwise as [`new`](Self::new), which the arguments
+    /// The quote is retained rather than read once, so a later set_value on it
+    /// notifies the surface's observers and anything priced off the surface
+    /// reprices at the new level. Otherwise as __init__, which the arguments
     /// after the first mirror exactly.
+    ///
+    /// Args:
+    ///     volatility (SimpleQuote): The volatility answered everywhere.
+    ///     settlement_days (int): The business days the reference date sits
+    ///         past the evaluation date.
+    ///     calendar (Calendar): The calendar those days are counted on.
+    ///     business_day_convention (BusinessDayConvention): The roll applied
+    ///         when resolving a date.
+    ///     day_counter (DayCounter): The day count times are measured in.
+    ///     observation_lag (Period): The lag the surface itself observes
+    ///         inflation with.
+    ///     frequency (Frequency): How often the observed index publishes.
+    ///     index_is_interpolated (bool): Whether the observed index
+    ///         interpolates between publications.
+    ///     min_strike (float): The lower bound of the strike domain.
+    ///     max_strike (float): The upper bound of the strike domain.
+    ///     settings (Settings): The explicit settings supplying the evaluation
+    ///         date the reference date moves with.
+    ///
+    /// Returns:
+    ///     ConstantYoYOptionletVolatility: The surface over that quote.
     #[staticmethod]
     #[allow(clippy::too_many_arguments)]
     fn with_quote(
@@ -2096,46 +2494,65 @@ impl PyConstantYoYOptionletVolatility {
         }
     }
 
-    /// The lag the surface itself observes inflation with.
+    /// Return the lag the surface itself observes inflation with.
+    ///
+    /// Returns:
+    ///     Period: The observation lag, which is what to pass as obs_lag for
+    ///         the surface's own.
     fn observation_lag(&self) -> PyPeriod {
         PyPeriod::from_inner(self.inner.observation_lag())
     }
 
-    /// How often the observed index publishes.
+    /// Return how often the observed index publishes.
+    ///
+    /// Returns:
+    ///     Frequency: The publication frequency.
     fn frequency(&self) -> PyResult<PyFrequency> {
         PyFrequency::from_inner(self.inner.frequency())
     }
 
-    /// Whether the observed index interpolates between publications.
+    /// Return whether the observed index interpolates between publications.
+    ///
+    /// Returns:
+    ///     bool: True when the index interpolates.
     fn index_is_interpolated(&self) -> bool {
         self.inner.index_is_interpolated()
     }
 
-    /// The date the surface measures its variance from: the reference date
-    /// pulled back by the surface's own observation lag, snapped to the start of
-    /// the publication period unless the index is interpolated.
+    /// Return the date the surface measures its variance from.
     ///
-    /// # Errors
+    /// The reference date pulled back by the surface's own observation lag,
+    /// snapped to the start of the publication period unless the index is
+    /// interpolated.
     ///
-    /// Reports an unset evaluation date, and a frequency admitting no
-    /// publication period.
+    /// Returns:
+    ///     Date: The base date.
+    ///
+    /// Raises:
+    ///     ItofinError: On an unset evaluation date, and on a frequency
+    ///         admitting no publication period.
     fn base_date(&self) -> PyResult<PyDate> {
         Ok(PyDate::from_inner(
             self.inner.base_date().map_err(PyQlError::from)?,
         ))
     }
 
-    /// The volatility for an exercise on `date` struck at `strike`, observing
-    /// inflation `obs_lag` back.
+    /// Return the volatility for an exercise on date struck at strike.
     ///
-    /// The lag is explicit rather than defaulted: C++ substitutes the surface's
-    /// own for a sentinel period, and the port has no sentinel to carry, so a
-    /// caller wanting it passes [`observation_lag`](Self::observation_lag).
+    /// Args:
+    ///     date (Date): The exercise date.
+    ///     strike (float): The strike the volatility is read at.
+    ///     obs_lag (Period): How far back inflation is observed; the lag is
+    ///         explicit rather than defaulted, because C++ substitutes the
+    ///         surface's own for a sentinel period and the port has no
+    ///         sentinel to carry. Pass observation_lag() for that behaviour.
     ///
-    /// # Errors
+    /// Returns:
+    ///     float: The optionlet volatility.
     ///
-    /// Reports an observed date before [`base_date`](Self::base_date), and a
-    /// `strike` outside the surface's strike domain.
+    /// Raises:
+    ///     ItofinError: On an observed date before base_date(), and on a
+    ///         strike outside the surface's strike domain.
     fn volatility(&self, date: &PyDate, strike: f64, obs_lag: &PyPeriod) -> PyResult<f64> {
         Ok(self
             .inner
@@ -2143,13 +2560,21 @@ impl PyConstantYoYOptionletVolatility {
             .map_err(PyQlError::from)?)
     }
 
-    /// The total integrated variance for an exercise on `date` struck at
-    /// `strike`: the figure that scales time out of the optionlet formulae
-    /// without committing to the distribution reading it.
+    /// Return the total integrated variance for an exercise on date.
     ///
-    /// # Errors
+    /// The figure that scales time out of the optionlet formulae without
+    /// committing to the distribution reading it.
     ///
-    /// As [`volatility`](Self::volatility).
+    /// Args:
+    ///     date (Date): The exercise date.
+    ///     strike (float): The strike the variance is read at.
+    ///     obs_lag (Period): How far back inflation is observed.
+    ///
+    /// Returns:
+    ///     float: The total integrated variance.
+    ///
+    /// Raises:
+    ///     ItofinError: On the same conditions volatility() reports.
     fn total_variance(&self, date: &PyDate, strike: f64, obs_lag: &PyPeriod) -> PyResult<f64> {
         Ok(self
             .inner
@@ -2165,17 +2590,15 @@ impl PyConstantYoYOptionletVolatility {
     }
 }
 
-/// Python `YoYInflationCapFloorEngine`: prices a year-on-year cap or floor
-/// optionlet by optionlet (`pricingengines::YoYInflationCapFloorEngine`).
+/// Prices a year-on-year inflation cap or floor optionlet by optionlet.
 ///
 /// The distribution is chosen by the constructor rather than passed as an
-/// argument, mirroring the core's three constructors and C++'s three engine
-/// classes: [`black`](Self::black) is lognormal, `unit_displaced` lognormal in
-/// `1 + rate` and `bachelier` normal. The core
-/// `YoYOptionletDistribution` enum is not bound - nothing takes one by value -
-/// so [`distribution`](Self::distribution) reads back as a string.
+/// argument, mirroring C++'s three engine classes: black is lognormal,
+/// unit_displaced lognormal in 1 + rate and bachelier normal. The core
+/// YoYOptionletDistribution enum is not bound, so distribution() reads back as
+/// a string.
 ///
-/// The `settings` behind the volatility surface and behind the cap/floor this
+/// The settings behind the volatility surface and behind the cap/floor this
 /// engine prices must be the same object, or the two resolve their dates
 /// against different evaluation dates and the NPV is silently wrong.
 ///
@@ -2188,9 +2611,17 @@ pub struct PyYoYInflationCapFloorEngine {
 
 #[pymethods]
 impl PyYoYInflationCapFloorEngine {
-    /// Optionlets under the lognormal model (C++
-    /// `YoYInflationBlackCapFloorEngine`), forwards read off `index`,
-    /// volatilities off `volatility` and discounting on `nominal_ts`.
+    /// Build an engine valuing optionlets under the lognormal model.
+    ///
+    /// Args:
+    ///     index (YoYInflationIndex): The index forwards are read off.
+    ///     volatility (ConstantYoYOptionletVolatility): The surface optionlet
+    ///         volatilities are read off.
+    ///     nominal_ts (YieldTermStructure): The nominal curve optionlets are
+    ///         discounted on.
+    ///
+    /// Returns:
+    ///     YoYInflationCapFloorEngine: The lognormal engine.
     #[staticmethod]
     fn black(
         index: &PyYoYInflationIndex,
@@ -2206,9 +2637,20 @@ impl PyYoYInflationCapFloorEngine {
         }
     }
 
-    /// Optionlets under the unit-displaced lognormal model (C++
-    /// `YoYInflationUnitDisplacedBlackCapFloorEngine`), the usual quoting
-    /// convention for a rate that may be negative. See [`black`](Self::black).
+    /// Build an engine valuing optionlets under the unit-displaced lognormal model.
+    ///
+    /// Lognormal in 1 + rate, the usual quoting convention for a rate that may
+    /// be negative.
+    ///
+    /// Args:
+    ///     index (YoYInflationIndex): The index forwards are read off.
+    ///     volatility (ConstantYoYOptionletVolatility): The surface optionlet
+    ///         volatilities are read off.
+    ///     nominal_ts (YieldTermStructure): The nominal curve optionlets are
+    ///         discounted on.
+    ///
+    /// Returns:
+    ///     YoYInflationCapFloorEngine: The unit-displaced lognormal engine.
     #[staticmethod]
     fn unit_displaced(
         index: &PyYoYInflationIndex,
@@ -2224,8 +2666,17 @@ impl PyYoYInflationCapFloorEngine {
         }
     }
 
-    /// Optionlets under the normal model (C++
-    /// `YoYInflationBachelierCapFloorEngine`). See [`black`](Self::black).
+    /// Build an engine valuing optionlets under the normal model.
+    ///
+    /// Args:
+    ///     index (YoYInflationIndex): The index forwards are read off.
+    ///     volatility (ConstantYoYOptionletVolatility): The surface optionlet
+    ///         volatilities are read off.
+    ///     nominal_ts (YieldTermStructure): The nominal curve optionlets are
+    ///         discounted on.
+    ///
+    /// Returns:
+    ///     YoYInflationCapFloorEngine: The normal engine.
     #[staticmethod]
     fn bachelier(
         index: &PyYoYInflationIndex,
@@ -2241,8 +2692,10 @@ impl PyYoYInflationCapFloorEngine {
         }
     }
 
-    /// The distribution optionlets are valued under, as `"black"`,
-    /// `"unit_displaced"` or `"bachelier"`.
+    /// Return the distribution optionlets are valued under.
+    ///
+    /// Returns:
+    ///     str: "black", "unit_displaced" or "bachelier".
     fn distribution(&self) -> String {
         match self.inner.borrow().distribution() {
             YoYOptionletDistribution::Black => "black",
@@ -2260,32 +2713,28 @@ impl PyYoYInflationCapFloorEngine {
     }
 }
 
-/// Python `MakeYoYInflationCapFloor`: the standard market builder for a
-/// year-on-year inflation cap or floor
-/// (`instruments::makeyoyinflationcapfloor`).
+/// The standard market builder for a year-on-year inflation cap or floor.
 ///
 /// It derives an annual year-on-year leg from a length in years, trims that leg
-/// to the optionlets asked for, and strikes it either at an explicit `strike` or
-/// at the money off `atm_strike`. Exactly one of the two is required: the core
+/// to the optionlets asked for, and strikes it either at an explicit strike or
+/// at the money off atm_strike. Exactly one of the two is required: the core
 /// refuses both together and neither at all, at build time rather than at the
-/// setters, so both surface from [`build`](Self::build).
+/// setters, so both surface from build().
 ///
 /// The core builder is a consumed-self fluent chain, which does not cross the
 /// FFI boundary; this facade takes the whole configuration up front and
-/// assembles the chain inside [`build`](Self::build), as
-/// [`MakeVanillaSwap`](crate::swap::PyMakeVanillaSwap) does. An unset optional
-/// leaves the core default in place: a 1,000,000 nominal, a `ModifiedFollowing`
-/// payment roll, a 30/360 bond-basis day counter, no fixing days, every
-/// optionlet kept and no forward start.
+/// assembles the chain inside build(), as MakeVanillaSwap does. An unset
+/// optional leaves the core default in place: a 1,000,000 nominal, a
+/// ModifiedFollowing payment roll, a 30/360 bond-basis day counter, no fixing
+/// days, every optionlet kept and no forward start.
 ///
-/// Trimming happens *before* the at-the-money fill, so `as_optionlet` and
-/// `first_caplet_excluded` change what an unset strike resolves to: the rate
-/// that reprices whatever survives, not the whole leg's.
+/// Trimming happens before the at-the-money fill, so as_optionlet and
+/// first_caplet_excluded change what an unset strike resolves to: the rate that
+/// reprices whatever survives, not the whole leg's.
 ///
-/// `CapFloorType.Collar` has no path through the builder - it carries a single
-/// strike, and a collar needs two strike vectors - so a collar is built through
-/// [`YoYInflationCapFloor::collar`](PyYoYInflationCapFloor::collar) over a leg
-/// of its own instead.
+/// CapFloorType.Collar has no path here - the builder carries a single strike,
+/// and a collar needs two strike vectors - so a collar is built through
+/// YoYInflationCapFloor.collar over a leg of its own instead.
 #[pyclass(name = "MakeYoYInflationCapFloor", unsendable)]
 pub struct PyMakeYoYInflationCapFloor {
     cap_floor_type: PyCapFloorType,
@@ -2310,9 +2759,41 @@ pub struct PyMakeYoYInflationCapFloor {
 
 #[pymethods]
 impl PyMakeYoYInflationCapFloor {
-    /// A builder for a `cap_floor_type` cap/floor of `length` years on `index`,
-    /// observed `observation_lag` back under `interpolation` and paying on
-    /// `calendar`.
+    /// Store the configuration the chain is assembled from in build().
+    ///
+    /// Args:
+    ///     cap_floor_type (CapFloorType): Cap or Floor; Collar has no path
+    ///         here.
+    ///     index (YoYInflationIndex): The index the optionlets fix off.
+    ///     length (int): The length of the derived annual leg, in years.
+    ///     calendar (Calendar): The calendar the payments roll on.
+    ///     observation_lag (Period): How far back each coupon's fixings are
+    ///         observed.
+    ///     interpolation (CpiInterpolationType): How the observed fixings are
+    ///         interpolated.
+    ///     settings (Settings): The explicit settings supplying the evaluation
+    ///         date and the stored fixings.
+    ///     nominal (float | None): The notional; None keeps the core default
+    ///         of 1,000,000.
+    ///     effective_date (Date | None): The start date; None derives it from
+    ///         the evaluation date.
+    ///     payment_day_counter (DayCounter | None): The day count; None keeps
+    ///         the core default of 30/360 bond basis.
+    ///     payment_adjustment (BusinessDayConvention | None): The payment
+    ///         roll; None keeps the core default of ModifiedFollowing.
+    ///     fixing_days (int | None): The fixing days of the coupons; None
+    ///         keeps the core default of none.
+    ///     engine (YoYInflationCapFloorEngine | None): An engine installed on
+    ///         the built instrument; None leaves it unpriced.
+    ///     as_optionlet (bool): Whether to keep only the last optionlet.
+    ///     forward_start (Period | None): The delay before the leg starts;
+    ///         None keeps the core default of no forward start.
+    ///     first_caplet_excluded (bool): Whether to drop the front optionlet.
+    ///     strike (float | None): The explicit strike; exactly one of this and
+    ///         atm_strike is required.
+    ///     atm_strike (YieldTermStructure | None): The curve the at-the-money
+    ///         strike is filled off; exactly one of this and strike is
+    ///         required.
     #[new]
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (
@@ -2377,15 +2858,16 @@ impl PyMakeYoYInflationCapFloor {
         }
     }
 
-    /// Builds the cap/floor, which already carries its engine when one was
-    /// given.
+    /// Build the cap/floor, which already carries its engine when one was given.
     ///
-    /// # Errors
+    /// Returns:
+    ///     YoYInflationCapFloor: The built instrument.
     ///
-    /// Reports both an explicit `strike` and an `atm_strike` given together and
-    /// neither given at all; an unset evaluation date when the start date has to
-    /// be derived; and whatever the leg construction and the at-the-money fill
-    /// report.
+    /// Raises:
+    ///     ItofinError: If both strike and atm_strike are given or neither is;
+    ///         if the start date has to be derived and no evaluation date is
+    ///         set; and on whatever the leg construction and the at-the-money
+    ///         fill report.
     fn build(&self) -> PyResult<PyYoYInflationCapFloor> {
         let mut maker = MakeYoYInflationCapFloor::new(
             self.cap_floor_type.inner(),
@@ -2435,22 +2917,17 @@ impl PyMakeYoYInflationCapFloor {
     }
 }
 
-/// Python `YoYInflationCapFloor`: a cap or floor over a year-on-year inflation
-/// leg (`instruments::inflationcapfloor::YoYInflationCapFloor`).
+/// A cap, floor or collar over a year-on-year inflation leg.
 ///
-/// Built either through [`MakeYoYInflationCapFloor`](PyMakeYoYInflationCapFloor),
-/// the standard market builder, or through the raw constructors
-/// [`new`](Self::new), [`cap`](Self::cap), [`floor`](Self::floor),
-/// [`collar`](Self::collar) and [`with_strikes`](Self::with_strikes), which take
-/// the coupon vector [`YoYInflationLeg`](crate::cashflows::PyYoYInflationLeg)
-/// hands back (#848). The raw route is the only one that reaches a collar: the
-/// builder carries a single strike.
+/// Built either through MakeYoYInflationCapFloor, the standard market builder,
+/// or through the raw constructors below, which take the coupon vector
+/// YoYInflationLeg.coupons() hands back (#848). The raw route is the only one
+/// that reaches a collar: the builder carries a single strike.
 ///
 /// Unlike a nominal cap/floor this instrument keeps its first optionlet, so the
 /// strip spans its leg exactly and cap - floor is the year-on-year swap.
 ///
-/// Pricing needs an engine: call [`set_engine`](Self::set_engine) before
-/// [`npv`](Self::npv).
+/// Pricing needs an engine: call set_engine before npv.
 #[pyclass(name = "YoYInflationCapFloor", unsendable)]
 pub struct PyYoYInflationCapFloor {
     inner: SharedMut<YoYInflationCapFloor>,
@@ -2458,16 +2935,26 @@ pub struct PyYoYInflationCapFloor {
 
 #[pymethods]
 impl PyYoYInflationCapFloor {
-    /// A `cap_floor_type` instrument over `coupons`, struck at `cap_rates` and
-    /// `floor_rates` (`inflationcapfloor.rs:141`).
+    /// Build an instrument of cap_floor_type over coupons, struck at both vectors.
     ///
     /// Each strike vector is padded to the leg length by repeating its last
     /// entry, so a single strike stands for every optionlet.
     ///
-    /// # Errors
+    /// Args:
+    ///     cap_floor_type (CapFloorType): Cap, Floor or Collar.
+    ///     coupons (list[YoYInflationCoupon]): The leg the optionlets sit on.
+    ///     cap_rates (list[float]): The cap strikes.
+    ///     floor_rates (list[float]): The floor strikes.
+    ///     settings (Settings): The explicit settings the instrument resolves
+    ///         its dates against.
     ///
-    /// Reports an empty leg, and a strike vector the type needs and did not
-    /// get: a cap or a collar needs cap rates, a floor or a collar floor rates.
+    /// Returns:
+    ///     YoYInflationCapFloor: The built instrument.
+    ///
+    /// Raises:
+    ///     ItofinError: On an empty leg, and on a strike vector the type needs
+    ///         and did not get: a cap or a collar needs cap rates, a floor or
+    ///         a collar floor rates.
     #[staticmethod]
     fn new(
         cap_floor_type: PyCapFloorType,
@@ -2488,8 +2975,19 @@ impl PyYoYInflationCapFloor {
         )))
     }
 
-    /// A cap over `coupons` struck at `strikes`. Fallible as
-    /// [`new`](Self::new).
+    /// Build a cap over coupons struck at strikes.
+    ///
+    /// Args:
+    ///     coupons (list[YoYInflationCoupon]): The leg the optionlets sit on.
+    ///     strikes (list[float]): The cap strikes, padded as new() pads.
+    ///     settings (Settings): The explicit settings the instrument resolves
+    ///         its dates against.
+    ///
+    /// Returns:
+    ///     YoYInflationCapFloor: The cap over that leg.
+    ///
+    /// Raises:
+    ///     ItofinError: On the same conditions new() reports.
     #[staticmethod]
     fn cap(
         coupons: Vec<PyRef<PyYoYInflationCoupon>>,
@@ -2506,8 +3004,19 @@ impl PyYoYInflationCapFloor {
         )))
     }
 
-    /// A floor over `coupons` struck at `strikes`. Fallible as
-    /// [`new`](Self::new).
+    /// Build a floor over coupons struck at strikes.
+    ///
+    /// Args:
+    ///     coupons (list[YoYInflationCoupon]): The leg the optionlets sit on.
+    ///     strikes (list[float]): The floor strikes, padded as new() pads.
+    ///     settings (Settings): The explicit settings the instrument resolves
+    ///         its dates against.
+    ///
+    /// Returns:
+    ///     YoYInflationCapFloor: The floor over that leg.
+    ///
+    /// Raises:
+    ///     ItofinError: On the same conditions new() reports.
     #[staticmethod]
     fn floor(
         coupons: Vec<PyRef<PyYoYInflationCoupon>>,
@@ -2524,8 +3033,20 @@ impl PyYoYInflationCapFloor {
         )))
     }
 
-    /// A collar over `coupons`, long the cap at `cap_rates` and short the floor
-    /// at `floor_rates`. Fallible as [`new`](Self::new).
+    /// Build a collar: long the cap at cap_rates, short the floor at floor_rates.
+    ///
+    /// Args:
+    ///     coupons (list[YoYInflationCoupon]): The leg the optionlets sit on.
+    ///     cap_rates (list[float]): The cap strikes, padded as new() pads.
+    ///     floor_rates (list[float]): The floor strikes, padded the same way.
+    ///     settings (Settings): The explicit settings the instrument resolves
+    ///         its dates against.
+    ///
+    /// Returns:
+    ///     YoYInflationCapFloor: The collar over that leg.
+    ///
+    /// Raises:
+    ///     ItofinError: On the same conditions new() reports.
     #[staticmethod]
     fn collar(
         coupons: Vec<PyRef<PyYoYInflationCoupon>>,
@@ -2544,14 +3065,23 @@ impl PyYoYInflationCapFloor {
         )))
     }
 
-    /// The single-vector constructor: `strikes` are cap rates for a
-    /// `CapFloorType.Cap` and floor rates for a `CapFloorType.Floor`.
+    /// Build a cap or a floor from a single strike vector.
     ///
-    /// # Errors
+    /// Args:
+    ///     cap_floor_type (CapFloorType): Cap or Floor.
+    ///     coupons (list[YoYInflationCoupon]): The leg the optionlets sit on.
+    ///     strikes (list[float]): Cap rates for a Cap and floor rates for a
+    ///         Floor.
+    ///     settings (Settings): The explicit settings the instrument resolves
+    ///         its dates against.
     ///
-    /// Reports an empty `strikes`, a `CapFloorType.Collar` - which needs two
-    /// vectors, so [`collar`](Self::collar) is its constructor - and as
-    /// [`new`](Self::new).
+    /// Returns:
+    ///     YoYInflationCapFloor: The built instrument.
+    ///
+    /// Raises:
+    ///     ItofinError: On an empty strikes, on a Collar - which needs two
+    ///         vectors, so collar() is its constructor - and on the same
+    ///         conditions new() reports.
     #[staticmethod]
     fn with_strikes(
         cap_floor_type: PyCapFloorType,
@@ -2570,34 +3100,51 @@ impl PyYoYInflationCapFloor {
         )))
     }
 
-    /// The cap strikes, one per coupon; empty on a floor.
+    /// Return the cap strikes, one per coupon.
+    ///
+    /// Returns:
+    ///     list[float]: The cap strikes; empty on a floor.
     fn cap_rates(&self) -> Vec<f64> {
         self.inner.borrow().cap_rates().to_vec()
     }
 
-    /// The floor strikes, one per coupon; empty on a cap.
+    /// Return the floor strikes, one per coupon.
+    ///
+    /// Returns:
+    ///     list[float]: The floor strikes; empty on a cap.
     fn floor_rates(&self) -> Vec<f64> {
         self.inner.borrow().floor_rates().to_vec()
     }
 
-    /// The number of optionlets, one per year-on-year coupon.
+    /// Return the number of optionlets.
+    ///
+    /// Returns:
+    ///     int: One per year-on-year coupon on the leg.
     fn coupon_count(&self) -> usize {
         self.inner.borrow().yoy_leg().len()
     }
 
-    /// The leg's earliest accrual start.
+    /// Return the leg's earliest accrual start.
     ///
-    /// # Errors
+    /// Returns:
+    ///     Date: The first accrual start date.
     ///
-    /// Reports an empty leg, which the constructors already refuse.
+    /// Raises:
+    ///     ItofinError: On an empty leg, which the constructors already
+    ///         refuse.
     fn start_date(&self) -> PyResult<PyDate> {
         Ok(PyDate::from_inner(
             self.inner.borrow().start_date().map_err(PyQlError::from)?,
         ))
     }
 
-    /// The leg's latest accrual end. Fallible as
-    /// [`start_date`](Self::start_date).
+    /// Return the leg's latest accrual end.
+    ///
+    /// Returns:
+    ///     Date: The last accrual end date.
+    ///
+    /// Raises:
+    ///     ItofinError: On the same conditions start_date reports.
     fn maturity_date(&self) -> PyResult<PyDate> {
         Ok(PyDate::from_inner(
             self.inner
@@ -2607,16 +3154,21 @@ impl PyYoYInflationCapFloor {
         ))
     }
 
-    /// The at-the-money rate: the strike at which the leg reprices on
-    /// `discount_curve`.
+    /// Return the strike at which the leg reprices on discount_curve.
     ///
     /// The core takes the curve itself rather than a handle, so the link is
-    /// resolved here and held for the call.
+    /// resolved for the call.
     ///
-    /// # Errors
+    /// Args:
+    ///     discount_curve (YieldTermStructure): The curve the leg reprices on.
     ///
-    /// Reports an unlinked `discount_curve`, a curve with no reference date and
-    /// a leg with no basis-point sensitivity to solve over.
+    /// Returns:
+    ///     float: The at-the-money rate.
+    ///
+    /// Raises:
+    ///     ItofinError: On an unlinked discount_curve, a curve with no
+    ///         reference date, and a leg with no basis-point sensitivity to
+    ///         solve over.
     fn atm_rate(&self, discount_curve: &PyYieldTermStructure) -> PyResult<f64> {
         let handle = discount_curve.handle();
         let link = handle.current_link().map_err(PyQlError::from)?;
@@ -2627,12 +3179,13 @@ impl PyYoYInflationCapFloor {
             .map_err(PyQlError::from)?)
     }
 
-    /// Attaches a [`PyYoYInflationCapFloorEngine`], replacing whatever engine
-    /// the factory installed.
+    /// Attach an engine, replacing whatever the factory installed.
     ///
-    /// The engine must resolve its dates against the same `Settings` object this
-    /// cap/floor was built with: two different ones would price the leg and the
-    /// optionlets on different dates with no error raised.
+    /// Args:
+    ///     engine (YoYInflationCapFloorEngine): The engine, which must resolve
+    ///         its dates against the same Settings object this cap/floor was
+    ///         built with: two different ones would price the leg and the
+    ///         optionlets on different dates with no error raised.
     fn set_engine(&mut self, engine: &PyYoYInflationCapFloorEngine) {
         self.inner
             .borrow_mut()
@@ -2640,8 +3193,11 @@ impl PyYoYInflationCapFloor {
             .set_pricing_engine(engine.engine());
     }
 
-    /// Forces the valuation, idempotent and fallible as
-    /// [`VanillaOption.calculate`](crate::option::PyVanillaOption::calculate).
+    /// Force the valuation. Idempotent.
+    ///
+    /// Raises:
+    ///     ItofinError: If no engine is attached, no evaluation date is set,
+    ///         or the engine refuses the instrument.
     fn calculate(&mut self) -> PyResult<()> {
         Ok(self
             .inner
@@ -2650,33 +3206,54 @@ impl PyYoYInflationCapFloor {
             .map_err(PyQlError::from)?)
     }
 
-    /// Whether the cached results are currently valid.
+    /// Return whether the cached results are currently valid.
+    ///
+    /// Returns:
+    ///     bool: True when the next accessor reads the cache.
     fn is_calculated(&self) -> bool {
         self.inner.borrow().base().is_calculated()
     }
 
-    /// Attaches `engine`, replacing whatever the factory installed, and returns
-    /// the NPV: the one-shot form of [`set_engine`](Self::set_engine) followed
-    /// by [`npv`](Self::npv).
+    /// Attach engine and return the NPV.
+    ///
+    /// Replaces whatever engine the factory installed.
+    ///
+    /// Args:
+    ///     engine (YoYInflationCapFloorEngine): The engine to install and
+    ///         price on.
+    ///
+    /// Returns:
+    ///     float: The cap/floor value.
+    ///
+    /// Raises:
+    ///     ItofinError: On anything that makes the valuation fail.
     fn price(&mut self, engine: &PyYoYInflationCapFloorEngine) -> PyResult<f64> {
         self.set_engine(engine);
         self.calculate()?;
         self.npv()
     }
 
-    /// A frozen [`Results`] copy of the valuation, calculating first.
+    /// Return a frozen snapshot of the valuation, calculating first.
+    ///
+    /// Returns:
+    ///     Results: A copy of the valuation results.
+    ///
+    /// Raises:
+    ///     ItofinError: On anything that makes the valuation fail.
     fn results(&mut self) -> PyResult<Results> {
         self.calculate()?;
         let inner = self.inner.borrow();
         Ok(Results::snapshot(inner.base()))
     }
 
-    /// The cap/floor NPV under the attached engine.
+    /// Return the cap/floor NPV under the attached engine.
     ///
-    /// # Errors
+    /// Returns:
+    ///     float: The present value.
     ///
-    /// Reports `"null pricing engine"` with no engine attached, and whatever the
-    /// engine reports.
+    /// Raises:
+    ///     ItofinError: If no engine is attached, which the core reports as
+    ///         "null pricing engine", and on whatever the engine reports.
     fn npv(&mut self) -> PyResult<f64> {
         Ok(self.inner.borrow_mut().npv().map_err(PyQlError::from)?)
     }
@@ -2689,27 +3266,19 @@ impl PyYoYInflationCapFloor {
     }
 }
 
-/// Python `YoYCapFloorTermPriceSurface`: the quoted year-on-year cap/floor
-/// price grid, bicubic-interpolated over strike and maturity with a cubic ATM
-/// swap rate curve through the cap/floor intersections (core
-/// `termstructures::inflation::yoycapfloortermpricesurface`, C++'s
-/// `InterpolatedYoYCapFloorTermPriceSurface<Bicubic, Cubic>`).
+/// The quoted year-on-year cap/floor price grid, bicubic-interpolated over
+/// strike and maturity with a cubic ATM swap rate curve through the cap/floor
+/// intersections.
 ///
-/// The facade holds the concrete interpolated surface; the K-interpolated
-/// optionlet stripping pipeline (#910) reads it back erased through a
-/// crate-internal upcast accessor, the same seam the engine facades use.
-///
-/// Construction only validates and stores the quotes. The calculations - the
+/// Construction only validates and stores the quotes; the calculations - the
 /// cap/floor intersection and the year-on-year bootstrap over its ATM swap
-/// rates - run on the first read and are cached, so a bad grid surfaces at the
-/// constructor and a failed solve at the first price or rate query. The
-/// reference date moves with the evaluation date carried by `settings`, which
-/// must be set before construction: the maturity checks resolve against it.
+/// rates - run on the first read and are cached. The reference date moves with
+/// the evaluation date carried by settings, which must be set before
+/// construction.
 ///
-/// Deferred (visible): the remaining trait surface - `price` and the by-tenor
-/// query forms, `atm_yoy_rate`, the `atm_yoy_swap_time_rates`/`date_rates`
-/// vectors, the cap/floor strike splits, `yoy_ts` and `base_date` - is not
-/// exposed; nothing downstream of #909/#910 reads it from Python yet.
+/// A price alone does not say cap or floor without the ATM level, and ATM
+/// prices are generally inaccurate, coming from extrapolation and
+/// intersection: the quoted grid is the data, the ATM curve a derived read.
 #[pyclass(name = "YoYCapFloorTermPriceSurface", unsendable)]
 pub struct PyYoYCapFloorTermPriceSurface {
     inner: Shared<InterpolatedYoYCapFloorTermPriceSurface>,
@@ -2717,14 +3286,39 @@ pub struct PyYoYCapFloorTermPriceSurface {
 
 #[pymethods]
 impl PyYoYCapFloorTermPriceSurface {
-    /// A surface over quoted cap and floor prices by strike (rows) and
-    /// maturity (columns).
+    /// Build the surface over quoted cap and floor prices.
     ///
-    /// # Errors
+    /// Args:
+    ///     fixing_days (int): The fixing days of the quoted instruments.
+    ///     yy_lag (Period): The observation lag of the quoted instruments.
+    ///     yoy_index (YoYInflationIndex): The year-on-year index the surface
+    ///         is quoted on.
+    ///     interpolation (CpiInterpolationType): How an observation
+    ///         interpolates between the index fixings bracketing it.
+    ///     nominal_term_structure (YieldTermStructure): The nominal discount
+    ///         curve the derived year-on-year bootstrap prices against.
+    ///     day_counter (DayCounter): The day count times are measured in.
+    ///     calendar (Calendar): The calendar maturities resolve on.
+    ///     business_day_convention (BusinessDayConvention): The roll applied
+    ///         when resolving a date.
+    ///     c_strikes (list[float]): The quoted cap strikes, one per cap grid
+    ///         row; strictly increasing.
+    ///     f_strikes (list[float]): The quoted floor strikes, one per floor
+    ///         grid row; strictly increasing.
+    ///     cf_maturities (list[Period]): The quoted maturities, one per grid
+    ///         column; shared by both grids.
+    ///     c_price (list[list[float]]): The cap prices, one row per cap
+    ///         strike and one column per maturity.
+    ///     f_price (list[list[float]]): The floor prices, one row per floor
+    ///         strike and one column per maturity.
+    ///     settings (Settings): The explicit settings supplying the
+    ///         evaluation date the reference date moves with.
     ///
-    /// Reports an empty or ragged price grid, and the core's data-consistency
-    /// gate: mismatched strike/maturity/grid dimensions, a non-increasing
-    /// axis, or a cap/floor strike union that overlaps the wrong way round.
+    /// Raises:
+    ///     ItofinError: On an empty or ragged price grid, on grid dimensions
+    ///         that do not match the strikes and maturities, on a
+    ///         non-increasing axis, and on a cap/floor strike union that
+    ///         overlaps the wrong way round.
     #[new]
     #[allow(clippy::too_many_arguments)]
     fn new(
@@ -2765,15 +3359,24 @@ impl PyYoYCapFloorTermPriceSurface {
         })
     }
 
-    /// The interpolated cap price at `date` struck at `strike`, a pure surface
-    /// lookup with the spline's extrapolation enabled as in C++.
+    /// Return the interpolated cap price at date struck at strike.
     ///
-    /// # Errors
+    /// A pure surface lookup with the spline's extrapolation enabled, as in
+    /// C++.
     ///
-    /// Reports an unset evaluation date, and whatever stops the first-read
-    /// calculations: a failed intersection solve, an intersection outside its
-    /// arbitrage bounds past the extrapolation horizon, or a bootstrap that
-    /// cannot reprice its helpers.
+    /// Args:
+    ///     date (Date): The maturity the price is read at.
+    ///     strike (float): The strike the price is read at.
+    ///
+    /// Returns:
+    ///     float: The interpolated cap price.
+    ///
+    /// Raises:
+    ///     ItofinError: On an unset evaluation date, and on whatever stops
+    ///         the first-read calculations: a failed intersection solve, an
+    ///         intersection outside its arbitrage bounds past the
+    ///         extrapolation horizon, or a bootstrap that cannot reprice its
+    ///         helpers.
     fn cap_price(&self, date: &PyDate, strike: f64) -> PyResult<f64> {
         Ok(self
             .inner
@@ -2781,8 +3384,17 @@ impl PyYoYCapFloorTermPriceSurface {
             .map_err(PyQlError::from)?)
     }
 
-    /// The interpolated floor price at `date` struck at `strike`. See
-    /// [`cap_price`](Self::cap_price).
+    /// Return the interpolated floor price at date struck at strike.
+    ///
+    /// Args:
+    ///     date (Date): The maturity the price is read at.
+    ///     strike (float): The strike the price is read at.
+    ///
+    /// Returns:
+    ///     float: The interpolated floor price.
+    ///
+    /// Raises:
+    ///     ItofinError: On the same conditions cap_price() reports.
     fn floor_price(&self, date: &PyDate, strike: f64) -> PyResult<f64> {
         Ok(self
             .inner
@@ -2790,15 +3402,21 @@ impl PyYoYCapFloorTermPriceSurface {
             .map_err(PyQlError::from)?)
     }
 
-    /// The ATM year-on-year swap rate at `date`, read off the cubic curve
-    /// through the cap/floor intersections. `extrapolate` defaults `True` as
-    /// in C++; passed `False`, a date outside the quoted maturities is an
-    /// error instead.
+    /// Return the ATM year-on-year swap rate at date.
     ///
-    /// # Errors
+    /// Read off the cubic curve through the cap/floor intersections.
     ///
-    /// As [`cap_price`](Self::cap_price), plus the range check when
-    /// `extrapolate` is `False`.
+    /// Args:
+    ///     date (Date): The maturity the rate is read at.
+    ///     extrapolate (bool): Whether to answer outside the quoted
+    ///         maturities; defaults True as in C++.
+    ///
+    /// Returns:
+    ///     float: The ATM year-on-year swap rate.
+    ///
+    /// Raises:
+    ///     ItofinError: On the same conditions cap_price() reports, and on a
+    ///         date outside the quoted maturities when extrapolate is False.
     #[pyo3(signature = (date, extrapolate = true))]
     fn atm_yoy_swap_rate(&self, date: &PyDate, extrapolate: bool) -> PyResult<f64> {
         Ok(self
@@ -2807,13 +3425,20 @@ impl PyYoYCapFloorTermPriceSurface {
             .map_err(PyQlError::from)?)
     }
 
-    /// The cap/floor strike union: every floor strike, then the cap strikes
-    /// above them.
+    /// Return the cap/floor strike union.
+    ///
+    /// Every floor strike, then the cap strikes above them.
+    ///
+    /// Returns:
+    ///     list[float]: The strike union, strictly increasing.
     fn strikes(&self) -> Vec<f64> {
         self.inner.strikes().to_vec()
     }
 
-    /// The quoted maturities, one per grid column.
+    /// Return the quoted maturities, one per grid column.
+    ///
+    /// Returns:
+    ///     list[Period]: The maturities.
     fn maturities(&self) -> Vec<PyPeriod> {
         self.inner
             .maturities()
@@ -2832,34 +3457,21 @@ impl PyYoYCapFloorTermPriceSurface {
     }
 }
 
-/// Python `KInterpolatedYoYOptionletVolatilitySurface`: the year-on-year
-/// optionlet volatility surface stripped out of a quoted
-/// [`PyYoYCapFloorTermPriceSurface`], interpolating linearly across the quoted
-/// strikes of each date's slice (core
-/// `termstructures::volatility::KInterpolatedYoYOptionletVolatilitySurface<Linear>`).
+/// The year-on-year optionlet volatility surface stripped out of a quoted
+/// YoYCapFloorTermPriceSurface, interpolating linearly across the quoted
+/// strikes of each date's slice.
 ///
-/// The stripping pipeline is built *inside* the constructor rather than passed
-/// in: the stripper reprices each optionlet through an engine whose volatility
-/// link it relinks every solver iteration, so engine and stripper must share
-/// one relinkable handle that starts empty. A caller-supplied engine would
-/// carry a handle the stripper never touches and the stripping would silently
-/// solve against nothing (the #387 cached-NPV trap the core test pins). The
-/// constructor therefore takes the `index` and `nominal_term_structure` the
-/// engine needs and wires the handle itself.
+/// The stripping pipeline is built inside the constructor rather than passed
+/// in: the stripper reprices each optionlet through an engine whose
+/// volatility link it relinks every solver iteration, so engine and stripper
+/// must share one relinkable handle that starts empty. The constructor
+/// therefore takes the index and nominal curve the engine needs and wires the
+/// handle itself; a caller-supplied engine would silently strip against
+/// nothing.
 ///
-/// Construction runs the stripping, C++'s constructor-run
-/// `performCalculations`, so it is fallible and the evaluation date carried by
-/// `settings` must be set first.
-///
-/// [`volatility`](Self::volatility) observes inflation the surface's own
-/// `observation_lag` back, C++'s default-lag behaviour; the flat surface's
-/// explicit-lag form is not offered here because the K-surface's lag is fixed
-/// by the price surface it strips.
-///
-/// Deferred (visible): the pricer is pinned to the unit-displaced lognormal
-/// model, the one the oracle strips under; a standard-Black or Bachelier
-/// variant would need a distribution argument nothing reads from Python yet.
-/// `total_variance` is likewise not exposed.
+/// Construction runs the stripping, so it is fallible and the evaluation date
+/// carried by settings must be set first. The pricer is pinned to the
+/// unit-displaced lognormal model.
 #[pyclass(name = "KInterpolatedYoYOptionletVolatilitySurface", unsendable)]
 pub struct PyKInterpolatedYoYOptionletVolatilitySurface {
     inner: Shared<KInterpolatedYoYOptionletVolatilitySurface<Linear>>,
@@ -2868,21 +3480,36 @@ pub struct PyKInterpolatedYoYOptionletVolatilitySurface {
 
 #[pymethods]
 impl PyKInterpolatedYoYOptionletVolatilitySurface {
-    /// A surface stripped from `cap_floor_prices`, optionlets repriced
-    /// through a unit-displaced engine forecasting off `index` and
-    /// discounting on `nominal_term_structure`; `slope` is the assumed
-    /// proportional change per year of the unobserved initial caplet
-    /// volatility.
+    /// Strip cap_floor_prices into an optionlet volatility surface.
     ///
-    /// `index` must be linked to a year-on-year curve: the engine forecasts
-    /// each optionlet's forward off the index's own curve, not the price
-    /// surface's bootstrapped one.
+    /// Args:
+    ///     settlement_days (int): Days from the evaluation date to the
+    ///         surface's reference date.
+    ///     calendar (Calendar): The calendar the reference date resolves on.
+    ///     business_day_convention (BusinessDayConvention): The roll applied
+    ///         when resolving a date.
+    ///     day_counter (DayCounter): The day count times are measured in.
+    ///     observation_lag (Period): The lag the surface observes inflation
+    ///         with, normally the price surface's own.
+    ///     cap_floor_prices (YoYCapFloorTermPriceSurface): The quoted
+    ///         cap/floor price grid to strip.
+    ///     index (YoYInflationIndex): The year-on-year index the internal
+    ///         engine forecasts off; it must be linked to a year-on-year
+    ///         curve, which is the index's own rather than the price
+    ///         surface's bootstrapped one.
+    ///     nominal_term_structure (YieldTermStructure): The nominal discount
+    ///         curve the internal engine discounts on.
+    ///     slope (float): The assumed proportional change per year of the
+    ///         unobserved initial caplet volatility, which the stripper
+    ///         extends each strike's first observable volatility back with.
+    ///     settings (Settings): The explicit settings supplying the
+    ///         evaluation date; it must match the one behind index and
+    ///         cap_floor_prices.
     ///
-    /// # Errors
-    ///
-    /// Reports whatever stops the stripping: an unset evaluation date, an
-    /// unlinked index, or a Brent solve that cannot bracket an optionlet
-    /// volatility.
+    /// Raises:
+    ///     ItofinError: On whatever stops the stripping: an unset evaluation
+    ///         date, an unlinked index, or a solve that cannot bracket an
+    ///         optionlet volatility.
     #[new]
     #[allow(clippy::too_many_arguments)]
     fn new(
@@ -2925,38 +3552,57 @@ impl PyKInterpolatedYoYOptionletVolatilitySurface {
         })
     }
 
-    /// The stripped (strikes, volatilities) profile at `date`, C++'s `Dslice`:
-    /// one volatility per strike of the price surface's cap/floor union.
+    /// Return the stripped (strikes, volatilities) profile at date.
     ///
-    /// # Errors
+    /// C++'s Dslice: one volatility per strike of the price surface's
+    /// cap/floor union.
     ///
-    /// Reports a date the stripper cannot price a slice at.
+    /// Args:
+    ///     date (Date): The date the slice is stripped at.
+    ///
+    /// Returns:
+    ///     tuple[list[float], list[float]]: The quoted strike union and the
+    ///         volatility stripped at each strike.
+    ///
+    /// Raises:
+    ///     ItofinError: On a date the stripper cannot price a slice at.
     fn d_slice(&self, date: &PyDate) -> PyResult<(Vec<f64>, Vec<f64>)> {
         Ok(self.inner.d_slice(date.inner()).map_err(PyQlError::from)?)
     }
 
-    /// The date the surface measures its variance from: the reference date
-    /// pulled back by the surface's own observation lag, snapped to the start
-    /// of the publication period.
+    /// Return the date the surface measures its variance from.
     ///
-    /// # Errors
+    /// The reference date pulled back by the surface's own observation lag,
+    /// snapped to the start of the publication period.
     ///
-    /// Reports an unset evaluation date, and a frequency admitting no
-    /// publication period.
+    /// Returns:
+    ///     Date: The base date.
+    ///
+    /// Raises:
+    ///     ItofinError: On an unset evaluation date, and on a frequency
+    ///         admitting no publication period.
     fn base_date(&self) -> PyResult<PyDate> {
         Ok(PyDate::from_inner(
             self.inner.base_date().map_err(PyQlError::from)?,
         ))
     }
 
-    /// The volatility for an exercise on `date` struck at `strike`, observing
-    /// inflation the surface's own observation lag back: the slice at the
-    /// observed date interpolated across its strikes.
+    /// Return the volatility for an exercise on date struck at strike.
     ///
-    /// # Errors
+    /// Observes inflation the surface's own observation lag back, C++'s
+    /// default-lag behaviour: the slice at the observed date interpolated
+    /// across its strikes.
     ///
-    /// Reports an observed date before [`base_date`](Self::base_date), and a
-    /// `strike` outside the surface's strike domain.
+    /// Args:
+    ///     date (Date): The exercise date.
+    ///     strike (float): The strike the volatility is read at.
+    ///
+    /// Returns:
+    ///     float: The optionlet volatility.
+    ///
+    /// Raises:
+    ///     ItofinError: On an observed date before base_date(), and on a
+    ///         strike outside the surface's strike domain.
     fn volatility(&self, date: &PyDate, strike: f64) -> PyResult<f64> {
         Ok(self
             .inner
@@ -2964,18 +3610,29 @@ impl PyKInterpolatedYoYOptionletVolatilitySurface {
             .map_err(PyQlError::from)?)
     }
 
-    /// The lowest quoted strike of the price surface's cap/floor union.
+    /// Return the lowest quoted strike of the cap/floor union.
+    ///
+    /// Returns:
+    ///     float: The lowest strike the surface answers for.
     fn min_strike(&self) -> f64 {
         self.inner.min_strike()
     }
 
-    /// The highest quoted strike of the price surface's cap/floor union.
+    /// Return the highest quoted strike of the cap/floor union.
+    ///
+    /// Returns:
+    ///     float: The highest strike the surface answers for.
     fn max_strike(&self) -> f64 {
         self.inner.max_strike()
     }
 
-    /// The last date the surface answers for: the reference date advanced by
-    /// the price surface's last quoted maturity.
+    /// Return the last date the surface answers for.
+    ///
+    /// The reference date advanced by the price surface's last quoted
+    /// maturity.
+    ///
+    /// Returns:
+    ///     Date: The last queryable date.
     fn max_date(&self) -> PyDate {
         PyDate::from_inner(self.inner.max_date())
     }

@@ -26,11 +26,10 @@ use libitofin::pricingengines::JamshidianSwaptionEngine;
 use libitofin::shared::{Shared, SharedMut, shared, shared_mut};
 use pyo3::prelude::*;
 
-/// Python `EuropeanExercise`: a single-date exercise schedule
-/// (`exercise::EuropeanExercise`).
+/// A single-date exercise schedule.
 ///
-/// Wraps a `Shared<dyn Exercise>` so the [`Swaption`] constructor, which takes
-/// the exercise as a trait object, can hold the same value.
+/// Held as the exercise trait object the swaption constructor takes, so the
+/// same value reaches the instrument.
 #[pyclass(name = "EuropeanExercise", unsendable)]
 pub struct PyEuropeanExercise {
     inner: Shared<dyn Exercise>,
@@ -38,6 +37,10 @@ pub struct PyEuropeanExercise {
 
 #[pymethods]
 impl PyEuropeanExercise {
+    /// Build the exercise schedule.
+    ///
+    /// Args:
+    ///     date (Date): The single date the option may be exercised on.
     #[new]
     fn new(date: &PyDate) -> Self {
         PyEuropeanExercise {
@@ -54,10 +57,7 @@ impl PyEuropeanExercise {
     }
 }
 
-/// Python `SettlementType`: how a swaption settles on exercise
-/// (`instruments::swaption::SettlementType`).
-///
-/// A fieldless pyo3 enum exposing `SettlementType.Physical` / `SettlementType.Cash`.
+/// How a swaption settles on exercise.
 #[pyclass(name = "SettlementType", eq, eq_int, from_py_object)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum PySettlementType {
@@ -75,13 +75,12 @@ impl PySettlementType {
     }
 }
 
-/// Python `SettlementMethod`: the settlement mechanics under a
-/// [`SettlementType`] (`instruments::swaption::SettlementMethod`).
+/// The settlement mechanics under a settlement type.
 ///
-/// Physical pairs with `PhysicalOTC` / `PhysicalCleared`; cash pairs with
-/// `CollateralizedCashPrice` / `ParYieldCurve`. The consistency check runs at
-/// pricing time (`SwaptionArguments::validate`), not construction, so a
-/// mismatched pair only surfaces as an `ItofinError` from `npv()`.
+/// Physical pairs with PhysicalOTC or PhysicalCleared, cash with
+/// CollateralizedCashPrice or ParYieldCurve. The consistency check runs at
+/// pricing time, not construction, so a mismatched pair only surfaces from
+/// npv().
 #[pyclass(name = "SettlementMethod", eq, eq_int, from_py_object)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum PySettlementMethod {
@@ -105,15 +104,11 @@ impl PySettlementMethod {
     }
 }
 
-/// Python `Swaption`: a European option to enter a [`VanillaSwap`](PyVanillaSwap)
-/// (`instruments::swaption::Swaption`).
+/// A European option to enter a vanilla swap.
 ///
-/// Built with [`Swaption::new`] (infallible): it registers with the underlying
-/// swap and the settings evaluation date (D5). Pricing needs an engine: call
-/// [`set_jamshidian_engine`](Self::set_jamshidian_engine) or
-/// [`set_black_engine`](Self::set_black_engine) before [`npv`](Self::npv).
-/// The (settlement type, method) consistency check runs at pricing time, so a
-/// mismatched pair surfaces as an `ItofinError` from `npv()`, not the ctor.
+/// The swaption registers with the underlying swap and with the evaluation
+/// date on the Settings it was built with (D5). Pricing needs an engine: call
+/// one of the three setters before npv.
 #[pyclass(name = "Swaption", unsendable)]
 pub struct PySwaption {
     inner: Swaption,
@@ -121,6 +116,19 @@ pub struct PySwaption {
 
 #[pymethods]
 impl PySwaption {
+    /// Build the swaption over swap.
+    ///
+    /// Args:
+    ///     swap (VanillaSwap): The swap the option enters; it needs no
+    ///         discounting engine of its own, the swaption engine reading its
+    ///         arguments instead.
+    ///     exercise (EuropeanExercise): The single exercise date.
+    ///     settlement_type (SettlementType): Whether exercise settles
+    ///         physically or in cash.
+    ///     settlement_method (SettlementMethod): The mechanics under that
+    ///         type; an inconsistent pair surfaces from npv(), not here.
+    ///     settings (Settings): The explicit settings supplying the evaluation
+    ///         date the swaption prices against.
     #[new]
     fn new(
         swap: &PyVanillaSwap,
@@ -140,78 +148,102 @@ impl PySwaption {
         }
     }
 
-    /// Attaches a [`JamshidianSwaptionEngine`] built on `model` so the swaption
-    /// prices analytically off the Hull-White dynamics.
+    /// Attach a Jamshidian engine so the swaption prices off Hull-White.
     ///
-    /// The engine (`jamshidianswaptionengine.rs:92`, infallible) is European-only:
-    /// a non-European exercise errors at pricing time. It is installed on the
-    /// swaption's [`InstrumentBase`](libitofin::instrument) via `set_pricing_engine`.
+    /// The engine is European-only: a non-European exercise errors at pricing
+    /// time.
+    ///
+    /// Args:
+    ///     model (HullWhite): The short-rate model supplying the dynamics.
     fn set_jamshidian_engine(&mut self, model: &PyHullWhite) {
         let engine = shared_mut(JamshidianSwaptionEngine::new(model.inner()))
             as SharedMut<dyn PricingEngine>;
         self.inner.base_mut().set_pricing_engine(engine);
     }
 
-    /// Attaches a [`PyBlackSwaptionEngine`] so the swaption prices off a
-    /// swaption volatility surface rather than a short-rate model.
+    /// Attach a Black engine, pricing off a swaption volatility surface.
     ///
-    /// The engine is built separately and installed here, so the same engine can
-    /// be shared across swaptions. It must carry the same `Settings` object this
-    /// swaption was built with: the engine resolves its own evaluation date, and
-    /// two different settings would price the swap and the option on different
-    /// dates without any error being raised.
+    /// The engine is built separately, so the same one can be shared across
+    /// swaptions. It must carry the same Settings object as this swaption: two
+    /// different settings would price the swap and the option on different
+    /// dates with no error raised.
+    ///
+    /// Args:
+    ///     engine (BlackSwaptionEngine): The engine and its volatility
+    ///         surface.
     fn set_black_engine(&mut self, engine: &PyBlackSwaptionEngine) {
         self.inner.base_mut().set_pricing_engine(engine.engine());
     }
 
-    /// Attaches a [`PyBachelierSwaptionEngine`] so the swaption prices off a
-    /// normal-volatility swaption surface.
+    /// Attach a Bachelier engine, pricing off a normal-volatility surface.
     ///
-    /// The same `Settings` requirement as [`set_black_engine`](Self::set_black_engine)
-    /// applies: the engine resolves its own evaluation date, and two different
-    /// settings would price the swap and the option on different dates without
-    /// any error being raised.
+    /// The same-Settings requirement as set_black_engine applies.
+    ///
+    /// Args:
+    ///     engine (BachelierSwaptionEngine): The engine and its
+    ///         normal-volatility surface.
     fn set_bachelier_engine(&mut self, engine: &PyBachelierSwaptionEngine) {
         self.inner.base_mut().set_pricing_engine(engine.engine());
     }
 
-    /// Forces the valuation, idempotent and fallible as
-    /// [`VanillaOption.calculate`](crate::option::PyVanillaOption::calculate);
-    /// here it also surfaces an inconsistent (settlement type, method) pair.
+    /// Force the valuation. Idempotent.
+    ///
+    /// Raises:
+    ///     ItofinError: If no engine is attached, no evaluation date is set,
+    ///         or the (settlement type, method) pair is inconsistent, which
+    ///         the core checks here rather than at construction.
     fn calculate(&mut self) -> PyResult<()> {
         Ok(self.inner.calculate().map_err(PyQlError::from)?)
     }
 
-    /// Whether the cached results are currently valid.
+    /// Return whether the cached results are currently valid.
+    ///
+    /// Returns:
+    ///     bool: True when the next accessor reads the cache.
     fn is_calculated(&self) -> bool {
         self.inner.base().is_calculated()
     }
 
-    /// Attaches the Black engine `engine` and returns the NPV, the one-shot
-    /// form of [`set_black_engine`](Self::set_black_engine) followed by
-    /// [`npv`](Self::npv).
+    /// Attach the Black engine and return the NPV.
     ///
-    /// Black is the primary because it is the standard swaption engine; the
-    /// Jamshidian and Bachelier engines keep their own setters and compose with
-    /// [`calculate`](Self::calculate) and [`results`](Self::results) as before.
+    /// set_black_engine followed by npv, in one call. Black is the primary
+    /// because it is the standard swaption engine; the Jamshidian and
+    /// Bachelier engines keep their own setters.
+    ///
+    /// Args:
+    ///     engine (BlackSwaptionEngine): The engine to install and price on.
+    ///
+    /// Returns:
+    ///     float: The swaption value.
+    ///
+    /// Raises:
+    ///     ItofinError: On anything that makes the valuation fail.
     fn price(&mut self, engine: &PyBlackSwaptionEngine) -> PyResult<f64> {
         self.set_black_engine(engine);
         self.calculate()?;
         self.npv()
     }
 
-    /// A frozen [`Results`] copy of the valuation, calculating first.
+    /// Return a frozen snapshot of the valuation, calculating first.
+    ///
+    /// Returns:
+    ///     Results: A copy of the valuation results.
+    ///
+    /// Raises:
+    ///     ItofinError: On anything that makes the valuation fail.
     fn results(&mut self) -> PyResult<Results> {
         self.calculate()?;
         Ok(Results::snapshot(self.inner.base()))
     }
 
-    /// The swaption NPV under the attached engine.
+    /// Return the swaption NPV under the attached engine.
     ///
-    /// Fallible: an engine must be attached ([`set_jamshidian_engine`](Self::set_jamshidian_engine),
-    /// [`set_black_engine`](Self::set_black_engine) or
-    /// [`set_bachelier_engine`](Self::set_bachelier_engine)) and the (settlement
-    /// type, method) pair consistent.
+    /// Returns:
+    ///     float: The present value.
+    ///
+    /// Raises:
+    ///     ItofinError: If no engine is attached or the (settlement type,
+    ///         method) pair is inconsistent.
     fn npv(&mut self) -> PyResult<f64> {
         Ok(self.inner.npv().map_err(PyQlError::from)?)
     }

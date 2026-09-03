@@ -26,14 +26,18 @@ use libitofin::shared::{Shared, shared};
 use libitofin::types::Natural;
 use pyo3::prelude::*;
 
-/// Python `SwapIndex`: the index whose fixing is the fair rate of an on-the-fly
-/// vanilla swap (`indexes::SwapIndex`).
+/// The index whose fixing is the fair rate of an on-the-fly vanilla swap,
+/// assembled from the index tenor, the forecasting Ibor index and the fixed-leg
+/// conventions.
 ///
-/// The swap is assembled from the index tenor, the forecasting `IborIndex` and
-/// the fixed-leg conventions, off the value date the fixing date implies.
-/// [`new`](PySwapIndex::new) forecasts and discounts off the ibor index's
-/// forwarding curve; [`with_exogenous_discount`](PySwapIndex::with_exogenous_discount)
-/// discounts off a separate curve.
+/// The swap is assembled off the value date the fixing date implies. The
+/// swaption volatility cubes take two of these (a long and a short base) and
+/// read the at-the-money forward off them, so this is the index the cube
+/// facades stack on rather than one priced with directly.
+///
+/// The currency is inert for every ported consumer, so currency() reading it
+/// back off the core index is the only place it shows. Deferred (visible): the
+/// clone family (re-curving / re-tenoring) is deferred in the core itself.
 #[pyclass(name = "SwapIndex", unsendable)]
 pub struct PySwapIndex {
     inner: Shared<SwapIndex>,
@@ -41,9 +45,27 @@ pub struct PySwapIndex {
 
 #[pymethods]
 impl PySwapIndex {
-    /// A swap index forecasting and discounting off `ibor_index`'s forwarding
-    /// curve, registering with that index so a relinked curve notifies
-    /// observers.
+    /// Build a swap index forecasting and discounting off one curve.
+    ///
+    /// Both legs use the ibor index's forwarding curve. The index registers
+    /// with that index, so a relinked curve notifies observers.
+    ///
+    /// Args:
+    ///     family_name (str): The index family the fixings are stored under.
+    ///     tenor (Period): The tenor of the underlying swap.
+    ///     settlement_days (int): The business days between the fixing date and
+    ///         the swap's start.
+    ///     currency (Currency): The index currency, inert for every ported
+    ///         consumer and read back only by currency().
+    ///     calendar (Calendar): The calendar the swap's dates roll on.
+    ///     fixed_leg_tenor (Period): The fixed leg's payment tenor.
+    ///     fixed_leg_convention (BusinessDayConvention): The fixed leg's
+    ///         business-day convention.
+    ///     fixed_leg_day_counter (DayCounter): The fixed leg's day count.
+    ///     ibor_index (IborIndex): The index forecasting the floating leg,
+    ///         whose forwarding curve also discounts.
+    ///     settings (Settings): The explicit settings supplying the evaluation
+    ///         date and the stored fixings.
     #[new]
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (family_name, tenor, settlement_days, currency, calendar, fixed_leg_tenor, fixed_leg_convention, fixed_leg_day_counter, ibor_index, settings))]
@@ -75,8 +97,31 @@ impl PySwapIndex {
         }
     }
 
-    /// A swap index forecasting off `ibor_index`'s forwarding curve but
-    /// discounting off the separate `discount` curve, registering with both.
+    /// Build a swap index discounting off a separate curve.
+    ///
+    /// The floating leg is still forecast off the ibor index's forwarding
+    /// curve, but discounting uses discount. The index registers with both.
+    ///
+    /// Args:
+    ///     family_name (str): The index family the fixings are stored under.
+    ///     tenor (Period): The tenor of the underlying swap.
+    ///     settlement_days (int): The business days between the fixing date and
+    ///         the swap's start.
+    ///     currency (Currency): The index currency, inert for every ported
+    ///         consumer and read back only by currency().
+    ///     calendar (Calendar): The calendar the swap's dates roll on.
+    ///     fixed_leg_tenor (Period): The fixed leg's payment tenor.
+    ///     fixed_leg_convention (BusinessDayConvention): The fixed leg's
+    ///         business-day convention.
+    ///     fixed_leg_day_counter (DayCounter): The fixed leg's day count.
+    ///     ibor_index (IborIndex): The index forecasting the floating leg.
+    ///     discount (YieldTermStructure): The separate curve both legs are
+    ///         discounted on.
+    ///     settings (Settings): The explicit settings supplying the evaluation
+    ///         date and the stored fixings.
+    ///
+    /// Returns:
+    ///     SwapIndex: The index discounting off the exogenous curve.
     #[staticmethod]
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (family_name, tenor, settlement_days, currency, calendar, fixed_leg_tenor, fixed_leg_convention, fixed_leg_day_counter, ibor_index, discount, settings))]
@@ -110,10 +155,21 @@ impl PySwapIndex {
         }
     }
 
-    /// The index's fixing for `fixing_date`: the fair rate of the underlying
-    /// swap, the number the volatility cubes read as the at-the-money forward.
-    /// Fallible: an empty forwarding handle, an unset evaluation date or an
-    /// invalid fixing date is an error.
+    /// Return the underlying swap's fair rate for fixing_date.
+    ///
+    /// This is the at-the-money forward the volatility cubes read.
+    ///
+    /// Args:
+    ///     fixing_date (Date): The date the underlying swap is struck off.
+    ///     forecast_todays_fixing (bool): Whether a fixing dated today is
+    ///         forecast rather than looked up.
+    ///
+    /// Returns:
+    ///     float: The fair rate of the underlying swap.
+    ///
+    /// Raises:
+    ///     ItofinError: If the forwarding handle is empty, the evaluation date
+    ///         is unset, or the fixing date is invalid.
     #[pyo3(signature = (fixing_date, forecast_todays_fixing = false))]
     fn fixing(&self, fixing_date: &PyDate, forecast_todays_fixing: bool) -> PyResult<f64> {
         Ok(self
@@ -122,17 +178,26 @@ impl PySwapIndex {
             .map_err(PyQlError::from)?)
     }
 
-    /// The index currency, read back off the core index.
+    /// Return the index currency, read back off the core index.
+    ///
+    /// Returns:
+    ///     Currency: The currency the index was built with.
     fn currency(&self) -> PyCurrency {
         PyCurrency::from_inner(self.inner.currency().clone())
     }
 
-    /// The fixed-leg tenor.
+    /// Return the fixed leg's payment tenor.
+    ///
+    /// Returns:
+    ///     Period: The fixed-leg tenor.
     fn fixed_leg_tenor(&self) -> PyPeriod {
         PyPeriod::from_inner(self.inner.fixed_leg_tenor())
     }
 
-    /// Whether the index discounts off a separate curve.
+    /// Return whether the index discounts off a separate curve.
+    ///
+    /// Returns:
+    ///     bool: True if the index was built by with_exogenous_discount.
     fn exogenous_discount(&self) -> bool {
         self.inner.exogenous_discount()
     }

@@ -25,11 +25,10 @@ use libitofin::time::period::Period;
 use libitofin::time::timeunit::TimeUnit;
 use pyo3::prelude::*;
 
-/// Python `SwapType`: which side of the named leg the swap is seen from
-/// (`instruments::swap::SwapType`, re-exported as `instruments::SwapType`).
+/// Which side of the named leg the swap is seen from.
 ///
-/// A fieldless pyo3 enum exposing `SwapType.Payer` / `SwapType.Receiver`; the
-/// signed `+1`/`-1` leg multiplier stays in the core.
+/// A fieldless enum; the signed leg multiplier the two variants stand for
+/// stays in the core.
 #[pyclass(name = "SwapType", eq, eq_int, from_py_object)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum PySwapType {
@@ -47,16 +46,9 @@ impl PySwapType {
     }
 }
 
-/// Python `VanillaSwap`: a fixed-vs-Ibor interest-rate swap
-/// (`instruments::vanillaswap::VanillaSwap`).
+/// A fixed-vs-Ibor interest-rate swap.
 ///
-/// Built with [`VanillaSwap::new`] and immediately lowered to its
-/// [`FixedVsFloatingSwap`] base via `into_fixed_vs_floating` (the shape X3's
-/// swaption consumes), held behind a `SharedMut`. The ctor is fallible
-/// (`vanillaswap.rs:88`): it builds the floating [`IborLeg`], so a degenerate
-/// leg surfaces as an `ItofinError`. Pricing needs an engine: call
-/// [`set_engine`](Self::set_engine) before [`fair_rate`](Self::fair_rate) or
-/// [`npv`](Self::npv).
+/// Pricing needs an engine: call set_engine before fair_rate or npv.
 #[pyclass(name = "VanillaSwap", unsendable)]
 pub struct PyVanillaSwap {
     inner: SharedMut<FixedVsFloatingSwap>,
@@ -64,6 +56,24 @@ pub struct PyVanillaSwap {
 
 #[pymethods]
 impl PyVanillaSwap {
+    /// Build the swap from both schedules spelled out.
+    ///
+    /// Args:
+    ///     swap_type (SwapType): Whether the fixed leg is paid or received.
+    ///     nominal (float): The notional both legs accrue on.
+    ///     fixed_schedule (Schedule): The fixed leg's payment schedule.
+    ///     fixed_rate (float): The rate the fixed leg accrues at.
+    ///     fixed_day_count (DayCounter): The day count of the fixed leg.
+    ///     float_schedule (Schedule): The floating leg's payment schedule.
+    ///     ibor_index (IborIndex): The index the floating leg fixes off.
+    ///     spread (float): The spread added to every floating fixing.
+    ///     floating_day_count (DayCounter): The day count of the floating leg.
+    ///     settings (Settings): The explicit settings supplying the evaluation
+    ///         date and the stored fixings.
+    ///
+    /// Raises:
+    ///     ItofinError: If the floating leg cannot be built, a degenerate leg
+    ///         being the usual cause.
     #[new]
     #[allow(clippy::too_many_arguments)]
     fn new(
@@ -97,12 +107,15 @@ impl PyVanillaSwap {
         })
     }
 
-    /// Attaches a [`DiscountingSwapEngine`] over `curve` so the swap prices.
+    /// Attach a discounting engine over curve so the swap prices.
     ///
-    /// The engine is built with the settings-driven flow defaults
-    /// (`include_settlement_date_flows`, `settlement_date`, `npv_date` all
-    /// unset) and installed on the swap's [`InstrumentBase`] via
-    /// `set_pricing_engine`.
+    /// The engine is built with the settings-driven flow defaults, leaving the
+    /// settlement date, the NPV date and the settlement-date-flows flag unset.
+    ///
+    /// Args:
+    ///     curve (YieldTermStructure): The curve the flows discount on.
+    ///     settings (Settings): The settings the engine resolves its dates
+    ///         against.
     fn set_engine(&mut self, curve: &PyYieldTermStructure, settings: &PySettings) {
         let engine = shared_mut(DiscountingSwapEngine::new(
             curve.handle(),
@@ -117,8 +130,11 @@ impl PyVanillaSwap {
             .set_pricing_engine(engine);
     }
 
-    /// Forces the valuation, idempotent and fallible as
-    /// [`VanillaOption.calculate`](crate::option::PyVanillaOption::calculate).
+    /// Force the valuation. Idempotent.
+    ///
+    /// Raises:
+    ///     ItofinError: If no engine is attached, no evaluation date is set,
+    ///         or the attached engine refuses the swap.
     fn calculate(&mut self) -> PyResult<()> {
         Ok(self
             .inner
@@ -127,30 +143,55 @@ impl PyVanillaSwap {
             .map_err(PyQlError::from)?)
     }
 
-    /// Whether the cached results are currently valid.
+    /// Return whether the cached results are currently valid.
+    ///
+    /// Returns:
+    ///     bool: True when the next accessor reads the cache.
     fn is_calculated(&self) -> bool {
         self.inner.borrow().base().is_calculated()
     }
 
-    /// Builds a discounting engine over `curve` and returns the NPV: the
-    /// one-shot form of [`set_engine`](Self::set_engine) plus [`npv`](Self::npv),
-    /// and it takes the same two arguments for the same reason.
+    /// Attach a discounting engine over curve and return the NPV.
+    ///
+    /// set_engine followed by npv, in one call, and it takes the same two
+    /// arguments for the same reason.
+    ///
+    /// Args:
+    ///     curve (YieldTermStructure): The curve the flows discount on.
+    ///     settings (Settings): The settings the engine resolves its dates
+    ///         against.
+    ///
+    /// Returns:
+    ///     float: The swap value under the freshly built engine.
+    ///
+    /// Raises:
+    ///     ItofinError: On anything that makes the valuation fail.
     fn price(&mut self, curve: &PyYieldTermStructure, settings: &PySettings) -> PyResult<f64> {
         self.set_engine(curve, settings);
         self.calculate()?;
         self.npv()
     }
 
-    /// A frozen [`Results`] copy of the valuation, calculating first.
+    /// Return a frozen snapshot of the valuation, calculating first.
+    ///
+    /// Returns:
+    ///     Results: A copy of the valuation results.
+    ///
+    /// Raises:
+    ///     ItofinError: On anything that makes the valuation fail.
     fn results(&mut self) -> PyResult<Results> {
         self.calculate()?;
         let inner = self.inner.borrow();
         Ok(Results::snapshot(inner.base()))
     }
 
-    /// The fair fixed rate that zeroes the swap NPV (`fairRate()`).
+    /// Return the fixed rate that zeroes the swap NPV.
     ///
-    /// Fallible: an engine must be attached and the swap non-expired.
+    /// Returns:
+    ///     float: The fair fixed rate.
+    ///
+    /// Raises:
+    ///     ItofinError: If no engine is attached or the swap has expired.
     fn fair_rate(&mut self) -> PyResult<f64> {
         Ok(self
             .inner
@@ -159,19 +200,33 @@ impl PyVanillaSwap {
             .map_err(PyQlError::from)?)
     }
 
-    /// The swap NPV under the attached engine.
+    /// Return the swap NPV under the attached engine.
     ///
-    /// Fallible: an engine must be attached (`set_engine`).
+    /// Returns:
+    ///     float: The present value.
+    ///
+    /// Raises:
+    ///     ItofinError: If no engine is attached.
     fn npv(&mut self) -> PyResult<f64> {
         Ok(self.inner.borrow_mut().npv().map_err(PyQlError::from)?)
     }
 
-    /// The swap nominal (`nominal()`).
+    /// Return the notional both legs accrue on.
+    ///
+    /// Returns:
+    ///     float: The single nominal.
+    ///
+    /// Raises:
+    ///     ItofinError: If the legs carry per-coupon nominals, which leaves no
+    ///         single one to report.
     fn nominal(&self) -> PyResult<f64> {
         Ok(self.inner.borrow().nominal().map_err(PyQlError::from)?)
     }
 
-    /// The fixed-leg rate (`fixedRate()`).
+    /// Return the fixed-leg rate.
+    ///
+    /// Returns:
+    ///     float: The rate the fixed leg accrues at.
     fn fixed_rate(&self) -> f64 {
         self.inner.borrow().fixed_rate()
     }
@@ -191,30 +246,20 @@ impl PyVanillaSwap {
     }
 }
 
-/// Python `MakeVanillaSwap`: the market-convention builder for a
-/// [`PyVanillaSwap`] (`instruments::makevanillaswap::MakeVanillaSwap`).
+/// Market-convention builder for a VanillaSwap.
 ///
-/// Derives the start and end dates, both schedules, the fixed-leg tenor and day
-/// count and the discounting engine from a swap tenor and an Ibor index, so the
-/// caller states conventions instead of hand-building two [`PySchedule`]s.
-/// `fixed_rate=None` builds a par swap: the fair rate is computed and written
-/// into the fixed leg, so the result prices to a zero NPV
-/// (`makevanillaswap.rs:364-376`).
+/// Derives the start and end dates, both schedules, the fixed-leg tenor and
+/// day count and the discounting engine from a swap tenor and an Ibor index,
+/// so the caller states conventions instead of hand-building two schedules.
+/// ``fixed_rate=None`` builds a par swap: the fair rate is computed and written
+/// into the fixed leg, so the result prices to a zero NPV.
 ///
-/// The core's `with_*` chain consumes the builder by value, which a `#[pyclass]`
-/// cannot hand out, so the overrides are constructor keywords instead and the
-/// chain is assembled inside [`build`](Self::build). Only the four the pass-A
-/// swaption fixture needs are exposed - `effective_date`, `nominal`,
-/// `fixed_leg_tenor`, `fixed_leg_day_count`. Every other core override
-/// (termination date, settlement days, the leg calendars / conventions /
-/// end-of-month flags, the discounting term structure, the indexed-coupon mode)
-/// is deferred and keeps its core default; the discounting curve is therefore
-/// always the index's forwarding curve.
-///
-/// [`build`](Self::build) returns a swap that already carries its
-/// [`DiscountingSwapEngine`] (`makevanillaswap.rs:514-522`), so it prices
-/// straight away. Calling [`PyVanillaSwap::set_engine`] on it replaces that
-/// engine with one built on the settings-driven flow defaults.
+/// The core builder is a consumed-self fluent chain, which does not cross the
+/// FFI boundary; this facade takes the overrides as constructor keywords and
+/// assembles the chain inside build(). Only four overrides are exposed; every
+/// other core one keeps its default, so the discounting curve is always the
+/// index's forwarding curve. The built swap already carries its
+/// DiscountingSwapEngine.
 #[pyclass(name = "MakeVanillaSwap", unsendable)]
 pub struct PyMakeVanillaSwap {
     swap_tenor: Period,
@@ -230,6 +275,25 @@ pub struct PyMakeVanillaSwap {
 
 #[pymethods]
 impl PyMakeVanillaSwap {
+    /// Store the configuration the chain is assembled from in build().
+    ///
+    /// Args:
+    ///     swap_tenor (Period): The length of the swap.
+    ///     ibor_index (IborIndex): The index the floating leg fixes off, and
+    ///         whose forwarding curve discounts.
+    ///     settings (Settings): The explicit settings supplying the evaluation
+    ///         date and the stored fixings.
+    ///     fixed_rate (float | None): The rate of the fixed leg; None builds a
+    ///         par swap.
+    ///     forward_start (Period | None): The delay before the swap starts;
+    ///         None starts it spot, at a zero-day period.
+    ///     effective_date (Date | None): The start date; None derives it from
+    ///         the evaluation date.
+    ///     nominal (float | None): The notional; None keeps the core default.
+    ///     fixed_leg_tenor (Period | None): The fixed-leg payment tenor; None
+    ///         takes the currency's market convention.
+    ///     fixed_leg_day_count (DayCounter | None): The fixed-leg day count;
+    ///         None takes the currency's market convention.
     #[new]
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (
@@ -269,12 +333,16 @@ impl PyMakeVanillaSwap {
         }
     }
 
-    /// Builds the priced swap.
+    /// Build the priced swap.
     ///
-    /// Fallible: without an `effective_date` the start date is derived from the
-    /// evaluation date, so an unset one is an error (D10); the fixed-leg
-    /// defaults are only known for EUR and USD indexes; and the par-rate fill
-    /// propagates a pricing failure.
+    /// Returns:
+    ///     VanillaSwap: The swap, already carrying its discounting engine.
+    ///
+    /// Raises:
+    ///     ItofinError: If effective_date is unset and no evaluation date is
+    ///         set to derive the start from; if the index is neither EUR nor
+    ///         USD, the two the fixed-leg defaults are known for; or if the
+    ///         par-rate fill fails to price.
     fn build(&self) -> PyResult<PyVanillaSwap> {
         let mut maker = MakeVanillaSwap::new(
             self.swap_tenor,

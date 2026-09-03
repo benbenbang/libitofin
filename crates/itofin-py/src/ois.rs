@@ -27,22 +27,11 @@ use libitofin::time::timeunit::TimeUnit;
 use libitofin::types::{Integer, Real};
 use pyo3::prelude::*;
 
-/// Python `OvernightIndexedSwap`: a fixed leg versus a compounded overnight leg
-/// (`instruments::overnightindexedswap::OvernightIndexedSwap`).
+/// A fixed leg versus a compounded overnight leg.
 ///
-/// Held as the OIS type rather than lowered to its [`FixedVsFloatingSwap`] base
-/// (unlike [`crate::swap::PyVanillaSwap`], which a swaption underlying needs in
-/// the base shape): nothing here consumes the base, and keeping the OIS type
-/// leaves the overnight accessors reachable for a later widening. The base's
-/// rate and nominal are read through `fixed_vs_floating`
-/// (`overnightindexedswap.rs:235-241`).
-///
-/// Only [`PyMakeOis`] builds one, so the swap always arrives priced; there is
-/// no `set_engine` and no raw constructor. Both are deferred with the
-/// two-schedule master ctor (`overnightindexedswap.rs:169`), which needs a
-/// [`crate::time::PySchedule`] pair the OIS oracle does not build.
-///
-/// [`FixedVsFloatingSwap`]: libitofin::instruments::FixedVsFloatingSwap
+/// Only MakeOis builds one, so it always arrives priced; there is no
+/// set_engine and no raw constructor (both deferred with the two-schedule
+/// master ctor).
 #[pyclass(name = "OvernightIndexedSwap", unsendable)]
 pub struct PyOvernightIndexedSwap {
     inner: SharedMut<OvernightIndexedSwap>,
@@ -50,10 +39,13 @@ pub struct PyOvernightIndexedSwap {
 
 #[pymethods]
 impl PyOvernightIndexedSwap {
-    /// The fair fixed rate that zeroes the swap NPV (`fairRate()`), read
-    /// through the base (`overnightindexedswap.rs:241`).
+    /// Return the fixed rate that zeroes the swap NPV.
     ///
-    /// Fallible: the swap must be non-expired and its engine must price.
+    /// Returns:
+    ///     float: The fair fixed rate, read through the swap's base.
+    ///
+    /// Raises:
+    ///     ItofinError: If the swap has expired or its engine fails to price.
     fn fair_rate(&mut self) -> PyResult<f64> {
         Ok(self
             .inner
@@ -63,8 +55,11 @@ impl PyOvernightIndexedSwap {
             .map_err(PyQlError::from)?)
     }
 
-    /// Forces the valuation, idempotent and fallible as
-    /// [`VanillaOption.calculate`](crate::option::PyVanillaOption::calculate).
+    /// Force the valuation. Idempotent.
+    ///
+    /// Raises:
+    ///     ItofinError: If no evaluation date is set or the engine refuses the
+    ///         swap.
     fn calculate(&mut self) -> PyResult<()> {
         Ok(self
             .inner
@@ -73,38 +68,63 @@ impl PyOvernightIndexedSwap {
             .map_err(PyQlError::from)?)
     }
 
-    /// Whether the cached results are currently valid.
+    /// Return whether the cached results are currently valid.
+    ///
+    /// Returns:
+    ///     bool: True when the next accessor reads the cache.
     fn is_calculated(&self) -> bool {
         self.inner.borrow().base().is_calculated()
     }
 
-    /// Prices and returns the NPV.
+    /// Price the swap and return the NPV.
     ///
-    /// The only no-argument `price()` of the nine facades: [`PyMakeOis::build`]
-    /// attaches the discounting engine, so there is no engine left to install
-    /// here. A swap that somehow reached Python without one surfaces the core's
-    /// `"null pricing engine"`, exactly as [`npv`](Self::npv) does.
+    /// The only no-argument price(): MakeOis already attached the discounting
+    /// engine, so none is left to install.
+    ///
+    /// Returns:
+    ///     float: The present value.
+    ///
+    /// Raises:
+    ///     ItofinError: On anything that makes the valuation fail, including
+    ///         the "null pricing engine" a swap that somehow arrived without
+    ///         one reports.
     fn price(&mut self) -> PyResult<f64> {
         self.calculate()?;
         self.npv()
     }
 
-    /// A frozen [`Results`] copy of the valuation, calculating first.
+    /// Return a frozen snapshot of the valuation, calculating first.
+    ///
+    /// Returns:
+    ///     Results: A copy of the valuation results.
+    ///
+    /// Raises:
+    ///     ItofinError: On anything that makes the valuation fail.
     fn results(&mut self) -> PyResult<Results> {
         self.calculate()?;
         let inner = self.inner.borrow();
         Ok(Results::snapshot(inner.base()))
     }
 
-    /// The swap NPV under the engine [`PyMakeOis::build`] attached.
+    /// Return the swap NPV under the engine the builder attached.
+    ///
+    /// Returns:
+    ///     float: The present value.
+    ///
+    /// Raises:
+    ///     ItofinError: On anything that makes the valuation fail.
     fn npv(&mut self) -> PyResult<f64> {
         Ok(self.inner.borrow_mut().npv().map_err(PyQlError::from)?)
     }
 
-    /// The swap nominal, read through the base (`nominal()`).
+    /// Return the notional both legs accrue on.
     ///
-    /// Fallible: the base errors on a swap whose legs carry per-coupon
-    /// nominals, which has no single one to report.
+    /// Returns:
+    ///     float: The single nominal, read through the swap's base.
+    ///
+    /// Raises:
+    ///     ItofinError: If the legs carry per-coupon nominals, which leaves no
+    ///         single one to report.
     fn nominal(&self) -> PyResult<f64> {
         Ok(self
             .inner
@@ -114,8 +134,11 @@ impl PyOvernightIndexedSwap {
             .map_err(PyQlError::from)?)
     }
 
-    /// The fixed-leg rate: the rate given to the builder, or the fair rate it
-    /// filled in for a `fixed_rate=None` par swap.
+    /// Return the fixed-leg rate.
+    ///
+    /// Returns:
+    ///     float: The rate given to the builder, or the fair rate it filled in
+    ///         for a par swap.
     fn fixed_rate(&self) -> f64 {
         self.inner.borrow().fixed_vs_floating().fixed_rate()
     }
@@ -128,26 +151,21 @@ impl PyOvernightIndexedSwap {
     }
 }
 
-/// Python `MakeOis`: the market-convention builder for a
-/// [`PyOvernightIndexedSwap`] (`instruments::makeois::MakeOis`).
+/// Market-convention builder for an OvernightIndexedSwap.
 ///
 /// Derives the start and end dates, both schedules and the discounting engine
 /// from a swap tenor and an overnight index, so the caller states conventions
-/// instead of hand-building two schedules. `fixed_rate=None` builds a par swap:
-/// the fair rate is computed off a temporary swap and written into the fixed
-/// leg (`makeois.rs:461-469`), so the result prices to a zero NPV.
+/// instead of hand-building two schedules. ``fixed_rate=None`` builds a par
+/// swap: the fair rate is computed off a temporary swap and written into the
+/// fixed leg, so the result prices to a zero NPV.
 ///
-/// The core's `with_*` chain consumes the builder by value, which a
-/// `#[pyclass]` cannot hand out, so the overrides are constructor keywords
-/// instead and the chain is assembled inside [`build`](Self::build). Only the
-/// five the OIS reprice oracle needs are exposed - `effective_date`,
-/// `nominal`, `payment_lag`, `discounting_term_structure` and
-/// `averaging_method`. Every other core override (the swap type, the overnight
-/// spread, the fixed-leg day count, the settlement days, the termination date,
-/// the payment frequency and calendar, the schedule conventions and rule, the
-/// end-of-month flag) is deferred and keeps its core default; the four the core
-/// rejects outright (telescopic value dates, lookback, lockout, observation
-/// shift, `makeois.rs:364-387`) are unreachable from here by construction.
+/// The core builder is a consumed-self fluent chain, which does not cross the
+/// FFI boundary; this facade takes the overrides as constructor keywords and
+/// assembles the chain inside build(). Only five overrides are exposed; every
+/// other core one keeps its default, and the four the core rejects outright
+/// (telescopic value dates, lookback, lockout and observation shift) are
+/// unreachable from here by construction. The built swap already carries its
+/// DiscountingSwapEngine.
 #[pyclass(name = "MakeOis", unsendable)]
 pub struct PyMakeOis {
     swap_tenor: Period,
@@ -164,6 +182,27 @@ pub struct PyMakeOis {
 
 #[pymethods]
 impl PyMakeOis {
+    /// Store the configuration the chain is assembled from in build().
+    ///
+    /// Args:
+    ///     swap_tenor (Period): The length of the swap.
+    ///     overnight_index (OvernightIndex): The index the overnight leg
+    ///         compounds.
+    ///     settings (Settings): The explicit settings supplying the evaluation
+    ///         date and the stored fixings.
+    ///     fixed_rate (float | None): The rate of the fixed leg; None builds a
+    ///         par swap.
+    ///     forward_start (Period | None): The delay before the swap starts;
+    ///         None starts it spot, at a zero-day period.
+    ///     effective_date (Date | None): The start date; None derives it from
+    ///         the evaluation date.
+    ///     nominal (float | None): The notional; None keeps the core default.
+    ///     payment_lag (int | None): The days between accrual end and payment;
+    ///         None keeps the core default.
+    ///     discounting_term_structure (YieldTermStructure | None): The curve
+    ///         the flows discount on; None keeps the core default.
+    ///     averaging_method (RateAveraging | None): Whether the overnight
+    ///         fixings compound or are averaged; None keeps the core default.
     #[new]
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (
@@ -206,12 +245,16 @@ impl PyMakeOis {
         }
     }
 
-    /// Builds the priced swap.
+    /// Build the priced swap.
     ///
-    /// Fallible: without an `effective_date` the start date is derived from the
-    /// evaluation date, so an unset one is an error (D10); the schedule and the
-    /// overnight leg can be degenerate; and the par-rate fill propagates a
-    /// pricing failure.
+    /// Returns:
+    ///     OvernightIndexedSwap: The swap, already carrying its discounting
+    ///         engine.
+    ///
+    /// Raises:
+    ///     ItofinError: If effective_date is unset and no evaluation date is
+    ///         set to derive the start from; if the schedule or the overnight
+    ///         leg is degenerate; or if the par-rate fill fails to price.
     fn build(&self) -> PyResult<PyOvernightIndexedSwap> {
         let mut maker = MakeOis::new(
             self.swap_tenor,

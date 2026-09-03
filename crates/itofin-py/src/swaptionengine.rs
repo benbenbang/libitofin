@@ -19,13 +19,12 @@ use libitofin::pricingengines::swaption::{
 use libitofin::shared::{SharedMut, shared_mut};
 use pyo3::prelude::*;
 
-/// Python `CashAnnuityModel`: which date a cash-settled par-yield annuity
-/// discounts to (`pricingengines::swaption::CashAnnuityModel`).
+/// Which date a cash-settled par-yield annuity discounts to.
 ///
-/// A fieldless pyo3 enum. Only the `Cash` / `ParYieldCurve` settlement pair
-/// reads it; every other pair takes the fixed-leg BPS annuity and is
-/// insensitive to the choice. The facade defaults to `SwapRate`, the branch
-/// every ported core test exercises, where C++ defaults to `DiscountCurve`.
+/// Only the (Cash, ParYieldCurve) settlement pair reads it; every other pair
+/// takes the fixed-leg BPS annuity and is insensitive to the choice. The
+/// swaption engines default to SwapRate, the branch every ported core test
+/// exercises, where C++ defaults to DiscountCurve.
 #[pyclass(name = "CashAnnuityModel", eq, eq_int, from_py_object)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum PyCashAnnuityModel {
@@ -43,17 +42,14 @@ impl PyCashAnnuityModel {
     }
 }
 
-/// Python `BlackSwaptionEngine`: the shifted-lognormal Black-formula swaption
-/// engine (`pricingengines::swaption::BlackSwaptionEngine`).
+/// The shifted-lognormal Black-formula swaption engine, European-only.
 ///
-/// European-only, and it prices the underlying swap itself: it installs its own
-/// discounting engine on the swap silently, so the swap needs none of its own.
-/// The `settings` handed here must be the same object driving the swaption and
-/// its swap, or the evaluation dates disagree and the NPV is silently wrong.
-///
-/// The surface's volatility type is checked against the Black formula at
-/// pricing time, not construction, so a normal-volatility surface surfaces as
-/// an `ItofinError` from `Swaption.npv()`.
+/// It prices the underlying swap itself, so that swap needs no engine of its
+/// own. The settings passed here must be the same object driving the swaption
+/// and its swap: a mismatch prices the two on different evaluation dates with
+/// no error raised. The surface's volatility type is checked against the Black
+/// formula at pricing time, not construction, so a normal-volatility surface
+/// raises from Swaption.npv().
 #[pyclass(name = "BlackSwaptionEngine", unsendable)]
 pub struct PyBlackSwaptionEngine {
     inner: SharedMut<BlackSwaptionEngine>,
@@ -61,7 +57,17 @@ pub struct PyBlackSwaptionEngine {
 
 #[pymethods]
 impl PyBlackSwaptionEngine {
-    /// An engine reading volatilities off `vol` and discounting on `discount`.
+    /// Build an engine reading volatilities off vol and discounting on discount.
+    ///
+    /// Args:
+    ///     vol (SwaptionVolatilityStructure): The surface volatilities are read
+    ///         off.
+    ///     discount (YieldTermStructure): The curve both legs are discounted
+    ///         on.
+    ///     settings (Settings): The explicit settings; must be the same object
+    ///         driving the swaption and its swap.
+    ///     model (CashAnnuityModel): Which date a cash-settled par-yield
+    ///         annuity discounts to. Defaults to SwapRate.
     #[new]
     #[pyo3(signature = (vol, discount, settings, model = PyCashAnnuityModel::SwapRate))]
     fn new(
@@ -80,9 +86,25 @@ impl PyBlackSwaptionEngine {
         }
     }
 
-    /// An engine over a flat volatility quote, which it wraps in a constant
-    /// surface on a null calendar whose reference date tracks the evaluation
-    /// date. `displacement` is the surface's lognormal shift.
+    /// Build an engine over a flat volatility quote.
+    ///
+    /// The quote is wrapped internally in a constant surface on a null calendar
+    /// whose reference date tracks the evaluation date.
+    ///
+    /// Args:
+    ///     discount (YieldTermStructure): The curve both legs are discounted
+    ///         on.
+    ///     vol (SimpleQuote): The flat Black volatility.
+    ///     day_counter (DayCounter): The day count the constant surface
+    ///         measures time on.
+    ///     displacement (float): The constant surface's lognormal shift.
+    ///     settings (Settings): The explicit settings; must be the same object
+    ///         driving the swaption and its swap.
+    ///     model (CashAnnuityModel): Which date a cash-settled par-yield
+    ///         annuity discounts to. Defaults to SwapRate.
+    ///
+    /// Returns:
+    ///     BlackSwaptionEngine: The engine over the flat surface.
     #[staticmethod]
     #[pyo3(signature = (discount, vol, day_counter, displacement, settings, model = PyCashAnnuityModel::SwapRate))]
     fn with_flat_vol(
@@ -113,18 +135,13 @@ impl PyBlackSwaptionEngine {
     }
 }
 
-/// Python `BachelierSwaptionEngine`: the normal-volatility swaption engine
-/// (`pricingengines::swaption::BachelierSwaptionEngine`), the Bachelier spec of
-/// the same template [`PyBlackSwaptionEngine`] instantiates.
+/// The normal-volatility swaption engine, European-only.
 ///
-/// European-only, and it prices the underlying swap itself: it installs its own
-/// discounting engine on the swap silently, so the swap needs none of its own.
-/// The `settings` handed here must be the same object driving the swaption and
-/// its swap, or the evaluation dates disagree and the NPV is silently wrong.
-///
-/// The surface's volatility type is checked against the normal formula at
-/// pricing time, not construction, so a shifted-lognormal surface surfaces as
-/// an `ItofinError` from `Swaption.npv()`.
+/// The Bachelier spec of the template BlackSwaptionEngine instantiates: same
+/// constructors, same settings requirement, same silent discounting engine on
+/// the underlying swap. The surface's volatility type is checked against the
+/// normal formula at pricing time, not construction, so a shifted-lognormal
+/// surface raises from Swaption.npv().
 #[pyclass(name = "BachelierSwaptionEngine", unsendable)]
 pub struct PyBachelierSwaptionEngine {
     inner: SharedMut<BachelierSwaptionEngine>,
@@ -132,8 +149,17 @@ pub struct PyBachelierSwaptionEngine {
 
 #[pymethods]
 impl PyBachelierSwaptionEngine {
-    /// An engine reading normal volatilities off `vol` and discounting on
-    /// `discount`.
+    /// Build an engine reading normal volatilities off vol.
+    ///
+    /// Args:
+    ///     vol (SwaptionVolatilityStructure): The surface normal volatilities
+    ///         are read off.
+    ///     discount (YieldTermStructure): The curve both legs are discounted
+    ///         on.
+    ///     settings (Settings): The explicit settings; must be the same object
+    ///         driving the swaption and its swap.
+    ///     model (CashAnnuityModel): Which date a cash-settled par-yield
+    ///         annuity discounts to. Defaults to SwapRate.
     #[new]
     #[pyo3(signature = (vol, discount, settings, model = PyCashAnnuityModel::SwapRate))]
     fn new(
@@ -152,11 +178,26 @@ impl PyBachelierSwaptionEngine {
         }
     }
 
-    /// An engine over a flat normal volatility quote, which it wraps in a
-    /// constant surface on a null calendar whose reference date tracks the
-    /// evaluation date. `displacement` is kept for signature parity with
-    /// [`PyBlackSwaptionEngine::with_flat_vol`]; the normal model has no shift
-    /// and ignores it.
+    /// Build an engine over a flat normal volatility quote.
+    ///
+    /// The quote is wrapped internally in a constant surface on a null calendar
+    /// whose reference date tracks the evaluation date.
+    ///
+    /// Args:
+    ///     discount (YieldTermStructure): The curve both legs are discounted
+    ///         on.
+    ///     vol (SimpleQuote): The flat normal volatility.
+    ///     day_counter (DayCounter): The day count the constant surface
+    ///         measures time on.
+    ///     displacement (float): Kept for signature parity with the Black
+    ///         engine; the normal model has no shift and ignores it.
+    ///     settings (Settings): The explicit settings; must be the same object
+    ///         driving the swaption and its swap.
+    ///     model (CashAnnuityModel): Which date a cash-settled par-yield
+    ///         annuity discounts to. Defaults to SwapRate.
+    ///
+    /// Returns:
+    ///     BachelierSwaptionEngine: The engine over the flat surface.
     #[staticmethod]
     #[pyo3(signature = (discount, vol, day_counter, displacement, settings, model = PyCashAnnuityModel::SwapRate))]
     fn with_flat_vol(

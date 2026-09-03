@@ -28,13 +28,11 @@ use libitofin::termstructures::credit::defaultprobabilityhelpers::{
 use libitofin::types::Integer;
 use pyo3::prelude::*;
 
-/// Python `DefaultProbabilityHelper`: the shared base for every credit
-/// bootstrap helper
-/// (`termstructures::credit::defaultprobabilityhelpers::DefaultProbabilityHelper`).
+/// Shared base for every credit bootstrap helper.
 ///
-/// Holds the erased `Shared<dyn DefaultProbabilityHelper>` and exposes the two
-/// dates the bootstrap places a curve node by. Concrete helpers such as
-/// [`PySpreadCdsHelper`] subclass this and supply only their constructor.
+/// A credit helper fits a default-probability curve rather than a yield curve,
+/// so it is a separate hierarchy from RateHelper. It exposes the two dates the
+/// bootstrap places a curve node by.
 #[pyclass(name = "DefaultProbabilityHelper", subclass, unsendable)]
 pub struct PyDefaultProbabilityHelper {
     inner: Shared<dyn DefaultProbabilityHelper>,
@@ -42,13 +40,18 @@ pub struct PyDefaultProbabilityHelper {
 
 #[pymethods]
 impl PyDefaultProbabilityHelper {
-    /// The pillar date, at which the curve node this helper sets sits.
+    /// Return the date the curve node this helper sets sits at.
+    ///
+    /// Returns:
+    ///     Date: The pillar date.
     fn pillar_date(&self) -> PyDate {
         PyDate::from_inner(self.inner.pillar_date())
     }
 
-    /// The latest date the helper needs curve data at (equal to the pillar
-    /// date).
+    /// Return the latest date the helper needs curve data at.
+    ///
+    /// Returns:
+    ///     Date: The latest date, equal to the pillar date.
     fn latest_date(&self) -> PyDate {
         PyDate::from_inner(self.inner.latest_date())
     }
@@ -67,27 +70,42 @@ impl PyDefaultProbabilityHelper {
     }
 }
 
-/// Python `SpreadCdsHelper`: the bootstrap helper fitting a CDS quoted as a
-/// running spread
-/// (`termstructures::credit::defaultprobabilityhelpers::SpreadCdsHelper`).
+/// Bootstrap helper fitting a CDS quoted as a running spread.
 ///
 /// The helper rebuilds its schedule and its contract off the evaluation date
-/// held by `settings`, so it tracks that date rather than freezing a maturity
-/// at construction. It retains the caller's [`PySimpleQuote`], so a later
-/// `set_value` re-drives the bootstrap, and it observes `discount_curve`.
-///
-/// Fallible, unlike the [`PyFlatHazardRate`](crate::credit::PyFlatHazardRate)
-/// chain it otherwise mirrors: under the three post-Big-Bang rules
-/// (`DateGeneration.OldCDS` / `.CDS` / `.CDS2015`) the maturity is rolled by
-/// `cdsMaturity`, which raises [`struct@crate::ItofinError`] on a tenor it
-/// cannot roll rather than building a schedule that ends on the wrong date.
+/// held by settings, so it tracks that date rather than freezing a maturity at
+/// construction. It retains the caller's quote, so a later set_value re-drives
+/// the bootstrap, and it observes the discount curve.
 #[pyclass(name = "SpreadCdsHelper", extends = PyDefaultProbabilityHelper, unsendable)]
 pub struct PySpreadCdsHelper;
 
 #[pymethods]
 impl PySpreadCdsHelper {
-    /// A helper fitting `running_spread` over `tenor`, on the C++ default CDS
-    /// terms.
+    /// Build the helper on the C++ default CDS terms.
+    ///
+    /// Args:
+    ///     running_spread (SimpleQuote): The quoted spread the helper fits.
+    ///     tenor (Period): The length of the contract.
+    ///     settlement_days (int): The days between the evaluation date and the
+    ///         contract's start.
+    ///     calendar (Calendar): The calendar the schedule rolls on.
+    ///     frequency (Frequency): The premium payment frequency.
+    ///     payment_convention (BusinessDayConvention): The roll applied to the
+    ///         payment dates.
+    ///     rule (DateGeneration): The schedule generation rule.
+    ///     day_counter (DayCounter): The day count the premium accrues on.
+    ///     recovery_rate (float): The recovery assumed on default.
+    ///     discount_curve (YieldTermStructure): The curve the flows discount
+    ///         on; the helper observes it.
+    ///     settings (Settings): The explicit settings supplying the evaluation
+    ///         date the schedule is rebuilt off.
+    ///
+    /// Raises:
+    ///     ItofinError: Under the three post-Big-Bang rules OldCDS, CDS and
+    ///         CDS2015, whose maturity is rolled by the CDS maturity rule: it
+    ///         refuses a tenor it cannot roll, or one it rolls to a contract
+    ///         that has already matured, rather than building a schedule that
+    ///         ends on the wrong date.
     #[new]
     #[allow(clippy::too_many_arguments)]
     fn new(

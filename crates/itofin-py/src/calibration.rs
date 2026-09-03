@@ -10,11 +10,11 @@ use libitofin::math::optimization::levenbergmarquardt::LevenbergMarquardt;
 use libitofin::models::CalibrationErrorType;
 use pyo3::prelude::*;
 
-/// Python `LevenbergMarquardt`: the least-squares optimizer used to fit model
-/// parameters (`math::optimization::levenbergmarquardt`).
+/// The least-squares optimizer used to fit model parameters.
 ///
-/// Holds the method by value so a later calibration facade can hand out the
-/// `&mut dyn OptimizationMethod` that the core `calibrate` free function takes.
+/// Wraps the MINPACK lmdif routine. The Jacobian comes from a built-in
+/// forward-difference scheme by default; the cost function's own jacobian
+/// method is used instead when use_cost_functions_jacobian is set.
 #[pyclass(name = "LevenbergMarquardt", unsendable)]
 pub struct PyLevenbergMarquardt {
     inner: LevenbergMarquardt,
@@ -22,6 +22,16 @@ pub struct PyLevenbergMarquardt {
 
 #[pymethods]
 impl PyLevenbergMarquardt {
+    /// Initialize the optimizer; the defaults are QuantLib's.
+    ///
+    /// Args:
+    ///     epsfcn (float): The finite-difference step seed used when the Jacobian is
+    ///         computed by differences.
+    ///     xtol (float): The tolerance on the independent variable.
+    ///     gtol (float): The tolerance on the gradient.
+    ///     use_cost_functions_jacobian (bool): Use the cost function's own jacobian
+    ///         method (a central difference, order 2 but costlier) instead of
+    ///         the built-in forward-difference scheme.
     #[new]
     #[pyo3(signature = (epsfcn = 1e-8, xtol = 1e-8, gtol = 1e-8, use_cost_functions_jacobian = false))]
     fn new(epsfcn: f64, xtol: f64, gtol: f64, use_cost_functions_jacobian: bool) -> Self {
@@ -38,13 +48,10 @@ impl PyLevenbergMarquardt {
     }
 }
 
-/// Python `EndCriteria`: the optimizer stopping rule
-/// (`math::optimization::endcriteria`).
+/// The optimizer stopping rule.
 ///
-/// The core constructor is fallible - it requires
-/// `1 < max_stationary_state_iterations < max_iterations` and finite,
-/// non-negative epsilons - so the ctor routes its `QlResult` through
-/// [`struct@crate::ItofinError`].
+/// Carries the iteration cap and the stationarity thresholds an optimization
+/// run is tested against.
 #[pyclass(name = "EndCriteria", unsendable)]
 pub struct PyEndCriteria {
     inner: EndCriteria,
@@ -52,6 +59,24 @@ pub struct PyEndCriteria {
 
 #[pymethods]
 impl PyEndCriteria {
+    /// Initialize the criteria.
+    ///
+    /// Args:
+    ///     max_iterations (int): The iteration count at which the run stops.
+    ///     max_stationary_state_iterations (int | None): How many consecutive stationary
+    ///         iterations are tolerated before the run is called converged;
+    ///         None defaults to min(max_iterations / 2, 100).
+    ///     root_epsilon (float): The variation of the independent variable below which
+    ///         an iteration counts as stationary.
+    ///     function_epsilon (float): The variation of the function value below which an
+    ///         iteration counts as stationary, and, for a cost function known
+    ///         to be positive, the value below which the run has converged.
+    ///     gradient_norm_epsilon (float | None): The gradient norm below which the run has
+    ///         converged; None defaults to function_epsilon.
+    ///
+    /// Raises:
+    ///     ItofinError: Unless 1 < max_stationary_state_iterations <
+    ///         max_iterations, or if any epsilon is negative or non-finite.
     #[new]
     #[pyo3(signature = (
         max_iterations,
@@ -86,11 +111,10 @@ impl PyEndCriteria {
     }
 }
 
-/// Python `CalibrationErrorType`: how market and model prices are compared
-/// during calibration (`models::CalibrationErrorType`).
+/// How market and model prices are compared during calibration.
 ///
-/// A fieldless pyo3 enum mirroring the core variants; the comparison formulas
-/// live in the core, so the facade only maps the variant across.
+/// RelativePriceError is |market - model| / market, PriceError is
+/// market - model, and ImpliedVolError compares the two implied volatilities.
 #[pyclass(name = "CalibrationErrorType", eq, eq_int, from_py_object)]
 #[derive(Clone, Copy, PartialEq)]
 #[allow(clippy::enum_variant_names)]

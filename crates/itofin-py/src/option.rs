@@ -19,11 +19,10 @@ use libitofin::types::Real;
 use pyo3::prelude::*;
 use pyo3::types::PyType;
 
-/// Python `OptionType`: the call/put flag (core `option::OptionType`).
+/// The call/put flag.
 ///
-/// A fieldless pyo3 enum exposing `OptionType.Call` / `OptionType.Put`; the
-/// signed discriminant convention lives in the core, so the facade only maps
-/// the variant across.
+/// A fieldless enum mirroring the core option type; the signed discriminant
+/// convention behind the two variants stays in the core.
 #[pyclass(name = "OptionType", eq, eq_int, from_py_object)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum PyOptionType {
@@ -41,15 +40,11 @@ impl PyOptionType {
     }
 }
 
-/// Python `VanillaOption`: a single-asset vanilla option (core
-/// `instruments::VanillaOption`, an alias of `OneAssetOption`).
+/// A single-asset vanilla option: European by construction, American through american().
 ///
-/// The constructor builds the European-exercise option; the `american`
-/// classmethod builds the American-exercise one.
-///
-/// Holds the option by value so the lazily-computed results can be produced
-/// through `&mut self` accessors; the inner instrument is `Rc`/`RefCell`-based
-/// and therefore `!Send`, hence `unsendable`.
+/// Valuation is lazy: an accessor reprices only once an observed input - the
+/// attached engine, or the evaluation date on the Settings the option
+/// registered with - has notified it.
 #[pyclass(name = "VanillaOption", unsendable)]
 pub struct PyVanillaOption {
     inner: VanillaOption,
@@ -57,6 +52,14 @@ pub struct PyVanillaOption {
 
 #[pymethods]
 impl PyVanillaOption {
+    /// Build the European-exercise option, exercisable only at expiry.
+    ///
+    /// Args:
+    ///     option_type (OptionType): Whether the payoff is a call or a put.
+    ///     strike (float): The strike of the plain vanilla payoff.
+    ///     expiry (Date): The single date the option may be exercised on.
+    ///     settings (Settings): The explicit settings supplying the evaluation
+    ///         date the option prices against.
     #[new]
     fn new(option_type: PyOptionType, strike: f64, expiry: &PyDate, settings: &PySettings) -> Self {
         let payoff = shared(PlainVanillaPayoff::new(option_type.inner(), strike))
@@ -67,13 +70,25 @@ impl PyVanillaOption {
         }
     }
 
-    /// The same option struck at `strike` but exercisable at any time over
-    /// `[earliest, latest]`, paying on exercise rather than at expiry.
+    /// Build the option exercisable at any time over [earliest, latest].
     ///
-    /// This is the exercise the Monte Carlo American engine requires; the
-    /// analytic European engine rejects it.
+    /// The option pays on exercise rather than at expiry. This is the exercise
+    /// the Monte Carlo American engine requires; the analytic European engine
+    /// rejects it.
     ///
-    /// Raises `ItofinError` when `earliest` is after `latest`.
+    /// Args:
+    ///     option_type (OptionType): Whether the payoff is a call or a put.
+    ///     strike (float): The strike of the plain vanilla payoff.
+    ///     earliest (Date): The first date the option may be exercised on.
+    ///     latest (Date): The last date the option may be exercised on.
+    ///     settings (Settings): The explicit settings supplying the evaluation
+    ///         date the option prices against.
+    ///
+    /// Returns:
+    ///     VanillaOption: The American-exercise option.
+    ///
+    /// Raises:
+    ///     ItofinError: If earliest is after latest.
     #[classmethod]
     fn american(
         _cls: &Bound<'_, PyType>,
@@ -93,8 +108,11 @@ impl PyVanillaOption {
         })
     }
 
-    /// Attaches an analytic European engine built on `process`, threading in
-    /// the exact same Black-Scholes process the Python object holds.
+    /// Attach an analytic European engine built on process.
+    ///
+    /// Args:
+    ///     process (BlackScholesProcess): The process the engine prices on;
+    ///         the exact object this Python instance holds is threaded in.
     fn set_engine(&mut self, process: &PyBlackScholesProcess) {
         let engine = shared_mut(AnalyticEuropeanEngine::new(process.inner()));
         self.inner
@@ -102,12 +120,18 @@ impl PyVanillaOption {
             .set_pricing_engine(engine as SharedMut<dyn PricingEngine>);
     }
 
-    /// Attaches an analytic Heston engine built on `model` with a Gauss-Laguerre
-    /// integration of `integration_order` (fallible: order > 192 errors).
+    /// Attach an analytic Heston engine built on model.
     ///
-    /// The analytic Heston engine fills only `results.value`, so `npv()` works
-    /// but the greeks (`delta()`, `gamma()`, ...) raise `ItofinError` ("not
-    /// provided") on this path.
+    /// The analytic Heston engine fills only the value, so npv() works but the
+    /// greeks raise on this path.
+    ///
+    /// Args:
+    ///     model (HestonModel): The calibrated Heston model to price under.
+    ///     integration_order (int): The order of the Gauss-Laguerre
+    ///         integration.
+    ///
+    /// Raises:
+    ///     ItofinError: If integration_order exceeds 192.
     fn set_heston_engine(
         &mut self,
         model: &PyHestonModel,
@@ -121,160 +145,275 @@ impl PyVanillaOption {
         Ok(())
     }
 
-    /// Attaches the Monte Carlo European engine `engine`, which already holds
-    /// the process it prices on.
+    /// Attach the Monte Carlo European engine.
+    ///
+    /// Args:
+    ///     engine (MCEuropeanEngine): The engine, which already holds the
+    ///         process it prices on.
     fn set_mc_engine(&mut self, engine: &PyMCEuropeanEngine) {
         self.inner.base_mut().set_pricing_engine(engine.engine());
     }
 
-    /// Attaches the Monte Carlo Heston engine `engine`, which already holds the
-    /// Heston process it prices on.
+    /// Attach the Monte Carlo Heston engine.
+    ///
+    /// Args:
+    ///     engine (MCEuropeanHestonEngine): The engine, which already holds
+    ///         the Heston process it prices on.
     fn set_mc_heston_engine(&mut self, engine: &PyMCEuropeanHestonEngine) {
         self.inner.base_mut().set_pricing_engine(engine.engine());
     }
 
-    /// Attaches the Monte Carlo American engine `engine`, which already holds
-    /// the process it prices on.
+    /// Attach the Monte Carlo American engine.
     ///
-    /// The option must have been built through `american`: pricing a
-    /// European-exercise option on this engine raises `ItofinError` ("wrong
-    /// exercise given") from `npv()`.
+    /// The option must have been built through american(): a European-exercise
+    /// option raises ItofinError ("wrong exercise given") from npv().
+    ///
+    /// Args:
+    ///     engine (MCAmericanEngine): The engine, which already holds the
+    ///         process it prices on.
     fn set_mc_american_engine(&mut self, engine: &PyMCAmericanEngine) {
         self.inner.base_mut().set_pricing_engine(engine.engine());
     }
 
-    /// Forces the valuation, so a later accessor reads a cache that is already
-    /// warm.
+    /// Force the valuation, so a later accessor reads a warm cache.
     ///
     /// Idempotent: the core short-circuits on a valid cache, and the option
-    /// only reprices once an observed input - the engine, or the settings
-    /// evaluation date it registered with - has notified it.
+    /// reprices only once an observed input notified it.
     ///
-    /// Fallible for everything a pricing accessor is: no engine attached, no
-    /// evaluation date set, an engine that refuses the option.
+    /// Raises:
+    ///     ItofinError: If no engine is attached, no evaluation date is set,
+    ///         or the attached engine refuses the option.
     fn calculate(&mut self) -> PyResult<()> {
         Ok(self.inner.calculate().map_err(PyQlError::from)?)
     }
 
-    /// Whether the cached results are currently valid, that is, whether the
-    /// next accessor reads the cache or reprices.
+    /// Return whether the cached results are currently valid.
+    ///
+    /// Returns:
+    ///     bool: True when the next accessor reads the cache rather than
+    ///         repricing.
     fn is_calculated(&self) -> bool {
         self.inner.base().is_calculated()
     }
 
-    /// Attaches an analytic European engine on `process` and returns the NPV,
-    /// the one-shot form of [`set_engine`](Self::set_engine) followed by
-    /// [`npv`](Self::npv).
+    /// Attach an analytic European engine on process and return the NPV.
     ///
-    /// The other engines have their own one-shots:
-    /// [`price_heston`](Self::price_heston), [`price_mc`](Self::price_mc),
-    /// [`price_mc_heston`](Self::price_mc_heston) and
-    /// [`price_mc_american`](Self::price_mc_american).
+    /// The one-shot form of set_engine followed by npv. The other engines have
+    /// their own one-shots: price_heston, price_mc, price_mc_heston and
+    /// price_mc_american.
+    ///
+    /// Args:
+    ///     process (BlackScholesProcess): The process the engine prices on.
+    ///
+    /// Returns:
+    ///     float: The present value under the analytic European engine.
+    ///
+    /// Raises:
+    ///     ItofinError: If no evaluation date is set or the engine refuses the
+    ///         option.
     fn price(&mut self, process: &PyBlackScholesProcess) -> PyResult<f64> {
         self.set_engine(process);
         self.calculate()?;
         self.npv()
     }
 
-    /// Attaches an analytic Heston engine on `model` at `integration_order` and
-    /// returns the NPV, the one-shot form of
-    /// [`set_heston_engine`](Self::set_heston_engine) followed by
-    /// [`npv`](Self::npv).
+    /// Attach an analytic Heston engine on model and return the NPV.
     ///
-    /// Fallible where the setter is: an `integration_order` above 192 raises
-    /// `ItofinError` before any engine is attached. The greeks stay unavailable
-    /// on this path.
+    /// The one-shot form of set_heston_engine followed by npv. The greeks stay
+    /// unavailable on this path.
+    ///
+    /// Args:
+    ///     model (HestonModel): The calibrated Heston model to price under.
+    ///     integration_order (int): The order of the Gauss-Laguerre
+    ///         integration.
+    ///
+    /// Returns:
+    ///     float: The present value under the analytic Heston engine.
+    ///
+    /// Raises:
+    ///     ItofinError: If integration_order exceeds 192, no evaluation date is
+    ///         set, or the engine refuses the option.
     fn price_heston(&mut self, model: &PyHestonModel, integration_order: usize) -> PyResult<f64> {
         self.set_heston_engine(model, integration_order)?;
         self.calculate()?;
         self.npv()
     }
 
-    /// Attaches the Monte Carlo European engine `engine` and returns the NPV,
-    /// the one-shot form of [`set_mc_engine`](Self::set_mc_engine) followed by
-    /// [`npv`](Self::npv).
+    /// Attach the Monte Carlo European engine and return the NPV.
+    ///
+    /// The one-shot form of set_mc_engine followed by npv.
+    ///
+    /// Args:
+    ///     engine (MCEuropeanEngine): The engine, which already holds the
+    ///         process it prices on.
+    ///
+    /// Returns:
+    ///     float: The present value under the Monte Carlo European engine.
+    ///
+    /// Raises:
+    ///     ItofinError: If no evaluation date is set or the engine refuses the
+    ///         option.
     fn price_mc(&mut self, engine: &PyMCEuropeanEngine) -> PyResult<f64> {
         self.set_mc_engine(engine);
         self.calculate()?;
         self.npv()
     }
 
-    /// Attaches the Monte Carlo Heston engine `engine` and returns the NPV, the
-    /// one-shot form of
-    /// [`set_mc_heston_engine`](Self::set_mc_heston_engine) followed by
-    /// [`npv`](Self::npv).
+    /// Attach the Monte Carlo Heston engine and return the NPV.
+    ///
+    /// The one-shot form of set_mc_heston_engine followed by npv.
+    ///
+    /// Args:
+    ///     engine (MCEuropeanHestonEngine): The engine, which already holds
+    ///         the Heston process it prices on.
+    ///
+    /// Returns:
+    ///     float: The present value under the Monte Carlo Heston engine.
+    ///
+    /// Raises:
+    ///     ItofinError: If no evaluation date is set or the engine refuses the
+    ///         option.
     fn price_mc_heston(&mut self, engine: &PyMCEuropeanHestonEngine) -> PyResult<f64> {
         self.set_mc_heston_engine(engine);
         self.calculate()?;
         self.npv()
     }
 
-    /// Attaches the Monte Carlo American engine `engine` and returns the NPV,
-    /// the one-shot form of
-    /// [`set_mc_american_engine`](Self::set_mc_american_engine) followed by
-    /// [`npv`](Self::npv).
+    /// Attach the Monte Carlo American engine and return the NPV.
     ///
-    /// The option must have been built through `american`: a European-exercise
-    /// option raises `ItofinError` ("wrong exercise given").
+    /// The one-shot form of set_mc_american_engine followed by npv. The option
+    /// must have been built through american(): a European-exercise option
+    /// raises ItofinError ("wrong exercise given").
+    ///
+    /// Args:
+    ///     engine (MCAmericanEngine): The engine, which already holds the
+    ///         process it prices on.
+    ///
+    /// Returns:
+    ///     float: The present value under the Monte Carlo American engine.
+    ///
+    /// Raises:
+    ///     ItofinError: If the option is not American-exercise, no evaluation
+    ///         date is set, or the engine refuses the option.
     fn price_mc_american(&mut self, engine: &PyMCAmericanEngine) -> PyResult<f64> {
         self.set_mc_american_engine(engine);
         self.calculate()?;
         self.npv()
     }
 
-    /// A frozen [`Results`] copy of the valuation, calculating first.
+    /// Return a frozen snapshot of the valuation, calculating first.
     ///
     /// The snapshot does not track the option: once taken, an evaluation-date
     /// or engine change reprices the live accessors and leaves it alone.
+    ///
+    /// Returns:
+    ///     Results: A copy of the valuation results.
+    ///
+    /// Raises:
+    ///     ItofinError: On anything that makes the valuation fail.
     fn results(&mut self) -> PyResult<Results> {
         self.calculate()?;
         Ok(Results::snapshot(self.inner.base()))
     }
 
-    /// The present value, erroring when no evaluation date or engine is set.
+    /// Return the present value.
+    ///
+    /// Returns:
+    ///     float: The option value under the attached engine.
+    ///
+    /// Raises:
+    ///     ItofinError: If no evaluation date or no engine is set.
     fn npv(&mut self) -> PyResult<f64> {
         Ok(self.inner.npv().map_err(PyQlError::from)?)
     }
 
-    /// The option delta.
+    /// Return the option delta.
+    ///
+    /// Returns:
+    ///     float: The sensitivity to the underlying spot.
+    ///
+    /// Raises:
+    ///     ItofinError: If the attached engine does not provide it, which the
+    ///         analytic Heston engine does not.
     fn delta(&mut self) -> PyResult<f64> {
         Ok(self.inner.delta().map_err(PyQlError::from)?)
     }
 
-    /// The option gamma.
+    /// Return the option gamma.
+    ///
+    /// Returns:
+    ///     float: The second-order sensitivity to the underlying spot.
+    ///
+    /// Raises:
+    ///     ItofinError: If the attached engine does not provide it.
     fn gamma(&mut self) -> PyResult<f64> {
         Ok(self.inner.gamma().map_err(PyQlError::from)?)
     }
 
-    /// The option theta.
+    /// Return the option theta.
+    ///
+    /// Returns:
+    ///     float: The sensitivity to the passage of time.
+    ///
+    /// Raises:
+    ///     ItofinError: If the attached engine does not provide it.
     fn theta(&mut self) -> PyResult<f64> {
         Ok(self.inner.theta().map_err(PyQlError::from)?)
     }
 
-    /// The option vega.
+    /// Return the option vega.
+    ///
+    /// Returns:
+    ///     float: The sensitivity to the volatility.
+    ///
+    /// Raises:
+    ///     ItofinError: If the attached engine does not provide it.
     fn vega(&mut self) -> PyResult<f64> {
         Ok(self.inner.vega().map_err(PyQlError::from)?)
     }
 
-    /// The option rho.
+    /// Return the option rho.
+    ///
+    /// Returns:
+    ///     float: The sensitivity to the risk-free rate.
+    ///
+    /// Raises:
+    ///     ItofinError: If the attached engine does not provide it.
     fn rho(&mut self) -> PyResult<f64> {
         Ok(self.inner.rho().map_err(PyQlError::from)?)
     }
 
-    /// The option dividend rho.
+    /// Return the option dividend rho.
+    ///
+    /// Returns:
+    ///     float: The sensitivity to the dividend yield.
+    ///
+    /// Raises:
+    ///     ItofinError: If the attached engine does not provide it.
     fn dividend_rho(&mut self) -> PyResult<f64> {
         Ok(self.inner.dividend_rho().map_err(PyQlError::from)?)
     }
 
-    /// The standard error on the present value, raising `ItofinError` on the
-    /// engines that do not produce one (every analytic engine here).
+    /// Return the standard error on the present value.
+    ///
+    /// Returns:
+    ///     float: The Monte Carlo standard error.
+    ///
+    /// Raises:
+    ///     ItofinError: On the engines that do not produce one, which is every
+    ///         analytic engine here.
     fn error_estimate(&mut self) -> PyResult<f64> {
         Ok(self.inner.error_estimate().map_err(PyQlError::from)?)
     }
 
-    /// The fraction of simulated paths exercised before expiry, raising
-    /// `ItofinError` on every engine that does not report it - only the Monte
-    /// Carlo American engine does.
+    /// Return the fraction of simulated paths exercised before expiry.
+    ///
+    /// Returns:
+    ///     float: The exercise probability reported by the engine.
+    ///
+    /// Raises:
+    ///     ItofinError: On every engine that does not report it - only
+    ///         MCAmericanEngine does.
     fn exercise_probability(&mut self) -> PyResult<f64> {
         Ok(self
             .inner

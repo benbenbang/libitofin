@@ -37,15 +37,11 @@ use libitofin::termstructures::volatility::{
 use libitofin::termstructures::yieldtermstructure::YieldTermStructure;
 use pyo3::prelude::*;
 
-/// Python `OptionletVolatilityStructure`: the shared base for every caplet
-/// volatility surface
-/// (`termstructures::volatility::OptionletVolatilityStructure`).
+/// Shared base for every caplet/floorlet volatility surface: volatility,
+/// Black variance and the lognormal displacement.
 ///
-/// The option axis is addressed by tenor, the form the surfaces are quoted in;
-/// the core resolves the tenor against the surface's reference date and calendar
-/// before reading the volatility. The date form is exposed too, since the
-/// optionlet stripper and the cap/floor engine both address the surface by a
-/// coupon's fixing date.
+/// A single option axis, unlike the swaption surfaces: a query takes one option
+/// tenor (or date) and a strike.
 #[pyclass(name = "OptionletVolatilityStructure", subclass, unsendable)]
 pub struct PyOptionletVolatilityStructure {
     inner: Handle<dyn OptionletVolatilityStructure>,
@@ -53,7 +49,20 @@ pub struct PyOptionletVolatilityStructure {
 
 #[pymethods]
 impl PyOptionletVolatilityStructure {
-    /// The caplet volatility for an option tenor and strike.
+    /// Return the caplet volatility for an option tenor and strike.
+    ///
+    /// Args:
+    ///     option_tenor (Period): The option's tenor, resolved against the
+    ///         surface's reference date and calendar.
+    ///     strike (float): The strike the volatility is read at.
+    ///     extrapolate (bool): Whether to answer outside the surface's grid.
+    ///
+    /// Returns:
+    ///     float: The caplet volatility.
+    ///
+    /// Raises:
+    ///     ItofinError: If the query falls outside the grid and extrapolation
+    ///         is not allowed.
     #[pyo3(signature = (option_tenor, strike, extrapolate = false))]
     fn volatility(&self, option_tenor: &PyPeriod, strike: f64, extrapolate: bool) -> PyResult<f64> {
         Ok(self
@@ -64,7 +73,22 @@ impl PyOptionletVolatilityStructure {
             .map_err(PyQlError::from)?)
     }
 
-    /// The caplet volatility for an option date and strike.
+    /// Return the caplet volatility for an option date and strike.
+    ///
+    /// The date form the optionlet stripper and the cap/floor engine use, both
+    /// addressing the surface by a coupon's fixing date.
+    ///
+    /// Args:
+    ///     option_date (Date): The option date the volatility is read at.
+    ///     strike (float): The strike the volatility is read at.
+    ///     extrapolate (bool): Whether to answer outside the surface's grid.
+    ///
+    /// Returns:
+    ///     float: The caplet volatility.
+    ///
+    /// Raises:
+    ///     ItofinError: If the query falls outside the grid and extrapolation
+    ///         is not allowed.
     #[pyo3(signature = (option_date, strike, extrapolate = false))]
     fn volatility_date(
         &self,
@@ -80,7 +104,19 @@ impl PyOptionletVolatilityStructure {
             .map_err(PyQlError::from)?)
     }
 
-    /// The Black variance (`vol^2 * option_time`) for an option tenor and strike.
+    /// Return the Black variance, the squared volatility times option time.
+    ///
+    /// Args:
+    ///     option_tenor (Period): The option's tenor.
+    ///     strike (float): The strike the variance is read at.
+    ///     extrapolate (bool): Whether to answer outside the surface's grid.
+    ///
+    /// Returns:
+    ///     float: The Black variance.
+    ///
+    /// Raises:
+    ///     ItofinError: If the query falls outside the grid and extrapolation
+    ///         is not allowed.
     #[pyo3(signature = (option_tenor, strike, extrapolate = false))]
     fn black_variance(
         &self,
@@ -96,7 +132,10 @@ impl PyOptionletVolatilityStructure {
             .map_err(PyQlError::from)?)
     }
 
-    /// Whether the surface answers dates/times beyond its maximum.
+    /// Return whether the surface answers dates and times beyond its maximum.
+    ///
+    /// Returns:
+    ///     bool: True when extrapolation is enabled on the surface itself.
     fn allows_extrapolation(&self) -> PyResult<bool> {
         Ok(self
             .inner
@@ -105,12 +144,10 @@ impl PyOptionletVolatilityStructure {
             .allows_extrapolation())
     }
 
-    /// Allows extrapolation past the maximum date/time.
+    /// Allow extrapolation past the maximum date and time.
     ///
-    /// A stripped surface ends at its last optionlet fixing, so a cap whose own
-    /// last caplet fixes there queries the boundary; the core's round-trip
-    /// fixture enables extrapolation before repricing
-    /// (`strippedoptionletadapter.rs:393`).
+    /// A stripped surface ends at its last optionlet fixing, so a cap whose
+    /// own last caplet fixes there queries the boundary.
     fn enable_extrapolation(&self) -> PyResult<()> {
         self.inner
             .current_link()
@@ -119,7 +156,7 @@ impl PyOptionletVolatilityStructure {
         Ok(())
     }
 
-    /// Forbids extrapolation past the maximum date/time.
+    /// Forbid extrapolation past the maximum date and time.
     fn disable_extrapolation(&self) -> PyResult<()> {
         self.inner
             .current_link()
@@ -128,11 +165,14 @@ impl PyOptionletVolatilityStructure {
         Ok(())
     }
 
-    /// The lognormal shift applied to forwards and strikes; `0.0` for the
-    /// unshifted lognormal and the normal model.
+    /// Return the lognormal shift applied to forwards and strikes.
     ///
-    /// This is what `BlackCapFloorEngine` checks a caller-supplied displacement
+    /// This is what BlackCapFloorEngine checks a caller-supplied displacement
     /// against, so it is the number to read before pinning one on the engine.
+    ///
+    /// Returns:
+    ///     float: The shift; zero for the unshifted lognormal and the normal
+    ///         model.
     fn displacement(&self) -> PyResult<f64> {
         Ok(self
             .inner
@@ -141,11 +181,18 @@ impl PyOptionletVolatilityStructure {
             .displacement())
     }
 
-    /// The date every option time is measured from.
+    /// Return the date every option time is measured from.
     ///
-    /// Pinned at construction on the fixed-reference surfaces; derived from the
-    /// `Settings` evaluation date (settlement days on the calendar) on the
-    /// moving ones, so it follows a later `set_evaluation_date`.
+    /// Pinned at construction on the fixed-reference surfaces; derived from
+    /// the Settings evaluation date (settlement days on the calendar) on the
+    /// moving ones, so it follows a later set_evaluation_date.
+    ///
+    /// Returns:
+    ///     Date: The surface's reference date.
+    ///
+    /// Raises:
+    ///     ItofinError: On a moving surface whose Settings has no evaluation
+    ///         date set.
     fn reference_date(&self) -> PyResult<PyDate> {
         Ok(PyDate::from_inner(
             self.inner
@@ -172,23 +219,33 @@ impl PyOptionletVolatilityStructure {
     }
 }
 
-/// Python `ConstantOptionletVolatility`: a single caplet volatility with no
-/// option-time or strike dependence
-/// (`termstructures::volatility::ConstantOptionletVolatility`).
+/// A single caplet volatility with no option-time or strike dependence.
 ///
-/// Extends [`PyOptionletVolatilityStructure`] and supplies only the
-/// constructors; the query surface is inherited. Unbounded in time and strike,
-/// so queries never need extrapolation enabled. [`new`](Self::new) and
-/// [`with_quote`](Self::with_quote) pin the reference date;
-/// [`moving`](Self::moving) and [`moving_with_quote`](Self::moving_with_quote)
-/// float it off the `Settings` evaluation date (#627).
+/// The constructor and with_quote pin the reference date, so every query's
+/// option time runs from reference_date rather than the evaluation date. The
+/// moving and moving_with_quote forms float the reference date off the
+/// Settings evaluation date instead (#627).
 #[pyclass(name = "ConstantOptionletVolatility", extends = PyOptionletVolatilityStructure, unsendable)]
 pub struct PyConstantOptionletVolatility;
 
 #[pymethods]
 impl PyConstantOptionletVolatility {
-    /// A constant surface at a fixed `volatility`, wrapped in an internal quote
-    /// the caller cannot later mutate.
+    /// Build the surface at a fixed volatility.
+    ///
+    /// Args:
+    ///     reference_date (Date): The date every query's option time runs
+    ///         from.
+    ///     calendar (Calendar): The calendar option tenors resolve on.
+    ///     business_day_convention (BusinessDayConvention): The roll applied
+    ///         when resolving a tenor to a date.
+    ///     volatility (float): The single volatility answered everywhere,
+    ///         wrapped in an internal quote the caller cannot later mutate.
+    ///     day_counter (DayCounter): The day count option times are measured
+    ///         in.
+    ///     volatility_type (VolatilityType): Whether the quote is
+    ///         shifted-lognormal or normal.
+    ///     displacement (float): The lognormal shift applied to forwards and
+    ///         strikes.
     #[new]
     #[pyo3(signature = (reference_date, calendar, business_day_convention, volatility, day_counter, volatility_type, displacement = 0.0))]
     fn new(
@@ -215,8 +272,25 @@ impl PyConstantOptionletVolatility {
         .add_subclass(PyConstantOptionletVolatility)
     }
 
-    /// A constant surface reading `volatility` from the caller's quote; a later
-    /// `set_value` on that quote notifies the surface's observers.
+    /// Build the surface reading its volatility from a live quote.
+    ///
+    /// Args:
+    ///     reference_date (Date): The date every query's option time runs
+    ///         from.
+    ///     calendar (Calendar): The calendar option tenors resolve on.
+    ///     business_day_convention (BusinessDayConvention): The roll applied
+    ///         when resolving a tenor to a date.
+    ///     volatility (SimpleQuote): The volatility; a later set_value
+    ///         notifies the surface's observers.
+    ///     day_counter (DayCounter): The day count option times are measured
+    ///         in.
+    ///     volatility_type (VolatilityType): Whether the quote is
+    ///         shifted-lognormal or normal.
+    ///     displacement (float): The lognormal shift applied to forwards and
+    ///         strikes.
+    ///
+    /// Returns:
+    ///     ConstantOptionletVolatility: The surface over that quote.
     #[staticmethod]
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (reference_date, calendar, business_day_convention, volatility, day_counter, volatility_type, displacement = 0.0))]
@@ -248,9 +322,31 @@ impl PyConstantOptionletVolatility {
         )
     }
 
-    /// A constant surface whose reference date floats off `settings`'
-    /// evaluation date by `settlement_days` on `calendar`, at a fixed
-    /// `volatility` wrapped in an internal quote the caller cannot later mutate.
+    /// Build the surface with a reference date floating off the evaluation date.
+    ///
+    /// The reference date is the evaluation date advanced by settlement_days
+    /// business days on calendar, so it follows a later set_evaluation_date.
+    ///
+    /// Args:
+    ///     settlement_days (int): Business days between the evaluation date
+    ///         and the reference date.
+    ///     calendar (Calendar): The calendar the reference date is derived on
+    ///         and option tenors resolve on.
+    ///     business_day_convention (BusinessDayConvention): The roll applied
+    ///         when resolving a tenor to a date.
+    ///     volatility (float): The single volatility answered everywhere,
+    ///         wrapped in an internal quote the caller cannot later mutate.
+    ///     day_counter (DayCounter): The day count option times are measured
+    ///         in.
+    ///     volatility_type (VolatilityType): Whether the quote is
+    ///         shifted-lognormal or normal.
+    ///     settings (Settings): The evaluation context the reference date
+    ///         floats off.
+    ///     displacement (float): The lognormal shift applied to forwards and
+    ///         strikes.
+    ///
+    /// Returns:
+    ///     ConstantOptionletVolatility: The moving surface.
     #[staticmethod]
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (settlement_days, calendar, business_day_convention, volatility, day_counter, volatility_type, settings, displacement = 0.0))]
@@ -284,9 +380,28 @@ impl PyConstantOptionletVolatility {
         )
     }
 
-    /// A constant surface whose reference date floats off `settings`'
-    /// evaluation date, reading `volatility` from the caller's quote; a later
-    /// `set_value` on that quote notifies the surface's observers.
+    /// Build the moving surface reading its volatility from a live quote.
+    ///
+    /// Args:
+    ///     settlement_days (int): Business days between the evaluation date
+    ///         and the reference date.
+    ///     calendar (Calendar): The calendar the reference date is derived on
+    ///         and option tenors resolve on.
+    ///     business_day_convention (BusinessDayConvention): The roll applied
+    ///         when resolving a tenor to a date.
+    ///     volatility (SimpleQuote): The volatility; a later set_value
+    ///         notifies the surface's observers.
+    ///     day_counter (DayCounter): The day count option times are measured
+    ///         in.
+    ///     volatility_type (VolatilityType): Whether the quote is
+    ///         shifted-lognormal or normal.
+    ///     settings (Settings): The evaluation context the reference date
+    ///         floats off.
+    ///     displacement (float): The lognormal shift applied to forwards and
+    ///         strikes.
+    ///
+    /// Returns:
+    ///     ConstantOptionletVolatility: The moving surface over that quote.
     #[staticmethod]
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (settlement_days, calendar, business_day_convention, volatility, day_counter, volatility_type, settings, displacement = 0.0))]
@@ -321,20 +436,17 @@ impl PyConstantOptionletVolatility {
     }
 }
 
-/// Python `OptionletStripper1`: bootstraps caplet volatilities out of a market
-/// cap/floor term-volatility surface
-/// (`termstructures::volatility::OptionletStripper1`).
+/// Bootstraps caplet volatilities out of a market cap/floor term-volatility
+/// surface.
 ///
-/// The stripper is not itself a volatility surface: it produces a grid of
-/// caplet volatilities that [`PyStrippedOptionletAdapter`] interpolates into
-/// one. It prices a cap at each of its own lengths off `term_vol_surface`,
-/// differences consecutive prices into a single caplet price, and inverts that
-/// for the caplet's implied volatility.
+/// Not itself a volatility surface: it produces a grid of caplet volatilities
+/// that StrippedOptionletAdapter interpolates into one. Stripping is lazy and
+/// cached, and re-runs only when a surface quote or the index changes.
 ///
-/// Stripping is lazy and cached: nothing runs until a query needs the grid, and
-/// it re-runs only when a surface quote or the index changes. The
-/// [`Normal`](crate::swaptionvol::PyVolatilityType::Normal) model is deferred
-/// (#440/#577) and fails at the strip rather than at construction.
+/// term_vol_surface must come from CapFloorTermVolSurface.moving or
+/// moving_with_quotes; a pinned-reference surface carries no settlement days
+/// and fails the adapter. VolatilityType.Normal is deferred (#440/#577) and
+/// fails at the strip, not at construction.
 #[pyclass(name = "OptionletStripper1", unsendable)]
 pub struct PyOptionletStripper1 {
     inner: Shared<OptionletStripper1>,
@@ -342,14 +454,31 @@ pub struct PyOptionletStripper1 {
 
 #[pymethods]
 impl PyOptionletStripper1 {
-    /// A stripper over `term_vol_surface` and `ibor_index`.
+    /// Build the stripper over a term-volatility surface and an index.
     ///
-    /// `term_vol_surface` must be one of the MOVING forms: the adapter reads
-    /// its settlement days back off the surface, and a pinned-reference surface
-    /// has none. `discount` is the curve the caps are priced on; `None` falls
-    /// back to the index's own forwarding curve. `accuracy` and `max_iter` size
-    /// the implied-volatility solve, and `optionlet_frequency` overrides the
-    /// index tenor as the caplet step.
+    /// It prices a cap at each of its own lengths off term_vol_surface,
+    /// differences consecutive prices into a single caplet price, and inverts
+    /// that for the caplet's implied volatility.
+    ///
+    /// Args:
+    ///     term_vol_surface (CapFloorTermVolSurface): The market term
+    ///         volatilities; it must be one of the moving forms, a
+    ///         pinned-reference surface carrying no settlement days.
+    ///     ibor_index (IborIndex): The index the caplets fix off.
+    ///     volatility_type (VolatilityType): The quoting convention; Normal is
+    ///         deferred and fails at the strip, not here.
+    ///     accuracy (float): The tolerance of the implied-volatility solve.
+    ///     max_iter (int): The iteration cap of that solve.
+    ///     displacement (float): The lognormal shift applied to forwards and
+    ///         strikes.
+    ///     discount (YieldTermStructure | None): The curve the caps are priced
+    ///         on; None falls back to the index's own forwarding curve.
+    ///     optionlet_frequency (Period | None): The caplet step; None uses the
+    ///         index tenor.
+    ///
+    /// Raises:
+    ///     ItofinError: On whatever the core rejects about the surface, the
+    ///         index or the solve parameters.
     #[new]
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (term_vol_surface, ibor_index, volatility_type, accuracy = 1e-6, max_iter = 100, displacement = 0.0, discount = None, optionlet_frequency = None))]
@@ -384,15 +513,28 @@ impl PyOptionletStripper1 {
         })
     }
 
-    /// The floating switch strike: the mean at-the-money caplet rate, which
-    /// decides whether each strike is stripped out of caps or out of floors.
+    /// Return the floating switch strike, the mean at-the-money caplet rate.
     ///
-    /// Fallible, and the first call triggers the strip.
+    /// It decides whether each strike is stripped out of caps or out of
+    /// floors. The first call triggers the strip.
+    ///
+    /// Returns:
+    ///     float: The switch strike.
+    ///
+    /// Raises:
+    ///     ItofinError: On a stripping failure, which a Normal volatility_type
+    ///         always is.
     fn switch_strike(&self) -> PyResult<f64> {
         Ok(self.inner.switch_strike().map_err(PyQlError::from)?)
     }
 
-    /// The at-the-money forward rate of each caplet, one per maturity.
+    /// Return the at-the-money forward rate of each caplet.
+    ///
+    /// Returns:
+    ///     list[float]: One rate per maturity.
+    ///
+    /// Raises:
+    ///     ItofinError: On a stripping failure.
     fn atm_optionlet_rates(&self) -> PyResult<Vec<f64>> {
         Ok(self.inner.atm_optionlet_rates().map_err(PyQlError::from)?)
     }
@@ -405,32 +547,36 @@ impl PyOptionletStripper1 {
     }
 }
 
-/// Python `StrippedOptionletAdapter`: serves a stripper's caplet volatility
-/// grid as an [`PyOptionletVolatilityStructure`]
-/// (`termstructures::volatility::StrippedOptionletAdapter`).
+/// Serves a stripper's caplet volatility grid as an
+/// OptionletVolatilityStructure: linear in strike within each maturity, then
+/// linear across maturities.
 ///
-/// This is what closes the cap/floor volatility loop: a
-/// [`PyBlackCapFloorEngine`](crate::capfloorengine::PyBlackCapFloorEngine)
-/// built on this surface reprices the caps the term volatilities were quoted
-/// on. Linear in strike within each maturity, then linear across maturities.
-///
-/// Extends [`PyOptionletVolatilityStructure`] and supplies only the
-/// constructor; the query surface is inherited. Its reference date floats off
-/// the evaluation date carried by `settings`, advanced by the settlement days
-/// the underlying term-volatility surface carries. The surface ends at the last
-/// caplet fixing, so pricing a cap that reaches it wants
-/// `enable_extrapolation()`.
+/// This closes the cap/floor volatility loop - a BlackCapFloorEngine on this
+/// surface reprices the caps the term volatilities were quoted on. The
+/// reference date floats off the evaluation date carried by settings, advanced
+/// by the term-volatility surface's settlement days. The surface ends at the
+/// last caplet fixing, so pricing a cap that reaches it wants
+/// enable_extrapolation().
 #[pyclass(name = "StrippedOptionletAdapter", extends = PyOptionletVolatilityStructure, unsendable)]
 pub struct PyStrippedOptionletAdapter;
 
 #[pymethods]
 impl PyStrippedOptionletAdapter {
-    /// The interpolated surface over `stripper`.
+    /// Build the interpolated surface over a stripper.
     ///
-    /// Fallible, and it strips eagerly: the constructor reads the caplet
-    /// strikes and fixing dates to snapshot its strike domain and maximum date.
-    /// It fails on a stripper whose term-volatility surface carries no
-    /// settlement days, which is every pinned-reference surface.
+    /// It strips eagerly: the constructor reads the caplet strikes and fixing
+    /// dates to snapshot its strike domain and maximum date.
+    ///
+    /// Args:
+    ///     stripper (OptionletStripper1): The stripper whose caplet grid is
+    ///         served.
+    ///     settings (Settings): The explicit settings supplying the evaluation
+    ///         date the reference date floats off.
+    ///
+    /// Raises:
+    ///     ItofinError: On a stripper whose term-volatility surface carries no
+    ///         settlement days, which is every pinned-reference surface, and
+    ///         on a stripping failure.
     #[new]
     fn new(
         stripper: &PyOptionletStripper1,

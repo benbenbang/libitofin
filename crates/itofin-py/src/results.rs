@@ -13,23 +13,22 @@ use libitofin::types::Real;
 use pyo3::prelude::*;
 use std::collections::BTreeMap;
 
-/// Python `Results`: a read-only snapshot of one instrument valuation
-/// (core `instrument::InstrumentResults`).
+/// A read-only snapshot of one instrument valuation.
 ///
-/// Handed back by every facade's `results()`, which forces the calculation and
-/// then copies the four fields out. The object holds no borrow on the
-/// instrument and no handle to its inputs, so it keeps reporting the valuation
-/// it was taken from even after the instrument reprices.
+/// Handed back by every instrument facade's results(), which forces the
+/// calculation and then copies the four fields out. It holds a copy, not a
+/// view: once taken, an input change reprices the instrument's live accessors
+/// and leaves the snapshot reporting the valuation it was taken from.
 ///
-/// Every field is optional because the core stores it that way: an engine
+/// Every field is optional because the core stores it that way - an engine
 /// fills what it computes and leaves the rest unset. The analytic European
-/// engine, for instance, provides a value but neither an error estimate nor a
+/// engine, for one, provides a value but neither an error estimate nor a
 /// valuation date.
 ///
-/// `additional_results` is REAL-ONLY. The core keeps the engine's extra outputs
-/// as `Shared<dyn Any>` and the only sanctioned downcast in this crate is to
-/// `Real` (`option.rs`'s `exercise_probability`), so a tag holding anything
-/// else is omitted from the dict rather than guessed at.
+/// additional_results is REAL-ONLY: the core keeps the engine's extra outputs
+/// behind a type-erased handle whose only sanctioned downcast is to a real, so
+/// tags holding anything else are OMITTED from the dict rather than guessed
+/// at.
 #[pyclass(name = "Results", frozen)]
 pub struct Results {
     npv: Option<Real>,
@@ -40,27 +39,40 @@ pub struct Results {
 
 #[pymethods]
 impl Results {
-    /// The net present value, or `None` when the engine provided none.
+    /// The net present value.
+    ///
+    /// Returns:
+    ///     float | None: The value, or None when the engine provided none.
     #[getter]
     fn npv(&self) -> Option<f64> {
         self.npv
     }
 
-    /// The standard error on the value, or `None` on the engines that do not
-    /// produce one - every analytic engine here.
+    /// The standard error on the value.
+    ///
+    /// Returns:
+    ///     float | None: The standard error, or None on the engines that do
+    ///         not produce one, which is every analytic engine here.
     #[getter]
     fn error_estimate(&self) -> Option<f64> {
         self.error_estimate
     }
 
-    /// The date the value refers to, or `None` when the engine did not say.
+    /// The date the value refers to.
+    ///
+    /// Returns:
+    ///     Date | None: The valuation date, or None when the engine did not
+    ///         say.
     #[getter]
     fn valuation_date(&self) -> Option<PyDate> {
         self.valuation_date.map(PyDate::from_inner)
     }
 
-    /// The engine's extra named outputs, restricted to the real-valued tags;
-    /// see the class docs.
+    /// The engine's extra named outputs, restricted to the real-valued tags.
+    ///
+    /// Returns:
+    ///     dict[str, float]: The real-valued tags; see the class docs for why
+    ///         the others are omitted.
     #[getter]
     fn additional_results(&self) -> BTreeMap<String, f64> {
         self.additional_results.clone()
