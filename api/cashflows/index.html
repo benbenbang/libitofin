@@ -1,0 +1,4899 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Python API reference for itofin, the Rust QuantLib port (libitofin).">
+      
+      
+      
+        <link rel="canonical" href="https://benbenbang.github.io/libitofin/api/cashflows/">
+      
+      
+        <link rel="prev" href="../instruments/">
+      
+      
+        <link rel="next" href="../pricingengines/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Cashflows - itofin</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#cashflows" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="itofin" class="md-header__button md-logo" aria-label="itofin" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            itofin
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Cashflows
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/benbenbang/libitofin" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    benbenbang/libitofin
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="itofin" class="md-nav__button md-logo" aria-label="itofin" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    itofin
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/benbenbang/libitofin" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    benbenbang/libitofin
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Python API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../time/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Time
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quotes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quotes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../termstructures/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Term structures
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../processes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Processes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../indexes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indexes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../instruments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Instruments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cashflows
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cashflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#itofin.cashflows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-module"></code>&nbsp;cashflows
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label=" cashflows">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationCoupon" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;YoYInflationCoupon
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label=" YoYInflationCoupon">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationCoupon.rate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;rate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationCoupon.amount" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;amount
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationCoupon.fixing_date" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;fixing_date
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationCoupon.index_fixing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;index_fixing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationCoupon.nominal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;nominal
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationCoupon.accrual_start_date" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;accrual_start_date
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationCoupon.accrual_end_date" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;accrual_end_date
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationCoupon.accrual_period" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;accrual_period
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationCoupon.date" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;date
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationCoupon.day_counter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;day_counter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationCoupon.gearing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;gearing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationCoupon.spread" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;spread
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationCoupon.observation_lag" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;observation_lag
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationCoupon.interpolation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;interpolation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationCoupon.fixing_days" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;fixing_days
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationOptionletCouponPricer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;YoYInflationOptionletCouponPricer
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label=" YoYInflationOptionletCouponPricer">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationOptionletCouponPricer.black" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;black
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationOptionletCouponPricer.unit_displaced" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;unit_displaced
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationOptionletCouponPricer.bachelier" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;bachelier
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.CappedFlooredYoYInflationCoupon" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;CappedFlooredYoYInflationCoupon
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label=" CappedFlooredYoYInflationCoupon">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.CappedFlooredYoYInflationCoupon.rate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;rate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.CappedFlooredYoYInflationCoupon.amount" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;amount
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.CappedFlooredYoYInflationCoupon.is_capped" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;is_capped
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.CappedFlooredYoYInflationCoupon.is_floored" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;is_floored
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.CappedFlooredYoYInflationCoupon.effective_cap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;effective_cap
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.CappedFlooredYoYInflationCoupon.effective_floor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;effective_floor
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationLeg" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;YoYInflationLeg
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label=" YoYInflationLeg">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationLeg.coupons" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;coupons
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationLeg.capped_floored_coupons" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;capped_floored_coupons
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationLeg.build" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;build
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.CashFlow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;CashFlow
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label=" CashFlow">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.CashFlow.amount" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;amount
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.CashFlow.date" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;date
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.Leg" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;Leg
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.IborLeg" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;IborLeg
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label=" IborLeg">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.IborLeg.with_notional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;with_notional
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.IborLeg.with_payment_day_counter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;with_payment_day_counter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.IborLeg.with_payment_adjustment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;with_payment_adjustment
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.IborLeg.with_fixing_days" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;with_fixing_days
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.IborLeg.coupon_count" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;coupon_count
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.npv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;npv
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pricingengines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pricing engines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../optimization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optimization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../results/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../rust/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#itofin.cashflows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-module"></code>&nbsp;cashflows
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label=" cashflows">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationCoupon" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;YoYInflationCoupon
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label=" YoYInflationCoupon">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationCoupon.rate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;rate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationCoupon.amount" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;amount
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationCoupon.fixing_date" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;fixing_date
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationCoupon.index_fixing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;index_fixing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationCoupon.nominal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;nominal
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationCoupon.accrual_start_date" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;accrual_start_date
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationCoupon.accrual_end_date" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;accrual_end_date
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationCoupon.accrual_period" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;accrual_period
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationCoupon.date" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;date
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationCoupon.day_counter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;day_counter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationCoupon.gearing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;gearing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationCoupon.spread" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;spread
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationCoupon.observation_lag" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;observation_lag
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationCoupon.interpolation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;interpolation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationCoupon.fixing_days" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;fixing_days
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationOptionletCouponPricer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;YoYInflationOptionletCouponPricer
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label=" YoYInflationOptionletCouponPricer">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationOptionletCouponPricer.black" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;black
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationOptionletCouponPricer.unit_displaced" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;unit_displaced
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationOptionletCouponPricer.bachelier" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;bachelier
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.CappedFlooredYoYInflationCoupon" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;CappedFlooredYoYInflationCoupon
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label=" CappedFlooredYoYInflationCoupon">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.CappedFlooredYoYInflationCoupon.rate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;rate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.CappedFlooredYoYInflationCoupon.amount" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;amount
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.CappedFlooredYoYInflationCoupon.is_capped" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;is_capped
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.CappedFlooredYoYInflationCoupon.is_floored" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;is_floored
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.CappedFlooredYoYInflationCoupon.effective_cap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;effective_cap
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.CappedFlooredYoYInflationCoupon.effective_floor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;effective_floor
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationLeg" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;YoYInflationLeg
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label=" YoYInflationLeg">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationLeg.coupons" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;coupons
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationLeg.capped_floored_coupons" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;capped_floored_coupons
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.YoYInflationLeg.build" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;build
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.CashFlow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;CashFlow
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label=" CashFlow">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.CashFlow.amount" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;amount
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.CashFlow.date" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;date
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.Leg" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;Leg
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.IborLeg" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;IborLeg
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label=" IborLeg">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.IborLeg.with_notional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;with_notional
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.IborLeg.with_payment_day_counter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;with_payment_day_counter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.IborLeg.with_payment_adjustment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;with_payment_adjustment
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.IborLeg.with_fixing_days" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;with_fixing_days
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.IborLeg.coupon_count" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;coupon_count
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.cashflows.npv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;npv
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="cashflows">Cashflows<a class="headerlink" href="#cashflows" title="Permanent link">&para;</a></h1>
+<p>Coupons, legs and cashflow analytics.</p>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="itofin.cashflows" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-module"></code>            <span class="doc doc-object-name doc-module-name">cashflows</span>
+
+
+<a href="#itofin.cashflows" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Runtime source shim for the native <code>itofin.cashflows</code> submodule.</p>
+<p>The real <code>itofin.cashflows</code> is a compiled submodule registered into
+<code>sys.modules</code> by the extension (see crates/itofin-py/src/lib.rs); it wins
+at import time, so nothing here runs. This file exists only so static type
+checkers resolve <code>from itofin.cashflows import ...</code> from <code>cashflows.pyi</code> without
+a <code>reportMissingModuleSource</code> warning.</p>
+<p>Auto-generated by scripts/gen_submodule_shims.py from <code>cashflows.pyi</code>; do not edit or delete by hand.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="itofin.cashflows.YoYInflationCoupon" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">YoYInflationCoupon</span>
+
+
+<a href="#itofin.cashflows.YoYInflationCoupon" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>One coupon of a year-on-year inflation leg.</p>
+<p>Built only through YoYInflationLeg, which attaches the pricer rate() and
+amount() need.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="itofin.cashflows.YoYInflationCoupon.rate" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">rate</span>
+
+
+<a href="#itofin.cashflows.YoYInflationCoupon.rate" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">rate</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><span title="float">float</span></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Return the rate the coupon accrues at: the geared index fixing plus the spread.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>float</code></td>            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The pricer's swaplet rate.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            ItofinError (itofin.ItofinError)" href="../core/#itofin.ItofinError">ItofinError</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If no pricer is attached, or resolving the fixing
+fails - a missing history entry, or a forecast off an index with
+no curve linked.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="itofin.cashflows.YoYInflationCoupon.amount" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">amount</span>
+
+
+<a href="#itofin.cashflows.YoYInflationCoupon.amount" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">amount</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><span title="float">float</span></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Return what the coupon pays on its payment date, undiscounted.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>float</code></td>            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>rate() * accrual_period() * nominal().</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            ItofinError (itofin.ItofinError)" href="../core/#itofin.ItofinError">ItofinError</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>As rate().</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="itofin.cashflows.YoYInflationCoupon.fixing_date" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">fixing_date</span>
+
+
+<a href="#itofin.cashflows.YoYInflationCoupon.fixing_date" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">fixing_date</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="            Date (itofin.time.Date)" href="../time/#itofin.time.Date">Date</a></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Return the date the observation is published on.</p>
+<p>The reference-period end moved back by the observation lag, then back
+the fixing days. This is not the date the rate resolves at: an inflation
+index has no fixing calendar, so with no fixing days the roll is inert.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>Date</code></td>            <td>
+                  <code><a class="autorefs autorefs-internal" title="            Date (itofin.time.Date)" href="../time/#itofin.time.Date">Date</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The publication date.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="itofin.cashflows.YoYInflationCoupon.index_fixing" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">index_fixing</span>
+
+
+<a href="#itofin.cashflows.YoYInflationCoupon.index_fixing" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">index_fixing</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><span title="float">float</span></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Return the year-on-year rate observed, before gearing and spread.</p>
+<p>It lags off accrual_end_date(), not off fixing_date(): a year-on-year
+coupon overrides the base rule that reads the index at its fixing date.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>float</code></td>            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The observed rate.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            ItofinError (itofin.ItofinError)" href="../core/#itofin.ItofinError">ItofinError</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>As rate(), bar the missing pricer.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="itofin.cashflows.YoYInflationCoupon.nominal" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">nominal</span>
+
+
+<a href="#itofin.cashflows.YoYInflationCoupon.nominal" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">nominal</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><span title="float">float</span></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Return the nominal the coupon accrues on.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>float</code></td>            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The nominal.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="itofin.cashflows.YoYInflationCoupon.accrual_start_date" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">accrual_start_date</span>
+
+
+<a href="#itofin.cashflows.YoYInflationCoupon.accrual_start_date" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">accrual_start_date</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="            Date (itofin.time.Date)" href="../time/#itofin.time.Date">Date</a></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Return the start of the accrual period.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>Date</code></td>            <td>
+                  <code><a class="autorefs autorefs-internal" title="            Date (itofin.time.Date)" href="../time/#itofin.time.Date">Date</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The accrual start.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="itofin.cashflows.YoYInflationCoupon.accrual_end_date" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">accrual_end_date</span>
+
+
+<a href="#itofin.cashflows.YoYInflationCoupon.accrual_end_date" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">accrual_end_date</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="            Date (itofin.time.Date)" href="../time/#itofin.time.Date">Date</a></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Return the end of the accrual period, which is also where the observation lags from.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>Date</code></td>            <td>
+                  <code><a class="autorefs autorefs-internal" title="            Date (itofin.time.Date)" href="../time/#itofin.time.Date">Date</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The accrual end.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="itofin.cashflows.YoYInflationCoupon.accrual_period" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">accrual_period</span>
+
+
+<a href="#itofin.cashflows.YoYInflationCoupon.accrual_period" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">accrual_period</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><span title="float">float</span></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Return the whole accrual period as a fraction of a year.</p>
+<p>Measured with day_counter() over the reference period.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>float</code></td>            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The year fraction.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="itofin.cashflows.YoYInflationCoupon.date" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">date</span>
+
+
+<a href="#itofin.cashflows.YoYInflationCoupon.date" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">date</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="            Date (itofin.time.Date)" href="../time/#itofin.time.Date">Date</a></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Return the payment date: the accrual end rolled on the leg's payment calendar.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>Date</code></td>            <td>
+                  <code><a class="autorefs autorefs-internal" title="            Date (itofin.time.Date)" href="../time/#itofin.time.Date">Date</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The payment date.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="itofin.cashflows.YoYInflationCoupon.day_counter" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">day_counter</span>
+
+
+<a href="#itofin.cashflows.YoYInflationCoupon.day_counter" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">day_counter</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="            DayCounter (itofin.time.DayCounter)" href="../time/#itofin.time.DayCounter">DayCounter</a></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Return the day counter the accrual is measured with.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>DayCounter</code></td>            <td>
+                  <code><a class="autorefs autorefs-internal" title="            DayCounter (itofin.time.DayCounter)" href="../time/#itofin.time.DayCounter">DayCounter</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The coupon day count.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="itofin.cashflows.YoYInflationCoupon.gearing" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">gearing</span>
+
+
+<a href="#itofin.cashflows.YoYInflationCoupon.gearing" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">gearing</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><span title="float">float</span></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Return the multiplicative coefficient applied to the index fixing.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>float</code></td>            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The gearing.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="itofin.cashflows.YoYInflationCoupon.spread" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">spread</span>
+
+
+<a href="#itofin.cashflows.YoYInflationCoupon.spread" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">spread</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><span title="float">float</span></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Return the spread paid over the geared fixing.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>float</code></td>            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The spread.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="itofin.cashflows.YoYInflationCoupon.observation_lag" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">observation_lag</span>
+
+
+<a href="#itofin.cashflows.YoYInflationCoupon.observation_lag" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">observation_lag</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="            Period (itofin.time.Period)" href="../time/#itofin.time.Period">Period</a></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Return how far back the coupon observes the index.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>Period</code></td>            <td>
+                  <code><a class="autorefs autorefs-internal" title="            Period (itofin.time.Period)" href="../time/#itofin.time.Period">Period</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The observation lag.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="itofin.cashflows.YoYInflationCoupon.interpolation" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">interpolation</span>
+
+
+<a href="#itofin.cashflows.YoYInflationCoupon.interpolation" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">interpolation</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="            CpiInterpolationType (itofin.indexes.CpiInterpolationType)" href="../indexes/#itofin.indexes.CpiInterpolationType">CpiInterpolationType</a></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Return how the observation interpolates between index fixings.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>CpiInterpolationType</code></td>            <td>
+                  <code><a class="autorefs autorefs-internal" title="            CpiInterpolationType (itofin.indexes.CpiInterpolationType)" href="../indexes/#itofin.indexes.CpiInterpolationType">CpiInterpolationType</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Flat or Linear.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="itofin.cashflows.YoYInflationCoupon.fixing_days" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">fixing_days</span>
+
+
+<a href="#itofin.cashflows.YoYInflationCoupon.fixing_days" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">fixing_days</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><span title="int">int</span></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Return the number of business days the fixing date rolls back by.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>int</code></td>            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The fixing days.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="itofin.cashflows.YoYInflationOptionletCouponPricer" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">YoYInflationOptionletCouponPricer</span>
+
+
+<a href="#itofin.cashflows.YoYInflationOptionletCouponPricer" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Values a capped or floored year-on-year coupon's optionlets off a
+volatility surface.</p>
+<p>The distribution is chosen by the constructor: black is lognormal,
+unit_displaced lognormal in 1 + rate and bachelier normal. The settings
+behind volatility and behind the priced coupons' index must be the same
+object. nominal_ts is optional: only the discounted price path reads it.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="itofin.cashflows.YoYInflationOptionletCouponPricer.black" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">black</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+<a href="#itofin.cashflows.YoYInflationOptionletCouponPricer.black" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">black</span><span class="p">(</span><span class="n">volatility</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            ConstantYoYOptionletVolatility (itofin.termstructures.ConstantYoYOptionletVolatility)" href="../termstructures/#itofin.termstructures.ConstantYoYOptionletVolatility">ConstantYoYOptionletVolatility</a></span><span class="p">,</span> <span class="n">nominal_ts</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            YieldTermStructure (itofin.termstructures.YieldTermStructure)" href="../termstructures/#itofin.termstructures.YieldTermStructure">YieldTermStructure</a></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="            YoYInflationOptionletCouponPricer (itofin.cashflows.YoYInflationOptionletCouponPricer)" href="#itofin.cashflows.YoYInflationOptionletCouponPricer">YoYInflationOptionletCouponPricer</a></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Build a pricer valuing optionlets under the lognormal model.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>volatility</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            ConstantYoYOptionletVolatility (itofin.termstructures.ConstantYoYOptionletVolatility)" href="../termstructures/#itofin.termstructures.ConstantYoYOptionletVolatility">ConstantYoYOptionletVolatility</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The surface optionlet
+volatilities are read off.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>nominal_ts</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            YieldTermStructure (itofin.termstructures.YieldTermStructure)" href="../termstructures/#itofin.termstructures.YieldTermStructure">YieldTermStructure</a> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The discount curve; only the
+discounted price path reads it.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>YoYInflationOptionletCouponPricer</code></td>            <td>
+                  <code><a class="autorefs autorefs-internal" title="            YoYInflationOptionletCouponPricer (itofin.cashflows.YoYInflationOptionletCouponPricer)" href="#itofin.cashflows.YoYInflationOptionletCouponPricer">YoYInflationOptionletCouponPricer</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The lognormal pricer.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="itofin.cashflows.YoYInflationOptionletCouponPricer.unit_displaced" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">unit_displaced</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+<a href="#itofin.cashflows.YoYInflationOptionletCouponPricer.unit_displaced" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">unit_displaced</span><span class="p">(</span><span class="n">volatility</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            ConstantYoYOptionletVolatility (itofin.termstructures.ConstantYoYOptionletVolatility)" href="../termstructures/#itofin.termstructures.ConstantYoYOptionletVolatility">ConstantYoYOptionletVolatility</a></span><span class="p">,</span> <span class="n">nominal_ts</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            YieldTermStructure (itofin.termstructures.YieldTermStructure)" href="../termstructures/#itofin.termstructures.YieldTermStructure">YieldTermStructure</a></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="            YoYInflationOptionletCouponPricer (itofin.cashflows.YoYInflationOptionletCouponPricer)" href="#itofin.cashflows.YoYInflationOptionletCouponPricer">YoYInflationOptionletCouponPricer</a></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Build a pricer valuing optionlets under the unit-displaced lognormal model.</p>
+<p>Lognormal in 1 + rate, the usual quoting convention for an inflation
+rate that may go negative.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>volatility</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            ConstantYoYOptionletVolatility (itofin.termstructures.ConstantYoYOptionletVolatility)" href="../termstructures/#itofin.termstructures.ConstantYoYOptionletVolatility">ConstantYoYOptionletVolatility</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The surface optionlet
+volatilities are read off.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>nominal_ts</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            YieldTermStructure (itofin.termstructures.YieldTermStructure)" href="../termstructures/#itofin.termstructures.YieldTermStructure">YieldTermStructure</a> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The discount curve; only the
+discounted price path reads it.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>YoYInflationOptionletCouponPricer</code></td>            <td>
+                  <code><a class="autorefs autorefs-internal" title="            YoYInflationOptionletCouponPricer (itofin.cashflows.YoYInflationOptionletCouponPricer)" href="#itofin.cashflows.YoYInflationOptionletCouponPricer">YoYInflationOptionletCouponPricer</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The unit-displaced pricer.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="itofin.cashflows.YoYInflationOptionletCouponPricer.bachelier" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">bachelier</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+<a href="#itofin.cashflows.YoYInflationOptionletCouponPricer.bachelier" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">bachelier</span><span class="p">(</span><span class="n">volatility</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            ConstantYoYOptionletVolatility (itofin.termstructures.ConstantYoYOptionletVolatility)" href="../termstructures/#itofin.termstructures.ConstantYoYOptionletVolatility">ConstantYoYOptionletVolatility</a></span><span class="p">,</span> <span class="n">nominal_ts</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            YieldTermStructure (itofin.termstructures.YieldTermStructure)" href="../termstructures/#itofin.termstructures.YieldTermStructure">YieldTermStructure</a></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="            YoYInflationOptionletCouponPricer (itofin.cashflows.YoYInflationOptionletCouponPricer)" href="#itofin.cashflows.YoYInflationOptionletCouponPricer">YoYInflationOptionletCouponPricer</a></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Build a pricer valuing optionlets under the normal model.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>volatility</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            ConstantYoYOptionletVolatility (itofin.termstructures.ConstantYoYOptionletVolatility)" href="../termstructures/#itofin.termstructures.ConstantYoYOptionletVolatility">ConstantYoYOptionletVolatility</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The surface optionlet
+volatilities are read off.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>nominal_ts</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            YieldTermStructure (itofin.termstructures.YieldTermStructure)" href="../termstructures/#itofin.termstructures.YieldTermStructure">YieldTermStructure</a> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The discount curve; only the
+discounted price path reads it.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>YoYInflationOptionletCouponPricer</code></td>            <td>
+                  <code><a class="autorefs autorefs-internal" title="            YoYInflationOptionletCouponPricer (itofin.cashflows.YoYInflationOptionletCouponPricer)" href="#itofin.cashflows.YoYInflationOptionletCouponPricer">YoYInflationOptionletCouponPricer</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The normal pricer.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="itofin.cashflows.CappedFlooredYoYInflationCoupon" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">CappedFlooredYoYInflationCoupon</span>
+
+
+<a href="#itofin.cashflows.CappedFlooredYoYInflationCoupon" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>A year-on-year inflation coupon with a cap and/or floor on its rate.</p>
+<p>Built only through YoYInflationLeg.capped_floored_coupons. A negative
+gearing swaps the two roles, so is_capped and effective_cap answer off the
+stored level rather than off what the leg was given.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="itofin.cashflows.CappedFlooredYoYInflationCoupon.rate" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">rate</span>
+
+
+<a href="#itofin.cashflows.CappedFlooredYoYInflationCoupon.rate" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">rate</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><span title="float">float</span></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Return the rate the coupon accrues at.</p>
+<p>The underlying's swaplet rate plus the floorlet, less the caplet.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>float</code></td>            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The capped and floored rate.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            ItofinError (itofin.ItofinError)" href="../core/#itofin.ItofinError">ItofinError</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If no pricer is attached, if resolving the fixing
+fails, or if the surface refuses the volatility - a strike
+outside its domain, or an observation before its base date.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="itofin.cashflows.CappedFlooredYoYInflationCoupon.amount" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">amount</span>
+
+
+<a href="#itofin.cashflows.CappedFlooredYoYInflationCoupon.amount" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">amount</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><span title="float">float</span></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Return what the coupon pays on its payment date, undiscounted.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>float</code></td>            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>rate() * accrual_period() * nominal().</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            ItofinError (itofin.ItofinError)" href="../core/#itofin.ItofinError">ItofinError</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>As rate().</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="itofin.cashflows.CappedFlooredYoYInflationCoupon.is_capped" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">is_capped</span>
+
+
+<a href="#itofin.cashflows.CappedFlooredYoYInflationCoupon.is_capped" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">is_capped</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><span title="bool">bool</span></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Return whether a cap applies.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>bool</code></td>            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>True if the stored cap level is set.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="itofin.cashflows.CappedFlooredYoYInflationCoupon.is_floored" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">is_floored</span>
+
+
+<a href="#itofin.cashflows.CappedFlooredYoYInflationCoupon.is_floored" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">is_floored</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><span title="bool">bool</span></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Return whether a floor applies.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>bool</code></td>            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>True if the stored floor level is set.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="itofin.cashflows.CappedFlooredYoYInflationCoupon.effective_cap" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">effective_cap</span>
+
+
+<a href="#itofin.cashflows.CappedFlooredYoYInflationCoupon.effective_cap" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">effective_cap</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><span title="float">float</span></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Return the de-spread, de-geared cap the caplet is struck at.</p>
+<p>Read off the stored level, so a negative gearing has already swapped the
+two roles.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>float</code></td>            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>(cap - spread) / gearing.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="itofin.cashflows.CappedFlooredYoYInflationCoupon.effective_floor" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">effective_floor</span>
+
+
+<a href="#itofin.cashflows.CappedFlooredYoYInflationCoupon.effective_floor" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">effective_floor</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><span title="float">float</span></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Return the de-spread, de-geared floor the floorlet is struck at.</p>
+<p>Read off the stored level, so a negative gearing has already swapped the
+two roles.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>float</code></td>            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>(floor - spread) / gearing.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="itofin.cashflows.YoYInflationLeg" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">YoYInflationLeg</span>
+
+
+<a href="#itofin.cashflows.YoYInflationLeg" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">YoYInflationLeg</span><span class="p">(</span><span class="n">schedule</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            Schedule (itofin.time.Schedule)" href="../time/#itofin.time.Schedule">Schedule</a></span><span class="p">,</span> <span class="n">payment_calendar</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            Calendar (itofin.time.Calendar)" href="../time/#itofin.time.Calendar">Calendar</a></span><span class="p">,</span> <span class="n">index</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            YoYInflationIndex (itofin.indexes.YoYInflationIndex)" href="../indexes/#itofin.indexes.YoYInflationIndex">YoYInflationIndex</a></span><span class="p">,</span> <span class="n">observation_lag</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            Period (itofin.time.Period)" href="../time/#itofin.time.Period">Period</a></span><span class="p">,</span> <span class="n">interpolation</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            CpiInterpolationType (itofin.indexes.CpiInterpolationType)" href="../indexes/#itofin.indexes.CpiInterpolationType">CpiInterpolationType</a></span><span class="p">,</span> <span class="n">payment_day_counter</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            DayCounter (itofin.time.DayCounter)" href="../time/#itofin.time.DayCounter">DayCounter</a></span><span class="p">,</span> <span class="n">notional</span><span class="p">:</span> <span class="n"><span title="float">float</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">notionals</span><span class="p">:</span> <span class="n"><span title="list">list</span></span><span class="p">[</span><span class="n"><span title="float">float</span></span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">payment_adjustment</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            BusinessDayConvention (itofin.time.BusinessDayConvention)" href="../time/#itofin.time.BusinessDayConvention">BusinessDayConvention</a></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">fixing_days</span><span class="p">:</span> <span class="n"><span title="int">int</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">gearing</span><span class="p">:</span> <span class="n"><span title="float">float</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">gearings</span><span class="p">:</span> <span class="n"><span title="list">list</span></span><span class="p">[</span><span class="n"><span title="float">float</span></span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">spread</span><span class="p">:</span> <span class="n"><span title="float">float</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">spreads</span><span class="p">:</span> <span class="n"><span title="list">list</span></span><span class="p">[</span><span class="n"><span title="float">float</span></span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">caps</span><span class="p">:</span> <span class="n"><span title="list">list</span></span><span class="p">[</span><span class="n"><span title="float">float</span></span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">floors</span><span class="p">:</span> <span class="n"><span title="list">list</span></span><span class="p">[</span><span class="n"><span title="float">float</span></span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Builds a sequence of year-on-year inflation coupons from a schedule.</p>
+<p>The core builder is a consumed-self fluent chain, which does not cross the
+FFI boundary; this facade takes the whole configuration up front and
+assembles the chain inside coupons(). An unset optional leaves the core
+default in place: a ModifiedFollowing payment roll, no fixing days, a unit
+gearing and no spread.</p>
+<p>The caps and floors lists select which of the two coupon types the leg
+produces: given either, coupons() hands back coupons the core deliberately
+leaves unpriced and capped_floored_coupons is the intended entry.</p>
+
+        <p>Configure a leg over schedule paying index, observed observation_lag back.</p>
+<p>payment_day_counter is required here although the core takes it through
+a setter, so a missing one is a build-time error rather than one raised
+from coupons(). A notional is just as required by the core but stays
+optional, since the per-coupon notionals list is the other way to supply
+it; giving neither surfaces that error from coupons().</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>schedule</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            Schedule (itofin.time.Schedule)" href="../time/#itofin.time.Schedule">Schedule</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The accrual schedule, one coupon per period.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>payment_calendar</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            Calendar (itofin.time.Calendar)" href="../time/#itofin.time.Calendar">Calendar</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The calendar payment dates roll on.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>index</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            YoYInflationIndex (itofin.indexes.YoYInflationIndex)" href="../indexes/#itofin.indexes.YoYInflationIndex">YoYInflationIndex</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The index the coupons observe.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>observation_lag</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            Period (itofin.time.Period)" href="../time/#itofin.time.Period">Period</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>How far back each coupon observes it.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>interpolation</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            CpiInterpolationType (itofin.indexes.CpiInterpolationType)" href="../indexes/#itofin.indexes.CpiInterpolationType">CpiInterpolationType</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>How the observation
+interpolates between index fixings.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>payment_day_counter</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            DayCounter (itofin.time.DayCounter)" href="../time/#itofin.time.DayCounter">DayCounter</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The day count the accruals are
+measured with.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>notional</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>One nominal for every coupon.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>notionals</code>
+            </td>
+            <td>
+                  <code><span title="list">list</span>[<span title="float">float</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A per-coupon nominal, the
+alternative to notional.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>payment_adjustment</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            BusinessDayConvention (itofin.time.BusinessDayConvention)" href="../time/#itofin.time.BusinessDayConvention">BusinessDayConvention</a> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The payment roll;
+the core default is ModifiedFollowing.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>fixing_days</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The business days the fixing date rolls
+back by; the core default is none.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>gearing</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>One gearing for every coupon; the core
+default is unit.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>gearings</code>
+            </td>
+            <td>
+                  <code><span title="list">list</span>[<span title="float">float</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A per-coupon gearing.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>spread</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>One spread for every coupon; the core default
+is none.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>spreads</code>
+            </td>
+            <td>
+                  <code><span title="list">list</span>[<span title="float">float</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A per-coupon spread.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>caps</code>
+            </td>
+            <td>
+                  <code><span title="list">list</span>[<span title="float">float</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A per-coupon cap level; given either
+list, capped_floored_coupons is the intended entry.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>floors</code>
+            </td>
+            <td>
+                  <code><span title="list">list</span>[<span title="float">float</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A per-coupon floor level.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="itofin.cashflows.YoYInflationLeg.coupons" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">coupons</span>
+
+
+<a href="#itofin.cashflows.YoYInflationLeg.coupons" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">coupons</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><span title="list">list</span></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-internal" title="            YoYInflationCoupon (itofin.cashflows.YoYInflationCoupon)" href="#itofin.cashflows.YoYInflationCoupon">YoYInflationCoupon</a></span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Return the coupons, each carrying the default swaplet pricer.</p>
+<p>Every call rebuilds the leg, so the coupons handed back are fresh
+objects each time: bind the list once rather than calling this per read,
+or two reads compare different objects. Given caps or floors the coupons
+come back unpriced, and capped_floored_coupons is the intended entry.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="list">list</span>[<a class="autorefs autorefs-internal" title="            YoYInflationCoupon (itofin.cashflows.YoYInflationCoupon)" href="#itofin.cashflows.YoYInflationCoupon">YoYInflationCoupon</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>list[YoYInflationCoupon]: The freshly built coupons.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            ItofinError (itofin.ItofinError)" href="../core/#itofin.ItofinError">ItofinError</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If the leg has no notional, the schedule holds fewer
+than two dates, or there are more notionals, gearings or spreads
+than the schedule has periods.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="itofin.cashflows.YoYInflationLeg.capped_floored_coupons" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">capped_floored_coupons</span>
+
+
+<a href="#itofin.cashflows.YoYInflationLeg.capped_floored_coupons" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">capped_floored_coupons</span><span class="p">(</span><span class="n">pricer</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            YoYInflationOptionletCouponPricer (itofin.cashflows.YoYInflationOptionletCouponPricer)" href="#itofin.cashflows.YoYInflationOptionletCouponPricer">YoYInflationOptionletCouponPricer</a></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="list">list</span></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-internal" title="            CappedFlooredYoYInflationCoupon (itofin.cashflows.CappedFlooredYoYInflationCoupon)" href="#itofin.cashflows.CappedFlooredYoYInflationCoupon">CappedFlooredYoYInflationCoupon</a></span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Return the coupons wrapped in the leg's caps and floors, each carrying pricer.</p>
+<p>The pricer is required rather than optional: the core withholds its
+default swaplet pricer from a capped leg, and a swaplet pricer could not
+value the optionlets anyway. One pricer is installed across every
+coupon. Rebuilt on every call, as coupons() is.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>pricer</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            YoYInflationOptionletCouponPricer (itofin.cashflows.YoYInflationOptionletCouponPricer)" href="#itofin.cashflows.YoYInflationOptionletCouponPricer">YoYInflationOptionletCouponPricer</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The pricer installed
+across every coupon.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="list">list</span>[<a class="autorefs autorefs-internal" title="            CappedFlooredYoYInflationCoupon (itofin.cashflows.CappedFlooredYoYInflationCoupon)" href="#itofin.cashflows.CappedFlooredYoYInflationCoupon">CappedFlooredYoYInflationCoupon</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>list[CappedFlooredYoYInflationCoupon]: The freshly built coupons.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            ItofinError (itofin.ItofinError)" href="../core/#itofin.ItofinError">ItofinError</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>As coupons(), plus more caps or floors than the
+schedule has periods, and a cap sitting below its floor.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="itofin.cashflows.YoYInflationLeg.build" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">build</span>
+
+
+<a href="#itofin.cashflows.YoYInflationLeg.build" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">build</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="            Leg (itofin.cashflows.Leg)" href="#itofin.cashflows.Leg">Leg</a></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Return the leg with its coupon type erased, the form npv() sums.</p>
+<p>The plain path erases coupons already carrying the default swaplet
+pricer. With a caps or floors list the erased coupons carry NO pricer,
+and because every call rebuilds the leg a pricer installed through
+capped_floored_coupons() does not reach them: a capped erased leg
+reports "pricer not set" from CashFlow.amount(), and the priced capped
+path stays capped_floored_coupons(). Rebuilt on every call.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>Leg</code></td>            <td>
+                  <code><a class="autorefs autorefs-internal" title="            Leg (itofin.cashflows.Leg)" href="#itofin.cashflows.Leg">Leg</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The freshly built erased leg.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            ItofinError (itofin.ItofinError)" href="../core/#itofin.ItofinError">ItofinError</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>As coupons().</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="itofin.cashflows.CashFlow" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">CashFlow</span>
+
+
+<a href="#itofin.cashflows.CashFlow" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>One erased flow of a Leg, read-only.</p>
+<p>It answers what it pays and when, which is all the leg-summing npv() needs;
+the concrete coupon accessors stay on the typed coupon wrappers.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="itofin.cashflows.CashFlow.amount" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">amount</span>
+
+
+<a href="#itofin.cashflows.CashFlow.amount" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">amount</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><span title="float">float</span></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Return what the flow pays on its date, undiscounted.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>float</code></td>            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The undiscounted payment amount.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            ItofinError (itofin.ItofinError)" href="../core/#itofin.ItofinError">ItofinError</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>On a coupon with no pricer attached, and on whatever
+resolving its fixing reports - a missing history entry, or a
+forecast off an index with no curve linked.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="itofin.cashflows.CashFlow.date" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">date</span>
+
+
+<a href="#itofin.cashflows.CashFlow.date" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">date</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="            Date (itofin.time.Date)" href="../time/#itofin.time.Date">Date</a></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Return the date the flow pays on.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>Date</code></td>            <td>
+                  <code><a class="autorefs autorefs-internal" title="            Date (itofin.time.Date)" href="../time/#itofin.time.Date">Date</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The payment date.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="itofin.cashflows.Leg" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">Leg</span>
+
+
+<a href="#itofin.cashflows.Leg" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>A sequence of erased cash flows, built by a leg builder's build().</p>
+<p>Indexable and sized, which with CashFlow's two accessors is enough to
+hand-check what npv() sums.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="itofin.cashflows.IborLeg" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">IborLeg</span>
+
+
+<a href="#itofin.cashflows.IborLeg" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">IborLeg</span><span class="p">(</span><span class="n">schedule</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            Schedule (itofin.time.Schedule)" href="../time/#itofin.time.Schedule">Schedule</a></span><span class="p">,</span> <span class="n">index</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            IborIndex (itofin.indexes.IborIndex)" href="../indexes/#itofin.indexes.IborIndex">IborIndex</a></span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Builds a sequence of floating ibor coupons from a schedule.</p>
+<p>The setters keep the core's fluent shape: each returns a NEW leg carrying
+the extra setting, so a leg bound to a name never changes under a later
+call. An unset optional leaves the core default in place: a Following
+payment roll and the index's own fixing days and day counter.</p>
+<p>The coupons themselves are not exposed: they are consumed by the raw
+CapFloor.cap / floor / collar constructors, which is the reason this leg
+exists. No caps/floors setter is offered either - a capped leg withholds the
+default coupon pricer in the core, so the strikes belong on the cap/floor
+constructor.</p>
+
+        <p>Configure a leg over schedule paying index, on the schedule's own calendar.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>schedule</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            Schedule (itofin.time.Schedule)" href="../time/#itofin.time.Schedule">Schedule</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The accrual schedule, one coupon per period.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>index</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            IborIndex (itofin.indexes.IborIndex)" href="../indexes/#itofin.indexes.IborIndex">IborIndex</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The index the floating coupons fix off.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="itofin.cashflows.IborLeg.with_notional" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">with_notional</span>
+
+
+<a href="#itofin.cashflows.IborLeg.with_notional" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">with_notional</span><span class="p">(</span><span class="n">notional</span><span class="p">:</span> <span class="n"><span title="float">float</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="            IborLeg (itofin.cashflows.IborLeg)" href="#itofin.cashflows.IborLeg">IborLeg</a></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Return the leg with notional on every coupon.</p>
+<p>Required: a leg built without one reports "no notional given" from
+coupon_count().</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>notional</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The nominal every coupon accrues on.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>IborLeg</code></td>            <td>
+                  <code><a class="autorefs autorefs-internal" title="            IborLeg (itofin.cashflows.IborLeg)" href="#itofin.cashflows.IborLeg">IborLeg</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A new leg carrying the notional.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="itofin.cashflows.IborLeg.with_payment_day_counter" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">with_payment_day_counter</span>
+
+
+<a href="#itofin.cashflows.IborLeg.with_payment_day_counter" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">with_payment_day_counter</span><span class="p">(</span><span class="n">day_counter</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            DayCounter (itofin.time.DayCounter)" href="../time/#itofin.time.DayCounter">DayCounter</a></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="            IborLeg (itofin.cashflows.IborLeg)" href="#itofin.cashflows.IborLeg">IborLeg</a></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Return the leg accruing with day_counter, overriding the index's.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>day_counter</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            DayCounter (itofin.time.DayCounter)" href="../time/#itofin.time.DayCounter">DayCounter</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The day count the accruals are measured
+with.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>IborLeg</code></td>            <td>
+                  <code><a class="autorefs autorefs-internal" title="            IborLeg (itofin.cashflows.IborLeg)" href="#itofin.cashflows.IborLeg">IborLeg</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A new leg carrying the day counter.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="itofin.cashflows.IborLeg.with_payment_adjustment" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">with_payment_adjustment</span>
+
+
+<a href="#itofin.cashflows.IborLeg.with_payment_adjustment" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">with_payment_adjustment</span><span class="p">(</span><span class="n">convention</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            BusinessDayConvention (itofin.time.BusinessDayConvention)" href="../time/#itofin.time.BusinessDayConvention">BusinessDayConvention</a></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="            IborLeg (itofin.cashflows.IborLeg)" href="#itofin.cashflows.IborLeg">IborLeg</a></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Return the leg rolling its payment dates with convention.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>convention</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            BusinessDayConvention (itofin.time.BusinessDayConvention)" href="../time/#itofin.time.BusinessDayConvention">BusinessDayConvention</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The payment roll, overriding the
+core default of Following.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>IborLeg</code></td>            <td>
+                  <code><a class="autorefs autorefs-internal" title="            IborLeg (itofin.cashflows.IborLeg)" href="#itofin.cashflows.IborLeg">IborLeg</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A new leg carrying the convention.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="itofin.cashflows.IborLeg.with_fixing_days" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">with_fixing_days</span>
+
+
+<a href="#itofin.cashflows.IborLeg.with_fixing_days" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">with_fixing_days</span><span class="p">(</span><span class="n">fixing_days</span><span class="p">:</span> <span class="n"><span title="int">int</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="            IborLeg (itofin.cashflows.IborLeg)" href="#itofin.cashflows.IborLeg">IborLeg</a></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Return the leg fixing fixing_days business days before each accrual start.</p>
+<p>Overrides the index's own count.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>fixing_days</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The business days each coupon fixes ahead of its
+accrual start.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>IborLeg</code></td>            <td>
+                  <code><a class="autorefs autorefs-internal" title="            IborLeg (itofin.cashflows.IborLeg)" href="#itofin.cashflows.IborLeg">IborLeg</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A new leg carrying the fixing days.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="itofin.cashflows.IborLeg.coupon_count" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">coupon_count</span>
+
+
+<a href="#itofin.cashflows.IborLeg.coupon_count" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">coupon_count</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><span title="int">int</span></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Return the number of coupons the leg builds, one per schedule period.</p>
+<p>The leg is rebuilt on every call, here and in the cap/floor
+constructors, so this counts the coupons a construction would produce
+rather than a stored list.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>int</code></td>            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The coupon count.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            ItofinError (itofin.ItofinError)" href="../core/#itofin.ItofinError">ItofinError</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If the leg has no notional, the schedule holds fewer
+than two dates, or a coupon's own preconditions reject.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="itofin.cashflows.npv" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">npv</span>
+
+
+<a href="#itofin.cashflows.npv" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">npv</span><span class="p">(</span><span class="n">leg</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            Leg (itofin.cashflows.Leg)" href="#itofin.cashflows.Leg">Leg</a></span><span class="p">,</span> <span class="n">discount_curve</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            YieldTermStructure (itofin.termstructures.YieldTermStructure)" href="../termstructures/#itofin.termstructures.YieldTermStructure">YieldTermStructure</a></span><span class="p">,</span> <span class="n">settings</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            Settings (itofin.Settings)" href="../core/#itofin.Settings">Settings</a></span><span class="p">,</span> <span class="n">include_settlement_date_flows</span><span class="p">:</span> <span class="n"><span title="bool">bool</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">settlement_date</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            Date (itofin.time.Date)" href="../time/#itofin.time.Date">Date</a></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">npv_date</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            Date (itofin.time.Date)" href="../time/#itofin.time.Date">Date</a></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="float">float</span></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Return the NPV of leg: every surviving flow discounted on discount_curve.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>leg</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            Leg (itofin.cashflows.Leg)" href="#itofin.cashflows.Leg">Leg</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The erased flows to sum.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>discount_curve</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            YieldTermStructure (itofin.termstructures.YieldTermStructure)" href="../termstructures/#itofin.termstructures.YieldTermStructure">YieldTermStructure</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The curve the flows discount on.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>settings</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            Settings (itofin.Settings)" href="../core/#itofin.Settings">Settings</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The evaluation context deciding which flows have
+occurred.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>include_settlement_date_flows</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Whether a flow paying
+exactly on the settlement date counts; None defers to the settings'
+include_todays_cash_flows policy.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>settlement_date</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            Date (itofin.time.Date)" href="../time/#itofin.time.Date">Date</a> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The date deciding which flows have
+occurred; None uses the evaluation date, which must then be set.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>npv_date</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            Date (itofin.time.Date)" href="../time/#itofin.time.Date">Date</a> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The date the sum is discounted to; None uses
+settlement_date.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>float</code></td>            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The discounted sum; exactly 0.0 for an empty leg.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            ItofinError (itofin.ItofinError)" href="../core/#itofin.ItofinError">ItofinError</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>On a flow or curve lookup failure, and without a
+settlement_date when the evaluation date is unset.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.top", "navigation.tracking", "content.code.copy", "content.tabs.link", "toc.follow", "search.suggest"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

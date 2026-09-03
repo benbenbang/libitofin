@@ -1,0 +1,4285 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Python API reference for itofin, the Rust QuantLib port (libitofin).">
+      
+      
+      
+        <link rel="canonical" href="https://benbenbang.github.io/libitofin/api/pricingengines/">
+      
+      
+        <link rel="prev" href="../cashflows/">
+      
+      
+        <link rel="next" href="../models/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Pricing engines - itofin</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#pricing-engines" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="itofin" class="md-header__button md-logo" aria-label="itofin" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            itofin
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Pricing engines
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/benbenbang/libitofin" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    benbenbang/libitofin
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="itofin" class="md-nav__button md-logo" aria-label="itofin" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    itofin
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/benbenbang/libitofin" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    benbenbang/libitofin
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Python API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../time/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Time
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quotes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quotes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../termstructures/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Term structures
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../processes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Processes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../indexes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indexes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../instruments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Instruments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cashflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cashflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pricing engines
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pricing engines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#itofin.pricingengines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-module"></code>&nbsp;pricingengines
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label=" pricingengines">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.CashAnnuityModel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;CashAnnuityModel
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.BlackSwaptionEngine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;BlackSwaptionEngine
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label=" BlackSwaptionEngine">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.BlackSwaptionEngine.with_flat_vol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;with_flat_vol
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.BachelierSwaptionEngine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;BachelierSwaptionEngine
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label=" BachelierSwaptionEngine">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.BachelierSwaptionEngine.with_flat_vol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;with_flat_vol
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.BlackCapFloorEngine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;BlackCapFloorEngine
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label=" BlackCapFloorEngine">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.BlackCapFloorEngine.with_flat_vol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;with_flat_vol
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.BlackCapFloorEngine.displacement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;displacement
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.MidPointCdsEngine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;MidPointCdsEngine
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.NumericalFix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;NumericalFix
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.AccrualBias" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;AccrualBias
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.ForwardsInCouponPeriod" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;ForwardsInCouponPeriod
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.IsdaCdsEngine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;IsdaCdsEngine
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.DiscountingSwapEngine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;DiscountingSwapEngine
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.MCEuropeanEngine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;MCEuropeanEngine
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label=" MCEuropeanEngine">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.MCEuropeanEngine--772-lifted-the-former-construction-time-rejection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        772 lifted the former construction-time rejection.
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.MCEuropeanHestonEngine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;MCEuropeanHestonEngine
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.MCAmericanEngine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;MCAmericanEngine
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.YoYInflationCapFloorEngine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;YoYInflationCapFloorEngine
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label=" YoYInflationCapFloorEngine">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.YoYInflationCapFloorEngine.black" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;black
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.YoYInflationCapFloorEngine.unit_displaced" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;unit_displaced
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.YoYInflationCapFloorEngine.bachelier" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;bachelier
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.YoYInflationCapFloorEngine.distribution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;distribution
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../optimization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optimization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../results/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../rust/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#itofin.pricingengines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-module"></code>&nbsp;pricingengines
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label=" pricingengines">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.CashAnnuityModel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;CashAnnuityModel
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.BlackSwaptionEngine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;BlackSwaptionEngine
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label=" BlackSwaptionEngine">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.BlackSwaptionEngine.with_flat_vol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;with_flat_vol
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.BachelierSwaptionEngine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;BachelierSwaptionEngine
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label=" BachelierSwaptionEngine">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.BachelierSwaptionEngine.with_flat_vol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;with_flat_vol
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.BlackCapFloorEngine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;BlackCapFloorEngine
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label=" BlackCapFloorEngine">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.BlackCapFloorEngine.with_flat_vol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;with_flat_vol
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.BlackCapFloorEngine.displacement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;displacement
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.MidPointCdsEngine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;MidPointCdsEngine
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.NumericalFix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;NumericalFix
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.AccrualBias" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;AccrualBias
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.ForwardsInCouponPeriod" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;ForwardsInCouponPeriod
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.IsdaCdsEngine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;IsdaCdsEngine
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.DiscountingSwapEngine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;DiscountingSwapEngine
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.MCEuropeanEngine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;MCEuropeanEngine
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label=" MCEuropeanEngine">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.MCEuropeanEngine--772-lifted-the-former-construction-time-rejection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        772 lifted the former construction-time rejection.
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.MCEuropeanHestonEngine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;MCEuropeanHestonEngine
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.MCAmericanEngine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;MCAmericanEngine
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.YoYInflationCapFloorEngine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;YoYInflationCapFloorEngine
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label=" YoYInflationCapFloorEngine">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.YoYInflationCapFloorEngine.black" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;black
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.YoYInflationCapFloorEngine.unit_displaced" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;unit_displaced
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.YoYInflationCapFloorEngine.bachelier" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;bachelier
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#itofin.pricingengines.YoYInflationCapFloorEngine.distribution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;distribution
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="pricing-engines">Pricing engines<a class="headerlink" href="#pricing-engines" title="Permanent link">&para;</a></h1>
+<p>Analytic, lattice and Monte Carlo pricing engines.</p>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="itofin.pricingengines" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-module"></code>            <span class="doc doc-object-name doc-module-name">pricingengines</span>
+
+
+<a href="#itofin.pricingengines" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Runtime source shim for the native <code>itofin.pricingengines</code> submodule.</p>
+<p>The real <code>itofin.pricingengines</code> is a compiled submodule registered into
+<code>sys.modules</code> by the extension (see crates/itofin-py/src/lib.rs); it wins
+at import time, so nothing here runs. This file exists only so static type
+checkers resolve <code>from itofin.pricingengines import ...</code> from <code>pricingengines.pyi</code> without
+a <code>reportMissingModuleSource</code> warning.</p>
+<p>Auto-generated by scripts/gen_submodule_shims.py from <code>pricingengines.pyi</code>; do not edit or delete by hand.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="itofin.pricingengines.CashAnnuityModel" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">CashAnnuityModel</span>
+
+
+<a href="#itofin.pricingengines.CashAnnuityModel" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Which date a cash-settled par-yield annuity discounts to.</p>
+<p>Only the (Cash, ParYieldCurve) settlement pair reads it; every other pair
+takes the fixed-leg BPS annuity and is insensitive to the choice. The
+swaption engines default to SwapRate, the branch every ported core test
+exercises, where C++ defaults to DiscountCurve.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="itofin.pricingengines.BlackSwaptionEngine" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">BlackSwaptionEngine</span>
+
+
+<a href="#itofin.pricingengines.BlackSwaptionEngine" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">BlackSwaptionEngine</span><span class="p">(</span><span class="n">vol</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            SwaptionVolatilityStructure (itofin.termstructures.SwaptionVolatilityStructure)" href="../termstructures/#itofin.termstructures.SwaptionVolatilityStructure">SwaptionVolatilityStructure</a></span><span class="p">,</span> <span class="n">discount</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            YieldTermStructure (itofin.termstructures.YieldTermStructure)" href="../termstructures/#itofin.termstructures.YieldTermStructure">YieldTermStructure</a></span><span class="p">,</span> <span class="n">settings</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            Settings (itofin.Settings)" href="../core/#itofin.Settings">Settings</a></span><span class="p">,</span> <span class="n">model</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            CashAnnuityModel (itofin.pricingengines.CashAnnuityModel)" href="#itofin.pricingengines.CashAnnuityModel">CashAnnuityModel</a></span> <span class="o">=</span> <span class="o">...</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>The shifted-lognormal Black-formula swaption engine, European-only.</p>
+<p>It prices the underlying swap itself, so that swap needs no engine of its
+own. The settings passed here must be the same object driving the swaption
+and its swap: a mismatch prices the two on different evaluation dates with
+no error raised. The surface's volatility type is checked against the Black
+formula at pricing time, not construction, so a normal-volatility surface
+raises from Swaption.npv().</p>
+
+        <p>Build an engine reading volatilities off vol and discounting on discount.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>vol</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            SwaptionVolatilityStructure (itofin.termstructures.SwaptionVolatilityStructure)" href="../termstructures/#itofin.termstructures.SwaptionVolatilityStructure">SwaptionVolatilityStructure</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The surface volatilities are read
+off.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>discount</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            YieldTermStructure (itofin.termstructures.YieldTermStructure)" href="../termstructures/#itofin.termstructures.YieldTermStructure">YieldTermStructure</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The curve both legs are discounted
+on.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>settings</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            Settings (itofin.Settings)" href="../core/#itofin.Settings">Settings</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The explicit settings; must be the same object
+driving the swaption and its swap.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>model</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            CashAnnuityModel (itofin.pricingengines.CashAnnuityModel)" href="#itofin.pricingengines.CashAnnuityModel">CashAnnuityModel</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Which date a cash-settled par-yield
+annuity discounts to. Defaults to SwapRate.</p>
+              </div>
+            </td>
+            <td>
+                  <code>...</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="itofin.pricingengines.BlackSwaptionEngine.with_flat_vol" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">with_flat_vol</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+<a href="#itofin.pricingengines.BlackSwaptionEngine.with_flat_vol" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">with_flat_vol</span><span class="p">(</span><span class="n">discount</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            YieldTermStructure (itofin.termstructures.YieldTermStructure)" href="../termstructures/#itofin.termstructures.YieldTermStructure">YieldTermStructure</a></span><span class="p">,</span> <span class="n">vol</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            SimpleQuote (itofin.quotes.SimpleQuote)" href="../quotes/#itofin.quotes.SimpleQuote">SimpleQuote</a></span><span class="p">,</span> <span class="n">day_counter</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            DayCounter (itofin.time.DayCounter)" href="../time/#itofin.time.DayCounter">DayCounter</a></span><span class="p">,</span> <span class="n">displacement</span><span class="p">:</span> <span class="n"><span title="float">float</span></span><span class="p">,</span> <span class="n">settings</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            Settings (itofin.Settings)" href="../core/#itofin.Settings">Settings</a></span><span class="p">,</span> <span class="n">model</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            CashAnnuityModel (itofin.pricingengines.CashAnnuityModel)" href="#itofin.pricingengines.CashAnnuityModel">CashAnnuityModel</a></span> <span class="o">=</span> <span class="o">...</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="            BlackSwaptionEngine (itofin.pricingengines.BlackSwaptionEngine)" href="#itofin.pricingengines.BlackSwaptionEngine">BlackSwaptionEngine</a></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Build an engine over a flat volatility quote.</p>
+<p>The quote is wrapped internally in a constant surface on a null calendar
+whose reference date tracks the evaluation date.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>discount</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            YieldTermStructure (itofin.termstructures.YieldTermStructure)" href="../termstructures/#itofin.termstructures.YieldTermStructure">YieldTermStructure</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The curve both legs are discounted
+on.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>vol</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            SimpleQuote (itofin.quotes.SimpleQuote)" href="../quotes/#itofin.quotes.SimpleQuote">SimpleQuote</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The flat Black volatility.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>day_counter</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            DayCounter (itofin.time.DayCounter)" href="../time/#itofin.time.DayCounter">DayCounter</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The day count the constant surface
+measures time on.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>displacement</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The constant surface's lognormal shift.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>settings</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            Settings (itofin.Settings)" href="../core/#itofin.Settings">Settings</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The explicit settings; must be the same object
+driving the swaption and its swap.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>model</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            CashAnnuityModel (itofin.pricingengines.CashAnnuityModel)" href="#itofin.pricingengines.CashAnnuityModel">CashAnnuityModel</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Which date a cash-settled par-yield
+annuity discounts to. Defaults to SwapRate.</p>
+              </div>
+            </td>
+            <td>
+                  <code>...</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>BlackSwaptionEngine</code></td>            <td>
+                  <code><a class="autorefs autorefs-internal" title="            BlackSwaptionEngine (itofin.pricingengines.BlackSwaptionEngine)" href="#itofin.pricingengines.BlackSwaptionEngine">BlackSwaptionEngine</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The engine over the flat surface.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="itofin.pricingengines.BachelierSwaptionEngine" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">BachelierSwaptionEngine</span>
+
+
+<a href="#itofin.pricingengines.BachelierSwaptionEngine" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">BachelierSwaptionEngine</span><span class="p">(</span><span class="n">vol</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            SwaptionVolatilityStructure (itofin.termstructures.SwaptionVolatilityStructure)" href="../termstructures/#itofin.termstructures.SwaptionVolatilityStructure">SwaptionVolatilityStructure</a></span><span class="p">,</span> <span class="n">discount</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            YieldTermStructure (itofin.termstructures.YieldTermStructure)" href="../termstructures/#itofin.termstructures.YieldTermStructure">YieldTermStructure</a></span><span class="p">,</span> <span class="n">settings</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            Settings (itofin.Settings)" href="../core/#itofin.Settings">Settings</a></span><span class="p">,</span> <span class="n">model</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            CashAnnuityModel (itofin.pricingengines.CashAnnuityModel)" href="#itofin.pricingengines.CashAnnuityModel">CashAnnuityModel</a></span> <span class="o">=</span> <span class="o">...</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>The normal-volatility swaption engine, European-only.</p>
+<p>The Bachelier spec of the template BlackSwaptionEngine instantiates: same
+constructors, same settings requirement, same silent discounting engine on
+the underlying swap. The surface's volatility type is checked against the
+normal formula at pricing time, not construction, so a shifted-lognormal
+surface raises from Swaption.npv().</p>
+
+        <p>Build an engine reading normal volatilities off vol.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>vol</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            SwaptionVolatilityStructure (itofin.termstructures.SwaptionVolatilityStructure)" href="../termstructures/#itofin.termstructures.SwaptionVolatilityStructure">SwaptionVolatilityStructure</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The surface normal volatilities
+are read off.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>discount</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            YieldTermStructure (itofin.termstructures.YieldTermStructure)" href="../termstructures/#itofin.termstructures.YieldTermStructure">YieldTermStructure</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The curve both legs are discounted
+on.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>settings</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            Settings (itofin.Settings)" href="../core/#itofin.Settings">Settings</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The explicit settings; must be the same object
+driving the swaption and its swap.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>model</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            CashAnnuityModel (itofin.pricingengines.CashAnnuityModel)" href="#itofin.pricingengines.CashAnnuityModel">CashAnnuityModel</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Which date a cash-settled par-yield
+annuity discounts to. Defaults to SwapRate.</p>
+              </div>
+            </td>
+            <td>
+                  <code>...</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="itofin.pricingengines.BachelierSwaptionEngine.with_flat_vol" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">with_flat_vol</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+<a href="#itofin.pricingengines.BachelierSwaptionEngine.with_flat_vol" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">with_flat_vol</span><span class="p">(</span><span class="n">discount</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            YieldTermStructure (itofin.termstructures.YieldTermStructure)" href="../termstructures/#itofin.termstructures.YieldTermStructure">YieldTermStructure</a></span><span class="p">,</span> <span class="n">vol</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            SimpleQuote (itofin.quotes.SimpleQuote)" href="../quotes/#itofin.quotes.SimpleQuote">SimpleQuote</a></span><span class="p">,</span> <span class="n">day_counter</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            DayCounter (itofin.time.DayCounter)" href="../time/#itofin.time.DayCounter">DayCounter</a></span><span class="p">,</span> <span class="n">displacement</span><span class="p">:</span> <span class="n"><span title="float">float</span></span><span class="p">,</span> <span class="n">settings</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            Settings (itofin.Settings)" href="../core/#itofin.Settings">Settings</a></span><span class="p">,</span> <span class="n">model</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            CashAnnuityModel (itofin.pricingengines.CashAnnuityModel)" href="#itofin.pricingengines.CashAnnuityModel">CashAnnuityModel</a></span> <span class="o">=</span> <span class="o">...</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="            BachelierSwaptionEngine (itofin.pricingengines.BachelierSwaptionEngine)" href="#itofin.pricingengines.BachelierSwaptionEngine">BachelierSwaptionEngine</a></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Build an engine over a flat normal volatility quote.</p>
+<p>The quote is wrapped internally in a constant surface on a null calendar
+whose reference date tracks the evaluation date.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>discount</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            YieldTermStructure (itofin.termstructures.YieldTermStructure)" href="../termstructures/#itofin.termstructures.YieldTermStructure">YieldTermStructure</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The curve both legs are discounted
+on.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>vol</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            SimpleQuote (itofin.quotes.SimpleQuote)" href="../quotes/#itofin.quotes.SimpleQuote">SimpleQuote</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The flat normal volatility.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>day_counter</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            DayCounter (itofin.time.DayCounter)" href="../time/#itofin.time.DayCounter">DayCounter</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The day count the constant surface
+measures time on.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>displacement</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Kept for signature parity with the Black
+engine; the normal model has no shift and ignores it.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>settings</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            Settings (itofin.Settings)" href="../core/#itofin.Settings">Settings</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The explicit settings; must be the same object
+driving the swaption and its swap.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>model</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            CashAnnuityModel (itofin.pricingengines.CashAnnuityModel)" href="#itofin.pricingengines.CashAnnuityModel">CashAnnuityModel</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Which date a cash-settled par-yield
+annuity discounts to. Defaults to SwapRate.</p>
+              </div>
+            </td>
+            <td>
+                  <code>...</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>BachelierSwaptionEngine</code></td>            <td>
+                  <code><a class="autorefs autorefs-internal" title="            BachelierSwaptionEngine (itofin.pricingengines.BachelierSwaptionEngine)" href="#itofin.pricingengines.BachelierSwaptionEngine">BachelierSwaptionEngine</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The engine over the flat surface.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="itofin.pricingengines.BlackCapFloorEngine" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">BlackCapFloorEngine</span>
+
+
+<a href="#itofin.pricingengines.BlackCapFloorEngine" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">BlackCapFloorEngine</span><span class="p">(</span><span class="n">vol</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            OptionletVolatilityStructure (itofin.termstructures.OptionletVolatilityStructure)" href="../termstructures/#itofin.termstructures.OptionletVolatilityStructure">OptionletVolatilityStructure</a></span><span class="p">,</span> <span class="n">discount</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            YieldTermStructure (itofin.termstructures.YieldTermStructure)" href="../termstructures/#itofin.termstructures.YieldTermStructure">YieldTermStructure</a></span><span class="p">,</span> <span class="n">displacement</span><span class="p">:</span> <span class="n"><span title="float">float</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>The shifted-lognormal Black-formula cap/floor engine, one Black 1976
+optionlet per coupon.</p>
+<p>Only the shifted-lognormal path is priced in the core, so a normal-volatility
+surface is rejected by the constructor rather than bound to a Bachelier
+engine. The instrument this engine prices must resolve its dates against the
+same Settings object the engine does.</p>
+
+        <p>Build an engine reading volatilities off vol and discounting on discount.</p>
+<p>Fallible at construction, unlike the swaption engines.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>vol</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            OptionletVolatilityStructure (itofin.termstructures.OptionletVolatilityStructure)" href="../termstructures/#itofin.termstructures.OptionletVolatilityStructure">OptionletVolatilityStructure</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The optionlet surface
+volatilities are read off; must be shifted-lognormal.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>discount</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            YieldTermStructure (itofin.termstructures.YieldTermStructure)" href="../termstructures/#itofin.termstructures.YieldTermStructure">YieldTermStructure</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The curve the optionlets are
+discounted on.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>displacement</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The lognormal shift; None adopts the
+surface's own.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            ItofinError (itofin.ItofinError)" href="../core/#itofin.ItofinError">ItofinError</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If the surface handle is empty, the surface is
+normal-volatility, or a given displacement differs from the
+surface's own.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="itofin.pricingengines.BlackCapFloorEngine.with_flat_vol" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">with_flat_vol</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+<a href="#itofin.pricingengines.BlackCapFloorEngine.with_flat_vol" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">with_flat_vol</span><span class="p">(</span><span class="n">discount</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            YieldTermStructure (itofin.termstructures.YieldTermStructure)" href="../termstructures/#itofin.termstructures.YieldTermStructure">YieldTermStructure</a></span><span class="p">,</span> <span class="n">vol</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            SimpleQuote (itofin.quotes.SimpleQuote)" href="../quotes/#itofin.quotes.SimpleQuote">SimpleQuote</a></span><span class="p">,</span> <span class="n">day_counter</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            DayCounter (itofin.time.DayCounter)" href="../time/#itofin.time.DayCounter">DayCounter</a></span><span class="p">,</span> <span class="n">displacement</span><span class="p">:</span> <span class="n"><span title="float">float</span></span><span class="p">,</span> <span class="n">settings</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            Settings (itofin.Settings)" href="../core/#itofin.Settings">Settings</a></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="            BlackCapFloorEngine (itofin.pricingengines.BlackCapFloorEngine)" href="#itofin.pricingengines.BlackCapFloorEngine">BlackCapFloorEngine</a></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Build an engine over a flat volatility quote.</p>
+<p>The quote is wrapped internally in a constant optionlet surface on a
+null calendar whose reference date tracks the evaluation date.
+displacement carries no default, mirroring the swaption engine: a
+trailing settings cannot follow a defaulted argument.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>discount</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            YieldTermStructure (itofin.termstructures.YieldTermStructure)" href="../termstructures/#itofin.termstructures.YieldTermStructure">YieldTermStructure</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The curve the optionlets are
+discounted on.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>vol</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            SimpleQuote (itofin.quotes.SimpleQuote)" href="../quotes/#itofin.quotes.SimpleQuote">SimpleQuote</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The flat Black volatility.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>day_counter</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            DayCounter (itofin.time.DayCounter)" href="../time/#itofin.time.DayCounter">DayCounter</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The day count the constant surface
+measures time on.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>displacement</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The constant surface's lognormal shift.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>settings</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            Settings (itofin.Settings)" href="../core/#itofin.Settings">Settings</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The explicit settings the constant surface's
+reference date tracks.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>BlackCapFloorEngine</code></td>            <td>
+                  <code><a class="autorefs autorefs-internal" title="            BlackCapFloorEngine (itofin.pricingengines.BlackCapFloorEngine)" href="#itofin.pricingengines.BlackCapFloorEngine">BlackCapFloorEngine</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The engine over the flat surface.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="itofin.pricingengines.BlackCapFloorEngine.displacement" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">displacement</span>
+
+
+<a href="#itofin.pricingengines.BlackCapFloorEngine.displacement" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">displacement</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><span title="float">float</span></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Return the lognormal shift the engine applies to forwards and strikes.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>float</code></td>            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The displacement.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="itofin.pricingengines.MidPointCdsEngine" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">MidPointCdsEngine</span>
+
+
+<a href="#itofin.pricingengines.MidPointCdsEngine" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">MidPointCdsEngine</span><span class="p">(</span><span class="n">probability</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            DefaultProbabilityTermStructure (itofin.termstructures.DefaultProbabilityTermStructure)" href="../termstructures/#itofin.termstructures.DefaultProbabilityTermStructure">DefaultProbabilityTermStructure</a></span><span class="p">,</span> <span class="n">recovery</span><span class="p">:</span> <span class="n"><span title="float">float</span></span><span class="p">,</span> <span class="n">discount</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            YieldTermStructure (itofin.termstructures.YieldTermStructure)" href="../termstructures/#itofin.termstructures.YieldTermStructure">YieldTermStructure</a></span><span class="p">,</span> <span class="n">settings</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            Settings (itofin.Settings)" href="../core/#itofin.Settings">Settings</a></span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>The mid-point credit-default-swap engine: each live premium period is
+priced against the default probability over that period, with the default
+placed at the period's mid-point.</p>
+<p>Infallible at construction - every precondition (an empty curve handle, an
+unset evaluation date) is reported when the contract is priced. The core's
+include_settlement_date_flows override is not exposed and is always None,
+so the settlement-date flow decision follows the settings' own flags. The
+contract this engine prices must carry the same Settings object.</p>
+
+        <p>Build an engine over a default-probability curve and a discount curve.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>probability</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            DefaultProbabilityTermStructure (itofin.termstructures.DefaultProbabilityTermStructure)" href="../termstructures/#itofin.termstructures.DefaultProbabilityTermStructure">DefaultProbabilityTermStructure</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The curve default
+probabilities are read off.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>recovery</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The recovery rate; a default pays 1 - recovery of
+the notional.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>discount</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            YieldTermStructure (itofin.termstructures.YieldTermStructure)" href="../termstructures/#itofin.termstructures.YieldTermStructure">YieldTermStructure</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The curve both legs are discounted
+on.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>settings</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            Settings (itofin.Settings)" href="../core/#itofin.Settings">Settings</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The explicit settings; must be the same object
+the contract this engine prices was built with.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="itofin.pricingengines.NumericalFix" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">NumericalFix</span>
+
+
+<a href="#itofin.pricingengines.NumericalFix" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>How the ISDA engine keeps the integrands' f + h denominators away from zero.</p>
+<p>NoFix adds 10^-50 to them instead; Taylor, the default, replaces the
+quotient by its Taylor expansion once f + h falls below 10^-4. Spelled NoFix
+rather than C++'s None, which Python cannot name.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="itofin.pricingengines.AccrualBias" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">AccrualBias</span>
+
+
+<a href="#itofin.pricingengines.AccrualBias" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Whether the premium leg carries the standard model's half-day accrual bias.</p>
+<p>The bias shifts the accrual's tstart back by 1/730 of a year. HalfDayBias,
+the default, includes it as the model's C code does before version 1.8.2;
+NoBias leaves it out, as from 1.8.2 on.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="itofin.pricingengines.ForwardsInCouponPeriod" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">ForwardsInCouponPeriod</span>
+
+
+<a href="#itofin.pricingengines.ForwardsInCouponPeriod" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>How the ISDA engine treats forward rates inside a coupon period.</p>
+<p>Piecewise, the default, subdivides each period at the integration grid's own
+nodes; Flat integrates each period in a single step. The two part only where
+the grid has nodes strictly inside a coupon period, so two flat curves price
+identically under either.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="itofin.pricingengines.IsdaCdsEngine" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">IsdaCdsEngine</span>
+
+
+<a href="#itofin.pricingengines.IsdaCdsEngine" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">IsdaCdsEngine</span><span class="p">(</span><span class="n">probability</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            DefaultProbabilityTermStructure (itofin.termstructures.DefaultProbabilityTermStructure)" href="../termstructures/#itofin.termstructures.DefaultProbabilityTermStructure">DefaultProbabilityTermStructure</a></span><span class="p">,</span> <span class="n">recovery</span><span class="p">:</span> <span class="n"><span title="float">float</span></span><span class="p">,</span> <span class="n">discount</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            YieldTermStructure (itofin.termstructures.YieldTermStructure)" href="../termstructures/#itofin.termstructures.YieldTermStructure">YieldTermStructure</a></span><span class="p">,</span> <span class="n">settings</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            Settings (itofin.Settings)" href="../core/#itofin.Settings">Settings</a></span><span class="p">,</span> <span class="n">numerical_fix</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            NumericalFix (itofin.pricingengines.NumericalFix)" href="#itofin.pricingengines.NumericalFix">NumericalFix</a></span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">accrual_bias</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            AccrualBias (itofin.pricingengines.AccrualBias)" href="#itofin.pricingengines.AccrualBias">AccrualBias</a></span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">forwards_in_coupon_period</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            ForwardsInCouponPeriod (itofin.pricingengines.ForwardsInCouponPeriod)" href="#itofin.pricingengines.ForwardsInCouponPeriod">ForwardsInCouponPeriod</a></span> <span class="o">=</span> <span class="o">...</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>The ISDA standard-model credit-default-swap engine: both legs are
+integrated over the pillar dates of the two curves the engine is built with
+rather than over the premium schedule alone.</p>
+<p>Infallible at construction, like MidPointCdsEngine. The model is specified
+against curves of a fixed shape, so every check - both curves counting
+Act/365 (Fixed) and referenced at the evaluation date, the contract settling
+its accrual, paying at the default time and carrying a face-value claim - is
+reported as ItofinError when the contract is priced, not from <strong>init</strong>. The
+core's include_settlement_date_flows override is not exposed and is always
+None. The three fidelity flags are trailing keyword arguments defaulting to
+the C++ defaults Taylor / HalfDayBias / Piecewise, so an engine built
+without them prices as before; they are taken here rather than through a
+with_fidelity method because the core builder consumes the engine while
+set_isda_engine has already cloned it into the contract. The contract this
+engine prices must carry the same Settings object.</p>
+
+        <p>Build an ISDA standard-model engine under the three fidelity flags.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>probability</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            DefaultProbabilityTermStructure (itofin.termstructures.DefaultProbabilityTermStructure)" href="../termstructures/#itofin.termstructures.DefaultProbabilityTermStructure">DefaultProbabilityTermStructure</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The curve default
+probabilities are read off; must count Act/365 (Fixed) and be
+referenced at the evaluation date, checked at pricing time.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>recovery</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The recovery rate; a default pays 1 - recovery of
+the notional.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>discount</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            YieldTermStructure (itofin.termstructures.YieldTermStructure)" href="../termstructures/#itofin.termstructures.YieldTermStructure">YieldTermStructure</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The curve both legs are discounted
+on, under the same shape requirement.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>settings</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            Settings (itofin.Settings)" href="../core/#itofin.Settings">Settings</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The explicit settings; must be the same object
+the contract this engine prices was built with.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>numerical_fix</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            NumericalFix (itofin.pricingengines.NumericalFix)" href="#itofin.pricingengines.NumericalFix">NumericalFix</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>How the integrand denominators are
+kept away from zero. Defaults to Taylor.</p>
+              </div>
+            </td>
+            <td>
+                  <code>...</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>accrual_bias</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            AccrualBias (itofin.pricingengines.AccrualBias)" href="#itofin.pricingengines.AccrualBias">AccrualBias</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Whether the premium leg carries the
+half-day accrual bias. Defaults to HalfDayBias.</p>
+              </div>
+            </td>
+            <td>
+                  <code>...</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>forwards_in_coupon_period</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            ForwardsInCouponPeriod (itofin.pricingengines.ForwardsInCouponPeriod)" href="#itofin.pricingengines.ForwardsInCouponPeriod">ForwardsInCouponPeriod</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>How forward
+rates inside a coupon period are integrated. Defaults to
+Piecewise.</p>
+              </div>
+            </td>
+            <td>
+                  <code>...</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="itofin.pricingengines.DiscountingSwapEngine" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">DiscountingSwapEngine</span>
+
+
+<a href="#itofin.pricingengines.DiscountingSwapEngine" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">DiscountingSwapEngine</span><span class="p">(</span><span class="n">discount</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            YieldTermStructure (itofin.termstructures.YieldTermStructure)" href="../termstructures/#itofin.termstructures.YieldTermStructure">YieldTermStructure</a></span><span class="p">,</span> <span class="n">settings</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            Settings (itofin.Settings)" href="../core/#itofin.Settings">Settings</a></span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Discounts every leg of a swap over a single yield curve.</p>
+<p>Infallible at construction - every precondition (an empty curve handle, an
+unset evaluation date) is reported when the swap is priced. The core's
+include_settlement_date_flows, settlement_date and npv_date overrides are
+not exposed and are always None, so the flow decision follows the settings'
+own flags and both dates fall back to the curve reference date. The swap
+this engine prices must carry the same Settings object.</p>
+
+        <p>Build an engine discounting every leg on discount.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>discount</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            YieldTermStructure (itofin.termstructures.YieldTermStructure)" href="../termstructures/#itofin.termstructures.YieldTermStructure">YieldTermStructure</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The curve every leg is discounted on;
+the engine registers as an observer of it.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>settings</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            Settings (itofin.Settings)" href="../core/#itofin.Settings">Settings</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The explicit settings; must be the same object
+the swap this engine prices was built with, or the two resolve
+their dates against different evaluation dates and the NPV is
+silently wrong.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="itofin.pricingengines.MCEuropeanEngine" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">MCEuropeanEngine</span>
+
+
+<a href="#itofin.pricingengines.MCEuropeanEngine" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">MCEuropeanEngine</span><span class="p">(</span><span class="n">process</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            BlackScholesProcess (itofin.processes.BlackScholesProcess)" href="../processes/#itofin.processes.BlackScholesProcess">BlackScholesProcess</a></span><span class="p">,</span> <span class="n">steps</span><span class="p">:</span> <span class="n"><span title="int">int</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">steps_per_year</span><span class="p">:</span> <span class="n"><span title="int">int</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">samples</span><span class="p">:</span> <span class="n"><span title="int">int</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">absolute_tolerance</span><span class="p">:</span> <span class="n"><span title="float">float</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">max_samples</span><span class="p">:</span> <span class="n"><span title="int">int</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">seed</span><span class="p">:</span> <span class="n"><span title="int">int</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">antithetic</span><span class="p">:</span> <span class="n"><span title="bool">bool</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>The Monte Carlo engine for European payoffs, over the pseudo-random RNG
+policy. The low-discrepancy policy is not exposed (#454).</p>
+<p>Pricing is seeded and deterministic: the same seed reproduces the NPV
+bitwise, and the standard error is read back through
+VanillaOption.error_estimate().</p>
+
+        <p>Build an engine over process, configured through the core factory.</p>
+<p>Every argument past process is left unset when omitted, so the core's
+own validation reports the illegal combinations.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>process</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            BlackScholesProcess (itofin.processes.BlackScholesProcess)" href="../processes/#itofin.processes.BlackScholesProcess">BlackScholesProcess</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The process paths are drawn from.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>steps</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The fixed number of time steps per path.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>steps_per_year</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The time steps per year, the
+alternative to steps.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>samples</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The fixed number of paths to draw.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>absolute_tolerance</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The target standard error, the
+alternative to samples.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>max_samples</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The cap on paths drawn when running to a
+tolerance.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>seed</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The RNG seed; the same seed reproduces the NPV
+bitwise.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>antithetic</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The antithetic variate, supported since</p>
+<h4 id="itofin.pricingengines.MCEuropeanEngine--772-lifted-the-former-construction-time-rejection">772 lifted the former construction-time rejection.<a class="headerlink" href="#itofin.pricingengines.MCEuropeanEngine--772-lifted-the-former-construction-time-rejection" title="Permanent link">&para;</a></h4>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            ItofinError (itofin.ItofinError)" href="../core/#itofin.ItofinError">ItofinError</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If neither or both of steps and steps_per_year are
+given, or if both samples and absolute_tolerance are given.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="itofin.pricingengines.MCEuropeanHestonEngine" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">MCEuropeanHestonEngine</span>
+
+
+<a href="#itofin.pricingengines.MCEuropeanHestonEngine" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">MCEuropeanHestonEngine</span><span class="p">(</span><span class="n">process</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            HestonProcess (itofin.processes.HestonProcess)" href="../processes/#itofin.processes.HestonProcess">HestonProcess</a></span><span class="p">,</span> <span class="n">steps</span><span class="p">:</span> <span class="n"><span title="int">int</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">steps_per_year</span><span class="p">:</span> <span class="n"><span title="int">int</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">samples</span><span class="p">:</span> <span class="n"><span title="int">int</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">absolute_tolerance</span><span class="p">:</span> <span class="n"><span title="float">float</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">max_samples</span><span class="p">:</span> <span class="n"><span title="int">int</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">seed</span><span class="p">:</span> <span class="n"><span title="int">int</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">antithetic</span><span class="p">:</span> <span class="n"><span title="bool">bool</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>The Monte Carlo engine for European payoffs on a Heston process, over the
+pseudo-random RNG policy. The low-discrepancy policy is not exposed (#454).</p>
+<p>Pricing is seeded and deterministic: the same seed reproduces the NPV
+bitwise, and the standard error is read back through
+VanillaOption.error_estimate().</p>
+
+        <p>Build an engine over process, configured through the core factory.</p>
+<p>Every argument past process is left unset when omitted, so the core's
+own validation reports the illegal combinations.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>process</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            HestonProcess (itofin.processes.HestonProcess)" href="../processes/#itofin.processes.HestonProcess">HestonProcess</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The Heston process paths are drawn from.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>steps</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The fixed number of time steps per path.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>steps_per_year</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The time steps per year, the
+alternative to steps.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>samples</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The fixed number of paths to draw.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>absolute_tolerance</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The target standard error, the
+alternative to samples.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>max_samples</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The cap on paths drawn when running to a
+tolerance.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>seed</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The RNG seed; the same seed reproduces the NPV
+bitwise.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>antithetic</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The antithetic variate, supported here;
+the core cached oracle prices with it on.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            ItofinError (itofin.ItofinError)" href="../core/#itofin.ItofinError">ItofinError</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If neither or both of steps and steps_per_year are
+given, or if both samples and absolute_tolerance are given.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="itofin.pricingengines.MCAmericanEngine" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">MCAmericanEngine</span>
+
+
+<a href="#itofin.pricingengines.MCAmericanEngine" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">MCAmericanEngine</span><span class="p">(</span><span class="n">process</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            BlackScholesProcess (itofin.processes.BlackScholesProcess)" href="../processes/#itofin.processes.BlackScholesProcess">BlackScholesProcess</a></span><span class="p">,</span> <span class="n">steps</span><span class="p">:</span> <span class="n"><span title="int">int</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">steps_per_year</span><span class="p">:</span> <span class="n"><span title="int">int</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">samples</span><span class="p">:</span> <span class="n"><span title="int">int</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">absolute_tolerance</span><span class="p">:</span> <span class="n"><span title="float">float</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">max_samples</span><span class="p">:</span> <span class="n"><span title="int">int</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">seed</span><span class="p">:</span> <span class="n"><span title="int">int</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">antithetic</span><span class="p">:</span> <span class="n"><span title="bool">bool</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">polynomial_order</span><span class="p">:</span> <span class="n"><span title="int">int</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">calibration_samples</span><span class="p">:</span> <span class="n"><span title="int">int</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>The Longstaff-Schwartz least-squares Monte Carlo engine for American
+payoffs, over the pseudo-random RNG policy. The low-discrepancy policy is
+not exposed (#454), and the Monomial regression basis is not selectable
+(#453).</p>
+<p>The option priced must come from VanillaOption.american(...): a
+European-exercise option raises ItofinError ("wrong exercise given") when
+priced here.</p>
+<p>Pricing is seeded and deterministic: the same seed reproduces the NPV
+bitwise, the standard error is read back through
+VanillaOption.error_estimate() and the early-exercise fraction through
+VanillaOption.exercise_probability().</p>
+
+        <p>Build an engine over process, configured through the core factory.</p>
+<p>Every argument past process is left unset when omitted, so the core's
+own validation reports the illegal combinations.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>process</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            BlackScholesProcess (itofin.processes.BlackScholesProcess)" href="../processes/#itofin.processes.BlackScholesProcess">BlackScholesProcess</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The process paths are drawn from.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>steps</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The fixed number of time steps per path.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>steps_per_year</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The time steps per year, the
+alternative to steps.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>samples</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The fixed number of paths to draw.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>absolute_tolerance</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The target standard error, the
+alternative to samples.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>max_samples</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The cap on paths drawn when running to a
+tolerance.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>seed</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The RNG seed; the same seed reproduces the NPV
+bitwise.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>antithetic</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The antithetic variate, supported here;
+the core oracle prices with it on.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>polynomial_order</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The order of the Monomial regression
+basis. The core default is 2.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>calibration_samples</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The paths the regression is fitted
+on. The core default is 2048.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            ItofinError (itofin.ItofinError)" href="../core/#itofin.ItofinError">ItofinError</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If neither or both of steps and steps_per_year are
+given, or if both samples and absolute_tolerance are given.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="itofin.pricingengines.YoYInflationCapFloorEngine" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">YoYInflationCapFloorEngine</span>
+
+
+<a href="#itofin.pricingengines.YoYInflationCapFloorEngine" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Prices a year-on-year inflation cap or floor optionlet by optionlet.</p>
+<p>The distribution is chosen by the constructor rather than passed as an
+argument, mirroring C++'s three engine classes: black is lognormal,
+unit_displaced lognormal in 1 + rate and bachelier normal. The core
+YoYOptionletDistribution enum is not bound, so distribution() reads back as
+a string.</p>
+<p>The settings behind the volatility surface and behind the cap/floor this
+engine prices must be the same object, or the two resolve their dates
+against different evaluation dates and the NPV is silently wrong.</p>
+<p>An engine carries the arguments and results of the contract it last priced,
+so a cap and a floor priced together want one engine each.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="itofin.pricingengines.YoYInflationCapFloorEngine.black" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">black</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+<a href="#itofin.pricingengines.YoYInflationCapFloorEngine.black" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">black</span><span class="p">(</span><span class="n">index</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            YoYInflationIndex (itofin.indexes.YoYInflationIndex)" href="../indexes/#itofin.indexes.YoYInflationIndex">YoYInflationIndex</a></span><span class="p">,</span> <span class="n">volatility</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            ConstantYoYOptionletVolatility (itofin.termstructures.ConstantYoYOptionletVolatility)" href="../termstructures/#itofin.termstructures.ConstantYoYOptionletVolatility">ConstantYoYOptionletVolatility</a></span><span class="p">,</span> <span class="n">nominal_ts</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            YieldTermStructure (itofin.termstructures.YieldTermStructure)" href="../termstructures/#itofin.termstructures.YieldTermStructure">YieldTermStructure</a></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="            YoYInflationCapFloorEngine (itofin.pricingengines.YoYInflationCapFloorEngine)" href="#itofin.pricingengines.YoYInflationCapFloorEngine">YoYInflationCapFloorEngine</a></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Build an engine valuing optionlets under the lognormal model.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>index</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            YoYInflationIndex (itofin.indexes.YoYInflationIndex)" href="../indexes/#itofin.indexes.YoYInflationIndex">YoYInflationIndex</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The index forwards are read off.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>volatility</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            ConstantYoYOptionletVolatility (itofin.termstructures.ConstantYoYOptionletVolatility)" href="../termstructures/#itofin.termstructures.ConstantYoYOptionletVolatility">ConstantYoYOptionletVolatility</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The surface optionlet
+volatilities are read off.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>nominal_ts</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            YieldTermStructure (itofin.termstructures.YieldTermStructure)" href="../termstructures/#itofin.termstructures.YieldTermStructure">YieldTermStructure</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The nominal curve optionlets are
+discounted on.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>YoYInflationCapFloorEngine</code></td>            <td>
+                  <code><a class="autorefs autorefs-internal" title="            YoYInflationCapFloorEngine (itofin.pricingengines.YoYInflationCapFloorEngine)" href="#itofin.pricingengines.YoYInflationCapFloorEngine">YoYInflationCapFloorEngine</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The lognormal engine.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="itofin.pricingengines.YoYInflationCapFloorEngine.unit_displaced" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">unit_displaced</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+<a href="#itofin.pricingengines.YoYInflationCapFloorEngine.unit_displaced" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">unit_displaced</span><span class="p">(</span><span class="n">index</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            YoYInflationIndex (itofin.indexes.YoYInflationIndex)" href="../indexes/#itofin.indexes.YoYInflationIndex">YoYInflationIndex</a></span><span class="p">,</span> <span class="n">volatility</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            ConstantYoYOptionletVolatility (itofin.termstructures.ConstantYoYOptionletVolatility)" href="../termstructures/#itofin.termstructures.ConstantYoYOptionletVolatility">ConstantYoYOptionletVolatility</a></span><span class="p">,</span> <span class="n">nominal_ts</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            YieldTermStructure (itofin.termstructures.YieldTermStructure)" href="../termstructures/#itofin.termstructures.YieldTermStructure">YieldTermStructure</a></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="            YoYInflationCapFloorEngine (itofin.pricingengines.YoYInflationCapFloorEngine)" href="#itofin.pricingengines.YoYInflationCapFloorEngine">YoYInflationCapFloorEngine</a></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Build an engine valuing optionlets under the unit-displaced lognormal model.</p>
+<p>Lognormal in 1 + rate, the usual quoting convention for a rate that may
+be negative.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>index</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            YoYInflationIndex (itofin.indexes.YoYInflationIndex)" href="../indexes/#itofin.indexes.YoYInflationIndex">YoYInflationIndex</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The index forwards are read off.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>volatility</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            ConstantYoYOptionletVolatility (itofin.termstructures.ConstantYoYOptionletVolatility)" href="../termstructures/#itofin.termstructures.ConstantYoYOptionletVolatility">ConstantYoYOptionletVolatility</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The surface optionlet
+volatilities are read off.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>nominal_ts</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            YieldTermStructure (itofin.termstructures.YieldTermStructure)" href="../termstructures/#itofin.termstructures.YieldTermStructure">YieldTermStructure</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The nominal curve optionlets are
+discounted on.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>YoYInflationCapFloorEngine</code></td>            <td>
+                  <code><a class="autorefs autorefs-internal" title="            YoYInflationCapFloorEngine (itofin.pricingengines.YoYInflationCapFloorEngine)" href="#itofin.pricingengines.YoYInflationCapFloorEngine">YoYInflationCapFloorEngine</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The unit-displaced lognormal engine.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="itofin.pricingengines.YoYInflationCapFloorEngine.bachelier" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">bachelier</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+<a href="#itofin.pricingengines.YoYInflationCapFloorEngine.bachelier" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">bachelier</span><span class="p">(</span><span class="n">index</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            YoYInflationIndex (itofin.indexes.YoYInflationIndex)" href="../indexes/#itofin.indexes.YoYInflationIndex">YoYInflationIndex</a></span><span class="p">,</span> <span class="n">volatility</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            ConstantYoYOptionletVolatility (itofin.termstructures.ConstantYoYOptionletVolatility)" href="../termstructures/#itofin.termstructures.ConstantYoYOptionletVolatility">ConstantYoYOptionletVolatility</a></span><span class="p">,</span> <span class="n">nominal_ts</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            YieldTermStructure (itofin.termstructures.YieldTermStructure)" href="../termstructures/#itofin.termstructures.YieldTermStructure">YieldTermStructure</a></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="            YoYInflationCapFloorEngine (itofin.pricingengines.YoYInflationCapFloorEngine)" href="#itofin.pricingengines.YoYInflationCapFloorEngine">YoYInflationCapFloorEngine</a></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Build an engine valuing optionlets under the normal model.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>index</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            YoYInflationIndex (itofin.indexes.YoYInflationIndex)" href="../indexes/#itofin.indexes.YoYInflationIndex">YoYInflationIndex</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The index forwards are read off.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>volatility</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            ConstantYoYOptionletVolatility (itofin.termstructures.ConstantYoYOptionletVolatility)" href="../termstructures/#itofin.termstructures.ConstantYoYOptionletVolatility">ConstantYoYOptionletVolatility</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The surface optionlet
+volatilities are read off.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>nominal_ts</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            YieldTermStructure (itofin.termstructures.YieldTermStructure)" href="../termstructures/#itofin.termstructures.YieldTermStructure">YieldTermStructure</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The nominal curve optionlets are
+discounted on.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>YoYInflationCapFloorEngine</code></td>            <td>
+                  <code><a class="autorefs autorefs-internal" title="            YoYInflationCapFloorEngine (itofin.pricingengines.YoYInflationCapFloorEngine)" href="#itofin.pricingengines.YoYInflationCapFloorEngine">YoYInflationCapFloorEngine</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The normal engine.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="itofin.pricingengines.YoYInflationCapFloorEngine.distribution" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">distribution</span>
+
+
+<a href="#itofin.pricingengines.YoYInflationCapFloorEngine.distribution" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">distribution</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><span title="str">str</span></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Return the distribution optionlets are valued under.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>str</code></td>            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>"black", "unit_displaced" or "bachelier".</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.top", "navigation.tracking", "content.code.copy", "content.tabs.link", "toc.follow", "search.suggest"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
