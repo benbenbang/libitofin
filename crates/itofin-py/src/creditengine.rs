@@ -25,17 +25,15 @@ use libitofin::pricingengines::credit::{
 use libitofin::shared::{SharedMut, shared_mut};
 use pyo3::prelude::*;
 
-/// Python `MidPointCdsEngine`: the mid-point credit-default-swap engine
-/// (`pricingengines::credit::midpointcdsengine::MidPointCdsEngine`).
+/// The mid-point credit-default-swap engine: each live premium period is
+/// priced against the default probability over that period, with the default
+/// placed at the period's mid-point.
 ///
-/// Infallible at construction: it only stores the two curve handles, the
-/// recovery rate and the settings, and registers as an observer of both curves.
-/// Every precondition (an empty handle, an unset evaluation date) is reported
-/// when the instrument is priced.
-///
-/// The `settings` passed here must be the same object the instrument this
-/// engine prices was built with, or the two resolve their dates against
-/// different evaluation dates and the NPV is silently wrong.
+/// Infallible at construction - every precondition (an empty curve handle, an
+/// unset evaluation date) is reported when the contract is priced. The core's
+/// include_settlement_date_flows override is not exposed and is always None,
+/// so the settlement-date flow decision follows the settings' own flags. The
+/// contract this engine prices must carry the same Settings object.
 #[pyclass(name = "MidPointCdsEngine", unsendable)]
 pub struct PyMidPointCdsEngine {
     inner: SharedMut<MidPointCdsEngine>,
@@ -43,9 +41,17 @@ pub struct PyMidPointCdsEngine {
 
 #[pymethods]
 impl PyMidPointCdsEngine {
-    /// An engine reading default probabilities off `probability`, paying
-    /// `1 - recovery` of the notional on a default, and discounting on
-    /// `discount`.
+    /// Build an engine over a default-probability curve and a discount curve.
+    ///
+    /// Args:
+    ///     probability (DefaultProbabilityTermStructure): The curve default
+    ///         probabilities are read off.
+    ///     recovery (float): The recovery rate; a default pays 1 - recovery of
+    ///         the notional.
+    ///     discount (YieldTermStructure): The curve both legs are discounted
+    ///         on.
+    ///     settings (Settings): The explicit settings; must be the same object
+    ///         the contract this engine prices was built with.
     #[new]
     fn new(
         probability: &PyDefaultProbabilityTermStructure,
@@ -73,15 +79,11 @@ impl PyMidPointCdsEngine {
     }
 }
 
-/// Python `NumericalFix`: how the ISDA engine keeps the integrands'
-/// `f_i + h_i` denominators away from zero (core
-/// `pricingengines::credit::NumericalFix`).
+/// How the ISDA engine keeps the integrands' f + h denominators away from zero.
 ///
-/// `NumericalFix.NoFix` adds `10^-50` to the denominators instead; the default
-/// `NumericalFix.Taylor` replaces the quotient by its Taylor expansion once
-/// `f_i + h_i` falls below `10^-4`. The core already renames C++'s `None`
-/// variant to `NoFix` (`isdacdsengine.rs:71`), which is also what Python needs:
-/// `NumericalFix.None` is a syntax error.
+/// NoFix adds 10^-50 to them instead; Taylor, the default, replaces the
+/// quotient by its Taylor expansion once f + h falls below 10^-4. Spelled NoFix
+/// rather than C++'s None, which Python cannot name.
 #[pyclass(name = "NumericalFix", eq, eq_int, from_py_object)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum PyNumericalFix {
@@ -99,13 +101,11 @@ impl PyNumericalFix {
     }
 }
 
-/// Python `AccrualBias`: whether the premium leg carries the ISDA standard
-/// model's half-day accrual bias (core `pricingengines::credit::AccrualBias`).
+/// Whether the premium leg carries the standard model's half-day accrual bias.
 ///
-/// The default `AccrualBias.HalfDayBias` includes the erroneous second term the
-/// standard model's C code carries before version 1.8.2, which shifts the
-/// accrual's `tstart` back by `1/730` of a year; `AccrualBias.NoBias` leaves it
-/// out, as from 1.8.2 on.
+/// The bias shifts the accrual's tstart back by 1/730 of a year. HalfDayBias,
+/// the default, includes it as the model's C code does before version 1.8.2;
+/// NoBias leaves it out, as from 1.8.2 on.
 #[pyclass(name = "AccrualBias", eq, eq_int, from_py_object)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum PyAccrualBias {
@@ -123,14 +123,11 @@ impl PyAccrualBias {
     }
 }
 
-/// Python `ForwardsInCouponPeriod`: how the ISDA engine treats forward rates
-/// inside a coupon period (core
-/// `pricingengines::credit::ForwardsInCouponPeriod`).
+/// How the ISDA engine treats forward rates inside a coupon period.
 ///
-/// The default `ForwardsInCouponPeriod.Piecewise` subdivides each coupon period
-/// at the integration grid's own nodes; `ForwardsInCouponPeriod.Flat`
-/// integrates each period in a single step. The two part only where the grid
-/// has nodes strictly inside a coupon period, so two flat curves price
+/// Piecewise, the default, subdivides each period at the integration grid's own
+/// nodes; Flat integrates each period in a single step. The two part only where
+/// the grid has nodes strictly inside a coupon period, so two flat curves price
 /// identically under either.
 #[pyclass(name = "ForwardsInCouponPeriod", eq, eq_int, from_py_object)]
 #[derive(Clone, Copy, PartialEq)]
@@ -149,34 +146,22 @@ impl PyForwardsInCouponPeriod {
     }
 }
 
-/// Python `IsdaCdsEngine`: the ISDA standard-model credit-default-swap engine
-/// (`pricingengines::credit::isdacdsengine::IsdaCdsEngine`).
+/// The ISDA standard-model credit-default-swap engine: both legs are
+/// integrated over the pillar dates of the two curves the engine is built with
+/// rather than over the premium schedule alone.
 ///
-/// Both legs are integrated over the pillar dates of the two curves the engine
-/// is built with, so the price follows the standard model rather than the
-/// premium schedule alone.
-///
-/// The model is specified against curves of a fixed shape, and the engine
-/// refuses anything else when it prices (`isdacdsengine.rs:162-205`): both
-/// curves must count Act/365 (Fixed) and be referenced at the evaluation date,
-/// and the contract must settle its accrual, pay at the default time and carry a
-/// face-value claim. Construction is infallible, as for
-/// [`PyMidPointCdsEngine`], so every one of those is reported as
-/// [`struct@crate::ItofinError`] from
-/// [`npv`](crate::credit::PyCreditDefaultSwap::npv), not from `__init__`.
-///
-/// The `settings` passed here must be the same object the instrument this
-/// engine prices was built with, or the two resolve their dates against
-/// different evaluation dates and the NPV is silently wrong.
-///
-/// The three fidelity flags are trailing keyword arguments defaulting to the
-/// C++ defaults `Taylor` / `HalfDayBias` / `Piecewise` the core constructor
-/// bakes in (`isdacdsengine.rs:139-141`), so an engine built without them
-/// prices exactly as before. They are taken here rather than through a
-/// `with_fidelity` method because the core builder consumes the engine
-/// (`:148-158`) while [`set_isda_engine`](crate::credit::PyCreditDefaultSwap)
-/// has already cloned it into the contract, which a post-construction
-/// reconfiguration would leave behind on the unconfigured engine.
+/// Infallible at construction, like MidPointCdsEngine. The model is specified
+/// against curves of a fixed shape, so every check - both curves counting
+/// Act/365 (Fixed) and referenced at the evaluation date, the contract settling
+/// its accrual, paying at the default time and carrying a face-value claim - is
+/// reported as ItofinError when the contract is priced, not from __init__. The
+/// core's include_settlement_date_flows override is not exposed and is always
+/// None. The three fidelity flags are trailing keyword arguments defaulting to
+/// the C++ defaults Taylor / HalfDayBias / Piecewise, so an engine built
+/// without them prices as before; they are taken here rather than through a
+/// with_fidelity method because the core builder consumes the engine while
+/// set_isda_engine has already cloned it into the contract. The contract this
+/// engine prices must carry the same Settings object.
 #[pyclass(name = "IsdaCdsEngine", unsendable)]
 pub struct PyIsdaCdsEngine {
     inner: SharedMut<IsdaCdsEngine>,
@@ -184,9 +169,25 @@ pub struct PyIsdaCdsEngine {
 
 #[pymethods]
 impl PyIsdaCdsEngine {
-    /// An engine reading default probabilities off `probability`, paying
-    /// `1 - recovery` of the notional on a default, and discounting on
-    /// `discount`, under the three fidelity flags.
+    /// Build an ISDA standard-model engine under the three fidelity flags.
+    ///
+    /// Args:
+    ///     probability (DefaultProbabilityTermStructure): The curve default
+    ///         probabilities are read off; must count Act/365 (Fixed) and be
+    ///         referenced at the evaluation date, checked at pricing time.
+    ///     recovery (float): The recovery rate; a default pays 1 - recovery of
+    ///         the notional.
+    ///     discount (YieldTermStructure): The curve both legs are discounted
+    ///         on, under the same shape requirement.
+    ///     settings (Settings): The explicit settings; must be the same object
+    ///         the contract this engine prices was built with.
+    ///     numerical_fix (NumericalFix): How the integrand denominators are
+    ///         kept away from zero. Defaults to Taylor.
+    ///     accrual_bias (AccrualBias): Whether the premium leg carries the
+    ///         half-day accrual bias. Defaults to HalfDayBias.
+    ///     forwards_in_coupon_period (ForwardsInCouponPeriod): How forward
+    ///         rates inside a coupon period are integrated. Defaults to
+    ///         Piecewise.
     #[new]
     #[pyo3(signature = (
         probability,

@@ -33,15 +33,11 @@ use libitofin::instrument::Instrument;
 use libitofin::instruments::{CapFloor, CapFloorType, MakeCapFloor};
 use pyo3::prelude::*;
 
-/// Python `CapFloorType`: whether the instrument caps or floors its floating leg
-/// (`instruments::capfloor::CapFloorType`).
+/// Whether the instrument caps, floors or collars its floating leg.
 ///
-/// A fieldless pyo3 enum. Its third variant, `Collar`, reaches an instrument
-/// only through a raw coupon-vector constructor - [`PyCapFloor::collar`] here,
-/// or the
-/// [`YoYInflationCapFloor`](crate::inflation::PyYoYInflationCapFloor) ones on
-/// the inflation side. [`MakeCapFloor`] refuses it, so the flag is not
-/// accepted by [`PyCapFloor::new`].
+/// Collar reaches an instrument only through a raw coupon-vector constructor:
+/// CapFloor.collar here, or the YoYInflationCapFloor ones on the inflation
+/// side. MakeCapFloor refuses it, so CapFloor(...) does not accept it.
 #[pyclass(name = "CapFloorType", eq, eq_int, from_py_object)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum PyCapFloorType {
@@ -61,19 +57,19 @@ impl PyCapFloorType {
     }
 }
 
-/// Python `CapFloor`: a cap or floor over a floating (ibor) leg
-/// (`instruments::capfloor::CapFloor`).
+/// A cap, floor or collar over a floating (ibor) leg.
 ///
-/// Built two ways. The constructor runs [`MakeCapFloor`] (fallible: it derives
-/// the floating leg, so a degenerate schedule or an unset evaluation date
-/// surfaces as an `ItofinError`), whose leg carries a unit nominal and drops the
-/// spot caplet. The [`cap`](Self::cap), [`floor`](Self::floor) and
-/// [`collar`](Self::collar) staticmethods take a leg the caller laid out through
-/// [`IborLeg`](crate::cashflows::PyIborLeg) instead, and cap exactly it. Either
-/// way the core pads a short strike list across every coupon.
+/// The constructor runs the standard market builder MakeCapFloor: its leg
+/// carries a unit nominal and one strike, and a zero forward_start excludes the
+/// spot caplet, so the leg is one coupon shorter than the schedule - that is
+/// what lets the cap price without a historical index fixing at the evaluation
+/// date.
 ///
-/// Pricing needs an engine: call
-/// [`set_black_engine`](Self::set_black_engine) before [`npv`](Self::npv).
+/// The cap/floor/collar staticmethods take an IborLeg the caller laid out
+/// instead and cap exactly it, spot caplet and all. They are the only route to
+/// a collar on this side, and the route a hand-built leg's own notional, day
+/// counter and fixing days reach the coupons by. Either way the core pads a
+/// short strike list across every coupon by repeating its last entry.
 #[pyclass(name = "CapFloor", unsendable)]
 pub struct PyCapFloor {
     inner: CapFloor,
@@ -81,11 +77,23 @@ pub struct PyCapFloor {
 
 #[pymethods]
 impl PyCapFloor {
-    /// A standard market cap or floor of `tenor` on `ibor_index`, struck at
-    /// `strike` and starting `forward_start` after spot.
+    /// Build a standard market cap or floor through MakeCapFloor.
     ///
-    /// A zero `forward_start` excludes the spot caplet, so the leg is one coupon
-    /// shorter than the schedule; see the module docs.
+    /// Args:
+    ///     cap_floor_type (CapFloorType): Cap or Floor; the builder refuses
+    ///         Collar.
+    ///     tenor (Period): The length of the capped leg.
+    ///     ibor_index (IborIndex): The index the floating leg fixes off.
+    ///     strike (float): The single strike, padded across every coupon.
+    ///     forward_start (Period): The delay before the leg starts; a zero
+    ///         period excludes the spot caplet.
+    ///     settings (Settings): The explicit settings supplying the evaluation
+    ///         date and the stored fixings.
+    ///
+    /// Raises:
+    ///     ItofinError: If cap_floor_type is Collar, if the derived schedule
+    ///         is degenerate, or if the start has to be derived and no
+    ///         evaluation date is set.
     #[new]
     fn new(
         cap_floor_type: PyCapFloorType,
@@ -109,17 +117,25 @@ impl PyCapFloor {
         })
     }
 
-    /// A cap over the coupons `leg` builds, struck at `cap_rates`.
+    /// Build a cap over the coupons leg builds, struck at cap_rates.
     ///
-    /// The strike list is padded to the leg length by repeating its last entry,
-    /// so a single rate caps every coupon. Unlike [`new`](Self::new) this keeps
-    /// whatever leg it is given: the spot caplet stays, and the leg's own
-    /// notional, day counter and fixing days reach the coupons.
+    /// Unlike the constructor this keeps whatever leg it is given: the spot
+    /// caplet stays, and the leg's own notional, day counter and fixing days
+    /// reach the coupons.
     ///
-    /// # Errors
+    /// Args:
+    ///     leg (IborLeg): The leg whose coupons are capped.
+    ///     cap_rates (list[float]): The cap strikes, padded to the leg length
+    ///         by repeating the last entry.
+    ///     settings (Settings): The explicit settings the instrument resolves
+    ///         its dates against.
     ///
-    /// Reports an empty `cap_rates` list, and whatever building the leg's
-    /// coupons reports - a missing notional above all.
+    /// Returns:
+    ///     CapFloor: The cap over that leg.
+    ///
+    /// Raises:
+    ///     ItofinError: On an empty cap_rates list, or on whatever building
+    ///         the leg's coupons reports, a missing notional above all.
     #[staticmethod]
     fn cap(leg: &PyIborLeg, cap_rates: Vec<f64>, settings: &PySettings) -> PyResult<Self> {
         Ok(PyCapFloor {
@@ -128,8 +144,20 @@ impl PyCapFloor {
         })
     }
 
-    /// A floor over the coupons `leg` builds, struck at `floor_rates`. Padded
-    /// and fallible as [`cap`](Self::cap).
+    /// Build a floor over the coupons leg builds, struck at floor_rates.
+    ///
+    /// Args:
+    ///     leg (IborLeg): The leg whose coupons are floored.
+    ///     floor_rates (list[float]): The floor strikes, padded as cap() pads.
+    ///     settings (Settings): The explicit settings the instrument resolves
+    ///         its dates against.
+    ///
+    /// Returns:
+    ///     CapFloor: The floor over that leg.
+    ///
+    /// Raises:
+    ///     ItofinError: Fallible as cap(), on an empty list or a leg whose
+    ///         coupons cannot be built.
     #[staticmethod]
     fn floor(leg: &PyIborLeg, floor_rates: Vec<f64>, settings: &PySettings) -> PyResult<Self> {
         Ok(PyCapFloor {
@@ -138,12 +166,24 @@ impl PyCapFloor {
         })
     }
 
-    /// A collar over the coupons `leg` builds: long the cap at `cap_rates`,
-    /// short the floor at `floor_rates`, so it is worth the one less the other.
+    /// Build a collar: long the cap at cap_rates, short the floor at floor_rates.
     ///
-    /// The only route to a collar over a floating leg; see the module docs.
-    /// Both lists are padded and both are required. Fallible as
-    /// [`cap`](Self::cap), reporting either list empty.
+    /// The collar is worth the one less the other, and this is the only route
+    /// to one over a floating leg.
+    ///
+    /// Args:
+    ///     leg (IborLeg): The leg whose coupons are collared.
+    ///     cap_rates (list[float]): The cap strikes, padded as cap() pads.
+    ///     floor_rates (list[float]): The floor strikes, padded the same way.
+    ///     settings (Settings): The explicit settings the instrument resolves
+    ///         its dates against.
+    ///
+    /// Returns:
+    ///     CapFloor: The collar over that leg.
+    ///
+    /// Raises:
+    ///     ItofinError: On either list being empty, both being required, or on
+    ///         a leg whose coupons cannot be built.
     #[staticmethod]
     fn collar(
         leg: &PyIborLeg,
@@ -157,67 +197,100 @@ impl PyCapFloor {
         })
     }
 
-    /// The cap strikes, one per coupon; empty for a floor.
+    /// Return the cap strikes, one per coupon.
+    ///
+    /// Returns:
+    ///     list[float]: The cap strikes; empty for a floor.
     fn cap_rates(&self) -> Vec<f64> {
         self.inner.cap_rates().to_vec()
     }
 
-    /// The floor strikes, one per coupon; empty for a cap.
+    /// Return the floor strikes, one per coupon.
+    ///
+    /// Returns:
+    ///     list[float]: The floor strikes; empty for a cap.
     fn floor_rates(&self) -> Vec<f64> {
         self.inner.floor_rates().to_vec()
     }
 
-    /// The number of optionlets, one per floating coupon.
+    /// Return the number of optionlets.
+    ///
+    /// Returns:
+    ///     int: One per floating coupon on the leg.
     fn coupon_count(&self) -> usize {
         self.inner.coupons().len()
     }
 
-    /// Attaches a [`PyBlackCapFloorEngine`] so the cap/floor prices each
-    /// optionlet off an optionlet volatility surface.
+    /// Attach a Black engine, pricing each optionlet off a volatility surface.
     ///
-    /// The engine is built separately and installed here, so the same engine can
-    /// be shared across instruments. It must resolve its dates against the same
-    /// `Settings` object this cap/floor was built with: two different settings
-    /// would price the leg and the optionlets on different dates without any
-    /// error being raised.
+    /// The engine is built separately, so the same one can be shared across
+    /// instruments. It must resolve its dates against the same Settings object
+    /// as this cap/floor: two different settings would price the leg and the
+    /// optionlets on different dates with no error raised.
+    ///
+    /// Args:
+    ///     engine (BlackCapFloorEngine): The engine and its optionlet
+    ///         volatility surface.
     fn set_black_engine(&mut self, engine: &PyBlackCapFloorEngine) {
         self.inner.base_mut().set_pricing_engine(engine.engine());
     }
 
-    /// Forces the valuation, idempotent and fallible as
-    /// [`VanillaOption.calculate`](crate::option::PyVanillaOption::calculate).
+    /// Force the valuation. Idempotent.
+    ///
+    /// Raises:
+    ///     ItofinError: If no engine is attached, no evaluation date is set,
+    ///         or the engine refuses the instrument.
     fn calculate(&mut self) -> PyResult<()> {
         Ok(self.inner.calculate().map_err(PyQlError::from)?)
     }
 
-    /// Whether the cached results are currently valid.
+    /// Return whether the cached results are currently valid.
     ///
-    /// This one has a live lever behind it: the Black engine observes its
-    /// volatility handle (`blackcapfloorengine.rs:88-89`), so moving a quote the
-    /// engine was built over reaches the cap and flips this back to `False`.
+    /// The Black engine observes its volatility handle, so moving a quote the
+    /// engine was built over reaches the cap and flips this back to False.
+    ///
+    /// Returns:
+    ///     bool: True when the next accessor reads the cache.
     fn is_calculated(&self) -> bool {
         self.inner.base().is_calculated()
     }
 
-    /// Attaches `engine` and returns the NPV: the one-shot form of
-    /// [`set_black_engine`](Self::set_black_engine) followed by
-    /// [`npv`](Self::npv).
+    /// Attach engine and return the NPV.
+    ///
+    /// Args:
+    ///     engine (BlackCapFloorEngine): The engine to install and price on.
+    ///
+    /// Returns:
+    ///     float: The cap/floor value.
+    ///
+    /// Raises:
+    ///     ItofinError: On anything that makes the valuation fail.
     fn price(&mut self, engine: &PyBlackCapFloorEngine) -> PyResult<f64> {
         self.set_black_engine(engine);
         self.calculate()?;
         self.npv()
     }
 
-    /// A frozen [`Results`] copy of the valuation, calculating first.
+    /// Return a frozen snapshot of the valuation, calculating first.
+    ///
+    /// Returns:
+    ///     Results: A copy of the valuation results.
+    ///
+    /// Raises:
+    ///     ItofinError: On anything that makes the valuation fail.
     fn results(&mut self) -> PyResult<Results> {
         self.calculate()?;
         Ok(Results::snapshot(self.inner.base()))
     }
 
-    /// The cap/floor NPV under the attached engine.
+    /// Return the cap/floor NPV under the attached engine.
     ///
-    /// Fallible: with no engine attached the core reports `"null pricing
-    /// engine"` as an `ItofinError`.
+    /// Returns:
+    ///     float: The present value.
+    ///
+    /// Raises:
+    ///     ItofinError: If no engine is attached, which the core reports as
+    ///         "null pricing engine".
     fn npv(&mut self) -> PyResult<f64> {
         Ok(self.inner.npv().map_err(PyQlError::from)?)
     }

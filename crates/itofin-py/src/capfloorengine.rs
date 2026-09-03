@@ -26,12 +26,13 @@ use libitofin::pricingengines::capfloor::BlackCapFloorEngine;
 use libitofin::shared::{SharedMut, shared_mut};
 use pyo3::prelude::*;
 
-/// Python `BlackCapFloorEngine`: the shifted-lognormal Black-formula cap/floor
-/// engine (`pricingengines::capfloor::BlackCapFloorEngine`).
+/// The shifted-lognormal Black-formula cap/floor engine, one Black 1976
+/// optionlet per coupon.
 ///
-/// The `settings` behind the instrument this engine prices must be the same
-/// object the engine resolves its own dates against, or the two disagree on the
-/// evaluation date and the NPV is silently wrong.
+/// Only the shifted-lognormal path is priced in the core, so a normal-volatility
+/// surface is rejected by the constructor rather than bound to a Bachelier
+/// engine. The instrument this engine prices must resolve its dates against the
+/// same Settings object the engine does.
 #[pyclass(name = "BlackCapFloorEngine", unsendable)]
 pub struct PyBlackCapFloorEngine {
     inner: SharedMut<BlackCapFloorEngine>,
@@ -39,12 +40,22 @@ pub struct PyBlackCapFloorEngine {
 
 #[pymethods]
 impl PyBlackCapFloorEngine {
-    /// An engine reading volatilities off `vol` and discounting on `discount`.
+    /// Build an engine reading volatilities off vol and discounting on discount.
     ///
-    /// Fallible at construction, unlike the swaption engine: the surface must be
-    /// shifted-lognormal, and a `displacement` given here must equal the
-    /// surface's own (`blackcapfloorengine.rs:75-82`). `None` adopts the
-    /// surface's displacement.
+    /// Fallible at construction, unlike the swaption engines.
+    ///
+    /// Args:
+    ///     vol (OptionletVolatilityStructure): The optionlet surface
+    ///         volatilities are read off; must be shifted-lognormal.
+    ///     discount (YieldTermStructure): The curve the optionlets are
+    ///         discounted on.
+    ///     displacement (float | None): The lognormal shift; None adopts the
+    ///         surface's own.
+    ///
+    /// Raises:
+    ///     ItofinError: If the surface handle is empty, the surface is
+    ///         normal-volatility, or a given displacement differs from the
+    ///         surface's own.
     #[new]
     #[pyo3(signature = (vol, discount, displacement = None))]
     fn new(
@@ -60,13 +71,25 @@ impl PyBlackCapFloorEngine {
         })
     }
 
-    /// An engine over a flat volatility quote, which it wraps in a constant
-    /// optionlet surface on a null calendar whose reference date tracks the
-    /// evaluation date. `displacement` is the surface's lognormal shift.
+    /// Build an engine over a flat volatility quote.
     ///
-    /// `displacement` carries no default, mirroring
-    /// [`BlackSwaptionEngine.with_flat_vol`](crate::swaptionengine::PyBlackSwaptionEngine):
-    /// a trailing `settings` cannot follow a defaulted argument.
+    /// The quote is wrapped internally in a constant optionlet surface on a
+    /// null calendar whose reference date tracks the evaluation date.
+    /// displacement carries no default, mirroring the swaption engine: a
+    /// trailing settings cannot follow a defaulted argument.
+    ///
+    /// Args:
+    ///     discount (YieldTermStructure): The curve the optionlets are
+    ///         discounted on.
+    ///     vol (SimpleQuote): The flat Black volatility.
+    ///     day_counter (DayCounter): The day count the constant surface
+    ///         measures time on.
+    ///     displacement (float): The constant surface's lognormal shift.
+    ///     settings (Settings): The explicit settings the constant surface's
+    ///         reference date tracks.
+    ///
+    /// Returns:
+    ///     BlackCapFloorEngine: The engine over the flat surface.
     #[staticmethod]
     fn with_flat_vol(
         discount: &PyYieldTermStructure,
@@ -89,7 +112,10 @@ impl PyBlackCapFloorEngine {
         })
     }
 
-    /// The lognormal shift the engine applies to forwards and strikes.
+    /// Return the lognormal shift the engine applies to forwards and strikes.
+    ///
+    /// Returns:
+    ///     float: The displacement.
     fn displacement(&self) -> f64 {
         self.inner.borrow().displacement()
     }

@@ -13,13 +13,11 @@ use libitofin::termstructures::volatility::{
 };
 use pyo3::prelude::*;
 
-/// Python `BlackVolTermStructure`: the shared base for every Black-volatility
-/// surface (`termstructures::volatility::BlackVolTermStructure`).
+/// Shared base for every Black-volatility surface: spot and forward vol/variance.
 ///
-/// Holds the erased `Handle<dyn BlackVolTermStructure>` and exposes the spot
-/// and forward volatility/variance queries every concrete surface inherits,
-/// plus the strike domain and the extrapolation toggles. Concrete surfaces
-/// subclass this and supply only their constructor.
+/// Concrete surfaces subclass this and supply only their constructor; the
+/// whole query surface below is inherited, along with the strike domain and
+/// the extrapolation toggles.
 #[pyclass(name = "BlackVolTermStructure", subclass, unsendable)]
 pub struct PyBlackVolTermStructure {
     inner: Handle<dyn BlackVolTermStructure>,
@@ -27,7 +25,19 @@ pub struct PyBlackVolTermStructure {
 
 #[pymethods]
 impl PyBlackVolTermStructure {
-    /// The spot Black volatility at year-fraction `t` and `strike`.
+    /// Return the spot Black volatility at year-fraction t and strike.
+    ///
+    /// Args:
+    ///     t (float): The year fraction, in the surface's own day count.
+    ///     strike (float): The strike the volatility is read at.
+    ///     extrapolate (bool): Whether to answer outside the surface's grid.
+    ///
+    /// Returns:
+    ///     float: The Black volatility.
+    ///
+    /// Raises:
+    ///     ItofinError: If the query falls outside the grid and extrapolation
+    ///         is not allowed.
     #[pyo3(signature = (t, strike, extrapolate = false))]
     fn black_vol(&self, t: f64, strike: f64, extrapolate: bool) -> PyResult<f64> {
         Ok(self
@@ -38,7 +48,19 @@ impl PyBlackVolTermStructure {
             .map_err(PyQlError::from)?)
     }
 
-    /// The spot Black volatility at `date` and `strike`.
+    /// Return the spot Black volatility at date and strike.
+    ///
+    /// Args:
+    ///     date (Date): The expiry the volatility is read at.
+    ///     strike (float): The strike the volatility is read at.
+    ///     extrapolate (bool): Whether to answer outside the surface's grid.
+    ///
+    /// Returns:
+    ///     float: The Black volatility.
+    ///
+    /// Raises:
+    ///     ItofinError: If the query falls outside the grid and extrapolation
+    ///         is not allowed.
     #[pyo3(signature = (date, strike, extrapolate = false))]
     fn black_vol_date(&self, date: &PyDate, strike: f64, extrapolate: bool) -> PyResult<f64> {
         Ok(self
@@ -49,7 +71,19 @@ impl PyBlackVolTermStructure {
             .map_err(PyQlError::from)?)
     }
 
-    /// The spot Black variance at year-fraction `t` and `strike`.
+    /// Return the spot Black variance at year-fraction t and strike.
+    ///
+    /// Args:
+    ///     t (float): The year fraction, in the surface's own day count.
+    ///     strike (float): The strike the variance is read at.
+    ///     extrapolate (bool): Whether to answer outside the surface's grid.
+    ///
+    /// Returns:
+    ///     float: The Black variance.
+    ///
+    /// Raises:
+    ///     ItofinError: If the query falls outside the grid and extrapolation
+    ///         is not allowed.
     #[pyo3(signature = (t, strike, extrapolate = false))]
     fn black_variance(&self, t: f64, strike: f64, extrapolate: bool) -> PyResult<f64> {
         Ok(self
@@ -60,7 +94,19 @@ impl PyBlackVolTermStructure {
             .map_err(PyQlError::from)?)
     }
 
-    /// The spot Black variance at `date` and `strike`.
+    /// Return the spot Black variance at date and strike.
+    ///
+    /// Args:
+    ///     date (Date): The expiry the variance is read at.
+    ///     strike (float): The strike the variance is read at.
+    ///     extrapolate (bool): Whether to answer outside the surface's grid.
+    ///
+    /// Returns:
+    ///     float: The Black variance.
+    ///
+    /// Raises:
+    ///     ItofinError: If the query falls outside the grid and extrapolation
+    ///         is not allowed.
     #[pyo3(signature = (date, strike, extrapolate = false))]
     fn black_variance_date(&self, date: &PyDate, strike: f64, extrapolate: bool) -> PyResult<f64> {
         Ok(self
@@ -71,7 +117,20 @@ impl PyBlackVolTermStructure {
             .map_err(PyQlError::from)?)
     }
 
-    /// The forward Black volatility between year-fractions `t1` and `t2`.
+    /// Return the forward Black volatility between year-fractions t1 and t2.
+    ///
+    /// Args:
+    ///     t1 (float): The start year fraction.
+    ///     t2 (float): The end year fraction.
+    ///     strike (float): The strike the volatility is read at.
+    ///     extrapolate (bool): Whether to answer outside the surface's grid.
+    ///
+    /// Returns:
+    ///     float: The forward Black volatility.
+    ///
+    /// Raises:
+    ///     ItofinError: If the query falls outside the grid and extrapolation
+    ///         is not allowed.
     #[pyo3(signature = (t1, t2, strike, extrapolate = false))]
     fn black_forward_vol(&self, t1: f64, t2: f64, strike: f64, extrapolate: bool) -> PyResult<f64> {
         Ok(self
@@ -82,7 +141,20 @@ impl PyBlackVolTermStructure {
             .map_err(PyQlError::from)?)
     }
 
-    /// The forward Black variance between year-fractions `t1` and `t2`.
+    /// Return the forward Black variance between year-fractions t1 and t2.
+    ///
+    /// Args:
+    ///     t1 (float): The start year fraction.
+    ///     t2 (float): The end year fraction.
+    ///     strike (float): The strike the variance is read at.
+    ///     extrapolate (bool): Whether to answer outside the surface's grid.
+    ///
+    /// Returns:
+    ///     float: The forward Black variance.
+    ///
+    /// Raises:
+    ///     ItofinError: If the query falls outside the grid and extrapolation
+    ///         is not allowed.
     #[pyo3(signature = (t1, t2, strike, extrapolate = false))]
     fn black_forward_variance(
         &self,
@@ -99,7 +171,10 @@ impl PyBlackVolTermStructure {
             .map_err(PyQlError::from)?)
     }
 
-    /// The minimum strike for which the surface can return volatilities.
+    /// Return the minimum strike for which the surface can return volatilities.
+    ///
+    /// Returns:
+    ///     float: The lower bound of the strike domain.
     fn min_strike(&self) -> PyResult<f64> {
         Ok(self
             .inner
@@ -108,7 +183,10 @@ impl PyBlackVolTermStructure {
             .min_strike())
     }
 
-    /// The maximum strike for which the surface can return volatilities.
+    /// Return the maximum strike for which the surface can return volatilities.
+    ///
+    /// Returns:
+    ///     float: The upper bound of the strike domain.
     fn max_strike(&self) -> PyResult<f64> {
         Ok(self
             .inner
@@ -117,7 +195,10 @@ impl PyBlackVolTermStructure {
             .max_strike())
     }
 
-    /// The latest date for which the surface can return values.
+    /// Return the latest date for which the surface can return values.
+    ///
+    /// Returns:
+    ///     Date: The surface's maximum date.
     fn max_date(&self) -> PyResult<PyDate> {
         let date = self
             .inner
@@ -127,7 +208,10 @@ impl PyBlackVolTermStructure {
         Ok(PyDate::from_inner(date))
     }
 
-    /// Whether the surface answers dates/times beyond its maximum.
+    /// Return whether the surface answers dates and times beyond its maximum.
+    ///
+    /// Returns:
+    ///     bool: True when extrapolation is enabled on the surface itself.
     fn allows_extrapolation(&self) -> PyResult<bool> {
         Ok(self
             .inner
@@ -136,7 +220,7 @@ impl PyBlackVolTermStructure {
             .allows_extrapolation())
     }
 
-    /// Allows extrapolation past the maximum date/time.
+    /// Allow extrapolation past the maximum date and time.
     fn enable_extrapolation(&self) -> PyResult<()> {
         self.inner
             .current_link()
@@ -145,7 +229,7 @@ impl PyBlackVolTermStructure {
         Ok(())
     }
 
-    /// Forbids extrapolation past the maximum date/time.
+    /// Forbid extrapolation past the maximum date and time.
     fn disable_extrapolation(&self) -> PyResult<()> {
         self.inner
             .current_link()
@@ -162,17 +246,22 @@ impl PyBlackVolTermStructure {
     }
 }
 
-/// Python `BlackConstantVol`: a flat Black volatility, constant in strike and
-/// time (`termstructures::volatility::BlackConstantVol`).
+/// A flat Black volatility, constant in strike and time.
 ///
-/// Extends [`PyBlackVolTermStructure`] and supplies only the constructor; the
-/// query surface is inherited. Unbounded in both time and strike, so queries
-/// never need extrapolation enabled.
+/// Unbounded in both time and strike, so queries never need extrapolation
+/// enabled.
 #[pyclass(name = "BlackConstantVol", extends = PyBlackVolTermStructure, unsendable)]
 pub struct PyBlackConstantVol;
 
 #[pymethods]
 impl PyBlackConstantVol {
+    /// Build the flat surface.
+    ///
+    /// Args:
+    ///     reference_date (Date): The date times are measured from.
+    ///     volatility (float): The single volatility answered everywhere.
+    ///     day_counter (DayCounter): The day count turning dates into times.
+    ///     calendar (Calendar | None): The surface's calendar, if any.
     #[new]
     #[pyo3(signature = (reference_date, volatility, day_counter, calendar = None))]
     fn new(
@@ -194,16 +283,12 @@ impl PyBlackConstantVol {
     }
 }
 
-/// Python `BlackVolTimeExtrapolation`: how a variance curve extrapolates past
-/// its last node (`termstructures::volatility::BlackVolTimeExtrapolation`).
+/// How a variance curve extrapolates past its last node.
 ///
-/// A fieldless pyo3 enum. `UseInterpolator` is accepted at construction but
-/// **fails on any extrapolating query**: delegating to the interpolation needs
-/// it evaluated past its last node, which the interpolation layer cannot enable
-/// generically (`blackvariancecurve.rs:22-25,156-160`). The core returns an
-/// `Err` there rather than silently substituting another rule, so the Python
-/// boundary surfaces an [`struct@crate::ItofinError`] from the *query*, not the
-/// constructor - the D10 no-silent-fallback line.
+/// ``UseInterpolator`` is accepted at construction but raises ItofinError on
+/// any extrapolating query: the interpolation layer cannot be evaluated past
+/// its last node, and the core errors rather than silently substituting
+/// another rule.
 #[pyclass(name = "BlackVolTimeExtrapolation", eq, eq_int, from_py_object)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum PyBlackVolTimeExtrapolation {
@@ -229,21 +314,12 @@ impl PyBlackVolTimeExtrapolation {
     }
 }
 
-/// Python `BlackVarianceCurve`: a term structure of Black volatility with no
-/// strike dimension, interpolating linearly on variance
-/// (`termstructures::volatility::BlackVarianceCurve<Linear>`).
+/// A term structure of Black volatility with no strike dimension.
 ///
-/// Extends [`PyBlackVolTermStructure`]. Finite in time: the last date is the
-/// maximum, so queries past it require `enable_extrapolation()`, and
-/// `time_extrapolation` picks the rule applied there (default
-/// `FlatVolatility`, the C++ default). The interpolation stays `Linear`: only
-/// the extrapolation axis is exposed, which keeps the concrete
-/// `BlackVarianceCurve<Linear>` handle retained alongside the erased base
-/// handle for a future local-volatility curve facade.
-///
-/// Selecting `UseInterpolator` constructs fine and answers in-range queries,
-/// then errors on an extrapolating one; see
-/// [`PyBlackVolTimeExtrapolation`].
+/// Interpolates linearly on variance. Finite in time: the last date is the
+/// maximum, so queries past it require enable_extrapolation(), and
+/// time_extrapolation picks the rule applied there. The interpolation itself
+/// stays linear; only the extrapolation axis is exposed.
 #[pyclass(name = "BlackVarianceCurve", extends = PyBlackVolTermStructure, unsendable)]
 pub struct PyBlackVarianceCurve {
     #[allow(dead_code)]
@@ -252,6 +328,23 @@ pub struct PyBlackVarianceCurve {
 
 #[pymethods]
 impl PyBlackVarianceCurve {
+    /// Build the variance curve over its (date, volatility) nodes.
+    ///
+    /// Args:
+    ///     reference_date (Date): The date times are measured from.
+    ///     dates (list[Date]): The node dates.
+    ///     black_vol_curve (list[float]): The Black volatility at each node.
+    ///     day_counter (DayCounter): The day count turning dates into times.
+    ///     force_monotone_variance (bool): Whether to require the implied
+    ///         variance to increase across the nodes.
+    ///     time_extrapolation (BlackVolTimeExtrapolation): The rule applied
+    ///         past the last node; defaults to FlatVolatility, the C++
+    ///         default. Selecting UseInterpolator constructs fine and answers
+    ///         in-range queries, then errors on an extrapolating one.
+    ///
+    /// Raises:
+    ///     ItofinError: On whatever the core rejects about the nodes, a
+    ///         non-monotone variance under force_monotone_variance included.
     #[new]
     #[pyo3(signature = (
         reference_date,
@@ -291,19 +384,29 @@ impl PyBlackVarianceCurve {
     }
 }
 
-/// Python `BlackVarianceSurface`: a Black volatility surface in strike and
-/// expiry, interpolating bilinearly on variance
-/// (`termstructures::volatility::BlackVarianceSurface`).
+/// A Black volatility surface in strike and expiry, interpolating bilinearly.
 ///
-/// Extends [`PyBlackVolTermStructure`]. The `black_vol_matrix` is a
-/// `list[list[float]]` with **one row per strike and one column per date**;
-/// the surface is finite in both time and strike, so out-of-grid queries
-/// require `enable_extrapolation()`.
+/// Finite in both time and strike, so out-of-grid queries require
+/// enable_extrapolation().
 #[pyclass(name = "BlackVarianceSurface", extends = PyBlackVolTermStructure, unsendable)]
 pub struct PyBlackVarianceSurface;
 
 #[pymethods]
 impl PyBlackVarianceSurface {
+    /// Build the surface over its strike-by-expiry grid.
+    ///
+    /// Args:
+    ///     reference_date (Date): The date times are measured from.
+    ///     dates (list[Date]): The expiry grid, one per matrix column.
+    ///     strikes (list[float]): The strike grid, one per matrix row.
+    ///     black_vol_matrix (list[list[float]]): The volatilities, one row per
+    ///         strike and one column per date.
+    ///     day_counter (DayCounter): The day count turning dates into times.
+    ///     calendar (Calendar | None): The surface's calendar, if any.
+    ///
+    /// Raises:
+    ///     ItofinError: On an empty or ragged matrix, and on whatever the core
+    ///         rejects about the grid dimensions.
     #[new]
     #[pyo3(signature = (reference_date, dates, strikes, black_vol_matrix, day_counter, calendar = None))]
     fn new(

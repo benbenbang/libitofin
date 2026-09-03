@@ -50,12 +50,10 @@ fn days_in_month(month: i32, year: i32) -> i32 {
     }
 }
 
-/// Python `Date`: a calendar date with a mandatory validation guard.
+/// A calendar date with a validation guard.
 ///
-/// The core's `Date::new`, `Month::from_ordinal` and `Date + i32` all `panic!`
-/// on out-of-range input, and a panic unwinding across the PyO3 boundary is an
-/// abort/UB hazard. Every constructor here validates first and returns
-/// [`struct@ItofinError`] before touching the core.
+/// Every constructor and every arithmetic result is range-checked before the
+/// core is reached, so an out-of-range date is an error rather than a panic.
 #[pyclass(name = "Date", unsendable)]
 pub struct PyDate {
     inner: Date,
@@ -63,6 +61,16 @@ pub struct PyDate {
 
 #[pymethods]
 impl PyDate {
+    /// Build a date from its three components.
+    ///
+    /// Args:
+    ///     day (int): The day of the month, within the length of that month.
+    ///     month (int): The month, from 1 to 12.
+    ///     year (int): The year, from 1901 to 2199.
+    ///
+    /// Raises:
+    ///     ItofinError: If month is outside [1, 12], year is outside
+    ///         [1901, 2199], or day is outside the length of that month.
     #[new]
     fn new(day: i32, month: i32, year: i32) -> PyResult<Self> {
         if !(1..=12).contains(&month) {
@@ -86,33 +94,46 @@ impl PyDate {
         })
     }
 
+    /// The year.
     #[getter]
     fn year(&self) -> i32 {
         self.inner.year()
     }
 
+    /// The month, from 1 to 12.
     #[getter]
     fn month(&self) -> i32 {
         self.inner.month().ordinal()
     }
 
+    /// The day of the month.
     #[getter]
     fn day(&self) -> i32 {
         self.inner.day_of_month()
     }
 
+    /// Shift the date forward by a number of calendar days.
+    ///
+    /// Args:
+    ///     days (int): The number of calendar days to add.
+    ///
+    /// Returns:
+    ///     Date: The shifted date.
+    ///
+    /// Raises:
+    ///     ItofinError: If the result falls outside the representable date
+    ///         range.
     fn __add__(&self, days: i32) -> PyResult<Self> {
         self.shifted(days as i64)
     }
 
-    /// Subtracts either a day count or another date.
+    /// The signed number of days from other to this date.
     ///
-    /// `date - int` shifts back by that many calendar days and returns a
-    /// [`PyDate`]; `date - date` returns the signed number of days between them
-    /// as an `int` (core `impl Sub<Date> for Date`, `date.rs:385`). PyO3 cannot
-    /// declare a type-directed overload, so the argument is taken untyped and
-    /// dispatched by downcast; anything else is a `TypeError` from the failed
-    /// `int` extraction.
+    /// Args:
+    ///     other (Date): The date to measure from.
+    ///
+    /// Returns:
+    ///     int: The signed day count between the two dates.
     fn __sub__(&self, py: Python<'_>, other: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
         if let Ok(other_date) = other.cast::<PyDate>() {
             let subtrahend = other_date.borrow().inner;
@@ -123,16 +144,29 @@ impl PyDate {
         self.shifted(-(days as i64))?.into_py_any(py)
     }
 
+    /// Whether the two dates are the same calendar day.
+    ///
+    /// Args:
+    ///     other (object): The date to compare against.
+    ///
+    /// Returns:
+    ///     bool: True when both stand for the same day.
     fn __eq__(&self, other: &PyDate) -> bool {
         self.inner == other.inner
     }
 
-    /// Hashes the core date, the one field [`__eq__`](Self::__eq__) compares,
-    /// so a date can key a dict or join a set.
+    /// Hashes the calendar day, the field equality compares.
+    ///
+    /// Returns:
+    ///     int: The hash of the date, so equal dates hash equal.
     fn __hash__(&self) -> u64 {
         hash_of(&self.inner)
     }
 
+    /// Return the constructor form of the date.
+    ///
+    /// Returns:
+    ///     str: The date as Date(day, month, year).
     fn __repr__(&self) -> String {
         format!(
             "Date({}, {}, {})",
@@ -170,7 +204,7 @@ impl PyDate {
     }
 }
 
-/// Python `DayCounter`: the year-fraction convention factories.
+/// A year-fraction convention.
 #[pyclass(name = "DayCounter", unsendable)]
 pub struct PyDayCounter {
     inner: DayCounter,
@@ -178,6 +212,10 @@ pub struct PyDayCounter {
 
 #[pymethods]
 impl PyDayCounter {
+    /// The Actual/360 convention.
+    ///
+    /// Returns:
+    ///     DayCounter: An Actual/360 day counter.
     #[staticmethod]
     fn actual360() -> Self {
         PyDayCounter {
@@ -185,6 +223,10 @@ impl PyDayCounter {
         }
     }
 
+    /// The Actual/365 (Fixed) convention.
+    ///
+    /// Returns:
+    ///     DayCounter: An Actual/365 (Fixed) day counter.
     #[staticmethod]
     fn actual365_fixed() -> Self {
         PyDayCounter {
@@ -192,8 +234,10 @@ impl PyDayCounter {
         }
     }
 
-    /// `ActualActual(ActualActual::ISDA)`: the day count the Heston/Hull-White
-    /// flat-curve oracles anchor on (`test-suite` `flatRate`).
+    /// The Actual/Actual (ISDA) convention.
+    ///
+    /// Returns:
+    ///     DayCounter: An Actual/Actual day counter on the ISDA convention.
     #[staticmethod]
     fn actual_actual_isda() -> Self {
         PyDayCounter {
@@ -201,8 +245,10 @@ impl PyDayCounter {
         }
     }
 
-    /// `Thirty360(Thirty360::BondBasis)`: the fixed-leg day count the Hull-White
-    /// swaption-calibration oracle anchors on (`hullwhite.rs:835`).
+    /// The 30/360 (Bond Basis) convention.
+    ///
+    /// Returns:
+    ///     DayCounter: A 30/360 day counter on the bond-basis convention.
     #[staticmethod]
     fn thirty360_bond_basis() -> Self {
         PyDayCounter {
@@ -210,30 +256,42 @@ impl PyDayCounter {
         }
     }
 
-    /// The period `[d1, d2]` as a fraction of a year under this convention
-    /// (`daycounter.rs:99`, the two-argument `yearFraction`).
+    /// The period [d1, d2] as a fraction of a year under this convention.
     ///
-    /// Infallible: the core reads the two dates and divides. The conventions
-    /// that need an explicit reference period (Actual/Actual ISMA) are not
-    /// among the four surfaced here, so the reference-period overload is not
-    /// exposed.
+    /// Args:
+    ///     d1 (Date): The start of the period.
+    ///     d2 (Date): The end of the period.
+    ///
+    /// Returns:
+    ///     float: The year fraction between the two dates.
     fn year_fraction(&self, d1: &PyDate, d2: &PyDate) -> f64 {
         self.inner.year_fraction(d1.inner(), d2.inner())
     }
 
-    /// Equality by convention name, delegating to the core `PartialEq`: two
-    /// independently built `Actual360`s are equal, an `Actual360` and an
-    /// `Actual365Fixed` are not.
+    /// Equality by convention name, so two independently built Actual360s
+    /// are equal.
+    ///
+    /// Args:
+    ///     other (object): The day counter to compare against.
+    ///
+    /// Returns:
+    ///     bool: True when both carry the same convention name.
     fn __eq__(&self, other: &PyDayCounter) -> bool {
         self.inner == other.inner
     }
 
-    /// Hashes the name, the one field [`__eq__`](Self::__eq__) compares, so a
-    /// day counter can key a dict or join a set.
+    /// Hashes the convention name, the field equality compares.
+    ///
+    /// Returns:
+    ///     int: The hash of the convention name, so equal day counters hash equal.
     fn __hash__(&self) -> u64 {
         hash_of(&self.inner.name())
     }
 
+    /// Return the day counter and its convention name.
+    ///
+    /// Returns:
+    ///     str: The day counter as DayCounter(name).
     fn __repr__(&self) -> String {
         format!("DayCounter({})", self.inner.name())
     }
@@ -255,11 +313,7 @@ impl PyDayCounter {
     }
 }
 
-/// Python `Period`: a signed length in one calendar unit.
-///
-/// The unit is taken as a string in {"Days", "Weeks", "Months", "Years"} and
-/// mapped to the core [`TimeUnit`]; an unknown unit returns
-/// [`struct@ItofinError`] rather than reaching the core.
+/// A signed length in one calendar unit (unit: Days, Weeks, Months, Years).
 #[pyclass(name = "Period", unsendable)]
 pub struct PyPeriod {
     inner: Period,
@@ -267,6 +321,14 @@ pub struct PyPeriod {
 
 #[pymethods]
 impl PyPeriod {
+    /// Build a period of n units.
+    ///
+    /// Args:
+    ///     n (int): The length, which may be negative.
+    ///     unit (str): One of "Days", "Weeks", "Months", "Years".
+    ///
+    /// Raises:
+    ///     ItofinError: If unit is not one of the four accepted strings.
     #[new]
     fn new(n: i32, unit: &str) -> PyResult<Self> {
         let units = match unit {
@@ -285,21 +347,34 @@ impl PyPeriod {
         })
     }
 
-    /// Semantic equality, delegating to the core `PartialEq`: `7 Days` equals
-    /// `1 Week` and `12 Months` equals `1 Year`, while a pair no calendar can
-    /// decide (`30 Days` against `1 Month`) is not equal.
+    /// Semantic equality: 7 Days equals 1 Week and 12 Months equals 1 Year,
+    /// while an undecidable pair such as 30 Days against 1 Month is not equal.
+    ///
+    /// Args:
+    ///     other (object): The period to compare against.
+    ///
+    /// Returns:
+    ///     bool: True when the two lengths are decidably the same.
     fn __eq__(&self, other: &PyPeriod) -> bool {
         self.inner == other.inner
     }
 
-    /// Hashes the canonical form, so every decidably equal pair hashes equal:
-    /// normalizing collapses `7 Days` onto `1 Week`, `12 Months` onto `1 Year`
-    /// and every zero length onto `0 Days` before the hash is taken.
+    /// Hashes the canonical form, so equal periods hash equal.
+    ///
+    /// Normalizing collapses 7 Days onto 1 Week, 12 Months onto 1 Year and
+    /// every zero length onto 0 Days before the hash is taken.
+    ///
+    /// Returns:
+    ///     int: The hash of the normalized length and unit.
     fn __hash__(&self) -> u64 {
         let normalized = self.inner.normalized();
         hash_of(&(normalized.length(), normalized.units()))
     }
 
+    /// Return the constructor form of the period.
+    ///
+    /// Returns:
+    ///     str: The period as Period(length, unit).
     fn __repr__(&self) -> String {
         format!("Period({}, {:?})", self.inner.length(), self.inner.units())
     }
@@ -332,7 +407,7 @@ fn parse_time_unit(unit: &str) -> PyResult<TimeUnit> {
     }
 }
 
-/// Python `Calendar`: the business-calendar factories.
+/// A business-day calendar.
 #[pyclass(name = "Calendar", unsendable)]
 pub struct PyCalendar {
     inner: Calendar,
@@ -340,6 +415,10 @@ pub struct PyCalendar {
 
 #[pymethods]
 impl PyCalendar {
+    /// The TARGET calendar.
+    ///
+    /// Returns:
+    ///     Calendar: The TARGET business-day calendar.
     #[staticmethod]
     fn target() -> Self {
         PyCalendar {
@@ -347,6 +426,10 @@ impl PyCalendar {
         }
     }
 
+    /// The calendar holding no holidays at all.
+    ///
+    /// Returns:
+    ///     Calendar: The null calendar, on which every day is a business day.
     #[staticmethod]
     fn null_calendar() -> Self {
         PyCalendar {
@@ -354,12 +437,14 @@ impl PyCalendar {
         }
     }
 
-    /// The weekends-only calendar: every Saturday and Sunday is a holiday and no
-    /// other day is.
+    /// The weekends-only calendar: Saturdays and Sundays are holidays and no
+    /// other day is. The calendar the ISDA CDS conventions roll on.
     ///
-    /// The ISDA CDS conventions roll on it, and it is not substitutable by
-    /// [`Self::null_calendar`] (which holds no holidays at all) or by a national
-    /// calendar (which adds public holidays).
+    /// It is not substitutable by the null calendar, which holds no holidays at
+    /// all, nor by a national calendar, which adds public holidays.
+    ///
+    /// Returns:
+    ///     Calendar: The weekends-only calendar.
     #[staticmethod]
     fn weekends_only() -> Self {
         PyCalendar {
@@ -367,12 +452,12 @@ impl PyCalendar {
         }
     }
 
-    /// The UK settlement calendar, the one the RPI inflation fixtures roll on.
+    /// The UK settlement calendar. Only the Settlement market is exposed:
+    /// the Exchange and Metals markets share an identical business-day rule in
+    /// the core and differ solely in their name.
     ///
-    /// Only [`Market::Settlement`] is exposed: the Exchange and Metals markets
-    /// share an identical `is_business_day` body in the core
-    /// (`unitedkingdom.rs:60-61`) and differ solely in `name()`, so a market
-    /// argument would select between three calendars that behave alike.
+    /// Returns:
+    ///     Calendar: The UK settlement calendar.
     #[staticmethod]
     fn united_kingdom() -> Self {
         PyCalendar {
@@ -380,11 +465,14 @@ impl PyCalendar {
         }
     }
 
-    /// Rolls `date` to the nearest business day per `convention`.
+    /// Roll a date to the nearest business day.
     ///
-    /// The core `Calendar::adjust` `assert!`s on the null date (calendar.rs:248);
-    /// `PyDate` cannot build one today, but the guard mirrors the `PySchedule`
-    /// precedent so no input reaches a core `assert!` across the PyO3 boundary.
+    /// Args:
+    ///     date (Date): The date to roll.
+    ///     convention (BusinessDayConvention): The rolling rule to apply.
+    ///
+    /// Returns:
+    ///     Date: The adjusted date, unchanged when it is already a business day.
     fn adjust(&self, date: &PyDate, convention: &PyBusinessDayConvention) -> PyResult<PyDate> {
         if date.inner() == Date::null() {
             return Err(ItofinError::new_err("cannot adjust the null date"));
@@ -394,11 +482,21 @@ impl PyCalendar {
         ))
     }
 
-    /// Advances `date` by `n` `unit`s, adjusting the result per `convention`.
+    /// Advance a date by n units and adjust the result.
     ///
-    /// `unit` is a string in {"Days", "Weeks", "Months", "Years"} mapped to the
-    /// core [`TimeUnit`]; an unknown unit returns [`struct@ItofinError`] rather
-    /// than reaching the core. The null-date guard mirrors [`Self::adjust`].
+    /// Args:
+    ///     date (Date): The date to advance from.
+    ///     n (int): The number of units to advance, which may be negative.
+    ///     unit (str): One of "Days", "Weeks", "Months", "Years".
+    ///     convention (BusinessDayConvention): The rule the advanced date is rolled under.
+    ///     end_of_month (bool): Keep the result on the month end when the starting
+    ///         date is one.
+    ///
+    /// Returns:
+    ///     Date: The advanced and adjusted date.
+    ///
+    /// Raises:
+    ///     ItofinError: If unit is not one of the four accepted strings.
     fn advance(
         &self,
         date: &PyDate,
@@ -420,6 +518,10 @@ impl PyCalendar {
         )))
     }
 
+    /// Return the calendar and its name.
+    ///
+    /// Returns:
+    ///     str: The calendar as Calendar(name).
     fn __repr__(&self) -> String {
         format!("Calendar({})", self.inner.name())
     }
@@ -440,15 +542,10 @@ impl PyCalendar {
     }
 }
 
-/// Python `Frequency`: the coupon and fixing frequencies the fixtures need.
+/// A coupon or fixing frequency.
 ///
-/// A fieldless pyo3 enum exposing `Frequency.Annual` / `Frequency.Semiannual` /
-/// `Frequency.Quarterly` / `Frequency.Monthly`; only the variants the
-/// Jamshidian, CDS and inflation fixtures use are surfaced. `Monthly` is the
-/// frequency every ported inflation index publishes at, and the only one
-/// [`ZeroInflationTermStructure`](crate::inflation::PyZeroInflationTermStructure)
-/// fixtures build curves under. New variants are appended, so the pyo3
-/// discriminants of the existing ones are unchanged.
+/// Only the variants the ported fixtures use are surfaced; new ones are
+/// appended, so the integer values of the existing variants are unchanged.
 #[pyclass(name = "Frequency", eq, eq_int, from_py_object)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum PyFrequency {
@@ -488,17 +585,8 @@ impl PyFrequency {
     }
 }
 
-/// Python `BusinessDayConvention`: the holiday-rolling rules.
-///
-/// A fieldless pyo3 enum covering every variant the core enum carries
-/// (`businessdayconvention.rs:11-33`); the adjustment logic itself lives in the
-/// core calendar. Exhaustive coverage is what lets an index report its own
-/// convention back through [`Self::from_inner`], whatever it was built with.
-///
-/// The four non-original variants are appended rather than sorted into the core
-/// order, so the pyo3 discriminants of `ModifiedFollowing`, `Following` and
-/// `Unadjusted` are unchanged: the class is `eq_int`, so Python compares these
-/// by integer and a reorder would silently move them.
+/// A holiday-rolling rule. Every core variant is covered; the four listed
+/// last are appended, so the integer values of the first three are unchanged.
 #[pyclass(name = "BusinessDayConvention", eq, eq_int, from_py_object)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum PyBusinessDayConvention {
@@ -544,21 +632,13 @@ impl PyBusinessDayConvention {
     }
 }
 
-/// Python `DateGeneration`: the rule a `Schedule` generates its dates by
-/// (core `time::dategenerationrule::DateGeneration`).
+/// The rule a Schedule generates its dates by.
 ///
-/// A fieldless pyo3 enum exposing every rule the core ports. `Backward` and
-/// `Forward` roll from one end of the range to the other; `Zero` keeps only the
-/// two endpoints; the `ThirdWednesday` and `Twentieth` families snap the
-/// interior dates onto an IMM Wednesday or the twentieth of the month, the
-/// convention CDS schedules are quoted under.
-///
-/// The three post-Big-Bang rules (`OldCDS`, `CDS`, `CDS2015`) are surfaced here
-/// because a `Schedule` builds under them, but
-/// [`SpreadCdsHelper`](crate::credithelpers::PySpreadCdsHelper) rejects them:
-/// their maturity comes from `cdsMaturity`, which the core has not ported
-/// (`defaultprobabilityhelpers.rs:314-319`). That rejection surfaces as an
-/// [`struct@crate::ItofinError`] rather than a silently wrong schedule.
+/// Backward and Forward roll from one end of the range to the other; Zero keeps
+/// only the two endpoints; the ThirdWednesday and Twentieth families snap the
+/// interior dates onto an IMM Wednesday or the twentieth of the month. A
+/// Schedule builds under the three CDS rules, but SpreadCdsHelper rejects them:
+/// their maturity comes from a core routine that is not ported yet.
 #[pyclass(name = "DateGeneration", eq, eq_int, from_py_object)]
 #[derive(Clone, Copy, PartialEq)]
 #[allow(clippy::upper_case_acronyms)]
@@ -593,33 +673,11 @@ impl PyDateGeneration {
     }
 }
 
-/// Python `Schedule`: a sequence of coupon dates built through `MakeSchedule`.
+/// A sequence of coupon dates built through MakeSchedule.
 ///
-/// The core `Schedule::new` (via `MakeSchedule::build`) `panic!`s on degenerate
-/// input - a null date or an effective date not strictly before the termination
-/// date - and a panic unwinding across the PyO3 boundary is an abort/UB hazard.
-/// The constructor supplies every builder input, so the `build`-level checks are
-/// unreachable; the date ordering is the one piece of user input, so it is
-/// validated first and returns [`struct@ItofinError`] before the core is
-/// touched. `date` likewise bounds-checks the index the core would otherwise
-/// panic on.
-///
-/// `rule` selects the date-generation rule and defaults to
-/// [`PyDateGeneration::Forward`], which is exactly what the builder's
-/// `forwards()` sets (`schedule.rs:852-853`), so an omitted `rule` reproduces
-/// every schedule this facade built before. The rule-dependent `panic!`s in
-/// `Schedule::new` (`schedule.rs:151-189`) all guard a non-null `first_date` or
-/// `next_to_last_date`, neither of which this constructor supplies, so no rule
-/// reaches them.
-///
-/// `termination_convention` rolls the last date only (`schedule.rs:415-421`)
-/// and defaults to `convention`, reproducing every schedule this facade built
-/// before it took one. CDS conventions need the two to differ: a credit helper
-/// leaves its maturity unadjusted (`defaultprobabilityhelpers.rs:512`) while
-/// paying `Following`, so under a twentieth rule a maturity landing on a
-/// weekend stays on the twentieth. Rolling it instead lengthens the contract by
-/// the roll, which the bootstrap round trip measures as a 3.6e-6 spread error
-/// on the one pillar it hits.
+/// termination_convention rolls the last date only, and defaults to
+/// convention. CDS conventions need the two to differ: a credit helper leaves
+/// its maturity unadjusted while paying Following.
 #[pyclass(name = "Schedule", unsendable)]
 pub struct PySchedule {
     inner: Schedule,
@@ -627,6 +685,20 @@ pub struct PySchedule {
 
 #[pymethods]
 impl PySchedule {
+    /// Build the schedule.
+    ///
+    /// Args:
+    ///     start (Date): The effective date, which must be strictly before end.
+    ///     end (Date): The termination date.
+    ///     frequency (Frequency): The coupon frequency the interior dates are spaced at.
+    ///     calendar (Calendar): The calendar the dates roll on.
+    ///     convention (BusinessDayConvention): The rule every date but the last is rolled under.
+    ///     rule (DateGeneration): The date-generation rule; defaults to Forward.
+    ///     termination_convention (BusinessDayConvention | None): The rule the last date is rolled under;
+    ///         None applies convention to it as well.
+    ///
+    /// Raises:
+    ///     ItofinError: If start is not strictly before end.
     #[new]
     #[pyo3(signature = (
         start,
@@ -669,12 +741,24 @@ impl PySchedule {
         Ok(PySchedule { inner })
     }
 
-    /// The number of dates in the schedule (one more than the period count).
+    /// The number of dates in the schedule.
+    ///
+    /// Returns:
+    ///     int: The date count, one more than the number of periods.
     fn size(&self) -> usize {
         self.inner.dates().len()
     }
 
-    /// The `i`-th date, erroring when `i` is out of range.
+    /// The i-th date in the schedule.
+    ///
+    /// Args:
+    ///     i (int): The zero-based index into the dates.
+    ///
+    /// Returns:
+    ///     Date: The date at that index.
+    ///
+    /// Raises:
+    ///     ItofinError: If i is out of range.
     fn date(&self, i: usize) -> PyResult<PyDate> {
         let dates = self.inner.dates();
         if i >= dates.len() {
@@ -686,7 +770,10 @@ impl PySchedule {
         Ok(PyDate { inner: dates[i] })
     }
 
-    /// All the schedule dates, as a Python list.
+    /// All the schedule dates.
+    ///
+    /// Returns:
+    ///     list[Date]: The dates in order, from the effective date to the termination date.
     fn dates(&self) -> Vec<PyDate> {
         self.inner
             .dates()
@@ -704,19 +791,33 @@ impl PySchedule {
     }
 }
 
-/// Whether `date` is an IMM date: the third Wednesday of the month, and of
-/// March, June, September or December only when `main_cycle` is set.
+/// Whether date is an IMM date.
 ///
-/// The free-function form QuantLib-SWIG exposes for `IMM::isIMMdate`; it is the
-/// way to build a valid IMM start date for the futures rate helper from Python.
+/// An IMM date is the third Wednesday of the month, and of March, June,
+/// September or December only when main_cycle is set.
+///
+/// Args:
+///     date (Date): The date to test.
+///     main_cycle (bool): Restrict the test to the March/June/September/December
+///         cycle.
+///
+/// Returns:
+///     bool: True when date is an IMM date under the selected cycle.
 #[pyfunction]
 #[pyo3(signature = (date, main_cycle = false))]
 fn is_imm_date(date: &PyDate, main_cycle: bool) -> bool {
     imm::is_imm_date(date.inner(), main_cycle)
 }
 
-/// The next IMM date strictly following `date`, restricted to the March/June/
-/// September/December cycle when `main_cycle` is set (`IMM::nextDate`).
+/// The next IMM date strictly following date.
+///
+/// Args:
+///     date (Date): The date to start from; the result is strictly after it.
+///     main_cycle (bool): Restrict the result to the March/June/September/December
+///         cycle.
+///
+/// Returns:
+///     Date: The next IMM date under the selected cycle.
 #[pyfunction]
 #[pyo3(signature = (date, main_cycle = false))]
 fn next_imm_date(date: &PyDate, main_cycle: bool) -> PyDate {

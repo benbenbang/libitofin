@@ -15,11 +15,10 @@ use libitofin::termstructures::yieldtermstructure::YieldTermStructure;
 use libitofin::time::frequency::Frequency;
 use pyo3::prelude::*;
 
-/// Python `SimpleQuote`: a mutable, observable market element (D1).
+/// A mutable, observable market element (D1).
 ///
-/// Wraps a `Shared<SimpleQuote>` so the same interior-mutable quote can be
-/// read while observers are notified of a change. The inner `Shared` is
-/// `Rc`-based and therefore `!Send`, hence `unsendable`.
+/// Wraps a single value that pricing inputs observe; setting a new value
+/// notifies dependents so any cached valuation recomputes lazily.
 #[pyclass(name = "SimpleQuote", unsendable)]
 pub struct PySimpleQuote {
     inner: Shared<SimpleQuote>,
@@ -27,6 +26,10 @@ pub struct PySimpleQuote {
 
 #[pymethods]
 impl PySimpleQuote {
+    /// Initialize the quote.
+    ///
+    /// Args:
+    ///     value (float): The initial market value.
     #[new]
     fn new(value: f64) -> Self {
         PySimpleQuote {
@@ -34,12 +37,19 @@ impl PySimpleQuote {
         }
     }
 
-    /// The stored value, erroring when the quote is unset.
+    /// Return the current value.
+    ///
+    /// Returns:
+    ///     float: The quote's current market value.
     fn value(&self) -> PyResult<f64> {
         Ok(self.inner.value().map_err(PyQlError::from)?)
     }
 
-    /// Sets a new value, notifying observers when it actually changes.
+    /// Set a new value and notify observers.
+    ///
+    /// Args:
+    ///     value (float): The new value; observers are notified when it actually
+    ///         changes, so dependent valuations recompute on next access.
     fn set_value(&self, value: f64) {
         self.inner.set_value(value);
     }
@@ -56,14 +66,12 @@ impl PySimpleQuote {
     }
 }
 
-/// Python `BlackScholesProcess`: a flat-market generalized Black-Scholes
-/// process (processes/blackscholesprocess.rs).
+/// A generalized Black-Scholes process, built from scalars or curve objects.
 ///
-/// The `Handle<dyn ...>` plumbing is assembled internally from scalar inputs
-/// so it never crosses the PyO3 boundary. The Python constructor takes the
-/// conventional `(risk_free_rate, dividend_yield, ...)` order; the core's
-/// `new` takes `(x0, dividend_yield, risk_free_rate, vol)`, so the two curves
-/// are bound by name and placed in the core's order at the single call site.
+/// The Handle plumbing is assembled internally, so no handle crosses the
+/// binding boundary. The constructor takes the conventional
+/// (risk_free_rate, dividend_yield) order and places the two curves in the
+/// core's own order at a single call site.
 #[pyclass(name = "BlackScholesProcess", unsendable)]
 pub struct PyBlackScholesProcess {
     inner: Shared<GeneralizedBlackScholesProcess>,
@@ -71,6 +79,17 @@ pub struct PyBlackScholesProcess {
 
 #[pymethods]
 impl PyBlackScholesProcess {
+    /// Build a flat-market process from scalar inputs.
+    ///
+    /// Args:
+    ///     spot (float): The spot level, held as a quote.
+    ///     risk_free_rate (float): The flat risk-free rate, made into a curve
+    ///         compounded continuously on an annual frequency.
+    ///     dividend_yield (float): The flat dividend yield, made into a curve on the
+    ///         same convention as the risk-free rate.
+    ///     volatility (float): The flat Black volatility.
+    ///     reference_date (Date): The date the three flat curves are anchored on.
+    ///     day_counter (DayCounter): The day count the curves accrue on.
     #[new]
     fn new(
         spot: f64,
@@ -113,12 +132,20 @@ impl PyBlackScholesProcess {
         }
     }
 
-    /// Builds a process from term-structure objects instead of scalars: a spot
-    /// level plus the risk-free curve, dividend curve, and Black vol surface.
+    /// Build a process from term-structure objects instead of scalars.
     ///
-    /// The three legs are bound by name and placed in the core's
-    /// `(x0, dividend, risk_free, vol)` order at the single call site, the same
-    /// r/q footgun the scalar constructor guards against.
+    /// The three legs are bound by name and placed in the core's order at a
+    /// single call site, the same risk-free/dividend argument-order footgun the
+    /// scalar constructor guards against.
+    ///
+    /// Args:
+    ///     spot (float): The spot level, held as a quote.
+    ///     risk_free (YieldTermStructure): The risk-free discount curve.
+    ///     dividend (YieldTermStructure): The dividend curve.
+    ///     vol (BlackVolTermStructure): The Black volatility surface.
+    ///
+    /// Returns:
+    ///     BlackScholesProcess: A process over the three supplied term structures.
     #[staticmethod]
     fn from_curves(
         spot: f64,
@@ -137,14 +164,20 @@ impl PyBlackScholesProcess {
         }
     }
 
-    /// The continuously compounded zero rate carried by the risk-free curve at
-    /// the reference date; the pin that the r/q arg-order was not swapped.
+    /// Return the risk-free rate carried by the process.
+    ///
+    /// Returns:
+    ///     float: The continuously compounded zero rate on the risk-free curve at the
+    ///     reference date.
     fn risk_free_rate(&self) -> PyResult<f64> {
         Ok(zero_rate(&self.inner.risk_free_rate()).map_err(PyQlError::from)?)
     }
 
-    /// The continuously compounded zero rate carried by the dividend curve at
-    /// the reference date; the pin that the r/q arg-order was not swapped.
+    /// Return the dividend yield carried by the process.
+    ///
+    /// Returns:
+    ///     float: The continuously compounded zero rate on the dividend curve at the
+    ///     reference date.
     fn dividend_yield(&self) -> PyResult<f64> {
         Ok(zero_rate(&self.inner.dividend_yield()).map_err(PyQlError::from)?)
     }

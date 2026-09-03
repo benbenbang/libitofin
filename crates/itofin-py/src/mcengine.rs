@@ -20,21 +20,12 @@ use libitofin::pricingengines::vanilla::{
 use libitofin::shared::{SharedMut, shared_mut};
 use pyo3::prelude::*;
 
-/// Python `MCEuropeanEngine`: the Monte Carlo engine for European payoffs
-/// (`pricingengines::vanilla::MCEuropeanEngine`), built through the core's
-/// `MakeMcEuropeanEngine` factory.
+/// The Monte Carlo engine for European payoffs, over the pseudo-random RNG
+/// policy. The low-discrepancy policy is not exposed (#454).
 ///
-/// Every argument past `process` is optional and left unset when omitted, so
-/// the core's own validation reports the illegal combinations as
-/// `ItofinError`: exactly one of `steps` / `steps_per_year` must be given, and
-/// `samples` and `absolute_tolerance` are mutually exclusive.
-///
-/// `antithetic` enables the antithetic-variate variance reduction in the core
-/// engine (#772 lifted the former construction-time rejection).
-///
-/// Pricing is seeded and deterministic: the same `seed` reproduces the NPV
-/// bitwise, and the resulting standard error is read back through
-/// `VanillaOption.error_estimate()`.
+/// Pricing is seeded and deterministic: the same seed reproduces the NPV
+/// bitwise, and the standard error is read back through
+/// VanillaOption.error_estimate().
 #[pyclass(name = "MCEuropeanEngine", unsendable)]
 pub struct PyMCEuropeanEngine {
     inner: SharedMut<MCEuropeanEngine<PseudoRandom>>,
@@ -42,7 +33,29 @@ pub struct PyMCEuropeanEngine {
 
 #[pymethods]
 impl PyMCEuropeanEngine {
-    /// An engine over `process`, configured through the core factory.
+    /// Build an engine over process, configured through the core factory.
+    ///
+    /// Every argument past process is left unset when omitted, so the core's
+    /// own validation reports the illegal combinations.
+    ///
+    /// Args:
+    ///     process (BlackScholesProcess): The process paths are drawn from.
+    ///     steps (int | None): The fixed number of time steps per path.
+    ///     steps_per_year (int | None): The time steps per year, the
+    ///         alternative to steps.
+    ///     samples (int | None): The fixed number of paths to draw.
+    ///     absolute_tolerance (float | None): The target standard error, the
+    ///         alternative to samples.
+    ///     max_samples (int | None): The cap on paths drawn when running to a
+    ///         tolerance.
+    ///     seed (int | None): The RNG seed; the same seed reproduces the NPV
+    ///         bitwise.
+    ///     antithetic (bool | None): The antithetic variate, supported since
+    ///         #772 lifted the former construction-time rejection.
+    ///
+    /// Raises:
+    ///     ItofinError: If neither or both of steps and steps_per_year are
+    ///         given, or if both samples and absolute_tolerance are given.
     #[new]
     #[pyo3(signature = (
         process,
@@ -101,20 +114,12 @@ impl PyMCEuropeanEngine {
     }
 }
 
-/// Python `MCEuropeanHestonEngine`: the Monte Carlo engine pricing European
-/// payoffs on a Heston process (`pricingengines::vanilla::
-/// MCEuropeanHestonEngine`), built through the core's
-/// `MakeMcEuropeanHestonEngine` factory.
+/// The Monte Carlo engine for European payoffs on a Heston process, over the
+/// pseudo-random RNG policy. The low-discrepancy policy is not exposed (#454).
 ///
-/// Same optional-argument contract as [`PyMCEuropeanEngine`]: everything past
-/// `process` is left unset when omitted, so the core reports the illegal
-/// combinations as `ItofinError`. Unlike that engine, `antithetic` is supported
-/// here - the multi-factor path generator wires the antithetic negation - and
-/// the core cached oracle prices with it on.
-///
-/// Pricing is seeded and deterministic: the same `seed` reproduces the NPV
-/// bitwise, and the resulting standard error is read back through
-/// `VanillaOption.error_estimate()`.
+/// Pricing is seeded and deterministic: the same seed reproduces the NPV
+/// bitwise, and the standard error is read back through
+/// VanillaOption.error_estimate().
 #[pyclass(name = "MCEuropeanHestonEngine", unsendable)]
 pub struct PyMCEuropeanHestonEngine {
     inner: SharedMut<MCEuropeanHestonEngine<PseudoRandom>>,
@@ -122,7 +127,29 @@ pub struct PyMCEuropeanHestonEngine {
 
 #[pymethods]
 impl PyMCEuropeanHestonEngine {
-    /// An engine over `process`, configured through the core factory.
+    /// Build an engine over process, configured through the core factory.
+    ///
+    /// Every argument past process is left unset when omitted, so the core's
+    /// own validation reports the illegal combinations.
+    ///
+    /// Args:
+    ///     process (HestonProcess): The Heston process paths are drawn from.
+    ///     steps (int | None): The fixed number of time steps per path.
+    ///     steps_per_year (int | None): The time steps per year, the
+    ///         alternative to steps.
+    ///     samples (int | None): The fixed number of paths to draw.
+    ///     absolute_tolerance (float | None): The target standard error, the
+    ///         alternative to samples.
+    ///     max_samples (int | None): The cap on paths drawn when running to a
+    ///         tolerance.
+    ///     seed (int | None): The RNG seed; the same seed reproduces the NPV
+    ///         bitwise.
+    ///     antithetic (bool | None): The antithetic variate, supported here;
+    ///         the core cached oracle prices with it on.
+    ///
+    /// Raises:
+    ///     ItofinError: If neither or both of steps and steps_per_year are
+    ///         given, or if both samples and absolute_tolerance are given.
     #[new]
     #[pyo3(signature = (
         process,
@@ -181,25 +208,19 @@ impl PyMCEuropeanHestonEngine {
     }
 }
 
-/// Python `MCAmericanEngine`: the Longstaff-Schwartz least-squares Monte Carlo
-/// engine for American payoffs (`pricingengines::vanilla::MCAmericanEngine`),
-/// built through the core's `MakeMcAmericanEngine` factory.
+/// The Longstaff-Schwartz least-squares Monte Carlo engine for American
+/// payoffs, over the pseudo-random RNG policy. The low-discrepancy policy is
+/// not exposed (#454), and the Monomial regression basis is not selectable
+/// (#453).
 ///
-/// Same optional-argument contract as [`PyMCEuropeanEngine`], plus the two
-/// regression settings: `polynomial_order` (default 2) and
-/// `calibration_samples` (default 2048). The basis family is `Monomial` and is
-/// not selectable (#453). The antithetic variate is supported here, and the
-/// core oracle prices with it on.
+/// The option priced must come from VanillaOption.american(...): a
+/// European-exercise option raises ItofinError ("wrong exercise given") when
+/// priced here.
 ///
-/// The option this engine prices must carry an American exercise that does not
-/// pay at expiry - `VanillaOption.american(...)` builds exactly that. Pricing a
-/// European-exercise option on this engine raises `ItofinError` ("wrong
-/// exercise given").
-///
-/// Pricing is seeded and deterministic: the same `seed` reproduces the NPV
-/// bitwise. The standard error is read back through
-/// `VanillaOption.error_estimate()` and the fraction of paths exercised early
-/// through `VanillaOption.exercise_probability()`.
+/// Pricing is seeded and deterministic: the same seed reproduces the NPV
+/// bitwise, the standard error is read back through
+/// VanillaOption.error_estimate() and the early-exercise fraction through
+/// VanillaOption.exercise_probability().
 #[pyclass(name = "MCAmericanEngine", unsendable)]
 pub struct PyMCAmericanEngine {
     inner: SharedMut<MCAmericanEngine<PseudoRandom>>,
@@ -207,7 +228,33 @@ pub struct PyMCAmericanEngine {
 
 #[pymethods]
 impl PyMCAmericanEngine {
-    /// An engine over `process`, configured through the core factory.
+    /// Build an engine over process, configured through the core factory.
+    ///
+    /// Every argument past process is left unset when omitted, so the core's
+    /// own validation reports the illegal combinations.
+    ///
+    /// Args:
+    ///     process (BlackScholesProcess): The process paths are drawn from.
+    ///     steps (int | None): The fixed number of time steps per path.
+    ///     steps_per_year (int | None): The time steps per year, the
+    ///         alternative to steps.
+    ///     samples (int | None): The fixed number of paths to draw.
+    ///     absolute_tolerance (float | None): The target standard error, the
+    ///         alternative to samples.
+    ///     max_samples (int | None): The cap on paths drawn when running to a
+    ///         tolerance.
+    ///     seed (int | None): The RNG seed; the same seed reproduces the NPV
+    ///         bitwise.
+    ///     antithetic (bool | None): The antithetic variate, supported here;
+    ///         the core oracle prices with it on.
+    ///     polynomial_order (int | None): The order of the Monomial regression
+    ///         basis. The core default is 2.
+    ///     calibration_samples (int | None): The paths the regression is fitted
+    ///         on. The core default is 2048.
+    ///
+    /// Raises:
+    ///     ItofinError: If neither or both of steps and steps_per_year are
+    ///         given, or if both samples and absolute_tolerance are given.
     #[new]
     #[pyo3(signature = (
         process,

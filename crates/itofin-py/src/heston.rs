@@ -20,13 +20,10 @@ use libitofin::termstructures::yieldtermstructure::YieldTermStructure;
 use libitofin::time::frequency::Frequency;
 use pyo3::prelude::*;
 
-/// Python `HestonProcess`: the square-root stochastic-variance process
-/// (`processes::HestonProcess`).
+/// The square-root stochastic-variance process.
 ///
 /// The two flat yield curves and the spot quote are assembled behind their
-/// `Handle`s internally so no `Handle` crosses the PyO3 boundary. The core
-/// ctor takes `(risk_free_rate, dividend_yield, s0, ...)` in that order; the
-/// two curves are bound by name and placed at the single call site.
+/// handles internally, so no handle crosses the binding boundary.
 #[pyclass(name = "HestonProcess", unsendable)]
 pub struct PyHestonProcess {
     inner: Shared<HestonProcess>,
@@ -34,6 +31,21 @@ pub struct PyHestonProcess {
 
 #[pymethods]
 impl PyHestonProcess {
+    /// Build the process from scalar market inputs and the five parameters.
+    ///
+    /// Args:
+    ///     risk_free_rate (float): The flat risk-free rate, made into a curve
+    ///         compounded continuously on an annual frequency.
+    ///     dividend_yield (float): The flat dividend yield, made into a curve on the
+    ///         same convention as the risk-free rate.
+    ///     spot (float): The spot level, held as a quote.
+    ///     v0 (float): The initial variance.
+    ///     kappa (float): The mean-reversion speed.
+    ///     theta (float): The long-run variance.
+    ///     sigma (float): The volatility of variance.
+    ///     rho (float): The spot/variance correlation.
+    ///     reference_date (Date): The date the two flat curves are anchored on.
+    ///     day_counter (DayCounter): The day count the curves accrue on.
     #[new]
     #[allow(clippy::too_many_arguments)]
     fn new(
@@ -81,27 +93,42 @@ impl PyHestonProcess {
         }
     }
 
-    /// The initial variance `v0`.
+    /// Return the initial variance.
+    ///
+    /// Returns:
+    ///     float: The initial variance v0.
     fn v0(&self) -> f64 {
         self.inner.v0()
     }
 
-    /// The mean-reversion speed `kappa`.
+    /// Return the mean-reversion speed.
+    ///
+    /// Returns:
+    ///     float: The mean-reversion speed kappa.
     fn kappa(&self) -> f64 {
         self.inner.kappa()
     }
 
-    /// The long-run variance `theta`.
+    /// Return the long-run variance.
+    ///
+    /// Returns:
+    ///     float: The long-run variance theta.
     fn theta(&self) -> f64 {
         self.inner.theta()
     }
 
-    /// The volatility of variance `sigma`.
+    /// Return the volatility of variance.
+    ///
+    /// Returns:
+    ///     float: The volatility of variance sigma.
     fn sigma(&self) -> f64 {
         self.inner.sigma()
     }
 
-    /// The spot/variance correlation `rho`.
+    /// Return the spot/variance correlation.
+    ///
+    /// Returns:
+    ///     float: The spot/variance correlation rho.
     fn rho(&self) -> f64 {
         self.inner.rho()
     }
@@ -114,12 +141,10 @@ impl PyHestonProcess {
     }
 }
 
-/// Python `HestonModel`: the five-parameter calibrated Heston model
-/// (`models::HestonModel`).
+/// The five-parameter calibrated Heston model.
 ///
-/// The ctor is fallible: it seeds its arguments from the process parameters
-/// under their constraints (`theta`, `kappa`, `sigma`, `v0` strictly positive,
-/// `rho` in `[-1, 1]`), so a violating parameter surfaces as an `ItofinError`.
+/// The parameters are seeded from the process it is built on and overwritten in
+/// place by a calibration, so the getters read the fitted values afterwards.
 #[pyclass(name = "HestonModel", unsendable)]
 pub struct PyHestonModel {
     inner: SharedMut<HestonModel>,
@@ -127,45 +152,78 @@ pub struct PyHestonModel {
 
 #[pymethods]
 impl PyHestonModel {
+    /// Seed the model from a process.
+    ///
+    /// Args:
+    ///     process (HestonProcess): The process whose five parameters seed the model.
+    ///
+    /// Raises:
+    ///     ItofinError: If a seeded parameter violates its constraint: theta,
+    ///         kappa, sigma and v0 must be strictly positive and rho must lie
+    ///         in [-1, 1].
     #[new]
     fn new(process: &PyHestonProcess) -> PyResult<Self> {
         let inner = HestonModel::new(process.inner()).map_err(PyQlError::from)?;
         Ok(PyHestonModel { inner })
     }
 
-    /// The long-run variance `theta`.
+    /// Return the long-run variance.
+    ///
+    /// Returns:
+    ///     float: The current value of theta.
     fn theta(&self) -> f64 {
         self.inner.borrow().theta()
     }
 
-    /// The mean-reversion speed `kappa`.
+    /// Return the mean-reversion speed.
+    ///
+    /// Returns:
+    ///     float: The current value of kappa.
     fn kappa(&self) -> f64 {
         self.inner.borrow().kappa()
     }
 
-    /// The volatility of variance `sigma`.
+    /// Return the volatility of variance.
+    ///
+    /// Returns:
+    ///     float: The current value of sigma.
     fn sigma(&self) -> f64 {
         self.inner.borrow().sigma()
     }
 
-    /// The spot/variance correlation `rho`.
+    /// Return the spot/variance correlation.
+    ///
+    /// Returns:
+    ///     float: The current value of rho.
     fn rho(&self) -> f64 {
         self.inner.borrow().rho()
     }
 
-    /// The initial variance `v0`.
+    /// Return the initial variance.
+    ///
+    /// Returns:
+    ///     float: The current value of v0.
     fn v0(&self) -> f64 {
         self.inner.borrow().v0()
     }
 
-    /// Calibrates the model to `helpers` with `method` under `end_criteria`,
-    /// then writes the fitted parameters back (readable through the getters).
+    /// Fit the five parameters to the helpers and write them back.
     ///
-    /// Mirrors the core oracle (`hestonmodelhelper.rs:556-581`): one
-    /// [`AnalyticHestonEngine`] of `integration_order` is built on this model and
-    /// installed on every helper, so all helpers price through the same engine
-    /// the optimizer drives. The engine ctor is fallible (order > 192 errors);
-    /// [`calibrate`](libitofin::models::calibrate) fails on an empty helper list.
+    /// One analytic Heston engine of the given integration order is built on
+    /// this model and installed on every helper, so all helpers price through
+    /// the same engine the optimizer drives. The fitted parameters are readable
+    /// through the getters afterwards.
+    ///
+    /// Args:
+    ///     helpers (list[HestonModelHelper]): The calibration instruments to fit; must not be empty.
+    ///     method (LevenbergMarquardt): The optimizer driving the fit.
+    ///     end_criteria (EndCriteria): The stopping rule handed to the optimizer.
+    ///     integration_order (int): The order of the Gauss-Laguerre integration the
+    ///         engine uses; at most 192.
+    ///
+    /// Raises:
+    ///     ItofinError: If integration_order exceeds 192, if helpers is empty,
+    ///         or if the optimization itself fails.
     fn calibrate(
         &mut self,
         helpers: Vec<PyRef<PyHestonModelHelper>>,
@@ -209,17 +267,10 @@ impl PyHestonModel {
     }
 }
 
-/// Python `HestonModelHelper`: a Black-vol calibration helper over a flat-vol
-/// surface (`models::equity::HestonModelHelper`).
+/// A Black-vol calibration helper over a flat-vol surface.
 ///
-/// The core ctor takes the spot as a bare `Real`, the volatility as a
-/// `Handle<dyn Quote>` and the two curves as `Handle<dyn YieldTermStructure>`.
-/// This facade takes scalar market inputs plus a `reference_date`/`day_counter`
-/// used only to assemble the vol quote handle and the two flat `FlatForward`
-/// curves inline (the same `Continuous`/`Annual` convention the other facades
-/// use); those two arguments are not forwarded to the core ctor. The helper is
-/// held as `SharedMut` so a calibration can install a pricing engine on it and
-/// upcast it to `SharedMut<dyn CalibrationHelper>`.
+/// Assembles its own volatility quote and two flat curves from the scalar
+/// market inputs, so no handle crosses the binding boundary.
 #[pyclass(name = "HestonModelHelper", unsendable)]
 pub struct PyHestonModelHelper {
     inner: SharedMut<HestonModelHelper>,
@@ -227,6 +278,23 @@ pub struct PyHestonModelHelper {
 
 #[pymethods]
 impl PyHestonModelHelper {
+    /// Build the helper from scalar market inputs.
+    ///
+    /// Args:
+    ///     maturity (Period): The option tenor.
+    ///     calendar (Calendar): The calendar the maturity rolls on.
+    ///     s0 (float): The spot level.
+    ///     strike (float): The option strike.
+    ///     volatility (float): The market Black volatility, held as a quote.
+    ///     risk_free_rate (float): The flat risk-free rate, made into a curve compounded
+    ///         continuously on an annual frequency.
+    ///     dividend_yield (float): The flat dividend yield, made into a curve on the
+    ///         same convention as the risk-free rate.
+    ///     error_type (CalibrationErrorType): How the market and model prices are compared.
+    ///     reference_date (Date): The date the two flat curves are anchored on; it is
+    ///         used only to assemble them, not forwarded to the core.
+    ///     day_counter (DayCounter): The day count the curves accrue on, used the same way.
+    ///     settings (Settings): The evaluation-date store the helper reads.
     #[new]
     #[allow(clippy::too_many_arguments)]
     fn new(
@@ -276,8 +344,17 @@ impl PyHestonModelHelper {
         }
     }
 
-    /// The calibration error under the helper's error type, after a calibration
-    /// has installed a pricing engine on it.
+    /// Return the error between the market and model values.
+    ///
+    /// Meaningful once a calibration has installed a pricing engine on the
+    /// helper; the comparison follows the helper's error type.
+    ///
+    /// Returns:
+    ///     float: The calibration error under the configured error type.
+    ///
+    /// Raises:
+    ///     ItofinError: If the market or model valuation fails, or the implied
+    ///         volatility solve does.
     fn calibration_error(&mut self) -> PyResult<f64> {
         Ok(self
             .inner

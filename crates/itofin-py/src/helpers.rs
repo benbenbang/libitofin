@@ -38,14 +38,11 @@ use libitofin::time::calendars::nullcalendar::NullCalendar;
 use libitofin::types::{Integer, Natural, Real};
 use pyo3::prelude::*;
 
-/// Python `RateHelper`: the shared base for every bootstrap helper
-/// (`termstructures::bootstraphelper::RateHelper`).
+/// Shared base for every bootstrap helper: implied/market quotes and dates.
 ///
-/// Holds the erased `Shared<dyn RateHelper>` and exposes the inspectors the
-/// bootstrap and its oracles read: the curve-implied quote and its error
-/// (fallible, needing a linked curve), the maturity and pillar dates
-/// (infallible), and the fitted market quote's current value. Concrete helpers
-/// such as [`PyDepositRateHelper`] subclass this and supply only their
+/// A rate helper wraps a market quote plus the schedule of a single
+/// instrument; a piecewise curve is bootstrapped so every helper reprices its
+/// own quote. Concrete helpers subclass this and supply only their
 /// constructor.
 #[pyclass(name = "RateHelper", subclass, unsendable)]
 pub struct PyRateHelper {
@@ -54,47 +51,77 @@ pub struct PyRateHelper {
 
 #[pymethods]
 impl PyRateHelper {
-    /// The quote implied by the curve the helper is linked to. Fallible: with
-    /// no curve set (the pre-bootstrap state) there is nothing to imply from.
+    /// Return the quote implied by the curve the helper is linked to.
+    ///
+    /// Returns:
+    ///     float: The curve-implied quote.
+    ///
+    /// Raises:
+    ///     ItofinError: With no curve set, the pre-bootstrap state, there
+    ///         being nothing to imply from.
     fn implied_quote(&self) -> PyResult<f64> {
         Ok(self.inner.implied_quote().map_err(PyQlError::from)?)
     }
 
-    /// The bootstrap root the solver drives to zero: market quote minus implied
-    /// quote. Fallible for the same reason as [`Self::implied_quote`].
+    /// Return the bootstrap root: market quote minus implied quote.
+    ///
+    /// Returns:
+    ///     float: The residual the solver drives to zero.
+    ///
+    /// Raises:
+    ///     ItofinError: On the same condition implied_quote reports.
     fn quote_error(&self) -> PyResult<f64> {
         Ok(self.inner.quote_error().map_err(PyQlError::from)?)
     }
 
-    /// The current value of the market quote the helper fits. Reads back through
-    /// the retained quote handle, so a `set_value` on the `SimpleQuote` passed
-    /// to the constructor is observed here (the same-object wiring the laziness
-    /// contract relies on). Fallible: the quote handle may be empty.
+    /// Return the current value of the market quote the helper fits.
+    ///
+    /// Reads back through the retained quote handle, so a set_value on the
+    /// SimpleQuote passed to the constructor is observed here: the same-object
+    /// wiring the laziness contract relies on.
+    ///
+    /// Returns:
+    ///     float: The market quote's current value.
     fn quote_value(&self) -> PyResult<f64> {
         Ok(self.inner.base().quote_value().map_err(PyQlError::from)?)
     }
 
-    /// The instrument's maturity date.
+    /// Return the instrument's maturity date.
+    ///
+    /// Returns:
+    ///     Date: The maturity.
     fn maturity_date(&self) -> PyDate {
         PyDate::from_inner(self.inner.maturity_date())
     }
 
-    /// The pillar date, at which the curve node this helper sets sits.
+    /// Return the date the curve node this helper sets sits at.
+    ///
+    /// Returns:
+    ///     Date: The pillar date.
     fn pillar_date(&self) -> PyDate {
         PyDate::from_inner(self.inner.pillar_date())
     }
 
-    /// The earliest date the helper needs curve data at.
+    /// Return the earliest date the helper needs curve data at.
+    ///
+    /// Returns:
+    ///     Date: The earliest relevant date.
     fn earliest_date(&self) -> PyDate {
         PyDate::from_inner(self.inner.earliest_date())
     }
 
-    /// The latest date the helper needs curve data at (equal to the pillar date).
+    /// Return the latest date the helper needs curve data at.
+    ///
+    /// Returns:
+    ///     Date: The latest date, equal to the pillar date.
     fn latest_date(&self) -> PyDate {
         PyDate::from_inner(self.inner.latest_date())
     }
 
-    /// The latest date whose data the helper is relevant for.
+    /// Return the latest date whose data the helper is relevant for.
+    ///
+    /// Returns:
+    ///     Date: The latest relevant date.
     fn latest_relevant_date(&self) -> PyDate {
         PyDate::from_inner(self.inner.latest_relevant_date())
     }
@@ -109,19 +136,18 @@ impl PyRateHelper {
     }
 }
 
-/// Python `DepositRateHelper`: a helper fitting a deposit rate
-/// (`termstructures::yields::ratehelpers::DepositRateHelper`).
-///
-/// The quote-form constructor retains the caller's [`PySimpleQuote`] so a later
-/// `set_value` re-drives the bootstrap; `from_rate` is a convenience that wraps
-/// a fixed rate in a fresh, un-retained quote.
+/// A helper fitting a deposit rate.
 #[pyclass(name = "DepositRateHelper", extends = PyRateHelper, unsendable)]
 pub struct PyDepositRateHelper;
 
 #[pymethods]
 impl PyDepositRateHelper {
-    /// A deposit helper fitting `quote`, whose schedule comes from `index`. The
-    /// caller keeps `quote`; mutating it later invalidates the bootstrap.
+    /// Build the helper over a live quote.
+    ///
+    /// Args:
+    ///     quote (SimpleQuote): The deposit rate; the caller keeps it, and
+    ///         mutating it later invalidates the bootstrap.
+    ///     index (IborIndex): The index supplying the deposit's schedule.
     #[new]
     fn new(quote: &PySimpleQuote, index: &PyIborIndex) -> PyClassInitializer<Self> {
         let idx = index.inner();
@@ -129,8 +155,15 @@ impl PyDepositRateHelper {
         PyClassInitializer::from(PyRateHelper { inner: helper }).add_subclass(PyDepositRateHelper)
     }
 
-    /// A deposit helper fitting a fixed `rate`, wrapped in an internal quote the
-    /// caller cannot later mutate.
+    /// Build the helper over a fixed rate.
+    ///
+    /// Args:
+    ///     rate (float): The deposit rate, wrapped in an internal quote the
+    ///         caller cannot later mutate.
+    ///     index (IborIndex): The index supplying the deposit's schedule.
+    ///
+    /// Returns:
+    ///     DepositRateHelper: The helper fitting that rate.
     #[staticmethod]
     fn from_rate(py: Python<'_>, rate: f64, index: &PyIborIndex) -> PyResult<Py<Self>> {
         let idx = index.inner();
@@ -143,20 +176,25 @@ impl PyDepositRateHelper {
     }
 }
 
-/// Python `SwapRateHelper`: a helper fitting a par swap rate
-/// (`termstructures::yields::ratehelpers::SwapRateHelper`).
+/// A helper fitting a par swap rate (spot-starting, no spread).
 ///
 /// The spot-starting form the curve-consistency oracle builds: no spread, no
-/// forward start, no exogenous discounting curve, and the default
-/// `Pillar::LastRelevantDate`.
+/// forward start, no exogenous discounting curve, and the default pillar.
 #[pyclass(name = "SwapRateHelper", extends = PyRateHelper, unsendable)]
 pub struct PySwapRateHelper;
 
 #[pymethods]
 impl PySwapRateHelper {
-    /// A swap helper fitting `quote` with the schedule of a spot-starting swap
-    /// of `tenor`, its fixed leg built from the given frequency, convention, and
-    /// day count, floating off `ibor_index`.
+    /// Build the helper over the schedule of a spot-starting swap.
+    ///
+    /// Args:
+    ///     quote (SimpleQuote): The par swap rate the helper fits.
+    ///     tenor (Period): The length of the swap.
+    ///     calendar (Calendar): The calendar the schedule rolls on.
+    ///     fixed_frequency (Frequency): The fixed leg's payment frequency.
+    ///     fixed_convention (BusinessDayConvention): The fixed leg's roll.
+    ///     fixed_day_count (DayCounter): The fixed leg's day count.
+    ///     ibor_index (IborIndex): The index the floating leg fixes off.
     #[new]
     #[allow(clippy::too_many_arguments)]
     fn new(
@@ -182,14 +220,12 @@ impl PySwapRateHelper {
     }
 }
 
-/// Python `FuturesType`: the date convention an interest-rate future settles on
-/// (`instruments::FuturesType`).
+/// The date convention an interest-rate future settles on.
 ///
-/// A fieldless pyo3 enum exposing `Imm`, `Asx` and `Custom`. `Imm` and `Custom`
-/// are fully usable from Python; `Asx` validates and prices against an explicitly
-/// supplied ASX start date, but the ASX date navigators (`is_asx_date`/
-/// `next_asx_date`, the analogues of the faced IMM functions) are deferred, so
-/// there is no helper to derive the next ASX date from Python yet.
+/// Imm and Custom are fully usable from Python. Asx validates and prices against
+/// an explicitly supplied ASX start date, but the ASX date navigators (the
+/// analogues of itofin.time.is_imm_date / next_imm_date) are deferred, so there
+/// is no helper to derive the next ASX date from Python yet.
 #[pyclass(name = "FuturesType", eq, eq_int, from_py_object)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum PyFuturesType {
@@ -209,16 +245,12 @@ impl PyFuturesType {
     }
 }
 
-/// Python `FuturesRateHelper`: a helper fitting an exchange-traded interest-rate
-/// future's quoted price at a fixed IMM/ASX window
-/// (`termstructures::yields::ratehelpers::FuturesRateHelper`).
+/// A helper fitting an exchange-traded interest-rate future's quoted price.
 ///
 /// Unlike the deposit and swap helpers the window is absolute: it is computed
-/// once from the supplied dates and never rebuilt on an evaluation-date change.
-/// The convexity adjustment is usually absent; pass `None` to leave it empty
-/// (an empty handle reports a zero adjustment). The subclass retains the concrete
-/// `Shared<FuturesRateHelper>` so [`Self::convexity_adjustment`], which is not on
-/// the [`RateHelper`] trait, stays reachable.
+/// once from the supplied dates and never rebuilt on an evaluation-date
+/// change. The convexity adjustment is usually absent; pass conv_adj=None to
+/// leave it empty, which reports a zero adjustment.
 #[pyclass(name = "FuturesRateHelper", extends = PyRateHelper, unsendable)]
 pub struct PyFuturesRateHelper {
     futures: Shared<FuturesRateHelper>,
@@ -226,11 +258,26 @@ pub struct PyFuturesRateHelper {
 
 #[pymethods]
 impl PyFuturesRateHelper {
-    /// A futures helper over a length-in-months window off `ibor_start_date`: the
-    /// maturity is the start advanced `length_in_months` months on `calendar`
-    /// under `convention`/`end_of_month`. `conv_adj` is the convexity quote, or
-    /// `None` for an empty (zero) adjustment. Fallible: an `Imm`/`Asx` start that
-    /// is not a valid date of that convention is rejected.
+    /// Build the helper over a length-in-months window off the start date.
+    ///
+    /// Args:
+    ///     price (SimpleQuote): The future's quoted price.
+    ///     ibor_start_date (Date): The window's start.
+    ///     length_in_months (int): The months the start is advanced by to
+    ///         reach maturity.
+    ///     calendar (Calendar): The calendar the maturity rolls on.
+    ///     convention (BusinessDayConvention): The roll applied to the
+    ///         maturity.
+    ///     end_of_month (bool): Whether the maturity roll keeps to month ends.
+    ///     day_counter (DayCounter): The day count the year fraction uses.
+    ///     conv_adj (SimpleQuote | None): The convexity quote, or None for an
+    ///         empty, zero adjustment.
+    ///     futures_type (FuturesType): The date convention the future settles
+    ///         on.
+    ///
+    /// Raises:
+    ///     ItofinError: If an Imm or Asx start is not a valid date of that
+    ///         convention.
     #[new]
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (
@@ -270,11 +317,27 @@ impl PyFuturesRateHelper {
         Ok(init(helper))
     }
 
-    /// A futures helper over an explicit window. With `ibor_end_date` `None` the
-    /// maturity is three IMM/ASX periods past the start; with a date, that date
-    /// (which must be past the start). Divergence from C++: a `Custom` helper with
-    /// no end date is an error here, not a null-maturity helper. Fallible for that
-    /// case and for a start that is not a valid date of the chosen convention.
+    /// Build the helper over an explicit window.
+    ///
+    /// Args:
+    ///     price (SimpleQuote): The future's quoted price.
+    ///     ibor_start_date (Date): The window's start.
+    ///     ibor_end_date (Date | None): The window's end, which must be past
+    ///         the start; None puts the maturity three IMM/ASX periods past
+    ///         the start.
+    ///     day_counter (DayCounter): The day count the year fraction uses.
+    ///     conv_adj (SimpleQuote | None): The convexity quote, or None for an
+    ///         empty, zero adjustment.
+    ///     futures_type (FuturesType): The date convention the future settles
+    ///         on.
+    ///
+    /// Returns:
+    ///     FuturesRateHelper: The helper over that window.
+    ///
+    /// Raises:
+    ///     ItofinError: On a Custom helper with no end date - a divergence
+    ///         from C++, which builds a null-maturity helper instead - and on
+    ///         a start that is not a valid date of the chosen convention.
     #[staticmethod]
     #[pyo3(signature = (
         price,
@@ -305,10 +368,26 @@ impl PyFuturesRateHelper {
         Py::new(py, init(helper))
     }
 
-    /// A futures helper whose window follows `index`'s conventions: the maturity
-    /// is the start advanced by the index tenor on the index's fixing calendar,
-    /// and the year fraction uses the index day counter. Fallible for a start that
-    /// is not a valid date of the chosen convention.
+    /// Build the helper with a window following the index's conventions.
+    ///
+    /// The maturity is the start advanced by the index tenor on the index's
+    /// fixing calendar, and the year fraction uses the index day counter.
+    ///
+    /// Args:
+    ///     price (SimpleQuote): The future's quoted price.
+    ///     ibor_start_date (Date): The window's start.
+    ///     index (IborIndex): The index supplying the conventions.
+    ///     conv_adj (SimpleQuote | None): The convexity quote, or None for an
+    ///         empty, zero adjustment.
+    ///     futures_type (FuturesType): The date convention the future settles
+    ///         on.
+    ///
+    /// Returns:
+    ///     FuturesRateHelper: The helper over that window.
+    ///
+    /// Raises:
+    ///     ItofinError: If the start is not a valid date of the chosen
+    ///         convention.
     #[staticmethod]
     #[pyo3(signature = (price, ibor_start_date, index, conv_adj, futures_type))]
     fn from_index(
@@ -331,9 +410,10 @@ impl PyFuturesRateHelper {
         Py::new(py, init(helper))
     }
 
-    /// The convexity adjustment applied to the forward: the convexity quote's
-    /// value, or zero when none was supplied. The quantity the convexity oracle
-    /// pins.
+    /// Return the convexity adjustment applied to the forward.
+    ///
+    /// Returns:
+    ///     float: The convexity quote's value, or zero when none was supplied.
     fn convexity_adjustment(&self) -> PyResult<f64> {
         Ok(self
             .futures
@@ -362,14 +442,11 @@ fn init(helper: Shared<FuturesRateHelper>) -> PyClassInitializer<PyFuturesRateHe
     PyClassInitializer::from(base).add_subclass(PyFuturesRateHelper { futures: helper })
 }
 
-/// Python `Pillar`: the date the curve node a helper fits sits at
-/// (`termstructures::yields::Pillar`).
+/// The date the curve node a helper fits sits at.
 ///
-/// A fieldless pyo3 enum exposing the two schedule-derived choices `MaturityDate`
-/// and `LastRelevantDate` (the C++ default). `Pillar::CustomDate` is deferred in
-/// the core (#343) - it needs an explicit pillar date threaded through
-/// construction plus its bounds check - so its omission here is deliberate, not
-/// an oversight.
+/// MaturityDate and LastRelevantDate (the default) are the two schedule-derived
+/// choices. Pillar.CustomDate is deferred in the core (#343), so its omission
+/// here is deliberate, not an oversight.
 #[pyclass(name = "Pillar", eq, eq_int, from_py_object)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum PyPillar {
@@ -387,26 +464,28 @@ impl PyPillar {
     }
 }
 
-/// Python `FraRateHelper`: a helper fitting a forward-rate-agreement rate over the
-/// window starting `period_to_start` after spot and spanning the index tenor
-/// (`termstructures::yields::ratehelpers::FraRateHelper`).
-///
-/// All four constructors are infallible, so `__init__` and the staticmethods hand
-/// back the initializer directly. `use_indexed_coupon` selects the implied-quote
-/// mode (C++ default `True`, the index fixing forecast off the curve; `False` is
-/// the par simple-forward over the raw window); it and `pillar` (default
-/// `Pillar.LastRelevantDate`) are exposed explicitly. Like the other relative
-/// helpers the quote-form constructors retain the caller's [`PySimpleQuote`] so a
-/// later `set_value` re-drives the bootstrap; `from_rate` wraps a fixed rate in a
-/// fresh, un-retained quote. `from_dates` fixes the window at construction, and it
-/// does not shift when the evaluation date changes.
+/// A helper fitting a forward-rate-agreement rate over the window starting
+/// period_to_start after spot and spanning the index tenor. use_indexed_coupon
+/// (default True) selects the indexed implied-quote mode; False is the par simple
+/// forward. from_dates fixes the window at construction (it does not shift on an
+/// evaluation-date change).
 #[pyclass(name = "FraRateHelper", extends = PyRateHelper, unsendable)]
 pub struct PyFraRateHelper;
 
 #[pymethods]
 impl PyFraRateHelper {
-    /// A FRA helper fitting `quote` over the window `period_to_start` past spot
-    /// spanning `index`'s tenor. The constructor the mixed strip uses.
+    /// Build the helper over the window period_to_start past spot.
+    ///
+    /// Args:
+    ///     quote (SimpleQuote): The FRA rate; the caller keeps it, so a later
+    ///         set_value re-drives the bootstrap.
+    ///     period_to_start (Period): How long after spot the window starts.
+    ///     index (IborIndex): The index whose tenor the window spans.
+    ///     use_indexed_coupon (bool): True selects the indexed implied-quote
+    ///         mode, the index fixing forecast off the curve; False is the par
+    ///         simple forward over the raw window.
+    ///     pillar (Pillar): The date the curve node sits at; defaults to
+    ///         LastRelevantDate.
     #[new]
     #[pyo3(signature = (
         quote,
@@ -433,8 +512,18 @@ impl PyFraRateHelper {
         PyClassInitializer::from(PyRateHelper { inner: helper }).add_subclass(PyFraRateHelper)
     }
 
-    /// A FRA helper fitting a fixed `rate`, wrapped in an internal quote the caller
-    /// cannot later mutate.
+    /// Build the helper over a fixed rate.
+    ///
+    /// Args:
+    ///     rate (float): The FRA rate, wrapped in an internal quote the caller
+    ///         cannot later mutate.
+    ///     period_to_start (Period): How long after spot the window starts.
+    ///     index (IborIndex): The index whose tenor the window spans.
+    ///     use_indexed_coupon (bool): The implied-quote mode; see __init__.
+    ///     pillar (Pillar): The date the curve node sits at.
+    ///
+    /// Returns:
+    ///     FraRateHelper: The helper fitting that rate.
     #[staticmethod]
     #[pyo3(signature = (
         rate,
@@ -465,7 +554,18 @@ impl PyFraRateHelper {
         )
     }
 
-    /// A FRA helper whose start is `months_to_start` months after spot.
+    /// Build the helper with a start given in months after spot.
+    ///
+    /// Args:
+    ///     quote (SimpleQuote): The FRA rate the helper fits.
+    ///     months_to_start (int): How many months after spot the window
+    ///         starts.
+    ///     index (IborIndex): The index whose tenor the window spans.
+    ///     use_indexed_coupon (bool): The implied-quote mode; see __init__.
+    ///     pillar (Pillar): The date the curve node sits at.
+    ///
+    /// Returns:
+    ///     FraRateHelper: The helper over that window.
     #[staticmethod]
     #[pyo3(signature = (
         quote,
@@ -496,8 +596,21 @@ impl PyFraRateHelper {
         )
     }
 
-    /// A FRA helper over the explicit `[start_date, end_date]` window. Its schedule
-    /// is fixed at construction and does not shift on an evaluation-date change.
+    /// Build the helper over an explicit window.
+    ///
+    /// The schedule is fixed at construction and does not shift when the
+    /// evaluation date changes.
+    ///
+    /// Args:
+    ///     quote (SimpleQuote): The FRA rate the helper fits.
+    ///     start_date (Date): The window's start.
+    ///     end_date (Date): The window's end.
+    ///     index (IborIndex): The index the forward is read off.
+    ///     use_indexed_coupon (bool): The implied-quote mode; see __init__.
+    ///     pillar (Pillar): The date the curve node sits at.
+    ///
+    /// Returns:
+    ///     FraRateHelper: The helper over that window.
     #[staticmethod]
     #[pyo3(signature = (
         quote,
@@ -532,17 +645,12 @@ impl PyFraRateHelper {
     }
 }
 
-/// Python `OvernightIndex`: the base of the overnight index families
-/// (`indexes::iborindex::OvernightIndex`).
+/// The base of the overnight index families.
 ///
-/// Abstract from Python: it has no constructor, because the core builds an
-/// overnight index only through a family factory such as [`PyEstr`], which is
-/// what supplies the conventions. It exists so the facades consuming an
-/// overnight index - [`PyOISRateHelper`] and the OIS-swap builder - name one
-/// type and accept any family, mirroring [`PyIborIndex`] under
-/// [`PyEuribor`]. The `fixing` accessor stays on the family facade rather than
-/// being lifted here; nothing reads a fixing off the base yet, so widening it
-/// is deferred.
+/// Abstract: it has no constructor, because the core builds an overnight index
+/// only through a family factory such as Estr. It exists so OISRateHelper and
+/// MakeOis name one type and accept any family. The fixing accessor stays on
+/// the family facade; lifting it here is deferred.
 #[pyclass(name = "OvernightIndex", subclass, unsendable)]
 pub struct PyOvernightIndex {
     inner: Shared<OvernightIndex>,
@@ -556,20 +664,12 @@ impl PyOvernightIndex {
     }
 }
 
-/// Python `Estr`: the Euro Short-Term Rate overnight index (`indexes::Estr`).
+/// The Euro Short-Term Rate overnight index.
 ///
-/// `Estr::new` returns an `OvernightIndex` by value (it adds no behaviour over
-/// the base, so the C++ subclass is pure configuration, `estr.rs:7`); it is
-/// wrapped in `shared()` so [`PyOISRateHelper`] can hold the same object and
-/// hand the core ctor the `&OvernightIndex` it takes. Passing `None` for the
-/// curve builds the index over an empty forwarding handle, the form the OIS
-/// bootstrap needs. Infallible (unlike `Euribor::new`, which rejects daily
-/// tenors): the overnight tenor is fixed to `1*Days` by the base.
-///
-/// A subclass of [`PyOvernightIndex`], so an ESTR index is accepted wherever
-/// the general overnight index is. It retains its own clone of the index the
-/// base holds - the same object, not a rebuild - so a facade typed on either
-/// half reads exactly the same core index.
+/// A subclass of OvernightIndex, so an ESTR index is accepted wherever the
+/// general overnight index is. It retains its own clone of the index the base
+/// holds - the same object, not a rebuild - so a facade typed on either half
+/// reads exactly the same core index.
 #[pyclass(name = "Estr", extends = PyOvernightIndex, unsendable)]
 pub struct PyEstr {
     inner: Shared<OvernightIndex>,
@@ -577,8 +677,17 @@ pub struct PyEstr {
 
 #[pymethods]
 impl PyEstr {
-    /// An ESTR index forwarding off `curve`, or off an empty handle when `curve`
-    /// is `None`.
+    /// Build an ESTR index forwarding off curve.
+    ///
+    /// Infallible, unlike the Euribor constructor: the overnight tenor is fixed
+    /// to one day by the base rather than taken from the caller.
+    ///
+    /// Args:
+    ///     curve (YieldTermStructure | None): The forwarding curve; None builds
+    ///         the index over an empty forwarding handle, the form the OIS
+    ///         bootstrap needs.
+    ///     settings (Settings): The explicit settings supplying the evaluation
+    ///         date and the stored fixings.
     #[new]
     #[pyo3(signature = (curve, settings))]
     fn new(
@@ -592,9 +701,23 @@ impl PyEstr {
         init_overnight(shared(Estr::new(forwarding, settings.inner())))
     }
 
-    /// The index's fixing for `fixing_date`, forecast off the forwarding curve
-    /// for a future date or read from stored fixings for a past one. Fallible:
-    /// an empty forwarding handle or an unset evaluation date is an error.
+    /// Return the index fixing for fixing_date.
+    ///
+    /// Forecast off the forwarding curve for a future date, or read from the
+    /// stored fixings for a past one.
+    ///
+    /// Args:
+    ///     fixing_date (Date): The date the fixing is read or forecast for.
+    ///     forecast_todays_fixing (bool): Whether a fixing dated today is
+    ///         forecast rather than looked up.
+    ///
+    /// Returns:
+    ///     float: The fixing rate.
+    ///
+    /// Raises:
+    ///     ItofinError: If the fixing date is not a valid one, the evaluation
+    ///         date is unset, a past fixing is missing from the store, or the
+    ///         forwarding handle is empty on a forecast.
     fn fixing(&self, fixing_date: &PyDate, forecast_todays_fixing: bool) -> PyResult<f64> {
         Ok(self
             .inner
@@ -613,11 +736,10 @@ fn init_overnight(index: Shared<OvernightIndex>) -> PyClassInitializer<PyEstr> {
     PyClassInitializer::from(base).add_subclass(PyEstr { inner: index })
 }
 
-/// Python `RateAveraging`: how an overnight coupon combines its daily fixings
-/// (`cashflows::RateAveraging`).
+/// How an overnight coupon combines its daily fixings.
 ///
-/// A fieldless pyo3 enum exposing `Simple` (arithmetic average) and `Compound`
-/// (daily compounding, the coupon default the OIS oracle uses).
+/// Simple is the arithmetic average; Compound (daily compounding) is the coupon
+/// default the OIS conventions use.
 #[pyclass(name = "RateAveraging", eq, eq_int, from_py_object)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum PyRateAveraging {
@@ -635,27 +757,46 @@ impl PyRateAveraging {
     }
 }
 
-/// Python `OISRateHelper`: a helper fitting an overnight-indexed swap rate
-/// (`termstructures::yields::ratehelpers::OISRateHelper`).
+/// A helper fitting an overnight-indexed swap rate (spot-starting, floating
+/// off an overnight index).
 ///
-/// The spot-starting OIS the bootstrap oracle builds: a swap of `tenor` starting
-/// `settlement_days` after the evaluation date, floating off `overnight_index`.
-/// The Python signature lists the required knobs first (so `settings` can sit
-/// among them rather than illegally after the defaulted trailing ones), then the
-/// four optional knobs the issue defaults; the body reorders these into the core
-/// ctor's 13-argument positional order. `discounting_curve` `None` discounts off
-/// the bootstrapping curve; `overnight_spread` `None` becomes an empty (zero)
-/// spread handle. The deferred core knobs past `averaging_method` (telescopic
-/// value dates, lookback, lockout, observation shift, custom pillar, per-leg
-/// calendars, `ratehelpers.rs:1036-1039`) take their benign defaults.
+/// The required knobs come first so settings can sit among them; the four
+/// optional knobs trail with defaults. discounting_curve=None discounts off the
+/// bootstrapping curve; overnight_spread=None is an empty (zero) spread. The
+/// deferred core knobs past averaging_method (telescopic value dates, lookback,
+/// lockout, observation shift, custom pillar, per-leg calendars) take benign
+/// defaults.
 #[pyclass(name = "OISRateHelper", extends = PyRateHelper, unsendable)]
 pub struct PyOISRateHelper;
 
 #[pymethods]
 impl PyOISRateHelper {
-    /// An OIS helper fitting `quote` with the schedule of a spot-starting OIS of
-    /// `tenor` floating off `overnight_index`. The caller keeps `quote` (and
-    /// `overnight_spread`); mutating either later re-drives the bootstrap.
+    /// Build the helper over the schedule of a spot-starting OIS.
+    ///
+    /// Args:
+    ///     settlement_days (int): The days after the evaluation date the swap
+    ///         starts.
+    ///     tenor (Period): The length of the swap.
+    ///     quote (SimpleQuote): The OIS rate; the caller keeps it, so a later
+    ///         set_value re-drives the bootstrap.
+    ///     overnight_index (OvernightIndex): The index the floating leg
+    ///         compounds.
+    ///     payment_lag (int): The days between accrual end and payment.
+    ///     payment_convention (BusinessDayConvention): The roll applied to the
+    ///         payment dates.
+    ///     payment_frequency (Frequency): The payment frequency.
+    ///     forward_start (Period): How long after spot the swap starts.
+    ///     settings (Settings): The explicit settings supplying the evaluation
+    ///         date and the stored fixings.
+    ///     discounting_curve (YieldTermStructure | None): The curve the flows
+    ///         discount on; None discounts off the bootstrapping curve.
+    ///     overnight_spread (SimpleQuote | None): The spread over the index;
+    ///         None leaves it empty, so zero. The caller keeps it, and
+    ///         mutating it re-drives the bootstrap.
+    ///     pillar (Pillar): The date the curve node sits at; defaults to
+    ///         LastRelevantDate.
+    ///     averaging_method (RateAveraging): How the daily fixings combine;
+    ///         defaults to Compound.
     #[new]
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (
@@ -710,14 +851,12 @@ impl PyOISRateHelper {
     }
 }
 
-/// Python `BondPriceType`: the price convention a bond helper fits
-/// (`instruments::BondPriceType`).
+/// The price convention a bond helper fits.
 ///
-/// A fieldless pyo3 enum exposing `Clean`, the quoted price with the accrued
-/// interest stripped out, and `Dirty`, the full settlement price. The two differ
-/// by exactly the bond's accrued amount at settlement (`bondhelpers.rs:367`), so
-/// the choice moves the bootstrapped curve for any bond settling mid-coupon and
-/// is a no-op for one settling on a coupon date.
+/// Clean is the quoted price with the accrued interest stripped out; Dirty is
+/// the full settlement price. The two differ by exactly the bond's accrued
+/// amount at settlement, so the choice moves the bootstrapped curve for any
+/// bond settling mid-coupon and is a no-op for one settling on a coupon date.
 #[pyclass(name = "BondPriceType", eq, eq_int, from_py_object)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum PyBondPriceType {
@@ -735,47 +874,65 @@ impl PyBondPriceType {
     }
 }
 
-/// Python `FixedRateBondHelper`: a helper fitting the quoted price of a
-/// fixed-coupon bond it builds internally
-/// (`termstructures::yields::bondhelpers::FixedRateBondHelper`).
+/// A helper fitting the quoted price of a fixed-coupon bond it builds itself.
 ///
-/// Unlike the schedule-derived helpers this one is a fixed-date helper: its bond
-/// and its dates are built once and do not shift when the evaluation date moves.
-/// The pillar is the bond's last cash-flow date, which rolls past the maturity
-/// whenever the final payment is date-adjusted (`bondhelpers.rs:84-88`), so read
-/// it off [`PyRateHelper::pillar_date`] rather than assuming the maturity.
+/// Unlike the schedule-derived helpers this one is a fixed-date helper: its
+/// bond and its dates are built once and do not shift when the evaluation date
+/// moves. The pillar is the bond's last cash-flow date, which rolls past the
+/// maturity whenever the final payment is date-adjusted, so read pillar_date()
+/// rather than assuming the maturity.
 ///
-/// The Python constructor is contained: it takes eleven of the core's sixteen
-/// arguments and defaults the rest, which are documented deferrals rather than
-/// silent omissions.
+/// The constructor is contained: it takes eleven of the core's sixteen
+/// arguments and defaults the rest. Those defaults are deferrals, not
+/// oversights:
 ///
-/// - The four ex-coupon knobs (`ex_coupon_period`, `ex_coupon_calendar`,
-///   `ex_coupon_convention`, `ex_coupon_end_of_month`) take the no-ex-coupon
-///   defaults the core oracle passes (`bondhelpers.rs:536-541`): no period, a
-///   null calendar, `Unadjusted`, and `false`. An ex-coupon bond is not
-///   constructible from Python yet.
-/// - `payment_calendar` is defaulted to `None`, so the schedule's own calendar
+/// - The four ex-coupon knobs (period, calendar, convention, end-of-month) take
+///   the no-ex-coupon defaults the core oracle passes: no period, a null
+///   calendar, Unadjusted, and False. An ex-coupon bond is not constructible
+///   from Python yet.
+/// - payment_calendar is defaulted to None, so the schedule's own calendar
 ///   rolls the payment dates, again as the core oracle does. A bond paying on a
 ///   calendar other than its schedule's is not constructible from Python yet.
-/// - The generic `BondHelper`, over an arbitrary pre-built bond, is not faced at
+/// - The generic BondHelper, over an arbitrary pre-built bond, is not faced at
 ///   all: it needs a bond-instrument facade, which does not exist.
-/// - [`PySchedule`] exposes no `end_of_month` knob (its builder leaves the core
-///   default `false`), so an end-of-month coupon schedule is not constructible
-///   from Python yet. Deferred with the schedule facade rather than here.
+/// - Schedule takes no end_of_month knob, so an end-of-month bond schedule is
+///   not constructible from Python yet.
 ///
-/// `issue_date` is the one core argument moved out of position: it is optional,
-/// so it trails the required `price_type` and `settings` rather than sitting
-/// between `redemption` and them as it does in the core signature.
+/// issue_date is the one core argument moved out of position: it is optional,
+/// so it trails the required price_type and settings.
 #[pyclass(name = "FixedRateBondHelper", extends = PyRateHelper, unsendable)]
 pub struct PyFixedRateBondHelper;
 
 #[pymethods]
 impl PyFixedRateBondHelper {
-    /// A bond helper fitting `price` - read as a clean or dirty quote per
-    /// `price_type` - for the fixed-coupon bond built from `schedule`. The caller
-    /// keeps `price`; mutating it later re-drives the bootstrap. Fallible: the
-    /// bond build and the helper's next-cash-flow date both resolve off the
-    /// evaluation date, which must be set on `settings`.
+    /// Build the helper over a fixed-coupon bond assembled from the schedule.
+    ///
+    /// Args:
+    ///     price (SimpleQuote): The bond's quoted price, read as clean or dirty
+    ///         per price_type. The caller keeps it, so a later set_value
+    ///         re-drives the bootstrap.
+    ///     settlement_days (int): The days between the evaluation date and the
+    ///         bond's settlement date.
+    ///     face_amount (float): The notional the coupons accrue on.
+    ///     schedule (Schedule): The coupon schedule; its calendar also rolls
+    ///         the payment dates.
+    ///     coupons (list[float]): The coupon rates, one per period or a single
+    ///         rate applied to every period.
+    ///     day_counter (DayCounter): The day count the coupons accrue under.
+    ///     payment_convention (BusinessDayConvention): The roll applied to the
+    ///         payment dates.
+    ///     redemption (float): The redemption amount, per 100 of face.
+    ///     price_type (BondPriceType): Whether price is a clean or a dirty
+    ///         quote.
+    ///     settings (Settings): The explicit settings supplying the evaluation
+    ///         date.
+    ///     issue_date (Date | None): The bond's issue date; None leaves it
+    ///         unset.
+    ///
+    /// Raises:
+    ///     ItofinError: On whatever the core rejects about the bond, and when
+    ///         the evaluation date is unset, since the helper resolves the
+    ///         bond's next cash-flow date off it.
     #[new]
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (

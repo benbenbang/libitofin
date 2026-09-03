@@ -15,11 +15,11 @@
 use libitofin::currency::Currency;
 use pyo3::prelude::*;
 
-/// Python `Currency`: an ISO 4217 currency specification (`currency::Currency`).
+/// An ISO 4217 currency specification.
 ///
-/// Two currencies compare equal on their name alone, matching the core's
-/// `PartialEq` (`currency.rs:132`), and `repr` prints the ISO code, matching its
-/// `Display` (`currency.rs:126`).
+/// Only the four named currencies the core provides are exposed; the general
+/// constructor is omitted, as the core ports only the currencies its indexes
+/// need and the full catalogue is deferred there.
 #[pyclass(name = "Currency", unsendable)]
 pub struct PyCurrency {
     inner: Currency,
@@ -27,7 +27,10 @@ pub struct PyCurrency {
 
 #[pymethods]
 impl PyCurrency {
-    /// The European Euro (ISO `EUR`).
+    /// Return the European Euro.
+    ///
+    /// Returns:
+    ///     Currency: The euro, ISO code "EUR".
     #[staticmethod]
     fn eur() -> Self {
         PyCurrency {
@@ -35,7 +38,10 @@ impl PyCurrency {
         }
     }
 
-    /// The U.S. dollar (ISO `USD`).
+    /// Return the U.S. dollar.
+    ///
+    /// Returns:
+    ///     Currency: The U.S. dollar, ISO code "USD".
     #[staticmethod]
     fn usd() -> Self {
         PyCurrency {
@@ -43,7 +49,10 @@ impl PyCurrency {
         }
     }
 
-    /// The British pound sterling (ISO `GBP`).
+    /// Return the British pound sterling.
+    ///
+    /// Returns:
+    ///     Currency: The pound sterling, ISO code "GBP".
     #[staticmethod]
     fn gbp() -> Self {
         PyCurrency {
@@ -51,7 +60,10 @@ impl PyCurrency {
         }
     }
 
-    /// The Japanese yen (ISO `JPY`).
+    /// Return the Japanese yen.
+    ///
+    /// Returns:
+    ///     Currency: The yen, ISO code "JPY".
     #[staticmethod]
     fn jpy() -> Self {
         PyCurrency {
@@ -59,11 +71,18 @@ impl PyCurrency {
         }
     }
 
-    /// The ISO 4217 three-letter code, e.g. `"EUR"`.
+    /// Return the ISO 4217 three-letter code.
+    ///
+    /// Returns:
+    ///     str: The three-letter code, e.g. "EUR".
     fn code(&self) -> &str {
         self.inner.code()
     }
 
+    /// Return the printable representation, which prints the ISO code.
+    ///
+    /// Returns:
+    ///     str: A string of the form Currency(EUR).
     fn __repr__(&self) -> String {
         format!("Currency({})", self.inner.code())
     }
