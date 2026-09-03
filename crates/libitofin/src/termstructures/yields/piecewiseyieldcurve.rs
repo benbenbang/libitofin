@@ -358,7 +358,7 @@ mod tests {
     };
     use crate::time::businessdayconvention::BusinessDayConvention;
     use crate::time::calendars::target::Target;
-    use crate::time::date::Month;
+    use crate::time::date::{Day, Month, Year};
     use crate::time::daycounters::actual360::Actual360;
     use crate::time::daycounters::actual365fixed::Actual365Fixed;
     use crate::time::daycounters::thirty360::{Convention, Thirty360};
@@ -406,11 +406,16 @@ mod tests {
     }
 
     fn common_vars() -> CommonVars {
+        common_vars_on(Date::new(15, Month::June, 2026))
+    }
+
+    /// The same fixture at an explicit evaluation date, the port of the C++
+    /// `CommonVars(Date)` constructor (`piecewiseyieldcurve.cpp:167`).
+    /// `testGlobalBootstrapVariables` pins its evaluation date to make the
+    /// solve reproducible.
+    fn common_vars_on(evaluation_date: Date) -> CommonVars {
         let calendar = Target::new();
-        let today = calendar.adjust(
-            Date::new(15, Month::June, 2026),
-            BusinessDayConvention::Following,
-        );
+        let today = calendar.adjust(evaluation_date, BusinessDayConvention::Following);
         let settings = shared(Settings::<Date>::new());
         settings.set_evaluation_date(today);
         let settlement = calendar.advance(
@@ -1377,5 +1382,216 @@ mod tests {
             !curve.lazy.borrow().is_calculated(),
             "an observing convexity handle must invalidate the curve"
         );
+    }
+    /// The IMM futures quotes of `CommonVars` (`piecewiseyieldcurve.cpp:116`,
+    /// turned into prices at `:266`): `100 - rate`.
+    const IMM_FUTURES_PRICE: [Real; 3] = [95.419, 95.427, 95.443];
+
+    /// The 22 pillar dates of the plain curve, from the C++ dylib run.
+    const REF_PILLAR: [(Day, Month, Year); 22] = [
+        (27, Month::September, 2019),
+        (4, Month::October, 2019),
+        (28, Month::October, 2019),
+        (27, Month::November, 2019),
+        (27, Month::December, 2019),
+        (27, Month::March, 2020),
+        (29, Month::June, 2020),
+        (28, Month::September, 2020),
+        (27, Month::September, 2021),
+        (27, Month::September, 2022),
+        (27, Month::September, 2023),
+        (27, Month::September, 2024),
+        (29, Month::September, 2025),
+        (28, Month::September, 2026),
+        (27, Month::September, 2027),
+        (27, Month::September, 2028),
+        (27, Month::September, 2029),
+        (29, Month::September, 2031),
+        (27, Month::September, 2034),
+        (27, Month::September, 2039),
+        (27, Month::September, 2044),
+        (27, Month::September, 2049),
+    ];
+
+    /// Port of `testGlobalBootstrapVariables`
+    /// (`piecewiseyieldcurve.cpp:1486-1545`): a `PiecewiseYieldCurve<Discount,
+    /// LogLinear, GlobalBootstrap>` over the `CommonVars` strip, and a second
+    /// one where the first swap is replaced by three IMM futures whose
+    /// convexity volatility is fitted AS PART OF the same global solve.
+    ///
+    /// The joint system is SQUARE: 23 interior nodes plus one volatility
+    /// variable against 6 deposit residuals, 14 swap residuals, 3 futures
+    /// residuals and 1 penalty term. The removed first swap carries no residual
+    /// of its own - it is an additional helper, and reaches the solve only
+    /// through the penalty `1e4 * quote_error`, which is what ties the futures
+    /// strip back to the swap level the volatility has to reproduce.
+    ///
+    /// TWO HANDLES, TWO BEHAVIOURS, and the distinction is load-bearing. The
+    /// volatility handle INSIDE each convexity quote is the ordinary observing
+    /// one, so a trial volatility drops the quote's cached bias and the next
+    /// residual is computed at the new one. Only the futures helper's handle TO
+    /// the convexity quote is unregistered, so that same write does not
+    /// invalidate the curve mid-solve.
+    ///
+    /// The reference numbers come from a harness run against a locally built
+    /// QuantLib dylib with `usingAtParCoupons()` set, since the `.cpp` prints
+    /// none: the two pillar lists, the solved volatility, and the pillar
+    /// discounts of both curves. The C++ arms are a pillar-list inequality and
+    /// a repricing comparison at `QL_CHECK_CLOSE` 1e-6, which is a PERCENTAGE
+    /// tolerance and so 1e-8 relative; the port asserts 1e-9, and the dylib's
+    /// own worst disagreement between the two curves is 2.5e-15 against this
+    /// port's 2.0e-15.
+    ///
+    /// The SOLVED-VOLATILITY pin is not in the C++ test and is what carries
+    /// this oracle. Both upstream arms are blind to the convexity model: the
+    /// joint solve reprices every original instrument for whatever volatility
+    /// the futures leg is fitted at, so the discount comparison passes on a
+    /// bias timed from the wrong reference date, and passes even when the
+    /// volatility never moves off its initial guess. Probed both ways - a bias
+    /// referenced to settlement rather than to the evaluation date leaves the
+    /// discount arm green and shifts the fitted volatility to 0.0993827, and an
+    /// unregistered inner volatility handle leaves it stuck at exactly 1.0.
+    #[test]
+    fn global_bootstrap_variables_fit_a_futures_convexity_volatility() {
+        use crate::indexes::interestrateindex::InterestRateIndex;
+        use crate::instruments::FuturesType;
+        use crate::termstructures::globalbootstrap::GlobalBootstrap;
+        use crate::termstructures::globalbootstrapvars::SimpleQuoteVariables;
+
+        let vars = common_vars_on(Date::new(25, Month::September, 2019));
+        let curve = PiecewiseYieldCurve::<Discount, LogLinear, GlobalBootstrap>::new(
+            vars.settlement,
+            vars.instruments.clone(),
+            Actual365Fixed::new(),
+            LogLinear,
+        )
+        .expect("the plain strip builds a curve");
+
+        let mut helpers = vars.instruments.clone();
+        let first_swap = helpers.remove(DEPOSIT_DATA.len());
+
+        let index = shared(Euribor::three_months(
+            Handle::empty(),
+            vars.settings.clone(),
+        ));
+        let volatility = shared(SimpleQuote::new(None));
+        let mean_reversion = make_quote_handle(0.03);
+        let mut futures_date = vars.today;
+        for price in IMM_FUTURES_PRICE {
+            futures_date = imm::next_date(futures_date, true);
+            if index.fixing_date(futures_date) < vars.today {
+                futures_date = imm::next_date(futures_date, true);
+            }
+            let price = Handle::new(shared(SimpleQuote::new(price)) as Shared<dyn Quote>);
+            let conv_adj = shared(
+                FuturesConvAdjustmentQuote::new(
+                    &index,
+                    futures_date,
+                    price.clone(),
+                    Handle::new(Shared::clone(&volatility) as Shared<dyn Quote>),
+                    mean_reversion.handle(),
+                    vars.settings.clone(),
+                )
+                .expect("the index resolves the maturity of an IMM date"),
+            ) as Shared<dyn Quote>;
+            helpers.push(
+                FuturesRateHelper::from_index(
+                    price,
+                    futures_date,
+                    &index,
+                    Handle::new_unregistered(conv_adj),
+                    FuturesType::Imm,
+                )
+                .expect("an IMM date builds a futures helper")
+                    as Shared<dyn RateHelper>,
+            );
+        }
+
+        let penalty_helper = Shared::clone(&first_swap);
+        let curve_futures = PiecewiseYieldCurve::<Discount, LogLinear, _>::with_bootstrap(
+            vars.settlement,
+            helpers,
+            Actual365Fixed::new(),
+            LogLinear,
+            GlobalBootstrap::with_grid_independent_penalties(
+                vec![Shared::clone(&first_swap)],
+                None,
+                Some(1.0e-12),
+                None,
+                Vec::new(),
+                move || {
+                    let error = penalty_helper
+                        .quote_error()
+                        .expect("the first swap reprices off the trial curve");
+                    vec![1.0e4 * error]
+                },
+            )
+            .with_additional_variables(Box::new(
+                SimpleQuoteVariables::new(vec![Shared::clone(&volatility)], vec![1.0], vec![0.0])
+                    .expect("one guess and one bound for one quote"),
+            )),
+        )
+        .expect("the futures strip builds a curve");
+
+        let pillars: Vec<Date> = REF_PILLAR
+            .iter()
+            .map(|(day, month, year)| Date::new(*day, *month, *year))
+            .collect();
+        assert_eq!(
+            curve.dates().expect("the plain strip solves"),
+            pillars,
+            "the plain curve's pillar list"
+        );
+
+        // The futures curve drops the first swap's pillar (28 Sep 2020) and
+        // gains the three futures maturities, so 24 dates against 22.
+        let mut futures_pillars: Vec<Date> = pillars
+            .iter()
+            .copied()
+            .filter(|date| *date != Date::new(28, Month::September, 2020))
+            .chain([
+                Date::new(18, Month::March, 2020),
+                Date::new(18, Month::June, 2020),
+                Date::new(17, Month::September, 2020),
+            ])
+            .collect();
+        futures_pillars.sort_unstable();
+        assert_eq!(futures_pillars.len(), 24);
+        assert_eq!(
+            curve_futures
+                .dates()
+                .expect("the futures strip solves")
+                .clone(),
+            futures_pillars,
+            "the futures curve's pillar list"
+        );
+
+        let solved = volatility.value().expect("the volatility is solved");
+        assert!(
+            (solved - 0.098_615_063_557_902_12).abs() < 1.0e-8,
+            "the fitted convexity volatility is {solved}"
+        );
+        assert!(
+            (solved - 1.0).abs() > 0.5,
+            "the volatility never moved off its initial guess of 1.0"
+        );
+
+        let mut worst = 0.0_f64;
+        for helper in &vars.instruments {
+            let pillar = helper.pillar_date();
+            let plain = curve
+                .discount_date(pillar, false)
+                .expect("the plain curve discounts its own pillar");
+            let with_futures = curve_futures
+                .discount_date(pillar, false)
+                .expect("the futures curve discounts the plain pillar");
+            let relative = (plain - with_futures).abs() / plain;
+            worst = worst.max(relative);
+            assert!(
+                relative < 1.0e-9,
+                "{pillar} discounts to {plain} without futures and {with_futures} with them"
+            );
+        }
+        assert!(worst < 1.0e-9, "worst relative discount gap is {worst}");
     }
 }
