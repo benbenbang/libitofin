@@ -1,12 +1,12 @@
 //! Facade for the market cap/floor TERM-volatility surface
-//! [`PyCapFloorTermVolSurface`].
+//! CapFloorTermVolSurface.
 //!
 //! This is a `CapFloorTermVolatilityStructure`, not an
-//! [`OptionletVolatilityStructure`](crate::optionletvol::PyOptionletVolatilityStructure):
-//! it quotes the flat volatility of a WHOLE cap by cap length, which is how the
-//! market quotes caps, whereas an optionlet surface quotes the individual
-//! caplets a cap decomposes into. It is therefore the optionlet stripper's
-//! input, not its output, and it does not extend the optionlet base.
+//! OptionletVolatilityStructure: it quotes the flat volatility of a WHOLE cap
+//! by cap length, which is how the market quotes caps, whereas an optionlet
+//! surface quotes the individual caplets a cap decomposes into. It is therefore
+//! the optionlet stripper's input, not its output, and it does not extend the
+//! optionlet base.
 //!
 //! It is exposed standalone rather than under a shared base: it is the only
 //! implementor of its trait in the core, so a Python base class would have a
@@ -19,10 +19,9 @@
 //! volatilities or over the caller's quotes. The moving pair is not optional
 //! polish here - it is what the optionlet stripping pipeline runs on. The
 //! adapter that serves the stripped surface reads its settlement days from this
-//! surface (`strippedoptionletadapter.rs:87` through
-//! `optionletstripper.rs:241`), and a fixed-reference term structure has none,
-//! so a surface built by the fixed forms fails the adapter with `"settlement
-//! days not provided for this instance"`.
+//! surface, and a fixed-reference term structure has none, so a surface built
+//! by the fixed forms fails the adapter with `"settlement days not provided for
+//! this instance"`.
 
 use crate::PyQlError;
 use crate::market::PySimpleQuote;
@@ -384,7 +383,7 @@ fn check_grid<T>(rows: &[Vec<T>]) -> PyResult<usize> {
     Ok(columns)
 }
 
-/// A `list[list[float]]` as a core [`Matrix`], one row per option tenor.
+/// A `list[list[float]]` as a core Matrix, one row per option tenor.
 pub(crate) fn matrix_from_rows(rows: &[Vec<f64>]) -> PyResult<Matrix> {
     let columns = check_grid(rows)?;
     let mut matrix = Matrix::with_size(rows.len(), columns);

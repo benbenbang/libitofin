@@ -1,14 +1,11 @@
-//! Facades for the cash-flow slice: the [`PyYoYInflationCoupon`] a year-on-year
-//! inflation leg pays, the [`PyYoYInflationLeg`] builder producing it
-//! (`cashflows::yoyinflationcoupon`, `cashflows::yoyinflationleg`), the
-//! floating [`PyIborLeg`] (`cashflows::iborleg`), and the erased
-//! [`PyCashFlow`]/[`PyLeg`] pair with the leg-summing [`npv`] (#878).
+//! Facades for the cash-flow slice: the YoYInflationCoupon a year-on-year
+//! inflation leg pays, the YoYInflationLeg builder producing it, the floating
+//! IborLeg, and the erased CashFlow/Leg pair with the leg-summing npv() (#878).
 //!
 //! This is the first coupon facade in the crate (#848). Until now the coupons
 //! were reachable only *through* the instruments built over them - a
-//! [`YearOnYearInflationSwap`](crate::inflation::PyYearOnYearInflationSwap) or a
-//! [`YoYInflationCapFloor`](crate::inflation::PyYoYInflationCapFloor) - which
-//! covers the pricing path but not a caller who wants the leg itself.
+//! YearOnYearInflationSwap or a YoYInflationCapFloor - which covers the pricing
+//! path but not a caller who wants the leg itself.
 
 use crate::PyQlError;
 use crate::curve::PyYieldTermStructure;
@@ -205,8 +202,7 @@ impl PyYoYInflationCoupon {
         PyYoYInflationCoupon { inner }
     }
 
-    /// The wrapped coupon, which is what the raw
-    /// [`YoYInflationCapFloor`](crate::inflation::PyYoYInflationCapFloor)
+    /// The wrapped coupon, which is what the raw YoYInflationCapFloor
     /// constructors take a vector of.
     pub(crate) fn shared(&self) -> Shared<YoYInflationCoupon> {
         Shared::clone(&self.inner)
@@ -782,7 +778,7 @@ impl PyIborLeg {
 
 impl PyIborLeg {
     /// A copy of the stored configuration, which each setter overrides one
-    /// field of. Not a [`Clone`] implementation: deriving one on a `pyclass`
+    /// field of. Not a Clone implementation: deriving one on a `pyclass`
     /// changes how the type is extracted from Python.
     fn copied(&self) -> Self {
         PyIborLeg {
@@ -813,13 +809,13 @@ impl PyIborLeg {
         leg
     }
 
-    /// The coupons a [`CapFloor`](crate::capfloor::PyCapFloor) is built over,
-    /// each already carrying the core's default `BlackIborCouponPricer`.
+    /// The coupons a CapFloor is built over, each already carrying the core's
+    /// default `BlackIborCouponPricer`.
     ///
     /// This is the plain path deliberately. Setting a cap or a floor on the leg
     /// would switch the core to `capped_floored_coupons`, which withholds that
-    /// pricer (`iborleg.rs:340-348`), so the strikes belong on the cap/floor
-    /// constructors and no `caps`/`floors` setter is exposed here.
+    /// pricer, so the strikes belong on the cap/floor constructors and no
+    /// `caps`/`floors` setter is exposed here.
     pub(crate) fn coupons(&self) -> PyResult<Vec<Shared<IborCoupon>>> {
         Ok(self.leg().coupons().map_err(PyQlError::from)?)
     }

@@ -1,10 +1,10 @@
-//! The frozen [`Results`] snapshot the instrument facades hand back.
+//! The frozen `Results` snapshot the instrument facades hand back.
 //!
-//! Every instrument caches the outputs of its last valuation in the core
-//! `InstrumentResults` bundle (`instrument.rs:36-45`), and the live accessors
-//! (`npv()`, the greeks, `fair_rate()`, ...) re-run the lazy calculation
-//! whenever an observed input moved. [`Results`] is the opposite: a plain copy
-//! of that bundle taken at one moment, which no later input change can move.
+//! Every instrument caches the outputs of its last valuation, and the live
+//! accessors (`npv()`, the greeks, `fair_rate()`, ...) re-run the lazy
+//! calculation whenever an observed input moved. `Results` is the opposite: a
+//! plain copy of those outputs taken at one moment, which no later input
+//! change can move.
 
 use crate::time::PyDate;
 use libitofin::instrument::InstrumentBase;

@@ -1,6 +1,5 @@
-//! Facade for the Black-style swaption pricing engines:
-//! [`PyCashAnnuityModel`], [`PyBlackSwaptionEngine`] and
-//! [`PyBachelierSwaptionEngine`].
+//! Facade for the Black-style swaption pricing engines: CashAnnuityModel,
+//! BlackSwaptionEngine and BachelierSwaptionEngine.
 //!
 //! The core engine is generic over a formula spec, which does not cross FFI
 //! (D7), so both spec instantiations - the shifted-lognormal
@@ -33,7 +32,7 @@ pub enum PyCashAnnuityModel {
 }
 
 impl PyCashAnnuityModel {
-    /// The core [`CashAnnuityModel`] this variant stands for.
+    /// The core CashAnnuityModel this variant stands for.
     fn inner(&self) -> CashAnnuityModel {
         match self {
             PyCashAnnuityModel::SwapRate => CashAnnuityModel::SwapRate,

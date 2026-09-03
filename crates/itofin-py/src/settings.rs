@@ -1,4 +1,4 @@
-//! Facade for the D5 evaluation-date [`Settings`].
+//! Facade for the D5 evaluation-date Settings.
 
 use crate::time::PyDate;
 use libitofin::settings::Settings;

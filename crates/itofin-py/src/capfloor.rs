@@ -1,26 +1,24 @@
-//! Facades for the cap/floor stack: the [`PyCapFloorType`] flag and the
-//! [`PyCapFloor`] instrument.
+//! Facades for the cap/floor stack: the CapFloorType flag and the CapFloor
+//! instrument.
 //!
 //! A cap or floor reaches Python two ways. The standard market builder
-//! [`MakeCapFloor`] backs the constructor: a tenor, an ibor index, a single
-//! strike and a forward start, the shape the core's own market fixtures use. It
+//! MakeCapFloor backs the constructor: a tenor, an ibor index, a single strike
+//! and a forward start, the shape the core's own market fixtures use. It
 //! derives the floating leg off `MakeVanillaSwap`, so a zero `forward_start`
 //! drops the spot caplet (`makecapfloor.cpp:34`): the cap needs no historical
 //! fixing at the evaluation date, which is what makes it buildable under the
 //! explicit-fixings design (D5/D11).
 //!
-//! The core's raw constructors (`CapFloor::cap` / `floor` / `collar`) back the
-//! three staticmethods instead. They take a leg of concrete `IborCoupon`s,
-//! which [`IborLeg`](crate::cashflows::PyIborLeg) now builds (#626), so a leg
-//! laid out coupon by coupon - its own notional, day counter and fixing days,
-//! spot caplet kept - can be capped from Python. That is the only route to a
-//! collar on this side: [`MakeCapFloor`] carries a single strike and refuses
-//! one outright (`makecapfloor.rs:135`).
+//! The core's raw cap, floor and collar constructors back the three
+//! staticmethods instead. They take a leg of concrete `IborCoupon`s,
+//! which IborLeg now builds (#626), so a leg laid out coupon by coupon - its
+//! own notional, day counter and fixing days, spot caplet kept - can be capped
+//! from Python. That is the only route to a collar on this side: MakeCapFloor
+//! carries a single strike and refuses one outright.
 //!
-//! Deferred (visible): the general `CapFloor::new` taking a type flag with both
-//! strike vectors (`capfloor.rs:129`), which the three named constructors cover
-//! between them, and the leg accessors on a built instrument beyond
-//! [`coupon_count`](PyCapFloor::coupon_count).
+//! Deferred (visible): the general constructor taking a type flag with both
+//! strike vectors, which the three named constructors cover between them, and
+//! the leg accessors on a built instrument beyond coupon_count().
 
 use crate::PyQlError;
 use crate::capfloorengine::PyBlackCapFloorEngine;
@@ -47,7 +45,7 @@ pub enum PyCapFloorType {
 }
 
 impl PyCapFloorType {
-    /// The core [`CapFloorType`] this variant stands for.
+    /// The core CapFloorType this variant stands for.
     pub(crate) fn inner(&self) -> CapFloorType {
         match self {
             PyCapFloorType::Cap => CapFloorType::Cap,

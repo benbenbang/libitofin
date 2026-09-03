@@ -1,6 +1,5 @@
-//! Facade for [`PySabrSmileSection`], a single option expiry's volatility smile
-//! at fixed Hagan SABR parameters
-//! (`termstructures::volatility::SabrSmileSection`).
+//! Facade for SabrSmileSection, a single option expiry's volatility smile at
+//! fixed Hagan SABR parameters.
 //!
 //! The core `SmileSection` trait is not exposed as a Python base class: the SABR
 //! section is the only implementor a caller of this crate has a constructor for,

@@ -1,18 +1,17 @@
-//! Facades for the bootstrap rate helpers: the [`PyRateHelper`] base and the
-//! concrete [`PyDepositRateHelper`] and [`PySwapRateHelper`] instruments.
+//! Facades for the bootstrap rate helpers: the RateHelper base and the concrete
+//! DepositRateHelper and SwapRateHelper instruments.
 //!
 //! A rate helper wraps a market quote plus the schedule of a single instrument;
 //! a piecewise curve is bootstrapped so every helper reprices its own quote.
-//! The base holds the already-upcast `Shared<dyn RateHelper>` (the four
-//! inspectors are all `&self`, so no interior mutability is needed here) and
-//! the concrete subclasses supply only their constructors, mirroring the
-//! [`crate::curve::PyYieldTermStructure`] base/subclass idiom.
+//! The base holds the helper already upcast and type-erased, and the concrete
+//! subclasses supply only their constructors, mirroring the YieldTermStructure
+//! base/subclass idiom.
 //!
-//! The `OIS` helper, with its [`PyEstr`] overnight index and
-//! [`PyRateAveraging`] convention, lands in this module (#551), as does
-//! [`PyFixedRateBondHelper`], which builds its own bond internally and so needs
-//! no bond facade (#530). The generic `BondHelper`, over an arbitrary pre-built
-//! bond, stays deferred: there is no bond-instrument facade to hand it one.
+//! The `OIS` helper, with its Estr overnight index and RateAveraging
+//! convention, lands in this module (#551), as does FixedRateBondHelper, which
+//! builds its own bond internally and so needs no bond facade (#530). The
+//! generic `BondHelper`, over an arbitrary pre-built bond, stays deferred:
+//! there is no bond-instrument facade to hand it one.
 
 use crate::PyQlError;
 use crate::curve::PyYieldTermStructure;
@@ -235,7 +234,7 @@ pub enum PyFuturesType {
 }
 
 impl PyFuturesType {
-    /// The core [`FuturesType`] this variant stands for.
+    /// The core FuturesType this variant stands for.
     pub(crate) fn inner(&self) -> FuturesType {
         match self {
             PyFuturesType::Imm => FuturesType::Imm,
@@ -423,7 +422,7 @@ impl PyFuturesRateHelper {
 }
 
 /// The convexity handle for a futures helper: the caller's quote, or an empty
-/// handle when `None`. `PySimpleQuote::handle` is never empty, so the empty case
+/// handle when `None`. A SimpleQuote handle is never empty, so the empty case
 /// (the zero-adjustment default the core tests pass) must be built here.
 fn empty_or_handle(conv_adj: Option<&PySimpleQuote>) -> Handle<dyn Quote> {
     match conv_adj {
@@ -433,8 +432,8 @@ fn empty_or_handle(conv_adj: Option<&PySimpleQuote>) -> Handle<dyn Quote> {
 }
 
 /// The base/subclass initializer shared by the three constructors: the erased
-/// upcast helper feeds the [`PyRateHelper`] base, and the concrete clone is
-/// retained on the subclass for [`PyFuturesRateHelper::convexity_adjustment`].
+/// upcast helper feeds the RateHelper base, and the concrete clone is retained
+/// on the subclass for FuturesRateHelper.convexity_adjustment().
 fn init(helper: Shared<FuturesRateHelper>) -> PyClassInitializer<PyFuturesRateHelper> {
     let base = PyRateHelper {
         inner: Shared::clone(&helper) as Shared<dyn RateHelper>,
@@ -455,7 +454,7 @@ pub enum PyPillar {
 }
 
 impl PyPillar {
-    /// The core [`Pillar`] this variant stands for.
+    /// The core Pillar this variant stands for.
     pub(crate) fn inner(&self) -> Pillar {
         match self {
             PyPillar::MaturityDate => Pillar::MaturityDate,
@@ -730,8 +729,8 @@ impl PyEstr {
 }
 
 /// The base/subclass initializer the ESTR constructor builds: one index object
-/// feeds both halves, so the base [`PyOvernightIndex`] the OIS facades read and
-/// the [`PyEstr`] its own `fixing` reads are the same core index.
+/// feeds both halves, so the base OvernightIndex the OIS facades read and the
+/// Estr its own `fixing` reads are the same core index.
 fn init_overnight(index: Shared<OvernightIndex>) -> PyClassInitializer<PyEstr> {
     let base = PyOvernightIndex {
         inner: Shared::clone(&index),
@@ -751,7 +750,7 @@ pub enum PyRateAveraging {
 }
 
 impl PyRateAveraging {
-    /// The core [`RateAveraging`] this variant stands for.
+    /// The core RateAveraging this variant stands for.
     pub(crate) fn inner(&self) -> RateAveraging {
         match self {
             PyRateAveraging::Simple => RateAveraging::Simple,
@@ -868,7 +867,7 @@ pub enum PyBondPriceType {
 }
 
 impl PyBondPriceType {
-    /// The core [`BondPriceType`] this variant stands for.
+    /// The core BondPriceType this variant stands for.
     pub(crate) fn inner(&self) -> BondPriceType {
         match self {
             PyBondPriceType::Clean => BondPriceType::Clean,

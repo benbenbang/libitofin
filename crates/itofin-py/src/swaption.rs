@@ -1,10 +1,10 @@
-//! Facades for the European swaption stack: [`PyEuropeanExercise`],
-//! [`PySettlementType`], [`PySettlementMethod`] and [`PySwaption`].
+//! Facades for the European swaption stack: EuropeanExercise, SettlementType,
+//! SettlementMethod and Swaption.
 //!
-//! [`PySwaption`] wraps a [`Swaption`] by value and prices it through the
-//! [`JamshidianSwaptionEngine`] built on a [`PyHullWhite`](crate::hullwhite::PyHullWhite)
-//! model (`set_jamshidian_engine`); the engine reads the swap's arguments, so
-//! the underlying swap needs no discounting engine of its own.
+//! Swaption wraps a Swaption by value and prices it through the
+//! JamshidianSwaptionEngine built on a HullWhite model
+//! (`set_jamshidian_engine`); the engine reads the swap's arguments, so the
+//! underlying swap needs no discounting engine of its own.
 //!
 //! Deferred (visible): the Bermudan `TreeSwaptionEngine` and a `BermudanExercise`
 //! facade are omitted. `BermudanExercise` has no public constructor on `main`
@@ -51,7 +51,7 @@ impl PyEuropeanExercise {
 
 impl PyEuropeanExercise {
     /// A clone of the inner exercise for the swaption facade, which takes the
-    /// exercise as a `Shared<dyn Exercise>`.
+    /// exercise type-erased.
     pub(crate) fn inner(&self) -> Shared<dyn Exercise> {
         Shared::clone(&self.inner)
     }
@@ -66,7 +66,7 @@ pub enum PySettlementType {
 }
 
 impl PySettlementType {
-    /// The core [`SettlementType`] this variant stands for.
+    /// The core SettlementType this variant stands for.
     fn inner(&self) -> SettlementType {
         match self {
             PySettlementType::Physical => SettlementType::Physical,
@@ -91,7 +91,7 @@ pub enum PySettlementMethod {
 }
 
 impl PySettlementMethod {
-    /// The core [`SettlementMethod`] this variant stands for.
+    /// The core SettlementMethod this variant stands for.
     fn inner(&self) -> SettlementMethod {
         match self {
             PySettlementMethod::PhysicalOTC => SettlementMethod::PhysicalOTC,

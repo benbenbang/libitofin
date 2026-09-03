@@ -1,5 +1,4 @@
-//! Facade for the Black-volatility term-structure base:
-//! [`PyBlackVolTermStructure`].
+//! Facade for the Black-volatility term-structure base: BlackVolTermStructure.
 
 use crate::PyQlError;
 use crate::time::{PyCalendar, PyDate, PyDayCounter};
@@ -298,7 +297,7 @@ pub enum PyBlackVolTimeExtrapolation {
 }
 
 impl PyBlackVolTimeExtrapolation {
-    /// The core [`BlackVolTimeExtrapolation`] this variant stands for.
+    /// The core BlackVolTimeExtrapolation this variant stands for.
     fn inner(&self) -> BlackVolTimeExtrapolation {
         match self {
             PyBlackVolTimeExtrapolation::FlatVolatility => {
@@ -440,9 +439,9 @@ impl PyBlackVarianceSurface {
     }
 }
 
-/// Converts a Python `list[list[float]]` (row per strike, column per date)
-/// into a core [`Matrix`], rejecting an empty or ragged grid before it reaches
-/// the surface constructor's dimension checks.
+/// Converts a Python `list[list[float]]` (row per strike, column per date) into
+/// a core Matrix, rejecting an empty or ragged grid before it reaches the
+/// surface constructor's dimension checks.
 fn matrix_from_rows(rows: &[Vec<f64>]) -> PyResult<Matrix> {
     let n_rows = rows.len();
     if n_rows == 0 {
