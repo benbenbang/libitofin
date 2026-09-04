@@ -10,7 +10,7 @@ The API mirrors QuantLib's `ql/` layout: types live in submodules (`itofin.time`
 pip install itofin
 ```
 
-Requires Python >= 3.13.
+Requires Python >= 3.10 (3.13 is the primary tested target; 3.10-3.12 are supported via the abi3 wheel).
 
 ## Price a European option and its greeks
 

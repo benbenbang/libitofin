@@ -12,4 +12,4 @@ extension-module = ["pyo3/extension-module"]
 
 [dependencies]
 libitofin = { path = "../libitofin" }
-pyo3 = { version = "0.29", features = ["abi3-py313"] }
+pyo3 = { version = "0.29", features = ["abi3-py310"] }
