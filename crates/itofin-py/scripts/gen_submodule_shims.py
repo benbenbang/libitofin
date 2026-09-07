@@ -2,20 +2,22 @@
 """Generate runtime source shims for itofin's native submodules.
 
 The compiled extension registers ``itofin.time``, ``itofin.instruments`` and the
-other submodules into ``sys.modules`` at load time (see
-``crates/itofin-py/src/lib.rs``). They exist only at runtime, so a static type
-checker sees ``time.pyi`` with no matching ``time.py`` and emits a yellow
-``reportMissingModuleSource`` warning even though the types resolve fine.
+other submodules into ``sys.modules`` at load time. They exist only at runtime,
+so a static type checker sees ``time/__init__.pyi`` with no matching source and
+emits a yellow ``reportMissingModuleSource`` warning even though the types
+resolve fine.
 
-The fix is one inert ``<name>.py`` source file per submodule: Pyright then reads
+The fix is one inert ``<name>/__init__.py`` per submodule: Pyright then reads
 types from the ``.pyi`` and stops warning, and the file never executes because
 ``sys.modules`` already holds the native module before any import resolves to it.
+Its docstring is also what the API docs show as the submodule blurb, since a
+generated stub carries no module docstring of its own.
 
-This script keeps those shims in sync with the ``.pyi`` set: it writes a shim for
-every ``python/itofin/<name>.pyi`` (except ``__init__``), and removes any orphaned
-shim it previously generated whose ``.pyi`` is gone. Run with ``--check`` to only
-report drift (used in CI); the default rewrites and exits non-zero on any change,
-matching the autofix hook convention.
+This script keeps those shims in sync with the generated stubs: it writes a shim
+for every ``python/itofin/<name>/__init__.pyi``, and removes any orphaned shim it
+previously generated whose stub is gone. Run with ``--check`` to only report
+drift; the default rewrites and exits non-zero on any change, matching the
+autofix hook convention.
 """
 
 from __future__ import annotations
@@ -34,32 +36,36 @@ def shim_body(name: str) -> str:
         f'"""Runtime source shim for the native ``itofin.{name}`` submodule.\n'
         f"\n"
         f"The real ``itofin.{name}`` is a compiled submodule registered into\n"
-        f"``sys.modules`` by the extension (see crates/itofin-py/src/lib.rs); it wins\n"
-        f"at import time, so nothing here runs. This file exists only so static type\n"
-        f"checkers resolve ``from itofin.{name} import ...`` from ``{name}.pyi`` without\n"
-        f"a ``reportMissingModuleSource`` warning.\n"
+        f"``sys.modules`` by the extension; it wins at import time, so nothing here\n"
+        f"runs. This file exists only so static type checkers resolve\n"
+        f"``from itofin.{name} import ...`` from ``{name}/__init__.pyi`` without a\n"
+        f"``reportMissingModuleSource`` warning.\n"
         f"\n"
-        f"Auto-{MARKER} from ``{name}.pyi``; do not edit or delete by hand.\n"
+        f"Auto-{MARKER} from ``{name}/__init__.pyi``; do not edit or delete by hand.\n"
         f'"""\n'
     )
 
 
 def desired_shims(pkg_dir: Path) -> dict[str, str]:
-    shims: dict[str, str] = {}
-    for pyi in sorted(pkg_dir.glob("*.pyi")):
-        name = pyi.stem
-        if name == "__init__":
-            continue
-        shims[name] = shim_body(name)
-    return shims
+    return {pyi.parent.name: shim_body(pyi.parent.name) for pyi in sorted(pkg_dir.glob("*/__init__.pyi"))}
 
 
 def is_generated_shim(path: Path) -> bool:
-    if not path.is_file():
-        return False
-    if path.name == "__init__.py":
-        return False
-    return MARKER in path.read_text(encoding="utf-8")
+    return path.is_file() and MARKER in path.read_text(encoding="utf-8")
+
+
+def orphans(pkg_dir: Path, wanted: dict[str, str]) -> list[Path]:
+    found = list(pkg_dir.glob("*.py")) + list(pkg_dir.glob("*/__init__.py"))
+    stale = []
+    for py in sorted(found):
+        name = py.parent.name if py.name == "__init__.py" else py.stem
+        if py.parent == pkg_dir and py.name == "__init__.py":
+            continue
+        if name in wanted and py.name == "__init__.py":
+            continue
+        if is_generated_shim(py):
+            stale.append(py)
+    return stale
 
 
 def run(pkg_dir: Path, check: bool) -> int:
@@ -67,21 +73,18 @@ def run(pkg_dir: Path, check: bool) -> int:
     changes: list[str] = []
 
     for name, body in wanted.items():
-        target = pkg_dir / f"{name}.py"
+        target = pkg_dir / name / "__init__.py"
         current = target.read_text(encoding="utf-8") if target.exists() else None
         if current != body:
-            changes.append(f"{'stale' if current is not None else 'missing'}: {name}.py")
+            changes.append(f"{'stale' if current is not None else 'missing'}: {name}/__init__.py")
             if not check:
+                target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_text(body, encoding="utf-8")
 
-    for py in sorted(pkg_dir.glob("*.py")):
-        name = py.stem
-        if name in wanted or name == "__init__":
-            continue
-        if is_generated_shim(py):
-            changes.append(f"orphaned: {py.name}")
-            if not check:
-                py.unlink()
+    for py in orphans(pkg_dir, wanted):
+        changes.append(f"orphaned: {py.relative_to(pkg_dir)}")
+        if not check:
+            py.unlink()
 
     if changes:
         verb = "would update" if check else "updated"
