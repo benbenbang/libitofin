@@ -23,8 +23,10 @@ Only files carrying the generator's own header are post-processed, so a stub
 written by hand is never touched.
 
 Run with ``--check`` to report drift without leaving any change behind. The exit
-code follows the autofix convention: non-zero when anything was (or would be)
-changed.
+code follows the autofix convention: 1 when anything was (or would be) changed,
+0 when nothing moved. A failure of the cargo step exits 2 instead, so a caller
+that treats drift as its own signal cannot mistake a broken build for a clean
+tree.
 """
 
 from __future__ import annotations
@@ -111,7 +113,11 @@ def main() -> int:
     check = "--check" in args
 
     before = snapshot(PKG_DIR)
-    run_generator()
+    try:
+        run_generator()
+    except subprocess.CalledProcessError as exc:
+        print(f"stub generator failed: {exc}", file=sys.stderr)
+        return 2
     post_process_generated(PKG_DIR)
     after = snapshot(PKG_DIR)
     changes = describe(before, after, PKG_DIR)

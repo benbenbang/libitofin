@@ -115,6 +115,17 @@ jobs:
           pip install pytest
           maturin develop -m crates/itofin-py/Cargo.toml
 
+      - name: check the committed stubs and shims match the rust facade
+        run: |
+          . .venv/bin/activate
+          set +e
+          python crates/itofin-py/scripts/gen_stubs.py
+          status=$?
+          set -e
+          if [ "$status" -gt 1 ]; then exit "$status"; fi
+          git diff --exit-code -- crates/itofin-py/python
+          test -z "$(git status --porcelain -- crates/itofin-py/python)"
+
       - name: run the pytest oracle
         run: |
           . .venv/bin/activate
