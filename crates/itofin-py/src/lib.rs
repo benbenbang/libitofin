@@ -115,7 +115,15 @@ use vol::{
     PyBlackVolTimeExtrapolation,
 };
 
-pyo3_stub_gen::create_exception!(itofin, ItofinError, PyException);
+pyo3_stub_gen::create_exception!(
+    itofin,
+    ItofinError,
+    PyException,
+    r#"Error raised by the itofin API, carrying the located message.
+
+Every fallible core call surfaces as this exception, whose message is the
+located form "file:line: message"."#
+);
 pyo3_stub_gen::module_variable!("itofin", "__version__", String);
 
 /// Newtype bridging QlError to Err across the crate boundary.
