@@ -20,6 +20,10 @@ use crate::PyQlError;
 use crate::swaptionvol::PyVolatilityType;
 use libitofin::termstructures::volatility::{SabrSmileSection, SmileSection};
 use pyo3::prelude::*;
+#[allow(unused_imports)]
+use pyo3_stub_gen::derive::{
+    gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pyfunction, gen_stub_pymethods,
+};
 
 /// One option expiry's volatility smile, read off the closed-form Hagan SABR
 /// formula at fixed parameters.
@@ -27,11 +31,17 @@ use pyo3::prelude::*;
 /// There is no calibration here: the four parameters are inputs. A fitted smile
 /// is what SabrSwaptionVolatilityCube serves; this class is for querying a smile
 /// whose parameters are already known.
-#[pyclass(name = "SabrSmileSection", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "SabrSmileSection",
+    unsendable,
+    module = "itofin.termstructures"
+)]
 pub struct PySabrSmileSection {
     inner: SabrSmileSection,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PySabrSmileSection {
     /// Build the smile at a given exercise time and forward.

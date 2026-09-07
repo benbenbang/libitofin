@@ -90,7 +90,7 @@ use optionletvol::{
     PyConstantOptionletVolatility, PyOptionletStripper1, PyOptionletVolatilityStructure,
     PyStrippedOptionletAdapter,
 };
-use pyo3::create_exception;
+
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -115,7 +115,8 @@ use vol::{
     PyBlackVolTimeExtrapolation,
 };
 
-create_exception!(itofin, ItofinError, PyException);
+pyo3_stub_gen::create_exception!(itofin, ItofinError, PyException);
+pyo3_stub_gen::module_variable!("itofin", "__version__", String);
 
 /// Newtype bridging QlError to Err across the crate boundary.
 ///

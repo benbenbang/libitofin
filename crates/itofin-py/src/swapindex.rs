@@ -24,6 +24,10 @@ use libitofin::indexes::{Index, InterestRateIndex, SwapIndex};
 use libitofin::shared::{Shared, shared};
 use libitofin::types::Natural;
 use pyo3::prelude::*;
+#[allow(unused_imports)]
+use pyo3_stub_gen::derive::{
+    gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pyfunction, gen_stub_pymethods,
+};
 
 /// The index whose fixing is the fair rate of an on-the-fly vanilla swap,
 /// assembled from the index tenor, the forecasting Ibor index and the fixed-leg
@@ -37,11 +41,13 @@ use pyo3::prelude::*;
 /// The currency is inert for every ported consumer, so currency() reading it
 /// back off the core index is the only place it shows. Deferred (visible): the
 /// clone family (re-curving / re-tenoring) is deferred in the core itself.
-#[pyclass(name = "SwapIndex", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "SwapIndex", unsendable, module = "itofin.indexes")]
 pub struct PySwapIndex {
     inner: Shared<SwapIndex>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PySwapIndex {
     /// Build a swap index forecasting and discounting off one curve.

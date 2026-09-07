@@ -31,10 +31,21 @@ use libitofin::termstructures::credit::probabilitytraits::HazardRate;
 use libitofin::time::date::Date;
 use libitofin::types::Natural;
 use pyo3::prelude::*;
+#[allow(unused_imports)]
+use pyo3_stub_gen::derive::{
+    gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pyfunction, gen_stub_pymethods,
+};
 
 /// Which leg of a default-protection contract a party holds: the buyer pays
 /// the premium leg and receives the default payment, the seller the reverse.
-#[pyclass(name = "ProtectionSide", eq, eq_int, from_py_object)]
+#[gen_stub_pyclass_enum]
+#[pyclass(
+    name = "ProtectionSide",
+    eq,
+    eq_int,
+    from_py_object,
+    module = "itofin.instruments"
+)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum PyProtectionSide {
     Buyer,
@@ -54,7 +65,14 @@ impl PyProtectionSide {
 /// The model a quoted contract is inverted under by
 /// CreditDefaultSwap.implied_hazard_rate: Midpoint is not ISDA conform, Isda
 /// carries the three fidelity flags the core fixes at that call site.
-#[pyclass(name = "PricingModel", eq, eq_int, from_py_object)]
+#[gen_stub_pyclass_enum]
+#[pyclass(
+    name = "PricingModel",
+    eq,
+    eq_int,
+    from_py_object,
+    module = "itofin.instruments"
+)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum PyPricingModel {
     Midpoint,
@@ -74,11 +92,18 @@ impl PyPricingModel {
 /// Shared base for every credit curve: survival and default probabilities,
 /// the default density and the hazard rate, each in a year-fraction and a date
 /// form.
-#[pyclass(name = "DefaultProbabilityTermStructure", subclass, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "DefaultProbabilityTermStructure",
+    subclass,
+    unsendable,
+    module = "itofin.termstructures"
+)]
 pub struct PyDefaultProbabilityTermStructure {
     inner: Handle<dyn DefaultProbabilityTermStructure>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyDefaultProbabilityTermStructure {
     /// Return the survival probability from the reference date to year-fraction t.
@@ -280,9 +305,11 @@ impl PyDefaultProbabilityTermStructure {
 /// moves the curve; the rate-backed forms wrap the value in a fresh, un-retained
 /// quote. The moving forms fix the reference date settlement_days business days
 /// past the evaluation date carried by settings.
-#[pyclass(name = "FlatHazardRate", extends = PyDefaultProbabilityTermStructure, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "FlatHazardRate", extends = PyDefaultProbabilityTermStructure, unsendable, module = "itofin.termstructures")]
 pub struct PyFlatHazardRate;
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyFlatHazardRate {
     /// Build a curve reading its hazard rate live, on a pinned reference date.
@@ -292,6 +319,7 @@ impl PyFlatHazardRate {
     ///     hazard_rate (SimpleQuote): The hazard rate; the caller keeps it, so
     ///         a later set_value moves the curve.
     ///     day_counter (DayCounter): The day count turning dates into times.
+    #[gen_stub(override_return_type(type_repr = "FlatHazardRate"))]
     #[new]
     fn new(
         reference_date: &PyDate,
@@ -437,11 +465,13 @@ impl PyFlatHazardRate {
 ///
 /// No interpolation argument is offered, and the curve carries no calendar: the
 /// calendar-taking constructor is not exposed.
-#[pyclass(name = "InterpolatedHazardRateCurve", extends = PyDefaultProbabilityTermStructure, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "InterpolatedHazardRateCurve", extends = PyDefaultProbabilityTermStructure, unsendable, module = "itofin.termstructures")]
 pub struct PyInterpolatedHazardRateCurve {
     concrete: Shared<InterpolatedHazardRateCurve<BackwardFlat>>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyInterpolatedHazardRateCurve {
     /// Build the curve over its (date, hazard-rate) nodes.
@@ -458,6 +488,7 @@ impl PyInterpolatedHazardRateCurve {
     /// Raises:
     ///     ItofinError: On too few dates, a dates and hazard_rates count
     ///         mismatch, a negative hazard rate, or unsorted dates.
+    #[gen_stub(override_return_type(type_repr = "InterpolatedHazardRateCurve"))]
     #[new]
     fn new(
         dates: Vec<PyRef<PyDate>>,
@@ -523,11 +554,13 @@ impl PyInterpolatedHazardRateCurve {
 /// Lazy: the bootstrap runs on the first read, so the helpers' Settings flags
 /// and evaluation date must be in place before that read, not merely before
 /// the constructor. A helper quote moving invalidates the cache.
-#[pyclass(name = "PiecewiseDefaultCurve", extends = PyDefaultProbabilityTermStructure, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "PiecewiseDefaultCurve", extends = PyDefaultProbabilityTermStructure, unsendable, module = "itofin.termstructures")]
 pub struct PyPiecewiseDefaultCurve {
     concrete: Shared<PiecewiseDefaultCurve<HazardRate, BackwardFlat>>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyPiecewiseDefaultCurve {
     /// Build the curve over helpers with a fixed reference date.
@@ -540,6 +573,7 @@ impl PyPiecewiseDefaultCurve {
     ///
     /// Raises:
     ///     ItofinError: On an empty helper list.
+    #[gen_stub(override_return_type(type_repr = "PiecewiseDefaultCurve"))]
     #[new]
     fn new(
         reference_date: &PyDate,
@@ -647,11 +681,13 @@ impl PyPiecewiseDefaultCurve {
 ///
 /// Pricing needs an engine: call set_engine() or set_isda_engine() before
 /// npv().
-#[pyclass(name = "CreditDefaultSwap", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "CreditDefaultSwap", unsendable, module = "itofin.instruments")]
 pub struct PyCreditDefaultSwap {
     inner: SharedMut<CreditDefaultSwap>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyCreditDefaultSwap {
     /// Build a contract on the C++ default terms.
@@ -1063,7 +1099,12 @@ impl PyCreditDefaultSwap {
 ///
 /// Each build() runs a fresh chain, so one builder object cannot carry a
 /// setting into a later contract.
-#[pyclass(name = "MakeCreditDefaultSwap", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "MakeCreditDefaultSwap",
+    unsendable,
+    module = "itofin.instruments"
+)]
 pub struct PyMakeCreditDefaultSwap {
     term_date: Date,
     running_spread: f64,
@@ -1074,6 +1115,7 @@ pub struct PyMakeCreditDefaultSwap {
     trade_date: Option<Date>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyMakeCreditDefaultSwap {
     /// Store the configuration the chain is assembled from in build().

@@ -18,12 +18,23 @@ use libitofin::shared::{Shared, SharedMut, shared, shared_mut};
 use libitofin::types::Real;
 use pyo3::prelude::*;
 use pyo3::types::PyType;
+#[allow(unused_imports)]
+use pyo3_stub_gen::derive::{
+    gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pyfunction, gen_stub_pymethods,
+};
 
 /// The call/put flag.
 ///
 /// A fieldless enum mirroring the core option type; the signed discriminant
 /// convention behind the two variants stays in the core.
-#[pyclass(name = "OptionType", eq, eq_int, from_py_object)]
+#[gen_stub_pyclass_enum]
+#[pyclass(
+    name = "OptionType",
+    eq,
+    eq_int,
+    from_py_object,
+    module = "itofin.instruments"
+)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum PyOptionType {
     Call,
@@ -45,11 +56,13 @@ impl PyOptionType {
 /// Valuation is lazy: an accessor reprices only once an observed input - the
 /// attached engine, or the evaluation date on the Settings the option
 /// registered with - has notified it.
-#[pyclass(name = "VanillaOption", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "VanillaOption", unsendable, module = "itofin.instruments")]
 pub struct PyVanillaOption {
     inner: VanillaOption,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyVanillaOption {
     /// Build the European-exercise option, exercisable only at expiry.

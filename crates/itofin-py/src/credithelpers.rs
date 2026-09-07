@@ -26,17 +26,28 @@ use libitofin::termstructures::credit::defaultprobabilityhelpers::{
 };
 use libitofin::types::Integer;
 use pyo3::prelude::*;
+#[allow(unused_imports)]
+use pyo3_stub_gen::derive::{
+    gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pyfunction, gen_stub_pymethods,
+};
 
 /// Shared base for every credit bootstrap helper.
 ///
 /// A credit helper fits a default-probability curve rather than a yield curve,
 /// so it is a separate hierarchy from RateHelper. It exposes the two dates the
 /// bootstrap places a curve node by.
-#[pyclass(name = "DefaultProbabilityHelper", subclass, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "DefaultProbabilityHelper",
+    subclass,
+    unsendable,
+    module = "itofin.termstructures"
+)]
 pub struct PyDefaultProbabilityHelper {
     inner: Shared<dyn DefaultProbabilityHelper>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyDefaultProbabilityHelper {
     /// Return the date the curve node this helper sets sits at.
@@ -80,9 +91,11 @@ impl PyDefaultProbabilityHelper {
 /// is rolled by the CDS maturity convention, which raises ItofinError on a
 /// tenor it cannot roll rather than building a schedule that ends on the wrong
 /// date.
-#[pyclass(name = "SpreadCdsHelper", extends = PyDefaultProbabilityHelper, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "SpreadCdsHelper", extends = PyDefaultProbabilityHelper, unsendable, module = "itofin.termstructures")]
 pub struct PySpreadCdsHelper;
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PySpreadCdsHelper {
     /// Build the helper on the C++ default CDS terms.
@@ -110,6 +123,7 @@ impl PySpreadCdsHelper {
     ///         refuses a tenor it cannot roll, or one it rolls to a contract
     ///         that has already matured, rather than building a schedule that
     ///         ends on the wrong date.
+    #[gen_stub(override_return_type(type_repr = "SpreadCdsHelper"))]
     #[new]
     #[allow(clippy::too_many_arguments)]
     fn new(

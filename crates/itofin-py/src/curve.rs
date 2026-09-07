@@ -23,16 +23,27 @@ use libitofin::termstructures::yields::{
 use libitofin::termstructures::yieldtermstructure::YieldTermStructure;
 use libitofin::time::frequency::Frequency;
 use pyo3::prelude::*;
+#[allow(unused_imports)]
+use pyo3_stub_gen::derive::{
+    gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pyfunction, gen_stub_pymethods,
+};
 
 /// Shared base for every yield curve: discount factors, zero and forward rates.
 ///
 /// Concrete curves subclass this and supply only their constructor; the whole
 /// query surface below is inherited.
-#[pyclass(name = "YieldTermStructure", subclass, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "YieldTermStructure",
+    subclass,
+    unsendable,
+    module = "itofin.termstructures"
+)]
 pub struct PyYieldTermStructure {
     inner: Handle<dyn YieldTermStructure>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyYieldTermStructure {
     /// Return the discount factor at year-fraction t.
@@ -207,9 +218,11 @@ impl PyYieldTermStructure {
 ///
 /// Built at annual frequency with continuous compounding, the convention every
 /// downstream Heston and Hull-White oracle assumes.
-#[pyclass(name = "FlatForward", extends = PyYieldTermStructure, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "FlatForward", extends = PyYieldTermStructure, unsendable, module = "itofin.termstructures")]
 pub struct PyFlatForward;
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyFlatForward {
     /// Build the flat curve.
@@ -220,6 +233,7 @@ impl PyFlatForward {
     ///     rate (float): The flat rate, continuously compounded at annual
     ///         frequency.
     ///     day_counter (DayCounter): The day count times are measured in.
+    #[gen_stub(override_return_type(type_repr = "FlatForward"))]
     #[new]
     fn new(
         reference_date: &PyDate,
@@ -244,9 +258,11 @@ impl PyFlatForward {
 ///
 /// The first date is the reference date. Finite in time: queries past the last
 /// node require enable_extrapolation() or extrapolate=True.
-#[pyclass(name = "ZeroCurve", extends = PyYieldTermStructure, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "ZeroCurve", extends = PyYieldTermStructure, unsendable, module = "itofin.termstructures")]
 pub struct PyZeroCurve;
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyZeroCurve {
     /// Build the curve over its (date, zero-rate) nodes.
@@ -263,6 +279,7 @@ impl PyZeroCurve {
     /// Raises:
     ///     ItofinError: On an unknown interpolation name, and on whatever the
     ///         core rejects about the nodes.
+    #[gen_stub(override_return_type(type_repr = "ZeroCurve"))]
     #[new]
     #[pyo3(signature = (dates, yields, day_counter, interpolation = "Linear"))]
     fn new(
@@ -298,9 +315,11 @@ impl PyZeroCurve {
 ///
 /// The first date is the reference date and its discount must be 1.0. Finite
 /// in time: queries past the last node require extrapolation.
-#[pyclass(name = "DiscountCurve", extends = PyYieldTermStructure, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "DiscountCurve", extends = PyYieldTermStructure, unsendable, module = "itofin.termstructures")]
 pub struct PyDiscountCurve;
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyDiscountCurve {
     /// Build the curve over its (date, discount-factor) nodes.
@@ -320,6 +339,7 @@ impl PyDiscountCurve {
     /// Raises:
     ///     ItofinError: On an unknown interpolation name, and on whatever the
     ///         core rejects about the nodes.
+    #[gen_stub(override_return_type(type_repr = "DiscountCurve"))]
     #[new]
     #[pyo3(signature = (dates, discounts, day_counter, calendar = None, interpolation = "LogLinear"))]
     fn new(
@@ -365,9 +385,11 @@ impl PyDiscountCurve {
 /// cubic curve on the zero and discount curves only.
 ///
 /// A query past the last node needs enable_extrapolation() or extrapolate=True.
-#[pyclass(name = "ForwardCurve", extends = PyYieldTermStructure, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "ForwardCurve", extends = PyYieldTermStructure, unsendable, module = "itofin.termstructures")]
 pub struct PyForwardCurve;
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyForwardCurve {
     /// Build the curve over its (date, forward-rate) nodes.
@@ -381,6 +403,7 @@ impl PyForwardCurve {
     ///
     /// Raises:
     ///     ItofinError: On whatever the core rejects about the nodes.
+    #[gen_stub(override_return_type(type_repr = "ForwardCurve"))]
     #[new]
     fn new(
         dates: Vec<PyRef<PyDate>>,
@@ -428,9 +451,11 @@ impl PyForwardCurve {
 ///
 /// max_date is the exception: it swallows a bootstrap failure and falls back to
 /// the last helper's date.
-#[pyclass(name = "PiecewiseYieldCurve", extends = PyYieldTermStructure, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "PiecewiseYieldCurve", extends = PyYieldTermStructure, unsendable, module = "itofin.termstructures")]
 pub struct PyPiecewiseYieldCurve;
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyPiecewiseYieldCurve {
     /// Build the curve over helpers with a fixed reference date.
@@ -455,6 +480,7 @@ impl PyPiecewiseYieldCurve {
     ///     ItofinError: On an empty helper list, on an unknown interpolation
     ///         or bootstrap name, on additional helpers under "iterative",
     ///         and on "Cubic" under "global".
+    #[gen_stub(override_return_type(type_repr = "PiecewiseYieldCurve"))]
     #[new]
     #[pyo3(signature = (
         reference_date,
@@ -579,11 +605,13 @@ impl PyPiecewiseYieldCurve {
 /// the concrete curve so it can expose the node introspection the erased
 /// handle discards. data() are discount factors, so data()[0] is the reference
 /// node's 1.0.
-#[pyclass(name = "PiecewiseLogLinearDiscount", extends = PyYieldTermStructure, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "PiecewiseLogLinearDiscount", extends = PyYieldTermStructure, unsendable, module = "itofin.termstructures")]
 pub struct PyPiecewiseLogLinearDiscount {
     concrete: Shared<PiecewiseYieldCurve<Discount, LogLinear>>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyPiecewiseLogLinearDiscount {
     /// Build the curve over helpers with a fixed reference date.
@@ -596,6 +624,7 @@ impl PyPiecewiseLogLinearDiscount {
     ///
     /// Raises:
     ///     ItofinError: On an empty helper list.
+    #[gen_stub(override_return_type(type_repr = "PiecewiseLogLinearDiscount"))]
     #[new]
     fn new(
         reference_date: &PyDate,
@@ -652,11 +681,13 @@ impl PyPiecewiseLogLinearDiscount {
 /// The verbatim QuantLib-SWIG name for the blessed (ZeroYield, Linear)
 /// combination. data() are continuously-compounded zero rates, so data()[0]
 /// mirrors the first solved pillar's rate rather than a 1.0 discount.
-#[pyclass(name = "PiecewiseLinearZero", extends = PyYieldTermStructure, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "PiecewiseLinearZero", extends = PyYieldTermStructure, unsendable, module = "itofin.termstructures")]
 pub struct PyPiecewiseLinearZero {
     concrete: Shared<PiecewiseYieldCurve<ZeroYield, Linear>>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyPiecewiseLinearZero {
     /// Build the curve over helpers with a fixed reference date.
@@ -668,6 +699,7 @@ impl PyPiecewiseLinearZero {
     ///
     /// Raises:
     ///     ItofinError: On an empty helper list.
+    #[gen_stub(override_return_type(type_repr = "PiecewiseLinearZero"))]
     #[new]
     fn new(
         reference_date: &PyDate,
@@ -725,11 +757,13 @@ impl PyPiecewiseLinearZero {
 /// global interpolator, so the bootstrap runs the multi-pass convergence loop
 /// instead of a single pass. data() are continuously-compounded zero rates, so
 /// data()[0] mirrors the first solved pillar's rate rather than a 1.0 discount.
-#[pyclass(name = "PiecewiseCubicZero", extends = PyYieldTermStructure, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "PiecewiseCubicZero", extends = PyYieldTermStructure, unsendable, module = "itofin.termstructures")]
 pub struct PyPiecewiseCubicZero {
     concrete: Shared<PiecewiseYieldCurve<ZeroYield, Cubic>>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyPiecewiseCubicZero {
     /// Build the curve over helpers with a fixed reference date.
@@ -741,6 +775,7 @@ impl PyPiecewiseCubicZero {
     ///
     /// Raises:
     ///     ItofinError: On an empty helper list.
+    #[gen_stub(override_return_type(type_repr = "PiecewiseCubicZero"))]
     #[new]
     fn new(
         reference_date: &PyDate,
@@ -796,11 +831,13 @@ impl PyPiecewiseCubicZero {
 ///
 /// The verbatim QuantLib-SWIG name for the blessed (ForwardRate, Linear)
 /// combination. data() are instantaneous forward rates.
-#[pyclass(name = "PiecewiseLinearForward", extends = PyYieldTermStructure, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "PiecewiseLinearForward", extends = PyYieldTermStructure, unsendable, module = "itofin.termstructures")]
 pub struct PyPiecewiseLinearForward {
     concrete: Shared<PiecewiseYieldCurve<ForwardRate, Linear>>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyPiecewiseLinearForward {
     /// Build the curve over helpers with a fixed reference date.
@@ -812,6 +849,7 @@ impl PyPiecewiseLinearForward {
     ///
     /// Raises:
     ///     ItofinError: On an empty helper list.
+    #[gen_stub(override_return_type(type_repr = "PiecewiseLinearForward"))]
     #[new]
     fn new(
         reference_date: &PyDate,
@@ -876,11 +914,13 @@ enum ConvexMonotoneCurve {
 /// nodes as discrete forwards, so the bootstrap runs the multi-pass
 /// convergence loop. data() are instantaneous forward rates; the interpolation
 /// ignores node [0], which only mirrors the first solved pillar.
-#[pyclass(name = "PiecewiseConvexMonotoneForward", extends = PyYieldTermStructure, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "PiecewiseConvexMonotoneForward", extends = PyYieldTermStructure, unsendable, module = "itofin.termstructures")]
 pub struct PyPiecewiseConvexMonotoneForward {
     concrete: ConvexMonotoneCurve,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyPiecewiseConvexMonotoneForward {
     /// Build the curve over helpers with a fixed reference date.
@@ -899,6 +939,7 @@ impl PyPiecewiseConvexMonotoneForward {
     /// Raises:
     ///     ItofinError: On an empty helper list, and on an unknown bootstrap
     ///         name.
+    #[gen_stub(override_return_type(type_repr = "PiecewiseConvexMonotoneForward"))]
     #[new]
     #[pyo3(signature = (reference_date, helpers, day_counter, bootstrap = "iterative"))]
     fn new(
@@ -989,11 +1030,13 @@ impl PyPiecewiseConvexMonotoneForward {
 /// combination. Piecewise-constant instantaneous forwards make it numerically
 /// identical to PiecewiseLogLinearDiscount under every query; only data(),
 /// forward rates against discount factors, tells the two apart.
-#[pyclass(name = "PiecewiseFlatForward", extends = PyYieldTermStructure, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "PiecewiseFlatForward", extends = PyYieldTermStructure, unsendable, module = "itofin.termstructures")]
 pub struct PyPiecewiseFlatForward {
     concrete: Shared<PiecewiseYieldCurve<ForwardRate, BackwardFlat>>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyPiecewiseFlatForward {
     /// Build the curve over helpers with a fixed reference date.
@@ -1005,6 +1048,7 @@ impl PyPiecewiseFlatForward {
     ///
     /// Raises:
     ///     ItofinError: On an empty helper list.
+    #[gen_stub(override_return_type(type_repr = "PiecewiseFlatForward"))]
     #[new]
     fn new(
         reference_date: &PyDate,

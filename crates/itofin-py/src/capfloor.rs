@@ -30,13 +30,24 @@ use crate::time::PyPeriod;
 use libitofin::instrument::Instrument;
 use libitofin::instruments::{CapFloor, CapFloorType, MakeCapFloor};
 use pyo3::prelude::*;
+#[allow(unused_imports)]
+use pyo3_stub_gen::derive::{
+    gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pyfunction, gen_stub_pymethods,
+};
 
 /// Whether the instrument caps, floors or collars its floating leg.
 ///
 /// Collar reaches an instrument only through a raw coupon-vector constructor:
 /// CapFloor.collar here, or the YoYInflationCapFloor ones on the inflation
 /// side. MakeCapFloor refuses it, so CapFloor(...) does not accept it.
-#[pyclass(name = "CapFloorType", eq, eq_int, from_py_object)]
+#[gen_stub_pyclass_enum]
+#[pyclass(
+    name = "CapFloorType",
+    eq,
+    eq_int,
+    from_py_object,
+    module = "itofin.instruments"
+)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum PyCapFloorType {
     Cap,
@@ -70,11 +81,13 @@ impl PyCapFloorType {
 /// short strike list across every coupon by repeating its last entry.
 ///
 /// Pricing needs an engine: call set_black_engine() before npv().
-#[pyclass(name = "CapFloor", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "CapFloor", unsendable, module = "itofin.instruments")]
 pub struct PyCapFloor {
     inner: CapFloor,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyCapFloor {
     /// Build a standard market cap or floor through MakeCapFloor.

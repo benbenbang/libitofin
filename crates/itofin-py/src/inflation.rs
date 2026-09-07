@@ -79,6 +79,10 @@ use libitofin::time::date::Date;
 use libitofin::time::daycounter::DayCounter;
 use libitofin::time::period::Period;
 use pyo3::prelude::*;
+#[allow(unused_imports)]
+use pyo3_stub_gen::derive::{
+    gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pyfunction, gen_stub_pymethods,
+};
 
 /// Discounts every leg of a swap over a single yield curve.
 ///
@@ -88,11 +92,17 @@ use pyo3::prelude::*;
 /// not exposed and are always None, so the flow decision follows the settings'
 /// own flags and both dates fall back to the curve reference date. The swap
 /// this engine prices must carry the same Settings object.
-#[pyclass(name = "DiscountingSwapEngine", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "DiscountingSwapEngine",
+    unsendable,
+    module = "itofin.pricingengines"
+)]
 pub struct PyDiscountingSwapEngine {
     inner: SharedMut<DiscountingSwapEngine>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyDiscountingSwapEngine {
     /// Build an engine discounting every leg on discount.
@@ -132,7 +142,14 @@ impl PyDiscountingSwapEngine {
 /// to the next period's fixing by how far the observation date has run into its
 /// own period. The core's deprecated AsIndex variant is not ported and so has
 /// no counterpart here.
-#[pyclass(name = "CpiInterpolationType", eq, eq_int, from_py_object)]
+#[gen_stub_pyclass_enum]
+#[pyclass(
+    name = "CpiInterpolationType",
+    eq,
+    eq_int,
+    from_py_object,
+    module = "itofin.indexes"
+)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum PyCpiInterpolationType {
     Flat,
@@ -165,7 +182,8 @@ impl PyCpiInterpolationType {
 /// index can be built before the curve it forecasts off exists. The handle
 /// starts empty and a forecast before any link raises ItofinError; link_to
 /// fills it.
-#[pyclass(name = "ZeroInflationIndex", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "ZeroInflationIndex", unsendable, module = "itofin.indexes")]
 pub struct PyZeroInflationIndex {
     inner: Shared<ZeroInflationIndex>,
     curve: RelinkableHandle<dyn ZeroInflationTermStructure>,
@@ -182,6 +200,7 @@ impl PyZeroInflationIndex {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyZeroInflationIndex {
     /// Return the UK Retail Price Index: monthly, one-month availability lag.
@@ -367,11 +386,17 @@ impl PyZeroInflationIndex {
 /// Install it with ZeroInflationTermStructure.set_seasonality. Only the
 /// date-taking rate query folds the correction in; the year-fraction one
 /// cannot, a time not naming the date the factors are a function of.
-#[pyclass(name = "MultiplicativePriceSeasonality", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "MultiplicativePriceSeasonality",
+    unsendable,
+    module = "itofin.termstructures"
+)]
 pub struct PyMultiplicativePriceSeasonality {
     inner: Shared<MultiplicativePriceSeasonality>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyMultiplicativePriceSeasonality {
     /// Build the correction from a factor set anchored on a base date.
@@ -470,11 +495,18 @@ impl PyMultiplicativePriceSeasonality {
 /// applies to a whole period; zero_rate takes a year-fraction already measured
 /// under the curve's own day counter and quantizes nothing. Only the first
 /// folds in any seasonality.
-#[pyclass(name = "ZeroInflationTermStructure", subclass, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "ZeroInflationTermStructure",
+    subclass,
+    unsendable,
+    module = "itofin.termstructures"
+)]
 pub struct PyZeroInflationTermStructure {
     inner: Handle<dyn ZeroInflationTermStructure>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyZeroInflationTermStructure {
     /// Return the zero-coupon inflation rate at year-fraction t.
@@ -619,15 +651,18 @@ impl PyZeroInflationTermStructure {
 /// The first date is the base date rather than the reference date, which is
 /// passed separately and normally follows it; node times are measured from the
 /// reference date, so the first one is negative.
+#[gen_stub_pyclass]
 #[pyclass(
     name = "InterpolatedZeroInflationCurve",
     extends = PyZeroInflationTermStructure,
-    unsendable
+    unsendable,
+    module = "itofin.termstructures"
 )]
 pub struct PyInterpolatedZeroInflationCurve {
     concrete: Shared<InterpolatedZeroInflationCurve<Linear>>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyInterpolatedZeroInflationCurve {
     /// Build the curve through the rates quoted at dates.
@@ -647,6 +682,7 @@ impl PyInterpolatedZeroInflationCurve {
     ///     ItofinError: On fewer than two dates, a dates and rates count
     ///         mismatch, a rate at or below -100 per cent from the second node
     ///         on, or unsorted dates.
+    #[gen_stub(override_return_type(type_repr = "None"))]
     #[new]
     fn new(
         reference_date: &PyDate,
@@ -717,11 +753,18 @@ impl PyInterpolatedZeroInflationCurve {
 ///
 /// Concrete helpers such as ZeroCouponInflationSwapHelper subclass this and
 /// supply only their constructor.
-#[pyclass(name = "ZeroInflationHelper", subclass, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "ZeroInflationHelper",
+    subclass,
+    unsendable,
+    module = "itofin.termstructures"
+)]
 pub struct PyZeroInflationHelper {
     inner: Shared<dyn ZeroInflationHelper>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyZeroInflationHelper {
     /// Return the date the curve node this helper sets sits at.
@@ -767,15 +810,18 @@ impl PyZeroInflationHelper {
 ///
 /// pillar picks which of the two nodes an interpolated swap straddles the helper
 /// fits; a flat swap reads a single fixing and ignores it.
+#[gen_stub_pyclass]
 #[pyclass(
     name = "ZeroCouponInflationSwapHelper",
     extends = PyZeroInflationHelper,
-    unsendable
+    unsendable,
+    module = "itofin.termstructures"
 )]
 pub struct PyZeroCouponInflationSwapHelper {
     concrete: Shared<ZeroCouponInflationSwapHelper>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyZeroCouponInflationSwapHelper {
     /// Build the helper on a swap maturing at maturity.
@@ -811,6 +857,7 @@ impl PyZeroCouponInflationSwapHelper {
     ///     ItofinError: On an observation lag the index cannot observe
     ///         through, and under Linear interpolation on one that leaves less
     ///         than a whole index period over the index's availability lag.
+    #[gen_stub(override_return_type(type_repr = "None"))]
     #[new]
     #[pyo3(signature = (
         quote,
@@ -891,15 +938,18 @@ impl PyZeroCouponInflationSwapHelper {
 ///
 /// A seasonality installed later through set_seasonality() invalidates the
 /// bootstrap, so the next read re-solves every node against the correction.
+#[gen_stub_pyclass]
 #[pyclass(
     name = "PiecewiseZeroInflationCurve",
     extends = PyZeroInflationTermStructure,
-    unsendable
+    unsendable,
+    module = "itofin.termstructures"
 )]
 pub struct PyPiecewiseZeroInflationCurve {
     concrete: Shared<PiecewiseZeroInflationCurve<Linear>>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyPiecewiseZeroInflationCurve {
     /// Build the curve over helpers, registering on them without solving.
@@ -914,6 +964,7 @@ impl PyPiecewiseZeroInflationCurve {
     ///
     /// Raises:
     ///     ItofinError: On an empty helper list.
+    #[gen_stub(override_return_type(type_repr = "None"))]
     #[new]
     fn new(
         reference_date: &PyDate,
@@ -1018,11 +1069,17 @@ impl PyPiecewiseZeroInflationCurve {
 /// Pricing needs an engine: call set_engine() before npv(). fair_rate() is the
 /// exception, reading the indexed flow directly and pricing with no engine at
 /// all, though it does need the index linked to a curve.
-#[pyclass(name = "ZeroCouponInflationSwap", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "ZeroCouponInflationSwap",
+    unsendable,
+    module = "itofin.instruments"
+)]
 pub struct PyZeroCouponInflationSwap {
     inner: SharedMut<ZeroCouponInflationSwap>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyZeroCouponInflationSwap {
     /// Build the swap from its two exchanged flows.
@@ -1294,11 +1351,18 @@ impl PyZeroCouponInflationSwap {
 ///
 /// base_rate is answered here where the zero base defers it: a year-on-year
 /// curve carries the rate observed over the period ending on its base date.
-#[pyclass(name = "YoYInflationTermStructure", subclass, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "YoYInflationTermStructure",
+    subclass,
+    unsendable,
+    module = "itofin.termstructures"
+)]
 pub struct PyYoYInflationTermStructure {
     inner: Handle<dyn YoYInflationTermStructure>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyYoYInflationTermStructure {
     /// Return the year-on-year inflation rate at year-fraction t.
@@ -1451,15 +1515,18 @@ impl PyYoYInflationTermStructure {
 /// passed separately and normally follows it; the first rate is the base rate
 /// the curve publishes, and node times are measured from the reference date, so
 /// the first one is negative.
+#[gen_stub_pyclass]
 #[pyclass(
     name = "InterpolatedYoYInflationCurve",
     extends = PyYoYInflationTermStructure,
-    unsendable
+    unsendable,
+    module = "itofin.termstructures"
 )]
 pub struct PyInterpolatedYoYInflationCurve {
     concrete: Shared<InterpolatedYoYInflationCurve<Linear>>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyInterpolatedYoYInflationCurve {
     /// Build the curve through the rates quoted at dates.
@@ -1477,6 +1544,7 @@ impl PyInterpolatedYoYInflationCurve {
     ///     ItofinError: On fewer than two dates, a dates and rates count
     ///         mismatch, or a rate at or below -100 per cent from the second
     ///         node on; the base rate is left unconstrained.
+    #[gen_stub(override_return_type(type_repr = "None"))]
     #[new]
     fn new(
         reference_date: &PyDate,
@@ -1548,11 +1616,18 @@ impl PyInterpolatedYoYInflationCurve {
 ///
 /// Concrete helpers such as YearOnYearInflationSwapHelper subclass this and
 /// supply only their constructor.
-#[pyclass(name = "YoYInflationHelper", subclass, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "YoYInflationHelper",
+    subclass,
+    unsendable,
+    module = "itofin.termstructures"
+)]
 pub struct PyYoYInflationHelper {
     inner: Shared<dyn YoYInflationHelper>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyYoYInflationHelper {
     /// Return the date the curve node this helper sets sits at.
@@ -1600,7 +1675,8 @@ impl PyYoYInflationHelper {
 /// The quoted constructor spells its region and currency out as their component
 /// fields: neither core type has a Python facade, and defaulting the currency
 /// metadata would put made-up values on the index.
-#[pyclass(name = "YoYInflationIndex", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "YoYInflationIndex", unsendable, module = "itofin.indexes")]
 pub struct PyYoYInflationIndex {
     inner: Shared<YoYInflationIndex>,
     curve: RelinkableHandle<dyn YoYInflationTermStructure>,
@@ -1628,6 +1704,7 @@ impl PyYoYInflationIndex {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyYoYInflationIndex {
     /// Build a quoted year-on-year index, keeping its own fixing history.
@@ -1888,13 +1965,16 @@ impl PyYoYInflationIndex {
 /// Fallible: CpiInterpolationType.Linear is refused outright, and the swap is
 /// built here, so an observation lag its legs cannot be built under fails at
 /// construction.
+#[gen_stub_pyclass]
 #[pyclass(
     name = "YearOnYearInflationSwapHelper",
     extends = PyYoYInflationHelper,
-    unsendable
+    unsendable,
+    module = "itofin.termstructures"
 )]
 pub struct PyYearOnYearInflationSwapHelper;
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyYearOnYearInflationSwapHelper {
     /// Build the helper on a swap maturing at maturity.
@@ -1928,6 +2008,7 @@ impl PyYearOnYearInflationSwapHelper {
     ///         outright pending the interpolated branch (#847), and on an
     ///         observation lag the helper's own swap legs cannot be built
     ///         under.
+    #[gen_stub(override_return_type(type_repr = "None"))]
     #[new]
     #[pyo3(signature = (
         quote,
@@ -1988,15 +2069,18 @@ impl PyYearOnYearInflationSwapHelper {
 /// Lazy: the bootstrap runs on the first read, so the evaluation date must be
 /// in place before that read as well as before the helpers were built. A helper
 /// quote moving invalidates the cache.
+#[gen_stub_pyclass]
 #[pyclass(
     name = "PiecewiseYoYInflationCurve",
     extends = PyYoYInflationTermStructure,
-    unsendable
+    unsendable,
+    module = "itofin.termstructures"
 )]
 pub struct PyPiecewiseYoYInflationCurve {
     concrete: Shared<PiecewiseYoYInflationCurve<Linear>>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyPiecewiseYoYInflationCurve {
     /// Build the curve over helpers, registering on them without solving.
@@ -2013,6 +2097,7 @@ impl PyPiecewiseYoYInflationCurve {
     ///
     /// Raises:
     ///     ItofinError: On an empty helper list.
+    #[gen_stub(override_return_type(type_repr = "None"))]
     #[new]
     #[allow(clippy::too_many_arguments)]
     fn new(
@@ -2116,11 +2201,17 @@ impl PyPiecewiseYoYInflationCurve {
 ///
 /// Pricing needs an engine: call set_engine first. Every priced accessor drives
 /// the calculation, so all of them mutate.
-#[pyclass(name = "YearOnYearInflationSwap", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "YearOnYearInflationSwap",
+    unsendable,
+    module = "itofin.instruments"
+)]
 pub struct PyYearOnYearInflationSwap {
     inner: SharedMut<YearOnYearInflationSwap>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyYearOnYearInflationSwap {
     /// Build the swap from its two schedules.
@@ -2378,11 +2469,17 @@ impl PyYearOnYearInflationSwap {
 ///
 /// Both constructors are bound: __init__ takes a value, with_quote a live
 /// quote. The whole stripped/interpolated hierarchy is deferred (#874).
-#[pyclass(name = "ConstantYoYOptionletVolatility", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "ConstantYoYOptionletVolatility",
+    unsendable,
+    module = "itofin.termstructures"
+)]
 pub struct PyConstantYoYOptionletVolatility {
     inner: Shared<ConstantYoYOptionletVolatility>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyConstantYoYOptionletVolatility {
     /// Build a flat surface at a fixed volatility.
@@ -2611,11 +2708,17 @@ impl PyConstantYoYOptionletVolatility {
 ///
 /// An engine carries the arguments and results of the contract it last priced,
 /// so a cap and a floor priced together want one engine each.
-#[pyclass(name = "YoYInflationCapFloorEngine", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "YoYInflationCapFloorEngine",
+    unsendable,
+    module = "itofin.pricingengines"
+)]
 pub struct PyYoYInflationCapFloorEngine {
     inner: SharedMut<YoYInflationCapFloorEngine>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyYoYInflationCapFloorEngine {
     /// Build an engine valuing optionlets under the lognormal model.
@@ -2742,7 +2845,12 @@ impl PyYoYInflationCapFloorEngine {
 /// CapFloorType.Collar has no path here - the builder carries a single strike,
 /// and a collar needs two strike vectors - so a collar is built through
 /// YoYInflationCapFloor.collar over a leg of its own instead.
-#[pyclass(name = "MakeYoYInflationCapFloor", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "MakeYoYInflationCapFloor",
+    unsendable,
+    module = "itofin.instruments"
+)]
 pub struct PyMakeYoYInflationCapFloor {
     cap_floor_type: PyCapFloorType,
     index: Shared<YoYInflationIndex>,
@@ -2764,6 +2872,7 @@ pub struct PyMakeYoYInflationCapFloor {
     atm_strike: Option<Handle<dyn YieldTermStructure>>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyMakeYoYInflationCapFloor {
     /// Store the configuration the chain is assembled from in build().
@@ -2935,11 +3044,17 @@ impl PyMakeYoYInflationCapFloor {
 /// strip spans its leg exactly and cap - floor is the year-on-year swap.
 ///
 /// Pricing needs an engine: call set_engine before npv.
-#[pyclass(name = "YoYInflationCapFloor", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "YoYInflationCapFloor",
+    unsendable,
+    module = "itofin.instruments"
+)]
 pub struct PyYoYInflationCapFloor {
     inner: SharedMut<YoYInflationCapFloor>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyYoYInflationCapFloor {
     /// Build an instrument of cap_floor_type over coupons, struck at both vectors.
@@ -3286,11 +3401,17 @@ impl PyYoYInflationCapFloor {
 /// A price alone does not say cap or floor without the ATM level, and ATM
 /// prices are generally inaccurate, coming from extrapolation and
 /// intersection: the quoted grid is the data, the ATM curve a derived read.
-#[pyclass(name = "YoYCapFloorTermPriceSurface", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "YoYCapFloorTermPriceSurface",
+    unsendable,
+    module = "itofin.termstructures"
+)]
 pub struct PyYoYCapFloorTermPriceSurface {
     inner: Shared<InterpolatedYoYCapFloorTermPriceSurface>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyYoYCapFloorTermPriceSurface {
     /// Build the surface over quoted cap and floor prices.
@@ -3479,12 +3600,18 @@ impl PyYoYCapFloorTermPriceSurface {
 /// Construction runs the stripping, so it is fallible and the evaluation date
 /// carried by settings must be set first. The pricer is pinned to the
 /// unit-displaced lognormal model.
-#[pyclass(name = "KInterpolatedYoYOptionletVolatilitySurface", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "KInterpolatedYoYOptionletVolatilitySurface",
+    unsendable,
+    module = "itofin.termstructures"
+)]
 pub struct PyKInterpolatedYoYOptionletVolatilitySurface {
     inner: Shared<KInterpolatedYoYOptionletVolatilitySurface<Linear>>,
     observation_lag: Period,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyKInterpolatedYoYOptionletVolatilitySurface {
     /// Strip cap_floor_prices into an optionlet volatility surface.

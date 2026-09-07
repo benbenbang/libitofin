@@ -31,6 +31,10 @@ use libitofin::termstructures::volatility::{
 };
 use libitofin::time::period::Period;
 use pyo3::prelude::*;
+#[allow(unused_imports)]
+use pyo3_stub_gen::derive::{
+    gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pyfunction, gen_stub_pymethods,
+};
 
 /// The four SABR parameters a guess row and the fixed-parameter flags carry,
 /// in the order `[alpha, beta, nu, rho]`.
@@ -38,11 +42,18 @@ const SABR_PARAMETERS: usize = 4;
 
 /// Shared base for every swaption volatility surface: volatility, Black
 /// variance and lognormal shift, addressed by option and swap tenor.
-#[pyclass(name = "SwaptionVolatilityStructure", subclass, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "SwaptionVolatilityStructure",
+    subclass,
+    unsendable,
+    module = "itofin.termstructures"
+)]
 pub struct PySwaptionVolatilityStructure {
     inner: Handle<dyn SwaptionVolatilityStructure>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PySwaptionVolatilityStructure {
     /// Return the volatility for an option tenor, swap tenor and strike.
@@ -182,7 +193,14 @@ impl PySwaptionVolatilityStructure {
 
 /// Whether a surface quotes shifted-lognormal (Black) or normal (Bachelier)
 /// volatilities. A mismatch with the engine's formula surfaces at pricing time.
-#[pyclass(name = "VolatilityType", eq, eq_int, from_py_object)]
+#[gen_stub_pyclass_enum]
+#[pyclass(
+    name = "VolatilityType",
+    eq,
+    eq_int,
+    from_py_object,
+    module = "itofin.termstructures"
+)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum PyVolatilityType {
     ShiftedLognormal,
@@ -205,9 +223,11 @@ impl PyVolatilityType {
 /// option time runs from reference_date rather than the evaluation date. The
 /// moving and moving_with_quote forms float the reference date off the
 /// Settings evaluation date instead (#627).
-#[pyclass(name = "ConstantSwaptionVolatility", extends = PySwaptionVolatilityStructure, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "ConstantSwaptionVolatility", extends = PySwaptionVolatilityStructure, unsendable, module = "itofin.termstructures")]
 pub struct PyConstantSwaptionVolatility;
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyConstantSwaptionVolatility {
     /// Build the surface at a fixed volatility.
@@ -225,6 +245,7 @@ impl PyConstantSwaptionVolatility {
     ///     volatility_type (VolatilityType): Whether the quote is
     ///         shifted-lognormal or normal.
     ///     shift (float): The lognormal shift.
+    #[gen_stub(override_return_type(type_repr = "ConstantSwaptionVolatility"))]
     #[new]
     #[pyo3(signature = (reference_date, calendar, business_day_convention, volatility, day_counter, volatility_type, shift = 0.0))]
     fn new(
@@ -420,9 +441,11 @@ impl PyConstantSwaptionVolatility {
 /// is at the money, so a query's strike is range-checked and then ignored.
 /// flat_extrapolation clamps a query past the grid to the nearest edge or
 /// corner vol instead of extending the boundary surface.
-#[pyclass(name = "SwaptionVolatilityMatrix", extends = PySwaptionVolatilityStructure, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "SwaptionVolatilityMatrix", extends = PySwaptionVolatilityStructure, unsendable, module = "itofin.termstructures")]
 pub struct PySwaptionVolatilityMatrix;
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PySwaptionVolatilityMatrix {
     /// Build the grid on a pinned reference date over fixed volatilities.
@@ -453,6 +476,7 @@ impl PySwaptionVolatilityMatrix {
     ///     ItofinError: On an empty or ragged grid, a shifts grid that does
     ///         not match the volatilities shape, and on whatever the core
     ///         rejects about the axes.
+    #[gen_stub(override_return_type(type_repr = "SwaptionVolatilityMatrix"))]
     #[new]
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (reference_date, calendar, business_day_convention, option_tenors, swap_tenors, volatilities, day_counter, volatility_type, shifts = None, flat_extrapolation = false))]
@@ -602,11 +626,13 @@ impl PySwaptionVolatilityMatrix {
 ///
 /// swap_index_base is the long base index and short_swap_index_base the short
 /// one; the cube picks between them per query by swap tenor.
-#[pyclass(name = "InterpolatedSwaptionVolatilityCube", extends = PySwaptionVolatilityStructure, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "InterpolatedSwaptionVolatilityCube", extends = PySwaptionVolatilityStructure, unsendable, module = "itofin.termstructures")]
 pub struct PyInterpolatedSwaptionVolatilityCube {
     concrete: Shared<InterpolatedSwaptionVolatilityCube>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyInterpolatedSwaptionVolatilityCube {
     /// Build the cube over an at-the-money surface and its vol spreads.
@@ -633,6 +659,7 @@ impl PyInterpolatedSwaptionVolatilityCube {
     ///     ItofinError: On an empty or ragged vol_spreads grid, on a row count
     ///         that is not one per node or a row length that is not one per
     ///         strike spread, and on whatever the core rejects.
+    #[gen_stub(override_return_type(type_repr = "InterpolatedSwaptionVolatilityCube"))]
     #[new]
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (atm_vol, option_tenors, swap_tenors, strike_spreads, vol_spreads, swap_index_base, short_swap_index_base, settings, vega_weighted_smile_fit = false))]
@@ -741,11 +768,13 @@ impl PyInterpolatedSwaptionVolatilityCube {
 /// generic XABR cube are a separate core track (#597), and the section-
 /// recalibration API is unported in the core: re-fit by bumping the guess or
 /// vol-spread quotes.
-#[pyclass(name = "SabrSwaptionVolatilityCube", extends = PySwaptionVolatilityStructure, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "SabrSwaptionVolatilityCube", extends = PySwaptionVolatilityStructure, unsendable, module = "itofin.termstructures")]
 pub struct PySabrSwaptionVolatilityCube {
     concrete: Shared<SabrSwaptionVolatilityCube>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PySabrSwaptionVolatilityCube {
     /// Build the cube, calibrating every node on construction.
@@ -786,6 +815,7 @@ impl PySabrSwaptionVolatilityCube {
     ///         is_parameter_fixed list that is not four entries long, on a
     ///         normal at-the-money surface, which needs the deferred normal
     ///         SABR formula, and on a calibration failure.
+    #[gen_stub(override_return_type(type_repr = "SabrSwaptionVolatilityCube"))]
     #[new]
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (atm_vol, option_tenors, swap_tenors, strike_spreads, vol_spreads, swap_index_base, short_swap_index_base, parameters_guess, is_parameter_fixed, is_atm_calibrated, settings, vega_weighted_smile_fit = false, use_max_error = false, max_guesses = 50, cutoff_strike = 0.0001))]

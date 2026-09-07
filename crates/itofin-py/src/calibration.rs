@@ -9,17 +9,27 @@ use libitofin::math::optimization::endcriteria::EndCriteria;
 use libitofin::math::optimization::levenbergmarquardt::LevenbergMarquardt;
 use libitofin::models::CalibrationErrorType;
 use pyo3::prelude::*;
+#[allow(unused_imports)]
+use pyo3_stub_gen::derive::{
+    gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pyfunction, gen_stub_pymethods,
+};
 
 /// The least-squares optimizer used to fit model parameters.
 ///
 /// Wraps the MINPACK lmdif routine. The Jacobian comes from a built-in
 /// forward-difference scheme by default; the cost function's own jacobian
 /// method is used instead when use_cost_functions_jacobian is set.
-#[pyclass(name = "LevenbergMarquardt", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "LevenbergMarquardt",
+    unsendable,
+    module = "itofin.optimization"
+)]
 pub struct PyLevenbergMarquardt {
     inner: LevenbergMarquardt,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyLevenbergMarquardt {
     /// Initialize the optimizer; the defaults are QuantLib's.
@@ -52,11 +62,13 @@ impl PyLevenbergMarquardt {
 ///
 /// Carries the iteration cap and the stationarity thresholds an optimization
 /// run is tested against.
-#[pyclass(name = "EndCriteria", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "EndCriteria", unsendable, module = "itofin.optimization")]
 pub struct PyEndCriteria {
     inner: EndCriteria,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyEndCriteria {
     /// Initialize the criteria.
@@ -115,7 +127,14 @@ impl PyEndCriteria {
 ///
 /// RelativePriceError is |market - model| / market, PriceError is
 /// market - model, and ImpliedVolError compares the two implied volatilities.
-#[pyclass(name = "CalibrationErrorType", eq, eq_int, from_py_object)]
+#[gen_stub_pyclass_enum]
+#[pyclass(
+    name = "CalibrationErrorType",
+    eq,
+    eq_int,
+    from_py_object,
+    module = "itofin.models"
+)]
 #[derive(Clone, Copy, PartialEq)]
 #[allow(clippy::enum_variant_names)]
 pub enum PyCalibrationErrorType {

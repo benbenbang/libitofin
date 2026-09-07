@@ -36,6 +36,10 @@ use libitofin::time::businessdayconvention::BusinessDayConvention;
 use libitofin::time::calendars::nullcalendar::NullCalendar;
 use libitofin::types::{Integer, Natural, Real};
 use pyo3::prelude::*;
+#[allow(unused_imports)]
+use pyo3_stub_gen::derive::{
+    gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pyfunction, gen_stub_pymethods,
+};
 
 /// Shared base for every bootstrap helper: implied/market quotes and dates.
 ///
@@ -43,11 +47,18 @@ use pyo3::prelude::*;
 /// instrument; a piecewise curve is bootstrapped so every helper reprices its
 /// own quote. Concrete helpers subclass this and supply only their
 /// constructor.
-#[pyclass(name = "RateHelper", subclass, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "RateHelper",
+    subclass,
+    unsendable,
+    module = "itofin.termstructures"
+)]
 pub struct PyRateHelper {
     inner: Shared<dyn RateHelper>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyRateHelper {
     /// Return the quote implied by the curve the helper is linked to.
@@ -136,9 +147,11 @@ impl PyRateHelper {
 }
 
 /// A helper fitting a deposit rate.
-#[pyclass(name = "DepositRateHelper", extends = PyRateHelper, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "DepositRateHelper", extends = PyRateHelper, unsendable, module = "itofin.termstructures")]
 pub struct PyDepositRateHelper;
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyDepositRateHelper {
     /// Build the helper over a live quote.
@@ -147,6 +160,7 @@ impl PyDepositRateHelper {
     ///     quote (SimpleQuote): The deposit rate; the caller keeps it, and
     ///         mutating it later invalidates the bootstrap.
     ///     index (IborIndex): The index supplying the deposit's schedule.
+    #[gen_stub(override_return_type(type_repr = "DepositRateHelper"))]
     #[new]
     fn new(quote: &PySimpleQuote, index: &PyIborIndex) -> PyClassInitializer<Self> {
         let idx = index.inner();
@@ -179,9 +193,11 @@ impl PyDepositRateHelper {
 ///
 /// The spot-starting form the curve-consistency oracle builds: no spread, no
 /// forward start, no exogenous discounting curve, and the default pillar.
-#[pyclass(name = "SwapRateHelper", extends = PyRateHelper, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "SwapRateHelper", extends = PyRateHelper, unsendable, module = "itofin.termstructures")]
 pub struct PySwapRateHelper;
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PySwapRateHelper {
     /// Build the helper over the schedule of a spot-starting swap.
@@ -194,6 +210,7 @@ impl PySwapRateHelper {
     ///     fixed_convention (BusinessDayConvention): The fixed leg's roll.
     ///     fixed_day_count (DayCounter): The fixed leg's day count.
     ///     ibor_index (IborIndex): The index the floating leg fixes off.
+    #[gen_stub(override_return_type(type_repr = "SwapRateHelper"))]
     #[new]
     #[allow(clippy::too_many_arguments)]
     fn new(
@@ -225,7 +242,14 @@ impl PySwapRateHelper {
 /// an explicitly supplied ASX start date, but the ASX date navigators (the
 /// analogues of itofin.time.is_imm_date / next_imm_date) are deferred, so there
 /// is no helper to derive the next ASX date from Python yet.
-#[pyclass(name = "FuturesType", eq, eq_int, from_py_object)]
+#[gen_stub_pyclass_enum]
+#[pyclass(
+    name = "FuturesType",
+    eq,
+    eq_int,
+    from_py_object,
+    module = "itofin.termstructures"
+)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum PyFuturesType {
     Imm,
@@ -250,11 +274,13 @@ impl PyFuturesType {
 /// once from the supplied dates and never rebuilt on an evaluation-date
 /// change. The convexity adjustment is usually absent; pass conv_adj=None to
 /// leave it empty, which reports a zero adjustment.
-#[pyclass(name = "FuturesRateHelper", extends = PyRateHelper, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "FuturesRateHelper", extends = PyRateHelper, unsendable, module = "itofin.termstructures")]
 pub struct PyFuturesRateHelper {
     futures: Shared<FuturesRateHelper>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyFuturesRateHelper {
     /// Build the helper over a length-in-months window off the start date.
@@ -277,6 +303,7 @@ impl PyFuturesRateHelper {
     /// Raises:
     ///     ItofinError: If an Imm or Asx start is not a valid date of that
     ///         convention.
+    #[gen_stub(override_return_type(type_repr = "FuturesRateHelper"))]
     #[new]
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (
@@ -446,7 +473,14 @@ fn init(helper: Shared<FuturesRateHelper>) -> PyClassInitializer<PyFuturesRateHe
 /// MaturityDate and LastRelevantDate (the default) are the two schedule-derived
 /// choices. Pillar.CustomDate is deferred in the core (#343), so its omission
 /// here is deliberate, not an oversight.
-#[pyclass(name = "Pillar", eq, eq_int, from_py_object)]
+#[gen_stub_pyclass_enum]
+#[pyclass(
+    name = "Pillar",
+    eq,
+    eq_int,
+    from_py_object,
+    module = "itofin.termstructures"
+)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum PyPillar {
     MaturityDate,
@@ -468,9 +502,11 @@ impl PyPillar {
 /// (default True) selects the indexed implied-quote mode; False is the par simple
 /// forward. from_dates fixes the window at construction (it does not shift on an
 /// evaluation-date change).
-#[pyclass(name = "FraRateHelper", extends = PyRateHelper, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "FraRateHelper", extends = PyRateHelper, unsendable, module = "itofin.termstructures")]
 pub struct PyFraRateHelper;
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyFraRateHelper {
     /// Build the helper over the window period_to_start past spot.
@@ -485,6 +521,7 @@ impl PyFraRateHelper {
     ///         simple forward over the raw window.
     ///     pillar (Pillar): The date the curve node sits at; defaults to
     ///         LastRelevantDate.
+    #[gen_stub(override_return_type(type_repr = "FraRateHelper"))]
     #[new]
     #[pyo3(signature = (
         quote,
@@ -650,7 +687,13 @@ impl PyFraRateHelper {
 /// only through a family factory such as Estr. It exists so OISRateHelper and
 /// MakeOis name one type and accept any family. The fixing accessor stays on
 /// the family facade; lifting it here is deferred.
-#[pyclass(name = "OvernightIndex", subclass, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "OvernightIndex",
+    subclass,
+    unsendable,
+    module = "itofin.indexes"
+)]
 pub struct PyOvernightIndex {
     inner: Shared<OvernightIndex>,
 }
@@ -672,11 +715,13 @@ impl PyOvernightIndex {
 ///
 /// Construction is infallible, unlike the Euribor one that rejects daily
 /// tenors: the overnight tenor is fixed to one day by the base.
-#[pyclass(name = "Estr", extends = PyOvernightIndex, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "Estr", extends = PyOvernightIndex, unsendable, module = "itofin.indexes")]
 pub struct PyEstr {
     inner: Shared<OvernightIndex>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyEstr {
     /// Build an ESTR index forwarding off curve.
@@ -690,6 +735,7 @@ impl PyEstr {
     ///         bootstrap needs.
     ///     settings (Settings): The explicit settings supplying the evaluation
     ///         date and the stored fixings.
+    #[gen_stub(override_return_type(type_repr = "Estr"))]
     #[new]
     #[pyo3(signature = (curve, settings))]
     fn new(
@@ -742,7 +788,14 @@ fn init_overnight(index: Shared<OvernightIndex>) -> PyClassInitializer<PyEstr> {
 ///
 /// Simple is the arithmetic average; Compound (daily compounding) is the coupon
 /// default the OIS conventions use.
-#[pyclass(name = "RateAveraging", eq, eq_int, from_py_object)]
+#[gen_stub_pyclass_enum]
+#[pyclass(
+    name = "RateAveraging",
+    eq,
+    eq_int,
+    from_py_object,
+    module = "itofin.termstructures"
+)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum PyRateAveraging {
     Simple,
@@ -768,9 +821,11 @@ impl PyRateAveraging {
 /// deferred core knobs past averaging_method (telescopic value dates, lookback,
 /// lockout, observation shift, custom pillar, per-leg calendars) take benign
 /// defaults.
-#[pyclass(name = "OISRateHelper", extends = PyRateHelper, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "OISRateHelper", extends = PyRateHelper, unsendable, module = "itofin.termstructures")]
 pub struct PyOISRateHelper;
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyOISRateHelper {
     /// Build the helper over the schedule of a spot-starting OIS.
@@ -799,6 +854,7 @@ impl PyOISRateHelper {
     ///         LastRelevantDate.
     ///     averaging_method (RateAveraging): How the daily fixings combine;
     ///         defaults to Compound.
+    #[gen_stub(override_return_type(type_repr = "OISRateHelper"))]
     #[new]
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (
@@ -859,7 +915,14 @@ impl PyOISRateHelper {
 /// the full settlement price. The two differ by exactly the bond's accrued
 /// amount at settlement, so the choice moves the bootstrapped curve for any
 /// bond settling mid-coupon and is a no-op for one settling on a coupon date.
-#[pyclass(name = "BondPriceType", eq, eq_int, from_py_object)]
+#[gen_stub_pyclass_enum]
+#[pyclass(
+    name = "BondPriceType",
+    eq,
+    eq_int,
+    from_py_object,
+    module = "itofin.termstructures"
+)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum PyBondPriceType {
     Clean,
@@ -902,9 +965,11 @@ impl PyBondPriceType {
 ///
 /// issue_date is the one core argument moved out of position: it is optional,
 /// so it trails the required price_type and settings.
-#[pyclass(name = "FixedRateBondHelper", extends = PyRateHelper, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "FixedRateBondHelper", extends = PyRateHelper, unsendable, module = "itofin.termstructures")]
 pub struct PyFixedRateBondHelper;
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyFixedRateBondHelper {
     /// Build the helper over a fixed-coupon bond assembled from the schedule.
@@ -935,6 +1000,7 @@ impl PyFixedRateBondHelper {
     ///     ItofinError: On whatever the core rejects about the bond, and when
     ///         the evaluation date is unset, since the helper resolves the
     ///         bond's next cash-flow date off it.
+    #[gen_stub(override_return_type(type_repr = "FixedRateBondHelper"))]
     #[new]
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (

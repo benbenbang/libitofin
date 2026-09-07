@@ -23,6 +23,10 @@ use libitofin::pricingengines::credit::{
 };
 use libitofin::shared::{SharedMut, shared_mut};
 use pyo3::prelude::*;
+#[allow(unused_imports)]
+use pyo3_stub_gen::derive::{
+    gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pyfunction, gen_stub_pymethods,
+};
 
 /// The mid-point credit-default-swap engine: each live premium period is
 /// priced against the default probability over that period, with the default
@@ -33,11 +37,17 @@ use pyo3::prelude::*;
 /// include_settlement_date_flows override is not exposed and is always None,
 /// so the settlement-date flow decision follows the settings' own flags. The
 /// contract this engine prices must carry the same Settings object.
-#[pyclass(name = "MidPointCdsEngine", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "MidPointCdsEngine",
+    unsendable,
+    module = "itofin.pricingengines"
+)]
 pub struct PyMidPointCdsEngine {
     inner: SharedMut<MidPointCdsEngine>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyMidPointCdsEngine {
     /// Build an engine over a default-probability curve and a discount curve.
@@ -83,7 +93,14 @@ impl PyMidPointCdsEngine {
 /// NoFix adds 10^-50 to them instead; Taylor, the default, replaces the
 /// quotient by its Taylor expansion once f + h falls below 10^-4. Spelled NoFix
 /// rather than C++'s None, which Python cannot name.
-#[pyclass(name = "NumericalFix", eq, eq_int, from_py_object)]
+#[gen_stub_pyclass_enum]
+#[pyclass(
+    name = "NumericalFix",
+    eq,
+    eq_int,
+    from_py_object,
+    module = "itofin.pricingengines"
+)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum PyNumericalFix {
     NoFix,
@@ -105,7 +122,14 @@ impl PyNumericalFix {
 /// The bias shifts the accrual's tstart back by 1/730 of a year. HalfDayBias,
 /// the default, includes it as the model's C code does before version 1.8.2;
 /// NoBias leaves it out, as from 1.8.2 on.
-#[pyclass(name = "AccrualBias", eq, eq_int, from_py_object)]
+#[gen_stub_pyclass_enum]
+#[pyclass(
+    name = "AccrualBias",
+    eq,
+    eq_int,
+    from_py_object,
+    module = "itofin.pricingengines"
+)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum PyAccrualBias {
     HalfDayBias,
@@ -128,7 +152,14 @@ impl PyAccrualBias {
 /// nodes; Flat integrates each period in a single step. The two part only where
 /// the grid has nodes strictly inside a coupon period, so two flat curves price
 /// identically under either.
-#[pyclass(name = "ForwardsInCouponPeriod", eq, eq_int, from_py_object)]
+#[gen_stub_pyclass_enum]
+#[pyclass(
+    name = "ForwardsInCouponPeriod",
+    eq,
+    eq_int,
+    from_py_object,
+    module = "itofin.pricingengines"
+)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum PyForwardsInCouponPeriod {
     Flat,
@@ -161,11 +192,13 @@ impl PyForwardsInCouponPeriod {
 /// with_fidelity method because the core builder consumes the engine while
 /// set_isda_engine has already cloned it into the contract. The contract this
 /// engine prices must carry the same Settings object.
-#[pyclass(name = "IsdaCdsEngine", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "IsdaCdsEngine", unsendable, module = "itofin.pricingengines")]
 pub struct PyIsdaCdsEngine {
     inner: SharedMut<IsdaCdsEngine>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyIsdaCdsEngine {
     /// Build an ISDA standard-model engine under the three fidelity flags.

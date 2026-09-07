@@ -11,6 +11,10 @@ use libitofin::instrument::InstrumentBase;
 use libitofin::time::date::Date;
 use libitofin::types::Real;
 use pyo3::prelude::*;
+#[allow(unused_imports)]
+use pyo3_stub_gen::derive::{
+    gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pyfunction, gen_stub_pymethods,
+};
 use std::collections::BTreeMap;
 
 /// A read-only snapshot of one instrument valuation.
@@ -29,7 +33,8 @@ use std::collections::BTreeMap;
 /// behind a type-erased handle whose only sanctioned downcast is to a real, so
 /// tags holding anything else are OMITTED from the dict rather than guessed
 /// at.
-#[pyclass(name = "Results", frozen)]
+#[gen_stub_pyclass]
+#[pyclass(name = "Results", frozen, module = "itofin.results")]
 pub struct Results {
     npv: Option<Real>,
     error_estimate: Option<Real>,
@@ -37,6 +42,7 @@ pub struct Results {
     additional_results: BTreeMap<String, Real>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl Results {
     /// The net present value.

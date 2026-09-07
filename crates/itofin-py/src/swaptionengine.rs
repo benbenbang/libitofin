@@ -17,6 +17,10 @@ use libitofin::pricingengines::swaption::{
 };
 use libitofin::shared::{SharedMut, shared_mut};
 use pyo3::prelude::*;
+#[allow(unused_imports)]
+use pyo3_stub_gen::derive::{
+    gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pyfunction, gen_stub_pymethods,
+};
 
 /// Which date a cash-settled par-yield annuity discounts to.
 ///
@@ -24,7 +28,14 @@ use pyo3::prelude::*;
 /// takes the fixed-leg BPS annuity and is insensitive to the choice. The
 /// swaption engines default to SwapRate, the branch every ported core test
 /// exercises, where C++ defaults to DiscountCurve.
-#[pyclass(name = "CashAnnuityModel", eq, eq_int, from_py_object)]
+#[gen_stub_pyclass_enum]
+#[pyclass(
+    name = "CashAnnuityModel",
+    eq,
+    eq_int,
+    from_py_object,
+    module = "itofin.pricingengines"
+)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum PyCashAnnuityModel {
     SwapRate,
@@ -49,11 +60,17 @@ impl PyCashAnnuityModel {
 /// no error raised. The surface's volatility type is checked against the Black
 /// formula at pricing time, not construction, so a normal-volatility surface
 /// raises from Swaption.npv().
-#[pyclass(name = "BlackSwaptionEngine", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "BlackSwaptionEngine",
+    unsendable,
+    module = "itofin.pricingengines"
+)]
 pub struct PyBlackSwaptionEngine {
     inner: SharedMut<BlackSwaptionEngine>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyBlackSwaptionEngine {
     /// Build an engine reading volatilities off vol and discounting on discount.
@@ -141,11 +158,17 @@ impl PyBlackSwaptionEngine {
 /// the underlying swap. The surface's volatility type is checked against the
 /// normal formula at pricing time, not construction, so a shifted-lognormal
 /// surface raises from Swaption.npv().
-#[pyclass(name = "BachelierSwaptionEngine", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "BachelierSwaptionEngine",
+    unsendable,
+    module = "itofin.pricingengines"
+)]
 pub struct PyBachelierSwaptionEngine {
     inner: SharedMut<BachelierSwaptionEngine>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyBachelierSwaptionEngine {
     /// Build an engine reading normal volatilities off vol.
