@@ -400,11 +400,17 @@ pub trait MultiCurveBootstrapContributor {
     /// [`setup_cost_function`](Self::setup_cost_function) set, without
     /// notifying anyone.
     ///
-    /// Divergence: C++ has no counterpart. It needs none, because it leaves a
-    /// failed `runMultiCurveBootstrap` to the caller and its curves stay marked
-    /// over whatever grid they reached. Here a contributor left marked would be
-    /// read as a solved curve by the next query, so the parent reverts every
-    /// contributor it had already set up whenever the joint solve fails.
+    /// Divergence, and a Rust-only one: C++ has no counterpart. When a later
+    /// contributor's setup throws, `runMultiCurveBootstrap` leaves the earlier
+    /// ones marked calculated over a partial grid and leaves the consequences
+    /// to the caller, a known rough edge upstream. This port reverts them
+    /// instead, so [`MultiCurveBootstrap::run`] never returns `Err` with a
+    /// contributor still marked calculated: D4 makes the failure explicit, and
+    /// D10 declines to hand a caller a half-marked curve that the next query
+    /// would read as solved.
+    ///
+    /// The error path only. On success nothing is reverted and the sequence is
+    /// C++'s, so no result any caller can observe changes.
     fn invalidate(&self);
 }
 
