@@ -2196,6 +2196,267 @@ mod tests {
         );
     }
 
+    /// A stand-in [`MultiCurveBootstrapContributor`] for the mechanism test.
+    ///
+    /// It owns `targets.len()` variables, guesses zero for each, and returns
+    /// `x[i] - targets[i]` as its residuals, so the stacked solve drives it to
+    /// its targets and the arithmetic stays checkable by eye. Real curves would
+    /// not do: the thing under test is the ORDER and the SLICING the parent
+    /// imposes across contributors, and a curve answers every question about
+    /// its own numbers while saying nothing about either.
+    ///
+    /// Every call goes into a log shared with the other mocks, which is what
+    /// makes the interleaving across contributors observable at all.
+    struct MockContributor {
+        id: usize,
+        targets: Vec<Real>,
+        log: Shared<RefCell<Vec<(usize, &'static str)>>>,
+        trials: RefCell<Vec<Vec<Real>>>,
+        solutions: RefCell<Vec<Vec<Real>>>,
+        current: RefCell<Vec<Real>>,
+        invalidations: Cell<usize>,
+        setup_fails: bool,
+    }
+
+    type MockLog = Shared<RefCell<Vec<(usize, &'static str)>>>;
+
+    impl MockContributor {
+        fn new(id: usize, targets: Vec<Real>, log: &MockLog) -> Shared<MockContributor> {
+            MockContributor::configured(id, targets, log, false)
+        }
+
+        /// The same, but its `setup_cost_function` fails, which is what the
+        /// error-path arm drives.
+        fn failing(id: usize, targets: Vec<Real>, log: &MockLog) -> Shared<MockContributor> {
+            MockContributor::configured(id, targets, log, true)
+        }
+
+        fn configured(
+            id: usize,
+            targets: Vec<Real>,
+            log: &MockLog,
+            setup_fails: bool,
+        ) -> Shared<MockContributor> {
+            shared(MockContributor {
+                id,
+                targets,
+                log: Shared::clone(log),
+                trials: RefCell::new(Vec::new()),
+                solutions: RefCell::new(Vec::new()),
+                current: RefCell::new(Vec::new()),
+                invalidations: Cell::new(0),
+                setup_fails,
+            })
+        }
+
+        fn record(&self, what: &'static str) {
+            self.log.borrow_mut().push((self.id, what));
+        }
+    }
+
+    impl MultiCurveBootstrapContributor for MockContributor {
+        fn set_parent_bootstrapper(&self, _parent: Shared<MultiCurveBootstrap>) {}
+
+        fn setup_cost_function(&self) -> QlResult<Array> {
+            self.record("setup");
+            if self.setup_fails {
+                crate::fail!("mock contributor {} refuses to set up", self.id);
+            }
+            *self.current.borrow_mut() = vec![0.0; self.targets.len()];
+            Ok(Array::with_size(self.targets.len()))
+        }
+
+        fn set_cost_function_argument(&self, x: &[Real]) -> QlResult<()> {
+            self.record("set");
+            self.trials.borrow_mut().push(x.to_vec());
+            *self.current.borrow_mut() = x.to_vec();
+            Ok(())
+        }
+
+        fn evaluate_cost_function(&self) -> QlResult<Array> {
+            self.record("evaluate");
+            let current = self.current.borrow();
+            Ok(current
+                .iter()
+                .zip(&self.targets)
+                .map(|(value, target)| value - target)
+                .collect())
+        }
+
+        fn set_to_valid(&self, solution: &[Real]) -> QlResult<()> {
+            self.record("valid");
+            self.solutions.borrow_mut().push(solution.to_vec());
+            Ok(())
+        }
+
+        fn invalidate(&self) {
+            self.record("invalidate");
+            self.invalidations.set(self.invalidations.get() + 1);
+        }
+    }
+
+    /// The maximal runs of consecutive `set` or `evaluate` entries in a mock
+    /// log, each with the contributor ids it covered, in order.
+    fn phases(log: &[(usize, &'static str)]) -> Vec<(&'static str, Vec<usize>)> {
+        let mut phases: Vec<(&'static str, Vec<usize>)> = Vec::new();
+        for (id, what) in log {
+            let (id, what) = (*id, *what);
+            if what != "set" && what != "evaluate" {
+                continue;
+            }
+            match phases.last_mut() {
+                Some((kind, ids)) if *kind == what => ids.push(id),
+                _ => phases.push((what, vec![id])),
+            }
+        }
+        phases
+    }
+
+    /// The stacked solve drives its contributors two-phase, on their own
+    /// slices, and pins each with its own slice of the answer
+    /// (`globalbootstrap.cpp:50-116`).
+    ///
+    /// This is the real gate for the joint mechanism. The oracle a multi-curve
+    /// port would reach for first - a bootstrapped curve plus a spreaded one -
+    /// cannot see any of this: a spreaded curve reads its base live, so a
+    /// contributor that ignored the parent entirely and solved alone converges
+    /// to the SAME fixed point and reprices just as well. Only mocks that
+    /// record what they were handed can tell a joint solve from two separate
+    /// ones.
+    ///
+    /// The three properties, and what each would catch:
+    /// - ORDERING (`cpp:70` / `:82`): every set phase covers BOTH contributors
+    ///   before any evaluate phase begins. Fusing the two loops into one
+    ///   per-contributor pass gives phases of one id each and fails the scan.
+    ///   It is load-bearing rather than cosmetic: a coupled contributor's
+    ///   evaluate reads a curve another contributor is still writing, and a
+    ///   fused loop would meet a live `borrow_mut`.
+    /// - SLICING (`cpp:64-71`): the 2-variable mock must always receive two
+    ///   coordinates and the 1-variable mock exactly one, over the same number
+    ///   of rounds.
+    /// - CONVERGENCE AND SWEEP (`cpp:102-115`): each mock is pinned once, in
+    ///   registration order, with a slice that reached its own targets. This is
+    ///   also the second slicing pin, and the sharper one: an offset off by one
+    ///   still hands out the right LENGTHS, but then the two mocks argue over
+    ///   one coordinate and neither reaches its target.
+    #[test]
+    fn the_stacked_solve_drives_its_contributors_in_two_phases_on_their_own_slices() {
+        let log: MockLog = shared(RefCell::new(Vec::new()));
+        let first = MockContributor::new(0, vec![0.3, -0.7], &log);
+        let second = MockContributor::new(1, vec![1.2], &log);
+        let parent = shared(MultiCurveBootstrap::new(1.0e-12));
+        parent.add(&(Shared::clone(&first) as Shared<dyn MultiCurveBootstrapContributor>));
+        parent.add(&(Shared::clone(&second) as Shared<dyn MultiCurveBootstrapContributor>));
+
+        parent.run().expect("the stacked system solves");
+
+        let entries = log.borrow();
+        let phases = phases(&entries);
+        assert!(!phases.is_empty(), "the stacked solve never evaluated");
+        assert_eq!(
+            phases.len() % 2,
+            0,
+            "a set phase was left without its evaluate phase: {phases:?}"
+        );
+        for (k, (kind, ids)) in phases.iter().enumerate() {
+            let expected = if k % 2 == 0 { "set" } else { "evaluate" };
+            assert_eq!(
+                *kind, expected,
+                "phase {k} is a {kind} run where a {expected} run belongs"
+            );
+            assert_eq!(
+                ids,
+                &vec![0usize, 1usize],
+                "phase {k} did not cover both contributors in registration order"
+            );
+        }
+
+        let first_trials = first.trials.borrow();
+        let second_trials = second.trials.borrow();
+        assert_eq!(
+            first_trials.len(),
+            second_trials.len(),
+            "the two contributors were driven over a different number of rounds"
+        );
+        assert!(
+            first_trials.iter().all(|trial| trial.len() == 2),
+            "the two-variable contributor was handed a slice of the wrong width"
+        );
+        assert!(
+            second_trials.iter().all(|trial| trial.len() == 1),
+            "the one-variable contributor was handed a slice of the wrong width"
+        );
+
+        assert_eq!(
+            entries
+                .iter()
+                .filter(|(_, what)| *what == "valid")
+                .copied()
+                .collect::<Vec<_>>(),
+            vec![(0, "valid"), (1, "valid")],
+            "the validity sweep did not run once per contributor in registration order"
+        );
+        for mock in [&first, &second] {
+            let solutions = mock.solutions.borrow();
+            assert_eq!(solutions.len(), 1, "mock {} was pinned twice", mock.id);
+            for (i, (value, target)) in solutions[0].iter().zip(&mock.targets).enumerate() {
+                assert!(
+                    (value - target).abs() < 1.0e-8,
+                    "mock {} coordinate {i} was pinned at {value}, not its target {target}",
+                    mock.id
+                );
+            }
+            assert_eq!(
+                mock.invalidations.get(),
+                0,
+                "a successful solve reverted mock {}",
+                mock.id
+            );
+        }
+    }
+
+    /// A joint solve that fails part way must not leave the contributors it
+    /// already set up marked as calculated.
+    ///
+    /// Divergence being pinned: `setup_cost_function` marks its curve
+    /// calculated FIRST (`globalbootstrap.hpp:324`), so by the time a later
+    /// contributor fails, the earlier ones would read as solved curves over a
+    /// grid no solve ever finished. C++ leaves exactly that to the caller. The
+    /// port reverts them instead, and this is the only arm that can see it.
+    ///
+    /// The failing contributor is reverted too, not just the ones before it: a
+    /// real one marks its curve before its setup can fail, so the count that
+    /// matters is how many setups were ENTERED, not how many returned.
+    #[test]
+    fn a_failed_setup_reverts_every_contributor_the_joint_solve_marked() {
+        let log: MockLog = shared(RefCell::new(Vec::new()));
+        let first = MockContributor::new(0, vec![0.3, -0.7], &log);
+        let second = MockContributor::failing(1, vec![1.2], &log);
+        let parent = shared(MultiCurveBootstrap::new(1.0e-12));
+        parent.add(&(Shared::clone(&first) as Shared<dyn MultiCurveBootstrapContributor>));
+        parent.add(&(Shared::clone(&second) as Shared<dyn MultiCurveBootstrapContributor>));
+
+        assert!(
+            parent.run().is_err(),
+            "a contributor that cannot set up must fail the joint solve"
+        );
+        assert_eq!(
+            first.invalidations.get(),
+            1,
+            "the contributor set up before the failure was left marked calculated"
+        );
+        assert_eq!(
+            second.invalidations.get(),
+            1,
+            "the contributor that failed to set up was left marked calculated"
+        );
+        let entries = log.borrow();
+        assert!(
+            phases(&entries).is_empty(),
+            "the solve went on to evaluate after a setup failure: {entries:?}"
+        );
+    }
+
     /// The recording [`AdditionalBootstrapVariables`] of the arm below: it
     /// delegates to a real [`SimpleQuoteVariables`] and records what the driver
     /// hands it.
