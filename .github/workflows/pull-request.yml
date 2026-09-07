@@ -29,6 +29,7 @@ jobs:
     name: check-changed-files
     outputs:
       rust: ${{ steps.check-changes.outputs.rust_any_modified }}
+      python: ${{ steps.check-changes.outputs.python_any_modified }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
