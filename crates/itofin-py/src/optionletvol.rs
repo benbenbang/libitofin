@@ -35,17 +35,28 @@ use libitofin::termstructures::volatility::{
 };
 use libitofin::termstructures::yieldtermstructure::YieldTermStructure;
 use pyo3::prelude::*;
+#[allow(unused_imports)]
+use pyo3_stub_gen::derive::{
+    gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pyfunction, gen_stub_pymethods,
+};
 
 /// Shared base for every caplet/floorlet volatility surface: volatility,
 /// Black variance and the lognormal displacement.
 ///
 /// A single option axis, unlike the swaption surfaces: a query takes one option
 /// tenor (or date) and a strike.
-#[pyclass(name = "OptionletVolatilityStructure", subclass, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "OptionletVolatilityStructure",
+    subclass,
+    unsendable,
+    module = "itofin.termstructures"
+)]
 pub struct PyOptionletVolatilityStructure {
     inner: Handle<dyn OptionletVolatilityStructure>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyOptionletVolatilityStructure {
     /// Return the caplet volatility for an option tenor and strike.
@@ -224,9 +235,11 @@ impl PyOptionletVolatilityStructure {
 /// option time runs from reference_date rather than the evaluation date. The
 /// moving and moving_with_quote forms float the reference date off the
 /// Settings evaluation date instead (#627).
-#[pyclass(name = "ConstantOptionletVolatility", extends = PyOptionletVolatilityStructure, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "ConstantOptionletVolatility", extends = PyOptionletVolatilityStructure, unsendable, module = "itofin.termstructures")]
 pub struct PyConstantOptionletVolatility;
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyConstantOptionletVolatility {
     /// Build the surface at a fixed volatility.
@@ -245,6 +258,7 @@ impl PyConstantOptionletVolatility {
     ///         shifted-lognormal or normal.
     ///     displacement (float): The lognormal shift applied to forwards and
     ///         strikes.
+    #[gen_stub(override_return_type(type_repr = "ConstantOptionletVolatility"))]
     #[new]
     #[pyo3(signature = (reference_date, calendar, business_day_convention, volatility, day_counter, volatility_type, displacement = 0.0))]
     fn new(
@@ -446,11 +460,17 @@ impl PyConstantOptionletVolatility {
 /// moving_with_quotes; a pinned-reference surface carries no settlement days
 /// and fails the adapter. VolatilityType.Normal is deferred (#440/#577) and
 /// fails at the strip, not at construction.
-#[pyclass(name = "OptionletStripper1", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "OptionletStripper1",
+    unsendable,
+    module = "itofin.termstructures"
+)]
 pub struct PyOptionletStripper1 {
     inner: Shared<OptionletStripper1>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyOptionletStripper1 {
     /// Build the stripper over a term-volatility surface and an index.
@@ -556,9 +576,11 @@ impl PyOptionletStripper1 {
 /// by the term-volatility surface's settlement days. The surface ends at the
 /// last caplet fixing, so pricing a cap that reaches it wants
 /// enable_extrapolation().
-#[pyclass(name = "StrippedOptionletAdapter", extends = PyOptionletVolatilityStructure, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "StrippedOptionletAdapter", extends = PyOptionletVolatilityStructure, unsendable, module = "itofin.termstructures")]
 pub struct PyStrippedOptionletAdapter;
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyStrippedOptionletAdapter {
     /// Build the interpolated surface over a stripper.
@@ -576,6 +598,7 @@ impl PyStrippedOptionletAdapter {
     ///     ItofinError: On a stripper whose term-volatility surface carries no
     ///         settlement days, which is every pinned-reference surface, and
     ///         on a stripping failure.
+    #[gen_stub(override_return_type(type_repr = "StrippedOptionletAdapter"))]
     #[new]
     fn new(
         stripper: &PyOptionletStripper1,

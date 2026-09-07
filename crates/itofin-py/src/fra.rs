@@ -20,13 +20,24 @@ use libitofin::shared::Shared;
 use libitofin::termstructures::yieldtermstructure::YieldTermStructure;
 use libitofin::time::date::Date;
 use pyo3::prelude::*;
+#[allow(unused_imports)]
+use pyo3_stub_gen::derive::{
+    gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pyfunction, gen_stub_pymethods,
+};
 
 /// The side taken in a contract.
 ///
 /// A fieldless enum; Long is an FRA purchase (a future long loan, short
 /// deposit), Short an FRA sale. The signed settlement multiplier the two
 /// variants stand for stays in the core.
-#[pyclass(name = "Position", eq, eq_int, from_py_object)]
+#[gen_stub_pyclass_enum]
+#[pyclass(
+    name = "Position",
+    eq,
+    eq_int,
+    from_py_object,
+    module = "itofin.instruments"
+)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum PyPosition {
     Long,
@@ -51,13 +62,19 @@ impl PyPosition {
 ///
 /// Passing None for the discount curve discounts on the forwarding curve
 /// instead.
-#[pyclass(name = "ForwardRateAgreement", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "ForwardRateAgreement",
+    unsendable,
+    module = "itofin.instruments"
+)]
 pub struct PyForwardRateAgreement {
     inner: ForwardRateAgreement,
     value_date: Date,
     maturity_date: Date,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyForwardRateAgreement {
     /// Build the indexed-coupon FRA.

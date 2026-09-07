@@ -5,17 +5,23 @@ use libitofin::settings::Settings;
 use libitofin::shared::{Shared, shared};
 use libitofin::time::date::Date;
 use pyo3::prelude::*;
+#[allow(unused_imports)]
+use pyo3_stub_gen::derive::{
+    gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pyfunction, gen_stub_pymethods,
+};
 
 /// The explicit, non-global evaluation-date store (D5).
 ///
 /// There is no global singleton: the exact settings object passed to a
 /// construction is the one it reads, so instruments built against different
 /// Settings do not see each other's evaluation date.
-#[pyclass(name = "Settings", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "Settings", unsendable, module = "itofin")]
 pub struct PySettings {
     inner: Shared<Settings<Date>>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PySettings {
     /// Create settings with no evaluation date set.

@@ -25,16 +25,22 @@ use libitofin::pricingengine::PricingEngine;
 use libitofin::pricingengines::JamshidianSwaptionEngine;
 use libitofin::shared::{Shared, SharedMut, shared, shared_mut};
 use pyo3::prelude::*;
+#[allow(unused_imports)]
+use pyo3_stub_gen::derive::{
+    gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pyfunction, gen_stub_pymethods,
+};
 
 /// A single-date exercise schedule.
 ///
 /// Held as the exercise trait object the swaption constructor takes, so the
 /// same value reaches the instrument.
-#[pyclass(name = "EuropeanExercise", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "EuropeanExercise", unsendable, module = "itofin.instruments")]
 pub struct PyEuropeanExercise {
     inner: Shared<dyn Exercise>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyEuropeanExercise {
     /// Build the exercise schedule.
@@ -58,7 +64,14 @@ impl PyEuropeanExercise {
 }
 
 /// How a swaption settles on exercise.
-#[pyclass(name = "SettlementType", eq, eq_int, from_py_object)]
+#[gen_stub_pyclass_enum]
+#[pyclass(
+    name = "SettlementType",
+    eq,
+    eq_int,
+    from_py_object,
+    module = "itofin.instruments"
+)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum PySettlementType {
     Physical,
@@ -81,7 +94,14 @@ impl PySettlementType {
 /// CollateralizedCashPrice or ParYieldCurve. The consistency check runs at
 /// pricing time, not construction, so a mismatched pair only surfaces from
 /// npv().
-#[pyclass(name = "SettlementMethod", eq, eq_int, from_py_object)]
+#[gen_stub_pyclass_enum]
+#[pyclass(
+    name = "SettlementMethod",
+    eq,
+    eq_int,
+    from_py_object,
+    module = "itofin.instruments"
+)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum PySettlementMethod {
     PhysicalOTC,
@@ -109,11 +129,13 @@ impl PySettlementMethod {
 /// The swaption registers with the underlying swap and with the evaluation
 /// date on the Settings it was built with (D5). Pricing needs an engine: call
 /// one of the three setters before npv.
-#[pyclass(name = "Swaption", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "Swaption", unsendable, module = "itofin.instruments")]
 pub struct PySwaption {
     inner: Swaption,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PySwaption {
     /// Build the swaption over swap.

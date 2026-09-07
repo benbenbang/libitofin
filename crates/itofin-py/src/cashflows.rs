@@ -35,16 +35,22 @@ use libitofin::time::daycounter::DayCounter;
 use libitofin::time::period::Period;
 use libitofin::time::schedule::Schedule;
 use pyo3::prelude::*;
+#[allow(unused_imports)]
+use pyo3_stub_gen::derive::{
+    gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pyfunction, gen_stub_pymethods,
+};
 
 /// One coupon of a year-on-year inflation leg.
 ///
 /// Built only through YoYInflationLeg, which attaches the pricer rate() and
 /// amount() need.
-#[pyclass(name = "YoYInflationCoupon", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "YoYInflationCoupon", unsendable, module = "itofin.cashflows")]
 pub struct PyYoYInflationCoupon {
     inner: Shared<YoYInflationCoupon>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyYoYInflationCoupon {
     /// Return the rate the coupon accrues at: the geared index fixing plus the spread.
@@ -216,11 +222,17 @@ impl PyYoYInflationCoupon {
 /// unit_displaced lognormal in 1 + rate and bachelier normal. The settings
 /// behind volatility and behind the priced coupons' index must be the same
 /// object. nominal_ts is optional: only the discounted price path reads it.
-#[pyclass(name = "YoYInflationOptionletCouponPricer", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "YoYInflationOptionletCouponPricer",
+    unsendable,
+    module = "itofin.cashflows"
+)]
 pub struct PyYoYInflationOptionletCouponPricer {
     inner: SharedMut<YoYInflationOptionletCouponPricer>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyYoYInflationOptionletCouponPricer {
     /// Build a pricer valuing optionlets under the lognormal model.
@@ -317,11 +329,17 @@ fn nominal_handle(nominal_ts: Option<&PyYieldTermStructure>) -> Handle<dyn Yield
 /// Built only through YoYInflationLeg.capped_floored_coupons. A negative
 /// gearing swaps the two roles, so is_capped and effective_cap answer off the
 /// stored level rather than off what the leg was given.
-#[pyclass(name = "CappedFlooredYoYInflationCoupon", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "CappedFlooredYoYInflationCoupon",
+    unsendable,
+    module = "itofin.cashflows"
+)]
 pub struct PyCappedFlooredYoYInflationCoupon {
     inner: Shared<CappedFlooredYoYInflationCoupon>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyCappedFlooredYoYInflationCoupon {
     /// Return the rate the coupon accrues at.
@@ -415,7 +433,8 @@ impl PyCappedFlooredYoYInflationCoupon {
 /// The caps and floors lists select which of the two coupon types the leg
 /// produces: given either, coupons() hands back coupons the core deliberately
 /// leaves unpriced and capped_floored_coupons is the intended entry.
-#[pyclass(name = "YoYInflationLeg", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "YoYInflationLeg", unsendable, module = "itofin.cashflows")]
 pub struct PyYoYInflationLeg {
     schedule: Schedule,
     payment_calendar: Calendar,
@@ -435,6 +454,7 @@ pub struct PyYoYInflationLeg {
     floors: Option<Vec<f64>>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyYoYInflationLeg {
     /// Configure a leg over schedule paying index, observed observation_lag back.
@@ -666,7 +686,8 @@ impl PyYoYInflationLeg {
 /// exists. No caps/floors setter is offered either - a capped leg withholds the
 /// default coupon pricer in the core, so the strikes belong on the cap/floor
 /// constructor.
-#[pyclass(name = "IborLeg", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "IborLeg", unsendable, module = "itofin.cashflows")]
 pub struct PyIborLeg {
     schedule: Schedule,
     index: Shared<IborIndex>,
@@ -676,6 +697,7 @@ pub struct PyIborLeg {
     fixing_days: Option<u32>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyIborLeg {
     /// Configure a leg over schedule paying index, on the schedule's own calendar.
@@ -825,11 +847,13 @@ impl PyIborLeg {
 ///
 /// It answers what it pays and when, which is all the leg-summing npv() needs;
 /// the concrete coupon accessors stay on the typed coupon wrappers.
-#[pyclass(name = "CashFlow", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "CashFlow", unsendable, module = "itofin.cashflows")]
 pub struct PyCashFlow {
     inner: Shared<dyn CashFlow>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyCashFlow {
     /// Return what the flow pays on its date, undiscounted.
@@ -858,11 +882,13 @@ impl PyCashFlow {
 ///
 /// Indexable and sized, which with CashFlow's two accessors is enough to
 /// hand-check what npv() sums.
-#[pyclass(name = "Leg", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "Leg", unsendable, module = "itofin.cashflows")]
 pub struct PyLeg {
     inner: Leg,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyLeg {
     /// Return the number of flows on the leg.
@@ -918,6 +944,7 @@ impl PyLeg {
 /// Raises:
 ///     ItofinError: On a flow or curve lookup failure, and without a
 ///         settlement_date when the evaluation date is unset.
+#[gen_stub_pyfunction(module = "itofin.cashflows")]
 #[pyfunction]
 #[pyo3(signature = (leg, discount_curve, settings, include_settlement_date_flows = None, settlement_date = None, npv_date = None))]
 pub(crate) fn npv(

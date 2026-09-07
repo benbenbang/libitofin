@@ -11,17 +11,28 @@ use libitofin::termstructures::volatility::{
     BlackVolTimeExtrapolation,
 };
 use pyo3::prelude::*;
+#[allow(unused_imports)]
+use pyo3_stub_gen::derive::{
+    gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pyfunction, gen_stub_pymethods,
+};
 
 /// Shared base for every Black-volatility surface: spot and forward vol/variance.
 ///
 /// Concrete surfaces subclass this and supply only their constructor; the
 /// whole query surface below is inherited, along with the strike domain and
 /// the extrapolation toggles.
-#[pyclass(name = "BlackVolTermStructure", subclass, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "BlackVolTermStructure",
+    subclass,
+    unsendable,
+    module = "itofin.termstructures"
+)]
 pub struct PyBlackVolTermStructure {
     inner: Handle<dyn BlackVolTermStructure>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyBlackVolTermStructure {
     /// Return the spot Black volatility at year-fraction t and strike.
@@ -249,9 +260,11 @@ impl PyBlackVolTermStructure {
 ///
 /// Unbounded in both time and strike, so queries never need extrapolation
 /// enabled.
-#[pyclass(name = "BlackConstantVol", extends = PyBlackVolTermStructure, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "BlackConstantVol", extends = PyBlackVolTermStructure, unsendable, module = "itofin.termstructures")]
 pub struct PyBlackConstantVol;
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyBlackConstantVol {
     /// Build the flat surface.
@@ -261,6 +274,7 @@ impl PyBlackConstantVol {
     ///     volatility (float): The single volatility answered everywhere.
     ///     day_counter (DayCounter): The day count turning dates into times.
     ///     calendar (Calendar | None): The surface's calendar, if any.
+    #[gen_stub(override_return_type(type_repr = "BlackConstantVol"))]
     #[new]
     #[pyo3(signature = (reference_date, volatility, day_counter, calendar = None))]
     fn new(
@@ -288,7 +302,14 @@ impl PyBlackConstantVol {
 /// any extrapolating query: the interpolation layer cannot be evaluated past
 /// its last node, and the core errors rather than silently substituting
 /// another rule.
-#[pyclass(name = "BlackVolTimeExtrapolation", eq, eq_int, from_py_object)]
+#[gen_stub_pyclass_enum]
+#[pyclass(
+    name = "BlackVolTimeExtrapolation",
+    eq,
+    eq_int,
+    from_py_object,
+    module = "itofin.termstructures"
+)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum PyBlackVolTimeExtrapolation {
     FlatVolatility,
@@ -322,12 +343,14 @@ impl PyBlackVolTimeExtrapolation {
 ///
 /// Selecting UseInterpolator constructs fine and answers in-range queries, then
 /// errors on an extrapolating one.
-#[pyclass(name = "BlackVarianceCurve", extends = PyBlackVolTermStructure, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "BlackVarianceCurve", extends = PyBlackVolTermStructure, unsendable, module = "itofin.termstructures")]
 pub struct PyBlackVarianceCurve {
     #[allow(dead_code)]
     concrete: Handle<BlackVarianceCurve<Linear>>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyBlackVarianceCurve {
     /// Build the variance curve over its (date, volatility) nodes.
@@ -347,6 +370,7 @@ impl PyBlackVarianceCurve {
     /// Raises:
     ///     ItofinError: On whatever the core rejects about the nodes, a
     ///         non-monotone variance under force_monotone_variance included.
+    #[gen_stub(override_return_type(type_repr = "BlackVarianceCurve"))]
     #[new]
     #[pyo3(signature = (
         reference_date,
@@ -390,9 +414,11 @@ impl PyBlackVarianceCurve {
 ///
 /// Finite in both time and strike, so out-of-grid queries require
 /// enable_extrapolation().
-#[pyclass(name = "BlackVarianceSurface", extends = PyBlackVolTermStructure, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "BlackVarianceSurface", extends = PyBlackVolTermStructure, unsendable, module = "itofin.termstructures")]
 pub struct PyBlackVarianceSurface;
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyBlackVarianceSurface {
     /// Build the surface over its strike-by-expiry grid.
@@ -409,6 +435,7 @@ impl PyBlackVarianceSurface {
     /// Raises:
     ///     ItofinError: On an empty or ragged matrix, and on whatever the core
     ///         rejects about the grid dimensions.
+    #[gen_stub(override_return_type(type_repr = "BlackVarianceSurface"))]
     #[new]
     #[pyo3(signature = (reference_date, dates, strikes, black_vol_matrix, day_counter, calendar = None))]
     fn new(

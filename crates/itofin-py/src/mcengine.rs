@@ -19,6 +19,10 @@ use libitofin::pricingengines::vanilla::{
 };
 use libitofin::shared::{SharedMut, shared_mut};
 use pyo3::prelude::*;
+#[allow(unused_imports)]
+use pyo3_stub_gen::derive::{
+    gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pyfunction, gen_stub_pymethods,
+};
 
 /// The Monte Carlo engine for European payoffs, over the pseudo-random RNG
 /// policy. The low-discrepancy policy is not exposed (#454).
@@ -26,11 +30,17 @@ use pyo3::prelude::*;
 /// Pricing is seeded and deterministic: the same seed reproduces the NPV
 /// bitwise, and the standard error is read back through
 /// VanillaOption.error_estimate().
-#[pyclass(name = "MCEuropeanEngine", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "MCEuropeanEngine",
+    unsendable,
+    module = "itofin.pricingengines"
+)]
 pub struct PyMCEuropeanEngine {
     inner: SharedMut<MCEuropeanEngine<PseudoRandom>>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyMCEuropeanEngine {
     /// Build an engine over process, configured through the core factory.
@@ -120,11 +130,17 @@ impl PyMCEuropeanEngine {
 /// Pricing is seeded and deterministic: the same seed reproduces the NPV
 /// bitwise, and the standard error is read back through
 /// VanillaOption.error_estimate().
-#[pyclass(name = "MCEuropeanHestonEngine", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "MCEuropeanHestonEngine",
+    unsendable,
+    module = "itofin.pricingengines"
+)]
 pub struct PyMCEuropeanHestonEngine {
     inner: SharedMut<MCEuropeanHestonEngine<PseudoRandom>>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyMCEuropeanHestonEngine {
     /// Build an engine over process, configured through the core factory.
@@ -221,11 +237,17 @@ impl PyMCEuropeanHestonEngine {
 /// bitwise, the standard error is read back through
 /// VanillaOption.error_estimate() and the early-exercise fraction through
 /// VanillaOption.exercise_probability().
-#[pyclass(name = "MCAmericanEngine", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "MCAmericanEngine",
+    unsendable,
+    module = "itofin.pricingengines"
+)]
 pub struct PyMCAmericanEngine {
     inner: SharedMut<MCAmericanEngine<PseudoRandom>>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyMCAmericanEngine {
     /// Build an engine over process, configured through the core factory.

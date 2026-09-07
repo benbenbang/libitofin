@@ -23,6 +23,10 @@ use libitofin::pricingengine::PricingEngine;
 use libitofin::pricingengines::capfloor::BlackCapFloorEngine;
 use libitofin::shared::{SharedMut, shared_mut};
 use pyo3::prelude::*;
+#[allow(unused_imports)]
+use pyo3_stub_gen::derive::{
+    gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pyfunction, gen_stub_pymethods,
+};
 
 /// The shifted-lognormal Black-formula cap/floor engine, one Black 1976
 /// optionlet per coupon.
@@ -31,11 +35,17 @@ use pyo3::prelude::*;
 /// surface is rejected by the constructor rather than bound to a Bachelier
 /// engine. The instrument this engine prices must resolve its dates against the
 /// same Settings object the engine does.
-#[pyclass(name = "BlackCapFloorEngine", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "BlackCapFloorEngine",
+    unsendable,
+    module = "itofin.pricingengines"
+)]
 pub struct PyBlackCapFloorEngine {
     inner: SharedMut<BlackCapFloorEngine>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyBlackCapFloorEngine {
     /// Build an engine reading volatilities off vol and discounting on discount.

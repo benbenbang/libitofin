@@ -36,6 +36,10 @@ use libitofin::termstructures::volatility::{
 };
 use libitofin::time::period::Period;
 use pyo3::prelude::*;
+#[allow(unused_imports)]
+use pyo3_stub_gen::derive::{
+    gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pyfunction, gen_stub_pymethods,
+};
 
 /// The market cap/floor TERM-volatility surface, bicubic over an option-tenor
 /// x strike grid.
@@ -54,11 +58,17 @@ use pyo3::prelude::*;
 /// settlement_days off the evaluation date, and are what the optionlet
 /// stripping pipeline runs on: StrippedOptionletAdapter reads its settlement
 /// days back off this surface, and a pinned-reference surface has none.
-#[pyclass(name = "CapFloorTermVolSurface", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "CapFloorTermVolSurface",
+    unsendable,
+    module = "itofin.termstructures"
+)]
 pub struct PyCapFloorTermVolSurface {
     inner: Shared<CapFloorTermVolSurface>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyCapFloorTermVolSurface {
     /// Build the surface on a pinned reference date over fixed volatilities.

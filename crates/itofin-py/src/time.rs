@@ -19,6 +19,10 @@ use libitofin::time::schedule::{MakeSchedule, Schedule};
 use libitofin::time::timeunit::TimeUnit;
 use pyo3::prelude::*;
 use pyo3::{IntoPyObjectExt, wrap_pyfunction};
+#[allow(unused_imports)]
+use pyo3_stub_gen::derive::{
+    gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pyfunction, gen_stub_pymethods,
+};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
@@ -54,11 +58,13 @@ fn days_in_month(month: i32, year: i32) -> i32 {
 ///
 /// Every constructor and every arithmetic result is range-checked before the
 /// core is reached, so an out-of-range date is an error rather than a panic.
-#[pyclass(name = "Date", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "Date", unsendable, module = "itofin.time")]
 pub struct PyDate {
     inner: Date,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyDate {
     /// Build a date from its three components.
@@ -208,11 +214,13 @@ impl PyDate {
 }
 
 /// A year-fraction convention.
-#[pyclass(name = "DayCounter", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "DayCounter", unsendable, module = "itofin.time")]
 pub struct PyDayCounter {
     inner: DayCounter,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyDayCounter {
     /// The Actual/360 convention.
@@ -317,11 +325,13 @@ impl PyDayCounter {
 }
 
 /// A signed length in one calendar unit (unit: Days, Weeks, Months, Years).
-#[pyclass(name = "Period", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "Period", unsendable, module = "itofin.time")]
 pub struct PyPeriod {
     inner: Period,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyPeriod {
     /// Build a period of n units.
@@ -411,11 +421,13 @@ fn parse_time_unit(unit: &str) -> PyResult<TimeUnit> {
 }
 
 /// A business-day calendar.
-#[pyclass(name = "Calendar", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "Calendar", unsendable, module = "itofin.time")]
 pub struct PyCalendar {
     inner: Calendar,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyCalendar {
     /// The TARGET calendar.
@@ -549,7 +561,8 @@ impl PyCalendar {
 ///
 /// Only the variants the ported fixtures use are surfaced; new ones are
 /// appended, so the integer values of the existing variants are unchanged.
-#[pyclass(name = "Frequency", eq, eq_int, from_py_object)]
+#[gen_stub_pyclass_enum]
+#[pyclass(name = "Frequency", eq, eq_int, from_py_object, module = "itofin.time")]
 #[derive(Clone, Copy, PartialEq)]
 pub enum PyFrequency {
     Annual,
@@ -590,7 +603,14 @@ impl PyFrequency {
 
 /// A holiday-rolling rule. Every core variant is covered; the four listed
 /// last are appended, so the integer values of the first three are unchanged.
-#[pyclass(name = "BusinessDayConvention", eq, eq_int, from_py_object)]
+#[gen_stub_pyclass_enum]
+#[pyclass(
+    name = "BusinessDayConvention",
+    eq,
+    eq_int,
+    from_py_object,
+    module = "itofin.time"
+)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum PyBusinessDayConvention {
     ModifiedFollowing,
@@ -642,7 +662,14 @@ impl PyBusinessDayConvention {
 /// interior dates onto an IMM Wednesday or the twentieth of the month. A
 /// Schedule builds under the three CDS rules, but SpreadCdsHelper rejects them:
 /// their maturity comes from a core routine that is not ported yet.
-#[pyclass(name = "DateGeneration", eq, eq_int, from_py_object)]
+#[gen_stub_pyclass_enum]
+#[pyclass(
+    name = "DateGeneration",
+    eq,
+    eq_int,
+    from_py_object,
+    module = "itofin.time"
+)]
 #[derive(Clone, Copy, PartialEq)]
 #[allow(clippy::upper_case_acronyms)]
 pub enum PyDateGeneration {
@@ -681,11 +708,13 @@ impl PyDateGeneration {
 /// termination_convention rolls the last date only, and defaults to
 /// convention. CDS conventions need the two to differ: a credit helper leaves
 /// its maturity unadjusted while paying Following.
-#[pyclass(name = "Schedule", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "Schedule", unsendable, module = "itofin.time")]
 pub struct PySchedule {
     inner: Schedule,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PySchedule {
     /// Build the schedule.
@@ -806,6 +835,7 @@ impl PySchedule {
 ///
 /// Returns:
 ///     bool: True when date is an IMM date under the selected cycle.
+#[gen_stub_pyfunction(module = "itofin.time")]
 #[pyfunction]
 #[pyo3(signature = (date, main_cycle = false))]
 fn is_imm_date(date: &PyDate, main_cycle: bool) -> bool {
@@ -821,6 +851,7 @@ fn is_imm_date(date: &PyDate, main_cycle: bool) -> bool {
 ///
 /// Returns:
 ///     Date: The next IMM date under the selected cycle.
+#[gen_stub_pyfunction(module = "itofin.time")]
 #[pyfunction]
 #[pyo3(signature = (date, main_cycle = false))]
 fn next_imm_date(date: &PyDate, main_cycle: bool) -> PyDate {

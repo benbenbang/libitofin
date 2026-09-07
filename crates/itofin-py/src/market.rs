@@ -14,16 +14,22 @@ use libitofin::termstructures::yields::FlatForward;
 use libitofin::termstructures::yieldtermstructure::YieldTermStructure;
 use libitofin::time::frequency::Frequency;
 use pyo3::prelude::*;
+#[allow(unused_imports)]
+use pyo3_stub_gen::derive::{
+    gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pyfunction, gen_stub_pymethods,
+};
 
 /// A mutable, observable market element (D1).
 ///
 /// Wraps a single value that pricing inputs observe; setting a new value
 /// notifies dependents so any cached valuation recomputes lazily.
-#[pyclass(name = "SimpleQuote", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "SimpleQuote", unsendable, module = "itofin.quotes")]
 pub struct PySimpleQuote {
     inner: Shared<SimpleQuote>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PySimpleQuote {
     /// Initialize the quote.
@@ -74,11 +80,13 @@ impl PySimpleQuote {
 /// binding boundary. The constructor takes the conventional
 /// (risk_free_rate, dividend_yield) order and places the two curves in the
 /// core's own order at a single call site.
-#[pyclass(name = "BlackScholesProcess", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "BlackScholesProcess", unsendable, module = "itofin.processes")]
 pub struct PyBlackScholesProcess {
     inner: Shared<GeneralizedBlackScholesProcess>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyBlackScholesProcess {
     /// Build a flat-market process from scalar inputs.

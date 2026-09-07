@@ -24,12 +24,23 @@ use libitofin::time::daycounter::DayCounter;
 use libitofin::time::period::Period;
 use libitofin::time::timeunit::TimeUnit;
 use pyo3::prelude::*;
+#[allow(unused_imports)]
+use pyo3_stub_gen::derive::{
+    gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pyfunction, gen_stub_pymethods,
+};
 
 /// Which side of the named leg the swap is seen from.
 ///
 /// A fieldless enum; the signed leg multiplier the two variants stand for
 /// stays in the core.
-#[pyclass(name = "SwapType", eq, eq_int, from_py_object)]
+#[gen_stub_pyclass_enum]
+#[pyclass(
+    name = "SwapType",
+    eq,
+    eq_int,
+    from_py_object,
+    module = "itofin.instruments"
+)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum PySwapType {
     Payer,
@@ -49,11 +60,13 @@ impl PySwapType {
 /// A fixed-vs-Ibor interest-rate swap.
 ///
 /// Pricing needs an engine: call set_engine before fair_rate or npv.
-#[pyclass(name = "VanillaSwap", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "VanillaSwap", unsendable, module = "itofin.instruments")]
 pub struct PyVanillaSwap {
     inner: SharedMut<FixedVsFloatingSwap>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyVanillaSwap {
     /// Build the swap from both schedules spelled out.
@@ -260,7 +273,8 @@ impl PyVanillaSwap {
 /// other core one keeps its default, so the discounting curve is always the
 /// index's forwarding curve. The built swap already carries its
 /// DiscountingSwapEngine.
-#[pyclass(name = "MakeVanillaSwap", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "MakeVanillaSwap", unsendable, module = "itofin.instruments")]
 pub struct PyMakeVanillaSwap {
     swap_tenor: Period,
     ibor_index: Shared<IborIndex>,
@@ -273,6 +287,7 @@ pub struct PyMakeVanillaSwap {
     fixed_leg_day_count: Option<DayCounter>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyMakeVanillaSwap {
     /// Store the configuration the chain is assembled from in build().

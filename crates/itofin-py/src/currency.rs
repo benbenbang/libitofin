@@ -12,17 +12,23 @@
 
 use libitofin::currency::Currency;
 use pyo3::prelude::*;
+#[allow(unused_imports)]
+use pyo3_stub_gen::derive::{
+    gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pyfunction, gen_stub_pymethods,
+};
 
 /// An ISO 4217 currency specification.
 ///
 /// Only the four named currencies the core provides are exposed; the general
 /// constructor is omitted, as the core ports only the currencies its indexes
 /// need and the full catalogue is deferred there.
-#[pyclass(name = "Currency", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "Currency", unsendable, module = "itofin.indexes")]
 pub struct PyCurrency {
     inner: Currency,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyCurrency {
     /// Return the European Euro.

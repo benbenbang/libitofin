@@ -19,16 +19,22 @@ use libitofin::termstructures::yields::FlatForward;
 use libitofin::termstructures::yieldtermstructure::YieldTermStructure;
 use libitofin::time::frequency::Frequency;
 use pyo3::prelude::*;
+#[allow(unused_imports)]
+use pyo3_stub_gen::derive::{
+    gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pyfunction, gen_stub_pymethods,
+};
 
 /// The square-root stochastic-variance process.
 ///
 /// The two flat yield curves and the spot quote are assembled behind their
 /// handles internally, so no handle crosses the binding boundary.
-#[pyclass(name = "HestonProcess", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "HestonProcess", unsendable, module = "itofin.processes")]
 pub struct PyHestonProcess {
     inner: Shared<HestonProcess>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyHestonProcess {
     /// Build the process from scalar market inputs and the five parameters.
@@ -145,11 +151,13 @@ impl PyHestonProcess {
 ///
 /// The parameters are seeded from the process it is built on and overwritten in
 /// place by a calibration, so the getters read the fitted values afterwards.
-#[pyclass(name = "HestonModel", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "HestonModel", unsendable, module = "itofin.models")]
 pub struct PyHestonModel {
     inner: SharedMut<HestonModel>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyHestonModel {
     /// Seed the model from a process.
@@ -227,6 +235,7 @@ impl PyHestonModel {
     fn calibrate(
         &mut self,
         helpers: Vec<PyRef<PyHestonModelHelper>>,
+        #[gen_stub(override_type(type_repr = "optimization.LevenbergMarquardt", imports = ("itofin.optimization")))]
         method: &mut PyLevenbergMarquardt,
         end_criteria: &PyEndCriteria,
         integration_order: usize,
@@ -271,11 +280,13 @@ impl PyHestonModel {
 ///
 /// Assembles its own volatility quote and two flat curves from the scalar
 /// market inputs, so no handle crosses the binding boundary.
-#[pyclass(name = "HestonModelHelper", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "HestonModelHelper", unsendable, module = "itofin.models")]
 pub struct PyHestonModelHelper {
     inner: SharedMut<HestonModelHelper>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyHestonModelHelper {
     /// Build the helper from scalar market inputs.

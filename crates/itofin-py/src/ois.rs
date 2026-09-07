@@ -25,17 +25,27 @@ use libitofin::time::period::Period;
 use libitofin::time::timeunit::TimeUnit;
 use libitofin::types::{Integer, Real};
 use pyo3::prelude::*;
+#[allow(unused_imports)]
+use pyo3_stub_gen::derive::{
+    gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pyfunction, gen_stub_pymethods,
+};
 
 /// A fixed leg versus a compounded overnight leg.
 ///
 /// Only MakeOis builds one, so it always arrives priced; there is no
 /// set_engine and no raw constructor (both deferred with the two-schedule
 /// master ctor).
-#[pyclass(name = "OvernightIndexedSwap", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "OvernightIndexedSwap",
+    unsendable,
+    module = "itofin.instruments"
+)]
 pub struct PyOvernightIndexedSwap {
     inner: SharedMut<OvernightIndexedSwap>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyOvernightIndexedSwap {
     /// Return the fixed rate that zeroes the swap NPV.
@@ -165,7 +175,8 @@ impl PyOvernightIndexedSwap {
 /// (telescopic value dates, lookback, lockout and observation shift) are
 /// unreachable from here by construction. The built swap already carries its
 /// DiscountingSwapEngine.
-#[pyclass(name = "MakeOis", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "MakeOis", unsendable, module = "itofin.instruments")]
 pub struct PyMakeOis {
     swap_tenor: Period,
     overnight_index: Shared<OvernightIndex>,
@@ -179,6 +190,7 @@ pub struct PyMakeOis {
     averaging_method: Option<RateAveraging>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyMakeOis {
     /// Store the configuration the chain is assembled from in build().

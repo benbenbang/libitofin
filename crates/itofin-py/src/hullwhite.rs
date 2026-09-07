@@ -23,16 +23,22 @@ use libitofin::shared::{Shared, SharedMut, shared, shared_mut};
 use libitofin::termstructures::volatility::VolatilityType;
 use libitofin::types::Natural;
 use pyo3::prelude::*;
+#[allow(unused_imports)]
+use pyo3_stub_gen::derive::{
+    gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pyfunction, gen_stub_pymethods,
+};
 
 /// The one-factor Hull-White short-rate model.
 ///
 /// Fitted to the term structure it is built on; a calibration overwrites a and
 /// sigma in place, so the getters read the fitted values afterwards.
-#[pyclass(name = "HullWhite", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "HullWhite", unsendable, module = "itofin.models")]
 pub struct PyHullWhite {
     inner: SharedMut<HullWhite>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyHullWhite {
     /// Fit the model to a term structure.
@@ -126,6 +132,7 @@ impl PyHullWhite {
     fn calibrate(
         &mut self,
         helpers: Vec<PyRef<PySwaptionHelper>>,
+        #[gen_stub(override_type(type_repr = "optimization.LevenbergMarquardt", imports = ("itofin.optimization")))]
         method: &mut PyLevenbergMarquardt,
         end_criteria: &PyEndCriteria,
         fix_reversion: bool,
@@ -181,11 +188,13 @@ impl PyHullWhite {
 /// swap, swap-index, optionlet-volatility, cap/floor and swaption-helper
 /// facades. The OIS helper is not one of them; it takes the overnight Estr,
 /// which is not an IborIndex.
-#[pyclass(name = "IborIndex", subclass, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "IborIndex", subclass, unsendable, module = "itofin.indexes")]
 pub struct PyIborIndex {
     inner: Shared<IborIndex>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyIborIndex {
     /// Build an index spelling out every convention the core constructor takes.
@@ -407,11 +416,13 @@ impl PyIborIndex {
 /// IborIndex, so this is the escape hatch for a Libor-like index outside the
 /// named families. A subclass of IborIndex, so it is accepted wherever the
 /// general index is, and the base half carries the three-calendar roll.
-#[pyclass(name = "CustomIborIndex", extends = PyIborIndex, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "CustomIborIndex", extends = PyIborIndex, unsendable, module = "itofin.indexes")]
 pub struct PyCustomIborIndex {
     inner: Shared<IborIndex>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyCustomIborIndex {
     /// Build a three-calendar Ibor index.
@@ -437,6 +448,7 @@ impl PyCustomIborIndex {
     ///         rate helpers need.
     ///     settings (Settings): The explicit settings supplying the evaluation
     ///         date and the stored fixings.
+    #[gen_stub(override_return_type(type_repr = "CustomIborIndex"))]
     #[new]
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (
@@ -520,11 +532,13 @@ impl PyCustomIborIndex {
 /// A subclass of IborIndex, so a Euribor is accepted wherever the general index
 /// is. It retains its own clone of the index the base holds - the same object,
 /// not a rebuild - so its own fixing reads exactly what the base reads.
-#[pyclass(name = "Euribor", extends = PyIborIndex, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "Euribor", extends = PyIborIndex, unsendable, module = "itofin.indexes")]
 pub struct PyEuribor {
     inner: Shared<IborIndex>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyEuribor {
     /// Build a Euribor index of the given tenor.
@@ -540,6 +554,7 @@ impl PyEuribor {
     /// Raises:
     ///     ItofinError: If tenor is a daily tenor, which needs the dedicated
     ///         daily-tenor constructor the core keeps separate.
+    #[gen_stub(override_return_type(type_repr = "Euribor"))]
     #[new]
     #[pyo3(signature = (tenor, curve, settings))]
     fn new(
@@ -634,11 +649,13 @@ fn init_euribor(index: Shared<IborIndex>) -> PyClassInitializer<PyEuribor> {
 /// A subclass of IborIndex, so a USD Libor is accepted wherever the general
 /// index is. It retains its own clone of the index the base holds - the same
 /// object, not a rebuild - so its own fixing reads exactly what the base reads.
-#[pyclass(name = "UsdLibor", extends = PyIborIndex, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "UsdLibor", extends = PyIborIndex, unsendable, module = "itofin.indexes")]
 pub struct PyUsdLibor {
     inner: Shared<IborIndex>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyUsdLibor {
     /// Build a USD Libor index of the given tenor.
@@ -654,6 +671,7 @@ impl PyUsdLibor {
     /// Raises:
     ///     ItofinError: If tenor is a daily tenor, which needs a dedicated
     ///         daily-tenor constructor the core has not ported.
+    #[gen_stub(override_return_type(type_repr = "UsdLibor"))]
     #[new]
     #[pyo3(signature = (tenor, curve, settings))]
     fn new(
@@ -704,11 +722,13 @@ impl PyUsdLibor {
 /// A subclass of IborIndex, so a JPY Libor is accepted wherever the general
 /// index is. It retains its own clone of the index the base holds - the same
 /// object, not a rebuild - so its own fixing reads exactly what the base reads.
-#[pyclass(name = "JpyLibor", extends = PyIborIndex, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "JpyLibor", extends = PyIborIndex, unsendable, module = "itofin.indexes")]
 pub struct PyJpyLibor {
     inner: Shared<IborIndex>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyJpyLibor {
     /// Build a JPY Libor index of the given tenor.
@@ -724,6 +744,7 @@ impl PyJpyLibor {
     /// Raises:
     ///     ItofinError: If tenor is a daily tenor, which needs a dedicated
     ///         daily-tenor constructor the core has not ported.
+    #[gen_stub(override_return_type(type_repr = "JpyLibor"))]
     #[new]
     #[pyo3(signature = (tenor, curve, settings))]
     fn new(
@@ -774,11 +795,13 @@ impl PyJpyLibor {
 /// A subclass of IborIndex, so a GBP Libor is accepted wherever the general
 /// index is. It retains its own clone of the index the base holds - the same
 /// object, not a rebuild - so its own fixing reads exactly what the base reads.
-#[pyclass(name = "GbpLibor", extends = PyIborIndex, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "GbpLibor", extends = PyIborIndex, unsendable, module = "itofin.indexes")]
 pub struct PyGbpLibor {
     inner: Shared<IborIndex>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyGbpLibor {
     /// Build a GBP Libor index of the given tenor.
@@ -794,6 +817,7 @@ impl PyGbpLibor {
     /// Raises:
     ///     ItofinError: If tenor is a daily tenor, which needs a dedicated
     ///         daily-tenor constructor the core has not ported.
+    #[gen_stub(override_return_type(type_repr = "GbpLibor"))]
     #[new]
     #[pyo3(signature = (tenor, curve, settings))]
     fn new(
@@ -848,11 +872,13 @@ impl PyGbpLibor {
 /// single-calendar approximation of it. It retains its own clone of the index
 /// the base holds - the same object, not a rebuild - so its own fixing reads
 /// exactly what the base reads.
-#[pyclass(name = "EurLibor", extends = PyIborIndex, unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "EurLibor", extends = PyIborIndex, unsendable, module = "itofin.indexes")]
 pub struct PyEurLibor {
     inner: Shared<IborIndex>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyEurLibor {
     /// Build a EUR Libor index of the given tenor.
@@ -868,6 +894,7 @@ impl PyEurLibor {
     /// Raises:
     ///     ItofinError: If tenor is a daily tenor, which needs a dedicated
     ///         daily-tenor constructor the core has not ported.
+    #[gen_stub(override_return_type(type_repr = "EurLibor"))]
     #[new]
     #[pyo3(signature = (tenor, curve, settings))]
     fn new(
@@ -919,11 +946,13 @@ impl PyEurLibor {
 /// swap or swaption object is needed. The swaption is struck at the forward on
 /// shifted-lognormal volatility with zero shift, takes the index's own
 /// settlement days, and compounds its averaging.
-#[pyclass(name = "SwaptionHelper", unsendable)]
+#[gen_stub_pyclass]
+#[pyclass(name = "SwaptionHelper", unsendable, module = "itofin.models")]
 pub struct PySwaptionHelper {
     inner: SharedMut<SwaptionHelper>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PySwaptionHelper {
     /// Build the helper and the swaption underlying it.
