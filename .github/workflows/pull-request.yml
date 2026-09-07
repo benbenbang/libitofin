@@ -17,14 +17,75 @@ concurrency:
 jobs:
   pre-commit:
     name: pre-commit checks
-    uses: benbenbang/reusable-workflows/.github/workflows/prek.yml@1.0.1
+    uses: benbenbang/reusable-workflows/.github/workflows/prek.yml@1.0.2
     permissions:
       contents: read
       packages: read
     secrets: inherit
+    with:
+      prek_skip: fmt,check,clippy,test
+
+  check-change-files:
+    name: check-changed-files
+    outputs:
+      rust: ${{ steps.check-changes.outputs.rust_any_modified }}
+      python: ${{ steps.check-changes.outputs.python_any_modified }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - name: get rust modules that have changed
+        id: check-changes
+        uses: tj-actions/changed-files@2f7c5bfce28377bc069a65ba478de0a74aa0ca32 # v46.0.1
+        with:
+          files_yaml: |
+            rust:
+              - crates/**/src/**
+              - crates/**/tests/**
+              - crates/**/Cargo.toml
+              - Cargo.toml
+              - Cargo.lock
+              - rust-toolchain.toml
+              - .github/workflows/*.yml
+
+            python:
+              - crates/itofin-py/**
+              - .github/workflows/*.yml
+
+  rust-ci:
+    name: rust ci
+    runs-on: ubuntu-latest
+    needs: check-change-files
+    if: needs.check-change-files.outputs.rust == 'true'
+    permissions:
+      contents: read
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v5
+      - name: install the toolchain pinned in rust-toolchain.toml
+        run: |
+          rustup toolchain install
+          rustup show active-toolchain
+      - name: restore cargo caches
+        uses: Swatinem/rust-cache@v2
+      - name: check formatting
+        run: cargo fmt --all -- --check
+      - name: run cargo check
+        run: cargo check --workspace --all-targets
+      - name: run clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: build
+        run: cargo build --workspace
+      - name: run tests
+        run: cargo test --workspace
 
   python-bindings:
     name: python bindings
+    needs: check-change-files
+    if: needs.check-change-files.outputs.python == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

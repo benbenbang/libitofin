@@ -161,3 +161,4 @@ graphify-out-ql/
 PORT_COVERAGE.md
 graphify*.md
 GRAPHIFY*.md
+*.patch
