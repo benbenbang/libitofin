@@ -2,8 +2,8 @@ repos:
     - repo: local
       hooks:
         - id: gen-submodule-shims
-          name: generate itofin submodule shims
-          entry: python scripts/gen_submodule_shims.py
+          name: generate itofin stubs and submodule shims
+          entry: python scripts/gen_stubs.py
           language: system
           files: ^python/itofin/.*\.pyi$
           pass_filenames: false
@@ -14,13 +14,13 @@ repos:
           name: isort
           args:
             - --settings-path=.isort.cfg
-          exclude: "tests/|scripts/|python/itofin/(?!__init__\\.py$)[^/]*\\.py$"
+          exclude: "tests/|scripts/|python/itofin/.*\\.pyi$|python/itofin/[^/]+/__init__\\.py$"
     - repo: https://github.com/astral-sh/ruff-pre-commit
       rev: v0.15.12
       hooks:
         - id: ruff
           args:
             - --fix
-          exclude: "tests/|scripts/|python/itofin/(?!__init__\\.py$)[^/]*\\.py$"
+          exclude: "tests/|scripts/|python/itofin/.*\\.pyi$|python/itofin/[^/]+/__init__\\.py$"
         - id: ruff-format
-          exclude: "tests/|scripts/|python/itofin/(?!__init__\\.py$)[^/]*\\.py$"
+          exclude: "tests/|scripts/|python/itofin/.*\\.pyi$|python/itofin/[^/]+/__init__\\.py$"
