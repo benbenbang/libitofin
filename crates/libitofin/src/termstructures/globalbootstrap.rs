@@ -38,12 +38,16 @@
 //! (`globalbootstrap.hpp:228`) - deliberately different literals from
 //! `LocalBootstrap`'s `(100, 10, 0, accuracy, 0)`.
 //!
-//! ## The C++ method split folds into `calculate`
+//! ## The C++ method split
 //!
 //! C++ spreads the driver over `setup`/`initialize`/`setupCostFunction`/
-//! `setCostFunctionArgument`/`evaluateCostFunction`/`calculate` with mutable
-//! members carrying state between them. All of it folds into the single
-//! [`Bootstrap::calculate`] here, as for the other bootstrap algorithms:
+//! `setCostFunctionArgument`/`evaluateCostFunction`/`setToValid`/`calculate`
+//! with mutable members carrying state between them. `setupCostFunction`
+//! through `setToValid` are kept separable here as private methods that
+//! [`Bootstrap::calculate`] recomposes exactly as C++'s `calculate` does
+//! (`globalbootstrap.hpp:405-429`), handing each other an explicit owned state
+//! instead of members; `setup` and `initialize` fold into the first of them, as
+//! for the other bootstrap algorithms:
 //!
 //! - The `setup()` D1 half, registering the curve as an observer of every
 //!   instrument (`globalbootstrap.hpp:217-218`), is performed - for any
@@ -300,28 +304,15 @@ impl GlobalBootstrap {
     }
 }
 
-/// The global cost (`setCostFunctionArgument` + `evaluateCostFunction`,
-/// `globalbootstrap.hpp:379-403`): writes every interior trial node into the
-/// node vector through `transform_direct`, rebuilds the full-grid
-/// interpolation, hands the remaining tail of the trial point to the
-/// [`AdditionalBootstrapVariables`], and returns the alive helpers' weighted
-/// quote errors - followed by the [`AdditionalPenalties`] terms, if any - as
-/// the residual vector.
-///
-/// The [`CostFunction`] trait is infallible, so a failed rebuild or reprice
-/// parks its error in `error` and returns NaN residuals, which the solver
-/// adapter treats as an infeasible penalty; the driver surfaces the parked
-/// error after the solve (D4), matching the C++ exception propagating out of
-/// the cost closure.
-struct GlobalCost<'a, C: PiecewiseCurve>
-where
-    C::Traits: YieldBootstrapTraits,
-{
-    curve: &'a C,
-    alive: &'a [Shared<C::Helper>],
-    alive_weights: &'a [Real],
-    penalties: Option<&'a AdditionalPenalties>,
-    variables: Option<&'a dyn AdditionalBootstrapVariables>,
+/// The state `setup` builds and the three later pieces read: the alive
+/// helpers, their weights, and the interior node count of the grid it
+/// installed. C++ carries the first two as the mutable members
+/// `aliveInstruments_` and `aliveInstrumentWeights_` (`globalbootstrap.hpp:148`
+/// and `:154`) and reads the third off the curve; the Rust pieces take `&self`
+/// on a shared bootstrap, so what they hand each other is explicit and owned.
+struct GlobalBootstrapState<C: PiecewiseCurve> {
+    alive: Vec<Shared<C::Helper>>,
+    alive_weights: Vec<Real>,
     /// The number of interior nodes, `times.len() - 1`, and the number of
     /// variables the solve carries; the residual count is `alive.len()` plus
     /// the penalty terms. The two are equal for a strip of distinct pillars
@@ -329,94 +320,18 @@ where
     /// penalty terms have to answer for, and the least-squares solver rejects
     /// a system left with fewer residuals than variables.
     interior: Size,
-    /// The penalty-term count of the last evaluation, so a failed evaluation's
-    /// NaN vector has the length the solver sized itself on.
-    penalty_len: Cell<Size>,
-    error: RefCell<Option<QlError>>,
 }
 
-impl<C: PiecewiseCurve> GlobalCost<'_, C>
-where
-    C::Traits: YieldBootstrapTraits,
-{
-    fn try_values(&self, x: &Array) -> QlResult<Array> {
-        {
-            let mut cd = self.curve.curve_data().borrow_mut();
-            for i in 0..self.interior {
-                let t = cd.times()[i + 1];
-                let value = C::Traits::transform_direct(x[i], t);
-                C::Traits::update_guess(cd.data_mut(), value, i + 1);
-            }
-            cd.rebuild(self.curve.interpolator(), self.interior)?;
-        }
-        // The trial point's tail goes to the additional variables (`:386-388`),
-        // still inside the C++ `setCostFunctionArgument` step and so before the
-        // penalties. It writes no curve cell - upstream it writes external
-        // quotes - but it does notify, which is why the helpers reaching those
-        // quotes must hold them through an unregistered handle
-        // (`Handle::new_unregistered`); an observing one would invalidate the
-        // curve on every evaluation.
-        if let Some(variables) = self.variables {
-            let trial: &[Real] = x;
-            variables.update(&trial[self.interior..])?;
-        }
-
-        // Only now that the `borrow_mut` above has dropped, so a penalty that
-        // reads the curve back can take its own shared borrow (`:392-395`).
-        let penalty_errors = match self.penalties {
-            Some(penalties) => {
-                let cd = self.curve.curve_data().borrow();
-                penalties(cd.times(), cd.data())
-            }
-            None => Vec::new(),
-        };
-        self.penalty_len.set(penalty_errors.len());
-
-        let mut residuals = Array::with_size(self.alive.len() + penalty_errors.len());
-        for (i, helper) in self.alive.iter().enumerate() {
-            residuals[i] = helper.quote_error()? * self.alive_weights[i];
-        }
-        for (i, penalty_error) in penalty_errors.into_iter().enumerate() {
-            residuals[self.alive.len() + i] = penalty_error;
-        }
-        Ok(residuals)
-    }
-}
-
-impl<C: PiecewiseCurve> CostFunction for GlobalCost<'_, C>
-where
-    C::Traits: YieldBootstrapTraits,
-{
-    fn values(&self, x: &Array) -> Array {
-        match self.try_values(x) {
-            Ok(values) => values,
-            Err(err) => {
-                let mut slot = self.error.borrow_mut();
-                if slot.is_none() {
-                    *slot = Some(err);
-                }
-                let residuals = self.alive.len() + self.penalty_len.get();
-                std::iter::repeat_n(Real::NAN, residuals).collect()
-            }
-        }
-    }
-}
-
-impl<C> Bootstrap<C> for GlobalBootstrap
-where
-    C: PiecewiseCurve<Helper = dyn RateHelper, TS = dyn YieldTermStructure>,
-    C::Traits: YieldBootstrapTraits,
-{
-    /// The additional helpers, all of them: the alive filter of `calculate`
-    /// governs the solve, never observability (`globalbootstrap.hpp:219-220`).
-    fn additional_observables(&self) -> Vec<Shared<Observable>> {
-        self.additional_helpers
-            .iter()
-            .map(|helper| helper.base().observable_shared())
-            .collect()
-    }
-
-    fn calculate(&self, curve: &C) -> QlResult<()> {
+impl GlobalBootstrap {
+    /// `setupCostFunction` (`globalbootstrap.hpp:319-374`) with the `setup`
+    /// guard and `initialize` (`:232-236`, `:244-315`) folded into it: the
+    /// weights guard, the alive filters, the pillar grid and its installation,
+    /// the hand-over of the curve to the helpers, and the initial guess.
+    fn setup<C>(&self, curve: &C) -> QlResult<(GlobalBootstrapState<C>, Array)>
+    where
+        C: PiecewiseCurve<Helper = dyn RateHelper, TS = dyn YieldTermStructure>,
+        C::Traits: YieldBootstrapTraits,
+    {
         let instruments = curve.instruments();
         let n = instruments.len();
 
@@ -562,6 +477,196 @@ where
             guess[interior + i] = additional_guess;
         }
 
+        Ok((
+            GlobalBootstrapState {
+                alive,
+                alive_weights,
+                interior,
+            },
+            guess,
+        ))
+    }
+
+    /// `setCostFunctionArgument` (`globalbootstrap.hpp:376-387`): the interior
+    /// trial nodes and the full-grid rebuild inside a scoped `borrow_mut`, then
+    /// the trial point's tail to the additional variables.
+    fn set_argument<C>(
+        &self,
+        curve: &C,
+        state: &GlobalBootstrapState<C>,
+        x: &[Real],
+    ) -> QlResult<()>
+    where
+        C: PiecewiseCurve<Helper = dyn RateHelper, TS = dyn YieldTermStructure>,
+        C::Traits: YieldBootstrapTraits,
+    {
+        {
+            let mut cd = curve.curve_data().borrow_mut();
+            for (i, &coordinate) in x[..state.interior].iter().enumerate() {
+                let t = cd.times()[i + 1];
+                let value = C::Traits::transform_direct(coordinate, t);
+                C::Traits::update_guess(cd.data_mut(), value, i + 1);
+            }
+            cd.rebuild(curve.interpolator(), state.interior)?;
+        }
+        // The trial point's tail goes to the additional variables (`:386-388`),
+        // still inside the C++ `setCostFunctionArgument` step and so before the
+        // penalties. It writes no curve cell - upstream it writes external
+        // quotes - but it does notify, which is why the helpers reaching those
+        // quotes must hold them through an unregistered handle
+        // (`Handle::new_unregistered`); an observing one would invalidate the
+        // curve on every evaluation.
+        if let Some(variables) = &self.additional_variables {
+            variables.update(&x[state.interior..])?;
+        }
+        Ok(())
+    }
+
+    /// `evaluateCostFunction` (`globalbootstrap.hpp:389-400`): the penalty
+    /// terms, then the alive helpers' weighted quote errors, as one residual
+    /// vector. `penalty_len` is the solver adapter's NaN-length bookkeeping,
+    /// written here because only this step knows the penalty count.
+    fn evaluate<C>(
+        &self,
+        curve: &C,
+        state: &GlobalBootstrapState<C>,
+        penalty_len: &Cell<Size>,
+    ) -> QlResult<Array>
+    where
+        C: PiecewiseCurve<Helper = dyn RateHelper, TS = dyn YieldTermStructure>,
+        C::Traits: YieldBootstrapTraits,
+    {
+        // Only now that the `borrow_mut` of `set_argument` has dropped, so a
+        // penalty that reads the curve back can take its own shared borrow
+        // (`:392-395`).
+        let penalty_errors = match &self.penalties {
+            Some(penalties) => {
+                let cd = curve.curve_data().borrow();
+                penalties(cd.times(), cd.data())
+            }
+            None => Vec::new(),
+        };
+        penalty_len.set(penalty_errors.len());
+
+        let mut residuals = Array::with_size(state.alive.len() + penalty_errors.len());
+        for (i, helper) in state.alive.iter().enumerate() {
+            residuals[i] = helper.quote_error()? * state.alive_weights[i];
+        }
+        for (i, penalty_error) in penalty_errors.into_iter().enumerate() {
+            residuals[state.alive.len() + i] = penalty_error;
+        }
+        Ok(residuals)
+    }
+
+    /// `setToValid` (`globalbootstrap.hpp:213`), which upstream is the bare
+    /// `validCurve_ = true` because C++ leaves the curve at the optimizer's
+    /// last trial point. This port pins the solution first, so the piece takes
+    /// it.
+    fn set_to_valid<C>(
+        &self,
+        curve: &C,
+        state: &GlobalBootstrapState<C>,
+        solution: &[Real],
+    ) -> QlResult<()>
+    where
+        C: PiecewiseCurve<Helper = dyn RateHelper, TS = dyn YieldTermStructure>,
+        C::Traits: YieldBootstrapTraits,
+    {
+        // Pin the returned solution: rewrite every interior node from the
+        // optimizer's answer and rebuild, so the curve holds the solution
+        // rather than the solver's last trial point; then mark the data as a
+        // valid seed for the next bootstrap (`validCurve_ = true`, `:428`).
+        {
+            let mut cd = curve.curve_data().borrow_mut();
+            for (i, &coordinate) in solution[..state.interior].iter().enumerate() {
+                let t = cd.times()[i + 1];
+                let value = C::Traits::transform_direct(coordinate, t);
+                C::Traits::update_guess(cd.data_mut(), value, i + 1);
+            }
+            cd.rebuild(curve.interpolator(), state.interior)?;
+            cd.set_valid(true);
+        }
+        // The additional variables are pinned to the solution too, after that
+        // `borrow_mut` has dropped. C++ has no pin loop at all and simply
+        // leaves the quotes at the optimizer's last trial point; this port
+        // rewrites the nodes from the returned solution, so the quotes are
+        // rewritten from the same vector and the two stay consistent.
+        if let Some(variables) = &self.additional_variables {
+            variables.update(&solution[state.interior..])?;
+        }
+        Ok(())
+    }
+}
+
+/// The global cost: the solver-side adapter that pairs `set_argument` with
+/// `evaluate` on every trial point, exactly as the C++ cost closure calls
+/// `setCostFunctionArgument` then `evaluateCostFunction`
+/// (`globalbootstrap.hpp:414-417`).
+///
+/// The [`CostFunction`] trait is infallible, so a failed rebuild or reprice
+/// parks its error in `error` and returns NaN residuals, which the solver
+/// adapter treats as an infeasible penalty; the driver surfaces the parked
+/// error after the solve (D4), matching the C++ exception propagating out of
+/// the cost closure.
+struct GlobalCost<'a, C: PiecewiseCurve> {
+    bootstrap: &'a GlobalBootstrap,
+    curve: &'a C,
+    state: &'a GlobalBootstrapState<C>,
+    /// The penalty-term count of the last evaluation, so a failed evaluation's
+    /// NaN vector has the length the solver sized itself on.
+    penalty_len: Cell<Size>,
+    error: RefCell<Option<QlError>>,
+}
+
+impl<C> GlobalCost<'_, C>
+where
+    C: PiecewiseCurve<Helper = dyn RateHelper, TS = dyn YieldTermStructure>,
+    C::Traits: YieldBootstrapTraits,
+{
+    fn try_values(&self, x: &Array) -> QlResult<Array> {
+        self.bootstrap.set_argument(self.curve, self.state, x)?;
+        self.bootstrap
+            .evaluate(self.curve, self.state, &self.penalty_len)
+    }
+}
+
+impl<C> CostFunction for GlobalCost<'_, C>
+where
+    C: PiecewiseCurve<Helper = dyn RateHelper, TS = dyn YieldTermStructure>,
+    C::Traits: YieldBootstrapTraits,
+{
+    fn values(&self, x: &Array) -> Array {
+        match self.try_values(x) {
+            Ok(values) => values,
+            Err(err) => {
+                let mut slot = self.error.borrow_mut();
+                if slot.is_none() {
+                    *slot = Some(err);
+                }
+                let residuals = self.state.alive.len() + self.penalty_len.get();
+                std::iter::repeat_n(Real::NAN, residuals).collect()
+            }
+        }
+    }
+}
+
+impl<C> Bootstrap<C> for GlobalBootstrap
+where
+    C: PiecewiseCurve<Helper = dyn RateHelper, TS = dyn YieldTermStructure>,
+    C::Traits: YieldBootstrapTraits,
+{
+    /// The additional helpers, all of them: the alive filter of `calculate`
+    /// governs the solve, never observability (`globalbootstrap.hpp:219-220`).
+    fn additional_observables(&self) -> Vec<Shared<Observable>> {
+        self.additional_helpers
+            .iter()
+            .map(|helper| helper.base().observable_shared())
+            .collect()
+    }
+
+    fn calculate(&self, curve: &C) -> QlResult<()> {
+        let (state, guess) = self.setup(curve)?;
+
         // Solver configuration (`:222-229`): the LM tolerances and the
         // EndCriteria literals (1000 iterations, three accuracies) are the
         // C++ defaults, distinct from LocalBootstrap's.
@@ -573,12 +678,9 @@ where
         };
 
         let cost = GlobalCost::<C> {
+            bootstrap: self,
             curve,
-            alive: &alive,
-            alive_weights: &alive_weights,
-            penalties: self.penalties.as_deref(),
-            variables: self.additional_variables.as_deref(),
-            interior,
+            state: &state,
             penalty_len: Cell::new(0),
             error: RefCell::new(None),
         };
@@ -598,30 +700,7 @@ where
             "global bootstrap failed to minimize to required accuracy: {end_type}"
         );
 
-        // Pin the returned solution: rewrite every interior node from the
-        // optimizer's answer and rebuild, so the curve holds the solution
-        // rather than the solver's last trial point; then mark the data as a
-        // valid seed for the next bootstrap (`validCurve_ = true`, `:428`).
-        {
-            let mut cd = curve.curve_data().borrow_mut();
-            for i in 0..interior {
-                let t = cd.times()[i + 1];
-                let value = C::Traits::transform_direct(solution[i], t);
-                C::Traits::update_guess(cd.data_mut(), value, i + 1);
-            }
-            cd.rebuild(curve.interpolator(), interior)?;
-            cd.set_valid(true);
-        }
-        // The additional variables are pinned to the solution too, after that
-        // `borrow_mut` has dropped. C++ has no pin loop at all and simply
-        // leaves the quotes at the optimizer's last trial point; this port
-        // rewrites the nodes from the returned solution, so the quotes are
-        // rewritten from the same vector and the two stay consistent.
-        if let Some(variables) = &self.additional_variables {
-            let solved: &[Real] = &solution;
-            variables.update(&solved[interior..])?;
-        }
-        Ok(())
+        self.set_to_valid(curve, &state, &solution)
     }
 }
 
