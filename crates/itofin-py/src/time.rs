@@ -21,8 +21,10 @@ use pyo3::prelude::*;
 use pyo3::{IntoPyObjectExt, wrap_pyfunction};
 #[allow(unused_imports)]
 use pyo3_stub_gen::derive::{
-    gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pyfunction, gen_stub_pymethods,
+    gen_methods_from_python, gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pyfunction,
+    gen_stub_pymethods,
 };
+use pyo3_stub_gen::inventory::submit;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
@@ -143,6 +145,7 @@ impl PyDate {
     ///
     /// Returns:
     ///     int: The signed day count between the two dates.
+    #[gen_stub(skip)]
     fn __sub__(&self, py: Python<'_>, other: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
         if let Ok(other_date) = other.cast::<PyDate>() {
             let subtrahend = other_date.borrow().inner;
@@ -210,6 +213,39 @@ impl PyDate {
         Ok(PyDate {
             inner: self.inner + days as i32,
         })
+    }
+}
+
+submit! {
+    gen_methods_from_python! {
+        r#"
+        class PyDate:
+            @overload
+            def __sub__(self, days: int) -> Date:
+                """Shift the date back by a number of calendar days.
+
+                Args:
+                    days (int): The number of calendar days to subtract.
+
+                Returns:
+                    Date: The shifted date.
+
+                Raises:
+                    ItofinError: If the result falls outside the representable date
+                        range.
+                """
+
+            @overload
+            def __sub__(self, other: Date) -> int:
+                """The signed number of days from other to this date.
+
+                Args:
+                    other (Date): The date to measure from.
+
+                Returns:
+                    int: The signed day count between the two dates.
+                """
+        "#
     }
 }
 

@@ -147,19 +147,6 @@ class Date:
             ItofinError: If the result falls outside the representable date
                 range.
         """
-    def __sub__(self, other: typing.Any) -> typing.Any:
-        r"""
-        The signed number of days from other to this date.
-
-        The other operand may also be an int, which shifts the date back by that
-        many calendar days and returns a Date. Anything else raises TypeError.
-
-        Args:
-            other (Date): The date to measure from.
-
-        Returns:
-            int: The signed day count between the two dates.
-        """
     def __eq__(self, other: Date) -> builtins.bool:
         r"""
         Whether the two dates are the same calendar day.
@@ -183,6 +170,32 @@ class Date:
 
         Returns:
             str: The date as Date(day, month, year).
+        """
+    @typing.overload
+    def __sub__(self, days: int) -> Date:
+        r"""
+        Shift the date back by a number of calendar days.
+
+        Args:
+            days (int): The number of calendar days to subtract.
+
+        Returns:
+            Date: The shifted date.
+
+        Raises:
+            ItofinError: If the result falls outside the representable date
+                range.
+        """
+    @typing.overload
+    def __sub__(self, other: Date) -> int:
+        r"""
+        The signed number of days from other to this date.
+
+        Args:
+            other (Date): The date to measure from.
+
+        Returns:
+            int: The signed day count between the two dates.
         """
 
 @typing.final
