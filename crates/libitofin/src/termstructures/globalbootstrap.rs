@@ -19,12 +19,15 @@
 //! residual terms (#974), the `additionalHelpers`/`additionalDates`
 //! restrictions (#976) and the `additionalVariables` optimizer coordinates
 //! with their `SimpleQuoteVariables` implementation (#977). It equals the C++
-//! path with `parentBootstrapper_` null. Deferred visibly, as its own
-//! follow-up issue referencing #949:
+//! path with `parentBootstrapper_` null. The multi-curve machinery is here
+//! too: the [`MultiCurveBootstrapContributor`] interface (`hpp:40-49`), the
+//! [`MultiCurveBootstrap`] parent it links to (`hpp:51-67`) and the
+//! `parentBootstrapper_` branch of `calculate` (`hpp:408-411`). Deferred
+//! visibly, as its own follow-up issue referencing #949:
 //!
-//! - **Multi-curve orchestration** (`MultiCurveBootstrap`,
-//!   `MultiCurveBootstrapContributor`, `setParentBootstrapper`/`setToValid`,
-//!   the `parentBootstrapper_` branch of `calculate`).
+//! - **The stacked multi-curve solve** ([`MultiCurveBootstrap::run`], the port
+//!   of `runMultiCurveBootstrap`, `globalbootstrap.cpp:50-116`) and the
+//!   `MultiCurve` wrapper that drives it (`ql/termstructures/multicurve.hpp`).
 //!
 //! The C++ optimizer override (`shared_ptr<OptimizationMethod>`) is not
 //! carried either: the default `LevenbergMarquardt(accuracy, accuracy,
@@ -63,7 +66,9 @@
 //!   only after an invalidation, and re-deriving the grid is idempotent, so
 //!   no flag is kept. `ts_->setCalculated(true)` (`:324`) is a multi-curve
 //!   artifact - the single-curve lazy flag is already set by the curve's own
-//!   `calculate` - and is dropped with the multi-curve deferral.
+//!   `calculate` - so it lives in
+//!   [`MultiCurveBootstrapContributor::setup_cost_function`], the only path
+//!   that reaches a contributing curve without going through that `calculate`.
 //! - The `validCurve_` warm-restart flag lives on the curve's node storage
 //!   ([`CurveData::is_valid`](crate::termstructures::bootstraptraits::CurveData::is_valid)),
 //!   exactly as for [`IterativeBootstrap`]: a still-valid previous solution of
@@ -98,6 +103,7 @@
 //! (`globalbootstrap.hpp:100-103`).
 
 use std::cell::{Cell, RefCell};
+use std::rc::Weak;
 
 use crate::errors::{QlError, QlResult};
 use crate::math::array::Array;
@@ -108,9 +114,9 @@ use crate::math::optimization::endcriteria::EndCriteria;
 use crate::math::optimization::levenbergmarquardt::LevenbergMarquardt;
 use crate::math::optimization::method::OptimizationMethod;
 use crate::math::optimization::problem::Problem;
-use crate::patterns::observable::Observable;
+use crate::patterns::observable::{Observable, Observer};
 use crate::require;
-use crate::shared::Shared;
+use crate::shared::{Shared, SharedMut, WeakMut};
 use crate::termstructures::bootstraphelper::{BootstrapHelperShared, RateHelper};
 use crate::termstructures::bootstraptraits::{BootstrapTraits, YieldBootstrapTraits};
 use crate::termstructures::iterativebootstrap::{Bootstrap, PiecewiseCurve};
@@ -301,6 +307,164 @@ impl GlobalBootstrap {
     ) -> GlobalBootstrap {
         self.additional_variables = Some(variables);
         self
+    }
+}
+
+/// The multi-curve contributor interface (`MultiCurveBootstrapContributor`,
+/// `globalbootstrap.hpp:40-49`): the five entry points a
+/// [`MultiCurveBootstrap`] drives on every curve it joins into one solve. They
+/// are the four pieces the single-curve [`Bootstrap::calculate`] recomposes,
+/// re-exposed one at a time, plus the parent link.
+///
+/// The C++ methods are `const` and infallible. Here they return [`QlResult`]
+/// (D4): each one reaches fallible Rust code - an interpolation rebuild, a
+/// reprice, a quote read - and the stacked cost closure needs the same
+/// fallible-to-NaN bridge the single-curve [`CostFunction`] adapter applies.
+pub trait MultiCurveBootstrapContributor {
+    /// `setParentBootstrapper` (`globalbootstrap.hpp:209-211`): links this
+    /// contributor to the parent that drives it, so a later query on it runs
+    /// the joint solve rather than its own single-curve one.
+    fn set_parent_bootstrapper(&self, parent: Shared<MultiCurveBootstrap>);
+
+    /// `setupCostFunction` (`globalbootstrap.hpp:319-374`): marks the curve
+    /// calculated (`:324`), installs the grid and returns this contributor's
+    /// guess for the parent to concatenate. The state the three methods below
+    /// read is stashed here, because the parent calls them as separate steps.
+    ///
+    /// # Errors
+    ///
+    /// Whatever the setup step fails on: an invalid quote, too few curve
+    /// points, an interpolation rebuild.
+    fn setup_cost_function(&self) -> QlResult<Array>;
+
+    /// `setCostFunctionArgument` (`globalbootstrap.hpp:376-387`): writes this
+    /// contributor's slice of the trial point into its curve.
+    ///
+    /// # Errors
+    ///
+    /// A failed interpolation rebuild, or a failed additional-variable write.
+    fn set_cost_function_argument(&self, x: &[Real]) -> QlResult<()>;
+
+    /// `evaluateCostFunction` (`globalbootstrap.hpp:389-400`): this
+    /// contributor's residuals, for the parent to concatenate.
+    ///
+    /// # Errors
+    ///
+    /// A failed reprice, or a call before [`setup_cost_function`](Self::setup_cost_function).
+    fn evaluate_cost_function(&self) -> QlResult<Array>;
+
+    /// `setToValid` (`globalbootstrap.hpp:213`), taking this contributor's
+    /// slice of the solved vector.
+    ///
+    /// Divergence: the C++ method is argument-free, because its parent never
+    /// re-applies the solution and simply leaves each curve at the optimizer's
+    /// last trial point (`globalbootstrap.cpp:114-115`). This port pins the
+    /// solution, exactly as the single-curve path does, so the parent must
+    /// offset-slice the global solution per contributor and hand each its own.
+    ///
+    /// # Errors
+    ///
+    /// A failed interpolation rebuild, or a call before
+    /// [`setup_cost_function`](Self::setup_cost_function).
+    fn set_to_valid(&self, solution: &[Real]) -> QlResult<()>;
+}
+
+/// The multi-curve parent (`MultiCurveBootstrap`, `globalbootstrap.hpp:51-67`,
+/// definitions `globalbootstrap.cpp:26-116`): it holds the contributing curves
+/// and joins their cost functions into one least-squares solve.
+///
+/// The C++ optimizer override (`shared_ptr<OptimizationMethod>`, `hpp:63`) is
+/// not carried, for the reason the module doc gives for `GlobalBootstrap`'s:
+/// `minimize` takes `&mut self`, which a stored trait object cannot offer from
+/// the `&self` of [`run`](Self::run). The accuracy and the [`EndCriteria`]
+/// override are carried instead, mirroring [`GlobalBootstrap`], and both are
+/// resolved inside `run`; an unset accuracy takes the C++ literal `1e-10`
+/// (`globalbootstrap.cpp:35`), there being no curve here to fall back to.
+///
+/// `setOtherContributorsToValid` (`hpp:59`) and `finalizeCalculation`
+/// (`hpp:60`) are declared in C++ and defined nowhere in the tree, so they are
+/// omitted rather than invented.
+pub struct MultiCurveBootstrap {
+    #[expect(dead_code, reason = "resolved by the stacked solve in unit 2b")]
+    accuracy: Option<Real>,
+    #[expect(dead_code, reason = "resolved by the stacked solve in unit 2b")]
+    end_criteria: Option<EndCriteria>,
+    /// The contributing curves (`contributors_`, `globalbootstrap.hpp:65`).
+    /// Weak, mirroring the C++ raw `const*`: a contributor holds its parent
+    /// strongly, so an owning link here would close the cycle.
+    contributors: RefCell<Vec<Weak<dyn MultiCurveBootstrapContributor>>>,
+    /// The observers notified between the set and evaluate phases of the
+    /// stacked solve (`observers_`, `globalbootstrap.hpp:66`).
+    observers: RefCell<Vec<WeakMut<dyn Observer>>>,
+    /// How many times [`run`](Self::run) has been entered, so a test can see
+    /// that a contributor's `calculate` routed to the joint solve rather than
+    /// running its own. C++ needs no such counter; the stacked solve of unit 2b
+    /// may replace it with an observable of its own.
+    runs: Cell<Size>,
+}
+
+impl MultiCurveBootstrap {
+    /// The accuracy constructor (`globalbootstrap.cpp:26-29`), which upstream
+    /// builds both the optimizer and the `EndCriteria` from the one number.
+    pub fn new(accuracy: Real) -> MultiCurveBootstrap {
+        MultiCurveBootstrap::configured(Some(accuracy), None)
+    }
+
+    /// The override constructor (`globalbootstrap.cpp:31-39`) minus its
+    /// dropped optimizer argument: an explicit [`EndCriteria`], or `None` for
+    /// the `1e-10` default. That default is built in [`run`](Self::run) rather
+    /// than here because `EndCriteria::new` is fallible and a constructor that
+    /// cannot fail is the more useful one.
+    pub fn with_end_criteria(end_criteria: Option<EndCriteria>) -> MultiCurveBootstrap {
+        MultiCurveBootstrap::configured(None, end_criteria)
+    }
+
+    fn configured(
+        accuracy: Option<Real>,
+        end_criteria: Option<EndCriteria>,
+    ) -> MultiCurveBootstrap {
+        MultiCurveBootstrap {
+            accuracy,
+            end_criteria,
+            contributors: RefCell::new(Vec::new()),
+            observers: RefCell::new(Vec::new()),
+            runs: Cell::new(0),
+        }
+    }
+
+    /// `add` (`globalbootstrap.cpp:41-44`): registers a contributing curve and
+    /// links it back to this parent.
+    ///
+    /// C++ reaches its own `shared_ptr` through `enable_shared_from_this`,
+    /// which Rust has no equivalent of from `&self`, so the parent is taken as
+    /// the [`Shared`] the caller already holds.
+    pub fn add(self: &Shared<Self>, contributor: &Shared<dyn MultiCurveBootstrapContributor>) {
+        self.contributors
+            .borrow_mut()
+            .push(Shared::downgrade(contributor));
+        contributor.set_parent_bootstrapper(Shared::clone(self));
+    }
+
+    /// `addObserver` (`globalbootstrap.cpp:46-48`): an observer the stacked
+    /// solve notifies between its set and evaluate phases.
+    pub fn add_observer(&self, observer: &SharedMut<dyn Observer>) {
+        self.observers
+            .borrow_mut()
+            .push(SharedMut::downgrade(observer));
+    }
+
+    /// `runMultiCurveBootstrap` (`globalbootstrap.cpp:50-116`): the stacked
+    /// solve over every contributor at once.
+    ///
+    /// Filled in by unit 2b. It counts its entries so the parent-link routing
+    /// is observable before the solve exists.
+    ///
+    /// # Errors
+    ///
+    /// None yet; the stacked solve propagates its contributors' failures.
+    pub fn run(&self) -> QlResult<()> {
+        self.runs.set(self.runs.get() + 1);
+        Ok(())
     }
 }
 
@@ -1620,6 +1784,7 @@ mod tests {
             "the extended range must be queryable without extrapolation"
         );
     }
+
     /// The recording [`AdditionalBootstrapVariables`] of the arm below: it
     /// delegates to a real [`SimpleQuoteVariables`] and records what the driver
     /// hands it.
