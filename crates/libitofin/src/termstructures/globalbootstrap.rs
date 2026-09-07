@@ -25,9 +25,10 @@
 //! `parentBootstrapper_` branch of `calculate` (`hpp:408-411`). Deferred
 //! visibly, as its own follow-up issue referencing #949:
 //!
-//! - **The stacked multi-curve solve** ([`MultiCurveBootstrap::run`], the port
-//!   of `runMultiCurveBootstrap`, `globalbootstrap.cpp:50-116`) and the
-//!   `MultiCurve` wrapper that drives it (`ql/termstructures/multicurve.hpp`).
+//! - **The `MultiCurve` wrapper** that assembles the contributors
+//!   (`ql/termstructures/multicurve.hpp`) and the non-bootstrapped contributor
+//!   with its two-phase observer refresh, which is what fills
+//!   [`MultiCurveBootstrap::add_observer`]'s list.
 //!
 //! The C++ optimizer override (`shared_ptr<OptimizationMethod>`) is not
 //! carried either: the default `LevenbergMarquardt(accuracy, accuracy,
@@ -394,6 +395,17 @@ pub trait MultiCurveBootstrapContributor {
     /// A failed interpolation rebuild, or a call before
     /// [`setup_cost_function`](Self::setup_cost_function).
     fn set_to_valid(&self, solution: &[Real]) -> QlResult<()>;
+
+    /// Undoes the "calculated" mark that
+    /// [`setup_cost_function`](Self::setup_cost_function) set, without
+    /// notifying anyone.
+    ///
+    /// Divergence: C++ has no counterpart. It needs none, because it leaves a
+    /// failed `runMultiCurveBootstrap` to the caller and its curves stay marked
+    /// over whatever grid they reached. Here a contributor left marked would be
+    /// read as a solved curve by the next query, so the parent reverts every
+    /// contributor it had already set up whenever the joint solve fails.
+    fn invalidate(&self);
 }
 
 /// The multi-curve parent (`MultiCurveBootstrap`, `globalbootstrap.hpp:51-67`,
@@ -412,9 +424,7 @@ pub trait MultiCurveBootstrapContributor {
 /// (`hpp:60`) are declared in C++ and defined nowhere in the tree, so they are
 /// omitted rather than invented.
 pub struct MultiCurveBootstrap {
-    #[expect(dead_code, reason = "resolved by the stacked solve in unit 2b")]
     accuracy: Option<Real>,
-    #[expect(dead_code, reason = "resolved by the stacked solve in unit 2b")]
     end_criteria: Option<EndCriteria>,
     /// The contributing curves (`contributors_`, `globalbootstrap.hpp:65`).
     /// Weak, mirroring the C++ raw `const*`: a contributor holds its parent
@@ -425,8 +435,8 @@ pub struct MultiCurveBootstrap {
     observers: RefCell<Vec<WeakMut<dyn Observer>>>,
     /// How many times [`run`](Self::run) has been entered, so a test can see
     /// that a contributor's `calculate` routed to the joint solve rather than
-    /// running its own. C++ needs no such counter; the stacked solve of unit 2b
-    /// may replace it with an observable of its own.
+    /// running its own single-curve one. C++ needs no such counter: there, the
+    /// routing is visible in a debugger and nowhere else.
     runs: Cell<Size>,
 }
 
@@ -483,15 +493,190 @@ impl MultiCurveBootstrap {
     /// `runMultiCurveBootstrap` (`globalbootstrap.cpp:50-116`): the stacked
     /// solve over every contributor at once.
     ///
-    /// Filled in by unit 2b. It counts its entries so the parent-link routing
-    /// is observable before the solve exists.
+    /// Each contributor sets up and contributes its guess block (`cpp:52-59`);
+    /// one least-squares solve then drives the concatenation, splitting every
+    /// trial point back into the blocks (`cpp:61-105`); finally each
+    /// contributor is pinned with its slice of the solution (`cpp:114-115`).
+    ///
+    /// The solver's cost function is infallible while the contributors are not,
+    /// so [`StackedCost`] parks the first failure and answers with NaN
+    /// residuals - the same bridge the single-curve [`GlobalCost`] uses - and
+    /// the parked error is raised here, after `minimize` returns.
+    ///
+    /// Divergence: on any failure this reverts the "calculated" mark on every
+    /// contributor it had already set up. C++ leaves them marked (`hpp:324`
+    /// sets the flag before anything can fail) and lets the caller live with
+    /// half-solved curves reading as calculated.
     ///
     /// # Errors
     ///
-    /// None yet; the stacked solve propagates its contributors' failures.
+    /// A contributor dropped since [`add`](Self::add), any failure inside a
+    /// contributor's four solve steps, or a solve that does not reach the
+    /// required accuracy.
     pub fn run(&self) -> QlResult<()> {
         self.runs.set(self.runs.get() + 1);
+
+        // Upgraded once and held for the whole solve (`contributors_` is a raw
+        // `const*` upstream, so C++ has nothing to upgrade).
+        let mut contributors: Vec<Shared<dyn MultiCurveBootstrapContributor>> = Vec::new();
+        for contributor in self.contributors.borrow().iter() {
+            let Some(contributor) = contributor.upgrade() else {
+                crate::fail!("multi-curve bootstrap: a contributing curve was dropped");
+            };
+            contributors.push(contributor);
+        }
+
+        let mut set_up = 0;
+        let outcome = self.solve(&contributors, &mut set_up);
+        if outcome.is_err() {
+            for contributor in &contributors[..set_up] {
+                contributor.invalidate();
+            }
+        }
+        outcome
+    }
+
+    /// The body of [`run`](Self::run), split out so the revert on failure sits
+    /// in one place. `set_up` counts the contributors whose
+    /// `setup_cost_function` was entered, which is what the caller reverts; it
+    /// is incremented before the call because a contributor marks its curve
+    /// calculated before it can fail (`globalbootstrap.hpp:324`).
+    fn solve(
+        &self,
+        contributors: &[Shared<dyn MultiCurveBootstrapContributor>],
+        set_up: &mut Size,
+    ) -> QlResult<()> {
+        // The guess concatenation (`globalbootstrap.cpp:52-59`), whose block
+        // sizes are the offsets every later split uses.
+        let mut guess: Vec<Real> = Vec::new();
+        let mut sizes: Vec<Size> = Vec::new();
+        for contributor in contributors {
+            *set_up += 1;
+            let block = contributor.setup_cost_function()?;
+            sizes.push(block.size());
+            guess.extend(block.iter().copied());
+        }
+        let guess = Array::from(guess);
+
+        // Solver configuration (`globalbootstrap.cpp:35-39`, `:102-105`): the
+        // literals are C++'s, with `1e-10` standing in for the curve accuracy
+        // the single-curve path falls back to, there being no curve here.
+        let accuracy = self.accuracy.unwrap_or(1.0e-10);
+        let mut optimizer = LevenbergMarquardt::new(accuracy, accuracy, accuracy, false);
+        let end_criteria = match self.end_criteria {
+            Some(criteria) => criteria,
+            None => EndCriteria::new(1000, Some(10), accuracy, accuracy, Some(accuracy))?,
+        };
+
+        let cost = StackedCost {
+            contributors,
+            sizes: &sizes,
+            observers: &self.observers,
+            error: RefCell::new(None),
+            last_len: Cell::new(guess.size()),
+        };
+        let no_constraint = NoConstraint;
+
+        let (end_type, solution) = {
+            let mut problem = Problem::new(&cost, &no_constraint, guess);
+            let outcome = optimizer.minimize(&mut problem, &end_criteria);
+            (outcome, problem.current_value().clone())
+        };
+        if let Some(inner) = cost.error.into_inner() {
+            return Err(inner);
+        }
+        let end_type = end_type?;
+        require!(
+            end_type.succeeded(),
+            "global bootstrap failed to minimize to required accuracy (during multi curve bootstrap): {end_type}"
+        );
+
+        // The validity sweep (`globalbootstrap.cpp:114-115`), which upstream
+        // takes no argument: this port re-pins each contributor from its slice
+        // of the solution, as the single-curve path re-pins its nodes.
+        let solved: &[Real] = &solution;
+        let mut offset = 0;
+        for (contributor, size) in contributors.iter().zip(&sizes) {
+            contributor.set_to_valid(&solved[offset..offset + size])?;
+            offset += size;
+        }
         Ok(())
+    }
+}
+
+/// The stacked cost (`runMultiCurveBootstrap`'s closure,
+/// `globalbootstrap.cpp:61-100`): it splits each trial point into the
+/// contributors' blocks, writes them all, notifies the observers, and only
+/// then collects the contributors' residuals into one vector.
+///
+/// The two phases are separate loops on purpose (`cpp:70` / `:74-75` / `:82`).
+/// A contributor's `evaluate` reads curves other contributors own, so every
+/// write and the `borrow_mut` it takes must be finished before any read starts;
+/// fusing the loops would take a shared borrow of a cell still mutably borrowed
+/// and panic.
+///
+/// The notify loop walks `observers` and never `contributors`: a contributing
+/// curve's own updater would clear the lazy flag `setup_cost_function` set, and
+/// the next helper read inside the solve would route back through the parent
+/// branch of `calculate` into [`MultiCurveBootstrap::run`].
+///
+/// Like [`GlobalCost`], it bridges fallible contributors to the infallible
+/// [`CostFunction`]: the first error is parked and the evaluation answers with
+/// NaN residuals, sized from the last successful evaluation or, before there is
+/// one, from the guess - any non-empty length will do, since
+/// [`CostFunction::value`] panics only on an empty one.
+struct StackedCost<'a> {
+    contributors: &'a [Shared<dyn MultiCurveBootstrapContributor>],
+    sizes: &'a [Size],
+    observers: &'a RefCell<Vec<WeakMut<dyn Observer>>>,
+    error: RefCell<Option<QlError>>,
+    last_len: Cell<Size>,
+}
+
+impl StackedCost<'_> {
+    fn try_values(&self, x: &Array) -> QlResult<Array> {
+        let trial: &[Real] = x;
+        let mut offset = 0;
+        for (contributor, size) in self.contributors.iter().zip(self.sizes) {
+            contributor.set_cost_function_argument(&trial[offset..offset + size])?;
+            offset += size;
+        }
+
+        // Upgraded out of the list before any `update` runs, so an observer
+        // reaching back into the parent does not find `observers` borrowed.
+        let observers: Vec<SharedMut<dyn Observer>> = self
+            .observers
+            .borrow()
+            .iter()
+            .filter_map(WeakMut::upgrade)
+            .collect();
+        for observer in observers {
+            observer.borrow_mut().update();
+        }
+
+        let mut residuals: Vec<Real> = Vec::new();
+        for contributor in self.contributors {
+            residuals.extend(contributor.evaluate_cost_function()?.iter().copied());
+        }
+        Ok(Array::from(residuals))
+    }
+}
+
+impl CostFunction for StackedCost<'_> {
+    fn values(&self, x: &Array) -> Array {
+        match self.try_values(x) {
+            Ok(values) => {
+                self.last_len.set(values.size());
+                values
+            }
+            Err(err) => {
+                let mut slot = self.error.borrow_mut();
+                if slot.is_none() {
+                    *slot = Some(err);
+                }
+                Array::filled(self.last_len.get(), Real::NAN)
+            }
+        }
     }
 }
 
@@ -951,6 +1136,10 @@ impl<T: YieldBootstrapTraits + 'static, I: Interpolator + 'static> MultiCurveBoo
             );
         };
         bootstrap.set_to_valid(self, state, solution)
+    }
+
+    fn invalidate(&self) {
+        self.invalidate_silently();
     }
 }
 
@@ -1879,22 +2068,18 @@ mod tests {
     /// answer every query with plausible numbers, and no repricing assertion
     /// downstream would notice, because a single-curve solve reprices its own
     /// helpers perfectly. So the pin is on the ROUTING, and it is
-    /// self-discriminating: the linked arm must both bump the parent's run
-    /// count and leave the curve's nodes exactly as they were, while the
-    /// unlinked arm must leave the count alone and solve its own nodes. The
-    /// counter DELTA between the two arms is the discriminator, not its
-    /// absolute value.
+    /// self-discriminating: the linked arm must bump the parent's run count and
+    /// come back solved through the joint path, while the unlinked arm must
+    /// leave the count alone and solve itself. The counter DELTA between the
+    /// two arms is the discriminator, not its absolute value.
     ///
-    /// The linked curve is read through `curve_data` rather than through
-    /// `discount`: the joint solve is a stub in this unit, so the curve is left
-    /// marked calculated over an empty grid and a rate query would fault inside
-    /// the interpolation rather than return an error.
-    ///
-    /// PRE-AUTHORISED EDIT: unit 2b makes `run` a real stacked solve, at which
-    /// point the linked arm's "nodes untouched" assertion cannot survive - the
-    /// joint solve writes them. That unit is expected to rewrite this test's
-    /// linked arm to assert the joint result instead, and doing so is not a
-    /// breach of the no-test-edits rule.
+    /// The linked arm asserts the helpers reprice rather than comparing node
+    /// vectors: the joint solve runs at the PARENT's accuracy, not the curve's,
+    /// so its answer is a different point of the same basin than the
+    /// single-curve solve's and the two node vectors do not agree bit for bit.
+    /// The helpers are checked before the unlinked curve is built, because both
+    /// curves are fitted to the same shared helper objects and the second setup
+    /// re-points them.
     #[test]
     fn a_parent_link_routes_calculate_to_the_joint_solve() {
         let fixture = fixture();
@@ -1904,7 +2089,6 @@ mod tests {
             &fixture,
             GlobalBootstrap::new(Some(1.0e-12), None, Vec::new()),
         );
-        let unsolved = linked.curve_data().borrow().data().to_vec();
         parent.add(&(Shared::clone(&linked) as Shared<dyn MultiCurveBootstrapContributor>));
         linked
             .calculate()
@@ -1914,11 +2098,15 @@ mod tests {
             1,
             "a linked curve's calculate did not route to the joint solve"
         );
-        assert_eq!(
-            linked.curve_data().borrow().data().to_vec(),
-            unsolved,
-            "the linked curve ran its own single-curve solve instead of the joint one"
-        );
+        for (i, helper) in fixture.helpers.iter().enumerate() {
+            let error = helper
+                .quote_error()
+                .expect("every helper reprices off the jointly solved curve");
+            assert!(
+                error.abs() < 1.0e-9,
+                "helper {i} does not reprice off the jointly solved curve: {error}"
+            );
+        }
 
         let alone = curve_with(
             &fixture,

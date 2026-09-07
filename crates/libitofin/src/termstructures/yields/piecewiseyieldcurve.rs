@@ -234,6 +234,15 @@ impl<T: YieldBootstrapTraits, I: Interpolator, B> PiecewiseYieldCurve<T, I, B> {
     pub(crate) fn mark_calculated(&self) {
         self.lazy.borrow_mut().mark_calculated();
     }
+
+    /// Undoes [`mark_calculated`](Self::mark_calculated) without notifying, so
+    /// the next read bootstraps again. The multi-curve parent calls it on every
+    /// curve it had already set up when the joint solve fails, since those
+    /// curves would otherwise read as calculated over a grid no solve
+    /// finished.
+    pub(crate) fn invalidate_silently(&self) {
+        self.lazy.borrow_mut().invalidate_silently();
+    }
 }
 
 impl<T: YieldBootstrapTraits, I: Interpolator, B> AsObservable for PiecewiseYieldCurve<T, I, B> {
