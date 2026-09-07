@@ -120,6 +120,7 @@ use crate::shared::{Shared, SharedMut, WeakMut};
 use crate::termstructures::bootstraphelper::{BootstrapHelperShared, RateHelper};
 use crate::termstructures::bootstraptraits::{BootstrapTraits, YieldBootstrapTraits};
 use crate::termstructures::iterativebootstrap::{Bootstrap, PiecewiseCurve};
+use crate::termstructures::yields::PiecewiseYieldCurve;
 use crate::termstructures::yieldtermstructure::YieldTermStructure;
 use crate::time::date::Date;
 use crate::types::{Real, Size, Time};
@@ -206,6 +207,26 @@ pub struct GlobalBootstrap {
     instrument_weights: Vec<Real>,
     penalties: Option<Box<AdditionalPenalties>>,
     additional_variables: Option<Box<dyn AdditionalBootstrapVariables>>,
+    /// The parent of a contributing curve (`mutable parentBootstrapper_`,
+    /// `globalbootstrap.hpp:156`), set by
+    /// [`MultiCurveBootstrapContributor::set_parent_bootstrapper`] and read at
+    /// the top of [`Bootstrap::calculate`]. Strong on purpose: a `Weak` here
+    /// would dangle once the caller drops the wrapper holding the parent, and
+    /// `calculate` would then fall back to the single-curve solve without
+    /// saying so. The parent holds its contributors weakly, so there is no
+    /// cycle.
+    parent: RefCell<Option<Shared<MultiCurveBootstrap>>>,
+    /// The state of the multi-curve solve in flight, stashed by
+    /// [`MultiCurveBootstrapContributor::setup_cost_function`] because the
+    /// parent calls the later pieces as separate steps and cannot carry it
+    /// between them. The single-curve `calculate` keeps its own local state and
+    /// never touches this.
+    state: RefCell<Option<GlobalBootstrapState>>,
+    /// The [`GlobalCost`] adapter's NaN-length bookkeeping, for the multi-curve
+    /// path only: the parent evaluates through the trait rather than through a
+    /// [`GlobalCost`], so the cell that adapter owns for the single-curve solve
+    /// lives here instead.
+    penalty_len: Cell<Size>,
 }
 
 impl Default for GlobalBootstrap {
@@ -232,6 +253,9 @@ impl GlobalBootstrap {
             instrument_weights,
             penalties: None,
             additional_variables: None,
+            parent: RefCell::new(None),
+            state: RefCell::new(None),
+            penalty_len: Cell::new(0),
         }
     }
 
@@ -264,6 +288,9 @@ impl GlobalBootstrap {
             instrument_weights,
             penalties: Some(Box::new(penalties)),
             additional_variables: None,
+            parent: RefCell::new(None),
+            state: RefCell::new(None),
+            penalty_len: Cell::new(0),
         }
     }
 
@@ -474,8 +501,8 @@ impl MultiCurveBootstrap {
 /// `aliveInstruments_` and `aliveInstrumentWeights_` (`globalbootstrap.hpp:148`
 /// and `:154`) and reads the third off the curve; the Rust pieces take `&self`
 /// on a shared bootstrap, so what they hand each other is explicit and owned.
-struct GlobalBootstrapState<C: PiecewiseCurve> {
-    alive: Vec<Shared<C::Helper>>,
+struct GlobalBootstrapState {
+    alive: Vec<Shared<dyn RateHelper>>,
     alive_weights: Vec<Real>,
     /// The number of interior nodes, `times.len() - 1`, and the number of
     /// variables the solve carries; the residual count is `alive.len()` plus
@@ -491,7 +518,7 @@ impl GlobalBootstrap {
     /// guard and `initialize` (`:232-236`, `:244-315`) folded into it: the
     /// weights guard, the alive filters, the pillar grid and its installation,
     /// the hand-over of the curve to the helpers, and the initial guess.
-    fn setup<C>(&self, curve: &C) -> QlResult<(GlobalBootstrapState<C>, Array)>
+    fn setup<C>(&self, curve: &C) -> QlResult<(GlobalBootstrapState, Array)>
     where
         C: PiecewiseCurve<Helper = dyn RateHelper, TS = dyn YieldTermStructure>,
         C::Traits: YieldBootstrapTraits,
@@ -654,12 +681,7 @@ impl GlobalBootstrap {
     /// `setCostFunctionArgument` (`globalbootstrap.hpp:376-387`): the interior
     /// trial nodes and the full-grid rebuild inside a scoped `borrow_mut`, then
     /// the trial point's tail to the additional variables.
-    fn set_argument<C>(
-        &self,
-        curve: &C,
-        state: &GlobalBootstrapState<C>,
-        x: &[Real],
-    ) -> QlResult<()>
+    fn set_argument<C>(&self, curve: &C, state: &GlobalBootstrapState, x: &[Real]) -> QlResult<()>
     where
         C: PiecewiseCurve<Helper = dyn RateHelper, TS = dyn YieldTermStructure>,
         C::Traits: YieldBootstrapTraits,
@@ -693,7 +715,7 @@ impl GlobalBootstrap {
     fn evaluate<C>(
         &self,
         curve: &C,
-        state: &GlobalBootstrapState<C>,
+        state: &GlobalBootstrapState,
         penalty_len: &Cell<Size>,
     ) -> QlResult<Array>
     where
@@ -729,7 +751,7 @@ impl GlobalBootstrap {
     fn set_to_valid<C>(
         &self,
         curve: &C,
-        state: &GlobalBootstrapState<C>,
+        state: &GlobalBootstrapState,
         solution: &[Real],
     ) -> QlResult<()>
     where
@@ -775,7 +797,7 @@ impl GlobalBootstrap {
 struct GlobalCost<'a, C: PiecewiseCurve> {
     bootstrap: &'a GlobalBootstrap,
     curve: &'a C,
-    state: &'a GlobalBootstrapState<C>,
+    state: &'a GlobalBootstrapState,
     /// The penalty-term count of the last evaluation, so a failed evaluation's
     /// NaN vector has the length the solver sized itself on.
     penalty_len: Cell<Size>,
@@ -829,6 +851,17 @@ where
     }
 
     fn calculate(&self, curve: &C) -> QlResult<()> {
+        // The parent branch (`globalbootstrap.hpp:408-411`): a contributing
+        // curve runs the joint solve instead of its own. The parent is bound
+        // out of the `RefCell` before the call because `run` drives this
+        // bootstrap's own cells; `setup_cost_function` marks the curve
+        // calculated (`:324`), so those callbacks do not re-enter here.
+        let parent = self.parent.borrow().clone();
+        if let Some(parent) = parent {
+            parent.run()?;
+            return Ok(());
+        }
+
         let (state, guess) = self.setup(curve)?;
 
         // Solver configuration (`:222-229`): the LM tolerances and the
@@ -865,6 +898,59 @@ where
         );
 
         self.set_to_valid(curve, &state, &solution)
+    }
+}
+
+impl<T: YieldBootstrapTraits + 'static, I: Interpolator + 'static> MultiCurveBootstrapContributor
+    for PiecewiseYieldCurve<T, I, GlobalBootstrap>
+{
+    fn set_parent_bootstrapper(&self, parent: Shared<MultiCurveBootstrap>) {
+        *self.bootstrap().parent.borrow_mut() = Some(parent);
+    }
+
+    fn setup_cost_function(&self) -> QlResult<Array> {
+        // `ts_->setCalculated(true)` comes first (`globalbootstrap.hpp:324`):
+        // the parent reaches a contributing curve without going through its
+        // `calculate`, so this is what stops a mid-solve read of that curve
+        // from re-entering `calculate` and recursing into `run`.
+        self.mark_calculated();
+        let bootstrap = self.bootstrap();
+        let (state, guess) = bootstrap.setup(self)?;
+        *bootstrap.state.borrow_mut() = Some(state);
+        Ok(guess)
+    }
+
+    fn set_cost_function_argument(&self, x: &[Real]) -> QlResult<()> {
+        let bootstrap = self.bootstrap();
+        let state = bootstrap.state.borrow();
+        let Some(state) = state.as_ref() else {
+            crate::fail!(
+                "multi-curve contributor has no state: set_cost_function_argument ran before setup_cost_function"
+            );
+        };
+        bootstrap.set_argument(self, state, x)
+    }
+
+    fn evaluate_cost_function(&self) -> QlResult<Array> {
+        let bootstrap = self.bootstrap();
+        let state = bootstrap.state.borrow();
+        let Some(state) = state.as_ref() else {
+            crate::fail!(
+                "multi-curve contributor has no state: evaluate_cost_function ran before setup_cost_function"
+            );
+        };
+        bootstrap.evaluate(self, state, &bootstrap.penalty_len)
+    }
+
+    fn set_to_valid(&self, solution: &[Real]) -> QlResult<()> {
+        let bootstrap = self.bootstrap();
+        let state = bootstrap.state.borrow();
+        let Some(state) = state.as_ref() else {
+            crate::fail!(
+                "multi-curve contributor has no state: set_to_valid ran before setup_cost_function"
+            );
+        };
+        bootstrap.set_to_valid(self, state, solution)
     }
 }
 
@@ -1782,6 +1868,143 @@ mod tests {
         assert!(
             curve.discount_date(max_date, false).is_ok(),
             "the extended range must be queryable without extrapolation"
+        );
+    }
+
+    /// A curve linked to a parent must run the JOINT solve and not its own
+    /// (`globalbootstrap.hpp:408-411`).
+    ///
+    /// This is the guard against the silent-wrong the parent link exists to
+    /// prevent: a contributor that quietly kept solving alone would still
+    /// answer every query with plausible numbers, and no repricing assertion
+    /// downstream would notice, because a single-curve solve reprices its own
+    /// helpers perfectly. So the pin is on the ROUTING, and it is
+    /// self-discriminating: the linked arm must both bump the parent's run
+    /// count and leave the curve's nodes exactly as they were, while the
+    /// unlinked arm must leave the count alone and solve its own nodes. The
+    /// counter DELTA between the two arms is the discriminator, not its
+    /// absolute value.
+    ///
+    /// The linked curve is read through `curve_data` rather than through
+    /// `discount`: the joint solve is a stub in this unit, so the curve is left
+    /// marked calculated over an empty grid and a rate query would fault inside
+    /// the interpolation rather than return an error.
+    ///
+    /// PRE-AUTHORISED EDIT: unit 2b makes `run` a real stacked solve, at which
+    /// point the linked arm's "nodes untouched" assertion cannot survive - the
+    /// joint solve writes them. That unit is expected to rewrite this test's
+    /// linked arm to assert the joint result instead, and doing so is not a
+    /// breach of the no-test-edits rule.
+    #[test]
+    fn a_parent_link_routes_calculate_to_the_joint_solve() {
+        let fixture = fixture();
+        let parent = shared(MultiCurveBootstrap::new(1.0e-10));
+
+        let linked = curve_with(
+            &fixture,
+            GlobalBootstrap::new(Some(1.0e-12), None, Vec::new()),
+        );
+        let unsolved = linked.curve_data().borrow().data().to_vec();
+        parent.add(&(Shared::clone(&linked) as Shared<dyn MultiCurveBootstrapContributor>));
+        linked
+            .calculate()
+            .expect("the linked curve routes to the parent");
+        assert_eq!(
+            parent.runs.get(),
+            1,
+            "a linked curve's calculate did not route to the joint solve"
+        );
+        assert_eq!(
+            linked.curve_data().borrow().data().to_vec(),
+            unsolved,
+            "the linked curve ran its own single-curve solve instead of the joint one"
+        );
+
+        let alone = curve_with(
+            &fixture,
+            GlobalBootstrap::new(Some(1.0e-12), None, Vec::new()),
+        );
+        alone.calculate().expect("an unlinked curve solves itself");
+        assert_eq!(
+            parent.runs.get(),
+            1,
+            "an unlinked curve reached a parent it was never added to"
+        );
+        assert_eq!(
+            alone.curve_data().borrow().data().len(),
+            fixture.helpers.len() + 1,
+            "the unlinked curve did not solve its own nodes"
+        );
+    }
+
+    /// `setup_cost_function` marks the curve calculated (`:324`), and that is
+    /// what stops a mid-solve read of a contributing curve from re-entering
+    /// `calculate` and recursing into the joint run.
+    ///
+    /// The parent reaches a contributor directly, never through the curve's own
+    /// `calculate`, so the lazy flag the single-curve path sets in
+    /// `start_calculation` is never set on this route. Dropping the
+    /// `mark_calculated` call sends this `calculate` to `parent.run` and the
+    /// count reads 1.
+    #[test]
+    fn setting_up_a_contributor_marks_its_curve_calculated() {
+        let fixture = fixture();
+        let parent = shared(MultiCurveBootstrap::new(1.0e-10));
+        let curve = curve_with(
+            &fixture,
+            GlobalBootstrap::new(Some(1.0e-12), None, Vec::new()),
+        );
+        parent.add(&(Shared::clone(&curve) as Shared<dyn MultiCurveBootstrapContributor>));
+
+        let guess = curve
+            .setup_cost_function()
+            .expect("the contributor installs its grid");
+        assert_eq!(
+            guess.size(),
+            fixture.helpers.len(),
+            "the guess must hold one coordinate per interior node"
+        );
+
+        curve
+            .calculate()
+            .expect("an already-calculated curve returns at once");
+        assert_eq!(
+            parent.runs.get(),
+            0,
+            "a curve marked calculated by setup_cost_function re-entered the joint solve"
+        );
+    }
+
+    /// `add` (`globalbootstrap.cpp:41-44`) is a round trip: the parent records
+    /// the contributor and the contributor records the parent.
+    ///
+    /// The two directions differ on purpose (D1/D3): the parent holds a `Weak`,
+    /// mirroring the C++ raw `const*`, while the contributor holds a strong
+    /// [`Shared`], mirroring the C++ `shared_ptr` member at `hpp:156`. A `Weak`
+    /// on the contributor's side would dangle as soon as the caller dropped the
+    /// parent, and the curve would fall back to solving alone.
+    #[test]
+    fn add_records_the_contributor_weakly_and_the_parent_strongly() {
+        let fixture = fixture();
+        let parent = shared(MultiCurveBootstrap::new(1.0e-10));
+        let curve = curve_with(
+            &fixture,
+            GlobalBootstrap::new(Some(1.0e-12), None, Vec::new()),
+        );
+
+        parent.add(&(Shared::clone(&curve) as Shared<dyn MultiCurveBootstrapContributor>));
+
+        let linked = curve.bootstrap().parent.borrow();
+        let linked = linked.as_ref().expect("add did not link the parent back");
+        assert!(
+            Shared::ptr_eq(linked, &parent),
+            "the contributor was linked to a different parent"
+        );
+        let contributors = parent.contributors.borrow();
+        assert_eq!(contributors.len(), 1, "the parent recorded no contributor");
+        assert!(
+            contributors[0].upgrade().is_some(),
+            "the parent's weak contributor does not resolve"
         );
     }
 

@@ -216,6 +216,26 @@ where
     }
 }
 
+impl<T: YieldBootstrapTraits, I: Interpolator, B> PiecewiseYieldCurve<T, I, B> {
+    /// The curve's own bootstrap instance, which for a
+    /// [`GlobalBootstrap`](crate::termstructures::globalbootstrap::GlobalBootstrap)
+    /// curve also carries its multi-curve parent link and per-solve state
+    /// (`globalbootstrap.hpp:156`). Unbounded in `B` so the accessor does not
+    /// drag the recursive `Bootstrap<Self>` obligation onto its callers.
+    pub(crate) fn bootstrap(&self) -> &B {
+        &self.bootstrap
+    }
+
+    /// Marks the cached bootstrap valid without running one, the port of
+    /// `ts_->setCalculated(true)` (`globalbootstrap.hpp:324`). The multi-curve
+    /// parent drives a contributing curve's bootstrap directly, never through
+    /// [`calculate`](Self::calculate), so it must set the flag that stops a
+    /// mid-solve read from re-entering.
+    pub(crate) fn mark_calculated(&self) {
+        self.lazy.borrow_mut().mark_calculated();
+    }
+}
+
 impl<T: YieldBootstrapTraits, I: Interpolator, B> AsObservable for PiecewiseYieldCurve<T, I, B> {
     fn observable(&self) -> &Observable {
         &self.observable
