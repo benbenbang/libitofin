@@ -41,6 +41,7 @@ pub mod inflation;
 pub mod interpolatedcurve;
 pub mod iterativebootstrap;
 pub mod localbootstrap;
+pub mod multicurve;
 pub mod volatility;
 pub mod yields;
 pub mod yieldtermstructure;
@@ -49,6 +50,7 @@ pub use bootstraphelper::{
     BootstrapHelperBase, BootstrapHelperShared, RateHelper, RelativeDateRateHelper,
     compare_by_pillar_date, sort_by_pillar_date,
 };
+pub use multicurve::MultiCurve;
 
 use std::cell::Cell;
 
@@ -271,6 +273,15 @@ impl TermStructureBase {
 pub trait TermStructure: AsObservable {
     /// The embedded shared holder.
     fn base(&self) -> &TermStructureBase;
+
+    /// The structure's observer half, for registering with an upstream
+    /// observable or delivering a fan-out to. Defaults to the base half; a
+    /// curve whose cache lives behind a private updater (a bootstrapped curve)
+    /// overrides this to return that half instead, so a notification reaches
+    /// the state that re-solves the curve rather than only its subscribers.
+    fn updater(&self) -> SharedMut<dyn Observer> {
+        self.base().updater()
+    }
 
     /// The latest date for which the curve can return values.
     fn max_date(&self) -> Date;

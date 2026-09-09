@@ -260,6 +260,13 @@ where
         &self.base
     }
 
+    /// Overrides the default base half with the private [`CurveUpdater`], the
+    /// only half that invalidates the bootstrap cache; the base half would
+    /// notify subscribers without re-solving the curve.
+    fn updater(&self) -> SharedMut<dyn Observer> {
+        SharedMut::clone(&self.updater) as SharedMut<dyn Observer>
+    }
+
     fn max_date(&self) -> Date {
         // Trigger the bootstrap so the maximum reflects the solved curve; a
         // bootstrap failure is surfaced by `discount`, so fall back here.

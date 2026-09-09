@@ -22,13 +22,14 @@
 //! path with `parentBootstrapper_` null. The multi-curve machinery is here
 //! too: the [`MultiCurveBootstrapContributor`] interface (`hpp:40-49`), the
 //! [`MultiCurveBootstrap`] parent it links to (`hpp:51-67`) and the
-//! `parentBootstrapper_` branch of `calculate` (`hpp:408-411`). Deferred
-//! visibly, as its own follow-up issue referencing #949:
+//! `parentBootstrapper_` branch of `calculate` (`hpp:408-411`). The
+//! [`MultiCurve`](crate::termstructures::multicurve::MultiCurve) wrapper that
+//! assembles the contributors (`ql/termstructures/multicurve.hpp`) is ported
+//! too. Deferred visibly, as its own follow-up issue (#995) referencing #949:
 //!
-//! - **The `MultiCurve` wrapper** that assembles the contributors
-//!   (`ql/termstructures/multicurve.hpp`) and the non-bootstrapped contributor
-//!   with its two-phase observer refresh, which is what fills
-//!   [`MultiCurveBootstrap::add_observer`]'s list.
+//! - **The two-curve spreaded self-reprice oracle**
+//!   (`testMultiCurvePiecewiseYieldCurveAndSpreadedCurve`) and the basis rate
+//!   helper it needs, which exercise the joint solve end to end.
 //!
 //! The C++ optimizer override (`shared_ptr<OptimizationMethod>`) is not
 //! carried either: the default `LevenbergMarquardt(accuracy, accuracy,
