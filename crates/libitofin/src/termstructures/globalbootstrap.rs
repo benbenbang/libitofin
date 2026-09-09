@@ -497,6 +497,21 @@ impl MultiCurveBootstrap {
             .push(SharedMut::downgrade(observer));
     }
 
+    /// The number of contributing curves registered by [`add`](Self::add), for
+    /// the `MultiCurve` wrapper's wiring tests.
+    #[cfg(test)]
+    pub(crate) fn contributor_count(&self) -> usize {
+        self.contributors.borrow().len()
+    }
+
+    /// The number of observers registered by
+    /// [`add_observer`](Self::add_observer), for the `MultiCurve` wrapper's
+    /// wiring tests.
+    #[cfg(test)]
+    pub(crate) fn observer_count(&self) -> usize {
+        self.observers.borrow().len()
+    }
+
     /// `runMultiCurveBootstrap` (`globalbootstrap.cpp:50-116`): the stacked
     /// solve over every contributor at once.
     ///

@@ -185,3 +185,238 @@ impl MultiCurve {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::handle::Handle;
+    use crate::indexes::IborIndex;
+    use crate::indexes::ibor::euribor::Euribor;
+    use crate::math::interpolations::loglinear::LogLinear;
+    use crate::patterns::observable::AsObservable;
+    use crate::settings::Settings;
+    use crate::shared::shared_mut;
+    use crate::termstructures::bootstraphelper::RateHelper;
+    use crate::termstructures::bootstraptraits::Discount;
+    use crate::termstructures::globalbootstrap::GlobalBootstrap;
+    use crate::termstructures::yields::{DepositRateHelper, PiecewiseYieldCurve};
+    use crate::time::date::{Date, Month};
+    use crate::time::daycounters::actual365fixed::Actual365Fixed;
+
+    type BootCurve = PiecewiseYieldCurve<Discount, LogLinear, GlobalBootstrap>;
+
+    #[derive(Default)]
+    struct Flag {
+        fired: bool,
+    }
+
+    impl Observer for Flag {
+        fn update(&mut self) {
+            self.fired = true;
+        }
+    }
+
+    fn env() -> (Shared<Settings<Date>>, Date, IborIndex) {
+        let settings = shared(Settings::<Date>::new());
+        let today = Date::new(13, Month::December, 2019);
+        settings.set_evaluation_date(today);
+        let index = Euribor::six_months(Handle::empty(), Shared::clone(&settings));
+        (settings, today, index)
+    }
+
+    /// A minimal single-deposit curve. The wiring tests never run the joint
+    /// solve, so the curve only has to build, not converge.
+    fn deposit_curve(reference_date: Date, index: &IborIndex, rate: Real) -> Shared<BootCurve> {
+        let helper = DepositRateHelper::from_rate(rate, index) as Shared<dyn RateHelper>;
+        PiecewiseYieldCurve::with_bootstrap(
+            reference_date,
+            vec![helper],
+            Actual365Fixed::new(),
+            LogLinear,
+            GlobalBootstrap::default(),
+        )
+        .expect("the single-deposit strip builds a curve")
+    }
+
+    fn flag_observer(flag: &SharedMut<Flag>) -> SharedMut<dyn Observer> {
+        SharedMut::clone(flag) as SharedMut<dyn Observer>
+    }
+
+    #[test]
+    fn adds_bootstrapped_and_non_bootstrapped_curves() {
+        let (_settings, reference_date, index) = env();
+        let multicurve = MultiCurve::new(1.0e-10);
+
+        let internal_boot = RelinkableHandle::<dyn YieldTermStructure>::empty();
+        let boot = deposit_curve(reference_date, &index, 0.02);
+        let boot_dyn = Shared::clone(&boot) as Shared<dyn YieldTermStructure>;
+        let external_boot = multicurve
+            .add_bootstrapped_curve(&internal_boot, Shared::clone(&boot))
+            .expect("a bootstrapped curve is added");
+
+        let internal_non = RelinkableHandle::<dyn YieldTermStructure>::empty();
+        let non_dyn: Shared<dyn YieldTermStructure> = deposit_curve(reference_date, &index, 0.025);
+        let external_non = multicurve
+            .add_non_bootstrapped_curve(&internal_non, Shared::clone(&non_dyn))
+            .expect("a non-bootstrapped curve is added");
+
+        assert!(!internal_boot.handle().is_empty());
+        assert!(!internal_non.handle().is_empty());
+        assert!(Shared::ptr_eq(
+            &internal_boot
+                .handle()
+                .current_link()
+                .expect("the internal handle resolves the curve"),
+            &boot_dyn
+        ));
+        assert!(Shared::ptr_eq(
+            &internal_non
+                .handle()
+                .current_link()
+                .expect("the internal handle resolves the curve"),
+            &non_dyn
+        ));
+
+        assert_eq!(
+            multicurve.bootstrap.contributor_count(),
+            1,
+            "only the bootstrapped curve is a contributor"
+        );
+        assert_eq!(
+            multicurve.bootstrap.observer_count(),
+            1,
+            "only the non-bootstrapped curve is an observer"
+        );
+
+        assert!(Shared::ptr_eq(
+            &external_boot
+                .current_link()
+                .expect("the external handle owns its curve"),
+            &boot_dyn
+        ));
+        assert!(Shared::ptr_eq(
+            &external_non
+                .current_link()
+                .expect("the external handle owns its curve"),
+            &non_dyn
+        ));
+    }
+
+    #[test]
+    fn rejects_a_reused_internal_handle() {
+        let (_settings, reference_date, index) = env();
+        let multicurve = MultiCurve::new(1.0e-10);
+        let internal = RelinkableHandle::<dyn YieldTermStructure>::empty();
+
+        let first = deposit_curve(reference_date, &index, 0.02);
+        multicurve
+            .add_bootstrapped_curve(&internal, first)
+            .expect("the first add links the handle");
+
+        let second = deposit_curve(reference_date, &index, 0.03);
+        assert!(
+            multicurve
+                .add_bootstrapped_curve(&internal, second)
+                .is_err(),
+            "a second add on a linked handle must be rejected"
+        );
+    }
+
+    #[test]
+    fn dropping_the_multicurve_surfaces_a_dropped_contributor() {
+        let (_settings, reference_date, index) = env();
+        let multicurve = MultiCurve::new(1.0e-10);
+
+        let internal_a = RelinkableHandle::<dyn YieldTermStructure>::empty();
+        let a = deposit_curve(reference_date, &index, 0.02);
+        let external_a = multicurve
+            .add_bootstrapped_curve(&internal_a, Shared::clone(&a))
+            .expect("curve A is added");
+
+        let internal_b = RelinkableHandle::<dyn YieldTermStructure>::empty();
+        let b = deposit_curve(reference_date, &index, 0.03);
+        multicurve
+            .add_bootstrapped_curve(&internal_b, Shared::clone(&b))
+            .expect("curve B is added");
+        drop(b);
+
+        drop(multicurve);
+
+        assert!(
+            internal_b.handle().current_link().is_err(),
+            "the weak internal handle did not keep the dropped contributor alive"
+        );
+
+        let error = a
+            .calculate()
+            .expect_err("a dropped contributor must surface as an error");
+        assert!(
+            format!("{error}").contains("dropped"),
+            "the error must name the dropped contributor: {error}"
+        );
+
+        drop(external_a);
+    }
+
+    #[test]
+    fn update_fans_out_to_member_curves() {
+        let (_settings, reference_date, index) = env();
+        let multicurve = MultiCurve::new(1.0e-10);
+
+        let internal_a = RelinkableHandle::<dyn YieldTermStructure>::empty();
+        let a = deposit_curve(reference_date, &index, 0.02);
+        multicurve
+            .add_bootstrapped_curve(&internal_a, Shared::clone(&a))
+            .expect("curve A is added");
+
+        let internal_b = RelinkableHandle::<dyn YieldTermStructure>::empty();
+        let b = deposit_curve(reference_date, &index, 0.03);
+        multicurve
+            .add_bootstrapped_curve(&internal_b, Shared::clone(&b))
+            .expect("curve B is added");
+
+        let flag = shared_mut(Flag::default());
+        b.observable().register_observer(&flag_observer(&flag));
+
+        a.observable().notify_observers();
+
+        assert!(
+            flag.borrow().fired,
+            "MultiCurve::update did not fan a change on A out to B"
+        );
+    }
+
+    #[test]
+    fn the_internal_weak_handle_does_not_forward() {
+        let (_settings, reference_date, index) = env();
+        let multicurve = MultiCurve::new(1.0e-10);
+
+        let internal_a = RelinkableHandle::<dyn YieldTermStructure>::empty();
+        let a = deposit_curve(reference_date, &index, 0.02);
+        multicurve
+            .add_bootstrapped_curve(&internal_a, Shared::clone(&a))
+            .expect("curve A is added");
+
+        let weak_flag = shared_mut(Flag::default());
+        internal_a
+            .handle()
+            .register_observer(&flag_observer(&weak_flag));
+
+        let owning = RelinkableHandle::new(Shared::clone(&a) as Shared<dyn YieldTermStructure>);
+        let owning_flag = shared_mut(Flag::default());
+        owning
+            .handle()
+            .register_observer(&flag_observer(&owning_flag));
+
+        a.observable().notify_observers();
+
+        assert!(
+            !weak_flag.borrow().fired,
+            "the weak internal handle forwarded a notification it must not"
+        );
+        assert!(
+            owning_flag.borrow().fired,
+            "an owning handle on the same curve did not forward the notification"
+        );
+    }
+}
