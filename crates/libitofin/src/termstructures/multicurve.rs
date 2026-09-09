@@ -142,15 +142,27 @@ impl MultiCurve {
     }
 
     /// The shared tail of both adders (`addCurve`, `multicurve.cpp:53-71`):
-    /// points the internal handle at the curve non-owningly, registers this
-    /// wrapper as an observer of the curve, takes ownership of the curve, and
-    /// returns an external handle.
+    /// points the internal handle at the curve non-owningly, subscribes this
+    /// wrapper to the curve's inputs, takes ownership of the curve, and returns
+    /// an external handle.
     ///
     /// The internal handle is linked weakly (`linkTo(..., null_deleter, false)`,
     /// `multicurve.cpp:56-57`): `curves` is the only strong owner, so the
     /// handle can neither keep the curve alive nor form the notification cycle
     /// the internal handles exist to avoid. The external handle owns only the
     /// curve, per the divergence documented on the module.
+    ///
+    /// The `registerWithObservables(curve)` of `multicurve.cpp:70` registers
+    /// with the observables *of* the curve (its inputs), not with the curve
+    /// itself (`observable.hpp:132-139`), so this calls
+    /// [`register_upstream`](TermStructure::register_upstream), not
+    /// `curve.observable()`. This is what keeps the cycle broken: MC sits beside
+    /// the members' own updaters on the shared inputs, so it hears a real input
+    /// move (a quote, a relink, an eval-date change) but is never notified from
+    /// inside a member's updater during the joint solve. A member's
+    /// [`link_to_weak`](RelinkableHandle::link_to_weak) internal handle registers
+    /// no observer on its pointee and relinks only at construction, so no
+    /// steady-state notification path leads a member's updater back to MC.
     fn add_curve(
         self: &Shared<Self>,
         internal: &RelinkableHandle<dyn YieldTermStructure>,
@@ -158,7 +170,7 @@ impl MultiCurve {
     ) -> QlResult<Handle<dyn YieldTermStructure>> {
         internal.link_to_weak(Shared::downgrade(&curve));
         let observer = SharedMut::clone(&self.updater) as SharedMut<dyn Observer>;
-        curve.observable().register_observer(&observer);
+        curve.register_upstream(&observer);
         self.curves.borrow_mut().push(Shared::clone(&curve));
         Ok(Handle::new(curve))
     }
@@ -192,16 +204,27 @@ mod tests {
     use crate::handle::Handle;
     use crate::indexes::IborIndex;
     use crate::indexes::ibor::euribor::Euribor;
+    use crate::interestrate::Compounding;
     use crate::math::interpolations::loglinear::LogLinear;
     use crate::patterns::observable::AsObservable;
+    use crate::quotes::{Quote, SimpleQuote};
     use crate::settings::Settings;
     use crate::shared::shared_mut;
     use crate::termstructures::bootstraphelper::RateHelper;
     use crate::termstructures::bootstraptraits::Discount;
     use crate::termstructures::globalbootstrap::GlobalBootstrap;
-    use crate::termstructures::yields::{DepositRateHelper, PiecewiseYieldCurve};
+    use crate::termstructures::yields::{
+        DepositRateHelper, PiecewiseYieldCurve, Pillar, SwapRateHelper, ZeroSpreadedTermStructure,
+    };
+    use crate::time::businessdayconvention::BusinessDayConvention;
+    use crate::time::calendars::target::Target;
     use crate::time::date::{Date, Month};
+    use crate::time::daycounters::actual360::Actual360;
     use crate::time::daycounters::actual365fixed::Actual365Fixed;
+    use crate::time::daycounters::thirty360::{Convention, Thirty360};
+    use crate::time::frequency::Frequency;
+    use crate::time::period::Period;
+    use crate::time::timeunit::TimeUnit;
 
     type BootCurve = PiecewiseYieldCurve<Discount, LogLinear, GlobalBootstrap>;
 
@@ -360,11 +383,23 @@ mod tests {
 
     #[test]
     fn update_fans_out_to_member_curves() {
+        // MultiCurve registers with each member's UPSTREAM observables (its
+        // inputs), never the member's own observable, so a change reaches the
+        // wrapper through an input. Build A with a helper we keep, add it, then
+        // notify that helper (A's upstream): the fan-out must reach B.
         let (_settings, reference_date, index) = env();
         let multicurve = MultiCurve::new(1.0e-10);
 
+        let helper_a = DepositRateHelper::from_rate(0.02, &index) as Shared<dyn RateHelper>;
+        let a = PiecewiseYieldCurve::<Discount, LogLinear, GlobalBootstrap>::with_bootstrap(
+            reference_date,
+            vec![Shared::clone(&helper_a)],
+            Actual365Fixed::new(),
+            LogLinear,
+            GlobalBootstrap::default(),
+        )
+        .expect("curve A builds");
         let internal_a = RelinkableHandle::<dyn YieldTermStructure>::empty();
-        let a = deposit_curve(reference_date, &index, 0.02);
         multicurve
             .add_bootstrapped_curve(&internal_a, Shared::clone(&a))
             .expect("curve A is added");
@@ -378,11 +413,89 @@ mod tests {
         let flag = shared_mut(Flag::default());
         b.observable().register_observer(&flag_observer(&flag));
 
-        a.observable().notify_observers();
+        helper_a.observable().notify_observers();
 
         assert!(
             flag.borrow().fired,
-            "MultiCurve::update did not fan a change on A out to B"
+            "MultiCurve::update did not fan an upstream change on A out to B"
+        );
+    }
+
+    #[test]
+    fn the_dependency_cycle_solves_without_re_entering_the_bootstrap() {
+        // The real multi-curve cycle: a bootstrapped 3m curve whose swap helpers
+        // discount on the ois curve, and a spreaded ois curve built over the 3m
+        // internal handle. Under the pre-fix wiring (MultiCurve registered on
+        // each member's OWN observable) the mid-solve observers-notify re-entered
+        // MultiCurveBootstrap::run and panicked at the state borrow_mut
+        // (globalbootstrap.rs:1126, the hazard globalbootstrap.rs:640-643 warns
+        // of). With MultiCurve off the members' observables the query returns Ok.
+        let settings = shared(Settings::<Date>::new());
+        let today = Date::new(23, Month::October, 2025);
+        settings.set_evaluation_date(today);
+
+        let intcurveois = RelinkableHandle::<dyn YieldTermStructure>::empty();
+        let intcurve3m = RelinkableHandle::<dyn YieldTermStructure>::empty();
+        let euribor3m = Euribor::three_months(intcurve3m.handle(), Shared::clone(&settings));
+
+        let q = Handle::new(shared(SimpleQuote::new(0.03)) as Shared<dyn Quote>);
+        let mut helpers3m: Vec<Shared<dyn RateHelper>> = Vec::new();
+        for i in 1..=5i32 {
+            helpers3m.push(SwapRateHelper::with_details(
+                q.clone(),
+                Period::new(i, TimeUnit::Years),
+                Target::new(),
+                Frequency::Annual,
+                BusinessDayConvention::Following,
+                Thirty360::with_convention(Convention::BondBasis),
+                &euribor3m,
+                Handle::empty(),
+                Period::new(0, TimeUnit::Days),
+                Some(intcurveois.handle()),
+                Pillar::LastRelevantDate,
+            ) as Shared<dyn RateHelper>);
+        }
+
+        let ptr3m = PiecewiseYieldCurve::<Discount, LogLinear, GlobalBootstrap>::with_bootstrap(
+            today,
+            helpers3m,
+            Actual360::new(),
+            LogLinear,
+            GlobalBootstrap::new(Some(1.0e-10), None, Vec::new()),
+        )
+        .expect("the 3m curve builds");
+
+        let multicurve = MultiCurve::new(1.0e-10);
+        let curve3m = multicurve
+            .add_bootstrapped_curve(&intcurve3m, ptr3m)
+            .expect("adds the 3m contributor");
+
+        let b = Handle::new(shared(SimpleQuote::new(-0.01)) as Shared<dyn Quote>);
+        let ptrois = shared(ZeroSpreadedTermStructure::new(intcurve3m.handle(), b));
+        let curveois = multicurve
+            .add_non_bootstrapped_curve(
+                &intcurveois,
+                Shared::clone(&ptrois) as Shared<dyn YieldTermStructure>,
+            )
+            .expect("adds the ois member");
+
+        let ois_rate = curveois
+            .current_link()
+            .expect("the ois handle resolves")
+            .zero_rate(1.0, Compounding::Continuous, Frequency::NoFrequency, false)
+            .expect("the ois zero rate solves without re-entering the bootstrap")
+            .rate();
+        let rate3m = curve3m
+            .current_link()
+            .expect("the 3m handle resolves")
+            .zero_rate(1.0, Compounding::Continuous, Frequency::NoFrequency, false)
+            .expect("the 3m zero rate solves")
+            .rate();
+
+        assert!(
+            (ois_rate - rate3m - (-0.01)).abs() < 1.0e-10,
+            "spread {} is not the -0.01 the ZeroSpreadedTermStructure adds",
+            ois_rate - rate3m
         );
     }
 
