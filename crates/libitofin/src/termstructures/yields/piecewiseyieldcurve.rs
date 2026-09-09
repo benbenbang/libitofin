@@ -267,6 +267,18 @@ where
         SharedMut::clone(&self.updater) as SharedMut<dyn Observer>
     }
 
+    /// The curve's inputs are its rate helpers plus any helpers the bootstrap
+    /// owns rather than fits: the same set its own [`CurveUpdater`] observes
+    /// (`:163-170`).
+    fn register_upstream(&self, observer: &SharedMut<dyn Observer>) {
+        for helper in &self.instruments {
+            helper.observable().register_observer(observer);
+        }
+        for observable in self.bootstrap.additional_observables() {
+            observable.register_observer(observer);
+        }
+    }
+
     fn max_date(&self) -> Date {
         // Trigger the bootstrap so the maximum reflects the solved curve; a
         // bootstrap failure is surfaced by `discount`, so fall back here.

@@ -109,6 +109,13 @@ impl TermStructure for ZeroSpreadedTermStructure {
         &self.base
     }
 
+    /// The spreaded curve's inputs are the original curve handle and the spread
+    /// quote handle: the two observables its own listener observes.
+    fn register_upstream(&self, observer: &SharedMut<dyn Observer>) {
+        self.original.register_observer(observer);
+        self.spread.register_observer(observer);
+    }
+
     fn max_date(&self) -> Date {
         self.original
             .current_link()
