@@ -204,9 +204,14 @@ mod tests {
     use crate::handle::Handle;
     use crate::indexes::IborIndex;
     use crate::indexes::ibor::euribor::Euribor;
+    use crate::indexes::interestrateindex::InterestRateIndex;
+    use crate::instrument::Instrument;
+    use crate::instruments::MakeVanillaSwap;
     use crate::interestrate::Compounding;
     use crate::math::interpolations::loglinear::LogLinear;
     use crate::patterns::observable::AsObservable;
+    use crate::pricingengine::PricingEngine;
+    use crate::pricingengines::swap::DiscountingSwapEngine;
     use crate::quotes::{Quote, SimpleQuote};
     use crate::settings::Settings;
     use crate::shared::shared_mut;
@@ -530,6 +535,174 @@ mod tests {
         assert!(
             owning_flag.borrow().fired,
             "an owning handle on the same curve did not forward the notification"
+        );
+    }
+
+    /// Prices an `i`-year vanilla swap at `fixed_rate` off `discount` (mirror
+    /// cpp:1731-1738): the fixed leg is annual Thirty360/Following, the float
+    /// leg the index's, and the discount curve is the exogenous ois handle.
+    fn swap_npv(
+        i: i32,
+        fixed_rate: Real,
+        euribor3m: &Shared<IborIndex>,
+        settings: &Shared<Settings<Date>>,
+        discount: &Handle<dyn YieldTermStructure>,
+    ) -> Real {
+        let mut swap = MakeVanillaSwap::new(
+            Period::new(i, TimeUnit::Years),
+            Shared::clone(euribor3m),
+            Some(fixed_rate),
+            Period::new(0, TimeUnit::Days),
+            Shared::clone(settings),
+        )
+        .with_settlement_days(euribor3m.fixing_days())
+        .with_fixed_leg_day_count(Thirty360::with_convention(Convention::BondBasis))
+        .with_fixed_leg_tenor(Period::new(1, TimeUnit::Years))
+        .with_fixed_leg_convention(BusinessDayConvention::Following)
+        .with_fixed_leg_termination_date_convention(BusinessDayConvention::Following)
+        .build()
+        .expect("the swap builds");
+        let engine = shared_mut(DiscountingSwapEngine::new(
+            discount.clone(),
+            None,
+            None,
+            None,
+            Shared::clone(settings),
+        ));
+        swap.base_mut()
+            .set_pricing_engine(engine as SharedMut<dyn PricingEngine>);
+        swap.npv().expect("the swap prices off the ois curve")
+    }
+
+    /// Ports `testMultiCurvePiecewiseYieldCurveAndSpreadedCurve`
+    /// (`piecewiseyieldcurve.cpp:1686-1742`): a bootstrapped 3m curve whose swap
+    /// helpers discount on a spreaded ois curve built over the 3m curve, joined
+    /// in one [`MultiCurve`]. The two members form a dependency cycle the joint
+    /// solve resolves; the spread and the self-repricing swaps are the oracle,
+    /// and a quote bump drives the cross-member fan-out.
+    ///
+    /// Honest negative: the joint mechanism (two-phase set/notify/evaluate,
+    /// offset slicing, parent routing, error revert) is pinned by the
+    /// mock-contributor tests in `globalbootstrap.rs`; this does not re-pin it.
+    /// The spread identity is additive for a `ZeroSpreadedTermStructure` and the
+    /// swap NPVs are self-reprice, so both pass even under a mis-wired solve:
+    /// this is an integration / self-consistency test, and the discriminating
+    /// arm is the q-bump fan-out flag (a broken registration fails it). The
+    /// strongest oracle (mutual basis, `testMultiCurveTwoPiecewiseYieldCurves`)
+    /// and a C++-matching solved-rate pin are deferred to #995 (they need
+    /// `IborIborBasisSwapRateHelper`); no C++ value pin here.
+    #[test]
+    fn multicurve_piecewise_and_spreaded_curve_self_reprice() {
+        let calendar = Target::new();
+        let settings = shared(Settings::<Date>::new());
+        let today = calendar.adjust(
+            Date::new(23, Month::October, 2025),
+            BusinessDayConvention::Following,
+        );
+        settings.set_evaluation_date(today);
+
+        let intcurveois = RelinkableHandle::<dyn YieldTermStructure>::empty();
+        let intcurve3m = RelinkableHandle::<dyn YieldTermStructure>::empty();
+        let euribor3m = shared(Euribor::three_months(
+            intcurve3m.handle(),
+            Shared::clone(&settings),
+        ));
+
+        let q = shared(SimpleQuote::new(0.03));
+        let q_handle = Handle::new(Shared::clone(&q) as Shared<dyn Quote>);
+        let b = shared(SimpleQuote::new(-0.01));
+        let b_handle = Handle::new(Shared::clone(&b) as Shared<dyn Quote>);
+
+        let mut helpers3m: Vec<Shared<dyn RateHelper>> = Vec::new();
+        for i in 1..=10i32 {
+            helpers3m.push(SwapRateHelper::with_details(
+                q_handle.clone(),
+                Period::new(i, TimeUnit::Years),
+                calendar.clone(),
+                Frequency::Annual,
+                BusinessDayConvention::Following,
+                Thirty360::with_convention(Convention::BondBasis),
+                &euribor3m,
+                Handle::empty(),
+                Period::new(0, TimeUnit::Days),
+                Some(intcurveois.handle()),
+                Pillar::LastRelevantDate,
+            ) as Shared<dyn RateHelper>);
+        }
+
+        let ptr3m = PiecewiseYieldCurve::<Discount, LogLinear, GlobalBootstrap>::with_bootstrap(
+            today,
+            helpers3m,
+            Actual360::new(),
+            LogLinear,
+            GlobalBootstrap::new(Some(1.0e-10), None, Vec::new()),
+        )
+        .expect("the 3m curve builds");
+
+        let multicurve = MultiCurve::new(1.0e-10);
+        let curve3m = multicurve
+            .add_bootstrapped_curve(&intcurve3m, ptr3m)
+            .expect("adds the 3m contributor");
+
+        let ptrois = shared(ZeroSpreadedTermStructure::new(
+            intcurve3m.handle(),
+            b_handle,
+        ));
+        let curveois = multicurve
+            .add_non_bootstrapped_curve(
+                &intcurveois,
+                Shared::clone(&ptrois) as Shared<dyn YieldTermStructure>,
+            )
+            .expect("adds the ois member");
+
+        let zero_rate = |handle: &Handle<dyn YieldTermStructure>| -> Real {
+            handle
+                .current_link()
+                .expect("the handle resolves")
+                .zero_rate(1.0, Compounding::Continuous, Frequency::NoFrequency, false)
+                .expect("the zero rate solves")
+                .rate()
+        };
+
+        assert!(
+            (zero_rate(&curveois) - zero_rate(&curve3m) - (-0.01)).abs() < 1.0e-10,
+            "the ois-3m spread is not the -0.01 the ZeroSpreadedTermStructure adds"
+        );
+
+        for i in 1..=10i32 {
+            let npv = swap_npv(i, 0.03, &euribor3m, &settings, &curveois);
+            assert!(
+                npv.abs() < 1.0e-10,
+                "swap {i} does not reprice to zero: {npv}"
+            );
+        }
+
+        let flag = shared_mut(Flag::default());
+        ptrois.observable().register_observer(&flag_observer(&flag));
+
+        let pre = zero_rate(&curve3m);
+        q.set_value(0.035);
+        let post = zero_rate(&curve3m);
+        assert!(
+            (post - pre).abs() > 1.0e-10,
+            "the q-bump fan-out did not re-solve the 3m curve: {pre} -> {post}"
+        );
+        assert!(
+            flag.borrow().fired,
+            "the q-bump did not fan out to the spreaded ois member"
+        );
+        for i in 1..=10i32 {
+            let npv = swap_npv(i, 0.035, &euribor3m, &settings, &curveois);
+            assert!(
+                npv.abs() < 1.0e-10,
+                "rebuilt swap {i} does not reprice to zero at the bumped quote: {npv}"
+            );
+        }
+
+        b.set_value(-0.005);
+        assert!(
+            (zero_rate(&curveois) - zero_rate(&curve3m) - (-0.005)).abs() < 1.0e-10,
+            "the bumped ois-3m spread is not the new -0.005"
         );
     }
 }

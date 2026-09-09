@@ -406,6 +406,15 @@ oversight) and is documented at the point of divergence in the source.
   deliberately not added (documented at
   `termstructures/yields/piecewiseyieldcurve.rs`).
 
+- **A `MultiCurve` external handle owns only its curve, not (as in C++) the whole
+  `MultiCurve`.** The caller must keep the `MultiCurve` alive for the lifetime of
+  its member curves; Rust has no `Rc` aliasing constructor, so the handle cannot
+  co-own the wrapper the way the C++ aliasing `shared_ptr` does
+  (`termstructures/multicurve.rs`). Dropping the `MultiCurve` while a member
+  handle is still held drops the co-contributor curves, and the next re-solve
+  returns an honest `Err` naming the dropped contributor, never a silent
+  single-curve fallback.
+
 **Indexes (EPIC-6):**
 
 - **`Currency` is always valid; there is no empty placeholder.** QuantLib's
