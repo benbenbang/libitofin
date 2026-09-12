@@ -1,8 +1,9 @@
 """Oracle for the low-discrepancy facades in itofin.randomnumbers.
 
-The first Sobol dimension is pinned to the van der Corput sequence modulo two,
-the values test-suite/lowdiscrepancysequences.cpp pins and the core repeats in
-crates/libitofin/src/math/randomnumbers/sobol/mod.rs.
+The first Sobol dimension is pinned to the van der Corput sequence modulo two
+and the first two Halton dimensions to the van der Corput sequences modulo two
+and three, the values test-suite/lowdiscrepancysequences.cpp pins and the core
+repeats in crates/libitofin/src/math/randomnumbers/{sobol/mod.rs,haltonrsg.rs}.
 The Sobol homogeneity check (the mean of each dimension is exactly 0.5 at the
 end of every 2^j - 1 cycle) is testSobol's.
 """
@@ -13,7 +14,7 @@ import pytest
 
 # itofin library
 from itofin import ItofinError
-from itofin.randomnumbers import DirectionIntegers, SobolRsg
+from itofin.randomnumbers import DirectionIntegers, HaltonRsg, SobolRsg
 
 VAN_DER_CORPUT_SOBOL = [
     0.50000, 0.75000, 0.25000, 0.37500, 0.87500, 0.62500, 0.12500, 0.18750, 0.68750, 0.93750,
@@ -22,7 +23,18 @@ VAN_DER_CORPUT_SOBOL = [
     0.03125,
 ]  # fmt: skip
 
+VAN_DER_CORPUT_MOD_TWO = [
+    0.50000, 0.25000, 0.75000, 0.12500, 0.62500, 0.37500, 0.87500, 0.06250, 0.56250, 0.31250,
+    0.81250, 0.18750, 0.68750, 0.43750, 0.93750, 0.03125, 0.53125, 0.28125, 0.78125, 0.15625,
+    0.65625, 0.40625, 0.90625, 0.09375, 0.59375, 0.34375, 0.84375, 0.21875, 0.71875, 0.46875,
+    0.96875, 0.0,
+]  # fmt: skip
 
+VAN_DER_CORPUT_MOD_THREE = [
+    1 / 3, 2 / 3, 1 / 9, 4 / 9, 7 / 9, 2 / 9, 5 / 9, 8 / 9, 1 / 27, 10 / 27, 19 / 27, 4 / 27,
+    13 / 27, 22 / 27, 7 / 27, 16 / 27, 25 / 27, 2 / 27, 11 / 27, 20 / 27, 5 / 27, 14 / 27,
+    23 / 27, 8 / 27, 17 / 27, 26 / 27,
+]  # fmt: skip
 
 TOLERANCE = 1e-15
 
@@ -129,6 +141,31 @@ def test_sobol_rejects_dimensions_outside_the_polynomial_table():
         SobolRsg(1).skip_to(2**32 - 1)
 
 
+def test_halton_first_two_dimensions_are_the_radical_inverses():
+    rsg = HaltonRsg(2)
+    assert rsg.dimension() == 2
+    for expected_two, expected_three in zip(VAN_DER_CORPUT_MOD_TWO[:26], VAN_DER_CORPUT_MOD_THREE):
+        point = rsg.next_sequence()
+        assert abs(point[0] - expected_two) <= TOLERANCE
+        assert abs(point[1] - expected_three) <= TOLERANCE
+
+
+def test_halton_next_sequences_stacks_successive_draws():
+    single = HaltonRsg(3)
+    matrix = HaltonRsg(3).next_sequences(20)
+    assert matrix.shape == (20, 3)
+    for row in matrix:
+        assert row.tolist() == single.next_sequence().tolist()
+    assert HaltonRsg(3).last_sequence().tolist() == [0.0] * 3
+
+
+def test_halton_rejects_zero_dimension():
+    with pytest.raises(ItofinError):
+        HaltonRsg(0)
+
+
 def test_batch_counts_past_the_address_space_are_rejected():
     with pytest.raises(ItofinError):
         SobolRsg(3).next_sequences(2**63)
+    with pytest.raises(ItofinError):
+        HaltonRsg(3).next_sequences(2**63)
