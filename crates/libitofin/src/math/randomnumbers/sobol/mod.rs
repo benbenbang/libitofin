@@ -82,6 +82,11 @@ fn next_polynomial(table: &[&'static [u32]], current_degree: &mut usize, index: 
 }
 
 /// Sobol low-discrepancy sequence generator.
+///
+/// `Clone` reproduces QuantLib's by-value copy of the generator (the C++
+/// class is copyable): the copy carries its own counter and continues the
+/// sequence independently of the original.
+#[derive(Clone)]
 pub struct SobolRsg {
     dimensionality: usize,
     sequence_counter: u32,

@@ -5,8 +5,12 @@ and the first two Halton dimensions to the van der Corput sequences modulo two
 and three, the values test-suite/lowdiscrepancysequences.cpp pins and the core
 repeats in crates/libitofin/src/math/randomnumbers/{sobol/mod.rs,haltonrsg.rs}.
 The Sobol homogeneity check (the mean of each dimension is exactly 0.5 at the
-end of every 2^j - 1 cycle) is testSobol's.
+end of every 2^j - 1 cycle) is testSobol's. The Gaussian Sobol generator is
+cross-checked against the Sobol points it maps through the normal CDF.
 """
+
+# standard library
+import math
 
 # pypi/conda library
 import numpy as np
@@ -14,7 +18,12 @@ import pytest
 
 # itofin library
 from itofin import ItofinError
-from itofin.randomnumbers import DirectionIntegers, HaltonRsg, SobolRsg
+from itofin.randomnumbers import (
+    DirectionIntegers,
+    GaussianLowDiscrepancySequenceGenerator,
+    HaltonRsg,
+    SobolRsg,
+)
 
 VAN_DER_CORPUT_SOBOL = [
     0.50000, 0.75000, 0.25000, 0.37500, 0.87500, 0.62500, 0.12500, 0.18750, 0.68750, 0.93750,
@@ -37,6 +46,10 @@ VAN_DER_CORPUT_MOD_THREE = [
 ]  # fmt: skip
 
 TOLERANCE = 1e-15
+
+
+def _normal_cdf(x):
+    return 0.5 * math.erfc(-x / math.sqrt(2.0))
 
 
 def test_sobol_first_dimension_is_the_van_der_corput_sequence():
@@ -164,8 +177,41 @@ def test_halton_rejects_zero_dimension():
         HaltonRsg(0)
 
 
+def test_gaussian_sobol_inverts_the_sobol_points():
+    sobol = SobolRsg(6, 42)
+    gaussian = GaussianLowDiscrepancySequenceGenerator(sobol)
+    assert gaussian.dimension() == 6
+    # The first Sobol point is 0.5 everywhere, whose inverse normal is 0.
+    assert gaussian.next_sequence().tolist() == [0.0] * 6
+    sobol.next_sequence()
+    for _ in range(30):
+        uniforms = sobol.next_sequence()
+        gaussians = gaussian.next_sequence()
+        for z, u in zip(gaussians.tolist(), uniforms.tolist()):
+            assert abs(_normal_cdf(z) - u) < 1e-8
+        assert gaussian.last_sequence().tolist() == gaussians.tolist()
+
+
+def test_gaussian_sobol_copies_the_sobol_generator():
+    sobol = SobolRsg(2)
+    gaussian = GaussianLowDiscrepancySequenceGenerator(sobol)
+    gaussian.next_sequences(10)
+    # The original generator still stands on its first point.
+    assert sobol.next_sequence().tolist() == [0.5, 0.5]
+
+
+def test_gaussian_sobol_next_sequences_stacks_successive_draws():
+    single = GaussianLowDiscrepancySequenceGenerator(SobolRsg(3))
+    matrix = GaussianLowDiscrepancySequenceGenerator(SobolRsg(3)).next_sequences(25)
+    assert matrix.shape == (25, 3)
+    for row in matrix:
+        assert row.tolist() == single.next_sequence().tolist()
+
+
 def test_batch_counts_past_the_address_space_are_rejected():
     with pytest.raises(ItofinError):
         SobolRsg(3).next_sequences(2**63)
     with pytest.raises(ItofinError):
         HaltonRsg(3).next_sequences(2**63)
+    with pytest.raises(ItofinError):
+        GaussianLowDiscrepancySequenceGenerator(SobolRsg(3)).next_sequences(2**63)
