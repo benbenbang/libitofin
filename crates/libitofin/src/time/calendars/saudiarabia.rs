@@ -18,7 +18,7 @@ use crate::time::weekday::Weekday;
 /// 2029 but its Eid al-Adha table stops at 2022, so from 2023 onward Eid al-Adha
 /// would be silently omitted. Queries beyond this year cannot be answered
 /// reliably and panic instead.
-const HOLIDAY_HORIZON: Year = 2022;
+pub const HOLIDAY_HORIZON: Year = 2022;
 
 /// Market handled by the Saudi Arabian calendar.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

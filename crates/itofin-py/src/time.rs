@@ -4,12 +4,12 @@ use crate::ItofinError;
 use libitofin::time::businessdayconvention::BusinessDayConvention;
 use libitofin::time::calendar::Calendar;
 use libitofin::time::calendars::{
-    Argentina, Australia, Austria, Brazil, Canada, Chile, China, Croatia, CzechRepublic, Denmark,
-    Finland, France, Germany, HongKong, Hungary, Iceland, India, Indonesia, Italy, Japan,
-    JointCalendar, JointCalendarRule, Malta, Mexico, Montenegro, NewZealand, NorthMacedonia,
-    Norway, NullCalendar, Poland, Romania, Russia, Serbia, Singapore, Slovakia, Slovenia,
-    SouthKorea, Sweden, Switzerland, Taiwan, Target, Thailand, Turkey, Ukraine, UnitedKingdom,
-    UnitedStates, Uzbekistan, WeekendsOnly,
+    Argentina, Australia, Austria, Botswana, Brazil, Canada, Chile, China, Croatia, CzechRepublic,
+    Denmark, Finland, France, Germany, HongKong, Hungary, Iceland, India, Indonesia, Israel, Italy,
+    Japan, JointCalendar, JointCalendarRule, Malta, Mexico, Montenegro, NewZealand, NorthMacedonia,
+    Norway, NullCalendar, Poland, Romania, Russia, SaudiArabia, Serbia, Singapore, Slovakia,
+    Slovenia, SouthAfrica, SouthKorea, Sweden, Switzerland, Taiwan, Target, Thailand, Turkey,
+    Ukraine, UnitedKingdom, UnitedStates, Uzbekistan, WeekendsOnly,
 };
 use libitofin::time::date::{Date, Month, SerialNumber, Year};
 use libitofin::time::dategenerationrule::DateGeneration;
@@ -566,6 +566,18 @@ impl PyCalendar {
         }
     }
 
+    /// The Botswanan calendar.
+    ///
+    /// Returns:
+    ///     Calendar: The Botswanan calendar.
+    #[staticmethod]
+    fn botswana() -> Self {
+        PyCalendar {
+            inner: Botswana::new(),
+            horizon: None,
+        }
+    }
+
     /// The Danish calendar.
     ///
     /// Returns:
@@ -622,6 +634,18 @@ impl PyCalendar {
     fn norway() -> Self {
         PyCalendar {
             inner: Norway::new(),
+            horizon: None,
+        }
+    }
+
+    /// The South African calendar.
+    ///
+    /// Returns:
+    ///     Calendar: The South African calendar.
+    #[staticmethod]
+    fn south_africa() -> Self {
+        PyCalendar {
+            inner: SouthAfrica::new(),
             horizon: None,
         }
     }
@@ -1044,6 +1068,36 @@ impl PyCalendar {
         })
     }
 
+    /// The Israeli calendar.
+    ///
+    /// Args:
+    ///     market (str): One of "Settlement", "TASE", "SHIR", "Telbor"; matched ignoring case.
+    ///
+    /// Returns:
+    ///     Calendar: The Israeli calendar for that market.
+    ///
+    /// Raises:
+    ///     ItofinError: If market is not one of the accepted names.
+    #[staticmethod]
+    #[pyo3(signature = (market = "Settlement"))]
+    fn israel(market: &str) -> PyResult<Self> {
+        use libitofin::time::calendars::israel::Market;
+        let market = parse_name(
+            "Israel market",
+            market,
+            &[
+                ("Settlement", Market::Settlement),
+                ("TASE", Market::Tase),
+                ("SHIR", Market::Shir),
+                ("Telbor", Market::Telbor),
+            ],
+        )?;
+        Ok(PyCalendar {
+            inner: Israel::new(market),
+            horizon: None,
+        })
+    }
+
     /// The Italian calendar.
     ///
     /// Args:
@@ -1256,6 +1310,35 @@ impl PyCalendar {
         Ok(PyCalendar {
             inner: Russia::new(market),
             horizon: None,
+        })
+    }
+
+    /// The Saudi Arabian calendar.
+    ///
+    /// Its Eid holidays are tabulated through 2022 only, as in QuantLib;
+    /// every query on this calendar raises ItofinError for a later date
+    /// rather than silently omitting holidays.
+    ///
+    /// Args:
+    ///     market (str): "Tadawul", the only market; matched ignoring case.
+    ///
+    /// Returns:
+    ///     Calendar: The Saudi Arabian calendar for that market.
+    ///
+    /// Raises:
+    ///     ItofinError: If market is not one of the accepted names.
+    #[staticmethod]
+    #[pyo3(signature = (market = "Tadawul"))]
+    fn saudi_arabia(market: &str) -> PyResult<Self> {
+        use libitofin::time::calendars::saudiarabia::Market;
+        let market = parse_name(
+            "SaudiArabia market",
+            market,
+            &[("Tadawul", Market::Tadawul)],
+        )?;
+        Ok(PyCalendar {
+            inner: SaudiArabia::new(market),
+            horizon: Some(libitofin::time::calendars::saudiarabia::HOLIDAY_HORIZON),
         })
     }
 

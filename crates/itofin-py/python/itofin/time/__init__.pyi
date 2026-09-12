@@ -56,6 +56,14 @@ class Calendar:
             Calendar: The weekends-only calendar.
         """
     @staticmethod
+    def botswana() -> Calendar:
+        r"""
+        The Botswanan calendar.
+
+        Returns:
+            Calendar: The Botswanan calendar.
+        """
+    @staticmethod
     def denmark() -> Calendar:
         r"""
         The Danish calendar.
@@ -94,6 +102,14 @@ class Calendar:
 
         Returns:
             Calendar: The Norwegian calendar.
+        """
+    @staticmethod
+    def south_africa() -> Calendar:
+        r"""
+        The South African calendar.
+
+        Returns:
+            Calendar: The South African calendar.
         """
     @staticmethod
     def sweden() -> Calendar:
@@ -342,6 +358,20 @@ class Calendar:
             ItofinError: If market is not one of the accepted names.
         """
     @staticmethod
+    def israel(market: builtins.str = 'Settlement') -> Calendar:
+        r"""
+        The Israeli calendar.
+
+        Args:
+            market (str): One of "Settlement", "TASE", "SHIR", "Telbor"; matched ignoring case.
+
+        Returns:
+            Calendar: The Israeli calendar for that market.
+
+        Raises:
+            ItofinError: If market is not one of the accepted names.
+        """
+    @staticmethod
     def italy(market: builtins.str = 'Settlement') -> Calendar:
         r"""
         The Italian calendar.
@@ -463,6 +493,24 @@ class Calendar:
 
         Returns:
             Calendar: The Russian calendar for that market.
+
+        Raises:
+            ItofinError: If market is not one of the accepted names.
+        """
+    @staticmethod
+    def saudi_arabia(market: builtins.str = 'Tadawul') -> Calendar:
+        r"""
+        The Saudi Arabian calendar.
+
+        Its Eid holidays are tabulated through 2022 only, as in QuantLib;
+        every query on this calendar raises ItofinError for a later date
+        rather than silently omitting holidays.
+
+        Args:
+            market (str): "Tadawul", the only market; matched ignoring case.
+
+        Returns:
+            Calendar: The Saudi Arabian calendar for that market.
 
         Raises:
             ItofinError: If market is not one of the accepted names.
