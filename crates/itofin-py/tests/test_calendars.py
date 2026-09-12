@@ -4,7 +4,9 @@ Every expected value below is pinned against the holiday rules in the core
 (`crates/libitofin/src/time/calendars/*.rs`), which mirror QuantLib's
 `ql/time/calendars/`. The discriminating dates are the ones where calendars
 disagree: 4 July 2025 is a holiday on both US markets and a business day on
-TARGET and in the UK; 25 December 2025 is a holiday across Europe.
+TARGET and in the UK; 25 December 2025 is a holiday across Europe but a
+business day in Japan, whose December holiday is the 31st (bank holiday) and,
+before 2019, the Emperor's birthday on the 23rd.
 
 Market names resolve ignoring case, so "NYSE", "Nyse" and "nyse" build the
 same calendar; an unknown market or joint rule is an ItofinError before the
@@ -16,7 +18,7 @@ import pytest
 
 # itofin library
 from itofin import ItofinError
-from itofin.time import Calendar, Date
+from itofin.time import BusinessDayConvention, Calendar, Date
 
 INDEPENDENCE_DAY_2025 = Date(4, 7, 2025)  # a Friday
 JUNETEENTH_2025 = Date(19, 6, 2025)  # a Thursday
@@ -37,7 +39,7 @@ def test_juneteenth_is_a_nyse_holiday():
     assert not Calendar.united_states("NYSE").is_business_day(JUNETEENTH_2025)
 
 
-def test_christmas_is_a_european_holiday():
+def test_christmas_is_a_european_holiday_and_a_japanese_business_day():
     for calendar in (
         Calendar.target(),
         Calendar.united_kingdom(),
@@ -45,6 +47,8 @@ def test_christmas_is_a_european_holiday():
         Calendar.germany("FrankfurtStockExchange"),
     ):
         assert calendar.is_holiday(CHRISTMAS_2025), calendar
+    assert Calendar.japan().is_business_day(CHRISTMAS_2025)
+    assert Calendar.japan().is_holiday(Date(31, 12, 2025))
 
 
 def test_new_year_is_a_holiday_on_every_western_calendar():
@@ -53,7 +57,9 @@ def test_new_year_is_a_holiday_on_every_western_calendar():
         Calendar.united_states(),
         Calendar.united_kingdom(),
         Calendar.germany(),
+        Calendar.japan(),
         Calendar.switzerland(),
+        Calendar.hong_kong(),
     ):
         assert calendar.is_holiday(NEW_YEAR_2025), calendar
 
@@ -116,7 +122,7 @@ def test_equality_and_hash_are_by_name():
     assert hash(Calendar.target()) == hash(Calendar.target())
     assert Calendar.target() != Calendar.united_kingdom()
     assert Calendar.united_states("NYSE") != Calendar.united_states("Settlement")
-    assert len({Calendar.target(), Calendar.target(), Calendar.united_kingdom()}) == 2
+    assert len({Calendar.target(), Calendar.target(), Calendar.japan()}) == 2
     assert {Calendar.united_kingdom(): "gbp"}[Calendar.united_kingdom("settlement")] == "gbp"
 
 
@@ -146,46 +152,80 @@ def test_business_days_between_on_target_around_christmas():
         Calendar.null_calendar,
         Calendar.weekends_only,
         Calendar.argentina,
+        Calendar.australia,
         Calendar.austria,
         Calendar.brazil,
         Calendar.canada,
         Calendar.chile,
+        Calendar.china,
         Calendar.croatia,
         Calendar.czech_republic,
         Calendar.denmark,
         Calendar.finland,
         Calendar.france,
         Calendar.germany,
+        Calendar.hong_kong,
         Calendar.hungary,
         Calendar.iceland,
+        Calendar.india,
+        Calendar.indonesia,
         Calendar.italy,
+        Calendar.japan,
         Calendar.malta,
         Calendar.mexico,
         Calendar.montenegro,
+        Calendar.new_zealand,
         Calendar.north_macedonia,
         Calendar.norway,
         Calendar.poland,
         Calendar.romania,
         Calendar.russia,
         Calendar.serbia,
+        Calendar.singapore,
         Calendar.slovakia,
         Calendar.slovenia,
+        Calendar.south_korea,
         Calendar.sweden,
         Calendar.switzerland,
+        Calendar.taiwan,
+        Calendar.thailand,
         Calendar.turkey,
         Calendar.ukraine,
         Calendar.united_kingdom,
         Calendar.united_states,
+        Calendar.uzbekistan,
     ],
 )
 def test_every_constructor_builds_without_arguments(build):
     calendar = build()
     assert calendar.name
-    # Every calendar but the null one holds at least its weekends over a year,
-    # whatever days those fall on.
+    # Indonesia and Saudi Arabia tabulate their lunar holidays only through
+    # 2014 and 2022, so the probe stays early. Every calendar but the null one
+    # holds at least its weekends over a year, whatever days those fall on.
     holidays = calendar.holiday_list(Date(1, 1, 2010), Date(31, 12, 2010), include_weekends=True)
     assert (len(holidays) > 0) == (calendar != Calendar.null_calendar())
     assert all(calendar.is_holiday(d) for d in holidays)
+
+
+@pytest.mark.parametrize(
+    ("build", "horizon"),
+    [(Calendar.indonesia, 2014)],
+)
+def test_calendars_with_a_holiday_horizon_raise_past_it(build, horizon):
+    calendar = build()
+    inside, outside = Date(1, 6, horizon), Date(1, 1, horizon + 1)
+    assert calendar.is_business_day(inside) in (True, False)
+    for query in (calendar.is_business_day, calendar.is_holiday, calendar.is_weekend):
+        with pytest.raises(ItofinError, match=f"tabulated only through {horizon}"):
+            query(outside)
+    with pytest.raises(ItofinError):
+        calendar.holiday_list(inside, outside)
+    with pytest.raises(ItofinError):
+        calendar.business_days_between(inside, outside)
+    with pytest.raises(ItofinError):
+        calendar.adjust(outside, BusinessDayConvention.Following)
+    with pytest.raises(ItofinError):
+        calendar.advance(outside, 1, "Days", BusinessDayConvention.Following, False)
 
 
 def test_holiday_list_rejects_a_reversed_range():
