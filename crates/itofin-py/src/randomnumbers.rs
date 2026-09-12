@@ -11,7 +11,9 @@
 //! over the uniform sequence generator and the inverse cumulative normal (the
 //! `PseudoRandom` policy the Monte Carlo engines draw from): a QuantLib Python
 //! caller swaps the import and keeps the call sites. `SobolRsg` and
-//! `HaltonRsg` keep the C++ names, as QuantLib's Python API does.
+//! `HaltonRsg` keep the C++ names, as QuantLib's Python API does, and
+//! `GaussianLowDiscrepancySequenceGenerator` is the inverse cumulative normal
+//! over a Sobol sequence.
 //!
 //! Deferred (visible): the Monte Carlo engines still pin the pseudo-random
 //! policy; the low-discrepancy policy behind `testQmcEngines` lands with the
@@ -32,6 +34,8 @@ use libitofin::math::randomnumbers::{
     BoxMullerGaussianRng, GaussianRng, HaltonRsg, InverseCumulativeRsg, MersenneTwisterUniformRng,
     RandomSequenceGenerator, UniformRng,
 };
+use libitofin::methods::montecarlo::Sample;
+use libitofin::types::Real;
 use numpy::{PyArray1, PyArray2, PyArrayMethods};
 use pyo3::prelude::*;
 #[allow(unused_imports)]
@@ -673,6 +677,14 @@ impl PySobolRsg {
     }
 }
 
+impl PySobolRsg {
+    /// A copy of the generator state, for the Gaussian sequence generator that
+    /// takes it by value as QuantLib does.
+    pub(crate) fn inner(&self) -> SobolRsg {
+        self.inner.clone()
+    }
+}
+
 /// The Halton low-discrepancy sequence generator, QuantLib's `HaltonRsg`
 /// with randomStart and randomShift both off.
 ///
@@ -748,5 +760,126 @@ impl PyHaltonRsg {
     ) -> PyResult<Bound<'py, PyArray2<f64>>> {
         let dimension = self.inner.dimension();
         draw_matrix(py, count, dimension, || self.inner.next_sequence().to_vec())
+    }
+}
+
+/// A Sobol generator presented as a weighted sequence generator, so the core
+/// `InverseCumulativeRsg` can map it as it maps the pseudo-random sequences.
+///
+/// The core `SobolRsg` returns bare slices because a low-discrepancy draw has
+/// unit weight; this adapter restores the `Sample` wrapper with that weight.
+/// It stands in for the core's deferred `LowDiscrepancy` policy (#454).
+#[derive(Clone)]
+pub(crate) struct SobolSequence {
+    rsg: SobolRsg,
+    sample: Sample<Vec<Real>>,
+}
+
+impl SobolSequence {
+    fn new(rsg: SobolRsg) -> Self {
+        let dimension = rsg.dimension();
+        SobolSequence {
+            rsg,
+            sample: Sample::new(vec![0.0; dimension], 1.0),
+        }
+    }
+}
+
+impl SequenceGenerator for SobolSequence {
+    fn next_sequence(&mut self) -> &Sample<Vec<Real>> {
+        self.sample.value.copy_from_slice(self.rsg.next_sequence());
+        &self.sample
+    }
+
+    fn last_sequence(&self) -> &Sample<Vec<Real>> {
+        &self.sample
+    }
+
+    fn dimension(&self) -> usize {
+        self.rsg.dimension()
+    }
+}
+
+/// The Gaussian low-discrepancy sequence generator: Sobol points mapped
+/// through the inverse cumulative normal, QuantLib's
+/// `InverseCumulativeRsg<SobolRsg, InverseCumulativeNormal>`.
+///
+/// The first draw is 0.0 in every dimension, the inverse normal of the first
+/// Sobol point 0.5. The generator copies the Sobol generator it is built from,
+/// as QuantLib does.
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "GaussianLowDiscrepancySequenceGenerator",
+    unsendable,
+    module = "itofin.randomnumbers"
+)]
+pub struct PyGaussianLowDiscrepancySequenceGenerator {
+    inner: InverseCumulativeRsg<SobolSequence, InverseCumulativeNormal>,
+}
+
+#[gen_stub_pymethods]
+#[pymethods]
+impl PyGaussianLowDiscrepancySequenceGenerator {
+    /// Build a Gaussian sequence generator over a copy of a Sobol generator.
+    ///
+    /// Args:
+    ///     rsg (SobolRsg): The Sobol generator to copy the state from; its
+    ///         dimension is the dimension here.
+    #[new]
+    fn new(rsg: &PySobolRsg) -> Self {
+        PyGaussianLowDiscrepancySequenceGenerator {
+            inner: InverseCumulativeRsg::new(
+                SobolSequence::new(rsg.inner()),
+                InverseCumulativeNormal::standard(),
+            ),
+        }
+    }
+
+    /// The number of draws per sequence.
+    ///
+    /// Returns:
+    ///     int: The dimension the generator was built with.
+    fn dimension(&self) -> usize {
+        self.inner.dimension()
+    }
+
+    /// Draw the next sequence.
+    ///
+    /// Returns:
+    ///     numpy.ndarray: A float64 array of shape (dimension,) of standard
+    ///     normal deviates.
+    fn next_sequence<'py>(&mut self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
+        PyArray1::from_vec(py, self.inner.next_sequence().value.clone())
+    }
+
+    /// The most recently drawn sequence, without advancing.
+    ///
+    /// Returns:
+    ///     numpy.ndarray: A float64 array of shape (dimension,); all zeros
+    ///     before the first draw.
+    fn last_sequence<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
+        PyArray1::from_vec(py, self.inner.last_sequence().value.clone())
+    }
+
+    /// Draw many sequences in one call.
+    ///
+    /// Args:
+    ///     count (int): The number of sequences to draw.
+    ///
+    /// Returns:
+    ///     numpy.ndarray: A float64 array of shape (count, dimension), row i
+    ///     being what the (i + 1)-th next_sequence() call would have returned.
+    ///
+    /// Raises:
+    ///     ItofinError: If a buffer of count sequences cannot be allocated.
+    fn next_sequences<'py>(
+        &mut self,
+        py: Python<'py>,
+        count: usize,
+    ) -> PyResult<Bound<'py, PyArray2<f64>>> {
+        let dimension = self.inner.dimension();
+        draw_matrix(py, count, dimension, || {
+            self.inner.next_sequence().value.clone()
+        })
     }
 }

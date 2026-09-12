@@ -250,6 +250,9 @@ print(usg.next_sequence())                             # ndarray, shape (3,)
 print(gsg.next_sequences(1000).shape)                  # (1000, 3) standard normals
 ```
 
+`SobolRsg`, `HaltonRsg` and `GaussianLowDiscrepancySequenceGenerator` provide the
+low-discrepancy counterparts with the same `next_sequence` / `next_sequences` calls.
+
 ## License
 
 BSD-3-Clause, matching the `libitofin` core. See the [repository](https://github.com/benbenbang/libitofin) for the layer status table, the divergences-from-QuantLib catalogue, and the Rust test oracles behind the numbers above.

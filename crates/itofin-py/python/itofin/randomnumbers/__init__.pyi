@@ -8,6 +8,7 @@ import numpy.typing
 import typing
 __all__ = [
     "DirectionIntegers",
+    "GaussianLowDiscrepancySequenceGenerator",
     "GaussianRandomGenerator",
     "GaussianRandomSequenceGenerator",
     "HaltonRsg",
@@ -15,6 +16,63 @@ __all__ = [
     "UniformRandomGenerator",
     "UniformRandomSequenceGenerator",
 ]
+
+@typing.final
+class GaussianLowDiscrepancySequenceGenerator:
+    r"""
+    The Gaussian low-discrepancy sequence generator: Sobol points mapped
+    through the inverse cumulative normal, QuantLib's
+    `InverseCumulativeRsg<SobolRsg, InverseCumulativeNormal>`.
+
+    The first draw is 0.0 in every dimension, the inverse normal of the first
+    Sobol point 0.5. The generator copies the Sobol generator it is built from,
+    as QuantLib does.
+    """
+    def __init__(self, rsg: SobolRsg) -> None:
+        r"""
+        Build a Gaussian sequence generator over a copy of a Sobol generator.
+
+        Args:
+            rsg (SobolRsg): The Sobol generator to copy the state from; its
+                dimension is the dimension here.
+        """
+    def dimension(self) -> builtins.int:
+        r"""
+        The number of draws per sequence.
+
+        Returns:
+            int: The dimension the generator was built with.
+        """
+    def next_sequence(self) -> numpy.typing.NDArray[numpy.float64]:
+        r"""
+        Draw the next sequence.
+
+        Returns:
+            numpy.ndarray: A float64 array of shape (dimension,) of standard
+            normal deviates.
+        """
+    def last_sequence(self) -> numpy.typing.NDArray[numpy.float64]:
+        r"""
+        The most recently drawn sequence, without advancing.
+
+        Returns:
+            numpy.ndarray: A float64 array of shape (dimension,); all zeros
+            before the first draw.
+        """
+    def next_sequences(self, count: builtins.int) -> numpy.typing.NDArray[numpy.float64]:
+        r"""
+        Draw many sequences in one call.
+
+        Args:
+            count (int): The number of sequences to draw.
+
+        Returns:
+            numpy.ndarray: A float64 array of shape (count, dimension), row i
+            being what the (i + 1)-th next_sequence() call would have returned.
+
+        Raises:
+            ItofinError: If a buffer of count sequences cannot be allocated.
+        """
 
 @typing.final
 class GaussianRandomGenerator:
