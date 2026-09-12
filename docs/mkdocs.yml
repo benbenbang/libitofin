@@ -84,5 +84,6 @@ nav:
       - Pricing engines: api/pricingengines.md
       - Models: api/models.md
       - Optimization: api/optimization.md
+      - Random numbers: api/randomnumbers.md
       - Results: api/results.md
   - Rust API: rust.md

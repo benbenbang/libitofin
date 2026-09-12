@@ -12,6 +12,7 @@ extension-module = ["pyo3/extension-module"]
 
 [dependencies]
 libitofin = { path = "../libitofin" }
+numpy = "0.29"
 pyo3 = { version = "0.29", features = ["abi3-py310"] }
 pyo3-stub-gen = "0.23"
 pyo3-stub-gen-derive = "0.23"

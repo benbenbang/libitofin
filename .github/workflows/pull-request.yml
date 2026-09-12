@@ -106,13 +106,13 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: install maturin and pytest
-        run: pip install --no-cache-dir maturin pytest
+        run: pip install --no-cache-dir maturin pytest numpy
 
       - name: build and install the itofin extension module
         run: |
           python -m venv .venv
           . .venv/bin/activate
-          pip install pytest
+          pip install pytest numpy
           maturin develop -m crates/itofin-py/Cargo.toml
 
       - name: check the committed stubs and shims match the rust facade

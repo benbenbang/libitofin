@@ -25,6 +25,7 @@ mod mcengine;
 mod ois;
 mod option;
 mod optionletvol;
+mod randomnumbers;
 mod results;
 mod settings;
 mod smilesection;
@@ -94,6 +95,7 @@ use optionletvol::{
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
+use randomnumbers::PyUniformRandomGenerator;
 use results::Results;
 use settings::PySettings;
 use smilesection::PySabrSmileSection;
@@ -147,7 +149,7 @@ impl From<PyQlError> for PyErr {
     }
 }
 
-/// Registers the eleven `ql/`-faithful submodules on `itofin`.
+/// Registers the twelve `ql/`-faithful submodules on `itofin`.
 ///
 /// Nested native modules give attribute access (`itofin.time.Date`) but do not
 /// form a Python package, so `import itofin.time` / `from itofin.time import
@@ -320,6 +322,9 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     optimization.add_class::<PyLevenbergMarquardt>()?;
     optimization.add_class::<PyEndCriteria>()?;
 
+    let randomnumbers = PyModule::new(py, "randomnumbers")?;
+    randomnumbers.add_class::<PyUniformRandomGenerator>()?;
+
     let results = PyModule::new(py, "results")?;
     results.add_class::<Results>()?;
 
@@ -334,6 +339,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
         ("models", &models),
         ("pricingengines", &pricingengines),
         ("optimization", &optimization),
+        ("randomnumbers", &randomnumbers),
         ("results", &results),
     ];
 
