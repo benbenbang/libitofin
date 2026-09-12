@@ -6,9 +6,61 @@ import numpy
 import numpy.typing
 import typing
 __all__ = [
+    "GaussianRandomGenerator",
     "UniformRandomGenerator",
     "UniformRandomSequenceGenerator",
 ]
+
+@typing.final
+class GaussianRandomGenerator:
+    r"""
+    The Gaussian pseudo-random number generator: the polar Box-Muller
+    transform over a Mersenne Twister, QuantLib's
+    `BoxMullerGaussianRng<MersenneTwisterUniformRng>`.
+
+    Each pair of uniform draws yields two standard normal deviates; the second
+    is cached and returned by the next call, as in QuantLib.
+    """
+    def __init__(self, rng: UniformRandomGenerator) -> None:
+        r"""
+        Build a generator over a copy of a uniform generator.
+
+        Args:
+            rng (UniformRandomGenerator): The uniform generator to copy the
+                state from.
+        """
+    @staticmethod
+    def with_seed(seed: builtins.int = 0) -> GaussianRandomGenerator:
+        r"""
+        Build a generator over a fresh Mersenne Twister.
+
+        Args:
+            seed (int): The 32-bit seed; 0 draws a random seed.
+
+        Returns:
+            GaussianRandomGenerator: The seeded generator.
+        """
+    def next_gaussian(self) -> builtins.float:
+        r"""
+        Draw the next standard normal deviate.
+
+        Returns:
+            float: A deviate with mean 0 and standard deviation 1.
+        """
+    def next_gaussians(self, count: builtins.int) -> numpy.typing.NDArray[numpy.float64]:
+        r"""
+        Draw many standard normal deviates in one call.
+
+        Args:
+            count (int): The number of deviates to draw.
+
+        Returns:
+            numpy.ndarray: A float64 array of shape (count,), holding exactly
+            what count successive next_gaussian() calls would have returned.
+
+        Raises:
+            ItofinError: If a buffer of count draws cannot be allocated.
+        """
 
 @typing.final
 class UniformRandomGenerator:

@@ -1,11 +1,13 @@
 //! Facades for the random-number generators: the uniform Mersenne-Twister
-//! generator and the sequence generator built on it.
+//! generator, the sequence generator built on it, and the Gaussian generator
+//! layered over the former.
 //!
 //! The classes carry QuantLib's Python (SWIG) names rather than the C++ ones,
-//! so `UniformRandomGenerator` stands for `MersenneTwisterUniformRng` and
+//! so `UniformRandomGenerator` stands for `MersenneTwisterUniformRng`,
 //! `UniformRandomSequenceGenerator` for
-//! `RandomSequenceGenerator<MersenneTwisterUniformRng>`: a QuantLib Python
-//! caller swaps the import and keeps the call sites.
+//! `RandomSequenceGenerator<MersenneTwisterUniformRng>` and
+//! `GaussianRandomGenerator` for `BoxMullerGaussianRng` over the Mersenne
+//! Twister: a QuantLib Python caller swaps the import and keeps the call sites.
 //!
 //! Every draw is returned as a value, not as QuantLib's weighted `Sample`
 //! wrapper; the weight of a pseudo-random draw is always 1.0. Vector draws come
@@ -15,7 +17,8 @@
 use crate::PyQlError;
 use libitofin::math::randomnumbers::rngtraits::SequenceGenerator;
 use libitofin::math::randomnumbers::{
-    MersenneTwisterUniformRng, RandomSequenceGenerator, UniformRng,
+    BoxMullerGaussianRng, GaussianRng, MersenneTwisterUniformRng, RandomSequenceGenerator,
+    UniformRng,
 };
 use numpy::{PyArray1, PyArray2, PyArrayMethods};
 use pyo3::prelude::*;
@@ -180,6 +183,80 @@ impl PyUniformRandomGenerator {
     /// generator by value as QuantLib does.
     pub(crate) fn inner(&self) -> MersenneTwisterUniformRng {
         self.inner.clone()
+    }
+}
+
+/// The Gaussian pseudo-random number generator: the polar Box-Muller
+/// transform over a Mersenne Twister, QuantLib's
+/// `BoxMullerGaussianRng<MersenneTwisterUniformRng>`.
+///
+/// Each pair of uniform draws yields two standard normal deviates; the second
+/// is cached and returned by the next call, as in QuantLib.
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "GaussianRandomGenerator",
+    unsendable,
+    module = "itofin.randomnumbers"
+)]
+pub struct PyGaussianRandomGenerator {
+    inner: BoxMullerGaussianRng<MersenneTwisterUniformRng>,
+}
+
+#[gen_stub_pymethods]
+#[pymethods]
+impl PyGaussianRandomGenerator {
+    /// Build a generator over a copy of a uniform generator.
+    ///
+    /// Args:
+    ///     rng (UniformRandomGenerator): The uniform generator to copy the
+    ///         state from.
+    #[new]
+    fn new(rng: &PyUniformRandomGenerator) -> Self {
+        PyGaussianRandomGenerator {
+            inner: BoxMullerGaussianRng::new(rng.inner()),
+        }
+    }
+
+    /// Build a generator over a fresh Mersenne Twister.
+    ///
+    /// Args:
+    ///     seed (int): The 32-bit seed; 0 draws a random seed.
+    ///
+    /// Returns:
+    ///     GaussianRandomGenerator: The seeded generator.
+    #[staticmethod]
+    #[pyo3(signature = (seed = 0))]
+    fn with_seed(seed: u32) -> Self {
+        PyGaussianRandomGenerator {
+            inner: BoxMullerGaussianRng::new(MersenneTwisterUniformRng::new(seed)),
+        }
+    }
+
+    /// Draw the next standard normal deviate.
+    ///
+    /// Returns:
+    ///     float: A deviate with mean 0 and standard deviation 1.
+    fn next_gaussian(&mut self) -> f64 {
+        self.inner.next_gaussian()
+    }
+
+    /// Draw many standard normal deviates in one call.
+    ///
+    /// Args:
+    ///     count (int): The number of deviates to draw.
+    ///
+    /// Returns:
+    ///     numpy.ndarray: A float64 array of shape (count,), holding exactly
+    ///     what count successive next_gaussian() calls would have returned.
+    ///
+    /// Raises:
+    ///     ItofinError: If a buffer of count draws cannot be allocated.
+    fn next_gaussians<'py>(
+        &mut self,
+        py: Python<'py>,
+        count: usize,
+    ) -> PyResult<Bound<'py, PyArray1<f64>>> {
+        draw_vector(py, count, || self.inner.next_gaussian())
     }
 }
 
