@@ -72,6 +72,14 @@ class Calendar:
             Calendar: The Finnish calendar.
         """
     @staticmethod
+    def hungary() -> Calendar:
+        r"""
+        The Hungarian calendar.
+
+        Returns:
+            Calendar: The Hungarian calendar.
+        """
+    @staticmethod
     def norway() -> Calendar:
         r"""
         The Norwegian calendar.
@@ -94,6 +102,14 @@ class Calendar:
 
         Returns:
             Calendar: The Swiss calendar.
+        """
+    @staticmethod
+    def turkey() -> Calendar:
+        r"""
+        The Turkish calendar.
+
+        Returns:
+            Calendar: The Turkish calendar.
         """
     @staticmethod
     def argentina(market: builtins.str = 'Merval') -> Calendar:
@@ -161,6 +177,34 @@ class Calendar:
 
         Returns:
             Calendar: The Chilean calendar for that market.
+
+        Raises:
+            ItofinError: If market is not one of the accepted names.
+        """
+    @staticmethod
+    def croatia(market: builtins.str = 'ZSE') -> Calendar:
+        r"""
+        The Croatian calendar.
+
+        Args:
+            market (str): "ZSE", the only market; matched ignoring case.
+
+        Returns:
+            Calendar: The Croatian calendar for that market.
+
+        Raises:
+            ItofinError: If market is not one of the accepted names.
+        """
+    @staticmethod
+    def czech_republic(market: builtins.str = 'PSE') -> Calendar:
+        r"""
+        The Czech calendar.
+
+        Args:
+            market (str): "PSE", the only market; matched ignoring case.
+
+        Returns:
+            Calendar: The Czech calendar for that market.
 
         Raises:
             ItofinError: If market is not one of the accepted names.
@@ -245,6 +289,132 @@ class Calendar:
 
         Returns:
             Calendar: The Mexican calendar for that market.
+
+        Raises:
+            ItofinError: If market is not one of the accepted names.
+        """
+    @staticmethod
+    def montenegro(market: builtins.str = 'MNSE') -> Calendar:
+        r"""
+        The Montenegrin calendar.
+
+        Args:
+            market (str): "MNSE", the only market; matched ignoring case.
+
+        Returns:
+            Calendar: The Montenegrin calendar for that market.
+
+        Raises:
+            ItofinError: If market is not one of the accepted names.
+        """
+    @staticmethod
+    def north_macedonia(market: builtins.str = 'MSE') -> Calendar:
+        r"""
+        The North Macedonian calendar.
+
+        Args:
+            market (str): "MSE", the only market; matched ignoring case.
+
+        Returns:
+            Calendar: The North Macedonian calendar for that market.
+
+        Raises:
+            ItofinError: If market is not one of the accepted names.
+        """
+    @staticmethod
+    def poland(market: builtins.str = 'Settlement') -> Calendar:
+        r"""
+        The Polish calendar.
+
+        Args:
+            market (str): One of "Settlement", "WSE"; matched ignoring case.
+
+        Returns:
+            Calendar: The Polish calendar for that market.
+
+        Raises:
+            ItofinError: If market is not one of the accepted names.
+        """
+    @staticmethod
+    def romania(market: builtins.str = 'Public') -> Calendar:
+        r"""
+        The Romanian calendar.
+
+        Args:
+            market (str): One of "Public", "BVB"; matched ignoring case.
+
+        Returns:
+            Calendar: The Romanian calendar for that market.
+
+        Raises:
+            ItofinError: If market is not one of the accepted names.
+        """
+    @staticmethod
+    def russia(market: builtins.str = 'Settlement') -> Calendar:
+        r"""
+        The Russian calendar.
+
+        Args:
+            market (str): One of "Settlement", "MOEX"; matched ignoring case.
+
+        Returns:
+            Calendar: The Russian calendar for that market.
+
+        Raises:
+            ItofinError: If market is not one of the accepted names.
+        """
+    @staticmethod
+    def serbia(market: builtins.str = 'BSE') -> Calendar:
+        r"""
+        The Serbian calendar.
+
+        Args:
+            market (str): "BSE", the only market; matched ignoring case.
+
+        Returns:
+            Calendar: The Serbian calendar for that market.
+
+        Raises:
+            ItofinError: If market is not one of the accepted names.
+        """
+    @staticmethod
+    def slovakia(market: builtins.str = 'BSSE') -> Calendar:
+        r"""
+        The Slovak calendar.
+
+        Args:
+            market (str): "BSSE", the only market; matched ignoring case.
+
+        Returns:
+            Calendar: The Slovak calendar for that market.
+
+        Raises:
+            ItofinError: If market is not one of the accepted names.
+        """
+    @staticmethod
+    def slovenia(market: builtins.str = 'LSE') -> Calendar:
+        r"""
+        The Slovenian calendar.
+
+        Args:
+            market (str): "LSE", the only market; matched ignoring case.
+
+        Returns:
+            Calendar: The Slovenian calendar for that market.
+
+        Raises:
+            ItofinError: If market is not one of the accepted names.
+        """
+    @staticmethod
+    def ukraine(market: builtins.str = 'USE') -> Calendar:
+        r"""
+        The Ukrainian calendar.
+
+        Args:
+            market (str): "USE", the only market; matched ignoring case.
+
+        Returns:
+            Calendar: The Ukrainian calendar for that market.
 
         Raises:
             ItofinError: If market is not one of the accepted names.

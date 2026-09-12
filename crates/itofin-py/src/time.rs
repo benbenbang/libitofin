@@ -4,9 +4,10 @@ use crate::ItofinError;
 use libitofin::time::businessdayconvention::BusinessDayConvention;
 use libitofin::time::calendar::Calendar;
 use libitofin::time::calendars::{
-    Argentina, Austria, Brazil, Canada, Chile, Denmark, Finland, France, Germany, Iceland, Italy,
-    JointCalendar, JointCalendarRule, Malta, Mexico, Norway, NullCalendar, Sweden, Switzerland,
-    Target, UnitedKingdom, UnitedStates, WeekendsOnly,
+    Argentina, Austria, Brazil, Canada, Chile, Croatia, CzechRepublic, Denmark, Finland, France,
+    Germany, Hungary, Iceland, Italy, JointCalendar, JointCalendarRule, Malta, Mexico, Montenegro,
+    NorthMacedonia, Norway, NullCalendar, Poland, Romania, Russia, Serbia, Slovakia, Slovenia,
+    Sweden, Switzerland, Target, Turkey, Ukraine, UnitedKingdom, UnitedStates, WeekendsOnly,
 };
 use libitofin::time::date::{Date, Month, SerialNumber, Year};
 use libitofin::time::dategenerationrule::DateGeneration;
@@ -587,6 +588,18 @@ impl PyCalendar {
         }
     }
 
+    /// The Hungarian calendar.
+    ///
+    /// Returns:
+    ///     Calendar: The Hungarian calendar.
+    #[staticmethod]
+    fn hungary() -> Self {
+        PyCalendar {
+            inner: Hungary::new(),
+            horizon: None,
+        }
+    }
+
     /// The Norwegian calendar.
     ///
     /// Returns:
@@ -619,6 +632,18 @@ impl PyCalendar {
     fn switzerland() -> Self {
         PyCalendar {
             inner: Switzerland::new(),
+            horizon: None,
+        }
+    }
+
+    /// The Turkish calendar.
+    ///
+    /// Returns:
+    ///     Calendar: The Turkish calendar.
+    #[staticmethod]
+    fn turkey() -> Self {
+        PyCalendar {
+            inner: Turkey::new(),
             horizon: None,
         }
     }
@@ -742,6 +767,48 @@ impl PyCalendar {
         let market = parse_name("Chile market", market, &[("SSE", Market::Sse)])?;
         Ok(PyCalendar {
             inner: Chile::new(market),
+            horizon: None,
+        })
+    }
+
+    /// The Croatian calendar.
+    ///
+    /// Args:
+    ///     market (str): "ZSE", the only market; matched ignoring case.
+    ///
+    /// Returns:
+    ///     Calendar: The Croatian calendar for that market.
+    ///
+    /// Raises:
+    ///     ItofinError: If market is not one of the accepted names.
+    #[staticmethod]
+    #[pyo3(signature = (market = "ZSE"))]
+    fn croatia(market: &str) -> PyResult<Self> {
+        use libitofin::time::calendars::croatia::Market;
+        let market = parse_name("Croatia market", market, &[("ZSE", Market::Zse)])?;
+        Ok(PyCalendar {
+            inner: Croatia::new(market),
+            horizon: None,
+        })
+    }
+
+    /// The Czech calendar.
+    ///
+    /// Args:
+    ///     market (str): "PSE", the only market; matched ignoring case.
+    ///
+    /// Returns:
+    ///     Calendar: The Czech calendar for that market.
+    ///
+    /// Raises:
+    ///     ItofinError: If market is not one of the accepted names.
+    #[staticmethod]
+    #[pyo3(signature = (market = "PSE"))]
+    fn czech_republic(market: &str) -> PyResult<Self> {
+        use libitofin::time::calendars::czechrepublic::Market;
+        let market = parse_name("CzechRepublic market", market, &[("PSE", Market::Pse)])?;
+        Ok(PyCalendar {
+            inner: CzechRepublic::new(market),
             horizon: None,
         })
     }
@@ -892,6 +959,207 @@ impl PyCalendar {
         let market = parse_name("Mexico market", market, &[("BMV", Market::Bmv)])?;
         Ok(PyCalendar {
             inner: Mexico::new(market),
+            horizon: None,
+        })
+    }
+
+    /// The Montenegrin calendar.
+    ///
+    /// Args:
+    ///     market (str): "MNSE", the only market; matched ignoring case.
+    ///
+    /// Returns:
+    ///     Calendar: The Montenegrin calendar for that market.
+    ///
+    /// Raises:
+    ///     ItofinError: If market is not one of the accepted names.
+    #[staticmethod]
+    #[pyo3(signature = (market = "MNSE"))]
+    fn montenegro(market: &str) -> PyResult<Self> {
+        use libitofin::time::calendars::montenegro::Market;
+        let market = parse_name("Montenegro market", market, &[("MNSE", Market::Mnse)])?;
+        Ok(PyCalendar {
+            inner: Montenegro::new(market),
+            horizon: None,
+        })
+    }
+
+    /// The North Macedonian calendar.
+    ///
+    /// Args:
+    ///     market (str): "MSE", the only market; matched ignoring case.
+    ///
+    /// Returns:
+    ///     Calendar: The North Macedonian calendar for that market.
+    ///
+    /// Raises:
+    ///     ItofinError: If market is not one of the accepted names.
+    #[staticmethod]
+    #[pyo3(signature = (market = "MSE"))]
+    fn north_macedonia(market: &str) -> PyResult<Self> {
+        use libitofin::time::calendars::northmacedonia::Market;
+        let market = parse_name("NorthMacedonia market", market, &[("MSE", Market::Mse)])?;
+        Ok(PyCalendar {
+            inner: NorthMacedonia::new(market),
+            horizon: None,
+        })
+    }
+
+    /// The Polish calendar.
+    ///
+    /// Args:
+    ///     market (str): One of "Settlement", "WSE"; matched ignoring case.
+    ///
+    /// Returns:
+    ///     Calendar: The Polish calendar for that market.
+    ///
+    /// Raises:
+    ///     ItofinError: If market is not one of the accepted names.
+    #[staticmethod]
+    #[pyo3(signature = (market = "Settlement"))]
+    fn poland(market: &str) -> PyResult<Self> {
+        use libitofin::time::calendars::poland::Market;
+        let market = parse_name(
+            "Poland market",
+            market,
+            &[("Settlement", Market::Settlement), ("WSE", Market::Wse)],
+        )?;
+        Ok(PyCalendar {
+            inner: Poland::new(market),
+            horizon: None,
+        })
+    }
+
+    /// The Romanian calendar.
+    ///
+    /// Args:
+    ///     market (str): One of "Public", "BVB"; matched ignoring case.
+    ///
+    /// Returns:
+    ///     Calendar: The Romanian calendar for that market.
+    ///
+    /// Raises:
+    ///     ItofinError: If market is not one of the accepted names.
+    #[staticmethod]
+    #[pyo3(signature = (market = "Public"))]
+    fn romania(market: &str) -> PyResult<Self> {
+        use libitofin::time::calendars::romania::Market;
+        let market = parse_name(
+            "Romania market",
+            market,
+            &[("Public", Market::Public), ("BVB", Market::Bvb)],
+        )?;
+        Ok(PyCalendar {
+            inner: Romania::new(market),
+            horizon: None,
+        })
+    }
+
+    /// The Russian calendar.
+    ///
+    /// Args:
+    ///     market (str): One of "Settlement", "MOEX"; matched ignoring case.
+    ///
+    /// Returns:
+    ///     Calendar: The Russian calendar for that market.
+    ///
+    /// Raises:
+    ///     ItofinError: If market is not one of the accepted names.
+    #[staticmethod]
+    #[pyo3(signature = (market = "Settlement"))]
+    fn russia(market: &str) -> PyResult<Self> {
+        use libitofin::time::calendars::russia::Market;
+        let market = parse_name(
+            "Russia market",
+            market,
+            &[("Settlement", Market::Settlement), ("MOEX", Market::Moex)],
+        )?;
+        Ok(PyCalendar {
+            inner: Russia::new(market),
+            horizon: None,
+        })
+    }
+
+    /// The Serbian calendar.
+    ///
+    /// Args:
+    ///     market (str): "BSE", the only market; matched ignoring case.
+    ///
+    /// Returns:
+    ///     Calendar: The Serbian calendar for that market.
+    ///
+    /// Raises:
+    ///     ItofinError: If market is not one of the accepted names.
+    #[staticmethod]
+    #[pyo3(signature = (market = "BSE"))]
+    fn serbia(market: &str) -> PyResult<Self> {
+        use libitofin::time::calendars::serbia::Market;
+        let market = parse_name("Serbia market", market, &[("BSE", Market::Bse)])?;
+        Ok(PyCalendar {
+            inner: Serbia::new(market),
+            horizon: None,
+        })
+    }
+
+    /// The Slovak calendar.
+    ///
+    /// Args:
+    ///     market (str): "BSSE", the only market; matched ignoring case.
+    ///
+    /// Returns:
+    ///     Calendar: The Slovak calendar for that market.
+    ///
+    /// Raises:
+    ///     ItofinError: If market is not one of the accepted names.
+    #[staticmethod]
+    #[pyo3(signature = (market = "BSSE"))]
+    fn slovakia(market: &str) -> PyResult<Self> {
+        use libitofin::time::calendars::slovakia::Market;
+        let market = parse_name("Slovakia market", market, &[("BSSE", Market::Bsse)])?;
+        Ok(PyCalendar {
+            inner: Slovakia::new(market),
+            horizon: None,
+        })
+    }
+
+    /// The Slovenian calendar.
+    ///
+    /// Args:
+    ///     market (str): "LSE", the only market; matched ignoring case.
+    ///
+    /// Returns:
+    ///     Calendar: The Slovenian calendar for that market.
+    ///
+    /// Raises:
+    ///     ItofinError: If market is not one of the accepted names.
+    #[staticmethod]
+    #[pyo3(signature = (market = "LSE"))]
+    fn slovenia(market: &str) -> PyResult<Self> {
+        use libitofin::time::calendars::slovenia::Market;
+        let market = parse_name("Slovenia market", market, &[("LSE", Market::Lse)])?;
+        Ok(PyCalendar {
+            inner: Slovenia::new(market),
+            horizon: None,
+        })
+    }
+
+    /// The Ukrainian calendar.
+    ///
+    /// Args:
+    ///     market (str): "USE", the only market; matched ignoring case.
+    ///
+    /// Returns:
+    ///     Calendar: The Ukrainian calendar for that market.
+    ///
+    /// Raises:
+    ///     ItofinError: If market is not one of the accepted names.
+    #[staticmethod]
+    #[pyo3(signature = (market = "USE"))]
+    fn ukraine(market: &str) -> PyResult<Self> {
+        use libitofin::time::calendars::ukraine::Market;
+        let market = parse_name("Ukraine market", market, &[("USE", Market::Use)])?;
+        Ok(PyCalendar {
+            inner: Ukraine::new(market),
             horizon: None,
         })
     }
