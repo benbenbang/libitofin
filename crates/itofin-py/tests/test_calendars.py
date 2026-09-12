@@ -154,6 +154,7 @@ def test_business_days_between_on_target_around_christmas():
         Calendar.argentina,
         Calendar.australia,
         Calendar.austria,
+        Calendar.botswana,
         Calendar.brazil,
         Calendar.canada,
         Calendar.chile,
@@ -169,6 +170,7 @@ def test_business_days_between_on_target_around_christmas():
         Calendar.iceland,
         Calendar.india,
         Calendar.indonesia,
+        Calendar.israel,
         Calendar.italy,
         Calendar.japan,
         Calendar.malta,
@@ -180,10 +182,12 @@ def test_business_days_between_on_target_around_christmas():
         Calendar.poland,
         Calendar.romania,
         Calendar.russia,
+        Calendar.saudi_arabia,
         Calendar.serbia,
         Calendar.singapore,
         Calendar.slovakia,
         Calendar.slovenia,
+        Calendar.south_africa,
         Calendar.south_korea,
         Calendar.sweden,
         Calendar.switzerland,
@@ -209,7 +213,7 @@ def test_every_constructor_builds_without_arguments(build):
 
 @pytest.mark.parametrize(
     ("build", "horizon"),
-    [(Calendar.indonesia, 2014)],
+    [(Calendar.indonesia, 2014), (Calendar.saudi_arabia, 2022)],
 )
 def test_calendars_with_a_holiday_horizon_raise_past_it(build, horizon):
     calendar = build()
