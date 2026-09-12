@@ -22,6 +22,11 @@ class Calendar:
     r"""
     A business-day calendar.
     """
+    @property
+    def name(self) -> builtins.str:
+        r"""
+        The calendar's name, as the core reports it.
+        """
     @staticmethod
     def target() -> Calendar:
         r"""
@@ -60,6 +65,103 @@ class Calendar:
         Returns:
             Calendar: The UK settlement calendar.
         """
+    @staticmethod
+    def joint(calendars: typing.Sequence[Calendar], rule: builtins.str = 'JoinHolidays') -> Calendar:
+        r"""
+        A calendar combining several others.
+
+        Args:
+            calendars (list[Calendar]): The calendars to combine; at least one.
+            rule (str): "JoinHolidays" makes a day a holiday when it is one on
+                any calendar; "JoinBusinessDays" makes it a business day when it
+                is one on any calendar. Matched ignoring case.
+
+        Returns:
+            Calendar: The joint calendar.
+
+        Raises:
+            ItofinError: If calendars is empty or rule is not one of the two
+                accepted names.
+        """
+    def is_business_day(self, date: Date) -> builtins.bool:
+        r"""
+        Whether date is a business day on this calendar.
+
+        Args:
+            date (Date): The date to test.
+
+        Returns:
+            bool: True when date is neither a weekend day nor a holiday.
+
+        Raises:
+            ItofinError: If date is the null date or past the calendar's
+                tabulated horizon.
+        """
+    def is_holiday(self, date: Date) -> builtins.bool:
+        r"""
+        Whether date is a holiday on this calendar, weekends included.
+
+        Args:
+            date (Date): The date to test.
+
+        Returns:
+            bool: True when date is not a business day.
+
+        Raises:
+            ItofinError: If date is the null date or past the calendar's
+                tabulated horizon.
+        """
+    def is_weekend(self, date: Date) -> builtins.bool:
+        r"""
+        Whether date falls on this calendar's weekend, which for a market whose
+        weekend moved over time depends on the date and not only its weekday.
+
+        Args:
+            date (Date): The date to test.
+
+        Returns:
+            bool: True when date is a weekend day.
+
+        Raises:
+            ItofinError: If date is the null date or past the calendar's
+                tabulated horizon.
+        """
+    def holiday_list(self, from_date: Date, to_date: Date, include_weekends: builtins.bool = False) -> builtins.list[Date]:
+        r"""
+        The holidays between two dates, both inclusive.
+
+        Args:
+            from_date (Date): The first date of the range.
+            to_date (Date): The last date of the range.
+            include_weekends (bool): Also list the weekend days; off by default.
+
+        Returns:
+            list[Date]: The holidays in the range, in order.
+
+        Raises:
+            ItofinError: If either date is the null date, if to_date is before
+                from_date, or if a date is past the calendar's tabulated
+                horizon.
+        """
+    def business_days_between(self, from_date: Date, to_date: Date, include_first: builtins.bool = True, include_last: builtins.bool = False) -> builtins.int:
+        r"""
+        The number of business days between two dates.
+
+        Args:
+            from_date (Date): The first date of the range.
+            to_date (Date): The last date of the range.
+            include_first (bool): Count from_date when it is a business day; on
+                by default.
+            include_last (bool): Count to_date when it is a business day; off by
+                default.
+
+        Returns:
+            int: The business-day count, negated when from_date is after to_date.
+
+        Raises:
+            ItofinError: If either date is the null date or past the
+                calendar's tabulated horizon.
+        """
     def adjust(self, date: Date, convention: BusinessDayConvention) -> Date:
         r"""
         Roll a date to the nearest business day.
@@ -70,6 +172,10 @@ class Calendar:
 
         Returns:
             Date: The adjusted date, unchanged when it is already a business day.
+
+        Raises:
+            ItofinError: If date is the null date or past the calendar's
+                tabulated horizon.
         """
     def advance(self, date: Date, n: builtins.int, unit: builtins.str, convention: BusinessDayConvention, end_of_month: builtins.bool) -> Date:
         r"""
@@ -87,7 +193,26 @@ class Calendar:
             Date: The advanced and adjusted date.
 
         Raises:
-            ItofinError: If unit is not one of the four accepted strings.
+            ItofinError: If unit is not one of the four accepted strings, or if
+                date is the null date or past the calendar's tabulated horizon.
+        """
+    def __eq__(self, other: Calendar) -> builtins.bool:
+        r"""
+        Equality by calendar name, so two independently built TARGET calendars
+        are equal and a calendar read back off a curve equals its factory call.
+
+        Args:
+            other (object): The calendar to compare against.
+
+        Returns:
+            bool: True when both carry the same name.
+        """
+    def __hash__(self) -> builtins.int:
+        r"""
+        Hashes the calendar name, the field equality compares.
+
+        Returns:
+            int: The hash of the name, so equal calendars hash equal.
         """
     def __repr__(self) -> builtins.str:
         r"""

@@ -4,8 +4,10 @@ use crate::ItofinError;
 use libitofin::time::businessdayconvention::BusinessDayConvention;
 use libitofin::time::calendar::Calendar;
 use libitofin::time::calendars::unitedkingdom::{Market, UnitedKingdom};
-use libitofin::time::calendars::{NullCalendar, Target, WeekendsOnly};
-use libitofin::time::date::{Date, Month, SerialNumber};
+use libitofin::time::calendars::{
+    JointCalendar, JointCalendarRule, NullCalendar, Target, WeekendsOnly,
+};
+use libitofin::time::date::{Date, Month, SerialNumber, Year};
 use libitofin::time::dategenerationrule::DateGeneration;
 use libitofin::time::daycounter::DayCounter;
 use libitofin::time::daycounters::actual360::Actual360;
@@ -456,11 +458,65 @@ fn parse_time_unit(unit: &str) -> PyResult<TimeUnit> {
     }
 }
 
+/// Resolves a name against the `(name, variant)` table of one national
+/// calendar (or of the joint-calendar rules), ignoring ASCII case, so "NYSE",
+/// "Nyse" and "nyse" all select the same variant. An unknown name is an
+/// ItofinError listing the accepted ones rather than a silent fall-through.
+fn parse_name<M: Copy>(what: &str, value: &str, accepted: &[(&str, M)]) -> PyResult<M> {
+    accepted
+        .iter()
+        .find(|(name, _)| name.eq_ignore_ascii_case(value))
+        .map(|&(_, variant)| variant)
+        .ok_or_else(|| {
+            let names: Vec<&str> = accepted.iter().map(|(name, _)| *name).collect();
+            ItofinError::new_err(format!(
+                "unknown {what} {value:?}, expected one of {}",
+                names.join(", ")
+            ))
+        })
+}
+
+/// The core date behind `date`, or an ItofinError when it is the null date,
+/// which no calendar query accepts. The same guard `adjust` applies inline.
+fn non_null(date: &PyDate, action: &str) -> PyResult<Date> {
+    if date.inner() == Date::null() {
+        return Err(ItofinError::new_err(format!(
+            "cannot {action} the null date"
+        )));
+    }
+    Ok(date.inner())
+}
+
+impl PyCalendar {
+    /// The core date behind `date`, once it is neither null nor past the
+    /// calendar's tabulated horizon.
+    ///
+    /// The horizon guard stands in front of the core `assert!` in the
+    /// Indonesia and Saudi Arabia calendars, so an out-of-table year surfaces
+    /// as an ItofinError rather than a panic.
+    fn checked(&self, date: &PyDate, action: &str) -> PyResult<Date> {
+        let date = non_null(date, action)?;
+        if let Some(horizon) = self.horizon
+            && date.year() > horizon
+        {
+            return Err(ItofinError::new_err(format!(
+                "cannot {action} a date in {}: the holidays of {} are tabulated only through {horizon}",
+                date.year(),
+                self.inner.name()
+            )));
+        }
+        Ok(date)
+    }
+}
+
 /// A business-day calendar.
 #[gen_stub_pyclass]
 #[pyclass(name = "Calendar", unsendable, module = "itofin.time")]
 pub struct PyCalendar {
     inner: Calendar,
+    /// The last year the calendar's holidays are tabulated for, when the core
+    /// asserts on later dates (Indonesia, Saudi Arabia); None otherwise.
+    horizon: Option<Year>,
 }
 
 #[gen_stub_pymethods]
@@ -474,6 +530,7 @@ impl PyCalendar {
     fn target() -> Self {
         PyCalendar {
             inner: Target::new(),
+            horizon: None,
         }
     }
 
@@ -485,6 +542,7 @@ impl PyCalendar {
     fn null_calendar() -> Self {
         PyCalendar {
             inner: NullCalendar::new(),
+            horizon: None,
         }
     }
 
@@ -500,6 +558,7 @@ impl PyCalendar {
     fn weekends_only() -> Self {
         PyCalendar {
             inner: WeekendsOnly::new(),
+            horizon: None,
         }
     }
 
@@ -513,7 +572,166 @@ impl PyCalendar {
     fn united_kingdom() -> Self {
         PyCalendar {
             inner: UnitedKingdom::new(Market::Settlement),
+            horizon: None,
         }
+    }
+
+    /// A calendar combining several others.
+    ///
+    /// Args:
+    ///     calendars (list[Calendar]): The calendars to combine; at least one.
+    ///     rule (str): "JoinHolidays" makes a day a holiday when it is one on
+    ///         any calendar; "JoinBusinessDays" makes it a business day when it
+    ///         is one on any calendar. Matched ignoring case.
+    ///
+    /// Returns:
+    ///     Calendar: The joint calendar.
+    ///
+    /// Raises:
+    ///     ItofinError: If calendars is empty or rule is not one of the two
+    ///         accepted names.
+    #[staticmethod]
+    #[pyo3(signature = (calendars, rule = "JoinHolidays"))]
+    fn joint(calendars: Vec<PyRef<'_, PyCalendar>>, rule: &str) -> PyResult<Self> {
+        let rule = parse_name(
+            "joint-calendar rule",
+            rule,
+            &[
+                ("JoinHolidays", JointCalendarRule::JoinHolidays),
+                ("JoinBusinessDays", JointCalendarRule::JoinBusinessDays),
+            ],
+        )?;
+        if calendars.is_empty() {
+            return Err(ItofinError::new_err(
+                "a joint calendar needs at least one calendar",
+            ));
+        }
+        let calendars = calendars.iter().map(|c| c.inner()).collect();
+        Ok(PyCalendar {
+            inner: JointCalendar::new(calendars, rule),
+            horizon: None,
+        })
+    }
+
+    /// The calendar's name, as the core reports it.
+    #[getter]
+    fn name(&self) -> String {
+        self.inner.name()
+    }
+
+    /// Whether date is a business day on this calendar.
+    ///
+    /// Args:
+    ///     date (Date): The date to test.
+    ///
+    /// Returns:
+    ///     bool: True when date is neither a weekend day nor a holiday.
+    ///
+    /// Raises:
+    ///     ItofinError: If date is the null date or past the calendar's
+    ///         tabulated horizon.
+    fn is_business_day(&self, date: &PyDate) -> PyResult<bool> {
+        Ok(self.inner.is_business_day(self.checked(date, "test")?))
+    }
+
+    /// Whether date is a holiday on this calendar, weekends included.
+    ///
+    /// Args:
+    ///     date (Date): The date to test.
+    ///
+    /// Returns:
+    ///     bool: True when date is not a business day.
+    ///
+    /// Raises:
+    ///     ItofinError: If date is the null date or past the calendar's
+    ///         tabulated horizon.
+    fn is_holiday(&self, date: &PyDate) -> PyResult<bool> {
+        Ok(self.inner.is_holiday(self.checked(date, "test")?))
+    }
+
+    /// Whether date falls on this calendar's weekend, which for a market whose
+    /// weekend moved over time depends on the date and not only its weekday.
+    ///
+    /// Args:
+    ///     date (Date): The date to test.
+    ///
+    /// Returns:
+    ///     bool: True when date is a weekend day.
+    ///
+    /// Raises:
+    ///     ItofinError: If date is the null date or past the calendar's
+    ///         tabulated horizon.
+    fn is_weekend(&self, date: &PyDate) -> PyResult<bool> {
+        Ok(self.inner.is_weekend_on(self.checked(date, "test")?))
+    }
+
+    /// The holidays between two dates, both inclusive.
+    ///
+    /// Args:
+    ///     from_date (Date): The first date of the range.
+    ///     to_date (Date): The last date of the range.
+    ///     include_weekends (bool): Also list the weekend days; off by default.
+    ///
+    /// Returns:
+    ///     list[Date]: The holidays in the range, in order.
+    ///
+    /// Raises:
+    ///     ItofinError: If either date is the null date, if to_date is before
+    ///         from_date, or if a date is past the calendar's tabulated
+    ///         horizon.
+    #[pyo3(signature = (from_date, to_date, include_weekends = false))]
+    fn holiday_list(
+        &self,
+        from_date: &PyDate,
+        to_date: &PyDate,
+        include_weekends: bool,
+    ) -> PyResult<Vec<PyDate>> {
+        let from = self.checked(from_date, "list holidays from")?;
+        let to = self.checked(to_date, "list holidays to")?;
+        if to < from {
+            return Err(ItofinError::new_err(format!(
+                "'from' date ({}) must be equal to or earlier than 'to' date ({})",
+                from_date.__repr__(),
+                to_date.__repr__()
+            )));
+        }
+        Ok(self
+            .inner
+            .holiday_list(from, to, include_weekends)
+            .into_iter()
+            .map(PyDate::from_inner)
+            .collect())
+    }
+
+    /// The number of business days between two dates.
+    ///
+    /// Args:
+    ///     from_date (Date): The first date of the range.
+    ///     to_date (Date): The last date of the range.
+    ///     include_first (bool): Count from_date when it is a business day; on
+    ///         by default.
+    ///     include_last (bool): Count to_date when it is a business day; off by
+    ///         default.
+    ///
+    /// Returns:
+    ///     int: The business-day count, negated when from_date is after to_date.
+    ///
+    /// Raises:
+    ///     ItofinError: If either date is the null date or past the
+    ///         calendar's tabulated horizon.
+    #[pyo3(signature = (from_date, to_date, include_first = true, include_last = false))]
+    fn business_days_between(
+        &self,
+        from_date: &PyDate,
+        to_date: &PyDate,
+        include_first: bool,
+        include_last: bool,
+    ) -> PyResult<i32> {
+        let from = self.checked(from_date, "count business days from")?;
+        let to = self.checked(to_date, "count business days to")?;
+        Ok(self
+            .inner
+            .business_days_between(from, to, include_first, include_last))
     }
 
     /// Roll a date to the nearest business day.
@@ -524,12 +742,14 @@ impl PyCalendar {
     ///
     /// Returns:
     ///     Date: The adjusted date, unchanged when it is already a business day.
+    ///
+    /// Raises:
+    ///     ItofinError: If date is the null date or past the calendar's
+    ///         tabulated horizon.
     fn adjust(&self, date: &PyDate, convention: &PyBusinessDayConvention) -> PyResult<PyDate> {
-        if date.inner() == Date::null() {
-            return Err(ItofinError::new_err("cannot adjust the null date"));
-        }
+        let date = self.checked(date, "adjust")?;
         Ok(PyDate::from_inner(
-            self.inner.adjust(date.inner(), convention.inner()),
+            self.inner.adjust(date, convention.inner()),
         ))
     }
 
@@ -547,7 +767,8 @@ impl PyCalendar {
     ///     Date: The advanced and adjusted date.
     ///
     /// Raises:
-    ///     ItofinError: If unit is not one of the four accepted strings.
+    ///     ItofinError: If unit is not one of the four accepted strings, or if
+    ///         date is the null date or past the calendar's tabulated horizon.
     fn advance(
         &self,
         date: &PyDate,
@@ -557,16 +778,34 @@ impl PyCalendar {
         end_of_month: bool,
     ) -> PyResult<PyDate> {
         let unit = parse_time_unit(unit)?;
-        if date.inner() == Date::null() {
-            return Err(ItofinError::new_err("cannot advance the null date"));
-        }
+        let date = self.checked(date, "advance")?;
         Ok(PyDate::from_inner(self.inner.advance(
-            date.inner(),
+            date,
             n,
             unit,
             convention.inner(),
             end_of_month,
         )))
+    }
+
+    /// Equality by calendar name, so two independently built TARGET calendars
+    /// are equal and a calendar read back off a curve equals its factory call.
+    ///
+    /// Args:
+    ///     other (object): The calendar to compare against.
+    ///
+    /// Returns:
+    ///     bool: True when both carry the same name.
+    fn __eq__(&self, other: &PyCalendar) -> bool {
+        self.inner.name() == other.inner.name()
+    }
+
+    /// Hashes the calendar name, the field equality compares.
+    ///
+    /// Returns:
+    ///     int: The hash of the name, so equal calendars hash equal.
+    fn __hash__(&self) -> u64 {
+        hash_of(&self.inner.name())
     }
 
     /// Return the calendar and its name.
@@ -589,7 +828,10 @@ impl PyCalendar {
     /// The result carries no factory identity; the calendar it stands for is
     /// readable through Self.__repr__(), which prints the core name.
     pub(crate) fn from_inner(inner: Calendar) -> Self {
-        PyCalendar { inner }
+        PyCalendar {
+            inner,
+            horizon: None,
+        }
     }
 }
 
