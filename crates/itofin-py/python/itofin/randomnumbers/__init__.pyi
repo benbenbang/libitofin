@@ -10,6 +10,7 @@ __all__ = [
     "DirectionIntegers",
     "GaussianRandomGenerator",
     "GaussianRandomSequenceGenerator",
+    "HaltonRsg",
     "SobolRsg",
     "UniformRandomGenerator",
     "UniformRandomSequenceGenerator",
@@ -138,6 +139,66 @@ class GaussianRandomSequenceGenerator:
 
         Raises:
             ItofinError: If a buffer of count sequences cannot be allocated.
+        """
+
+@typing.final
+class HaltonRsg:
+    r"""
+    The Halton low-discrepancy sequence generator, QuantLib's `HaltonRsg`
+    with randomStart and randomShift both off.
+
+    Draw k (1-based) is the radical inverse of k in a distinct prime base per
+    dimension: base 2 for the first dimension, 3 for the second, 5 for the
+    third, and so on. The sequence is deterministic; the randomized start and
+    shift of QuantLib's default constructor are not exposed, being deferred in
+    the core.
+    """
+    def __init__(self, dimension: builtins.int) -> None:
+        r"""
+        Build a Halton generator.
+
+        Args:
+            dimension (int): The number of draws per point, at least 1.
+
+        Raises:
+            ItofinError: If dimension is 0.
+        """
+    def dimension(self) -> builtins.int:
+        r"""
+        The number of draws per point.
+
+        Returns:
+            int: The dimension the generator was built with.
+        """
+    def next_sequence(self) -> numpy.typing.NDArray[numpy.float64]:
+        r"""
+        Draw the next Halton point.
+
+        Returns:
+            numpy.ndarray: A float64 array of shape (dimension,), every entry
+            inside [0, 1).
+        """
+    def last_sequence(self) -> numpy.typing.NDArray[numpy.float64]:
+        r"""
+        The most recently drawn point, without advancing.
+
+        Returns:
+            numpy.ndarray: A float64 array of shape (dimension,); all zeros
+            before the first draw.
+        """
+    def next_sequences(self, count: builtins.int) -> numpy.typing.NDArray[numpy.float64]:
+        r"""
+        Draw many points in one call.
+
+        Args:
+            count (int): The number of points to draw.
+
+        Returns:
+            numpy.ndarray: A float64 array of shape (count, dimension), row i
+            being what the (i + 1)-th next_sequence() call would have returned.
+
+        Raises:
+            ItofinError: If a buffer of count points cannot be allocated.
         """
 
 @typing.final

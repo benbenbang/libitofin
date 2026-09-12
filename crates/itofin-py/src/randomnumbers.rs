@@ -1,6 +1,6 @@
 //! Facades for the random-number generators: the uniform Mersenne-Twister
 //! generator, the sequence generator built on it, the Gaussian generators
-//! layered over both, and the Sobol low-discrepancy sequence.
+//! layered over both, and the Sobol and Halton low-discrepancy sequences.
 //!
 //! The classes carry QuantLib's Python (SWIG) names rather than the C++ ones,
 //! so `UniformRandomGenerator` stands for `MersenneTwisterUniformRng`,
@@ -10,12 +10,14 @@
 //! Twister and `GaussianRandomSequenceGenerator` for `InverseCumulativeRsg`
 //! over the uniform sequence generator and the inverse cumulative normal (the
 //! `PseudoRandom` policy the Monte Carlo engines draw from): a QuantLib Python
-//! caller swaps the import and keeps the call sites. `SobolRsg` keeps the C++
-//! name, as QuantLib's Python API does.
+//! caller swaps the import and keeps the call sites. `SobolRsg` and
+//! `HaltonRsg` keep the C++ names, as QuantLib's Python API does.
 //!
 //! Deferred (visible): the Monte Carlo engines still pin the pseudo-random
 //! policy; the low-discrepancy policy behind `testQmcEngines` lands with the
-//! core's `LowDiscrepancy` traits (#454).
+//! core's `LowDiscrepancy` traits (#454). The randomized Halton starts and
+//! shifts are deferred in the core, so `HaltonRsg` is the deterministic
+//! sequence.
 //!
 //! Every draw is returned as a value, not as QuantLib's weighted `Sample`
 //! wrapper; the weight of a pseudo-random draw is always 1.0. Vector draws come
@@ -27,7 +29,7 @@ use libitofin::math::distributions::normal::InverseCumulativeNormal;
 use libitofin::math::randomnumbers::rngtraits::SequenceGenerator;
 use libitofin::math::randomnumbers::sobol::{DirectionIntegers, PPMT_MAX_DIM, SobolRsg};
 use libitofin::math::randomnumbers::{
-    BoxMullerGaussianRng, GaussianRng, InverseCumulativeRsg, MersenneTwisterUniformRng,
+    BoxMullerGaussianRng, GaussianRng, HaltonRsg, InverseCumulativeRsg, MersenneTwisterUniformRng,
     RandomSequenceGenerator, UniformRng,
 };
 use numpy::{PyArray1, PyArray2, PyArrayMethods};
@@ -668,5 +670,83 @@ impl PySobolRsg {
             ));
         }
         Ok(PyArray1::from_vec(py, self.inner.skip_to(n).to_vec()))
+    }
+}
+
+/// The Halton low-discrepancy sequence generator, QuantLib's `HaltonRsg`
+/// with randomStart and randomShift both off.
+///
+/// Draw k (1-based) is the radical inverse of k in a distinct prime base per
+/// dimension: base 2 for the first dimension, 3 for the second, 5 for the
+/// third, and so on. The sequence is deterministic; the randomized start and
+/// shift of QuantLib's default constructor are not exposed, being deferred in
+/// the core.
+#[gen_stub_pyclass]
+#[pyclass(name = "HaltonRsg", unsendable, module = "itofin.randomnumbers")]
+pub struct PyHaltonRsg {
+    inner: HaltonRsg,
+}
+
+#[gen_stub_pymethods]
+#[pymethods]
+impl PyHaltonRsg {
+    /// Build a Halton generator.
+    ///
+    /// Args:
+    ///     dimension (int): The number of draws per point, at least 1.
+    ///
+    /// Raises:
+    ///     ItofinError: If dimension is 0.
+    #[new]
+    fn new(dimension: usize) -> PyResult<Self> {
+        Ok(PyHaltonRsg {
+            inner: HaltonRsg::new(dimension).map_err(PyQlError::from)?,
+        })
+    }
+
+    /// The number of draws per point.
+    ///
+    /// Returns:
+    ///     int: The dimension the generator was built with.
+    fn dimension(&self) -> usize {
+        self.inner.dimension()
+    }
+
+    /// Draw the next Halton point.
+    ///
+    /// Returns:
+    ///     numpy.ndarray: A float64 array of shape (dimension,), every entry
+    ///     inside [0, 1).
+    fn next_sequence<'py>(&mut self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
+        PyArray1::from_vec(py, self.inner.next_sequence().to_vec())
+    }
+
+    /// The most recently drawn point, without advancing.
+    ///
+    /// Returns:
+    ///     numpy.ndarray: A float64 array of shape (dimension,); all zeros
+    ///     before the first draw.
+    fn last_sequence<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
+        PyArray1::from_vec(py, self.inner.last_sequence().to_vec())
+    }
+
+    /// Draw many points in one call.
+    ///
+    /// Args:
+    ///     count (int): The number of points to draw.
+    ///
+    /// Returns:
+    ///     numpy.ndarray: A float64 array of shape (count, dimension), row i
+    ///     being what the (i + 1)-th next_sequence() call would have returned.
+    ///
+    /// Raises:
+    ///     ItofinError: If a buffer of count points cannot be allocated.
+    fn next_sequences<'py>(
+        &mut self,
+        py: Python<'py>,
+        count: usize,
+    ) -> PyResult<Bound<'py, PyArray2<f64>>> {
+        let dimension = self.inner.dimension();
+        draw_matrix(py, count, dimension, || self.inner.next_sequence().to_vec())
     }
 }
