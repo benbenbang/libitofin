@@ -95,7 +95,7 @@ use optionletvol::{
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use randomnumbers::PyUniformRandomGenerator;
+use randomnumbers::{PyUniformRandomGenerator, PyUniformRandomSequenceGenerator};
 use results::Results;
 use settings::PySettings;
 use smilesection::PySabrSmileSection;
@@ -324,6 +324,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     let randomnumbers = PyModule::new(py, "randomnumbers")?;
     randomnumbers.add_class::<PyUniformRandomGenerator>()?;
+    randomnumbers.add_class::<PyUniformRandomSequenceGenerator>()?;
 
     let results = PyModule::new(py, "results")?;
     results.add_class::<Results>()?;
