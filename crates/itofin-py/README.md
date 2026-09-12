@@ -237,12 +237,17 @@ generators return NumPy arrays, and `next_sequences(count)` draws a whole
 once per path.
 
 ```python
-from itofin.randomnumbers import UniformRandomGenerator, UniformRandomSequenceGenerator
+from itofin.randomnumbers import (
+    GaussianRandomSequenceGenerator,
+    UniformRandomGenerator,
+    UniformRandomSequenceGenerator,
+)
 
 rng = UniformRandomGenerator(42)                       # MT19937, seeded
 usg = UniformRandomSequenceGenerator(3, rng)           # 3 uniforms per sequence
+gsg = GaussianRandomSequenceGenerator(usg)             # inverse-cumulative normals
 print(usg.next_sequence())                             # ndarray, shape (3,)
-print(usg.next_sequences(1000).shape)                  # (1000, 3)
+print(gsg.next_sequences(1000).shape)                  # (1000, 3) standard normals
 ```
 
 ## License
