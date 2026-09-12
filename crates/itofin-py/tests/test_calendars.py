@@ -1,14 +1,14 @@
-"""The calendar queries on the Calendar facade.
+"""The named national calendars and the calendar queries on the Calendar facade.
 
 Every expected value below is pinned against the holiday rules in the core
 (`crates/libitofin/src/time/calendars/*.rs`), which mirror QuantLib's
-`ql/time/calendars/`. The discriminating date is one where the calendars
-disagree: 1 May 2025 (Labour Day) is a holiday on TARGET and a business day
-in the UK, whose early-May bank holiday falls on Monday the 5th.
+`ql/time/calendars/`. The discriminating dates are the ones where calendars
+disagree: 4 July 2025 is a holiday on both US markets and a business day on
+TARGET and in the UK.
 
-A joint-calendar rule resolves ignoring case; an unknown rule is an
-ItofinError before the core is reached, as is an empty joint-calendar list,
-which the core asserts on.
+Market names resolve ignoring case, so "NYSE", "Nyse" and "nyse" build the
+same calendar; an unknown market or joint rule is an ItofinError before the
+core is reached, as is an empty joint-calendar list, which the core asserts on.
 """
 
 # third-party
@@ -18,28 +18,43 @@ import pytest
 from itofin import ItofinError
 from itofin.time import Calendar, Date
 
-LABOUR_DAY_2025 = Date(1, 5, 2025)  # a Thursday
+INDEPENDENCE_DAY_2025 = Date(4, 7, 2025)  # a Friday
+JUNETEENTH_2025 = Date(19, 6, 2025)  # a Thursday
 SATURDAY = Date(5, 7, 2025)
+
+
+def test_independence_day_is_a_us_holiday_but_a_target_business_day():
+    assert Calendar.united_states("NYSE").is_holiday(INDEPENDENCE_DAY_2025)
+    assert Calendar.united_states("Settlement").is_holiday(INDEPENDENCE_DAY_2025)
+    assert Calendar.target().is_business_day(INDEPENDENCE_DAY_2025)
+    assert Calendar.united_kingdom().is_business_day(INDEPENDENCE_DAY_2025)
+
+
+def test_juneteenth_is_a_nyse_holiday():
+    assert Calendar.united_states("NYSE").is_holiday(JUNETEENTH_2025)
+    assert not Calendar.united_states("NYSE").is_business_day(JUNETEENTH_2025)
 
 
 def test_a_saturday_is_a_weekend_and_a_holiday_but_not_on_the_null_calendar():
     assert Calendar.target().is_weekend(SATURDAY)
     assert Calendar.target().is_holiday(SATURDAY)
     assert Calendar.weekends_only().is_holiday(SATURDAY)
-    assert not Calendar.target().is_weekend(LABOUR_DAY_2025)
+    assert not Calendar.target().is_weekend(INDEPENDENCE_DAY_2025)
     assert Calendar.null_calendar().is_business_day(SATURDAY)
 
 
 def test_joint_calendar_follows_its_rule():
+    us = Calendar.united_states()
     uk = Calendar.united_kingdom()
-    target = Calendar.target()
-    assert uk.is_business_day(LABOUR_DAY_2025)
-    assert target.is_holiday(LABOUR_DAY_2025)
-    assert Calendar.joint([uk, target]).is_holiday(LABOUR_DAY_2025)
-    assert Calendar.joint([uk, target], "JoinHolidays").is_holiday(LABOUR_DAY_2025)
-    assert Calendar.joint([uk, target], "JoinBusinessDays").is_business_day(LABOUR_DAY_2025)
-    assert Calendar.joint([uk, target], "joinbusinessdays").is_business_day(LABOUR_DAY_2025)
-    assert Calendar.joint([uk, target]).name == "JoinHolidays(UK settlement, TARGET)"
+    assert Calendar.joint([us, uk]).is_holiday(INDEPENDENCE_DAY_2025)
+    assert Calendar.joint([us, uk], "JoinHolidays").is_holiday(INDEPENDENCE_DAY_2025)
+    assert Calendar.joint([us, uk], "JoinBusinessDays").is_business_day(
+        INDEPENDENCE_DAY_2025
+    )
+    assert Calendar.joint([us, uk], "joinbusinessdays").is_business_day(
+        INDEPENDENCE_DAY_2025
+    )
+    assert Calendar.joint([us, uk]).name == "JoinHolidays(US settlement, UK settlement)"
 
 
 def test_joint_calendar_rejects_an_empty_list_and_an_unknown_rule():
@@ -49,9 +64,24 @@ def test_joint_calendar_rejects_an_empty_list_and_an_unknown_rule():
         Calendar.joint([Calendar.target()], "Union")
 
 
-def test_name_reflects_the_calendar():
+def test_unknown_market_raises_listing_the_accepted_names():
+    with pytest.raises(ItofinError, match="Settlement, NYSE, GovernmentBond"):
+        Calendar.united_states("LSE")
+    with pytest.raises(ItofinError, match="Merval"):
+        Calendar.argentina("Buenos Aires")
+
+
+def test_market_names_resolve_ignoring_case():
+    nyse = Calendar.united_states("NYSE")
+    assert Calendar.united_states("Nyse") == nyse
+    assert Calendar.united_states("nyse") == nyse
+
+
+def test_name_reflects_the_market():
+    assert Calendar.united_states().name == "US settlement"
+    assert Calendar.united_states("NYSE").name == "New York stock exchange"
+    assert Calendar.united_states("GovernmentBond").name == "US government bond market"
     assert Calendar.target().name == "TARGET"
-    assert Calendar.united_kingdom().name == "UK settlement"
     assert repr(Calendar.target()) == "Calendar(TARGET)"
 
 
@@ -59,6 +89,7 @@ def test_equality_and_hash_are_by_name():
     assert Calendar.target() == Calendar.target()
     assert hash(Calendar.target()) == hash(Calendar.target())
     assert Calendar.target() != Calendar.united_kingdom()
+    assert Calendar.united_states("NYSE") != Calendar.united_states("Settlement")
     assert len({Calendar.target(), Calendar.target(), Calendar.united_kingdom()}) == 2
     assert {Calendar.united_kingdom(): "gbp"}[Calendar.united_kingdom()] == "gbp"
 
@@ -80,6 +111,31 @@ def test_business_days_between_on_target_around_christmas():
     assert target.business_days_between(monday, next_monday, include_last=True) == 4
     assert target.business_days_between(monday, next_monday, include_first=False) == 2
     assert target.business_days_between(monday, monday) == 0
+
+
+@pytest.mark.parametrize(
+    "build",
+    [
+        Calendar.target,
+        Calendar.null_calendar,
+        Calendar.weekends_only,
+        Calendar.argentina,
+        Calendar.brazil,
+        Calendar.canada,
+        Calendar.chile,
+        Calendar.mexico,
+        Calendar.united_kingdom,
+        Calendar.united_states,
+    ],
+)
+def test_every_constructor_builds_without_arguments(build):
+    calendar = build()
+    assert calendar.name
+    # Every calendar but the null one holds at least its weekends over a year,
+    # whatever days those fall on.
+    holidays = calendar.holiday_list(Date(1, 1, 2010), Date(31, 12, 2010), include_weekends=True)
+    assert (len(holidays) > 0) == (calendar != Calendar.null_calendar())
+    assert all(calendar.is_holiday(d) for d in holidays)
 
 
 def test_holiday_list_rejects_a_reversed_range():

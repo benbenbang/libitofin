@@ -56,6 +56,76 @@ class Calendar:
             Calendar: The weekends-only calendar.
         """
     @staticmethod
+    def argentina(market: builtins.str = 'Merval') -> Calendar:
+        r"""
+        The Argentine calendar.
+
+        Args:
+            market (str): "Merval", the only market; matched ignoring case.
+
+        Returns:
+            Calendar: The Argentine calendar for that market.
+
+        Raises:
+            ItofinError: If market is not one of the accepted names.
+        """
+    @staticmethod
+    def brazil(market: builtins.str = 'Settlement') -> Calendar:
+        r"""
+        The Brazilian calendar.
+
+        Args:
+            market (str): One of "Settlement", "Exchange"; matched ignoring case.
+
+        Returns:
+            Calendar: The Brazilian calendar for that market.
+
+        Raises:
+            ItofinError: If market is not one of the accepted names.
+        """
+    @staticmethod
+    def canada(market: builtins.str = 'Settlement') -> Calendar:
+        r"""
+        The Canadian calendar.
+
+        Args:
+            market (str): One of "Settlement", "TSX"; matched ignoring case.
+
+        Returns:
+            Calendar: The Canadian calendar for that market.
+
+        Raises:
+            ItofinError: If market is not one of the accepted names.
+        """
+    @staticmethod
+    def chile(market: builtins.str = 'SSE') -> Calendar:
+        r"""
+        The Chilean calendar.
+
+        Args:
+            market (str): "SSE", the only market; matched ignoring case.
+
+        Returns:
+            Calendar: The Chilean calendar for that market.
+
+        Raises:
+            ItofinError: If market is not one of the accepted names.
+        """
+    @staticmethod
+    def mexico(market: builtins.str = 'BMV') -> Calendar:
+        r"""
+        The Mexican calendar.
+
+        Args:
+            market (str): "BMV", the only market; matched ignoring case.
+
+        Returns:
+            Calendar: The Mexican calendar for that market.
+
+        Raises:
+            ItofinError: If market is not one of the accepted names.
+        """
+    @staticmethod
     def united_kingdom() -> Calendar:
         r"""
         The UK settlement calendar. Only the Settlement market is exposed:
@@ -64,6 +134,20 @@ class Calendar:
 
         Returns:
             Calendar: The UK settlement calendar.
+        """
+    @staticmethod
+    def united_states(market: builtins.str = 'Settlement') -> Calendar:
+        r"""
+        The US calendar.
+
+        Args:
+            market (str): One of "Settlement", "NYSE", "GovernmentBond", "NERC", "LiborImpact", "FederalReserve", "SOFR"; matched ignoring case.
+
+        Returns:
+            Calendar: The US calendar for that market.
+
+        Raises:
+            ItofinError: If market is not one of the accepted names.
         """
     @staticmethod
     def joint(calendars: typing.Sequence[Calendar], rule: builtins.str = 'JoinHolidays') -> Calendar:
