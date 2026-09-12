@@ -11,6 +11,7 @@ from . import optimization
 from . import pricingengines
 from . import processes
 from . import quotes
+from . import randomnumbers
 from . import results
 from . import termstructures
 from . import time
@@ -25,6 +26,7 @@ __all__ = [
     "pricingengines",
     "processes",
     "quotes",
+    "randomnumbers",
     "results",
     "termstructures",
     "time",
