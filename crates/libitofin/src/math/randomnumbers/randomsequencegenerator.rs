@@ -29,6 +29,11 @@ use crate::require;
 use crate::types::Real;
 
 /// A random sequence generator wrapping a scalar uniform RNG `R`.
+///
+/// `Clone` reproduces QuantLib's by-value copy of the generator (the C++
+/// class is copyable): the copy carries its own RNG state and draws
+/// independently from the original.
+#[derive(Clone)]
 pub struct RandomSequenceGenerator<R> {
     dimension: usize,
     rng: R,

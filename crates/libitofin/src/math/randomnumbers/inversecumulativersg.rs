@@ -16,6 +16,10 @@ use crate::types::Real;
 
 /// Maps a uniform [`SequenceGenerator`] `USG` through an inverse cumulative
 /// transform `IC`.
+///
+/// `Clone` reproduces QuantLib's by-value copy of the generator, as for
+/// [`RandomSequenceGenerator`](super::randomsequencegenerator::RandomSequenceGenerator).
+#[derive(Clone)]
 pub struct InverseCumulativeRsg<USG, IC> {
     uniform_generator: USG,
     dimension: usize,

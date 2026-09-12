@@ -1,13 +1,16 @@
 //! Facades for the random-number generators: the uniform Mersenne-Twister
-//! generator, the sequence generator built on it, and the Gaussian generator
-//! layered over the former.
+//! generator, the sequence generator built on it, and the Gaussian
+//! generators layered over both.
 //!
 //! The classes carry QuantLib's Python (SWIG) names rather than the C++ ones,
 //! so `UniformRandomGenerator` stands for `MersenneTwisterUniformRng`,
 //! `UniformRandomSequenceGenerator` for
-//! `RandomSequenceGenerator<MersenneTwisterUniformRng>` and
+//! `RandomSequenceGenerator<MersenneTwisterUniformRng>`,
 //! `GaussianRandomGenerator` for `BoxMullerGaussianRng` over the Mersenne
-//! Twister: a QuantLib Python caller swaps the import and keeps the call sites.
+//! Twister and `GaussianRandomSequenceGenerator` for `InverseCumulativeRsg`
+//! over the uniform sequence generator and the inverse cumulative normal (the
+//! `PseudoRandom` policy the Monte Carlo engines draw from): a QuantLib Python
+//! caller swaps the import and keeps the call sites.
 //!
 //! Every draw is returned as a value, not as QuantLib's weighted `Sample`
 //! wrapper; the weight of a pseudo-random draw is always 1.0. Vector draws come
@@ -15,10 +18,11 @@
 //! so a Monte Carlo loop over paths does not cross the binding once per path.
 
 use crate::PyQlError;
+use libitofin::math::distributions::normal::InverseCumulativeNormal;
 use libitofin::math::randomnumbers::rngtraits::SequenceGenerator;
 use libitofin::math::randomnumbers::{
-    BoxMullerGaussianRng, GaussianRng, MersenneTwisterUniformRng, RandomSequenceGenerator,
-    UniformRng,
+    BoxMullerGaussianRng, GaussianRng, InverseCumulativeRsg, MersenneTwisterUniformRng,
+    RandomSequenceGenerator, UniformRng,
 };
 use numpy::{PyArray1, PyArray2, PyArrayMethods};
 use pyo3::prelude::*;
@@ -325,6 +329,120 @@ impl PyUniformRandomSequenceGenerator {
     /// Returns:
     ///     numpy.ndarray: A float64 array of shape (dimension,), every entry
     ///     strictly inside (0, 1).
+    fn next_sequence<'py>(&mut self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
+        PyArray1::from_vec(py, self.inner.next_sequence().value.clone())
+    }
+
+    /// The most recently drawn sequence, without advancing.
+    ///
+    /// Returns:
+    ///     numpy.ndarray: A float64 array of shape (dimension,); all zeros
+    ///     before the first draw.
+    fn last_sequence<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
+        PyArray1::from_vec(py, self.inner.last_sequence().value.clone())
+    }
+
+    /// Draw many sequences in one call.
+    ///
+    /// Args:
+    ///     count (int): The number of sequences to draw.
+    ///
+    /// Returns:
+    ///     numpy.ndarray: A float64 array of shape (count, dimension), row i
+    ///     being what the (i + 1)-th next_sequence() call would have returned.
+    ///
+    /// Raises:
+    ///     ItofinError: If a buffer of count sequences cannot be allocated.
+    fn next_sequences<'py>(
+        &mut self,
+        py: Python<'py>,
+        count: usize,
+    ) -> PyResult<Bound<'py, PyArray2<f64>>> {
+        let dimension = self.inner.dimension();
+        draw_matrix(py, count, dimension, || {
+            self.inner.next_sequence().value.clone()
+        })
+    }
+}
+
+impl PyUniformRandomSequenceGenerator {
+    /// A copy of the sequence generator state, for the Gaussian sequence
+    /// generator that takes it by value as QuantLib does.
+    pub(crate) fn inner(&self) -> RandomSequenceGenerator<MersenneTwisterUniformRng> {
+        self.inner.clone()
+    }
+}
+
+/// The Gaussian random sequence generator: uniform Mersenne-Twister sequences
+/// mapped through the inverse cumulative normal, QuantLib's
+/// `InverseCumulativeRsg<RandomSequenceGenerator<MersenneTwisterUniformRng>,
+/// InverseCumulativeNormal>`.
+///
+/// This is the `PseudoRandom` policy the Monte Carlo engines draw their paths
+/// from: with_seed(dimension, seed) reproduces the engines' generator for the
+/// same dimension and seed. The generator copies the uniform sequence generator
+/// it is built from, as QuantLib does.
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "GaussianRandomSequenceGenerator",
+    unsendable,
+    module = "itofin.randomnumbers"
+)]
+pub struct PyGaussianRandomSequenceGenerator {
+    inner: InverseCumulativeRsg<
+        RandomSequenceGenerator<MersenneTwisterUniformRng>,
+        InverseCumulativeNormal,
+    >,
+}
+
+#[gen_stub_pymethods]
+#[pymethods]
+impl PyGaussianRandomSequenceGenerator {
+    /// Build a Gaussian sequence generator over a copy of a uniform one.
+    ///
+    /// Args:
+    ///     usg (UniformRandomSequenceGenerator): The uniform sequence generator
+    ///         to copy the state from; its dimension is the dimension here.
+    #[new]
+    fn new(usg: &PyUniformRandomSequenceGenerator) -> Self {
+        PyGaussianRandomSequenceGenerator {
+            inner: InverseCumulativeRsg::new(usg.inner(), InverseCumulativeNormal::standard()),
+        }
+    }
+
+    /// Build a Gaussian sequence generator over a fresh Mersenne Twister.
+    ///
+    /// Args:
+    ///     dimension (int): The number of draws per sequence, at least 1.
+    ///     seed (int): The 32-bit seed; 0 draws a random seed.
+    ///
+    /// Returns:
+    ///     GaussianRandomSequenceGenerator: The seeded sequence generator.
+    ///
+    /// Raises:
+    ///     ItofinError: If dimension is 0.
+    #[staticmethod]
+    #[pyo3(signature = (dimension, seed = 0))]
+    fn with_seed(dimension: usize, seed: u32) -> PyResult<Self> {
+        let usg = RandomSequenceGenerator::with_seed(dimension, seed).map_err(PyQlError::from)?;
+        Ok(PyGaussianRandomSequenceGenerator {
+            inner: InverseCumulativeRsg::new(usg, InverseCumulativeNormal::standard()),
+        })
+    }
+
+    /// The number of draws per sequence.
+    ///
+    /// Returns:
+    ///     int: The dimension the generator was built with.
+    fn dimension(&self) -> usize {
+        self.inner.dimension()
+    }
+
+    /// Draw the next sequence.
+    ///
+    /// Returns:
+    ///     numpy.ndarray: A float64 array of shape (dimension,) of standard
+    ///     normal deviates.
     fn next_sequence<'py>(&mut self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
         PyArray1::from_vec(py, self.inner.next_sequence().value.clone())
     }
