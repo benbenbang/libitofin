@@ -2,12 +2,15 @@
 # ruff: noqa: E501, F401, F403, F405
 
 import builtins
+import enum
 import numpy
 import numpy.typing
 import typing
 __all__ = [
+    "DirectionIntegers",
     "GaussianRandomGenerator",
     "GaussianRandomSequenceGenerator",
+    "SobolRsg",
     "UniformRandomGenerator",
     "UniformRandomSequenceGenerator",
 ]
@@ -135,6 +138,100 @@ class GaussianRandomSequenceGenerator:
 
         Raises:
             ItofinError: If a buffer of count sequences cannot be allocated.
+        """
+
+@typing.final
+class SobolRsg:
+    r"""
+    The Sobol low-discrepancy sequence generator, QuantLib's `SobolRsg`.
+
+    Successive draws fill the unit hypercube evenly rather than randomly, so a
+    Monte Carlo estimate over them converges faster than over pseudo-random
+    draws. The first draw is 0.5 in every dimension, and every draw lies
+    strictly inside (0, 1). The generator is deterministic for a given seed:
+    the seed only matters for dimensions beyond the tabulated initializers.
+    """
+    def __init__(self, dimension: builtins.int, seed: builtins.int = 0, direction_integers: DirectionIntegers = DirectionIntegers.Jaeckel, use_gray_code: builtins.bool = True) -> None:
+        r"""
+        Build a Sobol generator.
+
+        Args:
+            dimension (int): The number of draws per sequence, from 1 to the
+                number of primitive polynomials shipped (21200).
+            seed (int): The seed for the free direction integers past the
+                tabulated dimensions; used literally, so 0 is a fixed seed.
+            direction_integers (DirectionIntegers): The direction-integer
+                table, Jaeckel by default as in QuantLib.
+            use_gray_code (bool): Generate through the Gray-code counter (the
+                QuantLib default) rather than the plain counter.
+
+        Raises:
+            ItofinError: If dimension is 0 or exceeds 21200.
+        """
+    def dimension(self) -> builtins.int:
+        r"""
+        The number of draws per sequence.
+
+        Returns:
+            int: The dimension the generator was built with.
+        """
+    def next_sequence(self) -> numpy.typing.NDArray[numpy.float64]:
+        r"""
+        Draw the next Sobol point.
+
+        Returns:
+            numpy.ndarray: A float64 array of shape (dimension,), every entry
+            strictly inside (0, 1).
+        """
+    def last_sequence(self) -> numpy.typing.NDArray[numpy.float64]:
+        r"""
+        The most recently drawn point, without advancing.
+
+        Returns:
+            numpy.ndarray: A float64 array of shape (dimension,); all zeros
+            before the first draw.
+        """
+    def next_int32_sequence(self) -> numpy.typing.NDArray[numpy.uint32]:
+        r"""
+        Draw the next point as raw 32-bit Sobol integers.
+
+        Returns:
+            numpy.ndarray: A uint32 array of shape (dimension,); the float
+            point is this array scaled by 2^-32.
+        """
+    def next_sequences(self, count: builtins.int) -> numpy.typing.NDArray[numpy.float64]:
+        r"""
+        Draw many points in one call.
+
+        Args:
+            count (int): The number of points to draw.
+
+        Returns:
+            numpy.ndarray: A float64 array of shape (count, dimension), row i
+            being what the (i + 1)-th next_sequence() call would have returned.
+
+        Raises:
+            ItofinError: If a buffer of count points cannot be allocated.
+        """
+    def skip_to(self, n: builtins.int) -> numpy.typing.NDArray[numpy.uint32]:
+        r"""
+        Skip to the n-th point of the sequence and return it as raw integers.
+
+        QuantLib's skipTo, whose counter semantics are kept: with the Gray-code
+        counter the following draw returns point n + 1, unless it is the very
+        first draw made on the generator, which returns point n itself; with
+        the plain counter the following draw returns point n. The float point
+        is the returned array scaled by 2^-32.
+
+        Args:
+            n (int): The 0-based index of the point to skip to.
+
+        Returns:
+            numpy.ndarray: A uint32 array of shape (dimension,), point n as
+            raw Sobol integers.
+
+        Raises:
+            ItofinError: If n is 2^32 - 1, past the sequence period.
         """
 
 @typing.final
@@ -274,3 +371,24 @@ class UniformRandomSequenceGenerator:
         Raises:
             ItofinError: If a buffer of count sequences cannot be allocated.
         """
+
+@typing.final
+class DirectionIntegers(enum.Enum):
+    r"""
+    The choice of free direction integers for the Sobol dimensions beyond the
+    first, QuantLib's `SobolRsg::DirectionIntegers`.
+
+    Jaeckel is QuantLib's default. Unit uses the unit initialization for every
+    dimension; the others are the tabulated initializers shipped with QuantLib,
+    with a seeded Mersenne Twister drawing the free integers past each table.
+    """
+    Unit = ...
+    Jaeckel = ...
+    SobolLevitan = ...
+    SobolLevitanLemieux = ...
+    JoeKuoD5 = ...
+    JoeKuoD6 = ...
+    JoeKuoD7 = ...
+    Kuo = ...
+    Kuo2 = ...
+    Kuo3 = ...

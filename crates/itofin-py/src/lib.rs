@@ -96,8 +96,8 @@ use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use randomnumbers::{
-    PyGaussianRandomGenerator, PyGaussianRandomSequenceGenerator, PyUniformRandomGenerator,
-    PyUniformRandomSequenceGenerator,
+    PyDirectionIntegers, PyGaussianRandomGenerator, PyGaussianRandomSequenceGenerator, PySobolRsg,
+    PyUniformRandomGenerator, PyUniformRandomSequenceGenerator,
 };
 use results::Results;
 use settings::PySettings;
@@ -330,6 +330,8 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     randomnumbers.add_class::<PyUniformRandomSequenceGenerator>()?;
     randomnumbers.add_class::<PyGaussianRandomGenerator>()?;
     randomnumbers.add_class::<PyGaussianRandomSequenceGenerator>()?;
+    randomnumbers.add_class::<PyDirectionIntegers>()?;
+    randomnumbers.add_class::<PySobolRsg>()?;
 
     let results = PyModule::new(py, "results")?;
     results.add_class::<Results>()?;
