@@ -229,6 +229,22 @@ print(f"payer swaption NPV {swaption.npv():.10f}")
 payer swaption NPV 1.5666103956
 ```
 
+## Draw random numbers as NumPy arrays
+
+The generators under `itofin.randomnumbers` carry QuantLib's Python names. Sequence
+generators return NumPy arrays, and `next_sequences(count)` draws a whole
+`(count, dimension)` matrix in one call, so a path loop never crosses the binding
+once per path.
+
+```python
+from itofin.randomnumbers import UniformRandomGenerator, UniformRandomSequenceGenerator
+
+rng = UniformRandomGenerator(42)                       # MT19937, seeded
+usg = UniformRandomSequenceGenerator(3, rng)           # 3 uniforms per sequence
+print(usg.next_sequence())                             # ndarray, shape (3,)
+print(usg.next_sequences(1000).shape)                  # (1000, 3)
+```
+
 ## License
 
 BSD-3-Clause, matching the `libitofin` core. See the [repository](https://github.com/benbenbang/libitofin) for the layer status table, the divergences-from-QuantLib catalogue, and the Rust test oracles behind the numbers above.

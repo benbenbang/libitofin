@@ -7,6 +7,7 @@ import numpy.typing
 import typing
 __all__ = [
     "UniformRandomGenerator",
+    "UniformRandomSequenceGenerator",
 ]
 
 @typing.final
@@ -71,4 +72,78 @@ class UniformRandomGenerator:
 
         Raises:
             ItofinError: If a buffer of count draws cannot be allocated.
+        """
+
+@typing.final
+class UniformRandomSequenceGenerator:
+    r"""
+    The uniform random sequence generator: `dimension` Mersenne-Twister draws
+    per sequence, QuantLib's `RandomSequenceGenerator<MersenneTwisterUniformRng>`.
+
+    The generator copies the scalar generator it is built from, as QuantLib
+    does, so later draws on the original do not affect the sequence.
+    """
+    def __init__(self, dimension: builtins.int, rng: UniformRandomGenerator) -> None:
+        r"""
+        Build a sequence generator over a copy of a scalar generator.
+
+        Args:
+            dimension (int): The number of draws per sequence, at least 1.
+            rng (UniformRandomGenerator): The scalar generator to copy the
+                state from.
+
+        Raises:
+            ItofinError: If dimension is 0.
+        """
+    @staticmethod
+    def with_seed(dimension: builtins.int, seed: builtins.int = 0) -> UniformRandomSequenceGenerator:
+        r"""
+        Build a sequence generator over a fresh Mersenne Twister.
+
+        Args:
+            dimension (int): The number of draws per sequence, at least 1.
+            seed (int): The 32-bit seed; 0 draws a random seed.
+
+        Returns:
+            UniformRandomSequenceGenerator: The seeded sequence generator.
+
+        Raises:
+            ItofinError: If dimension is 0.
+        """
+    def dimension(self) -> builtins.int:
+        r"""
+        The number of draws per sequence.
+
+        Returns:
+            int: The dimension the generator was built with.
+        """
+    def next_sequence(self) -> numpy.typing.NDArray[numpy.float64]:
+        r"""
+        Draw the next sequence.
+
+        Returns:
+            numpy.ndarray: A float64 array of shape (dimension,), every entry
+            strictly inside (0, 1).
+        """
+    def last_sequence(self) -> numpy.typing.NDArray[numpy.float64]:
+        r"""
+        The most recently drawn sequence, without advancing.
+
+        Returns:
+            numpy.ndarray: A float64 array of shape (dimension,); all zeros
+            before the first draw.
+        """
+    def next_sequences(self, count: builtins.int) -> numpy.typing.NDArray[numpy.float64]:
+        r"""
+        Draw many sequences in one call.
+
+        Args:
+            count (int): The number of sequences to draw.
+
+        Returns:
+            numpy.ndarray: A float64 array of shape (count, dimension), row i
+            being what the (i + 1)-th next_sequence() call would have returned.
+
+        Raises:
+            ItofinError: If a buffer of count sequences cannot be allocated.
         """
