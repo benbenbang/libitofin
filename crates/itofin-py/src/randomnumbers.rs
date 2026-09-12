@@ -1,6 +1,6 @@
 //! Facades for the random-number generators: the uniform Mersenne-Twister
-//! generator, the sequence generator built on it, and the Gaussian
-//! generators layered over both.
+//! generator, the sequence generator built on it, the Gaussian generators
+//! layered over both, and the Sobol low-discrepancy sequence.
 //!
 //! The classes carry QuantLib's Python (SWIG) names rather than the C++ ones,
 //! so `UniformRandomGenerator` stands for `MersenneTwisterUniformRng`,
@@ -10,7 +10,12 @@
 //! Twister and `GaussianRandomSequenceGenerator` for `InverseCumulativeRsg`
 //! over the uniform sequence generator and the inverse cumulative normal (the
 //! `PseudoRandom` policy the Monte Carlo engines draw from): a QuantLib Python
-//! caller swaps the import and keeps the call sites.
+//! caller swaps the import and keeps the call sites. `SobolRsg` keeps the C++
+//! name, as QuantLib's Python API does.
+//!
+//! Deferred (visible): the Monte Carlo engines still pin the pseudo-random
+//! policy; the low-discrepancy policy behind `testQmcEngines` lands with the
+//! core's `LowDiscrepancy` traits (#454).
 //!
 //! Every draw is returned as a value, not as QuantLib's weighted `Sample`
 //! wrapper; the weight of a pseudo-random draw is always 1.0. Vector draws come
@@ -20,6 +25,7 @@
 use crate::PyQlError;
 use libitofin::math::distributions::normal::InverseCumulativeNormal;
 use libitofin::math::randomnumbers::rngtraits::SequenceGenerator;
+use libitofin::math::randomnumbers::sobol::{DirectionIntegers, PPMT_MAX_DIM, SobolRsg};
 use libitofin::math::randomnumbers::{
     BoxMullerGaussianRng, GaussianRng, InverseCumulativeRsg, MersenneTwisterUniformRng,
     RandomSequenceGenerator, UniformRng,
@@ -476,5 +482,191 @@ impl PyGaussianRandomSequenceGenerator {
         draw_matrix(py, count, dimension, || {
             self.inner.next_sequence().value.clone()
         })
+    }
+}
+
+/// The choice of free direction integers for the Sobol dimensions beyond the
+/// first, QuantLib's `SobolRsg::DirectionIntegers`.
+///
+/// Jaeckel is QuantLib's default. Unit uses the unit initialization for every
+/// dimension; the others are the tabulated initializers shipped with QuantLib,
+/// with a seeded Mersenne Twister drawing the free integers past each table.
+#[gen_stub_pyclass_enum]
+#[pyclass(
+    name = "DirectionIntegers",
+    eq,
+    eq_int,
+    from_py_object,
+    module = "itofin.randomnumbers"
+)]
+#[derive(Clone, Copy, PartialEq)]
+pub enum PyDirectionIntegers {
+    Unit,
+    Jaeckel,
+    SobolLevitan,
+    SobolLevitanLemieux,
+    JoeKuoD5,
+    JoeKuoD6,
+    JoeKuoD7,
+    Kuo,
+    Kuo2,
+    Kuo3,
+}
+
+impl PyDirectionIntegers {
+    /// The core direction-integer choice this variant stands for.
+    pub(crate) fn inner(self) -> DirectionIntegers {
+        match self {
+            PyDirectionIntegers::Unit => DirectionIntegers::Unit,
+            PyDirectionIntegers::Jaeckel => DirectionIntegers::Jaeckel,
+            PyDirectionIntegers::SobolLevitan => DirectionIntegers::SobolLevitan,
+            PyDirectionIntegers::SobolLevitanLemieux => DirectionIntegers::SobolLevitanLemieux,
+            PyDirectionIntegers::JoeKuoD5 => DirectionIntegers::JoeKuoD5,
+            PyDirectionIntegers::JoeKuoD6 => DirectionIntegers::JoeKuoD6,
+            PyDirectionIntegers::JoeKuoD7 => DirectionIntegers::JoeKuoD7,
+            PyDirectionIntegers::Kuo => DirectionIntegers::Kuo,
+            PyDirectionIntegers::Kuo2 => DirectionIntegers::Kuo2,
+            PyDirectionIntegers::Kuo3 => DirectionIntegers::Kuo3,
+        }
+    }
+}
+
+/// The Sobol low-discrepancy sequence generator, QuantLib's `SobolRsg`.
+///
+/// Successive draws fill the unit hypercube evenly rather than randomly, so a
+/// Monte Carlo estimate over them converges faster than over pseudo-random
+/// draws. The first draw is 0.5 in every dimension, and every draw lies
+/// strictly inside (0, 1). The generator is deterministic for a given seed:
+/// the seed only matters for dimensions beyond the tabulated initializers.
+#[gen_stub_pyclass]
+#[pyclass(name = "SobolRsg", unsendable, module = "itofin.randomnumbers")]
+pub struct PySobolRsg {
+    inner: SobolRsg,
+}
+
+#[gen_stub_pymethods]
+#[pymethods]
+impl PySobolRsg {
+    /// Build a Sobol generator.
+    ///
+    /// Args:
+    ///     dimension (int): The number of draws per sequence, from 1 to the
+    ///         number of primitive polynomials shipped (21200).
+    ///     seed (int): The seed for the free direction integers past the
+    ///         tabulated dimensions; used literally, so 0 is a fixed seed.
+    ///     direction_integers (DirectionIntegers): The direction-integer
+    ///         table, Jaeckel by default as in QuantLib.
+    ///     use_gray_code (bool): Generate through the Gray-code counter (the
+    ///         QuantLib default) rather than the plain counter.
+    ///
+    /// Raises:
+    ///     ItofinError: If dimension is 0 or exceeds 21200.
+    #[new]
+    #[pyo3(signature = (
+        dimension,
+        seed = 0,
+        direction_integers = PyDirectionIntegers::Jaeckel,
+        use_gray_code = true,
+    ))]
+    fn new(
+        dimension: usize,
+        seed: u64,
+        direction_integers: PyDirectionIntegers,
+        use_gray_code: bool,
+    ) -> PyResult<Self> {
+        if dimension == 0 || dimension > PPMT_MAX_DIM {
+            return Err(crate::ItofinError::new_err(format!(
+                "dimension {dimension} outside [1, {PPMT_MAX_DIM}]"
+            )));
+        }
+        Ok(PySobolRsg {
+            inner: SobolRsg::with_gray_code(
+                dimension,
+                seed,
+                direction_integers.inner(),
+                use_gray_code,
+            ),
+        })
+    }
+
+    /// The number of draws per sequence.
+    ///
+    /// Returns:
+    ///     int: The dimension the generator was built with.
+    fn dimension(&self) -> usize {
+        self.inner.dimension()
+    }
+
+    /// Draw the next Sobol point.
+    ///
+    /// Returns:
+    ///     numpy.ndarray: A float64 array of shape (dimension,), every entry
+    ///     strictly inside (0, 1).
+    fn next_sequence<'py>(&mut self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
+        PyArray1::from_vec(py, self.inner.next_sequence().to_vec())
+    }
+
+    /// The most recently drawn point, without advancing.
+    ///
+    /// Returns:
+    ///     numpy.ndarray: A float64 array of shape (dimension,); all zeros
+    ///     before the first draw.
+    fn last_sequence<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
+        PyArray1::from_vec(py, self.inner.last_sequence().to_vec())
+    }
+
+    /// Draw the next point as raw 32-bit Sobol integers.
+    ///
+    /// Returns:
+    ///     numpy.ndarray: A uint32 array of shape (dimension,); the float
+    ///     point is this array scaled by 2^-32.
+    fn next_int32_sequence<'py>(&mut self, py: Python<'py>) -> Bound<'py, PyArray1<u32>> {
+        PyArray1::from_vec(py, self.inner.next_int32_sequence().to_vec())
+    }
+
+    /// Draw many points in one call.
+    ///
+    /// Args:
+    ///     count (int): The number of points to draw.
+    ///
+    /// Returns:
+    ///     numpy.ndarray: A float64 array of shape (count, dimension), row i
+    ///     being what the (i + 1)-th next_sequence() call would have returned.
+    ///
+    /// Raises:
+    ///     ItofinError: If a buffer of count points cannot be allocated.
+    fn next_sequences<'py>(
+        &mut self,
+        py: Python<'py>,
+        count: usize,
+    ) -> PyResult<Bound<'py, PyArray2<f64>>> {
+        let dimension = self.inner.dimension();
+        draw_matrix(py, count, dimension, || self.inner.next_sequence().to_vec())
+    }
+
+    /// Skip to the n-th point of the sequence and return it as raw integers.
+    ///
+    /// QuantLib's skipTo, whose counter semantics are kept: with the Gray-code
+    /// counter the following draw returns point n + 1, unless it is the very
+    /// first draw made on the generator, which returns point n itself; with
+    /// the plain counter the following draw returns point n. The float point
+    /// is the returned array scaled by 2^-32.
+    ///
+    /// Args:
+    ///     n (int): The 0-based index of the point to skip to.
+    ///
+    /// Returns:
+    ///     numpy.ndarray: A uint32 array of shape (dimension,), point n as
+    ///     raw Sobol integers.
+    ///
+    /// Raises:
+    ///     ItofinError: If n is 2^32 - 1, past the sequence period.
+    fn skip_to<'py>(&mut self, py: Python<'py>, n: u32) -> PyResult<Bound<'py, PyArray1<u32>>> {
+        if n == u32::MAX {
+            return Err(crate::ItofinError::new_err(
+                "skip exceeds the Sobol sequence period",
+            ));
+        }
+        Ok(PyArray1::from_vec(py, self.inner.skip_to(n).to_vec()))
     }
 }
