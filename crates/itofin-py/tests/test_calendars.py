@@ -4,7 +4,7 @@ Every expected value below is pinned against the holiday rules in the core
 (`crates/libitofin/src/time/calendars/*.rs`), which mirror QuantLib's
 `ql/time/calendars/`. The discriminating dates are the ones where calendars
 disagree: 4 July 2025 is a holiday on both US markets and a business day on
-TARGET and in the UK.
+TARGET and in the UK; 25 December 2025 is a holiday across Europe.
 
 Market names resolve ignoring case, so "NYSE", "Nyse" and "nyse" build the
 same calendar; an unknown market or joint rule is an ItofinError before the
@@ -20,6 +20,8 @@ from itofin.time import Calendar, Date
 
 INDEPENDENCE_DAY_2025 = Date(4, 7, 2025)  # a Friday
 JUNETEENTH_2025 = Date(19, 6, 2025)  # a Thursday
+CHRISTMAS_2025 = Date(25, 12, 2025)  # a Thursday
+NEW_YEAR_2025 = Date(1, 1, 2025)  # a Wednesday
 SATURDAY = Date(5, 7, 2025)
 
 
@@ -33,6 +35,27 @@ def test_independence_day_is_a_us_holiday_but_a_target_business_day():
 def test_juneteenth_is_a_nyse_holiday():
     assert Calendar.united_states("NYSE").is_holiday(JUNETEENTH_2025)
     assert not Calendar.united_states("NYSE").is_business_day(JUNETEENTH_2025)
+
+
+def test_christmas_is_a_european_holiday():
+    for calendar in (
+        Calendar.target(),
+        Calendar.united_kingdom(),
+        Calendar.germany(),
+        Calendar.germany("FrankfurtStockExchange"),
+    ):
+        assert calendar.is_holiday(CHRISTMAS_2025), calendar
+
+
+def test_new_year_is_a_holiday_on_every_western_calendar():
+    for calendar in (
+        Calendar.target(),
+        Calendar.united_states(),
+        Calendar.united_kingdom(),
+        Calendar.germany(),
+        Calendar.switzerland(),
+    ):
+        assert calendar.is_holiday(NEW_YEAR_2025), calendar
 
 
 def test_a_saturday_is_a_weekend_and_a_holiday_but_not_on_the_null_calendar():
@@ -67,6 +90,8 @@ def test_joint_calendar_rejects_an_empty_list_and_an_unknown_rule():
 def test_unknown_market_raises_listing_the_accepted_names():
     with pytest.raises(ItofinError, match="Settlement, NYSE, GovernmentBond"):
         Calendar.united_states("LSE")
+    with pytest.raises(ItofinError, match="Settlement, Exchange, Metals"):
+        Calendar.united_kingdom("Nyse")
     with pytest.raises(ItofinError, match="Merval"):
         Calendar.argentina("Buenos Aires")
 
@@ -75,6 +100,7 @@ def test_market_names_resolve_ignoring_case():
     nyse = Calendar.united_states("NYSE")
     assert Calendar.united_states("Nyse") == nyse
     assert Calendar.united_states("nyse") == nyse
+    assert Calendar.germany("xetra") == Calendar.germany("Xetra")
 
 
 def test_name_reflects_the_market():
@@ -91,7 +117,7 @@ def test_equality_and_hash_are_by_name():
     assert Calendar.target() != Calendar.united_kingdom()
     assert Calendar.united_states("NYSE") != Calendar.united_states("Settlement")
     assert len({Calendar.target(), Calendar.target(), Calendar.united_kingdom()}) == 2
-    assert {Calendar.united_kingdom(): "gbp"}[Calendar.united_kingdom()] == "gbp"
+    assert {Calendar.united_kingdom(): "gbp"}[Calendar.united_kingdom("settlement")] == "gbp"
 
 
 def test_holiday_list_over_december_on_target():
@@ -120,10 +146,21 @@ def test_business_days_between_on_target_around_christmas():
         Calendar.null_calendar,
         Calendar.weekends_only,
         Calendar.argentina,
+        Calendar.austria,
         Calendar.brazil,
         Calendar.canada,
         Calendar.chile,
+        Calendar.denmark,
+        Calendar.finland,
+        Calendar.france,
+        Calendar.germany,
+        Calendar.iceland,
+        Calendar.italy,
+        Calendar.malta,
         Calendar.mexico,
+        Calendar.norway,
+        Calendar.sweden,
+        Calendar.switzerland,
         Calendar.united_kingdom,
         Calendar.united_states,
     ],
