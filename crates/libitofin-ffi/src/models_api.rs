@@ -57,6 +57,11 @@ pub struct HestonProcessConfig {
     pub day_counter: u64,
 }
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_heston_process_new(
     ctx: *mut Context,
     config: HestonProcessConfig,
@@ -83,6 +88,11 @@ pub unsafe extern "C" fn itofin_heston_process_new(
     }
 }
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_heston_model_new(
     ctx: *mut Context,
     process: u64,
@@ -98,6 +108,11 @@ pub unsafe extern "C" fn itofin_heston_model_new(
     }
 }
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_hullwhite_new(
     ctx: *mut Context,
     curve: u64,
@@ -118,6 +133,11 @@ pub unsafe extern "C" fn itofin_hullwhite_new(
 /// Kind 0 Heston process, 1 Heston model, 2 HullWhite.
 /// Heston fields: v0, kappa, theta, sigma, rho. HullWhite fields: a, sigma, r0.
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_model_parameter(
     ctx: *mut Context,
     handle: u64,
@@ -157,6 +177,11 @@ pub unsafe extern "C" fn itofin_model_parameter(
     }
 }
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_hullwhite_bond_option(
     ctx: *mut Context,
     model: u64,
@@ -182,6 +207,11 @@ pub unsafe extern "C" fn itofin_hullwhite_bond_option(
     }
 }
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_levenberg_marquardt_new(
     ctx: *mut Context,
     epsfcn: f64,
@@ -222,6 +252,11 @@ pub struct EndCriteriaConfig {
     pub has_gradient: i32,
 }
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_end_criteria_new(
     ctx: *mut Context,
     config: EndCriteriaConfig,
@@ -265,6 +300,11 @@ pub struct HestonHelperConfig {
     pub settings: u64,
 }
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_heston_helper_new(
     ctx: *mut Context,
     cfg: HestonHelperConfig,
@@ -312,6 +352,11 @@ pub struct SwaptionHelperConfig {
     pub nominal: f64,
 }
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_swaption_helper_new(
     ctx: *mut Context,
     cfg: SwaptionHelperConfig,
@@ -351,6 +396,11 @@ pub unsafe extern "C" fn itofin_swaption_helper_new(
 }
 /// Kind 0 Heston helper, 1 swaption helper.
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_helper_error(
     ctx: *mut Context,
     helper: u64,
@@ -378,6 +428,11 @@ pub unsafe extern "C" fn itofin_helper_error(
 }
 /// Calibration kind 0 Heston (integration order), 1 HullWhite (fix_reversion).
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_model_calibrate(
     ctx: *mut Context,
     model: u64,

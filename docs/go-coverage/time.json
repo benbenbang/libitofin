@@ -1,78 +1,908 @@
 {
   "domain": "time-settings-results",
   "entries": [
-    {"python": "itofin.time.Calendar", "c": ["itofin_calendar_new"], "go": ["Session.Target", "Session.NullCalendar", "Session.WeekendsOnly", "Session.UnitedKingdom"], "tests": ["TestIMMAndCalendarOracles"], "status": "implemented"},
-    {"python": "itofin.time.Calendar.target", "c": ["itofin_calendar_new"], "go": ["Session.Target"], "tests": ["TestIMMAndCalendarOracles"], "status": "implemented"},
-    {"python": "itofin.time.Calendar.null_calendar", "c": ["itofin_calendar_new"], "go": ["Session.NullCalendar"], "tests": ["TestSchedulesDayCountersAndLifetimes"], "status": "implemented"},
-    {"python": "itofin.time.Calendar.weekends_only", "c": ["itofin_calendar_new"], "go": ["Session.WeekendsOnly"], "tests": ["TestIMMAndCalendarOracles"], "status": "implemented"},
-    {"python": "itofin.time.Calendar.united_kingdom", "c": ["itofin_calendar_new"], "go": ["Session.UnitedKingdom"], "tests": ["TestIMMAndCalendarOracles"], "status": "implemented"},
-    {"python": "itofin.time.Calendar.adjust", "c": ["itofin_calendar_adjust"], "go": ["Calendar.Adjust"], "tests": ["TestIMMAndCalendarOracles", "TestAllTimeConventions"], "status": "implemented"},
-    {"python": "itofin.time.Calendar.advance", "c": ["itofin_calendar_advance"], "go": ["Calendar.Advance"], "tests": ["calendar_rolls_follow_quantlib_conventions", "TestIMMAndCalendarOracles"], "status": "implemented"},
-    {"python": "itofin.time.Calendar.__repr__", "c": ["itofin_time_name"], "go": ["Calendar.Repr"], "tests": ["TestAllTimeConventions"], "status": "implemented"},
-    {"python": "itofin.time.Date", "c": ["itofin_date_new"], "go": ["NewDate"], "tests": ["TestDateLeapRangeAndPeriodEquality"], "status": "implemented"},
-    {"python": "itofin.time.Date.year", "c": ["itofin_date_parts"], "go": ["Date.Year"], "tests": ["TestDateLeapRangeAndPeriodEquality"], "status": "implemented"},
-    {"python": "itofin.time.Date.month", "c": ["itofin_date_parts"], "go": ["Date.Month"], "tests": ["TestDateLeapRangeAndPeriodEquality"], "status": "implemented"},
-    {"python": "itofin.time.Date.day", "c": ["itofin_date_parts"], "go": ["Date.Day"], "tests": ["TestDateLeapRangeAndPeriodEquality"], "status": "implemented"},
-    {"python": "itofin.time.Date.__init__", "c": ["itofin_date_new"], "go": ["NewDate"], "tests": ["TestDateLeapRangeAndPeriodEquality"], "status": "implemented"},
-    {"python": "itofin.time.Date.__add__", "c": ["itofin_date_shift"], "go": ["Date.AddDays"], "tests": ["TestDateLeapRangeAndPeriodEquality"], "status": "implemented"},
-    {"python": "itofin.time.Date.__eq__", "c": [], "go": ["Date: Go == operator"], "tests": ["TestDateLeapRangeAndPeriodEquality"], "status": "implemented"},
-    {"python": "itofin.time.Date.__hash__", "c": [], "go": ["Date: Go map key"], "tests": ["TestDateLeapRangeAndPeriodEquality"], "status": "implemented"},
-    {"python": "itofin.time.Date.__repr__", "c": ["itofin_date_parts"], "go": ["Date.String"], "tests": ["TestDateLeapRangeAndPeriodEquality"], "status": "implemented"},
-    {"python": "itofin.time.Date.__sub__", "c": ["itofin_date_shift"], "go": ["Date.SubtractDays", "Date.DaysSince"], "tests": ["TestDateLeapRangeAndPeriodEquality"], "status": "implemented"},
-    {"python": "itofin.time.DayCounter", "c": ["itofin_day_counter_new"], "go": ["Session.Actual360"], "tests": ["TestAllTimeConventions"], "status": "implemented"},
-    {"python": "itofin.time.DayCounter.actual360", "c": ["itofin_day_counter_new"], "go": ["Session.Actual360"], "tests": ["TestAllTimeConventions"], "status": "implemented"},
-    {"python": "itofin.time.DayCounter.actual365_fixed", "c": ["itofin_day_counter_new"], "go": ["Session.Actual365Fixed"], "tests": ["TestAllTimeConventions"], "status": "implemented"},
-    {"python": "itofin.time.DayCounter.actual_actual_isda", "c": ["itofin_day_counter_new"], "go": ["Session.ActualActualISDA"], "tests": ["TestAllTimeConventions"], "status": "implemented"},
-    {"python": "itofin.time.DayCounter.thirty360_bond_basis", "c": ["itofin_day_counter_new"], "go": ["Session.Thirty360BondBasis"], "tests": ["TestAllTimeConventions"], "status": "implemented"},
-    {"python": "itofin.time.DayCounter.year_fraction", "c": ["itofin_day_counter_year_fraction"], "go": ["DayCounter.YearFraction"], "tests": ["TestAllTimeConventions"], "status": "implemented"},
-    {"python": "itofin.time.DayCounter.__eq__", "c": ["itofin_time_name"], "go": ["DayCounter.Equal"], "tests": ["TestSchedulesDayCountersAndLifetimes"], "status": "implemented"},
-    {"python": "itofin.time.DayCounter.__hash__", "c": ["itofin_time_name"], "go": ["DayCounter.Key"], "tests": ["TestAllTimeConventions"], "status": "implemented"},
-    {"python": "itofin.time.DayCounter.__repr__", "c": ["itofin_time_name"], "go": ["DayCounter.Repr"], "tests": ["TestAllTimeConventions"], "status": "implemented"},
-    {"python": "itofin.time.Period", "c": [], "go": ["NewPeriod"], "tests": ["TestDateLeapRangeAndPeriodEquality"], "status": "implemented"},
-    {"python": "itofin.time.Period.__init__", "c": [], "go": ["NewPeriod"], "tests": ["TestDateLeapRangeAndPeriodEquality"], "status": "implemented"},
-    {"python": "itofin.time.Period.__eq__", "c": [], "go": ["Period.Equal"], "tests": ["TestDateLeapRangeAndPeriodEquality"], "status": "implemented"},
-    {"python": "itofin.time.Period.__hash__", "c": [], "go": ["Period.Key"], "tests": ["TestDateLeapRangeAndPeriodEquality"], "status": "implemented"},
-    {"python": "itofin.time.Period.__repr__", "c": [], "go": ["Period.String"], "tests": ["TestDateLeapRangeAndPeriodEquality"], "status": "implemented"},
-    {"python": "itofin.time.Schedule", "c": ["itofin_schedule_new"], "go": ["Session.NewSchedule"], "tests": ["TestSchedulesDayCountersAndLifetimes"], "status": "implemented"},
-    {"python": "itofin.time.Schedule.__init__", "c": ["itofin_schedule_new"], "go": ["Session.NewSchedule"], "tests": ["TestAllTimeConventions"], "status": "implemented"},
-    {"python": "itofin.time.Schedule.size", "c": ["itofin_schedule_dates"], "go": ["Schedule.Size"], "tests": ["TestAllTimeConventions"], "status": "implemented"},
-    {"python": "itofin.time.Schedule.date", "c": ["itofin_schedule_dates"], "go": ["Schedule.Date"], "tests": ["TestSchedulesDayCountersAndLifetimes"], "status": "implemented"},
-    {"python": "itofin.time.Schedule.dates", "c": ["itofin_schedule_dates"], "go": ["Schedule.Dates"], "tests": ["TestSchedulesDayCountersAndLifetimes"], "status": "implemented"},
-    {"python": "itofin.time.BusinessDayConvention", "c": [], "go": ["BusinessDayConvention"], "tests": ["TestAllTimeConventions"], "status": "implemented"},
-    {"python": "itofin.time.BusinessDayConvention.ModifiedFollowing", "c": [], "go": ["ModifiedFollowing"], "tests": ["TestAllTimeConventions"], "status": "implemented"},
-    {"python": "itofin.time.BusinessDayConvention.Following", "c": [], "go": ["Following"], "tests": ["TestAllTimeConventions"], "status": "implemented"},
-    {"python": "itofin.time.BusinessDayConvention.Unadjusted", "c": [], "go": ["Unadjusted"], "tests": ["TestAllTimeConventions"], "status": "implemented"},
-    {"python": "itofin.time.BusinessDayConvention.Preceding", "c": [], "go": ["Preceding"], "tests": ["TestAllTimeConventions"], "status": "implemented"},
-    {"python": "itofin.time.BusinessDayConvention.ModifiedPreceding", "c": [], "go": ["ModifiedPreceding"], "tests": ["TestAllTimeConventions"], "status": "implemented"},
-    {"python": "itofin.time.BusinessDayConvention.HalfMonthModifiedFollowing", "c": [], "go": ["HalfMonthModifiedFollowing"], "tests": ["TestAllTimeConventions"], "status": "implemented"},
-    {"python": "itofin.time.BusinessDayConvention.Nearest", "c": [], "go": ["Nearest"], "tests": ["TestAllTimeConventions"], "status": "implemented"},
-    {"python": "itofin.time.DateGeneration", "c": [], "go": ["DateGeneration"], "tests": ["TestAllTimeConventions"], "status": "implemented"},
-    {"python": "itofin.time.DateGeneration.Backward", "c": [], "go": ["Backward"], "tests": ["TestAllTimeConventions"], "status": "implemented"},
-    {"python": "itofin.time.DateGeneration.Forward", "c": [], "go": ["Forward"], "tests": ["TestAllTimeConventions"], "status": "implemented"},
-    {"python": "itofin.time.DateGeneration.Zero", "c": [], "go": ["Zero"], "tests": ["TestAllTimeConventions"], "status": "implemented"},
-    {"python": "itofin.time.DateGeneration.ThirdWednesday", "c": [], "go": ["ThirdWednesday"], "tests": ["TestAllTimeConventions"], "status": "implemented"},
-    {"python": "itofin.time.DateGeneration.ThirdWednesdayInclusive", "c": [], "go": ["ThirdWednesdayInclusive"], "tests": ["TestAllTimeConventions"], "status": "implemented"},
-    {"python": "itofin.time.DateGeneration.Twentieth", "c": [], "go": ["Twentieth"], "tests": ["TestAllTimeConventions"], "status": "implemented"},
-    {"python": "itofin.time.DateGeneration.TwentiethIMM", "c": [], "go": ["TwentiethIMM"], "tests": ["TestAllTimeConventions"], "status": "implemented"},
-    {"python": "itofin.time.DateGeneration.OldCDS", "c": [], "go": ["OldCDS"], "tests": ["TestAllTimeConventions"], "status": "implemented"},
-    {"python": "itofin.time.DateGeneration.CDS", "c": [], "go": ["CDS"], "tests": ["TestAllTimeConventions"], "status": "implemented"},
-    {"python": "itofin.time.DateGeneration.CDS2015", "c": [], "go": ["CDS2015"], "tests": ["TestAllTimeConventions"], "status": "implemented"},
-    {"python": "itofin.time.Frequency", "c": [], "go": ["Frequency"], "tests": ["TestAllTimeConventions"], "status": "implemented"},
-    {"python": "itofin.time.Frequency.Annual", "c": [], "go": ["Annual"], "tests": ["TestAllTimeConventions"], "status": "implemented"},
-    {"python": "itofin.time.Frequency.Semiannual", "c": [], "go": ["Semiannual"], "tests": ["TestAllTimeConventions"], "status": "implemented"},
-    {"python": "itofin.time.Frequency.Quarterly", "c": [], "go": ["Quarterly"], "tests": ["TestAllTimeConventions"], "status": "implemented"},
-    {"python": "itofin.time.Frequency.Monthly", "c": [], "go": ["Monthly"], "tests": ["TestAllTimeConventions"], "status": "implemented"},
-    {"python": "itofin.time.is_imm_date", "c": ["itofin_is_imm_date"], "go": ["IsIMMDate"], "tests": ["TestIMMAndCalendarOracles"], "status": "implemented"},
-    {"python": "itofin.time.next_imm_date", "c": ["itofin_next_imm_date"], "go": ["NextIMMDate"], "tests": ["TestIMMAndCalendarOracles"], "status": "implemented"},
-    {"python": "itofin.Settings", "c": ["itofin_settings_new"], "go": ["Session.NewSettings"], "tests": ["TestSettingsOptionalFlagAndIsolation"], "status": "implemented"},
-    {"python": "itofin.Settings.__init__", "c": ["itofin_settings_new"], "go": ["Session.NewSettings"], "tests": ["TestSettingsOptionalFlagAndIsolation"], "status": "implemented"},
-    {"python": "itofin.Settings.set_evaluation_date", "c": ["itofin_settings_set_evaluation_date"], "go": ["Settings.SetEvaluationDate"], "tests": ["TestSettingsOptionalFlagAndIsolation"], "status": "implemented"},
-    {"python": "itofin.Settings.set_include_todays_cash_flows", "c": ["itofin_settings_set_include_todays_cash_flows"], "go": ["Settings.SetIncludeTodaysCashFlows"], "tests": ["TestSettingsOptionalFlagAndIsolation"], "status": "implemented"},
-    {"python": "itofin.Settings.include_todays_cash_flows", "c": ["itofin_settings_include_todays_cash_flows"], "go": ["Settings.IncludeTodaysCashFlows"], "tests": ["TestSettingsOptionalFlagAndIsolation"], "status": "implemented"},
-    {"python": "itofin.results.Results", "c": ["itofin_results_fields"], "go": ["Results"], "tests": ["results_preserve_missing_values_and_utf8_keys", "snapshots_detach_and_omit_non_real_additional_results"], "status": "implemented", "notes": "Go snapshot reader is exercised by instrument-domain results tests; native field presence and snapshot isolation are tested here."},
-    {"python": "itofin.results.Results.npv", "c": ["itofin_results_fields"], "go": ["Results.NPV"], "tests": ["results_preserve_missing_values_and_utf8_keys", "snapshots_detach_and_omit_non_real_additional_results"], "status": "implemented", "notes": "Go snapshot reader is exercised by instrument-domain results tests; native field presence and snapshot isolation are tested here."},
-    {"python": "itofin.results.Results.error_estimate", "c": ["itofin_results_fields"], "go": ["Results.ErrorEstimate"], "tests": ["results_preserve_missing_values_and_utf8_keys", "snapshots_detach_and_omit_non_real_additional_results"], "status": "implemented", "notes": "Go snapshot reader is exercised by instrument-domain results tests; native field presence and snapshot isolation are tested here."},
-    {"python": "itofin.results.Results.valuation_date", "c": ["itofin_results_fields"], "go": ["Results.ValuationDate"], "tests": ["results_preserve_missing_values_and_utf8_keys", "snapshots_detach_and_omit_non_real_additional_results"], "status": "implemented", "notes": "Go snapshot reader is exercised by instrument-domain results tests; native field presence and snapshot isolation are tested here."},
-    {"python": "itofin.results.Results.additional_results", "c": ["itofin_results_additional"], "go": ["Results.AdditionalResults"], "tests": ["results_preserve_missing_values_and_utf8_keys", "snapshots_detach_and_omit_non_real_additional_results"], "status": "implemented", "notes": "Go snapshot reader is exercised by instrument-domain results tests; native field presence and snapshot isolation are tested here."}
+    {
+      "c": [
+        "itofin_calendar_new"
+      ],
+      "go": [
+        "Session.Target",
+        "Session.NullCalendar",
+        "Session.WeekendsOnly",
+        "Session.UnitedKingdom"
+      ],
+      "python": "itofin.time.Calendar",
+      "status": "implemented",
+      "tests": [
+        "TestIMMAndCalendarOracles"
+      ]
+    },
+    {
+      "c": [
+        "itofin_calendar_new"
+      ],
+      "go": [
+        "Session.Target"
+      ],
+      "python": "itofin.time.Calendar.target",
+      "status": "implemented",
+      "tests": [
+        "TestIMMAndCalendarOracles"
+      ]
+    },
+    {
+      "c": [
+        "itofin_calendar_new"
+      ],
+      "go": [
+        "Session.NullCalendar"
+      ],
+      "python": "itofin.time.Calendar.null_calendar",
+      "status": "implemented",
+      "tests": [
+        "TestSchedulesDayCountersAndLifetimes"
+      ]
+    },
+    {
+      "c": [
+        "itofin_calendar_new"
+      ],
+      "go": [
+        "Session.WeekendsOnly"
+      ],
+      "python": "itofin.time.Calendar.weekends_only",
+      "status": "implemented",
+      "tests": [
+        "TestIMMAndCalendarOracles"
+      ]
+    },
+    {
+      "c": [
+        "itofin_calendar_new"
+      ],
+      "go": [
+        "Session.UnitedKingdom"
+      ],
+      "python": "itofin.time.Calendar.united_kingdom",
+      "status": "implemented",
+      "tests": [
+        "TestIMMAndCalendarOracles"
+      ]
+    },
+    {
+      "c": [
+        "itofin_calendar_adjust"
+      ],
+      "go": [
+        "Calendar.Adjust"
+      ],
+      "python": "itofin.time.Calendar.adjust",
+      "status": "implemented",
+      "tests": [
+        "TestIMMAndCalendarOracles",
+        "TestAllTimeConventions"
+      ]
+    },
+    {
+      "c": [
+        "itofin_calendar_advance"
+      ],
+      "go": [
+        "Calendar.Advance"
+      ],
+      "python": "itofin.time.Calendar.advance",
+      "status": "implemented",
+      "tests": [
+        "calendar_rolls_follow_quantlib_conventions",
+        "TestIMMAndCalendarOracles"
+      ]
+    },
+    {
+      "c": [
+        "itofin_time_name"
+      ],
+      "go": [
+        "Calendar.Repr"
+      ],
+      "python": "itofin.time.Calendar.__repr__",
+      "status": "implemented",
+      "tests": [
+        "TestAllTimeConventions"
+      ]
+    },
+    {
+      "c": [
+        "itofin_date_new"
+      ],
+      "go": [
+        "NewDate"
+      ],
+      "python": "itofin.time.Date",
+      "status": "implemented",
+      "tests": [
+        "TestDateLeapRangeAndPeriodEquality"
+      ]
+    },
+    {
+      "c": [
+        "itofin_date_parts"
+      ],
+      "go": [
+        "Date.Year"
+      ],
+      "python": "itofin.time.Date.year",
+      "status": "implemented",
+      "tests": [
+        "TestDateLeapRangeAndPeriodEquality"
+      ]
+    },
+    {
+      "c": [
+        "itofin_date_parts"
+      ],
+      "go": [
+        "Date.Month"
+      ],
+      "python": "itofin.time.Date.month",
+      "status": "implemented",
+      "tests": [
+        "TestDateLeapRangeAndPeriodEquality"
+      ]
+    },
+    {
+      "c": [
+        "itofin_date_parts"
+      ],
+      "go": [
+        "Date.Day"
+      ],
+      "python": "itofin.time.Date.day",
+      "status": "implemented",
+      "tests": [
+        "TestDateLeapRangeAndPeriodEquality"
+      ]
+    },
+    {
+      "c": [
+        "itofin_date_new"
+      ],
+      "go": [
+        "NewDate"
+      ],
+      "python": "itofin.time.Date.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestDateLeapRangeAndPeriodEquality"
+      ]
+    },
+    {
+      "c": [
+        "itofin_date_shift"
+      ],
+      "go": [
+        "Date.AddDays"
+      ],
+      "python": "itofin.time.Date.__add__",
+      "status": "implemented",
+      "tests": [
+        "TestDateLeapRangeAndPeriodEquality"
+      ]
+    },
+    {
+      "c": [],
+      "go": [
+        "Date: Go == operator"
+      ],
+      "python": "itofin.time.Date.__eq__",
+      "status": "implemented",
+      "tests": [
+        "TestDateLeapRangeAndPeriodEquality"
+      ]
+    },
+    {
+      "c": [],
+      "go": [
+        "Date: Go map key"
+      ],
+      "python": "itofin.time.Date.__hash__",
+      "status": "implemented",
+      "tests": [
+        "TestDateLeapRangeAndPeriodEquality"
+      ]
+    },
+    {
+      "c": [
+        "itofin_date_parts"
+      ],
+      "go": [
+        "Date.String"
+      ],
+      "python": "itofin.time.Date.__repr__",
+      "status": "implemented",
+      "tests": [
+        "TestDateLeapRangeAndPeriodEquality"
+      ]
+    },
+    {
+      "c": [
+        "itofin_date_shift"
+      ],
+      "go": [
+        "Date.SubtractDays",
+        "Date.DaysSince"
+      ],
+      "python": "itofin.time.Date.__sub__",
+      "status": "implemented",
+      "tests": [
+        "TestDateLeapRangeAndPeriodEquality"
+      ]
+    },
+    {
+      "c": [
+        "itofin_day_counter_new"
+      ],
+      "go": [
+        "Session.Actual360"
+      ],
+      "python": "itofin.time.DayCounter",
+      "status": "implemented",
+      "tests": [
+        "TestAllTimeConventions"
+      ]
+    },
+    {
+      "c": [
+        "itofin_day_counter_new"
+      ],
+      "go": [
+        "Session.Actual360"
+      ],
+      "python": "itofin.time.DayCounter.actual360",
+      "status": "implemented",
+      "tests": [
+        "TestAllTimeConventions"
+      ]
+    },
+    {
+      "c": [
+        "itofin_day_counter_new"
+      ],
+      "go": [
+        "Session.Actual365Fixed"
+      ],
+      "python": "itofin.time.DayCounter.actual365_fixed",
+      "status": "implemented",
+      "tests": [
+        "TestAllTimeConventions"
+      ]
+    },
+    {
+      "c": [
+        "itofin_day_counter_new"
+      ],
+      "go": [
+        "Session.ActualActualISDA"
+      ],
+      "python": "itofin.time.DayCounter.actual_actual_isda",
+      "status": "implemented",
+      "tests": [
+        "TestAllTimeConventions"
+      ]
+    },
+    {
+      "c": [
+        "itofin_day_counter_new"
+      ],
+      "go": [
+        "Session.Thirty360BondBasis"
+      ],
+      "python": "itofin.time.DayCounter.thirty360_bond_basis",
+      "status": "implemented",
+      "tests": [
+        "TestAllTimeConventions"
+      ]
+    },
+    {
+      "c": [
+        "itofin_day_counter_year_fraction"
+      ],
+      "go": [
+        "DayCounter.YearFraction"
+      ],
+      "python": "itofin.time.DayCounter.year_fraction",
+      "status": "implemented",
+      "tests": [
+        "TestAllTimeConventions"
+      ]
+    },
+    {
+      "c": [
+        "itofin_time_name"
+      ],
+      "go": [
+        "DayCounter.Equal"
+      ],
+      "python": "itofin.time.DayCounter.__eq__",
+      "status": "implemented",
+      "tests": [
+        "TestSchedulesDayCountersAndLifetimes"
+      ]
+    },
+    {
+      "c": [
+        "itofin_time_name"
+      ],
+      "go": [
+        "DayCounter.Key"
+      ],
+      "python": "itofin.time.DayCounter.__hash__",
+      "status": "implemented",
+      "tests": [
+        "TestAllTimeConventions"
+      ]
+    },
+    {
+      "c": [
+        "itofin_time_name"
+      ],
+      "go": [
+        "DayCounter.Repr"
+      ],
+      "python": "itofin.time.DayCounter.__repr__",
+      "status": "implemented",
+      "tests": [
+        "TestAllTimeConventions"
+      ]
+    },
+    {
+      "c": [],
+      "go": [
+        "NewPeriod"
+      ],
+      "python": "itofin.time.Period",
+      "status": "implemented",
+      "tests": [
+        "TestDateLeapRangeAndPeriodEquality"
+      ]
+    },
+    {
+      "c": [],
+      "go": [
+        "NewPeriod"
+      ],
+      "python": "itofin.time.Period.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestDateLeapRangeAndPeriodEquality"
+      ]
+    },
+    {
+      "c": [],
+      "go": [
+        "Period.Equal"
+      ],
+      "python": "itofin.time.Period.__eq__",
+      "status": "implemented",
+      "tests": [
+        "TestDateLeapRangeAndPeriodEquality"
+      ]
+    },
+    {
+      "c": [],
+      "go": [
+        "Period.Key"
+      ],
+      "python": "itofin.time.Period.__hash__",
+      "status": "implemented",
+      "tests": [
+        "TestDateLeapRangeAndPeriodEquality"
+      ]
+    },
+    {
+      "c": [],
+      "go": [
+        "Period.String"
+      ],
+      "python": "itofin.time.Period.__repr__",
+      "status": "implemented",
+      "tests": [
+        "TestDateLeapRangeAndPeriodEquality"
+      ]
+    },
+    {
+      "c": [
+        "itofin_schedule_new"
+      ],
+      "go": [
+        "Session.NewSchedule"
+      ],
+      "python": "itofin.time.Schedule",
+      "status": "implemented",
+      "tests": [
+        "TestSchedulesDayCountersAndLifetimes"
+      ]
+    },
+    {
+      "c": [
+        "itofin_schedule_new"
+      ],
+      "go": [
+        "Session.NewSchedule"
+      ],
+      "python": "itofin.time.Schedule.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestAllTimeConventions"
+      ]
+    },
+    {
+      "c": [
+        "itofin_schedule_dates"
+      ],
+      "go": [
+        "Schedule.Size"
+      ],
+      "python": "itofin.time.Schedule.size",
+      "status": "implemented",
+      "tests": [
+        "TestAllTimeConventions"
+      ]
+    },
+    {
+      "c": [
+        "itofin_schedule_dates"
+      ],
+      "go": [
+        "Schedule.Date"
+      ],
+      "python": "itofin.time.Schedule.date",
+      "status": "implemented",
+      "tests": [
+        "TestSchedulesDayCountersAndLifetimes"
+      ]
+    },
+    {
+      "c": [
+        "itofin_schedule_dates"
+      ],
+      "go": [
+        "Schedule.Dates"
+      ],
+      "python": "itofin.time.Schedule.dates",
+      "status": "implemented",
+      "tests": [
+        "TestSchedulesDayCountersAndLifetimes"
+      ]
+    },
+    {
+      "c": [],
+      "go": [
+        "BusinessDayConvention"
+      ],
+      "python": "itofin.time.BusinessDayConvention",
+      "status": "implemented",
+      "tests": [
+        "TestAllTimeConventions"
+      ]
+    },
+    {
+      "c": [],
+      "go": [
+        "ModifiedFollowing"
+      ],
+      "python": "itofin.time.BusinessDayConvention.ModifiedFollowing",
+      "status": "implemented",
+      "tests": [
+        "TestAllTimeConventions"
+      ]
+    },
+    {
+      "c": [],
+      "go": [
+        "Following"
+      ],
+      "python": "itofin.time.BusinessDayConvention.Following",
+      "status": "implemented",
+      "tests": [
+        "TestAllTimeConventions"
+      ]
+    },
+    {
+      "c": [],
+      "go": [
+        "Unadjusted"
+      ],
+      "python": "itofin.time.BusinessDayConvention.Unadjusted",
+      "status": "implemented",
+      "tests": [
+        "TestAllTimeConventions"
+      ]
+    },
+    {
+      "c": [],
+      "go": [
+        "Preceding"
+      ],
+      "python": "itofin.time.BusinessDayConvention.Preceding",
+      "status": "implemented",
+      "tests": [
+        "TestAllTimeConventions"
+      ]
+    },
+    {
+      "c": [],
+      "go": [
+        "ModifiedPreceding"
+      ],
+      "python": "itofin.time.BusinessDayConvention.ModifiedPreceding",
+      "status": "implemented",
+      "tests": [
+        "TestAllTimeConventions"
+      ]
+    },
+    {
+      "c": [],
+      "go": [
+        "HalfMonthModifiedFollowing"
+      ],
+      "python": "itofin.time.BusinessDayConvention.HalfMonthModifiedFollowing",
+      "status": "implemented",
+      "tests": [
+        "TestAllTimeConventions"
+      ]
+    },
+    {
+      "c": [],
+      "go": [
+        "Nearest"
+      ],
+      "python": "itofin.time.BusinessDayConvention.Nearest",
+      "status": "implemented",
+      "tests": [
+        "TestAllTimeConventions"
+      ]
+    },
+    {
+      "c": [],
+      "go": [
+        "DateGeneration"
+      ],
+      "python": "itofin.time.DateGeneration",
+      "status": "implemented",
+      "tests": [
+        "TestAllTimeConventions"
+      ]
+    },
+    {
+      "c": [],
+      "go": [
+        "Backward"
+      ],
+      "python": "itofin.time.DateGeneration.Backward",
+      "status": "implemented",
+      "tests": [
+        "TestAllTimeConventions"
+      ]
+    },
+    {
+      "c": [],
+      "go": [
+        "Forward"
+      ],
+      "python": "itofin.time.DateGeneration.Forward",
+      "status": "implemented",
+      "tests": [
+        "TestAllTimeConventions"
+      ]
+    },
+    {
+      "c": [],
+      "go": [
+        "Zero"
+      ],
+      "python": "itofin.time.DateGeneration.Zero",
+      "status": "implemented",
+      "tests": [
+        "TestAllTimeConventions"
+      ]
+    },
+    {
+      "c": [],
+      "go": [
+        "ThirdWednesday"
+      ],
+      "python": "itofin.time.DateGeneration.ThirdWednesday",
+      "status": "implemented",
+      "tests": [
+        "TestAllTimeConventions"
+      ]
+    },
+    {
+      "c": [],
+      "go": [
+        "ThirdWednesdayInclusive"
+      ],
+      "python": "itofin.time.DateGeneration.ThirdWednesdayInclusive",
+      "status": "implemented",
+      "tests": [
+        "TestAllTimeConventions"
+      ]
+    },
+    {
+      "c": [],
+      "go": [
+        "Twentieth"
+      ],
+      "python": "itofin.time.DateGeneration.Twentieth",
+      "status": "implemented",
+      "tests": [
+        "TestAllTimeConventions"
+      ]
+    },
+    {
+      "c": [],
+      "go": [
+        "TwentiethIMM"
+      ],
+      "python": "itofin.time.DateGeneration.TwentiethIMM",
+      "status": "implemented",
+      "tests": [
+        "TestAllTimeConventions"
+      ]
+    },
+    {
+      "c": [],
+      "go": [
+        "OldCDS"
+      ],
+      "python": "itofin.time.DateGeneration.OldCDS",
+      "status": "implemented",
+      "tests": [
+        "TestAllTimeConventions"
+      ]
+    },
+    {
+      "c": [],
+      "go": [
+        "CDS"
+      ],
+      "python": "itofin.time.DateGeneration.CDS",
+      "status": "implemented",
+      "tests": [
+        "TestAllTimeConventions"
+      ]
+    },
+    {
+      "c": [],
+      "go": [
+        "CDS2015"
+      ],
+      "python": "itofin.time.DateGeneration.CDS2015",
+      "status": "implemented",
+      "tests": [
+        "TestAllTimeConventions"
+      ]
+    },
+    {
+      "c": [],
+      "go": [
+        "Frequency"
+      ],
+      "python": "itofin.time.Frequency",
+      "status": "implemented",
+      "tests": [
+        "TestAllTimeConventions"
+      ]
+    },
+    {
+      "c": [],
+      "go": [
+        "Annual"
+      ],
+      "python": "itofin.time.Frequency.Annual",
+      "status": "implemented",
+      "tests": [
+        "TestAllTimeConventions"
+      ]
+    },
+    {
+      "c": [],
+      "go": [
+        "Semiannual"
+      ],
+      "python": "itofin.time.Frequency.Semiannual",
+      "status": "implemented",
+      "tests": [
+        "TestAllTimeConventions"
+      ]
+    },
+    {
+      "c": [],
+      "go": [
+        "Quarterly"
+      ],
+      "python": "itofin.time.Frequency.Quarterly",
+      "status": "implemented",
+      "tests": [
+        "TestAllTimeConventions"
+      ]
+    },
+    {
+      "c": [],
+      "go": [
+        "Monthly"
+      ],
+      "python": "itofin.time.Frequency.Monthly",
+      "status": "implemented",
+      "tests": [
+        "TestAllTimeConventions"
+      ]
+    },
+    {
+      "c": [
+        "itofin_is_imm_date"
+      ],
+      "go": [
+        "IsIMMDate"
+      ],
+      "python": "itofin.time.is_imm_date",
+      "status": "implemented",
+      "tests": [
+        "TestIMMAndCalendarOracles"
+      ]
+    },
+    {
+      "c": [
+        "itofin_next_imm_date"
+      ],
+      "go": [
+        "NextIMMDate"
+      ],
+      "python": "itofin.time.next_imm_date",
+      "status": "implemented",
+      "tests": [
+        "TestIMMAndCalendarOracles"
+      ]
+    },
+    {
+      "c": [
+        "itofin_settings_new"
+      ],
+      "go": [
+        "Session.NewSettings"
+      ],
+      "python": "itofin.Settings",
+      "status": "implemented",
+      "tests": [
+        "TestSettingsOptionalFlagAndIsolation"
+      ]
+    },
+    {
+      "c": [
+        "itofin_settings_new"
+      ],
+      "go": [
+        "Session.NewSettings"
+      ],
+      "python": "itofin.Settings.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestSettingsOptionalFlagAndIsolation"
+      ]
+    },
+    {
+      "c": [
+        "itofin_settings_set_evaluation_date"
+      ],
+      "go": [
+        "Settings.SetEvaluationDate"
+      ],
+      "python": "itofin.Settings.set_evaluation_date",
+      "status": "implemented",
+      "tests": [
+        "TestSettingsOptionalFlagAndIsolation"
+      ]
+    },
+    {
+      "c": [
+        "itofin_settings_set_include_todays_cash_flows"
+      ],
+      "go": [
+        "Settings.SetIncludeTodaysCashFlows"
+      ],
+      "python": "itofin.Settings.set_include_todays_cash_flows",
+      "status": "implemented",
+      "tests": [
+        "TestSettingsOptionalFlagAndIsolation"
+      ]
+    },
+    {
+      "c": [
+        "itofin_settings_include_todays_cash_flows"
+      ],
+      "go": [
+        "Settings.IncludeTodaysCashFlows"
+      ],
+      "python": "itofin.Settings.include_todays_cash_flows",
+      "status": "implemented",
+      "tests": [
+        "TestSettingsOptionalFlagAndIsolation"
+      ]
+    },
+    {
+      "c": [
+        "itofin_results_fields"
+      ],
+      "go": [
+        "Results"
+      ],
+      "notes": "Go snapshot reader is exercised by instrument-domain results tests; native field presence and snapshot isolation are tested here.",
+      "python": "itofin.results.Results",
+      "status": "implemented",
+      "tests": [
+        "results_preserve_missing_values_and_utf8_keys",
+        "snapshots_detach_and_omit_non_real_additional_results"
+      ]
+    },
+    {
+      "c": [
+        "itofin_results_fields"
+      ],
+      "go": [
+        "Results.NPV"
+      ],
+      "notes": "Go snapshot reader is exercised by instrument-domain results tests; native field presence and snapshot isolation are tested here.",
+      "python": "itofin.results.Results.npv",
+      "status": "implemented",
+      "tests": [
+        "results_preserve_missing_values_and_utf8_keys",
+        "snapshots_detach_and_omit_non_real_additional_results"
+      ]
+    },
+    {
+      "c": [
+        "itofin_results_fields"
+      ],
+      "go": [
+        "Results.ErrorEstimate"
+      ],
+      "notes": "Go snapshot reader is exercised by instrument-domain results tests; native field presence and snapshot isolation are tested here.",
+      "python": "itofin.results.Results.error_estimate",
+      "status": "implemented",
+      "tests": [
+        "results_preserve_missing_values_and_utf8_keys",
+        "snapshots_detach_and_omit_non_real_additional_results"
+      ]
+    },
+    {
+      "c": [
+        "itofin_results_fields"
+      ],
+      "go": [
+        "Results.ValuationDate"
+      ],
+      "notes": "Go snapshot reader is exercised by instrument-domain results tests; native field presence and snapshot isolation are tested here.",
+      "python": "itofin.results.Results.valuation_date",
+      "status": "implemented",
+      "tests": [
+        "results_preserve_missing_values_and_utf8_keys",
+        "snapshots_detach_and_omit_non_real_additional_results"
+      ]
+    },
+    {
+      "c": [
+        "itofin_results_additional"
+      ],
+      "go": [
+        "Results.AdditionalResults"
+      ],
+      "notes": "Go snapshot reader is exercised by instrument-domain results tests; native field presence and snapshot isolation are tested here.",
+      "python": "itofin.results.Results.additional_results",
+      "status": "implemented",
+      "tests": [
+        "results_preserve_missing_values_and_utf8_keys",
+        "snapshots_detach_and_omit_non_real_additional_results"
+      ]
+    }
   ]
 }

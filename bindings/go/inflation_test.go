@@ -322,3 +322,17 @@ func TestYoYInflationBootstrapRelinkingAndRetainedCurves(t *testing.T) {
 		t.Fatalf("relinked forecast %g: %v", relinked, e)
 	}
 }
+
+func TestInflationIndexMetadataPreservesEmbeddedNUL(t *testing.T) {
+	s0, e := NewSession()
+	s := creditMust(t, s0, e)
+	defer s.Close()
+	settings0, e := s.NewSettings()
+	settings := creditMust(t, settings0, e)
+	index0, e := s.NewYoYInflationIndex(YoYInflationIndexConfig{FamilyName: "F\x00amily", RegionName: "N\x00orth", RegionCode: "N", Frequency: Monthly, AvailabilityLag: Period{1, Months}, CurrencyName: "P\x00ound", CurrencyCode: "GBP", CurrencyNumericCode: 826, CurrencySymbol: "£", CurrencyFractionSymbol: "p", CurrencyFractionsPerUnit: 100, Settings: settings})
+	index := creditMust(t, index0, e)
+	name, e := index.Name()
+	if e != nil || name != "N\x00orth F\x00amily" {
+		t.Fatalf("metadata was truncated: %q %v", name, e)
+	}
+}

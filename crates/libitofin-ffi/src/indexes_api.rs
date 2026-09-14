@@ -26,6 +26,11 @@ pub(crate) fn period(length: i32, unit: i32) -> BindingResult<Period> {
     ))
 }
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_currency_new(
     ctx: *mut Context,
     kind: i32,
@@ -48,6 +53,11 @@ pub unsafe extern "C" fn itofin_currency_new(
 }
 /// Fixed-size output containing the three ASCII ISO currency letters and a NUL byte.
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_currency_code(
     ctx: *mut Context,
     id: u64,
@@ -71,6 +81,11 @@ pub unsafe extern "C" fn itofin_currency_code(
 }
 /// Family: 0 Euribor, 1 USD Libor, 2 JPY Libor, 3 GBP Libor, 4 EUR Libor.
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_ibor_family_new(
     ctx: *mut Context,
     family: i32,
@@ -116,6 +131,11 @@ pub struct ItofinIborConfig {
 }
 /// custom=true uses distinct fixing/value/maturity calendars.
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_ibor_new(
     ctx: *mut Context,
     name: *const u8,
@@ -175,6 +195,11 @@ pub unsafe extern "C" fn itofin_ibor_new(
     }
 }
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_estr_new(
     ctx: *mut Context,
     forwarding: u64,
@@ -194,6 +219,11 @@ pub unsafe extern "C" fn itofin_estr_new(
     }
 }
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_index_fixing(
     ctx: *mut Context,
     id: u64,
@@ -218,6 +248,11 @@ pub unsafe extern "C" fn itofin_index_fixing(
 }
 /// Query 0 value date; 1 fixing date; 2 maturity date.
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_ibor_date(
     ctx: *mut Context,
     id: u64,
@@ -242,6 +277,11 @@ pub unsafe extern "C" fn itofin_ibor_date(
 }
 /// Query 0 day counter; 1 fixing calendar; 2 currency. Output is a newly owned handle.
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_ibor_component(
     ctx: *mut Context,
     id: u64,
@@ -271,6 +311,11 @@ pub struct ItofinIborInfo {
     pub end_of_month: bool,
 }
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_ibor_info(
     ctx: *mut Context,
     id: u64,
@@ -311,6 +356,11 @@ pub unsafe extern "C" fn itofin_ibor_info(
 }
 /// UTF-8, caller-owned buffer; first query capacity=0 to obtain length excluding NUL.
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_ibor_name(
     ctx: *mut Context,
     id: u64,

@@ -1,7 +1,31 @@
 {
   "domain": "library-identity-errors",
   "entries": [
-    {"python": "itofin.ItofinError", "c": ["itofin_date_parts"], "go": ["Error"], "tests": ["TestVersionAndNativeError"], "status": "implemented"},
-    {"python": "itofin.__version__", "c": ["itofin_version"], "go": ["Version"], "tests": ["TestVersionAndNativeError"], "status": "implemented"}
+    {
+      "c": [
+        "itofin_date_parts"
+      ],
+      "go": [
+        "Error"
+      ],
+      "python": "itofin.ItofinError",
+      "status": "implemented",
+      "tests": [
+        "TestVersionAndNativeError"
+      ]
+    },
+    {
+      "c": [
+        "itofin_version"
+      ],
+      "go": [
+        "Version"
+      ],
+      "python": "itofin.__version__",
+      "status": "implemented",
+      "tests": [
+        "TestVersionAndNativeError"
+      ]
+    }
   ]
 }

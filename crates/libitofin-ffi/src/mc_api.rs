@@ -54,6 +54,11 @@ macro_rules! configure {
 }
 /// Kind 0 European BSM, 1 European Heston, 2 American BSM.
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_mc_engine_new(
     ctx: *mut Context,
     process: u64,

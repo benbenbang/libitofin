@@ -1,78 +1,755 @@
 {
-  "scope": "vol.rs, smilesection.rs, swaptionvol.rs, optionletvol.rs, capfloortermvol.rs",
-  "python_stub": "crates/itofin-py/python/itofin/termstructures/__init__.pyi",
-  "symbol_count": 66,
-  "missing": [],
   "limitations": [
-    "SABR cube tests cover fixed-parameter beta=1/nu=0 limit; free-parameter calibration follows core and is not independently tested through Go yet.",
     "Known core unsupported behavior preserved, including normal/shifted SABR restrictions and UseInterpolator extrapolation errors."
   ],
+  "missing": [],
+  "python_stub": "crates/itofin-py/python/itofin/termstructures/__init__.pyi",
+  "scope": "vol.rs, smilesection.rs, swaptionvol.rs, optionletvol.rs, capfloortermvol.rs",
+  "symbol_count": 66,
   "symbols": [
-    {"python": "itofin.termstructures.BlackConstantVol.__init__", "status": "implemented", "c": "itofin_black_constant_vol_new", "rust_file": "crates/libitofin-ffi/src/vol_api.rs", "go": "Session.BlackConstantVol", "go_file": "bindings/go/vol.go", "test": "TestBlackVolatilityOraclesAndOwnership"},
-    {"python": "itofin.termstructures.BlackVarianceCurve.__init__", "status": "implemented", "c": "itofin_black_variance_curve_new", "rust_file": "crates/libitofin-ffi/src/vol_api.rs", "go": "Session.BlackVarianceCurve", "go_file": "bindings/go/vol.go", "test": "TestBlackVarianceGridAndExtrapolation"},
-    {"python": "itofin.termstructures.BlackVarianceSurface.__init__", "status": "implemented", "c": "itofin_black_variance_surface_new", "rust_file": "crates/libitofin-ffi/src/vol_api.rs", "go": "Session.BlackVarianceSurface", "go_file": "bindings/go/vol.go", "test": "TestBlackVarianceGridAndExtrapolation"},
-    {"python": "itofin.termstructures.BlackVolTermStructure.black_vol", "status": "implemented", "c": "itofin_black_vol_query", "rust_file": "crates/libitofin-ffi/src/vol_api.rs", "go": "BlackVolTermStructure.BlackVol", "go_file": "bindings/go/vol.go", "test": "TestBlackVarianceGridAndExtrapolation"},
-    {"python": "itofin.termstructures.BlackVolTermStructure.black_vol_date", "status": "implemented", "c": "itofin_black_vol_date_query", "rust_file": "crates/libitofin-ffi/src/vol_api.rs", "go": "BlackVolTermStructure.BlackVolDate", "go_file": "bindings/go/vol.go", "test": "TestBlackVarianceGridAndExtrapolation"},
-    {"python": "itofin.termstructures.BlackVolTermStructure.black_variance", "status": "implemented", "c": "itofin_black_vol_query", "rust_file": "crates/libitofin-ffi/src/vol_api.rs", "go": "BlackVolTermStructure.BlackVariance", "go_file": "bindings/go/vol.go", "test": "TestBlackVarianceGridAndExtrapolation"},
-    {"python": "itofin.termstructures.BlackVolTermStructure.black_variance_date", "status": "implemented", "c": "itofin_black_vol_date_query", "rust_file": "crates/libitofin-ffi/src/vol_api.rs", "go": "BlackVolTermStructure.BlackVarianceDate", "go_file": "bindings/go/vol.go", "test": "TestBlackVarianceGridAndExtrapolation"},
-    {"python": "itofin.termstructures.BlackVolTermStructure.black_forward_vol", "status": "implemented", "c": "itofin_black_vol_query", "rust_file": "crates/libitofin-ffi/src/vol_api.rs", "go": "BlackVolTermStructure.BlackForwardVol", "go_file": "bindings/go/vol.go", "test": "TestBlackVarianceGridAndExtrapolation"},
-    {"python": "itofin.termstructures.BlackVolTermStructure.black_forward_variance", "status": "implemented", "c": "itofin_black_vol_query", "rust_file": "crates/libitofin-ffi/src/vol_api.rs", "go": "BlackVolTermStructure.BlackForwardVariance", "go_file": "bindings/go/vol.go", "test": "TestBlackVarianceGridAndExtrapolation"},
-    {"python": "itofin.termstructures.BlackVolTermStructure.min_strike", "status": "implemented", "c": "itofin_black_vol_query", "rust_file": "crates/libitofin-ffi/src/vol_api.rs", "go": "BlackVolTermStructure.MinStrike", "go_file": "bindings/go/vol.go", "test": "TestBlackVarianceGridAndExtrapolation"},
-    {"python": "itofin.termstructures.BlackVolTermStructure.max_strike", "status": "implemented", "c": "itofin_black_vol_query", "rust_file": "crates/libitofin-ffi/src/vol_api.rs", "go": "BlackVolTermStructure.MaxStrike", "go_file": "bindings/go/vol.go", "test": "TestBlackVarianceGridAndExtrapolation"},
-    {"python": "itofin.termstructures.BlackVolTermStructure.max_date", "status": "implemented", "c": "itofin_black_vol_control", "rust_file": "crates/libitofin-ffi/src/vol_api.rs", "go": "BlackVolTermStructure.MaxDate", "go_file": "bindings/go/vol.go", "test": "TestBlackVarianceGridAndExtrapolation"},
-    {"python": "itofin.termstructures.BlackVolTermStructure.allows_extrapolation", "status": "implemented", "c": "itofin_black_vol_control", "rust_file": "crates/libitofin-ffi/src/vol_api.rs", "go": "BlackVolTermStructure.AllowsExtrapolation", "go_file": "bindings/go/vol.go", "test": "TestBlackVarianceGridAndExtrapolation"},
-    {"python": "itofin.termstructures.BlackVolTermStructure.enable_extrapolation", "status": "implemented", "c": "itofin_black_vol_control", "rust_file": "crates/libitofin-ffi/src/vol_api.rs", "go": "BlackVolTermStructure.EnableExtrapolation", "go_file": "bindings/go/vol.go", "test": "TestBlackVarianceGridAndExtrapolation"},
-    {"python": "itofin.termstructures.BlackVolTermStructure.disable_extrapolation", "status": "implemented", "c": "itofin_black_vol_control", "rust_file": "crates/libitofin-ffi/src/vol_api.rs", "go": "BlackVolTermStructure.DisableExtrapolation", "go_file": "bindings/go/vol.go", "test": "TestBlackVarianceGridAndExtrapolation"},
-    {"python": "itofin.termstructures.CapFloorTermVolSurface.__init__", "status": "implemented", "c": "itofin_capfloor_vol_surface_new", "rust_file": "crates/libitofin-ffi/src/volgrid_api.rs", "go": "Session.CapFloorTermVolSurface", "go_file": "bindings/go/volgrid.go", "test": "TestRateVolatilityConstructorModes"},
-    {"python": "itofin.termstructures.CapFloorTermVolSurface.with_quotes", "status": "implemented", "c": "itofin_capfloor_vol_surface_new", "rust_file": "crates/libitofin-ffi/src/volgrid_api.rs", "go": "Session.CapFloorTermVolSurface", "go_file": "bindings/go/volgrid.go", "test": "TestRateVolatilityConstructorModes", "configuration": "Settings selects moving dates; Quote/Quotes selects live market data"},
-    {"python": "itofin.termstructures.CapFloorTermVolSurface.moving", "status": "implemented", "c": "itofin_capfloor_vol_surface_new", "rust_file": "crates/libitofin-ffi/src/volgrid_api.rs", "go": "Session.CapFloorTermVolSurface", "go_file": "bindings/go/volgrid.go", "test": "TestRateVolatilityConstructorModes", "configuration": "Settings selects moving dates; Quote/Quotes selects live market data"},
-    {"python": "itofin.termstructures.CapFloorTermVolSurface.moving_with_quotes", "status": "implemented", "c": "itofin_capfloor_vol_surface_new", "rust_file": "crates/libitofin-ffi/src/volgrid_api.rs", "go": "Session.CapFloorTermVolSurface", "go_file": "bindings/go/volgrid.go", "test": "TestRateVolatilityConstructorModes", "configuration": "Settings selects moving dates; Quote/Quotes selects live market data"},
-    {"python": "itofin.termstructures.CapFloorTermVolSurface.volatility", "status": "implemented", "c": "itofin_capfloor_vol_query", "rust_file": "crates/libitofin-ffi/src/volgrid_api.rs", "go": "CapFloorTermVolSurface.Volatility", "go_file": "bindings/go/volgrid.go", "test": "TestRateVolatilityConstructorModes"},
-    {"python": "itofin.termstructures.CapFloorTermVolSurface.volatility_date", "status": "implemented", "c": "itofin_capfloor_vol_query", "rust_file": "crates/libitofin-ffi/src/volgrid_api.rs", "go": "CapFloorTermVolSurface.VolatilityDate", "go_file": "bindings/go/volgrid.go", "test": "TestRateVolatilityConstructorModes"},
-    {"python": "itofin.termstructures.CapFloorTermVolSurface.volatility_time", "status": "implemented", "c": "itofin_capfloor_vol_query", "rust_file": "crates/libitofin-ffi/src/volgrid_api.rs", "go": "CapFloorTermVolSurface.VolatilityTime", "go_file": "bindings/go/volgrid.go", "test": "TestRateVolatilityConstructorModes"},
-    {"python": "itofin.termstructures.ConstantOptionletVolatility.__init__", "status": "implemented", "c": "itofin_constant_optionlet_vol_new", "rust_file": "crates/libitofin-ffi/src/ratevol_api.rs", "go": "Session.ConstantOptionletVolatility", "go_file": "bindings/go/ratevol.go", "test": "TestRateVolatilityConstructorModes"},
-    {"python": "itofin.termstructures.ConstantOptionletVolatility.with_quote", "status": "implemented", "c": "itofin_constant_optionlet_vol_new", "rust_file": "crates/libitofin-ffi/src/ratevol_api.rs", "go": "Session.ConstantOptionletVolatility", "go_file": "bindings/go/ratevol.go", "test": "TestRateVolatilityConstructorModes", "configuration": "Settings selects moving dates; Quote/Quotes selects live market data"},
-    {"python": "itofin.termstructures.ConstantOptionletVolatility.moving", "status": "implemented", "c": "itofin_constant_optionlet_vol_new", "rust_file": "crates/libitofin-ffi/src/ratevol_api.rs", "go": "Session.ConstantOptionletVolatility", "go_file": "bindings/go/ratevol.go", "test": "TestRateVolatilityConstructorModes", "configuration": "Settings selects moving dates; Quote/Quotes selects live market data"},
-    {"python": "itofin.termstructures.ConstantOptionletVolatility.moving_with_quote", "status": "implemented", "c": "itofin_constant_optionlet_vol_new", "rust_file": "crates/libitofin-ffi/src/ratevol_api.rs", "go": "Session.ConstantOptionletVolatility", "go_file": "bindings/go/ratevol.go", "test": "TestRateVolatilityConstructorModes", "configuration": "Settings selects moving dates; Quote/Quotes selects live market data"},
-    {"python": "itofin.termstructures.ConstantSwaptionVolatility.__init__", "status": "implemented", "c": "itofin_constant_swaption_vol_new", "rust_file": "crates/libitofin-ffi/src/ratevol_api.rs", "go": "Session.ConstantSwaptionVolatility", "go_file": "bindings/go/ratevol.go", "test": "TestRateVolatilityConstructorModes"},
-    {"python": "itofin.termstructures.ConstantSwaptionVolatility.with_quote", "status": "implemented", "c": "itofin_constant_swaption_vol_new", "rust_file": "crates/libitofin-ffi/src/ratevol_api.rs", "go": "Session.ConstantSwaptionVolatility", "go_file": "bindings/go/ratevol.go", "test": "TestRateVolatilityConstructorModes", "configuration": "Settings selects moving dates; Quote/Quotes selects live market data"},
-    {"python": "itofin.termstructures.ConstantSwaptionVolatility.moving", "status": "implemented", "c": "itofin_constant_swaption_vol_new", "rust_file": "crates/libitofin-ffi/src/ratevol_api.rs", "go": "Session.ConstantSwaptionVolatility", "go_file": "bindings/go/ratevol.go", "test": "TestRateVolatilityConstructorModes", "configuration": "Settings selects moving dates; Quote/Quotes selects live market data"},
-    {"python": "itofin.termstructures.ConstantSwaptionVolatility.moving_with_quote", "status": "implemented", "c": "itofin_constant_swaption_vol_new", "rust_file": "crates/libitofin-ffi/src/ratevol_api.rs", "go": "Session.ConstantSwaptionVolatility", "go_file": "bindings/go/ratevol.go", "test": "TestRateVolatilityConstructorModes", "configuration": "Settings selects moving dates; Quote/Quotes selects live market data"},
-    {"python": "itofin.termstructures.InterpolatedSwaptionVolatilityCube.__init__", "status": "implemented", "c": "itofin_swaption_vol_cube_new(kind=0)", "rust_file": "crates/libitofin-ffi/src/volcube_api.rs", "go": "Session.InterpolatedSwaptionVolatilityCube", "go_file": "bindings/go/volcube.go", "test": "interpolated_cube_boundary_preserves_node_order_and_quote_updates", "test_scope": "native boundary exercised; Go wrapper compiles; full Go constructor execution pending integrated index APIs"},
-    {"python": "itofin.termstructures.InterpolatedSwaptionVolatilityCube.atm_strike_from_tenor", "status": "implemented", "c": "itofin_swaption_vol_cube_atm", "rust_file": "crates/libitofin-ffi/src/volcube_api.rs", "go": "SwaptionVolatilityCube.ATMStrikeFromTenor", "go_file": "bindings/go/volcube.go", "test": "interpolated_cube_boundary_preserves_node_order_and_quote_updates", "test_scope": "native boundary exercised; Go wrapper compiles; full Go constructor execution pending integrated index APIs"},
-    {"python": "itofin.termstructures.OptionletStripper1.__init__", "status": "implemented", "c": "itofin_optionlet_stripper_new", "rust_file": "crates/libitofin-ffi/src/stripper_api.rs", "go": "Session.OptionletStripper1", "go_file": "bindings/go/stripper.go", "test": "optionlet_boundary_round_trips_caps_and_rejects_bad_buffers", "test_scope": "native boundary exercised; Go wrapper compiles; full Go constructor execution pending integrated index APIs"},
-    {"python": "itofin.termstructures.OptionletStripper1.switch_strike", "status": "implemented", "c": "itofin_optionlet_stripper_switch_strike", "rust_file": "crates/libitofin-ffi/src/stripper_api.rs", "go": "OptionletStripper1.SwitchStrike", "go_file": "bindings/go/stripper.go", "test": "optionlet_boundary_round_trips_caps_and_rejects_bad_buffers", "test_scope": "native boundary exercised; Go wrapper compiles; full Go constructor execution pending integrated index APIs"},
-    {"python": "itofin.termstructures.OptionletStripper1.atm_optionlet_rates", "status": "implemented", "c": "itofin_optionlet_stripper_rates", "rust_file": "crates/libitofin-ffi/src/stripper_api.rs", "go": "OptionletStripper1.ATMOptionletRates", "go_file": "bindings/go/stripper.go", "test": "optionlet_boundary_round_trips_caps_and_rejects_bad_buffers", "test_scope": "native boundary exercised; Go wrapper compiles; full Go constructor execution pending integrated index APIs"},
-    {"python": "itofin.termstructures.OptionletVolatilityStructure.volatility", "status": "implemented", "c": "itofin_optionlet_vol_query", "rust_file": "crates/libitofin-ffi/src/ratevol_api.rs", "go": "OptionletVolatilityStructure.Volatility", "go_file": "bindings/go/ratevol.go", "test": "TestRateVolatilityMovingQuoteAndDate"},
-    {"python": "itofin.termstructures.OptionletVolatilityStructure.volatility_date", "status": "implemented", "c": "itofin_optionlet_vol_query", "rust_file": "crates/libitofin-ffi/src/ratevol_api.rs", "go": "OptionletVolatilityStructure.VolatilityDate", "go_file": "bindings/go/ratevol.go", "test": "TestRateVolatilityMovingQuoteAndDate"},
-    {"python": "itofin.termstructures.OptionletVolatilityStructure.black_variance", "status": "implemented", "c": "itofin_optionlet_vol_query", "rust_file": "crates/libitofin-ffi/src/ratevol_api.rs", "go": "OptionletVolatilityStructure.BlackVariance", "go_file": "bindings/go/ratevol.go", "test": "TestRateVolatilityMovingQuoteAndDate"},
-    {"python": "itofin.termstructures.OptionletVolatilityStructure.allows_extrapolation", "status": "implemented", "c": "itofin_rate_vol_control", "rust_file": "crates/libitofin-ffi/src/ratevol_api.rs", "go": "OptionletVolatilityStructure.AllowsExtrapolation", "go_file": "bindings/go/ratevol.go", "test": "TestRateVolatilityMovingQuoteAndDate"},
-    {"python": "itofin.termstructures.OptionletVolatilityStructure.enable_extrapolation", "status": "implemented", "c": "itofin_rate_vol_control", "rust_file": "crates/libitofin-ffi/src/ratevol_api.rs", "go": "OptionletVolatilityStructure.EnableExtrapolation", "go_file": "bindings/go/ratevol.go", "test": "TestRateVolatilityMovingQuoteAndDate"},
-    {"python": "itofin.termstructures.OptionletVolatilityStructure.disable_extrapolation", "status": "implemented", "c": "itofin_rate_vol_control", "rust_file": "crates/libitofin-ffi/src/ratevol_api.rs", "go": "OptionletVolatilityStructure.DisableExtrapolation", "go_file": "bindings/go/ratevol.go", "test": "TestRateVolatilityMovingQuoteAndDate"},
-    {"python": "itofin.termstructures.OptionletVolatilityStructure.displacement", "status": "implemented", "c": "itofin_optionlet_vol_query", "rust_file": "crates/libitofin-ffi/src/ratevol_api.rs", "go": "OptionletVolatilityStructure.Displacement", "go_file": "bindings/go/ratevol.go", "test": "TestRateVolatilityMovingQuoteAndDate"},
-    {"python": "itofin.termstructures.OptionletVolatilityStructure.reference_date", "status": "implemented", "c": "itofin_rate_vol_control", "rust_file": "crates/libitofin-ffi/src/ratevol_api.rs", "go": "OptionletVolatilityStructure.ReferenceDate", "go_file": "bindings/go/ratevol.go", "test": "TestRateVolatilityMovingQuoteAndDate"},
-    {"python": "itofin.termstructures.SabrSmileSection.exercise_time", "status": "implemented", "c": "itofin_sabr_smile_query", "rust_file": "crates/libitofin-ffi/src/smile_api.rs", "go": "SabrSmileSection.ExerciseTime", "go_file": "bindings/go/smile.go", "test": "TestSABRLognormalLimitAndParameters"},
-    {"python": "itofin.termstructures.SabrSmileSection.atm_level", "status": "implemented", "c": "itofin_sabr_smile_query", "rust_file": "crates/libitofin-ffi/src/smile_api.rs", "go": "SabrSmileSection.ATMLevel", "go_file": "bindings/go/smile.go", "test": "TestSABRLognormalLimitAndParameters"},
-    {"python": "itofin.termstructures.SabrSmileSection.alpha", "status": "implemented", "c": "itofin_sabr_smile_query", "rust_file": "crates/libitofin-ffi/src/smile_api.rs", "go": "SabrSmileSection.Alpha", "go_file": "bindings/go/smile.go", "test": "TestSABRLognormalLimitAndParameters"},
-    {"python": "itofin.termstructures.SabrSmileSection.beta", "status": "implemented", "c": "itofin_sabr_smile_query", "rust_file": "crates/libitofin-ffi/src/smile_api.rs", "go": "SabrSmileSection.Beta", "go_file": "bindings/go/smile.go", "test": "TestSABRLognormalLimitAndParameters"},
-    {"python": "itofin.termstructures.SabrSmileSection.nu", "status": "implemented", "c": "itofin_sabr_smile_query", "rust_file": "crates/libitofin-ffi/src/smile_api.rs", "go": "SabrSmileSection.Nu", "go_file": "bindings/go/smile.go", "test": "TestSABRLognormalLimitAndParameters"},
-    {"python": "itofin.termstructures.SabrSmileSection.rho", "status": "implemented", "c": "itofin_sabr_smile_query", "rust_file": "crates/libitofin-ffi/src/smile_api.rs", "go": "SabrSmileSection.Rho", "go_file": "bindings/go/smile.go", "test": "TestSABRLognormalLimitAndParameters"},
-    {"python": "itofin.termstructures.SabrSmileSection.__init__", "status": "implemented", "c": "itofin_sabr_smile_new", "rust_file": "crates/libitofin-ffi/src/smile_api.rs", "go": "Session.SabrSmileSection", "go_file": "bindings/go/smile.go", "test": "TestSABRLognormalLimitAndParameters"},
-    {"python": "itofin.termstructures.SabrSmileSection.volatility", "status": "implemented", "c": "itofin_sabr_smile_query", "rust_file": "crates/libitofin-ffi/src/smile_api.rs", "go": "SabrSmileSection.Volatility", "go_file": "bindings/go/smile.go", "test": "TestSABRLognormalLimitAndParameters"},
-    {"python": "itofin.termstructures.SabrSmileSection.variance", "status": "implemented", "c": "itofin_sabr_smile_query", "rust_file": "crates/libitofin-ffi/src/smile_api.rs", "go": "SabrSmileSection.Variance", "go_file": "bindings/go/smile.go", "test": "TestSABRLognormalLimitAndParameters"},
-    {"python": "itofin.termstructures.SabrSwaptionVolatilityCube.__init__", "status": "implemented", "c": "itofin_swaption_vol_cube_new(kind=1)", "rust_file": "crates/libitofin-ffi/src/volcube_api.rs", "go": "Session.SabrSwaptionVolatilityCube", "go_file": "bindings/go/volcube.go", "test": "interpolated_cube_boundary_preserves_node_order_and_quote_updates", "test_scope": "native boundary exercised; Go wrapper compiles; full Go constructor execution pending integrated index APIs"},
-    {"python": "itofin.termstructures.SabrSwaptionVolatilityCube.atm_strike_from_tenor", "status": "implemented", "c": "itofin_swaption_vol_cube_atm", "rust_file": "crates/libitofin-ffi/src/volcube_api.rs", "go": "SwaptionVolatilityCube.ATMStrikeFromTenor", "go_file": "bindings/go/volcube.go", "test": "interpolated_cube_boundary_preserves_node_order_and_quote_updates", "test_scope": "native boundary exercised; Go wrapper compiles; full Go constructor execution pending integrated index APIs"},
-    {"python": "itofin.termstructures.StrippedOptionletAdapter.__init__", "status": "implemented", "c": "itofin_stripped_optionlet_adapter_new", "rust_file": "crates/libitofin-ffi/src/stripper_api.rs", "go": "Session.StrippedOptionletAdapter", "go_file": "bindings/go/stripper.go", "test": "optionlet_boundary_round_trips_caps_and_rejects_bad_buffers", "test_scope": "native boundary exercised; Go wrapper compiles; full Go constructor execution pending integrated index APIs"},
-    {"python": "itofin.termstructures.SwaptionVolatilityMatrix.__init__", "status": "implemented", "c": "itofin_swaption_vol_matrix_new", "rust_file": "crates/libitofin-ffi/src/volgrid_api.rs", "go": "Session.SwaptionVolatilityMatrix", "go_file": "bindings/go/volgrid.go", "test": "TestRateVolatilityGridPinnedMemoryAndInterpolation"},
-    {"python": "itofin.termstructures.SwaptionVolatilityMatrix.moving", "status": "implemented", "c": "itofin_swaption_vol_matrix_new", "rust_file": "crates/libitofin-ffi/src/volgrid_api.rs", "go": "Session.SwaptionVolatilityMatrix", "go_file": "bindings/go/volgrid.go", "test": "TestRateVolatilityGridPinnedMemoryAndInterpolation", "configuration": "Settings selects moving dates; Quote/Quotes selects live market data"},
-    {"python": "itofin.termstructures.SwaptionVolatilityStructure.volatility", "status": "implemented", "c": "itofin_swaption_vol_query", "rust_file": "crates/libitofin-ffi/src/ratevol_api.rs", "go": "SwaptionVolatilityStructure.Volatility", "go_file": "bindings/go/ratevol.go", "test": "TestRateVolatilityMovingQuoteAndDate"},
-    {"python": "itofin.termstructures.SwaptionVolatilityStructure.black_variance", "status": "implemented", "c": "itofin_swaption_vol_query", "rust_file": "crates/libitofin-ffi/src/ratevol_api.rs", "go": "SwaptionVolatilityStructure.BlackVariance", "go_file": "bindings/go/ratevol.go", "test": "TestRateVolatilityMovingQuoteAndDate"},
-    {"python": "itofin.termstructures.SwaptionVolatilityStructure.shift", "status": "implemented", "c": "itofin_swaption_vol_query", "rust_file": "crates/libitofin-ffi/src/ratevol_api.rs", "go": "SwaptionVolatilityStructure.Shift", "go_file": "bindings/go/ratevol.go", "test": "TestRateVolatilityMovingQuoteAndDate"},
-    {"python": "itofin.termstructures.SwaptionVolatilityStructure.reference_date", "status": "implemented", "c": "itofin_rate_vol_control", "rust_file": "crates/libitofin-ffi/src/ratevol_api.rs", "go": "SwaptionVolatilityStructure.ReferenceDate", "go_file": "bindings/go/ratevol.go", "test": "TestRateVolatilityMovingQuoteAndDate"},
-    {"python": "itofin.termstructures.BlackVolTimeExtrapolation.FlatVolatility", "status": "implemented", "c": "validated integer enum", "rust_file": "crates/libitofin-ffi/src/vol_api.rs", "go": "FlatVolatility", "go_file": "bindings/go/vol.go", "test": "TestBlackLinearVarianceExtrapolation"},
-    {"python": "itofin.termstructures.BlackVolTimeExtrapolation.UseInterpolator", "status": "implemented", "c": "validated integer enum", "rust_file": "crates/libitofin-ffi/src/vol_api.rs", "go": "UseInterpolator", "go_file": "bindings/go/vol.go", "test": "TestBlackLinearVarianceExtrapolation"},
-    {"python": "itofin.termstructures.BlackVolTimeExtrapolation.LinearVariance", "status": "implemented", "c": "validated integer enum", "rust_file": "crates/libitofin-ffi/src/vol_api.rs", "go": "LinearVariance", "go_file": "bindings/go/vol.go", "test": "TestBlackLinearVarianceExtrapolation"},
-    {"python": "itofin.termstructures.VolatilityType.ShiftedLognormal", "status": "implemented", "c": "validated integer enum", "rust_file": "crates/libitofin-ffi/src/smile_api.rs", "go": "ShiftedLognormal", "go_file": "bindings/go/smile.go", "test": "TestSABRLognormalLimitAndParameters"},
-    {"python": "itofin.termstructures.VolatilityType.Normal", "status": "implemented", "c": "validated integer enum", "rust_file": "crates/libitofin-ffi/src/smile_api.rs", "go": "Normal", "go_file": "bindings/go/smile.go", "test": "TestSABRLognormalLimitAndParameters"}
+    {
+      "c": "itofin_black_constant_vol_new",
+      "go": "Session.BlackConstantVol",
+      "go_file": "bindings/go/vol.go",
+      "python": "itofin.termstructures.BlackConstantVol.__init__",
+      "rust_file": "crates/libitofin-ffi/src/vol_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/vol_test.go::TestBlackVolatilityOraclesAndOwnership"
+      ]
+    },
+    {
+      "c": "itofin_black_variance_curve_new",
+      "go": "Session.BlackVarianceCurve",
+      "go_file": "bindings/go/vol.go",
+      "python": "itofin.termstructures.BlackVarianceCurve.__init__",
+      "rust_file": "crates/libitofin-ffi/src/vol_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/vol_test.go::TestBlackVarianceGridAndExtrapolation"
+      ]
+    },
+    {
+      "c": "itofin_black_variance_surface_new",
+      "go": "Session.BlackVarianceSurface",
+      "go_file": "bindings/go/vol.go",
+      "python": "itofin.termstructures.BlackVarianceSurface.__init__",
+      "rust_file": "crates/libitofin-ffi/src/vol_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/vol_test.go::TestBlackVarianceGridAndExtrapolation"
+      ]
+    },
+    {
+      "c": "itofin_black_vol_query",
+      "go": "BlackVolTermStructure.BlackVol",
+      "go_file": "bindings/go/vol.go",
+      "python": "itofin.termstructures.BlackVolTermStructure.black_vol",
+      "rust_file": "crates/libitofin-ffi/src/vol_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/vol_test.go::TestBlackVarianceGridAndExtrapolation"
+      ]
+    },
+    {
+      "c": "itofin_black_vol_date_query",
+      "go": "BlackVolTermStructure.BlackVolDate",
+      "go_file": "bindings/go/vol.go",
+      "python": "itofin.termstructures.BlackVolTermStructure.black_vol_date",
+      "rust_file": "crates/libitofin-ffi/src/vol_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/vol_test.go::TestBlackVarianceGridAndExtrapolation"
+      ]
+    },
+    {
+      "c": "itofin_black_vol_query",
+      "go": "BlackVolTermStructure.BlackVariance",
+      "go_file": "bindings/go/vol.go",
+      "python": "itofin.termstructures.BlackVolTermStructure.black_variance",
+      "rust_file": "crates/libitofin-ffi/src/vol_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/vol_test.go::TestBlackVarianceGridAndExtrapolation"
+      ]
+    },
+    {
+      "c": "itofin_black_vol_date_query",
+      "go": "BlackVolTermStructure.BlackVarianceDate",
+      "go_file": "bindings/go/vol.go",
+      "python": "itofin.termstructures.BlackVolTermStructure.black_variance_date",
+      "rust_file": "crates/libitofin-ffi/src/vol_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/vol_test.go::TestBlackVarianceGridAndExtrapolation"
+      ]
+    },
+    {
+      "c": "itofin_black_vol_query",
+      "go": "BlackVolTermStructure.BlackForwardVol",
+      "go_file": "bindings/go/vol.go",
+      "python": "itofin.termstructures.BlackVolTermStructure.black_forward_vol",
+      "rust_file": "crates/libitofin-ffi/src/vol_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/vol_test.go::TestBlackVarianceGridAndExtrapolation"
+      ]
+    },
+    {
+      "c": "itofin_black_vol_query",
+      "go": "BlackVolTermStructure.BlackForwardVariance",
+      "go_file": "bindings/go/vol.go",
+      "python": "itofin.termstructures.BlackVolTermStructure.black_forward_variance",
+      "rust_file": "crates/libitofin-ffi/src/vol_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/vol_test.go::TestBlackVarianceGridAndExtrapolation"
+      ]
+    },
+    {
+      "c": "itofin_black_vol_query",
+      "go": "BlackVolTermStructure.MinStrike",
+      "go_file": "bindings/go/vol.go",
+      "python": "itofin.termstructures.BlackVolTermStructure.min_strike",
+      "rust_file": "crates/libitofin-ffi/src/vol_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/vol_test.go::TestBlackVarianceGridAndExtrapolation"
+      ]
+    },
+    {
+      "c": "itofin_black_vol_query",
+      "go": "BlackVolTermStructure.MaxStrike",
+      "go_file": "bindings/go/vol.go",
+      "python": "itofin.termstructures.BlackVolTermStructure.max_strike",
+      "rust_file": "crates/libitofin-ffi/src/vol_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/vol_test.go::TestBlackVarianceGridAndExtrapolation"
+      ]
+    },
+    {
+      "c": "itofin_black_vol_control",
+      "go": "BlackVolTermStructure.MaxDate",
+      "go_file": "bindings/go/vol.go",
+      "python": "itofin.termstructures.BlackVolTermStructure.max_date",
+      "rust_file": "crates/libitofin-ffi/src/vol_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/vol_test.go::TestBlackVarianceGridAndExtrapolation"
+      ]
+    },
+    {
+      "c": "itofin_black_vol_control",
+      "go": "BlackVolTermStructure.AllowsExtrapolation",
+      "go_file": "bindings/go/vol.go",
+      "python": "itofin.termstructures.BlackVolTermStructure.allows_extrapolation",
+      "rust_file": "crates/libitofin-ffi/src/vol_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/vol_test.go::TestBlackVarianceGridAndExtrapolation"
+      ]
+    },
+    {
+      "c": "itofin_black_vol_control",
+      "go": "BlackVolTermStructure.EnableExtrapolation",
+      "go_file": "bindings/go/vol.go",
+      "python": "itofin.termstructures.BlackVolTermStructure.enable_extrapolation",
+      "rust_file": "crates/libitofin-ffi/src/vol_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/vol_test.go::TestBlackVarianceGridAndExtrapolation"
+      ]
+    },
+    {
+      "c": "itofin_black_vol_control",
+      "go": "BlackVolTermStructure.DisableExtrapolation",
+      "go_file": "bindings/go/vol.go",
+      "python": "itofin.termstructures.BlackVolTermStructure.disable_extrapolation",
+      "rust_file": "crates/libitofin-ffi/src/vol_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/vol_test.go::TestBlackVarianceGridAndExtrapolation"
+      ]
+    },
+    {
+      "c": "itofin_capfloor_vol_surface_new",
+      "go": "Session.CapFloorTermVolSurface",
+      "go_file": "bindings/go/volgrid.go",
+      "python": "itofin.termstructures.CapFloorTermVolSurface.__init__",
+      "rust_file": "crates/libitofin-ffi/src/volgrid_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/ratevol_test.go::TestRateVolatilityConstructorModes"
+      ]
+    },
+    {
+      "c": "itofin_capfloor_vol_surface_new",
+      "configuration": "Settings selects moving dates; Quote/Quotes selects live market data",
+      "go": "Session.CapFloorTermVolSurface",
+      "go_file": "bindings/go/volgrid.go",
+      "python": "itofin.termstructures.CapFloorTermVolSurface.with_quotes",
+      "rust_file": "crates/libitofin-ffi/src/volgrid_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/ratevol_test.go::TestRateVolatilityConstructorModes"
+      ]
+    },
+    {
+      "c": "itofin_capfloor_vol_surface_new",
+      "configuration": "Settings selects moving dates; Quote/Quotes selects live market data",
+      "go": "Session.CapFloorTermVolSurface",
+      "go_file": "bindings/go/volgrid.go",
+      "python": "itofin.termstructures.CapFloorTermVolSurface.moving",
+      "rust_file": "crates/libitofin-ffi/src/volgrid_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/ratevol_test.go::TestRateVolatilityConstructorModes"
+      ]
+    },
+    {
+      "c": "itofin_capfloor_vol_surface_new",
+      "configuration": "Settings selects moving dates; Quote/Quotes selects live market data",
+      "go": "Session.CapFloorTermVolSurface",
+      "go_file": "bindings/go/volgrid.go",
+      "python": "itofin.termstructures.CapFloorTermVolSurface.moving_with_quotes",
+      "rust_file": "crates/libitofin-ffi/src/volgrid_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/ratevol_test.go::TestRateVolatilityConstructorModes"
+      ]
+    },
+    {
+      "c": "itofin_capfloor_vol_query",
+      "go": "CapFloorTermVolSurface.Volatility",
+      "go_file": "bindings/go/volgrid.go",
+      "python": "itofin.termstructures.CapFloorTermVolSurface.volatility",
+      "rust_file": "crates/libitofin-ffi/src/volgrid_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/ratevol_test.go::TestRateVolatilityConstructorModes"
+      ]
+    },
+    {
+      "c": "itofin_capfloor_vol_query",
+      "go": "CapFloorTermVolSurface.VolatilityDate",
+      "go_file": "bindings/go/volgrid.go",
+      "python": "itofin.termstructures.CapFloorTermVolSurface.volatility_date",
+      "rust_file": "crates/libitofin-ffi/src/volgrid_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/ratevol_test.go::TestRateVolatilityConstructorModes"
+      ]
+    },
+    {
+      "c": "itofin_capfloor_vol_query",
+      "go": "CapFloorTermVolSurface.VolatilityTime",
+      "go_file": "bindings/go/volgrid.go",
+      "python": "itofin.termstructures.CapFloorTermVolSurface.volatility_time",
+      "rust_file": "crates/libitofin-ffi/src/volgrid_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/ratevol_test.go::TestRateVolatilityConstructorModes"
+      ]
+    },
+    {
+      "c": "itofin_constant_optionlet_vol_new",
+      "go": "Session.ConstantOptionletVolatility",
+      "go_file": "bindings/go/ratevol.go",
+      "python": "itofin.termstructures.ConstantOptionletVolatility.__init__",
+      "rust_file": "crates/libitofin-ffi/src/ratevol_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/ratevol_test.go::TestRateVolatilityConstructorModes"
+      ]
+    },
+    {
+      "c": "itofin_constant_optionlet_vol_new",
+      "configuration": "Settings selects moving dates; Quote/Quotes selects live market data",
+      "go": "Session.ConstantOptionletVolatility",
+      "go_file": "bindings/go/ratevol.go",
+      "python": "itofin.termstructures.ConstantOptionletVolatility.with_quote",
+      "rust_file": "crates/libitofin-ffi/src/ratevol_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/ratevol_test.go::TestRateVolatilityConstructorModes"
+      ]
+    },
+    {
+      "c": "itofin_constant_optionlet_vol_new",
+      "configuration": "Settings selects moving dates; Quote/Quotes selects live market data",
+      "go": "Session.ConstantOptionletVolatility",
+      "go_file": "bindings/go/ratevol.go",
+      "python": "itofin.termstructures.ConstantOptionletVolatility.moving",
+      "rust_file": "crates/libitofin-ffi/src/ratevol_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/ratevol_test.go::TestRateVolatilityConstructorModes"
+      ]
+    },
+    {
+      "c": "itofin_constant_optionlet_vol_new",
+      "configuration": "Settings selects moving dates; Quote/Quotes selects live market data",
+      "go": "Session.ConstantOptionletVolatility",
+      "go_file": "bindings/go/ratevol.go",
+      "python": "itofin.termstructures.ConstantOptionletVolatility.moving_with_quote",
+      "rust_file": "crates/libitofin-ffi/src/ratevol_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/ratevol_test.go::TestRateVolatilityConstructorModes"
+      ]
+    },
+    {
+      "c": "itofin_constant_swaption_vol_new",
+      "go": "Session.ConstantSwaptionVolatility",
+      "go_file": "bindings/go/ratevol.go",
+      "python": "itofin.termstructures.ConstantSwaptionVolatility.__init__",
+      "rust_file": "crates/libitofin-ffi/src/ratevol_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/ratevol_test.go::TestRateVolatilityConstructorModes"
+      ]
+    },
+    {
+      "c": "itofin_constant_swaption_vol_new",
+      "configuration": "Settings selects moving dates; Quote/Quotes selects live market data",
+      "go": "Session.ConstantSwaptionVolatility",
+      "go_file": "bindings/go/ratevol.go",
+      "python": "itofin.termstructures.ConstantSwaptionVolatility.with_quote",
+      "rust_file": "crates/libitofin-ffi/src/ratevol_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/ratevol_test.go::TestRateVolatilityConstructorModes"
+      ]
+    },
+    {
+      "c": "itofin_constant_swaption_vol_new",
+      "configuration": "Settings selects moving dates; Quote/Quotes selects live market data",
+      "go": "Session.ConstantSwaptionVolatility",
+      "go_file": "bindings/go/ratevol.go",
+      "python": "itofin.termstructures.ConstantSwaptionVolatility.moving",
+      "rust_file": "crates/libitofin-ffi/src/ratevol_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/ratevol_test.go::TestRateVolatilityConstructorModes"
+      ]
+    },
+    {
+      "c": "itofin_constant_swaption_vol_new",
+      "configuration": "Settings selects moving dates; Quote/Quotes selects live market data",
+      "go": "Session.ConstantSwaptionVolatility",
+      "go_file": "bindings/go/ratevol.go",
+      "python": "itofin.termstructures.ConstantSwaptionVolatility.moving_with_quote",
+      "rust_file": "crates/libitofin-ffi/src/ratevol_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/ratevol_test.go::TestRateVolatilityConstructorModes"
+      ]
+    },
+    {
+      "c": "itofin_swaption_vol_cube_new(kind=0)",
+      "go": "Session.InterpolatedSwaptionVolatilityCube",
+      "go_file": "bindings/go/volcube.go",
+      "python": "itofin.termstructures.InterpolatedSwaptionVolatilityCube.__init__",
+      "rust_file": "crates/libitofin-ffi/src/volcube_api.rs",
+      "status": "implemented",
+      "tests": [
+        "crates/libitofin-ffi/src/vol_tests.rs::interpolated_cube_boundary_preserves_node_order_and_quote_updates",
+        "bindings/go/vol_advanced_test.go::TestVolatilityCubeGoBufferOwnershipAndSABRLimit"
+      ]
+    },
+    {
+      "c": "itofin_swaption_vol_cube_atm",
+      "go": "SwaptionVolatilityCube.ATMStrikeFromTenor",
+      "go_file": "bindings/go/volcube.go",
+      "python": "itofin.termstructures.InterpolatedSwaptionVolatilityCube.atm_strike_from_tenor",
+      "rust_file": "crates/libitofin-ffi/src/volcube_api.rs",
+      "status": "implemented",
+      "tests": [
+        "crates/libitofin-ffi/src/vol_tests.rs::interpolated_cube_boundary_preserves_node_order_and_quote_updates",
+        "bindings/go/vol_advanced_test.go::TestVolatilityCubeGoBufferOwnershipAndSABRLimit"
+      ]
+    },
+    {
+      "c": "itofin_optionlet_stripper_new",
+      "go": "Session.OptionletStripper1",
+      "go_file": "bindings/go/stripper.go",
+      "python": "itofin.termstructures.OptionletStripper1.__init__",
+      "rust_file": "crates/libitofin-ffi/src/stripper_api.rs",
+      "status": "implemented",
+      "tests": [
+        "crates/libitofin-ffi/src/vol_tests.rs::optionlet_boundary_round_trips_caps_and_rejects_bad_buffers",
+        "bindings/go/vol_advanced_test.go::TestOptionletStripperGoQueriesAndAdapterOwnership"
+      ]
+    },
+    {
+      "c": "itofin_optionlet_stripper_switch_strike",
+      "go": "OptionletStripper1.SwitchStrike",
+      "go_file": "bindings/go/stripper.go",
+      "python": "itofin.termstructures.OptionletStripper1.switch_strike",
+      "rust_file": "crates/libitofin-ffi/src/stripper_api.rs",
+      "status": "implemented",
+      "tests": [
+        "crates/libitofin-ffi/src/vol_tests.rs::optionlet_boundary_round_trips_caps_and_rejects_bad_buffers",
+        "bindings/go/vol_advanced_test.go::TestOptionletStripperGoQueriesAndAdapterOwnership"
+      ]
+    },
+    {
+      "c": "itofin_optionlet_stripper_rates",
+      "go": "OptionletStripper1.ATMOptionletRates",
+      "go_file": "bindings/go/stripper.go",
+      "python": "itofin.termstructures.OptionletStripper1.atm_optionlet_rates",
+      "rust_file": "crates/libitofin-ffi/src/stripper_api.rs",
+      "status": "implemented",
+      "tests": [
+        "crates/libitofin-ffi/src/vol_tests.rs::optionlet_boundary_round_trips_caps_and_rejects_bad_buffers",
+        "bindings/go/vol_advanced_test.go::TestOptionletStripperGoQueriesAndAdapterOwnership"
+      ]
+    },
+    {
+      "c": "itofin_optionlet_vol_query",
+      "go": "OptionletVolatilityStructure.Volatility",
+      "go_file": "bindings/go/ratevol.go",
+      "python": "itofin.termstructures.OptionletVolatilityStructure.volatility",
+      "rust_file": "crates/libitofin-ffi/src/ratevol_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/ratevol_test.go::TestRateVolatilityMovingQuoteAndDate"
+      ]
+    },
+    {
+      "c": "itofin_optionlet_vol_query",
+      "go": "OptionletVolatilityStructure.VolatilityDate",
+      "go_file": "bindings/go/ratevol.go",
+      "python": "itofin.termstructures.OptionletVolatilityStructure.volatility_date",
+      "rust_file": "crates/libitofin-ffi/src/ratevol_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/ratevol_test.go::TestRateVolatilityMovingQuoteAndDate"
+      ]
+    },
+    {
+      "c": "itofin_optionlet_vol_query",
+      "go": "OptionletVolatilityStructure.BlackVariance",
+      "go_file": "bindings/go/ratevol.go",
+      "python": "itofin.termstructures.OptionletVolatilityStructure.black_variance",
+      "rust_file": "crates/libitofin-ffi/src/ratevol_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/ratevol_test.go::TestRateVolatilityMovingQuoteAndDate"
+      ]
+    },
+    {
+      "c": "itofin_rate_vol_control",
+      "go": "OptionletVolatilityStructure.AllowsExtrapolation",
+      "go_file": "bindings/go/ratevol.go",
+      "python": "itofin.termstructures.OptionletVolatilityStructure.allows_extrapolation",
+      "rust_file": "crates/libitofin-ffi/src/ratevol_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/ratevol_test.go::TestRateVolatilityMovingQuoteAndDate"
+      ]
+    },
+    {
+      "c": "itofin_rate_vol_control",
+      "go": "OptionletVolatilityStructure.EnableExtrapolation",
+      "go_file": "bindings/go/ratevol.go",
+      "python": "itofin.termstructures.OptionletVolatilityStructure.enable_extrapolation",
+      "rust_file": "crates/libitofin-ffi/src/ratevol_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/ratevol_test.go::TestRateVolatilityMovingQuoteAndDate"
+      ]
+    },
+    {
+      "c": "itofin_rate_vol_control",
+      "go": "OptionletVolatilityStructure.DisableExtrapolation",
+      "go_file": "bindings/go/ratevol.go",
+      "python": "itofin.termstructures.OptionletVolatilityStructure.disable_extrapolation",
+      "rust_file": "crates/libitofin-ffi/src/ratevol_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/ratevol_test.go::TestRateVolatilityMovingQuoteAndDate"
+      ]
+    },
+    {
+      "c": "itofin_optionlet_vol_query",
+      "go": "OptionletVolatilityStructure.Displacement",
+      "go_file": "bindings/go/ratevol.go",
+      "python": "itofin.termstructures.OptionletVolatilityStructure.displacement",
+      "rust_file": "crates/libitofin-ffi/src/ratevol_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/ratevol_test.go::TestRateVolatilityMovingQuoteAndDate"
+      ]
+    },
+    {
+      "c": "itofin_rate_vol_control",
+      "go": "OptionletVolatilityStructure.ReferenceDate",
+      "go_file": "bindings/go/ratevol.go",
+      "python": "itofin.termstructures.OptionletVolatilityStructure.reference_date",
+      "rust_file": "crates/libitofin-ffi/src/ratevol_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/ratevol_test.go::TestRateVolatilityMovingQuoteAndDate"
+      ]
+    },
+    {
+      "c": "itofin_sabr_smile_query",
+      "go": "SabrSmileSection.ExerciseTime",
+      "go_file": "bindings/go/smile.go",
+      "python": "itofin.termstructures.SabrSmileSection.exercise_time",
+      "rust_file": "crates/libitofin-ffi/src/smile_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/vol_test.go::TestSABRLognormalLimitAndParameters"
+      ]
+    },
+    {
+      "c": "itofin_sabr_smile_query",
+      "go": "SabrSmileSection.ATMLevel",
+      "go_file": "bindings/go/smile.go",
+      "python": "itofin.termstructures.SabrSmileSection.atm_level",
+      "rust_file": "crates/libitofin-ffi/src/smile_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/vol_test.go::TestSABRLognormalLimitAndParameters"
+      ]
+    },
+    {
+      "c": "itofin_sabr_smile_query",
+      "go": "SabrSmileSection.Alpha",
+      "go_file": "bindings/go/smile.go",
+      "python": "itofin.termstructures.SabrSmileSection.alpha",
+      "rust_file": "crates/libitofin-ffi/src/smile_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/vol_test.go::TestSABRLognormalLimitAndParameters"
+      ]
+    },
+    {
+      "c": "itofin_sabr_smile_query",
+      "go": "SabrSmileSection.Beta",
+      "go_file": "bindings/go/smile.go",
+      "python": "itofin.termstructures.SabrSmileSection.beta",
+      "rust_file": "crates/libitofin-ffi/src/smile_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/vol_test.go::TestSABRLognormalLimitAndParameters"
+      ]
+    },
+    {
+      "c": "itofin_sabr_smile_query",
+      "go": "SabrSmileSection.Nu",
+      "go_file": "bindings/go/smile.go",
+      "python": "itofin.termstructures.SabrSmileSection.nu",
+      "rust_file": "crates/libitofin-ffi/src/smile_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/vol_test.go::TestSABRLognormalLimitAndParameters"
+      ]
+    },
+    {
+      "c": "itofin_sabr_smile_query",
+      "go": "SabrSmileSection.Rho",
+      "go_file": "bindings/go/smile.go",
+      "python": "itofin.termstructures.SabrSmileSection.rho",
+      "rust_file": "crates/libitofin-ffi/src/smile_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/vol_test.go::TestSABRLognormalLimitAndParameters"
+      ]
+    },
+    {
+      "c": "itofin_sabr_smile_new",
+      "go": "Session.SabrSmileSection",
+      "go_file": "bindings/go/smile.go",
+      "python": "itofin.termstructures.SabrSmileSection.__init__",
+      "rust_file": "crates/libitofin-ffi/src/smile_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/vol_test.go::TestSABRLognormalLimitAndParameters"
+      ]
+    },
+    {
+      "c": "itofin_sabr_smile_query",
+      "go": "SabrSmileSection.Volatility",
+      "go_file": "bindings/go/smile.go",
+      "python": "itofin.termstructures.SabrSmileSection.volatility",
+      "rust_file": "crates/libitofin-ffi/src/smile_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/vol_test.go::TestSABRLognormalLimitAndParameters"
+      ]
+    },
+    {
+      "c": "itofin_sabr_smile_query",
+      "go": "SabrSmileSection.Variance",
+      "go_file": "bindings/go/smile.go",
+      "python": "itofin.termstructures.SabrSmileSection.variance",
+      "rust_file": "crates/libitofin-ffi/src/smile_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/vol_test.go::TestSABRLognormalLimitAndParameters"
+      ]
+    },
+    {
+      "c": "itofin_swaption_vol_cube_new(kind=1)",
+      "go": "Session.SabrSwaptionVolatilityCube",
+      "go_file": "bindings/go/volcube.go",
+      "python": "itofin.termstructures.SabrSwaptionVolatilityCube.__init__",
+      "rust_file": "crates/libitofin-ffi/src/volcube_api.rs",
+      "status": "implemented",
+      "tests": [
+        "crates/libitofin-ffi/src/vol_tests.rs::interpolated_cube_boundary_preserves_node_order_and_quote_updates",
+        "bindings/go/vol_advanced_test.go::TestSABRCubeFreeCalibrationPythonOracle"
+      ]
+    },
+    {
+      "c": "itofin_swaption_vol_cube_atm",
+      "go": "SwaptionVolatilityCube.ATMStrikeFromTenor",
+      "go_file": "bindings/go/volcube.go",
+      "python": "itofin.termstructures.SabrSwaptionVolatilityCube.atm_strike_from_tenor",
+      "rust_file": "crates/libitofin-ffi/src/volcube_api.rs",
+      "status": "implemented",
+      "tests": [
+        "crates/libitofin-ffi/src/vol_tests.rs::interpolated_cube_boundary_preserves_node_order_and_quote_updates",
+        "bindings/go/vol_advanced_test.go::TestSABRCubeFreeCalibrationPythonOracle"
+      ]
+    },
+    {
+      "c": "itofin_stripped_optionlet_adapter_new",
+      "go": "Session.StrippedOptionletAdapter",
+      "go_file": "bindings/go/stripper.go",
+      "python": "itofin.termstructures.StrippedOptionletAdapter.__init__",
+      "rust_file": "crates/libitofin-ffi/src/stripper_api.rs",
+      "status": "implemented",
+      "tests": [
+        "crates/libitofin-ffi/src/vol_tests.rs::optionlet_boundary_round_trips_caps_and_rejects_bad_buffers",
+        "bindings/go/vol_advanced_test.go::TestOptionletStripperGoQueriesAndAdapterOwnership"
+      ]
+    },
+    {
+      "c": "itofin_swaption_vol_matrix_new",
+      "go": "Session.SwaptionVolatilityMatrix",
+      "go_file": "bindings/go/volgrid.go",
+      "python": "itofin.termstructures.SwaptionVolatilityMatrix.__init__",
+      "rust_file": "crates/libitofin-ffi/src/volgrid_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/ratevol_test.go::TestRateVolatilityGridPinnedMemoryAndInterpolation"
+      ]
+    },
+    {
+      "c": "itofin_swaption_vol_matrix_new",
+      "configuration": "Settings selects moving dates; Quote/Quotes selects live market data",
+      "go": "Session.SwaptionVolatilityMatrix",
+      "go_file": "bindings/go/volgrid.go",
+      "python": "itofin.termstructures.SwaptionVolatilityMatrix.moving",
+      "rust_file": "crates/libitofin-ffi/src/volgrid_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/ratevol_test.go::TestRateVolatilityGridPinnedMemoryAndInterpolation"
+      ]
+    },
+    {
+      "c": "itofin_swaption_vol_query",
+      "go": "SwaptionVolatilityStructure.Volatility",
+      "go_file": "bindings/go/ratevol.go",
+      "python": "itofin.termstructures.SwaptionVolatilityStructure.volatility",
+      "rust_file": "crates/libitofin-ffi/src/ratevol_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/ratevol_test.go::TestRateVolatilityMovingQuoteAndDate"
+      ]
+    },
+    {
+      "c": "itofin_swaption_vol_query",
+      "go": "SwaptionVolatilityStructure.BlackVariance",
+      "go_file": "bindings/go/ratevol.go",
+      "python": "itofin.termstructures.SwaptionVolatilityStructure.black_variance",
+      "rust_file": "crates/libitofin-ffi/src/ratevol_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/ratevol_test.go::TestRateVolatilityMovingQuoteAndDate"
+      ]
+    },
+    {
+      "c": "itofin_swaption_vol_query",
+      "go": "SwaptionVolatilityStructure.Shift",
+      "go_file": "bindings/go/ratevol.go",
+      "python": "itofin.termstructures.SwaptionVolatilityStructure.shift",
+      "rust_file": "crates/libitofin-ffi/src/ratevol_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/ratevol_test.go::TestRateVolatilityMovingQuoteAndDate"
+      ]
+    },
+    {
+      "c": "itofin_rate_vol_control",
+      "go": "SwaptionVolatilityStructure.ReferenceDate",
+      "go_file": "bindings/go/ratevol.go",
+      "python": "itofin.termstructures.SwaptionVolatilityStructure.reference_date",
+      "rust_file": "crates/libitofin-ffi/src/ratevol_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/ratevol_test.go::TestRateVolatilityMovingQuoteAndDate"
+      ]
+    },
+    {
+      "c": "validated integer enum",
+      "go": "FlatVolatility",
+      "go_file": "bindings/go/vol.go",
+      "python": "itofin.termstructures.BlackVolTimeExtrapolation.FlatVolatility",
+      "rust_file": "crates/libitofin-ffi/src/vol_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/vol_test.go::TestBlackLinearVarianceExtrapolation"
+      ]
+    },
+    {
+      "c": "validated integer enum",
+      "go": "UseInterpolator",
+      "go_file": "bindings/go/vol.go",
+      "python": "itofin.termstructures.BlackVolTimeExtrapolation.UseInterpolator",
+      "rust_file": "crates/libitofin-ffi/src/vol_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/vol_test.go::TestBlackLinearVarianceExtrapolation"
+      ]
+    },
+    {
+      "c": "validated integer enum",
+      "go": "LinearVariance",
+      "go_file": "bindings/go/vol.go",
+      "python": "itofin.termstructures.BlackVolTimeExtrapolation.LinearVariance",
+      "rust_file": "crates/libitofin-ffi/src/vol_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/vol_test.go::TestBlackLinearVarianceExtrapolation"
+      ]
+    },
+    {
+      "c": "validated integer enum",
+      "go": "ShiftedLognormal",
+      "go_file": "bindings/go/smile.go",
+      "python": "itofin.termstructures.VolatilityType.ShiftedLognormal",
+      "rust_file": "crates/libitofin-ffi/src/smile_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/vol_test.go::TestSABRLognormalLimitAndParameters"
+      ]
+    },
+    {
+      "c": "validated integer enum",
+      "go": "Normal",
+      "go_file": "bindings/go/smile.go",
+      "python": "itofin.termstructures.VolatilityType.Normal",
+      "rust_file": "crates/libitofin-ffi/src/smile_api.rs",
+      "status": "implemented",
+      "tests": [
+        "bindings/go/vol_test.go::TestSABRLognormalLimitAndParameters"
+      ]
+    }
   ]
 }

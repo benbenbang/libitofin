@@ -1,0 +1,42 @@
+name: Go and C ABI bindings
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'feat/go-cabi-*']
+    paths: ['crates/**', 'bindings/go/**', 'scripts/check_go_*', 'docs/go-coverage/**', 'Cargo.*', 'rust-toolchain.toml', '.github/workflows/go-bindings.yml']
+  pull_request:
+    paths: ['crates/**', 'bindings/go/**', 'scripts/check_go_*', 'docs/go-coverage/**', 'Cargo.*', 'rust-toolchain.toml', '.github/workflows/go-bindings.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  bindings:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.27.1'
+          cache: false
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - name: Check native formatting and lints
+        run: |
+          cargo fmt -p libitofin-ffi -- --check
+          cargo clippy -p libitofin-ffi --all-targets -- -D warnings
+      - name: Check generated header
+        run: |
+          cargo install cbindgen --version 0.29.2 --locked
+          cbindgen --config crates/libitofin-ffi/cbindgen.toml --crate libitofin-ffi --output crates/libitofin-ffi/include/itofin.h
+          git diff --exit-code -- crates/libitofin-ffi/include/itofin.h
+      - name: Check Go formatting
+        run: test -z "$(gofmt -l bindings/go)"
+      - name: Test native and Go bindings
+        run: bash scripts/check_go_bindings.sh
