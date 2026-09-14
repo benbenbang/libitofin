@@ -50,6 +50,11 @@ fn futures_type(value: i32) -> BindingResult<FuturesType> {
     }
 }
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_deposit_helper_new(
     ctx: *mut Context,
     quote_id: u64,
@@ -84,6 +89,11 @@ pub struct ItofinSwapHelperConfig {
     pub index: u64,
 }
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_swap_helper_new(
     ctx: *mut Context,
     cfg: *const ItofinSwapHelperConfig,
@@ -124,6 +134,11 @@ pub struct ItofinFraHelperConfig {
 }
 /// Mode 0 quote+period, 1 fixed rate+period, 2 months, 3 explicit dates.
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_fra_helper_new(
     ctx: *mut Context,
     mode: i32,
@@ -185,6 +200,11 @@ pub struct ItofinFuturesHelperConfig {
 }
 /// Mode 0 tenor months, 1 explicit/optional end date, 2 index conventions.
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_futures_helper_new(
     ctx: *mut Context,
     mode: i32,
@@ -254,6 +274,11 @@ pub struct ItofinOisHelperConfig {
     pub averaging: i32,
 }
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_ois_helper_new(
     ctx: *mut Context,
     cfg: *const ItofinOisHelperConfig,
@@ -309,6 +334,11 @@ pub struct ItofinBondHelperConfig {
     pub has_issue_date: bool,
 }
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_bond_helper_new(
     ctx: *mut Context,
     cfg: *const ItofinBondHelperConfig,
@@ -355,6 +385,11 @@ pub unsafe extern "C" fn itofin_bond_helper_new(
 }
 /// Query 0 implied quote, 1 quote error, 2 market quote, 3 futures convexity adjustment.
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_helper_value(
     ctx: *mut Context,
     id: u64,
@@ -379,6 +414,11 @@ pub unsafe extern "C" fn itofin_helper_value(
 }
 /// Query 0 maturity, 1 pillar, 2 earliest, 3 latest, 4 latest relevant date.
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_helper_date(
     ctx: *mut Context,
     id: u64,

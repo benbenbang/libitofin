@@ -77,7 +77,7 @@ def audit():
                     errors.append(f"{name}: missing Go identifier {ident}")
             for value in items(record.get("tests")):
                 ident = value.split("::")[-1]
-                if not re.search(r"\b" + re.escape(ident) + r"\b", tests):
+                if not re.search(r"\b(?:func|fn)\s+" + re.escape(ident) + r"\s*\(", tests):
                     errors.append(f"{name}: missing test {value}")
             records.setdefault(name, []).append(record)
     implied_types = {

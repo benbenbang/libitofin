@@ -1,0 +1,1503 @@
+{
+  "domain": "inflation-products-volatility-cashflows",
+  "entries": [
+    {
+      "c": [
+        "itofin_discounting_swap_engine_new"
+      ],
+      "go": [
+        "Session.NewDiscountingSwapEngine"
+      ],
+      "python": "itofin.pricingengines.DiscountingSwapEngine",
+      "status": "implemented",
+      "tests": [
+        "TestZeroInflationSwapPythonOracleAndSnapshot"
+      ]
+    },
+    {
+      "c": [
+        "itofin_discounting_swap_engine_new"
+      ],
+      "go": [
+        "Session.NewDiscountingSwapEngine"
+      ],
+      "python": "itofin.pricingengines.DiscountingSwapEngine.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestZeroInflationSwapPythonOracleAndSnapshot"
+      ]
+    },
+    {
+      "c": [
+        "itofin_zero_inflation_swap_new"
+      ],
+      "go": [
+        "Session.NewZeroCouponInflationSwap"
+      ],
+      "python": "itofin.instruments.ZeroCouponInflationSwap",
+      "status": "implemented",
+      "tests": [
+        "TestZeroInflationSwapPythonOracleAndSnapshot"
+      ]
+    },
+    {
+      "c": [
+        "itofin_zero_inflation_swap_new"
+      ],
+      "go": [
+        "Session.NewZeroCouponInflationSwap"
+      ],
+      "python": "itofin.instruments.ZeroCouponInflationSwap.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestZeroInflationSwapPythonOracleAndSnapshot"
+      ]
+    },
+    {
+      "c": [
+        "itofin_zero_inflation_swap_set_engine"
+      ],
+      "go": [
+        "ZeroCouponInflationSwap.SetEngine"
+      ],
+      "python": "itofin.instruments.ZeroCouponInflationSwap.set_engine",
+      "status": "implemented",
+      "tests": [
+        "TestZeroInflationSwapPythonOracleAndSnapshot"
+      ]
+    },
+    {
+      "c": [
+        "itofin_zero_inflation_swap_calculate"
+      ],
+      "go": [
+        "ZeroCouponInflationSwap.Calculate"
+      ],
+      "python": "itofin.instruments.ZeroCouponInflationSwap.calculate",
+      "status": "implemented",
+      "tests": [
+        "TestZeroInflationSwapPythonOracleAndSnapshot"
+      ]
+    },
+    {
+      "c": [
+        "itofin_zero_inflation_swap_is_calculated"
+      ],
+      "go": [
+        "ZeroCouponInflationSwap.IsCalculated"
+      ],
+      "python": "itofin.instruments.ZeroCouponInflationSwap.is_calculated",
+      "status": "implemented",
+      "tests": [
+        "TestZeroInflationSwapPythonOracleAndSnapshot"
+      ]
+    },
+    {
+      "c": [
+        "itofin_zero_inflation_swap_set_engine",
+        "itofin_zero_inflation_swap_npv"
+      ],
+      "go": [
+        "ZeroCouponInflationSwap.Price"
+      ],
+      "python": "itofin.instruments.ZeroCouponInflationSwap.price",
+      "status": "implemented",
+      "tests": [
+        "TestZeroInflationSwapPythonOracleAndSnapshot"
+      ]
+    },
+    {
+      "c": [
+        "itofin_zero_inflation_swap_results"
+      ],
+      "go": [
+        "ZeroCouponInflationSwap.Results"
+      ],
+      "python": "itofin.instruments.ZeroCouponInflationSwap.results",
+      "status": "implemented",
+      "tests": [
+        "TestZeroInflationSwapPythonOracleAndSnapshot"
+      ]
+    },
+    {
+      "c": [
+        "itofin_zero_inflation_swap_npv"
+      ],
+      "go": [
+        "ZeroCouponInflationSwap.NPV"
+      ],
+      "python": "itofin.instruments.ZeroCouponInflationSwap.npv",
+      "status": "implemented",
+      "tests": [
+        "TestZeroInflationSwapPythonOracleAndSnapshot"
+      ]
+    },
+    {
+      "c": [
+        "itofin_zero_inflation_swap_fair_rate"
+      ],
+      "go": [
+        "ZeroCouponInflationSwap.FairRate"
+      ],
+      "python": "itofin.instruments.ZeroCouponInflationSwap.fair_rate",
+      "status": "implemented",
+      "tests": [
+        "TestZeroInflationSwapPythonOracleAndSnapshot"
+      ]
+    },
+    {
+      "c": [
+        "itofin_zero_inflation_swap_fixed_leg_npv"
+      ],
+      "go": [
+        "ZeroCouponInflationSwap.FixedLegNPV"
+      ],
+      "python": "itofin.instruments.ZeroCouponInflationSwap.fixed_leg_npv",
+      "status": "implemented",
+      "tests": [
+        "TestZeroInflationSwapPythonOracleAndSnapshot"
+      ]
+    },
+    {
+      "c": [
+        "itofin_zero_inflation_swap_inflation_leg_npv"
+      ],
+      "go": [
+        "ZeroCouponInflationSwap.InflationLegNPV"
+      ],
+      "python": "itofin.instruments.ZeroCouponInflationSwap.inflation_leg_npv",
+      "status": "implemented",
+      "tests": [
+        "TestZeroInflationSwapPythonOracleAndSnapshot"
+      ]
+    },
+    {
+      "c": [
+        "itofin_zero_inflation_swap_fixed_leg_bps"
+      ],
+      "go": [
+        "ZeroCouponInflationSwap.FixedLegBPS"
+      ],
+      "python": "itofin.instruments.ZeroCouponInflationSwap.fixed_leg_bps",
+      "status": "implemented",
+      "tests": [
+        "TestZeroInflationSwapPythonOracleAndSnapshot"
+      ]
+    },
+    {
+      "c": [
+        "itofin_zero_inflation_swap_maturity_date"
+      ],
+      "go": [
+        "ZeroCouponInflationSwap.MaturityDate"
+      ],
+      "python": "itofin.instruments.ZeroCouponInflationSwap.maturity_date",
+      "status": "implemented",
+      "tests": [
+        "TestZeroInflationSwapPythonOracleAndSnapshot"
+      ]
+    },
+    {
+      "c": [
+        "itofin_zero_inflation_swap_obs_date"
+      ],
+      "go": [
+        "ZeroCouponInflationSwap.ObsDate"
+      ],
+      "python": "itofin.instruments.ZeroCouponInflationSwap.obs_date",
+      "status": "implemented",
+      "tests": [
+        "TestZeroInflationSwapPythonOracleAndSnapshot"
+      ]
+    },
+    {
+      "c": [
+        "itofin_zero_inflation_swap_inflation_fixing_date"
+      ],
+      "go": [
+        "ZeroCouponInflationSwap.InflationFixingDate"
+      ],
+      "python": "itofin.instruments.ZeroCouponInflationSwap.inflation_fixing_date",
+      "status": "implemented",
+      "tests": [
+        "TestZeroInflationSwapPythonOracleAndSnapshot"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_inflation_swap_new"
+      ],
+      "go": [
+        "Session.NewYearOnYearInflationSwap"
+      ],
+      "python": "itofin.instruments.YearOnYearInflationSwap",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationSwapFlatCurveOracle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_inflation_swap_new"
+      ],
+      "go": [
+        "Session.NewYearOnYearInflationSwap"
+      ],
+      "python": "itofin.instruments.YearOnYearInflationSwap.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationSwapFlatCurveOracle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_inflation_swap_set_engine"
+      ],
+      "go": [
+        "YearOnYearInflationSwap.SetEngine"
+      ],
+      "python": "itofin.instruments.YearOnYearInflationSwap.set_engine",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationSwapFlatCurveOracle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_inflation_swap_calculate"
+      ],
+      "go": [
+        "YearOnYearInflationSwap.Calculate"
+      ],
+      "python": "itofin.instruments.YearOnYearInflationSwap.calculate",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationSwapFlatCurveOracle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_inflation_swap_is_calculated"
+      ],
+      "go": [
+        "YearOnYearInflationSwap.IsCalculated"
+      ],
+      "python": "itofin.instruments.YearOnYearInflationSwap.is_calculated",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationSwapFlatCurveOracle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_inflation_swap_set_engine",
+        "itofin_yoy_inflation_swap_npv"
+      ],
+      "go": [
+        "YearOnYearInflationSwap.Price"
+      ],
+      "python": "itofin.instruments.YearOnYearInflationSwap.price",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationSwapFlatCurveOracle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_inflation_swap_results"
+      ],
+      "go": [
+        "YearOnYearInflationSwap.Results"
+      ],
+      "python": "itofin.instruments.YearOnYearInflationSwap.results",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationSwapFlatCurveOracle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_inflation_swap_npv"
+      ],
+      "go": [
+        "YearOnYearInflationSwap.NPV"
+      ],
+      "python": "itofin.instruments.YearOnYearInflationSwap.npv",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationSwapFlatCurveOracle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_inflation_swap_fair_rate"
+      ],
+      "go": [
+        "YearOnYearInflationSwap.FairRate"
+      ],
+      "python": "itofin.instruments.YearOnYearInflationSwap.fair_rate",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationSwapFlatCurveOracle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_inflation_swap_fair_spread"
+      ],
+      "go": [
+        "YearOnYearInflationSwap.FairSpread"
+      ],
+      "python": "itofin.instruments.YearOnYearInflationSwap.fair_spread",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationSwapFlatCurveOracle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_inflation_swap_fixed_leg_npv"
+      ],
+      "go": [
+        "YearOnYearInflationSwap.FixedLegNPV"
+      ],
+      "python": "itofin.instruments.YearOnYearInflationSwap.fixed_leg_npv",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationSwapFlatCurveOracle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_inflation_swap_yoy_leg_npv"
+      ],
+      "go": [
+        "YearOnYearInflationSwap.YoYLegNPV"
+      ],
+      "python": "itofin.instruments.YearOnYearInflationSwap.yoy_leg_npv",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationSwapFlatCurveOracle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_inflation_swap_fixed_rate"
+      ],
+      "go": [
+        "YearOnYearInflationSwap.FixedRate"
+      ],
+      "python": "itofin.instruments.YearOnYearInflationSwap.fixed_rate",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationSwapFlatCurveOracle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_inflation_swap_spread"
+      ],
+      "go": [
+        "YearOnYearInflationSwap.Spread"
+      ],
+      "python": "itofin.instruments.YearOnYearInflationSwap.spread",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationSwapFlatCurveOracle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_constant_yoy_vol_new"
+      ],
+      "go": [
+        "Session.NewConstantYoYOptionletVolatility"
+      ],
+      "python": "itofin.termstructures.ConstantYoYOptionletVolatility",
+      "status": "implemented",
+      "tests": [
+        "TestYoYCapFloorCachedPriceLiveQuoteAndOptionalBuilder"
+      ]
+    },
+    {
+      "c": [
+        "itofin_constant_yoy_vol_new"
+      ],
+      "go": [
+        "Session.NewConstantYoYOptionletVolatility"
+      ],
+      "python": "itofin.termstructures.ConstantYoYOptionletVolatility.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestYoYCapFloorCachedPriceLiveQuoteAndOptionalBuilder"
+      ]
+    },
+    {
+      "c": [
+        "itofin_constant_yoy_vol_new"
+      ],
+      "go": [
+        "Session.NewConstantYoYOptionletVolatility"
+      ],
+      "python": "itofin.termstructures.ConstantYoYOptionletVolatility.with_quote",
+      "status": "implemented",
+      "tests": [
+        "TestYoYCapFloorCachedPriceLiveQuoteAndOptionalBuilder"
+      ]
+    },
+    {
+      "c": [
+        "itofin_constant_yoy_vol_metadata"
+      ],
+      "go": [
+        "ConstantYoYOptionletVolatility.ObservationLag"
+      ],
+      "python": "itofin.termstructures.ConstantYoYOptionletVolatility.observation_lag",
+      "status": "implemented",
+      "tests": [
+        "TestYoYCapFloorCachedPriceLiveQuoteAndOptionalBuilder"
+      ]
+    },
+    {
+      "c": [
+        "itofin_constant_yoy_vol_metadata"
+      ],
+      "go": [
+        "ConstantYoYOptionletVolatility.Frequency"
+      ],
+      "python": "itofin.termstructures.ConstantYoYOptionletVolatility.frequency",
+      "status": "implemented",
+      "tests": [
+        "TestYoYCapFloorCachedPriceLiveQuoteAndOptionalBuilder"
+      ]
+    },
+    {
+      "c": [
+        "itofin_constant_yoy_vol_metadata"
+      ],
+      "go": [
+        "ConstantYoYOptionletVolatility.IndexIsInterpolated"
+      ],
+      "python": "itofin.termstructures.ConstantYoYOptionletVolatility.index_is_interpolated",
+      "status": "implemented",
+      "tests": [
+        "TestYoYCapFloorCachedPriceLiveQuoteAndOptionalBuilder"
+      ]
+    },
+    {
+      "c": [
+        "itofin_constant_yoy_vol_base_date"
+      ],
+      "go": [
+        "ConstantYoYOptionletVolatility.BaseDate"
+      ],
+      "python": "itofin.termstructures.ConstantYoYOptionletVolatility.base_date",
+      "status": "implemented",
+      "tests": [
+        "TestYoYCapFloorCachedPriceLiveQuoteAndOptionalBuilder"
+      ]
+    },
+    {
+      "c": [
+        "itofin_constant_yoy_vol_value"
+      ],
+      "go": [
+        "ConstantYoYOptionletVolatility.Volatility"
+      ],
+      "python": "itofin.termstructures.ConstantYoYOptionletVolatility.volatility",
+      "status": "implemented",
+      "tests": [
+        "TestYoYCapFloorCachedPriceLiveQuoteAndOptionalBuilder"
+      ]
+    },
+    {
+      "c": [
+        "itofin_constant_yoy_vol_value"
+      ],
+      "go": [
+        "ConstantYoYOptionletVolatility.TotalVariance"
+      ],
+      "python": "itofin.termstructures.ConstantYoYOptionletVolatility.total_variance",
+      "status": "implemented",
+      "tests": [
+        "TestYoYCapFloorCachedPriceLiveQuoteAndOptionalBuilder"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_capfloor_engine_new"
+      ],
+      "go": [
+        "Session.NewBlackYoYInflationCapFloorEngine"
+      ],
+      "python": "itofin.pricingengines.YoYInflationCapFloorEngine",
+      "status": "implemented",
+      "tests": [
+        "TestYoYCapFloorCachedPriceLiveQuoteAndOptionalBuilder"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_capfloor_engine_new"
+      ],
+      "go": [
+        "Session.NewBlackYoYInflationCapFloorEngine"
+      ],
+      "python": "itofin.pricingengines.YoYInflationCapFloorEngine.black",
+      "status": "implemented",
+      "tests": [
+        "TestYoYCapFloorCachedPriceLiveQuoteAndOptionalBuilder"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_capfloor_engine_new"
+      ],
+      "go": [
+        "Session.NewUnitDisplacedYoYInflationCapFloorEngine"
+      ],
+      "python": "itofin.pricingengines.YoYInflationCapFloorEngine.unit_displaced",
+      "status": "implemented",
+      "tests": [
+        "TestYoYCapFloorCachedPriceLiveQuoteAndOptionalBuilder"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_capfloor_engine_new"
+      ],
+      "go": [
+        "Session.NewBachelierYoYInflationCapFloorEngine"
+      ],
+      "python": "itofin.pricingengines.YoYInflationCapFloorEngine.bachelier",
+      "status": "implemented",
+      "tests": [
+        "TestYoYCapFloorCachedPriceLiveQuoteAndOptionalBuilder"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_capfloor_engine_distribution"
+      ],
+      "go": [
+        "YoYInflationCapFloorEngine.Distribution"
+      ],
+      "python": "itofin.pricingengines.YoYInflationCapFloorEngine.distribution",
+      "status": "implemented",
+      "tests": [
+        "TestYoYCapFloorCachedPriceLiveQuoteAndOptionalBuilder"
+      ]
+    },
+    {
+      "c": [
+        "itofin_make_yoy_capfloor_new"
+      ],
+      "go": [
+        "Session.NewMakeYoYInflationCapFloor"
+      ],
+      "python": "itofin.instruments.MakeYoYInflationCapFloor",
+      "status": "implemented",
+      "tests": [
+        "TestYoYCapFloorCachedPriceLiveQuoteAndOptionalBuilder"
+      ]
+    },
+    {
+      "c": [
+        "itofin_make_yoy_capfloor_new"
+      ],
+      "go": [
+        "Session.NewMakeYoYInflationCapFloor"
+      ],
+      "python": "itofin.instruments.MakeYoYInflationCapFloor.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestYoYCapFloorCachedPriceLiveQuoteAndOptionalBuilder"
+      ]
+    },
+    {
+      "c": [
+        "itofin_make_yoy_capfloor_build"
+      ],
+      "go": [
+        "MakeYoYInflationCapFloor.Build"
+      ],
+      "python": "itofin.instruments.MakeYoYInflationCapFloor.build",
+      "status": "implemented",
+      "tests": [
+        "TestYoYCapFloorCachedPriceLiveQuoteAndOptionalBuilder"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_capfloor_new"
+      ],
+      "go": [
+        "Session.NewYoYInflationCapFloor"
+      ],
+      "python": "itofin.instruments.YoYInflationCapFloor",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_capfloor_new"
+      ],
+      "go": [
+        "Session.NewYoYInflationCapFloor"
+      ],
+      "python": "itofin.instruments.YoYInflationCapFloor.new",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_capfloor_new"
+      ],
+      "go": [
+        "Session.NewYoYInflationCap"
+      ],
+      "python": "itofin.instruments.YoYInflationCapFloor.cap",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_capfloor_new"
+      ],
+      "go": [
+        "Session.NewYoYInflationFloor"
+      ],
+      "python": "itofin.instruments.YoYInflationCapFloor.floor",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_capfloor_new"
+      ],
+      "go": [
+        "Session.NewYoYInflationCollar"
+      ],
+      "python": "itofin.instruments.YoYInflationCapFloor.collar",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_capfloor_new"
+      ],
+      "go": [
+        "Session.NewYoYInflationCapFloorWithStrikes"
+      ],
+      "python": "itofin.instruments.YoYInflationCapFloor.with_strikes",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_capfloor_strikes"
+      ],
+      "go": [
+        "YoYInflationCapFloor.CapRates"
+      ],
+      "python": "itofin.instruments.YoYInflationCapFloor.cap_rates",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_capfloor_strikes"
+      ],
+      "go": [
+        "YoYInflationCapFloor.FloorRates"
+      ],
+      "python": "itofin.instruments.YoYInflationCapFloor.floor_rates",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_capfloor_query"
+      ],
+      "go": [
+        "YoYInflationCapFloor.CouponCount"
+      ],
+      "python": "itofin.instruments.YoYInflationCapFloor.coupon_count",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_capfloor_query"
+      ],
+      "go": [
+        "YoYInflationCapFloor.StartDate"
+      ],
+      "python": "itofin.instruments.YoYInflationCapFloor.start_date",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_capfloor_query"
+      ],
+      "go": [
+        "YoYInflationCapFloor.MaturityDate"
+      ],
+      "python": "itofin.instruments.YoYInflationCapFloor.maturity_date",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_capfloor_query"
+      ],
+      "go": [
+        "YoYInflationCapFloor.ATMRate"
+      ],
+      "python": "itofin.instruments.YoYInflationCapFloor.atm_rate",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_capfloor_set_engine"
+      ],
+      "go": [
+        "YoYInflationCapFloor.SetEngine"
+      ],
+      "python": "itofin.instruments.YoYInflationCapFloor.set_engine",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_capfloor_query"
+      ],
+      "go": [
+        "YoYInflationCapFloor.Calculate"
+      ],
+      "python": "itofin.instruments.YoYInflationCapFloor.calculate",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_capfloor_query"
+      ],
+      "go": [
+        "YoYInflationCapFloor.IsCalculated"
+      ],
+      "python": "itofin.instruments.YoYInflationCapFloor.is_calculated",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_capfloor_set_engine",
+        "itofin_yoy_capfloor_query"
+      ],
+      "go": [
+        "YoYInflationCapFloor.Price"
+      ],
+      "python": "itofin.instruments.YoYInflationCapFloor.price",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_capfloor_results"
+      ],
+      "go": [
+        "YoYInflationCapFloor.Results"
+      ],
+      "python": "itofin.instruments.YoYInflationCapFloor.results",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_capfloor_query"
+      ],
+      "go": [
+        "YoYInflationCapFloor.NPV"
+      ],
+      "python": "itofin.instruments.YoYInflationCapFloor.npv",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_price_surface_new"
+      ],
+      "go": [
+        "Session.NewYoYCapFloorTermPriceSurface"
+      ],
+      "python": "itofin.termstructures.YoYCapFloorTermPriceSurface",
+      "status": "implemented",
+      "tests": [
+        "TestYoYPriceSurfaceCachedSwapsAndGridOracle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_price_surface_new"
+      ],
+      "go": [
+        "Session.NewYoYCapFloorTermPriceSurface"
+      ],
+      "python": "itofin.termstructures.YoYCapFloorTermPriceSurface.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestYoYPriceSurfaceCachedSwapsAndGridOracle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_price_surface_value"
+      ],
+      "go": [
+        "YoYCapFloorTermPriceSurface.CapPrice"
+      ],
+      "python": "itofin.termstructures.YoYCapFloorTermPriceSurface.cap_price",
+      "status": "implemented",
+      "tests": [
+        "TestYoYPriceSurfaceCachedSwapsAndGridOracle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_price_surface_value"
+      ],
+      "go": [
+        "YoYCapFloorTermPriceSurface.FloorPrice"
+      ],
+      "python": "itofin.termstructures.YoYCapFloorTermPriceSurface.floor_price",
+      "status": "implemented",
+      "tests": [
+        "TestYoYPriceSurfaceCachedSwapsAndGridOracle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_price_surface_value"
+      ],
+      "go": [
+        "YoYCapFloorTermPriceSurface.ATMYoYSwapRate"
+      ],
+      "python": "itofin.termstructures.YoYCapFloorTermPriceSurface.atm_yoy_swap_rate",
+      "status": "implemented",
+      "tests": [
+        "TestYoYPriceSurfaceCachedSwapsAndGridOracle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_price_surface_strikes"
+      ],
+      "go": [
+        "YoYCapFloorTermPriceSurface.Strikes"
+      ],
+      "python": "itofin.termstructures.YoYCapFloorTermPriceSurface.strikes",
+      "status": "implemented",
+      "tests": [
+        "TestYoYPriceSurfaceCachedSwapsAndGridOracle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_price_surface_maturities"
+      ],
+      "go": [
+        "YoYCapFloorTermPriceSurface.Maturities"
+      ],
+      "python": "itofin.termstructures.YoYCapFloorTermPriceSurface.maturities",
+      "status": "implemented",
+      "tests": [
+        "TestYoYPriceSurfaceCachedSwapsAndGridOracle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_k_yoy_vol_new"
+      ],
+      "go": [
+        "Session.NewKInterpolatedYoYOptionletVolatilitySurface"
+      ],
+      "python": "itofin.termstructures.KInterpolatedYoYOptionletVolatilitySurface",
+      "status": "implemented",
+      "tests": [
+        "TestKInterpolatedYoYVolatilityCachedSlicesOracle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_k_yoy_vol_new"
+      ],
+      "go": [
+        "Session.NewKInterpolatedYoYOptionletVolatilitySurface"
+      ],
+      "python": "itofin.termstructures.KInterpolatedYoYOptionletVolatilitySurface.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestKInterpolatedYoYVolatilityCachedSlicesOracle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_k_yoy_vol_slice"
+      ],
+      "go": [
+        "KInterpolatedYoYOptionletVolatilitySurface.DSlice"
+      ],
+      "python": "itofin.termstructures.KInterpolatedYoYOptionletVolatilitySurface.d_slice",
+      "status": "implemented",
+      "tests": [
+        "TestKInterpolatedYoYVolatilityCachedSlicesOracle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_k_yoy_vol_query"
+      ],
+      "go": [
+        "KInterpolatedYoYOptionletVolatilitySurface.BaseDate"
+      ],
+      "python": "itofin.termstructures.KInterpolatedYoYOptionletVolatilitySurface.base_date",
+      "status": "implemented",
+      "tests": [
+        "TestKInterpolatedYoYVolatilityCachedSlicesOracle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_k_yoy_vol_query"
+      ],
+      "go": [
+        "KInterpolatedYoYOptionletVolatilitySurface.Volatility"
+      ],
+      "python": "itofin.termstructures.KInterpolatedYoYOptionletVolatilitySurface.volatility",
+      "status": "implemented",
+      "tests": [
+        "TestKInterpolatedYoYVolatilityCachedSlicesOracle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_k_yoy_vol_query"
+      ],
+      "go": [
+        "KInterpolatedYoYOptionletVolatilitySurface.MinStrike"
+      ],
+      "python": "itofin.termstructures.KInterpolatedYoYOptionletVolatilitySurface.min_strike",
+      "status": "implemented",
+      "tests": [
+        "TestKInterpolatedYoYVolatilityCachedSlicesOracle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_k_yoy_vol_query"
+      ],
+      "go": [
+        "KInterpolatedYoYOptionletVolatilitySurface.MaxStrike"
+      ],
+      "python": "itofin.termstructures.KInterpolatedYoYOptionletVolatilitySurface.max_strike",
+      "status": "implemented",
+      "tests": [
+        "TestKInterpolatedYoYVolatilityCachedSlicesOracle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_k_yoy_vol_query"
+      ],
+      "go": [
+        "KInterpolatedYoYOptionletVolatilitySurface.MaxDate"
+      ],
+      "python": "itofin.termstructures.KInterpolatedYoYOptionletVolatilitySurface.max_date",
+      "status": "implemented",
+      "tests": [
+        "TestKInterpolatedYoYVolatilityCachedSlicesOracle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_leg_coupons"
+      ],
+      "go": [
+        "YoYInflationLeg.Coupons"
+      ],
+      "python": "itofin.cashflows.YoYInflationCoupon",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_coupon_value"
+      ],
+      "go": [
+        "YoYInflationCoupon.Rate"
+      ],
+      "python": "itofin.cashflows.YoYInflationCoupon.rate",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_coupon_value"
+      ],
+      "go": [
+        "YoYInflationCoupon.Amount"
+      ],
+      "python": "itofin.cashflows.YoYInflationCoupon.amount",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_coupon_fields"
+      ],
+      "go": [
+        "YoYInflationCoupon.FixingDate"
+      ],
+      "python": "itofin.cashflows.YoYInflationCoupon.fixing_date",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_coupon_value"
+      ],
+      "go": [
+        "YoYInflationCoupon.IndexFixing"
+      ],
+      "python": "itofin.cashflows.YoYInflationCoupon.index_fixing",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_coupon_fields"
+      ],
+      "go": [
+        "YoYInflationCoupon.Nominal"
+      ],
+      "python": "itofin.cashflows.YoYInflationCoupon.nominal",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_coupon_fields"
+      ],
+      "go": [
+        "YoYInflationCoupon.AccrualStartDate"
+      ],
+      "python": "itofin.cashflows.YoYInflationCoupon.accrual_start_date",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_coupon_fields"
+      ],
+      "go": [
+        "YoYInflationCoupon.AccrualEndDate"
+      ],
+      "python": "itofin.cashflows.YoYInflationCoupon.accrual_end_date",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_coupon_fields"
+      ],
+      "go": [
+        "YoYInflationCoupon.AccrualPeriod"
+      ],
+      "python": "itofin.cashflows.YoYInflationCoupon.accrual_period",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_coupon_fields"
+      ],
+      "go": [
+        "YoYInflationCoupon.Date"
+      ],
+      "python": "itofin.cashflows.YoYInflationCoupon.date",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_coupon_day_counter"
+      ],
+      "go": [
+        "YoYInflationCoupon.DayCounter"
+      ],
+      "python": "itofin.cashflows.YoYInflationCoupon.day_counter",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_coupon_fields"
+      ],
+      "go": [
+        "YoYInflationCoupon.Gearing"
+      ],
+      "python": "itofin.cashflows.YoYInflationCoupon.gearing",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_coupon_fields"
+      ],
+      "go": [
+        "YoYInflationCoupon.Spread"
+      ],
+      "python": "itofin.cashflows.YoYInflationCoupon.spread",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_coupon_fields"
+      ],
+      "go": [
+        "YoYInflationCoupon.ObservationLag"
+      ],
+      "python": "itofin.cashflows.YoYInflationCoupon.observation_lag",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_coupon_fields"
+      ],
+      "go": [
+        "YoYInflationCoupon.Interpolation"
+      ],
+      "python": "itofin.cashflows.YoYInflationCoupon.interpolation",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_coupon_fields"
+      ],
+      "go": [
+        "YoYInflationCoupon.FixingDays"
+      ],
+      "python": "itofin.cashflows.YoYInflationCoupon.fixing_days",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_coupon_fields"
+      ],
+      "go": [
+        "YoYInflationCoupon.Repr"
+      ],
+      "python": "itofin.cashflows.YoYInflationCoupon.__repr__",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_coupon_pricer_new"
+      ],
+      "go": [
+        "Session.NewBlackYoYInflationOptionletCouponPricer"
+      ],
+      "python": "itofin.cashflows.YoYInflationOptionletCouponPricer",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_coupon_pricer_new"
+      ],
+      "go": [
+        "Session.NewBlackYoYInflationOptionletCouponPricer"
+      ],
+      "python": "itofin.cashflows.YoYInflationOptionletCouponPricer.black",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_coupon_pricer_new"
+      ],
+      "go": [
+        "Session.NewUnitDisplacedYoYInflationOptionletCouponPricer"
+      ],
+      "python": "itofin.cashflows.YoYInflationOptionletCouponPricer.unit_displaced",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_coupon_pricer_new"
+      ],
+      "go": [
+        "Session.NewBachelierYoYInflationOptionletCouponPricer"
+      ],
+      "python": "itofin.cashflows.YoYInflationOptionletCouponPricer.bachelier",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_leg_coupons"
+      ],
+      "go": [
+        "YoYInflationLeg.CappedFlooredCoupons"
+      ],
+      "python": "itofin.cashflows.CappedFlooredYoYInflationCoupon",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_capped_yoy_coupon_value"
+      ],
+      "go": [
+        "CappedFlooredYoYInflationCoupon.Rate"
+      ],
+      "python": "itofin.cashflows.CappedFlooredYoYInflationCoupon.rate",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_capped_yoy_coupon_value"
+      ],
+      "go": [
+        "CappedFlooredYoYInflationCoupon.Amount"
+      ],
+      "python": "itofin.cashflows.CappedFlooredYoYInflationCoupon.amount",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_capped_yoy_coupon_fields"
+      ],
+      "go": [
+        "CappedFlooredYoYInflationCoupon.IsCapped"
+      ],
+      "python": "itofin.cashflows.CappedFlooredYoYInflationCoupon.is_capped",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_capped_yoy_coupon_fields"
+      ],
+      "go": [
+        "CappedFlooredYoYInflationCoupon.IsFloored"
+      ],
+      "python": "itofin.cashflows.CappedFlooredYoYInflationCoupon.is_floored",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_capped_yoy_coupon_fields"
+      ],
+      "go": [
+        "CappedFlooredYoYInflationCoupon.EffectiveCap"
+      ],
+      "python": "itofin.cashflows.CappedFlooredYoYInflationCoupon.effective_cap",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_capped_yoy_coupon_fields"
+      ],
+      "go": [
+        "CappedFlooredYoYInflationCoupon.EffectiveFloor"
+      ],
+      "python": "itofin.cashflows.CappedFlooredYoYInflationCoupon.effective_floor",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_capped_yoy_coupon_fields"
+      ],
+      "go": [
+        "CappedFlooredYoYInflationCoupon.Repr"
+      ],
+      "python": "itofin.cashflows.CappedFlooredYoYInflationCoupon.__repr__",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_leg_new"
+      ],
+      "go": [
+        "Session.NewYoYInflationLeg"
+      ],
+      "python": "itofin.cashflows.YoYInflationLeg",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_leg_new"
+      ],
+      "go": [
+        "Session.NewYoYInflationLeg"
+      ],
+      "python": "itofin.cashflows.YoYInflationLeg.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_leg_coupons"
+      ],
+      "go": [
+        "YoYInflationLeg.Coupons"
+      ],
+      "python": "itofin.cashflows.YoYInflationLeg.coupons",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_leg_coupons"
+      ],
+      "go": [
+        "YoYInflationLeg.CappedFlooredCoupons"
+      ],
+      "python": "itofin.cashflows.YoYInflationLeg.capped_floored_coupons",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    },
+    {
+      "c": [
+        "itofin_yoy_leg_build"
+      ],
+      "go": [
+        "YoYInflationLeg.Build"
+      ],
+      "python": "itofin.cashflows.YoYInflationLeg.build",
+      "status": "implemented",
+      "tests": [
+        "TestYoYInflationCouponsAndCapFloorFactories"
+      ]
+    }
+  ]
+}

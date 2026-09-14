@@ -34,6 +34,11 @@ pub(crate) fn optional_curve(
     }
 }
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_flat_forward_new(
     ctx: *mut Context,
     reference: i32,
@@ -58,6 +63,11 @@ pub unsafe extern "C" fn itofin_flat_forward_new(
 }
 /// kind: 0 linear zero, 1 cubic zero, 2 log-linear discount, 3 cubic discount, 4 backward-flat forward.
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_node_curve_new(
     ctx: *mut Context,
     kind: i32,
@@ -101,6 +111,11 @@ pub unsafe extern "C" fn itofin_node_curve_new(
 }
 /// Query: 0 discount(time), 1 discount(date), 2 zero rate, 3 forward rate.
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_curve_value(
     ctx: *mut Context,
     id: u64,
@@ -139,6 +154,11 @@ pub unsafe extern "C" fn itofin_curve_value(
 }
 /// Query: 0 reference date, 1 maximum date, 2 extrapolation enabled.
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_curve_info(
     ctx: *mut Context,
     id: u64,
@@ -162,6 +182,11 @@ pub unsafe extern "C" fn itofin_curve_info(
     }
 }
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_curve_extrapolation(
     ctx: *mut Context,
     id: u64,
@@ -183,6 +208,11 @@ pub unsafe extern "C" fn itofin_curve_extrapolation(
 /// kind: discount log-linear/linear/cubic = 0/1/2, zero linear/cubic = 3/4,
 /// forward linear/convex-monotone/backward-flat = 5/6/7. Algorithm: iterative/global/local = 0/1/2.
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_piecewise_curve_new(
     ctx: *mut Context,
     reference: i32,
@@ -293,6 +323,11 @@ pub unsafe extern "C" fn itofin_piecewise_curve_new(
 }
 /// Caller first queries length with capacity=0; then supplies both arrays with that capacity.
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_curve_nodes(
     ctx: *mut Context,
     id: u64,

@@ -110,6 +110,11 @@ pub struct ItofinDateParts {
     pub year: i32,
 }
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_date_new(
     day: i32,
     month: i32,
@@ -124,6 +129,11 @@ pub unsafe extern "C" fn itofin_date_new(
     }
 }
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_date_parts(
     serial: i32,
     out: *mut ItofinDateParts,
@@ -144,6 +154,11 @@ pub unsafe extern "C" fn itofin_date_parts(
     }
 }
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_date_shift(
     serial: i32,
     days: i64,
@@ -157,6 +172,11 @@ pub unsafe extern "C" fn itofin_date_shift(
     }
 }
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_is_imm_date(
     serial: i32,
     main_cycle: u8,
@@ -181,6 +201,11 @@ pub(crate) fn bool_flag(value: u8) -> BindingResult<bool> {
     }
 }
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_next_imm_date(
     serial: i32,
     main_cycle: u8,
@@ -199,6 +224,11 @@ pub unsafe extern "C" fn itofin_next_imm_date(
     }
 }
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_day_counter_new(
     ctx: *mut Context,
     kind: i32,
@@ -220,6 +250,11 @@ pub unsafe extern "C" fn itofin_day_counter_new(
     }
 }
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_day_counter_year_fraction(
     ctx: *mut Context,
     id: u64,
@@ -239,6 +274,11 @@ pub unsafe extern "C" fn itofin_day_counter_year_fraction(
 }
 /// UTF-8 bytes without a trailing NUL. Query required length with capacity zero.
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_time_name(
     ctx: *mut Context,
     id: u64,
@@ -269,6 +309,11 @@ pub unsafe extern "C" fn itofin_time_name(
     }
 }
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_calendar_new(
     ctx: *mut Context,
     kind: i32,
@@ -372,6 +417,11 @@ fn advance(
     adjust(cal, next, rule)
 }
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_calendar_adjust(
     ctx: *mut Context,
     id: u64,
@@ -390,6 +440,11 @@ pub unsafe extern "C" fn itofin_calendar_adjust(
     }
 }
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_calendar_advance(
     ctx: *mut Context,
     id: u64,
@@ -430,6 +485,11 @@ pub struct ItofinScheduleConfig {
     pub termination_convention: i32,
 }
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_schedule_new(
     ctx: *mut Context,
     config: ItofinScheduleConfig,
@@ -464,6 +524,11 @@ pub unsafe extern "C" fn itofin_schedule_new(
     }
 }
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_schedule_dates(
     ctx: *mut Context,
     id: u64,

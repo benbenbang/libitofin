@@ -41,6 +41,11 @@ pub struct ItofinResultsFields {
     pub additional_count: usize,
 }
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_results_fields(
     ctx: *mut Context,
     id: u64,
@@ -68,6 +73,11 @@ pub unsafe extern "C" fn itofin_results_fields(
 /// Read a sorted additional-results entry; key is UTF-8 without a trailing NUL.
 /// Capacity zero queries the required size and still returns the real value.
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_results_additional(
     ctx: *mut Context,
     id: u64,

@@ -17,6 +17,11 @@ pub(crate) fn quote(c: &Context, id: u64) -> BindingResult<Handle<dyn Quote>> {
     ))
 }
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_quote_new(
     ctx: *mut Context,
     value: f64,
@@ -31,6 +36,11 @@ pub unsafe extern "C" fn itofin_quote_new(
     }
 }
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_quote_value(
     ctx: *mut Context,
     id: u64,
@@ -44,6 +54,11 @@ pub unsafe extern "C" fn itofin_quote_value(
     }
 }
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_quote_set(
     ctx: *mut Context,
     id: u64,
@@ -58,6 +73,11 @@ pub unsafe extern "C" fn itofin_quote_set(
     }
 }
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_black_scholes_new(
     ctx: *mut Context,
     spot: f64,
@@ -97,6 +117,11 @@ pub unsafe extern "C" fn itofin_black_scholes_new(
     }
 }
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_black_scholes_from_curves(
     ctx: *mut Context,
     spot: f64,
@@ -120,6 +145,11 @@ pub unsafe extern "C" fn itofin_black_scholes_from_curves(
     }
 }
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_black_scholes_rate(
     ctx: *mut Context,
     id: u64,

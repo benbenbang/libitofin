@@ -46,7 +46,7 @@ type request struct {
 // calls execute serially. Close waits for active calls, then releases the graph.
 // Do not copy a Session. No finalizer accesses thread-confined Rust state.
 type Session struct {
-	ctx      *C.Context
+	ctx      *C.ItofinContext
 	queue    chan request
 	stopped  chan struct{}
 	gate     sync.RWMutex
@@ -157,7 +157,7 @@ func (o object) Close() error {
 		// owned by this wrapper was already released, including by a copy.
 		// Keep no permanent Go tombstones for completed native objects.
 		var native *Error
-		if errors.As(err, &native) && native.Code == int32(C.INVALID_HANDLE) {
+		if errors.As(err, &native) && native.Code == int32(C.ITOFIN_INVALID_HANDLE) {
 			return nil
 		}
 		return err

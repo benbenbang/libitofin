@@ -24,6 +24,11 @@ pub(crate) fn option_type(value: i32) -> BindingResult<OptionType> {
 
 /// `american`: 0 European, 1 American; earliest ignored for European exercise.
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_option_new(
     ctx: *mut Context,
     kind: i32,
@@ -54,6 +59,11 @@ pub unsafe extern "C" fn itofin_option_new(
 
 /// Engine kind: 0 analytic European (BSM process), 1 analytic Heston (model), 2 MC engine.
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_option_set_engine(
     ctx: *mut Context,
     option: u64,
@@ -88,6 +98,11 @@ pub unsafe extern "C" fn itofin_option_set_engine(
 /// Field: 0 NPV, 1 delta, 2 gamma, 3 theta, 4 vega, 5 rho, 6 dividend rho,
 /// 7 error estimate, 8 exercise probability. Missing fields return core errors.
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_option_value(
     ctx: *mut Context,
     option: u64,
@@ -119,6 +134,11 @@ pub unsafe extern "C" fn itofin_option_value(
 
 /// Calculate if requested, then report cache validity.
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_option_calculate(
     ctx: *mut Context,
     option: u64,
@@ -142,6 +162,11 @@ pub unsafe extern "C" fn itofin_option_calculate(
 }
 
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_option_results(
     ctx: *mut Context,
     option: u64,

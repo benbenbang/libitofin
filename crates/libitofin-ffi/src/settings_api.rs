@@ -9,6 +9,11 @@ pub(crate) fn settings(c: &Context, id: u64) -> BindingResult<Shared<Settings<Da
     c.get(id)
 }
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_settings_new(
     ctx: *mut Context,
     out: *mut u64,
@@ -22,6 +27,11 @@ pub unsafe extern "C" fn itofin_settings_new(
     }
 }
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_settings_set_evaluation_date(
     ctx: *mut Context,
     id: u64,
@@ -37,6 +47,11 @@ pub unsafe extern "C" fn itofin_settings_set_evaluation_date(
 }
 /// -1 means unset, 0 means exclude, 1 means include.
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_settings_set_include_todays_cash_flows(
     ctx: *mut Context,
     id: u64,
@@ -57,6 +72,11 @@ pub unsafe extern "C" fn itofin_settings_set_include_todays_cash_flows(
     }
 }
 #[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_settings_include_todays_cash_flows(
     ctx: *mut Context,
     id: u64,

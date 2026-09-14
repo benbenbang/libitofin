@@ -6,8 +6,6 @@ package itofin
 */
 import "C"
 import (
-	"fmt"
-	"strings"
 	"unsafe"
 )
 
@@ -71,13 +69,10 @@ func (s *Session) NewYoYInflationIndex(a YoYInflationIndexConfig) (*YoYInflation
 	names := []string{a.FamilyName, a.RegionName, a.RegionCode, a.CurrencyName, a.CurrencyCode, a.CurrencySymbol, a.CurrencyFractionSymbol}
 	ptrs := make([]*C.char, len(names))
 	for i, v := range names {
-		if strings.ContainsRune(v, 0) {
-			return nil, fmt.Errorf("inflation metadata contains NUL")
-		}
 		ptrs[i] = C.CString(v)
 		defer C.free(unsafe.Pointer(ptrs[i]))
 	}
-	cfg := C.ItofinYoyIndexConfig{family: ptrs[0], region_name: ptrs[1], region_code: ptrs[2], revised: creditBool(a.Revised), frequency: C.int32_t(a.Frequency), lag_length: C.int32_t(a.AvailabilityLag.Length), lag_unit: C.int32_t(a.AvailabilityLag.Unit), currency_name: ptrs[3], currency_code: ptrs[4], currency_numeric: C.int32_t(a.CurrencyNumericCode), currency_symbol: ptrs[5], currency_fraction_symbol: ptrs[6], currency_fractions: C.int32_t(a.CurrencyFractionsPerUnit), settings: C.uint64_t(a.Settings.id)}
+	cfg := C.ItofinYoyIndexConfig{family: ptrs[0], family_length: C.size_t(len(names[0])), region_name: ptrs[1], region_name_length: C.size_t(len(names[1])), region_code: ptrs[2], region_code_length: C.size_t(len(names[2])), revised: creditBool(a.Revised), frequency: C.int32_t(a.Frequency), lag_length: C.int32_t(a.AvailabilityLag.Length), lag_unit: C.int32_t(a.AvailabilityLag.Unit), currency_name: ptrs[3], currency_name_length: C.size_t(len(names[3])), currency_code: ptrs[4], currency_code_length: C.size_t(len(names[4])), currency_numeric: C.int32_t(a.CurrencyNumericCode), currency_symbol: ptrs[5], currency_symbol_length: C.size_t(len(names[5])), currency_fraction_symbol: ptrs[6], currency_fraction_symbol_length: C.size_t(len(names[6])), currency_fractions: C.int32_t(a.CurrencyFractionsPerUnit), settings: C.uint64_t(a.Settings.id)}
 	var id C.uint64_t
 	err := s.invoke(func() error {
 		if e := sameSession(s, a.Settings.object); e != nil {
@@ -134,7 +129,7 @@ func (i inflationIndex) Name() (string, error) {
 		if err := ffiError(C.itofin_inflation_index_name(i.session.ctx, C.uint64_t(i.id), C.int32_t(i.kind), &buf[0], n, &n, &e), &e); err != nil {
 			return err
 		}
-		name = C.GoString(&buf[0])
+		name = string(unsafe.Slice((*byte)(unsafe.Pointer(&buf[0])), int(n)-1))
 		return nil
 	})
 	return name, err
