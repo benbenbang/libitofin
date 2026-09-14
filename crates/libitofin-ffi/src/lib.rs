@@ -9,4 +9,6 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
 pub mod boundary;
+pub mod simulation_api;
+pub mod simulation_kernel;
 pub use boundary::{Context, ItofinError};
