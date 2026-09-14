@@ -179,3 +179,144 @@ pub fn gbm_paths(request: &GbmRequest<'_>) -> QlResult<Vec<Real>> {
     }
     Ok(output)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn request() -> GbmRequest<'static> {
+        GbmRequest {
+            initial: &[100.0, 80.0], drift: &[0.05, -0.02],
+            volatility: &[0.2, 0.3], correlation: &[1.0, 0.4, 0.4, 1.0],
+            horizon: 1.0, steps: 4, paths: 3, seed: 42, terminal_only: false,
+        }
+    }
+
+    #[test]
+    fn gaussian_matches_native_sequence_across_batch_boundaries() {
+        let draws = gaussian_draws(35, 42).unwrap();
+        let mut native = PseudoRandom::make_sequence_generator(7, 42).unwrap();
+        for chunk in draws.chunks_exact(7) {
+            assert_eq!(chunk, native.next_sequence().value);
+        }
+        assert_eq!(draws, gaussian_draws(35, 42).unwrap());
+        assert_ne!(draws, gaussian_draws(35, 43).unwrap());
+        assert!(gaussian_draws(0, 42).unwrap().is_empty());
+        assert!(gaussian_draws(1, 0).is_err());
+        assert!(gaussian_draws(Size::MAX, 42).is_err());
+    }
+
+    #[test]
+    fn correlated_paths_match_native_rng_and_analytic_two_asset_factor() {
+        let r = request();
+        let paths = gbm_paths(&r).unwrap();
+        let mut native = PseudoRandom::make_sequence_generator(8, 42).unwrap();
+        for path in paths.chunks_exact(10) {
+            assert_eq!(&path[..2], r.initial);
+            let z = &native.next_sequence().value;
+            let mut expected = [100.0, 80.0];
+            for step in 0..4 {
+                let correlated = [z[2 * step], 0.4 * z[2 * step] + (1.0_f64 - 0.16).sqrt() * z[2 * step + 1]];
+                for i in 0..2 {
+                    let sigma = r.volatility[i];
+                    expected[i] *= ((r.drift[i] - 0.5 * sigma * sigma) * 0.25
+                        + sigma * 0.5 * correlated[i]).exp();
+                    assert_eq!(path[(step + 1) * 2 + i], expected[i]);
+                }
+            }
+        }
+        let terminal = gbm_paths(&GbmRequest { terminal_only: true, ..r }).unwrap();
+        for (i, chunk) in terminal.chunks_exact(2).enumerate() {
+            assert_eq!(chunk, &paths[i * 10 + 8..i * 10 + 10]);
+        }
+    }
+
+    #[test]
+    fn zero_horizon_and_volatility_are_exact() {
+        let r = GbmRequest { horizon: 0.0, ..request() };
+        for pair in gbm_paths(&r).unwrap().chunks_exact(2) {
+            assert_eq!(pair, r.initial);
+        }
+        let r = GbmRequest { volatility: &[0.0, 0.0], ..request() };
+        let result = gbm_paths(&r).unwrap();
+        for path in result.chunks_exact(10) {
+            for time in 0..=4 {
+                for asset in 0..2 {
+                    assert_eq!(path[2 * time + asset], r.initial[asset] * (r.drift[asset] * time as Real / 4.0).exp());
+                }
+            }
+        }
+        let changed_seed = gbm_paths(&GbmRequest { seed: 91, ..r }).unwrap();
+        assert_eq!(result, changed_seed);
+    }
+
+    #[test]
+    fn scalar_terminal_log_returns_have_theoretical_moments() {
+        let r = GbmRequest {
+            initial: &[100.0], drift: &[0.07], volatility: &[0.2],
+            correlation: &[1.0], horizon: 2.0, steps: 4, paths: 50_000,
+            seed: 1234, terminal_only: true,
+        };
+        let values = gbm_paths(&r).unwrap();
+        let n = values.len() as Real;
+        let mean = values.iter().map(|s| (s / 100.0).ln()).sum::<Real>() / n;
+        let variance = values.iter().map(|s| ((s / 100.0).ln() - mean).powi(2)).sum::<Real>() / n;
+        // Six standard errors for the mean and variance of normal log returns.
+        assert!((mean - 0.1).abs() < 6.0 * (0.08 / n).sqrt());
+        assert!((variance - 0.08).abs() < 6.0 * 0.08 * (2.0 / n).sqrt());
+    }
+
+    #[test]
+    fn correlated_log_returns_reproduce_requested_correlation() {
+        let r = GbmRequest { paths: 50_000, steps: 1, terminal_only: true, ..request() };
+        let values = gbm_paths(&r).unwrap();
+        let n = r.paths as Real;
+        let mut sum = [0.0; 2];
+        let mut square = [0.0; 2];
+        let mut cross = 0.0;
+        for pair in values.chunks_exact(2) {
+            let x = (pair[0] / 100.0).ln();
+            let y = (pair[1] / 80.0).ln();
+            sum[0] += x; sum[1] += y;
+            square[0] += x * x; square[1] += y * y;
+            cross += x * y;
+        }
+        let covariance = cross / n - sum[0] * sum[1] / (n * n);
+        let variance = [square[0] / n - (sum[0] / n).powi(2), square[1] / n - (sum[1] / n).powi(2)];
+        let correlation = covariance / (variance[0] * variance[1]).sqrt();
+        assert!((correlation - 0.4).abs() < 6.0 * (1.0 - 0.16) / n.sqrt());
+    }
+
+    #[test]
+    fn rejects_invalid_parameters_and_dimensions() {
+        let cases = [
+            GbmRequest { steps: 0, ..request() },
+            GbmRequest { paths: 0, ..request() },
+            GbmRequest { seed: 0, ..request() },
+            GbmRequest { horizon: -1.0, ..request() },
+            GbmRequest { horizon: Real::NAN, ..request() },
+            GbmRequest { initial: &[], ..request() },
+            GbmRequest { initial: &[0.0, 1.0], ..request() },
+            GbmRequest { initial: &[Real::INFINITY, 1.0], ..request() },
+            GbmRequest { drift: &[0.0], ..request() },
+            GbmRequest { drift: &[Real::NAN, 0.0], ..request() },
+            GbmRequest { volatility: &[-0.1, 0.2], ..request() },
+            GbmRequest { volatility: &[Real::INFINITY, 0.2], ..request() },
+            GbmRequest { correlation: &[1.0], ..request() },
+            GbmRequest { correlation: &[1.0, 0.1, 0.2, 1.0], ..request() },
+            GbmRequest { correlation: &[1.0, Real::NAN, Real::NAN, 1.0], ..request() },
+            GbmRequest { correlation: &[0.9, 0.0, 0.0, 1.0], ..request() },
+            GbmRequest { correlation: &[1.0, 1.0, 1.0, 1.0], ..request() },
+            GbmRequest { correlation: &[1.0, -1.0, -1.0, 1.0], ..request() },
+            GbmRequest { correlation: &[1.0, 1.1, 1.1, 1.0], ..request() },
+            GbmRequest { paths: Size::MAX, ..request() },
+            GbmRequest { steps: Size::MAX, ..request() },
+            GbmRequest { volatility: &[0.0, 0.0], drift: &[1e308, 0.0], ..request() },
+        ];
+        for r in cases {
+            assert!(gbm_paths(&r).is_err());
+        }
+        // All entries are valid correlations, but this matrix is indefinite.
+        assert!(correlation_factor(&[1.0, 0.9, 0.9, 0.9, 1.0, -0.9, 0.9, -0.9, 1.0], 3).is_err());
+    }
+}
