@@ -76,3 +76,56 @@ func(s *Session)NewEndCriteria(cfg EndCriteriaConfig)(*EndCriteria,error){
  var id C.uint64_t;err:=s.invoke(func()error{var e C.ItofinError;return ffiError(C.itofin_end_criteria_new(s.ctx,c,&id,&e),&e)})
  if err!=nil{return nil,err};return &EndCriteria{object{s,uint64(id)}},nil
 }
+
+type HestonHelperConfig struct{
+ Maturity Period
+ Calendar *Calendar
+ Spot,Strike,Volatility,RiskFreeRate,DividendYield float64
+ ErrorType CalibrationErrorType
+ ReferenceDate Date
+ DayCounter *DayCounter
+ Settings *Settings
+}
+func(s *Session)NewHestonModelHelper(cfg HestonHelperConfig)(*HestonModelHelper,error){
+ if cfg.Calendar==nil||cfg.DayCounter==nil||cfg.Settings==nil{return nil,errNilArgument("calendar, day counter or settings")}
+ if err:=sameSession(s,cfg.Calendar.object,cfg.DayCounter.object,cfg.Settings.object);err!=nil{return nil,err}
+ c:=C.HestonHelperConfig{maturity_length:C.int32_t(cfg.Maturity.Length),maturity_unit:C.int32_t(cfg.Maturity.Unit),calendar:C.uint64_t(cfg.Calendar.id),spot:C.double(cfg.Spot),strike:C.double(cfg.Strike),volatility:C.double(cfg.Volatility),risk_free_rate:C.double(cfg.RiskFreeRate),dividend_yield:C.double(cfg.DividendYield),error_type:C.int32_t(cfg.ErrorType),reference_date:C.int32_t(cfg.ReferenceDate.Serial()),day_counter:C.uint64_t(cfg.DayCounter.id),settings:C.uint64_t(cfg.Settings.id)}
+ var id C.uint64_t;err:=s.invoke(func()error{var e C.ItofinError;return ffiError(C.itofin_heston_helper_new(s.ctx,c,&id,&e),&e)})
+ if err!=nil{return nil,err};return &HestonModelHelper{object{s,uint64(id)}},nil
+}
+type SwaptionHelperConfig struct{
+ Maturity,Length,FixedLegTenor Period
+ Volatility,Nominal float64
+ Index *IborIndex
+ FixedLegDayCounter,FloatingLegDayCounter *DayCounter
+ Curve *YieldTermStructure
+ ErrorType CalibrationErrorType
+}
+func(s *Session)NewSwaptionHelper(cfg SwaptionHelperConfig)(*SwaptionHelper,error){
+ if cfg.Index==nil||cfg.FixedLegDayCounter==nil||cfg.FloatingLegDayCounter==nil||cfg.Curve==nil{return nil,errNilArgument("index, day counter or curve")}
+ if err:=sameSession(s,cfg.Index.object,cfg.FixedLegDayCounter.object,cfg.FloatingLegDayCounter.object,cfg.Curve.object);err!=nil{return nil,err}
+ c:=C.SwaptionHelperConfig{maturity_length:C.int32_t(cfg.Maturity.Length),maturity_unit:C.int32_t(cfg.Maturity.Unit),length:C.int32_t(cfg.Length.Length),length_unit:C.int32_t(cfg.Length.Unit),fixed_tenor_length:C.int32_t(cfg.FixedLegTenor.Length),fixed_tenor_unit:C.int32_t(cfg.FixedLegTenor.Unit),volatility:C.double(cfg.Volatility),nominal:C.double(cfg.Nominal),index:C.uint64_t(cfg.Index.id),fixed_day_counter:C.uint64_t(cfg.FixedLegDayCounter.id),floating_day_counter:C.uint64_t(cfg.FloatingLegDayCounter.id),curve:C.uint64_t(cfg.Curve.id),error_type:C.int32_t(cfg.ErrorType)}
+ var id C.uint64_t;err:=s.invoke(func()error{var e C.ItofinError;return ffiError(C.itofin_swaption_helper_new(s.ctx,c,&id,&e),&e)})
+ if err!=nil{return nil,err};return &SwaptionHelper{object{s,uint64(id)}},nil
+}
+func helperError(o object,kind int32)(float64,error){
+ var value C.double;err:=o.session.invoke(func()error{var e C.ItofinError;return ffiError(C.itofin_helper_error(o.session.ctx,C.uint64_t(o.id),C.int32_t(kind),&value,&e),&e)});return float64(value),err
+}
+func(h *HestonModelHelper)CalibrationError()(float64,error){if h==nil{return 0,errNilArgument("helper")};return helperError(h.object,0)}
+func(h *SwaptionHelper)CalibrationError()(float64,error){if h==nil{return 0,errNilArgument("helper")};return helperError(h.object,1)}
+func calibrateModel(model object,kind int32,helpers []object,method *LevenbergMarquardt,criteria *EndCriteria,order uint,fix bool)error{
+ if method==nil||criteria==nil{return errNilArgument("method or criteria")}
+ s:=model.session;objects:=append([]object{model,method.object,criteria.object},helpers...)
+ if err:=sameSession(s,objects...);err!=nil{return err}
+ ids:=make([]C.uint64_t,len(helpers));for i,h:=range helpers{ids[i]=C.uint64_t(h.id)}
+ var ptr *C.uint64_t;if len(ids)>0{ptr=(*C.uint64_t)(unsafe.Pointer(&ids[0]))};var fixed C.int32_t;if fix{fixed=1}
+ return s.invoke(func()error{var e C.ItofinError;return ffiError(C.itofin_model_calibrate(s.ctx,C.uint64_t(model.id),C.int32_t(kind),ptr,C.size_t(len(ids)),C.uint64_t(method.id),C.uint64_t(criteria.id),C.size_t(order),fixed,&e),&e)})
+}
+func(m *HestonModel)Calibrate(helpers []*HestonModelHelper,method *LevenbergMarquardt,criteria *EndCriteria,integrationOrder uint)error{
+ if m==nil{return errNilArgument("model")};objects:=make([]object,len(helpers));for i,h:=range helpers{if h==nil{return errNilArgument("helper")};objects[i]=h.object}
+ return calibrateModel(m.object,0,objects,method,criteria,integrationOrder,false)
+}
+func(m *HullWhite)Calibrate(helpers []*SwaptionHelper,method *LevenbergMarquardt,criteria *EndCriteria,fixReversion bool)error{
+ if m==nil{return errNilArgument("model")};objects:=make([]object,len(helpers));for i,h:=range helpers{if h==nil{return errNilArgument("helper")};objects[i]=h.object}
+ return calibrateModel(m.object,1,objects,method,criteria,0,fixReversion)
+}
