@@ -64,7 +64,7 @@ under `bindings/go`. See `bindings/go/README.md` for build and ownership example
   releases were published. Go callers must build the native library and configure
   the dynamic loader path.
 - Local execution was Linux only. The added CI workflow also defines macOS
-  validation; it has not run remotely because GitHub rejected repository writes.
+  validation; remote CI was not part of the local validation recorded here.
 - API coverage and broad numerical tests do not imply exhaustive argument,
   branch or calibration-variant coverage. Manifests retain specific test gaps.
 - The existing core can panic on extreme schedule date/rule combinations. The
@@ -77,7 +77,12 @@ under `bindings/go`. See `bindings/go/README.md` for build and ownership example
   migration, orchestration changes and optimization beyond the existing Python
   API are separate work. No private consumer source or data was copied.
 
-Remote publication is blocked: the GitHub connector returned HTTP 403,
-`Resource not accessible by integration`, for `benbenbang/libitofin`. A portable
-review bundle preserves the completed branch until repository write access is
-available.
+Publication target: `bitbrew-dev/libitofin`, branch
+`feat/go-cabi-python-parity`. The original target rejected writes with HTTP 403;
+the owner supplied this writable fork. The final implementation tree matches
+`79925a630b8f7a73a0f6c610edf579c2c4af10e0` from the validated local stack.
+
+The published history preserves the first 41 development commits and consolidates
+the remaining work into five integration commits, followed by this documentation
+update. The original 139-commit development history remains in the portable review
+bundle. No PR or merge to main was created.
