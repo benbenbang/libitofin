@@ -344,3 +344,21 @@ func (s *Schedule) Date(index int) (Date, error) {
 	}
 	return dates[index], nil
 }
+
+// Key returns the convention name for semantic map keys, including independently
+// constructed day counters and counters belonging to separate sessions.
+func (d *DayCounter) Key() (string, error) { return d.Name() }
+func (d *DayCounter) Repr() (string, error) {
+	name, err := d.Name()
+	if err != nil {
+		return "", err
+	}
+	return "DayCounter(" + name + ")", nil
+}
+func (c *Calendar) Repr() (string, error) {
+	name, err := c.Name()
+	if err != nil {
+		return "", err
+	}
+	return "Calendar(" + name + ")", nil
+}
