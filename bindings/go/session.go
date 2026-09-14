@@ -52,12 +52,11 @@ type Session struct {
 	gate     sync.RWMutex
 	closed   bool
 	closeErr error
-	released map[uint64]bool // used only by the worker
 }
 
 // NewSession creates a native context on its dedicated OS thread.
 func NewSession() (*Session, error) {
-	s := &Session{queue: make(chan request), stopped: make(chan struct{}), released: make(map[uint64]bool)}
+	s := &Session{queue: make(chan request), stopped: make(chan struct{})}
 	ready := make(chan error, 1)
 	go func() {
 		runtime.LockOSThread()
@@ -152,13 +151,14 @@ func (o object) Close() error {
 		return nil
 	}
 	err := o.session.invoke(func() error {
-		if o.session.released[o.id] {
-			return nil
-		}
 		var e C.ItofinError
 		err := ffiError(C.itofin_handle_release(o.session.ctx, C.uint64_t(o.id), &e), &e)
-		if err == nil {
-			o.session.released[o.id] = true
+		// Handles are globally unique and never reused. An unknown handle
+		// owned by this wrapper was already released, including by a copy.
+		// Keep no permanent Go tombstones for completed native objects.
+		var native *Error
+		if errors.As(err, &native) && native.Code == int32(C.INVALID_HANDLE) {
+			return nil
 		}
 		return err
 	})

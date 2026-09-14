@@ -144,7 +144,10 @@ func (i inflationIndex) String() string {
 	if e != nil {
 		return "InflationIndex(error: " + e.Error() + ")"
 	}
-	return v
+	if i.kind == 0 {
+		return "ZeroInflationIndex(" + v + ")"
+	}
+	return "YoYInflationIndex(" + v + ")"
 }
 func (i inflationIndex) AddFixing(date Date, value float64) error {
 	return i.session.invoke(func() error {

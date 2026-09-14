@@ -53,8 +53,17 @@ func(o *Swaption) SetBlackEngine(e *BlackSwaptionEngine)error{if e==nil{return f
 func(o *Swaption) SetBachelierEngine(e *BachelierSwaptionEngine)error{if e==nil{return fmt.Errorf("engine required")};return rateOptionSet(o.object,e.object,1)}
 func(o *Swaption) SetJamshidianEngine(e *HullWhite)error{if e==nil{return fmt.Errorf("model required")};return rateOptionSet(o.object,e.object,2)}
 func(o *CapFloor) SetBlackEngine(e *BlackCapFloorEngine)error{if e==nil{return fmt.Errorf("engine required")};return rateOptionSet(o.object,e.object,3)}
-func(o *Swaption) Price(e *BlackSwaptionEngine)(float64,error){if err:=o.SetBlackEngine(e);err!=nil{return 0,err};return o.NPV()}
-func(o *CapFloor) Price(e *BlackCapFloorEngine)(float64,error){if err:=o.SetBlackEngine(e);err!=nil{return 0,err};return o.NPV()}
+// Setting an engine and valuing execute in one worker task, so concurrent
+// callers cannot replace the chosen engine between these two native calls.
+func rateOptionPrice(o,engine object,engineKind,instrumentKind int32)(float64,error){
+ s:=o.session;var value C.double;err:=s.invoke(func()error{
+  if err:=sameSession(s,o,engine);err!=nil{return err};var e C.ItofinError
+  if err:=ffiError(C.itofin_rate_option_set_engine(s.ctx,C.uint64_t(o.id),C.uint64_t(engine.id),C.int32_t(engineKind),&e),&e);err!=nil{return err}
+  return ffiError(C.itofin_rate_option_value(s.ctx,C.uint64_t(o.id),C.int32_t(instrumentKind),0,&value,&e),&e)
+ });return float64(value),err
+}
+func(o *Swaption) Price(e *BlackSwaptionEngine)(float64,error){if o==nil||e==nil{return 0,fmt.Errorf("swaption and engine required")};return rateOptionPrice(o.object,e.object,0,0)}
+func(o *CapFloor) Price(e *BlackCapFloorEngine)(float64,error){if o==nil||e==nil{return 0,fmt.Errorf("cap/floor and engine required")};return rateOptionPrice(o.object,e.object,3,1)}
 func rateOptionValue(o object,kind,field int32)(float64,error){
  s:=o.session;var value C.double;err:=s.invoke(func()error{if err:=sameSession(s,o);err!=nil{return err};var e C.ItofinError
  return ffiError(C.itofin_rate_option_value(s.ctx,C.uint64_t(o.id),C.int32_t(kind),C.int32_t(field),&value,&e),&e)})

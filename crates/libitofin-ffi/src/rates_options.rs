@@ -104,3 +104,58 @@ pub unsafe extern "C" fn itofin_capfloor_rates(ctx:*mut Context,id:u64,which:i32
         if !rates.is_empty(){check_ptr(out)?;std::ptr::copy_nonoverlapping(rates.as_ptr(),out,rates.len());}Ok(())
     })}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::rates_api::{ItofinMakeSwapConfig,itofin_make_vanilla_swap};
+    use crate::rates_engines::{ItofinRateEngineConfig,itofin_rate_engine_new};
+    use libitofin::handle::Handle;
+    use libitofin::indexes::ibor::Euribor;
+    use libitofin::interestrate::Compounding;
+    use libitofin::quotes::SimpleQuote;
+    use libitofin::settings::Settings;
+    use libitofin::termstructures::{yieldtermstructure::YieldTermStructure,yields::FlatForward};
+    use libitofin::time::{date::{Date,Month},calendars::target::Target,
+        daycounters::{actual365fixed::Actual365Fixed,thirty360::{Thirty360,Convention}},
+        timeunit::TimeUnit,businessdayconvention::BusinessDayConvention,frequency::Frequency};
+    use std::ptr::null_mut;
+    /// QuantLib swaption.cpp testCachedValue, both par/indexed coupon arms.
+    #[test]
+    fn test_cached_value_across_c_boundary_and_dependency_release() {
+        for (at_par,expected) in [(true,0.036418158579),(false,0.036421429684)] {
+            let mut c=Context::new();let cal=Target::new();
+            let settings=shared(Settings::new());let today=Date::new(13,Month::March,2002);
+            settings.set_evaluation_date(today);settings.set_using_at_par_coupons(at_par);
+            let settle=cal.advance(today,2,TimeUnit::Days,BusinessDayConvention::Following,false);
+            let exercise=cal.advance(settle,5,TimeUnit::Years,BusinessDayConvention::Following,false);
+            let start=cal.advance(exercise,2,TimeUnit::Days,BusinessDayConvention::Following,false);
+            let curve=Handle::new(shared(FlatForward::with_rate(settle,0.05,Actual365Fixed::new(),Compounding::Continuous,Frequency::Annual)) as Shared<dyn YieldTermStructure>);
+            let index=c.insert(shared(Euribor::six_months(curve.clone(),settings.clone()))).unwrap();
+            let discount=c.insert(curve).unwrap();let settings_id=c.insert(settings).unwrap();
+            let fixed_dc=c.insert(Thirty360::with_convention(Convention::BondBasis)).unwrap();
+            let vol_dc=c.insert(Actual365Fixed::new()).unwrap();let quote=c.insert(shared(SimpleQuote::new(0.2))).unwrap();
+            let a=ItofinMakeSwapConfig {tenor_length:10,tenor_unit:3,index,settings:settings_id,flags:27,fixed_rate:0.06,
+                forward_length:0,forward_unit:0,effective_date:start.serial_number(),nominal:0.,fixed_length:1,fixed_unit:3,
+                fixed_day_counter:fixed_dc,payment_lag:0,discount:0,averaging:0};
+            let (mut swap,mut ex,mut option,mut engine)=(0,0,0,0);let mut npv=0.;
+            unsafe {
+                assert_eq!(itofin_make_vanilla_swap(&mut c,a,&mut swap,null_mut()),0);
+                assert_eq!(itofin_european_exercise_new(&mut c,exercise.serial_number(),&mut ex,null_mut()),0);
+                assert_eq!(itofin_swaption_new(&mut c,swap,ex,0,0,settings_id,&mut option,null_mut()),0);
+                assert_eq!(itofin_rate_option_value(&mut c,option,0,0,&mut npv,null_mut()),CORE_ERROR);
+                let cfg=ItofinRateEngineConfig {kind:0,discount,volatility:quote,settings:settings_id,day_counter:vol_dc,displacement:0.,cash_annuity_model:0,flat:1,has_displacement:1};
+                assert_eq!(itofin_rate_engine_new(&mut c,cfg,&mut engine,null_mut()),0);
+                assert_eq!(itofin_rate_option_set_engine(&mut c,option,engine,0,null_mut()),0);
+                for id in [swap,ex,engine,discount,index,quote,settings_id,fixed_dc,vol_dc] {
+                    assert_eq!(itofin_handle_release(&mut c,id,null_mut()),0);
+                }
+                assert_eq!(itofin_rate_option_value(&mut c,option,0,0,&mut npv,null_mut()),0);
+                assert!((npv-expected).abs()<=1e-12,"{npv} vs {expected}");
+                let mut snapshot=0;assert_eq!(itofin_rate_option_results(&mut c,option,0,&mut snapshot,null_mut()),0);
+                assert_eq!(c.get::<crate::results_api::ResultsSnapshot>(snapshot).unwrap().npv,Some(npv));
+                assert_eq!(itofin_rate_option_value(&mut c,option,1,0,&mut npv,null_mut()),INVALID_HANDLE);
+            }
+        }
+    }
+}

@@ -85,7 +85,14 @@ func (v *VanillaSwap) SetEngine(discount *YieldTermStructure,settings *Settings)
         var e C.ItofinError;return ffiError(C.itofin_vanilla_swap_set_engine(s.ctx,C.uint64_t(v.id),C.uint64_t(discount.id),C.uint64_t(settings.id),&e),&e)
     })
 }
-func (v *VanillaSwap) Price(discount *YieldTermStructure,settings *Settings)(float64,error){if err:=v.SetEngine(discount,settings);err!=nil{return 0,err};return v.NPV()}
+func (v *VanillaSwap) Price(discount *YieldTermStructure,settings *Settings)(float64,error){
+ if v==nil||discount==nil||settings==nil{return 0,fmt.Errorf("swap, discount and settings required")}
+ s:=v.session;var value C.double;err:=s.invoke(func()error{
+  if err:=sameSession(s,v.object,discount.object,settings.object);err!=nil{return err};var e C.ItofinError
+  if err:=ffiError(C.itofin_vanilla_swap_set_engine(s.ctx,C.uint64_t(v.id),C.uint64_t(discount.id),C.uint64_t(settings.id),&e),&e);err!=nil{return err}
+  return ffiError(C.itofin_swap_value(s.ctx,C.uint64_t(v.id),0,0,&value,&e),&e)
+ });return float64(value),err
+}
 func swapValue(o object,kind,field int32)(float64,error){
     var out C.double;s:=o.session;err:=s.invoke(func()error{
         if err:=sameSession(s,o);err!=nil{return err};var e C.ItofinError

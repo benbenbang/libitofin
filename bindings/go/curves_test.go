@@ -217,3 +217,101 @@ func TestPiecewiseCurveRepricesIndependentDepositFixings(t *testing.T) {
 		})
 	}
 }
+
+func TestBootstrapAlgorithmsAndSwapHelpers(t *testing.T) {
+	s, e := NewSession()
+	s = curveMust(t, s, e)
+	defer s.Close()
+	settings, e := s.NewSettings()
+	settings = curveMust(t, settings, e)
+	today := curveDate(t, 15, 6, 2026)
+	if e = settings.SetEvaluationDate(today); e != nil {
+		t.Fatal(e)
+	}
+	dc, e := s.Actual360()
+	dc = curveMust(t, dc, e)
+	bondDC, e := s.Thirty360BondBasis()
+	bondDC = curveMust(t, bondDC, e)
+	cal, e := s.Target()
+	cal = curveMust(t, cal, e)
+	settlement, e := cal.Advance(today, 2, Days, Following, false)
+	settlement = curveMust(t, settlement, e)
+	index, e := s.NewEuribor(Period{6, Months}, nil, settings)
+	index = curveMust(t, index, e)
+	var hs []*RateHelper
+	for _, row := range []struct {
+		years int32
+		rate  float64
+	}{{1, 0.0454}, {2, 0.0463}, {3, 0.0475}} {
+		q, e := s.NewSimpleQuote(row.rate)
+		q = curveMust(t, q, e)
+		h, e := s.NewSwapRateHelper(SwapRateHelperConfig{Quote: q, Tenor: Period{row.years, Years}, Calendar: cal, FixedFrequency: Annual, FixedConvention: Unadjusted, FixedDayCount: bondDC, IborIndex: index})
+		hs = append(hs, curveMust(t, h, e))
+	}
+	for _, interp := range []string{"LogLinear", "Linear"} {
+		c, e := s.NewPiecewiseYieldCurve(PiecewiseCurveConfig{ReferenceDate: settlement, Helpers: hs, DayCounter: dc, Interpolation: interp, Bootstrap: "global"})
+		c = curveMust(t, c, e)
+		_, e = c.Discount(0.5, false)
+		if e != nil {
+			t.Fatal(e)
+		}
+		for _, h := range hs {
+			v, e := h.QuoteError()
+			curveNear(t, curveMust(t, v, e), 0, 1e-9)
+		}
+	}
+	c, e := s.NewPiecewiseConvexMonotoneForward(PiecewiseCurveConfig{ReferenceDate: settlement, Helpers: hs, DayCounter: dc, Bootstrap: "local"})
+	c = curveMust(t, c, e)
+	_, e = c.Discount(0.5, false)
+	if e != nil {
+		t.Fatal(e)
+	}
+	dates, e := c.Dates()
+	if len(curveMust(t, dates, e)) != 4 {
+		t.Fatal("local node dates")
+	}
+	data, e := c.Data()
+	if len(curveMust(t, data, e)) != 4 {
+		t.Fatal("local node data")
+	}
+	c, e = s.NewPiecewiseYieldCurve(PiecewiseCurveConfig{ReferenceDate: settlement, Helpers: hs[:2], AdditionalHelpers: hs[2:], DayCounter: dc, Bootstrap: "global"})
+	c = curveMust(t, c, e)
+	max, e := c.MaxDate()
+	max = curveMust(t, max, e)
+	pillar, e := hs[2].LatestRelevantDate()
+	if max != curveMust(t, pillar, e) {
+		t.Fatal("global additional helper did not extend max date")
+	}
+	if _, e = s.NewPiecewiseYieldCurve(PiecewiseCurveConfig{ReferenceDate: settlement, Helpers: hs[:2], AdditionalHelpers: hs[2:], DayCounter: dc}); e == nil {
+		t.Fatal("iterative additional helper accepted")
+	}
+	if _, e = s.NewPiecewiseYieldCurve(PiecewiseCurveConfig{ReferenceDate: settlement, Helpers: hs, DayCounter: dc, Bootstrap: "global", Interpolation: "Cubic"}); e == nil {
+		t.Fatal("global cubic accepted")
+	}
+}
+
+func TestProcessFromCurvesPreservesOrderAndDependencies(t *testing.T) {
+	s, e := NewSession()
+	s = curveMust(t, s, e)
+	defer s.Close()
+	dc, e := s.Actual365Fixed()
+	dc = curveMust(t, dc, e)
+	ref := curveDate(t, 15, 6, 2026)
+	rf, e := s.NewFlatForward(ref, 0.08, dc)
+	rf = curveMust(t, rf, e)
+	div, e := s.NewFlatForward(ref, 0.02, dc)
+	div = curveMust(t, div, e)
+	vol, e := s.BlackConstantVol(BlackConstantVolConfig{ReferenceDate: ref, Volatility: 0.30, DayCounter: dc})
+	vol = curveMust(t, vol, e)
+	p, e := s.NewBlackScholesProcessFromCurves(60, rf, div, vol)
+	p = curveMust(t, p, e)
+	for _, o := range []object{rf.object, div.object, vol.object, dc.object} {
+		if e = o.Close(); e != nil {
+			t.Fatal(e)
+		}
+	}
+	r, e := p.RiskFreeRate()
+	curveNear(t, curveMust(t, r, e), 0.08, 1e-10)
+	d, e := p.DividendYield()
+	curveNear(t, curveMust(t, d, e), 0.02, 1e-10)
+}

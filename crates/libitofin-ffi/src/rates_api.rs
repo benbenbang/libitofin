@@ -119,3 +119,36 @@ pub unsafe extern "C" fn itofin_swap_results(ctx:*mut Context,id:u64,kind:i32,ou
         output(out,c.insert(result)?)
     })}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use libitofin::indexes::ibor::{Euribor,Estr};
+    use libitofin::interestrate::Compounding;
+    use libitofin::shared::shared;
+    use libitofin::termstructures::yields::FlatForward;
+    use libitofin::time::{date::Month,daycounters::actual360::Actual360,frequency::Frequency};
+    use std::ptr::null_mut;
+    #[test]
+    fn unset_fixed_rate_fills_fair_rate_for_vanilla_and_ois() {
+        let mut c=Context::new();let today=Date::new(7,Month::July,2026);let settings=shared(Settings::new());settings.set_evaluation_date(today);
+        let curve=Handle::new(shared(FlatForward::with_rate(today,0.02,Actual360::new(),Compounding::Continuous,Frequency::Annual)) as Shared<dyn YieldTermStructure>);
+        let index=c.insert(shared(Euribor::six_months(curve.clone(),settings.clone()))).unwrap();
+        let overnight=c.insert(shared(Estr::new(curve,settings.clone()))).unwrap();let settings=c.insert(settings).unwrap();
+        let config=|index|ItofinMakeSwapConfig {tenor_length:5,tenor_unit:3,index,settings,flags:2,fixed_rate:0.,forward_length:0,forward_unit:0,
+            effective_date:Date::new(9,Month::July,2026).serial_number(),nominal:0.,fixed_length:0,fixed_unit:0,fixed_day_counter:0,payment_lag:0,discount:0,averaging:0};
+        for (kind,index) in [(0,index),(1,overnight)] {
+            let mut id=0;let mut value=0.;unsafe {
+                let status=if kind==0 {itofin_make_vanilla_swap(&mut c,config(index),&mut id,null_mut())}else{itofin_make_ois(&mut c,config(index),&mut id,null_mut())};
+                assert_eq!(status,0);
+                assert_eq!(itofin_swap_value(&mut c,id,kind,0,&mut value,null_mut()),0);assert!(value.abs()<1e-8);
+                assert_eq!(itofin_swap_value(&mut c,id,kind,1,&mut value,null_mut()),0);let fair=value;
+                assert_eq!(itofin_swap_value(&mut c,id,kind,3,&mut value,null_mut()),0);assert!((value-fair).abs()<1e-12);
+                assert_eq!(itofin_swap_value(&mut c,id,kind,2,&mut value,null_mut()),0);assert_eq!(value,1.);
+                let mut other=Context::new();assert_eq!(itofin_swap_value(&mut other,id,kind,0,&mut value,null_mut()),INVALID_HANDLE);
+            }
+        }
+        let mut bad=config(index);bad.flags=1;bad.fixed_rate=Real::NAN;let mut out=0;
+        unsafe{assert_eq!(itofin_make_vanilla_swap(&mut c,bad,&mut out,null_mut()),INVALID_ARGUMENT);}
+    }
+}
