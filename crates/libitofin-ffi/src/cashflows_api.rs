@@ -88,3 +88,28 @@ pub unsafe extern "C" fn itofin_leg_npv(ctx:*mut Context,id:u64,discount:u64,set
         output(out,CashFlows::npv(&c.get::<Leg>(id)?,&*curve,&*settings(c,settings_id)?,include,settlement,npv_date)?)
     })}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use libitofin::cashflows::SimpleCashFlow;
+    use libitofin::shared::shared;
+    use libitofin::time::date::{Date,Month};
+    use std::ptr::null_mut;
+    #[test]
+    fn generic_leg_negative_index_and_cashflow_lifetime() {
+        let mut c=Context::new();let d=Date::new(1,Month::June,2030);
+        let flows:Leg=vec![shared(SimpleCashFlow::new(123.45,d).unwrap()) as Shared<dyn CashFlow>];
+        let id=c.insert(flows).unwrap();let mut item=0;let mut count=0;
+        unsafe {
+            assert_eq!(itofin_leg_count(&mut c,id,&mut count,null_mut()),0);assert_eq!(count,1);
+            assert_eq!(itofin_leg_item(&mut c,id,-2,&mut item,null_mut()),INVALID_ARGUMENT);
+            assert_eq!(itofin_leg_item(&mut c,id,-1,&mut item,null_mut()),0);
+            assert_eq!(itofin_handle_release(&mut c,id,null_mut()),0);
+            let mut amount=0.;assert_eq!(itofin_cashflow_amount(&mut c,item,&mut amount,null_mut()),0);assert_eq!(amount,123.45);
+            let mut serial=0;assert_eq!(itofin_cashflow_date(&mut c,item,&mut serial,null_mut()),0);assert_eq!(serial,d.serial_number());
+            assert_eq!(itofin_handle_release(&mut c,item,null_mut()),0);
+            assert_eq!(itofin_cashflow_amount(&mut c,item,&mut amount,null_mut()),INVALID_HANDLE);
+        }
+    }
+}

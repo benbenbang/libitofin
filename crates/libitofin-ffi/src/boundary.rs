@@ -189,3 +189,92 @@ pub unsafe extern "C" fn itofin_handle_release(ctx: *mut Context, handle: u64, e
         Ok(())
     }) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::ptr::null_mut;
+
+    #[test]
+    fn typed_context_handles_are_unique_scoped_and_released() {
+        let mut first = Context::new();
+        let mut second = Context::new();
+        let id = first.insert(42_u64).unwrap();
+        let other = second.insert(42_u64).unwrap();
+        assert_ne!(id, other);
+        assert_eq!(first.get::<u64>(id).unwrap(), 42);
+        assert_eq!(first.get::<String>(id).unwrap_err().code, INVALID_HANDLE);
+        assert_eq!(second.get::<u64>(id).unwrap_err().code, INVALID_HANDLE);
+        unsafe {
+            assert_eq!(itofin_handle_release(&mut second, id, null_mut()), INVALID_HANDLE);
+            assert_eq!(itofin_handle_release(&mut first, id, null_mut()), 0);
+            assert_eq!(itofin_handle_release(&mut first, id, null_mut()), INVALID_HANDLE);
+        }
+        assert_eq!(first.get::<u64>(id).unwrap_err().code, INVALID_HANDLE);
+        assert_ne!(first.insert(99_u64).unwrap(), id);
+        assert_eq!(second.get::<u64>(other).unwrap(), 42);
+    }
+
+    #[test]
+    fn wrong_thread_calls_and_destruction_preserve_owner_context() {
+        let mut context = null_mut();
+        unsafe { assert_eq!(itofin_context_new(&mut context, null_mut()), 0); }
+        let address = context as usize;
+        // Parent makes no calls until join. The context allocation stays live;
+        // the wrong-thread checks run before any thread-confined object access.
+        let status = std::thread::spawn(move || unsafe {
+            let ptr = address as *mut Context;
+            let operation = with_context(ptr, null_mut(), |_| {
+                panic!("wrong-thread closure must not execute")
+            });
+            let destruction = itofin_context_free(ptr, null_mut());
+            (operation, destruction)
+        }).join().unwrap();
+        assert_eq!(status, (WRONG_THREAD, WRONG_THREAD));
+        unsafe {
+            assert_eq!(with_context(context, null_mut(), |c| {
+                let id = c.insert(7_u64)?;
+                assert_eq!(c.get::<u64>(id)?, 7);
+                Ok(())
+            }), 0);
+            assert_eq!(itofin_context_free(context, null_mut()), 0);
+        }
+    }
+
+    #[test]
+    fn panic_poisoning_blocks_further_calls_but_allows_destruction() {
+        let mut context = null_mut();
+        let mut error = ItofinError { code: 0, message: [0; 1024] };
+        unsafe {
+            assert_eq!(itofin_context_new(&mut context, &mut error), 0);
+            assert_eq!(with_context(context, &mut error, |c| {
+                c.insert(1_u64)?;
+                panic!("intentional boundary test panic")
+            }), PANIC);
+            assert_eq!(error.code, PANIC);
+            assert_eq!(with_context(context, &mut error, |_| {
+                panic!("poisoned context closure must not execute")
+            }), POISONED);
+            assert_eq!(error.code, POISONED);
+            assert_eq!(itofin_context_free(context, &mut error), 0);
+            assert_eq!(error.code, 0);
+        }
+    }
+
+    #[test]
+    fn errors_are_utf8_truncated_and_success_clears_them() {
+        let mut error = ItofinError { code: 0, message: [0; 1024] };
+        unsafe {
+            assert_eq!(without_context(&mut error, || {
+                Err(BindingError::invalid("é".repeat(1024)))
+            }), INVALID_ARGUMENT);
+            let bytes = error.message.iter().map(|x| *x as u8).take_while(|x| *x != 0).collect::<Vec<_>>();
+            assert_eq!(bytes.len(), 1022);
+            assert!(std::str::from_utf8(&bytes).is_ok());
+            assert_eq!(without_context(&mut error, || Ok(())), 0);
+            assert_eq!(error.code, 0);
+            assert_eq!(error.message[0], 0);
+            assert_eq!(with_context(null_mut(), &mut error, |_| Ok(())), INVALID_ARGUMENT);
+        }
+    }
+}

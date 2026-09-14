@@ -251,11 +251,24 @@ func (c *CreditDefaultSwap) CouponLegNPV() (float64, error)  { return c.value(4)
 func (c *CreditDefaultSwap) DefaultLegNPV() (float64, error) { return c.value(5) }
 func (c *CreditDefaultSwap) Calculate() error                { _, e := c.value(6); return e }
 func (c *CreditDefaultSwap) IsCalculated() (bool, error)     { v, e := c.value(7); return v != 0, e }
+
+// Price attaches and values atomically relative to other session callers.
 func (c *CreditDefaultSwap) Price(engine *MidPointCdsEngine) (float64, error) {
-	if e := c.SetEngine(engine); e != nil {
-		return 0, e
+	if c == nil || engine == nil {
+		return 0, errNilArgument("instrument or engine")
 	}
-	return c.NPV()
+	var out C.double
+	err := c.session.invoke(func() error {
+		if e := sameSession(c.session, c.object, engine.object); e != nil {
+			return e
+		}
+		var e C.ItofinError
+		if err := ffiError(C.itofin_cds_set_engine(c.session.ctx, C.uint64_t(c.id), C.uint64_t(engine.id), &e), &e); err != nil {
+			return err
+		}
+		return ffiError(C.itofin_cds_value(c.session.ctx, C.uint64_t(c.id), 0, &out, &e), &e)
+	})
+	return float64(out), err
 }
 func (c *CreditDefaultSwap) Rebate() (amount *float64, date *Date, err error) {
 	if c == nil {
