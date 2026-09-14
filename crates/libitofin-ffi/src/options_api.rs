@@ -87,3 +87,15 @@ pub unsafe extern "C" fn itofin_option_calculate(ctx: *mut Context, option: u64,
         output(out, i32::from(option.base().is_calculated()))
     }) }
 }
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn itofin_option_results(ctx: *mut Context, option: u64,
+    out: *mut u64, error: *mut ItofinError) -> i32 {
+    unsafe { with_context(ctx, error, |c| {
+        check_ptr(out)?;
+        let option = c.get::<SharedMut<VanillaOption>>(option)?;
+        let mut option = option.borrow_mut();
+        option.calculate()?;
+        output(out, c.insert(crate::results_api::snapshot(option.base()))?)
+    }) }
+}
