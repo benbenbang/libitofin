@@ -139,12 +139,11 @@ pub unsafe extern "C" fn itofin_default_curve_calculate(ctx: *mut Context, id: u
 #[cfg(test)]
 mod tests {
     use super::*;
-    use libitofin::time::daycounter::DayCounter;
     use libitofin::time::daycounters::actual365fixed::Actual365Fixed;
     use libitofin::time::month::Month;
     #[test]
     fn flat_hazard_live_quote_lifetime_and_foreign_handle() {
-        let mut c=Context::new();let dc=c.insert(DayCounter::new(Actual365Fixed::new())).unwrap();
+        let mut c=Context::new();let dc=c.insert(Actual365Fixed::new()).unwrap();
         let quote=shared(SimpleQuote::new(0.01234));let q=c.insert(quote.clone()).unwrap();
         let cfg=ItofinFlatHazardConfig {reference_date:Date::new(9,Month::June,2006).serial_number(),
             settlement_days:0,calendar:0,quote:q,rate:0.0,day_counter:dc,settings:0};
