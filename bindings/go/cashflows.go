@@ -71,6 +71,7 @@ type CashFlowsNPVConfig struct {
 }
 func(l *Leg) NPV(a CashFlowsNPVConfig)(float64,error){
     if a.Discount==nil||a.Settings==nil{return 0,fmt.Errorf("curve and settings required")}
+    if (a.SettlementDate!=nil&&a.SettlementDate.Serial()==0)||(a.NPVDate!=nil&&a.NPVDate.Serial()==0){return 0,fmt.Errorf("invalid explicit settlement or NPV date")}
     s:=l.session;var n C.double;err:=s.invoke(func()error{
         if err:=sameSession(s,l.object,a.Discount.object,a.Settings.object);err!=nil{return err}
         include:=C.int32_t(-1);var settlement,npvDate C.int32_t

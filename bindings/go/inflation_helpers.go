@@ -20,7 +20,8 @@ type InflationHelperConfig struct {
 	DayCounter               *DayCounter
 	ObservationInterpolation CpiInterpolationType
 	Settings                 *Settings
-	Pillar                   Pillar
+	// Nil selects LastRelevantDate, matching Python.
+	Pillar *Pillar
 }
 
 func (s *Session) inflationHelperNew(a InflationHelperConfig, index object, discount *YieldTermStructure, kind int32) (inflationHelper, error) {
@@ -28,7 +29,7 @@ func (s *Session) inflationHelperNew(a InflationHelperConfig, index object, disc
 		return inflationHelper{}, errNilArgument("inflation helper argument")
 	}
 	args := []object{a.Quote.object, a.Calendar.object, a.DayCounter.object, a.Settings.object, index}
-	cfg := C.ItofinInflationHelperConfig{quote: C.uint64_t(a.Quote.id), lag_length: C.int32_t(a.SwapObservationLag.Length), lag_unit: C.int32_t(a.SwapObservationLag.Unit), maturity: C.int32_t(a.Maturity.Serial()), calendar: C.uint64_t(a.Calendar.id), convention: C.int32_t(a.PaymentConvention), day_counter: C.uint64_t(a.DayCounter.id), index: C.uint64_t(index.id), interpolation: C.int32_t(a.ObservationInterpolation), settings: C.uint64_t(a.Settings.id), pillar: C.int32_t(a.Pillar)}
+	cfg := C.ItofinInflationHelperConfig{quote: C.uint64_t(a.Quote.id), lag_length: C.int32_t(a.SwapObservationLag.Length), lag_unit: C.int32_t(a.SwapObservationLag.Unit), maturity: C.int32_t(a.Maturity.Serial()), calendar: C.uint64_t(a.Calendar.id), convention: C.int32_t(a.PaymentConvention), day_counter: C.uint64_t(a.DayCounter.id), index: C.uint64_t(index.id), interpolation: C.int32_t(a.ObservationInterpolation), settings: C.uint64_t(a.Settings.id), pillar: C.int32_t(creditOptional(a.Pillar, LastRelevantDate))}
 	if discount != nil {
 		cfg.discount = C.uint64_t(discount.id)
 		args = append(args, discount.object)
@@ -85,5 +86,5 @@ func (h *ZeroInflationHelper) InflationFixingDate() (Date, error) {
 
 // DefaultInflationHelperConfig preserves the Python default pillar convention.
 func DefaultInflationHelperConfig() InflationHelperConfig {
-	return InflationHelperConfig{Pillar: LastRelevantDate}
+	return InflationHelperConfig{}
 }

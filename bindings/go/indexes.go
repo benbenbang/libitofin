@@ -262,5 +262,9 @@ func (i *IborIndex) Name() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return C.GoString((*C.char)(unsafe.Pointer(unsafe.SliceData(buf)))), nil
+	value := make([]byte, len(buf)-1)
+	for j := range value {
+		value[j] = byte(buf[j])
+	}
+	return string(value), nil
 }

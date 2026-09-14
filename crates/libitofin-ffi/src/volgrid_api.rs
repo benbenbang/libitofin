@@ -42,6 +42,8 @@ fn validate(x: &ItofinVolGridConfig) -> BindingResult<()> {
     if x.shift_count != 0 && x.shift_count != x.count { return Err(BindingError::invalid("shift grid dimensions do not match")); }
     Ok(())
 }
+/// # Safety
+/// Follow the crate C caller contract; arrays must have their stated lengths.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn itofin_swaption_vol_matrix_new(ctx: *mut Context,
     cfg: *const ItofinVolGridConfig, out: *mut u64, error: *mut ItofinError) -> i32 {
@@ -65,6 +67,8 @@ pub unsafe extern "C" fn itofin_swaption_vol_matrix_new(ctx: *mut Context,
         output(out,c.insert(Handle::new(shared(v) as Shared<dyn SwaptionVolatilityStructure>))?)
     }) }
 }
+/// # Safety
+/// Follow the crate C caller contract; arrays must have their stated lengths.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn itofin_capfloor_vol_surface_new(ctx: *mut Context,
     cfg: *const ItofinVolGridConfig, out: *mut u64, error: *mut ItofinError) -> i32 {
@@ -85,6 +89,8 @@ pub unsafe extern "C" fn itofin_capfloor_vol_surface_new(ctx: *mut Context,
     }) }
 }
 /// Query 0 tenor, 1 date, 2 time.
+/// # Safety
+/// Follow the crate C caller contract; arrays must have their stated lengths.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn itofin_capfloor_vol_query(ctx: *mut Context,id:u64,kind:i32,
     length:i32,unit:i32,serial:i32,time:f64,strike:f64,extrapolate:i32,

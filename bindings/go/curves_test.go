@@ -200,7 +200,7 @@ func TestPiecewiseCurveRepricesIndependentDepositFixings(t *testing.T) {
 			if len(dates) != 7 || len(values) != 7 || dates[0] != settlement {
 				t.Fatalf("wrong nodes: %v %v", dates, values)
 			}
-			before, e := c.Discount(0.5, false)
+			before, e := c.Discount(0.01, false)
 			before = curveMust(t, before, e)
 			if e = quotes[0].SetValue(0.05559); e != nil {
 				t.Fatal(e)

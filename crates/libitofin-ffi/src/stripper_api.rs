@@ -10,6 +10,8 @@ use libitofin::termstructures::volatility::{CapFloorTermVolSurface, OptionletStr
     StrippedOptionletAdapter, StrippedOptionletBase, OptionletVolatilityStructure};
 use libitofin::termstructures::yieldtermstructure::YieldTermStructure;
 use libitofin::time::period::Period;
+/// # Safety
+/// Follow the crate C caller contract; arrays must have their stated lengths.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn itofin_optionlet_stripper_new(ctx:*mut Context,surface:u64,
     index:u64,kind:i32,accuracy:f64,max_iter:u32,displacement:f64,discount:u64,
@@ -30,12 +32,16 @@ pub unsafe extern "C" fn itofin_optionlet_stripper_new(ctx:*mut Context,surface:
         output(out,c.insert(shared(stripper))?)
     })}
 }
+/// # Safety
+/// Follow the crate C caller contract; arrays must have their stated lengths.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn itofin_optionlet_stripper_switch_strike(ctx:*mut Context,id:u64,
     out:*mut f64,error:*mut ItofinError)->i32 {
     unsafe{with_context(ctx,error,|c|{check_ptr(out)?;output(out,c.get::<Shared<OptionletStripper1>>(id)?.switch_strike()?)})}
 }
 /// Pass null output/capacity zero to size the caller-owned rates buffer.
+/// # Safety
+/// Follow the crate C caller contract; arrays must have their stated lengths.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn itofin_optionlet_stripper_rates(ctx:*mut Context,id:u64,
     out:*mut f64,capacity:usize,written:*mut usize,error:*mut ItofinError)->i32 {
@@ -50,6 +56,8 @@ pub unsafe extern "C" fn itofin_optionlet_stripper_rates(ctx:*mut Context,id:u64
         Ok(())
     })}
 }
+/// # Safety
+/// Follow the crate C caller contract; arrays must have their stated lengths.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn itofin_stripped_optionlet_adapter_new(ctx:*mut Context,
     stripper:u64,setting:u64,out:*mut u64,error:*mut ItofinError)->i32 {

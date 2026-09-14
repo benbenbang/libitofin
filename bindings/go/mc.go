@@ -6,7 +6,8 @@ package itofin
 import "C"
 
 // MCConfig preserves omitted versus explicit zero settings. Engines use the
-// native PseudoRandom policy; identical configuration and seed repeat exactly.
+// native PseudoRandom policy; identical configuration with an explicit nonzero
+// seed repeats exactly. An omitted or zero seed uses native seed generation.
 type MCConfig struct {
 	Steps, StepsPerYear, Samples        *uint
 	AbsoluteTolerance                   *float64
