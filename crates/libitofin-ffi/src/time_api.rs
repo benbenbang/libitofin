@@ -491,3 +491,189 @@ pub unsafe extern "C" fn itofin_schedule_dates(
         })
     }
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn leap_dates_and_range_errors() {
+        assert!(ymd(29, 2, 2000).is_ok());
+        assert!(ymd(29, 2, 2100).is_err());
+        assert!(ymd(31, 4, 2024).is_err());
+        assert!(shifted(date(367).unwrap(), -1).is_err());
+        assert!(shifted(date(109_574).unwrap(), 1).is_err());
+        assert!(shifted(date(45_000).unwrap(), i64::MAX).is_err());
+        assert_eq!(
+            shifted(ymd(28, 2, 2024).unwrap(), 1).unwrap(),
+            ymd(29, 2, 2024).unwrap()
+        );
+    }
+    #[test]
+    fn calendar_rolls_follow_quantlib_conventions() {
+        let cal = WeekendsOnly::new();
+        let saturday = ymd(31, 8, 2024).unwrap();
+        assert_eq!(
+            adjust(&cal, saturday, BusinessDayConvention::ModifiedFollowing).unwrap(),
+            ymd(30, 8, 2024).unwrap()
+        );
+        assert_eq!(
+            adjust(&cal, saturday, BusinessDayConvention::Following).unwrap(),
+            ymd(2, 9, 2024).unwrap()
+        );
+        assert_eq!(
+            advance(
+                &cal,
+                ymd(31, 1, 2024).unwrap(),
+                1,
+                TimeUnit::Months,
+                BusinessDayConvention::Following,
+                true
+            )
+            .unwrap(),
+            ymd(29, 2, 2024).unwrap()
+        );
+        assert!(
+            advance(
+                &cal,
+                ymd(31, 12, 2199).unwrap(),
+                1,
+                TimeUnit::Days,
+                BusinessDayConvention::Following,
+                false
+            )
+            .is_err()
+        );
+        for serial in 45_000..45_400 {
+            let d = date(serial).unwrap();
+            for value in 0..=6 {
+                let rule = convention(value).unwrap();
+                assert_eq!(adjust(&cal, d, rule).unwrap(), cal.adjust(d, rule));
+            }
+            for unit in 0..4 {
+                let unit = time_unit(unit).unwrap();
+                for n in [-13, -1, 0, 1, 13] {
+                    for eom in [false, true] {
+                        assert_eq!(
+                            advance(
+                                &cal,
+                                d,
+                                n,
+                                unit,
+                                BusinessDayConvention::ModifiedFollowing,
+                                eom
+                            )
+                            .unwrap(),
+                            cal.advance(d, n, unit, BusinessDayConvention::ModifiedFollowing, eom)
+                        );
+                    }
+                }
+            }
+        }
+    }
+    #[test]
+    fn isda_year_fraction_and_invalid_handles() {
+        let mut c = Context::new();
+        let mut id = 0;
+        let mut value = 0.;
+        unsafe {
+            assert_eq!(
+                itofin_day_counter_new(&mut c, 2, &mut id, std::ptr::null_mut()),
+                0
+            );
+            assert_eq!(
+                itofin_day_counter_year_fraction(
+                    &mut c,
+                    id,
+                    ymd(1, 1, 2024).unwrap().serial_number(),
+                    ymd(1, 1, 2025).unwrap().serial_number(),
+                    &mut value,
+                    std::ptr::null_mut()
+                ),
+                0
+            );
+            assert_eq!(value, 1.0);
+            let mut foreign = Context::new();
+            assert_eq!(
+                itofin_day_counter_year_fraction(
+                    &mut foreign,
+                    id,
+                    45_000,
+                    45_001,
+                    &mut value,
+                    std::ptr::null_mut()
+                ),
+                INVALID_HANDLE
+            );
+            assert_eq!(itofin_handle_release(&mut c, id, std::ptr::null_mut()), 0);
+            assert_eq!(
+                itofin_day_counter_year_fraction(
+                    &mut c,
+                    id,
+                    45_000,
+                    45_001,
+                    &mut value,
+                    std::ptr::null_mut()
+                ),
+                INVALID_HANDLE
+            );
+        }
+    }
+    #[test]
+    fn schedule_retains_calendar_and_supports_size_queries() {
+        let mut c = Context::new();
+        let mut cal = 0;
+        let mut id = 0;
+        let mut size = 0;
+        unsafe {
+            assert_eq!(
+                itofin_calendar_new(&mut c, 1, &mut cal, std::ptr::null_mut()),
+                0
+            );
+            let start = ymd(1, 1, 2024).unwrap().serial_number();
+            let end = ymd(1, 1, 2025).unwrap().serial_number();
+            assert_eq!(
+                itofin_schedule_new(
+                    &mut c,
+                    ItofinScheduleConfig {
+                        start,
+                        end,
+                        frequency: 2,
+                        calendar: cal,
+                        convention: 2,
+                        rule: 1,
+                        termination_convention: -1
+                    },
+                    &mut id,
+                    std::ptr::null_mut()
+                ),
+                0
+            );
+            assert_eq!(itofin_handle_release(&mut c, cal, std::ptr::null_mut()), 0);
+            assert_eq!(
+                itofin_schedule_dates(
+                    &mut c,
+                    id,
+                    std::ptr::null_mut(),
+                    0,
+                    &mut size,
+                    std::ptr::null_mut()
+                ),
+                0
+            );
+            assert_eq!(size, 5);
+            let mut dates = [0; 5];
+            assert_eq!(
+                itofin_schedule_dates(
+                    &mut c,
+                    id,
+                    dates.as_mut_ptr(),
+                    5,
+                    &mut size,
+                    std::ptr::null_mut()
+                ),
+                0
+            );
+            assert_eq!(dates[0], start);
+            assert_eq!(dates[4], end);
+        }
+    }
+}
