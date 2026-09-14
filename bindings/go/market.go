@@ -42,3 +42,11 @@ func (p *BlackScholesProcess) rate(dividend bool) (float64,error) {
 }
 func (p *BlackScholesProcess) RiskFreeRate() (float64,error) { return p.rate(false) }
 func (p *BlackScholesProcess) DividendYield() (float64,error) { return p.rate(true) }
+
+func(s *Session) NewBlackScholesProcessFromCurves(spot float64,riskFree,dividend *YieldTermStructure,vol *BlackVolTermStructure)(*BlackScholesProcess,error){
+ if riskFree==nil||dividend==nil||vol==nil{return nil,errNilArgument("market curve")}
+ if err:=sameSession(s,riskFree.object,dividend.object,vol.object);err!=nil{return nil,err}
+ var id C.uint64_t
+ err:=s.invoke(func()error{var e C.ItofinError;return ffiError(C.itofin_black_scholes_from_curves(s.ctx,C.double(spot),C.uint64_t(riskFree.id),C.uint64_t(dividend.id),C.uint64_t(vol.id),&id,&e),&e)})
+ if err!=nil{return nil,err};return &BlackScholesProcess{object{s,uint64(id)}},nil
+}
