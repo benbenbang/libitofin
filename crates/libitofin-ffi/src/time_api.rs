@@ -289,3 +289,205 @@ pub unsafe extern "C" fn itofin_calendar_new(
         })
     }
 }
+// These checked boundary walks follow Calendar::adjust/advance and report range
+// errors instead of allowing Date's assertion to invalidate the whole session.
+fn adjust(cal: &Calendar, d: Date, rule: BusinessDayConvention) -> BindingResult<Date> {
+    use BusinessDayConvention::*;
+    if rule == Unadjusted {
+        return Ok(d);
+    }
+    if rule == Nearest {
+        let mut next = d;
+        let mut prev = d;
+        while cal.is_holiday(next) && cal.is_holiday(prev) {
+            next = shifted(next, 1)?;
+            prev = shifted(prev, -1)?;
+        }
+        return Ok(if cal.is_holiday(next) { prev } else { next });
+    }
+    let following = matches!(
+        rule,
+        Following | ModifiedFollowing | HalfMonthModifiedFollowing
+    );
+    let mut result = d;
+    while cal.is_holiday(result) {
+        result = shifted(result, if following { 1 } else { -1 })?;
+    }
+    if (matches!(rule, ModifiedFollowing | HalfMonthModifiedFollowing)
+        && result.month() != d.month())
+        || (rule == HalfMonthModifiedFollowing
+            && d.day_of_month() <= 15
+            && result.day_of_month() > 15)
+    {
+        return adjust(cal, d, Preceding);
+    }
+    if rule == ModifiedPreceding && result.month() != d.month() {
+        return adjust(cal, d, Following);
+    }
+    Ok(result)
+}
+fn advance(
+    cal: &Calendar,
+    d: Date,
+    n: i32,
+    unit: TimeUnit,
+    rule: BusinessDayConvention,
+    eom: bool,
+) -> BindingResult<Date> {
+    if n == 0 {
+        return adjust(cal, d, rule);
+    }
+    if unit == TimeUnit::Days {
+        let direction = if n > 0 { 1 } else { -1 };
+        let mut result = d;
+        for _ in 0..i64::from(n).abs() {
+            result = shifted(result, direction)?;
+            while cal.is_holiday(result) {
+                result = shifted(result, direction)?;
+            }
+        }
+        return Ok(result);
+    }
+    if unit == TimeUnit::Weeks {
+        return adjust(cal, shifted(d, i64::from(n) * 7)?, rule);
+    }
+    let months = i64::from(d.year()) * 12 + i64::from(d.month().ordinal()) - 1
+        + i64::from(n) * if unit == TimeUnit::Years { 12 } else { 1 };
+    let year =
+        i32::try_from(months.div_euclid(12)).map_err(|_| BindingError::invalid("date overflow"))?;
+    let month = months.rem_euclid(12) as i32 + 1;
+    let first = ymd(1, month, year)?;
+    let last = Date::end_of_month(first);
+    let next = ymd(d.day_of_month().min(last.day_of_month()), month, year)?;
+    if eom {
+        if rule == BusinessDayConvention::Unadjusted && Date::is_end_of_month(d) {
+            return Ok(last);
+        }
+        if rule != BusinessDayConvention::Unadjusted
+            && d >= adjust(cal, Date::end_of_month(d), BusinessDayConvention::Preceding)?
+        {
+            return adjust(cal, last, BusinessDayConvention::Preceding);
+        }
+    }
+    adjust(cal, next, rule)
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn itofin_calendar_adjust(
+    ctx: *mut Context,
+    id: u64,
+    serial: i32,
+    rule: i32,
+    out: *mut i32,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            output(
+                out,
+                adjust(&calendar(c, id)?, date(serial)?, convention(rule)?)?.serial_number(),
+            )
+        })
+    }
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn itofin_calendar_advance(
+    ctx: *mut Context,
+    id: u64,
+    serial: i32,
+    n: i32,
+    unit: i32,
+    rule: i32,
+    eom: u8,
+    out: *mut i32,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            output(
+                out,
+                advance(
+                    &calendar(c, id)?,
+                    date(serial)?,
+                    n,
+                    time_unit(unit)?,
+                    convention(rule)?,
+                    bool_flag(eom)?,
+                )?
+                .serial_number(),
+            )
+        })
+    }
+}
+#[repr(C)]
+pub struct ItofinScheduleConfig {
+    pub start: i32,
+    pub end: i32,
+    pub frequency: i32,
+    pub calendar: u64,
+    pub convention: i32,
+    pub rule: i32,
+    /// -1 uses convention.
+    pub termination_convention: i32,
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn itofin_schedule_new(
+    ctx: *mut Context,
+    config: ItofinScheduleConfig,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(out)?;
+            let start = date(config.start)?;
+            let end = date(config.end)?;
+            if start >= end {
+                return Err(BindingError::invalid("schedule start must precede end"));
+            }
+            let rule = convention(config.convention)?;
+            let term = if config.termination_convention == -1 {
+                rule
+            } else {
+                convention(config.termination_convention)?
+            };
+            let schedule = MakeSchedule::new()
+                .from(start)
+                .to(end)
+                .with_frequency(frequency(config.frequency)?)
+                .with_calendar(calendar(c, config.calendar)?)
+                .with_convention(rule)
+                .with_termination_date_convention(term)
+                .with_rule(generation(config.rule)?)
+                .build();
+            output(out, c.insert(schedule)?)
+        })
+    }
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn itofin_schedule_dates(
+    ctx: *mut Context,
+    id: u64,
+    out: *mut i32,
+    capacity: usize,
+    required: *mut usize,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            let schedule = c.get::<Schedule>(id)?;
+            let dates = schedule.dates();
+            output(required, dates.len())?;
+            if capacity == 0 {
+                return Ok(());
+            }
+            if capacity < dates.len() {
+                return Err(BindingError::invalid("date buffer too small"));
+            }
+            check_ptr(out)?;
+            for (i, d) in dates.iter().enumerate() {
+                output(out.add(i), d.serial_number())?;
+            }
+            Ok(())
+        })
+    }
+}
