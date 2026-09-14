@@ -24,8 +24,12 @@ func TestRatesParSwapsAndFRA(t *testing.T){
  overnight,e:=s.NewEstr(curve,settings);ratesOK(t,e)
  ois,e:=s.MakeOis(MakeOisConfig{Tenor:Period{2,Years},Index:overnight,Settings:settings,EffectiveDate:&effective});ratesOK(t,e)
  value,e=ois.Price();ratesOK(t,e);if math.Abs(value)>1e-8{t.Fatalf("par OIS NPV %g",value)}
+ ratesOK(t,ois.Calculate());oisCached,e:=ois.IsCalculated();ratesOK(t,e);if !oisCached{t.Fatal("uncached OIS")}
+ oisResults,e:=ois.Results();ratesOK(t,e);if oisResults.NPV==nil||math.Abs(*oisResults.NPV)>1e-8{t.Fatal("bad OIS snapshot")}
+ oisFair,e:=ois.FairRate();ratesOK(t,e);oisFixed,e:=ois.FixedRate();ratesOK(t,e);if math.Abs(oisFair-oisFixed)>1e-12{t.Fatal("OIS fair rate")};oisNominal,e:=ois.Nominal();ratesOK(t,e);if oisNominal!=1{t.Fatal(oisNominal)}
  end,e:=NewDate(9,10,2026);ratesOK(t,e)
  fra,e:=s.NewForwardRateAgreement(FRAConfig{Index:index,ValueDate:effective,MaturityDate:&end,Position:PositionLong,Strike:.02,Notional:100});ratesOK(t,e)
+ zero:=Date{};if _,err:=s.NewForwardRateAgreement(FRAConfig{Index:index,ValueDate:effective,MaturityDate:&zero,Notional:100});err==nil{t.Fatal("explicit zero maturity accepted")}
  term,e:=dc.YearFraction(effective,end);ratesOK(t,e);forward:=math.Expm1(.04*term)/term
  got,e:=fra.ForwardRate();ratesOK(t,e);if math.Abs(got-forward)>1e-12{t.Fatal(got,forward)}
  amount,e:=fra.Amount();ratesOK(t,e);expected:=100*(forward-.02)*term/(1+forward*term);if math.Abs(amount-expected)>1e-12{t.Fatal(amount,expected)}
@@ -85,4 +89,37 @@ func TestRatesCapFloorLegsAndSwapIndex(t *testing.T){
  tenor,e:=swapIndex.FixedLegTenor();ratesOK(t,e);if tenor!=(Period{1,Years}){t.Fatal(tenor)}
  gotCurrency,e:=swapIndex.Currency();ratesOK(t,e);code,e:=gotCurrency.Code();ratesOK(t,e);if code!="EUR"{t.Fatal(code)}
  ratesOK(t,leg.Close());ratesOK(t,flows.Close());_,e=flow.Amount();ratesOK(t,e);_,e=cap.NPV();ratesOK(t,e)
+}
+
+func TestRatesEngineFactoriesAndAtomicPrice(t *testing.T){
+ s,e:=NewSession();ratesOK(t,e);defer s.Close()
+ today,e:=NewDate(7,7,2026);ratesOK(t,e);settings,e:=s.NewSettings();ratesOK(t,e);ratesOK(t,settings.SetEvaluationDate(today))
+ cal,e:=s.Target();ratesOK(t,e);dc,e:=s.Actual365Fixed();ratesOK(t,e);floatDC,e:=s.Actual360();ratesOK(t,e)
+ curve,e:=s.NewFlatForward(today,.04,dc);ratesOK(t,e);index,e:=s.NewEuriborSixMonths(curve,settings);ratesOK(t,e)
+ exerciseDate,e:=cal.Advance(today,1,Years,Following,false);ratesOK(t,e);start,e:=cal.Advance(exerciseDate,2,Days,Following,false);ratesOK(t,e);end,e:=cal.Advance(start,3,Years,Following,false);ratesOK(t,e)
+ fixed,e:=s.NewSchedule(ScheduleConfig{Start:start,End:end,Frequency:Annual,Calendar:cal,Convention:ModifiedFollowing});ratesOK(t,e)
+ floating,e:=s.NewSchedule(ScheduleConfig{Start:start,End:end,Frequency:Semiannual,Calendar:cal,Convention:ModifiedFollowing});ratesOK(t,e)
+ swap,e:=s.NewVanillaSwap(VanillaSwapConfig{Type:SwapPayer,Nominal:1,FixedRate:.04,FixedSchedule:fixed,FloatingSchedule:floating,FixedDayCounter:dc,FloatingDayCounter:floatDC,Index:index,Settings:settings});ratesOK(t,e)
+ _,e=swap.Price(curve,settings);ratesOK(t,e)
+ exercise,e:=s.NewEuropeanExercise(exerciseDate);ratesOK(t,e);option,e:=s.NewSwaption(SwaptionConfig{Swap:swap,Exercise:exercise,Settings:settings});ratesOK(t,e)
+ blackQuote,e:=s.NewSimpleQuote(.20);ratesOK(t,e);normalQuote,e:=s.NewSimpleQuote(.01);ratesOK(t,e)
+ blackFlat,e:=s.NewBlackSwaptionEngineFlat(RateEngineFlatVolConfig{Discount:curve,Volatility:blackQuote,DayCounter:dc,Settings:settings});ratesOK(t,e)
+ normalFlat,e:=s.NewBachelierSwaptionEngineFlat(RateEngineFlatVolConfig{Discount:curve,Volatility:normalQuote,DayCounter:dc,Settings:settings});ratesOK(t,e)
+ cfg:=ConstantRateVolConfig{Calendar:cal,Convention:Following,DayCounter:dc,Settings:settings,Quote:blackQuote,VolatilityType:ShiftedLognormal}
+ blackVol,e:=s.ConstantSwaptionVolatility(cfg);ratesOK(t,e);blackSurface,e:=s.NewBlackSwaptionEngine(SwaptionEngineConfig{Volatility:blackVol,Discount:curve,Settings:settings});ratesOK(t,e)
+ cfg.Quote=normalQuote;cfg.VolatilityType=Normal;normalVol,e:=s.ConstantSwaptionVolatility(cfg);ratesOK(t,e);normalSurface,e:=s.NewBachelierSwaptionEngine(SwaptionEngineConfig{Volatility:normalVol,Discount:curve,Settings:settings});ratesOK(t,e)
+ blackValue,e:=option.Price(blackFlat);ratesOK(t,e);surfaceValue,e:=option.Price(blackSurface);ratesOK(t,e);if math.Abs(blackValue-surfaceValue)>1e-12{t.Fatal("Black factories differ",blackValue,surfaceValue)}
+ ratesOK(t,option.SetBachelierEngine(normalFlat));normalValue,e:=option.NPV();ratesOK(t,e);ratesOK(t,option.SetBachelierEngine(normalSurface));surfaceValue,e=option.NPV();ratesOK(t,e);if math.Abs(normalValue-surfaceValue)>1e-12{t.Fatal("Bachelier factories differ",normalValue,surfaceValue)}
+ ratesOK(t,option.Calculate());cached,e:=option.IsCalculated();ratesOK(t,e);if !cached{t.Fatal("uncached swaption")}
+ hw,e:=s.NewHullWhite(curve,.03,.01);ratesOK(t,e);ratesOK(t,option.SetJamshidianEngine(hw));v,e:=option.NPV();ratesOK(t,e);if v<=0||math.IsNaN(v){t.Fatal("invalid Jamshidian value",v)}
+ // Different Black engines price the same object concurrently. Price must
+ // select and use its engine within one serialized worker invocation.
+ highQuote,e:=s.NewSimpleQuote(.40);ratesOK(t,e);high,e:=s.NewBlackSwaptionEngineFlat(RateEngineFlatVolConfig{Discount:curve,Volatility:highQuote,DayCounter:dc,Settings:settings});ratesOK(t,e);highValue,e:=option.Price(high);ratesOK(t,e)
+ var wg sync.WaitGroup
+ for n:=0;n<40;n++{wg.Add(1);go func(n int){defer wg.Done();engine,want:=blackFlat,blackValue;if n%2==1{engine,want=high,highValue};got,e:=option.Price(engine);if e!=nil||math.Abs(got-want)>1e-12{t.Errorf("interleaved engine: %g want %g (%v)",got,want,e)}}(n)};wg.Wait()
+ cap,e:=s.NewCapFloor(CapFloorConfig{Type:CapType,Tenor:Period{3,Years},ForwardStart:Period{1,Years},Index:index,Strike:.04,Settings:settings});ratesOK(t,e)
+ capFlat,e:=s.NewBlackCapFloorEngineFlat(RateEngineFlatVolConfig{Discount:curve,Volatility:blackQuote,DayCounter:dc,Settings:settings});ratesOK(t,e)
+ cfg.Quote=blackQuote;cfg.VolatilityType=ShiftedLognormal;capVol,e:=s.ConstantOptionletVolatility(cfg);ratesOK(t,e);capSurface,e:=s.NewBlackCapFloorEngine(BlackCapFloorEngineConfig{Volatility:capVol,Discount:curve});ratesOK(t,e)
+ flatValue,e:=cap.Price(capFlat);ratesOK(t,e);surfaceValue,e=cap.Price(capSurface);ratesOK(t,e);if math.Abs(flatValue-surfaceValue)>1e-12{t.Fatal("cap/floor factories differ",flatValue,surfaceValue)}
+ ratesOK(t,cap.SetBlackEngine(capFlat))
 }

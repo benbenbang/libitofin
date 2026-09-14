@@ -1,6 +1,9 @@
 package itofin
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestIndexFamiliesAndConventionInspectors(t *testing.T) {
 	s, e := NewSession()
@@ -35,7 +38,7 @@ func TestIndexFamiliesAndConventionInspectors(t *testing.T) {
 	}
 	usd, e := s.USD()
 	usd = curveMust(t, usd, e)
-	cfg := IborIndexConfig{FamilyName: "Probe", Tenor: Period{3, Months}, SettlementDays: 3, Currency: usd, FixingCalendar: cal, Convention: Preceding, DayCounter: dc, Forwarding: curve, Settings: settings}
+	cfg := IborIndexConfig{FamilyName: "Prøbe\x00Suffix", Tenor: Period{3, Months}, SettlementDays: 3, Currency: usd, FixingCalendar: cal, Convention: Preceding, DayCounter: dc, Forwarding: curve, Settings: settings}
 	idx, e := s.NewIborIndex(cfg)
 	idx = curveMust(t, idx, e)
 	tenor, e := idx.Tenor()
@@ -69,8 +72,8 @@ func TestIndexFamiliesAndConventionInspectors(t *testing.T) {
 		t.Fatal("wrong index currency")
 	}
 	n, e = idx.Name()
-	if curveMust(t, n, e) == "" {
-		t.Fatal("empty index name")
+	if !strings.HasPrefix(curveMust(t, n, e), cfg.FamilyName) {
+		t.Fatal("index family name was truncated")
 	}
 	value, e := idx.ValueDate(today)
 	value = curveMust(t, value, e)

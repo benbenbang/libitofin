@@ -20,6 +20,8 @@ pub struct ItofinConstantRateVolConfig {
 fn boolean(v: i32) -> BindingResult<bool> {
     match v { 0 => Ok(false), 1 => Ok(true), _ => Err(BindingError::invalid("expected boolean 0 or 1")) }
 }
+/// # Safety
+/// Follow the crate C caller contract; arrays must have their stated lengths.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn itofin_constant_swaption_vol_new(ctx: *mut Context,
     cfg: *const ItofinConstantRateVolConfig, out: *mut u64, error: *mut ItofinError) -> i32 {
@@ -40,6 +42,8 @@ pub unsafe extern "C" fn itofin_constant_swaption_vol_new(ctx: *mut Context,
         output(out, c.insert(Handle::new(shared(v) as Shared<dyn SwaptionVolatilityStructure>))?)
     }) }
 }
+/// # Safety
+/// Follow the crate C caller contract; arrays must have their stated lengths.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn itofin_constant_optionlet_vol_new(ctx: *mut Context,
     cfg: *const ItofinConstantRateVolConfig, out: *mut u64, error: *mut ItofinError) -> i32 {
@@ -61,6 +65,8 @@ pub unsafe extern "C" fn itofin_constant_optionlet_vol_new(ctx: *mut Context,
     }) }
 }
 /// Swaption query: 0 volatility, 1 variance, 2 date shift.
+/// # Safety
+/// Follow the crate C caller contract; arrays must have their stated lengths.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn itofin_swaption_vol_query(ctx: *mut Context, id: u64,
     kind: i32, option_length: i32, option_unit: i32, swap_length: i32, swap_unit: i32,
@@ -84,6 +90,8 @@ pub unsafe extern "C" fn itofin_swaption_vol_query(ctx: *mut Context, id: u64,
     }) }
 }
 /// Optionlet query: 0 tenor volatility, 1 tenor variance, 2 date volatility, 3 displacement.
+/// # Safety
+/// Follow the crate C caller contract; arrays must have their stated lengths.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn itofin_optionlet_vol_query(ctx: *mut Context, id: u64,
     kind: i32, length: i32, unit: i32, serial: i32, strike: f64,
@@ -103,6 +111,8 @@ pub unsafe extern "C" fn itofin_optionlet_vol_query(ctx: *mut Context, id: u64,
     }) }
 }
 /// Family 0 swaption, 1 optionlet. Action: 0 reference date, 1 extrapolation state, 2 enable, 3 disable.
+/// # Safety
+/// Follow the crate C caller contract; arrays must have their stated lengths.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn itofin_rate_vol_control(ctx: *mut Context, id: u64,
     family: i32, action: i32, out: *mut i32, error: *mut ItofinError) -> i32 {

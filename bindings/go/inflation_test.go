@@ -187,8 +187,24 @@ func TestZeroInflationBootstrapHelperDatesAndQuoteUpdate(t *testing.T) {
 	cal := creditMust(t, cal0, e)
 	q0, e := s.NewSimpleQuote(.03)
 	q := creditMust(t, q0, e)
-	helper0, e := s.NewZeroCouponInflationSwapHelper(InflationHelperConfig{Quote: q, SwapObservationLag: Period{3, Months}, Maturity: inflationDate(t, 13, 8, 2008), Calendar: cal, PaymentConvention: ModifiedFollowing, DayCounter: dc, ObservationInterpolation: CpiFlat, Settings: settings, Pillar: LastRelevantDate}, index)
+	helper0, e := s.NewZeroCouponInflationSwapHelper(InflationHelperConfig{Quote: q, SwapObservationLag: Period{3, Months}, Maturity: inflationDate(t, 13, 8, 2008), Calendar: cal, PaymentConvention: ModifiedFollowing, DayCounter: dc, ObservationInterpolation: CpiFlat, Settings: settings}, index)
 	helper := creditMust(t, helper0, e)
+
+	linearConfig := InflationHelperConfig{Quote: q, SwapObservationLag: Period{3, Months}, Maturity: inflationDate(t, 13, 8, 2008), Calendar: cal, PaymentConvention: ModifiedFollowing, DayCounter: dc, ObservationInterpolation: CpiLinear, Settings: settings}
+	linear0, e := s.NewZeroCouponInflationSwapHelper(linearConfig, index)
+	linear := creditMust(t, linear0, e)
+	defaultPillar, e := linear.PillarDate()
+	if e != nil || defaultPillar.Serial() != inflationDate(t, 1, 5, 2008).Serial() {
+		t.Fatalf("default LastRelevantDate pillar %v: %v", defaultPillar, e)
+	}
+	far := MaturityDate
+	linearConfig.Pillar = &far
+	far0, e := s.NewZeroCouponInflationSwapHelper(linearConfig, index)
+	farHelper := creditMust(t, far0, e)
+	farPillar, e := farHelper.PillarDate()
+	if e != nil || farPillar.Serial() != inflationDate(t, 1, 6, 2008).Serial() {
+		t.Fatalf("explicit MaturityDate pillar %v: %v", farPillar, e)
+	}
 	pillar, e := helper.PillarDate()
 	if e != nil || pillar.Serial() != inflationDate(t, 1, 5, 2008).Serial() {
 		t.Fatalf("pillar %v: %v", pillar, e)
@@ -221,5 +237,88 @@ func TestZeroInflationBootstrapHelperDatesAndQuoteUpdate(t *testing.T) {
 	}
 	if _, e = curve.Nodes(); e != nil {
 		t.Fatal(e)
+	}
+}
+
+// The first two quoted swaps and published history of QuantLib testYYTermStructure.
+func TestYoYInflationBootstrapRelinkingAndRetainedCurves(t *testing.T) {
+	s0, e := NewSession()
+	s := creditMust(t, s0, e)
+	defer s.Close()
+	today := inflationDate(t, 13, 8, 2007)
+	settings0, e := s.NewSettings()
+	settings := creditMust(t, settings0, e)
+	if e = settings.SetEvaluationDate(today); e != nil {
+		t.Fatal(e)
+	}
+	zero0, e := s.NewUKRPI(settings)
+	zero := creditMust(t, zero0, e)
+	values := []float64{189.9, 189.9, 189.6, 190.5, 191.6, 192, 192.2, 192.2, 192.6, 193.1, 193.3, 193.6, 194.1, 193.4, 194.2, 195, 196.5, 197.7, 198.5, 198.5, 199.2, 200.1, 200.4, 201.1, 202.7, 201.6, 203.1, 204.4, 205.4, 206.2, 207.3}
+	for j, v := range values {
+		if e = zero.AddFixing(inflationDate(t, 1, j%12+1, 2005+j/12), v); e != nil {
+			t.Fatal(e)
+		}
+	}
+	index0, e := s.NewYoYInflationIndexFromUnderlying(zero)
+	index := creditMust(t, index0, e)
+	dc0, e := s.Thirty360BondBasis()
+	dc := creditMust(t, dc0, e)
+	nomdc0, e := s.Actual360()
+	nomdc := creditMust(t, nomdc0, e)
+	nominal0, e := s.NewFlatForward(today, .05, nomdc)
+	nominal := creditMust(t, nominal0, e)
+	cal0, e := s.UnitedKingdom()
+	cal := creditMust(t, cal0, e)
+	helpers := make([]*YoYInflationHelper, 2)
+	quotes := make([]*SimpleQuote, 2)
+	for j := range helpers {
+		q0, e := s.NewSimpleQuote(.0295)
+		quotes[j] = creditMust(t, q0, e)
+		h0, e := s.NewYearOnYearInflationSwapHelper(InflationHelperConfig{Quote: quotes[j], SwapObservationLag: Period{2, Months}, Maturity: inflationDate(t, 13, 8, 2008+j), Calendar: cal, PaymentConvention: ModifiedFollowing, DayCounter: dc, ObservationInterpolation: CpiFlat, Settings: settings}, index, nominal)
+		helpers[j] = creditMust(t, h0, e)
+	}
+	base := inflationDate(t, 1, 7, 2007)
+	curve0, e := s.NewPiecewiseYoYInflationCurve(InflationCurveConfig{ReferenceDate: today, BaseDate: base, BaseYoYRate: .0295, Frequency: Monthly, DayCounter: dc}, helpers)
+	curve := creditMust(t, curve0, e)
+	if e = curve.Calculate(); e != nil {
+		t.Fatal(e)
+	}
+	dates, e := curve.Dates()
+	if e != nil || len(dates) != 3 || dates[0].Serial() != base.Serial() {
+		t.Fatalf("YoY bootstrap nodes %v: %v", dates, e)
+	}
+	if e = index.LinkTo(curve); e != nil {
+		t.Fatal(e)
+	}
+	future := inflationDate(t, 1, 6, 2009)
+	before, e := index.Fixing(future, false)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e = quotes[1].SetValue(.035); e != nil {
+		t.Fatal(e)
+	}
+	after, e := index.Fixing(future, false)
+	if e != nil || after <= before {
+		t.Fatalf("YoY quote update %g -> %g: %v", before, after, e)
+	}
+	if e = curve.Close(); e != nil {
+		t.Fatal(e)
+	}
+	if e = zero.Close(); e != nil {
+		t.Fatal(e)
+	}
+	retained, e := index.Fixing(future, false)
+	if e != nil || retained != after {
+		t.Fatalf("retained forecast %g: %v", retained, e)
+	}
+	replacement0, e := s.NewInterpolatedYoYInflationCurve(InflationCurveConfig{ReferenceDate: today, Frequency: Monthly, DayCounter: dc}, []Date{base, inflationDate(t, 1, 7, 2010)}, []float64{.04, .04})
+	replacement := creditMust(t, replacement0, e)
+	if e = index.LinkTo(replacement); e != nil {
+		t.Fatal(e)
+	}
+	relinked, e := index.Fixing(future, false)
+	if e != nil || math.Abs(relinked-.04) > 1e-12 {
+		t.Fatalf("relinked forecast %g: %v", relinked, e)
 	}
 }

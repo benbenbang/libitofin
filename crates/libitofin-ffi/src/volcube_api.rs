@@ -30,6 +30,8 @@ unsafe fn quote_grid(c:&Context,p:*const u64,count:usize,cols:usize)->BindingRes
     unsafe{input_slice(p,count)?}.chunks(cols).map(|r|r.iter().map(|&id|quote(c,id)).collect()).collect()
 }
 /// Kind: 0 interpolated, 1 SABR. Both returned handles must be released.
+/// # Safety
+/// Follow the crate C caller contract; arrays must have their stated lengths.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn itofin_swaption_vol_cube_new(ctx:*mut Context,kind:i32,
     cfg:*const ItofinVolCubeConfig,out:*mut ItofinVolCubeHandles,error:*mut ItofinError)->i32{
@@ -62,6 +64,8 @@ pub unsafe extern "C" fn itofin_swaption_vol_cube_new(ctx:*mut Context,kind:i32,
         output(out,ItofinVolCubeHandles{surface,cube})
     })}
 }
+/// # Safety
+/// Follow the crate C caller contract; arrays must have their stated lengths.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn itofin_swaption_vol_cube_atm(ctx:*mut Context,id:u64,
     option_length:i32,option_unit:i32,swap_length:i32,swap_unit:i32,

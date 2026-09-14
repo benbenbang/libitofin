@@ -103,20 +103,22 @@ func (h *DefaultProbabilityHelper) PillarDate() (Date, error) { p, _, e := h.dat
 func (h *DefaultProbabilityHelper) LatestDate() (Date, error) { _, l, e := h.dates(); return l, e }
 
 type CdsEngineConfig struct {
-	Probability  *DefaultProbabilityTermStructure
-	Discount     *YieldTermStructure
-	Settings     *Settings
-	Recovery     float64
-	NumericalFix NumericalFix
+	Probability *DefaultProbabilityTermStructure
+	Discount    *YieldTermStructure
+	Settings    *Settings
+	Recovery    float64
+	// Nil selects Taylor.
+	NumericalFix *NumericalFix
 	AccrualBias  AccrualBias
-	Forwards     ForwardsInCouponPeriod
+	// Nil selects PiecewiseForwards.
+	Forwards *ForwardsInCouponPeriod
 }
 
 func (s *Session) cdsEngine(a CdsEngineConfig, kind int) (*CdsEngine, error) {
 	if a.Probability == nil || a.Discount == nil || a.Settings == nil {
 		return nil, errNilArgument("credit argument")
 	}
-	cfg := C.ItofinCdsEngineConfig{probability: C.uint64_t(a.Probability.id), discount: C.uint64_t(a.Discount.id), settings: C.uint64_t(a.Settings.id), recovery: C.double(a.Recovery), kind: C.int32_t(kind), numerical_fix: C.int32_t(a.NumericalFix), accrual_bias: C.int32_t(a.AccrualBias), forwards: C.int32_t(a.Forwards)}
+	cfg := C.ItofinCdsEngineConfig{probability: C.uint64_t(a.Probability.id), discount: C.uint64_t(a.Discount.id), settings: C.uint64_t(a.Settings.id), recovery: C.double(a.Recovery), kind: C.int32_t(kind), numerical_fix: C.int32_t(creditOptional(a.NumericalFix, Taylor)), accrual_bias: C.int32_t(a.AccrualBias), forwards: C.int32_t(creditOptional(a.Forwards, PiecewiseForwards))}
 	var id C.uint64_t
 	err := s.invoke(func() error {
 		if e := sameSession(s, a.Probability.object, a.Discount.object, a.Settings.object); e != nil {
@@ -136,31 +138,32 @@ func (s *Session) NewMidPointCdsEngine(a CdsEngineConfig) (*MidPointCdsEngine, e
 
 // DefaultIsdaCdsEngineConfig selects the Python/QuantLib fidelity defaults.
 func DefaultIsdaCdsEngineConfig() CdsEngineConfig {
-	return CdsEngineConfig{NumericalFix: Taylor, AccrualBias: HalfDayBias, Forwards: PiecewiseForwards}
+	return CdsEngineConfig{}
 }
 func (s *Session) NewIsdaCdsEngine(a CdsEngineConfig) (*IsdaCdsEngine, error) {
 	return s.cdsEngine(a, 1)
 }
 
 type CdsConfig struct {
-	Side                                              ProtectionSide
-	Notional, Spread                                  float64
-	Schedule                                          *Schedule
-	PaymentConvention                                 BusinessDayConvention
-	DayCounter                                        *DayCounter
-	Settings                                          *Settings
-	ProtectionStart                                   *Date
-	SettlesAccrual, PaysAtDefaultTime, RebatesAccrual bool
+	Side              ProtectionSide
+	Notional, Spread  float64
+	Schedule          *Schedule
+	PaymentConvention BusinessDayConvention
+	DayCounter        *DayCounter
+	Settings          *Settings
+	ProtectionStart   *Date
+	// Nil flags select true, matching Python with_terms defaults.
+	SettlesAccrual, PaysAtDefaultTime, RebatesAccrual *bool
 }
 
 func DefaultCdsConfig() CdsConfig {
-	return CdsConfig{Side: ProtectionBuyer, SettlesAccrual: true, PaysAtDefaultTime: true, RebatesAccrual: true}
+	return CdsConfig{}
 }
 func (s *Session) NewCreditDefaultSwap(a CdsConfig) (*CreditDefaultSwap, error) {
 	if a.Schedule == nil || a.DayCounter == nil || a.Settings == nil {
 		return nil, errNilArgument("credit argument")
 	}
-	cfg := C.ItofinCdsConfig{side: C.int32_t(a.Side), notional: C.double(a.Notional), spread: C.double(a.Spread), schedule: C.uint64_t(a.Schedule.id), convention: C.int32_t(a.PaymentConvention), day_counter: C.uint64_t(a.DayCounter.id), settings: C.uint64_t(a.Settings.id), settles_accrual: creditBool(a.SettlesAccrual), pays_at_default_time: creditBool(a.PaysAtDefaultTime), rebates_accrual: creditBool(a.RebatesAccrual)}
+	cfg := C.ItofinCdsConfig{side: C.int32_t(a.Side), notional: C.double(a.Notional), spread: C.double(a.Spread), schedule: C.uint64_t(a.Schedule.id), convention: C.int32_t(a.PaymentConvention), day_counter: C.uint64_t(a.DayCounter.id), settings: C.uint64_t(a.Settings.id), settles_accrual: creditBool(creditOptional(a.SettlesAccrual, true)), pays_at_default_time: creditBool(creditOptional(a.PaysAtDefaultTime, true)), rebates_accrual: creditBool(creditOptional(a.RebatesAccrual, true))}
 	if a.ProtectionStart != nil {
 		cfg.protection_start = C.int32_t(a.ProtectionStart.Serial())
 	}
@@ -331,4 +334,11 @@ func (c *CreditDefaultSwap) Results() (*Results, error) {
 		return err
 	})
 	return result, err
+}
+
+func creditOptional[T any](value *T, fallback T) T {
+	if value != nil {
+		return *value
+	}
+	return fallback
 }

@@ -417,6 +417,135 @@ typedef struct ItofinFraConfig {
   uint64_t discount;
 } ItofinFraConfig;
 
+typedef struct ItofinVolCubeConfig {
+  uint64_t atm;
+  uint64_t index;
+  uint64_t short_index;
+  uint64_t settings;
+  const int32_t *option_lengths;
+  const int32_t *option_units;
+  size_t options;
+  const int32_t *swap_lengths;
+  const int32_t *swap_units;
+  size_t swaps;
+  const double *strike_spreads;
+  size_t strikes;
+  const uint64_t *vol_spreads;
+  size_t vol_count;
+  const uint64_t *guesses;
+  size_t guess_count;
+  const int32_t *fixed;
+  int32_t atm_calibrated;
+  int32_t vega_weighted;
+  int32_t use_max_error;
+  size_t max_guesses;
+  double cutoff_strike;
+} ItofinVolCubeConfig;
+
+typedef struct ItofinVolCubeHandles {
+  uint64_t surface;
+  uint64_t cube;
+} ItofinVolCubeHandles;
+
+typedef struct ItofinCapFloorConfig {
+  int32_t kind;
+  int32_t tenor_length;
+  int32_t tenor_unit;
+  uint64_t index;
+  Real strike;
+  int32_t forward_length;
+  int32_t forward_unit;
+  uint64_t settings;
+} ItofinCapFloorConfig;
+
+typedef struct ItofinRateEngineConfig {
+  /**
+   * 0 Black swaption, 1 Bachelier swaption, 2 Black cap/floor.
+   */
+  int32_t kind;
+  uint64_t discount;
+  uint64_t volatility;
+  uint64_t settings;
+  uint64_t day_counter;
+  Real displacement;
+  int32_t cash_annuity_model;
+  /**
+   * 0 volatility structure, 1 quote + day counter.
+   */
+  uint8_t flat;
+  /**
+   * Used only for cap/floor volatility-structure constructors.
+   */
+  uint8_t has_displacement;
+} ItofinRateEngineConfig;
+
+typedef struct ItofinYoyIndexConfig {
+  const char *family;
+  const char *region_name;
+  const char *region_code;
+  int32_t revised;
+  int32_t frequency;
+  int32_t lag_length;
+  int32_t lag_unit;
+  const char *currency_name;
+  const char *currency_code;
+  int32_t currency_numeric;
+  const char *currency_symbol;
+  const char *currency_fraction_symbol;
+  int32_t currency_fractions;
+  uint64_t settings;
+} ItofinYoyIndexConfig;
+
+typedef struct ItofinInflationCurveConfig {
+  int32_t reference;
+  int32_t base_date;
+  double base_rate;
+  int32_t frequency;
+  uint64_t day_counter;
+} ItofinInflationCurveConfig;
+
+typedef struct ItofinInflationNode {
+  int32_t date;
+  double time;
+  double rate;
+} ItofinInflationNode;
+
+typedef struct ItofinInflationHelperConfig {
+  uint64_t quote;
+  int32_t lag_length;
+  int32_t lag_unit;
+  int32_t maturity;
+  uint64_t calendar;
+  int32_t convention;
+  uint64_t day_counter;
+  uint64_t index;
+  int32_t interpolation;
+  uint64_t discount;
+  uint64_t settings;
+  int32_t pillar;
+} ItofinInflationHelperConfig;
+
+typedef struct ItofinSwapIndexConfig {
+  int32_t tenor_length;
+  int32_t tenor_unit;
+  uint32_t settlement_days;
+  uint64_t currency;
+  uint64_t calendar;
+  int32_t fixed_length;
+  int32_t fixed_unit;
+  int32_t fixed_convention;
+  uint64_t day_counter;
+  uint64_t index;
+  uint64_t discount;
+  uint64_t settings;
+} ItofinSwapIndexConfig;
+
+typedef struct ItofinSwapIndexDetails {
+  int32_t fixed_length;
+  int32_t fixed_unit;
+  uint8_t exogenous_discount;
+} ItofinSwapIndexDetails;
+
 /**
  * ABI major version. Increment for incompatible layouts or calling conventions.
  */
@@ -1345,5 +1474,379 @@ int32_t itofin_stripped_optionlet_adapter_new(struct Context *ctx,
                                               uint64_t setting,
                                               uint64_t *out,
                                               struct ItofinError *error);
+
+/**
+ * Kind: 0 interpolated, 1 SABR. Both returned handles must be released.
+ */
+int32_t itofin_swaption_vol_cube_new(struct Context *ctx,
+                                     int32_t kind,
+                                     const struct ItofinVolCubeConfig *cfg,
+                                     struct ItofinVolCubeHandles *out,
+                                     struct ItofinError *error);
+
+int32_t itofin_swaption_vol_cube_atm(struct Context *ctx,
+                                     uint64_t id,
+                                     int32_t option_length,
+                                     int32_t option_unit,
+                                     int32_t swap_length,
+                                     int32_t swap_unit,
+                                     double *out,
+                                     struct ItofinError *error);
+
+int32_t itofin_ibor_leg_new(struct Context *ctx,
+                            uint64_t schedule,
+                            uint64_t index,
+                            uint64_t *out,
+                            struct ItofinError *error);
+
+/**
+ * Copy with one override: 0 notional, 1 day counter handle, 2 adjustment, 3 fixing days.
+ */
+int32_t itofin_ibor_leg_with(struct Context *ctx,
+                             uint64_t id,
+                             int32_t field,
+                             Real real,
+                             uint64_t integer,
+                             uint64_t *out,
+                             struct ItofinError *error);
+
+int32_t itofin_ibor_leg_count(struct Context *ctx,
+                              uint64_t id,
+                              size_t *out,
+                              struct ItofinError *error);
+
+int32_t itofin_ibor_leg_build(struct Context *ctx,
+                              uint64_t id,
+                              uint64_t *out,
+                              struct ItofinError *error);
+
+int32_t itofin_leg_count(struct Context *ctx, uint64_t id, size_t *out, struct ItofinError *error);
+
+/**
+ * Negative indices count backwards, matching the Python sequence interface.
+ */
+int32_t itofin_leg_item(struct Context *ctx,
+                        uint64_t id,
+                        int64_t index,
+                        uint64_t *out,
+                        struct ItofinError *error);
+
+int32_t itofin_cashflow_amount(struct Context *ctx,
+                               uint64_t id,
+                               Real *out,
+                               struct ItofinError *error);
+
+int32_t itofin_cashflow_date(struct Context *ctx,
+                             uint64_t id,
+                             int32_t *out,
+                             struct ItofinError *error);
+
+/**
+ * include_settlement: -1 unset, 0 false, 1 true. Date zero means unset.
+ */
+int32_t itofin_leg_npv(struct Context *ctx,
+                       uint64_t id,
+                       uint64_t discount,
+                       uint64_t settings_id,
+                       int32_t include_settlement,
+                       int32_t settlement,
+                       int32_t npv_date,
+                       Real *out,
+                       struct ItofinError *error);
+
+int32_t itofin_european_exercise_new(struct Context *ctx,
+                                     int32_t serial,
+                                     uint64_t *out,
+                                     struct ItofinError *error);
+
+int32_t itofin_swaption_new(struct Context *ctx,
+                            uint64_t swap,
+                            uint64_t exercise,
+                            int32_t settlement_type,
+                            int32_t settlement_method,
+                            uint64_t settings_id,
+                            uint64_t *out,
+                            struct ItofinError *error);
+
+int32_t itofin_capfloor_new(struct Context *ctx,
+                            struct ItofinCapFloorConfig a,
+                            uint64_t *out,
+                            struct ItofinError *error);
+
+int32_t itofin_capfloor_from_leg(struct Context *ctx,
+                                 int32_t kind,
+                                 uint64_t leg,
+                                 const Real *caps,
+                                 size_t ncaps,
+                                 const Real *floors,
+                                 size_t nfloors,
+                                 uint64_t settings_id,
+                                 uint64_t *out,
+                                 struct ItofinError *error);
+
+/**
+ * Kind: 0 swaption Black, 1 swaption Bachelier, 2 swaption HullWhite, 3 cap/floor Black.
+ */
+int32_t itofin_rate_option_set_engine(struct Context *ctx,
+                                      uint64_t id,
+                                      uint64_t engine_id,
+                                      int32_t kind,
+                                      struct ItofinError *error);
+
+/**
+ * Instrument kind 0 swaption, 1 cap/floor. Field 0 NPV, 1 calculated, 2 calculate, 3 coupon count (cap/floor only).
+ */
+int32_t itofin_rate_option_value(struct Context *ctx,
+                                 uint64_t id,
+                                 int32_t kind,
+                                 int32_t field,
+                                 Real *out,
+                                 struct ItofinError *error);
+
+int32_t itofin_rate_option_results(struct Context *ctx,
+                                   uint64_t id,
+                                   int32_t kind,
+                                   uint64_t *out,
+                                   struct ItofinError *error);
+
+/**
+ * Which 0 cap rates, 1 floor rates. Capacity zero queries required length.
+ */
+int32_t itofin_capfloor_rates(struct Context *ctx,
+                              uint64_t id,
+                              int32_t which,
+                              Real *out,
+                              size_t capacity,
+                              size_t *required,
+                              struct ItofinError *error);
+
+int32_t itofin_rate_engine_new(struct Context *ctx,
+                               struct ItofinRateEngineConfig a,
+                               uint64_t *out,
+                               struct ItofinError *error);
+
+int32_t itofin_black_capfloor_displacement(struct Context *ctx,
+                                           uint64_t id,
+                                           Real *out,
+                                           struct ItofinError *error);
+
+/**
+ * kind 0 UK RPI, 1 UK HICP, 2 EU HICP.
+ */
+int32_t itofin_zero_index_new(struct Context *ctx,
+                              int32_t kind,
+                              uint64_t settings,
+                              uint64_t *out,
+                              struct ItofinError *error);
+
+int32_t itofin_yoy_index_new(struct Context *ctx,
+                             const struct ItofinYoyIndexConfig *a,
+                             uint64_t *out,
+                             struct ItofinError *error);
+
+int32_t itofin_yoy_index_from_underlying(struct Context *ctx,
+                                         uint64_t id,
+                                         uint64_t *out,
+                                         struct ItofinError *error);
+
+/**
+ * Returns zero for a quoted index, otherwise a new external reference to its underlying.
+ */
+int32_t itofin_yoy_index_underlying(struct Context *ctx,
+                                    uint64_t id,
+                                    uint64_t *out,
+                                    struct ItofinError *error);
+
+/**
+ * kind 0 zero, 1 YoY. All input strings are copied; name output includes trailing NUL.
+ */
+int32_t itofin_inflation_index_name(struct Context *ctx,
+                                    uint64_t id,
+                                    int32_t kind,
+                                    char *out,
+                                    size_t capacity,
+                                    size_t *count,
+                                    struct ItofinError *error);
+
+int32_t itofin_inflation_index_fixing(struct Context *ctx,
+                                      uint64_t id,
+                                      int32_t kind,
+                                      int32_t serial,
+                                      int32_t forecast,
+                                      double *out,
+                                      struct ItofinError *error);
+
+int32_t itofin_inflation_index_add_fixing(struct Context *ctx,
+                                          uint64_t id,
+                                          int32_t kind,
+                                          int32_t serial,
+                                          double value,
+                                          struct ItofinError *error);
+
+/**
+ * query 0 needs_forecast, 1 last_fixing_date serial, 2 ratio (YoY only).
+ */
+int32_t itofin_inflation_index_info(struct Context *ctx,
+                                    uint64_t id,
+                                    int32_t kind,
+                                    int32_t query,
+                                    int32_t serial,
+                                    int32_t *out,
+                                    struct ItofinError *error);
+
+int32_t itofin_inflation_index_link(struct Context *ctx,
+                                    uint64_t id,
+                                    int32_t kind,
+                                    uint64_t curve,
+                                    struct ItofinError *error);
+
+int32_t itofin_zero_inflation_curve_new(struct Context *ctx,
+                                        const struct ItofinInflationCurveConfig *a,
+                                        const int32_t *dates,
+                                        const double *rates,
+                                        size_t n,
+                                        uint64_t *out,
+                                        struct ItofinError *error);
+
+int32_t itofin_piecewise_zero_inflation_new(struct Context *ctx,
+                                            const struct ItofinInflationCurveConfig *a,
+                                            const uint64_t *helpers,
+                                            size_t n,
+                                            uint64_t *out,
+                                            struct ItofinError *error);
+
+/**
+ * query 0 time rate, 1 date rate, 2 base date serial, 3 frequency, 4 has seasonality, 5 calculate.
+ */
+int32_t itofin_zero_inflation_curve_value(struct Context *ctx,
+                                          uint64_t id,
+                                          int32_t query,
+                                          double t,
+                                          int32_t serial,
+                                          int32_t extrapolate,
+                                          double *out,
+                                          struct ItofinError *error);
+
+int32_t itofin_zero_inflation_set_seasonality(struct Context *ctx,
+                                              uint64_t id,
+                                              uint64_t seasonality,
+                                              struct ItofinError *error);
+
+int32_t itofin_zero_inflation_nodes(struct Context *ctx,
+                                    uint64_t id,
+                                    struct ItofinInflationNode *out,
+                                    size_t capacity,
+                                    size_t *count,
+                                    struct ItofinError *error);
+
+int32_t itofin_yoy_inflation_curve_new(struct Context *ctx,
+                                       const struct ItofinInflationCurveConfig *a,
+                                       const int32_t *dates,
+                                       const double *rates,
+                                       size_t n,
+                                       uint64_t *out,
+                                       struct ItofinError *error);
+
+int32_t itofin_piecewise_yoy_inflation_new(struct Context *ctx,
+                                           const struct ItofinInflationCurveConfig *a,
+                                           const uint64_t *helpers,
+                                           size_t n,
+                                           uint64_t *out,
+                                           struct ItofinError *error);
+
+/**
+ * query 0 time rate, 1 date rate, 2 base date serial, 3 frequency, 4 has seasonality, 5 calculate, 6 base rate.
+ */
+int32_t itofin_yoy_inflation_curve_value(struct Context *ctx,
+                                         uint64_t id,
+                                         int32_t query,
+                                         double t,
+                                         int32_t serial,
+                                         int32_t extrapolate,
+                                         double *out,
+                                         struct ItofinError *error);
+
+int32_t itofin_yoy_inflation_set_seasonality(struct Context *ctx,
+                                             uint64_t id,
+                                             uint64_t seasonality,
+                                             struct ItofinError *error);
+
+int32_t itofin_yoy_inflation_nodes(struct Context *ctx,
+                                   uint64_t id,
+                                   struct ItofinInflationNode *out,
+                                   size_t capacity,
+                                   size_t *count,
+                                   struct ItofinError *error);
+
+int32_t itofin_inflation_helper_new(struct Context *ctx,
+                                    const struct ItofinInflationHelperConfig *a,
+                                    int32_t kind,
+                                    uint64_t *out,
+                                    struct ItofinError *error);
+
+/**
+ * query 0 pillar, 1 latest, 2 inflation fixing date (zero only).
+ */
+int32_t itofin_inflation_helper_date(struct Context *ctx,
+                                     uint64_t id,
+                                     int32_t kind,
+                                     int32_t query,
+                                     int32_t *out,
+                                     struct ItofinError *error);
+
+int32_t itofin_seasonality_new(struct Context *ctx,
+                               int32_t base,
+                               int32_t freq,
+                               const double *factors,
+                               size_t n,
+                               uint64_t *out,
+                               struct ItofinError *error);
+
+/**
+ * query 0 base date serial, 1 frequency, 2 factor at date.
+ */
+int32_t itofin_seasonality_value(struct Context *ctx,
+                                 uint64_t id,
+                                 int32_t query,
+                                 int32_t serial,
+                                 double *out,
+                                 struct ItofinError *error);
+
+int32_t itofin_seasonality_factors(struct Context *ctx,
+                                   uint64_t id,
+                                   double *out,
+                                   size_t capacity,
+                                   size_t *count,
+                                   struct ItofinError *error);
+
+int32_t itofin_swap_index_new(struct Context *ctx,
+                              const uint8_t *name,
+                              size_t name_len,
+                              struct ItofinSwapIndexConfig a,
+                              uint64_t *out,
+                              struct ItofinError *error);
+
+int32_t itofin_swap_index_fixing(struct Context *ctx,
+                                 uint64_t id,
+                                 int32_t serial,
+                                 uint8_t forecast_today,
+                                 Real *out,
+                                 struct ItofinError *error);
+
+int32_t itofin_swap_index_currency(struct Context *ctx,
+                                   uint64_t id,
+                                   uint64_t *out,
+                                   struct ItofinError *error);
+
+int32_t itofin_swap_index_details(struct Context *ctx,
+                                  uint64_t id,
+                                  struct ItofinSwapIndexDetails *out,
+                                  struct ItofinError *error);
+
+/**
+ * Returns the package version as a static, NUL-terminated UTF-8 string.
+ * The caller must not modify or free it. Valid for the loaded library lifetime.
+ */
+const char *itofin_version(void);
 
 #endif  /* ITOFIN_H */

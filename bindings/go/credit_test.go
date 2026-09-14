@@ -66,6 +66,16 @@ func TestCreditCachedMidpointAndLifecycle(t *testing.T) {
 	if e != nil || math.Abs(spread-.007517539081) > 1e-7 {
 		t.Fatalf("fair spread %g: %v", spread, e)
 	}
+
+	noRebate := false
+	noRebateCfg := cfg
+	noRebateCfg.RebatesAccrual = &noRebate
+	noRebate0, e := s.NewCreditDefaultSwap(noRebateCfg)
+	noRebateCds := creditMust(t, noRebate0, e)
+	rebate, e := noRebateCds.AccrualRebateAmount()
+	if e != nil || rebate != nil {
+		t.Fatalf("explicit false rebate flag ignored: %v %v", rebate, e)
+	}
 	if e = q.SetValue(.02); e != nil {
 		t.Fatal(e)
 	}
@@ -136,5 +146,88 @@ func TestCreditCurveNodesAndSessionIsolation(t *testing.T) {
 	}
 	if _, e = s.NewInterpolatedHazardRateCurve([]Date{b, a}, []float64{.01, .02}, dc); e == nil {
 		t.Fatal("unsorted dates accepted")
+	}
+}
+
+// Same flat Act/365F fixture as the Python ISDA binding oracle.
+func TestCreditISDAOracleDefaultsAndImpliedHazard(t *testing.T) {
+	s0, e := NewSession()
+	s := creditMust(t, s0, e)
+	defer s.Close()
+	today0, e := NewDate(15, 6, 2026)
+	today := creditMust(t, today0, e)
+	maturity0, e := NewDate(15, 6, 2029)
+	maturity := creditMust(t, maturity0, e)
+	settings0, e := s.NewSettings()
+	settings := creditMust(t, settings0, e)
+	if e = settings.SetEvaluationDate(today); e != nil {
+		t.Fatal(e)
+	}
+	dc0, e := s.Actual360()
+	dc := creditMust(t, dc0, e)
+	curvedc0, e := s.Actual365Fixed()
+	curvedc := creditMust(t, curvedc0, e)
+	cal0, e := s.Target()
+	cal := creditMust(t, cal0, e)
+	probability0, e := s.NewFlatHazardRate(FlatHazardConfig{ReferenceDate: today, Rate: .02, DayCounter: curvedc})
+	probability := creditMust(t, probability0, e)
+	discount0, e := s.NewFlatForward(today, .03, curvedc)
+	discount := creditMust(t, discount0, e)
+	engineCfg := CdsEngineConfig{Probability: probability, Discount: discount, Settings: settings, Recovery: .4}
+	engine0, e := s.NewIsdaCdsEngine(engineCfg)
+	engine := creditMust(t, engine0, e)
+	schedule0, e := s.NewSchedule(ScheduleConfig{Start: today, End: maturity, Frequency: Quarterly, Calendar: cal, Convention: Following})
+	schedule := creditMust(t, schedule0, e)
+	cds0, e := s.NewCreditDefaultSwap(CdsConfig{Side: ProtectionSeller, Notional: 1e7, Spread: .01, Schedule: schedule, PaymentConvention: Following, DayCounter: dc, Settings: settings})
+	cds := creditMust(t, cds0, e)
+	if e = cds.SetIsdaEngine(engine); e != nil {
+		t.Fatal(e)
+	}
+	npv, e := cds.NPV()
+	if e != nil || math.Abs(npv-(-52927.18294373818)) > 1e-8 {
+		t.Fatalf("ISDA NPV %.14g: %v", npv, e)
+	}
+	coupon, e := cds.CouponLegNPV()
+	if e != nil || math.Abs(coupon-281656.6267407311) > 1e-8 {
+		t.Fatalf("ISDA coupon %.14g: %v", coupon, e)
+	}
+	protection, e := cds.DefaultLegNPV()
+	if e != nil || math.Abs(protection-(-334583.8096844693)) > 1e-8 {
+		t.Fatalf("ISDA protection %.14g: %v", protection, e)
+	}
+	snapshot0, e := cds.Results()
+	snapshot := creditMust(t, snapshot0, e)
+	if snapshot.NPV == nil || *snapshot.NPV != npv {
+		t.Fatalf("snapshot NPV %v", snapshot.NPV)
+	}
+	implied, e := cds.ImpliedHazardRate(npv, discount, curvedc, .4, 1e-10, Isda)
+	if e != nil || math.Abs(implied-.02) > 1e-9 {
+		t.Fatalf("implied hazard %g: %v", implied, e)
+	}
+	numerical := Taylor
+	forwards := PiecewiseForwards
+	engineCfg.NumericalFix = &numerical
+	engineCfg.Forwards = &forwards
+	explicit0, e := s.NewIsdaCdsEngine(engineCfg)
+	explicit := creditMust(t, explicit0, e)
+	if e = cds.SetIsdaEngine(explicit); e != nil {
+		t.Fatal(e)
+	}
+	explicitNPV, e := cds.NPV()
+	if e != nil || explicitNPV != npv {
+		t.Fatalf("default fidelity differs: %g %v", explicitNPV, e)
+	}
+	engineCfg.AccrualBias = NoBias
+	unbiased0, e := s.NewIsdaCdsEngine(engineCfg)
+	unbiased := creditMust(t, unbiased0, e)
+	if e = cds.SetIsdaEngine(unbiased); e != nil {
+		t.Fatal(e)
+	}
+	noBiasCoupon, e := cds.CouponLegNPV()
+	if e != nil || math.Abs(noBiasCoupon-281648.88829497696) > 1e-8 {
+		t.Fatalf("unbiased coupon %.14g: %v", noBiasCoupon, e)
+	}
+	if snapshot.NPV == nil || *snapshot.NPV != npv {
+		t.Fatal("snapshot mutated with instrument")
 	}
 }

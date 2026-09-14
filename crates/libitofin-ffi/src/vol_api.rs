@@ -15,6 +15,8 @@ fn calendar(c: &Context, id: u64) -> BindingResult<Option<Calendar>> {
 fn flag(value: i32) -> BindingResult<bool> {
     match value { 0 => Ok(false), 1 => Ok(true), _ => Err(BindingError::invalid("expected boolean 0 or 1")) }
 }
+/// # Safety
+/// Follow the crate C caller contract; arrays must have their stated lengths.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn itofin_black_constant_vol_new(ctx: *mut Context,
     reference_date: i32, volatility: f64, dc: u64, cal: u64, out: *mut u64,
@@ -27,6 +29,8 @@ pub unsafe extern "C" fn itofin_black_constant_vol_new(ctx: *mut Context,
         output(out, c.insert(Handle::new(v))?)
     }) }
 }
+/// # Safety
+/// Follow the crate C caller contract; arrays must have their stated lengths.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn itofin_black_variance_curve_new(ctx: *mut Context,
     reference_date: i32, dates: *const i32, vols: *const f64, count: usize,
@@ -49,6 +53,8 @@ pub unsafe extern "C" fn itofin_black_variance_curve_new(ctx: *mut Context,
         output(out, c.insert(Handle::new(v))?)
     }) }
 }
+/// # Safety
+/// Follow the crate C caller contract; arrays must have their stated lengths.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn itofin_black_variance_surface_new(ctx: *mut Context,
     reference_date: i32, dates: *const i32, date_count: usize, strikes: *const f64,
@@ -74,6 +80,8 @@ pub unsafe extern "C" fn itofin_black_variance_surface_new(ctx: *mut Context,
 }
 /// Query kind: 0 vol, 1 variance, 2 forward vol, 3 forward variance,
 /// 4 minimum strike, 5 maximum strike. Times are year fractions.
+/// # Safety
+/// Follow the crate C caller contract; arrays must have their stated lengths.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn itofin_black_vol_query(ctx: *mut Context, id: u64,
     kind: i32, t1: f64, t2: f64, strike: f64, extrapolate: i32,
@@ -97,6 +105,8 @@ pub unsafe extern "C" fn itofin_black_vol_query(ctx: *mut Context, id: u64,
     }) }
 }
 /// Date query kind: 0 vol, 1 variance.
+/// # Safety
+/// Follow the crate C caller contract; arrays must have their stated lengths.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn itofin_black_vol_date_query(ctx: *mut Context, id: u64,
     kind: i32, serial: i32, strike: f64, extrapolate: i32,
@@ -115,6 +125,8 @@ pub unsafe extern "C" fn itofin_black_vol_date_query(ctx: *mut Context, id: u64,
     }) }
 }
 /// Metadata action: 0 max date, 1 allows extrapolation, 2 enable, 3 disable.
+/// # Safety
+/// Follow the crate C caller contract; arrays must have their stated lengths.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn itofin_black_vol_control(ctx: *mut Context, id: u64,
     action: i32, out: *mut i32, error: *mut ItofinError) -> i32 {

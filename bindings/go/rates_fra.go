@@ -17,7 +17,7 @@ type FRAConfig struct {
     Discount *YieldTermStructure
 }
 func(s *Session) NewForwardRateAgreement(a FRAConfig)(*ForwardRateAgreement,error){
-    if a.Index==nil{return nil,fmt.Errorf("FRA index required")};var id C.uint64_t
+    if a.Index==nil{return nil,fmt.Errorf("FRA index required")};if a.MaturityDate!=nil&&a.MaturityDate.Serial()==0{return nil,fmt.Errorf("invalid explicit maturity date")};var id C.uint64_t
     err:=s.invoke(func()error{
         objects:=[]object{a.Index.object};if a.Discount!=nil{objects=append(objects,a.Discount.object)}
         if err:=sameSession(s,objects...);err!=nil{return err}
