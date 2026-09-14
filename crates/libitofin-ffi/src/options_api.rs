@@ -12,7 +12,7 @@ use libitofin::pricingengines::vanilla::analytichestonengine::AnalyticHestonEngi
 use libitofin::processes::GeneralizedBlackScholesProcess;
 use libitofin::settings::Settings;
 use libitofin::shared::{Shared, SharedMut, shared, shared_mut};
-use libitofin::time::Date;
+use libitofin::time::date::Date;
 
 pub(crate) fn option_type(value: i32) -> BindingResult<OptionType> {
     match value { 0 => Ok(OptionType::Call), 1 => Ok(OptionType::Put),

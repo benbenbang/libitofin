@@ -16,7 +16,7 @@ use libitofin::quotes::{Quote, SimpleQuote};
 use libitofin::shared::{Shared, SharedMut, shared, shared_mut};
 use libitofin::termstructures::yields::FlatForward;
 use libitofin::termstructures::yieldtermstructure::YieldTermStructure;
-use libitofin::time::{Date, DayCounter};
+use libitofin::time::{date::Date, daycounter::DayCounter};
 use libitofin::time::frequency::Frequency;
 
 pub(crate) fn error_type(value: i32) -> BindingResult<CalibrationErrorType> {
@@ -152,7 +152,7 @@ pub unsafe extern "C" fn itofin_heston_helper_new(ctx: *mut Context,
         let d = date(cfg.reference_date)?;
         let dc = day_counter(c, cfg.day_counter)?;
         let helper = HestonModelHelper::new(
-            libitofin::time::Period::new(cfg.maturity_length, crate::time_api::time_unit(cfg.maturity_unit)?),
+            libitofin::time::period::Period::new(cfg.maturity_length, crate::time_api::time_unit(cfg.maturity_unit)?),
             crate::time_api::calendar(c, cfg.calendar)?, cfg.spot, cfg.strike,
             Handle::new(shared(SimpleQuote::new(cfg.volatility)) as Shared<dyn Quote>),
             flat(d, cfg.risk_free_rate, dc.clone()), flat(d, cfg.dividend_yield, dc),
@@ -174,7 +174,7 @@ pub unsafe extern "C" fn itofin_swaption_helper_new(ctx: *mut Context,
     cfg: SwaptionHelperConfig, out: *mut u64, error: *mut ItofinError) -> i32 {
     unsafe { with_context(ctx, error, |c| {
         check_ptr(out)?;
-        use libitofin::time::Period;
+        use libitofin::time::period::Period;
         let helper = SwaptionHelper::new(
             Period::new(cfg.maturity_length, crate::time_api::time_unit(cfg.maturity_unit)?),
             Period::new(cfg.length, crate::time_api::time_unit(cfg.length_unit)?),
