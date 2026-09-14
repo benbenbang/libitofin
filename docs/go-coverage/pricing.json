@@ -1,0 +1,798 @@
+{
+  "scope": "Python option.rs, heston.rs, calibration.rs, mcengine.rs and HullWhite/SwaptionHelper portions of hullwhite.rs",
+  "implementation_gaps": [],
+  "test_gaps": [
+    "PriceError and ImpliedVolError enum values implemented but not separately calibrated."
+  ],
+  "symbols": [
+    {
+      "python": "itofin.instruments.VanillaOption.__init__",
+      "source": "crates/itofin-py/python/itofin/instruments/__init__.pyi",
+      "c": "itofin_option_new",
+      "go": "Session.NewVanillaOption",
+      "native_file": "crates/libitofin-ffi/src/options_api.rs",
+      "go_file": "bindings/go/options.go",
+      "status": "implemented",
+      "tests": [
+        "TestHestonCachedPriceAndLifecycle",
+        "TestOptionSessionIsolationAndConcurrentPricing"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.instruments.VanillaOption.american",
+      "source": "crates/itofin-py/python/itofin/instruments/__init__.pyi",
+      "c": "itofin_option_new",
+      "go": "Session.NewAmericanOption",
+      "native_file": "crates/libitofin-ffi/src/options_api.rs",
+      "go_file": "bindings/go/options.go",
+      "status": "implemented",
+      "tests": [
+        "TestMCAmericanCachedOracle"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.instruments.VanillaOption.set_engine",
+      "source": "crates/itofin-py/python/itofin/instruments/__init__.pyi",
+      "c": "itofin_option_set_engine",
+      "go": "VanillaOption.SetEngine",
+      "native_file": "crates/libitofin-ffi/src/options_api.rs",
+      "go_file": "bindings/go/options.go",
+      "status": "implemented",
+      "tests": [
+        "TestHestonCachedPriceAndLifecycle",
+        "TestOptionSessionIsolationAndConcurrentPricing"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.instruments.VanillaOption.set_heston_engine",
+      "source": "crates/itofin-py/python/itofin/instruments/__init__.pyi",
+      "c": "itofin_option_set_engine",
+      "go": "VanillaOption.SetHestonEngine",
+      "native_file": "crates/libitofin-ffi/src/options_api.rs",
+      "go_file": "bindings/go/options.go",
+      "status": "implemented",
+      "tests": [
+        "TestHestonCachedPriceAndLifecycle",
+        "TestOptionSessionIsolationAndConcurrentPricing"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.instruments.VanillaOption.set_mc_engine",
+      "source": "crates/itofin-py/python/itofin/instruments/__init__.pyi",
+      "c": "itofin_option_set_engine",
+      "go": "VanillaOption.SetMCEngine",
+      "native_file": "crates/libitofin-ffi/src/options_api.rs",
+      "go_file": "bindings/go/options.go",
+      "status": "implemented",
+      "tests": [
+        "TestMCEuropeanOracleAndValidation"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.instruments.VanillaOption.set_mc_heston_engine",
+      "source": "crates/itofin-py/python/itofin/instruments/__init__.pyi",
+      "c": "itofin_option_set_engine",
+      "go": "VanillaOption.SetMCHestonEngine",
+      "native_file": "crates/libitofin-ffi/src/options_api.rs",
+      "go_file": "bindings/go/options.go",
+      "status": "implemented",
+      "tests": [
+        "TestMCHestonCachedOracle"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.instruments.VanillaOption.set_mc_american_engine",
+      "source": "crates/itofin-py/python/itofin/instruments/__init__.pyi",
+      "c": "itofin_option_set_engine",
+      "go": "VanillaOption.SetMCAmericanEngine",
+      "native_file": "crates/libitofin-ffi/src/options_api.rs",
+      "go_file": "bindings/go/options.go",
+      "status": "implemented",
+      "tests": [
+        "TestMCAmericanCachedOracle"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.instruments.VanillaOption.calculate",
+      "source": "crates/itofin-py/python/itofin/instruments/__init__.pyi",
+      "c": "itofin_option_calculate",
+      "go": "VanillaOption.Calculate",
+      "native_file": "crates/libitofin-ffi/src/options_api.rs",
+      "go_file": "bindings/go/options.go",
+      "status": "implemented",
+      "tests": [
+        "TestHestonCachedPriceAndLifecycle",
+        "TestOptionSessionIsolationAndConcurrentPricing"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.instruments.VanillaOption.is_calculated",
+      "source": "crates/itofin-py/python/itofin/instruments/__init__.pyi",
+      "c": "itofin_option_calculate",
+      "go": "VanillaOption.IsCalculated",
+      "native_file": "crates/libitofin-ffi/src/options_api.rs",
+      "go_file": "bindings/go/options.go",
+      "status": "implemented",
+      "tests": [
+        "TestHestonCachedPriceAndLifecycle",
+        "TestOptionSessionIsolationAndConcurrentPricing"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.instruments.VanillaOption.price",
+      "source": "crates/itofin-py/python/itofin/instruments/__init__.pyi",
+      "c": [
+        "itofin_option_set_engine",
+        "itofin_option_value"
+      ],
+      "go": "VanillaOption.Price",
+      "native_file": "crates/libitofin-ffi/src/options_api.rs",
+      "go_file": "bindings/go/options.go",
+      "status": "implemented",
+      "tests": [
+        "TestHestonCachedPriceAndLifecycle",
+        "TestOptionSessionIsolationAndConcurrentPricing"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.instruments.VanillaOption.price_heston",
+      "source": "crates/itofin-py/python/itofin/instruments/__init__.pyi",
+      "c": [
+        "itofin_option_set_engine",
+        "itofin_option_value"
+      ],
+      "go": "VanillaOption.PriceHeston",
+      "native_file": "crates/libitofin-ffi/src/options_api.rs",
+      "go_file": "bindings/go/options.go",
+      "status": "implemented",
+      "tests": [
+        "TestHestonCachedPriceAndLifecycle"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.instruments.VanillaOption.price_mc",
+      "source": "crates/itofin-py/python/itofin/instruments/__init__.pyi",
+      "c": [
+        "itofin_option_set_engine",
+        "itofin_option_value"
+      ],
+      "go": "VanillaOption.PriceMC",
+      "native_file": "crates/libitofin-ffi/src/options_api.rs",
+      "go_file": "bindings/go/options.go",
+      "status": "implemented",
+      "tests": [
+        "TestMCEuropeanOracleAndValidation"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.instruments.VanillaOption.price_mc_heston",
+      "source": "crates/itofin-py/python/itofin/instruments/__init__.pyi",
+      "c": [
+        "itofin_option_set_engine",
+        "itofin_option_value"
+      ],
+      "go": "VanillaOption.PriceMCHeston",
+      "native_file": "crates/libitofin-ffi/src/options_api.rs",
+      "go_file": "bindings/go/options.go",
+      "status": "implemented",
+      "tests": [
+        "TestMCHestonCachedOracle"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.instruments.VanillaOption.price_mc_american",
+      "source": "crates/itofin-py/python/itofin/instruments/__init__.pyi",
+      "c": [
+        "itofin_option_set_engine",
+        "itofin_option_value"
+      ],
+      "go": "VanillaOption.PriceMCAmerican",
+      "native_file": "crates/libitofin-ffi/src/options_api.rs",
+      "go_file": "bindings/go/options.go",
+      "status": "implemented",
+      "tests": [
+        "TestMCAmericanCachedOracle"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.instruments.VanillaOption.results",
+      "source": "crates/itofin-py/python/itofin/instruments/__init__.pyi",
+      "c": "itofin_option_results",
+      "go": "VanillaOption.Results",
+      "native_file": "crates/libitofin-ffi/src/options_api.rs",
+      "go_file": "bindings/go/options.go",
+      "status": "implemented",
+      "tests": [
+        "TestHestonCachedPriceAndLifecycle",
+        "TestOptionSessionIsolationAndConcurrentPricing"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.instruments.VanillaOption.npv",
+      "source": "crates/itofin-py/python/itofin/instruments/__init__.pyi",
+      "c": "itofin_option_value",
+      "go": "VanillaOption.NPV",
+      "native_file": "crates/libitofin-ffi/src/options_api.rs",
+      "go_file": "bindings/go/options.go",
+      "status": "implemented",
+      "tests": [
+        "TestHestonCachedPriceAndLifecycle",
+        "TestOptionSessionIsolationAndConcurrentPricing"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.instruments.VanillaOption.delta",
+      "source": "crates/itofin-py/python/itofin/instruments/__init__.pyi",
+      "c": "itofin_option_value",
+      "go": "VanillaOption.Delta",
+      "native_file": "crates/libitofin-ffi/src/options_api.rs",
+      "go_file": "bindings/go/options.go",
+      "status": "implemented",
+      "tests": [
+        "TestHestonCachedPriceAndLifecycle",
+        "TestOptionSessionIsolationAndConcurrentPricing"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.instruments.VanillaOption.gamma",
+      "source": "crates/itofin-py/python/itofin/instruments/__init__.pyi",
+      "c": "itofin_option_value",
+      "go": "VanillaOption.Gamma",
+      "native_file": "crates/libitofin-ffi/src/options_api.rs",
+      "go_file": "bindings/go/options.go",
+      "status": "implemented",
+      "tests": [
+        "TestHestonCachedPriceAndLifecycle",
+        "TestOptionSessionIsolationAndConcurrentPricing"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.instruments.VanillaOption.theta",
+      "source": "crates/itofin-py/python/itofin/instruments/__init__.pyi",
+      "c": "itofin_option_value",
+      "go": "VanillaOption.Theta",
+      "native_file": "crates/libitofin-ffi/src/options_api.rs",
+      "go_file": "bindings/go/options.go",
+      "status": "implemented",
+      "tests": [
+        "TestHestonCachedPriceAndLifecycle",
+        "TestOptionSessionIsolationAndConcurrentPricing"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.instruments.VanillaOption.vega",
+      "source": "crates/itofin-py/python/itofin/instruments/__init__.pyi",
+      "c": "itofin_option_value",
+      "go": "VanillaOption.Vega",
+      "native_file": "crates/libitofin-ffi/src/options_api.rs",
+      "go_file": "bindings/go/options.go",
+      "status": "implemented",
+      "tests": [
+        "TestHestonCachedPriceAndLifecycle",
+        "TestOptionSessionIsolationAndConcurrentPricing"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.instruments.VanillaOption.rho",
+      "source": "crates/itofin-py/python/itofin/instruments/__init__.pyi",
+      "c": "itofin_option_value",
+      "go": "VanillaOption.Rho",
+      "native_file": "crates/libitofin-ffi/src/options_api.rs",
+      "go_file": "bindings/go/options.go",
+      "status": "implemented",
+      "tests": [
+        "TestHestonCachedPriceAndLifecycle",
+        "TestOptionSessionIsolationAndConcurrentPricing"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.instruments.VanillaOption.dividend_rho",
+      "source": "crates/itofin-py/python/itofin/instruments/__init__.pyi",
+      "c": "itofin_option_value",
+      "go": "VanillaOption.DividendRho",
+      "native_file": "crates/libitofin-ffi/src/options_api.rs",
+      "go_file": "bindings/go/options.go",
+      "status": "implemented",
+      "tests": [
+        "TestHestonCachedPriceAndLifecycle",
+        "TestOptionSessionIsolationAndConcurrentPricing"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.instruments.VanillaOption.error_estimate",
+      "source": "crates/itofin-py/python/itofin/instruments/__init__.pyi",
+      "c": "itofin_option_value",
+      "go": "VanillaOption.ErrorEstimate",
+      "native_file": "crates/libitofin-ffi/src/options_api.rs",
+      "go_file": "bindings/go/options.go",
+      "status": "implemented",
+      "tests": [
+        "TestHestonCachedPriceAndLifecycle",
+        "TestOptionSessionIsolationAndConcurrentPricing"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.instruments.VanillaOption.exercise_probability",
+      "source": "crates/itofin-py/python/itofin/instruments/__init__.pyi",
+      "c": "itofin_option_value",
+      "go": "VanillaOption.ExerciseProbability",
+      "native_file": "crates/libitofin-ffi/src/options_api.rs",
+      "go_file": "bindings/go/options.go",
+      "status": "implemented",
+      "tests": [
+        "TestMCAmericanCachedOracle"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.models.HestonModel.__init__",
+      "source": "crates/itofin-py/python/itofin/models/__init__.pyi",
+      "c": "itofin_heston_model_new",
+      "go": "Session.NewHestonModel",
+      "native_file": "crates/libitofin-ffi/src/models_api.rs",
+      "go_file": "bindings/go/models.go",
+      "status": "implemented",
+      "tests": [
+        "TestModelConstraintsParametersAndBondOption",
+        "TestHestonCalibratesFlatSurface"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.models.HestonModel.theta",
+      "source": "crates/itofin-py/python/itofin/models/__init__.pyi",
+      "c": "itofin_model_parameter",
+      "go": "HestonModel.Theta",
+      "native_file": "crates/libitofin-ffi/src/models_api.rs",
+      "go_file": "bindings/go/models.go",
+      "status": "implemented",
+      "tests": [
+        "TestModelConstraintsParametersAndBondOption",
+        "TestHestonCalibratesFlatSurface"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.models.HestonModel.kappa",
+      "source": "crates/itofin-py/python/itofin/models/__init__.pyi",
+      "c": "itofin_model_parameter",
+      "go": "HestonModel.Kappa",
+      "native_file": "crates/libitofin-ffi/src/models_api.rs",
+      "go_file": "bindings/go/models.go",
+      "status": "implemented",
+      "tests": [
+        "TestModelConstraintsParametersAndBondOption",
+        "TestHestonCalibratesFlatSurface"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.models.HestonModel.sigma",
+      "source": "crates/itofin-py/python/itofin/models/__init__.pyi",
+      "c": "itofin_model_parameter",
+      "go": "HestonModel.Sigma",
+      "native_file": "crates/libitofin-ffi/src/models_api.rs",
+      "go_file": "bindings/go/models.go",
+      "status": "implemented",
+      "tests": [
+        "TestModelConstraintsParametersAndBondOption",
+        "TestHestonCalibratesFlatSurface"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.models.HestonModel.rho",
+      "source": "crates/itofin-py/python/itofin/models/__init__.pyi",
+      "c": "itofin_model_parameter",
+      "go": "HestonModel.Rho",
+      "native_file": "crates/libitofin-ffi/src/models_api.rs",
+      "go_file": "bindings/go/models.go",
+      "status": "implemented",
+      "tests": [
+        "TestModelConstraintsParametersAndBondOption",
+        "TestHestonCalibratesFlatSurface"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.models.HestonModel.v0",
+      "source": "crates/itofin-py/python/itofin/models/__init__.pyi",
+      "c": "itofin_model_parameter",
+      "go": "HestonModel.V0",
+      "native_file": "crates/libitofin-ffi/src/models_api.rs",
+      "go_file": "bindings/go/models.go",
+      "status": "implemented",
+      "tests": [
+        "TestModelConstraintsParametersAndBondOption",
+        "TestHestonCalibratesFlatSurface"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.models.HestonModel.calibrate",
+      "source": "crates/itofin-py/python/itofin/models/__init__.pyi",
+      "c": "itofin_model_calibrate",
+      "go": "HestonModel.Calibrate",
+      "native_file": "crates/libitofin-ffi/src/models_api.rs",
+      "go_file": "bindings/go/models.go",
+      "status": "implemented",
+      "tests": [
+        "TestModelConstraintsParametersAndBondOption",
+        "TestHestonCalibratesFlatSurface"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.models.HestonModelHelper.__init__",
+      "source": "crates/itofin-py/python/itofin/models/__init__.pyi",
+      "c": "itofin_heston_helper_new",
+      "go": "Session.NewHestonModelHelper",
+      "native_file": "crates/libitofin-ffi/src/models_api.rs",
+      "go_file": "bindings/go/models.go",
+      "status": "implemented",
+      "tests": [
+        "TestHestonCalibratesFlatSurface"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.models.HestonModelHelper.calibration_error",
+      "source": "crates/itofin-py/python/itofin/models/__init__.pyi",
+      "c": "itofin_helper_error",
+      "go": "HestonModelHelper.CalibrationError",
+      "native_file": "crates/libitofin-ffi/src/models_api.rs",
+      "go_file": "bindings/go/models.go",
+      "status": "implemented",
+      "tests": [
+        "TestHestonCalibratesFlatSurface"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.models.HullWhite.__init__",
+      "source": "crates/itofin-py/python/itofin/models/__init__.pyi",
+      "c": "itofin_hullwhite_new",
+      "go": "Session.NewHullWhite",
+      "native_file": "crates/libitofin-ffi/src/models_api.rs",
+      "go_file": "bindings/go/models.go",
+      "status": "implemented",
+      "tests": [
+        "TestModelConstraintsParametersAndBondOption",
+        "TestHullWhiteCalibrationCachedOracles"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.models.HullWhite.a",
+      "source": "crates/itofin-py/python/itofin/models/__init__.pyi",
+      "c": "itofin_model_parameter",
+      "go": "HullWhite.A",
+      "native_file": "crates/libitofin-ffi/src/models_api.rs",
+      "go_file": "bindings/go/models.go",
+      "status": "implemented",
+      "tests": [
+        "TestModelConstraintsParametersAndBondOption",
+        "TestHullWhiteCalibrationCachedOracles"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.models.HullWhite.sigma",
+      "source": "crates/itofin-py/python/itofin/models/__init__.pyi",
+      "c": "itofin_model_parameter",
+      "go": "HullWhite.Sigma",
+      "native_file": "crates/libitofin-ffi/src/models_api.rs",
+      "go_file": "bindings/go/models.go",
+      "status": "implemented",
+      "tests": [
+        "TestModelConstraintsParametersAndBondOption",
+        "TestHullWhiteCalibrationCachedOracles"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.models.HullWhite.r0",
+      "source": "crates/itofin-py/python/itofin/models/__init__.pyi",
+      "c": "itofin_model_parameter",
+      "go": "HullWhite.R0",
+      "native_file": "crates/libitofin-ffi/src/models_api.rs",
+      "go_file": "bindings/go/models.go",
+      "status": "implemented",
+      "tests": [
+        "TestModelConstraintsParametersAndBondOption",
+        "TestHullWhiteCalibrationCachedOracles"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.models.HullWhite.discount_bond_option",
+      "source": "crates/itofin-py/python/itofin/models/__init__.pyi",
+      "c": "itofin_hullwhite_bond_option",
+      "go": "HullWhite.DiscountBondOption",
+      "native_file": "crates/libitofin-ffi/src/models_api.rs",
+      "go_file": "bindings/go/models.go",
+      "status": "implemented",
+      "tests": [
+        "TestModelConstraintsParametersAndBondOption",
+        "TestHullWhiteCalibrationCachedOracles"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.models.HullWhite.calibrate",
+      "source": "crates/itofin-py/python/itofin/models/__init__.pyi",
+      "c": "itofin_model_calibrate",
+      "go": "HullWhite.Calibrate",
+      "native_file": "crates/libitofin-ffi/src/models_api.rs",
+      "go_file": "bindings/go/models.go",
+      "status": "implemented",
+      "tests": [
+        "TestModelConstraintsParametersAndBondOption",
+        "TestHullWhiteCalibrationCachedOracles"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.models.SwaptionHelper.__init__",
+      "source": "crates/itofin-py/python/itofin/models/__init__.pyi",
+      "c": "itofin_swaption_helper_new",
+      "go": "Session.NewSwaptionHelper",
+      "native_file": "crates/libitofin-ffi/src/models_api.rs",
+      "go_file": "bindings/go/models.go",
+      "status": "implemented",
+      "tests": [
+        "TestHullWhiteCalibrationCachedOracles"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.models.SwaptionHelper.calibration_error",
+      "source": "crates/itofin-py/python/itofin/models/__init__.pyi",
+      "c": "itofin_helper_error",
+      "go": "SwaptionHelper.CalibrationError",
+      "native_file": "crates/libitofin-ffi/src/models_api.rs",
+      "go_file": "bindings/go/models.go",
+      "status": "implemented",
+      "tests": [
+        "TestHullWhiteCalibrationCachedOracles"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.pricingengines.MCAmericanEngine.__init__",
+      "source": "crates/itofin-py/python/itofin/pricingengines/__init__.pyi",
+      "c": "itofin_mc_engine_new",
+      "go": "Session.NewMCAmericanEngine",
+      "native_file": "crates/libitofin-ffi/src/mc_api.rs",
+      "go_file": "bindings/go/mc.go",
+      "status": "implemented",
+      "tests": [
+        "TestMCAmericanCachedOracle"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.pricingengines.MCEuropeanEngine.__init__",
+      "source": "crates/itofin-py/python/itofin/pricingengines/__init__.pyi",
+      "c": "itofin_mc_engine_new",
+      "go": "Session.NewMCEuropeanEngine",
+      "native_file": "crates/libitofin-ffi/src/mc_api.rs",
+      "go_file": "bindings/go/mc.go",
+      "status": "implemented",
+      "tests": [
+        "TestMCEuropeanOracleAndValidation"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.pricingengines.MCEuropeanHestonEngine.__init__",
+      "source": "crates/itofin-py/python/itofin/pricingengines/__init__.pyi",
+      "c": "itofin_mc_engine_new",
+      "go": "Session.NewMCEuropeanHestonEngine",
+      "native_file": "crates/libitofin-ffi/src/mc_api.rs",
+      "go_file": "bindings/go/mc.go",
+      "status": "implemented",
+      "tests": [
+        "TestMCHestonCachedOracle"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.processes.HestonProcess.__init__",
+      "source": "crates/itofin-py/python/itofin/processes/__init__.pyi",
+      "c": "itofin_heston_process_new",
+      "go": "Session.NewHestonProcess",
+      "native_file": "crates/libitofin-ffi/src/models_api.rs",
+      "go_file": "bindings/go/models.go",
+      "status": "implemented",
+      "tests": [
+        "TestModelConstraintsParametersAndBondOption"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.processes.HestonProcess.v0",
+      "source": "crates/itofin-py/python/itofin/processes/__init__.pyi",
+      "c": "itofin_model_parameter",
+      "go": "HestonProcess.V0",
+      "native_file": "crates/libitofin-ffi/src/models_api.rs",
+      "go_file": "bindings/go/models.go",
+      "status": "implemented",
+      "tests": [
+        "TestModelConstraintsParametersAndBondOption"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.processes.HestonProcess.kappa",
+      "source": "crates/itofin-py/python/itofin/processes/__init__.pyi",
+      "c": "itofin_model_parameter",
+      "go": "HestonProcess.Kappa",
+      "native_file": "crates/libitofin-ffi/src/models_api.rs",
+      "go_file": "bindings/go/models.go",
+      "status": "implemented",
+      "tests": [
+        "TestModelConstraintsParametersAndBondOption"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.processes.HestonProcess.theta",
+      "source": "crates/itofin-py/python/itofin/processes/__init__.pyi",
+      "c": "itofin_model_parameter",
+      "go": "HestonProcess.Theta",
+      "native_file": "crates/libitofin-ffi/src/models_api.rs",
+      "go_file": "bindings/go/models.go",
+      "status": "implemented",
+      "tests": [
+        "TestModelConstraintsParametersAndBondOption"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.processes.HestonProcess.sigma",
+      "source": "crates/itofin-py/python/itofin/processes/__init__.pyi",
+      "c": "itofin_model_parameter",
+      "go": "HestonProcess.Sigma",
+      "native_file": "crates/libitofin-ffi/src/models_api.rs",
+      "go_file": "bindings/go/models.go",
+      "status": "implemented",
+      "tests": [
+        "TestModelConstraintsParametersAndBondOption"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.processes.HestonProcess.rho",
+      "source": "crates/itofin-py/python/itofin/processes/__init__.pyi",
+      "c": "itofin_model_parameter",
+      "go": "HestonProcess.Rho",
+      "native_file": "crates/libitofin-ffi/src/models_api.rs",
+      "go_file": "bindings/go/models.go",
+      "status": "implemented",
+      "tests": [
+        "TestModelConstraintsParametersAndBondOption"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.optimization.EndCriteria.__init__",
+      "source": "crates/itofin-py/python/itofin/optimization/__init__.pyi",
+      "c": "itofin_end_criteria_new",
+      "go": "Session.NewEndCriteria",
+      "native_file": "crates/libitofin-ffi/src/models_api.rs",
+      "go_file": "bindings/go/models.go",
+      "status": "implemented",
+      "tests": [
+        "TestModelConstraintsParametersAndBondOption",
+        "TestHullWhiteCalibrationCachedOracles"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.optimization.LevenbergMarquardt.__init__",
+      "source": "crates/itofin-py/python/itofin/optimization/__init__.pyi",
+      "c": "itofin_levenberg_marquardt_new",
+      "go": "Session.NewLevenbergMarquardt",
+      "native_file": "crates/libitofin-ffi/src/models_api.rs",
+      "go_file": "bindings/go/models.go",
+      "status": "implemented",
+      "tests": [
+        "TestHestonCalibratesFlatSurface",
+        "TestHullWhiteCalibrationCachedOracles"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.instruments.OptionType.Call",
+      "c": "int32 discriminant 0",
+      "go": "Call",
+      "native_file": "crates/libitofin-ffi/src/options_api.rs",
+      "go_file": "bindings/go/options.go",
+      "status": "implemented",
+      "tests": [
+        "TestOptionSessionIsolationAndConcurrentPricing",
+        "TestMCAmericanCachedOracle"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.instruments.OptionType.Put",
+      "c": "int32 discriminant 1",
+      "go": "Put",
+      "native_file": "crates/libitofin-ffi/src/options_api.rs",
+      "go_file": "bindings/go/options.go",
+      "status": "implemented",
+      "tests": [
+        "TestOptionSessionIsolationAndConcurrentPricing",
+        "TestMCAmericanCachedOracle"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.models.CalibrationErrorType.RelativePriceError",
+      "c": "int32 discriminant 0",
+      "go": "RelativePriceError",
+      "native_file": "crates/libitofin-ffi/src/models_api.rs",
+      "go_file": "bindings/go/models.go",
+      "status": "implemented",
+      "tests": [
+        "TestHullWhiteCalibrationCachedOracles"
+      ],
+      "validation": "Go feature-subset tests passed with Go 1.27.1"
+    },
+    {
+      "python": "itofin.models.CalibrationErrorType.PriceError",
+      "c": "int32 discriminant 1",
+      "go": "PriceError",
+      "native_file": "crates/libitofin-ffi/src/models_api.rs",
+      "go_file": "bindings/go/models.go",
+      "status": "implemented",
+      "tests": [
+        "models_api::tests::calibration_enum_and_optional_criteria_are_checked"
+      ],
+      "validation": "Native discriminant mapping test added; execution pending; calibration variant not separately exercised"
+    },
+    {
+      "python": "itofin.models.CalibrationErrorType.ImpliedVolError",
+      "c": "int32 discriminant 2",
+      "go": "ImpliedVolError",
+      "native_file": "crates/libitofin-ffi/src/models_api.rs",
+      "go_file": "bindings/go/models.go",
+      "status": "implemented",
+      "tests": [
+        "models_api::tests::calibration_enum_and_optional_criteria_are_checked"
+      ],
+      "validation": "Native discriminant mapping test added; execution pending; calibration variant not separately exercised"
+    }
+  ],
+  "verification": {
+    "go_version": "go1.27.1",
+    "command": "go test -count=1 -v session.go time.go settings.go results.go market.go curves.go indexes.go helpers.go vol.go smile.go options.go models.go mc.go pricing_test.go models_test.go",
+    "result": "PASS: all eight pricing/model Go tests (0.685s)",
+    "scope": "Integrated Go feature subset linked to release native library; whole-package integration gate remains separate. Later observability assertion requires rerun."
+  }
+}

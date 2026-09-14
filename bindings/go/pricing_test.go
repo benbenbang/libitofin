@@ -44,6 +44,7 @@ func TestHestonCachedPriceAndLifecycle(t *testing.T) {
 	}
 	pricingOK(t, opt.SetHestonEngine(model, 64))
 	pricingNear(t, pricingMust(opt.NPV()), .0404774515, 1e-8)
+	pricingNear(t, pricingMust(opt.PriceHeston(model, 64)), .0404774515, 1e-8)
 	for _, f := range []func() (float64, error){opt.Delta, opt.Gamma, opt.Theta, opt.Vega, opt.Rho, opt.DividendRho, opt.ErrorEstimate, opt.ExerciseProbability} {
 		if _, err := f(); err == nil {
 			t.Fatal("missing result accepted")
@@ -139,6 +140,7 @@ func TestMCEuropeanOracleAndValidation(t *testing.T) {
 		opt := pricingMust(s.NewVanillaOption(Call, strike, expiry, settings))
 		analytic := pricingMust(opt.Price(p))
 		engine := pricingMust(s.NewMCEuropeanEngine(p, cfg))
+		pricingOK(t, opt.SetMCEngine(engine))
 		mc := pricingMust(opt.PriceMC(engine))
 		se := pricingMust(opt.ErrorEstimate())
 		if se <= 0 || math.Abs(mc-analytic) >= 3*se {
@@ -178,6 +180,7 @@ func TestMCHestonCachedOracle(t *testing.T) {
 	cfg := MCConfig{StepsPerYear: pricingPtr(uint(11)), Samples: pricingPtr(uint(50000)), Seed: pricingPtr(uint32(1234)), Antithetic: pricingPtr(true)}
 	engine := pricingMust(s.NewMCEuropeanHestonEngine(p, cfg))
 	opt := pricingMust(s.NewVanillaOption(Put, 1.05, expiry, settings))
+	pricingOK(t, opt.SetMCHestonEngine(engine))
 	value := pricingMust(opt.PriceMCHeston(engine))
 	se := pricingMust(opt.ErrorEstimate())
 	if se <= 0 || se > 7.5e-4 || math.Abs(value-.0632851308977151) > 2.34*se {
@@ -198,6 +201,7 @@ func TestMCAmericanCachedOracle(t *testing.T) {
 	cfg := MCConfig{Steps: pricingPtr(uint(75)), AbsoluteTolerance: pricingPtr(.02), Seed: pricingPtr(uint32(42)), Antithetic: pricingPtr(true), PolynomialOrder: pricingPtr(uint(3))}
 	engine := pricingMust(s.NewMCAmericanEngine(p, cfg))
 	opt := pricingMust(s.NewAmericanOption(Put, 36, settlement, expiry, settings))
+	pricingOK(t, opt.SetMCAmericanEngine(engine))
 	value := pricingMust(opt.PriceMCAmerican(engine))
 	se := pricingMust(opt.ErrorEstimate())
 	probability := pricingMust(opt.ExerciseProbability())

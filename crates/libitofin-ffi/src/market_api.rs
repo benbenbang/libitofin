@@ -62,3 +62,28 @@ pub unsafe extern "C" fn itofin_black_scholes_rate(ctx: *mut Context, id: u64, d
         output(out, curve.current_link()?.zero_rate(0.0, Compounding::Continuous, Frequency::Annual, true)?.rate())
     }) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use libitofin::time::daycounters::actual360::Actual360;
+    #[test]
+    fn market_argument_order_and_observable_quote() {
+        let mut c=Context::new();let mut id=0;let mut value=0.0;
+        unsafe {
+            assert_eq!(itofin_quote_new(&mut c,60.0,&mut id,std::ptr::null_mut()),0);
+            assert_eq!(itofin_quote_set(&mut c,id,61.0,std::ptr::null_mut()),0);
+            assert_eq!(itofin_quote_value(&mut c,id,&mut value,std::ptr::null_mut()),0);
+        }
+        assert_eq!(value,61.0);
+        let dc=c.insert(Actual360::new()).unwrap();
+        let ref_date=libitofin::time::date::Date::new(15,libitofin::time::date::Month::June,2026);
+        unsafe {
+            assert_eq!(itofin_black_scholes_new(&mut c,60.0,0.08,0.02,0.30,ref_date.serial_number(),dc,&mut id,std::ptr::null_mut()),0);
+            assert_eq!(itofin_black_scholes_rate(&mut c,id,false,&mut value,std::ptr::null_mut()),0);
+        }
+        assert!((value-0.08).abs()<1e-10);
+        unsafe {assert_eq!(itofin_black_scholes_rate(&mut c,id,true,&mut value,std::ptr::null_mut()),0);}
+        assert!((value-0.02).abs()<1e-10);
+    }
+}

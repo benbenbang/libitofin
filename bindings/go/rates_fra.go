@@ -39,7 +39,7 @@ func(f *ForwardRateAgreement) date(field int32)(Date,error){
     var out C.int32_t;s:=f.session;err:=s.invoke(func()error{
         if err:=sameSession(s,f.object);err!=nil{return err};var e C.ItofinError
         return ffiError(C.itofin_fra_date(s.ctx,C.uint64_t(f.id),C.int32_t(field),&out,&e),&e)
-    });return Date(out),err
+    });if err!=nil{return Date{},err};return DateFromSerial(int32(out))
 }
 func(f *ForwardRateAgreement) ValueDate()(Date,error){return f.date(0)}
 func(f *ForwardRateAgreement) MaturityDate()(Date,error){return f.date(1)}
