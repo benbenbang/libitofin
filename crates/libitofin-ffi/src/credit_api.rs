@@ -140,7 +140,7 @@ pub unsafe extern "C" fn itofin_default_curve_calculate(ctx: *mut Context, id: u
 mod tests {
     use super::*;
     use libitofin::time::daycounters::actual365fixed::Actual365Fixed;
-    use libitofin::time::month::Month;
+    use libitofin::time::date::Month;
     #[test]
     fn flat_hazard_live_quote_lifetime_and_foreign_handle() {
         let mut c=Context::new();let dc=c.insert(Actual365Fixed::new()).unwrap();

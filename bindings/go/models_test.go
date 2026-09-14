@@ -26,12 +26,23 @@ func TestHestonCalibratesFlatSurface(t *testing.T) {
 	for _, sigma := range []float64{.1, .3, .5} {
 		proc := pricingMust(s.NewHestonProcess(HestonProcessConfig{RiskFreeRate: .04, DividendYield: .50, Spot: 1, V0: .01, Kappa: .2, Theta: .02, Sigma: sigma, Rho: -.75, ReferenceDate: ref, DayCounter: dc}))
 		model := pricingMust(s.NewHestonModel(proc))
+		option := pricingMust(s.NewVanillaOption(Call, .7, pricingMust(ref.AddDays(360)), settings))
+		before := pricingMust(option.PriceHeston(model, 96))
+		if !pricingMust(option.IsCalculated()) {
+			t.Fatal("precalibration cache invalid")
+		}
 		method := pricingMust(s.NewLevenbergMarquardt(nil))
 		criteria := pricingMust(s.NewEndCriteria(EndCriteriaConfig{MaxIterations: 400, MaxStationaryStateIterations: pricingPtr(uint(40)), RootEpsilon: 1e-8, FunctionEpsilon: 1e-8, GradientNormEpsilon: pricingPtr(1e-8)}))
 		if err := model.Calibrate(nil, method, criteria, 96); err == nil {
 			t.Fatal("empty helpers accepted")
 		}
 		pricingOK(t, model.Calibrate(helpers, method, criteria, 96))
+		if pricingMust(option.IsCalculated()) {
+			t.Fatal("calibration failed to invalidate live option")
+		}
+		if after := pricingMust(option.NPV()); after == before {
+			t.Fatal("calibration did not change price")
+		}
 		if got := pricingMust(model.Sigma()); got >= 3e-3 {
 			t.Fatalf("sigma %g", got)
 		}

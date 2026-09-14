@@ -93,10 +93,11 @@ func swapValue(o object,kind,field int32)(float64,error){
     });return float64(out),err
 }
 func swapResults(o object,kind int32)(*Results,error){
-    var id C.uint64_t;s:=o.session;err:=s.invoke(func()error{
-        if err:=sameSession(s,o);err!=nil{return err};var e C.ItofinError
-        return ffiError(C.itofin_swap_results(s.ctx,C.uint64_t(o.id),C.int32_t(kind),&id,&e),&e)
-    });if err!=nil{return nil,err};return &Results{object{s,uint64(id)}},nil
+    var result *Results;s:=o.session;err:=s.invoke(func()error{
+        if err:=sameSession(s,o);err!=nil{return err};var e C.ItofinError;var id C.uint64_t
+        if err:=ffiError(C.itofin_swap_results(s.ctx,C.uint64_t(o.id),C.int32_t(kind),&id,&e),&e);err!=nil{return err}
+        var err error;result,err=s.readResults(uint64(id));return err
+    });return result,err
 }
 func (v *VanillaSwap) NPV()(float64,error){return swapValue(v.object,0,0)}
 func (v *VanillaSwap) FairRate()(float64,error){return swapValue(v.object,0,1)}

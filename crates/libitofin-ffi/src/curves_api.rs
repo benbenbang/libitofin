@@ -5,7 +5,7 @@ use libitofin::handle::Handle;
 use libitofin::interestrate::Compounding;
 use libitofin::math::interpolations::{convexmonotone::ConvexMonotone, cubic::Cubic, flat::BackwardFlat, linear::Linear, loglinear::LogLinear};
 use libitofin::shared::{Shared, shared};
-use libitofin::termstructures::{RateHelper, bootstraptraits::{Discount, ForwardRate, ZeroYield}, globalbootstrap::GlobalBootstrap, localbootstrap::LocalBootstrap};
+use libitofin::termstructures::{bootstraptraits::{Discount, ForwardRate, ZeroYield}, globalbootstrap::GlobalBootstrap, localbootstrap::LocalBootstrap};
 use libitofin::termstructures::yields::{FlatForward, ZeroCurve, DiscountCurve, ForwardCurve, InterpolatedDiscountCurve, InterpolatedZeroCurve, PiecewiseYieldCurve};
 use libitofin::termstructures::yieldtermstructure::YieldTermStructure;
 use libitofin::time::frequency::Frequency;
@@ -124,4 +124,46 @@ pub unsafe extern "C" fn itofin_curve_nodes(ctx: *mut Context, id: u64, dates: *
         for (i,(d,v)) in ds.iter().zip(vs.iter()).enumerate() { output(dates.add(i),d.serial_number())?; output(values.add(i),*v)?; }
         Ok(())
     }) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use libitofin::time::{date::Date,daycounters::actual365fixed::Actual365Fixed};
+    #[test]
+    fn flat_curve_native_boundary_and_lifetimes() {
+        let mut c=Context::new();let dc=c.insert(Actual365Fixed::new()).unwrap();
+        let d=Date::new(15,libitofin::time::date::Month::June,2026).serial_number();
+        let mut id=0;let mut v=0.0;
+        unsafe {
+            assert_eq!(itofin_flat_forward_new(&mut c,d,0.04,dc,&mut id,std::ptr::null_mut()),0);
+            assert_eq!(itofin_handle_release(&mut c,dc,std::ptr::null_mut()),0);
+            assert_eq!(itofin_curve_value(&mut c,id,0,2.0,0.0,0,false,&mut v,std::ptr::null_mut()),0);
+        }
+        assert!((v-(-0.08_f64).exp()).abs()<1e-14);
+        let mut other=Context::new();
+        unsafe {
+            assert_eq!(itofin_curve_value(&mut other,id,0,2.0,0.0,0,false,&mut v,std::ptr::null_mut()),INVALID_HANDLE);
+            assert_eq!(itofin_curve_value(&mut c,id,9,0.0,0.0,0,false,&mut v,std::ptr::null_mut()),INVALID_ARGUMENT);
+            assert_eq!(itofin_curve_value(&mut c,id,0,2.0,0.0,0,false,std::ptr::null_mut(),std::ptr::null_mut()),INVALID_ARGUMENT);
+            assert_eq!(itofin_handle_release(&mut c,id,std::ptr::null_mut()),0);
+            assert_eq!(itofin_curve_value(&mut c,id,0,2.0,0.0,0,false,&mut v,std::ptr::null_mut()),INVALID_HANDLE);
+        }
+    }
+    #[test]
+    fn node_curve_checks_dates_and_extrapolation() {
+        let mut c=Context::new();let dc=c.insert(Actual365Fixed::new()).unwrap();
+        let dates=[Date::new(15,libitofin::time::date::Month::June,2026).serial_number(),Date::new(15,libitofin::time::date::Month::June,2027).serial_number()];
+        let values=[1.0,0.95];let mut id=0;let mut v=0.0;
+        unsafe {
+            assert_eq!(itofin_node_curve_new(&mut c,2,dates.as_ptr(),values.as_ptr(),2,dc,0,&mut id,std::ptr::null_mut()),0);
+            assert_eq!(itofin_curve_value(&mut c,id,0,1.0,0.0,0,false,&mut v,std::ptr::null_mut()),0);
+            assert!((v-0.95).abs()<1e-14);
+            assert_ne!(itofin_curve_value(&mut c,id,0,2.0,0.0,0,false,&mut v,std::ptr::null_mut()),0);
+            assert_eq!(itofin_curve_extrapolation(&mut c,id,true,std::ptr::null_mut()),0);
+            assert_eq!(itofin_curve_value(&mut c,id,0,2.0,0.0,0,false,&mut v,std::ptr::null_mut()),0);
+            assert!((v-0.95_f64.powi(2)).abs()<1e-14);
+            assert_eq!(itofin_node_curve_new(&mut c,2,std::ptr::null(),values.as_ptr(),2,dc,0,&mut id,std::ptr::null_mut()),INVALID_ARGUMENT);
+        }
+    }
 }

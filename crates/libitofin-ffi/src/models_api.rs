@@ -472,3 +472,49 @@ pub unsafe extern "C" fn itofin_model_calibrate(
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::ptr::null_mut;
+    #[test]
+    fn calibration_enum_and_optional_criteria_are_checked() {
+        assert_eq!(
+            error_type(0).unwrap(),
+            CalibrationErrorType::RelativePriceError
+        );
+        assert_eq!(error_type(1).unwrap(), CalibrationErrorType::PriceError);
+        assert_eq!(
+            error_type(2).unwrap(),
+            CalibrationErrorType::ImpliedVolError
+        );
+        assert!(error_type(3).is_err());
+        let mut c = Context::new();
+        let mut id = 99;
+        let mut config = EndCriteriaConfig {
+            max_iterations: 100,
+            stationary_iterations: 0,
+            root_epsilon: 1e-8,
+            function_epsilon: 1e-8,
+            gradient_epsilon: 0.,
+            has_stationary: 0,
+            has_gradient: 0,
+        };
+        unsafe {
+            assert_eq!(
+                itofin_end_criteria_new(&mut c, config, &mut id, null_mut()),
+                0
+            );
+            config.has_stationary = 1;
+            assert_eq!(
+                itofin_end_criteria_new(&mut c, config, &mut id, null_mut()),
+                CORE_ERROR
+            );
+            config.has_stationary = 2;
+            assert_eq!(
+                itofin_end_criteria_new(&mut c, config, &mut id, null_mut()),
+                INVALID_ARGUMENT
+            );
+        }
+    }
+}
