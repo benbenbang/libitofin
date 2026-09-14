@@ -135,3 +135,34 @@ pub unsafe extern "C" fn itofin_default_curve_calculate(ctx: *mut Context, id: u
         Ok(())
     }) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use libitofin::time::daycounter::DayCounter;
+    use libitofin::time::daycounters::actual365fixed::Actual365Fixed;
+    use libitofin::time::month::Month;
+    #[test]
+    fn flat_hazard_live_quote_lifetime_and_foreign_handle() {
+        let mut c=Context::new();let dc=c.insert(DayCounter::new(Actual365Fixed::new())).unwrap();
+        let quote=shared(SimpleQuote::new(0.01234));let q=c.insert(quote.clone()).unwrap();
+        let cfg=ItofinFlatHazardConfig {reference_date:Date::new(9,Month::June,2006).serial_number(),
+            settlement_days:0,calendar:0,quote:q,rate:0.0,day_counter:dc,settings:0};
+        let mut id=0;let mut v=0.0;
+        unsafe {
+            assert_eq!(itofin_flat_hazard_new(&mut c,&cfg,&mut id,std::ptr::null_mut()),0);
+            assert_eq!(itofin_default_curve_value(&mut c,id,0,10.0,0,0,0,&mut v,std::ptr::null_mut()),0);
+            assert!((v-(-0.1234_f64).exp()).abs()<1e-14);
+            quote.set_value(0.02);
+            assert_eq!(itofin_handle_release(&mut c,q,std::ptr::null_mut()),0);
+            assert_eq!(itofin_default_curve_value(&mut c,id,0,10.0,0,0,0,&mut v,std::ptr::null_mut()),0);
+            assert!((v-(-0.2_f64).exp()).abs()<1e-14);
+            let mut other=Context::new();
+            assert_eq!(itofin_default_curve_value(&mut other,id,0,1.0,0,0,0,&mut v,std::ptr::null_mut()),INVALID_HANDLE);
+            assert_eq!(itofin_default_curve_value(&mut c,id,0,f64::NAN,0,0,0,&mut v,std::ptr::null_mut()),INVALID_ARGUMENT);
+            assert_eq!(itofin_default_curve_value(&mut c,id,0,1.0,0,2,0,&mut v,std::ptr::null_mut()),INVALID_ARGUMENT);
+            assert_eq!(itofin_handle_release(&mut c,id,std::ptr::null_mut()),0);
+            assert_eq!(itofin_default_curve_value(&mut c,id,0,1.0,0,0,0,&mut v,std::ptr::null_mut()),INVALID_HANDLE);
+        }
+    }
+}
