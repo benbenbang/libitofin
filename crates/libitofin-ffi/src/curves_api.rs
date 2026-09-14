@@ -84,8 +84,8 @@ pub unsafe extern "C" fn itofin_piecewise_curve_new(ctx: *mut Context, reference
     unsafe { with_context(ctx,error,|c| {
         check_ptr(out)?;
         let reference=date(reference)?; let dc=day_counter(c,dc)?;
-        let helpers = input_slice(helpers,len)?.iter().map(|id| c.get::<Shared<dyn RateHelper>>(*id)).collect::<BindingResult<Vec<_>>>()?;
-        let additional = input_slice(additional,additional_len)?.iter().map(|id| c.get::<Shared<dyn RateHelper>>(*id)).collect::<BindingResult<Vec<_>>>()?;
+        let helpers = input_slice(helpers,len)?.iter().map(|id| crate::helpers_api::helper(c,*id)).collect::<BindingResult<Vec<_>>>()?;
+        let additional = input_slice(additional,additional_len)?.iter().map(|id| crate::helpers_api::helper(c,*id)).collect::<BindingResult<Vec<_>>>()?;
         if algorithm != 1 && !additional.is_empty() { return Err(BindingError::invalid("additional helpers require global bootstrap")); }
         let v: Shared<dyn YieldTermStructure> = match (kind,algorithm) {
             (0,0) => PiecewiseYieldCurve::<Discount,LogLinear>::new(reference,helpers,dc,LogLinear)?,
