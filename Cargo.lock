@@ -272,6 +272,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "libitofin-ffi"
+version = "0.20.0"
+dependencies = [
+ "libitofin",
+]
+
+[[package]]
 name = "log"
 version = "0.4.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"

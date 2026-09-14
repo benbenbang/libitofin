@@ -106,6 +106,37 @@ pub unsafe extern "C" fn itofin_results_additional(
 mod tests {
     use super::*;
     #[test]
+    fn snapshots_detach_and_omit_non_real_additional_results() {
+        use libitofin::instrument::InstrumentResults;
+        use libitofin::shared::shared;
+        let mut base = InstrumentBase::new();
+        let mut original = InstrumentResults {
+            value: Some(10.),
+            error_estimate: Some(0.25),
+            valuation_date: Some(Date::from_serial(45_000)),
+            ..Default::default()
+        };
+        original
+            .additional_results
+            .insert("delta".into(), shared(0.5_f64));
+        original
+            .additional_results
+            .insert("label".into(), shared("not a real".to_string()));
+        base.store_results(&original);
+        let frozen = snapshot(&base);
+        original.value = Some(20.);
+        original.additional_results.clear();
+        base.store_results(&original);
+        assert_eq!(frozen.npv, Some(10.));
+        assert_eq!(frozen.error_estimate, Some(0.25));
+        assert_eq!(frozen.valuation_date, Some(Date::from_serial(45_000)));
+        assert_eq!(
+            frozen.additional_results,
+            BTreeMap::from([("delta".into(), 0.5)])
+        );
+        assert_eq!(snapshot(&base).npv, Some(20.));
+    }
+    #[test]
     fn results_preserve_missing_values_and_utf8_keys() {
         let mut c = Context::new();
         let id = c
