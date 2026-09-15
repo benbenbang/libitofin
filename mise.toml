@@ -1,0 +1,5 @@
+[tools]
+python = "3.13.15"
+
+[env]
+DYLD_LIBRARY_PATH = { value = "{{ tools.python.path }}/lib", tools = true }

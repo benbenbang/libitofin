@@ -1,7 +1,10 @@
 # C and Go binding implementation contract
 
 The core stays FFI-agnostic and retains its settled Shared/Rc ownership design.
-The coverage target is the committed Python stubs at the baseline revision.
+The coverage target is the committed Python stubs at baseline revision
+`bf6c5d640c1a0aac3184d8a24d77897e2df2b5ae`. CI enforces this with
+`scripts/check_go_coverage.py --strict --baseline`, reporting newer unmapped
+Python APIs separately. Invalid mapping references remain errors in both modes.
 
 ## Native boundary
 

@@ -10,17 +10,31 @@ import argparse
 import ast
 import json
 import re
+import subprocess
 from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+BASELINE = "bf6c5d640c1a0aac3184d8a24d77897e2df2b5ae"
 
 
-def inventory():
+def inventory(ref=None):
     symbols = {}
-    for path in sorted((ROOT / "crates/itofin-py/python/itofin").rglob("*.pyi")):
-        module = ".".join(path.relative_to(ROOT / "crates/itofin-py/python").parts[:-1])
-        for node in ast.parse(path.read_text()).body:
+    python_root = Path("crates/itofin-py/python")
+    if ref is None:
+        sources = ((p.relative_to(ROOT), p.read_text()) for p in sorted((ROOT / python_root / "itofin").rglob("*.pyi")))
+    else:
+        paths = subprocess.check_output(
+            ["git", "ls-tree", "-r", "--name-only", "-z", ref, "--", str(python_root / "itofin")],
+            cwd=ROOT, text=True,
+        ).split("\0")
+        sources = (
+            (Path(p), subprocess.check_output(["git", "show", f"{ref}:{p}"], cwd=ROOT, text=True))
+            for p in paths if p.endswith(".pyi")
+        )
+    for path, source in sources:
+        module = ".".join(path.relative_to(python_root).parts[:-1])
+        for node in ast.parse(source).body:
             if isinstance(node, ast.ClassDef):
                 name = f"{module}.{node.name}"
                 symbols[name] = "type"
@@ -92,24 +106,44 @@ def audit():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--strict", action="store_true", help="fail on any unmapped Python symbol")
+    parser.add_argument("--baseline", action="store_true", help=f"require parity with {BASELINE}; report newer gaps separately")
     parser.add_argument("--report", type=Path, help="write JSON audit report")
     args = parser.parse_args()
     symbols, covered, linked, records, errors = audit()
     missing = sorted(set(symbols) - covered)
+    required = set(symbols)
+    if args.baseline:
+        try:
+            required = set(inventory(BASELINE))
+        except subprocess.CalledProcessError:
+            parser.error(f"cannot read baseline {BASELINE}; fetch repository history first")
+        if not required:
+            parser.error(f"baseline {BASELINE} contains no Python API symbols")
+    required_missing = sorted(required - covered)
+    newer_missing = sorted(set(missing) - required)
     report = {
         "metric": "declared Python API symbols; overloads deduplicated; containing types inferred from mapped members",
         "total": len(symbols), "mapped": len(covered), "with_test_references": len(linked),
         "kinds": dict(Counter(symbols.values())), "missing": missing, "errors": errors,
         "mappings": {s: records.get(s, [{"note": "type established by mapped member"}]) for s in sorted(covered)},
     }
+    if args.baseline:
+        report["baseline"] = {
+            "revision": BASELINE, "total": len(required), "mapped": len(required & covered),
+            "missing": required_missing, "newer_unmapped": newer_missing,
+        }
     if args.report:
         args.report.write_text(json.dumps(report, indent=2) + "\n")
     print(f"Python API mappings: {len(covered)}/{len(symbols)}; {len(linked)} explicitly link tests")
+    if args.baseline:
+        print(f"Baseline API mappings ({BASELINE}): {len(required & covered)}/{len(required)}")
     for error in errors:
         print("ERROR:", error)
-    for name in missing:
+    for name in required_missing:
         print("UNMAPPED:", name)
-    return bool(errors or (args.strict and missing))
+    for name in newer_missing:
+        print("NEW UNMAPPED (outside baseline):", name)
+    return bool(errors or (args.strict and required_missing))
 
 
 if __name__ == "__main__":
