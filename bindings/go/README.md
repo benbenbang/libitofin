@@ -65,9 +65,13 @@ temporary native result. Use smaller batches or terminal mode for larger jobs.
 
 ## Coverage and checks
 
-The Python `.pyi` files define the API coverage target. Reviewed mappings live
-in `docs/go-coverage/`; run `python3 scripts/check_go_coverage.py --strict` from
-the repository root. This measures declared API symbols, including enum members
+The Python `.pyi` files at baseline `bf6c5d640c1a0aac3184d8a24d77897e2df2b5ae`
+define the CI coverage target. Reviewed mappings live in `docs/go-coverage/`;
+run `python3 scripts/check_go_coverage.py --strict --baseline` from the repository
+root with the baseline commit available in Git history. Newer unmapped APIs are
+reported separately; missing baseline mappings and invalid C/Go/test references
+still fail. Omit `--baseline` to require full current Python API parity.
+This measures declared API symbols, including enum members
 and deduplicated overloads, and verifies referenced exports/identifiers/tests
 exist. It is separate from line coverage or exhaustive numerical validation.
 

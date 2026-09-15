@@ -4,7 +4,8 @@ cd "$(dirname "$0")/.."
 test "$(go env GOVERSION)" = go1.27.1
 cargo test -p libitofin-ffi --release
 cargo build -p libitofin-ffi --release
-python3 scripts/check_go_coverage.py --strict
+python3 -m unittest discover -s scripts -p 'check_go_coverage_test.py'
+python3 scripts/check_go_coverage.py --strict --baseline
 export LD_LIBRARY_PATH="$PWD/target/release${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export DYLD_LIBRARY_PATH="$PWD/target/release${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
 export GOEXPERIMENT=cgocheck2
