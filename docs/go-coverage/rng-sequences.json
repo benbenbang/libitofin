@@ -1,0 +1,89 @@
+{
+  "domain": "rng-sequences",
+  "entries": [
+    {
+      "c": "itofin_random_sequence_new",
+      "go": "Session.NewUniformRandomSequenceGenerator",
+      "python": "itofin.randomnumbers.UniformRandomSequenceGenerator.__init__",
+      "status": "implemented",
+      "tests": "TestPseudoRandomSequences"
+    },
+    {
+      "c": "itofin_random_sequence_new",
+      "go": "Session.UniformRandomSequenceGeneratorWithSeed",
+      "python": "itofin.randomnumbers.UniformRandomSequenceGenerator.with_seed",
+      "status": "implemented",
+      "tests": "TestPseudoRandomSequences"
+    },
+    {
+      "c": "itofin_rng_sequence_dimension",
+      "go": "UniformRandomSequenceGenerator.Dimension",
+      "python": "itofin.randomnumbers.UniformRandomSequenceGenerator.dimension",
+      "status": "implemented",
+      "tests": "TestPseudoRandomSequences"
+    },
+    {
+      "c": "itofin_rng_sequence_draw",
+      "go": "UniformRandomSequenceGenerator.NextSequence",
+      "python": "itofin.randomnumbers.UniformRandomSequenceGenerator.next_sequence",
+      "status": "implemented",
+      "tests": "TestPseudoRandomSequences"
+    },
+    {
+      "c": "itofin_rng_sequence_draw",
+      "go": "UniformRandomSequenceGenerator.NextSequences",
+      "python": "itofin.randomnumbers.UniformRandomSequenceGenerator.next_sequences",
+      "status": "implemented",
+      "tests": "TestPseudoRandomSequences"
+    },
+    {
+      "c": "itofin_rng_sequence_draw",
+      "go": "UniformRandomSequenceGenerator.LastSequence",
+      "python": "itofin.randomnumbers.UniformRandomSequenceGenerator.last_sequence",
+      "status": "implemented",
+      "tests": "TestPseudoRandomSequences"
+    },
+    {
+      "c": "itofin_random_sequence_new",
+      "go": "Session.NewGaussianRandomSequenceGenerator",
+      "python": "itofin.randomnumbers.GaussianRandomSequenceGenerator.__init__",
+      "status": "implemented",
+      "tests": "TestPseudoRandomSequences"
+    },
+    {
+      "c": "itofin_random_sequence_new",
+      "go": "Session.GaussianRandomSequenceGeneratorWithSeed",
+      "python": "itofin.randomnumbers.GaussianRandomSequenceGenerator.with_seed",
+      "status": "implemented",
+      "tests": "TestPseudoRandomSequences"
+    },
+    {
+      "c": "itofin_rng_sequence_dimension",
+      "go": "GaussianRandomSequenceGenerator.Dimension",
+      "python": "itofin.randomnumbers.GaussianRandomSequenceGenerator.dimension",
+      "status": "implemented",
+      "tests": "TestPseudoRandomSequences"
+    },
+    {
+      "c": "itofin_rng_sequence_draw",
+      "go": "GaussianRandomSequenceGenerator.NextSequence",
+      "python": "itofin.randomnumbers.GaussianRandomSequenceGenerator.next_sequence",
+      "status": "implemented",
+      "tests": "TestPseudoRandomSequences"
+    },
+    {
+      "c": "itofin_rng_sequence_draw",
+      "go": "GaussianRandomSequenceGenerator.NextSequences",
+      "python": "itofin.randomnumbers.GaussianRandomSequenceGenerator.next_sequences",
+      "status": "implemented",
+      "tests": "TestPseudoRandomSequences"
+    },
+    {
+      "c": "itofin_rng_sequence_draw",
+      "go": "GaussianRandomSequenceGenerator.LastSequence",
+      "python": "itofin.randomnumbers.GaussianRandomSequenceGenerator.last_sequence",
+      "status": "implemented",
+      "tests": "TestPseudoRandomSequences"
+    }
+  ]
+}
