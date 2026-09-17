@@ -245,11 +245,10 @@ func (s *Session) newCalendar(kind int32) (*Calendar, error) {
 	}
 	return &Calendar{object{s, uint64(id)}}, nil
 }
-func (s *Session) Target() (*Calendar, error)        { return s.newCalendar(0) }
-func (s *Session) NullCalendar() (*Calendar, error)  { return s.newCalendar(1) }
-func (s *Session) WeekendsOnly() (*Calendar, error)  { return s.newCalendar(2) }
-func (s *Session) UnitedKingdom() (*Calendar, error) { return s.newCalendar(3) }
-func (c *Calendar) Name() (string, error)            { return c.object.timeName(1) }
+func (s *Session) Target() (*Calendar, error)       { return s.newCalendar(0) }
+func (s *Session) NullCalendar() (*Calendar, error) { return s.newCalendar(1) }
+func (s *Session) WeekendsOnly() (*Calendar, error) { return s.newCalendar(2) }
+func (c *Calendar) Name() (string, error)           { return c.object.timeName(1) }
 func (c *Calendar) Adjust(d Date, rule BusinessDayConvention) (Date, error) {
 	var out C.int32_t
 	err := c.session.invoke(func() error {
