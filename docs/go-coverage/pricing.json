@@ -548,7 +548,8 @@
       "status": "implemented",
       "tests": [
         "TestModelConstraintsParametersAndBondOption",
-        "TestHullWhiteCalibrationCachedOracles"
+        "TestHullWhiteCalibrationCachedOracles",
+        "TestHullWhiteCalibrationErrorVariantsAndDefaults"
       ],
       "validation": "Go feature-subset tests passed with Go 1.27.1"
     },
@@ -574,7 +575,8 @@
       "source": "crates/itofin-py/python/itofin/models/__init__.pyi",
       "status": "implemented",
       "tests": [
-        "TestHullWhiteCalibrationCachedOracles"
+        "TestHullWhiteCalibrationCachedOracles",
+        "TestHullWhiteCalibrationErrorVariantsAndDefaults"
       ],
       "validation": "Go feature-subset tests passed with Go 1.27.1"
     },
@@ -705,7 +707,8 @@
       "status": "implemented",
       "tests": [
         "TestModelConstraintsParametersAndBondOption",
-        "TestHullWhiteCalibrationCachedOracles"
+        "TestHullWhiteCalibrationCachedOracles",
+        "TestHullWhiteCalibrationErrorVariantsAndDefaults"
       ],
       "validation": "Go feature-subset tests passed with Go 1.27.1"
     },
@@ -719,7 +722,8 @@
       "status": "implemented",
       "tests": [
         "TestHestonCalibratesFlatSurface",
-        "TestHullWhiteCalibrationCachedOracles"
+        "TestHullWhiteCalibrationCachedOracles",
+        "TestHullWhiteCalibrationErrorVariantsAndDefaults"
       ],
       "validation": "Go feature-subset tests passed with Go 1.27.1"
     },
@@ -769,9 +773,10 @@
       "python": "itofin.models.CalibrationErrorType.PriceError",
       "status": "implemented",
       "tests": [
-        "models_api::tests::calibration_enum_and_optional_criteria_are_checked"
+        "models_api::tests::calibration_enum_and_optional_criteria_are_checked",
+        "TestHullWhiteCalibrationErrorVariantsAndDefaults"
       ],
-      "validation": "Native discriminant mapping test passed; calibration variant not separately exercised"
+      "validation": "macOS arm64: Hull-White calibration parameters and signed errors match independently generated QuantLib 1.43 oracle."
     },
     {
       "c": "int32 discriminant 2",
@@ -781,13 +786,14 @@
       "python": "itofin.models.CalibrationErrorType.ImpliedVolError",
       "status": "implemented",
       "tests": [
-        "models_api::tests::calibration_enum_and_optional_criteria_are_checked"
+        "models_api::tests::calibration_enum_and_optional_criteria_are_checked",
+        "TestHullWhiteCalibrationErrorVariantsAndDefaults"
       ],
-      "validation": "Native discriminant mapping test passed; calibration variant not separately exercised"
+      "validation": "macOS arm64: Hull-White calibration parameters and signed errors match independently generated QuantLib 1.43 oracle."
     }
   ],
   "test_gaps": [
-    "PriceError and ImpliedVolError enum values implemented but not separately calibrated."
+    "Heston PriceError/ImpliedVolError and fixed-reversion combinations remain untested; see docs/go-binding-test-gaps.md."
   ],
   "verification": {
     "command": "go test -count=1 -v session.go time.go settings.go results.go market.go curves.go indexes.go helpers.go vol.go smile.go options.go models.go mc.go pricing_test.go models_test.go",
