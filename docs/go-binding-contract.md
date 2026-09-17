@@ -8,7 +8,8 @@ Python APIs separately. Invalid mapping references remain errors in both modes.
 
 ## Native boundary
 
-`crates/libitofin-ffi` produces `libitofin` as a static/shared native library.
+`crates/libitofin-ffi` produces `libitofin_ffi` as a static/shared native library,
+distinct from the Python extension's `itofin` artifact.
 Modules use `crate::boundary::{Context, ItofinError, BindingError, BindingResult,
 with_context, without_context, input_slice, output, check_ptr}`.
 

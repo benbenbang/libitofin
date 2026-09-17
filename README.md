@@ -18,7 +18,8 @@ first, then a C ABI for everything else).
 > options, Hull-White swaptions (with model calibration), and Heston options
 > end-to-end, but the API will change until 1.0 and parts of the pricing surface
 > are still being filled in. The **Python bindings** (`itofin`) are published on
-> [PyPI](https://pypi.org/project/itofin/); a C ABI is planned. See
+> [PyPI](https://pypi.org/project/itofin/); C and Go bindings are available from
+> this checkout. See
 > [Status](#status).
 
 ```sh
@@ -110,6 +111,21 @@ svol = SwaptionVolatilityMatrix(
 print(f"{svol.volatility(Period(1, 'Years'), Period(5, 'Years'), 0.03):.4f}")  # 0.1800 (node)
 print(f"{svol.volatility(Period(3, 'Years'), Period(3, 'Years'), 0.03):.4f}")  # 0.1775 (bilinear)
 ```
+
+### Go and C
+
+The [Go package](bindings/go/README.md) calls the same Rust core through the
+[C ABI](crates/libitofin-ffi/include/itofin.h). Build it with Rust 1.96.0,
+Go 1.27.1, and a C compiler. Each Go session confines its mutable native graph
+to one OS thread; independent sessions can run concurrently. Close sessions
+explicitly. A native panic poisons its session, which must then be closed.
+
+Start with the [build and ownership guide](bindings/go/README.md) and the
+[synthetic portfolio example](bindings/go/examples/portfolio/main.go).
+The [binding contract](docs/go-binding-contract.md) specifies the boundary;
+[tracker #1000](https://github.com/benbenbang/libitofin/issues/1000) records
+remaining parity and delivery work. API mappings, numerical tests, and statement
+coverage are separate measures; see the [validation record](docs/go-bindings-review.md).
 
 ## Why
 
@@ -223,8 +239,9 @@ pre-commit run --all-files
 
 ```
 crates/libitofin/       the core library — FFI-agnostic, idiomatic Rust
-crates/libitofin-ffi/   extern "C" + cbindgen → C header          (planned)
-crates/itofin-py/       PyO3 + maturin → the `itofin` package       (on PyPI)
+crates/libitofin-ffi/   extern "C" + cbindgen -> C header + libitofin_ffi
+crates/itofin-py/       PyO3 + maturin -> the `itofin` package       (on PyPI)
+bindings/go/            Go 1.27.1 cgo package with explicit sessions
 QuantLib/               reference C++ tree + test oracle           (git-ignored symlink)
 ```
 

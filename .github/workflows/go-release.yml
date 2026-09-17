@@ -3,6 +3,7 @@ name: Go native packages
 on:
   workflow_dispatch:
   push:
+    branches: ['feat/go-bindings-*']
     tags: ['bindings/go/v*']
 
 permissions:
