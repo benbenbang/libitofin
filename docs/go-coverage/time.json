@@ -3,7 +3,8 @@
   "entries": [
     {
       "c": [
-        "itofin_calendar_new"
+        "itofin_calendar_new",
+        "itofin_calendar_country_new"
       ],
       "go": [
         "Session.Target",
@@ -58,7 +59,7 @@
     },
     {
       "c": [
-        "itofin_calendar_new"
+        "itofin_calendar_country_new"
       ],
       "go": [
         "Session.UnitedKingdom"
@@ -66,7 +67,7 @@
       "python": "itofin.time.Calendar.united_kingdom",
       "status": "implemented",
       "tests": [
-        "TestIMMAndCalendarOracles"
+        "TestCalendarCountriesAndMarkets"
       ]
     },
     {
