@@ -42,8 +42,8 @@ tar -xzf "itofin-native-$version-$platform.tar.gz"
 export ITOFIN_NATIVE="$PWD/itofin-native-$version-$platform"
 (cd "$ITOFIN_NATIVE" && shasum -a 256 -c SHA256SUMS)
 export CGO_ENABLED=1
-export CGO_CFLAGS="-I\"$ITOFIN_NATIVE/include\""
-export CGO_LDFLAGS="-L\"$ITOFIN_NATIVE/lib\" -litofin_ffi -Wl,-rpath,\"$ITOFIN_NATIVE/lib\""
+export CGO_CFLAGS="\"-I$ITOFIN_NATIVE/include\""
+export CGO_LDFLAGS="\"-L$ITOFIN_NATIVE/lib\" -litofin_ffi \"-Wl,-rpath,$ITOFIN_NATIVE/lib\""
 ```
 
 Once a Go release tag exists, run these commands in your application's module:
