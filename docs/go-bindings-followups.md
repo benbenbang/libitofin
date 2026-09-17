@@ -31,6 +31,23 @@ prove every configuration, branch, or numerical behavior. Statement coverage,
 independent numerical oracles, and lifecycle tests provide separate evidence.
 The [original review](go-bindings-review.md) retains the previous Linux counts.
 
+## Combined local validation
+
+The integrated tree at `34a5a8bc` passed on macOS arm64 with Go 1.27.1 and
+Rust 1.96.0:
+
+- Full-current strict audit: 855/855 declarations mapped, 713 explicit test
+  references; baseline audit: 744/744.
+- All repository pre-commit checks, including full Cargo tests and Python stub
+  synchronization; generated C header matches cbindgen 0.29.2 output.
+- 36 native tests, C and C++ smoke clients, Go vet, race detection with
+  `cgocheck2`, and the portfolio example. Go package statement coverage: 83.4%.
+- Native archive checksums and standalone external-consumer acceptance passed
+  with the extracted library under a path containing spaces and no loader
+  environment variables.
+- Workflow linting and shellcheck passed. Linux execution belongs to the
+  feature branch CI; these local results do not claim it.
+
 ## Delivery limits
 
 The new release workflow validates Linux amd64 and macOS arm64 packages and
@@ -39,9 +56,10 @@ Feature-branch validation does not publish a release. No release tag is created
 by this implementation. First published-tag resolution and downstream application
 migration remain release/consumer acceptance tasks.
 
-Direct calendar queries check tabulated bounds. Core instruments or calendars
-returned by existing index inspectors can still encounter core limitations;
-panic containment and session poisoning remain part of the contract. Related
+Direct calendar queries check tabulated bounds, including fixing calendars
+retrieved from indexes after their original handles close. Core instrument
+calculations can still encounter core calendar limitations; panic containment
+and session poisoning remain part of the contract. Related
 inflation dependencies still require the intended shared Settings identity.
 
 `AGENTS.md` and `CLAUDE.md` in this local checkout are excluded via local Git
