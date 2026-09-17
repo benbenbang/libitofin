@@ -32,7 +32,7 @@ shared across contexts. Handle zero represents None only where documented.
 
 Date inputs use the core serial number (i32), validated by the time module.
 Native day counters/calendars/settings use handles. Calendars are stored as
-`calendar_api::NativeCalendar`, retaining the core calendar and optional holiday
+`calendar_api::NativeCalendar`, retaining the core calendar, earliest supported year, and optional holiday
 horizon; retrieve core calendars through `time_api::calendar`. Shared helper functions in
 time_api are `date(serial:i32)->BindingResult<Date>` and
 `day_counter(context:&Context,handle:u64)->BindingResult<DayCounter>`.

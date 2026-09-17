@@ -394,5 +394,174 @@ mod tests {
         let moex = country_calendar(35, 1).unwrap();
         assert!(moex.checked(Date::new(31, Month::December, 2011)).is_err());
         assert!(moex.is_holiday(Date::new(1, Month::January, 2012)).is_ok());
+        let id = c.insert(moex).unwrap();
+        let before = Date::new(31, Month::December, 2011).serial_number();
+        let inside = Date::new(1, Month::January, 2012).serial_number();
+        unsafe {
+            for rule in 0..2 {
+                let mut joint = 0;
+                assert_eq!(
+                    itofin_calendar_joint_new(
+                        &mut c,
+                        &id,
+                        1,
+                        rule,
+                        &mut joint,
+                        std::ptr::null_mut()
+                    ),
+                    0
+                );
+                let mut out = 99;
+                for handle in [id, joint] {
+                    assert_eq!(
+                        itofin_calendar_query(
+                            &mut c,
+                            handle,
+                            before,
+                            0,
+                            &mut out,
+                            std::ptr::null_mut()
+                        ),
+                        INVALID_ARGUMENT
+                    );
+                    assert_eq!(
+                        itofin_calendar_query(
+                            &mut c,
+                            handle,
+                            inside,
+                            0,
+                            &mut out,
+                            std::ptr::null_mut()
+                        ),
+                        0
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn queries_validate_buffers_flags_and_contexts() {
+        let mut c = Context::new();
+        let id = c
+            .insert(NativeCalendar {
+                inner: Target::new(),
+                horizon: None,
+                first_year: 1901,
+            })
+            .unwrap();
+        let start = Date::new(1, Month::December, 2025).serial_number();
+        let end = Date::new(31, Month::December, 2025).serial_number();
+        let mut len = 0;
+        let mut buffer = [-1; 2];
+        let mut flag = 99;
+        unsafe {
+            assert_eq!(
+                itofin_calendar_holiday_list(
+                    &mut c,
+                    id,
+                    start,
+                    end,
+                    0,
+                    std::ptr::null_mut(),
+                    0,
+                    &mut len,
+                    std::ptr::null_mut()
+                ),
+                0
+            );
+            assert_eq!(len, 2);
+            assert_eq!(
+                itofin_calendar_holiday_list(
+                    &mut c,
+                    id,
+                    start,
+                    end,
+                    0,
+                    buffer.as_mut_ptr(),
+                    1,
+                    &mut len,
+                    std::ptr::null_mut()
+                ),
+                INVALID_ARGUMENT
+            );
+            assert_eq!(buffer, [-1; 2]);
+            assert_eq!(
+                itofin_calendar_holiday_list(
+                    &mut c,
+                    id,
+                    start,
+                    end,
+                    0,
+                    buffer.as_mut_ptr(),
+                    2,
+                    &mut len,
+                    std::ptr::null_mut()
+                ),
+                0
+            );
+            assert_eq!(
+                buffer,
+                [
+                    Date::new(25, Month::December, 2025).serial_number(),
+                    Date::new(26, Month::December, 2025).serial_number()
+                ]
+            );
+            assert_eq!(
+                itofin_calendar_query(&mut c, id, start, 9, &mut flag, std::ptr::null_mut()),
+                INVALID_ARGUMENT
+            );
+            assert_eq!(flag, 99);
+            assert_eq!(
+                itofin_calendar_holiday_list(
+                    &mut c,
+                    id,
+                    start,
+                    end,
+                    2,
+                    buffer.as_mut_ptr(),
+                    2,
+                    &mut len,
+                    std::ptr::null_mut()
+                ),
+                INVALID_ARGUMENT
+            );
+            let mut foreign = Context::new();
+            assert_eq!(
+                itofin_calendar_query(&mut foreign, id, start, 0, &mut flag, std::ptr::null_mut()),
+                INVALID_HANDLE
+            );
+            let mut joint = 0;
+            assert_eq!(
+                itofin_calendar_joint_new(
+                    &mut foreign,
+                    &id,
+                    1,
+                    0,
+                    &mut joint,
+                    std::ptr::null_mut()
+                ),
+                INVALID_HANDLE
+            );
+            assert_eq!(
+                itofin_calendar_joint_new(&mut c, &id, 1, 3, &mut joint, std::ptr::null_mut()),
+                INVALID_ARGUMENT
+            );
+            assert_eq!(
+                itofin_calendar_joint_new(
+                    &mut c,
+                    std::ptr::null(),
+                    0,
+                    0,
+                    &mut joint,
+                    std::ptr::null_mut()
+                ),
+                INVALID_ARGUMENT
+            );
+            assert_eq!(
+                itofin_calendar_query(&mut c, id, start, 0, &mut flag, std::ptr::null_mut()),
+                0
+            );
+        }
     }
 }
