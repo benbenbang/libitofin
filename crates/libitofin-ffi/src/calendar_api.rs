@@ -6,6 +6,7 @@ use libitofin::time::calendars::*;
 pub(crate) struct NativeCalendar {
     pub inner: Calendar,
     pub horizon: Option<i32>,
+    pub first_year: i32,
 }
 
 fn country_calendar(country: i32, market: i32) -> BindingResult<NativeCalendar> {
@@ -86,11 +87,31 @@ fn country_calendar(country: i32, market: i32) -> BindingResult<NativeCalendar> 
         _ => return Err(BindingError::invalid("unknown calendar or market")),
     };
     let horizon = match country {
+        46 => Some(uzbekistan::HOLIDAY_HORIZON),
+        42 => Some(taiwan::HOLIDAY_HORIZON),
+        41 => Some(southkorea::HOLIDAY_HORIZON),
+        38 => Some(singapore::HOLIDAY_HORIZON),
+        32 => Some(northmacedonia::HOLIDAY_HORIZON),
+        31 => Some(newzealand::HOLIDAY_HORIZON),
+        26 => Some(israel::HOLIDAY_HORIZON),
+        24 => Some(india::HOLIDAY_HORIZON),
+        22 => Some(hongkong::HOLIDAY_HORIZON),
+        17 => Some(china::HOLIDAY_HORIZON),
+        10 => Some(turkey::HOLIDAY_HORIZON),
+        9 => Some(thailand::HOLIDAY_HORIZON),
         25 => Some(indonesia::HOLIDAY_HORIZON),
         36 => Some(saudiarabia::HOLIDAY_HORIZON),
         _ => None,
     };
-    Ok(NativeCalendar { inner, horizon })
+    Ok(NativeCalendar {
+        inner,
+        horizon,
+        first_year: if country == 35 && market == 1 {
+            russia::MOEX_FIRST_YEAR
+        } else {
+            1901
+        },
+    })
 }
 
 #[unsafe(no_mangle)]
@@ -116,6 +137,12 @@ impl NativeCalendar {
         &self,
         date: libitofin::time::date::Date,
     ) -> BindingResult<libitofin::time::date::Date> {
+        if date.year() < self.first_year {
+            return Err(BindingError::invalid(format!(
+                "calendar starts in {}",
+                self.first_year
+            )));
+        }
         if let Some(horizon) = self.horizon
             && date.year() > horizon
         {
@@ -127,6 +154,144 @@ impl NativeCalendar {
     }
     pub(crate) fn is_holiday(&self, date: libitofin::time::date::Date) -> BindingResult<bool> {
         Ok(self.inner.is_holiday(self.checked(date)?))
+    }
+}
+
+#[unsafe(no_mangle)]
+/// # Safety
+/// Pointers and context must satisfy the crate-level C caller contract.
+pub unsafe extern "C" fn itofin_calendar_joint_new(
+    ctx: *mut Context,
+    handles: *const u64,
+    len: usize,
+    rule: i32,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(out)?;
+            let rule = match rule {
+                0 => JointCalendarRule::JoinHolidays,
+                1 => JointCalendarRule::JoinBusinessDays,
+                _ => return Err(BindingError::invalid("unknown joint-calendar rule")),
+            };
+            let handles = input_slice(handles, len)?;
+            if handles.is_empty() {
+                return Err(BindingError::invalid(
+                    "a joint calendar needs at least one calendar",
+                ));
+            }
+            let calendars = handles
+                .iter()
+                .map(|&id| c.get::<NativeCalendar>(id))
+                .collect::<BindingResult<Vec<_>>>()?;
+            let first_year = calendars.iter().map(|v| v.first_year).max().unwrap_or(1901);
+            let horizon = calendars.iter().filter_map(|v| v.horizon).min();
+            let inner = JointCalendar::new(calendars.into_iter().map(|v| v.inner).collect(), rule);
+            output(
+                out,
+                c.insert(NativeCalendar {
+                    inner,
+                    horizon,
+                    first_year,
+                })?,
+            )
+        })
+    }
+}
+
+#[unsafe(no_mangle)]
+/// # Safety
+/// Pointers and context must satisfy the crate-level C caller contract.
+pub unsafe extern "C" fn itofin_calendar_query(
+    ctx: *mut Context,
+    id: u64,
+    serial: i32,
+    query: i32,
+    out: *mut u8,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            let cal = c.get::<NativeCalendar>(id)?;
+            let date = cal.checked(crate::time_api::date(serial)?)?;
+            let value = match query {
+                0 => cal.inner.is_business_day(date),
+                1 => cal.inner.is_holiday(date),
+                2 => cal.inner.is_weekend_on(date),
+                _ => return Err(BindingError::invalid("unknown calendar query")),
+            };
+            output(out, u8::from(value))
+        })
+    }
+}
+
+#[unsafe(no_mangle)]
+/// # Safety
+/// Pointers and context must satisfy the crate-level C caller contract.
+pub unsafe extern "C" fn itofin_calendar_business_days_between(
+    ctx: *mut Context,
+    id: u64,
+    from: i32,
+    to: i32,
+    include_first: u8,
+    include_last: u8,
+    out: *mut i32,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            let cal = c.get::<NativeCalendar>(id)?;
+            let from = cal.checked(crate::time_api::date(from)?)?;
+            let to = cal.checked(crate::time_api::date(to)?)?;
+            let first = crate::time_api::bool_flag(include_first)?;
+            let last = crate::time_api::bool_flag(include_last)?;
+            output(out, cal.inner.business_days_between(from, to, first, last))
+        })
+    }
+}
+
+#[unsafe(no_mangle)]
+/// # Safety
+/// Pointers and context must satisfy the crate-level C caller contract.
+pub unsafe extern "C" fn itofin_calendar_holiday_list(
+    ctx: *mut Context,
+    id: u64,
+    from: i32,
+    to: i32,
+    include_weekends: u8,
+    out: *mut i32,
+    capacity: usize,
+    required: *mut usize,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(required)?;
+            let cal = c.get::<NativeCalendar>(id)?;
+            let from = cal.checked(crate::time_api::date(from)?)?;
+            let to = cal.checked(crate::time_api::date(to)?)?;
+            if to < from {
+                return Err(BindingError::invalid(
+                    "holiday-list start must not follow end",
+                ));
+            }
+            let weekends = crate::time_api::bool_flag(include_weekends)?;
+            let dates = cal.inner.holiday_list(from, to, weekends);
+            output(required, dates.len())?;
+            if capacity == 0 {
+                return Ok(());
+            }
+            if capacity < dates.len() {
+                return Err(BindingError::invalid("holiday buffer too small"));
+            }
+            check_ptr(out)?;
+            for (i, date) in dates.iter().enumerate() {
+                output(out.add(i), date.serial_number())?;
+            }
+            Ok(())
+        })
     }
 }
 
@@ -170,5 +335,64 @@ mod tests {
             assert!(cal.checked(Date::new(1, Month::June, year)).is_ok());
             assert!(cal.checked(Date::new(1, Month::January, year + 1)).is_err());
         }
+    }
+    #[test]
+    fn constrained_calendars_and_joints_reject_unsupported_dates() {
+        let mut c = Context::new();
+        for country in 0..47 {
+            let calendar = country_calendar(country, 0).unwrap();
+            let Some(horizon) = calendar.horizon else {
+                continue;
+            };
+            let id = c.insert(calendar).unwrap();
+            let outside = Date::new(1, Month::January, horizon + 1).serial_number();
+            let inside = Date::new(1, Month::June, horizon).serial_number();
+            let mut out = 99;
+            unsafe {
+                for rule in 0..2 {
+                    let mut joint = 0;
+                    assert_eq!(
+                        itofin_calendar_joint_new(
+                            &mut c,
+                            &id,
+                            1,
+                            rule,
+                            &mut joint,
+                            std::ptr::null_mut()
+                        ),
+                        0
+                    );
+                    for handle in [id, joint] {
+                        for query in 0..3 {
+                            assert_eq!(
+                                itofin_calendar_query(
+                                    &mut c,
+                                    handle,
+                                    outside,
+                                    query,
+                                    &mut out,
+                                    std::ptr::null_mut()
+                                ),
+                                INVALID_ARGUMENT
+                            );
+                        }
+                        assert_eq!(
+                            itofin_calendar_query(
+                                &mut c,
+                                handle,
+                                inside,
+                                0,
+                                &mut out,
+                                std::ptr::null_mut()
+                            ),
+                            0
+                        );
+                    }
+                }
+            }
+        }
+        let moex = country_calendar(35, 1).unwrap();
+        assert!(moex.checked(Date::new(31, Month::December, 2011)).is_err());
+        assert!(moex.is_holiday(Date::new(1, Month::January, 2012)).is_ok());
     }
 }
