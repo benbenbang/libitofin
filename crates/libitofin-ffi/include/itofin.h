@@ -794,6 +794,16 @@ int32_t itofin_gbm_paths(const struct ItofinGbmInput *input,
 
 /**
  * # Safety
+ * Pointers and context must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_calendar_country_new(struct ItofinContext *ctx,
+                                    int32_t country,
+                                    int32_t market,
+                                    uint64_t *out,
+                                    struct ItofinError *error);
+
+/**
+ * # Safety
  * Pointers must be aligned, live and valid for their stated lengths. Outputs
  * must not overlap inputs or other outputs. Any context and its handles must
  * belong to the calling thread; serialize calls including destruction.

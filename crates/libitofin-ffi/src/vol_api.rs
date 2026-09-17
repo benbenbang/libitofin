@@ -15,7 +15,7 @@ fn calendar(c: &Context, id: u64) -> BindingResult<Option<Calendar>> {
     if id == 0 {
         Ok(None)
     } else {
-        c.get(id).map(Some)
+        crate::time_api::calendar(c, id).map(Some)
     }
 }
 fn flag(value: i32) -> BindingResult<bool> {

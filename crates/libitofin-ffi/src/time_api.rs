@@ -1,5 +1,6 @@
 //! Checked calendar primitives and Python-compatible time conventions.
 use crate::boundary::*;
+use crate::calendar_api::NativeCalendar;
 use libitofin::time::businessdayconvention::BusinessDayConvention;
 use libitofin::time::calendar::Calendar;
 use libitofin::time::calendars::unitedkingdom::{Market, UnitedKingdom};
@@ -25,7 +26,7 @@ pub(crate) fn day_counter(c: &Context, id: u64) -> BindingResult<DayCounter> {
     c.get(id)
 }
 pub(crate) fn calendar(c: &Context, id: u64) -> BindingResult<Calendar> {
-    c.get(id)
+    Ok(c.get::<crate::calendar_api::NativeCalendar>(id)?.inner)
 }
 pub(crate) fn frequency(value: i32) -> BindingResult<Frequency> {
     match value {
@@ -330,13 +331,20 @@ pub unsafe extern "C" fn itofin_calendar_new(
                 3 => UnitedKingdom::new(Market::Settlement),
                 _ => return Err(BindingError::invalid("unknown calendar")),
             };
-            output(out, c.insert(cal)?)
+            output(
+                out,
+                c.insert(crate::calendar_api::NativeCalendar {
+                    inner: cal,
+                    horizon: None,
+                })?,
+            )
         })
     }
 }
 // These checked boundary walks follow Calendar::adjust/advance and report range
 // errors instead of allowing Date's assertion to invalidate the whole session.
-fn adjust(cal: &Calendar, d: Date, rule: BusinessDayConvention) -> BindingResult<Date> {
+fn adjust(cal: &NativeCalendar, d: Date, rule: BusinessDayConvention) -> BindingResult<Date> {
+    cal.checked(d)?;
     use BusinessDayConvention::*;
     if rule == Unadjusted {
         return Ok(d);
@@ -344,18 +352,18 @@ fn adjust(cal: &Calendar, d: Date, rule: BusinessDayConvention) -> BindingResult
     if rule == Nearest {
         let mut next = d;
         let mut prev = d;
-        while cal.is_holiday(next) && cal.is_holiday(prev) {
+        while cal.is_holiday(next)? && cal.is_holiday(prev)? {
             next = shifted(next, 1)?;
             prev = shifted(prev, -1)?;
         }
-        return Ok(if cal.is_holiday(next) { prev } else { next });
+        return Ok(if cal.is_holiday(next)? { prev } else { next });
     }
     let following = matches!(
         rule,
         Following | ModifiedFollowing | HalfMonthModifiedFollowing
     );
     let mut result = d;
-    while cal.is_holiday(result) {
+    while cal.is_holiday(result)? {
         result = shifted(result, if following { 1 } else { -1 })?;
     }
     if (matches!(rule, ModifiedFollowing | HalfMonthModifiedFollowing)
@@ -372,13 +380,14 @@ fn adjust(cal: &Calendar, d: Date, rule: BusinessDayConvention) -> BindingResult
     Ok(result)
 }
 fn advance(
-    cal: &Calendar,
+    cal: &NativeCalendar,
     d: Date,
     n: i32,
     unit: TimeUnit,
     rule: BusinessDayConvention,
     eom: bool,
 ) -> BindingResult<Date> {
+    cal.checked(d)?;
     if n == 0 {
         return adjust(cal, d, rule);
     }
@@ -387,7 +396,7 @@ fn advance(
         let mut result = d;
         for _ in 0..i64::from(n).abs() {
             result = shifted(result, direction)?;
-            while cal.is_holiday(result) {
+            while cal.is_holiday(result)? {
                 result = shifted(result, direction)?;
             }
         }
@@ -434,7 +443,12 @@ pub unsafe extern "C" fn itofin_calendar_adjust(
         with_context(ctx, error, |c| {
             output(
                 out,
-                adjust(&calendar(c, id)?, date(serial)?, convention(rule)?)?.serial_number(),
+                adjust(
+                    &c.get::<NativeCalendar>(id)?,
+                    date(serial)?,
+                    convention(rule)?,
+                )?
+                .serial_number(),
             )
         })
     }
@@ -461,7 +475,7 @@ pub unsafe extern "C" fn itofin_calendar_advance(
             output(
                 out,
                 advance(
-                    &calendar(c, id)?,
+                    &c.get::<NativeCalendar>(id)?,
                     date(serial)?,
                     n,
                     time_unit(unit)?,
@@ -574,7 +588,10 @@ mod tests {
     }
     #[test]
     fn calendar_rolls_follow_quantlib_conventions() {
-        let cal = WeekendsOnly::new();
+        let cal = NativeCalendar {
+            inner: WeekendsOnly::new(),
+            horizon: None,
+        };
         let saturday = ymd(31, 8, 2024).unwrap();
         assert_eq!(
             adjust(&cal, saturday, BusinessDayConvention::ModifiedFollowing).unwrap(),
@@ -611,7 +628,7 @@ mod tests {
             let d = date(serial).unwrap();
             for value in 0..=6 {
                 let rule = convention(value).unwrap();
-                assert_eq!(adjust(&cal, d, rule).unwrap(), cal.adjust(d, rule));
+                assert_eq!(adjust(&cal, d, rule).unwrap(), cal.inner.adjust(d, rule));
             }
             for unit in 0..4 {
                 let unit = time_unit(unit).unwrap();
@@ -627,7 +644,13 @@ mod tests {
                                 eom
                             )
                             .unwrap(),
-                            cal.advance(d, n, unit, BusinessDayConvention::ModifiedFollowing, eom)
+                            cal.inner.advance(
+                                d,
+                                n,
+                                unit,
+                                BusinessDayConvention::ModifiedFollowing,
+                                eom
+                            )
                         );
                     }
                 }

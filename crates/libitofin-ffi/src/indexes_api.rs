@@ -295,7 +295,10 @@ pub unsafe extern "C" fn itofin_ibor_component(
             let v = c.get::<Shared<IborIndex>>(id)?;
             let id = match query {
                 0 => c.insert(v.day_counter().clone())?,
-                1 => c.insert(v.fixing_calendar())?,
+                1 => c.insert(crate::calendar_api::NativeCalendar {
+                    inner: v.fixing_calendar(),
+                    horizon: None,
+                })?,
                 2 => c.insert(v.currency().clone())?,
                 _ => return Err(BindingError::invalid("unknown index component")),
             };
