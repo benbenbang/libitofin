@@ -1,10 +1,15 @@
 # Go / C ABI review
 
+This document records the original implementation and its historical Linux
+validation. For the subsequent review branch, current coverage, and new local/CI
+evidence, see [Go binding follow-ups](go-bindings-followups.md). Counts and
+publication notes below describe the original delivery, not the current tree.
+
 Baseline: `bf6c5d640c1a0aac3184d8a24d77897e2df2b5ae` (libitofin 0.20.0).
 Review branch: `feat/go-cabi-python-parity`. The branch contains a linear stack
 of feature, test and integration commits; no PR or merge to main was created.
 
-## Result
+## Original result
 
 The sibling `libitofin-ffi` crate exports 223 C entry points, and `bindings/go`
 provides the Go 1.27.1 package. The existing Rust core and Python source are
@@ -21,7 +26,7 @@ comparable keys. This is API surface coverage, not proof of every behavior.
 578 symbols explicitly reference tests; unmapped symbols and stale C/Go/test
 references fail `scripts/check_go_coverage.py --strict`.
 
-## Validation on Linux
+## Original validation on Linux
 
 | Gate | Result |
 | --- | --- |
