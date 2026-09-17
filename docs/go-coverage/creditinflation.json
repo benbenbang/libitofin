@@ -17,28 +17,36 @@
       "go": "DefaultProbabilityTermStructure.DefaultDensity",
       "python": "DefaultProbabilityTermStructure.default_density",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestFlatHazardAnalyticQueriesAndRetainedQuote"
+      ]
     },
     {
       "c": "itofin_default_curve_value",
       "go": "DefaultProbabilityTermStructure.DefaultDensityDate",
       "python": "DefaultProbabilityTermStructure.default_density_date",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestFlatHazardAnalyticQueriesAndRetainedQuote"
+      ]
     },
     {
       "c": "itofin_default_curve_value",
       "go": "DefaultProbabilityTermStructure.DefaultProbability",
       "python": "DefaultProbabilityTermStructure.default_probability",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestFlatHazardAnalyticQueriesAndRetainedQuote"
+      ]
     },
     {
       "c": "itofin_default_curve_value",
       "go": "DefaultProbabilityTermStructure.DefaultProbabilityDate",
       "python": "DefaultProbabilityTermStructure.default_probability_date",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestFlatHazardAnalyticQueriesAndRetainedQuote"
+      ]
     },
     {
       "c": "itofin_default_curve_value",
@@ -54,14 +62,18 @@
       "go": "DefaultProbabilityTermStructure.HazardRateDate",
       "python": "DefaultProbabilityTermStructure.hazard_rate_date",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestFlatHazardAnalyticQueriesAndRetainedQuote"
+      ]
     },
     {
       "c": "itofin_default_curve_value",
       "go": "DefaultProbabilityTermStructure.SurvivalProbability",
       "python": "DefaultProbabilityTermStructure.survival_probability",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestFlatHazardAnalyticQueriesAndRetainedQuote"
+      ]
     },
     {
       "c": "itofin_default_curve_value",
