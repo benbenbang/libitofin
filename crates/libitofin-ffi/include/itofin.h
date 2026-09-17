@@ -3269,6 +3269,52 @@ int32_t itofin_results_additional(struct ItofinContext *ctx,
                                   struct ItofinError *error);
 
 /**
+ * `use_seeds` selects a nonempty array; otherwise `seed` is used, with zero randomized.
+ * # Safety
+ * Follow the crate-level C caller contract; seeds contains len words.
+ */
+int32_t itofin_uniform_rng_new(struct ItofinContext *ctx,
+                               uint32_t seed,
+                               const uint32_t *seeds,
+                               size_t len,
+                               bool use_seeds,
+                               uint64_t *out,
+                               struct ItofinError *error);
+
+/**
+ * Copies the uniform source state; source zero constructs a fresh seeded generator.
+ * # Safety
+ * Follow the crate-level C caller contract.
+ */
+int32_t itofin_gaussian_rng_new(struct ItofinContext *ctx,
+                                uint64_t source,
+                                uint32_t seed,
+                                uint64_t *out,
+                                struct ItofinError *error);
+
+/**
+ * Draws count scalar values, preserving generator state between calls.
+ * # Safety
+ * Follow the crate-level C caller contract; out contains capacity doubles.
+ */
+int32_t itofin_rng_draw(struct ItofinContext *ctx,
+                        uint64_t id,
+                        bool gaussian,
+                        size_t count,
+                        double *out,
+                        size_t capacity,
+                        struct ItofinError *error);
+
+/**
+ * # Safety
+ * Follow the crate-level C caller contract.
+ */
+int32_t itofin_uniform_rng_u32(struct ItofinContext *ctx,
+                               uint64_t id,
+                               uint32_t *out,
+                               struct ItofinError *error);
+
+/**
  * # Safety
  * Pointers must be aligned, live and valid for their stated lengths. Outputs
  * must not overlap inputs or other outputs. Any context and its handles must
