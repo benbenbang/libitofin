@@ -161,42 +161,54 @@
       "go": "PiecewiseDefaultCurve.Calculate",
       "python": "PiecewiseDefaultCurve.calculate",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestCreditBootstrapRepricesIndependentContracts"
+      ]
     },
     {
       "c": "itofin_default_curve_nodes",
       "go": "PiecewiseDefaultCurve.Data",
       "python": "PiecewiseDefaultCurve.data",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestCreditBootstrapRepricesIndependentContracts"
+      ]
     },
     {
       "c": "itofin_default_curve_nodes",
       "go": "PiecewiseDefaultCurve.Dates",
       "python": "PiecewiseDefaultCurve.dates",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestCreditBootstrapRepricesIndependentContracts"
+      ]
     },
     {
       "c": "itofin_piecewise_default_new",
       "go": "Session.NewPiecewiseDefaultCurve",
       "python": "PiecewiseDefaultCurve.__init__",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestCreditBootstrapRepricesIndependentContracts"
+      ]
     },
     {
       "c": "itofin_default_curve_nodes",
       "go": "PiecewiseDefaultCurve.Nodes",
       "python": "PiecewiseDefaultCurve.nodes",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestCreditBootstrapRepricesIndependentContracts"
+      ]
     },
     {
       "c": "itofin_default_curve_nodes",
       "go": "PiecewiseDefaultCurve.Times",
       "python": "PiecewiseDefaultCurve.times",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestCreditBootstrapRepricesIndependentContracts"
+      ]
     },
     {
       "c": "itofin_cds_rebate",
@@ -219,7 +231,9 @@
       "go": "CreditDefaultSwap.Calculate",
       "python": "CreditDefaultSwap.calculate",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestCreditBootstrapRepricesIndependentContracts"
+      ]
     },
     {
       "c": "itofin_cds_value",
@@ -287,7 +301,9 @@
       "go": "CreditDefaultSwap.Notional",
       "python": "CreditDefaultSwap.notional",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestCreditBootstrapRepricesIndependentContracts"
+      ]
     },
     {
       "c": "itofin_cds_value",
@@ -304,7 +320,9 @@
       "go": "CreditDefaultSwap.Price",
       "python": "CreditDefaultSwap.price",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestCreditBootstrapRepricesIndependentContracts"
+      ]
     },
     {
       "c": "itofin_cds_results",
@@ -379,28 +397,36 @@
       "go": "DefaultProbabilityHelper.LatestDate",
       "python": "DefaultProbabilityHelper.latest_date",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestCreditBootstrapRepricesIndependentContracts"
+      ]
     },
     {
       "c": "itofin_default_helper_dates",
       "go": "DefaultProbabilityHelper.PillarDate",
       "python": "DefaultProbabilityHelper.pillar_date",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestCreditBootstrapRepricesIndependentContracts"
+      ]
     },
     {
       "c": "itofin_spread_cds_helper_new",
       "go": "Session.NewSpreadCdsHelper",
       "python": "SpreadCdsHelper.__init__",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestCreditBootstrapRepricesIndependentContracts"
+      ]
     },
     {
       "c": "validated int32 discriminant",
       "go": "ProtectionBuyer",
       "python": "ProtectionSide.Buyer",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestCreditBootstrapRepricesIndependentContracts"
+      ]
     },
     {
       "c": "validated int32 discriminant",

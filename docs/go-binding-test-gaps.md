@@ -21,15 +21,15 @@ Names below omit `itofin.`; term-structure names are in `termstructures`.
 | API group | Count | Evidence or concrete follow-up |
 | --- | ---: | --- |
 | `indexes.ZeroInflationIndex.__repr__, link_to`; `indexes.YoYInflationIndex.__repr__` | 3 | Deferred: assert representation metadata; relink zero index and verify a forecast against an independently flat inflation curve after old handles close. YoY relinking already has a separate test. |
-| `instruments.CreditDefaultSwap.accrual_rebate_date, calculate, fair_upfront, notional, price` | 5 | Existing NPV/lifecycle tests exercise calculation indirectly. Deferred: assert direct methods, rebate settlement date and zero-NPV fair-upfront reconstruction. |
+| `instruments.CreditDefaultSwap.accrual_rebate_date, calculate, fair_upfront, notional, price` | 5 | New bootstrap test directly calls calculate/price/notional and checks independently rebuilt CDS fair spreads. Deferred: rebate settlement date and zero-NPV fair-upfront reconstruction. |
 | `instruments.MakeCreditDefaultSwap.__init__, build` | 2 | Deferred: compare builder schedule/cashflows and cached NPV with an explicit standard CDS fixture. Both Python calls map to one Go factory. |
-| `DefaultProbabilityHelper.latest_date, pillar_date` | 2 | Deferred: pin CDS helper dates around IMM/holiday boundaries from QuantLib. |
+| `DefaultProbabilityHelper.latest_date, pillar_date` | 2 | New bootstrap test pins all four final-payment dates; the 3Y June 2009 weekend rolls to June 22, independently confirmed with QuantLib 1.43. |
 | `DefaultProbabilityTermStructure.default_density, default_density_date, default_probability, default_probability_date, hazard_rate_date, survival_probability` | 6 | Added `TestFlatHazardAnalyticQueriesAndRetainedQuote`: independent exponential survival/density formula, date/time equivalence, quote mutation, retained dependencies and closed-session error. |
 | `InterpolatedHazardRateCurve.dates, hazard_rates` | 2 | Nodes and terminal survival already asserted by `TestCreditCurveNodesAndSessionIsolation`; deferred direct array content/copy-independence assertions. |
 | `InterpolatedYoYInflationCurve.dates, nodes, times` | 3 | Date-rate behavior already checked; deferred ordered output, day-count times and detached-array assertions. |
 | `InterpolatedZeroInflationCurve.dates, nodes` | 2 | Times/date/time rates already checked; deferred direct dates/nodes and detached-array assertions. |
 | `MultiplicativePriceSeasonality.frequency, seasonality_base_date` | 2 | Factors/seasonal application already checked; deferred exact metadata round trip. |
-| `PiecewiseDefaultCurve.__init__, calculate, data, dates, nodes, times`; `SpreadCdsHelper.__init__` | 7 | Deferred high priority: bootstrap multiple quoted CDS tenors, independently reprice quotes, verify pillars and update/release quote dependencies. |
+| `PiecewiseDefaultCurve.__init__, calculate, data, dates, nodes, times`; `SpreadCdsHelper.__init__` | 7 | Added `TestCreditBootstrapRepricesIndependentContracts`: four-tenor round trip from QuantLib `defaultprobabilitycurves.cpp:testBootstrapFromSpread`, unchanged 1e-6 tolerance; direct node/date/time/data checks, quote update and helper/quote release, detached arrays. |
 | `PiecewiseYoYInflationCurve.nodes, times` | 2 | Bootstrap dates, forecasts and quote-driven relinking already checked; deferred direct node/time output. |
 | `PiecewiseZeroInflationCurve.dates, times` | 2 | Bootstrap rates/update and retained nodes already checked; deferred direct date/time output. |
 | `YoYInflationHelper.latest_date, pillar_date`; `ZeroInflationHelper.latest_date` | 3 | Zero pillar/observation dates already checked; deferred remaining exact helper dates. |
@@ -42,7 +42,7 @@ Names below omit `itofin.`; term-structure names are in `termstructures`.
 | --- | ---: | --- |
 | `CpiInterpolationType.Flat, Linear` | 2 | Existing inflation helper tests assert different pillar dates; direct metadata test also checks Flat. |
 | `PricingModel.Isda, Midpoint` | 2 | Isda implied-hazard recovery directly checked. Midpoint pricing engine checked, but deferred Midpoint implied-hazard dispatch. |
-| `ProtectionSide.Buyer, Seller` | 2 | Seller cached CDS NPV checked; deferred Buyer/Seller sign reversal for identical contracts. |
+| `ProtectionSide.Buyer, Seller` | 2 | Seller cached CDS NPV and Buyer bootstrap round trip checked; deferred Buyer/Seller sign reversal for identical contracts. |
 | `SettlementMethod.CollateralizedCashPrice, ParYieldCurve, PhysicalCleared`; `SettlementType.Cash`; `CashAnnuityModel.DiscountCurve` | 5 | Deferred: supported cash/physical swaption fixtures and discounted-annuity valuation oracle, plus explicit rejection where unsupported. |
 | `SwapType.Receiver` | 1 | Deferred payer/receiver sign reversal and fair-rate consistency. |
 | `AccrualBias.HalfDayBias, NoBias` | 2 | Existing ISDA test checks default HalfDayBias and explicit NoBias coupon cached values. |
@@ -70,8 +70,8 @@ Local macOS arm64 results (Go 1.27.1, Rust 1.96.0):
 
 - `cargo build -p libitofin-ffi --release`: passed.
 - `cargo test -p libitofin-ffi --release models_api::tests::calibration_enum_and_optional_criteria_are_checked`: one passed.
-- `GOEXPERIMENT=cgocheck2 go test -race -count=1 -run 'TestHullWhiteCalibrationErrorVariants|TestFlatHazardAnalytic'` in `bindings/go`, with `DYLD_LIBRARY_PATH` pointing to this worktree's release output: both top-level tests passed, including both calibration variants.
-- `python3 scripts/check_go_coverage.py --strict --baseline`: 744/744 baseline mapped, 584 explicit test references, no invalid references; 111 newer symbols still unmapped.
+- `GOEXPERIMENT=cgocheck2 go test -race -count=1 -run 'TestHullWhiteCalibrationErrorVariants|TestFlatHazardAnalytic'` in `bindings/go`, with `DYLD_LIBRARY_PATH` pointing to this worktree's release output: both top-level tests passed, including both calibration variants. The additional `TestCreditBootstrapRepricesIndependentContracts` passed with the same race/cgo flags.
+- `python3 scripts/check_go_coverage.py --strict --baseline`: 744/744 baseline mapped, 597 explicit test references, no invalid references; 111 newer symbols still unmapped.
 
 The independently downloaded QuantLib 1.43 wheel generated the calibration
 constants using [the reproducible oracle](../bindings/go/testdata/hullwhite_calibration_oracle.py).
@@ -80,3 +80,5 @@ changing only the error metric. Signed residuals use 1e-8 absolute tolerance;
 parameters retain 1.3e-5. The constant-hazard test uses `exp(-hazard * time)`
 and its analytical derivative, with 1e-12 tolerance.
 No remote CI or private consumer integration is claimed.
+
+Credit round-trip source: [Python oracle and convention notes](../crates/itofin-py/tests/test_credit_bootstrap.py).
