@@ -63,7 +63,9 @@ fn optionlet_boundary_round_trips_caps_and_rejects_bad_buffers() {
     );
     let index = shared(Euribor::six_months(curve.clone(), settings.clone()));
     let surface_id = c.insert(surface).unwrap();
-    let index_id = c.insert(index.clone()).unwrap();
+    let index_id = c
+        .insert(crate::indexes_api::NativeIbor::builtin(index.clone()))
+        .unwrap();
     let settings_id = c.insert(settings.clone()).unwrap();
     let mut stripper = 0;
     let mut adapter = 0;

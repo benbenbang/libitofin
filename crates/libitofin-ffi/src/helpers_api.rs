@@ -7,7 +7,7 @@ use crate::settings_api::settings;
 use crate::time_api::{calendar, convention, date, day_counter, frequency};
 use libitofin::cashflows::RateAveraging;
 use libitofin::handle::Handle;
-use libitofin::indexes::{IborIndex, OvernightIndex};
+use libitofin::indexes::OvernightIndex;
 use libitofin::instruments::{BondPriceType, FuturesType};
 use libitofin::quotes::Quote;
 use libitofin::shared::Shared;
@@ -67,7 +67,7 @@ pub unsafe extern "C" fn itofin_deposit_helper_new(
     unsafe {
         with_context(ctx, error, |c| {
             check_ptr(out)?;
-            let i = c.get::<Shared<IborIndex>>(index)?;
+            let i = crate::indexes_api::ibor_index(c, index)?;
             let v = if from_rate {
                 DepositRateHelper::from_rate(rate, &i)
             } else {
@@ -105,7 +105,7 @@ pub unsafe extern "C" fn itofin_swap_helper_new(
             check_ptr(out)?;
             check_ptr(cfg)?;
             let a = &*cfg;
-            let i = c.get::<Shared<IborIndex>>(a.index)?;
+            let i = crate::indexes_api::ibor_index(c, a.index)?;
             let v = SwapRateHelper::new(
                 quote(c, a.quote)?,
                 period(a.tenor_length, a.tenor_unit)?,
@@ -151,7 +151,7 @@ pub unsafe extern "C" fn itofin_fra_helper_new(
             check_ptr(out)?;
             check_ptr(cfg)?;
             let a = &*cfg;
-            let i = c.get::<Shared<IborIndex>>(a.index)?;
+            let i = crate::indexes_api::ibor_index(c, a.index)?;
             let p = pillar(a.pillar)?;
             let v = match mode {
                 0 => FraRateHelper::new(
@@ -246,7 +246,7 @@ pub unsafe extern "C" fn itofin_futures_helper_new(
                     ft,
                 )?,
                 2 => {
-                    let i = c.get::<Shared<IborIndex>>(a.index)?;
+                    let i = crate::indexes_api::ibor_index(c, a.index)?;
                     FuturesRateHelper::from_index(q, d, &i, adj, ft)?
                 }
                 _ => return Err(BindingError::invalid("unknown futures constructor")),

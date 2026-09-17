@@ -36,6 +36,9 @@ Native day counters/calendars/settings use handles. Calendars are stored as
 horizon; retrieve core calendars through `time_api::calendar`. Shared helper functions in
 time_api are `date(serial:i32)->BindingResult<Date>` and
 `day_counter(context:&Context,handle:u64)->BindingResult<DayCounter>`.
+Ibor indexes are stored as `indexes_api::NativeIbor`, retaining the original
+`NativeCalendar` for fixing-calendar inspectors; retrieve core indexes through
+`indexes_api::ibor_index`. Built-in index families have unrestricted calendars.
 Settings stored as Shared<Settings<Date>>. Ordinary curve adapters retrieve
 Handle<dyn YieldTermStructure>, volatility Handle<dyn BlackVolTermStructure>.
 

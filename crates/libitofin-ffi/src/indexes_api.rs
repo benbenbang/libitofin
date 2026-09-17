@@ -13,6 +13,28 @@ use libitofin::time::{
     businessdayconvention::BusinessDayConvention, period::Period, timeunit::TimeUnit,
 };
 
+#[derive(Clone)]
+pub(crate) struct NativeIbor {
+    inner: Shared<IborIndex>,
+    fixing_calendar: crate::calendar_api::NativeCalendar,
+}
+impl NativeIbor {
+    pub(crate) fn builtin(inner: Shared<IborIndex>) -> Self {
+        let fixing_calendar = crate::calendar_api::NativeCalendar {
+            inner: inner.fixing_calendar(),
+            horizon: None,
+            first_year: 1901,
+        };
+        Self {
+            inner,
+            fixing_calendar,
+        }
+    }
+}
+pub(crate) fn ibor_index(c: &Context, id: u64) -> BindingResult<Shared<IborIndex>> {
+    Ok(c.get::<NativeIbor>(id)?.inner)
+}
+
 pub(crate) fn period(length: i32, unit: i32) -> BindingResult<Period> {
     Ok(Period::new(
         length,
@@ -110,7 +132,7 @@ pub unsafe extern "C" fn itofin_ibor_family_new(
                 4 => EurLibor::new(t, f, s)?.upcast(),
                 _ => return Err(BindingError::invalid("unknown Ibor family")),
             };
-            output(out, c.insert(v)?)
+            output(out, c.insert(NativeIbor::builtin(v))?)
         })
     }
 }
@@ -155,7 +177,9 @@ pub unsafe extern "C" fn itofin_ibor_new(
                 .to_owned();
             let t = period(a.tenor_length, a.tenor_unit)?;
             let cur = c.get::<Currency>(a.currency)?;
-            let cal = calendar(c, a.fixing_calendar)?;
+            let fixing_calendar =
+                c.get::<crate::calendar_api::NativeCalendar>(a.fixing_calendar)?;
+            let cal = fixing_calendar.inner.clone();
             let bdc = convention(a.convention)?;
             let dc = day_counter(c, a.day_counter)?;
             let f = optional_curve(c, a.forwarding)?;
@@ -190,7 +214,13 @@ pub unsafe extern "C" fn itofin_ibor_new(
                     s,
                 ))
             };
-            output(out, c.insert(v)?)
+            output(
+                out,
+                c.insert(NativeIbor {
+                    inner: v,
+                    fixing_calendar,
+                })?,
+            )
         })
     }
 }
@@ -240,7 +270,7 @@ pub unsafe extern "C" fn itofin_index_fixing(
                 c.get::<Shared<OvernightIndex>>(id)?
                     .fixing(d, forecast_today)?
             } else {
-                c.get::<Shared<IborIndex>>(id)?.fixing(d, forecast_today)?
+                crate::indexes_api::ibor_index(c, id)?.fixing(d, forecast_today)?
             };
             output(out, v)
         })
@@ -263,7 +293,7 @@ pub unsafe extern "C" fn itofin_ibor_date(
 ) -> i32 {
     unsafe {
         with_context(ctx, error, |c| {
-            let v = c.get::<Shared<IborIndex>>(id)?;
+            let v = crate::indexes_api::ibor_index(c, id)?;
             let d = date(serial)?;
             let d = match query {
                 0 => v.value_date(d)?,
@@ -292,14 +322,11 @@ pub unsafe extern "C" fn itofin_ibor_component(
     unsafe {
         with_context(ctx, error, |c| {
             check_ptr(out)?;
-            let v = c.get::<Shared<IborIndex>>(id)?;
+            let index = c.get::<NativeIbor>(id)?;
+            let v = index.inner;
             let id = match query {
                 0 => c.insert(v.day_counter().clone())?,
-                1 => c.insert(crate::calendar_api::NativeCalendar {
-                    inner: v.fixing_calendar(),
-                    horizon: None,
-                    first_year: 1901,
-                })?,
+                1 => c.insert(index.fixing_calendar)?,
                 2 => c.insert(v.currency().clone())?,
                 _ => return Err(BindingError::invalid("unknown index component")),
             };
@@ -328,7 +355,7 @@ pub unsafe extern "C" fn itofin_ibor_info(
 ) -> i32 {
     unsafe {
         with_context(ctx, error, |c| {
-            let v = c.get::<Shared<IborIndex>>(id)?;
+            let v = crate::indexes_api::ibor_index(c, id)?;
             let tenor = v.tenor();
             let unit = match tenor.units() {
                 TimeUnit::Days => 0,
@@ -376,7 +403,7 @@ pub unsafe extern "C" fn itofin_ibor_name(
     unsafe {
         with_context(ctx, error, |c| {
             check_ptr(length)?;
-            let name = c.get::<Shared<IborIndex>>(id)?.name();
+            let name = crate::indexes_api::ibor_index(c, id)?.name();
             output(length, name.len())?;
             if capacity == 0 {
                 return Ok(());

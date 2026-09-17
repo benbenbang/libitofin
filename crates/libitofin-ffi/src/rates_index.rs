@@ -55,7 +55,7 @@ pub unsafe extern "C" fn itofin_swap_index_new(
                     period(a.fixed_length, a.fixed_unit)?,
                     convention(a.fixed_convention)?,
                     day_counter(c, a.day_counter)?,
-                    c.get(a.index)?,
+                    crate::indexes_api::ibor_index(c, a.index)?,
                     settings(c, a.settings)?,
                 )
             } else {
@@ -68,7 +68,7 @@ pub unsafe extern "C" fn itofin_swap_index_new(
                     period(a.fixed_length, a.fixed_unit)?,
                     convention(a.fixed_convention)?,
                     day_counter(c, a.day_counter)?,
-                    c.get(a.index)?,
+                    crate::indexes_api::ibor_index(c, a.index)?,
                     curve(c, a.discount)?,
                     settings(c, a.settings)?,
                 )
