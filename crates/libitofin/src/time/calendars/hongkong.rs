@@ -18,7 +18,7 @@ use crate::time::weekday::Weekday;
 /// Last year for which Hong Kong's public/lunar holidays are tabulated
 /// (matching QuantLib's data). Queries beyond this year cannot be answered
 /// reliably and panic rather than silently omitting holidays.
-const HOLIDAY_HORIZON: Year = 2025;
+pub const HOLIDAY_HORIZON: Year = 2025;
 
 /// Hong Kong markets.
 ///

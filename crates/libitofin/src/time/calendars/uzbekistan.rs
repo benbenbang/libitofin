@@ -11,7 +11,7 @@ use crate::time::weekday::Weekday;
 /// Last year for which Uzbekistan's Islamic (Eid) holidays are tabulated via
 /// `moon_sighting` (matching QuantLib's data). Queries beyond this year cannot
 /// be answered reliably and panic rather than silently omitting holidays.
-const HOLIDAY_HORIZON: Year = 2040;
+pub const HOLIDAY_HORIZON: Year = 2040;
 
 /// Market handled by the Uzbekistan calendar.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
