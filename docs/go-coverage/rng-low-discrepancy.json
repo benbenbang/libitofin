@@ -1,0 +1,89 @@
+{
+  "domain": "rng-low-discrepancy",
+  "entries": [
+    {
+      "c": "itofin_low_discrepancy_new",
+      "go": "Session.NewSobolRsg",
+      "python": "itofin.randomnumbers.SobolRsg.__init__",
+      "status": "implemented",
+      "tests": "TestLowDiscrepancyOracles"
+    },
+    {
+      "c": "itofin_rng_sequence_dimension",
+      "go": "SobolRsg.Dimension",
+      "python": "itofin.randomnumbers.SobolRsg.dimension",
+      "status": "implemented",
+      "tests": "TestLowDiscrepancyOracles"
+    },
+    {
+      "c": "itofin_rng_sequence_draw",
+      "go": "SobolRsg.NextSequence",
+      "python": "itofin.randomnumbers.SobolRsg.next_sequence",
+      "status": "implemented",
+      "tests": "TestLowDiscrepancyOracles"
+    },
+    {
+      "c": "itofin_rng_sequence_draw",
+      "go": "SobolRsg.NextSequences",
+      "python": "itofin.randomnumbers.SobolRsg.next_sequences",
+      "status": "implemented",
+      "tests": "TestLowDiscrepancyOracles"
+    },
+    {
+      "c": "itofin_rng_sequence_draw",
+      "go": "SobolRsg.LastSequence",
+      "python": "itofin.randomnumbers.SobolRsg.last_sequence",
+      "status": "implemented",
+      "tests": "TestLowDiscrepancyOracles"
+    },
+    {
+      "c": "itofin_sobol_integers",
+      "go": "SobolRsg.NextInt32Sequence",
+      "python": "itofin.randomnumbers.SobolRsg.next_int32_sequence",
+      "status": "implemented",
+      "tests": "TestSobolIntegerSkipAndLimits"
+    },
+    {
+      "c": "itofin_sobol_integers",
+      "go": "SobolRsg.SkipTo",
+      "python": "itofin.randomnumbers.SobolRsg.skip_to",
+      "status": "implemented",
+      "tests": "TestSobolIntegerSkipAndLimits"
+    },
+    {
+      "c": "itofin_low_discrepancy_new",
+      "go": "Session.NewHaltonRsg",
+      "python": "itofin.randomnumbers.HaltonRsg.__init__",
+      "status": "implemented",
+      "tests": "TestLowDiscrepancyOracles"
+    },
+    {
+      "c": "itofin_rng_sequence_dimension",
+      "go": "HaltonRsg.Dimension",
+      "python": "itofin.randomnumbers.HaltonRsg.dimension",
+      "status": "implemented",
+      "tests": "TestLowDiscrepancyOracles"
+    },
+    {
+      "c": "itofin_rng_sequence_draw",
+      "go": "HaltonRsg.NextSequence",
+      "python": "itofin.randomnumbers.HaltonRsg.next_sequence",
+      "status": "implemented",
+      "tests": "TestLowDiscrepancyOracles"
+    },
+    {
+      "c": "itofin_rng_sequence_draw",
+      "go": "HaltonRsg.NextSequences",
+      "python": "itofin.randomnumbers.HaltonRsg.next_sequences",
+      "status": "implemented",
+      "tests": "TestLowDiscrepancyOracles"
+    },
+    {
+      "c": "itofin_rng_sequence_draw",
+      "go": "HaltonRsg.LastSequence",
+      "python": "itofin.randomnumbers.HaltonRsg.last_sequence",
+      "status": "implemented",
+      "tests": "TestLowDiscrepancyOracles"
+    }
+  ]
+}
