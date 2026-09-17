@@ -5,7 +5,7 @@ package itofin
 
 /*
 #cgo CFLAGS: -I${SRCDIR}/../../crates/libitofin-ffi/include
-#cgo LDFLAGS: -L${SRCDIR}/../../target/release -litofin
+#cgo LDFLAGS: -L${SRCDIR}/../../target/release -litofin_ffi
 #include "itofin.h"
 */
 import "C"

@@ -14,10 +14,11 @@ go test ./...
 go run ./examples/portfolio
 ```
 
-The native artifacts are `target/release/libitofin.so` (Linux),
-`libitofin.dylib` (macOS), and `libitofin.a`. The header is
-`crates/libitofin-ffi/include/itofin.h`. The cgo flags use paths relative to this
-checkout. An application using a published Go module would also need a native
+The native artifacts are `target/release/libitofin_ffi.so` (Linux),
+`libitofin_ffi.dylib` (macOS), and `libitofin_ffi.a`. The header is
+`crates/libitofin-ffi/include/itofin.h`. The distinct `itofin_ffi` library name
+allows C/Go and Python builds to share Cargo target directories. The cgo flags use paths
+relative to this checkout. An application using a published Go module would also need a native
 distribution and suitable `CGO_CFLAGS`, `CGO_LDFLAGS`, and runtime loader paths;
 the current supported workflow is a local checkout with a Go `replace` directive.
 
