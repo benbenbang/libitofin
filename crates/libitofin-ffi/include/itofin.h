@@ -3325,6 +3325,33 @@ int32_t itofin_uniform_rng_u32(struct ItofinContext *ctx,
                                struct ItofinError *error);
 
 /**
+ * kind=0: Sobol; kind=1: deterministic Halton. Tables 0..9 match Python DirectionIntegers.
+ * # Safety
+ * Follow the crate-level C caller contract.
+ */
+int32_t itofin_low_discrepancy_new(struct ItofinContext *ctx,
+                                   int32_t kind,
+                                   size_t dimension,
+                                   uint64_t seed,
+                                   int32_t table,
+                                   bool gray,
+                                   uint64_t *out,
+                                   struct ItofinError *error);
+
+/**
+ * skip=true positions the counter at index; otherwise draws raw Sobol integers.
+ * # Safety
+ * Follow the crate-level C caller contract; out contains capacity words.
+ */
+int32_t itofin_sobol_integers(struct ItofinContext *ctx,
+                              uint64_t id,
+                              bool skip,
+                              uint32_t index,
+                              uint32_t *out,
+                              size_t capacity,
+                              struct ItofinError *error);
+
+/**
  * Copies source state: uniform takes a scalar, Gaussian takes a uniform sequence.
  * A zero source constructs a seeded generator using dimension and seed.
  * # Safety

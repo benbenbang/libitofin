@@ -1,6 +1,8 @@
 use crate::boundary::*;
 use crate::rng_api::{check_buffer, uniform};
+use crate::rng_low_discrepancy::SobolState;
 use libitofin::math::distributions::normal::InverseCumulativeNormal;
+use libitofin::math::randomnumbers::HaltonRsg;
 use libitofin::math::randomnumbers::rngtraits::SequenceGenerator;
 use libitofin::math::randomnumbers::{
     InverseCumulativeRsg, MersenneTwisterUniformRng, RandomSequenceGenerator,
@@ -13,24 +15,38 @@ type Gaussian = InverseCumulativeRsg<Uniform, InverseCumulativeNormal>;
 pub(crate) enum Sequence {
     Uniform(Box<Uniform>),
     Gaussian(Box<Gaussian>),
+    Sobol(Box<SobolState>),
+    Halton(HaltonRsg),
 }
 impl Sequence {
+    fn check_draws(&self, count: usize) -> BindingResult<()> {
+        match self {
+            Self::Sobol(r) => r.check_draws(count),
+            _ => Ok(()),
+        }
+    }
     fn dimension(&self) -> usize {
         match self {
             Self::Uniform(r) => r.dimension(),
             Self::Gaussian(r) => r.dimension(),
+            Self::Sobol(r) => r.inner.dimension(),
+            Self::Halton(r) => r.dimension(),
         }
     }
     fn last(&self) -> &[f64] {
         match self {
             Self::Uniform(r) => &r.last_sequence().value,
             Self::Gaussian(r) => &r.last_sequence().value,
+            Self::Sobol(r) => r.inner.last_sequence(),
+            Self::Halton(r) => r.last_sequence(),
         }
     }
     fn next(&mut self) -> &[f64] {
         match self {
             Self::Uniform(r) => &r.next_sequence().value,
             Self::Gaussian(r) => &r.next_sequence().value,
+            Self::Sobol(r) => r.next(),
+            Self::Halton(r) => r.next_sequence(),
         }
     }
 }
@@ -126,6 +142,9 @@ pub unsafe extern "C" fn itofin_rng_sequence_draw(
             check_buffer(out, len, capacity)?;
             if last && count != 1 {
                 return Err(BindingError::invalid("last sequence requires one row"));
+            }
+            if !last {
+                rsg.check_draws(count)?;
             }
             for row in 0..count {
                 let values = if last { rsg.last() } else { rsg.next() };
