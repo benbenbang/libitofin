@@ -40,6 +40,7 @@ pub mod rates_options;
 pub mod ratevol_api;
 pub mod results_api;
 pub mod rng_api;
+pub mod rng_low_discrepancy;
 pub mod rng_sequence_api;
 pub mod settings_api;
 pub mod smile_api;
