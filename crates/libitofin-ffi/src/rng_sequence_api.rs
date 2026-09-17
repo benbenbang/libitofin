@@ -1,5 +1,6 @@
 use crate::boundary::*;
 use crate::rng_api::{check_buffer, uniform};
+use crate::rng_gaussian_sobol::GaussianSobol;
 use crate::rng_low_discrepancy::SobolState;
 use libitofin::math::distributions::normal::InverseCumulativeNormal;
 use libitofin::math::randomnumbers::HaltonRsg;
@@ -17,11 +18,13 @@ pub(crate) enum Sequence {
     Gaussian(Box<Gaussian>),
     Sobol(Box<SobolState>),
     Halton(HaltonRsg),
+    GaussianSobol(GaussianSobol),
 }
 impl Sequence {
     fn check_draws(&self, count: usize) -> BindingResult<()> {
         match self {
             Self::Sobol(r) => r.check_draws(count),
+            Self::GaussianSobol(r) => r.source.check_draws(count),
             _ => Ok(()),
         }
     }
@@ -31,6 +34,7 @@ impl Sequence {
             Self::Gaussian(r) => r.dimension(),
             Self::Sobol(r) => r.inner.dimension(),
             Self::Halton(r) => r.dimension(),
+            Self::GaussianSobol(r) => r.last.len(),
         }
     }
     fn last(&self) -> &[f64] {
@@ -39,6 +43,7 @@ impl Sequence {
             Self::Gaussian(r) => &r.last_sequence().value,
             Self::Sobol(r) => r.inner.last_sequence(),
             Self::Halton(r) => r.last_sequence(),
+            Self::GaussianSobol(r) => &r.last,
         }
     }
     fn next(&mut self) -> &[f64] {
@@ -47,6 +52,7 @@ impl Sequence {
             Self::Gaussian(r) => &r.next_sequence().value,
             Self::Sobol(r) => r.next(),
             Self::Halton(r) => r.next_sequence(),
+            Self::GaussianSobol(r) => r.next(),
         }
     }
 }

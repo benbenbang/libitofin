@@ -3374,6 +3374,16 @@ int32_t itofin_uniform_rng_u32(struct ItofinContext *ctx,
                                struct ItofinError *error);
 
 /**
+ * Copies Sobol state, including its current position; subsequent draws are independent.
+ * # Safety
+ * Follow the crate-level C caller contract.
+ */
+int32_t itofin_gaussian_sobol_new(struct ItofinContext *ctx,
+                                  uint64_t source,
+                                  uint64_t *out,
+                                  struct ItofinError *error);
+
+/**
  * kind=0: Sobol; kind=1: deterministic Halton. Tables 0..9 match Python DirectionIntegers.
  * # Safety
  * Follow the crate-level C caller contract.

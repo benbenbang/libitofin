@@ -1,0 +1,110 @@
+{
+  "domain": "rng-gaussian-sobol",
+  "entries": [
+    {
+      "c": [],
+      "go": "Unit",
+      "python": "itofin.randomnumbers.DirectionIntegers.Unit",
+      "status": "implemented",
+      "tests": "TestLowDiscrepancyOracles"
+    },
+    {
+      "c": [],
+      "go": "Jaeckel",
+      "python": "itofin.randomnumbers.DirectionIntegers.Jaeckel",
+      "status": "implemented",
+      "tests": "TestLowDiscrepancyOracles"
+    },
+    {
+      "c": [],
+      "go": "SobolLevitan",
+      "python": "itofin.randomnumbers.DirectionIntegers.SobolLevitan",
+      "status": "implemented",
+      "tests": "TestLowDiscrepancyOracles"
+    },
+    {
+      "c": [],
+      "go": "SobolLevitanLemieux",
+      "python": "itofin.randomnumbers.DirectionIntegers.SobolLevitanLemieux",
+      "status": "implemented",
+      "tests": "TestLowDiscrepancyOracles"
+    },
+    {
+      "c": [],
+      "go": "JoeKuoD5",
+      "python": "itofin.randomnumbers.DirectionIntegers.JoeKuoD5",
+      "status": "implemented",
+      "tests": "TestLowDiscrepancyOracles"
+    },
+    {
+      "c": [],
+      "go": "JoeKuoD6",
+      "python": "itofin.randomnumbers.DirectionIntegers.JoeKuoD6",
+      "status": "implemented",
+      "tests": "TestLowDiscrepancyOracles"
+    },
+    {
+      "c": [],
+      "go": "JoeKuoD7",
+      "python": "itofin.randomnumbers.DirectionIntegers.JoeKuoD7",
+      "status": "implemented",
+      "tests": "TestLowDiscrepancyOracles"
+    },
+    {
+      "c": [],
+      "go": "Kuo",
+      "python": "itofin.randomnumbers.DirectionIntegers.Kuo",
+      "status": "implemented",
+      "tests": "TestLowDiscrepancyOracles"
+    },
+    {
+      "c": [],
+      "go": "Kuo2",
+      "python": "itofin.randomnumbers.DirectionIntegers.Kuo2",
+      "status": "implemented",
+      "tests": "TestLowDiscrepancyOracles"
+    },
+    {
+      "c": [],
+      "go": "Kuo3",
+      "python": "itofin.randomnumbers.DirectionIntegers.Kuo3",
+      "status": "implemented",
+      "tests": "TestLowDiscrepancyOracles"
+    },
+    {
+      "c": "itofin_gaussian_sobol_new",
+      "go": "Session.NewGaussianLowDiscrepancySequenceGenerator",
+      "python": "itofin.randomnumbers.GaussianLowDiscrepancySequenceGenerator.__init__",
+      "status": "implemented",
+      "tests": "TestGaussianSobolSequence"
+    },
+    {
+      "c": "itofin_rng_sequence_dimension",
+      "go": "GaussianLowDiscrepancySequenceGenerator.Dimension",
+      "python": "itofin.randomnumbers.GaussianLowDiscrepancySequenceGenerator.dimension",
+      "status": "implemented",
+      "tests": "TestGaussianSobolSequence"
+    },
+    {
+      "c": "itofin_rng_sequence_draw",
+      "go": "GaussianLowDiscrepancySequenceGenerator.NextSequence",
+      "python": "itofin.randomnumbers.GaussianLowDiscrepancySequenceGenerator.next_sequence",
+      "status": "implemented",
+      "tests": "TestGaussianSobolSequence"
+    },
+    {
+      "c": "itofin_rng_sequence_draw",
+      "go": "GaussianLowDiscrepancySequenceGenerator.NextSequences",
+      "python": "itofin.randomnumbers.GaussianLowDiscrepancySequenceGenerator.next_sequences",
+      "status": "implemented",
+      "tests": "TestGaussianSobolSequence"
+    },
+    {
+      "c": "itofin_rng_sequence_draw",
+      "go": "GaussianLowDiscrepancySequenceGenerator.LastSequence",
+      "python": "itofin.randomnumbers.GaussianLowDiscrepancySequenceGenerator.last_sequence",
+      "status": "implemented",
+      "tests": "TestGaussianSobolSequence"
+    }
+  ]
+}
