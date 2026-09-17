@@ -157,3 +157,132 @@ func (s *Session) UnitedStates(market ...string) (*Calendar, error) {
 func (s *Session) Uzbekistan(market ...string) (*Calendar, error) {
 	return s.countryCalendar(46, []string{"UZSE"}, market)
 }
+
+func (s *Session) JointCalendar(calendars []*Calendar, rule ...string) (*Calendar, error) {
+	if len(rule) > 1 {
+		return nil, fmt.Errorf("at most one joint-calendar rule is accepted")
+	}
+	value := int32(0)
+	if len(rule) == 1 {
+		switch {
+		case len(rule[0]) == len("JoinHolidays") && strings.EqualFold(rule[0], "JoinHolidays"):
+		case len(rule[0]) == len("JoinBusinessDays") && strings.EqualFold(rule[0], "JoinBusinessDays"):
+			value = 1
+		default:
+			return nil, fmt.Errorf("unknown joint-calendar rule, expected JoinHolidays, JoinBusinessDays")
+		}
+	}
+	if len(calendars) == 0 {
+		return nil, fmt.Errorf("a joint calendar needs at least one calendar")
+	}
+	ids := make([]C.uint64_t, len(calendars))
+	for i, cal := range calendars {
+		if cal == nil {
+			return nil, fmt.Errorf("calendar required")
+		}
+		if err := sameSession(s, cal.object); err != nil {
+			return nil, err
+		}
+		ids[i] = C.uint64_t(cal.id)
+	}
+	var id C.uint64_t
+	err := s.invoke(func() error {
+		var e C.ItofinError
+		return ffiError(C.itofin_calendar_joint_new(s.ctx, &ids[0], C.size_t(len(ids)), C.int32_t(value), &id, &e), &e)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &Calendar{object{s, uint64(id)}}, nil
+}
+
+func (c *Calendar) calendarQuery(date Date, query int32) (bool, error) {
+	var out C.uint8_t
+	err := c.session.invoke(func() error {
+		var e C.ItofinError
+		return ffiError(C.itofin_calendar_query(c.session.ctx, C.uint64_t(c.id), C.int32_t(date.serial), C.int32_t(query), &out, &e), &e)
+	})
+	return out != 0, err
+}
+func (c *Calendar) IsBusinessDay(date Date) (bool, error) { return c.calendarQuery(date, 0) }
+func (c *Calendar) IsHoliday(date Date) (bool, error)     { return c.calendarQuery(date, 1) }
+func (c *Calendar) IsWeekend(date Date) (bool, error)     { return c.calendarQuery(date, 2) }
+
+// BusinessDayCountOptions defaults to including the first date and excluding the last.
+type BusinessDayCountOptions struct {
+	IncludeFirst *bool
+	IncludeLast  bool
+}
+
+func (c *Calendar) BusinessDaysBetween(from, to Date, options ...BusinessDayCountOptions) (int32, error) {
+	if len(options) > 1 {
+		return 0, fmt.Errorf("at most one business-day count option set is accepted")
+	}
+	first, last := true, false
+	if len(options) == 1 {
+		if options[0].IncludeFirst != nil {
+			first = *options[0].IncludeFirst
+		}
+		last = options[0].IncludeLast
+	}
+	var out C.int32_t
+	err := c.session.invoke(func() error {
+		var e C.ItofinError
+		return ffiError(C.itofin_calendar_business_days_between(c.session.ctx, C.uint64_t(c.id), C.int32_t(from.serial), C.int32_t(to.serial), calendarBool(first), calendarBool(last), &out, &e), &e)
+	})
+	return int32(out), err
+}
+
+// HolidayList returns holidays inclusively; weekends are omitted by default.
+func (c *Calendar) HolidayList(from, to Date, includeWeekends ...bool) ([]Date, error) {
+	if len(includeWeekends) > 1 {
+		return nil, fmt.Errorf("at most one weekend flag is accepted")
+	}
+	weekends := len(includeWeekends) == 1 && includeWeekends[0]
+	var dates []Date
+	err := c.session.invoke(func() error {
+		var e C.ItofinError
+		var size C.size_t
+		call := func(out *C.int32_t, capacity C.size_t) error {
+			return ffiError(C.itofin_calendar_holiday_list(c.session.ctx, C.uint64_t(c.id), C.int32_t(from.serial), C.int32_t(to.serial), calendarBool(weekends), out, capacity, &size, &e), &e)
+		}
+		if err := call(nil, 0); err != nil {
+			return err
+		}
+		dates = make([]Date, int(size))
+		if size == 0 {
+			return nil
+		}
+		serials := make([]C.int32_t, int(size))
+		if err := call(&serials[0], size); err != nil {
+			return err
+		}
+		for i, value := range serials {
+			dates[i] = Date{int32(value)}
+		}
+		return nil
+	})
+	return dates, err
+}
+
+func (c *Calendar) Equal(other *Calendar) (bool, error) {
+	if other == nil {
+		return false, nil
+	}
+	name, err := c.Name()
+	if err != nil {
+		return false, err
+	}
+	otherName, err := other.Name()
+	return name == otherName, err
+}
+
+// Key returns the calendar name for semantic map keys, including across sessions.
+func (c *Calendar) Key() (string, error) { return c.Name() }
+
+func calendarBool(value bool) C.uint8_t {
+	if value {
+		return 1
+	}
+	return 0
+}
