@@ -3325,6 +3325,42 @@ int32_t itofin_uniform_rng_u32(struct ItofinContext *ctx,
                                struct ItofinError *error);
 
 /**
+ * Copies source state: uniform takes a scalar, Gaussian takes a uniform sequence.
+ * A zero source constructs a seeded generator using dimension and seed.
+ * # Safety
+ * Follow the crate-level C caller contract.
+ */
+int32_t itofin_random_sequence_new(struct ItofinContext *ctx,
+                                   uint64_t source,
+                                   size_t dimension,
+                                   uint32_t seed,
+                                   bool gaussian,
+                                   uint64_t *out,
+                                   struct ItofinError *error);
+
+/**
+ * # Safety
+ * Follow the crate-level C caller contract.
+ */
+int32_t itofin_rng_sequence_dimension(struct ItofinContext *ctx,
+                                      uint64_t id,
+                                      size_t *out,
+                                      struct ItofinError *error);
+
+/**
+ * Draws count rows; last=true copies the last row without drawing and requires count=1.
+ * # Safety
+ * Follow the crate-level C caller contract; out contains capacity doubles.
+ */
+int32_t itofin_rng_sequence_draw(struct ItofinContext *ctx,
+                                 uint64_t id,
+                                 size_t count,
+                                 bool last,
+                                 double *out,
+                                 size_t capacity,
+                                 struct ItofinError *error);
+
+/**
  * # Safety
  * Pointers must be aligned, live and valid for their stated lengths. Outputs
  * must not overlap inputs or other outputs. Any context and its handles must
