@@ -7,6 +7,9 @@ use crate::time::calendar::{Calendar, CalendarImpl, is_weekend_sat_sun};
 use crate::time::date::{Date, Day, Month, Year};
 use crate::time::weekday::Weekday;
 
+/// First year supported by the Moscow Exchange calendar.
+pub const MOEX_FIRST_YEAR: Year = 2012;
+
 /// Market handled by the Russian calendar.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Market {
@@ -211,7 +214,7 @@ impl CalendarImpl for ExchangeImpl {
 
         // the exchange was formally established in 2011, so data are only
         // available from 2012 to present
-        if y < 2012 {
+        if y < MOEX_FIRST_YEAR {
             panic!("MOEX calendar for the year {y} does not exist.");
         }
 

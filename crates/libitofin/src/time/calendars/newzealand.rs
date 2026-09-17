@@ -25,7 +25,7 @@ pub enum Market {
 /// QuantLib's data). Matariki has no fixed formula - its dates are announced
 /// and tabulated per year - so queries beyond this year cannot be answered
 /// reliably and panic rather than silently omitting Matariki.
-const HOLIDAY_HORIZON: Year = 2052;
+pub const HOLIDAY_HORIZON: Year = 2052;
 
 /// The New Zealand calendar.
 ///

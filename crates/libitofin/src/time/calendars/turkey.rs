@@ -10,7 +10,7 @@ use crate::time::weekday::Weekday;
 /// Last year for which Turkey's Islamic holidays are tabulated (matching
 /// QuantLib's data). Queries beyond this year cannot be answered reliably and
 /// panic rather than silently omitting holidays.
-const HOLIDAY_HORIZON: Year = 2034;
+pub const HOLIDAY_HORIZON: Year = 2034;
 
 /// The Turkish calendar (Istanbul Stock Exchange).
 ///

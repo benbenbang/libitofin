@@ -15,7 +15,7 @@ use crate::time::weekday::Weekday;
 /// Last year for which South Korea's public/lunar holidays are tabulated
 /// (matching QuantLib's data). Queries beyond this year cannot be answered
 /// reliably and panic rather than silently omitting holidays.
-const HOLIDAY_HORIZON: Year = 2050;
+pub const HOLIDAY_HORIZON: Year = 2050;
 
 /// South Korean markets.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
