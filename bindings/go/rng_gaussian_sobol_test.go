@@ -22,7 +22,7 @@ func TestGaussianSobolSequence(t *testing.T) {
 	for range 30 {
 		uniforms, gaussian := mustRNG(source.NextSequence()), mustRNG(g.NextSequence())
 		for i, z := range gaussian {
-			if math.Abs(.5*math.Erfc(-z/math.Sqrt2)-uniforms[i]) > 1e-8 {
+			if !rngClose(.5*math.Erfc(-z/math.Sqrt2), uniforms[i], 1e-8) {
 				t.Fatal(z, uniforms[i])
 			}
 		}
