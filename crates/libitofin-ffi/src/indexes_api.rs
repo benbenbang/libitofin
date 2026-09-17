@@ -298,6 +298,7 @@ pub unsafe extern "C" fn itofin_ibor_component(
                 1 => c.insert(crate::calendar_api::NativeCalendar {
                     inner: v.fixing_calendar(),
                     horizon: None,
+                    first_year: 1901,
                 })?,
                 2 => c.insert(v.currency().clone())?,
                 _ => return Err(BindingError::invalid("unknown index component")),

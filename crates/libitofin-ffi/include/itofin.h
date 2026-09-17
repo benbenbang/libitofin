@@ -804,6 +804,55 @@ int32_t itofin_calendar_country_new(struct ItofinContext *ctx,
 
 /**
  * # Safety
+ * Pointers and context must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_calendar_joint_new(struct ItofinContext *ctx,
+                                  const uint64_t *handles,
+                                  size_t len,
+                                  int32_t rule,
+                                  uint64_t *out,
+                                  struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers and context must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_calendar_query(struct ItofinContext *ctx,
+                              uint64_t id,
+                              int32_t serial,
+                              int32_t query,
+                              uint8_t *out,
+                              struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers and context must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_calendar_business_days_between(struct ItofinContext *ctx,
+                                              uint64_t id,
+                                              int32_t from,
+                                              int32_t to,
+                                              uint8_t include_first,
+                                              uint8_t include_last,
+                                              int32_t *out,
+                                              struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers and context must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_calendar_holiday_list(struct ItofinContext *ctx,
+                                     uint64_t id,
+                                     int32_t from,
+                                     int32_t to,
+                                     uint8_t include_weekends,
+                                     int32_t *out,
+                                     size_t capacity,
+                                     size_t *required,
+                                     struct ItofinError *error);
+
+/**
+ * # Safety
  * Pointers must be aligned, live and valid for their stated lengths. Outputs
  * must not overlap inputs or other outputs. Any context and its handles must
  * belong to the calling thread; serialize calls including destruction.

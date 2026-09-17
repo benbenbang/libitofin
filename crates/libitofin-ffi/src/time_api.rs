@@ -336,6 +336,7 @@ pub unsafe extern "C" fn itofin_calendar_new(
                 c.insert(crate::calendar_api::NativeCalendar {
                     inner: cal,
                     horizon: None,
+                    first_year: 1901,
                 })?,
             )
         })
@@ -413,6 +414,7 @@ fn advance(
     let first = ymd(1, month, year)?;
     let last = Date::end_of_month(first);
     let next = ymd(d.day_of_month().min(last.day_of_month()), month, year)?;
+    cal.checked(next)?;
     if eom {
         if rule == BusinessDayConvention::Unadjusted && Date::is_end_of_month(d) {
             return Ok(last);
@@ -591,6 +593,7 @@ mod tests {
         let cal = NativeCalendar {
             inner: WeekendsOnly::new(),
             horizon: None,
+            first_year: 1901,
         };
         let saturday = ymd(31, 8, 2024).unwrap();
         assert_eq!(
