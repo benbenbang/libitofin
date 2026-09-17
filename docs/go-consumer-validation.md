@@ -19,7 +19,7 @@ tests run with race detection and strict cgo pointer checks.
 ## Local evidence
 
 On 2026-09-17, macOS arm64, Apple M4, Go 1.27.1 and Rust 1.96.0, the fixture
-passed against the native archive built from packaging commit `0ea15c1b`.
+passed against the native archive built from integrated commit `34a5a8bc`.
 The extracted package path contained spaces. The copied module had no adjacent
 Rust source tree or Cargo target directory. Remote Linux CI was not run here.
 
@@ -29,13 +29,13 @@ development load, not stable performance budgets or application throughput claim
 
 | Paths | Output | Time/op | Go-allocated bytes/op |
 | --- | --- | ---: | ---: |
-| 1,000 | Full paths | 34.1 ms | 4,062,392 |
-| 1,000 | Terminal | 29.2 ms | 17,952 |
-| 10,000 | Full paths | 401.7 ms | 40,486,640 |
-| 10,000 | Terminal | 386.7 ms | 165,408 |
+| 1,000 | Full paths | 13.9 ms | 4,062,168 |
+| 1,000 | Terminal | 12.8 ms | 17,952 |
+| 10,000 | Full paths | 157.5 ms | 40,486,416 |
+| 10,000 | Terminal | 132.7 ms | 165,408 |
 
 Go's allocation counters exclude native allocations. The separate benchmark
-process peaked at 93,552,640 bytes resident across all four cases, measured by
+process peaked at 93,487,104 bytes resident across all four cases, measured by
 `/usr/bin/time -l`; this includes native memory and the Go runtime. The largest
 full-path result itself contains 40,480,000 bytes of doubles. The existing output
 limit remains 16 million doubles, with an additional native result buffer.
