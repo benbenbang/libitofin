@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-test "$(go env GOVERSION)" = go1.27.1
+go_version=$(go env GOVERSION)
+if [[ "$go_version" != go1.27.1 ]]; then
+  printf 'Go 1.27.1 is required; found %s. Install the version pinned in bindings/go/go.mod.\n' "$go_version" >&2
+  exit 1
+fi
 cargo test -p libitofin-ffi --release
 cargo build -p libitofin-ffi --release
 python3 -m unittest discover -s scripts -p 'check_go_coverage_test.py'

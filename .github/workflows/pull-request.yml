@@ -23,6 +23,7 @@ jobs:
       packages: read
     secrets: inherit
     with:
+      go_version_file: bindings/go/go.mod
       prek_skip: fmt,check,clippy,test
 
   check-change-files:
