@@ -1,9 +1,8 @@
 # Go bindings
 
 The Go package calls the same Rust core as the Python package through a C ABI.
-It requires **Go 1.27.1**, cgo, a C compiler, and the native library. Build from
-this repository checkout; there are no prebuilt native artifacts or Go release
-tags for these bindings yet.
+It requires **Go 1.27.1**, cgo, a C compiler, and the native library. For a source checkout, use the commands below. For an external Go module,
+see [native packages and installation](../../docs/go-distribution.md).
 
 ```sh
 cargo build -p libitofin-ffi --release
@@ -18,9 +17,8 @@ The native artifacts are `target/release/libitofin_ffi.so` (Linux),
 `libitofin_ffi.dylib` (macOS), and `libitofin_ffi.a`. The header is
 `crates/libitofin-ffi/include/itofin.h`. The distinct `itofin_ffi` library name
 allows C/Go and Python builds to share Cargo target directories. The cgo flags use paths
-relative to this checkout. An application using a published Go module would also need a native
-distribution and suitable `CGO_CFLAGS`, `CGO_LDFLAGS`, and runtime loader paths;
-the current supported workflow is a local checkout with a Go `replace` directive.
+relative to this checkout. An external Go module uses the `itofin_external` build tag with the native
+package headers and library paths described in the installation guide.
 
 ## Sessions and ownership
 
