@@ -59,7 +59,7 @@ pub unsafe extern "C" fn itofin_ibor_leg_new(
             check_ptr(out)?;
             let b = IborLegConfig {
                 schedule: c.get(schedule)?,
-                index: c.get(index)?,
+                index: crate::indexes_api::ibor_index(c, index)?,
                 notional: None,
                 day_counter: None,
                 adjustment: None,

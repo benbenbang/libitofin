@@ -118,7 +118,7 @@ pub unsafe extern "C" fn itofin_capfloor_new(
             let cap = MakeCapFloor::new(
                 cap_type(a.kind)?,
                 period(a.tenor_length, a.tenor_unit)?,
-                c.get(a.index)?,
+                crate::indexes_api::ibor_index(c, a.index)?,
                 finite(a.strike)?,
                 period(a.forward_length, a.forward_unit)?,
                 settings(c, a.settings)?,
@@ -395,7 +395,9 @@ mod tests {
                 Frequency::Annual,
             )) as Shared<dyn YieldTermStructure>);
             let index = c
-                .insert(shared(Euribor::six_months(curve.clone(), settings.clone())))
+                .insert(crate::indexes_api::NativeIbor::builtin(shared(
+                    Euribor::six_months(curve.clone(), settings.clone()),
+                )))
                 .unwrap();
             let discount = c.insert(curve).unwrap();
             let settings_id = c.insert(settings).unwrap();

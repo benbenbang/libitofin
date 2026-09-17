@@ -2,7 +2,7 @@
 use crate::boundary::*;
 use crate::time_api::{date, day_counter, time_unit};
 use libitofin::handle::Handle;
-use libitofin::indexes::{IborIndex, OvernightIndex};
+use libitofin::indexes::OvernightIndex;
 use libitofin::instrument::Instrument;
 use libitofin::instruments::{
     FixedVsFloatingSwap, MakeOis, MakeVanillaSwap, OvernightIndexedSwap, SwapType, VanillaSwap,
@@ -74,7 +74,7 @@ pub unsafe extern "C" fn itofin_vanilla_swap_new(
                 finite(a.fixed_rate)?,
                 day_counter(c, a.fixed_day_counter)?,
                 c.get::<Schedule>(a.floating_schedule)?,
-                c.get::<Shared<IborIndex>>(a.index)?,
+                crate::indexes_api::ibor_index(c, a.index)?,
                 finite(a.spread)?,
                 day_counter(c, a.floating_day_counter)?,
                 None,
@@ -131,7 +131,7 @@ pub unsafe extern "C" fn itofin_make_vanilla_swap(
             };
             let mut builder = MakeVanillaSwap::new(
                 period(a.tenor_length, a.tenor_unit)?,
-                c.get(a.index)?,
+                crate::indexes_api::ibor_index(c, a.index)?,
                 rate,
                 period(a.forward_length, a.forward_unit)?,
                 settings(c, a.settings)?,
@@ -353,7 +353,9 @@ mod tests {
             Frequency::Annual,
         )) as Shared<dyn YieldTermStructure>);
         let index = c
-            .insert(shared(Euribor::six_months(curve.clone(), settings.clone())))
+            .insert(crate::indexes_api::NativeIbor::builtin(shared(
+                Euribor::six_months(curve.clone(), settings.clone()),
+            )))
             .unwrap();
         let overnight = c
             .insert(shared(Estr::new(curve, settings.clone())))

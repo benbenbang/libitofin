@@ -3,11 +3,11 @@ use crate::boundary::*;
 use crate::rates_api::{curve, finite};
 use crate::time_api::date;
 use libitofin::handle::Handle;
-use libitofin::indexes::{IborIndex, InterestRateIndex};
+use libitofin::indexes::InterestRateIndex;
 use libitofin::instrument::Instrument;
 use libitofin::instruments::ForwardRateAgreement;
 use libitofin::position::Position;
-use libitofin::shared::{Shared, SharedMut, shared_mut};
+use libitofin::shared::{SharedMut, shared_mut};
 use libitofin::time::date::Date;
 use libitofin::types::Real;
 
@@ -42,7 +42,7 @@ pub unsafe extern "C" fn itofin_fra_new(
     unsafe {
         with_context(ctx, error, |c| {
             check_ptr(out)?;
-            let index = c.get::<Shared<IborIndex>>(a.index)?;
+            let index = crate::indexes_api::ibor_index(c, a.index)?;
             let value = date(a.value_date)?;
             let pos = match a.position {
                 0 => Position::Long,
@@ -156,7 +156,7 @@ mod tests {
     use libitofin::indexes::ibor::Euribor;
     use libitofin::interestrate::Compounding;
     use libitofin::settings::Settings;
-    use libitofin::shared::shared;
+    use libitofin::shared::{Shared, shared};
     use libitofin::termstructures::{yields::FlatForward, yieldtermstructure::YieldTermStructure};
     use libitofin::time::{date::Month, daycounters::actual360::Actual360, frequency::Frequency};
     use std::ptr::null_mut;
@@ -177,7 +177,9 @@ mod tests {
             )) as Shared<dyn YieldTermStructure>)
         };
         let index = c
-            .insert(shared(Euribor::three_months(flat(0.04), settings)))
+            .insert(crate::indexes_api::NativeIbor::builtin(shared(
+                Euribor::three_months(flat(0.04), settings),
+            )))
             .unwrap();
         let discount = c.insert(flat(0.06)).unwrap();
         let start = Date::new(17, Month::August, 2026);

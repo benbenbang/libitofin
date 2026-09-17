@@ -4,7 +4,6 @@ use crate::settings_api::settings;
 use crate::smile_api::volatility_type;
 use crate::time_api::time_unit;
 use libitofin::handle::Handle;
-use libitofin::indexes::iborindex::IborIndex;
 use libitofin::shared::{Shared, shared};
 use libitofin::termstructures::volatility::{
     CapFloorTermVolSurface, OptionletStripper1, OptionletVolatilityStructure,
@@ -52,7 +51,7 @@ pub unsafe extern "C" fn itofin_optionlet_stripper_new(
             };
             let stripper = OptionletStripper1::new(
                 c.get::<Shared<CapFloorTermVolSurface>>(surface)?,
-                c.get::<Shared<IborIndex>>(index)?,
+                crate::indexes_api::ibor_index(c, index)?,
                 discount,
                 accuracy,
                 max_iter,

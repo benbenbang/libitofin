@@ -374,7 +374,7 @@ pub unsafe extern "C" fn itofin_swaption_helper_new(
                 ),
                 Period::new(cfg.length, crate::time_api::time_unit(cfg.length_unit)?),
                 Handle::new(shared(SimpleQuote::new(cfg.volatility)) as Shared<dyn Quote>),
-                c.get::<Shared<libitofin::indexes::IborIndex>>(cfg.index)?,
+                crate::indexes_api::ibor_index(c, cfg.index)?,
                 Period::new(
                     cfg.fixed_tenor_length,
                     crate::time_api::time_unit(cfg.fixed_tenor_unit)?,
