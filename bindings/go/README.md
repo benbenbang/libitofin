@@ -76,6 +76,11 @@ This measures declared API symbols, including enum members
 and deduplicated overloads, and verifies referenced exports/identifiers/tests
 exist. It is separate from line coverage or exhaustive numerical validation.
 
+The root `go-bindings-tests` pre-commit hook runs the same validation for changes
+to the Go/C ABI, core, Python stubs, coverage mappings, or build configuration.
+It requires Go 1.27.1, the pinned Rust toolchain, Python 3, and C/C++ compilers.
+Run it manually with `pre-commit run go-bindings-tests --all-files`.
+
 Run `bash scripts/check_go_bindings.sh` for native tests, strict cgo pointer
 checks, race detection, and Go line coverage. The Go tests use cached QuantLib
 values, mathematical identities, seeded simulation checks, and ownership and

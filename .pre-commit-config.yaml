@@ -36,6 +36,12 @@ repos:
           language: system
           types: [rust]
           pass_filenames: false
+        - id: go-bindings-tests
+          name: Go and C ABI validation
+          entry: bash scripts/check_go_bindings.sh
+          language: system
+          files: ^(crates/(libitofin|libitofin-ffi)/|crates/itofin-py/python/itofin/.*\.pyi$|bindings/go/|scripts/check_go_|docs/go-coverage/|Cargo\.(toml|lock)$|rust-toolchain\.toml$|\.pre-commit-config\.yaml$|\.github/workflows/go-bindings\.yml$)
+          pass_filenames: false
         - id: itofin-submodule-shims
           name: itofin generated stubs and submodule shims in sync
           entry: python3 crates/itofin-py/scripts/gen_stubs.py
