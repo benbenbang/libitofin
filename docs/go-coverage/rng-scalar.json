@@ -1,0 +1,68 @@
+{
+  "domain": "rng-scalar",
+  "entries": [
+    {
+      "c": "itofin_uniform_rng_new",
+      "go": "Session.NewUniformRandomGenerator",
+      "python": "itofin.randomnumbers.UniformRandomGenerator.__init__",
+      "status": "implemented",
+      "tests": "TestScalarRNGOracles"
+    },
+    {
+      "c": "itofin_uniform_rng_new",
+      "go": "Session.UniformRandomGeneratorFromSeeds",
+      "python": "itofin.randomnumbers.UniformRandomGenerator.from_seeds",
+      "status": "implemented",
+      "tests": "TestScalarRNGOracles"
+    },
+    {
+      "c": "itofin_rng_draw",
+      "go": "UniformRandomGenerator.NextReal",
+      "python": "itofin.randomnumbers.UniformRandomGenerator.next_real",
+      "status": "implemented",
+      "tests": "TestScalarRNGOracles"
+    },
+    {
+      "c": "itofin_rng_draw",
+      "go": "UniformRandomGenerator.NextReals",
+      "python": "itofin.randomnumbers.UniformRandomGenerator.next_reals",
+      "status": "implemented",
+      "tests": "TestScalarRNGOracles"
+    },
+    {
+      "c": "itofin_uniform_rng_u32",
+      "go": "UniformRandomGenerator.NextU32",
+      "python": "itofin.randomnumbers.UniformRandomGenerator.next_u32",
+      "status": "implemented",
+      "tests": "TestScalarRNGOracles"
+    },
+    {
+      "c": "itofin_gaussian_rng_new",
+      "go": "Session.NewGaussianRandomGenerator",
+      "python": "itofin.randomnumbers.GaussianRandomGenerator.__init__",
+      "status": "implemented",
+      "tests": "TestScalarRNGOracles"
+    },
+    {
+      "c": "itofin_gaussian_rng_new",
+      "go": "Session.GaussianRandomGeneratorWithSeed",
+      "python": "itofin.randomnumbers.GaussianRandomGenerator.with_seed",
+      "status": "implemented",
+      "tests": "TestScalarRNGOracles"
+    },
+    {
+      "c": "itofin_rng_draw",
+      "go": "GaussianRandomGenerator.NextGaussian",
+      "python": "itofin.randomnumbers.GaussianRandomGenerator.next_gaussian",
+      "status": "implemented",
+      "tests": "TestScalarRNGOracles"
+    },
+    {
+      "c": "itofin_rng_draw",
+      "go": "GaussianRandomGenerator.NextGaussians",
+      "python": "itofin.randomnumbers.GaussianRandomGenerator.next_gaussians",
+      "status": "implemented",
+      "tests": "TestScalarRNGOracles"
+    }
+  ]
+}
