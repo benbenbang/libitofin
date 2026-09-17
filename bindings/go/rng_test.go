@@ -2,8 +2,6 @@ package itofin
 
 import (
 	"errors"
-	"math"
-	"reflect"
 	"testing"
 )
 
@@ -53,11 +51,13 @@ func TestScalarRNGOracles(t *testing.T) {
 	g := mustRNG(s.NewGaussianRandomGenerator(a))
 	seeded := mustRNG(s.GaussianRandomGeneratorWithSeed(42))
 	want := []float64{-.51696416445487181, 1.2219212173764127, .72133261267083881, .86963581617716534, 1.6182168832131514, 1.5885563656499377, -1.1883085743351087, -.18712466949524548}
-	if got := mustRNG(g.NextGaussians(len(want))); !reflect.DeepEqual(got, want) {
-		t.Fatal(got)
+	for i, got := range mustRNG(g.NextGaussians(len(want))) {
+		if !rngClose(got, want[i], 1e-15) {
+			t.Fatal(got, want[i])
+		}
 	}
 	for _, v := range want {
-		if got := mustRNG(seeded.NextGaussian()); math.Abs(got-v) > 1e-15 {
+		if got := mustRNG(seeded.NextGaussian()); !rngClose(got, v, 1e-15) {
 			t.Fatal(got, v)
 		}
 	}

@@ -29,7 +29,7 @@ func TestLowDiscrepancyOracles(t *testing.T) {
 		}
 		if k == 1 || k == 3 || k == 7 || k == 15 {
 			for _, v := range sums {
-				if math.Abs(v/float64(k)-.5) > 1e-15 {
+				if !rngClose(v/float64(k), .5, 1e-15) {
 					t.Fatal("homogeneity", v, k)
 				}
 			}
@@ -42,7 +42,7 @@ func TestLowDiscrepancyOracles(t *testing.T) {
 	for _, want := range [][]float64{{.5, 1. / 3}, {.25, 2. / 3}, {.75, 1. / 9}, {.125, 4. / 9}, {.625, 7. / 9}, {.375, 2. / 9}, {.875, 5. / 9}, {.0625, 8. / 9}} {
 		got := mustRNG(halton.NextSequence())
 		for i, v := range want {
-			if math.Abs(got[i]-v) > 1e-15 {
+			if !rngClose(got[i], v, 1e-15) {
 				t.Fatal(got, want)
 			}
 		}

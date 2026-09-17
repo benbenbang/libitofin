@@ -24,7 +24,7 @@ func TestPseudoRandomSequences(t *testing.T) {
 			t.Fatal("source state was not copied")
 		}
 		for i, z := range g {
-			if math.Abs(.5*math.Erfc(-z/math.Sqrt2)-u[i]) > 1e-8 {
+			if !rngClose(.5*math.Erfc(-z/math.Sqrt2), u[i], 1e-8) {
 				t.Fatal(z, u[i])
 			}
 		}
