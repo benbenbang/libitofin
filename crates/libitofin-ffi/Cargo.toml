@@ -7,7 +7,7 @@ description = "C ABI for libitofin"
 repository = "https://github.com/benbenbang/libitofin"
 
 [lib]
-name = "itofin"
+name = "itofin_ffi"
 crate-type = ["cdylib", "staticlib", "rlib"]
 
 [dependencies]

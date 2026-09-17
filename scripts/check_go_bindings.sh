@@ -10,10 +10,10 @@ export LD_LIBRARY_PATH="$PWD/target/release${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
 export DYLD_LIBRARY_PATH="$PWD/target/release${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
 export GOEXPERIMENT=cgocheck2
 cc -std=c11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
-  crates/libitofin-ffi/tests/c_smoke.c -Ltarget/release -litofin -o target/c-smoke
+  crates/libitofin-ffi/tests/c_smoke.c -Ltarget/release -litofin_ffi -o target/c-smoke
 ./target/c-smoke
 c++ -x c++ -std=c++11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
-  crates/libitofin-ffi/tests/c_smoke.c -Ltarget/release -litofin -o target/cpp-smoke
+  crates/libitofin-ffi/tests/c_smoke.c -Ltarget/release -litofin_ffi -o target/cpp-smoke
 ./target/cpp-smoke
 cd bindings/go
 go vet ./...
