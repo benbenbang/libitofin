@@ -54,7 +54,9 @@
       "go": "ZeroInflationIndex.LinkTo",
       "python": "ZeroInflationIndex.link_to",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestZeroInflationRelinkingRetainsIndependentForecast"
+      ]
     },
     {
       "c": "itofin_inflation_index_name",
@@ -97,7 +99,9 @@
       "go": "MultiplicativePriceSeasonality.Frequency",
       "python": "MultiplicativePriceSeasonality.frequency",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestInflationCurveMetadataAndDetachedNodes"
+      ]
     },
     {
       "c": "itofin_seasonality_new",
@@ -113,7 +117,9 @@
       "go": "MultiplicativePriceSeasonality.SeasonalityBaseDate",
       "python": "MultiplicativePriceSeasonality.seasonality_base_date",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestInflationCurveMetadataAndDetachedNodes"
+      ]
     },
     {
       "c": "itofin_seasonality_value",
@@ -138,14 +144,18 @@
       "go": "ZeroInflationTermStructure.BaseDate",
       "python": "ZeroInflationTermStructure.base_date",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestInflationCurveMetadataAndDetachedNodes"
+      ]
     },
     {
       "c": "itofin_zero_inflation_curve_value",
       "go": "ZeroInflationTermStructure.Frequency",
       "python": "ZeroInflationTermStructure.frequency",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestInflationCurveMetadataAndDetachedNodes"
+      ]
     },
     {
       "c": "itofin_zero_inflation_curve_value",
@@ -188,7 +198,9 @@
       "go": "InterpolatedZeroInflationCurve.Dates",
       "python": "InterpolatedZeroInflationCurve.dates",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestInflationCurveMetadataAndDetachedNodes"
+      ]
     },
     {
       "c": "itofin_zero_inflation_curve_new",
@@ -204,7 +216,9 @@
       "go": "InterpolatedZeroInflationCurve.Nodes",
       "python": "InterpolatedZeroInflationCurve.nodes",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestInflationCurveMetadataAndDetachedNodes"
+      ]
     },
     {
       "c": "itofin_zero_inflation_nodes",
@@ -295,7 +309,9 @@
       "go": "YoYInflationTermStructure.BaseDate",
       "python": "YoYInflationTermStructure.base_date",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestInflationCurveMetadataAndDetachedNodes"
+      ]
     },
     {
       "c": "itofin_yoy_inflation_curve_value",
@@ -311,7 +327,9 @@
       "go": "YoYInflationTermStructure.Frequency",
       "python": "YoYInflationTermStructure.frequency",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestInflationCurveMetadataAndDetachedNodes"
+      ]
     },
     {
       "c": "itofin_yoy_inflation_curve_value",
@@ -336,7 +354,9 @@
       "go": "YoYInflationTermStructure.YoYRate",
       "python": "YoYInflationTermStructure.yoy_rate",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestInflationCurveMetadataAndDetachedNodes"
+      ]
     },
     {
       "c": "itofin_yoy_inflation_curve_value",
@@ -352,7 +372,9 @@
       "go": "InterpolatedYoYInflationCurve.Dates",
       "python": "InterpolatedYoYInflationCurve.dates",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestInflationCurveMetadataAndDetachedNodes"
+      ]
     },
     {
       "c": "itofin_yoy_inflation_curve_new",
@@ -368,14 +390,18 @@
       "go": "InterpolatedYoYInflationCurve.Nodes",
       "python": "InterpolatedYoYInflationCurve.nodes",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestInflationCurveMetadataAndDetachedNodes"
+      ]
     },
     {
       "c": "itofin_yoy_inflation_nodes",
       "go": "InterpolatedYoYInflationCurve.Times",
       "python": "InterpolatedYoYInflationCurve.times",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestInflationCurveMetadataAndDetachedNodes"
+      ]
     },
     {
       "c": "itofin_inflation_helper_date",
