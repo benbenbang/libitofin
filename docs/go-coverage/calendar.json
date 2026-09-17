@@ -1,0 +1,178 @@
+{
+  "domain": "calendar",
+  "entries": [
+    {
+      "c": "itofin_time_name",
+      "go": "Calendar.Equal",
+      "python": "itofin.time.Calendar.__eq__",
+      "status": "implemented",
+      "tests": "TestCalendarJointLifetimeAndKeys"
+    },
+    {
+      "c": "itofin_time_name",
+      "go": "Calendar.Key",
+      "notes": "Go uses the exact calendar name as a comparable map key, preserving name-based equality across sessions.",
+      "python": "itofin.time.Calendar.__hash__",
+      "status": "implemented",
+      "tests": "TestCalendarJointLifetimeAndKeys"
+    },
+    {
+      "c": "itofin_calendar_country_new",
+      "go": "Session.Argentina",
+      "python": "itofin.time.Calendar.argentina",
+      "status": "implemented",
+      "tests": "TestCalendarCountriesAndMarkets"
+    },
+    {
+      "c": "itofin_calendar_country_new",
+      "go": "Session.Australia",
+      "python": "itofin.time.Calendar.australia",
+      "status": "implemented",
+      "tests": "TestCalendarCountriesAndMarkets"
+    },
+    {
+      "c": "itofin_calendar_country_new",
+      "go": "Session.Austria",
+      "python": "itofin.time.Calendar.austria",
+      "status": "implemented",
+      "tests": "TestCalendarCountriesAndMarkets"
+    },
+    {
+      "c": "itofin_calendar_country_new",
+      "go": "Session.Botswana",
+      "python": "itofin.time.Calendar.botswana",
+      "status": "implemented",
+      "tests": "TestCalendarCountriesAndMarkets"
+    },
+    {
+      "c": "itofin_calendar_country_new",
+      "go": "Session.Brazil",
+      "python": "itofin.time.Calendar.brazil",
+      "status": "implemented",
+      "tests": "TestCalendarCountriesAndMarkets"
+    },
+    {
+      "c": "itofin_calendar_business_days_between",
+      "go": "Calendar.BusinessDaysBetween",
+      "python": "itofin.time.Calendar.business_days_between",
+      "status": "implemented",
+      "tests": "TestCalendarHolidayOracles"
+    },
+    {
+      "c": "itofin_calendar_country_new",
+      "go": "Session.Canada",
+      "python": "itofin.time.Calendar.canada",
+      "status": "implemented",
+      "tests": "TestCalendarCountriesAndMarkets"
+    },
+    {
+      "c": "itofin_calendar_country_new",
+      "go": "Session.Chile",
+      "python": "itofin.time.Calendar.chile",
+      "status": "implemented",
+      "tests": "TestCalendarCountriesAndMarkets"
+    },
+    {
+      "c": "itofin_calendar_country_new",
+      "go": "Session.China",
+      "notes": "Unsupported core dates return recoverable errors; date bounds use the core calendar table limits.",
+      "python": "itofin.time.Calendar.china",
+      "status": "implemented",
+      "tests": "TestCalendarCountriesAndMarkets"
+    },
+    {
+      "c": "itofin_calendar_country_new",
+      "go": "Session.Croatia",
+      "python": "itofin.time.Calendar.croatia",
+      "status": "implemented",
+      "tests": "TestCalendarCountriesAndMarkets"
+    },
+    {
+      "c": "itofin_calendar_country_new",
+      "go": "Session.CzechRepublic",
+      "python": "itofin.time.Calendar.czech_republic",
+      "status": "implemented",
+      "tests": "TestCalendarCountriesAndMarkets"
+    },
+    {
+      "c": "itofin_calendar_country_new",
+      "go": "Session.Denmark",
+      "python": "itofin.time.Calendar.denmark",
+      "status": "implemented",
+      "tests": "TestCalendarCountriesAndMarkets"
+    },
+    {
+      "c": "itofin_calendar_country_new",
+      "go": "Session.Finland",
+      "python": "itofin.time.Calendar.finland",
+      "status": "implemented",
+      "tests": "TestCalendarCountriesAndMarkets"
+    },
+    {
+      "c": "itofin_calendar_country_new",
+      "go": "Session.France",
+      "python": "itofin.time.Calendar.france",
+      "status": "implemented",
+      "tests": "TestCalendarCountriesAndMarkets"
+    },
+    {
+      "c": "itofin_calendar_country_new",
+      "go": "Session.Germany",
+      "python": "itofin.time.Calendar.germany",
+      "status": "implemented",
+      "tests": "TestCalendarCountriesAndMarkets"
+    },
+    {
+      "c": "itofin_calendar_holiday_list",
+      "go": "Calendar.HolidayList",
+      "python": "itofin.time.Calendar.holiday_list",
+      "status": "implemented",
+      "tests": "TestCalendarHolidayOracles"
+    },
+    {
+      "c": "itofin_calendar_country_new",
+      "go": "Session.HongKong",
+      "notes": "Unsupported core dates return recoverable errors; date bounds use the core calendar table limits.",
+      "python": "itofin.time.Calendar.hong_kong",
+      "status": "implemented",
+      "tests": "TestCalendarCountriesAndMarkets"
+    },
+    {
+      "c": "itofin_calendar_country_new",
+      "go": "Session.Hungary",
+      "python": "itofin.time.Calendar.hungary",
+      "status": "implemented",
+      "tests": "TestCalendarCountriesAndMarkets"
+    },
+    {
+      "c": "itofin_calendar_country_new",
+      "go": "Session.Iceland",
+      "python": "itofin.time.Calendar.iceland",
+      "status": "implemented",
+      "tests": "TestCalendarCountriesAndMarkets"
+    },
+    {
+      "c": "itofin_calendar_country_new",
+      "go": "Session.India",
+      "notes": "Unsupported core dates return recoverable errors; date bounds use the core calendar table limits.",
+      "python": "itofin.time.Calendar.india",
+      "status": "implemented",
+      "tests": "TestCalendarCountriesAndMarkets"
+    },
+    {
+      "c": "itofin_calendar_country_new",
+      "go": "Session.Indonesia",
+      "notes": "Unsupported core dates return recoverable errors; date bounds use the core calendar table limits.",
+      "python": "itofin.time.Calendar.indonesia",
+      "status": "implemented",
+      "tests": "TestCalendarCountriesAndMarkets"
+    },
+    {
+      "c": "itofin_calendar_query",
+      "go": "Calendar.IsBusinessDay",
+      "python": "itofin.time.Calendar.is_business_day",
+      "status": "implemented",
+      "tests": "TestCalendarHolidayOracles"
+    }
+  ]
+}
