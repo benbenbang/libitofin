@@ -12,6 +12,7 @@ pub mod boundary;
 pub mod simulation_api;
 pub mod simulation_kernel;
 pub use boundary::{Context, ItofinError};
+pub mod calendar_api;
 pub mod cashflows_api;
 pub mod credit_api;
 pub mod credit_instruments_api;

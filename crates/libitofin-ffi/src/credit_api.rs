@@ -12,7 +12,7 @@ use libitofin::termstructures::credit::{
     interpolatedhazardratecurve::InterpolatedHazardRateCurve,
     piecewisedefaultcurve::PiecewiseDefaultCurve, probabilitytraits::HazardRate,
 };
-use libitofin::time::{calendar::Calendar, date::Date};
+use libitofin::time::date::Date;
 
 type Interpolated = InterpolatedHazardRateCurve<BackwardFlat>;
 type Piecewise = PiecewiseDefaultCurve<HazardRate, BackwardFlat>;
@@ -73,7 +73,7 @@ pub unsafe extern "C" fn itofin_flat_hazard_new(
             } else {
                 FlatHazardRate::moving(
                     a.settlement_days,
-                    c.get::<Calendar>(a.calendar)?,
+                    crate::time_api::calendar(c, a.calendar)?,
                     q,
                     dc,
                     c.get::<Shared<Settings<Date>>>(a.settings)?,

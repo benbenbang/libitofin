@@ -30,7 +30,9 @@ unique, type checked, context scoped, and explicitly released. No core graph is
 shared across contexts. Handle zero represents None only where documented.
 
 Date inputs use the core serial number (i32), validated by the time module.
-Native day counters/calendars/settings use handles. Shared helper functions in
+Native day counters/calendars/settings use handles. Calendars are stored as
+`calendar_api::NativeCalendar`, retaining the core calendar and optional holiday
+horizon; retrieve core calendars through `time_api::calendar`. Shared helper functions in
 time_api are `date(serial:i32)->BindingResult<Date>` and
 `day_counter(context:&Context,handle:u64)->BindingResult<DayCounter>`.
 Settings stored as Shared<Settings<Date>>. Ordinary curve adapters retrieve
