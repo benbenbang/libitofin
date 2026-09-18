@@ -2,8 +2,7 @@
 
 Run: uv run --with QuantLib==1.43 rates_completion_oracle.py
 
-The Go tests consume supported cases. Simple OIS is future-core evidence (#1038);
-its current binding contract is an explicit, non-poisoning unsupported error.
+The Go tests consume both Simple and Compound OIS cases.
 The swaption fixture follows test-suite/swaption.cpp settlement conventions;
 OIS helpers use explicit simple/compound averaging and a single log-linear node.
 """
