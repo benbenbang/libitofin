@@ -41,3 +41,12 @@ jobs:
         run: test -z "$(gofmt -l bindings/go)"
       - name: Test native and Go bindings
         run: bash scripts/check_go_bindings.sh
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify clean and incremental Python/C ABI build orders
+        run: |
+          python -m venv .venv
+          . .venv/bin/activate
+          pip install 'maturin>=1.5,<2' numpy pytest
+          bash scripts/check_go_mixed_builds.sh
