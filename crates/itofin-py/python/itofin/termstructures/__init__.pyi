@@ -2410,23 +2410,29 @@ class PiecewiseYieldCurve(YieldTermStructure):
     "global" is a faithful superset rather than a divergent algorithm. It is
     offered for "LogLinear" and "Linear" only.
 
-    What the global bootstrap adds is additional_helpers: instruments handed to
-    the curve and registered with it that contribute neither a pillar nor a
-    residual. Their quote is inert (reading it takes a penalty term, and
-    penalties, additional dates and additional variables from Python are
-    deferred), so all they do is extend the curve's max_date to their own
-    latest_relevant_date, making dates past the last pillar queryable without
-    extrapolation.
+    Global-only restrictions include additional helpers, callable additional
+    node dates, penalties(times, data) returning extra residuals, and external
+    SimpleQuoteVariables. Callbacks run synchronously on the owning thread and
+    are retained by native consumers even after this Python wrapper is dropped.
+    Fallible pricing queries report callback exceptions as ItofinError with their
+    original type and message.
+
+    Avoid strong callback captures of this curve or consumers that retain it:
+    those cycles cross the native ownership graph and cannot be garbage-collected.
+    Capture a weakref.ref(curve) instead. Capturing additional helpers is supported.
+    Keep the residual count constant during each calculation; values must be finite.
+    Quote mutation from a callback is rejected; read helpers and trial nodes instead.
+    The supplied time and data lists include the reference node and are copies.
 
     The bootstrap is lazy: construction only rejects an empty helper list, and
     the solver runs on the first query, re-running after a helper-quote or
     evaluation-date change. A bootstrap failure therefore surfaces from the
     query methods, not from the constructor.
 
-    max_date is the exception: it swallows a bootstrap failure and falls back to
-    the last helper's date.
+    max_date is the exception: it swallows a bootstrap failure and reports the
+    current grid bound, or the reference date before a grid has been installed.
     """
-    def __init__(self, reference_date: time.Date, helpers: typing.Sequence[RateHelper], day_counter: time.DayCounter, interpolation: builtins.str = 'LogLinear', bootstrap: builtins.str = 'iterative', additional_helpers: typing.Optional[typing.Sequence[RateHelper]] = None) -> None:
+    def __init__(self, reference_date: time.Date, helpers: typing.Sequence[RateHelper], day_counter: time.DayCounter, interpolation: builtins.str = 'LogLinear', bootstrap: builtins.str = 'iterative', additional_helpers: typing.Optional[typing.Sequence[RateHelper]] = None, *, additional_penalties: typing.Optional[typing.Callable[[list[float], list[float]], list[float]]] = None, additional_dates: typing.Optional[typing.Callable[[], list[time.Date]]] = None, additional_variables: typing.Optional[SimpleQuoteVariables] = None) -> None:
         r"""
         Build the curve over helpers with a fixed reference date.
 
@@ -2443,8 +2449,13 @@ class PiecewiseYieldCurve(YieldTermStructure):
                 supports "LogLinear" and "Linear" only.
             additional_helpers (list[RateHelper] | None): Instruments the
                 global bootstrap registers without giving them a pillar or a
-                residual. They only extend the curve's max_date to their
-                latest_relevant_date; "iterative" rejects them.
+                residual. Penalty callbacks may read their quote_error().
+            additional_penalties (Callable | None): Called with (times, data)
+                to return finite additional least-squares residuals.
+            additional_dates (Callable | None): Returns Date objects, read again
+                on each recalculation. Additional nodes need matching residuals.
+            additional_variables (SimpleQuoteVariables | None): External quotes
+                solved jointly with nodes. All additional options require global.
 
         Raises:
             ItofinError: On an empty helper list, on an unknown interpolation
