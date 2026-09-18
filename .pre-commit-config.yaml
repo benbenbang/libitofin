@@ -48,6 +48,20 @@ repos:
           language: system
           files: ^crates/itofin-py/python/itofin/.*\.pyi$
           pass_filenames: false
+        - id: python-typing-gate-tests
+          name: Python typing gate regression tests
+          entry: python -m unittest discover -s crates/itofin-py/scripts -p test_*.py
+          language: python
+          additional_dependencies: [pyright==1.1.411, pytest==8.4.2, numpy==2.2.6]
+          files: ^(crates/itofin-py/|\.pre-commit-config\.yaml$|\.github/workflows/pre-commit\.yml$)
+          pass_filenames: false
+        - id: python-typing-baseline
+          name: Python diagnostics match in both directions
+          entry: python crates/itofin-py/scripts/check_typing.py
+          language: python
+          additional_dependencies: [pyright==1.1.411, pytest==8.4.2, numpy==2.2.6]
+          files: ^(crates/itofin-py/|\.pre-commit-config\.yaml$|\.github/workflows/pre-commit\.yml$)
+          pass_filenames: false
         - id: validate-commit-msg
           name: commit message is valid
           args:
