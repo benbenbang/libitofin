@@ -61,8 +61,8 @@ Close and retained-consumer ownership have direct tests. The [binding contract](
 defines these semantics. Full-current and historical audits are both enforced.
 
 #1036 completes the bounded behavioral follow-ups with independent credit, rates,
-inflation and calibration fixtures. Simple OIS averaging remains Rust #1038;
-the C boundary now rejects it without poisoning the session. See the
+inflation and calibration fixtures. Rust #1038 subsequently implements Simple
+OIS averaging, exercised through the Python and C/Go bindings. See the
 [case-by-case evidence](go-binding-test-gaps.md). Local and platform validation
 for these additions is recorded in their implementation PRs; the older run above
 only establishes the historical tree.
