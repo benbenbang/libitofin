@@ -2,7 +2,6 @@
 # ruff: noqa: E501, F401, F403, F405
 
 import builtins
-import enum
 import itofin
 from itofin import termstructures
 from itofin import time
@@ -1030,7 +1029,7 @@ class ZeroInflationIndex:
         """
 
 @typing.final
-class CpiInterpolationType(enum.Enum):
+class CpiInterpolationType:
     r"""
     How a CPI observation interpolates between the index fixings bracketing it.
 
@@ -1039,5 +1038,8 @@ class CpiInterpolationType(enum.Enum):
     own period. The core's deprecated AsIndex variant is not ported and so has
     no counterpart here.
     """
-    Flat = ...
-    Linear = ...
+    Flat: typing.ClassVar[CpiInterpolationType]
+    Linear: typing.ClassVar[CpiInterpolationType]
+    def __new__(cls, _unconstructible: typing.NoReturn) -> CpiInterpolationType: ...
+    def __int__(self) -> builtins.int: ...
+    __hash__: typing.ClassVar[None]  # type: ignore[assignment]

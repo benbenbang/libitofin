@@ -2,7 +2,6 @@
 # ruff: noqa: E501, F401, F403, F405
 
 import builtins
-import enum
 import itofin
 from itofin import indexes
 from itofin import quotes
@@ -3745,7 +3744,7 @@ class ZeroInflationTermStructure:
         """
 
 @typing.final
-class BlackVolTimeExtrapolation(enum.Enum):
+class BlackVolTimeExtrapolation:
     r"""
     How a variance curve extrapolates past its last node.
 
@@ -3754,12 +3753,15 @@ class BlackVolTimeExtrapolation(enum.Enum):
     its last node, and the core errors rather than silently substituting
     another rule.
     """
-    FlatVolatility = ...
-    UseInterpolator = ...
-    LinearVariance = ...
+    FlatVolatility: typing.ClassVar[BlackVolTimeExtrapolation]
+    UseInterpolator: typing.ClassVar[BlackVolTimeExtrapolation]
+    LinearVariance: typing.ClassVar[BlackVolTimeExtrapolation]
+    def __new__(cls, _unconstructible: typing.NoReturn) -> BlackVolTimeExtrapolation: ...
+    def __int__(self) -> builtins.int: ...
+    __hash__: typing.ClassVar[None]  # type: ignore[assignment]
 
 @typing.final
-class BondPriceType(enum.Enum):
+class BondPriceType:
     r"""
     The price convention a bond helper fits.
 
@@ -3768,11 +3770,14 @@ class BondPriceType(enum.Enum):
     amount at settlement, so the choice moves the bootstrapped curve for any
     bond settling mid-coupon and is a no-op for one settling on a coupon date.
     """
-    Clean = ...
-    Dirty = ...
+    Clean: typing.ClassVar[BondPriceType]
+    Dirty: typing.ClassVar[BondPriceType]
+    def __new__(cls, _unconstructible: typing.NoReturn) -> BondPriceType: ...
+    def __int__(self) -> builtins.int: ...
+    __hash__: typing.ClassVar[None]  # type: ignore[assignment]
 
 @typing.final
-class FuturesType(enum.Enum):
+class FuturesType:
     r"""
     The date convention an interest-rate future settles on.
 
@@ -3781,12 +3786,15 @@ class FuturesType(enum.Enum):
     analogues of itofin.time.is_imm_date / next_imm_date) are deferred, so there
     is no helper to derive the next ASX date from Python yet.
     """
-    Imm = ...
-    Asx = ...
-    Custom = ...
+    Imm: typing.ClassVar[FuturesType]
+    Asx: typing.ClassVar[FuturesType]
+    Custom: typing.ClassVar[FuturesType]
+    def __new__(cls, _unconstructible: typing.NoReturn) -> FuturesType: ...
+    def __int__(self) -> builtins.int: ...
+    __hash__: typing.ClassVar[None]  # type: ignore[assignment]
 
 @typing.final
-class Pillar(enum.Enum):
+class Pillar:
     r"""
     The date the curve node a helper fits sits at.
 
@@ -3794,25 +3802,34 @@ class Pillar(enum.Enum):
     choices. Pillar.CustomDate is deferred in the core (#343), so its omission
     here is deliberate, not an oversight.
     """
-    MaturityDate = ...
-    LastRelevantDate = ...
+    MaturityDate: typing.ClassVar[Pillar]
+    LastRelevantDate: typing.ClassVar[Pillar]
+    def __new__(cls, _unconstructible: typing.NoReturn) -> Pillar: ...
+    def __int__(self) -> builtins.int: ...
+    __hash__: typing.ClassVar[None]  # type: ignore[assignment]
 
 @typing.final
-class RateAveraging(enum.Enum):
+class RateAveraging:
     r"""
     How an overnight coupon combines its daily fixings.
 
     Simple is the arithmetic average; Compound (daily compounding) is the coupon
     default the OIS conventions use.
     """
-    Simple = ...
-    Compound = ...
+    Simple: typing.ClassVar[RateAveraging]
+    Compound: typing.ClassVar[RateAveraging]
+    def __new__(cls, _unconstructible: typing.NoReturn) -> RateAveraging: ...
+    def __int__(self) -> builtins.int: ...
+    __hash__: typing.ClassVar[None]  # type: ignore[assignment]
 
 @typing.final
-class VolatilityType(enum.Enum):
+class VolatilityType:
     r"""
     Whether a surface quotes shifted-lognormal (Black) or normal (Bachelier)
     volatilities. A mismatch with the engine's formula surfaces at pricing time.
     """
-    ShiftedLognormal = ...
-    Normal = ...
+    ShiftedLognormal: typing.ClassVar[VolatilityType]
+    Normal: typing.ClassVar[VolatilityType]
+    def __new__(cls, _unconstructible: typing.NoReturn) -> VolatilityType: ...
+    def __int__(self) -> builtins.int: ...
+    __hash__: typing.ClassVar[None]  # type: ignore[assignment]

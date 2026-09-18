@@ -2,7 +2,6 @@
 # ruff: noqa: E501, F401, F403, F405
 
 import builtins
-import enum
 import itofin
 from itofin import cashflows
 from itofin import indexes
@@ -2087,7 +2086,7 @@ class ZeroCouponInflationSwap:
         """
 
 @typing.final
-class CapFloorType(enum.Enum):
+class CapFloorType:
     r"""
     Whether the instrument caps, floors or collars its floating leg.
 
@@ -2095,23 +2094,29 @@ class CapFloorType(enum.Enum):
     CapFloor.collar here, or the YoYInflationCapFloor ones on the inflation
     side. MakeCapFloor refuses it, so CapFloor(...) does not accept it.
     """
-    Cap = ...
-    Floor = ...
-    Collar = ...
+    Cap: typing.ClassVar[CapFloorType]
+    Floor: typing.ClassVar[CapFloorType]
+    Collar: typing.ClassVar[CapFloorType]
+    def __new__(cls, _unconstructible: typing.NoReturn) -> CapFloorType: ...
+    def __int__(self) -> builtins.int: ...
+    __hash__: typing.ClassVar[None]  # type: ignore[assignment]
 
 @typing.final
-class OptionType(enum.Enum):
+class OptionType:
     r"""
     The call/put flag.
 
     A fieldless enum mirroring the core option type; the signed discriminant
     convention behind the two variants stays in the core.
     """
-    Call = ...
-    Put = ...
+    Call: typing.ClassVar[OptionType]
+    Put: typing.ClassVar[OptionType]
+    def __new__(cls, _unconstructible: typing.NoReturn) -> OptionType: ...
+    def __int__(self) -> builtins.int: ...
+    __hash__: typing.ClassVar[None]  # type: ignore[assignment]
 
 @typing.final
-class Position(enum.Enum):
+class Position:
     r"""
     The side taken in a contract.
 
@@ -2119,30 +2124,39 @@ class Position(enum.Enum):
     deposit), Short an FRA sale. The signed settlement multiplier the two
     variants stand for stays in the core.
     """
-    Long = ...
-    Short = ...
+    Long: typing.ClassVar[Position]
+    Short: typing.ClassVar[Position]
+    def __new__(cls, _unconstructible: typing.NoReturn) -> Position: ...
+    def __int__(self) -> builtins.int: ...
+    __hash__: typing.ClassVar[None]  # type: ignore[assignment]
 
 @typing.final
-class PricingModel(enum.Enum):
+class PricingModel:
     r"""
     The model a quoted contract is inverted under by
     CreditDefaultSwap.implied_hazard_rate: Midpoint is not ISDA conform, Isda
     carries the three fidelity flags the core fixes at that call site.
     """
-    Midpoint = ...
-    Isda = ...
+    Midpoint: typing.ClassVar[PricingModel]
+    Isda: typing.ClassVar[PricingModel]
+    def __new__(cls, _unconstructible: typing.NoReturn) -> PricingModel: ...
+    def __int__(self) -> builtins.int: ...
+    __hash__: typing.ClassVar[None]  # type: ignore[assignment]
 
 @typing.final
-class ProtectionSide(enum.Enum):
+class ProtectionSide:
     r"""
     Which leg of a default-protection contract a party holds: the buyer pays
     the premium leg and receives the default payment, the seller the reverse.
     """
-    Buyer = ...
-    Seller = ...
+    Buyer: typing.ClassVar[ProtectionSide]
+    Seller: typing.ClassVar[ProtectionSide]
+    def __new__(cls, _unconstructible: typing.NoReturn) -> ProtectionSide: ...
+    def __int__(self) -> builtins.int: ...
+    __hash__: typing.ClassVar[None]  # type: ignore[assignment]
 
 @typing.final
-class SettlementMethod(enum.Enum):
+class SettlementMethod:
     r"""
     The settlement mechanics under a settlement type.
 
@@ -2151,26 +2165,35 @@ class SettlementMethod(enum.Enum):
     pricing time, not construction, so a mismatched pair only surfaces from
     npv().
     """
-    PhysicalOTC = ...
-    PhysicalCleared = ...
-    CollateralizedCashPrice = ...
-    ParYieldCurve = ...
+    PhysicalOTC: typing.ClassVar[SettlementMethod]
+    PhysicalCleared: typing.ClassVar[SettlementMethod]
+    CollateralizedCashPrice: typing.ClassVar[SettlementMethod]
+    ParYieldCurve: typing.ClassVar[SettlementMethod]
+    def __new__(cls, _unconstructible: typing.NoReturn) -> SettlementMethod: ...
+    def __int__(self) -> builtins.int: ...
+    __hash__: typing.ClassVar[None]  # type: ignore[assignment]
 
 @typing.final
-class SettlementType(enum.Enum):
+class SettlementType:
     r"""
     How a swaption settles on exercise.
     """
-    Physical = ...
-    Cash = ...
+    Physical: typing.ClassVar[SettlementType]
+    Cash: typing.ClassVar[SettlementType]
+    def __new__(cls, _unconstructible: typing.NoReturn) -> SettlementType: ...
+    def __int__(self) -> builtins.int: ...
+    __hash__: typing.ClassVar[None]  # type: ignore[assignment]
 
 @typing.final
-class SwapType(enum.Enum):
+class SwapType:
     r"""
     Which side of the named leg the swap is seen from.
 
     A fieldless enum; the signed leg multiplier the two variants stand for
     stays in the core.
     """
-    Payer = ...
-    Receiver = ...
+    Payer: typing.ClassVar[SwapType]
+    Receiver: typing.ClassVar[SwapType]
+    def __new__(cls, _unconstructible: typing.NoReturn) -> SwapType: ...
+    def __int__(self) -> builtins.int: ...
+    __hash__: typing.ClassVar[None]  # type: ignore[assignment]

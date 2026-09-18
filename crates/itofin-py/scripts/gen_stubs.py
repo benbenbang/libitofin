@@ -13,7 +13,9 @@ runs three steps in order:
    entirely, so the whole constructor block would vanish from the API docs. The
    rewrite to ``def __init__(self, ...) -> None`` restores it and is also the
    correct stub for a type whose ``__init__`` is what callers invoke. The same
-   pass strips trailing whitespace and forces a single final newline, so the
+   pass models fieldless PyO3 enums as nonconstructible classes with typed
+   class members and integer conversion, without Python Enum inheritance. It
+   strips trailing whitespace and forces a single final newline, so the
    committed stubs already satisfy the whitespace hooks and keep matching
    generator output byte for byte.
 3. ``gen_submodule_shims.py`` refreshes the ``.py`` shims that make the native
@@ -32,6 +34,7 @@ tree.
 from __future__ import annotations
 
 # standard library
+import ast
 import re
 import subprocess
 import sys
@@ -57,7 +60,46 @@ def rewrite_constructor(line: str) -> str:
     return f"{m['indent']}def __init__(self{m['params']}) -> None:"
 
 
+def rewrite_enums(text: str) -> str:
+    """Describe fieldless PyO3 classes without promising Python Enum behavior."""
+    lines = text.splitlines()
+    replacements: dict[int, list[str]] = {}
+    for node in ast.parse(text).body:
+        if not isinstance(node, ast.ClassDef) or not any(
+            ast.unparse(base) == "enum.Enum" for base in node.bases
+        ):
+            continue
+        replacements[node.lineno - 1] = [f"class {node.name}:"]
+        members = [member for member in node.body if isinstance(member, ast.Assign)]
+        if not members:
+            raise ValueError(f"generated enum {node.name} has no members")
+        for member in members:
+            if (
+                len(member.targets) != 1
+                or not isinstance(member.targets[0], ast.Name)
+                or not isinstance(member.value, ast.Constant)
+                or member.value.value is not Ellipsis
+            ):
+                raise ValueError(f"unsupported generated enum member in {node.name}")
+            replacements[member.lineno - 1] = [
+                f"    {member.targets[0].id}: typing.ClassVar[{node.name}]"
+            ]
+        replacements[members[-1].lineno - 1].extend([
+            f"    def __new__(cls, _unconstructible: typing.NoReturn) -> {node.name}: ...",
+            "    def __int__(self) -> builtins.int: ...",
+            "    __hash__: typing.ClassVar[None]  # type: ignore[assignment]",
+        ])
+    rewritten = "\n".join(
+        output for index, line in enumerate(lines)
+        for output in replacements.get(index, [line])
+    )
+    if "enum." not in rewritten:
+        rewritten = rewritten.replace("import enum\n", "")
+    return rewritten
+
+
 def post_process(text: str) -> str:
+    text = rewrite_enums(text)
     lines = [rewrite_constructor(line).rstrip() for line in text.split("\n")]
     while lines and not lines[-1]:
         lines.pop()

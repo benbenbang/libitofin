@@ -2,7 +2,6 @@
 # ruff: noqa: E501, F401, F403, F405
 
 import builtins
-import enum
 import itofin
 from itofin import indexes
 from itofin import processes
@@ -481,7 +480,7 @@ class YoYInflationCapFloorEngine:
         """
 
 @typing.final
-class AccrualBias(enum.Enum):
+class AccrualBias:
     r"""
     Whether the premium leg carries the standard model's half-day accrual bias.
 
@@ -489,11 +488,14 @@ class AccrualBias(enum.Enum):
     the default, includes it as the model's C code does before version 1.8.2;
     NoBias leaves it out, as from 1.8.2 on.
     """
-    HalfDayBias = ...
-    NoBias = ...
+    HalfDayBias: typing.ClassVar[AccrualBias]
+    NoBias: typing.ClassVar[AccrualBias]
+    def __new__(cls, _unconstructible: typing.NoReturn) -> AccrualBias: ...
+    def __int__(self) -> builtins.int: ...
+    __hash__: typing.ClassVar[None]  # type: ignore[assignment]
 
 @typing.final
-class CashAnnuityModel(enum.Enum):
+class CashAnnuityModel:
     r"""
     Which date a cash-settled par-yield annuity discounts to.
 
@@ -502,11 +504,14 @@ class CashAnnuityModel(enum.Enum):
     swaption engines default to SwapRate, the branch every ported core test
     exercises, where C++ defaults to DiscountCurve.
     """
-    SwapRate = ...
-    DiscountCurve = ...
+    SwapRate: typing.ClassVar[CashAnnuityModel]
+    DiscountCurve: typing.ClassVar[CashAnnuityModel]
+    def __new__(cls, _unconstructible: typing.NoReturn) -> CashAnnuityModel: ...
+    def __int__(self) -> builtins.int: ...
+    __hash__: typing.ClassVar[None]  # type: ignore[assignment]
 
 @typing.final
-class ForwardsInCouponPeriod(enum.Enum):
+class ForwardsInCouponPeriod:
     r"""
     How the ISDA engine treats forward rates inside a coupon period.
 
@@ -515,11 +520,14 @@ class ForwardsInCouponPeriod(enum.Enum):
     the grid has nodes strictly inside a coupon period, so two flat curves price
     identically under either.
     """
-    Flat = ...
-    Piecewise = ...
+    Flat: typing.ClassVar[ForwardsInCouponPeriod]
+    Piecewise: typing.ClassVar[ForwardsInCouponPeriod]
+    def __new__(cls, _unconstructible: typing.NoReturn) -> ForwardsInCouponPeriod: ...
+    def __int__(self) -> builtins.int: ...
+    __hash__: typing.ClassVar[None]  # type: ignore[assignment]
 
 @typing.final
-class NumericalFix(enum.Enum):
+class NumericalFix:
     r"""
     How the ISDA engine keeps the integrands' f + h denominators away from zero.
 
@@ -527,5 +535,8 @@ class NumericalFix(enum.Enum):
     quotient by its Taylor expansion once f + h falls below 10^-4. Spelled NoFix
     rather than C++'s None, which Python cannot name.
     """
-    NoFix = ...
-    Taylor = ...
+    NoFix: typing.ClassVar[NumericalFix]
+    Taylor: typing.ClassVar[NumericalFix]
+    def __new__(cls, _unconstructible: typing.NoReturn) -> NumericalFix: ...
+    def __int__(self) -> builtins.int: ...
+    __hash__: typing.ClassVar[None]  # type: ignore[assignment]
