@@ -212,6 +212,20 @@ pub unsafe extern "C" fn itofin_futures_helper_new(
     out: *mut u64,
     error: *mut ItofinError,
 ) -> i32 {
+    unsafe { itofin_futures_helper_new_with_observation(ctx, mode, cfg, true, out, error) }
+}
+/// Futures helper with explicit convexity observation. Disable for bootstrap variables.
+/// # Safety
+/// Follow the crate-level context and pointer contract.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn itofin_futures_helper_new_with_observation(
+    ctx: *mut Context,
+    mode: i32,
+    cfg: *const ItofinFuturesHelperConfig,
+    observe_convexity: bool,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
     unsafe {
         with_context(ctx, error, |c| {
             check_ptr(out)?;
@@ -219,7 +233,14 @@ pub unsafe extern "C" fn itofin_futures_helper_new(
             let a = &*cfg;
             let q = quote(c, a.price)?;
             let d = date(a.start_date)?;
-            let adj = optional_quote(c, a.convexity)?;
+            let adj = if a.convexity != 0 && !observe_convexity {
+                Handle::new_unregistered(
+                    c.get::<Shared<libitofin::quotes::SimpleQuote>>(a.convexity)?
+                        as Shared<dyn libitofin::quotes::Quote>,
+                )
+            } else {
+                optional_quote(c, a.convexity)?
+            };
             let ft = futures_type(a.futures_type)?;
             let v = match mode {
                 0 => FuturesRateHelper::new(
