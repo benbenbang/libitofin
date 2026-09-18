@@ -5,6 +5,7 @@
 //! ItofinError exception. The pricing facades land in follow-up tickets
 //! (#485-#487).
 
+mod bootstrap;
 mod calibration;
 mod capfloor;
 mod capfloorengine;
@@ -204,6 +205,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     termstructures.add_class::<PyOISRateHelper>()?;
     termstructures.add_class::<PyBondPriceType>()?;
     termstructures.add_class::<PyFixedRateBondHelper>()?;
+    termstructures.add_class::<bootstrap::PySimpleQuoteVariables>()?;
     termstructures.add_class::<PyPiecewiseYieldCurve>()?;
     termstructures.add_class::<PyPiecewiseLogLinearDiscount>()?;
     termstructures.add_class::<PyPiecewiseLinearZero>()?;

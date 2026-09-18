@@ -53,6 +53,7 @@ __all__ = [
     "RateHelper",
     "SabrSmileSection",
     "SabrSwaptionVolatilityCube",
+    "SimpleQuoteVariables",
     "SpreadCdsHelper",
     "StrippedOptionletAdapter",
     "SwapRateHelper",
@@ -2873,6 +2874,20 @@ class SabrSwaptionVolatilityCube(SwaptionVolatilityStructure):
         Raises:
             ItofinError: On whatever the selected index's fixing reports, an
                 unset evaluation date or an unlinked forwarding curve included.
+        """
+
+@typing.final
+class SimpleQuoteVariables:
+    r"""
+    Mutable quotes solved jointly with the global curve nodes.
+
+    Guesses and bounds may be shorter than quotes. Missing guesses default to
+    zero; missing bounds leave the variable unconstrained. A supplied guess must
+    be strictly above its lower bound. The curve retains the underlying quotes.
+    """
+    def __init__(self, quotes: typing.Sequence[quotes.SimpleQuote], initial_guesses: typing.Optional[typing.Sequence[builtins.float]] = None, lower_bounds: typing.Optional[typing.Sequence[builtins.float]] = None) -> None:
+        r"""
+        Configure external quotes, optional initial guesses, and lower bounds.
         """
 
 @typing.final
