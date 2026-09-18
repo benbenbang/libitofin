@@ -79,6 +79,11 @@ extracted package:
 bash scripts/check_go_consumer.sh "$ITOFIN_NATIVE"
 ```
 
+CI also runs `bash scripts/check_go_install_failures.sh "$ITOFIN_NATIVE"`.
+It verifies missing-library failures at link and load time, and exercises the
+Go session's incompatible-ABI rejection through a temporary native shim.
+All mutations are confined to temporary package copies.
+
 This validates the external installation path and the portfolio simulation
 contract. It does not establish compatibility with an unavailable downstream
 application or establish a production latency budget.
