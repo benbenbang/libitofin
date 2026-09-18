@@ -1347,7 +1347,9 @@
       "notes": "Typed Go enum value; C boundary validates the corresponding integer selector.",
       "python": "itofin.instruments.SettlementMethod.PhysicalCleared",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestRatesCompletionSwaptionSettlementAndReceiver"
+      ]
     },
     {
       "c": [],
@@ -1357,7 +1359,9 @@
       "notes": "Typed Go enum value; C boundary validates the corresponding integer selector.",
       "python": "itofin.instruments.SettlementMethod.CollateralizedCashPrice",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestRatesCompletionSwaptionSettlementAndReceiver"
+      ]
     },
     {
       "c": [],
@@ -1367,7 +1371,9 @@
       "notes": "Typed Go enum value; C boundary validates the corresponding integer selector.",
       "python": "itofin.instruments.SettlementMethod.ParYieldCurve",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestRatesCompletionSwaptionSettlementAndReceiver"
+      ]
     },
     {
       "c": [],
@@ -1389,7 +1395,9 @@
       "notes": "Typed Go enum value; C boundary validates the corresponding integer selector.",
       "python": "itofin.instruments.SettlementType.Cash",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestRatesCompletionSwaptionSettlementAndReceiver"
+      ]
     },
     {
       "c": [],
@@ -1411,7 +1419,9 @@
       "notes": "Typed Go enum value; C boundary validates the corresponding integer selector.",
       "python": "itofin.instruments.SwapType.Receiver",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestRatesCompletionSwaptionSettlementAndReceiver"
+      ]
     },
     {
       "c": [],
@@ -1433,7 +1443,9 @@
       "notes": "Typed Go enum value; C boundary validates the corresponding integer selector.",
       "python": "itofin.pricingengines.CashAnnuityModel.DiscountCurve",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestRatesCompletionSwaptionSettlementAndReceiver"
+      ]
     }
   ],
   "notes": [

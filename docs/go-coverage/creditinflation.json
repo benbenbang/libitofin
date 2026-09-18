@@ -129,14 +129,18 @@
       "go": "InterpolatedHazardRateCurve.Dates",
       "python": "InterpolatedHazardRateCurve.dates",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestCreditCompletionHazardArraysAndNonflatISDA"
+      ]
     },
     {
       "c": "itofin_default_curve_nodes",
       "go": "InterpolatedHazardRateCurve.HazardRates",
       "python": "InterpolatedHazardRateCurve.hazard_rates",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestCreditCompletionHazardArraysAndNonflatISDA"
+      ]
     },
     {
       "c": "itofin_interpolated_hazard_new",
@@ -224,7 +228,9 @@
       "go": "CreditDefaultSwap.AccrualRebateDate",
       "python": "CreditDefaultSwap.accrual_rebate_date",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestCreditCompletionRebateSettlementBusinessDays"
+      ]
     },
     {
       "c": "itofin_cds_value",
@@ -232,7 +238,8 @@
       "python": "CreditDefaultSwap.calculate",
       "status": "implemented",
       "tests": [
-        "TestCreditBootstrapRepricesIndependentContracts"
+        "TestCreditBootstrapRepricesIndependentContracts",
+        "TestCreditCompletionBuilderCashflowsAndFairUpfront"
       ]
     },
     {
@@ -267,7 +274,9 @@
       "go": "CreditDefaultSwap.FairUpfront",
       "python": "CreditDefaultSwap.fair_upfront",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestCreditCompletionBuilderCashflowsAndFairUpfront"
+      ]
     },
     {
       "c": "itofin_cds_implied_hazard",
@@ -302,7 +311,8 @@
       "python": "CreditDefaultSwap.notional",
       "status": "implemented",
       "tests": [
-        "TestCreditBootstrapRepricesIndependentContracts"
+        "TestCreditBootstrapRepricesIndependentContracts",
+        "TestCreditCompletionBuilderCashflowsAndFairUpfront"
       ]
     },
     {
@@ -321,7 +331,8 @@
       "python": "CreditDefaultSwap.price",
       "status": "implemented",
       "tests": [
-        "TestCreditBootstrapRepricesIndependentContracts"
+        "TestCreditBootstrapRepricesIndependentContracts",
+        "TestCreditCompletionBuilderCashflowsAndFairUpfront"
       ]
     },
     {
@@ -365,14 +376,18 @@
       "go": "Session.MakeCreditDefaultSwap",
       "python": "MakeCreditDefaultSwap.build",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestCreditCompletionBuilderCashflowsAndFairUpfront"
+      ]
     },
     {
       "c": "itofin_make_cds",
       "go": "Session.MakeCreditDefaultSwap",
       "python": "MakeCreditDefaultSwap.__init__",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestCreditCompletionBuilderCashflowsAndFairUpfront"
+      ]
     },
     {
       "c": "itofin_cds_engine_new",
@@ -425,7 +440,8 @@
       "python": "ProtectionSide.Buyer",
       "status": "implemented",
       "tests": [
-        "TestCreditBootstrapRepricesIndependentContracts"
+        "TestCreditBootstrapRepricesIndependentContracts",
+        "TestCreditCompletionMidpointHazardAndProtectionSigns"
       ]
     },
     {
@@ -433,35 +449,45 @@
       "go": "ProtectionSeller",
       "python": "ProtectionSide.Seller",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestCreditCompletionMidpointHazardAndProtectionSigns"
+      ]
     },
     {
       "c": "validated int32 discriminant",
       "go": "Midpoint",
       "python": "PricingModel.Midpoint",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestCreditCompletionMidpointHazardAndProtectionSigns"
+      ]
     },
     {
       "c": "validated int32 discriminant",
       "go": "Isda",
       "python": "PricingModel.Isda",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestCreditCompletionMidpointHazardAndProtectionSigns"
+      ]
     },
     {
       "c": "validated int32 discriminant",
       "go": "NoFix",
       "python": "NumericalFix.NoFix",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestCreditCompletionHazardArraysAndNonflatISDA"
+      ]
     },
     {
       "c": "validated int32 discriminant",
       "go": "Taylor",
       "python": "NumericalFix.Taylor",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestCreditCompletionHazardArraysAndNonflatISDA"
+      ]
     },
     {
       "c": "validated int32 discriminant",
@@ -482,14 +508,18 @@
       "go": "FlatForwards",
       "python": "ForwardsInCouponPeriod.Flat",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestCreditCompletionHazardArraysAndNonflatISDA"
+      ]
     },
     {
       "c": "validated int32 discriminant",
       "go": "PiecewiseForwards",
       "python": "ForwardsInCouponPeriod.Piecewise",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestCreditCompletionHazardArraysAndNonflatISDA"
+      ]
     }
   ]
 }

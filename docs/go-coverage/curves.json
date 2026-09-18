@@ -498,14 +498,18 @@
       "go": "Asx",
       "python": "itofin.termstructures.FuturesType.Asx",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestRatesCompletionCustomAndASXFutures"
+      ]
     },
     {
       "c": [],
       "go": "Custom",
       "python": "itofin.termstructures.FuturesType.Custom",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestRatesCompletionCustomAndASXFutures"
+      ]
     },
     {
       "c": [],
@@ -526,28 +530,36 @@
       "go": "SimpleAveraging",
       "python": "itofin.termstructures.RateAveraging.Simple",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestRatesCompletionOISAveragingOracle"
+      ]
     },
     {
       "c": [],
       "go": "CompoundAveraging",
       "python": "itofin.termstructures.RateAveraging.Compound",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestRatesCompletionOISAveragingOracle"
+      ]
     },
     {
       "c": [],
       "go": "Clean",
       "python": "itofin.termstructures.BondPriceType.Clean",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestRatesCompletionDirtyBondWithAccruedInterest"
+      ]
     },
     {
       "c": [],
       "go": "Dirty",
       "python": "itofin.termstructures.BondPriceType.Dirty",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestRatesCompletionDirtyBondWithAccruedInterest"
+      ]
     },
     {
       "c": "itofin_currency_new",

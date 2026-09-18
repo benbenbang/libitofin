@@ -438,7 +438,8 @@
       "status": "implemented",
       "tests": [
         "TestModelConstraintsParametersAndBondOption",
-        "TestHestonCalibratesFlatSurface"
+        "TestHestonCalibratesFlatSurface",
+        "TestHestonCalibrationPriceAndImpliedVolOracles"
       ],
       "validation": "Go feature-subset tests passed with Go 1.27.1"
     },
@@ -464,7 +465,8 @@
       "source": "crates/itofin-py/python/itofin/models/__init__.pyi",
       "status": "implemented",
       "tests": [
-        "TestHestonCalibratesFlatSurface"
+        "TestHestonCalibratesFlatSurface",
+        "TestHestonCalibrationPriceAndImpliedVolOracles"
       ],
       "validation": "Go feature-subset tests passed with Go 1.27.1"
     },
@@ -549,7 +551,8 @@
       "tests": [
         "TestModelConstraintsParametersAndBondOption",
         "TestHullWhiteCalibrationCachedOracles",
-        "TestHullWhiteCalibrationErrorVariantsAndDefaults"
+        "TestHullWhiteCalibrationErrorVariantsAndDefaults",
+        "TestHullWhiteCalibrationFixedReversionAndOptionalCombinations"
       ],
       "validation": "Go feature-subset tests passed with Go 1.27.1"
     },
@@ -576,7 +579,8 @@
       "status": "implemented",
       "tests": [
         "TestHullWhiteCalibrationCachedOracles",
-        "TestHullWhiteCalibrationErrorVariantsAndDefaults"
+        "TestHullWhiteCalibrationErrorVariantsAndDefaults",
+        "TestHullWhiteCalibrationFixedReversionAndOptionalCombinations"
       ],
       "validation": "Go feature-subset tests passed with Go 1.27.1"
     },
@@ -774,7 +778,8 @@
       "status": "implemented",
       "tests": [
         "models_api::tests::calibration_enum_and_optional_criteria_are_checked",
-        "TestHullWhiteCalibrationErrorVariantsAndDefaults"
+        "TestHullWhiteCalibrationErrorVariantsAndDefaults",
+        "TestHestonCalibrationPriceAndImpliedVolOracles"
       ],
       "validation": "macOS arm64: Hull-White calibration parameters and signed errors match independently generated QuantLib 1.43 oracle."
     },
@@ -787,7 +792,8 @@
       "status": "implemented",
       "tests": [
         "models_api::tests::calibration_enum_and_optional_criteria_are_checked",
-        "TestHullWhiteCalibrationErrorVariantsAndDefaults"
+        "TestHullWhiteCalibrationErrorVariantsAndDefaults",
+        "TestHestonCalibrationPriceAndImpliedVolOracles"
       ],
       "validation": "macOS arm64: Hull-White calibration parameters and signed errors match independently generated QuantLib 1.43 oracle."
     }
