@@ -120,8 +120,9 @@ Go 1.27.1, and a C compiler. Each Go session confines its mutable native graph
 to one OS thread; independent sessions can run concurrently. Close sessions
 explicitly. A native panic poisons its session, which must then be closed.
 
-The source module is `github.com/benbenbang/libitofin/sdk/go`; its first release
-is pending. Existing v0.22.0 consumers retain the published `bindings/go` path.
+The Go module is `github.com/benbenbang/libitofin/sdk/go`. Install a version with
+a matching `sdk/go/vVERSION` tag and native release package. Existing v0.22.0
+consumers retain the published `bindings/go` path.
 See the [installation and migration guide](docs/go-distribution.md).
 
 Start with the [build and ownership guide](sdk/go/README.md) and the

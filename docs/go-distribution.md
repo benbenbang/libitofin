@@ -30,9 +30,9 @@ between releases that add symbols. Keep the header and library together.
 
 ## Use from an external Go module
 
-The source module is `github.com/benbenbang/libitofin/sdk/go`. Its first tagged
-release is pending; these published-install commands apply after a matching
-`sdk/go/vVERSION` tag exists. Set `version` to that release number without `v`,
+The module is `github.com/benbenbang/libitofin/sdk/go`. Choose a release with
+a matching `sdk/go/vVERSION` tag and native assets. Set `version` to that
+release number without `v`,
 and `platform` to `darwin-arm64` or `linux-amd64`. Download the archive and
 checksum from the main LibItoFin release:
 
