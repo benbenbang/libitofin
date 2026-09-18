@@ -19,7 +19,8 @@ This inventory does not claim exhaustive QuantLib product coverage.
 | Swaption cash/physical settlement, both annuity models, unsupported combinations, payer/receiver fair rates | `TestRatesCompletionSwaptionSettlementAndReceiver` |
 | Dirty/clean bond quotes with nonzero accrued interest | `TestRatesCompletionDirtyBondWithAccruedInterest` |
 | Valid Custom/ASX futures dates, prices and analytical forward/discount factors | `TestRatesCompletionCustomAndASXFutures` |
-| Compound OIS numerical oracle, safe rejection of unsupported Simple, same-session recovery | `TestRatesCompletionOISAveragingOracle` |
+| Simple and Compound OIS numerical oracles | `TestRatesCompletionOISAveragingOracle` |
+| OIS quote/date updates, separate discounting, forward starts, retained objects and invalid-enum recovery | `TestOvernightAveragingOISUpdatesAndRetention`, `TestOvernightAveragingOISForwardAndDiscounting`, `TestOvernightAveragingInvalidEnumDoesNotPoisonSession` |
 | Heston PriceError/ImpliedVolError fitted parameters and signed residuals | `TestHestonCalibrationPriceAndImpliedVolOracles` |
 | Hull-White fixed reversion and mixed omitted/explicit optimizer and stopping settings | `TestHullWhiteCalibrationFixedReversionAndOptionalCombinations` |
 
@@ -28,11 +29,15 @@ constructor does not expose that convention. Each is checked against its own
 matching QuantLib contract, and the one-day premium difference is reconstructed
 analytically. Their NPVs are intentionally different.
 
-Simple-averaged overnight coupons remain unimplemented in the Rust core:
-[#1038](https://github.com/benbenbang/libitofin/issues/1038). The C boundary rejects
-this option before construction with an invalid-input error, leaving the session
-usable. The Simple oracle is retained for that future implementation; successful
-Simple pricing is not claimed.
+[#1038](https://github.com/benbenbang/libitofin/issues/1038) adds the default
+arithmetic-averaging overnight coupon path in Rust and successful Simple OIS
+pricing through Python and C/Go. The default uses the full daily schedule and
+zero convexity adjustment. Custom arithmetic-pricer volatility and telescopic
+approximation are outside this increment. Existing Compound behavior and the
+retained QuantLib 1.43 discount/quote tolerances are unchanged. The richer
+[overnight oracle](../crates/libitofin/tests/fixtures/overnight_averaging/README.md)
+covers all three language surfaces. Two pre-existing Compound coupon differences
+remain tracked in [#1045](https://github.com/benbenbang/libitofin/issues/1045).
 
 ## Oracle reproduction and tolerances
 
