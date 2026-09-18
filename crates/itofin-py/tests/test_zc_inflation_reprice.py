@@ -44,6 +44,7 @@ from itofin.pricingengines import DiscountingSwapEngine
 from itofin.quotes import SimpleQuote
 from itofin.termstructures import (
     FlatForward,
+    InterpolatedZeroInflationCurve,
     MultiplicativePriceSeasonality,
     PiecewiseZeroInflationCurve,
     ZeroCouponInflationSwapHelper,
@@ -341,26 +342,55 @@ def test_a_seasonality_moves_the_forecast_and_the_curve_reprices_the_swaps_again
     assert abs(curve.zero_rate_date(SEASONALITY_PROBE) - raw_rate) < FORECAST_MATCH
 
 
-def test_a_multi_year_seasonality_is_rejected_by_the_consistency_gate():
-    """The gate reports the correction's own verdict, and a twenty-four-factor
-    set is the multi-year branch the core defers (#807).
-
-    It runs on its own fixture because the failure leaves the curve in a state
-    the reprice test must not inherit: the store happens before the gate, as
-    C++'s does, so the rejected correction stays installed - which
-    has_seasonality() reports as True below, deliberately - while the
-    notification that would invalidate the bootstrap never fires. Reading the
-    curve from here would fold a correction onto nodes that were never re-solved
-    against it, so the correction is cleared before the test ends.
-    """
+def test_a_consistent_multi_year_seasonality_reprices_the_swaps():
     settings = _settings()
     index = _index(settings)
     curve = _bootstrapped(settings, index)
+    raw_forecast = index.fixing(SEASONALITY_PROBE, True)
+    factors = SEASONALITY_FACTORS * 3
+    factors[7] += 0.002
+    factors[19] -= 0.001
+    curve.set_seasonality(_a_seasonality(factors))
+    assert curve.has_seasonality()
+    assert abs(index.fixing(SEASONALITY_PROBE, True) - raw_forecast) > FORECAST_MATCH
 
-    with pytest.raises(ItofinError) as raised:
-        curve.set_seasonality(_a_seasonality(SEASONALITY_FACTORS * 2))
-    assert "#807" in str(raised.value)
+    worst_npv = max(
+        abs(_a_swap(settings, index, maturity, rate / 100.0).npv())
+        for maturity, rate in ZC_DATA
+    )
+    print(f"worst |NPV| under multi-year seasonality = {worst_npv:.3e}")
+    assert worst_npv < EPS
+    curve.set_seasonality(None)
+    assert not curve.has_seasonality()
+
+
+def test_an_inconsistent_multi_year_seasonality_is_rejected_and_retained():
+    settings = _settings()
+    index = _index(settings)
+    curve = _bootstrapped(settings, index)
+    factors = SEASONALITY_FACTORS * 3
+    factors[30] += 0.002
+
+    with pytest.raises(ItofinError, match="seasonality is inconsistent"):
+        curve.set_seasonality(_a_seasonality(factors))
 
     assert curve.has_seasonality(), "the store precedes the gate, as C++'s does"
+    curve.set_seasonality(None)
+    assert not curve.has_seasonality()
+
+
+def test_a_seasonality_anniversary_beyond_the_date_range_is_a_typed_error():
+    base = Date(1, 1, 2199)
+    curve = InterpolatedZeroInflationCurve(
+        Date(1, 2, 2199),
+        [base, Date(31, 12, 2199)],
+        [0.02, 0.03],
+        Frequency.Monthly,
+        DayCounter.actual365_fixed(),
+    )
+    seasonality = MultiplicativePriceSeasonality(base, Frequency.Monthly, [1.0] * 24)
+    with pytest.raises(ItofinError, match="supported date range"):
+        curve.set_seasonality(seasonality)
+    assert curve.has_seasonality()
     curve.set_seasonality(None)
     assert not curve.has_seasonality()
