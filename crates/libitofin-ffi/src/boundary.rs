@@ -174,6 +174,7 @@ pub unsafe fn with_context(
     f: impl FnOnce(&mut Context) -> BindingResult<()>,
 ) -> i32 {
     let result = (|| {
+        crate::bootstrap_callbacks::ensure_not_active()?;
         check_ptr(ctx)?;
         let context = unsafe { &mut *ctx };
         context.check()?;
@@ -235,6 +236,7 @@ pub unsafe extern "C" fn itofin_context_free(ctx: *mut Context, error: *mut Itof
     unsafe {
         without_context(error, || {
             check_ptr(ctx)?;
+            crate::bootstrap_callbacks::ensure_not_active()?;
             if (*ctx).owner != thread::current().id() {
                 return Err(BindingError {
                     code: WRONG_THREAD,

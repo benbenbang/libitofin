@@ -39,12 +39,47 @@ typedef double ItofinReal;
 typedef struct ItofinContext ItofinContext;
 
 /**
+ * Callback output, valid only during its callback. Never retain this pointer.
+ */
+typedef struct ItofinBootstrapOutput ItofinBootstrapOutput;
+
+/**
+ * Borrowed arrays valid only during a penalty callback; consumers must copy them.
+ */
+typedef struct ItofinBootstrapState {
+  const double *times;
+  const double *data;
+  size_t node_count;
+  const double *quote_values;
+  size_t quote_count;
+  const double *helper_errors;
+  size_t helper_count;
+} ItofinBootstrapState;
+
+/**
  * Caller-owned error. Zero code means success; message is NUL-terminated UTF-8.
  */
 typedef struct ItofinError {
   int32_t code;
   char message[1024];
 } ItofinError;
+
+/**
+ * Functions and integer userdata remain valid until release is called exactly once.
+ * Callbacks must not unwind, retain borrowed pointers, or call context APIs.
+ */
+typedef struct ItofinBootstrapCallbacks {
+  size_t userdata;
+  int32_t (*penalties)(size_t,
+                       const struct ItofinBootstrapState*,
+                       struct ItofinBootstrapOutput*,
+                       struct ItofinError*);
+  int32_t (*dates)(size_t,
+                   const struct ItofinBootstrapState*,
+                   struct ItofinBootstrapOutput*,
+                   struct ItofinError*);
+  void (*release)(size_t);
+} ItofinBootstrapCallbacks;
 
 /**
  * GBM inputs; arrays each contain `assets` doubles, correlation `assets*assets`.
@@ -744,6 +779,55 @@ extern "C" {
 #endif // __cplusplus
 
 /**
+ * Construct a global discount curve, kind 0 log-linear or 1 linear.
+ * Callback ownership transfers exactly when `adopted` becomes true, including
+ * failed construction; the last native curve owner releases the callbacks.
+ * Initialize `adopted` to false before calling, including when retrying.
+ * # Safety
+ * Follow the crate-level pointer/context contract. Callback functions must remain
+ * valid until release; borrowed callback inputs/output cannot escape their call.
+ */
+int32_t itofin_global_curve_new(struct ItofinContext *ctx,
+                                int32_t reference,
+                                const uint64_t *helpers,
+                                size_t len,
+                                uint64_t dc,
+                                int32_t kind,
+                                const uint64_t *additional,
+                                size_t additional_len,
+                                uint64_t variables,
+                                const struct ItofinBootstrapCallbacks *callbacks,
+                                bool *adopted,
+                                uint64_t *out,
+                                struct ItofinError *error);
+
+/**
+ * Copy one callback result into native storage. Dates use integer serial values.
+ * # Safety
+ * `out` must be the current callback's output; values must satisfy the slice contract.
+ */
+int32_t itofin_bootstrap_output_set(struct ItofinBootstrapOutput *out,
+                                    const double *values,
+                                    size_t count,
+                                    struct ItofinError *error);
+
+/**
+ * Create retained quote variables. Guesses and bounds may be shorter than quotes.
+ * Missing guesses are zero; supplied bounds must be finite and below the guess.
+ * # Safety
+ * Follow the crate-level context and pointer contract.
+ */
+int32_t itofin_simple_quote_variables_new(struct ItofinContext *ctx,
+                                          const uint64_t *quotes,
+                                          size_t count,
+                                          const double *guesses,
+                                          size_t guess_count,
+                                          const double *bounds,
+                                          size_t bound_count,
+                                          uint64_t *out,
+                                          struct ItofinError *error);
+
+/**
  * ABI major version. Increment for incompatible layouts or calling conventions.
  */
 uint32_t itofin_abi_version(void);
@@ -1357,6 +1441,18 @@ int32_t itofin_futures_helper_new(struct ItofinContext *ctx,
                                   const struct ItofinFuturesHelperConfig *cfg,
                                   uint64_t *out,
                                   struct ItofinError *error);
+
+/**
+ * Futures helper with explicit convexity observation. Disable for bootstrap variables.
+ * # Safety
+ * Follow the crate-level context and pointer contract.
+ */
+int32_t itofin_futures_helper_new_with_observation(struct ItofinContext *ctx,
+                                                   int32_t mode,
+                                                   const struct ItofinFuturesHelperConfig *cfg,
+                                                   bool observe_convexity,
+                                                   uint64_t *out,
+                                                   struct ItofinError *error);
 
 /**
  * # Safety
