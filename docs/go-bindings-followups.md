@@ -1,8 +1,10 @@
 # Go binding follow-ups
 
-Review branch: `feat/go-bindings-followups`, starting at `4c48647e`.
-Tracker: [#1000](https://github.com/benbenbang/libitofin/issues/1000).
-Changes are assembled as sequential commits from isolated feature branches.
+The original `feat/go-bindings-followups` stack started at `4c48647e`, with
+reviewed commits integrated sequentially from isolated feature branches. GitHub
+rebase-merges rewrite commit IDs; that starting point records assembly history.
+Tracker: [#1000](https://github.com/benbenbang/libitofin/issues/1000); binding
+strategy: [#46](https://github.com/benbenbang/libitofin/issues/46).
 
 ## Scope
 
@@ -31,7 +33,19 @@ prove every configuration, branch, or numerical behavior. Statement coverage,
 independent numerical oracles, and lifecycle tests provide separate evidence.
 The [original review](go-bindings-review.md) retains the previous Linux counts.
 
-## Combined local validation
+## Integrated validation
+
+Validated API revision: `b169fabe15d86623b24f3dd76489533d59a3a4da`. The [Linux/macOS CI run](https://github.com/benbenbang/libitofin/actions/runs/35302175566) passed Rust, Python, native/C/C++ checks, Go vet and
+race/cgocheck2 tests, header generation, native-package consumer validation,
+and the aggregate `workflow-success` gate.
+
+On 2026-09-18, the same file tree passed all local repository hooks on macOS
+arm64 with Go 1.27.1 and Rust 1.96.0. The separate full-current strict audit
+mapped 855/855 declarations with 713 explicit test references; the baseline
+remains 744/744. Go library statement coverage was 83.4%. These measures do
+not imply exhaustive behavioral coverage.
+
+## Historical combined local validation
 
 The integrated tree at `34a5a8bc` passed on macOS arm64 with Go 1.27.1 and
 Rust 1.96.0:
@@ -45,8 +59,8 @@ Rust 1.96.0:
 - Native archive checksums and standalone external-consumer acceptance passed
   with the extracted library under a path containing spaces and no loader
   environment variables.
-- Workflow linting and shellcheck passed. Linux execution belongs to the
-  feature branch CI; these local results do not claim it.
+- Workflow linting and shellcheck passed. This local run did not establish
+  Linux validation; platform CI evidence is recorded separately above.
 
 ## Delivery limits
 
@@ -54,7 +68,11 @@ The new release workflow validates Linux amd64 and macOS arm64 packages and
 prepares a draft release only for a matching `bindings/go/vVERSION` tag.
 Feature-branch validation does not publish a release. No release tag is created
 by this implementation. First published-tag resolution and downstream application
-migration remain release/consumer acceptance tasks.
+migration remain separate tasks; the public consumer fixture establishes
+synthetic library acceptance without claiming either.
+Linux mixed-build-order evidence remains tracked in [#1001](https://github.com/benbenbang/libitofin/issues/1001);
+negative installation checks for missing/incompatible native libraries remain
+in [#1006](https://github.com/benbenbang/libitofin/issues/1006).
 
 Direct calendar queries check tabulated bounds, including fixing calendars
 retrieved from indexes after their original handles close. Core instrument
@@ -62,7 +80,7 @@ calculations can still encounter core calendar limitations; panic containment
 and session poisoning remain part of the contract. Related
 inflation dependencies still require the intended shared Settings identity.
 
-`AGENTS.md` and `CLAUDE.md` in this local checkout are excluded via local Git
-configuration, so they are not part of the review commits. The tracked README,
-binding contract, installation guide, and issue tracker are the current shared
-development references.
+`AGENTS.md`, `.agents/` guidance, and `CLAUDE.md` in the original checkout are
+excluded via local Git configuration, so they are not shared review artifacts.
+The tracked README, binding contract, installation guide, and issue tracker
+are the current shared development references.
