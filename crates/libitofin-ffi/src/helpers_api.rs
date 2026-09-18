@@ -292,7 +292,11 @@ pub unsafe extern "C" fn itofin_ois_helper_new(
             let a = &*cfg;
             let i = c.get::<Shared<OvernightIndex>>(a.index)?;
             let averaging = match a.averaging {
-                0 => RateAveraging::Simple,
+                0 => {
+                    return Err(BindingError::invalid(
+                        "simple-averaged OIS is not supported",
+                    ));
+                }
                 1 => RateAveraging::Compound,
                 _ => return Err(BindingError::invalid("unknown averaging method")),
             };
