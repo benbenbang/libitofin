@@ -640,7 +640,7 @@ mod tests {
 
     /// Twelve monthly factors anchored on a month other than the curve's base
     /// month, so the correction is not the identity; `count` above twelve makes
-    /// it the multi-year case the consistency gate defers.
+    /// it inconsistent at the curve base month in subsequent years.
     fn a_seasonality(count: usize) -> Shared<dyn Seasonality> {
         shared(
             MultiplicativePriceSeasonality::new(
@@ -693,7 +693,11 @@ mod tests {
         let curve = curve(None);
 
         let err = curve.set_seasonality(Some(a_seasonality(24))).unwrap_err();
-        assert!(err.message().contains("#807"), "{}", err.message());
+        assert!(
+            err.message().contains("seasonality is inconsistent"),
+            "{}",
+            err.message()
+        );
         assert!(curve.has_seasonality(), "C++ stores before it checks");
         assert!(curve.check_seasonality().is_err());
     }
