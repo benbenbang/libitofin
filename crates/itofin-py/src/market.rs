@@ -64,6 +64,10 @@ impl PySimpleQuote {
 }
 
 impl PySimpleQuote {
+    pub(crate) fn shared(&self) -> Shared<SimpleQuote> {
+        Shared::clone(&self.inner)
+    }
+
     /// A handle wrapping the retained quote, for the rate-helper facades (#528)
     /// that take one. The handle shares the same quote, so a later `set_value`
     /// on this SimpleQuote is observed by any helper built from it (the

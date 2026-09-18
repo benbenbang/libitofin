@@ -299,6 +299,8 @@ impl PyFuturesRateHelper {
     ///         empty, zero adjustment.
     ///     futures_type (FuturesType): The date convention the future settles
     ///         on.
+    ///     register_conv_adj (bool): Observe convexity changes by default.
+    ///         Set False when SimpleQuoteVariables drives this quote.
     ///
     /// Raises:
     ///     ItofinError: If an Imm or Asx start is not a valid date of that
@@ -316,6 +318,8 @@ impl PyFuturesRateHelper {
         day_counter,
         conv_adj,
         futures_type,
+        *,
+        register_conv_adj = true,
     ))]
     fn new(
         price: &PySimpleQuote,
@@ -327,6 +331,7 @@ impl PyFuturesRateHelper {
         day_counter: &PyDayCounter,
         conv_adj: Option<&PySimpleQuote>,
         futures_type: &PyFuturesType,
+        register_conv_adj: bool,
     ) -> PyResult<PyClassInitializer<Self>> {
         let helper = FuturesRateHelper::new(
             price.handle(),
@@ -336,7 +341,7 @@ impl PyFuturesRateHelper {
             convention.inner(),
             end_of_month,
             day_counter.inner(),
-            empty_or_handle(conv_adj),
+            empty_or_handle(conv_adj, register_conv_adj),
             futures_type.inner(),
         )
         .map_err(PyQlError::from)?;
@@ -356,6 +361,8 @@ impl PyFuturesRateHelper {
     ///         empty, zero adjustment.
     ///     futures_type (FuturesType): The date convention the future settles
     ///         on.
+    ///     register_conv_adj (bool): Observe convexity changes by default.
+    ///         Set False when SimpleQuoteVariables drives this quote.
     ///
     /// Returns:
     ///     FuturesRateHelper: The helper over that window.
@@ -365,6 +372,7 @@ impl PyFuturesRateHelper {
     ///         from C++, which builds a null-maturity helper instead - and on
     ///         a start that is not a valid date of the chosen convention.
     #[staticmethod]
+    #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (
         price,
         ibor_start_date,
@@ -372,6 +380,8 @@ impl PyFuturesRateHelper {
         day_counter,
         conv_adj,
         futures_type,
+        *,
+        register_conv_adj = true,
     ))]
     fn from_end_date(
         py: Python<'_>,
@@ -381,13 +391,14 @@ impl PyFuturesRateHelper {
         day_counter: &PyDayCounter,
         conv_adj: Option<&PySimpleQuote>,
         futures_type: &PyFuturesType,
+        register_conv_adj: bool,
     ) -> PyResult<Py<Self>> {
         let helper = FuturesRateHelper::from_end_date(
             price.handle(),
             ibor_start_date.inner(),
             ibor_end_date.map(PyDate::inner),
             day_counter.inner(),
-            empty_or_handle(conv_adj),
+            empty_or_handle(conv_adj, register_conv_adj),
             futures_type.inner(),
         )
         .map_err(PyQlError::from)?;
@@ -407,6 +418,8 @@ impl PyFuturesRateHelper {
     ///         empty, zero adjustment.
     ///     futures_type (FuturesType): The date convention the future settles
     ///         on.
+    ///     register_conv_adj (bool): Observe convexity changes by default.
+    ///         Set False when SimpleQuoteVariables drives this quote.
     ///
     /// Returns:
     ///     FuturesRateHelper: The helper over that window.
@@ -415,7 +428,7 @@ impl PyFuturesRateHelper {
     ///     ItofinError: If the start is not a valid date of the chosen
     ///         convention.
     #[staticmethod]
-    #[pyo3(signature = (price, ibor_start_date, index, conv_adj, futures_type))]
+    #[pyo3(signature = (price, ibor_start_date, index, conv_adj, futures_type, *, register_conv_adj = true))]
     fn from_index(
         py: Python<'_>,
         price: &PySimpleQuote,
@@ -423,13 +436,14 @@ impl PyFuturesRateHelper {
         index: &PyIborIndex,
         conv_adj: Option<&PySimpleQuote>,
         futures_type: &PyFuturesType,
+        register_conv_adj: bool,
     ) -> PyResult<Py<Self>> {
         let idx = index.inner();
         let helper = FuturesRateHelper::from_index(
             price.handle(),
             ibor_start_date.inner(),
             &idx,
-            empty_or_handle(conv_adj),
+            empty_or_handle(conv_adj, register_conv_adj),
             futures_type.inner(),
         )
         .map_err(PyQlError::from)?;
@@ -451,9 +465,10 @@ impl PyFuturesRateHelper {
 /// The convexity handle for a futures helper: the caller's quote, or an empty
 /// handle when `None`. A SimpleQuote handle is never empty, so the empty case
 /// (the zero-adjustment default the core tests pass) must be built here.
-fn empty_or_handle(conv_adj: Option<&PySimpleQuote>) -> Handle<dyn Quote> {
+fn empty_or_handle(conv_adj: Option<&PySimpleQuote>, register: bool) -> Handle<dyn Quote> {
     match conv_adj {
-        Some(quote) => quote.handle(),
+        Some(quote) if register => quote.handle(),
+        Some(quote) => Handle::new_unregistered(quote.shared() as Shared<dyn Quote>),
         None => Handle::empty(),
     }
 }

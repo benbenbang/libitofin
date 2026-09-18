@@ -1321,7 +1321,7 @@ class FuturesRateHelper(RateHelper):
     change. The convexity adjustment is usually absent; pass conv_adj=None to
     leave it empty, which reports a zero adjustment.
     """
-    def __init__(self, price: quotes.SimpleQuote, ibor_start_date: time.Date, length_in_months: builtins.int, calendar: time.Calendar, convention: time.BusinessDayConvention, end_of_month: builtins.bool, day_counter: time.DayCounter, conv_adj: typing.Optional[quotes.SimpleQuote], futures_type: FuturesType) -> None:
+    def __init__(self, price: quotes.SimpleQuote, ibor_start_date: time.Date, length_in_months: builtins.int, calendar: time.Calendar, convention: time.BusinessDayConvention, end_of_month: builtins.bool, day_counter: time.DayCounter, conv_adj: typing.Optional[quotes.SimpleQuote], futures_type: FuturesType, *, register_conv_adj: builtins.bool = True) -> None:
         r"""
         Build the helper over a length-in-months window off the start date.
 
@@ -1339,13 +1339,15 @@ class FuturesRateHelper(RateHelper):
                 empty, zero adjustment.
             futures_type (FuturesType): The date convention the future settles
                 on.
+            register_conv_adj (bool): Observe convexity changes by default.
+                Set False when SimpleQuoteVariables drives this quote.
 
         Raises:
             ItofinError: If an Imm or Asx start is not a valid date of that
                 convention.
         """
     @staticmethod
-    def from_end_date(price: quotes.SimpleQuote, ibor_start_date: time.Date, ibor_end_date: typing.Optional[time.Date], day_counter: time.DayCounter, conv_adj: typing.Optional[quotes.SimpleQuote], futures_type: FuturesType) -> FuturesRateHelper:
+    def from_end_date(price: quotes.SimpleQuote, ibor_start_date: time.Date, ibor_end_date: typing.Optional[time.Date], day_counter: time.DayCounter, conv_adj: typing.Optional[quotes.SimpleQuote], futures_type: FuturesType, *, register_conv_adj: builtins.bool = True) -> FuturesRateHelper:
         r"""
         Build the helper over an explicit window.
 
@@ -1360,6 +1362,8 @@ class FuturesRateHelper(RateHelper):
                 empty, zero adjustment.
             futures_type (FuturesType): The date convention the future settles
                 on.
+            register_conv_adj (bool): Observe convexity changes by default.
+                Set False when SimpleQuoteVariables drives this quote.
 
         Returns:
             FuturesRateHelper: The helper over that window.
@@ -1370,7 +1374,7 @@ class FuturesRateHelper(RateHelper):
                 a start that is not a valid date of the chosen convention.
         """
     @staticmethod
-    def from_index(price: quotes.SimpleQuote, ibor_start_date: time.Date, index: indexes.IborIndex, conv_adj: typing.Optional[quotes.SimpleQuote], futures_type: FuturesType) -> FuturesRateHelper:
+    def from_index(price: quotes.SimpleQuote, ibor_start_date: time.Date, index: indexes.IborIndex, conv_adj: typing.Optional[quotes.SimpleQuote], futures_type: FuturesType, *, register_conv_adj: builtins.bool = True) -> FuturesRateHelper:
         r"""
         Build the helper with a window following the index's conventions.
 
@@ -1385,6 +1389,8 @@ class FuturesRateHelper(RateHelper):
                 empty, zero adjustment.
             futures_type (FuturesType): The date convention the future settles
                 on.
+            register_conv_adj (bool): Observe convexity changes by default.
+                Set False when SimpleQuoteVariables drives this quote.
 
         Returns:
             FuturesRateHelper: The helper over that window.
