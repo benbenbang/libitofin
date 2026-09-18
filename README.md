@@ -22,6 +22,8 @@ first, then a C ABI for everything else).
 > this checkout. See
 > [Status](#status).
 
+## Install
+
 ```sh
 cargo add libitofin
 ```
