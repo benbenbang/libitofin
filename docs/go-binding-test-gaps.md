@@ -1,104 +1,61 @@
-# Go behavioral test triage (#1005)
+# Go behavioral test evidence
 
-Baseline review: `4c48647e`, macOS arm64, Go 1.27.1. The coverage audit's
-744 mapped symbols minus 578 explicit test references yields 166, comprising
-93 containing types inferred from mapped members, 46 methods and 27 enum members.
-A missing reference is not evidence that the corresponding code never executes.
-At that baseline, 111 newer RNG/calendar symbols were unmapped under #1003/#1004.
-The integrated follow-up maps all 855 current declarations; see the
-[current validation record](go-bindings-followups.md) for revision and evidence.
+[#1036](https://github.com/benbenbang/libitofin/issues/1036) completes the bounded
+cases deferred by the original #1005 triage. Tests below use independent
+QuantLib or analytical expectations; API mappings alone do not prove behavior.
+This inventory does not claim exhaustive QuantLib product coverage.
 
-## Types (93)
+## Completed cases
 
-All 93 are containing types inferred by `scripts/check_go_coverage.py` from
-mapped members. Constructors, members, aliases and returned objects establish
-these types in compiled Go tests. Separate type-name assertions would add no
-behavioral evidence. This does not claim every member or configuration is tested.
+| Scope | Executable evidence |
+| --- | --- |
+| Zero/YoY index representations and retained ratio identity | `TestInflationCompletionIndexRepresentations` |
+| Piecewise zero/YoY dates, times, nodes and detached copies | `TestInflationCompletionPiecewiseDetachedOutputs` |
+| Zero/YoY helper latest and pillar dates, flat/linear interpolation | `TestInflationCompletionHelperDates` |
+| CDS rebate settlement, weekend handling and absent rebate | `TestCreditCompletionRebateSettlementBusinessDays` |
+| CDS builder, explicit schedule, premium/default cashflows, cached calculation and fair-upfront zero NPV | `TestCreditCompletionBuilderCashflowsAndFairUpfront` |
+| Midpoint implied hazard, ISDA dispatch and buyer/seller signs | `TestCreditCompletionMidpointHazardAndProtectionSigns` |
+| Hazard dates/rates detached copies and non-flat ISDA NoFix/Taylor, Flat/Piecewise combinations | `TestCreditCompletionHazardArraysAndNonflatISDA` |
+| Swaption cash/physical settlement, both annuity models, unsupported combinations, payer/receiver fair rates | `TestRatesCompletionSwaptionSettlementAndReceiver` |
+| Dirty/clean bond quotes with nonzero accrued interest | `TestRatesCompletionDirtyBondWithAccruedInterest` |
+| Valid Custom/ASX futures dates, prices and analytical forward/discount factors | `TestRatesCompletionCustomAndASXFutures` |
+| Compound OIS numerical oracle, safe rejection of unsupported Simple, same-session recovery | `TestRatesCompletionOISAveragingOracle` |
+| Heston PriceError/ImpliedVolError fitted parameters and signed residuals | `TestHestonCalibrationPriceAndImpliedVolOracles` |
+| Hull-White fixed reversion and mixed omitted/explicit optimizer and stopping settings | `TestHullWhiteCalibrationFixedReversionAndOptionalCombinations` |
 
-## Methods (46)
+The CDS builder includes the final accrual day; the current explicit Go
+constructor does not expose that convention. Each is checked against its own
+matching QuantLib contract, and the one-day premium difference is reconstructed
+analytically. Their NPVs are intentionally different.
 
-Names below omit `itofin.`; term-structure names are in `termstructures`.
-"Deferred" means no numerical/behavioral gate is claimed for that specific API.
+Simple-averaged overnight coupons remain unimplemented in the Rust core:
+[#1038](https://github.com/benbenbang/libitofin/issues/1038). The C boundary rejects
+this option before construction with an invalid-input error, leaving the session
+usable. The Simple oracle is retained for that future implementation; successful
+Simple pricing is not claimed.
 
-| API group | Count | Evidence or concrete follow-up |
-| --- | ---: | --- |
-| `indexes.ZeroInflationIndex.__repr__, link_to`; `indexes.YoYInflationIndex.__repr__` | 3 | Added `TestZeroInflationRelinkingRetainsIndependentForecast`: flat-rate forecast equals base fixing times two years of compounding after each curve handle closes. Deferred: representation metadata. YoY relinking already has a separate test. |
-| `instruments.CreditDefaultSwap.accrual_rebate_date, calculate, fair_upfront, notional, price` | 5 | New bootstrap test directly calls calculate/price/notional and checks independently rebuilt CDS fair spreads. Deferred: rebate settlement date and zero-NPV fair-upfront reconstruction. |
-| `instruments.MakeCreditDefaultSwap.__init__, build` | 2 | Deferred: compare builder schedule/cashflows and cached NPV with an explicit standard CDS fixture. Both Python calls map to one Go factory. |
-| `DefaultProbabilityHelper.latest_date, pillar_date` | 2 | New bootstrap test pins all four final-payment dates; the 3Y June 2009 weekend rolls to June 22, independently confirmed with QuantLib 1.43. |
-| `DefaultProbabilityTermStructure.default_density, default_density_date, default_probability, default_probability_date, hazard_rate_date, survival_probability` | 6 | Added `TestFlatHazardAnalyticQueriesAndRetainedQuote`: independent exponential survival/density formula, date/time equivalence, quote mutation, retained dependencies and closed-session error. |
-| `InterpolatedHazardRateCurve.dates, hazard_rates` | 2 | Nodes and terminal survival already asserted by `TestCreditCurveNodesAndSessionIsolation`; deferred direct array content/copy-independence assertions. |
-| `InterpolatedYoYInflationCurve.dates, nodes, times` | 3 | Added `TestInflationCurveMetadataAndDetachedNodes`: exact ordered dates/rates, negative base time, analytical Thirty360 times and detached output arrays. |
-| `InterpolatedZeroInflationCurve.dates, nodes` | 2 | New metadata test checks direct dates/nodes and detached arrays alongside existing date/time rate checks. |
-| `MultiplicativePriceSeasonality.frequency, seasonality_base_date` | 2 | New metadata test checks exact frequency/base-date round trip; existing tests check factors and seasonal application. |
-| `PiecewiseDefaultCurve.__init__, calculate, data, dates, nodes, times`; `SpreadCdsHelper.__init__` | 7 | Added `TestCreditBootstrapRepricesIndependentContracts`: four-tenor round trip from QuantLib `defaultprobabilitycurves.cpp:testBootstrapFromSpread`, unchanged 1e-6 tolerance; direct node/date/time/data checks, quote update and helper/quote release, detached arrays. |
-| `PiecewiseYoYInflationCurve.nodes, times` | 2 | Bootstrap dates, forecasts and quote-driven relinking already checked; deferred direct node/time output. |
-| `PiecewiseZeroInflationCurve.dates, times` | 2 | Bootstrap rates/update and retained nodes already checked; deferred direct date/time output. |
-| `YoYInflationHelper.latest_date, pillar_date`; `ZeroInflationHelper.latest_date` | 3 | Zero pillar/observation dates already checked; deferred remaining exact helper dates. |
-| `YoYInflationTermStructure.base_date, frequency, yoy_rate` | 3 | New metadata test checks base date/frequency and analytical time interpolation (.02235), complementing existing date-rate quantization tests. |
-| `ZeroInflationTermStructure.base_date, frequency` | 2 | New metadata test checks exact base date/frequency and retains negative base-time assertions. |
+## Oracle reproduction and tolerances
 
-## Enum members (27)
+Sources and fixtures live in [`sdk/go/testdata`](../sdk/go/testdata/):
 
-| Group | Count | Evidence or concrete follow-up |
-| --- | ---: | --- |
-| `CpiInterpolationType.Flat, Linear` | 2 | Existing inflation helper tests assert different pillar dates; direct metadata test also checks Flat. |
-| `PricingModel.Isda, Midpoint` | 2 | Isda implied-hazard recovery directly checked. Midpoint pricing engine checked, but deferred Midpoint implied-hazard dispatch. |
-| `ProtectionSide.Buyer, Seller` | 2 | Seller cached CDS NPV and Buyer bootstrap round trip checked; deferred Buyer/Seller sign reversal for identical contracts. |
-| `SettlementMethod.CollateralizedCashPrice, ParYieldCurve, PhysicalCleared`; `SettlementType.Cash`; `CashAnnuityModel.DiscountCurve` | 5 | Deferred: supported cash/physical swaption fixtures and discounted-annuity valuation oracle, plus explicit rejection where unsupported. |
-| `SwapType.Receiver` | 1 | Deferred payer/receiver sign reversal and fair-rate consistency. |
-| `AccrualBias.HalfDayBias, NoBias` | 2 | Existing ISDA test checks default HalfDayBias and explicit NoBias coupon cached values. |
-| `ForwardsInCouponPeriod.Flat, Piecewise`; `NumericalFix.NoFix, Taylor` | 4 | Existing ISDA test checks explicit Piecewise/Taylor against defaults; deferred Flat/NoFix non-flat-curve oracle. |
-| `BondPriceType.Clean, Dirty` | 2 | Clean fixture reconstructs a discount analytically; deferred Dirty with nonzero accrued interest. |
-| `FuturesType.Asx, Custom, Imm` | 3 | IMM repricing/default end date and missing Custom end-date rejection checked. Deferred valid Custom and ASX maturity/pricing cases. |
-| `Pillar.LastRelevantDate, MaturityDate` | 2 | Existing zero-inflation helper test checks default LastRelevantDate and explicit MaturityDate. |
-| `RateAveraging.Compound, Simple` | 2 | Compound is exercised through the default OIS helper bootstrap; deferred explicit Simple versus Compound numerical oracle. |
+- `credit_completion_oracle.py` and `rates_completion_oracle.py`: QuantLib 1.43;
+  CDS prices retain 1e-8 and fair quotes 1e-12; rate discounts retain 1e-12.
+- `calibration_completion_oracle.py`: QuantLib 1.43; perturbed Heston smile
+  distinguishes nonzero signed residuals. Parameters retain 3e-3 for Heston and
+  1.3e-5 for Hull-White; signed residuals retain 1e-8.
+- `inflation_completion_oracle.cpp` and its reproduction guide: pinned independent
+  QuantLib source; exact dates and 1e-12 node/time/rate comparisons.
 
-## Calibration variants and defaults
+Run `bash scripts/check_go_bindings.sh` for native tests, C/C++ clients, Go vet,
+uncached race/cgocheck2 tests, and the portfolio example. Platform CI and release
+acceptance are recorded separately in [the validation record](go-bindings-followups.md).
 
-The old PriceError/ImpliedVolError references proved only native enum validation.
-`TestHullWhiteCalibrationErrorVariantsAndDefaults` calibrates both variants on
-the five-swaption `testCachedHullWhite` fixture and checks fitted parameters and
-signed helper residuals against independent QuantLib output. It repeats with
-omitted and explicit optimizer/end-criteria defaults. The parameter tolerance is
-the existing cached-oracle tolerance, 1.3e-5. Heston calibration with these two
-error types, fixed-reversion variants and broader optional-argument combinations
-remain deferred.
+## Earlier triage provenance
 
-## Deferral rationale
-
-This increment prioritizes independent calibration/default oracles, credit
-bootstrap repricing, and retained-dependency behavior. Remaining representation
-and getter assertions have narrower scope alongside existing pricing/metadata
-tests. Optional pricing conventions, builders, and model combinations need
-separate valid fixtures and independent numerical expectations; they remain
-explicit follow-up work rather than inheriting a pass from adjacent tests.
-The tables define those outstanding cases. Completing this triage does not
-claim exhaustive behavioral coverage or extend deferred core capabilities.
-
-## Historical validation provenance
-
-These results describe the behavioral-test increment before RNG/calendar
-parity landed. The original Linux review and these macOS arm64 results
-(Go 1.27.1, Rust 1.96.0) are separate from the final integrated
-[Linux/macOS evidence](go-bindings-followups.md#integrated-validation):
-
-- `cargo build -p libitofin-ffi --release`: passed.
-- `cargo test -p libitofin-ffi --release models_api::tests::calibration_enum_and_optional_criteria_are_checked`: one passed.
-- `GOEXPERIMENT=cgocheck2 go test -race -count=1 -run 'TestHullWhiteCalibrationErrorVariants|TestFlatHazardAnalytic'` in `bindings/go` (now `sdk/go`), with `DYLD_LIBRARY_PATH` pointing to this worktree's release output: both top-level tests passed, including both calibration variants. The additional `TestCreditBootstrapRepricesIndependentContracts` passed with the same race/cgo flags, as did `TestInflationCurveMetadataAndDetachedNodes` and `TestZeroInflationRelinkingRetainsIndependentForecast`.
-- Full package `GOEXPERIMENT=cgocheck2 go test -race -count=1 ./...` with the same loader path: passed (1.686s); portfolio package compiled, no example execution claimed.
-- `python3 scripts/check_go_coverage.py --strict --baseline`: 744/744 baseline mapped, 610 explicit test references, no invalid references; 111 newer symbols still unmapped.
-
-The independently downloaded QuantLib 1.43 wheel generated the calibration
-constants using [the reproducible oracle](../sdk/go/testdata/hullwhite_calibration_oracle.py).
-Its fixture follows QuantLib `test-suite/shortratemodels.cpp:testCachedHullWhite`,
-changing only the error metric. Signed residuals use 1e-8 absolute tolerance;
-parameters retain 1.3e-5. The constant-hazard test uses `exp(-hazard * time)`
-and its analytical derivative, with 1e-12 tolerance.
-This historical local run did not establish remote CI or private consumer integration.
-
-Credit round-trip source: [Python oracle and convention notes](../crates/itofin-py/tests/test_credit_bootstrap.py).
-
-Inflation metadata fixture: [Python curve oracle](../crates/itofin-py/tests/test_inflation_curve.py);
-new time interpolation and two-year flat inflation forecasts use direct arithmetic
-at the existing 1e-12 tolerance.
+At `4c48647e`, 166 declarations lacked explicit test references: 93 containing
+types, 46 methods and 27 enum members. Inferred containing types did not need
+artificial type-name tests. #1005 added Hull-White error/default oracles, CDS
+bootstrap repricing, analytical hazard queries, inflation metadata and retained
+relinking tests. #1003/#1004 subsequently completed the RNG/calendar surface.
+The [historical validation record](go-bindings-followups.md) preserves those
+revision-specific counts; missing references never implied unexecuted code.
