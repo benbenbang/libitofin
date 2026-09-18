@@ -796,9 +796,9 @@
     "Heston PriceError/ImpliedVolError and fixed-reversion combinations remain untested; see docs/go-binding-test-gaps.md."
   ],
   "verification": {
-    "command": "go test -count=1 -v session.go time.go settings.go results.go market.go curves.go indexes.go helpers.go vol.go smile.go options.go models.go mc.go pricing_test.go models_test.go",
+    "command": "bash scripts/check_go_bindings.sh",
     "go_version": "go1.27.1",
-    "result": "PASS: all eight pricing/model Go tests (0.685s)",
-    "scope": "Integrated Go feature subset linked to release native library; whole-package integration gate remains separate. Later observability assertion requires rerun."
+    "result": "PASS: integrated whole-package validation at b169fabe15d86623b24f3dd76489533d59a3a4da; see https://github.com/benbenbang/libitofin/actions/runs/35302175566.",
+    "scope": "Runs native/C/C++ checks, baseline API audit, Go vet and all Go tests with race detection and cgocheck2, plus the portfolio example. Final results and the separate full-current audit belong in docs/go-bindings-followups.md."
   }
 }

@@ -125,7 +125,7 @@ Start with the [build and ownership guide](bindings/go/README.md) and the
 The [binding contract](docs/go-binding-contract.md) specifies the boundary;
 [tracker #1000](https://github.com/benbenbang/libitofin/issues/1000) records
 remaining parity and delivery work. API mappings, numerical tests, and statement
-coverage are separate measures; see the [validation record](docs/go-bindings-review.md).
+coverage are separate measures; see the [current validation record](docs/go-bindings-followups.md).
 
 ## Why
 
@@ -253,8 +253,8 @@ available locally: `ln -s /path/to/QuantLib QuantLib`.
 
 - **Bottom-up, layer by layer** — never port a module before its dependencies.
 - **The C++ test-suite is the oracle** — match the numbers, not just the shape.
-- **Small PRs** — ≤350 LOC target, 400 hard cap; large source files split across
-  tickets.
+- **Reviewable commits** - target at most 350 changed lines, hard cap 500,
+  counting additions plus deletions. Split larger work into focused commits and PRs.
 - **Single-threaded-mutable core, snapshot-and-fan-out for parallelism** — the
   observable graph is mutated single-threaded during setup, then frozen into
   immutable snapshots for `rayon` compute. No `async` in the core (QuantLib does

@@ -4,7 +4,9 @@ Baseline review: `4c48647e`, macOS arm64, Go 1.27.1. The coverage audit's
 744 mapped symbols minus 578 explicit test references yields 166, comprising
 93 containing types inferred from mapped members, 46 methods and 27 enum members.
 A missing reference is not evidence that the corresponding code never executes.
-The 111 newer unmapped RNG/calendar symbols belong to #1003/#1004.
+At that baseline, 111 newer RNG/calendar symbols were unmapped under #1003/#1004.
+The integrated follow-up maps all 855 current declarations; see the
+[current validation record](go-bindings-followups.md) for revision and evidence.
 
 ## Types (93)
 
@@ -61,12 +63,25 @@ signed helper residuals against independent QuantLib output. It repeats with
 omitted and explicit optimizer/end-criteria defaults. The parameter tolerance is
 the existing cached-oracle tolerance, 1.3e-5. Heston calibration with these two
 error types, fixed-reversion variants and broader optional-argument combinations
-remain deferred; this slice does not close #1005 by itself.
+remain deferred.
 
-## Validation provenance
+## Deferral rationale
 
-The Linux results in `go-bindings-review.md` are historical, not rerun here.
-Local macOS arm64 results (Go 1.27.1, Rust 1.96.0):
+This increment prioritizes independent calibration/default oracles, credit
+bootstrap repricing, and retained-dependency behavior. Remaining representation
+and getter assertions have narrower scope alongside existing pricing/metadata
+tests. Optional pricing conventions, builders, and model combinations need
+separate valid fixtures and independent numerical expectations; they remain
+explicit follow-up work rather than inheriting a pass from adjacent tests.
+The tables define those outstanding cases. Completing this triage does not
+claim exhaustive behavioral coverage or extend deferred core capabilities.
+
+## Historical validation provenance
+
+These results describe the behavioral-test increment before RNG/calendar
+parity landed. The original Linux review and these macOS arm64 results
+(Go 1.27.1, Rust 1.96.0) are separate from the final integrated
+[Linux/macOS evidence](go-bindings-followups.md#integrated-validation):
 
 - `cargo build -p libitofin-ffi --release`: passed.
 - `cargo test -p libitofin-ffi --release models_api::tests::calibration_enum_and_optional_criteria_are_checked`: one passed.
@@ -80,7 +95,7 @@ Its fixture follows QuantLib `test-suite/shortratemodels.cpp:testCachedHullWhite
 changing only the error metric. Signed residuals use 1e-8 absolute tolerance;
 parameters retain 1.3e-5. The constant-hazard test uses `exp(-hazard * time)`
 and its analytical derivative, with 1e-12 tolerance.
-No remote CI or private consumer integration is claimed.
+This historical local run did not establish remote CI or private consumer integration.
 
 Credit round-trip source: [Python oracle and convention notes](../crates/itofin-py/tests/test_credit_bootstrap.py).
 

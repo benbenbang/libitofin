@@ -21,7 +21,8 @@ tests run with race detection and strict cgo pointer checks.
 On 2026-09-17, macOS arm64, Apple M4, Go 1.27.1 and Rust 1.96.0, the fixture
 passed against the native archive built from integrated commit `34a5a8bc`.
 The extracted package path contained spaces. The copied module had no adjacent
-Rust source tree or Cargo target directory. Remote Linux CI was not run here.
+Rust source tree or Cargo target directory. This local run did not establish
+Linux validation; fresh platform CI is recorded separately below.
 
 The following single-iteration measurements used two assets and 252 steps,
 without the race detector. They are smoke measurements under concurrent local
@@ -39,6 +40,13 @@ process peaked at 93,487,104 bytes resident across all four cases, measured by
 `/usr/bin/time -l`; this includes native memory and the Go runtime. The largest
 full-path result itself contains 40,480,000 bytes of doubles. The existing output
 limit remains 16 million doubles, with an additional native result buffer.
+
+## Integrated package CI
+
+Linux amd64 and macOS arm64 package/consumer validation for `b169fabe15d86623b24f3dd76489533d59a3a4da`
+passed in the [CI run](https://github.com/benbenbang/libitofin/actions/runs/35302175566). These jobs build matching
+archives, verify checksums, and run the standalone fixture. They do not measure
+the private application or validate a published Go tag.
 
 Application migration, production workload selection, deployment-platform
 validation, and latency/memory budgets require acceptance in the downstream
