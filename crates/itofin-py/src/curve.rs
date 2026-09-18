@@ -1,6 +1,7 @@
 //! Facades for the yield term-structure hierarchy: the YieldTermStructure base
 //! and the concrete FlatForward curve.
 
+use crate::bootstrap::{PySimpleQuoteVariables, global_bootstrap};
 use crate::helpers::PyRateHelper;
 use crate::time::{PyCalendar, PyDate, PyDayCounter};
 use crate::{ItofinError, PyQlError};
@@ -436,23 +437,29 @@ impl PyForwardCurve {
 /// "global" is a faithful superset rather than a divergent algorithm. It is
 /// offered for "LogLinear" and "Linear" only.
 ///
-/// What the global bootstrap adds is additional_helpers: instruments handed to
-/// the curve and registered with it that contribute neither a pillar nor a
-/// residual. Their quote is inert (reading it takes a penalty term, and
-/// penalties, additional dates and additional variables from Python are
-/// deferred), so all they do is extend the curve's max_date to their own
-/// latest_relevant_date, making dates past the last pillar queryable without
-/// extrapolation.
+/// Global-only restrictions include additional helpers, callable additional
+/// node dates, penalties(times, data) returning extra residuals, and external
+/// SimpleQuoteVariables. Callbacks run synchronously on the owning thread and
+/// are retained by native consumers even after this Python wrapper is dropped.
+/// Fallible pricing queries report callback exceptions as ItofinError with their
+/// original type and message.
+///
+/// Avoid strong callback captures of this curve or consumers that retain it:
+/// those cycles cross the native ownership graph and cannot be garbage-collected.
+/// Capture a weakref.ref(curve) instead. Capturing additional helpers is supported.
+/// Keep the residual count constant during each calculation; values must be finite.
+/// Quote mutation from a callback is rejected; read helpers and trial nodes instead.
+/// The supplied time and data lists include the reference node and are copies.
 ///
 /// The bootstrap is lazy: construction only rejects an empty helper list, and
 /// the solver runs on the first query, re-running after a helper-quote or
 /// evaluation-date change. A bootstrap failure therefore surfaces from the
 /// query methods, not from the constructor.
 ///
-/// max_date is the exception: it swallows a bootstrap failure and falls back to
-/// the last helper's date.
+/// max_date is the exception: it swallows a bootstrap failure and reports the
+/// current grid bound, or the reference date before a grid has been installed.
 #[gen_stub_pyclass]
-#[pyclass(name = "PiecewiseYieldCurve", extends = PyYieldTermStructure, unsendable, module = "itofin.termstructures")]
+#[pyclass(name = "PiecewiseYieldCurve", extends = PyYieldTermStructure, unsendable, weakref, module = "itofin.termstructures")]
 pub struct PyPiecewiseYieldCurve;
 
 #[gen_stub_pymethods]
@@ -473,8 +480,13 @@ impl PyPiecewiseYieldCurve {
     ///         supports "LogLinear" and "Linear" only.
     ///     additional_helpers (list[RateHelper] | None): Instruments the
     ///         global bootstrap registers without giving them a pillar or a
-    ///         residual. They only extend the curve's max_date to their
-    ///         latest_relevant_date; "iterative" rejects them.
+    ///         residual. Penalty callbacks may read their quote_error().
+    ///     additional_penalties (Callable | None): Called with (times, data)
+    ///         to return finite additional least-squares residuals.
+    ///     additional_dates (Callable | None): Returns Date objects, read again
+    ///         on each recalculation. Additional nodes need matching residuals.
+    ///     additional_variables (SimpleQuoteVariables | None): External quotes
+    ///         solved jointly with nodes. All additional options require global.
     ///
     /// Raises:
     ///     ItofinError: On an empty helper list, on an unknown interpolation
@@ -482,6 +494,7 @@ impl PyPiecewiseYieldCurve {
     ///         and on "Cubic" under "global".
     #[gen_stub(override_return_type(type_repr = "PiecewiseYieldCurve"))]
     #[new]
+    #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (
         reference_date,
         helpers,
@@ -489,14 +502,24 @@ impl PyPiecewiseYieldCurve {
         interpolation = "LogLinear",
         bootstrap = "iterative",
         additional_helpers = None,
+        *,
+        additional_penalties = None,
+        additional_dates = None,
+        additional_variables = None,
     ))]
     fn new(
+        py: Python<'_>,
         reference_date: &PyDate,
         helpers: Vec<PyRef<PyRateHelper>>,
         day_counter: &PyDayCounter,
         interpolation: &str,
         bootstrap: &str,
         additional_helpers: Option<Vec<PyRef<PyRateHelper>>>,
+        #[gen_stub(override_type(type_repr = "typing.Optional[typing.Callable[[list[float], list[float]], list[float]]]", imports = ("typing")))]
+        additional_penalties: Option<Py<PyAny>>,
+        #[gen_stub(override_type(type_repr = "typing.Optional[typing.Callable[[], list[time.Date]]]", imports = ("typing", "itofin.time")))]
+        additional_dates: Option<Py<PyAny>>,
+        additional_variables: Option<PyRef<PySimpleQuoteVariables>>,
     ) -> PyResult<PyClassInitializer<Self>> {
         let instruments: Vec<Shared<dyn RateHelper>> =
             helpers.iter().map(|helper| helper.inner()).collect();
@@ -505,9 +528,13 @@ impl PyPiecewiseYieldCurve {
             .unwrap_or_default();
         let curve: Shared<dyn YieldTermStructure> = match bootstrap {
             "iterative" => {
-                if !additional.is_empty() {
+                if !additional.is_empty()
+                    || additional_penalties.is_some()
+                    || additional_dates.is_some()
+                    || additional_variables.is_some()
+                {
                     return Err(ItofinError::new_err(
-                        "additional_helpers requires bootstrap=\"global\"",
+                        "additional_helpers, additional_penalties, additional_dates and additional_variables require bootstrap=\"global\"",
                     ));
                 }
                 match interpolation {
@@ -539,52 +566,47 @@ impl PyPiecewiseYieldCurve {
                     }
                 }
             }
-            "global" => match interpolation {
-                "LogLinear" => {
-                    PiecewiseYieldCurve::<Discount, LogLinear, GlobalBootstrap>::with_bootstrap(
-                        reference_date.inner(),
-                        instruments,
-                        day_counter.inner(),
-                        LogLinear,
-                        GlobalBootstrap::with_penalties(
-                            additional,
-                            None,
-                            None,
-                            None,
-                            Vec::new(),
-                            |_, _| Vec::new(),
-                        ),
-                    )
-                    .map_err(PyQlError::from)?
+            "global" => {
+                let strategy = global_bootstrap(
+                    py,
+                    additional,
+                    additional_penalties,
+                    additional_dates,
+                    additional_variables.as_deref(),
+                )?;
+                match interpolation {
+                    "LogLinear" => {
+                        PiecewiseYieldCurve::<Discount, LogLinear, GlobalBootstrap>::with_bootstrap(
+                            reference_date.inner(),
+                            instruments,
+                            day_counter.inner(),
+                            LogLinear,
+                            strategy,
+                        )
+                        .map_err(PyQlError::from)?
+                    }
+                    "Linear" => {
+                        PiecewiseYieldCurve::<Discount, Linear, GlobalBootstrap>::with_bootstrap(
+                            reference_date.inner(),
+                            instruments,
+                            day_counter.inner(),
+                            Linear,
+                            strategy,
+                        )
+                        .map_err(PyQlError::from)?
+                    }
+                    "Cubic" => {
+                        return Err(ItofinError::new_err(
+                            "bootstrap=\"global\" supports LogLinear or Linear",
+                        ));
+                    }
+                    other => {
+                        return Err(ItofinError::new_err(format!(
+                            "unknown interpolation {other:?}, expected LogLinear, Linear or Cubic"
+                        )));
+                    }
                 }
-                "Linear" => {
-                    PiecewiseYieldCurve::<Discount, Linear, GlobalBootstrap>::with_bootstrap(
-                        reference_date.inner(),
-                        instruments,
-                        day_counter.inner(),
-                        Linear,
-                        GlobalBootstrap::with_penalties(
-                            additional,
-                            None,
-                            None,
-                            None,
-                            Vec::new(),
-                            |_, _| Vec::new(),
-                        ),
-                    )
-                    .map_err(PyQlError::from)?
-                }
-                "Cubic" => {
-                    return Err(ItofinError::new_err(
-                        "bootstrap=\"global\" supports LogLinear or Linear",
-                    ));
-                }
-                other => {
-                    return Err(ItofinError::new_err(format!(
-                        "unknown interpolation {other:?}, expected LogLinear, Linear or Cubic"
-                    )));
-                }
-            },
+            }
             other => {
                 return Err(ItofinError::new_err(format!(
                     "unknown bootstrap {other:?}, expected iterative or global"

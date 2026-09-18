@@ -58,8 +58,10 @@ impl PySimpleQuote {
     /// Args:
     ///     value (float): The new value; observers are notified when it actually
     ///         changes, so dependent valuations recompute on next access.
-    fn set_value(&self, value: f64) {
+    fn set_value(&self, value: f64) -> PyResult<()> {
+        crate::bootstrap::ensure_quote_mutation_allowed()?;
         self.inner.set_value(value);
+        Ok(())
     }
 }
 
