@@ -1,0 +1,196 @@
+{
+  "accepted_removals": [
+    {
+      "classification": "accuracy-improvement",
+      "count": 1,
+      "evidence": "#625: 1bb39b61 -> 99111f24; reproduced with Pyright 1.1.411. https://github.com/benbenbang/libitofin/issues/993#issuecomment-5565178722",
+      "id": "b4fe8915a9659b79",
+      "reason": "test_credit_bootstrap.py: generated Sequence helper arguments accept covariant subtype lists without changing runtime behavior."
+    },
+    {
+      "classification": "accuracy-improvement",
+      "count": 1,
+      "evidence": "#625: 1bb39b61 -> 99111f24; reproduced with Pyright 1.1.411. https://github.com/benbenbang/libitofin/issues/993#issuecomment-5565178722",
+      "id": "59d64fcdff6775ba",
+      "reason": "test_isda_markit.py: generated Sequence helper arguments accept covariant subtype lists without changing runtime behavior."
+    },
+    {
+      "classification": "accuracy-improvement",
+      "count": 1,
+      "evidence": "#625: 1bb39b61 -> 99111f24; reproduced with Pyright 1.1.411. https://github.com/benbenbang/libitofin/issues/993#issuecomment-5565178722",
+      "id": "5b6da3f7e950f588",
+      "reason": "test_isda_reconcile.py: generated Sequence helper arguments accept covariant subtype lists without changing runtime behavior."
+    },
+    {
+      "classification": "accuracy-improvement",
+      "count": 1,
+      "evidence": "#625: 1bb39b61 -> 99111f24; reproduced with Pyright 1.1.411. https://github.com/benbenbang/libitofin/issues/993#issuecomment-5565178722",
+      "id": "7952171d32b5cead",
+      "reason": "test_piecewise_yield_curve.py: generated Sequence helper arguments accept covariant subtype lists without changing runtime behavior."
+    },
+    {
+      "classification": "accuracy-improvement",
+      "count": 1,
+      "evidence": "#625: 1bb39b61 -> 99111f24; reproduced with Pyright 1.1.411. https://github.com/benbenbang/libitofin/issues/993#issuecomment-5565178722",
+      "id": "dfa649b090c5a27f",
+      "reason": "test_yoy_inflation_capfloor.py: generated Sequence helper arguments accept covariant subtype lists without changing runtime behavior."
+    },
+    {
+      "classification": "accuracy-improvement",
+      "count": 1,
+      "evidence": "#625: 1bb39b61 -> 99111f24; reproduced with Pyright 1.1.411. https://github.com/benbenbang/libitofin/issues/993#issuecomment-5565178722",
+      "id": "e307cfd388b95574",
+      "reason": "test_yoy_inflation_leg.py: generated Sequence helper arguments accept covariant subtype lists without changing runtime behavior."
+    },
+    {
+      "classification": "accuracy-improvement",
+      "count": 1,
+      "evidence": "#625: 1bb39b61 -> 99111f24; reproduced with Pyright 1.1.411. https://github.com/benbenbang/libitofin/issues/993#issuecomment-5565178722",
+      "id": "dd03ab63bab9266e",
+      "reason": "test_yoy_inflation_reprice.py: generated Sequence helper arguments accept covariant subtype lists without changing runtime behavior."
+    },
+    {
+      "classification": "accuracy-improvement",
+      "count": 1,
+      "evidence": "#625: 1bb39b61 -> 99111f24; reproduced with Pyright 1.1.411. https://github.com/benbenbang/libitofin/issues/993#issuecomment-5565178722",
+      "id": "a4fb6cd88d48afd1",
+      "reason": "test_yoy_optionlet_vol.py: generated Sequence helper arguments accept covariant subtype lists without changing runtime behavior."
+    },
+    {
+      "classification": "accuracy-improvement",
+      "count": 1,
+      "evidence": "#625: 1bb39b61 -> 99111f24; reproduced with Pyright 1.1.411. https://github.com/benbenbang/libitofin/issues/993#issuecomment-5565178722",
+      "id": "49157ade48dc9ee5",
+      "reason": "test_zc_inflation_reprice.py: generated Sequence helper arguments accept covariant subtype lists without changing runtime behavior."
+    }
+  ],
+  "diagnostics": [
+    {
+      "count": 1,
+      "file": "crates/itofin-py/tests/test_credit_bootstrap.py",
+      "message": "Argument of type \"list[SpreadCdsHelper]\" cannot be assigned to parameter \"helpers\" of type \"list[DefaultProbabilityHelper]\" in function \"__init__\" \"list[SpreadCdsHelper]\" is not assignable to \"list[DefaultProbabilityHelper]\" Type parameter \"_T@list\" is invariant, but \"SpreadCdsHelper\" is not the same as \"DefaultProbabilityHelper\" Consider switching from \"list\" to \"Sequence\" which is covariant",
+      "rule": "reportArgumentType",
+      "severity": "error"
+    },
+    {
+      "count": 1,
+      "file": "crates/itofin-py/tests/test_ibor_inspectors.py",
+      "message": "Operator \"-\" not supported for types \"Date\" and \"Literal['a week']\"",
+      "rule": "reportOperatorIssue",
+      "severity": "error"
+    },
+    {
+      "count": 1,
+      "file": "crates/itofin-py/tests/test_ibor_inspectors.py",
+      "message": "Expression value is unused",
+      "rule": "reportUnusedExpression",
+      "severity": "warning"
+    },
+    {
+      "count": 1,
+      "file": "crates/itofin-py/tests/test_instrument_ergonomics.py",
+      "message": "Cannot assign to attribute \"npv\" for class \"Results\" \"float\" is not assignable to \"property\"",
+      "rule": "reportAttributeAccessIssue",
+      "severity": "error"
+    },
+    {
+      "count": 1,
+      "file": "crates/itofin-py/tests/test_instrument_ergonomics.py",
+      "message": "Operator \">\" not supported for \"None\"",
+      "rule": "reportOptionalOperand",
+      "severity": "error"
+    },
+    {
+      "count": 1,
+      "file": "crates/itofin-py/tests/test_isda_markit.py",
+      "message": "Argument of type \"list[SwapRateHelper | DepositRateHelper]\" cannot be assigned to parameter \"helpers\" of type \"list[RateHelper]\" in function \"__init__\" \"list[SwapRateHelper | DepositRateHelper]\" is not assignable to \"list[RateHelper]\" Type parameter \"_T@list\" is invariant, but \"SwapRateHelper | DepositRateHelper\" is not the same as \"RateHelper\" Consider switching from \"list\" to \"Sequence\" which is covariant",
+      "rule": "reportArgumentType",
+      "severity": "error"
+    },
+    {
+      "count": 1,
+      "file": "crates/itofin-py/tests/test_isda_reconcile.py",
+      "message": "Argument of type \"list[SwapRateHelper | DepositRateHelper]\" cannot be assigned to parameter \"helpers\" of type \"list[RateHelper]\" in function \"__init__\" \"list[SwapRateHelper | DepositRateHelper]\" is not assignable to \"list[RateHelper]\" Type parameter \"_T@list\" is invariant, but \"SwapRateHelper | DepositRateHelper\" is not the same as \"RateHelper\" Consider switching from \"list\" to \"Sequence\" which is covariant",
+      "rule": "reportArgumentType",
+      "severity": "error"
+    },
+    {
+      "count": 1,
+      "file": "crates/itofin-py/tests/test_piecewise_yield_curve.py",
+      "message": "Argument of type \"list[DepositRateHelper]\" cannot be assigned to parameter \"helpers\" of type \"list[RateHelper]\" in function \"__init__\" \"list[DepositRateHelper]\" is not assignable to \"list[RateHelper]\" Type parameter \"_T@list\" is invariant, but \"DepositRateHelper\" is not the same as \"RateHelper\" Consider switching from \"list\" to \"Sequence\" which is covariant",
+      "rule": "reportArgumentType",
+      "severity": "error"
+    },
+    {
+      "count": 1,
+      "file": "crates/itofin-py/tests/test_primitives.py",
+      "message": "Expression value is unused",
+      "rule": "reportUnusedExpression",
+      "severity": "warning"
+    },
+    {
+      "count": 1,
+      "file": "crates/itofin-py/tests/test_shared.py",
+      "message": "Argument missing for parameter \"gradient_norm_epsilon\"",
+      "rule": "reportCallIssue",
+      "severity": "error"
+    },
+    {
+      "count": 1,
+      "file": "crates/itofin-py/tests/test_shared.py",
+      "message": "Arguments missing for parameters \"max_stationary_state_iterations\", \"root_epsilon\", \"function_epsilon\", \"gradient_norm_epsilon\"",
+      "rule": "reportCallIssue",
+      "severity": "error"
+    },
+    {
+      "count": 1,
+      "file": "crates/itofin-py/tests/test_yoy_inflation_capfloor.py",
+      "message": "Argument of type \"list[YearOnYearInflationSwapHelper]\" cannot be assigned to parameter \"helpers\" of type \"list[YoYInflationHelper]\" in function \"__init__\" \"list[YearOnYearInflationSwapHelper]\" is not assignable to \"list[YoYInflationHelper]\" Type parameter \"_T@list\" is invariant, but \"YearOnYearInflationSwapHelper\" is not the same as \"YoYInflationHelper\" Consider switching from \"list\" to \"Sequence\" which is covariant",
+      "rule": "reportArgumentType",
+      "severity": "error"
+    },
+    {
+      "count": 1,
+      "file": "crates/itofin-py/tests/test_yoy_inflation_capfloor.py",
+      "message": "\"last_fixing_date\" is not a known attribute of \"None\"",
+      "rule": "reportOptionalMemberAccess",
+      "severity": "error"
+    },
+    {
+      "count": 1,
+      "file": "crates/itofin-py/tests/test_yoy_inflation_leg.py",
+      "message": "Argument of type \"list[YearOnYearInflationSwapHelper]\" cannot be assigned to parameter \"helpers\" of type \"list[YoYInflationHelper]\" in function \"__init__\" \"list[YearOnYearInflationSwapHelper]\" is not assignable to \"list[YoYInflationHelper]\" Type parameter \"_T@list\" is invariant, but \"YearOnYearInflationSwapHelper\" is not the same as \"YoYInflationHelper\" Consider switching from \"list\" to \"Sequence\" which is covariant",
+      "rule": "reportArgumentType",
+      "severity": "error"
+    },
+    {
+      "count": 1,
+      "file": "crates/itofin-py/tests/test_yoy_inflation_reprice.py",
+      "message": "Argument of type \"list[YearOnYearInflationSwapHelper]\" cannot be assigned to parameter \"helpers\" of type \"list[YoYInflationHelper]\" in function \"__init__\" \"list[YearOnYearInflationSwapHelper]\" is not assignable to \"list[YoYInflationHelper]\" Type parameter \"_T@list\" is invariant, but \"YearOnYearInflationSwapHelper\" is not the same as \"YoYInflationHelper\" Consider switching from \"list\" to \"Sequence\" which is covariant",
+      "rule": "reportArgumentType",
+      "severity": "error"
+    },
+    {
+      "count": 1,
+      "file": "crates/itofin-py/tests/test_yoy_optionlet_vol.py",
+      "message": "Argument of type \"list[YearOnYearInflationSwapHelper]\" cannot be assigned to parameter \"helpers\" of type \"list[YoYInflationHelper]\" in function \"__init__\" \"list[YearOnYearInflationSwapHelper]\" is not assignable to \"list[YoYInflationHelper]\" Type parameter \"_T@list\" is invariant, but \"YearOnYearInflationSwapHelper\" is not the same as \"YoYInflationHelper\" Consider switching from \"list\" to \"Sequence\" which is covariant",
+      "rule": "reportArgumentType",
+      "severity": "error"
+    },
+    {
+      "count": 1,
+      "file": "crates/itofin-py/tests/test_zc_inflation_reprice.py",
+      "message": "Argument of type \"list[ZeroCouponInflationSwapHelper]\" cannot be assigned to parameter \"helpers\" of type \"list[ZeroInflationHelper]\" in function \"__init__\" \"list[ZeroCouponInflationSwapHelper]\" is not assignable to \"list[ZeroInflationHelper]\" Type parameter \"_T@list\" is invariant, but \"ZeroCouponInflationSwapHelper\" is not the same as \"ZeroInflationHelper\" Consider switching from \"list\" to \"Sequence\" which is covariant",
+      "rule": "reportArgumentType",
+      "severity": "error"
+    },
+    {
+      "count": 1,
+      "file": "crates/itofin-py/tests/test_zc_inflation_reprice.py",
+      "message": "Expression of type \"None\" cannot be assigned to parameter of type \"list[float]\" \"None\" is not assignable to \"list[float]\"",
+      "rule": "reportArgumentType",
+      "severity": "error"
+    }
+  ],
+  "pyright_version": "1.1.411"
+}
