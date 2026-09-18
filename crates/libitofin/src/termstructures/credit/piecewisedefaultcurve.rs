@@ -33,16 +33,11 @@
 //! off the partially solved node prefix - which is exactly what the bootstrap
 //! needs, since a helper only ever reads up to its own pillar.
 //!
-//! ## Scope
+//! ## Supported curve conventions
 //!
-//! The `Traits` type parameter carries the C++ spelling
-//! (`PiecewiseDefaultCurve<HazardRate, BackwardFlat>`) but only
-//! [`HazardRate`] is wired: every impl below is written at that instantiation,
-//! so a curve on the yield traits will not compile - the Rust counterpart of
-//! C++'s `Traits::curve<I>::type` failing to be a
-//! `DefaultProbabilityTermStructure`. `DefaultDensity` and
-//! `SurvivalProbability` need their own base curves and follow within EPIC
-//! Credit (#676); adding them means relaxing these bounds.
+//! [`HazardRate`] and [`SurvivalProbability`] share the bootstrap driver; their
+//! [`CreditBootstrapTraits`] implementations interpret the solved nodes.
+//! Default-density curves remain outside this implementation.
 //!
 //! Jump quotes are not ported, per the
 //! [`defaulttermstructure`](crate::termstructures::credit::defaulttermstructure)
@@ -59,14 +54,15 @@ use crate::patterns::lazyobject::LazyObject;
 use crate::patterns::observable::{AsObservable, Observable, Observer};
 use crate::require;
 use crate::shared::{Shared, SharedMut, shared_mut};
-use crate::termstructures::bootstraptraits::{BootstrapTraits, CurveData};
+use crate::termstructures::bootstraptraits::CurveData;
 use crate::termstructures::credit::defaultprobabilityhelpers::DefaultProbabilityHelper;
 use crate::termstructures::credit::defaulttermstructure::DefaultProbabilityTermStructure;
 use crate::termstructures::credit::hazardratestructure::HazardRateStructure;
-use crate::termstructures::credit::interpolatedhazardratecurve::{
-    hazard_rate_from_nodes, survival_probability_from_nodes,
+use crate::termstructures::credit::interpolatedhazardratecurve::hazard_rate_from_nodes;
+use crate::termstructures::credit::probabilitytraits::{
+    CreditBootstrapTraits, HazardRate, SurvivalProbability,
 };
-use crate::termstructures::credit::probabilitytraits::HazardRate;
+use crate::termstructures::credit::survivalprobabilitystructure::SurvivalProbabilityStructure;
 use crate::termstructures::iterativebootstrap::{IterativeBootstrap, PiecewiseCurve};
 use crate::termstructures::{TermStructure, TermStructureBase};
 use crate::time::date::Date;
@@ -94,7 +90,7 @@ impl Observer for CurveUpdater {
 /// `T` is the curve-shape traits ([`HazardRate`]) and `I` the interpolation
 /// factory (`BackwardFlat`). The node data lives in a `RefCell` the bootstrap
 /// mutates and the survival/hazard lookups read back.
-pub struct PiecewiseDefaultCurve<T: BootstrapTraits, I: Interpolator> {
+pub struct PiecewiseDefaultCurve<T: CreditBootstrapTraits, I: Interpolator> {
     base: TermStructureBase,
     instruments: Vec<Shared<dyn DefaultProbabilityHelper>>,
     interpolator: I,
@@ -108,7 +104,7 @@ pub struct PiecewiseDefaultCurve<T: BootstrapTraits, I: Interpolator> {
     _traits: PhantomData<fn() -> T>,
 }
 
-impl<I: Interpolator + 'static> PiecewiseDefaultCurve<HazardRate, I> {
+impl<T: CreditBootstrapTraits + 'static, I: Interpolator + 'static> PiecewiseDefaultCurve<T, I> {
     /// Builds a curve over `instruments` with a fixed `reference_date` (the C++
     /// reference-date constructor, `piecewisedefaultcurve.hpp:68-79`).
     /// Construction is cheap; the bootstrap runs on first use.
@@ -121,10 +117,10 @@ impl<I: Interpolator + 'static> PiecewiseDefaultCurve<HazardRate, I> {
         instruments: Vec<Shared<dyn DefaultProbabilityHelper>>,
         day_counter: DayCounter,
         interpolator: I,
-    ) -> QlResult<Shared<PiecewiseDefaultCurve<HazardRate, I>>> {
+    ) -> QlResult<Shared<PiecewiseDefaultCurve<T, I>>> {
         require!(!instruments.is_empty(), "no bootstrap helpers given");
 
-        let curve = Shared::new_cyclic(|weak: &Weak<PiecewiseDefaultCurve<HazardRate, I>>| {
+        let curve = Shared::new_cyclic(|weak: &Weak<PiecewiseDefaultCurve<T, I>>| {
             let self_weak: Weak<dyn DefaultProbabilityTermStructure> = weak.clone();
             let lazy = shared_mut(LazyObject::new(true));
             let observable = lazy.borrow().observable_handle();
@@ -185,13 +181,13 @@ impl<I: Interpolator + 'static> PiecewiseDefaultCurve<HazardRate, I> {
         Ok(self.data.borrow().dates().to_vec())
     }
 
-    /// The node hazard rates, after bootstrapping.
+    /// The node values, after bootstrapping.
     pub fn data(&self) -> QlResult<Vec<Real>> {
         self.calculate()?;
         Ok(self.data.borrow().data().to_vec())
     }
 
-    /// The (date, hazard rate) nodes, after bootstrapping.
+    /// The (date, value) nodes, after bootstrapping.
     pub fn nodes(&self) -> QlResult<Vec<(Date, Real)>> {
         self.calculate()?;
         Ok(self.data.borrow().nodes())
@@ -203,13 +199,15 @@ impl<I: Interpolator + 'static> PiecewiseDefaultCurve<HazardRate, I> {
     }
 }
 
-impl<I: Interpolator> AsObservable for PiecewiseDefaultCurve<HazardRate, I> {
+impl<T: CreditBootstrapTraits, I: Interpolator> AsObservable for PiecewiseDefaultCurve<T, I> {
     fn observable(&self) -> &Observable {
         &self.observable
     }
 }
 
-impl<I: Interpolator + 'static> TermStructure for PiecewiseDefaultCurve<HazardRate, I> {
+impl<T: CreditBootstrapTraits + 'static, I: Interpolator + 'static> TermStructure
+    for PiecewiseDefaultCurve<T, I>
+{
     fn base(&self) -> &TermStructureBase {
         &self.base
     }
@@ -234,8 +232,8 @@ impl<I: Interpolator + 'static> HazardRateStructure for PiecewiseDefaultCurve<Ha
     }
 }
 
-impl<I: Interpolator + 'static> DefaultProbabilityTermStructure
-    for PiecewiseDefaultCurve<HazardRate, I>
+impl<T: CreditBootstrapTraits + 'static, I: Interpolator + 'static> DefaultProbabilityTermStructure
+    for PiecewiseDefaultCurve<T, I>
 {
     /// Opts the bootstrapped curve into the downcast seam, for the same reason
     /// its yield-side twin does
@@ -250,20 +248,24 @@ impl<I: Interpolator + 'static> DefaultProbabilityTermStructure
     fn survival_probability_impl(&self, t: Time) -> QlResult<Probability> {
         self.calculate()?;
         let data = self.data.borrow();
-        survival_probability_from_nodes(data.interpolation()?, t)
+        T::survival(data.interpolation()?, t)
     }
 
     fn default_density_impl(&self, t: Time) -> QlResult<Real> {
-        self.default_density_from_hazard_rate(t)
+        self.calculate()?;
+        T::density(self.data.borrow().interpolation()?, t)
     }
 
     fn hazard_rate_impl(&self, t: Time) -> QlResult<Rate> {
-        self.hazard_rate_curve_impl(t)
+        self.calculate()?;
+        T::hazard(self.data.borrow().interpolation()?, t)
     }
 }
 
-impl<I: Interpolator + 'static> PiecewiseCurve for PiecewiseDefaultCurve<HazardRate, I> {
-    type Traits = HazardRate;
+impl<T: CreditBootstrapTraits + 'static, I: Interpolator + 'static> PiecewiseCurve
+    for PiecewiseDefaultCurve<T, I>
+{
+    type Traits = T;
     type Interp = I;
     type TS = dyn DefaultProbabilityTermStructure;
     type Helper = dyn DefaultProbabilityHelper;
@@ -298,6 +300,11 @@ impl<I: Interpolator + 'static> PiecewiseCurve for PiecewiseDefaultCurve<HazardR
             None => crate::fail!("curve dropped before bootstrap"),
         }
     }
+}
+
+impl<I: Interpolator + 'static> SurvivalProbabilityStructure
+    for PiecewiseDefaultCurve<SurvivalProbability, I>
+{
 }
 
 #[cfg(test)]
