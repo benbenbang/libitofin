@@ -19,8 +19,8 @@ class BaselineCoverageTests(unittest.TestCase):
             "crates/itofin-py/python/itofin/__init__.pyi": "def old(): ...\ndef new(): ...\n",
             "crates/libitofin-ffi/src/lib.rs": "fn itofin_old() {}\n",
             "crates/libitofin-ffi/include/itofin.h": "int itofin_old();\n",
-            "bindings/go/api.go": "func Old() {}\n",
-            "bindings/go/api_test.go": "func TestOld() {}\n",
+            "sdk/go/api.go": "func Old() {}\n",
+            "sdk/go/api_test.go": "func TestOld() {}\n",
             "docs/go-coverage/test.json": json.dumps({"entries": [{
                 "python": "itofin.old", "status": "implemented", "c": "itofin_old",
                 "go": "Old", "tests": ["TestOld"],
@@ -79,8 +79,8 @@ class BaselineCoverageTests(unittest.TestCase):
         for name, message in [
             ("crates/libitofin-ffi/src/lib.rs", "missing C export"),
             ("crates/libitofin-ffi/include/itofin.h", "missing C export"),
-            ("bindings/go/api.go", "missing Go identifier"),
-            ("bindings/go/api_test.go", "missing test"),
+            ("sdk/go/api.go", "missing Go identifier"),
+            ("sdk/go/api_test.go", "missing test"),
         ]:
             with self.subTest(name=name):
                 path = self.root / name

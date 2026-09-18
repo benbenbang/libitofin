@@ -26,7 +26,7 @@ jobs:
       packages: read
     secrets: inherit
     with:
-      go_version_file: bindings/go/go.mod
+      go_version_file: sdk/go/go.mod
       prek_skip: fmt,check,clippy,test
 
   check-change-files:
@@ -56,7 +56,7 @@ jobs:
 
             go:
               - crates/**
-              - bindings/go/**
+              - sdk/go/**
               - scripts/check_go_*
               - scripts/package_go_native.sh
               - scripts/check_release_version.py

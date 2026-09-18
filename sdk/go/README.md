@@ -8,7 +8,7 @@ see [native packages and installation](../../docs/go-distribution.md).
 cargo build -p libitofin-ffi --release
 export LD_LIBRARY_PATH="$PWD/target/release${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 # On macOS, use DYLD_LIBRARY_PATH instead.
-cd bindings/go
+cd sdk/go
 go test ./...
 go run ./examples/portfolio
 ```

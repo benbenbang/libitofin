@@ -3,7 +3,7 @@ set -euo pipefail
 ulimit -c 0
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 native_root="$(cd "${1:?usage: check_go_install_failures.sh EXTRACTED_NATIVE_DIR [GO_SOURCE_DIR]}" && pwd)"
-go_source="$(cd "${2:-$repo_root/bindings/go}" && pwd)"
+go_source="$(cd "${2:-$repo_root/sdk/go}" && pwd)"
 work="$(mktemp -d "${TMPDIR:-/tmp}/itofin-install-failures.XXXXXX")"
 trap 'rm -rf "$work"' EXIT
 case "$(uname -s)" in
@@ -22,8 +22,8 @@ export CGO_LDFLAGS="\"$work/native/lib/$library\" \"-Wl,-rpath,$work/native/lib\
 unset CGO_CPPFLAGS CGO_CXXFLAGS LIBRARY_PATH CPATH C_INCLUDE_PATH
 unset LD_LIBRARY_PATH LD_PRELOAD DYLD_LIBRARY_PATH DYLD_INSERT_LIBRARIES DYLD_FALLBACK_LIBRARY_PATH
 cd "$work"
-go mod edit -replace="github.com/benbenbang/libitofin/bindings/go=$work/binding"
-test "$(go list -tags itofin_external -f '{{.CgoCFLAGS}} {{.CgoLDFLAGS}}' github.com/benbenbang/libitofin/bindings/go)" = '[] []'
+go mod edit -replace="github.com/benbenbang/libitofin/sdk/go=$work/binding"
+test "$(go list -tags itofin_external -f '{{.CgoCFLAGS}} {{.CgoLDFLAGS}}' github.com/benbenbang/libitofin/sdk/go)" = '[] []'
 go build -tags itofin_external -o consumer .
 test "$(./consumer)" = 'native session ready'
 printf '%s\n' 'PASS: valid native installation creates and closes a session'

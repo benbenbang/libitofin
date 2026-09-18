@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	itofin "github.com/benbenbang/libitofin/bindings/go"
+	itofin "github.com/benbenbang/libitofin/sdk/go"
 )
 
 func main() {
