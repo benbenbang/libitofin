@@ -1,10 +1,12 @@
 # C and Go binding implementation contract
 
 The core stays FFI-agnostic and retains its settled Shared/Rc ownership design.
-The coverage target is the committed Python stubs at baseline revision
-`bf6c5d640c1a0aac3184d8a24d77897e2df2b5ae`. CI enforces this with
-`scripts/check_go_coverage.py --strict --baseline`, reporting newer unmapped
-Python APIs separately. Invalid mapping references remain errors in both modes.
+CI enforces both the full-current Python stub inventory and the historical
+`bf6c5d640c1a0aac3184d8a24d77897e2df2b5ae` implementation baseline. Explicit
+nonconstructible Python enum declarations have reviewed language-specific
+classifications, counted separately from Go mappings. Go enums use typed integer
+constants and explicit conversions; native APIs validate their discriminants.
+Classifications cannot replace baseline implementations or hide new APIs.
 
 ## Native boundary
 
@@ -56,6 +58,36 @@ Objects are always returned as pointers. Constructors are Session methods.
 Prefer explicit Go configuration structs to long positional argument lists.
 Use Go-owned scalar arrays for synchronous native calls only; retain no Go memory
 in Rust. Batch large numerical work across the boundary.
+
+## Global bootstrap callbacks
+
+`PiecewiseCurveConfig` accepts `AdditionalVariables`, `AdditionalDates`, and
+`AdditionalPenalties` with global bootstrap on linear or log-linear discount
+curves. `NewSimpleQuoteVariables` retains external quotes; optional guesses and
+lower bounds follow quote order. Initial guesses must be finite and strictly
+above supplied finite bounds. Variables require a penalty callback.
+
+Penalty callbacks receive copied `BootstrapState` arrays: trial node times and
+discount factors, variable quote values, and additional-helper residuals. Use
+these snapshots for callback calculations. Callable dates return Go dates.
+Callback errors, panics, invalid residuals, and changing residual counts surface
+as ordinary errors; they do not poison the session.
+
+Callbacks run synchronously on the session's worker. Calls into that session,
+including `Close` from another goroutine while a callback is active, return
+`ErrCallbackReentry`. Native context entry and release are also guarded before
+borrowing the context. Callback code must not wait for an already queued session
+operation. Close the session explicitly after callbacks return.
+
+Rust retains an integer `cgo.Handle`, never a Go pointer. Callback state transfers
+when the C constructor sets `adopted`; C callers initialize it to false before
+each call. Exactly one release occurs at the last native owner, including failed
+construction after adoption. Closing a Go curve wrapper does not release a
+callback still needed by an index or another retained consumer.
+
+Set `FuturesRateHelperConfig.DoNotObserveConvexity` when the convexity quote is a
+jointly fitted variable. The default continues observing changes. Existing C
+entrypoints and configuration layouts retain their original behavior.
 
 ## Review gates
 

@@ -16,8 +16,8 @@ strategy: [#46](https://github.com/benbenbang/libitofin/issues/46).
   extend the time facade. Existing core holiday-table bounds are exposed as
   constants for checked native input validation; numerical algorithms are unchanged.
 - Independent calibration and CDS repricing oracles, inflation metadata, and
-  retained-dependency tests address selected behavioral gaps. The remaining
-  cases are enumerated in [the test triage](go-binding-test-gaps.md).
+  retained-dependency tests address selected behavioral gaps. The completed
+  bounded cases and remaining Rust limitations are in [the behavioral evidence](go-binding-test-gaps.md).
 - [Native packaging](go-distribution.md) and [external consumer acceptance](go-consumer-validation.md)
   establish an installation path separate from the Rust checkout.
 
@@ -47,16 +47,25 @@ not imply exhaustive behavioral coverage.
 
 ## Python API additions after 0.21.0
 
-The 855/855 result above describes the released API baseline. Python enum stub
-corrections add 48 typing declarations for existing runtime behavior;
-GlobalBootstrap adds external quote variables and callback configuration.
-The current audit must report these additions separately from existing mappings.
+The 855/855 result above is historical. #1030 now accounts for all 905 current
+declarations: 881 implemented mappings and 24 explicitly classified Python-only
+nonconstructible enum declarations. The original 744 implementation mappings
+remain required. An independent Python 0.22.0 fixture checks integer conversions
+for 24 enum types; Go retains typed integer constants and casts.
 
-[#1030](https://github.com/benbenbang/libitofin/issues/1030) tracks Go parity,
-including callback errors and ownership, jointly fitted quotes, and the futures
-convexity-observation option. Existing constructor mappings do not prove parity
-for new keyword arguments. The original 744/744 baseline remains enforced;
-full-current parity is incomplete until that follow-up is validated.
+GlobalBootstrap supports retained external quote variables, fallible penalties,
+callable dates, and futures convexity-observation control. Joint fitting and
+quote-driven recalibration use the independent #981 QuantLib C++ oracle at the
+unchanged 1e-9 tolerance. Callback snapshots, failures, panics, reentry, concurrent
+Close and retained-consumer ownership have direct tests. The [binding contract](go-binding-contract.md)
+defines these semantics. Full-current and historical audits are both enforced.
+
+#1036 completes the bounded behavioral follow-ups with independent credit, rates,
+inflation and calibration fixtures. Simple OIS averaging remains Rust #1038;
+the C boundary now rejects it without poisoning the session. See the
+[case-by-case evidence](go-binding-test-gaps.md). Local and platform validation
+for these additions is recorded in their implementation PRs; the older run above
+only establishes the historical tree.
 
 ## Historical combined local validation
 
