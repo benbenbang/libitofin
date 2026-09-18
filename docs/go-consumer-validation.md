@@ -64,4 +64,5 @@ metadata before running the functional fixture. Version queries retry briefly
 for public-proxy propagation. Legacy `bindings/go/v0.22.0` passed this acceptance
 on both platforms; release evidence is recorded in
 [#1025](https://github.com/benbenbang/libitofin/issues/1025). The source module has
-since moved to `sdk/go`; its first published-release acceptance is pending.
+since moved to `sdk/go`; its published-release acceptance is recorded in
+[#1037](https://github.com/benbenbang/libitofin/issues/1037).
