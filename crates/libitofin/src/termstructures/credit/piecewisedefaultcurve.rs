@@ -449,15 +449,21 @@ mod tests {
 
     const SETTLEMENT_DAYS: Integer = 1;
 
-    struct Fixture {
+    struct Fixture<T: CreditBootstrapTraits = HazardRate, I: Interpolator = BackwardFlat> {
         settings: Shared<Settings<Date>>,
         discount: Handle<dyn YieldTermStructure>,
         helpers: Vec<Shared<dyn DefaultProbabilityHelper>>,
-        curve: Shared<PiecewiseDefaultCurve<HazardRate, BackwardFlat>>,
+        curve: Shared<PiecewiseDefaultCurve<T, I>>,
     }
 
     /// The four-pillar fixture of `testBootstrapFromSpread` (`:154-186`).
     fn fixture() -> Fixture {
+        fixture_with::<HazardRate, _>(BackwardFlat)
+    }
+
+    fn fixture_with<T: CreditBootstrapTraits + 'static, I: Interpolator + 'static>(
+        interpolator: I,
+    ) -> Fixture<T, I> {
         assert!(
             Target::new().is_business_day(today()),
             "the fixed evaluation date must be a TARGET business day, as the \
@@ -484,11 +490,11 @@ mod tests {
             })
             .collect();
 
-        let curve = PiecewiseDefaultCurve::<HazardRate, BackwardFlat>::new(
+        let curve = PiecewiseDefaultCurve::<T, I>::new(
             today(),
             helpers.clone(),
             day_counter(),
-            BackwardFlat,
+            interpolator,
         )
         .unwrap();
 
@@ -505,7 +511,15 @@ mod tests {
     /// bootstrapped curve, returns its own input spread to 1e-6.
     #[test]
     fn bootstrapped_curve_reproduces_the_input_cds_spreads() {
-        let fixture = fixture();
+        assert_the_spreads_reproduce(&fixture());
+    }
+
+    fn assert_the_spreads_reproduce<
+        T: CreditBootstrapTraits + 'static,
+        I: Interpolator + 'static,
+    >(
+        fixture: &Fixture<T, I>,
+    ) {
         let curve: Handle<dyn DefaultProbabilityTermStructure> = Handle::new(Shared::clone(
             &fixture.curve,
         )
@@ -834,6 +848,13 @@ mod tests {
     /// The four upfront helpers of `testBootstrapFromUpfront` (`:252-266`) and
     /// the curve they bootstrap.
     fn upfront_fixture(settings: &Shared<Settings<Date>>) -> Fixture {
+        upfront_fixture_with::<HazardRate, _>(settings, BackwardFlat)
+    }
+
+    fn upfront_fixture_with<T: CreditBootstrapTraits + 'static, I: Interpolator + 'static>(
+        settings: &Shared<Settings<Date>>,
+        interpolator: I,
+    ) -> Fixture<T, I> {
         let discount = discount_curve(today());
         let helpers: Vec<Shared<dyn DefaultProbabilityHelper>> = UPFRONT_QUOTES
             .iter()
@@ -842,11 +863,11 @@ mod tests {
                 upfront_helper(*quote, Period::new(n, TimeUnit::Years), &discount, settings)
             })
             .collect();
-        let curve = PiecewiseDefaultCurve::<HazardRate, BackwardFlat>::new(
+        let curve = PiecewiseDefaultCurve::<T, I>::new(
             today(),
             helpers.clone(),
             day_counter(),
-            BackwardFlat,
+            interpolator,
         )
         .unwrap();
         Fixture {
@@ -864,7 +885,12 @@ mod tests {
     /// The `includeTodaysCashFlows` write and its unwind are the C++ block's
     /// (`:278-281`), kept around the reprice alone so that what the flag holds
     /// outside it is the caller's business.
-    fn assert_the_upfronts_reproduce(fixture: &Fixture) {
+    fn assert_the_upfronts_reproduce<
+        T: CreditBootstrapTraits + 'static,
+        I: Interpolator + 'static,
+    >(
+        fixture: &Fixture<T, I>,
+    ) {
         let curve: Handle<dyn DefaultProbabilityTermStructure> = Handle::new(Shared::clone(
             &fixture.curve,
         )
@@ -956,5 +982,66 @@ mod tests {
         );
         assert_the_upfronts_reproduce(&fixture);
         assert_eq!(settings.include_todays_cash_flows(), Some(false));
+    }
+
+    /// QuantLib `testLogLinearSurvivalConsistency`, defaultprobabilitycurves.cpp:338.
+    #[test]
+    fn loglinear_survival_reproduces_spread_and_upfront_quotes() {
+        let fixture = fixture_with::<SurvivalProbability, _>(LogLinear);
+        assert_the_spreads_reproduce(&fixture);
+        let upfront =
+            upfront_fixture_with::<SurvivalProbability, _>(&settings_at(today()), LogLinear);
+        assert_the_upfronts_reproduce(&upfront);
+        for curve in [&fixture.curve, &upfront.curve] {
+            let data = curve.data().unwrap();
+            assert_eq!(data[0], 1.0);
+            assert!(
+                data.windows(2)
+                    .all(|pair| pair[1] > 0.0 && pair[1] <= pair[0])
+            );
+        }
+    }
+
+    #[test]
+    fn loglinear_survival_single_helper_recalibrates_after_quote_change() {
+        let settings = settings_at(today());
+        let discount = discount_curve(today());
+        let quote = shared(SimpleQuote::new(0.005));
+        let helper = SpreadCdsHelper::new(
+            Handle::new(Shared::clone(&quote) as Shared<dyn Quote>),
+            Period::new(5, TimeUnit::Years),
+            SETTLEMENT_DAYS,
+            Target::new(),
+            Frequency::Quarterly,
+            BusinessDayConvention::Following,
+            DateGeneration::TwentiethIMM,
+            day_counter(),
+            RECOVERY_RATE,
+            discount,
+            Shared::clone(&settings),
+        )
+        .unwrap();
+        let curve = PiecewiseDefaultCurve::<SurvivalProbability, LogLinear>::new(
+            today(),
+            vec![Shared::clone(&helper) as Shared<dyn DefaultProbabilityHelper>],
+            day_counter(),
+            LogLinear,
+        )
+        .unwrap();
+        assert!(!curve.lazy.borrow().is_calculated());
+        let first = curve
+            .survival_probability_date(helper.latest_date(), false)
+            .unwrap();
+        assert!(curve.lazy.borrow().is_calculated());
+        assert_eq!(curve.dates().unwrap().len(), 2);
+        assert!((helper.implied_quote().unwrap() - 0.005).abs() <= TOLERANCE);
+        quote.set_value(0.02);
+        assert!(!curve.lazy.borrow().is_calculated());
+        let second = curve
+            .survival_probability_date(helper.latest_date(), false)
+            .unwrap();
+        assert!(second < first);
+        assert!((helper.implied_quote().unwrap() - 0.02).abs() <= TOLERANCE);
+        assert_eq!(curve.data().unwrap()[0], 1.0);
     }
 }
