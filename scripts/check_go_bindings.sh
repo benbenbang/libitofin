@@ -8,6 +8,13 @@ if [[ "$go_version" != go1.27.1 ]]; then
 fi
 cargo test -p libitofin-ffi --release
 cargo build -p libitofin-ffi --release
+ITOFIN_EXPECTED_VERSION=$(cargo metadata --no-deps --format-version 1 | python3 -c '
+import json, sys
+print(next(package["version"] for package in json.load(sys.stdin)["packages"]
+           if package["name"] == "libitofin-ffi"))
+')
+test -n "$ITOFIN_EXPECTED_VERSION"
+export ITOFIN_EXPECTED_VERSION
 python3 -m unittest discover -s scripts -p 'check_go_coverage_test.py'
 python3 scripts/check_go_coverage.py --strict --baseline
 export LD_LIBRARY_PATH="$PWD/target/release${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
@@ -21,5 +28,5 @@ c++ -x c++ -std=c++11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
 ./target/cpp-smoke
 cd bindings/go
 go vet ./...
-go test -race -coverprofile=../../target/go-coverage.out ./...
+go test -race -count=1 -coverprofile=../../target/go-coverage.out ./...
 go run ./examples/portfolio
