@@ -136,21 +136,7 @@ coverage are separate measures; see the [current validation record](docs/go-bind
 
 ## Why
 
-QuantLib is ~470k lines of mature, battle-tested C++ across 16 modules. This
-project re-expresses that core in safe, idiomatic Rust:
-
-- **Memory-safe by construction** — no manual `shared_ptr` cycles or
-  use-after-free. The core is single-threaded-mutable during setup, then frozen
-  into immutable snapshots for data-race-free parallel compute (`rayon`).
-- **A clean FFI story** — a single core crate with Python (PyO3) and C-ABI
-  (cbindgen) bindings layered on top, so the same engine is reachable from
-  Python, C, C++, Julia, R, and more.
-- **Faithful numerics** — QuantLib's `test-suite/` (186 `.cpp` files) is the
-  porting oracle: a feature is "done" only when the matching tests are ported and
-  the Rust output matches the C++ numbers within tolerance.
-- **Usability at the edges** — where C++ leans on runtime casts, silent
-  fallbacks, or clock magic, the core prefers compile-time typing and explicit
-  errors; ergonomic conveniences live in the binding crates.
+See the [project design and porting principles](wiki/design.md).
 
 ## Status
 
@@ -221,55 +207,7 @@ Verified end-to-end since then, each against the matching `test-suite/` oracle:
 
 ## Getting started (development)
 
-Requires the toolchain pinned in [`rust-toolchain.toml`](rust-toolchain.toml)
-(Rust 1.96.0, edition 2024); plain `cargo` picks it up automatically.
-
-```sh
-cargo build                          # whole workspace
-cargo build -p libitofin             # core crate only
-
-cargo test                           # the porting oracle
-cargo test -p libitofin patterns::   # one module
-
-cargo fmt
-cargo clippy --all-targets
-```
-
-A [`pre-commit`](https://pre-commit.com/) config runs `fmt`, `check`, `clippy`,
-`test`, and conventional-commit linting on every commit:
-
-```sh
-pre-commit run --all-files
-```
-
-## Project layout
-
-```
-crates/libitofin/       the core library — FFI-agnostic, idiomatic Rust
-crates/libitofin-ffi/   extern "C" + cbindgen -> C header + libitofin_ffi
-crates/itofin-py/       PyO3 + maturin -> the `itofin` package       (on PyPI)
-sdk/go/                Go 1.27.1 cgo package with explicit sessions
-sdk/node/              Node SDK placeholder (not implemented)
-QuantLib/               reference C++ tree + test oracle           (git-ignored symlink)
-```
-
-The `QuantLib/` entry is a **git-ignored local symlink**, not committed — point
-it at a QuantLib checkout to have the reference source and test-suite oracle
-available locally: `ln -s /path/to/QuantLib QuantLib`.
-
-## Design principles
-
-- **Bottom-up, layer by layer** — never port a module before its dependencies.
-- **The C++ test-suite is the oracle** — match the numbers, not just the shape.
-- **Reviewable commits** - target at most 350 changed lines, hard cap 500,
-  counting additions plus deletions. Split larger work into focused commits and PRs.
-- **Single-threaded-mutable core, snapshot-and-fan-out for parallelism** — the
-  observable graph is mutated single-threaded during setup, then frozen into
-  immutable snapshots for `rayon` compute. No `async` in the core (QuantLib does
-  no I/O; market data is user input).
-- **Fidelity in numerics, usability at API boundaries** — QuantLib is the oracle
-  for every number, but the core favours compile-time typing and explicit `Result`
-  errors over runtime casts and silent fallbacks; convenience lives in the bindings.
+See [development and repository layout](wiki/development.md).
 
 ## Divergences from QuantLib
 

@@ -36,20 +36,9 @@ bindings. All three language surfaces share the Rust numerical core.
     Go requires cgo, a C compiler, and the `itofin_external` build tag for
     applications outside this repository.
 
-## A first taste
-
-```python
-from itofin import Settings
-from itofin.instruments import OptionType, VanillaOption
-from itofin.processes import BlackScholesProcess
-from itofin.time import Date
-
-settings = Settings()
-settings.set_evaluation_date(Date(15, 6, 2026))
-# ... build the process, wrap it in a VanillaOption, attach an engine, read npv()
-```
-
-The full walk-through, in Python, Rust, and Go, is on the [Getting started](getting-started.md) page.
+The [Getting started](getting-started.md) page has runnable pricing examples
+in Python, Rust, and Go. The [project index](https://github.com/benbenbang/libitofin#readme)
+links to the language guides and project documentation.
 
 ## Where the docs live
 
@@ -59,3 +48,13 @@ The full walk-through, in Python, Rust, and Go, is on the [Getting started](gett
 | Rust API reference | [docs.rs/libitofin](https://docs.rs/libitofin) - see [Rust API](rust.md) |
 | Go SDK | [Installation, sessions, and examples](go.md), plus [API reference](https://pkg.go.dev/github.com/benbenbang/libitofin/sdk/go) |
 | Worked examples | [`example/python`](https://github.com/benbenbang/libitofin/tree/main/example/python), [`sdk/go/examples`](https://github.com/benbenbang/libitofin/tree/main/sdk/go/examples), and [`crates/libitofin/examples`](https://github.com/benbenbang/libitofin/tree/main/crates/libitofin/examples) |
+
+## Project guides
+
+- Language guides: [Rust](https://github.com/benbenbang/libitofin/blob/main/wiki/rust.md),
+  [Python](https://github.com/benbenbang/libitofin/blob/main/wiki/python.md),
+  [Go](https://github.com/benbenbang/libitofin/blob/main/wiki/go.md).
+- [Status and scope](https://github.com/benbenbang/libitofin/blob/main/wiki/status.md)
+- [Development](https://github.com/benbenbang/libitofin/blob/main/wiki/development.md)
+- [Design](https://github.com/benbenbang/libitofin/blob/main/wiki/design.md)
+- [QuantLib compatibility](https://github.com/benbenbang/libitofin/blob/main/wiki/compatibility.md)

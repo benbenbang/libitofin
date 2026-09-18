@@ -88,3 +88,9 @@ nav:
       - Random numbers: api/randomnumbers.md
       - Results: api/results.md
   - Rust API: rust.md
+  - Project:
+      - Repository index: https://github.com/benbenbang/libitofin#readme
+      - Status and scope: https://github.com/benbenbang/libitofin/blob/main/wiki/status.md
+      - Development: https://github.com/benbenbang/libitofin/blob/main/wiki/development.md
+      - Design: https://github.com/benbenbang/libitofin/blob/main/wiki/design.md
+      - QuantLib compatibility: https://github.com/benbenbang/libitofin/blob/main/wiki/compatibility.md
