@@ -86,7 +86,6 @@ jobs:
   python-bindings:
     name: python bindings
     needs: check-change-files
-    if: needs.check-change-files.outputs.python == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
