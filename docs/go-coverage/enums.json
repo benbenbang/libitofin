@@ -1,0 +1,317 @@
+{
+  "domain": "enum-language-semantics",
+  "entries": [
+    {
+      "go": "CpiInterpolationType: explicit integer conversion",
+      "python": "itofin.indexes.CpiInterpolationType.__int__",
+      "status": "implemented",
+      "tests": "TestEnumPythonIntegerParity"
+    },
+    {
+      "classification": "nonconstructible-enum",
+      "go": "CpiInterpolationType",
+      "python": "itofin.indexes.CpiInterpolationType.__new__",
+      "reason": "Python CpiInterpolationType forbids construction; Go uses typed integer constants and casts. Native APIs validate discriminants.",
+      "status": "language-specific"
+    },
+    {
+      "go": "CapFloorType: explicit integer conversion",
+      "python": "itofin.instruments.CapFloorType.__int__",
+      "status": "implemented",
+      "tests": "TestEnumPythonIntegerParity"
+    },
+    {
+      "classification": "nonconstructible-enum",
+      "go": "CapFloorType",
+      "python": "itofin.instruments.CapFloorType.__new__",
+      "reason": "Python CapFloorType forbids construction; Go uses typed integer constants and casts. Native APIs validate discriminants.",
+      "status": "language-specific"
+    },
+    {
+      "go": "OptionType: explicit integer conversion",
+      "python": "itofin.instruments.OptionType.__int__",
+      "status": "implemented",
+      "tests": "TestEnumPythonIntegerParity"
+    },
+    {
+      "classification": "nonconstructible-enum",
+      "go": "OptionType",
+      "python": "itofin.instruments.OptionType.__new__",
+      "reason": "Python OptionType forbids construction; Go uses typed integer constants and casts. Native APIs validate discriminants.",
+      "status": "language-specific"
+    },
+    {
+      "go": "Position: explicit integer conversion",
+      "python": "itofin.instruments.Position.__int__",
+      "status": "implemented",
+      "tests": "TestEnumPythonIntegerParity"
+    },
+    {
+      "classification": "nonconstructible-enum",
+      "go": "Position",
+      "python": "itofin.instruments.Position.__new__",
+      "reason": "Python Position forbids construction; Go uses typed integer constants and casts. Native APIs validate discriminants.",
+      "status": "language-specific"
+    },
+    {
+      "go": "PricingModel: explicit integer conversion",
+      "python": "itofin.instruments.PricingModel.__int__",
+      "status": "implemented",
+      "tests": "TestEnumPythonIntegerParity"
+    },
+    {
+      "classification": "nonconstructible-enum",
+      "go": "PricingModel",
+      "python": "itofin.instruments.PricingModel.__new__",
+      "reason": "Python PricingModel forbids construction; Go uses typed integer constants and casts. Native APIs validate discriminants.",
+      "status": "language-specific"
+    },
+    {
+      "go": "ProtectionSide: explicit integer conversion",
+      "python": "itofin.instruments.ProtectionSide.__int__",
+      "status": "implemented",
+      "tests": "TestEnumPythonIntegerParity"
+    },
+    {
+      "classification": "nonconstructible-enum",
+      "go": "ProtectionSide",
+      "python": "itofin.instruments.ProtectionSide.__new__",
+      "reason": "Python ProtectionSide forbids construction; Go uses typed integer constants and casts. Native APIs validate discriminants.",
+      "status": "language-specific"
+    },
+    {
+      "go": "SettlementMethod: explicit integer conversion",
+      "python": "itofin.instruments.SettlementMethod.__int__",
+      "status": "implemented",
+      "tests": "TestEnumPythonIntegerParity"
+    },
+    {
+      "classification": "nonconstructible-enum",
+      "go": "SettlementMethod",
+      "python": "itofin.instruments.SettlementMethod.__new__",
+      "reason": "Python SettlementMethod forbids construction; Go uses typed integer constants and casts. Native APIs validate discriminants.",
+      "status": "language-specific"
+    },
+    {
+      "go": "SettlementType: explicit integer conversion",
+      "python": "itofin.instruments.SettlementType.__int__",
+      "status": "implemented",
+      "tests": "TestEnumPythonIntegerParity"
+    },
+    {
+      "classification": "nonconstructible-enum",
+      "go": "SettlementType",
+      "python": "itofin.instruments.SettlementType.__new__",
+      "reason": "Python SettlementType forbids construction; Go uses typed integer constants and casts. Native APIs validate discriminants.",
+      "status": "language-specific"
+    },
+    {
+      "go": "SwapType: explicit integer conversion",
+      "python": "itofin.instruments.SwapType.__int__",
+      "status": "implemented",
+      "tests": "TestEnumPythonIntegerParity"
+    },
+    {
+      "classification": "nonconstructible-enum",
+      "go": "SwapType",
+      "python": "itofin.instruments.SwapType.__new__",
+      "reason": "Python SwapType forbids construction; Go uses typed integer constants and casts. Native APIs validate discriminants.",
+      "status": "language-specific"
+    },
+    {
+      "go": "CalibrationErrorType: explicit integer conversion",
+      "python": "itofin.models.CalibrationErrorType.__int__",
+      "status": "implemented",
+      "tests": "TestEnumPythonIntegerParity"
+    },
+    {
+      "classification": "nonconstructible-enum",
+      "go": "CalibrationErrorType",
+      "python": "itofin.models.CalibrationErrorType.__new__",
+      "reason": "Python CalibrationErrorType forbids construction; Go uses typed integer constants and casts. Native APIs validate discriminants.",
+      "status": "language-specific"
+    },
+    {
+      "go": "AccrualBias: explicit integer conversion",
+      "python": "itofin.pricingengines.AccrualBias.__int__",
+      "status": "implemented",
+      "tests": "TestEnumPythonIntegerParity"
+    },
+    {
+      "classification": "nonconstructible-enum",
+      "go": "AccrualBias",
+      "python": "itofin.pricingengines.AccrualBias.__new__",
+      "reason": "Python AccrualBias forbids construction; Go uses typed integer constants and casts. Native APIs validate discriminants.",
+      "status": "language-specific"
+    },
+    {
+      "go": "CashAnnuityModel: explicit integer conversion",
+      "python": "itofin.pricingengines.CashAnnuityModel.__int__",
+      "status": "implemented",
+      "tests": "TestEnumPythonIntegerParity"
+    },
+    {
+      "classification": "nonconstructible-enum",
+      "go": "CashAnnuityModel",
+      "python": "itofin.pricingengines.CashAnnuityModel.__new__",
+      "reason": "Python CashAnnuityModel forbids construction; Go uses typed integer constants and casts. Native APIs validate discriminants.",
+      "status": "language-specific"
+    },
+    {
+      "go": "ForwardsInCouponPeriod: explicit integer conversion",
+      "python": "itofin.pricingengines.ForwardsInCouponPeriod.__int__",
+      "status": "implemented",
+      "tests": "TestEnumPythonIntegerParity"
+    },
+    {
+      "classification": "nonconstructible-enum",
+      "go": "ForwardsInCouponPeriod",
+      "python": "itofin.pricingengines.ForwardsInCouponPeriod.__new__",
+      "reason": "Python ForwardsInCouponPeriod forbids construction; Go uses typed integer constants and casts. Native APIs validate discriminants.",
+      "status": "language-specific"
+    },
+    {
+      "go": "NumericalFix: explicit integer conversion",
+      "python": "itofin.pricingengines.NumericalFix.__int__",
+      "status": "implemented",
+      "tests": "TestEnumPythonIntegerParity"
+    },
+    {
+      "classification": "nonconstructible-enum",
+      "go": "NumericalFix",
+      "python": "itofin.pricingengines.NumericalFix.__new__",
+      "reason": "Python NumericalFix forbids construction; Go uses typed integer constants and casts. Native APIs validate discriminants.",
+      "status": "language-specific"
+    },
+    {
+      "go": "DirectionIntegers: explicit integer conversion",
+      "python": "itofin.randomnumbers.DirectionIntegers.__int__",
+      "status": "implemented",
+      "tests": "TestEnumPythonIntegerParity"
+    },
+    {
+      "classification": "nonconstructible-enum",
+      "go": "DirectionIntegers",
+      "python": "itofin.randomnumbers.DirectionIntegers.__new__",
+      "reason": "Python DirectionIntegers forbids construction; Go uses typed integer constants and casts. Native APIs validate discriminants.",
+      "status": "language-specific"
+    },
+    {
+      "go": "BlackVolTimeExtrapolation: explicit integer conversion",
+      "python": "itofin.termstructures.BlackVolTimeExtrapolation.__int__",
+      "status": "implemented",
+      "tests": "TestEnumPythonIntegerParity"
+    },
+    {
+      "classification": "nonconstructible-enum",
+      "go": "BlackVolTimeExtrapolation",
+      "python": "itofin.termstructures.BlackVolTimeExtrapolation.__new__",
+      "reason": "Python BlackVolTimeExtrapolation forbids construction; Go uses typed integer constants and casts. Native APIs validate discriminants.",
+      "status": "language-specific"
+    },
+    {
+      "go": "BondPriceType: explicit integer conversion",
+      "python": "itofin.termstructures.BondPriceType.__int__",
+      "status": "implemented",
+      "tests": "TestEnumPythonIntegerParity"
+    },
+    {
+      "classification": "nonconstructible-enum",
+      "go": "BondPriceType",
+      "python": "itofin.termstructures.BondPriceType.__new__",
+      "reason": "Python BondPriceType forbids construction; Go uses typed integer constants and casts. Native APIs validate discriminants.",
+      "status": "language-specific"
+    },
+    {
+      "go": "FuturesType: explicit integer conversion",
+      "python": "itofin.termstructures.FuturesType.__int__",
+      "status": "implemented",
+      "tests": "TestEnumPythonIntegerParity"
+    },
+    {
+      "classification": "nonconstructible-enum",
+      "go": "FuturesType",
+      "python": "itofin.termstructures.FuturesType.__new__",
+      "reason": "Python FuturesType forbids construction; Go uses typed integer constants and casts. Native APIs validate discriminants.",
+      "status": "language-specific"
+    },
+    {
+      "go": "Pillar: explicit integer conversion",
+      "python": "itofin.termstructures.Pillar.__int__",
+      "status": "implemented",
+      "tests": "TestEnumPythonIntegerParity"
+    },
+    {
+      "classification": "nonconstructible-enum",
+      "go": "Pillar",
+      "python": "itofin.termstructures.Pillar.__new__",
+      "reason": "Python Pillar forbids construction; Go uses typed integer constants and casts. Native APIs validate discriminants.",
+      "status": "language-specific"
+    },
+    {
+      "go": "RateAveraging: explicit integer conversion",
+      "python": "itofin.termstructures.RateAveraging.__int__",
+      "status": "implemented",
+      "tests": "TestEnumPythonIntegerParity"
+    },
+    {
+      "classification": "nonconstructible-enum",
+      "go": "RateAveraging",
+      "python": "itofin.termstructures.RateAveraging.__new__",
+      "reason": "Python RateAveraging forbids construction; Go uses typed integer constants and casts. Native APIs validate discriminants.",
+      "status": "language-specific"
+    },
+    {
+      "go": "VolatilityType: explicit integer conversion",
+      "python": "itofin.termstructures.VolatilityType.__int__",
+      "status": "implemented",
+      "tests": "TestEnumPythonIntegerParity"
+    },
+    {
+      "classification": "nonconstructible-enum",
+      "go": "VolatilityType",
+      "python": "itofin.termstructures.VolatilityType.__new__",
+      "reason": "Python VolatilityType forbids construction; Go uses typed integer constants and casts. Native APIs validate discriminants.",
+      "status": "language-specific"
+    },
+    {
+      "go": "BusinessDayConvention: explicit integer conversion",
+      "python": "itofin.time.BusinessDayConvention.__int__",
+      "status": "implemented",
+      "tests": "TestEnumPythonIntegerParity"
+    },
+    {
+      "classification": "nonconstructible-enum",
+      "go": "BusinessDayConvention",
+      "python": "itofin.time.BusinessDayConvention.__new__",
+      "reason": "Python BusinessDayConvention forbids construction; Go uses typed integer constants and casts. Native APIs validate discriminants.",
+      "status": "language-specific"
+    },
+    {
+      "go": "DateGeneration: explicit integer conversion",
+      "python": "itofin.time.DateGeneration.__int__",
+      "status": "implemented",
+      "tests": "TestEnumPythonIntegerParity"
+    },
+    {
+      "classification": "nonconstructible-enum",
+      "go": "DateGeneration",
+      "python": "itofin.time.DateGeneration.__new__",
+      "reason": "Python DateGeneration forbids construction; Go uses typed integer constants and casts. Native APIs validate discriminants.",
+      "status": "language-specific"
+    },
+    {
+      "go": "Frequency: explicit integer conversion",
+      "python": "itofin.time.Frequency.__int__",
+      "status": "implemented",
+      "tests": "TestEnumPythonIntegerParity"
+    },
+    {
+      "classification": "nonconstructible-enum",
+      "go": "Frequency",
+      "python": "itofin.time.Frequency.__new__",
+      "reason": "Python Frequency forbids construction; Go uses typed integer constants and casts. Native APIs validate discriminants.",
+      "status": "language-specific"
+    }
+  ]
+}
