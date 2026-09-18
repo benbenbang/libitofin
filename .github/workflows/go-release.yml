@@ -4,59 +4,13 @@ on:
   workflow_dispatch:
   push:
     tags: ['bindings/go/v*']
-  pull_request:
-    paths: ['crates/**', 'bindings/go/**', 'scripts/package_go_native.sh', 'scripts/check_go_consumer.sh', 'scripts/fixtures/go-consumer/**', 'Cargo.*', 'rust-toolchain.toml', '.github/workflows/go-release.yml']
 
 permissions:
   contents: read
 
 jobs:
   package:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-24.04
-            platform: linux-amd64
-          - os: macos-14
-            platform: darwin-arm64
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-go@v6
-        with:
-          go-version: '1.27.1'
-          cache: false
-      - name: Install build tools
-        run: |
-          rustup toolchain install
-          cargo install cbindgen --version 0.29.2 --locked
-      - uses: Swatinem/rust-cache@v2
-      - name: Build native archive
-        run: bash scripts/package_go_native.sh dist
-      - name: Verify archive and external consumer
-        env:
-          PLATFORM: ${{ matrix.platform }}
-        run: |
-          cd dist
-          shasum -a 256 -c ./*.sha256
-          mkdir unpacked
-          tar -xzf ./*-"$PLATFORM".tar.gz -C unpacked
-          native=$(find "$PWD/unpacked" -mindepth 1 -maxdepth 1 -type d)
-          (cd "$native" && shasum -a 256 -c SHA256SUMS)
-          version=$(sed -n 's/^version=//p' "$native/VERSION")
-          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
-            test "$GITHUB_REF_NAME" = "bindings/go/v$version"
-          fi
-          cd ..
-          bash scripts/check_go_consumer.sh "$native"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: native-${{ matrix.platform }}
-          path: |
-            dist/*.tar.gz
-            dist/*.sha256
-          if-no-files-found: error
+    uses: ./.github/workflows/go-package.yml
   draft-release:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/bindings/go/v')
     needs: package

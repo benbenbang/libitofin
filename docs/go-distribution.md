@@ -85,10 +85,12 @@ application or establish a production latency budget.
 
 ## Release process
 
-`.github/workflows/go-release.yml` builds native archives on explicit
+`.github/workflows/go-package.yml` builds native archives on explicit
 `ubuntu-24.04` and `macos-14` runners, checks both archive and file checksums,
-and runs the external consumer. Pull requests and manual runs upload workflow
-artifacts without creating a release. Linux runtime compatibility must be
+and runs the external consumer. Pull requests call it from `pre-commit.yml`
+and include both platforms in the required `workflow-success` check.
+`go-release.yml` calls it for tags and manual runs; pull requests and manual
+runs upload workflow artifacts without creating a release. Linux runtime compatibility must be
 verified on deployment targets; these are not manylinux or musl packages.
 
 A maintainer releases the nested Go module using a tag named

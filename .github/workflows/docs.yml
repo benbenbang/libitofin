@@ -9,13 +9,6 @@ on:
       - "crates/libitofin/examples/**"
       - "example/**"
       - ".github/workflows/docs.yml"
-  pull_request:
-    paths:
-      - "docs/**"
-      - "crates/itofin-py/python/**"
-      - "crates/libitofin/examples/**"
-      - "example/**"
-      - ".github/workflows/docs.yml"
 
 permissions:
   contents: write
