@@ -147,6 +147,12 @@ pub type AdditionalPenalties = dyn Fn(&[Time], &[Real]) -> Vec<Real>;
 /// curve date are dropped (`hpp:268-274`).
 pub type AdditionalDates = dyn Fn() -> Vec<Date>;
 
+/// Additional penalties whose failures propagate out of the bootstrap.
+pub type FallibleAdditionalPenalties = dyn Fn(&[Time], &[Real]) -> QlResult<Vec<Real>>;
+
+/// Additional node dates whose failures propagate out of the bootstrap.
+pub type FallibleAdditionalDates = dyn Fn() -> QlResult<Vec<Date>>;
+
 /// The additional optimizer variables (`AdditionalBootstrapVariables`,
 /// `globalbootstrap.hpp:69-76`).
 ///
@@ -202,12 +208,13 @@ pub trait AdditionalBootstrapVariables {
 /// [`PiecewiseYieldCurve::new`](crate::termstructures::yields::PiecewiseYieldCurve::new)
 /// still needs the empty configuration.
 pub struct GlobalBootstrap {
+    calculating: Cell<bool>,
     additional_helpers: Vec<Shared<dyn RateHelper>>,
-    additional_dates: Option<Box<AdditionalDates>>,
+    additional_dates: Option<Box<FallibleAdditionalDates>>,
     accuracy: Option<Real>,
     end_criteria: Option<EndCriteria>,
     instrument_weights: Vec<Real>,
-    penalties: Option<Box<AdditionalPenalties>>,
+    penalties: Option<Box<FallibleAdditionalPenalties>>,
     additional_variables: Option<Box<dyn AdditionalBootstrapVariables>>,
     /// The parent of a contributing curve (`mutable parentBootstrapper_`,
     /// `globalbootstrap.hpp:156`), set by
@@ -231,6 +238,14 @@ pub struct GlobalBootstrap {
     penalty_len: Cell<Size>,
 }
 
+struct CalculationGuard<'a>(&'a Cell<bool>);
+
+impl Drop for CalculationGuard<'_> {
+    fn drop(&mut self) {
+        self.0.set(false);
+    }
+}
+
 impl Default for GlobalBootstrap {
     fn default() -> GlobalBootstrap {
         GlobalBootstrap::new(None, None, Vec::new())
@@ -248,6 +263,7 @@ impl GlobalBootstrap {
         instrument_weights: Vec<Real>,
     ) -> GlobalBootstrap {
         GlobalBootstrap {
+            calculating: Cell::new(false),
             additional_helpers: Vec::new(),
             additional_dates: None,
             accuracy,
@@ -282,7 +298,34 @@ impl GlobalBootstrap {
     where
         F: Fn(&[Time], &[Real]) -> Vec<Real> + 'static,
     {
+        Self::with_fallible_penalties(
+            additional_helpers,
+            additional_dates
+                .map(|dates| Box::new(move || Ok(dates())) as Box<FallibleAdditionalDates>),
+            accuracy,
+            end_criteria,
+            instrument_weights,
+            move |times, data| Ok(penalties(times, data)),
+        )
+    }
+
+    /// Fallible additional restrictions, preserving callback errors during fitting.
+    ///
+    /// Existing infallible constructors delegate here. Callback failures invalidate
+    /// the calculation and are returned by the next curve query.
+    pub fn with_fallible_penalties<F>(
+        additional_helpers: Vec<Shared<dyn RateHelper>>,
+        additional_dates: Option<Box<FallibleAdditionalDates>>,
+        accuracy: Option<Real>,
+        end_criteria: Option<EndCriteria>,
+        instrument_weights: Vec<Real>,
+        penalties: F,
+    ) -> GlobalBootstrap
+    where
+        F: Fn(&[Time], &[Real]) -> QlResult<Vec<Real>> + 'static,
+    {
         GlobalBootstrap {
+            calculating: Cell::new(false),
             additional_helpers,
             additional_dates,
             accuracy,
@@ -770,7 +813,7 @@ impl GlobalBootstrap {
         // because the upstream functor is evaluation-date relative, with the
         // expired ones dropped before they can reach the grid.
         let additional_dates: Vec<Date> = match &self.additional_dates {
-            Some(dates) => dates()
+            Some(dates) => dates()?
                 .into_iter()
                 .filter(|date| *date > first_date)
                 .collect(),
@@ -935,7 +978,7 @@ impl GlobalBootstrap {
         let penalty_errors = match &self.penalties {
             Some(penalties) => {
                 let cd = curve.curve_data().borrow();
-                penalties(cd.times(), cd.data())
+                penalties(cd.times(), cd.data())?
             }
             None => Vec::new(),
         };
@@ -1069,6 +1112,11 @@ where
             return Ok(());
         }
 
+        require!(
+            !self.calculating.replace(true),
+            "global bootstrap re-entered during calculation; additional-variable helpers must use unregistered quote handles"
+        );
+        let _guard = CalculationGuard(&self.calculating);
         let (state, guess) = self.setup(curve)?;
 
         // Solver configuration (`:222-229`): the LM tolerances and the
@@ -2037,6 +2085,46 @@ mod tests {
             message.contains("less functions (32) than available variables (37)"),
             "unexpected failure: {message}"
         );
+    }
+
+    #[test]
+    fn fallible_callbacks_propagate_and_retry_after_failure() {
+        for fail_dates in [false, true] {
+            let fixture = fixture();
+            let fail = shared(Cell::new(true));
+            let date_fail = Shared::clone(&fail);
+            let penalty_fail = Shared::clone(&fail);
+            let curve = curve_with(
+                &fixture,
+                GlobalBootstrap::with_fallible_penalties(
+                    Vec::new(),
+                    Some(Box::new(move || {
+                        require!(!fail_dates || !date_fail.get(), "date callback failed");
+                        Ok(Vec::new())
+                    })),
+                    Some(1.0e-12),
+                    None,
+                    Vec::new(),
+                    move |_, _| {
+                        require!(fail_dates || !penalty_fail.get(), "penalty callback failed");
+                        Ok(Vec::new())
+                    },
+                ),
+            );
+            for _ in 0..2 {
+                let error = curve
+                    .dates()
+                    .expect_err("callback failure must remain visible");
+                assert!(error.message().contains("callback failed"));
+            }
+            fail.set(false);
+            curve
+                .dates()
+                .expect("a corrected callback retries the failed solve");
+            for helper in &fixture.helpers {
+                assert!(helper.quote_error().expect("helper reprices").abs() < 1.0e-9);
+            }
+        }
     }
 
     /// ARM G, the maxDate extension over the additional helpers
