@@ -11,5 +11,7 @@ pub mod defaulttermstructure;
 pub mod flathazardrate;
 pub mod hazardratestructure;
 pub mod interpolatedhazardratecurve;
+pub mod interpolatedsurvivalprobabilitycurve;
 pub mod piecewisedefaultcurve;
 pub mod probabilitytraits;
+pub mod survivalprobabilitystructure;
