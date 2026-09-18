@@ -77,12 +77,12 @@ Rust 1.96.0:
 
 ## Delivery limits
 
-The new release workflow validates Linux amd64 and macOS arm64 packages and
-prepares a draft release only for a matching `bindings/go/vVERSION` tag.
-Feature-branch validation does not publish a release. No release tag is created
-by this implementation. First published-tag resolution and downstream application
-migration remain separate tasks; the public consumer fixture establishes
-synthetic library acceptance without claiming either.
+The coordinated release workflow validates Linux amd64 and macOS arm64 packages,
+attaches them to the main `vVERSION` release, and publishes the matching
+`bindings/go/vVERSION` tag. Fresh external consumers verify the published module
+and assets without local replacements. First-release evidence remains tracked in
+[#1025](https://github.com/benbenbang/libitofin/issues/1025); private application
+migration and production budgets remain separate acceptance work.
 The Go/C ABI matrix checks both clean and incremental Python/stub/C ABI build
 orders on Linux and macOS with `scripts/check_go_mixed_builds.sh`. It uses fresh
 Cargo target directories, then verifies Python imports, stubs, and C/C++ callers

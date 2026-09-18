@@ -30,13 +30,15 @@ between releases that add symbols. Keep the header and library together.
 
 ## Use from an external Go module
 
-The commands below use `0.20.0` as an example. Choose the version of the archive
+The commands below use `0.22.0` as an example. Choose the version of the archive
 you built or downloaded, and set `platform` to `darwin-arm64` or `linux-amd64`.
-Run these commands from the directory containing the archive and checksum:
+Download the archive and checksum from the main LibItoFin release:
 
 ```sh
-version=0.20.0
+version=0.22.0
 platform=darwin-arm64
+gh release download "v$version" --repo benbenbang/libitofin \
+  --pattern "itofin-native-$version-$platform.tar.gz*"
 shasum -a 256 -c "itofin-native-$version-$platform.tar.gz.sha256"
 tar -xzf "itofin-native-$version-$platform.tar.gz"
 export ITOFIN_NATIVE="$PWD/itofin-native-$version-$platform"
@@ -46,7 +48,7 @@ export CGO_CFLAGS="\"-I$ITOFIN_NATIVE/include\""
 export CGO_LDFLAGS="\"-L$ITOFIN_NATIVE/lib\" -litofin_ffi \"-Wl,-rpath,$ITOFIN_NATIVE/lib\""
 ```
 
-Once a Go release tag exists, run these commands in your application's module:
+For a published coordinated release, run these commands in your application's module:
 
 ```sh
 go get "github.com/benbenbang/libitofin/bindings/go@v$version"
@@ -90,21 +92,38 @@ application or establish a production latency budget.
 
 ## Release process
 
-`.github/workflows/go-package.yml` builds native archives on explicit
-`ubuntu-24.04` and `macos-14` runners, checks both archive and file checksums,
-and runs the external consumer. Pull requests call it from `pre-commit.yml`
-and include both platforms in the required `workflow-success` check.
-`go-release.yml` calls it for tags and manual runs; pull requests and manual
-runs upload workflow artifacts without creating a release. Linux runtime compatibility must be
-verified on deployment targets; these are not manylinux or musl packages.
+The main `semantic-release.yml` workflow publishes one LibItoFin release at
+`vVERSION`. Rust and Python package versions remain unprefixed. The release tag,
+committed workspace version, and every local Cargo.lock package must agree;
+publication jobs validate those files instead of rewriting them after tagging.
 
-A maintainer releases the nested Go module using a tag named
-`bindings/go/vVERSION`, where `VERSION` matches the workspace package version.
-The workflow rejects mismatched versions and creates a **draft** GitHub release
-with the two archives and checksums only after both platforms pass. Review the
-artifacts and publish that draft separately. The tag itself makes the Go module
-resolvable independently of whether the GitHub release is still a draft.
-No release tag or published native artifact is created by adding this workflow.
-
-Go documents the required subdirectory tag prefix in
+Go publication builds and validates Linux amd64 and macOS arm64 packages from
+that exact tag. It attaches both archives and checksums to the same public
+release, then creates `bindings/go/vVERSION` at the same commit. This extra tag
+is visible under GitHub Tags and resolves the nested Go module; it does not
+create another release page. Go documents the prefix in
 [Mapping versions to commits](https://go.dev/ref/mod#vcs-version).
+
+After publication, both platforms install the uploaded assets and fetch the Go
+module through the public module proxy into a fresh cache, without local
+replacements. The check verifies module/native versions, source revision,
+checksums, runtime linking, and the portfolio/session acceptance fixture.
+
+First dispatch the main release workflow with `prompt=true`, `dry_run=true` to
+check the next version and notes. Dispatch with `dry_run=false` to publish.
+During the one-time prefix migration, `v0.21.0` aliases the existing `0.21.0`
+commit; the original tag and release remain unchanged.
+
+For recovery, dispatch `go-release.yml` with an existing coordinated core
+`release_tag`, such as `v0.22.0`. Runs for that tag are serialized. Existing native
+archives are downloaded and verified, then preserved even if a rebuild differs
+byte-for-byte. An interrupted archive-only upload can have its checksum repaired;
+conflicting Go tags, invalid archives, or mismatched checksums fail without an
+overwrite. The workflow never creates a second Go-specific release.
+
+PRs call `go-package.yml` and include both platforms in `workflow-success`.
+PR validation does not publish tags or assets. Native Linux compatibility must
+be checked on deployment targets; these are not manylinux or musl packages.
+Private application migration and production budgets remain consumer work.
+First published-release evidence is tracked in
+[#1025](https://github.com/benbenbang/libitofin/issues/1025).

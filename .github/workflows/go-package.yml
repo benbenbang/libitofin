@@ -2,6 +2,15 @@ name: Go native package validation
 
 on:
   workflow_call:
+    inputs:
+      release_ref:
+        description: "Exact release tag; empty validates the current CI checkout"
+        type: string
+        default: ''
+      release_revision:
+        description: "Resolved release commit used for the build"
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -19,6 +28,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.release_revision || inputs.release_ref }}
       - uses: actions/setup-go@v6
         with:
           go-version: '1.27.1'
@@ -33,6 +44,7 @@ jobs:
       - name: Verify archive and external consumer
         env:
           PLATFORM: ${{ matrix.platform }}
+          RELEASE_REF: ${{ inputs.release_ref }}
         run: |
           cd dist
           shasum -a 256 -c ./*.sha256
@@ -41,10 +53,12 @@ jobs:
           native=$(find "$PWD/unpacked" -mindepth 1 -maxdepth 1 -type d)
           (cd "$native" && shasum -a 256 -c SHA256SUMS)
           version=$(sed -n 's/^version=//p' "$native/VERSION")
-          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
-            test "$GITHUB_REF_NAME" = "bindings/go/v$version"
-          fi
           cd ..
+          if [[ -n "$RELEASE_REF" ]]; then
+            test "$version" = "$(python3 scripts/check_release_version.py "$RELEASE_REF")"
+          elif [[ "$GITHUB_REF_TYPE" == tag ]]; then
+            test "$version" = "$(python3 scripts/check_release_version.py "$GITHUB_REF_NAME")"
+          fi
           bash scripts/check_go_consumer.sh "$native"
           bash scripts/check_go_install_failures.sh "$native"
       - uses: actions/upload-artifact@v4

@@ -52,3 +52,14 @@ Application migration, production workload selection, deployment-platform
 validation, and latency/memory budgets require acceptance in the downstream
 consumer repository. Release-tag installation must also be checked when the
 first Go module tag is published; this run used a local module replacement.
+
+## Published-release acceptance
+
+The coordinated release workflow additionally runs
+`bash scripts/check_go_release_consumer.sh EXTRACTED_NATIVE_DIR VERSION REVISION`
+on Linux amd64 and macOS arm64. It uses downloaded release assets and a fresh
+public Go module cache, without a source copy, replace directive, or workspace.
+It checks the requested version and revision against module checksums and native
+metadata before running the functional fixture. Version queries retry briefly
+for public-proxy propagation. Release evidence is recorded in
+[#1025](https://github.com/benbenbang/libitofin/issues/1025).
