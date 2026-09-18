@@ -12,6 +12,15 @@ on:
           - "true"
           - "false"
 
+      dry_run:
+        description: "Preview the version and notes without publishing"
+        default: false
+        type: boolean
+
+concurrency:
+  group: coordinated-release
+  cancel-in-progress: false
+
 jobs:
   semantic-release:
     name: semantic-release
@@ -26,11 +35,12 @@ jobs:
     secrets: inherit
     with:
       new_version_title: "🧮 LibItoFin"
+      dry_run: ${{ inputs.dry_run }}
 
   publish-crate:
     name: publish libitofin to crates.io
     needs: semantic-release
-    if: ${{ needs.semantic-release.outputs.new_release == 'true' }}
+    if: ${{ needs.semantic-release.outputs.new_release == 'true' && !inputs.dry_run }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -42,24 +52,22 @@ jobs:
           ref: ${{ needs.semantic-release.outputs.new_release_tag }}
       - name: install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-      - name: sync the workspace version to the release tag
-        run: |
-          VER="${{ needs.semantic-release.outputs.new_release_tag }}"
-          sed -i -E "s/^version = \"[0-9]+\.[0-9]+\.[0-9]+\"/version = \"${VER}\"/" Cargo.toml
-          grep -qF "version = \"${VER}\"" Cargo.toml || { echo "version sync failed: workspace version does not match ${VER}"; exit 1; }
-          grep -E "^version" Cargo.toml
+      - name: Verify the committed release version
+        env:
+          RELEASE_TAG: ${{ needs.semantic-release.outputs.new_release_tag }}
+        run: python3 scripts/check_release_version.py "$RELEASE_TAG"
       - name: authenticate to crates.io via OIDC trusted publishing
         uses: rust-lang/crates-io-auth-action@v1
         id: auth
       - name: publish
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
-        run: cargo publish -p libitofin --allow-dirty
+        run: cargo publish -p libitofin --locked
 
   build-python-wheels:
     name: build itofin wheels (${{ matrix.os }})
     needs: semantic-release
-    if: ${{ needs.semantic-release.outputs.new_release == 'true' }}
+    if: ${{ needs.semantic-release.outputs.new_release == 'true' && !inputs.dry_run }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -69,14 +77,14 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ needs.semantic-release.outputs.new_release_tag }}
-      - name: sync the workspace version to the release tag
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify the committed release version
         shell: bash
         env:
-          VER: ${{ needs.semantic-release.outputs.new_release_tag }}
-        run: |
-          python3 -c "import re,pathlib,os; v=os.environ['VER']; p=pathlib.Path('Cargo.toml'); p.write_text(re.sub(r'(?m)^version = \"[0-9]+\.[0-9]+\.[0-9]+\"', f'version = \"{v}\"', p.read_text()))"
-          grep -qF "version = \"${VER}\"" Cargo.toml || { echo "version sync failed: workspace version does not match ${VER}"; exit 1; }
-          grep -E "^version" Cargo.toml
+          RELEASE_TAG: ${{ needs.semantic-release.outputs.new_release_tag }}
+        run: python3 scripts/check_release_version.py "$RELEASE_TAG"
       - name: build wheel
         uses: PyO3/maturin-action@v1
         with:
@@ -98,7 +106,7 @@ jobs:
   publish-pypi:
     name: publish itofin to PyPI
     needs: [semantic-release, build-python-wheels]
-    if: ${{ needs.semantic-release.outputs.new_release == 'true' }}
+    if: ${{ needs.semantic-release.outputs.new_release == 'true' && !inputs.dry_run }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -117,3 +125,13 @@ jobs:
         # then uncomment the override below (and remove it for the real publish):
         # with:
         #   repository-url: https://test.pypi.org/legacy/
+
+  publish-go:
+    name: Publish and verify Go bindings
+    needs: semantic-release
+    if: ${{ needs.semantic-release.outputs.new_release == 'true' && !inputs.dry_run }}
+    permissions:
+      contents: write
+    uses: ./.github/workflows/go-release.yml
+    with:
+      release_tag: ${{ needs.semantic-release.outputs.new_release_tag }}

@@ -1,33 +1,109 @@
-name: Go native packages
+name: Go release publication
 
 on:
+  workflow_call:
+    inputs:
+      release_tag:
+        description: "Existing published core release tag (vVERSION)"
+        required: true
+        type: string
   workflow_dispatch:
-  push:
-    branches: ['feat/go-bindings-*']
-    tags: ['bindings/go/v*']
+    inputs:
+      release_tag:
+        description: "Existing published core release tag (vVERSION)"
+        required: true
+        type: string
 
 permissions:
   contents: read
 
+concurrency:
+  group: go-publication-${{ inputs.release_tag }}
+  cancel-in-progress: false
+
 jobs:
+  resolve:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      revision: ${{ steps.release.outputs.revision }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.release_tag }}
+      - name: Validate release identity
+        id: release
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(python3 scripts/check_release_version.py "$RELEASE_TAG")
+          test "$RELEASE_TAG" = "v$version"
+          test "$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft)" = false
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "revision=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
   package:
+    needs: resolve
     uses: ./.github/workflows/go-package.yml
-  draft-release:
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/bindings/go/v')
-    needs: package
+    with:
+      release_ref: ${{ inputs.release_tag }}
+      release_revision: ${{ needs.resolve.outputs.revision }}
+
+  publish:
+    needs: [resolve, package]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.resolve.outputs.revision }}
       - uses: actions/download-artifact@v5
         with:
           pattern: native-*
           merge-multiple: true
           path: dist
-      - name: Create release draft for review
+      - name: Attach native packages and create the matching Go tag
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: python3 scripts/publish_go_release.py "$RELEASE_TAG" dist
+
+  verify-published:
+    needs: [resolve, publish]
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            platform: linux-amd64
+          - os: macos-14
+            platform: darwin-arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.resolve.outputs.revision }}
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: bindings/go/go.mod
+          cache: false
+      - name: Install from the public release and Go module proxy
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
+          RELEASE_REVISION: ${{ needs.resolve.outputs.revision }}
+          PLATFORM: ${{ matrix.platform }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" \
-            --verify-tag --draft --title "Go bindings ${GITHUB_REF_NAME#bindings/go/}" \
-            --notes 'Native packages for Linux amd64 and macOS arm64. See docs/go-distribution.md at this tag for requirements, checksums, and installation.'
+          mkdir published
+          gh release download "$RELEASE_TAG" --pattern "itofin-native-$RELEASE_VERSION-$PLATFORM.tar.gz*" --dir published
+          cd published
+          shasum -a 256 -c ./*.sha256
+          tar -xzf "itofin-native-$RELEASE_VERSION-$PLATFORM.tar.gz"
+          native="$PWD/itofin-native-$RELEASE_VERSION-$PLATFORM"
+          (cd "$native" && shasum -a 256 -c SHA256SUMS)
+          cd ..
+          bash scripts/check_go_release_consumer.sh "$native" "$RELEASE_VERSION" "$RELEASE_REVISION"
