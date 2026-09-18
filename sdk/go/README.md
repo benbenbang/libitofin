@@ -64,12 +64,19 @@ temporary native result. Use smaller batches or terminal mode for larger jobs.
 
 ## Coverage and checks
 
-The Python `.pyi` files at baseline `bf6c5d640c1a0aac3184d8a24d77897e2df2b5ae`
-define the CI coverage target. Reviewed mappings live in `docs/go-coverage/`;
-run `python3 scripts/check_go_coverage.py --strict --baseline` from the repository
-root with the baseline commit available in Git history. Newer unmapped APIs are
-reported separately; missing baseline mappings and invalid C/Go/test references
-still fail. Omit `--baseline` to require full current Python API parity.
+CI enforces the full-current Python stub inventory and the original
+`bf6c5d640c1a0aac3184d8a24d77897e2df2b5ae` implementation baseline. Reviewed
+mappings live in `docs/go-coverage/`. Run both audits from the repository root
+with baseline history available:
+
+```sh
+python3 scripts/check_go_coverage.py --strict
+python3 scripts/check_go_coverage.py --strict --baseline
+```
+
+Python-only nonconstructible enum declarations are explicitly classified with
+rationale and counted separately from implemented Go mappings. They cannot
+replace baseline implementations. Invalid C/Go/test references fail both audits.
 This measures declared API symbols, including enum members
 and deduplicated overloads, and verifies referenced exports/identifiers/tests
 exist. It is separate from line coverage or exhaustive numerical validation.
@@ -77,7 +84,7 @@ exist. It is separate from line coverage or exhaustive numerical validation.
 The root `go-bindings-tests` pre-commit hook runs the same validation for changes
 to the Go/C ABI, core, Python stubs, coverage mappings, or build configuration.
 It requires Go 1.27.1, the pinned Rust toolchain, Python 3, and C/C++ compilers.
-Run it manually with `pre-commit run go-bindings-tests --all-files`.
+Run it manually with `prek run go-bindings-tests --all-files`.
 
 Run `bash scripts/check_go_bindings.sh` for native tests, strict cgo pointer
 checks, race detection, and Go line coverage. The Go tests use cached QuantLib
