@@ -18,10 +18,8 @@
 //! (`:53-60`), and its `survivalProbabilityImpl` / `defaultDensityImpl` /
 //! `hazardRateImpl` each call `calculate()` before delegating to the base curve
 //! (`:259-276`). Rust has no inheritance, so the node storage lives here and the
-//! reads run the same conversions over it, through the free functions
-//! `survival_probability_from_nodes` and `hazard_rate_from_nodes` the plain
-//! [`InterpolatedHazardRateCurve`](crate::termstructures::credit::interpolatedhazardratecurve::InterpolatedHazardRateCurve)
-//! reads its own nodes with.
+//! reads delegate to [`CreditBootstrapTraits`], sharing the same node
+//! conversions as the corresponding interpolated credit curves.
 //!
 //! The pre-set `calculated` flag ([`LazyObject::new(true)`](LazyObject::new)) is
 //! what breaks the bootstrap cycle, and the cycle here is tighter than on the
@@ -87,8 +85,8 @@ impl Observer for CurveUpdater {
 
 /// Default-probability term structure bootstrapped from credit helpers.
 ///
-/// `T` is the curve-shape traits ([`HazardRate`]) and `I` the interpolation
-/// factory (`BackwardFlat`). The node data lives in a `RefCell` the bootstrap
+/// `T` is the node convention ([`HazardRate`] or [`SurvivalProbability`])
+/// and `I` the interpolation factory. The node data lives in a `RefCell` the bootstrap
 /// mutates and the survival/hazard lookups read back.
 pub struct PiecewiseDefaultCurve<T: CreditBootstrapTraits, I: Interpolator> {
     base: TermStructureBase,
@@ -1043,5 +1041,23 @@ mod tests {
         assert!(second < first);
         assert!((helper.implied_quote().unwrap() - 0.02).abs() <= TOLERANCE);
         assert_eq!(curve.data().unwrap()[0], 1.0);
+        quote.set_value(-0.01);
+        assert!(curve.calculate().is_err());
+        assert!(!curve.lazy.borrow().is_calculated());
+        quote.set_value(0.01);
+        curve.calculate().unwrap();
+        assert!((helper.implied_quote().unwrap() - 0.01).abs() <= TOLERANCE);
+    }
+
+    #[test]
+    fn bootstrapped_loglinear_survival_feeds_the_isda_grid() {
+        let fixture = fixture_with::<SurvivalProbability, _>(LogLinear);
+        let credit = Handle::new(
+            Shared::clone(&fixture.curve) as Shared<dyn DefaultProbabilityTermStructure>
+        );
+        assert_eq!(
+            isda_node_grid(&fixture.discount, &credit, today() + 10_000).unwrap(),
+            fixture.curve.dates().unwrap()
+        );
     }
 }
