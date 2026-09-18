@@ -34,15 +34,6 @@
 //! is an error on both sides. Both fall to the same `QL_FAIL` C++ reaches
 //! (`isdacdsengine.cpp:128-129` on the yield side, `:146-147` on the credit
 //! side) - the rejection is the ported behaviour, not a missing feature.
-//!
-//! ## Deferred (#915)
-//!
-//! `InterpolatedSurvivalProbabilityCurve<LogLinear>` (`isdacdsengine.cpp:132-136`)
-//! is the one ISDA curve variant still absent from this port: there is no
-//! survival-probability curve yet. Its arm is simply missing, so such a curve
-//! reports the same error as any other unsupported shape.
-//! (`InterpolatedForwardCurve<ForwardFlat>`, the other variant #799 deferred,
-//! landed with the `ForwardFlat` factory.)
 
 use crate::errors::QlResult;
 use crate::fail;
@@ -53,8 +44,9 @@ use crate::termstructures::bootstraptraits::{Discount, ForwardRate};
 use crate::termstructures::credit::defaulttermstructure::DefaultProbabilityTermStructure;
 use crate::termstructures::credit::flathazardrate::FlatHazardRate;
 use crate::termstructures::credit::interpolatedhazardratecurve::InterpolatedHazardRateCurve;
+use crate::termstructures::credit::interpolatedsurvivalprobabilitycurve::InterpolatedSurvivalProbabilityCurve;
 use crate::termstructures::credit::piecewisedefaultcurve::PiecewiseDefaultCurve;
-use crate::termstructures::credit::probabilitytraits::HazardRate;
+use crate::termstructures::credit::probabilitytraits::{HazardRate, SurvivalProbability};
 use crate::termstructures::yields::{
     FlatForward, InterpolatedDiscountCurve, InterpolatedForwardCurve, PiecewiseYieldCurve,
 };
@@ -136,6 +128,13 @@ fn credit_curve_dates(curve: &dyn DefaultProbabilityTermStructure) -> QlResult<V
     let Some(any) = curve.as_any() else {
         fail!("{UNSUPPORTED}");
     };
+    if let Some(curve) = any.downcast_ref::<InterpolatedSurvivalProbabilityCurve<LogLinear>>() {
+        return Ok(curve.dates().to_vec());
+    }
+    if let Some(curve) = any.downcast_ref::<PiecewiseDefaultCurve<SurvivalProbability, LogLinear>>()
+    {
+        return curve.dates();
+    }
     if let Some(curve) = any.downcast_ref::<InterpolatedHazardRateCurve<BackwardFlat>>() {
         return Ok(curve.dates().to_vec());
     }
@@ -536,5 +535,46 @@ mod tests {
         fn discount_impl(&self, _t: Time) -> QlResult<DiscountFactor> {
             Ok(1.0)
         }
+    }
+
+    #[test]
+    fn loglinear_survival_contributes_its_exact_nodes_to_the_union() {
+        let curve = shared(
+            InterpolatedSurvivalProbabilityCurve::new(
+                dates_at(&CREDIT_OFFSETS),
+                vec![1.0, 0.99, 0.98, 0.95],
+                day_counter(),
+                LogLinear,
+            )
+            .unwrap(),
+        );
+        let grid = isda_node_grid(
+            &yield_handle(discount_curve()),
+            &credit_handle(curve),
+            maturity(),
+        )
+        .unwrap();
+        assert_eq!(grid, dates_at(&[0, 90, 180, 270, 540, 720]));
+    }
+
+    #[test]
+    fn linear_survival_is_not_an_isda_curve() {
+        let curve = shared(
+            InterpolatedSurvivalProbabilityCurve::new(
+                dates_at(&CREDIT_OFFSETS),
+                vec![1.0, 0.99, 0.98, 0.95],
+                day_counter(),
+                Linear,
+            )
+            .unwrap(),
+        );
+        assert!(
+            isda_node_grid(
+                &yield_handle(flat_forward()),
+                &credit_handle(curve),
+                maturity()
+            )
+            .is_err()
+        );
     }
 }

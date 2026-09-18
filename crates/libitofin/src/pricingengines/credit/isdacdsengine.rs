@@ -1916,6 +1916,15 @@ mod markit_oracle {
     /// have let through.
     #[test]
     fn the_markit_grid_reproduces_the_isda_upfronts() {
+        check_markit_grid(false);
+    }
+
+    #[test]
+    fn loglinear_survival_reproduces_the_markit_upfronts() {
+        check_markit_grid(true);
+    }
+
+    fn check_markit_grid(survival_nodes: bool) {
         const TOLERANCE: Real = 1.0e-6;
         let settings = shared(Settings::<Date>::new());
         let trade_date = Date::new(21, Month::May, 2009);
@@ -1961,7 +1970,38 @@ mod markit_oracle {
                             PricingModel::Isda,
                         )
                         .expect("the quoted trade inverts on the ISDA engine");
-                    let engine = isda_engine(hazard_rate, recovery, &discount, &settings);
+                    let engine = if survival_nodes {
+                        use crate::termstructures::credit::interpolatedsurvivalprobabilitycurve::InterpolatedSurvivalProbabilityCurve;
+                        let offsets = [0, 365, 1095, 7300];
+                        let credit = InterpolatedSurvivalProbabilityCurve::new(
+                            offsets.iter().map(|offset| trade_date + *offset).collect(),
+                            offsets
+                                .iter()
+                                .map(|offset| (-hazard_rate * f64::from(*offset) / 365.0).exp())
+                                .collect(),
+                            Actual365Fixed::new(),
+                            LogLinear,
+                        )
+                        .unwrap();
+                        shared_mut(
+                            IsdaCdsEngine::new(
+                                Handle::new(
+                                    shared(credit) as Shared<dyn DefaultProbabilityTermStructure>
+                                ),
+                                recovery,
+                                discount.clone(),
+                                None,
+                                Shared::clone(&settings),
+                            )
+                            .with_fidelity(
+                                NumericalFix::Taylor,
+                                AccrualBias::HalfDayBias,
+                                ForwardsInCouponPeriod::Piecewise,
+                            ),
+                        ) as SharedMut<dyn PricingEngine>
+                    } else {
+                        isda_engine(hazard_rate, recovery, &discount, &settings)
+                    };
 
                     let mut conventional = trade(0.01).build().expect("the trade builds");
                     conventional
