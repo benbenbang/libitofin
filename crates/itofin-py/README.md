@@ -253,6 +253,10 @@ print(gsg.next_sequences(1000).shape)                  # (1000, 3) standard norm
 `SobolRsg`, `HaltonRsg` and `GaussianLowDiscrepancySequenceGenerator` provide the
 low-discrepancy counterparts with the same `next_sequence` / `next_sequences` calls.
 
+## Typing checks
+
+See [typing acceptance](TYPING.md) for the pinned, bidirectional Pyright gate.
+
 ## License
 
 BSD-3-Clause, matching the `libitofin` core. See the [repository](https://github.com/benbenbang/libitofin) for the layer status table, the divergences-from-QuantLib catalogue, and the Rust test oracles behind the numbers above.

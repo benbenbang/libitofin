@@ -131,7 +131,7 @@ jobs:
         run: |
           python -m venv .venv
           . .venv/bin/activate
-          pip install pytest numpy
+          pip install -r crates/itofin-py/typing-requirements.txt
           maturin develop -m crates/itofin-py/Cargo.toml
 
       - name: check the committed stubs and shims match the rust facade
@@ -144,6 +144,12 @@ jobs:
           if [ "$status" -gt 1 ]; then exit "$status"; fi
           git diff --exit-code -- crates/itofin-py/python
           test -z "$(git status --porcelain -- crates/itofin-py/python)"
+
+      - name: check both directions of the typing baseline
+        run: |
+          . .venv/bin/activate
+          python -m unittest discover -s crates/itofin-py/scripts -p 'test_*.py'
+          python crates/itofin-py/scripts/check_typing.py
 
       - name: run the pytest oracle
         run: |
