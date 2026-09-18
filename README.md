@@ -114,14 +114,18 @@ print(f"{svol.volatility(Period(3, 'Years'), Period(3, 'Years'), 0.03):.4f}")  #
 
 ### Go and C
 
-The [Go package](bindings/go/README.md) calls the same Rust core through the
+The [Go package](sdk/go/README.md) calls the same Rust core through the
 [C ABI](crates/libitofin-ffi/include/itofin.h). Build it with Rust 1.96.0,
 Go 1.27.1, and a C compiler. Each Go session confines its mutable native graph
 to one OS thread; independent sessions can run concurrently. Close sessions
 explicitly. A native panic poisons its session, which must then be closed.
 
-Start with the [build and ownership guide](bindings/go/README.md) and the
-[synthetic portfolio example](bindings/go/examples/portfolio/main.go).
+The source module is `github.com/benbenbang/libitofin/sdk/go`; its first release
+is pending. Existing v0.22.0 consumers retain the published `bindings/go` path.
+See the [installation and migration guide](docs/go-distribution.md).
+
+Start with the [build and ownership guide](sdk/go/README.md) and the
+[synthetic portfolio example](sdk/go/examples/portfolio/main.go).
 The [binding contract](docs/go-binding-contract.md) specifies the boundary;
 [tracker #1000](https://github.com/benbenbang/libitofin/issues/1000) records
 remaining parity and delivery work. API mappings, numerical tests, and statement
@@ -241,7 +245,8 @@ pre-commit run --all-files
 crates/libitofin/       the core library — FFI-agnostic, idiomatic Rust
 crates/libitofin-ffi/   extern "C" + cbindgen -> C header + libitofin_ffi
 crates/itofin-py/       PyO3 + maturin -> the `itofin` package       (on PyPI)
-bindings/go/            Go 1.27.1 cgo package with explicit sessions
+sdk/go/                Go 1.27.1 cgo package with explicit sessions
+sdk/node/              Node SDK placeholder (not implemented)
 QuantLib/               reference C++ tree + test oracle           (git-ignored symlink)
 ```
 

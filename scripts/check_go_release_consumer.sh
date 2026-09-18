@@ -46,7 +46,7 @@ export ITOFIN_EXPECTED_VERSION="$version"
 unset CGO_CPPFLAGS CGO_CXXFLAGS LIBRARY_PATH CPATH C_INCLUDE_PATH
 unset LD_LIBRARY_PATH LD_PRELOAD DYLD_LIBRARY_PATH DYLD_INSERT_LIBRARIES DYLD_FALLBACK_LIBRARY_PATH
 cd "$work/consumer"
-module=github.com/benbenbang/libitofin/bindings/go
+module=github.com/benbenbang/libitofin/sdk/go
 go version
 go mod edit -require="$module@v$version"
 for query in "v$version" "$revision"; do

@@ -13,7 +13,7 @@ from unittest.mock import patch
 import publish_go_release as release
 
 
-VERSION = "0.22.0"
+VERSION = "0.23.0"
 REVISION = "a" * 40
 TAG = f"v{VERSION}"
 REPOSITORY = "example/libitofin"
@@ -42,6 +42,9 @@ class PublicationTests(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
+        self.module = self.root / "sdk/go/go.mod"
+        self.module.parent.mkdir(parents=True)
+        self.module.write_text(f"module github.com/{REPOSITORY}/sdk/go\n")
         self.local = self.root / "local"
         self.local.mkdir()
         for platform in PLATFORMS:
@@ -83,6 +86,8 @@ class PublicationTests(unittest.TestCase):
             notes = Path(args[args.index("--notes-file") + 1]).read_text()
             self.assertTrue(notes.startswith(self.body))
             self.assertIn("## Go bindings", notes)
+            self.assertIn(f"github.com/{REPOSITORY}/sdk/go@v{VERSION}", notes)
+            self.assertNotIn("/bindings/go@", notes)
             self.body = notes
             self.mutations.append(("edit", args[3]))
         else:
@@ -95,7 +100,7 @@ class PublicationTests(unittest.TestCase):
             expected = {archive_name(p) + suffix for p in PLATFORMS for suffix in ("", ".sha256")}
             self.assertTrue(expected.issubset(self.assets))
             self.assertIn(f"sha={REVISION}", args)
-            tag = f"bindings/go/v{VERSION}"
+            tag = f"sdk/go/v{VERSION}"
             self.assertIn(f"ref=refs/tags/{tag}", args)
             self.references[tag] = REVISION
             self.mutations.append(("tag", tag))
@@ -138,7 +143,7 @@ class PublicationTests(unittest.TestCase):
     def test_release_and_tag_mismatches_precede_mutations(self):
         cases = (("draft", True), ("reported_tag", "v0.21.0"),
                  ("references", {TAG: "b" * 40}),
-                 ("references", {TAG: REVISION, f"bindings/go/v{VERSION}": "b" * 40}))
+                 ("references", {TAG: REVISION, f"sdk/go/v{VERSION}": "b" * 40}))
         for attribute, invalid in cases:
             with self.subTest(attribute=attribute, invalid=invalid):
                 original = getattr(self, attribute)
@@ -155,20 +160,39 @@ class PublicationTests(unittest.TestCase):
         result = self.publish()
         self.assertEqual([action for action, _ in self.mutations], ["upload"] * 4 + ["tag", "edit"])
         self.assertEqual(result["revision"], REVISION)
+        self.assertEqual(result["go_tag"], f"sdk/go/v{VERSION}")
         self.assertEqual(set(result["sha256"]), {archive_name(p) for p in PLATFORMS})
+
+    def test_published_legacy_tag_is_preserved(self):
+        legacy_tag = "bindings/go/v0.22.0"
+        self.references[legacy_tag] = "c" * 40
+        self.publish()
+        self.assertEqual(self.references[legacy_tag], "c" * 40)
+        self.assertNotIn(f"bindings/go/v{VERSION}", self.references)
+        self.assertEqual(self.references[f"sdk/go/v{VERSION}"], REVISION)
+
+    def test_missing_or_legacy_module_is_rejected_before_mutations(self):
+        self.module.write_text(f"module github.com/{REPOSITORY}/bindings/go\n")
+        with self.assertRaisesRegex(ValueError, "sdk/go module"):
+            self.publish()
+        self.assertEqual(self.mutations, [])
+        self.module.unlink()
+        with self.assertRaisesRegex(ValueError, "sdk/go module"):
+            self.publish()
+        self.assertEqual(self.mutations, [])
 
     def test_server_missing_uploaded_assets_prevents_tag(self):
         self.drop_uploads = True
         with self.assertRaisesRegex(ValueError, "both native platforms"):
             self.publish()
-        self.assertNotIn(f"bindings/go/v{VERSION}", self.references)
+        self.assertNotIn(f"sdk/go/v{VERSION}", self.references)
 
     def test_rerun_preserves_remote_assets_when_rebuilt_bytes_differ(self):
         self.seed_remote()
         original = dict(self.assets)
         for name in original:
             self.assertNotEqual(original[name], (self.local / name).read_bytes())
-        self.references[f"bindings/go/v{VERSION}"] = REVISION
+        self.references[f"sdk/go/v{VERSION}"] = REVISION
         result = self.publish()
         self.assertEqual(self.assets, original)
         self.assertEqual(self.mutations, [("edit", TAG)])
@@ -213,8 +237,8 @@ class RemoteCommitTests(unittest.TestCase):
         with patch.object(release.subprocess, "run") as run, patch.object(release, "api") as api:
             run.return_value = subprocess.CompletedProcess([], 0, json.dumps(result), "")
             api.return_value = {"object": {"type": "commit", "sha": REVISION}}
-            self.assertEqual(release.remote_commit(REPOSITORY, "bindings/go/v0.22.0"), REVISION)
-            self.assertIn("bindings%2Fgo%2Fv0.22.0", run.call_args.args[0][-1])
+            self.assertEqual(release.remote_commit(REPOSITORY, "sdk/go/v0.23.0"), REVISION)
+            self.assertIn("sdk%2Fgo%2Fv0.23.0", run.call_args.args[0][-1])
 
 
 if __name__ == "__main__":

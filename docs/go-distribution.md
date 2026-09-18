@@ -30,12 +30,14 @@ between releases that add symbols. Keep the header and library together.
 
 ## Use from an external Go module
 
-The commands below use `0.22.0` as an example. Choose the version of the archive
-you built or downloaded, and set `platform` to `darwin-arm64` or `linux-amd64`.
-Download the archive and checksum from the main LibItoFin release:
+The source module is `github.com/benbenbang/libitofin/sdk/go`. Its first tagged
+release is pending; these published-install commands apply after a matching
+`sdk/go/vVERSION` tag exists. Set `version` to that release number without `v`,
+and `platform` to `darwin-arm64` or `linux-amd64`. Download the archive and
+checksum from the main LibItoFin release:
 
 ```sh
-version=0.22.0
+version=VERSION
 platform=darwin-arm64
 gh release download "v$version" --repo benbenbang/libitofin \
   --pattern "itofin-native-$version-$platform.tar.gz*"
@@ -51,13 +53,13 @@ export CGO_LDFLAGS="\"-L$ITOFIN_NATIVE/lib\" -litofin_ffi \"-Wl,-rpath,$ITOFIN_N
 For a published coordinated release, run these commands in your application's module:
 
 ```sh
-go get "github.com/benbenbang/libitofin/bindings/go@v$version"
+go get "github.com/benbenbang/libitofin/sdk/go@v$version"
 go test -tags itofin_external ./...
 go build -tags itofin_external ./...
 ```
 
 Before publication, use a local `replace` pointing at the matching checkout's
-`bindings/go` directory and require version `v0.0.0`. The Go source may also be
+`sdk/go` directory and require version `v0.0.0`. The Go source may also be
 copied into its own directory; with `itofin_external`, no paths to the Rust
 checkout are compiled into the Go package. The tag is required for every Go
 build, test, and vet command using the external package. Without it, the
@@ -71,6 +73,20 @@ executable into `app/bin`, and instead set its linker runtime search path to
 literal `$ORIGIN` when constructing the environment variable. The packaged
 macOS library uses `@rpath/libitofin_ffi.dylib` and is signed ad hoc after changing
 its install name; production application signing remains the consumer's step.
+
+## Migration from v0.22.0
+
+The published `bindings/go/v0.22.0` and core `v0.22.0` tags remain unchanged.
+Existing applications can keep
+`github.com/benbenbang/libitofin/bindings/go@v0.22.0` with its matching native
+package. There is no `sdk/go/v0.22.0` release.
+
+When the first SDK release is available, replace imports of
+`github.com/benbenbang/libitofin/bindings/go` with
+`github.com/benbenbang/libitofin/sdk/go`, require the new module version, and
+install its matching native package. Run `go mod tidy` to remove the old module
+requirement. The Go package name remains `itofin`; this move does not change its
+API. For development before that release, use the local replacement above.
 
 ## Verify a consumer
 
@@ -99,7 +115,7 @@ publication jobs validate those files instead of rewriting them after tagging.
 
 Go publication builds and validates Linux amd64 and macOS arm64 packages from
 that exact tag. It attaches both archives and checksums to the same public
-release, then creates `bindings/go/vVERSION` at the same commit. This extra tag
+release, then creates `sdk/go/vVERSION` at the same commit. This extra tag
 is visible under GitHub Tags and resolves the nested Go module; it does not
 create another release page. Go documents the prefix in
 [Mapping versions to commits](https://go.dev/ref/mod#vcs-version).
@@ -115,7 +131,9 @@ During the one-time prefix migration, `v0.21.0` aliases the existing `0.21.0`
 commit; the original tag and release remain unchanged.
 
 For recovery, dispatch `go-release.yml` with an existing coordinated core
-`release_tag`, such as `v0.22.0`. Runs for that tag are serialized. Existing native
+`release_tag`. For the legacy v0.22.0 release, select its original workflow with
+`gh workflow run go-release.yml --ref v0.22.0 -f release_tag=v0.22.0`; the current
+workflow targets `sdk/go`. Runs for that tag are serialized. Existing native
 archives are downloaded and verified, then preserved even if a rebuild differs
 byte-for-byte. An interrupted archive-only upload can have its checksum repaired;
 conflicting Go tags, invalid archives, or mismatched checksums fail without an
@@ -125,5 +143,5 @@ PRs call `go-package.yml` and include both platforms in `workflow-success`.
 PR validation does not publish tags or assets. Native Linux compatibility must
 be checked on deployment targets; these are not manylinux or musl packages.
 Private application migration and production budgets remain consumer work.
-First published-release evidence is tracked in
+Legacy v0.22.0 published-release evidence is recorded in
 [#1025](https://github.com/benbenbang/libitofin/issues/1025).

@@ -79,8 +79,10 @@ Rust 1.96.0:
 
 The coordinated release workflow validates Linux amd64 and macOS arm64 packages,
 attaches them to the main `vVERSION` release, and publishes the matching
-`bindings/go/vVERSION` tag. Fresh external consumers verify the published module
-and assets without local replacements. First-release evidence remains tracked in
+`sdk/go/vVERSION` tag for future releases. The first release at this path is
+pending. Fresh external consumers verify the published module and assets without
+local replacements. Legacy `bindings/go/v0.22.0` remains unchanged; its acceptance
+evidence is recorded in
 [#1025](https://github.com/benbenbang/libitofin/issues/1025); private application
 migration and production budgets remain separate acceptance work.
 The Go/C ABI matrix checks both clean and incremental Python/stub/C ABI build

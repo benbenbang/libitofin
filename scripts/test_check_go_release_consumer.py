@@ -8,7 +8,7 @@ import unittest
 
 SCRIPT = Path(__file__).with_name("check_go_release_consumer.sh")
 REVISION = "a" * 40
-MODULE = "github.com/benbenbang/libitofin/bindings/go"
+MODULE = "github.com/benbenbang/libitofin/sdk/go"
 FAKE_GO = r'''#!/usr/bin/env python3
 import json
 import os
@@ -24,20 +24,22 @@ if args[:2] == ["mod", "download"]:
     if mode == "unavailable":
         print(json.dumps({"Error": "not yet published"}))
         sys.exit(1)
-    record = {"Path": "github.com/benbenbang/libitofin/bindings/go", "Version": "v0.22.0",
+    record = {"Path": "github.com/benbenbang/libitofin/sdk/go", "Version": "v0.23.0",
               "Sum": "h1:source", "GoModSum": "h1:manifest"}
     if mode == "origin":
         record["Origin"] = {"Hash": "b" * 40}
     if mode == "version":
         record["Version"] = "v0.21.0"
+    if mode == "legacy-path":
+        record["Path"] = "github.com/benbenbang/libitofin/bindings/go"
     if mode == "checksum" and query == "a" * 40:
         record["Sum"] = "h1:different"
     print(json.dumps(record))
 elif args == ["mod", "edit", "-json"]:
     print(json.dumps({"Replace": [{"Old": {"Path": "bad"}}]} if mode == "replace" else {}))
 elif args[:3] == ["list", "-m", "-json"]:
-    print(json.dumps({"Path": "github.com/benbenbang/libitofin/bindings/go",
-                      "Version": "v0.22.0"}))
+    print(json.dumps({"Path": "github.com/benbenbang/libitofin/sdk/go",
+                      "Version": "v0.23.0"}))
 elif args and args[0] == "list":
     print("[] []")
 elif args and args[0] == "build":
@@ -59,7 +61,7 @@ class ReleaseConsumerTests(unittest.TestCase):
         for library in ("libitofin_ffi.dylib", "libitofin_ffi.so"):
             (self.native / "lib" / library).touch()
         self.metadata = self.native / "VERSION"
-        self.metadata.write_text(f"version=0.22.0\nrevision={REVISION}\n")
+        self.metadata.write_text(f"version=0.23.0\nrevision={REVISION}\n")
         self.bin = self.root / "bin"
         self.bin.mkdir()
         for name, content in (("go", FAKE_GO), ("sleep", "#!/bin/sh\nexit 0\n")):
@@ -72,7 +74,7 @@ class ReleaseConsumerTests(unittest.TestCase):
                         GOWORK="/unwanted/go.work", GOFLAGS="-modfile=unwanted.mod",
                         GOPRIVATE="*", GONOPROXY="*", GONOSUMDB="*")
 
-    def run_consumer(self, version="0.22.0", revision=REVISION, mode=""):
+    def run_consumer(self, version="0.23.0", revision=REVISION, mode=""):
         return subprocess.run(["bash", str(SCRIPT), str(self.native), version, revision],
                               env=dict(self.env, TEST_MODE=mode), capture_output=True,
                               text=True, timeout=30)
@@ -85,7 +87,7 @@ class ReleaseConsumerTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         calls = self.calls()
         downloads = [call["args"][-1] for call in calls if call["args"][:2] == ["mod", "download"]]
-        self.assertEqual(downloads, [f"{MODULE}@v0.22.0", f"{MODULE}@{REVISION}"])
+        self.assertEqual(downloads, [f"{MODULE}@v0.23.0", f"{MODULE}@{REVISION}"])
         for call in calls:
             env = call["env"]
             self.assertEqual(env["GOPROXY"], "https://proxy.golang.org,direct")
@@ -102,8 +104,8 @@ class ReleaseConsumerTests(unittest.TestCase):
         self.assertTrue(any("-race" in call["args"] for call in calls))
 
     def test_invalid_input_rejected_before_go(self):
-        for version, revision in (("v0.22.0", REVISION), ("00.22.0", REVISION),
-                                  ("0.22.0-beta.1", REVISION), ("0.22.0", "short")):
+        for version, revision in (("v0.23.0", REVISION), ("00.23.0", REVISION),
+                                  ("0.23.0-beta.1", REVISION), ("0.23.0", "short")):
             with self.subTest(version=version, revision=revision):
                 result = self.run_consumer(version, revision)
                 self.assertNotEqual(result.returncode, 0)
@@ -112,8 +114,8 @@ class ReleaseConsumerTests(unittest.TestCase):
 
     def test_native_metadata_must_match(self):
         for metadata in (f"version=0.21.0\nrevision={REVISION}\n",
-                         "version=0.22.0\nrevision=wrong\n",
-                         f"version=0.22.0\nversion=0.22.0\nrevision={REVISION}\n"):
+                         "version=0.23.0\nrevision=wrong\n",
+                         f"version=0.23.0\nversion=0.23.0\nrevision={REVISION}\n"):
             with self.subTest(metadata=metadata):
                 self.metadata.write_text(metadata)
                 self.assertNotEqual(self.run_consumer().returncode, 0)
@@ -121,6 +123,7 @@ class ReleaseConsumerTests(unittest.TestCase):
 
     def test_remote_mismatches_and_replace_are_rejected(self):
         for mode, diagnostic in (("origin", "origin"), ("version", "path/version"),
+                                 ("legacy-path", "path/version"),
                                  ("checksum", "disagree"), ("replace", "replace directive")):
             with self.subTest(mode=mode):
                 result = self.run_consumer(mode=mode)

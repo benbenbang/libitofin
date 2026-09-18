@@ -9,11 +9,14 @@ from check_release_version import check_version, release_version
 
 class ReleaseVersionTests(unittest.TestCase):
     def test_stable_tag_forms(self):
-        for tag in ("0.21.0", "v0.21.0", "bindings/go/v0.21.0"):
-            self.assertEqual(release_version(tag), "0.21.0")
+        for tag, version in (("0.21.0", "0.21.0"), ("v0.22.0", "0.22.0"),
+                             ("bindings/go/v0.22.0", "0.22.0"), ("sdk/go/v0.23.0", "0.23.0")):
+            with self.subTest(tag=tag):
+                self.assertEqual(release_version(tag), version)
 
     def test_invalid_tag_forms(self):
-        for tag in ("main", "v01.2.3", "v1.2", "v1.2.3-rc.1", "v1.2.3\n", "vv1.2.3", "bindings/go/1.2.3"):
+        for tag in ("main", "v01.2.3", "v1.2", "v1.2.3-rc.1", "v1.2.3\n", "vv1.2.3",
+                    "bindings/go/1.2.3", "sdk/go/1.2.3"):
             with self.subTest(tag=tag), self.assertRaises(ValueError):
                 release_version(tag)
 
