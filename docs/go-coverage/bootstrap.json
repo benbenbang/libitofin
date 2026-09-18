@@ -1,0 +1,63 @@
+{
+  "entries": [
+    {
+      "c": "itofin_simple_quote_variables_new",
+      "go": "Session.NewSimpleQuoteVariables",
+      "python": "itofin.termstructures.SimpleQuoteVariables.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestGlobalBootstrapVariablesValidation",
+        "TestGlobalBootstrapIndependentOracleAndRetainedGraph"
+      ]
+    },
+    {
+      "c": "itofin_global_curve_new",
+      "go": "Session.NewPiecewiseYieldCurve",
+      "python": "itofin.termstructures.PiecewiseYieldCurve.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestGlobalBootstrapIndependentOracleAndRetainedGraph",
+        "TestGlobalBootstrapCallbackErrorsAndReentry",
+        "TestGlobalBootstrapOptionsRequireGlobalAndEnoughResiduals"
+      ]
+    },
+    {
+      "c": "itofin_global_curve_new",
+      "go": "Session.NewPiecewiseLogLinearDiscount",
+      "python": "itofin.termstructures.PiecewiseLogLinearDiscount.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestGlobalBootstrapIndependentOracleAndRetainedGraph",
+        "TestGlobalBootstrapCallbackErrorsAndReentry",
+        "TestGlobalBootstrapOptionsRequireGlobalAndEnoughResiduals"
+      ]
+    },
+    {
+      "c": "itofin_futures_helper_new_with_observation",
+      "go": "Session.NewFuturesRateHelper",
+      "python": "itofin.termstructures.FuturesRateHelper.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestFuturesConvexityObserverSelection"
+      ]
+    },
+    {
+      "c": "itofin_futures_helper_new_with_observation",
+      "go": "Session.NewFuturesRateHelperFromEndDate",
+      "python": "itofin.termstructures.FuturesRateHelper.from_end_date",
+      "status": "implemented",
+      "tests": [
+        "TestFuturesConvexityObserverSelection"
+      ]
+    },
+    {
+      "c": "itofin_futures_helper_new_with_observation",
+      "go": "Session.NewFuturesRateHelperFromIndex",
+      "python": "itofin.termstructures.FuturesRateHelper.from_index",
+      "status": "implemented",
+      "tests": [
+        "TestFuturesConvexityObserverSelection"
+      ]
+    }
+  ]
+}
