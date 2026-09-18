@@ -852,7 +852,7 @@ impl PyOISRateHelper {
     ///     quote (SimpleQuote): The OIS rate; the caller keeps it, so a later
     ///         set_value re-drives the bootstrap.
     ///     overnight_index (OvernightIndex): The index the floating leg
-    ///         compounds.
+    ///         averages or compounds.
     ///     payment_lag (int): The days between accrual end and payment.
     ///     payment_convention (BusinessDayConvention): The roll applied to the
     ///         payment dates.

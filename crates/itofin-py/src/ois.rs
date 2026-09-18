@@ -30,7 +30,7 @@ use pyo3_stub_gen::derive::{
     gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pyfunction, gen_stub_pymethods,
 };
 
-/// A fixed leg versus a compounded overnight leg.
+/// A fixed leg versus a simple-averaged or compounded overnight leg.
 ///
 /// Only MakeOis builds one, so it always arrives priced; there is no
 /// set_engine and no raw constructor (both deferred with the two-schedule
@@ -198,7 +198,7 @@ impl PyMakeOis {
     /// Args:
     ///     swap_tenor (Period): The length of the swap.
     ///     overnight_index (OvernightIndex): The index the overnight leg
-    ///         compounds.
+    ///         averages or compounds.
     ///     settings (Settings): The explicit settings supplying the evaluation
     ///         date and the stored fixings.
     ///     fixed_rate (float | None): The rate of the fixed leg; None builds a
