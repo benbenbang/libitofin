@@ -11,7 +11,9 @@
       "go": "ZeroInflationIndex.String",
       "python": "ZeroInflationIndex.__repr__",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestInflationCompletionIndexRepresentations"
+      ]
     },
     {
       "c": "itofin_inflation_index_add_fixing",
@@ -234,7 +236,9 @@
       "go": "ZeroInflationHelper.LatestDate",
       "python": "ZeroInflationHelper.latest_date",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestInflationCompletionHelperDates"
+      ]
     },
     {
       "c": "itofin_inflation_helper_date",
@@ -277,7 +281,9 @@
       "go": "PiecewiseZeroInflationCurve.Dates",
       "python": "PiecewiseZeroInflationCurve.dates",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestInflationCompletionPiecewiseDetachedOutputs"
+      ]
     },
     {
       "c": "itofin_piecewise_zero_inflation_new",
@@ -302,7 +308,9 @@
       "go": "PiecewiseZeroInflationCurve.Times",
       "python": "PiecewiseZeroInflationCurve.times",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestInflationCompletionPiecewiseDetachedOutputs"
+      ]
     },
     {
       "c": "itofin_yoy_inflation_curve_value",
@@ -408,21 +416,27 @@
       "go": "YoYInflationHelper.LatestDate",
       "python": "YoYInflationHelper.latest_date",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestInflationCompletionHelperDates"
+      ]
     },
     {
       "c": "itofin_inflation_helper_date",
       "go": "YoYInflationHelper.PillarDate",
       "python": "YoYInflationHelper.pillar_date",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestInflationCompletionHelperDates"
+      ]
     },
     {
       "c": "itofin_inflation_index_name",
       "go": "YoYInflationIndex.String",
       "python": "YoYInflationIndex.__repr__",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestInflationCompletionIndexRepresentations"
+      ]
     },
     {
       "c": "itofin_inflation_index_add_fixing",
@@ -555,14 +569,18 @@
       "go": "PiecewiseYoYInflationCurve.Nodes",
       "python": "PiecewiseYoYInflationCurve.nodes",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestInflationCompletionPiecewiseDetachedOutputs"
+      ]
     },
     {
       "c": "itofin_yoy_inflation_nodes",
       "go": "PiecewiseYoYInflationCurve.Times",
       "python": "PiecewiseYoYInflationCurve.times",
       "status": "implemented",
-      "tests": []
+      "tests": [
+        "TestInflationCompletionPiecewiseDetachedOutputs"
+      ]
     },
     {
       "c": "validated int32 discriminant",
