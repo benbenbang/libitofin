@@ -45,7 +45,8 @@
 //! [`average_rate`](Self::average_rate) / [`effective_spread`](Self::effective_spread)
 //! / [`effective_index_fixing`](Self::effective_index_fixing)) and refuses the
 //! rest. The `OvernightIndexedCouponPricer` base (its optionlet-volatility
-//! members and the arithmetic-averaging pricer) is not ported; see the module
+//! members) is not ported; the default arithmetic pricer is implemented separately.
+//! See the module
 //! doc of [`overnightindexedcoupon`](super::overnightindexedcoupon).
 
 use super::couponpricer::FloatingRateCouponPricer;
@@ -126,7 +127,7 @@ impl OvernightSchedule {
 
     /// The accrual end (last interest date), the date the swaplet rate is
     /// compounded to.
-    fn accrual_end(&self) -> Date {
+    pub(super) fn accrual_end(&self) -> Date {
         *self
             .interest_dates
             .last()
@@ -137,7 +138,7 @@ impl OvernightSchedule {
 /// The number of fixings whose interest date falls before `date`
 /// (`determineNumberOfFixings`): the lower bound of `date` in the interest dates
 /// excluding the last.
-fn determine_number_of_fixings(interest_dates: &[Date], date: Date) -> usize {
+pub(super) fn determine_number_of_fixings(interest_dates: &[Date], date: Date) -> usize {
     let searchable = &interest_dates[..interest_dates.len() - 1];
     searchable.partition_point(|&d| d < date)
 }

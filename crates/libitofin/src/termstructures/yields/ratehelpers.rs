@@ -1168,7 +1168,7 @@ impl RelativeDateRateHelper for OISRateHelper {
     /// `lastPaymentDate` whenever the payment lag is at least one business day
     /// (the bootstrap oracle uses lag 2), and reaching the last coupon's fixing
     /// date needs a typed accessor the `dyn CashFlow` leg does not expose, so it
-    /// is deferred with the arithmetic-averaging leg.
+    /// remains deferred.
     fn initialize_dates(&self) {
         let swap = MakeOis::new(
             self.tenor,
