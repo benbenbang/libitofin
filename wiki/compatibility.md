@@ -7,6 +7,18 @@ bit-for-bit reproduction of its implementation. A small, deliberate set of
 divergences is catalogued here. Each is an intentional, reviewed decision (not an
 oversight) and is documented at the point of divergence in the source.
 
+## Contents
+
+- [Time and calendars](#time--calendars-epic-2)
+- [Core state](#core-epic-0)
+- [Cash flows](#cash-flows-epic-7)
+- [Term structures](#term-structures-epic-4)
+- [Indexes](#indexes-epic-6)
+- [Pricing engines](#pricing-engines-milestone-1)
+- [Credit](#credit-epic-credit-676)
+- [Processes](#processes-l5)
+- [Non-finite inputs](#non-finite-inputs-cross-cutting)
+
 ## Time / calendars (EPIC-2)
 
 - **Calendar holiday overrides are per-value, not process-global.** QuantLib
@@ -144,3 +156,126 @@ oversight) and is documented at the point of divergence in the source.
   template collapses to a `FixedRateCoupon`, is not special-cased: `IborCoupon`
   rejects it, so `with_gearing(0.0)` surfaces that `Err` rather than a silent
   fixed coupon.
+
+## Term structures (EPIC-4)
+
+- **The `Cubic` interpolator is the Kruger scheme, not QuantLib's
+  monotone-filtered natural spline.** QuantLib bootstraps its spline curves with
+  `Cubic(Spline, monotonic, SecondDerivative 0)` - a natural cubic spline under a
+  monotonicity filter - whereas this port's `Cubic` is the non-monotonic Kruger
+  scheme (`math/interpolations/cubic.rs`). Both are *global* cubics, so both
+  drive the bootstrap's convergence loop identically and reprice every pillar to
+  the same quote; the schemes differ only in the shape interpolated *between*
+  nodes, so bootstrapped node values and off-pillar queries can differ. The
+  consistency oracle is a self-repricing round-trip with no cached C++ number, so
+  the choice is fidelity-neutral there; a Spline-monotonic interpolator is
+  deliberately not added (documented at
+  `termstructures/yields/piecewiseyieldcurve.rs`).
+
+- **A `MultiCurve` external handle owns only its curve, not (as in C++) the whole
+  `MultiCurve`.** The caller must keep the `MultiCurve` alive for the lifetime of
+  its member curves; Rust has no `Rc` aliasing constructor, so the handle cannot
+  co-own the wrapper the way the C++ aliasing `shared_ptr` does
+  (`termstructures/multicurve.rs`). Dropping the `MultiCurve` while a member
+  handle is still held drops the co-contributor curves, and the next re-solve
+  returns an honest `Err` naming the dropped contributor, never a silent
+  single-curve fallback.
+
+## Indexes (EPIC-6)
+
+- **`Currency` is always valid; there is no empty placeholder.** QuantLib's
+  default-constructed `Currency` holds a null `data_` and `QL_REQUIRE`s a
+  non-null one on every inspector; its `operator==` treats two empty currencies
+  as equal and `operator<<` prints `"null currency"`. This port omits the empty
+  state, so a `Currency` always holds a concrete specification: accessors never
+  trip that null check, equality is purely by name (QuantLib's non-empty
+  branch), and `Display` always prints the ISO code. The "not yet set"
+  placeholder is an `Option<Currency>` at higher call sites, mirroring the
+  `DayCounter` decision above. The `rounding` convention, `triangulationCurrency`
+  and `minorUnitCodes` fields are dropped as unused by the index slice; rounding
+  returns with the money layer. Only EUR is provided; the `ql/currencies/*`
+  catalogue is deferred.
+
+## Pricing engines (Milestone 1)
+
+- **Zero-volatility Black greeks dispatch on the stored option type, not on the
+  sign of `alpha_`.** This is a deliberate divergence where the oracle is
+  wrong, and the only place in the port where a *finite* priced number
+  intentionally disagrees with QuantLib. Upstream (tree `v1.42.1-266-g9863b578a`,
+  from commit `17f1a1bed` "Fixing zero vol for Black") detects the option type
+  in its zero-vol branches with `if (alpha_ >= 0) // Call`, at nine sites
+  (`blackcalculator.cpp:215,222,229,257,264,271,439,446,453`). For a
+  plain-vanilla put, `alpha_ = -1.0 + cum_d1_` (`blackcalculator.cpp:137`), and
+  at zero volatility an out-of-the-money put has `cum_d1_ == 1.0` exactly, so
+  `alpha_ == 0.0` exactly and `0.0 >= 0` takes the Call branch: the OTM put is
+  handed a delta of `+1.0` where the correct value is `0.0`. This port instead
+  dispatches on the option type stored in the calculator, implementing the
+  values the reference's own comments state, so the OTM-put delta is `0.0`. The
+  full zero-vol ladder is pinned by `zero_volatility_ladder_matches_stated_intent`
+  and `zero_volatility_otm_put_gets_put_greeks_not_call_greeks` in
+  `blackcalculator.rs`, which assert the corrected numbers (OTM `0.0`, ATM
+  `-0.5`, ITM `-1.0` for the put, and the call mirror), so a regression to the
+  `alpha_ >= 0` form is a test failure.
+
+## Credit (EPIC Credit, #676)
+
+- **`FaceValueAccrualClaim` fails on a zero reference notional where QuantLib
+  returns `NaN`.** `claim.cpp:41-43` forms the accrual as
+  `accruedAmount(d) / notional(d)` with no guard, so a reference security whose
+  notional has been redeemed by the default date yields `0/0`. The port's
+  `Bond::notional` reports a redeemed bond as `Ok(0.0)` rather than throwing,
+  which puts that quotient within reach of ordinary use, so the claim names the
+  condition as an error (D4) instead of letting a `NaN` propagate silently into
+  a protection leg. Every other input reproduces `claim.cpp` exactly.
+- **`Claim::amount` returns `Result` where C++ returns a bare `Real`.**
+  `FaceValueAccrualClaim` reads a fallible `Bond` API, so the trait it shares
+  with `FaceValueClaim` is fallible too (D4); the face-value claim, which cannot
+  fail, simply returns `Ok`.
+
+## Processes (L5)
+
+- **`HestonProcess::evolve` ports the ctor-default Andersen QE scheme; the
+  other seven schemes and `pdf` are deferred.** QuantLib's `HestonProcess`
+  overrides `evolve` (`hestonprocess.cpp:396`) with a nine-way `Discretization`
+  switch, defaulting to `QuadraticExponentialMartingale`
+  (`hestonprocess.hpp:65`). This port implements the shared
+  `QuadraticExponential`/`QuadraticExponentialMartingale` body
+  (`hestonprocess.cpp:461-516`) and exposes the full `Discretization` enum; the
+  remaining seven variants (PartialTruncation, FullTruncation, Reflection,
+  NonCentralChiSquareVariance, and the three BroadieKaya exact schemes) return
+  `Err` referencing the deferral (#410) rather than silently mispricing via a
+  wrong branch. The QE `evolve` drifts the spot by the INTERVAL forward
+  `forwardRate(t0, t0+dt, Continuous)`, not the instantaneous forward that
+  `drift` uses. The ctor still installs the base Euler
+  `expectation`/`std_deviation`/`covariance` (`hestonprocess.cpp:46`), which
+  match QuantLib. `pdf`, `varianceDistribution`, and the modified-Bessel /
+  complex machinery the BroadieKaya schemes need remain with #410.
+
+## Non-finite inputs (cross-cutting)
+
+- **Non-finite arguments are rejected at the API boundary.** QuantLib validates
+  signs (`stdDev >= 0`, `forward > 0`, `t >= 0`) and relies on NaN failing every
+  such comparison, so a NaN is already an error wherever a sign is checked. An
+  infinity is not: it passes `>= 0.0` and propagates to a NaN result several
+  layers down, and where a curve extrapolates the range check is skipped
+  entirely. Following D10, this port widens each of those guards from "not NaN"
+  to "finite", and adds finiteness checks where C++ has none at all: solver
+  arguments and functor values (`solver1d.rs`), sampled quadrature abscissae
+  (`discrete.rs`), Black-Scholes process arguments (`blackscholesprocess.rs`),
+  and the volatility and variance an implementation returns
+  (`termstructures/volatility/`). Each site names the C++ guard it extends, or
+  states that none exists. The only behavioural change is for infinities; every
+  finite input QuantLib accepts is still accepted, so no priced number moves.
+- **Statistics accumulators reject a NaN sample value, and accept infinities.**
+  QuantLib's only sample guard is `QL_REQUIRE(weight >= 0.0)`
+  (`generalstatistics.hpp:233`, `incrementalstatistics.cpp:127`), which this
+  port keeps verbatim, written `!(weight >= 0.0)` so a NaN weight fails it as it
+  does in C++. A NaN *value* has no C++ guard: it is accumulated and poisons
+  every subsequent mean, variance and percentile with no diagnostic. Infinite
+  values remain accepted, as in C++, being meaningful to `min`, `max` and the
+  risk measures.
+- **Shape mismatches panic with a named cause.** `SVD::solveFor`
+  (`svd.cpp:528`) and the default `CostFunction::gradient` / `jacobian` have no
+  `QL_REQUIRE`; a wrongly-sized output leaves stale entries the optimiser reads
+  as real derivatives. These are caller errors, not market-data errors, so the
+  port asserts rather than returning `Err`.
