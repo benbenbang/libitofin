@@ -40,7 +40,7 @@ repos:
           name: Go and C ABI validation
           entry: bash scripts/check_go_bindings.sh
           language: system
-          files: ^(crates/(libitofin|libitofin-ffi)/|crates/itofin-py/python/itofin/.*\.pyi$|bindings/go/|scripts/(check_go_|package_go_native\.sh$|fixtures/go-(consumer|install-failures)/)|docs/go-coverage/|Cargo\.(toml|lock)$|rust-toolchain\.toml$|\.pre-commit-config\.yaml$|\.github/workflows/(go-(bindings|package|release)|pre-commit)\.yml$)
+          files: ^(crates/(libitofin|libitofin-ffi)/|crates/itofin-py/python/itofin/.*\.pyi$|sdk/go/|scripts/(check_go_|package_go_native\.sh$|fixtures/go-(consumer|install-failures)/)|docs/go-coverage/|Cargo\.(toml|lock)$|rust-toolchain\.toml$|\.pre-commit-config\.yaml$|\.github/workflows/(go-(bindings|package|release)|pre-commit)\.yml$)
           pass_filenames: false
         - id: itofin-submodule-shims
           name: itofin generated stubs and submodule shims in sync

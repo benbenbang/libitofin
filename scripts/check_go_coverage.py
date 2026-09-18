@@ -63,8 +63,8 @@ def audit():
     records, errors = {}, []
     native = "\n".join(p.read_text() for p in (ROOT / "crates/libitofin-ffi/src").glob("*.rs"))
     header = (ROOT / "crates/libitofin-ffi/include/itofin.h").read_text()
-    go = "\n".join(p.read_text() for p in (ROOT / "bindings/go").glob("*.go") if not p.name.endswith("_test.go"))
-    tests = native + "\n" + "\n".join(p.read_text() for p in (ROOT / "bindings/go").glob("*_test.go"))
+    go = "\n".join(p.read_text() for p in (ROOT / "sdk/go").glob("*.go") if not p.name.endswith("_test.go"))
+    tests = native + "\n" + "\n".join(p.read_text() for p in (ROOT / "sdk/go").glob("*_test.go"))
     for path in sorted((ROOT / "docs/go-coverage").glob("*.json")):
         data = json.loads(path.read_text())
         for record in data.get("entries", data.get("symbols", [])):

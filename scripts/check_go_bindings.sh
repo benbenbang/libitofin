@@ -3,7 +3,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 go_version=$(go env GOVERSION)
 if [[ "$go_version" != go1.27.1 ]]; then
-  printf 'Go 1.27.1 is required; found %s. Install the version pinned in bindings/go/go.mod.\n' "$go_version" >&2
+  printf 'Go 1.27.1 is required; found %s. Install the version pinned in sdk/go/go.mod.\n' "$go_version" >&2
   exit 1
 fi
 cargo test -p libitofin-ffi --release
@@ -26,7 +26,7 @@ cc -std=c11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
 c++ -x c++ -std=c++11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
   crates/libitofin-ffi/tests/c_smoke.c -Ltarget/release -litofin_ffi -o target/cpp-smoke
 ./target/cpp-smoke
-cd bindings/go
+cd sdk/go
 go vet ./...
 go test -race -count=1 -coverprofile=../../target/go-coverage.out ./...
 go run ./examples/portfolio

@@ -5,7 +5,7 @@ on:
   workflow_call:
   push:
     branches: [main, 'feat/go-cabi-*', 'feat/go-bindings-*']
-    paths: ['crates/**', 'bindings/go/**', 'scripts/check_go_*', 'docs/go-coverage/**', 'Cargo.*', 'rust-toolchain.toml', '.github/workflows/go-bindings.yml']
+    paths: ['crates/**', 'sdk/go/**', 'scripts/check_go_*', 'docs/go-coverage/**', 'Cargo.*', 'rust-toolchain.toml', '.github/workflows/go-bindings.yml']
 
 permissions:
   contents: read
@@ -38,7 +38,7 @@ jobs:
           cbindgen --config crates/libitofin-ffi/cbindgen.toml --crate libitofin-ffi --output crates/libitofin-ffi/include/itofin.h
           git diff --exit-code -- crates/libitofin-ffi/include/itofin.h
       - name: Check Go formatting
-        run: test -z "$(gofmt -l bindings/go)"
+        run: test -z "$(gofmt -l sdk/go)"
       - name: Test native and Go bindings
         run: bash scripts/check_go_bindings.sh
       - uses: actions/setup-python@v5

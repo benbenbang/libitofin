@@ -88,7 +88,7 @@ jobs:
           ref: ${{ needs.resolve.outputs.revision }}
       - uses: actions/setup-go@v6
         with:
-          go-version-file: bindings/go/go.mod
+          go-version-file: sdk/go/go.mod
           cache: false
       - name: Install from the public release and Go module proxy
         env:

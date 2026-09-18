@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	itofin "github.com/benbenbang/libitofin/bindings/go"
+	itofin "github.com/benbenbang/libitofin/sdk/go"
 )
 
 func main() {
