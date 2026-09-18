@@ -44,7 +44,7 @@ Handle<dyn YieldTermStructure>, volatility Handle<dyn BlackVolTermStructure>.
 
 ## Go boundary
 
-Go module path is github.com/benbenbang/libitofin/bindings/go, package itofin.
+Go module path is github.com/benbenbang/libitofin/sdk/go, package itofin.
 Each Go feature file uses a cgo preamble `#include "itofin.h"`.
 `Session` owns a native context created, used and destroyed on one locked OS
 thread. Feature methods call `s.invoke(func() error { ... })`; `s.ctx` is

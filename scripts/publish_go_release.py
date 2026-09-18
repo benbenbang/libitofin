@@ -71,10 +71,15 @@ def publish(repository: str, tag: str, directory: Path, root: Path) -> dict:
     version = check_version(root, tag)
     if tag != f"v{version}":
         raise ValueError("coordinated releases require a v-prefixed core tag")
+    module = root / "sdk/go/go.mod"
+    if not module.is_file() or ["module", f"github.com/{repository}/sdk/go"] not in [
+        line.split() for line in module.read_text().splitlines()
+    ]:
+        raise ValueError("checkout must declare the sdk/go module before publishing its tag")
     revision = command("git", "-C", str(root), "rev-parse", "HEAD")
     if remote_commit(repository, tag) != revision:
         raise ValueError("checkout does not match the remote core release tag")
-    go_tag = f"bindings/go/v{version}"
+    go_tag = f"sdk/go/v{version}"
     existing = remote_commit(repository, go_tag)
     if existing is not None and existing != revision:
         raise ValueError("existing Go tag points to a different commit; refusing to move it")
@@ -123,7 +128,7 @@ def publish(repository: str, tag: str, directory: Path, root: Path) -> dict:
     body = release.get("body") or ""
     if "## Go bindings" not in body:
         notes = (f"\n\n## Go bindings\n\n"
-                 f"Install `github.com/{repository}/bindings/go@v{version}` with Go 1.27.1. "
+                 f"Install `github.com/{repository}/sdk/go@v{version}` with Go 1.27.1. "
                  "The native archives and SHA-256 checksums are attached below for Linux amd64 "
                  "and macOS arm64. cgo, a C compiler, and the matching native package are required. "
                  f"See the [installation guide](https://github.com/{repository}/blob/{tag}/docs/go-distribution.md).\n")

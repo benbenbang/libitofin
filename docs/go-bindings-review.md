@@ -11,8 +11,8 @@ of feature, test and integration commits; no PR or merge to main was created.
 
 ## Original result
 
-The sibling `libitofin-ffi` crate exports 223 C entry points, and `bindings/go`
-provides the Go 1.27.1 package. The existing Rust core and Python source are
+The sibling `libitofin-ffi` crate exports 223 C entry points, and the Go package
+(originally `bindings/go`, now `sdk/go`) uses Go 1.27.1. The existing Rust core and Python source are
 unchanged. Explicit session workers preserve the core's thread confinement and
 observer ownership model. Batched seeded Gaussian/GBM simulation provides a
 usable portfolio path through one native call, with a runnable synthetic example.
@@ -61,7 +61,7 @@ results, panic poisoning, integer ranges and UTF-8 metadata.
 6. Coverage mappings, numerical tests, build instructions and CI workflow.
 
 All native source paths above are under `crates/libitofin-ffi/src`; Go paths are
-under `bindings/go`. See `bindings/go/README.md` for build and ownership examples.
+under `sdk/go`. See `sdk/go/README.md` for build and ownership examples.
 
 ## Practical limits
 

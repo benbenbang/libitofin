@@ -85,12 +85,12 @@ parity landed. The original Linux review and these macOS arm64 results
 
 - `cargo build -p libitofin-ffi --release`: passed.
 - `cargo test -p libitofin-ffi --release models_api::tests::calibration_enum_and_optional_criteria_are_checked`: one passed.
-- `GOEXPERIMENT=cgocheck2 go test -race -count=1 -run 'TestHullWhiteCalibrationErrorVariants|TestFlatHazardAnalytic'` in `bindings/go`, with `DYLD_LIBRARY_PATH` pointing to this worktree's release output: both top-level tests passed, including both calibration variants. The additional `TestCreditBootstrapRepricesIndependentContracts` passed with the same race/cgo flags, as did `TestInflationCurveMetadataAndDetachedNodes` and `TestZeroInflationRelinkingRetainsIndependentForecast`.
+- `GOEXPERIMENT=cgocheck2 go test -race -count=1 -run 'TestHullWhiteCalibrationErrorVariants|TestFlatHazardAnalytic'` in `bindings/go` (now `sdk/go`), with `DYLD_LIBRARY_PATH` pointing to this worktree's release output: both top-level tests passed, including both calibration variants. The additional `TestCreditBootstrapRepricesIndependentContracts` passed with the same race/cgo flags, as did `TestInflationCurveMetadataAndDetachedNodes` and `TestZeroInflationRelinkingRetainsIndependentForecast`.
 - Full package `GOEXPERIMENT=cgocheck2 go test -race -count=1 ./...` with the same loader path: passed (1.686s); portfolio package compiled, no example execution claimed.
 - `python3 scripts/check_go_coverage.py --strict --baseline`: 744/744 baseline mapped, 610 explicit test references, no invalid references; 111 newer symbols still unmapped.
 
 The independently downloaded QuantLib 1.43 wheel generated the calibration
-constants using [the reproducible oracle](../bindings/go/testdata/hullwhite_calibration_oracle.py).
+constants using [the reproducible oracle](../sdk/go/testdata/hullwhite_calibration_oracle.py).
 Its fixture follows QuantLib `test-suite/shortratemodels.cpp:testCachedHullWhite`,
 changing only the error metric. Signed residuals use 1e-8 absolute tolerance;
 parameters retain 1.3e-5. The constant-hazard test uses `exp(-hazard * time)`

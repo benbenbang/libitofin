@@ -7,7 +7,7 @@ import tomllib
 
 
 def release_version(tag: str) -> str:
-    match = re.fullmatch(r"(?:v|bindings/go/v)?((?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*))", tag)
+    match = re.fullmatch(r"(?:v|bindings/go/v|sdk/go/v)?((?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*))", tag)
     if match is None:
         raise ValueError(f"not a stable release tag: {tag!r}")
     return match[1]
