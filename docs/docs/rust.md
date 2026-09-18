@@ -15,9 +15,8 @@ release:
 - **`rustdoc` is the native tool.** Rust API docs come from the `///` doc comments on the
   source and render with full type links, trait implementations and source view. docs.rs
   builds them for you on publish, so there is nothing to duplicate here.
-- **This site is the Python surface.** It renders the hand-written `.pyi` stubs (see the
-  **Python API** section). Keeping the two apart avoids one language's docs going stale
-  against the other's toolchain.
+- **This site brings the language guides together.** It renders Python `.pyi` stubs
+  and links to native Rust and Go API references, while sharing runnable examples.
 
 ## Add it to a Rust project
 
@@ -32,4 +31,4 @@ use libitofin::settings::Settings;
 ```
 
 Runnable Rust examples live in [`crates/libitofin/examples`](https://github.com/benbenbang/libitofin/tree/main/crates/libitofin/examples);
-their Python counterparts are on the [Getting started](getting-started.md) page.
+the Python and Go introductions are on the [Getting started](getting-started.md) page.

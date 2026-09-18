@@ -3,6 +3,8 @@
 The Go package calls the same Rust core as the Python package through a C ABI.
 It requires **Go 1.27.1**, cgo, a C compiler, and the native library. For a source checkout, use the commands below. For an external Go module,
 see [native packages and installation](../../docs/go-distribution.md).
+The [Go SDK site](https://benbenbang.github.io/libitofin/go/) includes setup,
+session guidance, and worked examples.
 
 ```sh
 cargo build -p libitofin-ffi --release
@@ -10,6 +12,7 @@ export LD_LIBRARY_PATH="$PWD/target/release${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
 # On macOS, use DYLD_LIBRARY_PATH instead.
 cd sdk/go
 go test ./...
+go run ./examples/european_option
 go run ./examples/portfolio
 ```
 

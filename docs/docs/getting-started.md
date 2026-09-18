@@ -1,9 +1,8 @@
 # Getting started
 
-The same pricing task in Python and in Rust. The Python API is the thin binding; the Rust
-core is where the numerics live. Both snippets below are the real, runnable example files
-from the repository (`example/python` and `crates/libitofin/examples`), included verbatim, so what you
-read here is exactly what runs.
+The same pricing task in Python, Rust, and Go. All three use the Rust numerical
+core. The snippets below include the real runnable files from the repository,
+so the documentation stays in sync with the examples.
 
 ## Price a European option
 
@@ -22,7 +21,15 @@ read the value plus the greeks.
     --8<-- "crates/libitofin/examples/european_option.rs"
     ```
 
-Run them with:
+=== "Go"
+
+    ```go title="sdk/go/examples/european_option/main.go"
+    --8<-- "sdk/go/examples/european_option/main.go"
+    ```
+
+Run them from a source checkout. For Go, first follow the
+[native build and runtime setup](go.md#run-examples-from-a-source-checkout).
+For an application using the published module, follow [Go installation](go.md#install-in-an-application).
 
 === "Python"
 
@@ -36,9 +43,23 @@ Run them with:
     cargo run --example european_option
     ```
 
+=== "Go"
+
+    ```sh
+    cd sdk/go
+    go run ./examples/european_option
+    ```
+
+The Python and Go examples price the same call: spot 60, strike 65, 90 days to expiry,
+30% volatility, 8% risk-free rate, zero dividends, and Actual/360 day count.
+Their expected NPV is `2.1333684449`. The Rust example illustrates the same
+pricing workflow with a different market and maturity.
+
 ## More worked examples
 
-Every example ships in both languages with a matching filename. Browse the full set:
+Go examples currently cover the European option above and
+[correlated portfolio simulation](go.md#portfolio-simulation). The Python and
+Rust examples below cover additional products:
 
 | Topic | Python | Rust |
 |-------|--------|------|

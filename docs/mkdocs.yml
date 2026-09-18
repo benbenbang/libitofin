@@ -1,5 +1,5 @@
 site_name: itofin
-site_description: Python API reference for itofin, the Rust QuantLib port (libitofin).
+site_description: Python, Rust, and Go documentation for itofin, the Rust QuantLib port (libitofin).
 site_url: https://benbenbang.github.io/libitofin/
 repo_url: https://github.com/benbenbang/libitofin
 repo_name: benbenbang/libitofin
@@ -72,6 +72,7 @@ plugins:
 nav:
   - Home: index.md
   - Getting started: getting-started.md
+  - Go SDK: go.md
   - Python API:
       - Core: api/core.md
       - Time: api/time.md
