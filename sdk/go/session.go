@@ -13,9 +13,11 @@ import (
 	"fmt"
 	"runtime"
 	"sync"
+	"sync/atomic"
 )
 
 var (
+	ErrCallbackReentry = errors.New("itofin: session calls are not allowed during bootstrap callbacks")
 	ErrClosed          = errors.New("itofin: session is closed")
 	ErrSessionMismatch = errors.New("itofin: objects belong to different sessions")
 )
@@ -42,14 +44,16 @@ type request struct {
 
 // Session owns a native object graph. Its methods may be called concurrently;
 // calls execute serially. Close waits for active calls, then releases the graph.
+// Calls during a bootstrap callback, including Close, return ErrCallbackReentry.
 // Do not copy a Session. No finalizer accesses thread-confined Rust state.
 type Session struct {
-	ctx      *C.ItofinContext
-	queue    chan request
-	stopped  chan struct{}
-	gate     sync.RWMutex
-	closed   bool
-	closeErr error
+	callbackActive atomic.Bool
+	ctx            *C.ItofinContext
+	queue          chan request
+	stopped        chan struct{}
+	gate           sync.RWMutex
+	closed         bool
+	closeErr       error
 }
 
 // NewSession creates a native context on its dedicated OS thread.
@@ -85,6 +89,9 @@ func (s *Session) invoke(fn func() error) error {
 	if s == nil {
 		return errNilArgument("session")
 	}
+	if s.callbackActive.Load() {
+		return ErrCallbackReentry
+	}
 	s.gate.RLock()
 	defer s.gate.RUnlock()
 	if s.closed || s.queue == nil {
@@ -99,6 +106,9 @@ func (s *Session) invoke(fn func() error) error {
 func (s *Session) Close() error {
 	if s == nil {
 		return nil
+	}
+	if s.callbackActive.Load() {
+		return ErrCallbackReentry
 	}
 	s.gate.Lock()
 	defer s.gate.Unlock()

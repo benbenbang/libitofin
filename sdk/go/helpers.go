@@ -155,17 +155,18 @@ func (s *Session) NewFraRateHelperFromDates(c FraRateHelperConfig) (*RateHelper,
 }
 
 type FuturesRateHelperConfig struct {
-	Price               *SimpleQuote
-	IborStartDate       Date
-	IborEndDate         *Date // FromEndDate only; nil follows the core IMM/ASX rule.
-	LengthInMonths      uint32
-	Calendar            *Calendar
-	Convention          BusinessDayConvention
-	EndOfMonth          bool
-	DayCounter          *DayCounter
-	ConvexityAdjustment *SimpleQuote
-	FuturesType         FuturesType
-	Index               *IborIndex // FromIndex only.
+	DoNotObserveConvexity bool
+	Price                 *SimpleQuote
+	IborStartDate         Date
+	IborEndDate           *Date // FromEndDate only; nil follows the core IMM/ASX rule.
+	LengthInMonths        uint32
+	Calendar              *Calendar
+	Convention            BusinessDayConvention
+	EndOfMonth            bool
+	DayCounter            *DayCounter
+	ConvexityAdjustment   *SimpleQuote
+	FuturesType           FuturesType
+	Index                 *IborIndex // FromIndex only.
 }
 
 func (s *Session) futuresHelper(cfg FuturesRateHelperConfig, mode int) (*RateHelper, error) {
@@ -215,7 +216,7 @@ func (s *Session) futuresHelper(cfg FuturesRateHelperConfig, mode int) (*RateHel
 	var id C.uint64_t
 	err := s.invoke(func() error {
 		var e C.ItofinError
-		return ffiError(C.itofin_futures_helper_new(s.ctx, C.int32_t(mode), &a, &id, &e), &e)
+		return ffiError(C.itofin_futures_helper_new_with_observation(s.ctx, C.int32_t(mode), &a, C.bool(!cfg.DoNotObserveConvexity), &id, &e), &e)
 	})
 	return helperResult(s, id, err)
 }

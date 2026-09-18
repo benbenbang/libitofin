@@ -152,12 +152,15 @@ func (c *YieldTermStructure) EnableExtrapolation() error  { return c.setExtrapol
 func (c *YieldTermStructure) DisableExtrapolation() error { return c.setExtrapolation(false) }
 
 type PiecewiseCurveConfig struct {
-	ReferenceDate     Date
-	Helpers           []*RateHelper
-	DayCounter        *DayCounter
-	Interpolation     string        // PiecewiseYieldCurve: LogLinear (default), Linear, Cubic.
-	Bootstrap         string        // iterative (default), global; convex-monotone also supports local.
-	AdditionalHelpers []*RateHelper // global bootstrap only; extends maximum date.
+	AdditionalVariables *SimpleQuoteVariables
+	AdditionalDates     func() ([]Date, error)
+	AdditionalPenalties func(BootstrapState) ([]float64, error)
+	ReferenceDate       Date
+	Helpers             []*RateHelper
+	DayCounter          *DayCounter
+	Interpolation       string        // PiecewiseYieldCurve: LogLinear (default), Linear, Cubic.
+	Bootstrap           string        // iterative (default), global; convex-monotone also supports local.
+	AdditionalHelpers   []*RateHelper // global bootstrap only; extends maximum date.
 }
 
 func (s *Session) piecewise(cfg PiecewiseCurveConfig, kind int) (*YieldTermStructure, error) {
@@ -194,8 +197,15 @@ func (s *Session) piecewise(cfg PiecewiseCurveConfig, kind int) (*YieldTermStruc
 	default:
 		return nil, fmt.Errorf("unknown bootstrap %q", cfg.Bootstrap)
 	}
+	globalOptions := cfg.AdditionalVariables != nil || cfg.AdditionalDates != nil || cfg.AdditionalPenalties != nil
+	if globalOptions && algo != 1 {
+		return nil, fmt.Errorf("additional variables, dates and penalties require global bootstrap")
+	}
 	var id C.uint64_t
 	err := s.invoke(func() error {
+		if globalOptions {
+			return s.globalCurve(cfg, kind, ids, extra, &id)
+		}
 		var e C.ItofinError
 		return ffiError(C.itofin_piecewise_curve_new(s.ctx, C.int32_t(cfg.ReferenceDate.Serial()), unsafe.SliceData(ids), C.size_t(len(ids)), C.uint64_t(cfg.DayCounter.id), C.int32_t(kind), C.int32_t(algo), unsafe.SliceData(extra), C.size_t(len(extra)), &id, &e), &e)
 	})
