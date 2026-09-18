@@ -372,8 +372,8 @@ mod tests {
     }
 
     /// The seasonality gate runs from this constructor, as it does on the zero
-    /// curve: twelve monthly factors are consistent with any curve, a
-    /// twenty-four-factor set is the multi-year case this port defers.
+    /// curve: twelve monthly factors are consistent with any curve, the
+    /// increasing twenty-four-factor set is inconsistent.
     #[test]
     fn the_constructor_installs_and_gates_a_seasonality() {
         fn built(count: usize) -> QlResult<YoYInflationCurve> {
@@ -397,14 +397,16 @@ mod tests {
         }
 
         assert!(built(12).unwrap().has_seasonality());
-        let deferred = match built(24) {
+        let inconsistent = match built(24) {
             Ok(_) => panic!("expected the multi-year seasonality to be rejected"),
             Err(err) => err,
         };
         assert!(
-            deferred.message().contains("#807"),
+            inconsistent
+                .message()
+                .contains("seasonality is inconsistent"),
             "{}",
-            deferred.message()
+            inconsistent.message()
         );
         assert!(!sample().has_seasonality());
     }

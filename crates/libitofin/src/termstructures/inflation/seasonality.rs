@@ -19,11 +19,6 @@
 //!   `seasonality.cpp:220-277`) is **not ported**. It is a distinct
 //!   cumulative-product subclass, not a parametrization of
 //!   [`MultiplicativePriceSeasonality`], and is out of scope here (#729).
-//! - [`MultiplicativePriceSeasonality::is_consistent`] ports the two
-//!   short-circuits (`seasonality.cpp:69-70`) but **not** the multi-year
-//!   whole-year comparison loop (`seasonality.cpp:72-85`), which returns a
-//!   typed error naming the deferral (#807) rather than a silent `true`. A
-//!   stationary factor set - the same count as the frequency - is unaffected.
 //! - C++'s `set` assigns the fields and *then* validates, leaving an invalid
 //!   object behind on failure; [`MultiplicativePriceSeasonality::set`] builds
 //!   the replacement first, so a rejected input leaves the receiver untouched.
@@ -95,7 +90,7 @@ pub trait Seasonality {
 /// whole years either side of the curve's base date must match or the curve
 /// contradicts its own quotes. See
 /// [`is_consistent`](MultiplicativePriceSeasonality::is_consistent) for how
-/// much of that check is ported.
+/// that check is applied.
 #[derive(Debug)]
 pub struct MultiplicativePriceSeasonality {
     seasonality_base_date: Date,
@@ -337,33 +332,49 @@ impl Seasonality for MultiplicativePriceSeasonality {
         )
     }
 
-    /// Consistency with the curve (`seasonality.cpp:64-88`), as far as it is
-    /// ported.
+    /// Consistency with the curve (`seasonality.cpp:64-88`).
     ///
-    /// Daily seasonality is consistent by fiat: weekends, holidays and leap
-    /// years make it otherwise never so (`seasonality.cpp:67-69`). A
-    /// stationary set - one factor per period of the year - is consistent
-    /// because it repeats exactly on whole years (`seasonality.cpp:70`).
+    /// Daily and stationary factor sets are accepted immediately. Multi-year
+    /// sets compare factors at whole calendar years from the end of the
+    /// curve's base inflation period, with QuantLib's strict `1e-5` tolerance.
     ///
     /// # Errors
     ///
-    /// Any other (multi-year) factor count errors: the whole-year comparison
-    /// loop that decides those (`seasonality.cpp:72-85`) is deferred to #807,
-    /// and reporting consistency without running it would let an inconsistent
-    /// curve through unnoticed.
-    fn is_consistent(&self, _its: &dyn InflationTermStructure) -> QlResult<bool> {
+    /// Returns an error if a whole-year factor differs by at least `1e-5`,
+    /// a required anniversary exceeds the supported date range, or the curve
+    /// frequency cannot define an inflation period.
+    fn is_consistent(&self, its: &dyn InflationTermStructure) -> QlResult<bool> {
         if self.frequency == Frequency::Daily {
             return Ok(true);
         }
-        if (self.frequency as i16 as usize) == self.seasonality_factors.len() {
+        let frequency = self.frequency as i16 as usize;
+        if frequency == self.seasonality_factors.len() {
             return Ok(true);
         }
-        fail!(
-            "multi-year seasonality consistency check is not ported (#807): \
-             {} factors at {} frequency",
-            self.seasonality_factors.len(),
-            self.frequency
-        )
+        let (_, curve_base_date) = inflation_period(its.base_date(), its.frequency())?;
+        let factor_base = self.seasonality_factor(curve_base_date)?;
+        let available_years = (Date::max_date().year() - curve_base_date.year()) as usize;
+        for year in 1..self.seasonality_factors.len() / frequency {
+            require!(
+                year <= available_years,
+                "seasonality consistency date exceeds the supported date range: {} years after {}",
+                year,
+                curve_base_date
+            );
+            let factor_at = self.seasonality_factor(
+                curve_base_date + Period::new(year as Integer, TimeUnit::Years),
+            )?;
+            let consistent = (factor_at - factor_base).abs() < 1.0e-5;
+            require!(
+                consistent,
+                "seasonality is inconsistent with inflation term structure, factors {} and later factor {}, {} years later from inflation curve with base date at {}",
+                factor_base,
+                factor_at,
+                year,
+                curve_base_date
+            );
+        }
+        Ok(true)
     }
 }
 
@@ -542,15 +553,18 @@ mod tests {
         assert!((corrected - 0.03).abs() < 1.0e-15, "moved to {corrected}");
     }
 
-    /// Twelve monthly factors are consistent with any curve; twenty-four are
-    /// the deferred multi-year branch; thirteen never build at all.
+    /// Stationary factors pass; inconsistent multi-year factors and incomplete years fail.
     #[test]
-    fn consistency_covers_the_stationary_case_and_defers_the_multi_year_one() {
+    fn consistency_accepts_stationary_and_rejects_inconsistent_multi_year_factors() {
         let curve = a_curve();
 
         assert!(monthly(12).is_consistent(&curve).unwrap());
-        let deferred = monthly(24).is_consistent(&curve).unwrap_err();
-        assert!(deferred.message().contains("#807"));
+        let inconsistent = monthly(24).is_consistent(&curve).unwrap_err();
+        assert!(
+            inconsistent
+                .message()
+                .contains("seasonality is inconsistent")
+        );
 
         let rejected = MultiplicativePriceSeasonality::new(
             seasonality_base_date(),
