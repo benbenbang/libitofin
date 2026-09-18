@@ -45,6 +45,19 @@ mapped 855/855 declarations with 713 explicit test references; the baseline
 remains 744/744. Go library statement coverage was 83.4%. These measures do
 not imply exhaustive behavioral coverage.
 
+## Python API additions after 0.21.0
+
+The 855/855 result above describes the released API baseline. Python enum stub
+corrections add 48 typing declarations for existing runtime behavior;
+GlobalBootstrap adds external quote variables and callback configuration.
+The current audit must report these additions separately from existing mappings.
+
+[#1030](https://github.com/benbenbang/libitofin/issues/1030) tracks Go parity,
+including callback errors and ownership, jointly fitted quotes, and the futures
+convexity-observation option. Existing constructor mappings do not prove parity
+for new keyword arguments. The original 744/744 baseline remains enforced;
+full-current parity is incomplete until that follow-up is validated.
+
 ## Historical combined local validation
 
 The integrated tree at `34a5a8bc` passed on macOS arm64 with Go 1.27.1 and
