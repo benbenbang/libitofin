@@ -29,7 +29,7 @@
 //!   capped coupon and those pricers are deferred (see below), so no ported call
 //!   ever supplies a pricer.
 //! - [`OvernightIndexedCoupon`] installs its own
-//!   [`CompoundingOvernightIndexedCouponPricer`] in its constructor and holds a
+//!   averaging pricer in its constructor and holds a
 //!   reference to it in a private field that its rate-bearing inspectors
 //!   (`accrued_amount`, `effective_spread`) read directly. Overriding that pricer
 //!   after construction would desync that field from the embedded
@@ -46,7 +46,7 @@
 //! C++ ends the builder with `operator Leg()`. The port splits that into
 //! [`OvernightLeg::coupons`], which keeps the concrete [`OvernightIndexedCoupon`]
 //! type, and [`OvernightLeg::build`], which erases it into a [`Leg`]. Each coupon
-//! carries the compounding pricer its own constructor installed; the leg attaches
+//! carries the averaging pricer its own constructor installed; the leg attaches
 //! none.
 //!
 //! ## Deferred (later sub-tickets of #69)
@@ -61,9 +61,6 @@
 //! corresponding constructor arguments. A zero gearing, which C++ collapses to a
 //! `FixedRateCoupon`, is likewise not special-cased: the port's coupon rejects it,
 //! so `with_gearing(0.0)` surfaces that error rather than a silent fixed coupon.
-//! [`RateAveraging::Simple`](super::rateaveraging::RateAveraging::Simple) may be
-//! set, but the coupon refuses it at construction, so the error surfaces at
-//! [`build`](OvernightLeg::build).
 
 use crate::cashflow::{CashFlow, Leg};
 use crate::cashflows::overnightindexedcoupon::OvernightIndexedCoupon;
@@ -174,11 +171,7 @@ impl OvernightLeg {
         self
     }
 
-    /// The averaging method. Only
-    /// [`RateAveraging::Compound`](super::rateaveraging::RateAveraging::Compound)
-    /// is supported by the coupon; setting
-    /// [`Simple`](super::rateaveraging::RateAveraging::Simple) surfaces an error at
-    /// [`build`](Self::build).
+    /// The averaging method: daily compounding or arithmetic averaging.
     pub fn with_averaging_method(mut self, averaging_method: RateAveraging) -> OvernightLeg {
         self.averaging_method = averaging_method;
         self
@@ -191,7 +184,7 @@ impl OvernightLeg {
         self
     }
 
-    /// The coupons the leg is made of, each carrying the compounding pricer its own
+    /// The coupons the leg is made of, each carrying the averaging pricer its own
     /// constructor installed.
     ///
     /// # Errors
@@ -199,7 +192,7 @@ impl OvernightLeg {
     /// Errors if no notional was given, if the schedule holds fewer than two dates,
     /// if more notionals, gearings or spreads were given than the schedule has
     /// periods, or if a coupon fails its [`OvernightIndexedCoupon::new`]
-    /// preconditions (a zero gearing and simple averaging among them).
+    /// preconditions, including nonzero gearing.
     pub fn coupons(&self) -> QlResult<Vec<Shared<OvernightIndexedCoupon>>> {
         require!(!self.notionals.is_empty(), "no notional given");
         let size = self.schedule.len();
@@ -408,6 +401,23 @@ mod tests {
         }
     }
 
+    #[test]
+    fn simple_averaging_builds_and_prices_every_coupon() {
+        let (settings, curve, sofr, schedule) = common_vars(Date::new(1, Month::June, 2025));
+        curve.link_to(flat_rate(settings.evaluation_date().unwrap(), 0.04));
+        let compound = base_leg(schedule.clone(), sofr.clone()).coupons().unwrap();
+        let simple = base_leg(schedule, sofr)
+            .with_averaging_method(RateAveraging::Simple)
+            .coupons()
+            .unwrap();
+        assert_eq!(simple.len(), compound.len());
+        for (simple, compound) in simple.iter().zip(compound) {
+            assert_eq!(simple.averaging_method(), RateAveraging::Simple);
+            assert!(simple.rate().unwrap() > 0.0);
+            assert!(simple.rate().unwrap() < compound.rate().unwrap());
+        }
+    }
+
     /// `testOvernightLegWithGearingsAndSpreads` (:999): four coupons, each carrying
     /// its own gearing and spread. The coupon exposes no `gearing()`/`spread()`, so
     /// the broadcast is proved through the rate against a plain (gearing 1, spread
@@ -443,8 +453,7 @@ mod tests {
     }
 
     /// `testOvernightLegErrorConditions` (:1094) and the `operator Leg()` guard: a
-    /// leg with no notional, one asking for simple averaging (the coupon ports only
-    /// compound), and one with a zero gearing (the coupon rejects it rather than
+    /// leg with no notional and one with a zero gearing (the coupon rejects it rather than
     /// collapsing to a fixed coupon) all surface an error at build.
     #[test]
     fn invalid_legs_surface_errors_at_build() {
@@ -452,12 +461,6 @@ mod tests {
 
         assert!(
             OvernightLeg::new(schedule.clone(), sofr.clone())
-                .build()
-                .is_err()
-        );
-        assert!(
-            base_leg(schedule.clone(), sofr.clone())
-                .with_averaging_method(RateAveraging::Simple)
                 .build()
                 .is_err()
         );

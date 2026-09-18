@@ -4,6 +4,7 @@
 //! base. The items are re-exported flat, so a coupon is `cashflows::Coupon`
 //! rather than `cashflows::coupon::Coupon`.
 
+mod arithmeticaveragedovernightindexedcouponpricer;
 mod capflooredcoupon;
 #[cfg(test)]
 mod capflooredcoupon_oracle;
