@@ -75,6 +75,7 @@ jobs:
               - crates/itofin-py/python/**
               - crates/libitofin/examples/**
               - example/**
+              - sdk/go/examples/**
               - .github/workflows/*.yml
 
   rust-ci:

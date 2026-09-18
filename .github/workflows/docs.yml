@@ -8,6 +8,7 @@ on:
       - "crates/itofin-py/python/**"
       - "crates/libitofin/examples/**"
       - "example/**"
+      - "sdk/go/examples/**"
       - ".github/workflows/docs.yml"
 
 permissions:
