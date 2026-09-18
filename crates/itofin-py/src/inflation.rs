@@ -600,9 +600,10 @@ impl PyZeroInflationTermStructure {
     ///         to install; None clears it.
     ///
     /// Raises:
-    ///     ItofinError: From the consistency gate, which a multi-year factor
-    ///         set fails, that comparison being a documented core deferral
-    ///         (#807). The store happens before the gate runs, as C++'s does,
+    ///     ItofinError: If multi-year factors disagree at whole years from
+    ///         the end of the curve's base inflation period by at least 1e-5,
+    ///         or an anniversary exceeds the supported date range.
+    ///         The store happens before the gate runs, as C++'s does,
     ///         so a rejected correction is left installed and unannounced:
     ///         clear it with None before reading the curve again.
     #[pyo3(signature = (seasonality))]
