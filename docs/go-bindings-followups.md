@@ -70,9 +70,13 @@ Feature-branch validation does not publish a release. No release tag is created
 by this implementation. First published-tag resolution and downstream application
 migration remain separate tasks; the public consumer fixture establishes
 synthetic library acceptance without claiming either.
-Linux mixed-build-order evidence remains tracked in [#1001](https://github.com/benbenbang/libitofin/issues/1001);
-negative installation checks for missing/incompatible native libraries remain
-in [#1006](https://github.com/benbenbang/libitofin/issues/1006).
+The Go/C ABI matrix checks both clean and incremental Python/stub/C ABI build
+orders on Linux and macOS with `scripts/check_go_mixed_builds.sh`. It uses fresh
+Cargo target directories, then verifies Python imports, stubs, and C/C++ callers
+after each order and a workspace build. Run it in a Python virtual environment
+with maturin, numpy, and pytest installed.
+The package matrix checks missing and incompatible native-library failures
+with `scripts/check_go_install_failures.sh`.
 
 Direct calendar queries check tabulated bounds, including fixing calendars
 retrieved from indexes after their original handles close. Core instrument

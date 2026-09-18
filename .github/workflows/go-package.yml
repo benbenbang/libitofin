@@ -46,6 +46,7 @@ jobs:
           fi
           cd ..
           bash scripts/check_go_consumer.sh "$native"
+          bash scripts/check_go_install_failures.sh "$native"
       - uses: actions/upload-artifact@v4
         with:
           name: native-${{ matrix.platform }}

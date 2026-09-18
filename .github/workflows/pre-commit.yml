@@ -60,6 +60,7 @@ jobs:
               - scripts/check_go_*
               - scripts/package_go_native.sh
               - scripts/fixtures/go-consumer/**
+              - scripts/fixtures/go-install-failures/**
               - docs/go-coverage/**
               - Cargo.*
               - rust-toolchain.toml
