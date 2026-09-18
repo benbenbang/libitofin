@@ -698,7 +698,7 @@ class MakeOis:
         Args:
             swap_tenor (Period): The length of the swap.
             overnight_index (OvernightIndex): The index the overnight leg
-                compounds.
+                averages or compounds.
             settings (Settings): The explicit settings supplying the evaluation
                 date and the stored fixings.
             fixed_rate (float | None): The rate of the fixed leg; None builds a
@@ -864,7 +864,7 @@ class MakeYoYInflationCapFloor:
 @typing.final
 class OvernightIndexedSwap:
     r"""
-    A fixed leg versus a compounded overnight leg.
+    A fixed leg versus a simple-averaged or compounded overnight leg.
 
     Only MakeOis builds one, so it always arrives priced; there is no
     set_engine and no raw constructor (both deferred with the two-schedule
