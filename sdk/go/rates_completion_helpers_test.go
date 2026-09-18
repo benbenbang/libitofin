@@ -1,10 +1,8 @@
 package itofin
 
 import (
-	"errors"
 	"fmt"
 	"math"
-	"strings"
 	"testing"
 )
 
@@ -28,24 +26,7 @@ func TestRatesCompletionOISAveragingOracle(t *testing.T) {
 			if row.Averaging == "simple" {
 				cfg.AveragingMethod = SimpleAveraging
 			}
-			helper, err := s.NewOISRateHelper(cfg)
-			if row.Averaging == "simple" {
-				var native *Error
-				if !errors.As(err, &native) || native.Code != 1 || !strings.Contains(native.Message, "simple-averaged OIS is not supported") {
-					t.Fatalf("simple averaging must return an unsupported-input error: %v", err)
-				}
-				curveNear(t, pricingMust(quote.Value()), .05, 0)
-				cfg.AveragingMethod = CompoundAveraging
-				helper = pricingMust(s.NewOISRateHelper(cfg))
-				recovered := pricingMust(s.NewPiecewiseLogLinearDiscount(PiecewiseCurveConfig{ReferenceDate: today, Helpers: []*RateHelper{helper}, DayCounter: dc}))
-				compound := oracle.OIS[1]
-				if compound.Averaging != "compound" {
-					t.Fatal("missing compound recovery oracle")
-				}
-				curveNear(t, pricingMust(recovered.DiscountDate(pricingMust(helper.MaturityDate()), false)), compound.Discount, 1e-12)
-				return
-			}
-			ratesOK(t, err)
+			helper := pricingMust(s.NewOISRateHelper(cfg))
 			curve := pricingMust(s.NewPiecewiseLogLinearDiscount(PiecewiseCurveConfig{ReferenceDate: today, Helpers: []*RateHelper{helper}, DayCounter: dc}))
 			maturity := pricingMust(helper.MaturityDate())
 			pillar := pricingMust(helper.PillarDate())
