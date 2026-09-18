@@ -1,0 +1,130 @@
+{
+  "quantlib": "1.43",
+  "swap_cases": [
+    {
+      "fixings": [],
+      "inputs": {
+        "discount_rate": 0.03,
+        "effective_date": "2026-07-09",
+        "evaluation_date": "2026-07-07",
+        "fixed_rate": 0.05,
+        "forward_rate": 0.04,
+        "nominal": 1000000,
+        "payment_lag": 2,
+        "reference_date": "2026-07-07",
+        "tenor_years": 1
+      },
+      "name": "future",
+      "results": {
+        "compound": {
+          "fair_rate": 0.040251722491122695,
+          "fixed_leg_npv": -49171.94202971055,
+          "maturity": "2027-07-09",
+          "npv": -9586.834731120936,
+          "overnight_leg_npv": 39585.10729858962
+        },
+        "simple": {
+          "fair_rate": 0.039456218781979274,
+          "fixed_leg_npv": -49171.94202971055,
+          "maturity": "2027-07-09",
+          "npv": -10369.163976529337,
+          "overnight_leg_npv": 38802.77805318122
+        }
+      }
+    },
+    {
+      "fixings": [],
+      "inputs": {
+        "discount_rate": 0.03,
+        "effective_date": "2026-07-09",
+        "evaluation_date": "2026-07-07",
+        "fixed_rate": 0.05,
+        "forward_rate": 0.06,
+        "nominal": 1000000,
+        "payment_lag": 2,
+        "reference_date": "2026-07-07",
+        "tenor_years": 1
+      },
+      "name": "forward_updated",
+      "results": {
+        "compound": {
+          "fair_rate": 0.0609894705652863,
+          "fixed_leg_npv": -49171.94202971055,
+          "maturity": "2027-07-09",
+          "npv": 10807.47219146938,
+          "overnight_leg_npv": 59979.41422117993
+        },
+        "simple": {
+          "fair_rate": 0.0591874515971375,
+          "fixed_leg_npv": -49171.94202971055,
+          "maturity": "2027-07-09",
+          "npv": 9035.296746704349,
+          "overnight_leg_npv": 58207.2387764149
+        }
+      }
+    },
+    {
+      "fixings": [],
+      "inputs": {
+        "discount_rate": 0.03,
+        "effective_date": "2026-07-03",
+        "evaluation_date": "2026-07-07",
+        "fixed_rate": 0.05,
+        "forward_rate": 0.04,
+        "nominal": 1000000,
+        "payment_lag": 2,
+        "reference_date": "2026-07-07",
+        "tenor_years": 1
+      },
+      "name": "historical_missing",
+      "results": {
+        "compound": {
+          "error": "2nd leg: Missing ESTRON Actual/360 fixing for July 3rd, 2026"
+        },
+        "simple": {
+          "error": "2nd leg: Missing ESTRON Actual/360 fixing for July 3rd, 2026"
+        }
+      }
+    },
+    {
+      "fixings": [
+        {
+          "date": "2026-07-03",
+          "rate": 0.031
+        },
+        {
+          "date": "2026-07-06",
+          "rate": 0.032
+        }
+      ],
+      "inputs": {
+        "discount_rate": 0.03,
+        "effective_date": "2026-07-03",
+        "evaluation_date": "2026-07-07",
+        "fixed_rate": 0.05,
+        "forward_rate": 0.04,
+        "nominal": 1000000,
+        "payment_lag": 2,
+        "reference_date": "2026-07-07",
+        "tenor_years": 1
+      },
+      "name": "mixed",
+      "results": {
+        "compound": {
+          "fair_rate": 0.04016306511666647,
+          "fixed_leg_npv": -49465.765390597546,
+          "maturity": "2027-07-05",
+          "npv": -9731.830262031232,
+          "overnight_leg_npv": 39733.935128566314
+        },
+        "simple": {
+          "fair_rate": 0.039366788616247,
+          "fixed_leg_npv": -49465.765390597546,
+          "maturity": "2027-07-05",
+          "npv": -10519.598793147146,
+          "overnight_leg_npv": 38946.1665974504
+        }
+      }
+    }
+  ]
+}
