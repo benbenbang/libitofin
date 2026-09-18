@@ -1,31 +1,14 @@
-//! Credit bootstrap traits.
-//!
-//! Port of the `HazardRate` trait struct in
-//! `ql/termstructures/credit/probabilitytraits.hpp:115-188`.
-//!
-//! ## Why this is not the zero-rate trait
-//!
-//! A hazard rate and a zero rate are both non-negative rates stored one per
-//! pillar, which makes it tempting to reuse
-//! [`ZeroYield`](crate::termstructures::bootstraptraits::ZeroYield). C++ keeps
-//! them as separate structs and the numbers differ in four places, so this port
-//! transcribes rather than aliases: the average rate is `0.01` and not `0.05`,
-//! the fresh-curve lower bracket is `QL_EPSILON` and not `-maxRate`, the
-//! valid-data brackets have no sign branch, and the iteration cap is `30` and
-//! not `100`.
-//!
-//! ## Only the core trait
-//!
-//! [`HazardRate`] implements
-//! [`BootstrapTraits`](crate::termstructures::bootstraptraits::BootstrapTraits)
-//! and deliberately does not implement
-//! [`YieldBootstrapTraits`](crate::termstructures::bootstraptraits::YieldBootstrapTraits):
-//! a hazard-rate node has no discount factor to hand back. The node-to-value
-//! conversions this convention does need - `hazardRateImpl` and
-//! `survivalProbabilityImpl` - belong to the curve
-//! (`interpolatedhazardratecurve.hpp:148-165`), not to the traits struct.
+//! Bootstrap conventions for hazard-rate and survival-probability credit curves.
 
+use crate::errors::QlResult;
+use crate::math::interpolations::Interpolation;
 use crate::termstructures::bootstraptraits::BootstrapTraits;
+use crate::termstructures::credit::interpolatedhazardratecurve::{
+    hazard_rate_from_nodes, survival_probability_from_nodes,
+};
+use crate::termstructures::credit::interpolatedsurvivalprobabilitycurve::{
+    density_from_nodes, survival_from_nodes,
+};
 use crate::types::{Real, Size, Time};
 
 /// The average and maximum hazard rate the bracket/guess formulas assume
@@ -118,10 +101,113 @@ impl BootstrapTraits for HazardRate {
     }
 }
 
+/// Credit-specific conversion of bootstrap nodes into probabilities and rates.
+pub trait CreditBootstrapTraits: BootstrapTraits {
+    /// Survival probability at time `t`, including terminal extrapolation.
+    fn survival<I: Interpolation>(interpolation: &I, t: Time) -> QlResult<Real>;
+    /// Default density at time `t`.
+    fn density<I: Interpolation>(interpolation: &I, t: Time) -> QlResult<Real>;
+    /// Hazard rate at time `t`.
+    fn hazard<I: Interpolation>(interpolation: &I, t: Time) -> QlResult<Real> {
+        let survival = Self::survival(interpolation, t)?;
+        if survival == 0.0 {
+            return Ok(0.0);
+        }
+        Ok(Self::density(interpolation, t)? / survival)
+    }
+}
+
+impl CreditBootstrapTraits for HazardRate {
+    fn survival<I: Interpolation>(interpolation: &I, t: Time) -> QlResult<Real> {
+        survival_probability_from_nodes(interpolation, t)
+    }
+    fn density<I: Interpolation>(interpolation: &I, t: Time) -> QlResult<Real> {
+        Ok(Self::hazard(interpolation, t)? * Self::survival(interpolation, t)?)
+    }
+    fn hazard<I: Interpolation>(interpolation: &I, t: Time) -> QlResult<Real> {
+        hazard_rate_from_nodes(interpolation, t)
+    }
+}
+
+/// Survival-probability bootstrap convention from `probabilitytraits.hpp:44-110`.
+pub struct SurvivalProbability;
+
+impl BootstrapTraits for SurvivalProbability {
+    fn initial_value() -> Real {
+        1.0
+    }
+    fn guess(i: Size, times: &[Time], data: &[Real], valid_data: bool) -> Real {
+        if valid_data {
+            return data[i];
+        }
+        if i == 1 {
+            return 1.0 / (1.0 + AVG_HAZARD_RATE * 0.25);
+        }
+        let hazard = (data[i - 2] / data[i - 1]).ln() / (times[i - 1] - times[i - 2]);
+        data[i - 1] * (-hazard * (times[i] - times[i - 1])).exp()
+    }
+    fn min_value_after(i: Size, times: &[Time], data: &[Real], valid_data: bool) -> Real {
+        if valid_data {
+            return data[data.len() - 1] / 2.0;
+        }
+        data[i - 1] * (-MAX_HAZARD_RATE * (times[i] - times[i - 1])).exp()
+    }
+    fn max_value_after(i: Size, _times: &[Time], data: &[Real], _valid_data: bool) -> Real {
+        data[i - 1]
+    }
+    fn update_guess(data: &mut [Real], value: Real, i: Size) {
+        data[i] = value;
+    }
+    fn max_iterations() -> Size {
+        50
+    }
+}
+
+impl CreditBootstrapTraits for SurvivalProbability {
+    fn survival<I: Interpolation>(interpolation: &I, t: Time) -> QlResult<Real> {
+        survival_from_nodes(interpolation, t)
+    }
+    fn density<I: Interpolation>(interpolation: &I, t: Time) -> QlResult<Real> {
+        density_from_nodes(interpolation, t)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::termstructures::bootstraptraits::ZeroYield;
+
+    #[test]
+    fn survival_traits_preserve_the_anchor_and_monotone_brackets() {
+        let times = [0.0, 1.0, 3.0];
+        let mut data = [1.0, 0.9, 0.8];
+        assert_eq!(SurvivalProbability::initial_value(), 1.0);
+        assert_eq!(SurvivalProbability::max_iterations(), 50);
+        assert_eq!(
+            SurvivalProbability::guess(1, &times, &data, false),
+            1.0 / 1.0025
+        );
+        assert_eq!(SurvivalProbability::guess(2, &times, &data, true), 0.8);
+        assert!((SurvivalProbability::guess(2, &times, &data, false) - 0.729).abs() < 1e-14);
+        assert!(
+            (SurvivalProbability::min_value_after(2, &times, &data, false)
+                - 0.9 * (-2.0_f64).exp())
+            .abs()
+                < 1e-14
+        );
+        assert_eq!(
+            SurvivalProbability::min_value_after(2, &times, &data, true),
+            0.4
+        );
+        for valid in [false, true] {
+            assert_eq!(
+                SurvivalProbability::max_value_after(2, &times, &data, valid),
+                0.9
+            );
+        }
+        SurvivalProbability::update_guess(&mut data, 0.95, 1);
+        assert_eq!(data, [1.0, 0.95, 0.8]);
+    }
 
     #[test]
     fn initial_value_is_the_average_hazard_rate_not_the_average_yield() {
