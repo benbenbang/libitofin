@@ -17,6 +17,7 @@ test -n "$ITOFIN_EXPECTED_VERSION"
 export ITOFIN_EXPECTED_VERSION
 python3 -m unittest discover -s scripts -p 'check_go_coverage_test.py'
 python3 scripts/check_go_coverage.py --strict --baseline
+python3 scripts/check_go_coverage.py --strict
 export LD_LIBRARY_PATH="$PWD/target/release${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export DYLD_LIBRARY_PATH="$PWD/target/release${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
 export GOEXPERIMENT=cgocheck2
