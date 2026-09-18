@@ -2,10 +2,9 @@ name: Go and C ABI bindings
 
 on:
   workflow_dispatch:
+  workflow_call:
   push:
     branches: [main, 'feat/go-cabi-*', 'feat/go-bindings-*']
-    paths: ['crates/**', 'bindings/go/**', 'scripts/check_go_*', 'docs/go-coverage/**', 'Cargo.*', 'rust-toolchain.toml', '.github/workflows/go-bindings.yml']
-  pull_request:
     paths: ['crates/**', 'bindings/go/**', 'scripts/check_go_*', 'docs/go-coverage/**', 'Cargo.*', 'rust-toolchain.toml', '.github/workflows/go-bindings.yml']
 
 permissions:

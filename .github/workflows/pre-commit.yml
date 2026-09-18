@@ -1,4 +1,4 @@
-name: "pull request workflow"
+name: pull-request
 
 on:
   pull_request:
@@ -9,6 +9,9 @@ on:
       - synchronize
       - edited
       - reopened
+
+permissions:
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -30,13 +33,14 @@ jobs:
     name: check-changed-files
     outputs:
       rust: ${{ steps.check-changes.outputs.rust_any_modified }}
-      python: ${{ steps.check-changes.outputs.python_any_modified }}
+      go: ${{ steps.check-changes.outputs.go_any_modified }}
+      docs: ${{ steps.check-changes.outputs.docs_any_modified }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v5
-      - name: get rust modules that have changed
+      - name: check validation paths
         id: check-changes
         uses: tj-actions/changed-files@2f7c5bfce28377bc069a65ba478de0a74aa0ca32 # v46.0.1
         with:
@@ -50,8 +54,22 @@ jobs:
               - rust-toolchain.toml
               - .github/workflows/*.yml
 
-            python:
-              - crates/itofin-py/**
+            go:
+              - crates/**
+              - bindings/go/**
+              - scripts/check_go_*
+              - scripts/package_go_native.sh
+              - scripts/fixtures/go-consumer/**
+              - docs/go-coverage/**
+              - Cargo.*
+              - rust-toolchain.toml
+              - .github/workflows/*.yml
+
+            docs:
+              - docs/**
+              - crates/itofin-py/python/**
+              - crates/libitofin/examples/**
+              - example/**
               - .github/workflows/*.yml
 
   rust-ci:
@@ -148,3 +166,55 @@ jobs:
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           configuration-path: .github/labeler.yml
+
+  go-bindings:
+    needs: check-change-files
+    if: needs.check-change-files.outputs.go == 'true'
+    uses: ./.github/workflows/go-bindings.yml
+
+  go-package:
+    needs: check-change-files
+    if: needs.check-change-files.outputs.go == 'true'
+    uses: ./.github/workflows/go-package.yml
+
+  docs:
+    needs: check-change-files
+    if: needs.check-change-files.outputs.docs == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Build site (strict)
+        working-directory: docs
+        run: uv run --frozen mkdocs build --strict
+
+  workflow-success:
+    name: workflow-success
+    needs: [check-change-files, pre-commit, rust-ci, python-bindings, go-bindings, go-package, docs]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require successful validation
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        shell: python
+        run: |
+          import json
+          import os
+          import sys
+
+          needs = json.loads(os.environ["NEEDS_JSON"])
+          paths = needs["check-change-files"]["outputs"]
+          conditional = {"rust-ci": "rust", "go-bindings": "go", "go-package": "go", "docs": "docs"}
+          failed = False
+          for job, details in needs.items():
+              result = details["result"]
+              flag = paths.get(conditional[job]) if job in conditional else "true"
+              accepted = flag in ("true", "false") and (
+                  result == "success" or (result == "skipped" and flag == "false")
+              )
+              print(f"{job}: {result} (required: {flag})", flush=True)
+              failed |= not accepted
+          sys.exit(1 if failed else 0)
