@@ -1,0 +1,101 @@
+{
+  "ois": [
+    {
+      "averaging": "simple",
+      "discount": 0.950311545407754,
+      "maturity": "2027-07-09",
+      "pillar": "2027-07-13",
+      "quote": 0.0499999999999973
+    },
+    {
+      "averaging": "compound",
+      "discount": 0.9514936296184163,
+      "maturity": "2027-07-09",
+      "pillar": "2027-07-13",
+      "quote": 0.04999999999999796
+    }
+  ],
+  "payer": {
+    "fair_rate": 0.040811595177963574,
+    "npv": 0.0021619525475344153
+  },
+  "quantlib": "1.43",
+  "receiver": {
+    "fair_rate": 0.040811595177963574,
+    "npv": -0.0021619525475344153
+  },
+  "swaptions": [
+    {
+      "annuity": "swap_rate",
+      "npv": 0.009697712244845348,
+      "settlement": "physical_cleared",
+      "side": "payer"
+    },
+    {
+      "annuity": "discount_curve",
+      "npv": 0.009697712244845348,
+      "settlement": "physical_cleared",
+      "side": "payer"
+    },
+    {
+      "annuity": "swap_rate",
+      "npv": 0.009697712244845348,
+      "settlement": "collateralized_cash",
+      "side": "payer"
+    },
+    {
+      "annuity": "discount_curve",
+      "npv": 0.009697712244845348,
+      "settlement": "collateralized_cash",
+      "side": "payer"
+    },
+    {
+      "annuity": "swap_rate",
+      "npv": 0.009697689444179121,
+      "settlement": "par_yield",
+      "side": "payer"
+    },
+    {
+      "annuity": "discount_curve",
+      "npv": 0.009697697135575977,
+      "settlement": "par_yield",
+      "side": "payer"
+    },
+    {
+      "annuity": "swap_rate",
+      "npv": 0.007535759697310927,
+      "settlement": "physical_cleared",
+      "side": "receiver"
+    },
+    {
+      "annuity": "discount_curve",
+      "npv": 0.007535759697310927,
+      "settlement": "physical_cleared",
+      "side": "receiver"
+    },
+    {
+      "annuity": "swap_rate",
+      "npv": 0.007535759697310927,
+      "settlement": "collateralized_cash",
+      "side": "receiver"
+    },
+    {
+      "annuity": "discount_curve",
+      "npv": 0.007535759697310927,
+      "settlement": "collateralized_cash",
+      "side": "receiver"
+    },
+    {
+      "annuity": "swap_rate",
+      "npv": 0.007535741979694929,
+      "settlement": "par_yield",
+      "side": "receiver"
+    },
+    {
+      "annuity": "discount_curve",
+      "npv": 0.007535747956415724,
+      "settlement": "par_yield",
+      "side": "receiver"
+    }
+  ]
+}
