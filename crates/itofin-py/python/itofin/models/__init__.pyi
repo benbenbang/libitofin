@@ -2,7 +2,6 @@
 # ruff: noqa: E501, F401, F403, F405
 
 import builtins
-import enum
 import itofin
 from itofin import indexes
 from itofin import instruments
@@ -263,13 +262,16 @@ class SwaptionHelper:
         """
 
 @typing.final
-class CalibrationErrorType(enum.Enum):
+class CalibrationErrorType:
     r"""
     How market and model prices are compared during calibration.
 
     RelativePriceError is |market - model| / market, PriceError is
     market - model, and ImpliedVolError compares the two implied volatilities.
     """
-    RelativePriceError = ...
-    PriceError = ...
-    ImpliedVolError = ...
+    RelativePriceError: typing.ClassVar[CalibrationErrorType]
+    PriceError: typing.ClassVar[CalibrationErrorType]
+    ImpliedVolError: typing.ClassVar[CalibrationErrorType]
+    def __new__(cls, _unconstructible: typing.NoReturn) -> CalibrationErrorType: ...
+    def __int__(self) -> builtins.int: ...
+    __hash__: typing.ClassVar[None]  # type: ignore[assignment]

@@ -2,7 +2,6 @@
 # ruff: noqa: E501, F401, F403, F405
 
 import builtins
-import enum
 import typing
 __all__ = [
     "BusinessDayConvention",
@@ -1087,21 +1086,24 @@ class Schedule:
         """
 
 @typing.final
-class BusinessDayConvention(enum.Enum):
+class BusinessDayConvention:
     r"""
     A holiday-rolling rule. Every core variant is covered; the four listed
     last are appended, so the integer values of the first three are unchanged.
     """
-    ModifiedFollowing = ...
-    Following = ...
-    Unadjusted = ...
-    Preceding = ...
-    ModifiedPreceding = ...
-    HalfMonthModifiedFollowing = ...
-    Nearest = ...
+    ModifiedFollowing: typing.ClassVar[BusinessDayConvention]
+    Following: typing.ClassVar[BusinessDayConvention]
+    Unadjusted: typing.ClassVar[BusinessDayConvention]
+    Preceding: typing.ClassVar[BusinessDayConvention]
+    ModifiedPreceding: typing.ClassVar[BusinessDayConvention]
+    HalfMonthModifiedFollowing: typing.ClassVar[BusinessDayConvention]
+    Nearest: typing.ClassVar[BusinessDayConvention]
+    def __new__(cls, _unconstructible: typing.NoReturn) -> BusinessDayConvention: ...
+    def __int__(self) -> builtins.int: ...
+    __hash__: typing.ClassVar[None]  # type: ignore[assignment]
 
 @typing.final
-class DateGeneration(enum.Enum):
+class DateGeneration:
     r"""
     The rule a Schedule generates its dates by.
 
@@ -1111,29 +1113,35 @@ class DateGeneration(enum.Enum):
     Schedule builds under the three CDS rules, but SpreadCdsHelper rejects them:
     their maturity comes from a core routine that is not ported yet.
     """
-    Backward = ...
-    Forward = ...
-    Zero = ...
-    ThirdWednesday = ...
-    ThirdWednesdayInclusive = ...
-    Twentieth = ...
-    TwentiethIMM = ...
-    OldCDS = ...
-    CDS = ...
-    CDS2015 = ...
+    Backward: typing.ClassVar[DateGeneration]
+    Forward: typing.ClassVar[DateGeneration]
+    Zero: typing.ClassVar[DateGeneration]
+    ThirdWednesday: typing.ClassVar[DateGeneration]
+    ThirdWednesdayInclusive: typing.ClassVar[DateGeneration]
+    Twentieth: typing.ClassVar[DateGeneration]
+    TwentiethIMM: typing.ClassVar[DateGeneration]
+    OldCDS: typing.ClassVar[DateGeneration]
+    CDS: typing.ClassVar[DateGeneration]
+    CDS2015: typing.ClassVar[DateGeneration]
+    def __new__(cls, _unconstructible: typing.NoReturn) -> DateGeneration: ...
+    def __int__(self) -> builtins.int: ...
+    __hash__: typing.ClassVar[None]  # type: ignore[assignment]
 
 @typing.final
-class Frequency(enum.Enum):
+class Frequency:
     r"""
     A coupon or fixing frequency.
 
     Only the variants the ported fixtures use are surfaced; new ones are
     appended, so the integer values of the existing variants are unchanged.
     """
-    Annual = ...
-    Semiannual = ...
-    Quarterly = ...
-    Monthly = ...
+    Annual: typing.ClassVar[Frequency]
+    Semiannual: typing.ClassVar[Frequency]
+    Quarterly: typing.ClassVar[Frequency]
+    Monthly: typing.ClassVar[Frequency]
+    def __new__(cls, _unconstructible: typing.NoReturn) -> Frequency: ...
+    def __int__(self) -> builtins.int: ...
+    __hash__: typing.ClassVar[None]  # type: ignore[assignment]
 
 def is_imm_date(date: Date, main_cycle: builtins.bool = False) -> builtins.bool:
     r"""

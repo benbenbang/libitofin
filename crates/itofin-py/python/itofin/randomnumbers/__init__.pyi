@@ -2,7 +2,6 @@
 # ruff: noqa: E501, F401, F403, F405
 
 import builtins
-import enum
 import numpy
 import numpy.typing
 import typing
@@ -492,7 +491,7 @@ class UniformRandomSequenceGenerator:
         """
 
 @typing.final
-class DirectionIntegers(enum.Enum):
+class DirectionIntegers:
     r"""
     The choice of free direction integers for the Sobol dimensions beyond the
     first, QuantLib's `SobolRsg::DirectionIntegers`.
@@ -501,13 +500,16 @@ class DirectionIntegers(enum.Enum):
     dimension; the others are the tabulated initializers shipped with QuantLib,
     with a seeded Mersenne Twister drawing the free integers past each table.
     """
-    Unit = ...
-    Jaeckel = ...
-    SobolLevitan = ...
-    SobolLevitanLemieux = ...
-    JoeKuoD5 = ...
-    JoeKuoD6 = ...
-    JoeKuoD7 = ...
-    Kuo = ...
-    Kuo2 = ...
-    Kuo3 = ...
+    Unit: typing.ClassVar[DirectionIntegers]
+    Jaeckel: typing.ClassVar[DirectionIntegers]
+    SobolLevitan: typing.ClassVar[DirectionIntegers]
+    SobolLevitanLemieux: typing.ClassVar[DirectionIntegers]
+    JoeKuoD5: typing.ClassVar[DirectionIntegers]
+    JoeKuoD6: typing.ClassVar[DirectionIntegers]
+    JoeKuoD7: typing.ClassVar[DirectionIntegers]
+    Kuo: typing.ClassVar[DirectionIntegers]
+    Kuo2: typing.ClassVar[DirectionIntegers]
+    Kuo3: typing.ClassVar[DirectionIntegers]
+    def __new__(cls, _unconstructible: typing.NoReturn) -> DirectionIntegers: ...
+    def __int__(self) -> builtins.int: ...
+    __hash__: typing.ClassVar[None]  # type: ignore[assignment]
