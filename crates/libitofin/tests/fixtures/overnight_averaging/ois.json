@@ -1,0 +1,134 @@
+{
+  "ois_cases": [
+    {
+      "inputs": {
+        "discount_rate": null,
+        "evaluation_date": "2026-07-07",
+        "forward_start_months": 0,
+        "payment_lag": 2,
+        "quote": 0.05,
+        "reference_date": "2026-07-07"
+      },
+      "name": "baseline",
+      "results": {
+        "compound": {
+          "discount": 0.9514936296184163,
+          "maturity": "2027-07-09",
+          "pillar": "2027-07-13",
+          "quote": 0.04999999999999796
+        },
+        "simple": {
+          "discount": 0.950311545407754,
+          "maturity": "2027-07-09",
+          "pillar": "2027-07-13",
+          "quote": 0.0499999999999973
+        }
+      }
+    },
+    {
+      "inputs": {
+        "discount_rate": null,
+        "evaluation_date": "2026-07-07",
+        "forward_start_months": 0,
+        "payment_lag": 2,
+        "quote": 0.06,
+        "reference_date": "2026-07-07"
+      },
+      "name": "quote_updated",
+      "results": {
+        "compound": {
+          "discount": 0.9423501630236597,
+          "maturity": "2027-07-09",
+          "pillar": "2027-07-13",
+          "quote": 0.05999999999999996
+        },
+        "simple": {
+          "discount": 0.9406756822390272,
+          "maturity": "2027-07-09",
+          "pillar": "2027-07-13",
+          "quote": 0.0599999999999669
+        }
+      }
+    },
+    {
+      "inputs": {
+        "discount_rate": null,
+        "evaluation_date": "2026-07-08",
+        "forward_start_months": 0,
+        "payment_lag": 2,
+        "quote": 0.06,
+        "reference_date": "2026-07-07"
+      },
+      "name": "date_updated",
+      "results": {
+        "compound": {
+          "discount": 0.9419018185533831,
+          "maturity": "2027-07-12",
+          "pillar": "2027-07-14",
+          "quote": 0.059999999999999935
+        },
+        "simple": {
+          "discount": 0.9402055919868065,
+          "maturity": "2027-07-12",
+          "pillar": "2027-07-14",
+          "quote": 0.059999999999961376
+        }
+      }
+    },
+    {
+      "inputs": {
+        "discount_rate": null,
+        "evaluation_date": "2026-07-07",
+        "forward_start_months": 3,
+        "payment_lag": 4,
+        "quote": 0.05,
+        "reference_date": "2026-07-07"
+      },
+      "name": "forward_start",
+      "results": {
+        "compound": {
+          "discount": 0.9394606233029998,
+          "maturity": "2027-10-11",
+          "pillar": "2027-10-15",
+          "quote": 0.049999999999999975
+        },
+        "simple": {
+          "discount": 0.9379870228460887,
+          "maturity": "2027-10-11",
+          "pillar": "2027-10-15",
+          "quote": 0.04999999999999845
+        }
+      }
+    },
+    {
+      "inputs": {
+        "discount_rate": 0.03,
+        "evaluation_date": "2026-07-07",
+        "forward_start_months": 3,
+        "payment_frequency": "semiannual",
+        "payment_lag": 2,
+        "quote": 0.05,
+        "reference_date": "2026-07-07",
+        "tenor_years": 3
+      },
+      "name": "external_discount",
+      "results": {
+        "compound": {
+          "discount": 0.8494078101141893,
+          "endogenous_discount": 0.8494078425194762,
+          "maturity": "2029-10-09",
+          "pillar": "2029-10-11",
+          "quote": 0.05000000000000005
+        },
+        "simple": {
+          "discount": 0.847677028050461,
+          "endogenous_discount": 0.8476770286507471,
+          "maturity": "2029-10-09",
+          "pillar": "2029-10-11",
+          "quote": 0.04999999999999582
+        }
+      }
+    }
+  ],
+  "quantlib": "1.43"
+}
