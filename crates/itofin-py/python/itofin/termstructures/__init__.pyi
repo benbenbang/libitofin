@@ -4,6 +4,7 @@
 import builtins
 import itofin
 from itofin import indexes
+from itofin import instruments
 from itofin import quotes
 from itofin import time
 import typing
@@ -61,6 +62,7 @@ __all__ = [
     "SwapRateHelper",
     "SwaptionVolatilityMatrix",
     "SwaptionVolatilityStructure",
+    "UpfrontCdsHelper",
     "VolatilityType",
     "YearOnYearInflationSwapHelper",
     "YieldTermStructure",
@@ -850,6 +852,10 @@ class DefaultProbabilityHelper:
     so it is a separate hierarchy from RateHelper. It exposes the two dates the
     bootstrap places a curve node by.
     """
+    def implied_quote(self) -> builtins.float:
+        r"""
+        Return the quote implied by the linked, bootstrapped curve.
+        """
     def pillar_date(self) -> time.Date:
         r"""
         Return the date the curve node this helper sets sits at.
@@ -3029,6 +3035,11 @@ class SpreadCdsHelper(DefaultProbabilityHelper):
                 that has already matured, rather than building a schedule that
                 ends on the wrong date.
         """
+    @staticmethod
+    def with_terms(running_spread: quotes.SimpleQuote, tenor: time.Period, settlement_days: builtins.int, calendar: time.Calendar, frequency: time.Frequency, payment_convention: time.BusinessDayConvention, rule: time.DateGeneration, day_counter: time.DayCounter, recovery_rate: builtins.float, discount_curve: YieldTermStructure, settings: itofin.Settings, *, model: instruments.PricingModel = instruments.PricingModel.Midpoint, settles_accrual: builtins.bool = True, pays_at_default_time: builtins.bool = True, start_date: typing.Optional[time.Date] = None, last_period_day_counter: typing.Optional[time.DayCounter] = None, rebates_accrual: builtins.bool = True) -> SpreadCdsHelper:
+        r"""
+        Build a helper with explicit pricing and accrual conventions.
+        """
 
 @typing.final
 class StrippedOptionletAdapter(OptionletVolatilityStructure):
@@ -3237,6 +3248,16 @@ class SwaptionVolatilityStructure:
         Raises:
             ItofinError: On a moving surface whose Settings has no evaluation
                 date set.
+        """
+
+@typing.final
+class UpfrontCdsHelper(DefaultProbabilityHelper):
+    r"""
+    Bootstrap helper fitting an upfront CDS quote with explicit model conventions.
+    """
+    def __init__(self, upfront: quotes.SimpleQuote, running_spread: builtins.float, tenor: time.Period, settlement_days: builtins.int, calendar: time.Calendar, frequency: time.Frequency, payment_convention: time.BusinessDayConvention, rule: time.DateGeneration, day_counter: time.DayCounter, recovery_rate: builtins.float, discount_curve: YieldTermStructure, settings: itofin.Settings, *, upfront_settlement_days: builtins.int = 3, model: instruments.PricingModel = instruments.PricingModel.Midpoint, settles_accrual: builtins.bool = True, pays_at_default_time: builtins.bool = True, start_date: typing.Optional[time.Date] = None, last_period_day_counter: typing.Optional[time.DayCounter] = None, rebates_accrual: builtins.bool = True) -> None:
+        r"""
+        Retain the upfront quote, discount curve and settings.
         """
 
 @typing.final

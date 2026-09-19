@@ -56,7 +56,7 @@ use creditdensity::{PyInterpolatedDefaultDensityCurve, PyPiecewiseDefaultDensity
 use creditengine::{
     PyAccrualBias, PyForwardsInCouponPeriod, PyIsdaCdsEngine, PyMidPointCdsEngine, PyNumericalFix,
 };
-use credithelpers::{PyDefaultProbabilityHelper, PySpreadCdsHelper};
+use credithelpers::{PyDefaultProbabilityHelper, PySpreadCdsHelper, PyUpfrontCdsHelper};
 use currency::PyCurrency;
 use curve::{
     PyDiscountCurve, PyFlatForward, PyForwardCurve, PyPiecewiseConvexMonotoneForward,
@@ -234,6 +234,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     termstructures.add_class::<PyPiecewiseDefaultDensityCurve>()?;
     termstructures.add_class::<PyDefaultProbabilityHelper>()?;
     termstructures.add_class::<PySpreadCdsHelper>()?;
+    termstructures.add_class::<PyUpfrontCdsHelper>()?;
     termstructures.add_class::<PyPiecewiseDefaultCurve>()?;
     termstructures.add_class::<PyZeroInflationTermStructure>()?;
     termstructures.add_class::<PyInterpolatedZeroInflationCurve>()?;
