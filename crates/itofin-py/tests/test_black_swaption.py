@@ -1,9 +1,8 @@
 """Oracle for the swaption vol-structure + Black-engine facade (issue #612).
 
-The bindings oracle is the wrapped Rust numbers, and this pass proves the
-CONSTRUCTION is right rather than reproducing a swap NPV literal: the core's
-``blackswaptionengine.rs`` fixture is built with ``MakeVanillaSwap``, which has
-no Python facade yet, so its literal belongs to a later ticket.
+These tests verify construction, reference dates and invalid volatility types.
+``test_black_swaption_oracle.py`` separately pins the independent QuantLib
+cached value and settlement matrix through the existing concrete facades.
 
 Three pins, all on one shared ``Settings`` (the engine, the swap and the
 swaption must agree on the evaluation date or the NPV is silently wrong):
