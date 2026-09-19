@@ -252,3 +252,162 @@ impl RelativeDateRateHelper for IborIborBasisSwapRateHelper {
         *self.swap.borrow_mut() = Some(swap);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::indexes::ibor::euribor::Euribor;
+    use crate::interestrate::Compounding;
+    use crate::quotes::SimpleQuote;
+    use crate::termstructures::yields::FlatForward;
+    use crate::time::calendars::target::Target;
+    use crate::time::date::Month;
+    use crate::time::daycounters::actual360::Actual360;
+    use crate::time::frequency::Frequency;
+
+    fn flat(reference: Date, rate: Real) -> Shared<dyn YieldTermStructure> {
+        shared(FlatForward::with_rate(
+            reference,
+            rate,
+            Actual360::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>
+    }
+
+    struct Market {
+        settings: Shared<Settings<Date>>,
+        euribor3m: Shared<IborIndex>,
+        euribor6m: Shared<IborIndex>,
+        curve3m: Shared<dyn YieldTermStructure>,
+        curve6m: Shared<dyn YieldTermStructure>,
+        discount: Handle<dyn YieldTermStructure>,
+    }
+
+    /// Flat 3m, 6m and discount curves, the two Euribor indices forecasting
+    /// off their own curve, all on one settings.
+    fn market() -> Market {
+        let settings = shared(Settings::<Date>::new());
+        let today = Date::new(23, Month::October, 2025);
+        settings.set_evaluation_date(today);
+        let curve3m = flat(today, 0.03);
+        let curve6m = flat(today, 0.035);
+        let discount = Handle::new(flat(today, 0.02));
+        let euribor3m = shared(Euribor::three_months(
+            Handle::new(Shared::clone(&curve3m)),
+            Shared::clone(&settings),
+        ));
+        let euribor6m = shared(Euribor::six_months(
+            Handle::new(Shared::clone(&curve6m)),
+            Shared::clone(&settings),
+        ));
+        Market {
+            settings,
+            euribor3m,
+            euribor6m,
+            curve3m,
+            curve6m,
+            discount,
+        }
+    }
+
+    fn helper(m: &Market, bootstrap_base_curve: bool) -> Shared<IborIborBasisSwapRateHelper> {
+        IborIborBasisSwapRateHelper::new(
+            Handle::new(shared(SimpleQuote::new(0.002)) as Shared<dyn Quote>),
+            Period::new(5, TimeUnit::Years),
+            m.euribor3m.fixing_days(),
+            m.euribor3m.fixing_calendar(),
+            m.euribor3m.business_day_convention(),
+            m.euribor3m.end_of_month(),
+            &m.euribor3m,
+            &m.euribor6m,
+            m.discount.clone(),
+            bootstrap_base_curve,
+        )
+    }
+
+    /// An independent copy of the helper's swap on the original indices, with
+    /// `basis` on the base leg and notional 1, priced off the discount curve.
+    fn independent_swap_npv(m: &Market, h: &IborIborBasisSwapRateHelper, basis: Real) -> Real {
+        let leg = |index: &Shared<IborIndex>, spread: Real| {
+            let schedule = MakeSchedule::new()
+                .from(h.earliest_date())
+                .to(h.maturity_date())
+                .with_tenor(index.tenor())
+                .with_calendar(m.euribor3m.fixing_calendar())
+                .with_convention(m.euribor3m.business_day_convention())
+                .end_of_month(m.euribor3m.end_of_month())
+                .forwards()
+                .build();
+            IborLeg::new(schedule, Shared::clone(index))
+                .with_spread(spread)
+                .with_notional(1.0)
+                .build()
+                .expect("the leg builds")
+        };
+        let mut swap = Swap::two_leg(
+            leg(&m.euribor3m, basis),
+            leg(&m.euribor6m, 0.0),
+            Shared::clone(&m.settings),
+        );
+        let engine = shared_mut(DiscountingSwapEngine::new(
+            m.discount.clone(),
+            None,
+            None,
+            None,
+            Shared::clone(&m.settings),
+        ));
+        swap.base_mut()
+            .set_pricing_engine(engine as SharedMut<dyn PricingEngine>);
+        swap.npv().expect("the swap prices")
+    }
+
+    /// Either way round, the implied basis is the spread that zeroes the same
+    /// swap built independently on the un-cloned indices, once the helper's own
+    /// handle points at the curve the kept index already reads.
+    #[test]
+    fn implied_quote_zeroes_the_independent_swap() {
+        let m = market();
+        for (bootstrap_base_curve, curve) in [(true, &m.curve3m), (false, &m.curve6m)] {
+            let h = helper(&m, bootstrap_base_curve);
+            assert!(h.implied_quote().is_err(), "no curve set yet");
+            h.set_term_structure(curve);
+            let basis = h.implied_quote().expect("the basis solves");
+            assert!(basis.abs() > 1.0e-4, "flat 3% vs 3.5% is a real basis");
+            let npv = independent_swap_npv(&m, &h, basis);
+            assert!(npv.abs() < 1.0e-12, "swap at the implied basis: {npv}");
+            let off = independent_swap_npv(&m, &h, basis + 1.0e-4);
+            assert!(off.abs() > 1.0e-6, "a 1bp bump moves the swap: {off}");
+        }
+    }
+
+    /// Spot is two TARGET days after today, maturity is the tenor past spot,
+    /// and the pillar sits at the latest relevant date, past the maturity by
+    /// the last coupon's estimation tail (`.cpp:64-66`, `:87-91`).
+    #[test]
+    fn initialize_dates_places_the_pillar_at_the_latest_relevant_date() {
+        let m = market();
+        let h = helper(&m, true);
+        let calendar = Target::new();
+        let spot = calendar.advance(
+            Date::new(23, Month::October, 2025),
+            2,
+            TimeUnit::Days,
+            BusinessDayConvention::Following,
+            false,
+        );
+        assert_eq!(h.earliest_date(), spot);
+        assert_eq!(
+            h.maturity_date(),
+            calendar.advance_by_period(
+                spot,
+                Period::new(5, TimeUnit::Years),
+                BusinessDayConvention::ModifiedFollowing,
+                false
+            )
+        );
+        assert!(h.latest_relevant_date() >= h.maturity_date());
+        assert_eq!(h.pillar_date(), h.latest_relevant_date());
+        assert_eq!(h.latest_date(), h.latest_relevant_date());
+    }
+}
