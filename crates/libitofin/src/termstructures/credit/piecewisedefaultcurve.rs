@@ -33,9 +33,8 @@
 //!
 //! ## Supported curve conventions
 //!
-//! [`HazardRate`] and [`SurvivalProbability`] share the bootstrap driver; their
+//! [`HazardRate`], [`SurvivalProbability`] and [`DefaultDensity`] share the bootstrap driver; their
 //! [`CreditBootstrapTraits`] implementations interpret the solved nodes.
-//! Default-density curves remain outside this implementation.
 //!
 //! Jump quotes are not ported, per the
 //! [`defaulttermstructure`](crate::termstructures::credit::defaulttermstructure)
@@ -53,12 +52,13 @@ use crate::patterns::observable::{AsObservable, Observable, Observer};
 use crate::require;
 use crate::shared::{Shared, SharedMut, shared_mut};
 use crate::termstructures::bootstraptraits::CurveData;
+use crate::termstructures::credit::defaultdensitystructure::DefaultDensityStructure;
 use crate::termstructures::credit::defaultprobabilityhelpers::DefaultProbabilityHelper;
 use crate::termstructures::credit::defaulttermstructure::DefaultProbabilityTermStructure;
 use crate::termstructures::credit::hazardratestructure::HazardRateStructure;
 use crate::termstructures::credit::interpolatedhazardratecurve::hazard_rate_from_nodes;
 use crate::termstructures::credit::probabilitytraits::{
-    CreditBootstrapTraits, HazardRate, SurvivalProbability,
+    CreditBootstrapTraits, DefaultDensity, HazardRate, SurvivalProbability,
 };
 use crate::termstructures::credit::survivalprobabilitystructure::SurvivalProbabilityStructure;
 use crate::termstructures::iterativebootstrap::{IterativeBootstrap, PiecewiseCurve};
@@ -85,7 +85,7 @@ impl Observer for CurveUpdater {
 
 /// Default-probability term structure bootstrapped from credit helpers.
 ///
-/// `T` is the node convention ([`HazardRate`] or [`SurvivalProbability`])
+/// `T` is the node convention ([`HazardRate`], [`SurvivalProbability`] or [`DefaultDensity`])
 /// and `I` the interpolation factory. The node data lives in a `RefCell` the bootstrap
 /// mutates and the survival/hazard lookups read back.
 pub struct PiecewiseDefaultCurve<T: CreditBootstrapTraits, I: Interpolator> {
@@ -228,6 +228,11 @@ impl<I: Interpolator + 'static> HazardRateStructure for PiecewiseDefaultCurve<Ha
         let data = self.data.borrow();
         hazard_rate_from_nodes(data.interpolation()?, t)
     }
+}
+
+impl<I: Interpolator + 'static> DefaultDensityStructure
+    for PiecewiseDefaultCurve<DefaultDensity, I>
+{
 }
 
 impl<T: CreditBootstrapTraits + 'static, I: Interpolator + 'static> DefaultProbabilityTermStructure
