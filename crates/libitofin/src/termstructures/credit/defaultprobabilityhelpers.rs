@@ -19,20 +19,22 @@
 //! below on `dyn DefaultProbabilityHelper`.
 //!
 //! [`CdsHelperBase`] follows them, with the two quoted contracts it serves:
-//! [`SpreadCdsHelper`] and [`UpfrontCdsHelper`]. Only the mid-point model is
-//! ported; the ISDA arm of `resetEngine`
-//! (`defaultprobabilityhelpers.cpp:143-148`) rides the `IsdaCdsEngine` (#783).
+//! [`SpreadCdsHelper`] and [`UpfrontCdsHelper`] support midpoint and ISDA
+//! pricing (`defaultprobabilityhelpers.cpp:143-153,204-214`).
 
 use std::cell::{Cell, Ref, RefCell};
 use std::rc::Weak;
 
 use crate::errors::{QlError, QlResult};
+use crate::fail;
 use crate::handle::{Handle, RelinkableHandle};
 use crate::instrument::Instrument;
 use crate::instruments::{CdsTerms, CreditDefaultSwap, PricingModel, ProtectionSide, cds_maturity};
 use crate::patterns::observable::{AsObservable, Observable};
 use crate::pricingengine::PricingEngine;
-use crate::pricingengines::credit::MidPointCdsEngine;
+use crate::pricingengines::credit::{
+    AccrualBias, ForwardsInCouponPeriod, IsdaCdsEngine, MidPointCdsEngine, NumericalFix,
+};
 use crate::quotes::Quote;
 use crate::settings::Settings;
 use crate::shared::{Shared, SharedMut, shared_mut};
@@ -49,7 +51,6 @@ use crate::time::period::Period;
 use crate::time::schedule::{MakeSchedule, Schedule};
 use crate::time::timeunit::TimeUnit;
 use crate::types::{Integer, Natural, Rate, Real};
-use crate::{fail, require};
 
 /// The shared state of a credit bootstrap helper: a
 /// [`BootstrapHelperBase`] whose back-pointer is a default-probability curve.
@@ -371,26 +372,34 @@ impl CdsHelperBase {
     /// Installs the model's engine over the helper's own probability handle
     /// (`resetEngine`'s switch, `cpp:143-153`).
     ///
-    /// # Errors
-    ///
-    /// [`PricingModel::Isda`] needs the `IsdaCdsEngine` deferred to #783; the
-    /// arm is refused rather than silently priced on the mid-point engine.
-    fn install_engine(&self, swap: &mut CreditDefaultSwap) -> QlResult<()> {
-        require!(
-            self.model == PricingModel::Midpoint,
-            "the ISDA arm of resetEngine (defaultprobabilityhelpers.cpp:143-148) needs the \
-             IsdaCdsEngine, which is not ported yet (#783)"
-        );
-        let engine = MidPointCdsEngine::new(
-            self.probability.handle(),
-            self.recovery_rate,
-            self.discount_curve.clone(),
-            None,
-            Shared::clone(&self.settings),
-        );
-        swap.base_mut()
-            .set_pricing_engine(shared_mut(engine) as SharedMut<dyn PricingEngine>);
-        Ok(())
+    /// ISDA passes false for settlement-date flows and uses Taylor, HalfDayBias
+    /// and Piecewise, matching both QuantLib constructors. The normal
+    /// today-cash-flow settings override still applies.
+    fn install_engine(&self, swap: &mut CreditDefaultSwap) {
+        let engine: SharedMut<dyn PricingEngine> = match self.model {
+            PricingModel::Midpoint => shared_mut(MidPointCdsEngine::new(
+                self.probability.handle(),
+                self.recovery_rate,
+                self.discount_curve.clone(),
+                None,
+                Shared::clone(&self.settings),
+            )),
+            PricingModel::Isda => shared_mut(
+                IsdaCdsEngine::new(
+                    self.probability.handle(),
+                    self.recovery_rate,
+                    self.discount_curve.clone(),
+                    Some(false),
+                    Shared::clone(&self.settings),
+                )
+                .with_fidelity(
+                    NumericalFix::Taylor,
+                    AccrualBias::HalfDayBias,
+                    ForwardsInCouponPeriod::Piecewise,
+                ),
+            ),
+        };
+        swap.base_mut().set_pricing_engine(engine);
     }
 
     /// Rebuilds the schedule off the current evaluation date (`initializeDates`,
@@ -602,8 +611,8 @@ impl SpreadCdsHelper {
     }
 
     /// The par contract the helper prices: a protection-buyer CDS on a notional
-    /// of 100 paying a 1% running spread (`cpp:138-141`), under a fresh midpoint
-    /// engine over the helper's own probability handle (`cpp:151-152`).
+    /// of 100 paying a 1% running spread (`cpp:138-141`), under the selected
+    /// engine over the helper's own probability handle (`cpp:143-153`).
     fn build_swap(&self) -> QlResult<CreditDefaultSwap> {
         let mut swap = CreditDefaultSwap::with_terms(
             ProtectionSide::Buyer,
@@ -615,7 +624,7 @@ impl SpreadCdsHelper {
             self.cds.contract_terms(),
             Shared::clone(&self.cds.settings),
         )?;
-        self.cds.install_engine(&mut swap)?;
+        self.cds.install_engine(&mut swap);
         Ok(swap)
     }
 }
@@ -805,7 +814,7 @@ impl UpfrontCdsHelper {
             },
             Shared::clone(&self.cds.settings),
         )?;
-        self.cds.install_engine(&mut swap)?;
+        self.cds.install_engine(&mut swap);
         Ok(swap)
     }
 
@@ -1300,15 +1309,10 @@ mod tests {
         );
     }
 
-    /// The ISDA arm, ported as far as it goes: the pillar takes the extra day
-    /// `initializeDates` adds under that model (`cpp:105-106`), and the engine
-    /// it would price on is the deferral (`cpp:144-148`, #783).
-    ///
-    /// Both are inert on every other test here, which is the reason for this
-    /// one: an omitted `++latestDate` and a silent fall back to the mid-point
-    /// engine would each leave the whole suite green.
+    /// The ISDA helper retains the extra pillar day and prices through the
+    /// shipped engine instead of falling back to midpoint.
     #[test]
-    fn the_isda_model_moves_the_pillar_and_defers_the_engine() {
+    fn the_isda_model_moves_the_pillar_and_prices() {
         let settings = settings_at(today());
         let isda = helper(
             &settings,
@@ -1322,12 +1326,12 @@ mod tests {
             helper(&settings, CdsHelperTerms::default()).latest_date() + 1
         );
 
-        isda.set_term_structure(&hazard_curve());
-        assert!(
-            isda.implied_quote()
-                .err()
-                .is_some_and(|error| error.message().contains("#783"))
-        );
+        let curve = hazard_curve();
+        isda.set_term_structure(&curve);
+        let isda_quote = isda.implied_quote().unwrap();
+        let midpoint = helper(&settings, CdsHelperTerms::default());
+        midpoint.set_term_structure(&curve);
+        assert!((isda_quote - midpoint.implied_quote().unwrap()).abs() > 1.0e-8);
     }
 
     /// An upfront helper on a `lag`-day cash settlement, quoting a 1% upfront
