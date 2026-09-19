@@ -1066,3 +1066,7 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "isdahelper_tests.rs"]
+mod isdahelper_tests;
