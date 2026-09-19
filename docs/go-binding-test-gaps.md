@@ -16,6 +16,10 @@ This inventory does not claim exhaustive QuantLib product coverage.
 | CDS builder, explicit schedule, premium/default cashflows, cached calculation and fair-upfront zero NPV | `TestCreditCompletionBuilderCashflowsAndFairUpfront` |
 | Midpoint implied hazard, ISDA dispatch and buyer/seller signs | `TestCreditCompletionMidpointHazardAndProtectionSigns` |
 | Hazard dates/rates detached copies and non-flat ISDA NoFix/Taylor, Flat/Piecewise combinations | `TestCreditCompletionHazardArraysAndNonflatISDA` |
+| Default-density interpolation, bootstrap repricing, quote updates and retained dependencies | `TestDefaultDensityInterpolationAndBoundary`, `TestDefaultDensityBootstrapLiveHelpers` |
+| Survival-jump strict boundaries, date updates and retained quotes | `TestCreditJumpsQuantLibOracle`, `TestCreditJumpsInvalidArguments`, `TestCreditJumpDatesWithoutEvaluationDate` |
+| ISDA spread/upfront helper repricing, quote updates, ownership and settings restoration | `TestIsdaCreditHelpersOracleAndRetention`, `TestCreditHelperExplicitTermsErrors` |
+| CDS protection end independent of adjusted payment date | `TestCreditProtectionEndDate` |
 | Swaption cash/physical settlement, both annuity models, unsupported combinations, payer/receiver fair rates | `TestRatesCompletionSwaptionSettlementAndReceiver` |
 | Dirty/clean bond quotes with nonzero accrued interest | `TestRatesCompletionDirtyBondWithAccruedInterest` |
 | Valid Custom/ASX futures dates, prices and analytical forward/discount factors | `TestRatesCompletionCustomAndASXFutures` |
@@ -56,6 +60,11 @@ Sources and fixtures live in [`sdk/go/testdata`](../sdk/go/testdata/):
 
 - `credit_completion_oracle.py` and `rates_completion_oracle.py`: QuantLib 1.43;
   CDS prices retain 1e-8 and fair quotes 1e-12; rate discounts retain 1e-12.
+- `credit_jumps_oracle.cpp`: QuantLib 1.43; strict-boundary survival retains 1e-15.
+- `isda_helpers.csv`: the [core generator](../crates/libitofin/tests/fixtures/isda_helpers/generator.py)
+  produces the same 18 binding rows; survival and implied quotes retain 1e-10.
+  Binding discount scenarios rebuild the market; Rust additionally checks live
+  discount-quote recalibration. Density bootstrap fair quotes retain 1e-6.
 - `calibration_completion_oracle.py`: QuantLib 1.43; perturbed Heston smile
   distinguishes nonzero signed residuals. Parameters retain 3e-3 for Heston and
   1.3e-5 for Hull-White; signed residuals retain 1e-8.

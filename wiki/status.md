@@ -17,6 +17,10 @@ see the [Go validation record](../docs/go-binding-test-gaps.md).
 
 ## Credit extensions
 
+- [#1023](https://github.com/benbenbang/libitofin/issues/1023): spread and upfront
+  helpers support ISDA pricing, extended pillars and quote recalibration in Rust,
+  Python and Go. [QuantLib fixtures](../crates/libitofin/tests/fixtures/isda_helpers/generator.py)
+  independently pin prices and settings-sensitive settlement cases.
 - [#1021](https://github.com/benbenbang/libitofin/issues/1021): fixed and moving
   FlatHazardRate curves accept observable survival jumps in Rust, Python and Go.
   Other Rust curves can opt into the shared jump hook. Strict boundaries,

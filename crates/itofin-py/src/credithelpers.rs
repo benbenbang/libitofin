@@ -8,11 +8,10 @@
 //! already upcast and type-erased, and the concrete subclasses supply only
 //! their constructors, mirroring the credit() base/subclass idiom.
 //!
-//! `UpfrontCdsHelper` (`defaultprobabilityhelpers.hpp:170`) has no core port yet
-//! and is omitted here rather than stubbed; it follows within EPIC Credit
-//! (#676).
+//! Spread and upfront helpers select Midpoint or ISDA pricing explicitly.
 
 use crate::PyQlError;
+use crate::credit::PyPricingModel;
 use crate::curve::PyYieldTermStructure;
 use crate::market::PySimpleQuote;
 use crate::settings::PySettings;
@@ -22,7 +21,7 @@ use crate::time::{
 };
 use libitofin::shared::Shared;
 use libitofin::termstructures::credit::defaultprobabilityhelpers::{
-    DefaultProbabilityHelper, SpreadCdsHelper,
+    CdsHelperTerms, DefaultProbabilityHelper, SpreadCdsHelper, UpfrontCdsHelper,
 };
 use libitofin::types::Integer;
 use pyo3::prelude::*;
@@ -50,6 +49,11 @@ pub struct PyDefaultProbabilityHelper {
 #[gen_stub_pymethods]
 #[pymethods]
 impl PyDefaultProbabilityHelper {
+    /// Return the quote implied by the linked, bootstrapped curve.
+    fn implied_quote(&self) -> PyResult<f64> {
+        Ok(self.inner.implied_quote().map_err(PyQlError::from)?)
+    }
+
     /// Return the date the curve node this helper sets sits at.
     ///
     /// Returns:
@@ -156,6 +160,124 @@ impl PySpreadCdsHelper {
         Ok(
             PyClassInitializer::from(PyDefaultProbabilityHelper::from_shared(helper))
                 .add_subclass(PySpreadCdsHelper),
+        )
+    }
+    /// Build a helper with explicit pricing and accrual conventions.
+    #[gen_stub(override_return_type(type_repr = "SpreadCdsHelper"))]
+    #[staticmethod]
+    #[pyo3(signature = (running_spread, tenor, settlement_days, calendar, frequency, payment_convention, rule, day_counter, recovery_rate, discount_curve, settings, *, model = PyPricingModel::Midpoint, settles_accrual = true, pays_at_default_time = true, start_date = None, last_period_day_counter = None, rebates_accrual = true))]
+    #[allow(clippy::too_many_arguments)]
+    fn with_terms(
+        py: Python<'_>,
+        running_spread: &PySimpleQuote,
+        tenor: &PyPeriod,
+        settlement_days: Integer,
+        calendar: &PyCalendar,
+        frequency: &PyFrequency,
+        payment_convention: &PyBusinessDayConvention,
+        rule: PyDateGeneration,
+        day_counter: &PyDayCounter,
+        recovery_rate: f64,
+        discount_curve: &PyYieldTermStructure,
+        settings: &PySettings,
+        model: PyPricingModel,
+        settles_accrual: bool,
+        pays_at_default_time: bool,
+        start_date: Option<&PyDate>,
+        last_period_day_counter: Option<&PyDayCounter>,
+        rebates_accrual: bool,
+    ) -> PyResult<Py<Self>> {
+        let helper = SpreadCdsHelper::with_terms(
+            running_spread.handle(),
+            tenor.inner(),
+            settlement_days,
+            calendar.inner(),
+            frequency.inner(),
+            payment_convention.inner(),
+            rule.inner(),
+            day_counter.inner(),
+            recovery_rate,
+            discount_curve.handle(),
+            CdsHelperTerms {
+                model: model.inner(),
+                settles_accrual,
+                pays_at_default_time,
+                start_date: start_date.map(PyDate::inner),
+                last_period_day_counter: last_period_day_counter.map(PyDayCounter::inner),
+                rebates_accrual,
+            },
+            settings.inner(),
+        )
+        .map_err(PyQlError::from)? as Shared<dyn DefaultProbabilityHelper>;
+        Py::new(
+            py,
+            PyClassInitializer::from(PyDefaultProbabilityHelper::from_shared(helper))
+                .add_subclass(PySpreadCdsHelper),
+        )
+    }
+}
+
+/// Bootstrap helper fitting an upfront CDS quote with explicit model conventions.
+#[gen_stub_pyclass]
+#[pyclass(name = "UpfrontCdsHelper", extends = PyDefaultProbabilityHelper, unsendable, module = "itofin.termstructures")]
+pub struct PyUpfrontCdsHelper;
+
+#[gen_stub_pymethods]
+#[pymethods]
+impl PyUpfrontCdsHelper {
+    /// Retain the upfront quote, discount curve and settings.
+    #[gen_stub(override_return_type(type_repr = "UpfrontCdsHelper"))]
+    #[new]
+    #[pyo3(signature = (upfront, running_spread, tenor, settlement_days, calendar, frequency, payment_convention, rule, day_counter, recovery_rate, discount_curve, settings, *, upfront_settlement_days = 3, model = PyPricingModel::Midpoint, settles_accrual = true, pays_at_default_time = true, start_date = None, last_period_day_counter = None, rebates_accrual = true))]
+    #[allow(clippy::too_many_arguments)]
+    fn new(
+        upfront: &PySimpleQuote,
+        running_spread: f64,
+        tenor: &PyPeriod,
+        settlement_days: Integer,
+        calendar: &PyCalendar,
+        frequency: &PyFrequency,
+        payment_convention: &PyBusinessDayConvention,
+        rule: PyDateGeneration,
+        day_counter: &PyDayCounter,
+        recovery_rate: f64,
+        discount_curve: &PyYieldTermStructure,
+        settings: &PySettings,
+        upfront_settlement_days: u32,
+        model: PyPricingModel,
+        settles_accrual: bool,
+        pays_at_default_time: bool,
+        start_date: Option<&PyDate>,
+        last_period_day_counter: Option<&PyDayCounter>,
+        rebates_accrual: bool,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        let helper = UpfrontCdsHelper::with_terms(
+            upfront.handle(),
+            running_spread,
+            tenor.inner(),
+            settlement_days,
+            calendar.inner(),
+            frequency.inner(),
+            payment_convention.inner(),
+            rule.inner(),
+            day_counter.inner(),
+            recovery_rate,
+            discount_curve.handle(),
+            upfront_settlement_days,
+            CdsHelperTerms {
+                model: model.inner(),
+                settles_accrual,
+                pays_at_default_time,
+                start_date: start_date.map(PyDate::inner),
+                last_period_day_counter: last_period_day_counter.map(PyDayCounter::inner),
+                rebates_accrual,
+            },
+            settings.inner(),
+        )
+        .map_err(PyQlError::from)? as Shared<dyn DefaultProbabilityHelper>;
+        Ok(
+            PyClassInitializer::from(PyDefaultProbabilityHelper::from_shared(helper))
+                .add_subclass(PyUpfrontCdsHelper),
         )
     }
 }

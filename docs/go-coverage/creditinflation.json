@@ -688,6 +688,36 @@
         "TestCreditJumpsQuantLibOracle",
         "TestCreditJumpsInvalidArguments"
       ]
+    },
+    {
+      "c": "itofin_cds_helper_implied_quote",
+      "go": "DefaultProbabilityHelper.ImpliedQuote",
+      "python": "DefaultProbabilityHelper.implied_quote",
+      "status": "implemented",
+      "tests": [
+        "TestIsdaCreditHelpersOracleAndRetention",
+        "TestCreditHelperExplicitTermsErrors"
+      ]
+    },
+    {
+      "c": "itofin_cds_helper_with_terms",
+      "go": "Session.NewSpreadCdsHelperWithTerms",
+      "python": "SpreadCdsHelper.with_terms",
+      "status": "implemented",
+      "tests": [
+        "TestIsdaCreditHelpersOracleAndRetention",
+        "TestCreditHelperExplicitTermsErrors"
+      ]
+    },
+    {
+      "c": "itofin_cds_helper_with_terms",
+      "go": "Session.NewUpfrontCdsHelper",
+      "python": "UpfrontCdsHelper.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestIsdaCreditHelpersOracleAndRetention",
+        "TestCreditHelperExplicitTermsErrors"
+      ]
     }
   ]
 }
