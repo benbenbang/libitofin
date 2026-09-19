@@ -116,6 +116,43 @@ func (s *Session) NewPiecewiseZeroInflationCurve(a InflationCurveConfig, helpers
 	}
 	return &PiecewiseZeroInflationCurve{c}, nil
 }
+func (s *Session) NewPiecewiseZeroInflationCurveWithLastFixingDate(a InflationCurveConfig, index *ZeroInflationIndex, helpers []*ZeroInflationHelper, seasonality *MultiplicativePriceSeasonality) (*PiecewiseZeroInflationCurve, error) {
+	if a.DayCounter == nil || index == nil {
+		return nil, errNilArgument("day counter or inflation index")
+	}
+	args := []object{a.DayCounter.object, index.object}
+	var season C.uint64_t
+	if seasonality != nil {
+		args = append(args, seasonality.object)
+		season = C.uint64_t(seasonality.id)
+	}
+	ids := make([]C.uint64_t, len(helpers))
+	for i, helper := range helpers {
+		if helper == nil {
+			return nil, errNilArgument("inflation helper")
+		}
+		args = append(args, helper.object)
+		ids[i] = C.uint64_t(helper.id)
+	}
+	var ptr *C.uint64_t
+	if len(ids) != 0 {
+		ptr = &ids[0]
+	}
+	cfg := a.native()
+	var id C.uint64_t
+	err := s.invoke(func() error {
+		if err := sameSession(s, args...); err != nil {
+			return err
+		}
+		var e C.ItofinError
+		return ffiError(C.itofin_piecewise_zero_inflation_last_fixing_new(s.ctx, &cfg, C.uint64_t(index.id), ptr, C.size_t(len(ids)), season, &id, &e), &e)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &PiecewiseZeroInflationCurve{inflationCurve{object{s, uint64(id)}, 0}}, nil
+}
+
 func (s *Session) NewPiecewiseYoYInflationCurve(a InflationCurveConfig, helpers []*YoYInflationHelper) (*PiecewiseYoYInflationCurve, error) {
 	hs := make([]object, len(helpers))
 	for i, h := range helpers {
