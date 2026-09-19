@@ -487,7 +487,7 @@ impl ZeroInflationIndex {
     /// [`Handle`] gives on dereference.
     fn forecast_fixing(&self, fixing_date: Date) -> QlResult<Rate> {
         let curve = self.term_structure.current_link()?;
-        let base_date = curve.base_date();
+        let base_date = curve.try_base_date()?;
         crate::require!(
             !self.needs_forecast(base_date)?,
             "{} index fixing at base date {base_date} is not available",
