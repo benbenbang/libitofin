@@ -62,7 +62,7 @@ use libitofin::termstructures::inflation::interpolatedzeroinflationcurve::Interp
 use libitofin::termstructures::inflation::piecewiseyoyinflationcurve::PiecewiseYoYInflationCurve;
 use libitofin::termstructures::inflation::piecewisezeroinflationcurve::PiecewiseZeroInflationCurve;
 use libitofin::termstructures::inflation::seasonality::{
-    MultiplicativePriceSeasonality, Seasonality,
+    KerkhofSeasonality, MultiplicativePriceSeasonality, Seasonality,
 };
 use libitofin::termstructures::inflation::yoycapfloortermpricesurface::{
     InterpolatedYoYCapFloorTermPriceSurface, YoYCapFloorTermPriceSurface,
@@ -389,11 +389,13 @@ impl PyZeroInflationIndex {
 #[gen_stub_pyclass]
 #[pyclass(
     name = "MultiplicativePriceSeasonality",
+    subclass,
     unsendable,
     module = "itofin.termstructures"
 )]
 pub struct PyMultiplicativePriceSeasonality {
     inner: Shared<MultiplicativePriceSeasonality>,
+    kerkhof: Option<Shared<KerkhofSeasonality>>,
 }
 
 #[gen_stub_pymethods]
@@ -419,6 +421,7 @@ impl PyMultiplicativePriceSeasonality {
         seasonality_factors: Vec<f64>,
     ) -> PyResult<Self> {
         Ok(PyMultiplicativePriceSeasonality {
+            kerkhof: None,
             inner: shared(
                 MultiplicativePriceSeasonality::new(
                     seasonality_base_date.inner(),
@@ -482,7 +485,52 @@ impl PyMultiplicativePriceSeasonality {
 impl PyMultiplicativePriceSeasonality {
     /// The upcast correction, for the curve facade that installs one.
     pub(crate) fn shared(&self) -> Shared<dyn Seasonality> {
-        Shared::clone(&self.inner) as Shared<dyn Seasonality>
+        match &self.kerkhof {
+            Some(seasonality) => seasonality.clone(),
+            None => self.inner.clone(),
+        }
+    }
+}
+
+/// Monthly cumulative Kerkhof correction for zero inflation; YoY curves reject it.
+#[gen_stub_pyclass]
+#[pyclass(name = "KerkhofSeasonality", extends = PyMultiplicativePriceSeasonality, unsendable, module = "itofin.termstructures")]
+pub struct PyKerkhofSeasonality;
+
+#[gen_stub_pymethods]
+#[pymethods]
+impl PyKerkhofSeasonality {
+    /// Build from exactly twelve monthly factors, retaining a copied factor set.
+    #[new]
+    #[gen_stub(override_return_type(type_repr = "KerkhofSeasonality"))]
+    fn new(base_date: &PyDate, factors: Vec<f64>) -> PyResult<PyClassInitializer<Self>> {
+        let kerkhof = shared(
+            KerkhofSeasonality::new(base_date.inner(), factors.clone()).map_err(PyQlError::from)?,
+        );
+        let inner = shared(
+            MultiplicativePriceSeasonality::new(
+                base_date.inner(),
+                libitofin::time::frequency::Frequency::Monthly,
+                factors,
+            )
+            .map_err(PyQlError::from)?,
+        );
+        Ok(PyClassInitializer::from(PyMultiplicativePriceSeasonality {
+            inner,
+            kerkhof: Some(kerkhof),
+        })
+        .add_subclass(Self))
+    }
+
+    /// Return the cumulative monthly factor relative to the anchor date.
+    fn seasonality_factor(slf: PyRef<'_, Self>, to: &PyDate) -> PyResult<f64> {
+        let base = slf.into_super();
+        Ok(base
+            .kerkhof
+            .as_ref()
+            .expect("Kerkhof subclass invariant")
+            .seasonality_factor(to.inner())
+            .map_err(PyQlError::from)?)
     }
 }
 

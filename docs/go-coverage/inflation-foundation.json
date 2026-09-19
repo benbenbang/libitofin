@@ -595,6 +595,26 @@
       "python": "CpiInterpolationType.Linear",
       "status": "implemented",
       "tests": []
+    },
+    {
+      "c": "itofin_kerkhof_seasonality_new",
+      "go": "Session.NewKerkhofSeasonality",
+      "python": "KerkhofSeasonality.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestKerkhofSeasonalityQuantLibOracle",
+        "TestKerkhofSeasonalityOwnershipAndErrors"
+      ]
+    },
+    {
+      "c": "itofin_seasonality_value",
+      "go": "MultiplicativePriceSeasonality.SeasonalityFactor",
+      "python": "KerkhofSeasonality.seasonality_factor",
+      "status": "implemented",
+      "tests": [
+        "TestKerkhofSeasonalityQuantLibOracle",
+        "TestKerkhofSeasonalityOwnershipAndErrors"
+      ]
     }
   ]
 }

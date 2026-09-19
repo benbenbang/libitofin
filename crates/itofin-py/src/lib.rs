@@ -77,7 +77,7 @@ use hullwhite::{
 use inflation::{
     PyConstantYoYOptionletVolatility, PyCpiInterpolationType, PyDiscountingSwapEngine,
     PyInterpolatedYoYInflationCurve, PyInterpolatedZeroInflationCurve,
-    PyKInterpolatedYoYOptionletVolatilitySurface, PyMakeYoYInflationCapFloor,
+    PyKInterpolatedYoYOptionletVolatilitySurface, PyKerkhofSeasonality, PyMakeYoYInflationCapFloor,
     PyMultiplicativePriceSeasonality, PyPiecewiseYoYInflationCurve, PyPiecewiseZeroInflationCurve,
     PyYearOnYearInflationSwap, PyYearOnYearInflationSwapHelper, PyYoYCapFloorTermPriceSurface,
     PyYoYInflationCapFloor, PyYoYInflationCapFloorEngine, PyYoYInflationHelper,
@@ -242,6 +242,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     termstructures.add_class::<PyZeroCouponInflationSwapHelper>()?;
     termstructures.add_class::<PyPiecewiseZeroInflationCurve>()?;
     termstructures.add_class::<PyMultiplicativePriceSeasonality>()?;
+    termstructures.add_class::<PyKerkhofSeasonality>()?;
     termstructures.add_class::<PyYoYInflationTermStructure>()?;
     termstructures.add_class::<PyInterpolatedYoYInflationCurve>()?;
     termstructures.add_class::<PyYoYInflationHelper>()?;
