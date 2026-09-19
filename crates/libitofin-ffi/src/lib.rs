@@ -18,6 +18,7 @@ pub use boundary::{Context, ItofinError};
 pub mod calendar_api;
 pub mod cashflows_api;
 pub mod credit_api;
+pub mod credit_helpers_api;
 pub mod credit_instruments_api;
 pub mod curves_api;
 pub mod helpers_api;
