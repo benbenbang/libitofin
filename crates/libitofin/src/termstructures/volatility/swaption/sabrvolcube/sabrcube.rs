@@ -56,7 +56,9 @@
 //!   concrete smile for an option/swap tenor.
 //! - A non-zero ATM shift returns `Err` naming #586 (displaced SABR); the oracle
 //!   fixtures are shift-0.
-//! - `backwardFlat = true` returns `Err` naming #606, as the #601 [`Cube`] does.
+//! - `backwardFlat = true` (#606) switches the parameter cubes to backward-flat
+//!   interpolation along option time (see [`Cube`]); the
+//!   `tests/fixtures/sabr_backward_flat` oracle pins it against QuantLib.
 //! - `updateAfterRecalibration`, `sabrCalibrationSection` and `recalibration`
 //!   (the section-recalibration API) are not ported; they defer as their own
 //!   issue.
@@ -168,8 +170,7 @@ impl SabrSwaptionVolatilityCube {
     ///
     /// # Errors
     ///
-    /// Returns `Err` when `backward_flat` is `true` (deferred to #606), when
-    /// `parameters_guess` is not `nOptionTenors * nSwapTenors` rows of four
+    /// Returns `Err` when `parameters_guess` is not `nOptionTenors * nSwapTenors` rows of four
     /// quotes each, or from [`SwaptionVolatilityCube::new`] (empty ATM handle,
     /// missing calendar or day counter, too few or non-increasing strike
     /// spreads, a mis-shaped vol-spread grid, or a short index longer than the
@@ -197,13 +198,6 @@ impl SabrSwaptionVolatilityCube {
         cutoff_strike: Real,
         settings: Shared<Settings<Date>>,
     ) -> QlResult<SabrSwaptionVolatilityCube> {
-        if backward_flat {
-            fail!(
-                "SABR cube backward-flat interpolation is not ported; deferred under #606. \
-                 The SABR oracle grids have >= 2 nodes per axis."
-            );
-        }
-
         let n_strikes = strike_spreads.len();
         let cube = SwaptionVolatilityCube::new(
             atm_vol,
@@ -254,7 +248,7 @@ impl SabrSwaptionVolatilityCube {
 
         let parameters_guess_cube =
             build_guess_cube(&cube, &parameters_guess, backward_flat, n_options, n_swaps)?;
-        let market_vol_cube = zero_cube(&cube, n_strikes, backward_flat)?;
+        let market_vol_cube = zero_cube(&cube, n_strikes, false)?;
         let sparse_parameters = zero_cube(&cube, N_SABR_PARAMS + N_METADATA_LAYERS, backward_flat)?;
         let dense_parameters = zero_cube(&cube, N_SABR_PARAMS + N_METADATA_LAYERS, backward_flat)?;
 
@@ -516,7 +510,9 @@ impl SabrSwaptionVolatilityCube {
     /// axis, clamped at 0), then for each strike spread: rescales the strike to
     /// each corner's forward through the shared moneyness, reads the corner smile
     /// vol minus that corner's ATM vol, and bilinearly blends the four corner
-    /// spreads in `(optionTime, swapLength)` via a local one-layer [`Cube`]. This
+    /// spreads in `(optionTime, swapLength)` via a local one-layer [`Cube`]. The
+    /// local cube takes the C++ ctor default `backwardFlat = false` (hpp:852), as
+    /// does `marketVolCube_` (hpp:371), whatever the cube-level flag. This
     /// carries the documented small ATM-fit-error the C++ comment (hpp:818-832)
     /// describes.
     #[allow(clippy::needless_range_loop)]
@@ -610,7 +606,7 @@ impl SabrSwaptionVolatilityCube {
                 swap_lengths_nodes.to_vec(),
                 1,
                 true,
-                self.backward_flat,
+                false,
             )?;
             local.set_layer(0, spread_vols)?;
             local.update_interpolators()?;
@@ -634,7 +630,7 @@ impl SabrSwaptionVolatilityCube {
             lengths.clone(),
             n_strikes,
             true,
-            self.backward_flat,
+            false,
         )?;
         for j in 0..n_options {
             for k in 0..n_swaps {
@@ -1394,57 +1390,6 @@ mod tests {
     }
 
     #[test]
-    fn backward_flat_defers_to_606() {
-        let settings = settings_today();
-        let euribor6m = shared(Euribor::six_months(
-            flat_curve(0.05),
-            Shared::clone(&settings),
-        ));
-        let long = long_index(&euribor6m, &settings);
-        let short = short_index(&euribor6m, &settings);
-        let n_strikes = strike_spreads().len();
-        let vol_spreads: Vec<Vec<Handle<dyn Quote>>> = (0..N_NODES)
-            .map(|_| {
-                (0..n_strikes)
-                    .map(|_| Handle::new(shared(SimpleQuote::new(0.0)) as Shared<dyn Quote>))
-                    .collect()
-            })
-            .collect();
-        let parameters_guess: Vec<Vec<Handle<dyn Quote>>> = (0..N_NODES)
-            .map(|_| {
-                (0..N_SABR_PARAMS)
-                    .map(|_| Handle::new(shared(SimpleQuote::new(0.2)) as Shared<dyn Quote>))
-                    .collect()
-            })
-            .collect();
-        let err = SabrSwaptionVolatilityCube::new(
-            atm_handle(ATM_VOL),
-            option_tenors(),
-            swap_tenors(),
-            strike_spreads(),
-            vol_spreads,
-            long,
-            short,
-            false,
-            parameters_guess,
-            [false; N_SABR_PARAMS],
-            false,
-            None,
-            None,
-            None,
-            None,
-            false,
-            50,
-            true,
-            0.0001,
-            settings,
-        )
-        .err()
-        .expect("backward_flat = true must be rejected");
-        assert!(err.to_string().contains("606"), "err was: {err}");
-    }
-
-    #[test]
     fn wrong_guess_shape_is_rejected() {
         let settings = settings_today();
         let euribor6m = shared(Euribor::six_months(
@@ -2159,6 +2104,7 @@ mod tests {
     fn build_common_sabr_cube(
         settings: &Shared<Settings<Date>>,
         is_atm_calibrated: bool,
+        backward_flat: bool,
     ) -> SabrSwaptionVolatilityCube {
         let euribor6m = shared(Euribor::six_months(
             flat_curve(0.05),
@@ -2206,7 +2152,7 @@ mod tests {
             None,
             false,
             50,
-            false,
+            backward_flat,
             0.0001,
             Shared::clone(settings),
         )
@@ -2216,7 +2162,7 @@ mod tests {
     #[test]
     fn testsabrvols_recovers_atm_vols_and_smile_spreads() {
         let settings = settings_today();
-        let cube = build_common_sabr_cube(&settings, true);
+        let cube = build_common_sabr_cube(&settings, true, false);
         let atm = cube.cube().atm_vol();
         let atm_link = atm.current_link().unwrap();
 
@@ -2260,7 +2206,7 @@ mod tests {
     #[test]
     fn testsabrparameters_interpolates_between_swap_nodes() {
         let settings = settings_today();
-        let cube = build_common_sabr_cube(&settings, true);
+        let cube = build_common_sabr_cube(&settings, true, false);
 
         let option = Period::new(10, TimeUnit::Years);
         let smile1 = cube
@@ -2307,7 +2253,7 @@ mod tests {
     #[test]
     fn testobservability_sabr_arm_reanchors_on_eval_date_move() {
         let settings = settings_today();
-        let cube1_0 = build_common_sabr_cube(&settings, true);
+        let cube1_0 = build_common_sabr_cube(&settings, true, false);
 
         let reference = today();
         let dummy_strike = 0.03;
@@ -2332,7 +2278,7 @@ mod tests {
             Target::new().advance_by_period(reference, Period::new(1, TimeUnit::Days), BDC, false);
         settings.set_evaluation_date(moved);
 
-        let cube1_1 = build_common_sabr_cube(&settings, true);
+        let cube1_1 = build_common_sabr_cube(&settings, true, false);
 
         assert_eq!(
             cube1_0.base().reference_date().unwrap(),
@@ -2368,5 +2314,57 @@ mod tests {
         );
 
         settings.set_evaluation_date(reference);
+    }
+
+    /// QuantLib 1.43 oracle for the `backwardFlat` flag
+    /// (`tests/fixtures/sabr_backward_flat/generator.py`): the CommonVars cube
+    /// queried at option tenors between the parameter-cube nodes, with the flag
+    /// off and on, for the sparse and the ATM-calibrated arms. The bilinear
+    /// column doubles as the calibration-agreement control: every row must
+    /// match C++ within `1e-6` (the same order as the #603 dense-arm checks),
+    /// while the two columns differ by 1e-2 off the nodes.
+    #[test]
+    fn backward_flat_matches_quantlib_oracle() {
+        const ORACLE: &str =
+            include_str!("../../../../../tests/fixtures/sabr_backward_flat/oracle.csv");
+        let years =
+            |s: &str| Period::new(s.trim_end_matches('Y').parse().unwrap(), TimeUnit::Years);
+        let settings = settings_today();
+        let cubes = [
+            [
+                build_common_sabr_cube(&settings, false, false),
+                build_common_sabr_cube(&settings, false, true),
+            ],
+            [
+                build_common_sabr_cube(&settings, true, false),
+                build_common_sabr_cube(&settings, true, true),
+            ],
+        ];
+        let mut worst = [0.0_f64; 2];
+        let mut rows = 0;
+        for line in ORACLE.lines().skip(1) {
+            let cols: Vec<&str> = line.split(',').collect();
+            let arm: usize = cols[0].parse().unwrap();
+            let option = years(cols[1]);
+            let swap = years(cols[2]);
+            let strike: Real = cols[3].parse().unwrap();
+            for (flag, expected) in cols[4..6].iter().enumerate() {
+                let expected: Real = expected.parse().unwrap();
+                let got = cubes[arm][flag]
+                    .volatility_tenors(option, swap, strike, true)
+                    .unwrap();
+                let err = (got - expected).abs();
+                assert!(
+                    err < 1e-6,
+                    "arm {arm} backward_flat {flag} {}/{} strike {strike}: got {got}, C++ {expected}",
+                    cols[1],
+                    cols[2]
+                );
+                worst[flag] = worst[flag].max(err);
+            }
+            rows += 1;
+        }
+        assert_eq!(rows, 72);
+        assert!(worst.iter().all(|w| *w < 1e-6), "worst errors {worst:?}");
     }
 }

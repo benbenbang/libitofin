@@ -95,10 +95,13 @@ live quotes, moving numeric values and explicit option dates. The
 pins 120 volatility nodes at `1e-16`; Rust also checks Black prices, volatility
 recovery through a test-only flat engine, and quote-handle relinks.
 
-Advanced volatility work retains separate scope: backward-flat SABR cubes
-[#606](https://github.com/benbenbang/libitofin/issues/606), SABR variants
-[#586](https://github.com/benbenbang/libitofin/issues/586), and ZABR
-[#597](https://github.com/benbenbang/libitofin/issues/597).
+Rust supports backward-flat SABR parameter cubes
+([#606](https://github.com/benbenbang/libitofin/issues/606)), with independent
+QuantLib sparse/dense oracles and live quote/date recalculation checks. Both
+axes require at least two nodes. This feature will ship after v0.25.0;
+Python/C/Go flag exposure remains [#1065](https://github.com/benbenbang/libitofin/issues/1065).
+SABR variants [#586](https://github.com/benbenbang/libitofin/issues/586) and ZABR
+[#597](https://github.com/benbenbang/libitofin/issues/597) retain separate scope.
 
 ## Dependency layers
 
