@@ -57,6 +57,17 @@ The [oracle](../crates/libitofin/tests/fixtures/lazy_inflation_base/README.md) c
 rebuilt node grids with fresh QuantLib curves and documents its persistent-grid
 difference. Existing fixed-base constructors remain available.
 
+## Joint curve bootstrapping
+
+Rust exposes `IborIborBasisSwapRateHelper` and the genuinely coupled 3M/6M
+`MultiCurve` oracle ([#995](https://github.com/benbenbang/libitofin/issues/995)).
+Both helper sets read the opposite curve; QuantLib's FRA and swap repricing
+tolerances are preserved. Fixing-history updates on either index invalidate
+and recalibrate the live curve without observing its own forecast handle.
+This work will ship after v0.25.0. Concrete Python/C/Go joint-curve assembly
+remains [#1066](https://github.com/benbenbang/libitofin/issues/1066); the overnight
+basis-helper sibling remains [#1060](https://github.com/benbenbang/libitofin/issues/1060).
+
 ## Hull-White calibration
 
 [#400](https://github.com/benbenbang/libitofin/issues/400) covers fixed-reversion
