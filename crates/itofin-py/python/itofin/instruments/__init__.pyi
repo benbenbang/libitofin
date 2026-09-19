@@ -20,6 +20,7 @@ __all__ = [
     "ForwardRateAgreement",
     "MakeCreditDefaultSwap",
     "MakeOis",
+    "MakeSwaption",
     "MakeVanillaSwap",
     "MakeYoYInflationCapFloor",
     "OptionType",
@@ -738,6 +739,24 @@ class MakeOis:
             ItofinError: If effective_date is unset and no evaluation date is
                 set to derive the start from; if the schedule or the overnight
                 leg is degenerate; or if the par-rate fill fails to price.
+        """
+
+@typing.final
+class MakeSwaption:
+    r"""
+    Build a payer vanilla swaption from a SwapIndex and exactly one option date source.
+
+    Specify option_tenor or fixing_date. A missing strike requests the forward
+    swap's fair rate. Overnight swap indexes and underlying-type selection are
+    not supported. Attach a pricing engine to the resulting Swaption separately.
+    """
+    def __init__(self, swap_index: indexes.SwapIndex, option_tenor: typing.Optional[time.Period] = None, strike: typing.Optional[builtins.float] = None, *, fixing_date: typing.Optional[time.Date] = None, nominal: builtins.float = 1.0, settlement_type: SettlementType = SettlementType.Physical, settlement_method: SettlementMethod = SettlementMethod.PhysicalOTC, option_convention: time.BusinessDayConvention = time.BusinessDayConvention.ModifiedFollowing, exercise_date: typing.Optional[time.Date] = None, exercise_calendar: typing.Optional[time.Calendar] = None, indexed_coupons: typing.Optional[builtins.bool] = None) -> None:
+        r"""
+        Retain the index and overrides for repeatable build calls.
+        """
+    def build(self) -> Swaption:
+        r"""
+        Build the swaption, propagating date, forwarding and coupon-setting errors.
         """
 
 @typing.final
