@@ -21,8 +21,7 @@
 //!   [`InterpolatedForwardCurve`](crate::termstructures::yields::InterpolatedForwardCurve)
 //!   is on the yield side.
 //! - The Gauss-Chebyshev survival-probability fallback of
-//!   [`HazardRateStructure`] stays unported (#676) and is unreachable from
-//!   here: [`survival_probability_impl`](DefaultProbabilityTermStructure::survival_probability_impl)
+//!   [`HazardRateStructure`] is available but is not used here: [`survival_probability_impl`](DefaultProbabilityTermStructure::survival_probability_impl)
 //!   is answered by the interpolation's own primitive
 //!   (`interpolatedhazardratecurve.hpp:157-172`), which is the closed form the
 //!   quadrature approximates.

@@ -15,6 +15,14 @@ follow-ups [#1036](https://github.com/benbenbang/libitofin/issues/1036) are clos
 API accounting, numerical tests, and statement coverage measure different things;
 see the [Go validation record](../docs/go-binding-test-gaps.md).
 
+## Credit extensions
+
+- [#1022](https://github.com/benbenbang/libitofin/issues/1022): custom Rust hazard
+  curves can derive survival using QuantLib's 48-point Gauss-Chebyshev fallback.
+  Existing concrete curves retain their closed-form calculations. The
+  [independent oracle generator](../crates/libitofin/tests/fixtures/credit_hazard_quadrature.py)
+  pins the quadrature result separately from its analytical integration error.
+
 ## Swaption foundation
 
 [EPIC-10 #358](https://github.com/benbenbang/libitofin/issues/358) covers the

@@ -43,18 +43,17 @@
 //!   side: [`HazardRateStructure`] cannot be implemented without supplying the
 //!   hook, so the case C++ reports at run time cannot be written here.
 //!
-//! - The numeric `survivalProbabilityImpl` fallback
-//!   (`hazardratestructure.cpp:77-82`), which integrates the hazard rate under
-//!   a 48-point Gauss-Chebyshev quadrature with a `[-1, 1]` to `[0, t]`
-//!   remapping and its `t / 2` Jacobian, is not ported:
-//!   [`survival_probability_impl`](DefaultProbabilityTermStructure::survival_probability_impl)
-//!   stays a required method of the base trait. Curves with a closed-form
-//!   survival probability supply it directly and never reach the quadrature
-//!   (`flathazardrate.hpp:64,72-74`); the interpolated hazard curve that does
-//!   need it arrives with the bootstrapped credit curves in EPIC Credit
-//!   (#676), for which
-//!   [`GaussianQuadrature::chebyshev`](crate::math::integrals::gaussianquadratures::GaussianQuadrature::chebyshev)
-//!   is already available.
+//! - The numeric `survivalProbabilityImpl` fallback is provided by
+//!   [`survival_probability_from_hazard_rate`](HazardRateStructure::survival_probability_from_hazard_rate).
+//!   It uses the same 48-point Gauss-Chebyshev rule, remapping and Jacobian
+//!   as `hazardratestructure.cpp:77-82`. Concrete curves opt into it through
+//!   their required `survival_probability_impl`; existing closed-form curves
+//!   retain their exact formulas. Even constant hazards have a small quadrature
+//!   error because this rule approximates an unweighted integral. Tests pin
+//!   QuantLib 1.43 `GaussChebyshevIntegration(48)` results for `h(t) = .04`
+//!   and `h(t) = .04 + .01*t + .002*t*t` at `1e-13`. Separate analytic
+//!   checks bound the rule's approximation error over the tested five years.
+//!   Regenerate the pins with `tests/fixtures/credit_hazard_quadrature.py`.
 //!
 //! - The three C++ constructors (`hazardratestructure.cpp:52-71`) only forward
 //!   the day counter, jumps and jump dates to the base, so this adapter is a
@@ -63,9 +62,12 @@
 //!   [`defaulttermstructure`](crate::termstructures::credit::defaulttermstructure)
 //!   module documentation.
 
+use std::sync::LazyLock;
+
 use crate::errors::QlResult;
+use crate::math::integrals::gaussianquadratures::GaussianQuadrature;
 use crate::termstructures::credit::defaulttermstructure::DefaultProbabilityTermStructure;
-use crate::types::{Rate, Real, Time};
+use crate::types::{Probability, Rate, Real, Time};
 
 /// Hazard-rate term structure: implement
 /// [`hazard_rate_curve_impl`](Self::hazard_rate_curve_impl) and wire
@@ -87,6 +89,29 @@ pub trait HazardRateStructure: DefaultProbabilityTermStructure {
     /// is the rate *derived* from the density, and a curve implementing this
     /// adapter is the one *quoting* it.
     fn hazard_rate_curve_impl(&self, t: Time) -> QlResult<Rate>;
+
+    /// Numerically derives survival from the quoted hazard rate using
+    /// QuantLib's 48-point Gauss-Chebyshev rule on `[0, t]`.
+    ///
+    /// Wire this into `survival_probability_impl` only when no closed form is
+    /// available. Like other implementation hooks, it assumes the public curve
+    /// method has checked the time range, and excludes jumps. Evaluation errors
+    /// propagate immediately, including at zero time.
+    fn survival_probability_from_hazard_rate(&self, t: Time) -> QlResult<Probability> {
+        static INTEGRAL: LazyLock<QlResult<GaussianQuadrature>> =
+            LazyLock::new(|| GaussianQuadrature::chebyshev(48));
+        let integral = INTEGRAL.as_ref().map_err(Clone::clone)?;
+        let mut sum = 0.0;
+        for (&weight, &x) in integral
+            .weights()
+            .iter()
+            .zip(integral.abscissas().iter())
+            .rev()
+        {
+            sum += weight * self.hazard_rate_curve_impl((x + 1.0) * t / 2.0)?;
+        }
+        Ok((-sum * t / 2.0).exp())
+    }
 
     /// The default density calculated from the hazard rate as
     /// `h(t) S(t)` (C++'s `defaultDensityImpl`,
@@ -110,7 +135,7 @@ mod tests {
     use crate::termstructures::{TermStructure, TermStructureBase};
     use crate::time::date::{Date, Month};
     use crate::time::daycounters::actual360::Actual360;
-    use crate::types::Probability;
+    use std::cell::Cell;
 
     const INTENSITY: Real = 0.04;
 
@@ -276,5 +301,114 @@ mod tests {
         let err = curve.hazard_rate(1.0, false).unwrap_err();
         assert!(err.message().contains("no hazard rate available"));
         assert!((curve.survival_probability(1.0, false).unwrap() - survival(1.0)).abs() < 1.0e-15);
+    }
+
+    struct QuadratureCurve {
+        inner: DerivedHazardCurve,
+        hazard: fn(Time) -> QlResult<Rate>,
+        evaluations: Cell<usize>,
+    }
+
+    impl QuadratureCurve {
+        fn new(hazard: fn(Time) -> QlResult<Rate>) -> Self {
+            Self {
+                inner: DerivedHazardCurve::new(false),
+                hazard,
+                evaluations: Cell::new(0),
+            }
+        }
+    }
+
+    impl AsObservable for QuadratureCurve {
+        fn observable(&self) -> &Observable {
+            self.inner.observable()
+        }
+    }
+
+    impl TermStructure for QuadratureCurve {
+        fn base(&self) -> &TermStructureBase {
+            self.inner.base()
+        }
+
+        fn max_date(&self) -> Date {
+            Date::max_date()
+        }
+    }
+
+    impl HazardRateStructure for QuadratureCurve {
+        fn hazard_rate_curve_impl(&self, t: Time) -> QlResult<Rate> {
+            self.evaluations.set(self.evaluations.get() + 1);
+            (self.hazard)(t)
+        }
+    }
+
+    impl DefaultProbabilityTermStructure for QuadratureCurve {
+        fn survival_probability_impl(&self, t: Time) -> QlResult<Probability> {
+            self.survival_probability_from_hazard_rate(t)
+        }
+
+        fn default_density_impl(&self, t: Time) -> QlResult<Real> {
+            self.default_density_from_hazard_rate(t)
+        }
+    }
+
+    #[test]
+    fn quadrature_matches_quantlib_and_analytic_survival() {
+        let constant = QuadratureCurve::new(|_| Ok(0.04));
+        let varying = QuadratureCurve::new(|t| Ok(0.04 + 0.01 * t + 0.002 * t * t));
+        let cases = [
+            (0.0, 1.0, 1.0),
+            (0.25, 0.9900480664219722, 0.9897283570410018),
+            (1.0, 0.9607825787915585, 0.9553525176808173),
+            (2.5, 0.9048212660113185, 0.867887755838896),
+            (5.0, 0.8187015234263251, 0.6647038533745758),
+        ];
+        for (t, constant_ql, varying_ql) in cases {
+            let flat = constant.survival_probability(t, false).unwrap();
+            let curved = varying.survival_probability(t, false).unwrap();
+            assert!((flat - constant_ql).abs() < 1.0e-13);
+            assert!((curved - varying_ql).abs() < 1.0e-13);
+            assert!((flat - (-0.04 * t).exp()).abs() < 3.0e-5);
+            let integrated = 0.04 * t + 0.005 * t * t + 0.002 * t.powi(3) / 3.0;
+            assert!((curved - (-integrated).exp()).abs() < 6.0e-5);
+            assert!((constant.hazard_rate(t, false).unwrap() - 0.04).abs() < 1.0e-15);
+        }
+    }
+
+    #[test]
+    fn quadrature_maps_all_48_nodes_into_the_time_interval() {
+        let curve = QuadratureCurve::new(|t| {
+            assert!((0.0..2.5).contains(&t));
+            Ok(0.04)
+        });
+        curve.survival_probability(2.5, false).unwrap();
+        assert_eq!(curve.evaluations.get(), 48);
+        curve.evaluations.set(0);
+        assert_eq!(curve.survival_probability(0.0, false).unwrap(), 1.0);
+        assert_eq!(curve.evaluations.get(), 48);
+    }
+
+    #[test]
+    fn quadrature_propagates_hazard_errors_and_rejects_invalid_public_times() {
+        let curve = QuadratureCurve::new(|_| fail!("hazard unavailable"));
+        for t in [0.0, 1.0] {
+            let err = curve.survival_probability(t, false).unwrap_err();
+            assert_eq!(err.message(), "hazard unavailable");
+        }
+        assert_eq!(curve.evaluations.get(), 2);
+        for t in [-1.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(curve.survival_probability(t, true).is_err());
+        }
+        assert_eq!(curve.evaluations.get(), 2);
+        let late_failure = QuadratureCurve::new(|t| {
+            if t > 0.5 {
+                fail!("late hazard failure");
+            }
+            Ok(0.04)
+        });
+        let err = late_failure.survival_probability(1.0, false).unwrap_err();
+        assert_eq!(err.message(), "late hazard failure");
+        assert!(late_failure.evaluations.get() > 1);
+        assert!(late_failure.evaluations.get() < 48);
     }
 }
