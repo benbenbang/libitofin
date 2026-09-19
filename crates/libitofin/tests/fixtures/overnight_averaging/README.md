@@ -14,6 +14,8 @@ uv run --with QuantLib==1.43 crates/libitofin/tests/fixtures/overnight_averaging
   quote/evaluation updates, forward start, payment lag and separate discounting.
 - `swaps.json`: payer OIS valuation with separate flat forecast/discount curves,
   a forecast-rate update, mixed fixings and missing-history rejection.
+- `bindings.json`: today-start OIS and additive-spread helper repricing through
+  the existing Python/Go APIs, which do not expose coupon daily-spread settings.
 
 All indices are ESTR (TARGET, Actual/360). Flat curves use continuously compounded
 Actual/365 Fixed rates. Helper curves use Actual/360 log-linear discount factors.
@@ -32,7 +34,16 @@ fixing error while Compound forecasts. CSV errors normalize QuantLib's dated
 Updated cases specify reproducible target values; consumers should also mutate
 retained objects to verify invalidation, rather than only reconstructing them.
 
-The Rust fixture test checks all 12 Simple rows and 10 Compound rows. Two
-pre-existing Compound differences (`today_enforced_absent` and `daily_spread`)
-remain explicit exclusions under [#1045](https://github.com/benbenbang/libitofin/issues/1045);
-their reference values stay in the fixture. They are not passing evidence.
+The Rust fixture test checks all 18 Simple and 18 Compound rows, including the
+[#1045](https://github.com/benbenbang/libitofin/issues/1045) regressions. Additional
+cases cover weekend boundaries, forecast/historical daily spread, and enforced
+missing-today errors on partial spans. Effective spread and index fixing are
+independent QuantLib outputs; Simple has no effective index fixing.
+
+Compound projects complete future intervals with a discount ratio, including
+when daily-spread compounding is enabled. Partial forecast boundary intervals
+still use individual fixings, apply daily spread and enforce today's fixing
+setting. Thus a fully forecast coupon can have zero effective daily spread,
+while historical and partial intervals retain it. With daily spread, QuantLib's
+rate is `gearing * (effective_index_fixing + effective_spread)`; otherwise it is
+`gearing * effective_index_fixing + spread`.

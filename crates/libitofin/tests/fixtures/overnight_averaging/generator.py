@@ -60,6 +60,9 @@ def coupon_case(name, overrides, fixings):
             results[mode] = {
                 "rate": coupon.rate(), "amount": coupon.amount(),
                 "accrued_amounts": [coupon.accruedAmount(date(d)) for d in ACCRUED_DATES],
+                "effective_spread": coupon.effectiveSpread(),
+                "effective_index_fixing": (coupon.effectiveIndexFixing()
+                                           if mode == "compound" else ""),
             }
         except RuntimeError as error:
             results[mode] = {"error": str(error)}
@@ -78,7 +81,7 @@ def ois_case(name, inputs):
             paymentFrequency=(q.Semiannual if inputs.get("payment_frequency") == "semiannual"
                               else q.Annual),
             forwardStart=q.Period(inputs["forward_start_months"], q.Months),
-            averagingMethod=averaging)
+            averagingMethod=averaging, overnightSpread=inputs.get("overnight_spread", 0.0))
         curve = q.PiecewiseLogLinearDiscount(
             date(inputs["reference_date"]), [helper], q.Actual360())
         results[mode] = {
@@ -127,6 +130,23 @@ coupon_cases = [
     coupon_case("daily_spread", {"gearing": 1.7, "spread": 0.002, "compound_spread": True}, HISTORY),
     coupon_case("forward_updated", {"forward_rate": 0.06}, HISTORY),
     coupon_case("evaluation_updated", {"evaluation_date": "2026-07-08"}, HISTORY + [TODAY]),
+    coupon_case("weekend_start", {"start": "2026-07-04", "evaluation_date": "2026-07-02"}, []),
+    coupon_case("weekend_end", {"end": "2026-07-12", "evaluation_date": "2026-07-02"}, []),
+    coupon_case("daily_spread_future", {
+        "evaluation_date": "2026-07-02", "gearing": 1.7,
+        "spread": 0.002, "compound_spread": True,
+    }, []),
+    coupon_case("daily_spread_historical", {
+        "evaluation_date": "2026-07-14", "gearing": 1.7,
+        "spread": 0.002, "compound_spread": True,
+    }, ALL_FIXINGS),
+    coupon_case("today_enforced_partial", {
+        "evaluation_date": "2026-07-03", "end": "2026-07-05",
+        "payment": "2026-07-06", "enforce_today": True,
+    }, []),
+    coupon_case("today_enforced_weekend_start", {
+        "evaluation_date": "2026-07-03", "start": "2026-07-04", "enforce_today": True,
+    }, []),
 ]
 ois_inputs = {
     "evaluation_date": "2026-07-07", "reference_date": "2026-07-07", "quote": 0.05,
@@ -158,12 +178,24 @@ swap_cases = [
     swap_case("historical_missing", swap_inputs | {"effective_date": "2026-07-03"}, []),
     swap_case("mixed", swap_inputs | {"effective_date": "2026-07-03"}, HISTORY),
 ]
+binding_cases = {
+    "quantlib": q.__version__,
+    "swap_cases": [swap_case("today_start", swap_inputs | {
+        "effective_date": swap_inputs["evaluation_date"],
+    }, [])],
+    "ois_cases": [
+        ois_case("spread_initial", ois_inputs | {"overnight_spread": 0.002}),
+        ois_case("spread_updated", ois_inputs | {"overnight_spread": 0.003}),
+    ],
+}
 output = Path(__file__).parent
+(output / "bindings.json").write_text(json.dumps(binding_cases, indent=2, sort_keys=True) + "\n")
 for filename, key, cases in [("ois.json", "ois_cases", ois_cases),
                              ("swaps.json", "swap_cases", swap_cases)]:
     (output / filename).write_text(json.dumps(
         {"quantlib": q.__version__, key: cases}, indent=2, sort_keys=True) + "\n")
-columns = ["name", "averaging", *DEFAULTS, "fixings", "rate", "amount", "accrued_amounts", "error"]
+columns = ["name", "averaging", *DEFAULTS, "fixings", "rate", "amount", "accrued_amounts", "error",
+           "effective_spread", "effective_index_fixing"]
 with (output / "coupons.csv").open("w", newline="") as stream:
     writer = csv.DictWriter(stream, fieldnames=columns, lineterminator="\n")
     writer.writeheader()
@@ -174,7 +206,7 @@ with (output / "coupons.csv").open("w", newline="") as stream:
             error = ""
             if "error" in result:
                 assert "Missing ESTRON Actual/360 fixing" in result["error"]
-                error = "missing_today" if case["name"] == "today_enforced_absent" else "missing_past"
+                error = "missing_today" if case["name"].startswith("today_enforced") else "missing_past"
             writer.writerow({
                 "name": case["name"], "averaging": mode, **inputs,
                 "fixings": "|".join(f"{f['date']}:{f['rate']}" for f in case["fixings"]),
@@ -182,4 +214,6 @@ with (output / "coupons.csv").open("w", newline="") as stream:
                 "accrued_amounts": "|".join(
                     f"{d}:{v}" for d, v in zip(ACCRUED_DATES, result.get("accrued_amounts", []))),
                 "error": error,
+                "effective_spread": result.get("effective_spread", ""),
+                "effective_index_fixing": result.get("effective_index_fixing", ""),
             })

@@ -1,0 +1,90 @@
+{
+  "ois_cases": [
+    {
+      "inputs": {
+        "discount_rate": null,
+        "evaluation_date": "2026-07-07",
+        "forward_start_months": 0,
+        "overnight_spread": 0.002,
+        "payment_lag": 2,
+        "quote": 0.05,
+        "reference_date": "2026-07-07"
+      },
+      "name": "spread_initial",
+      "results": {
+        "compound": {
+          "discount": 0.9533435978894659,
+          "maturity": "2027-07-09",
+          "pillar": "2027-07-13",
+          "quote": 0.05000000000000019
+        },
+        "simple": {
+          "discount": 0.9522505927886751,
+          "maturity": "2027-07-09",
+          "pillar": "2027-07-13",
+          "quote": 0.050000000000017704
+        }
+      }
+    },
+    {
+      "inputs": {
+        "discount_rate": null,
+        "evaluation_date": "2026-07-07",
+        "forward_start_months": 0,
+        "overnight_spread": 0.003,
+        "payment_lag": 2,
+        "quote": 0.05,
+        "reference_date": "2026-07-07"
+      },
+      "name": "spread_updated",
+      "results": {
+        "compound": {
+          "discount": 0.9542712749129756,
+          "maturity": "2027-07-09",
+          "pillar": "2027-07-13",
+          "quote": 0.050000000000002175
+        },
+        "simple": {
+          "discount": 0.9532216074564187,
+          "maturity": "2027-07-09",
+          "pillar": "2027-07-13",
+          "quote": 0.04999999999999232
+        }
+      }
+    }
+  ],
+  "quantlib": "1.43",
+  "swap_cases": [
+    {
+      "fixings": [],
+      "inputs": {
+        "discount_rate": 0.03,
+        "effective_date": "2026-07-07",
+        "evaluation_date": "2026-07-07",
+        "fixed_rate": 0.05,
+        "forward_rate": 0.04,
+        "nominal": 1000000,
+        "payment_lag": 2,
+        "reference_date": "2026-07-07",
+        "tenor_years": 1
+      },
+      "name": "today_start",
+      "results": {
+        "compound": {
+          "fair_rate": 0.040251722491122695,
+          "fixed_leg_npv": -49188.11080537343,
+          "maturity": "2027-07-07",
+          "npv": -9589.987085363748,
+          "overnight_leg_npv": 39598.12372000968
+        },
+        "simple": {
+          "fair_rate": 0.039456218781979496,
+          "fixed_leg_npv": -49188.11080537343,
+          "maturity": "2027-07-07",
+          "npv": -10372.573577192175,
+          "overnight_leg_npv": 38815.53722818125
+        }
+      }
+    }
+  ]
+}
