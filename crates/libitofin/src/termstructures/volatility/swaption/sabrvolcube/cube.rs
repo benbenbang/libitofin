@@ -22,6 +22,16 @@
 //! and internally queries `value(swap_length, option_time)`. The non-square oracle
 //! grid pins it: cross the axes and the bilinear fails to build.
 //!
+//! The `backward_flat = true` arm is NOT symmetric: C++ builds
+//! `BackwardflatLinearInterpolation(x = optionTimes, y = swapLengths, z = transposed)`
+//! for layers `k <= 4` (hpp:1018-1024), flat along OPTION TIME and linear along
+//! swap length. Those layers are therefore built C++-style, `x = option_times`,
+//! `y = swap_lengths`, `z = transpose(points[k])`, and queried as
+//! `value(option_time, swap_length)`; the [`LayerInterpolator`] enum carries the
+//! per-variant argument order. Layers `k > 4` stay bilinear whatever the flag,
+//! mirroring the C++ threshold (and its forward-layer side effect for 4-param
+//! models, noted at hpp:1012-1017).
+//!
 //! ## Stale interpolators (mirrors C++)
 //!
 //! The mutators change `points` but do NOT rebuild the interpolators; only
@@ -32,25 +42,40 @@
 //!
 //! ## Deferrals (documented omissions)
 //!
-//! - The `backward_flat = true` path (`BackwardflatLinearInterpolation`, used only
-//!   for a single-node axis) is not ported: the constructor returns `Err`. The SABR
-//!   oracle grids have >= 2 nodes per axis. Deferred under #596.
 //! - `browse()` (hpp:1245, a debugging matrix dump), the copy constructor and
 //!   `operator=` are omitted: Rust move semantics cover the `RefCell`-held usage.
 #![allow(dead_code)]
 
 use crate::errors::QlResult;
 use crate::math::interpolations::Interpolation2D;
+use crate::math::interpolations::backwardflatlinear::BackwardflatLinearInterpolation;
 use crate::math::interpolations::bilinear::BilinearInterpolation;
 use crate::math::interpolations::flatextrapolator2d::FlatExtrapolator2D;
 use crate::math::matrix::Matrix;
+use crate::require;
 use crate::time::date::Date;
 use crate::time::period::Period;
 use crate::types::{Real, Size, Time};
-use crate::{fail, require};
 
-/// A per-layer flat-extrapolating bilinear interpolator.
-type LayerInterpolator = FlatExtrapolator2D<BilinearInterpolation>;
+/// The highest layer index that takes backward-flat interpolation when the
+/// flag is set (`k <= 4`, hpp:1018 and 1227).
+const MAX_BACKWARD_FLAT_LAYER: Size = 4;
+
+/// A per-layer flat-extrapolating interpolator, each variant carrying its own
+/// axis order (see the module doc).
+enum LayerInterpolator {
+    Bilinear(FlatExtrapolator2D<BilinearInterpolation>),
+    BackwardFlat(FlatExtrapolator2D<BackwardflatLinearInterpolation>),
+}
+
+impl LayerInterpolator {
+    fn value(&self, option_time: Time, swap_length: Time) -> QlResult<Real> {
+        match self {
+            LayerInterpolator::Bilinear(interp) => interp.value(swap_length, option_time),
+            LayerInterpolator::BackwardFlat(interp) => interp.value(option_time, swap_length),
+        }
+    }
+}
 
 /// The multi-layer parameter store the SABR swaption vol cube interpolates.
 pub(crate) struct Cube {
@@ -61,6 +86,7 @@ pub(crate) struct Cube {
     n_layers: Size,
     points: Vec<Matrix>,
     extrapolation: bool,
+    backward_flat: bool,
     interpolators: Vec<LayerInterpolator>,
 }
 
@@ -71,7 +97,8 @@ impl Cube {
     /// `option_times`/`swap_lengths`. `extrapolation` is carried onto each layer
     /// interpolator; the flat wrapper always clamps into the grid, so the inner
     /// flag never fires, mirroring C++'s unconditional `enableExtrapolation()`.
-    /// `backward_flat = true` is a documented deferral.
+    /// `backward_flat` switches layers `0..=4` to backward-flat-in-option-time
+    /// interpolation (hpp:1018-1024); the other layers stay bilinear.
     pub(crate) fn new(
         option_dates: Vec<Date>,
         swap_tenors: Vec<Period>,
@@ -81,12 +108,6 @@ impl Cube {
         extrapolation: bool,
         backward_flat: bool,
     ) -> QlResult<Self> {
-        if backward_flat {
-            fail!(
-                "Cube backward-flat interpolation (single-node-axis path) is not ported; \
-                 deferred under #596 (SABR cube). The SABR oracle grids have >= 2 nodes per axis."
-            );
-        }
         require!(
             option_times.len() > 1,
             "Cube::new: option_times.len() < 2 (got {})",
@@ -111,8 +132,13 @@ impl Cube {
         );
 
         let points = vec![Matrix::with_size(option_times.len(), swap_lengths.len()); n_layers];
-        let interpolators =
-            build_interpolators(&option_times, &swap_lengths, &points, extrapolation)?;
+        let interpolators = build_interpolators(
+            &option_times,
+            &swap_lengths,
+            &points,
+            extrapolation,
+            backward_flat,
+        )?;
         Ok(Cube {
             option_times,
             swap_lengths,
@@ -121,6 +147,7 @@ impl Cube {
             n_layers,
             points,
             extrapolation,
+            backward_flat,
             interpolators,
         })
     }
@@ -130,7 +157,7 @@ impl Cube {
     pub(crate) fn value(&self, option_time: Time, swap_length: Time) -> QlResult<Vec<Real>> {
         self.interpolators
             .iter()
-            .map(|interp| interp.value(swap_length, option_time))
+            .map(|interp| interp.value(option_time, swap_length))
             .collect()
     }
 
@@ -315,6 +342,7 @@ impl Cube {
             &self.swap_lengths,
             &self.points,
             self.extrapolation,
+            self.backward_flat,
         )?;
         Ok(())
     }
@@ -345,32 +373,51 @@ impl Cube {
     }
 }
 
-/// Builds one flat-extrapolating bilinear interpolator per layer matrix.
+/// Builds one flat-extrapolating interpolator per layer matrix.
 fn build_interpolators(
     option_times: &[Time],
     swap_lengths: &[Time],
     points: &[Matrix],
     extrapolation: bool,
+    backward_flat: bool,
 ) -> QlResult<Vec<LayerInterpolator>> {
     points
         .iter()
-        .map(|layer| build_layer(option_times, swap_lengths, layer, extrapolation))
+        .enumerate()
+        .map(|(k, layer)| {
+            let flat = backward_flat && k <= MAX_BACKWARD_FLAT_LAYER;
+            build_layer(option_times, swap_lengths, layer, extrapolation, flat)
+        })
         .collect()
 }
 
-/// Builds the interpolator for one layer: bilinear over
-/// `x = swap_lengths`, `y = option_times`, `z = layer` rows, wrapped flat.
+/// Builds the interpolator for one layer, wrapped flat: bilinear over
+/// `x = swap_lengths`, `y = option_times`, `z = layer` rows, or backward-flat
+/// linear over `x = option_times`, `y = swap_lengths`, `z = transpose(layer)`.
 fn build_layer(
     option_times: &[Time],
     swap_lengths: &[Time],
     layer: &Matrix,
     extrapolation: bool,
+    backward_flat: bool,
 ) -> QlResult<LayerInterpolator> {
-    let z: Vec<Vec<Real>> = (0..layer.rows()).map(|j| layer.row(j).to_vec()).collect();
-    let bilinear = BilinearInterpolation::new(swap_lengths.to_vec(), option_times.to_vec(), z)?;
-    let mut wrapper = FlatExtrapolator2D::new(bilinear);
+    let rows =
+        |m: &Matrix| -> Vec<Vec<Real>> { (0..m.rows()).map(|j| m.row(j).to_vec()).collect() };
+    if backward_flat {
+        let inner = BackwardflatLinearInterpolation::new(
+            option_times.to_vec(),
+            swap_lengths.to_vec(),
+            rows(&layer.transpose()),
+        )?;
+        let mut wrapper = FlatExtrapolator2D::new(inner);
+        wrapper.set_extrapolation(extrapolation);
+        return Ok(LayerInterpolator::BackwardFlat(wrapper));
+    }
+    let inner =
+        BilinearInterpolation::new(swap_lengths.to_vec(), option_times.to_vec(), rows(layer))?;
+    let mut wrapper = FlatExtrapolator2D::new(inner);
     wrapper.set_extrapolation(extrapolation);
-    Ok(wrapper)
+    Ok(LayerInterpolator::Bilinear(wrapper))
 }
 
 /// Whether `sorted` (strictly increasing, finite) already contains `v`.
@@ -414,6 +461,10 @@ mod tests {
     /// A 3-option x 2-swap (non-square) cube with distinct per-node per-layer
     /// values `node(l, j, k) = 100*l + 10*j + k`, interpolators refreshed.
     fn built_cube() -> Cube {
+        built_cube_with(N_LAYERS, false)
+    }
+
+    fn built_cube_with(n_layers: Size, backward_flat: bool) -> Cube {
         let option_dates = vec![option_date(0), option_date(1), option_date(2)];
         let swap_tenors = vec![swap_tenor(0), swap_tenor(1)];
         let mut cube = Cube::new(
@@ -421,12 +472,12 @@ mod tests {
             swap_tenors,
             OPTION_TIMES.to_vec(),
             SWAP_LENGTHS.to_vec(),
-            N_LAYERS,
+            n_layers,
             true,
-            false,
+            backward_flat,
         )
         .unwrap();
-        for l in 0..N_LAYERS {
+        for l in 0..n_layers {
             let mut m = Matrix::with_size(OPTION_TIMES.len(), SWAP_LENGTHS.len());
             for j in 0..OPTION_TIMES.len() {
                 for k in 0..SWAP_LENGTHS.len() {
@@ -556,19 +607,40 @@ mod tests {
     }
 
     #[test]
-    fn backward_flat_is_a_documented_deferral() {
-        let err = Cube::new(
-            vec![option_date(0), option_date(1), option_date(2)],
-            vec![swap_tenor(0), swap_tenor(1)],
-            OPTION_TIMES.to_vec(),
-            SWAP_LENGTHS.to_vec(),
-            N_LAYERS,
-            true,
-            true,
-        )
-        .err()
-        .expect("backward_flat = true must be rejected");
-        assert!(err.to_string().contains("596"));
+    fn backward_flat_is_flat_in_option_time_and_linear_in_swap_length() {
+        // Six layers so index 5 sits past the `k <= 4` backward-flat threshold.
+        let cube = built_cube_with(6, true);
+        for (j, &option_time) in OPTION_TIMES.iter().enumerate() {
+            for (k, &swap_length) in SWAP_LENGTHS.iter().enumerate() {
+                for (l, &got) in cube
+                    .value(option_time, swap_length)
+                    .unwrap()
+                    .iter()
+                    .enumerate()
+                {
+                    assert_exact(got, node(l, j, k));
+                }
+            }
+        }
+        // Between option nodes 1.0 and 2.0 layers 0..=4 read the NEXT option node
+        // (hpp:59-69); layer 5 stays bilinear (hpp:1018).
+        let mid_option = cube.value(1.5, SWAP_LENGTHS[0]).unwrap();
+        for (l, &got) in mid_option.iter().enumerate().take(5) {
+            assert_exact(got, node(l, 1, 0));
+        }
+        assert_exact(mid_option[5], 0.5 * (node(5, 0, 0) + node(5, 1, 0)));
+        // Between swap nodes every layer is linear.
+        let mid_swap = cube.value(OPTION_TIMES[2], 7.5).unwrap();
+        for (l, &got) in mid_swap.iter().enumerate() {
+            assert_exact(got, 0.5 * (node(l, 2, 0) + node(l, 2, 1)));
+        }
+        // Off the grid the flat wrapper clamps into it on every layer.
+        let past = cube.value(9.0, 99.0).unwrap();
+        let before = cube.value(0.0, 1.0).unwrap();
+        for (l, (&p, &b)) in past.iter().zip(&before).enumerate() {
+            assert_exact(p, node(l, 2, 1));
+            assert_exact(b, node(l, 0, 0));
+        }
     }
 
     #[test]
