@@ -1,4 +1,4 @@
-//! Bootstrap conventions for hazard-rate and survival-probability credit curves.
+//! Bootstrap conventions for hazard-rate, survival-probability and default-density curves.
 
 use crate::errors::QlResult;
 use crate::math::interpolations::Interpolation;
@@ -169,6 +169,42 @@ impl CreditBootstrapTraits for SurvivalProbability {
     }
     fn density<I: Interpolation>(interpolation: &I, t: Time) -> QlResult<Real> {
         density_from_nodes(interpolation, t)
+    }
+}
+
+/// Default-density convention from `probabilitytraits.hpp:192-264`.
+/// Brackets, first-node updates and iteration limits match the hazard convention.
+/// Later guesses use the preceding density, matching flat-tail extrapolation;
+/// they only seed the bracketed solver for non-flat interpolation.
+pub struct DefaultDensity;
+
+impl BootstrapTraits for DefaultDensity {
+    fn initial_value() -> Real {
+        HazardRate::initial_value()
+    }
+    fn guess(i: Size, times: &[Time], data: &[Real], valid_data: bool) -> Real {
+        HazardRate::guess(i, times, data, valid_data)
+    }
+    fn min_value_after(i: Size, times: &[Time], data: &[Real], valid_data: bool) -> Real {
+        HazardRate::min_value_after(i, times, data, valid_data)
+    }
+    fn max_value_after(i: Size, times: &[Time], data: &[Real], valid_data: bool) -> Real {
+        HazardRate::max_value_after(i, times, data, valid_data)
+    }
+    fn update_guess(data: &mut [Real], value: Real, i: Size) {
+        HazardRate::update_guess(data, value, i);
+    }
+    fn max_iterations() -> Size {
+        30
+    }
+}
+
+impl CreditBootstrapTraits for DefaultDensity {
+    fn survival<I: Interpolation>(interpolation: &I, t: Time) -> QlResult<Real> {
+        super::interpolateddefaultdensitycurve::survival_from_density_nodes(interpolation, t)
+    }
+    fn density<I: Interpolation>(interpolation: &I, t: Time) -> QlResult<Real> {
+        super::interpolateddefaultdensitycurve::default_density_from_nodes(interpolation, t)
     }
 }
 
