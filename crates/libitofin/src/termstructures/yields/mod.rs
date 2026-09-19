@@ -4,6 +4,7 @@
 //! Rust keyword); concrete curves implementing
 //! [`YieldTermStructure`](super::yieldtermstructure::YieldTermStructure).
 
+mod basisswapratehelpers;
 mod bondhelpers;
 mod discountcurve;
 mod flatforward;
@@ -18,6 +19,7 @@ mod zerocurve;
 mod zerospreadedtermstructure;
 mod zeroyieldstructure;
 
+pub use basisswapratehelpers::IborIborBasisSwapRateHelper;
 pub use bondhelpers::{BondHelper, FixedRateBondHelper};
 pub use discountcurve::{DiscountCurve, InterpolatedDiscountCurve};
 pub use flatforward::FlatForward;
