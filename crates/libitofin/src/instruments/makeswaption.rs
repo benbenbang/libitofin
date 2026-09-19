@@ -21,9 +21,9 @@
 //!
 //! - **The `MakeOIS` underlying path is not ported.** C++ builds the underlying
 //!   through `MakeOIS` when the index is an `OvernightIndexedSwapIndex`
-//!   (`makeswaption.cpp:112-125`); that index is itself deferred (it needs the
-//!   `MakeOIS` extension #344 tracks), so only the [`MakeVanillaSwap`] path lands
-//!   here. A non-overnight [`SwapIndex`] always takes it.
+//!   (`makeswaption.cpp:112-125`). That index remains deferred, so this builder
+//!   only supports the [`MakeVanillaSwap`] path through a non-overnight
+//!   [`SwapIndex`].
 //! - **`withUnderlyingType` is not ported.** It threads `Swap::Type` into the
 //!   underlying (`makeswaption.cpp:137`), but [`MakeVanillaSwap`] defers its own
 //!   `withType` and always builds a [`Payer`](crate::instruments::SwapType), so

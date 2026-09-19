@@ -15,6 +15,32 @@ follow-ups [#1036](https://github.com/benbenbang/libitofin/issues/1036) are clos
 API accounting, numerical tests, and statement coverage measure different things;
 see the [Go validation record](../docs/go-binding-test-gaps.md).
 
+## Swaption foundation
+
+[EPIC-10 #358](https://github.com/benbenbang/libitofin/issues/358) covers the
+constant volatility surface, swaption instrument, Black engine, Eonia, SwapIndex
+and vanilla MakeSwaption builder. Its five core issues (#359-#363) are complete.
+Physical and cash settlement, both cash annuity models, and payer/receiver pricing
+are supported; the later convention and delta gates (#364/#365) are also complete.
+
+| Evidence | Independent price checks |
+| --- | --- |
+| [Rust Black engine](../crates/libitofin/src/pricingengines/swaption/blackswaptionengine.rs) | Par `0.036418158579`, indexed `0.036421429684`, Eonia OIS `0.014101075767`; absolute tolerance `1e-12` |
+| [Python oracle](../crates/itofin-py/tests/test_black_swaption_oracle.py) | Cached par value, 12 QuantLib 1.43 settlement cases, retained dependencies and live quote repricing |
+| [Go settlement oracle](../sdk/go/rates_completion_settlement_test.go) | Same 12 independent settlement cases; both cash annuity models and payer/receiver sides |
+
+Python/C/Go currently construct swaptions on vanilla swaps. Eonia, the MakeSwaption
+convenience and OIS-underlying swaptions remain Rust-only, tracked in
+[#1049](https://github.com/benbenbang/libitofin/issues/1049). Rust MakeSwaption is
+payer-only and has no overnight-index builder; SwapIndex clone variants and
+swaption implied volatility remain deferred.
+
+Advanced volatility work retains separate scope: matrix construction/observability
+[#570](https://github.com/benbenbang/libitofin/issues/570), backward-flat SABR cubes
+[#606](https://github.com/benbenbang/libitofin/issues/606), SABR variants
+[#586](https://github.com/benbenbang/libitofin/issues/586), and ZABR
+[#597](https://github.com/benbenbang/libitofin/issues/597).
+
 ## Dependency layers
 
 The port proceeds **bottom-up** through dependency layers L0→L11; each layer

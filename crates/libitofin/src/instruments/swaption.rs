@@ -25,8 +25,8 @@
 //!   [`QlResult`] rather than throwing.
 //! - `impliedVolatility` (needs the unported implied-vol solver family) and the
 //!   `deepUpdate` observer optimisation are deferred; the ported tests reach
-//!   neither. The `MakeSwaption` builder is deferred to #363 (it needs the
-//!   unported `SwapIndex`).
+//!   neither. [`MakeSwaption`](crate::instruments::MakeSwaption) builds vanilla
+//!   swaptions from a [`SwapIndex`](crate::indexes::SwapIndex).
 
 use std::any::Any;
 
