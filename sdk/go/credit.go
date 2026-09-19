@@ -8,6 +8,93 @@ type DefaultProbabilityTermStructure struct{ object }
 type FlatHazardRate = DefaultProbabilityTermStructure
 type InterpolatedHazardRateCurve = DefaultProbabilityTermStructure
 type PiecewiseDefaultCurve = DefaultProbabilityTermStructure
+type InterpolatedDefaultDensityCurve = DefaultProbabilityTermStructure
+type PiecewiseDefaultDensityCurve = DefaultProbabilityTermStructure
+
+type CreditDensityInterpolation int32
+
+const (
+	DensityBackwardFlat CreditDensityInterpolation = iota
+	DensityLinear
+)
+
+type DefaultDensityCurveConfig struct {
+	Dates         []Date
+	Densities     []float64
+	DayCounter    *DayCounter
+	Calendar      *Calendar
+	Interpolation CreditDensityInterpolation
+}
+
+func (s *Session) NewInterpolatedDefaultDensityCurve(a DefaultDensityCurveConfig) (*InterpolatedDefaultDensityCurve, error) {
+	if a.DayCounter == nil {
+		return nil, errNilArgument("day counter")
+	}
+	if len(a.Dates) != len(a.Densities) {
+		return nil, creditArgumentError("dates/densities length mismatch")
+	}
+	args := []object{a.DayCounter.object}
+	var calendar C.uint64_t
+	if a.Calendar != nil {
+		args = append(args, a.Calendar.object)
+		calendar = C.uint64_t(a.Calendar.id)
+	}
+	dates := make([]C.int32_t, len(a.Dates))
+	for i, d := range a.Dates {
+		dates[i] = C.int32_t(d.Serial())
+	}
+	var dp *C.int32_t
+	var vp *C.double
+	if len(dates) > 0 {
+		dp = &dates[0]
+		vp = (*C.double)(unsafe.Pointer(&a.Densities[0]))
+	}
+	var id C.uint64_t
+	err := s.invoke(func() error {
+		if e := sameSession(s, args...); e != nil {
+			return e
+		}
+		var e C.ItofinError
+		return ffiError(C.itofin_interpolated_default_density_new(s.ctx, dp, vp, C.size_t(len(dates)), C.uint64_t(a.DayCounter.id), calendar, C.int32_t(a.Interpolation), &id, &e), &e)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &InterpolatedDefaultDensityCurve{object{s, uint64(id)}}, nil
+}
+
+func (s *Session) NewPiecewiseDefaultDensityCurve(reference Date, helpers []*DefaultProbabilityHelper, dc *DayCounter, interpolation CreditDensityInterpolation) (*PiecewiseDefaultDensityCurve, error) {
+	if dc == nil {
+		return nil, errNilArgument("day counter")
+	}
+	args := []object{dc.object}
+	ids := make([]C.uint64_t, len(helpers))
+	for i, h := range helpers {
+		if h == nil {
+			return nil, errNilArgument("credit helper")
+		}
+		args = append(args, h.object)
+		ids[i] = C.uint64_t(h.id)
+	}
+	var ptr *C.uint64_t
+	if len(ids) > 0 {
+		ptr = &ids[0]
+	}
+	var id C.uint64_t
+	err := s.invoke(func() error {
+		if e := sameSession(s, args...); e != nil {
+			return e
+		}
+		var e C.ItofinError
+		return ffiError(C.itofin_piecewise_default_density_new(s.ctx, C.int32_t(reference.Serial()), ptr, C.size_t(len(ids)), C.uint64_t(dc.id), C.int32_t(interpolation), &id, &e), &e)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &PiecewiseDefaultDensityCurve{object{s, uint64(id)}}, nil
+}
+
+func (c *DefaultProbabilityTermStructure) DefaultDensities() ([]float64, error) { return c.Data() }
 
 type FlatHazardConfig struct {
 	ReferenceDate  Date
