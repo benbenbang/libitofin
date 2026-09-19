@@ -2,9 +2,8 @@
 //!
 //! Port of `ql/termstructures/inflation/seasonality.{hpp,cpp}`:
 //! [`Seasonality`] is the transformation an inflation curve folds into the
-//! rates it publishes, and [`MultiplicativePriceSeasonality`] is the one
-//! implementation QuantLib ships for price indexes (CPI/RPI/HICP), where the
-//! factors multiply the index level itself.
+//! rates it publishes. [`MultiplicativePriceSeasonality`] multiplies price index
+//! levels, while [`KerkhofSeasonality`] accumulates monthly factors for zero rates.
 //!
 //! Seasonality fills in an inflation curve between the integer-year maturities
 //! the market quotes. Stationary (one year of factors) multiplicative price
@@ -15,10 +14,9 @@
 //!
 //! ## Divergences from QuantLib
 //!
-//! - `KerkhofSeasonality` (`seasonality.hpp:170-187`,
-//!   `seasonality.cpp:220-277`) is **not ported**. It is a distinct
-//!   cumulative-product subclass, not a parametrization of
-//!   [`MultiplicativePriceSeasonality`], and is out of scope here (#729).
+//! - [`KerkhofSeasonality`] validates its twelve-month contract at construction
+//!   and replacement, instead of deferring that check until factor lookup.
+//!   It does not expose the inherited arbitrary-frequency C++ setter.
 //! - C++'s `set` assigns the fields and *then* validates, leaving an invalid
 //!   object behind on failure; [`MultiplicativePriceSeasonality::set`] builds
 //!   the replacement first, so a rejected input leaves the receiver untouched.
@@ -375,6 +373,115 @@ impl Seasonality for MultiplicativePriceSeasonality {
             );
         }
         Ok(true)
+    }
+}
+
+/// Monthly cumulative-product seasonality for zero inflation rates.
+///
+/// Port of `seasonality.hpp:170-187` and `seasonality.cpp:220-277`. Factors
+/// use calendar-month indexing: January to February uses `factors[1]`, and
+/// January to December multiplies `factors[1..12]`. Element zero is retained
+/// but never used. Years and days do not affect the factor; moving backwards
+/// in calendar month takes the reciprocal of the forward product.
+///
+/// Zero corrections use the cumulative factor directly, without dividing by
+/// the curve-base factor. Aligning the seasonality and curve base months makes
+/// the correction one at the base. Misaligned months retain QuantLib's IEEE
+/// behavior, including an infinite correction at zero elapsed time.
+/// Year-on-year corrections are unsupported. The twelve-factor specification
+/// always passes QuantLib's stationary consistency check; this does not test
+/// factor normalization or whether a YoY consumer is supported.
+#[derive(Debug)]
+pub struct KerkhofSeasonality {
+    seasonality_base_date: Date,
+    seasonality_factors: Vec<Rate>,
+}
+
+impl KerkhofSeasonality {
+    /// Creates the monthly cumulative-product correction.
+    ///
+    /// # Errors
+    ///
+    /// Requires exactly twelve factors. As in QuantLib, factor values are not
+    /// constrained to be finite or positive and are not normalized.
+    pub fn new(seasonality_base_date: Date, seasonality_factors: Vec<Rate>) -> QlResult<Self> {
+        require!(
+            seasonality_factors.len() == 12,
+            "12 monthly seasonal factors needed for Kerkhof Seasonality: got {}",
+            seasonality_factors.len()
+        );
+        Ok(Self {
+            seasonality_base_date,
+            seasonality_factors,
+        })
+    }
+
+    /// Replaces the monthly specification atomically.
+    ///
+    /// # Errors
+    ///
+    /// As [`new`](Self::new); a rejected replacement leaves this object intact.
+    pub fn set(
+        &mut self,
+        seasonality_base_date: Date,
+        seasonality_factors: Vec<Rate>,
+    ) -> QlResult<()> {
+        *self = Self::new(seasonality_base_date, seasonality_factors)?;
+        Ok(())
+    }
+
+    /// The date whose calendar month anchors the cumulative factors.
+    pub fn seasonality_base_date(&self) -> Date {
+        self.seasonality_base_date
+    }
+
+    /// The supported factor frequency, always monthly.
+    pub fn frequency(&self) -> Frequency {
+        Frequency::Monthly
+    }
+
+    /// The twelve factors in calendar-month order, including unused element zero.
+    pub fn seasonality_factors(&self) -> &[Rate] {
+        &self.seasonality_factors
+    }
+
+    /// The calendar-month cumulative factor, repeating unchanged each year.
+    pub fn seasonality_factor(&self, to: Date) -> QlResult<Rate> {
+        let from_month = self.seasonality_base_date.month() as usize;
+        let to_month = to.month() as usize;
+        let factor = self.seasonality_factors[from_month.min(to_month)..from_month.max(to_month)]
+            .iter()
+            .fold(1.0, |product, value| product * value);
+        Ok(if to_month < from_month {
+            1.0 / factor
+        } else {
+            factor
+        })
+    }
+}
+
+impl Seasonality for KerkhofSeasonality {
+    fn correct_zero_rate(
+        &self,
+        date: Date,
+        rate: Rate,
+        its: &dyn InflationTermStructure,
+    ) -> QlResult<Rate> {
+        let (effective_date, _) = inflation_period(date, its.frequency())?;
+        let (base_month, _) = inflation_period(its.base_date(), Frequency::Monthly)?;
+        let time = its
+            .require_day_counter()?
+            .year_fraction(base_month, effective_date);
+        Ok((rate + 1.0) * self.seasonality_factor(effective_date)?.powf(1.0 / time) - 1.0)
+    }
+
+    fn correct_yoy_rate(
+        &self,
+        _date: Date,
+        _rate: Rate,
+        _its: &dyn InflationTermStructure,
+    ) -> QlResult<Rate> {
+        fail!("Seasonal Kerkhof model is not defined on YoY rates")
     }
 }
 

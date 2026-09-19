@@ -926,6 +926,43 @@ mod zero_term_structure_oracle {
         assert!(worst_npv < EPS, "worst |NPV| {worst_npv}");
     }
 
+    #[test]
+    fn kerkhof_seasonality_recalibrates_and_clearing_restores_the_curve() {
+        use crate::termstructures::inflation::seasonality::KerkhofSeasonality;
+
+        let fixture = a_fixture();
+        let curve = &fixture.curve;
+        let query = Date::new(1, August, 2012);
+        let before = fixture.index.fixing(query, true).unwrap();
+        let nodes_before = curve.data().unwrap();
+        let seasonality = shared(
+            KerkhofSeasonality::new(curve.base_date(), SEASONALITY_FACTORS.to_vec()).unwrap(),
+        );
+        curve.set_seasonality(Some(seasonality)).unwrap();
+        assert!(!curve.lazy.borrow().is_calculated());
+        let after = fixture.index.fixing(query, true).unwrap();
+        assert!((after - before).abs() > 1.0e-3, "forecast must move");
+        assert!(
+            curve
+                .data()
+                .unwrap()
+                .iter()
+                .zip(&nodes_before)
+                .any(|(after, before)| (after - before).abs() > 1.0e-6),
+            "bootstrap nodes must change"
+        );
+        for (maturity, rate) in zc_data() {
+            let mut swap = fixture.a_swap(maturity, rate / 100.0);
+            assert!(swap.npv().unwrap().abs() < EPS);
+        }
+        curve.set_seasonality(None).unwrap();
+        assert!(!curve.lazy.borrow().is_calculated());
+        assert!((fixture.index.fixing(query, true).unwrap() - before).abs() < EPS);
+        for (restored, before) in curve.data().unwrap().iter().zip(nodes_before) {
+            assert!((restored - before).abs() < EPS);
+        }
+    }
+
     /// Phase 2 (`:437-463`): the index, forecasting off the bootstrapped curve,
     /// reproduces the curve's own zero rate compounded off the base fixing at
     /// every monthly date from the reference date to a month short of the
