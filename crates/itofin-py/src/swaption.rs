@@ -300,3 +300,9 @@ impl PySwaption {
         Ok(self.inner.npv().map_err(PyQlError::from)?)
     }
 }
+
+impl PySwaption {
+    pub(crate) fn from_inner(inner: Swaption) -> Self {
+        Self { inner }
+    }
+}

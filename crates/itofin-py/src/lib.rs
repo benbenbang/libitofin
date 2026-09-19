@@ -22,6 +22,7 @@ mod helpers;
 mod heston;
 mod hullwhite;
 mod inflation;
+mod makeswaption;
 mod market;
 mod mcengine;
 mod ois;
@@ -289,6 +290,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     instruments.add_class::<PySwapType>()?;
     instruments.add_class::<PyVanillaSwap>()?;
     instruments.add_class::<PyMakeVanillaSwap>()?;
+    instruments.add_class::<makeswaption::PyMakeSwaption>()?;
     instruments.add_class::<PyPosition>()?;
     instruments.add_class::<PyForwardRateAgreement>()?;
     instruments.add_class::<PyOvernightIndexedSwap>()?;
