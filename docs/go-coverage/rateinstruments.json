@@ -511,7 +511,9 @@
       "python": "itofin.instruments.Swaption.npv",
       "status": "implemented",
       "tests": [
-        "TestRatesEngineFactoriesAndAtomicPrice"
+        "TestRatesEngineFactoriesAndAtomicPrice",
+        "TestEoniaOisSwaptionCachedLifecycle",
+        "TestMakeSwaptionCalendarAndForecastOracles"
       ]
     },
     {
@@ -537,7 +539,8 @@
       "python": "itofin.instruments.Swaption.is_calculated",
       "status": "implemented",
       "tests": [
-        "TestRatesEngineFactoriesAndAtomicPrice"
+        "TestRatesEngineFactoriesAndAtomicPrice",
+        "TestMakeSwaptionCalendarAndForecastOracles"
       ]
     },
     {
@@ -564,7 +567,9 @@
       "python": "itofin.instruments.Swaption.price",
       "status": "implemented",
       "tests": [
-        "TestRatesEngineFactoriesAndAtomicPrice"
+        "TestRatesEngineFactoriesAndAtomicPrice",
+        "TestEoniaOisSwaptionCachedLifecycle",
+        "TestMakeSwaptionCalendarAndForecastOracles"
       ]
     },
     {
@@ -968,7 +973,8 @@
       "python": "itofin.indexes.SwapIndex.fixing",
       "status": "implemented",
       "tests": [
-        "TestRatesCapFloorLegsAndSwapIndex"
+        "TestRatesCapFloorLegsAndSwapIndex",
+        "TestMakeSwaptionCalendarAndForecastOracles"
       ]
     },
     {
