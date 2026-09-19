@@ -111,7 +111,8 @@ fn advance(schedule: &Schedule, d: Date, p: Period) -> Date {
 /// Port of `getListOfPeriodDatesIncludingQuasiPayments`. Note that the two
 /// rewrites index the *original* schedule positions: when a prior notional
 /// coupon has been prepended, `size - 1` no longer addresses the final date.
-/// That is QuantLib's behaviour and is reproduced here.
+/// That is QuantLib's behaviour and is reproduced here; it is frozen by
+/// `reproduces_quantlibs_off_by_one_when_both_stubs_are_irregular`.
 fn period_dates_including_quasi_payments(schedule: &Schedule) -> Vec<Date> {
     let issue_date = schedule.date(0);
     let size = schedule.len();
@@ -544,6 +545,61 @@ mod tests {
         assert_eq!(dates[1], d(28, Month::February, 2017));
         assert_eq!(dates[2], d(31, Month::August, 2017));
         assert_eq!(dates.len(), schedule.len() + 1);
+    }
+
+    /// Freezes QuantLib's off-by-one in `getListOfPeriodDatesIncludingQuasiPayments`
+    /// (`ql/time/daycounters/actualactual.cpp:38-89`, tree `v1.42.1-266-g9863b578a`)
+    /// so the port cannot silently diverge from C++. The expected vector is
+    /// derived by hand from the C++ path, not from this port:
+    ///
+    /// Schedule (Backward, 6M, null calendar, Unadjusted, `schedule.cpp:195-243`):
+    /// `[15 Jan 2020, 15 Sep 2020, 15 Mar 2021, 15 Sep 2021, 15 Mar 2022, 15 Jun 2022]`,
+    /// `isRegular = [false, true, true, true, false]`, `size = 6`.
+    ///
+    /// 1. `isRegular(1)` is false (cpp:44): `notionalFirstCoupon = 15 Sep 2020 - 6M
+    ///    = 15 Mar 2020` replaces index 0 (cpp:54). It is later than the issue
+    ///    date (cpp:57), so `priorNotionalCoupon = 15 Sep 2019` is inserted at
+    ///    the front (cpp:63); the vector is now 7 long.
+    /// 2. `isRegular(5)` is false (cpp:68): `notionalLastCoupon = date(4) + 6M
+    ///    = 15 Mar 2022 + 6M = 15 Sep 2022`. cpp:76 writes it to
+    ///    `newDates[size - 1] = newDates[5]`, which after the insert holds
+    ///    15 Mar 2022 (the real next-to-last coupon), not the maturity at
+    ///    index 6. `15 Sep 2022 < 15 Jun 2022` is false (cpp:78), so nothing
+    ///    is appended.
+    ///
+    /// Result: `[15 Sep 2019, 15 Mar 2020, 15 Sep 2020, 15 Mar 2021, 15 Sep 2021,
+    /// 15 Sep 2022, 15 Jun 2022]` - non-monotonic, with the next-to-last coupon
+    /// lost. The intended result would end `..., 15 Sep 2021, 15 Mar 2022,
+    /// 15 Sep 2022`. Delete this test when upstream fixes the indexing.
+    #[test]
+    fn reproduces_quantlibs_off_by_one_when_both_stubs_are_irregular() {
+        let schedule = MakeSchedule::new()
+            .from(d(15, Month::January, 2020))
+            .with_first_date(d(15, Month::September, 2020))
+            .with_next_to_last_date(d(15, Month::March, 2022))
+            .to(d(15, Month::June, 2022))
+            .with_frequency(Frequency::Semiannual)
+            .with_convention(BusinessDayConvention::Unadjusted)
+            .backwards()
+            .end_of_month(false)
+            .build();
+        assert_eq!(schedule.len(), 6);
+        assert!(!schedule.is_regular_at(1));
+        assert!(!schedule.is_regular_at(schedule.len() - 1));
+
+        let dates = period_dates_including_quasi_payments(&schedule);
+        assert_eq!(
+            dates,
+            vec![
+                d(15, Month::September, 2019),
+                d(15, Month::March, 2020),
+                d(15, Month::September, 2020),
+                d(15, Month::March, 2021),
+                d(15, Month::September, 2021),
+                d(15, Month::September, 2022),
+                d(15, Month::June, 2022),
+            ]
+        );
     }
 
     #[test]
