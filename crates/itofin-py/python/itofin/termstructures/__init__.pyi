@@ -29,6 +29,7 @@ __all__ = [
     "FraRateHelper",
     "FuturesRateHelper",
     "FuturesType",
+    "InterpolatedDefaultDensityCurve",
     "InterpolatedHazardRateCurve",
     "InterpolatedSwaptionVolatilityCube",
     "InterpolatedYoYInflationCurve",
@@ -1406,6 +1407,36 @@ class FuturesRateHelper(RateHelper):
 
         Returns:
             float: The convexity quote's value, or zero when none was supplied.
+        """
+
+@typing.final
+class InterpolatedDefaultDensityCurve(DefaultProbabilityTermStructure):
+    r"""
+    A density curve using BackwardFlat or Linear interpolation and flat-density extrapolation.
+    """
+    def __init__(self, dates: typing.Sequence[time.Date], densities: typing.Sequence[builtins.float], day_counter: time.DayCounter, interpolation: builtins.str = 'BackwardFlat', calendar: typing.Optional[time.Calendar] = None) -> None:
+        r"""
+        Build from dated density nodes; interpolation is BackwardFlat or Linear.
+        """
+    def dates(self) -> builtins.list[time.Date]:
+        r"""
+        Return copied node dates.
+        """
+    def times(self) -> builtins.list[builtins.float]:
+        r"""
+        Return copied node times.
+        """
+    def data(self) -> builtins.list[builtins.float]:
+        r"""
+        Return copied node densities.
+        """
+    def default_densities(self) -> builtins.list[builtins.float]:
+        r"""
+        Return copied node densities.
+        """
+    def nodes(self) -> builtins.list[tuple[time.Date, builtins.float]]:
+        r"""
+        Return copied date and density pairs.
         """
 
 @typing.final
