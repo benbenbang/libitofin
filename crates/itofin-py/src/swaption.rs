@@ -1,18 +1,8 @@
-//! Facades for the European swaption stack: EuropeanExercise, SettlementType,
-//! SettlementMethod and Swaption.
-//!
-//! Swaption wraps a Swaption by value and prices it through the
-//! JamshidianSwaptionEngine built on a HullWhite model
-//! (`set_jamshidian_engine`); the engine reads the swap's arguments, so the
-//! underlying swap needs no discounting engine of its own.
-//!
-//! Deferred (visible): the Bermudan `TreeSwaptionEngine` and a `BermudanExercise`
-//! facade are omitted. `BermudanExercise` has no public constructor on `main`
-//! (the core tree tests build one through a private stub), so there is nothing
-//! to wrap; only the European Jamshidian path is exposed here.
+//! European swaptions on vanilla or overnight swaps and the vanilla MakeSwaption builder.
 
 use crate::PyQlError;
 use crate::hullwhite::PyHullWhite;
+use crate::ois::PyOvernightIndexedSwap;
 use crate::results::Results;
 use crate::settings::PySettings;
 use crate::swap::PyVanillaSwap;
@@ -80,7 +70,7 @@ pub enum PySettlementType {
 
 impl PySettlementType {
     /// The core SettlementType this variant stands for.
-    fn inner(&self) -> SettlementType {
+    pub(crate) fn inner(&self) -> SettlementType {
         match self {
             PySettlementType::Physical => SettlementType::Physical,
             PySettlementType::Cash => SettlementType::Cash,
@@ -112,7 +102,7 @@ pub enum PySettlementMethod {
 
 impl PySettlementMethod {
     /// The core SettlementMethod this variant stands for.
-    fn inner(&self) -> SettlementMethod {
+    pub(crate) fn inner(&self) -> SettlementMethod {
         match self {
             PySettlementMethod::PhysicalOTC => SettlementMethod::PhysicalOTC,
             PySettlementMethod::PhysicalCleared => SettlementMethod::PhysicalCleared,
@@ -124,7 +114,7 @@ impl PySettlementMethod {
     }
 }
 
-/// A European option to enter a vanilla swap.
+/// A European option to enter a vanilla or overnight swap.
 ///
 /// The swaption registers with the underlying swap and with the evaluation
 /// date on the Settings it was built with (D5). Pricing needs an engine: call
@@ -168,6 +158,46 @@ impl PySwaption {
                 settings.inner(),
             ),
         }
+    }
+
+    /// Build an option on an overnight swap, retaining the same shared underlying.
+    #[staticmethod]
+    fn from_ois(
+        swap: &PyOvernightIndexedSwap,
+        exercise: &PyEuropeanExercise,
+        settlement_type: &PySettlementType,
+        settlement_method: &PySettlementMethod,
+        settings: &PySettings,
+    ) -> Self {
+        Self {
+            inner: Swaption::new(
+                swap.inner(),
+                exercise.inner(),
+                settlement_type.inner(),
+                settlement_method.inner(),
+                settings.inner(),
+            ),
+        }
+    }
+
+    /// Return the single European exercise date.
+    fn exercise_date(&self) -> PyDate {
+        PyDate::from_inner(self.inner.exercise().dates()[0])
+    }
+
+    /// Return the underlying swap's fixed rate.
+    fn underlying_fixed_rate(&self) -> f64 {
+        self.inner.underlying().borrow().fixed_rate()
+    }
+
+    /// Return the underlying swap's nominal.
+    fn underlying_nominal(&self) -> PyResult<f64> {
+        Ok(self
+            .inner
+            .underlying()
+            .borrow()
+            .nominal()
+            .map_err(PyQlError::from)?)
     }
 
     /// Attach a Jamshidian engine so the swaption prices off Hull-White.

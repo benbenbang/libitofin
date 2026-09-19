@@ -311,10 +311,13 @@
       "go": [
         "Session.MakeOis"
       ],
+      "notes": "Optional fixed_leg_day_count maps to MakeOisConfig.FixedLegDayCounter through existing itofin_make_ois bit 16; no new Python symbol or native ABI layout.",
       "python": "itofin.instruments.MakeOis",
       "status": "implemented",
       "tests": [
-        "TestRatesParSwapsAndFRA"
+        "TestRatesParSwapsAndFRA",
+        "TestEoniaOisSwaptionCachedLifecycle",
+        "eonia_ois_swaption_c_handles_retain_dependencies_and_reprice"
       ]
     },
     {
@@ -324,11 +327,13 @@
       "go": [
         "Session.MakeOis"
       ],
-      "notes": "Go configuration struct and Session factory combine immutable configuration with native build.",
+      "notes": "Go configuration struct and Session factory combine immutable configuration with native build. Optional fixed_leg_day_count maps to MakeOisConfig.FixedLegDayCounter through existing itofin_make_ois bit 16; no new Python symbol or native ABI layout.",
       "python": "itofin.instruments.MakeOis.__init__",
       "status": "implemented",
       "tests": [
-        "TestRatesParSwapsAndFRA"
+        "TestRatesParSwapsAndFRA",
+        "TestEoniaOisSwaptionCachedLifecycle",
+        "eonia_ois_swaption_c_handles_retain_dependencies_and_reprice"
       ]
     },
     {
@@ -338,11 +343,13 @@
       "go": [
         "Session.MakeOis"
       ],
-      "notes": "Go configuration struct and Session factory combine immutable configuration with native build.",
+      "notes": "Go configuration struct and Session factory combine immutable configuration with native build. Optional fixed_leg_day_count maps to MakeOisConfig.FixedLegDayCounter through existing itofin_make_ois bit 16; no new Python symbol or native ABI layout.",
       "python": "itofin.instruments.MakeOis.build",
       "status": "implemented",
       "tests": [
-        "TestRatesParSwapsAndFRA"
+        "TestRatesParSwapsAndFRA",
+        "TestEoniaOisSwaptionCachedLifecycle",
+        "eonia_ois_swaption_c_handles_retain_dependencies_and_reprice"
       ]
     },
     {
