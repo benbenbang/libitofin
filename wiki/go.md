@@ -20,6 +20,7 @@ The [source-checkout setup](https://benbenbang.github.io/libitofin/go/#run-examp
 shows how to build the native library and run these examples:
 
 - [European option](../sdk/go/examples/european_option/main.go): price a call and read its greeks, with a [walkthrough](https://benbenbang.github.io/libitofin/getting-started/).
+- [Swaption example](../sdk/go/examples/swaption/main.go) (requires current `main`): price vanilla payer and Eonia OIS swaptions with checked errors, retained dependencies and live volatility repricing.
 - [Portfolio simulation](../sdk/go/examples/portfolio/main.go): simulate correlated assets with a [worked explanation](https://benbenbang.github.io/libitofin/go/#portfolio-simulation).
 
 A session owns its native object graph. Close sessions explicitly, check returned

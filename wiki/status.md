@@ -79,11 +79,14 @@ are supported; the later convention and delta gates (#364/#365) are also complet
 | [Python oracle](../crates/itofin-py/tests/test_black_swaption_oracle.py) | Cached par value, 12 QuantLib 1.43 settlement cases, retained dependencies and live quote repricing |
 | [Go settlement oracle](../sdk/go/rates_completion_settlement_test.go) | Same 12 independent settlement cases; both cash annuity models and payer/receiver sides |
 
-Python/C/Go currently construct swaptions on vanilla swaps. Eonia, the MakeSwaption
-convenience and OIS-underlying swaptions remain Rust-only, tracked in
-[#1049](https://github.com/benbenbang/libitofin/issues/1049). Rust MakeSwaption is
-payer-only and has no overnight-index builder; SwapIndex clone variants and
-swaption implied volatility remain deferred.
+Python/C/Go expose Eonia, OIS-underlying swaptions and the vanilla MakeSwaption
+convenience ([#1049](https://github.com/benbenbang/libitofin/issues/1049)).
+[Python](../crates/itofin-py/tests/test_swaption_facades.py) and
+[C/Go](../sdk/go/swaption_facades_test.go) tests preserve the Eonia OIS cached NPV
+`0.014101075767` at `1e-12`, independent forecast pins, exercise-calendar overrides,
+retained dependencies and live repricing. These facades will ship after v0.25.0.
+MakeSwaption is payer-only and has no overnight-index builder; SwapIndex clone
+variants and swaption implied volatility remain deferred.
 
 [#570](https://github.com/benbenbang/libitofin/issues/570) completes all five
 swaption volatility matrix constructors in Rust, Python and Go, including fixed

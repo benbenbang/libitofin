@@ -1,18 +1,22 @@
-"""Eonia/OIS cached QuantLib value, conventions, ownership and errors."""
+"""Eonia/OIS cached QuantLib value and vanilla builder dates, ownership and errors."""
 
 import gc
+import json
 import math
+from pathlib import Path
 
 import pytest
 
 from itofin import ItofinError, Settings
-from itofin.indexes import Eonia, OvernightIndex
-from itofin.instruments import EuropeanExercise, MakeOis, SettlementMethod, SettlementType, Swaption
+from itofin.indexes import Currency, Eonia, Euribor, OvernightIndex, SwapIndex
+from itofin.instruments import EuropeanExercise, MakeOis, MakeSwaption, SettlementMethod, SettlementType, Swaption
 from itofin.pricingengines import BlackSwaptionEngine
 from itofin.quotes import SimpleQuote
 from itofin.termstructures import FlatForward
 from itofin.time import BusinessDayConvention as BDC
 from itofin.time import Calendar, Date, DayCounter, Period
+
+ORACLE = json.loads((Path(__file__).resolve().parents[3] / "sdk/go/testdata/makeswaption_oracle.json").read_text())
 
 
 def _ois_option():
@@ -87,3 +91,94 @@ def test_eonia_conventions_forecasts_lifetime_and_errors():
     del settings
     gc.collect()
     assert index.fixing(today, True) == pytest.approx(expected, rel=0, abs=1e-13)
+
+
+def _swap_index(empty=False, dated=True):
+    settings = Settings()
+    today = Date(9, 10, 2015)
+    if dated:
+        settings.set_evaluation_date(today)
+    curve = None if empty else FlatForward(today, 0.05, DayCounter.actual360())
+    index = SwapIndex(
+        "EuriborSwapIsdaFixA",
+        Period(5, "Years"),
+        2,
+        Currency.eur(),
+        Calendar.target(),
+        Period(1, "Years"),
+        BDC.ModifiedFollowing,
+        DayCounter.thirty360_bond_basis(),
+        Euribor(Period(6, "Months"), curve, settings),
+        settings,
+    )
+    return index
+
+
+def test_make_swaption_calendar_and_independent_atm_fixing_oracles():
+    """QuantLib testMakeSwaptionWithExerciseCalendar and independent SwapIndex pins."""
+    index = _swap_index()
+    tenor = Period(1, "Years")
+    maker = MakeSwaption(index, tenor)
+    custom = MakeSwaption(index, tenor, exercise_calendar=Calendar.united_states("Settlement"))
+    assert ORACLE["quantlib"] == "1.43"
+    for row in ORACLE["fixings"]:
+        year, month, day = map(int, row["date"].split("-"))
+        assert index.fixing(Date(day, month, year)) == pytest.approx(row["fixing"], rel=0, abs=1e-12)
+    del index
+    gc.collect()
+    default = maker.build()
+    assert default.exercise_date() == Date(10, 10, 2016)
+    assert default.underlying_fixed_rate() == pytest.approx(ORACLE["fixings"][0]["fixing"], rel=0, abs=1e-12)
+    assert custom.build().exercise_date() == Date(11, 10, 2016)
+    assert custom.build().underlying_fixed_rate() == pytest.approx(ORACLE["fixings"][1]["fixing"], rel=0, abs=1e-12)
+    explicit = MakeSwaption(
+        _swap_index(), fixing_date=Date(10, 10, 2016), strike=0.05, exercise_date=Date(11, 4, 2016), nominal=123
+    ).build()
+    assert explicit.exercise_date() == Date(11, 4, 2016)
+    assert explicit.underlying_fixed_rate() == 0.05
+    assert explicit.underlying_nominal() == 123
+    with pytest.raises(ItofinError):
+        default.npv()
+
+
+def test_make_swaption_date_source_and_core_errors():
+    """Ambiguous dates, missing evaluation/forward curve and invalid exercises fail."""
+    index = _swap_index()
+    for kwargs in [{}, {"option_tenor": Period(1, "Years"), "fixing_date": Date(10, 10, 2016)}]:
+        with pytest.raises(ValueError, match="exactly one"):
+            MakeSwaption(index, **kwargs)
+    with pytest.raises(ItofinError, match="exercise date"):
+        MakeSwaption(index, fixing_date=Date(10, 10, 2016), exercise_date=Date(11, 10, 2016)).build()
+    with pytest.raises(ItofinError):
+        MakeSwaption(_swap_index(empty=True), Period(1, "Years")).build()
+    with pytest.raises(ItofinError):
+        MakeSwaption(_swap_index(dated=False), Period(1, "Years"), strike=0.05).build()
+    with pytest.raises(ItofinError):
+        MakeSwaption(index, Period(1, "Years"), strike=0.05, indexed_coupons=True).build()
+    assert (
+        MakeSwaption(index, Period(1, "Years"), strike=0.05, indexed_coupons=False).build().underlying_fixed_rate()
+        == 0.05
+    )
+
+
+def test_make_swaption_option_convention_override():
+    """Month-end rolling distinguishes the default from an explicit Following override."""
+    settings = Settings()
+    settings.set_evaluation_date(Date(30, 9, 2016))
+    curve = FlatForward(Date(30, 9, 2016), 0.05, DayCounter.actual360())
+    index = SwapIndex(
+        "EuriborSwapIsdaFixA",
+        Period(5, "Years"),
+        2,
+        Currency.eur(),
+        Calendar.target(),
+        Period(1, "Years"),
+        BDC.ModifiedFollowing,
+        DayCounter.thirty360_bond_basis(),
+        Euribor(Period(6, "Months"), curve, settings),
+        settings,
+    )
+    default = MakeSwaption(index, Period(1, "Years"), strike=0.05).build()
+    following = MakeSwaption(index, Period(1, "Years"), strike=0.05, option_convention=BDC.Following).build()
+    assert default.exercise_date() == Date(29, 9, 2017)
+    assert following.exercise_date() == Date(2, 10, 2017)
