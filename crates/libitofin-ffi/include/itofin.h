@@ -686,6 +686,26 @@ typedef struct ItofinCapFloorConfig {
 } ItofinCapFloorConfig;
 
 /**
+ * Payer-only vanilla builder. Flags: 1 strike, 2 nominal, 4 fixing date,
+ * 8 exercise date, 16 indexed coupons. Zero calendar keeps index conventions.
+ */
+typedef struct ItofinMakeSwaptionConfig {
+  uint64_t index;
+  int32_t tenor_length;
+  int32_t tenor_unit;
+  uint32_t flags;
+  ItofinReal strike;
+  ItofinReal nominal;
+  int32_t fixing_date;
+  int32_t exercise_date;
+  uint64_t exercise_calendar;
+  int32_t option_convention;
+  int32_t settlement_type;
+  int32_t settlement_method;
+  uint8_t indexed_coupons;
+} ItofinMakeSwaptionConfig;
+
+/**
  * quote/settings zero select scalar volatility/fixed date respectively.
  */
 typedef struct ItofinConstantRateVolConfig {
@@ -3528,6 +3548,28 @@ int32_t itofin_capfloor_rates(struct ItofinContext *ctx,
                               size_t capacity,
                               size_t *required,
                               struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers must be aligned, live and valid. Context and handles must belong
+ * to the calling thread; serialize calls including destruction.
+ */
+int32_t itofin_make_swaption(struct ItofinContext *ctx,
+                             struct ItofinMakeSwaptionConfig a,
+                             uint64_t *out,
+                             struct ItofinError *error);
+
+/**
+ * Fields: 0 exercise-date serial, 1 underlying fixed rate, 2 underlying nominal.
+ * # Safety
+ * Pointers must be aligned, live and valid. Context and handles must belong
+ * to the calling thread; serialize calls including destruction.
+ */
+int32_t itofin_swaption_details(struct ItofinContext *ctx,
+                                uint64_t id,
+                                int32_t field,
+                                ItofinReal *out,
+                                struct ItofinError *error);
 
 /**
  * # Safety

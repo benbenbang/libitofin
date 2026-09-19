@@ -375,6 +375,123 @@ pub unsafe extern "C" fn itofin_capfloor_rates(
     }
 }
 
+/// Payer-only vanilla builder. Flags: 1 strike, 2 nominal, 4 fixing date,
+/// 8 exercise date, 16 indexed coupons. Zero calendar keeps index conventions.
+#[repr(C)]
+pub struct ItofinMakeSwaptionConfig {
+    pub index: u64,
+    pub tenor_length: i32,
+    pub tenor_unit: i32,
+    pub flags: u32,
+    pub strike: Real,
+    pub nominal: Real,
+    pub fixing_date: i32,
+    pub exercise_date: i32,
+    pub exercise_calendar: u64,
+    pub option_convention: i32,
+    pub settlement_type: i32,
+    pub settlement_method: i32,
+    pub indexed_coupons: u8,
+}
+
+#[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid. Context and handles must belong
+/// to the calling thread; serialize calls including destruction.
+pub unsafe extern "C" fn itofin_make_swaption(
+    ctx: *mut Context,
+    a: ItofinMakeSwaptionConfig,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(out)?;
+            if a.flags & !31 != 0 {
+                return Err(BindingError::invalid("invalid swaption builder flags"));
+            }
+            let index = c.get::<Shared<libitofin::indexes::SwapIndex>>(a.index)?;
+            let strike = if a.flags & 1 != 0 {
+                Some(finite(a.strike)?)
+            } else {
+                None
+            };
+            let mut builder = if a.flags & 4 != 0 {
+                libitofin::instruments::MakeSwaption::with_fixing_date(
+                    index,
+                    date(a.fixing_date)?,
+                    strike,
+                )
+            } else {
+                libitofin::instruments::MakeSwaption::new(
+                    index,
+                    period(a.tenor_length, a.tenor_unit)?,
+                    strike,
+                )
+            };
+            let settlement_type = match a.settlement_type {
+                0 => SettlementType::Physical,
+                1 => SettlementType::Cash,
+                _ => return Err(BindingError::invalid("invalid settlement type")),
+            };
+            let settlement_method = match a.settlement_method {
+                0 => SettlementMethod::PhysicalOTC,
+                1 => SettlementMethod::PhysicalCleared,
+                2 => SettlementMethod::CollateralizedCashPrice,
+                3 => SettlementMethod::ParYieldCurve,
+                _ => return Err(BindingError::invalid("invalid settlement method")),
+            };
+            builder = builder
+                .with_settlement_type(settlement_type)
+                .with_settlement_method(settlement_method)
+                .with_option_convention(crate::time_api::convention(a.option_convention)?);
+            if a.flags & 2 != 0 {
+                builder = builder.with_nominal(finite(a.nominal)?);
+            }
+            if a.flags & 8 != 0 {
+                builder = builder.with_exercise_date(date(a.exercise_date)?);
+            }
+            if a.exercise_calendar != 0 {
+                builder = builder
+                    .with_exercise_calendar(crate::time_api::calendar(c, a.exercise_calendar)?);
+            }
+            if a.flags & 16 != 0 {
+                builder = builder
+                    .with_indexed_coupons(Some(crate::time_api::bool_flag(a.indexed_coupons)?));
+            }
+            output(out, c.insert(shared_mut(builder.build()?))?)
+        })
+    }
+}
+
+/// Fields: 0 exercise-date serial, 1 underlying fixed rate, 2 underlying nominal.
+#[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid. Context and handles must belong
+/// to the calling thread; serialize calls including destruction.
+pub unsafe extern "C" fn itofin_swaption_details(
+    ctx: *mut Context,
+    id: u64,
+    field: i32,
+    out: *mut Real,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(out)?;
+            let option = c.get::<SharedMut<Swaption>>(id)?;
+            let option = option.borrow();
+            let value = match field {
+                0 => Real::from(option.exercise().last_date().serial_number()),
+                1 => option.underlying().borrow().fixed_rate(),
+                2 => option.underlying().borrow().nominal()?,
+                _ => return Err(BindingError::invalid("invalid swaption field")),
+            };
+            output(out, value)
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
