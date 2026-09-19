@@ -22,6 +22,7 @@ This inventory does not claim exhaustive QuantLib product coverage.
 | Survival-jump strict boundaries, date updates and retained quotes | `TestCreditJumpsQuantLibOracle`, `TestCreditJumpsInvalidArguments`, `TestCreditJumpDatesWithoutEvaluationDate` |
 | ISDA spread/upfront helper repricing, quote updates, ownership and settings restoration | `TestIsdaCreditHelpersOracleAndRetention`, `TestCreditHelperExplicitTermsErrors` |
 | CDS protection end independent of adjusted payment date | `TestCreditProtectionEndDate` |
+| All five swaption matrix constructors, explicit dates, live quotes/settings, copied values and retained dependencies | `TestSwaptionMatrixFiveConstructorOracles`, `TestSwaptionMatrixAdditionalConstructorErrors` |
 | Swaption cash/physical settlement, both annuity models, unsupported combinations, payer/receiver fair rates | `TestRatesCompletionSwaptionSettlementAndReceiver` |
 | Dirty/clean bond quotes with nonzero accrued interest | `TestRatesCompletionDirtyBondWithAccruedInterest` |
 | Valid Custom/ASX futures dates, prices and analytical forward/discount factors | `TestRatesCompletionCustomAndASXFutures` |
@@ -68,6 +69,10 @@ Sources and fixtures live in [`sdk/go/testdata`](../sdk/go/testdata/):
   produces the same 18 binding rows; survival and implied quotes retain 1e-10.
   Binding discount scenarios rebuild the market; Rust additionally checks live
   discount-quote recalibration. Density bootstrap fair quotes retain 1e-6.
+- [Swaption matrix oracle](../crates/libitofin/tests/fixtures/swaption_matrix/README.md):
+  Python/Go check 120 volatility nodes at `1e-16` and live quote/date observations.
+  Rust additionally checks Black NPVs at `1e-12`, volatility recovery at `1e-6`,
+  and quote-handle relinks. No public instrument implied-volatility API is added.
 - `calibration_completion_oracle.py`: QuantLib 1.43; perturbed Heston smile
   distinguishes nonzero signed residuals. Parameters retain 3e-3 for Heston and
   1.3e-5 for Hull-White; signed residuals retain 1e-8.
