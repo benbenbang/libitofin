@@ -17,21 +17,21 @@ the Go module. `go get` downloads Go source; it does not install native headers
 or libraries. Published native packages support Linux amd64 (Ubuntu 24.04,
 glibc 2.39 or compatible newer systems) and macOS arm64 (macOS 14 or newer).
 
-The following commands use the published v0.23.0 release. With the GitHub CLI
+The following commands pin the v0.24.0 release. With the GitHub CLI
 installed, run them in your application's module directory. For a new project,
 first run `go mod init example.com/pricing`.
 
 === "macOS arm64"
 
     ```sh
-    version=0.23.0
+    version=0.24.0
     platform=darwin-arm64
     ```
 
 === "Linux amd64"
 
     ```sh
-    version=0.23.0
+    version=0.24.0
     platform=linux-amd64
     ```
 
@@ -132,7 +132,7 @@ run reproducible; its stream is not promised to match NumPy.
 --8<-- "sdk/go/examples/portfolio/main.go"
 ```
 
-With v0.23.0, it prints `native 0.23.0; 1000 paths; mean terminal portfolio 10525.33`.
+With v0.24.0, it prints `native 0.24.0; 1000 paths; mean terminal portfolio 10525.33`.
 
 ## Sessions and errors
 

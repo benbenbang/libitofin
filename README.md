@@ -38,7 +38,7 @@ Follow the [native installation guide](https://benbenbang.github.io/libitofin/go
 first, then add the matching module version:
 
 ```sh
-go get github.com/benbenbang/libitofin/sdk/go@v0.23.0
+go get github.com/benbenbang/libitofin/sdk/go@v0.24.0
 ```
 
 Use `-tags itofin_external` for builds, runs, tests, and vet outside this checkout.
