@@ -406,3 +406,7 @@ mod tests {
         assert!(curve.default_density(1.0, false).is_err());
     }
 }
+
+#[cfg(test)]
+#[path = "defaultjumps_tests.rs"]
+mod jump_tests;
