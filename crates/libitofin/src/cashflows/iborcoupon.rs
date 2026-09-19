@@ -158,6 +158,23 @@ impl IborCoupon {
         }
     }
 
+    /// The end of the coupon's estimation period (`IborCoupon::fixingEndDate`,
+    /// `iborcoupon.cpp:69-72`): the index maturity of the fixing value date
+    /// under the indexed convention, or the par roll-off of the accrual end
+    /// under the at-par one (see [`forecast_fixing_dates`]). A bootstrap helper
+    /// reads it off a leg's last coupon to place its latest relevant date.
+    ///
+    /// [`forecast_fixing_dates`]: Self::forecast_fixing_dates
+    ///
+    /// # Errors
+    ///
+    /// As [`forecast_fixing_dates`](Self::forecast_fixing_dates): a value date
+    /// or index maturity that cannot be computed, or a non-positive span.
+    pub fn fixing_end_date(&self) -> QlResult<Date> {
+        let (_, end_date, _) = self.forecast_fixing_dates()?;
+        Ok(end_date)
+    }
+
     /// The cached forecast dates `(fixingValueDate, fixingEndDate, spanningTime)`
     /// the 3-arg forecast reads (`IborCouponPricer::initializeCachedData`,
     /// `couponpricer.cpp:56-88`).
