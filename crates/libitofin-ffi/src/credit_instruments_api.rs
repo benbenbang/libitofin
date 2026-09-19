@@ -337,6 +337,27 @@ pub unsafe extern "C" fn itofin_cds_value(
     }
 }
 #[unsafe(no_mangle)]
+/// Return the final premium coupon's accrual-end serial date.
+///
+/// # Safety
+/// Pointers must be aligned, live and valid. Output must not overlap inputs.
+/// The context and its handles must belong to the calling thread.
+pub unsafe extern "C" fn itofin_cds_protection_end_date(
+    ctx: *mut Context,
+    id: u64,
+    serial: *mut i32,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(serial)?;
+            let cds = c.get::<SharedMut<CreditDefaultSwap>>(id)?;
+            let date = cds.borrow().protection_end_date()?;
+            output(serial, date.serial_number())
+        })
+    }
+}
+#[unsafe(no_mangle)]
 /// # Safety
 /// Pointers must be aligned, live and valid for their stated lengths. Outputs
 /// must not overlap inputs or other outputs. Any context and its handles must
@@ -435,5 +456,36 @@ pub unsafe extern "C" fn itofin_cds_results(
             let snapshot = crate::results_api::snapshot(cds.base());
             output(out, c.insert(snapshot)?)
         })
+    }
+}
+
+#[cfg(test)]
+mod protection_end_tests {
+    use super::*;
+
+    #[test]
+    fn protection_end_rejects_invalid_outputs_and_handles() {
+        let mut ctx = Context::new();
+        let mut error = ItofinError {
+            code: 0,
+            message: [0; 1024],
+        };
+        let mut serial = -1;
+        unsafe {
+            assert_eq!(
+                itofin_cds_protection_end_date(&mut ctx, 0, std::ptr::null_mut(), &mut error),
+                INVALID_ARGUMENT
+            );
+            assert_eq!(
+                itofin_cds_protection_end_date(&mut ctx, 0, &mut serial, &mut error),
+                INVALID_HANDLE
+            );
+            let wrong_type = ctx.insert(42_u32).unwrap();
+            assert_eq!(
+                itofin_cds_protection_end_date(&mut ctx, wrong_type, &mut serial, &mut error),
+                INVALID_HANDLE
+            );
+        }
+        assert_eq!(serial, -1);
     }
 }

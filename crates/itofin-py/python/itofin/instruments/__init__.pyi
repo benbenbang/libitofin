@@ -413,6 +413,16 @@ class CreditDefaultSwap:
         Returns:
             float: The contract notional.
         """
+    def protection_end_date(self) -> time.Date:
+        r"""
+        Return the final premium coupon's accrual end before payment adjustment.
+
+        Returns:
+            Date: The final date covered by protection.
+
+        Raises:
+            ItofinError: If the premium leg has no final coupon.
+        """
     def accrual_rebate_amount(self) -> typing.Optional[builtins.float]:
         r"""
         Return the accrued coupon the protection seller rebates.

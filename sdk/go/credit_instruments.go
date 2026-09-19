@@ -273,6 +273,24 @@ func (c *CreditDefaultSwap) Price(engine *MidPointCdsEngine) (float64, error) {
 	})
 	return float64(out), err
 }
+func (c *CreditDefaultSwap) ProtectionEndDate() (Date, error) {
+	if c == nil {
+		return Date{}, errNilArgument("credit argument")
+	}
+	var serial C.int32_t
+	err := c.session.invoke(func() error {
+		if e := sameSession(c.session, c.object); e != nil {
+			return e
+		}
+		var e C.ItofinError
+		return ffiError(C.itofin_cds_protection_end_date(c.session.ctx, C.uint64_t(c.id), &serial, &e), &e)
+	})
+	if err != nil {
+		return Date{}, err
+	}
+	return DateFromSerial(int32(serial))
+}
+
 func (c *CreditDefaultSwap) Rebate() (amount *float64, date *Date, err error) {
 	if c == nil {
 		return nil, nil, errNilArgument("credit argument")

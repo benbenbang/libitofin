@@ -61,15 +61,6 @@
 //!   a bundle C++ inverts unvalidated is one whose pricing failure the port
 //!   could only report as a failure to bracket (D4).
 //!
-//! ## Deferred
-//!
-//! Within EPIC Credit (#676), and omitted visibly rather than accepted and
-//! ignored:
-//!
-//! - `protectionEndDate` (`creditdefaultswap.cpp:430-432`), which reads the
-//!   accrual end of the last coupon through the `coupon_cast` that
-//!   [`CashFlow::as_coupon`](crate::cashflow::CashFlow::as_coupon) ports.
-//!
 //! [`upfront`]: CreditDefaultSwap::upfront
 //! [`setup_expired`]: CreditDefaultSwap::setup_expired
 //! [`implied_hazard_rate`]: CreditDefaultSwap::implied_hazard_rate
@@ -620,6 +611,22 @@ impl CreditDefaultSwap {
         self.protection_start
     }
 
+    /// The final premium coupon's accrual end, before payment-date adjustment.
+    ///
+    /// Mirrors QuantLib `creditdefaultswap.cpp:430-432`.
+    ///
+    /// # Errors
+    /// Returns an error if the premium leg is empty or its final flow is not a coupon.
+    pub fn protection_end_date(&self) -> QlResult<Date> {
+        let Some(last) = self.leg.last() else {
+            fail!("protection end date requires a non-empty premium leg");
+        };
+        let Some(coupon) = last.as_coupon() else {
+            fail!("protection end date requires a final premium coupon");
+        };
+        Ok(coupon.accrual_end_date())
+    }
+
     /// The schedule's last date.
     pub fn maturity(&self) -> Date {
         self.maturity
@@ -1124,6 +1131,56 @@ mod tests {
             terms,
             settings,
         )
+    }
+
+    #[test]
+    fn protection_end_is_the_unadjusted_final_accrual_end() {
+        let end = Date::new(20, Month::June, 2026);
+        let schedule = MakeSchedule::new()
+            .from(Date::new(20, Month::June, 2025))
+            .to(end)
+            .with_frequency(Frequency::Quarterly)
+            .with_calendar(WeekendsOnly::new())
+            .with_convention(BusinessDayConvention::Following)
+            .with_termination_date_convention(BusinessDayConvention::Unadjusted)
+            .forwards()
+            .build();
+        let cds = CreditDefaultSwap::with_terms(
+            ProtectionSide::Buyer,
+            NOTIONAL,
+            SPREAD,
+            schedule,
+            BusinessDayConvention::Following,
+            Actual360::new(),
+            CdsTerms::default(),
+            settings_today(),
+        )
+        .unwrap();
+        assert_eq!(cds.protection_end_date().unwrap(), end);
+        assert_eq!(
+            cds.coupons().last().unwrap().date(),
+            Date::new(22, Month::June, 2026)
+        );
+    }
+
+    #[test]
+    fn protection_end_rejects_missing_and_noncoupon_premium_flows() {
+        let mut cds = contract(CdsTerms::default()).unwrap();
+        cds.leg.clear();
+        assert!(
+            cds.protection_end_date()
+                .unwrap_err()
+                .to_string()
+                .contains("non-empty")
+        );
+        cds.leg
+            .push(shared(SimpleCashFlow::new(1.0, today()).unwrap()));
+        assert!(
+            cds.protection_end_date()
+                .unwrap_err()
+                .to_string()
+                .contains("final premium coupon")
+        );
     }
 
     #[test]

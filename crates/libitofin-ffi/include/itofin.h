@@ -1231,6 +1231,18 @@ int32_t itofin_cds_value(struct ItofinContext *ctx,
                          struct ItofinError *error);
 
 /**
+ * Return the final premium coupon's accrual-end serial date.
+ *
+ * # Safety
+ * Pointers must be aligned, live and valid. Output must not overlap inputs.
+ * The context and its handles must belong to the calling thread.
+ */
+int32_t itofin_cds_protection_end_date(struct ItofinContext *ctx,
+                                       uint64_t id,
+                                       int32_t *serial,
+                                       struct ItofinError *error);
+
+/**
  * # Safety
  * Pointers must be aligned, live and valid for their stated lengths. Outputs
  * must not overlap inputs or other outputs. Any context and its handles must

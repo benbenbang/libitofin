@@ -965,6 +965,22 @@ impl PyCreditDefaultSwap {
         self.inner.borrow().notional()
     }
 
+    /// Return the final premium coupon's accrual end before payment adjustment.
+    ///
+    /// Returns:
+    ///     Date: The final date covered by protection.
+    ///
+    /// Raises:
+    ///     ItofinError: If the premium leg has no final coupon.
+    fn protection_end_date(&self) -> PyResult<PyDate> {
+        Ok(PyDate::from_inner(
+            self.inner
+                .borrow()
+                .protection_end_date()
+                .map_err(PyQlError::from)?,
+        ))
+    }
+
     /// Return the accrued coupon the protection seller rebates.
     ///
     /// A contract traded in the past still carries the flow: the core builds

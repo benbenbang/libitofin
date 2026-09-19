@@ -17,6 +17,9 @@ see the [Go validation record](../docs/go-binding-test-gaps.md).
 
 ## Credit extensions
 
+- [#1024](https://github.com/benbenbang/libitofin/issues/1024): Rust, Python and Go
+  expose the CDS protection end as the final coupon's accrual end, independent of
+  payment-date adjustment. [Cross-language regression](../crates/itofin-py/tests/test_credit_protection_end.py).
 - [#1022](https://github.com/benbenbang/libitofin/issues/1022): custom Rust hazard
   curves can derive survival using QuantLib's 48-point Gauss-Chebyshev fallback.
   Existing concrete curves retain their closed-form calculations. The
