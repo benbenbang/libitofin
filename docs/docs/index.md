@@ -30,7 +30,7 @@ bindings. All three language surfaces share the Rust numerical core.
     Then add the module to your application:
 
     ```sh
-    go get github.com/benbenbang/libitofin/sdk/go@v0.23.0
+    go get github.com/benbenbang/libitofin/sdk/go@v0.24.0
     ```
 
     Go requires cgo, a C compiler, and the `itofin_external` build tag for
