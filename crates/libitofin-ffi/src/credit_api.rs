@@ -86,6 +86,35 @@ pub unsafe extern "C" fn itofin_flat_hazard_new(
     error: *mut ItofinError,
 ) -> i32 {
     unsafe {
+        itofin_flat_hazard_with_jumps_new(
+            ctx,
+            config,
+            std::ptr::null(),
+            0,
+            std::ptr::null(),
+            0,
+            out,
+            error,
+        )
+    }
+}
+#[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
+pub unsafe extern "C" fn itofin_flat_hazard_with_jumps_new(
+    ctx: *mut Context,
+    config: *const ItofinFlatHazardConfig,
+    jumps: *const u64,
+    jump_count: usize,
+    dates: *const i32,
+    date_count: usize,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
         with_context(ctx, error, |c| {
             check_ptr(config)?;
             check_ptr(out)?;
@@ -99,16 +128,29 @@ pub unsafe extern "C" fn itofin_flat_hazard_new(
             } else {
                 Handle::new(c.get::<Shared<SimpleQuote>>(a.quote)?)
             };
+            let jumps = input_slice(jumps, jump_count)?
+                .iter()
+                .map(|id| {
+                    c.get::<Shared<SimpleQuote>>(*id)
+                        .map(|q| Handle::new(q as Shared<dyn Quote>))
+                })
+                .collect::<BindingResult<Vec<_>>>()?;
+            let dates = input_slice(dates, date_count)?
+                .iter()
+                .map(|d| date(*d))
+                .collect::<BindingResult<Vec<_>>>()?;
             let curve = if a.settings == 0 {
-                FlatHazardRate::new(date(a.reference_date)?, q, dc)
+                FlatHazardRate::with_jumps(date(a.reference_date)?, q, dc, jumps, dates)?
             } else {
-                FlatHazardRate::moving(
+                FlatHazardRate::moving_with_jumps(
                     a.settlement_days,
                     crate::time_api::calendar(c, a.calendar)?,
                     q,
                     dc,
                     c.get::<Shared<Settings<Date>>>(a.settings)?,
-                )
+                    jumps,
+                    dates,
+                )?
             };
             output(out, c.insert(CreditCurve::flat(curve))?)
         })
@@ -450,6 +492,50 @@ pub unsafe extern "C" fn itofin_default_curve_calculate(
             } else {
                 Err(BindingError::invalid("not a piecewise default curve"))
             }
+        })
+    }
+}
+
+/// Capacity zero queries the required length. Dates remain fixed when reference dates move.
+/// A null `times` pointer requests dates only, without resolving the reference date.
+#[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
+pub unsafe extern "C" fn itofin_default_curve_jumps(
+    ctx: *mut Context,
+    id: u64,
+    dates: *mut i32,
+    times: *mut f64,
+    capacity: usize,
+    count: *mut usize,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(count)?;
+            let curve = c.get::<CreditCurve>(id)?.handle.current_link()?;
+            let jump_dates = curve.jump_dates();
+            output(count, jump_dates.len())?;
+            if capacity == 0 {
+                return Ok(());
+            }
+            check_ptr(dates)?;
+            if capacity < jump_dates.len() {
+                return Err(BindingError::invalid("jump buffer too small"));
+            }
+            if !times.is_null() {
+                check_ptr(times)?;
+                for (i, t) in curve.jump_times()?.into_iter().enumerate() {
+                    output(times.add(i), t)?;
+                }
+            }
+            for (i, d) in jump_dates.iter().enumerate() {
+                output(dates.add(i), d.serial_number())?;
+            }
+            Ok(())
         })
     }
 }

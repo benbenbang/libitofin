@@ -1075,6 +1075,22 @@ int32_t itofin_flat_hazard_new(struct ItofinContext *ctx,
  * belong to the calling thread; serialize calls including destruction.
  * See the crate-level C caller contract for lifetime requirements.
  */
+int32_t itofin_flat_hazard_with_jumps_new(struct ItofinContext *ctx,
+                                          const struct ItofinFlatHazardConfig *config,
+                                          const uint64_t *jumps,
+                                          size_t jump_count,
+                                          const int32_t *dates,
+                                          size_t date_count,
+                                          uint64_t *out,
+                                          struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers must be aligned, live and valid for their stated lengths. Outputs
+ * must not overlap inputs or other outputs. Any context and its handles must
+ * belong to the calling thread; serialize calls including destruction.
+ * See the crate-level C caller contract for lifetime requirements.
+ */
 int32_t itofin_interpolated_hazard_new(struct ItofinContext *ctx,
                                        const int32_t *dates,
                                        const double *rates,
@@ -1174,6 +1190,23 @@ int32_t itofin_default_curve_nodes(struct ItofinContext *ctx,
 int32_t itofin_default_curve_calculate(struct ItofinContext *ctx,
                                        uint64_t id,
                                        struct ItofinError *error);
+
+/**
+ * Capacity zero queries the required length. Dates remain fixed when reference dates move.
+ * A null `times` pointer requests dates only, without resolving the reference date.
+ * # Safety
+ * Pointers must be aligned, live and valid for their stated lengths. Outputs
+ * must not overlap inputs or other outputs. Any context and its handles must
+ * belong to the calling thread; serialize calls including destruction.
+ * See the crate-level C caller contract for lifetime requirements.
+ */
+int32_t itofin_default_curve_jumps(struct ItofinContext *ctx,
+                                   uint64_t id,
+                                   int32_t *dates,
+                                   double *times,
+                                   size_t capacity,
+                                   size_t *count,
+                                   struct ItofinError *error);
 
 /**
  * # Safety
