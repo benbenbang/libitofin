@@ -57,3 +57,6 @@ pub mod vol_api;
 mod vol_tests;
 pub mod volcube_api;
 pub mod volgrid_api;
+
+#[cfg(test)]
+mod swaption_facades_tests;
