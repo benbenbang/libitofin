@@ -140,6 +140,59 @@ pub unsafe extern "C" fn itofin_piecewise_zero_inflation_new(
         })
     }
 }
+/// Build a zero inflation curve using an unlinked index clone's last fixing date.
+#[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. The context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
+pub unsafe extern "C" fn itofin_piecewise_zero_inflation_last_fixing_new(
+    ctx: *mut Context,
+    a: *const ItofinInflationCurveConfig,
+    index: u64,
+    helpers: *const u64,
+    n: usize,
+    seasonality: u64,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(a)?;
+            check_ptr(out)?;
+            let a = &*a;
+            let helpers = input_slice(helpers, n)?
+                .iter()
+                .map(|id| c.get::<ZeroHelper>(*id).map(|helper| helper.inner))
+                .collect::<BindingResult<Vec<_>>>()?;
+            let seasonality = if seasonality == 0 {
+                None
+            } else {
+                Some(crate::inflation_seasonality_api::seasonality(
+                    c,
+                    seasonality,
+                )?)
+            };
+            let p = PiecewiseZeroInflationCurve::<Linear>::with_last_fixing_date(
+                date(a.reference)?,
+                &crate::inflation_api::zero_index(c, index)?,
+                frequency(a.frequency)?,
+                day_counter(c, a.day_counter)?,
+                helpers,
+                seasonality,
+            )?;
+            output(
+                out,
+                c.insert(ZeroCurve {
+                    handle: Handle::new(p.clone()),
+                    interpolated: None,
+                    piecewise: Some(p),
+                })?,
+            )
+        })
+    }
+}
 /// query 0 time rate, 1 date rate, 2 base date serial, 3 frequency, 4 has seasonality, 5 calculate.
 #[unsafe(no_mangle)]
 /// # Safety
@@ -171,7 +224,7 @@ pub unsafe extern "C" fn itofin_zero_inflation_curve_value(
                     p.zero_rate(t, ex)?
                 }
                 1 => p.zero_rate_date(date(serial)?, ex)?,
-                2 => p.base_date().serial_number() as f64,
+                2 => p.try_base_date()?.serial_number() as f64,
                 3 => frequency_code(p.frequency())? as f64,
                 4 => p.has_seasonality() as i32 as f64,
                 5 => {

@@ -2120,6 +2120,23 @@ int32_t itofin_piecewise_zero_inflation_new(struct ItofinContext *ctx,
                                             struct ItofinError *error);
 
 /**
+ * Build a zero inflation curve using an unlinked index clone's last fixing date.
+ * # Safety
+ * Pointers must be aligned, live and valid for their stated lengths. Outputs
+ * must not overlap inputs or other outputs. The context and its handles must
+ * belong to the calling thread; serialize calls including destruction.
+ * See the crate-level C caller contract for lifetime requirements.
+ */
+int32_t itofin_piecewise_zero_inflation_last_fixing_new(struct ItofinContext *ctx,
+                                                        const struct ItofinInflationCurveConfig *a,
+                                                        uint64_t index,
+                                                        const uint64_t *helpers,
+                                                        size_t n,
+                                                        uint64_t seasonality,
+                                                        uint64_t *out,
+                                                        struct ItofinError *error);
+
+/**
  * query 0 time rate, 1 date rate, 2 base date serial, 3 frequency, 4 has seasonality, 5 calculate.
  * # Safety
  * Pointers must be aligned, live and valid for their stated lengths. Outputs
