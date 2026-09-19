@@ -10,6 +10,7 @@ This inventory does not claim exhaustive QuantLib product coverage.
 | Scope | Executable evidence |
 | --- | --- |
 | Kerkhof monthly factors, independent zero corrections, copied factors, retained handles and YoY errors | `TestKerkhofSeasonalityQuantLibOracle`, `TestKerkhofSeasonalityOwnershipAndErrors` |
+| Lazy zero-inflation base dates, independent nodes/forecasts, fixing/date/quote updates and retained dependencies | `TestLazyInflationBaseMatchesQuantLibAndRetainsDependencies` |
 | Zero/YoY index representations and retained ratio identity | `TestInflationCompletionIndexRepresentations` |
 | Piecewise zero/YoY dates, times, nodes and detached copies | `TestInflationCompletionPiecewiseDetachedOutputs` |
 | Zero/YoY helper latest and pillar dates, flat/linear interpolation | `TestInflationCompletionHelperDates` |
@@ -70,6 +71,10 @@ Sources and fixtures live in [`sdk/go/testdata`](../sdk/go/testdata/):
 - `calibration_completion_oracle.py`: QuantLib 1.43; perturbed Heston smile
   distinguishes nonzero signed residuals. Parameters retain 3e-3 for Heston and
   1.3e-5 for Hull-White; signed residuals retain 1e-8.
+- [Lazy inflation oracle](../crates/libitofin/tests/fixtures/lazy_inflation_base/README.md):
+  75 QuantLib node rates at `1e-12` and five forecasts at `1e-7`; full node dates
+  match fresh curves. Bindings rebuild the corrected-history scenario and exercise
+  live fixing/date/quote updates; Rust also clears and repopulates history.
 - `inflation_completion_oracle.cpp` and its reproduction guide: pinned independent
   QuantLib source; exact dates and 1e-12 node/time/rate comparisons.
 

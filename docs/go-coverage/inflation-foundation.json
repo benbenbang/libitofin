@@ -147,7 +147,8 @@
       "python": "ZeroInflationTermStructure.base_date",
       "status": "implemented",
       "tests": [
-        "TestInflationCurveMetadataAndDetachedNodes"
+        "TestInflationCurveMetadataAndDetachedNodes",
+        "TestLazyInflationBaseMatchesQuantLibAndRetainsDependencies"
       ]
     },
     {
@@ -300,7 +301,8 @@
       "python": "PiecewiseZeroInflationCurve.nodes",
       "status": "implemented",
       "tests": [
-        "TestZeroInflationBootstrapHelperDatesAndQuoteUpdate"
+        "TestZeroInflationBootstrapHelperDatesAndQuoteUpdate",
+        "TestLazyInflationBaseMatchesQuantLibAndRetainsDependencies"
       ]
     },
     {
@@ -614,6 +616,17 @@
       "tests": [
         "TestKerkhofSeasonalityQuantLibOracle",
         "TestKerkhofSeasonalityOwnershipAndErrors"
+      ]
+    },
+    {
+      "c": "itofin_piecewise_zero_inflation_last_fixing_new",
+      "go": "Session.NewPiecewiseZeroInflationCurveWithLastFixingDate",
+      "go_file": "sdk/go/inflation_curves.go",
+      "python": "PiecewiseZeroInflationCurve.with_last_fixing_date",
+      "rust_file": "crates/libitofin-ffi/src/inflation_curves_api.rs",
+      "status": "implemented",
+      "tests": [
+        "TestLazyInflationBaseMatchesQuantLibAndRetainsDependencies"
       ]
     }
   ]

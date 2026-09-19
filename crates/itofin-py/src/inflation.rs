@@ -620,7 +620,8 @@ impl PyZeroInflationTermStructure {
             self.inner
                 .current_link()
                 .map_err(PyQlError::from)?
-                .base_date(),
+                .try_base_date()
+                .map_err(PyQlError::from)?,
         ))
     }
 
@@ -1001,6 +1002,38 @@ pub struct PyPiecewiseZeroInflationCurve {
 #[gen_stub_pymethods]
 #[pymethods]
 impl PyPiecewiseZeroInflationCurve {
+    /// Build a curve whose base date follows the index's last historical fixing.
+    /// The curve retains an unlinked index clone, sharing fixings and settings without a forecast cycle.
+    #[staticmethod]
+    #[pyo3(signature = (reference_date, index, frequency, day_counter, helpers, seasonality = None))]
+    fn with_last_fixing_date(
+        py: Python<'_>,
+        reference_date: &PyDate,
+        index: &PyZeroInflationIndex,
+        frequency: &PyFrequency,
+        day_counter: &PyDayCounter,
+        helpers: Vec<PyRef<PyZeroInflationHelper>>,
+        seasonality: Option<&PyMultiplicativePriceSeasonality>,
+    ) -> PyResult<Py<Self>> {
+        let concrete = PiecewiseZeroInflationCurve::with_last_fixing_date(
+            reference_date.inner(),
+            &index.shared(),
+            frequency.inner(),
+            day_counter.inner(),
+            helpers.iter().map(|helper| helper.shared()).collect(),
+            seasonality.map(PyMultiplicativePriceSeasonality::shared),
+        )
+        .map_err(PyQlError::from)?;
+        let erased = concrete.clone() as Shared<dyn ZeroInflationTermStructure>;
+        Py::new(
+            py,
+            PyClassInitializer::from(PyZeroInflationTermStructure::from_handle(Handle::new(
+                erased,
+            )))
+            .add_subclass(Self { concrete }),
+        )
+    }
+
     /// Build the curve over helpers, registering on them without solving.
     ///
     /// Args:

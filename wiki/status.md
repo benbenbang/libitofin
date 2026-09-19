@@ -48,6 +48,15 @@ installing or clearing it recalibrates zero-inflation curves. Exactly twelve
 factors are supported; YoY corrections are rejected. This addition is on main
 and will ship after v0.25.0.
 
+[#1017](https://github.com/benbenbang/libitofin/issues/1017) adds lazy zero-inflation
+base dates. Python/C/Go expose a last-fixing constructor with linear interpolation;
+its unlinked index copy shares settings/history without retaining its forecast
+curve. Generic callbacks remain Rust-only. `try_base_date()` and binding inspectors
+propagate calculation errors; legacy Rust `base_date()` returns null on failure.
+The [oracle](../crates/libitofin/tests/fixtures/lazy_inflation_base/README.md) compares
+rebuilt node grids with fresh QuantLib curves and documents its persistent-grid
+difference. Existing fixed-base constructors remain available.
+
 ## Hull-White calibration
 
 [#400](https://github.com/benbenbang/libitofin/issues/400) covers fixed-reversion
