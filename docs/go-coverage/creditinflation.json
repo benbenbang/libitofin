@@ -520,6 +520,16 @@
       "tests": [
         "TestCreditCompletionHazardArraysAndNonflatISDA"
       ]
+    },
+    {
+      "c": "itofin_cds_protection_end_date",
+      "go": "CreditDefaultSwap.ProtectionEndDate",
+      "python": "CreditDefaultSwap.protection_end_date",
+      "status": "implemented",
+      "tests": [
+        "TestCreditProtectionEndDate",
+        "protection_end_rejects_invalid_outputs_and_handles"
+      ]
     }
   ]
 }
