@@ -1069,6 +1069,7 @@ impl OISRateHelper {
                 true,
                 on_eval_change,
             );
+            overnight_spread.register_observer(&base.observer());
             let helper = OISRateHelper {
                 base,
                 swap: RefCell::new(None),
@@ -1619,6 +1620,76 @@ mod tests {
 
         let implied = helper.implied_quote().unwrap();
         assert!((helper.quote_error().unwrap() - (0.05 - implied)).abs() < 1e-15);
+    }
+
+    /// QuantLib 1.43 values from `tests/fixtures/overnight_averaging/bindings.json`.
+    #[test]
+    fn ois_spread_updates_rebootstrap_without_retaining_the_curve() {
+        use crate::indexes::ibor::Estr;
+        use crate::math::interpolations::loglinear::LogLinear;
+        use crate::termstructures::bootstraptraits::Discount;
+        use crate::termstructures::yields::PiecewiseYieldCurve;
+
+        for (averaging, initial_discount, updated_discount) in [
+            (
+                RateAveraging::Compound,
+                0.9533435978894659,
+                0.9542712749129756,
+            ),
+            (
+                RateAveraging::Simple,
+                0.9522505927886751,
+                0.9532216074564187,
+            ),
+        ] {
+            let reference = Date::new(7, Month::July, 2026);
+            let settings = settings_on(reference);
+            let index = Estr::new(Handle::empty(), settings.clone());
+            let spread = shared(SimpleQuote::new(0.002));
+            let spread_handle = RelinkableHandle::new(spread.clone() as Shared<dyn Quote>);
+            let helper = OISRateHelper::new(
+                2,
+                Period::new(1, TimeUnit::Years),
+                Handle::new(shared(SimpleQuote::new(0.05)) as Shared<dyn Quote>),
+                &index,
+                None,
+                2,
+                BusinessDayConvention::Following,
+                Frequency::Annual,
+                Period::new(0, TimeUnit::Days),
+                spread_handle.handle(),
+                Pillar::LastRelevantDate,
+                averaging,
+                settings,
+            );
+            let curve = PiecewiseYieldCurve::<Discount, LogLinear>::new(
+                reference,
+                vec![helper.clone() as Shared<dyn RateHelper>],
+                Actual360::new(),
+                LogLinear,
+            )
+            .unwrap();
+            let maturity = helper.maturity_date();
+            assert!(
+                (curve.discount_date(maturity, false).unwrap() - initial_discount).abs() < 1e-12
+            );
+            spread.set_value(0.003);
+            assert!(
+                (curve.discount_date(maturity, false).unwrap() - updated_discount).abs() < 1e-12
+            );
+            assert!((helper.implied_quote().unwrap() - 0.05).abs() < 1e-12);
+            spread_handle.link_to(shared(SimpleQuote::new(0.002)) as Shared<dyn Quote>);
+            assert!(
+                (curve.discount_date(maturity, false).unwrap() - initial_discount).abs() < 1e-12
+            );
+            let weak_helper = Shared::downgrade(&helper);
+            let weak_curve = Shared::downgrade(&curve);
+            drop(helper);
+            drop(curve);
+            assert!(weak_helper.upgrade().is_none());
+            assert!(weak_curve.upgrade().is_none());
+            spread.set_value(0.004);
+        }
     }
 
     /// `overnightindexedswap.cpp estrSwapData` (`:92-125`): the OIS quotes the

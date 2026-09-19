@@ -21,6 +21,7 @@ This inventory does not claim exhaustive QuantLib product coverage.
 | Valid Custom/ASX futures dates, prices and analytical forward/discount factors | `TestRatesCompletionCustomAndASXFutures` |
 | Simple and Compound OIS numerical oracles | `TestRatesCompletionOISAveragingOracle` |
 | OIS quote/date updates, separate discounting, forward starts, retained objects and invalid-enum recovery | `TestOvernightAveragingOISUpdatesAndRetention`, `TestOvernightAveragingOISForwardAndDiscounting`, `TestOvernightAveragingInvalidEnumDoesNotPoisonSession` |
+| OIS today-to-history error recovery and live additive-spread rebootstrap | `TestOvernightTodayForecastRecoversAfterMissingPastFixing`, `TestOvernightAdditiveSpreadQuoteRebootstrapsExistingCurve` |
 | Heston PriceError/ImpliedVolError fitted parameters and signed residuals | `TestHestonCalibrationPriceAndImpliedVolOracles` |
 | Hull-White fixed reversion and mixed omitted/explicit optimizer and stopping settings | `TestHullWhiteCalibrationFixedReversionAndOptionalCombinations` |
 
@@ -33,11 +34,21 @@ analytically. Their NPVs are intentionally different.
 arithmetic-averaging overnight coupon path in Rust and successful Simple OIS
 pricing through Python and C/Go. The default uses the full daily schedule and
 zero convexity adjustment. Custom arithmetic-pricer volatility and telescopic
-approximation are outside this increment. Existing Compound behavior and the
-retained QuantLib 1.43 discount/quote tolerances are unchanged. The richer
+approximation are outside this increment. The retained QuantLib 1.43 discount/quote
+tolerances are unchanged. The richer
 [overnight oracle](../crates/libitofin/tests/fixtures/overnight_averaging/README.md)
-covers all three language surfaces. Two pre-existing Compound coupon differences
-remain tracked in [#1045](https://github.com/benbenbang/libitofin/issues/1045).
+covers all three language surfaces.
+
+[#1045](https://github.com/benbenbang/libitofin/issues/1045) aligns Compound
+forecast discount-ratio compounding, today's fixing enforcement and daily-spread
+treatment with QuantLib, including partial forecast intervals. Both previously
+excluded coupon cases now run. Exact enforcement and daily-spread switches remain
+Rust-only: Python/Go expose neither those settings nor fixing-history writes.
+Their OIS tests cover the exposed pricing and recovery from missing-history
+errors; they do not claim coverage of unexposed switches.
+[#1047](https://github.com/benbenbang/libitofin/issues/1047) registers the helper's
+additive-spread handle with its existing observer, so a live spread change
+invalidates and rebootstraps the same fitted curve in Rust, Python and Go.
 
 ## Oracle reproduction and tolerances
 

@@ -16,6 +16,7 @@ type overnightOISOracle struct {
 		EvaluationDate     string   `json:"evaluation_date"`
 		ReferenceDate      string   `json:"reference_date"`
 		Quote              float64  `json:"quote"`
+		OvernightSpread    float64  `json:"overnight_spread"`
 		PaymentLag         int32    `json:"payment_lag"`
 		TenorYears         int32    `json:"tenor_years"`
 		PaymentFrequency   string   `json:"payment_frequency"`
