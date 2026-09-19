@@ -967,3 +967,7 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "swaptionvolmatrix_tests.rs"]
+mod completion_tests;
