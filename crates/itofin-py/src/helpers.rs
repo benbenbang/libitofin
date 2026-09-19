@@ -23,7 +23,7 @@ use crate::time::{
 };
 use libitofin::cashflows::RateAveraging;
 use libitofin::handle::Handle;
-use libitofin::indexes::{Estr, Index, OvernightIndex};
+use libitofin::indexes::{Eonia, Estr, Index, InterestRateIndex, OvernightIndex};
 use libitofin::instruments::{BondPriceType, FuturesType};
 use libitofin::quotes::Quote;
 use libitofin::shared::{Shared, shared};
@@ -797,6 +797,64 @@ fn init_overnight(index: Shared<OvernightIndex>) -> PyClassInitializer<PyEstr> {
         inner: Shared::clone(&index),
     };
     PyClassInitializer::from(base).add_subclass(PyEstr { inner: index })
+}
+
+/// Eonia overnight index with zero fixing days, EUR, TARGET and Actual360.
+///
+/// Retains its settings and forwarding curve independently of Python wrappers.
+#[gen_stub_pyclass]
+#[pyclass(name = "Eonia", extends = PyOvernightIndex, unsendable, module = "itofin.indexes")]
+pub struct PyEonia {
+    inner: Shared<OvernightIndex>,
+}
+
+#[gen_stub_pymethods]
+#[pymethods]
+impl PyEonia {
+    /// Build an Eonia index; None leaves its forwarding handle empty.
+    #[gen_stub(override_return_type(type_repr = "Eonia"))]
+    #[new]
+    #[pyo3(signature = (curve, settings))]
+    fn new(
+        curve: Option<&PyYieldTermStructure>,
+        settings: &PySettings,
+    ) -> PyClassInitializer<Self> {
+        let forwarding = curve.map_or_else(Handle::empty, PyYieldTermStructure::handle);
+        let inner = shared(Eonia::new(forwarding, settings.inner()));
+        PyClassInitializer::from(PyOvernightIndex {
+            inner: Shared::clone(&inner),
+        })
+        .add_subclass(Self { inner })
+    }
+
+    /// Read a stored fixing or forecast from the retained forwarding curve.
+    #[pyo3(signature = (fixing_date, forecast_todays_fixing = false))]
+    fn fixing(&self, fixing_date: &PyDate, forecast_todays_fixing: bool) -> PyResult<f64> {
+        Ok(self
+            .inner
+            .fixing(fixing_date.inner(), forecast_todays_fixing)
+            .map_err(PyQlError::from)?)
+    }
+
+    /// Return the zero-day fixing lag.
+    fn fixing_days(&self) -> u32 {
+        self.inner.fixing_days()
+    }
+
+    /// Return the EUR currency.
+    fn currency(&self) -> crate::currency::PyCurrency {
+        crate::currency::PyCurrency::from_inner(self.inner.currency().clone())
+    }
+
+    /// Return the TARGET fixing calendar.
+    fn fixing_calendar(&self) -> PyCalendar {
+        PyCalendar::from_inner(self.inner.fixing_calendar())
+    }
+
+    /// Return the Actual360 day counter.
+    fn day_counter(&self) -> PyDayCounter {
+        PyDayCounter::from_inner(self.inner.day_counter().clone())
+    }
 }
 
 /// How an overnight coupon combines its daily fixings.

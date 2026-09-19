@@ -65,7 +65,7 @@ use curve::{
 };
 use fra::{PyForwardRateAgreement, PyPosition};
 use helpers::{
-    PyBondPriceType, PyDepositRateHelper, PyEstr, PyFixedRateBondHelper, PyFraRateHelper,
+    PyBondPriceType, PyDepositRateHelper, PyEonia, PyEstr, PyFixedRateBondHelper, PyFraRateHelper,
     PyFuturesRateHelper, PyFuturesType, PyOISRateHelper, PyOvernightIndex, PyPillar,
     PyRateAveraging, PyRateHelper, PySwapRateHelper,
 };
@@ -267,6 +267,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     indexes.add_class::<PyCustomIborIndex>()?;
     indexes.add_class::<PyOvernightIndex>()?;
     indexes.add_class::<PyEstr>()?;
+    indexes.add_class::<PyEonia>()?;
     indexes.add_class::<PySwapIndex>()?;
     indexes.add_class::<PyCpiInterpolationType>()?;
     indexes.add_class::<PyZeroInflationIndex>()?;

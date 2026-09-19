@@ -10,6 +10,7 @@ __all__ = [
     "CpiInterpolationType",
     "Currency",
     "CustomIborIndex",
+    "Eonia",
     "Estr",
     "EurLibor",
     "Euribor",
@@ -137,6 +138,38 @@ class CustomIborIndex(IborIndex):
             ItofinError: If the fixing date is not a valid one, the evaluation
                 date is unset, a past fixing is missing from the store, or the
                 forwarding handle is empty on a forecast.
+        """
+
+@typing.final
+class Eonia(OvernightIndex):
+    r"""
+    Eonia overnight index with zero fixing days, EUR, TARGET and Actual360.
+
+    Retains its settings and forwarding curve independently of Python wrappers.
+    """
+    def __init__(self, curve: typing.Optional[termstructures.YieldTermStructure], settings: itofin.Settings) -> None:
+        r"""
+        Build an Eonia index; None leaves its forwarding handle empty.
+        """
+    def fixing(self, fixing_date: time.Date, forecast_todays_fixing: builtins.bool = False) -> builtins.float:
+        r"""
+        Read a stored fixing or forecast from the retained forwarding curve.
+        """
+    def fixing_days(self) -> builtins.int:
+        r"""
+        Return the zero-day fixing lag.
+        """
+    def currency(self) -> Currency:
+        r"""
+        Return the EUR currency.
+        """
+    def fixing_calendar(self) -> time.Calendar:
+        r"""
+        Return the TARGET fixing calendar.
+        """
+    def day_counter(self) -> time.DayCounter:
+        r"""
+        Return the Actual360 day counter.
         """
 
 @typing.final
