@@ -1,13 +1,15 @@
+import gc
+
 # pypi/conda library
 import pytest
 
 # itofin library
 from itofin import ItofinError, Settings
-from itofin.indexes import Euribor
+from itofin.indexes import Currency, Euribor, IborIndex
 from itofin.models import CalibrationErrorType, HullWhite, SwaptionHelper
 from itofin.optimization import EndCriteria, LevenbergMarquardt
 from itofin.termstructures import FlatForward
-from itofin.time import Date, DayCounter, Period
+from itofin.time import BusinessDayConvention, Calendar, Date, DayCounter, Period
 
 # ORACLE testCachedHullWhite (shortratemodels.cpp:83-153, mirrored by the Rust
 # oracle calibrate_cached_hull_white in hullwhite.rs:793-912): calibrate
@@ -121,3 +123,32 @@ def test_calibrate_with_no_helpers_raises():
     end_criteria = EndCriteria(10000, 100, 1e-6, 1e-8, 1e-8)
     with pytest.raises(ItofinError):
         model.calibrate([], method, end_criteria, False)
+
+
+def test_hullwhite_calibrates_without_start_delay_after_inputs_are_collected():
+    """QuantLib testCachedHullWhite2, shortratemodels.cpp:229-306, PAR arm."""
+    settings = _fixture_settings()
+    curve = _fixture_curve()
+    model = HullWhite(curve, 0.1, 0.01)
+    index = IborIndex(
+        "Euribor",
+        Period(6, "Months"),
+        0,
+        Currency.eur(),
+        Calendar.target(),
+        BusinessDayConvention.ModifiedFollowing,
+        True,
+        DayCounter.actual360(),
+        curve,
+        settings,
+    )
+    helpers = _build_helpers(curve, index)
+    del index, curve, settings
+    gc.collect()
+
+    method = LevenbergMarquardt(1e-8, 1e-8, 1e-8, False)
+    end_criteria = EndCriteria(10000, 100, 1e-6, 1e-8, 1e-8)
+    model.calibrate(helpers, method, end_criteria, False)
+
+    assert model.a() == pytest.approx(0.0482063, rel=0, abs=1e-5)
+    assert model.sigma() == pytest.approx(0.00582687, rel=0, abs=1e-5)

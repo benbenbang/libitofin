@@ -39,6 +39,14 @@ see the [Go validation record](../docs/go-binding-test-gaps.md).
   [independent oracle generator](../crates/libitofin/tests/fixtures/credit_hazard_quadrature.py)
   pins the quadrature result separately from its analytical integration error.
 
+## Hull-White calibration
+
+[#400](https://github.com/benbenbang/libitofin/issues/400) covers fixed-reversion
+and zero-start-delay calibration. Rust tests both coupon modes; Python and Go
+check the exposed PAR cases against the original QuantLib caches at `1e-5`,
+including calibration after input wrappers are released.
+[Binding regressions](../crates/itofin-py/tests/test_hullwhite_calibration.py).
+
 ## Swaption foundation
 
 [EPIC-10 #358](https://github.com/benbenbang/libitofin/issues/358) covers the
