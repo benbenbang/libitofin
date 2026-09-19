@@ -2658,6 +2658,12 @@ class PiecewiseZeroInflationCurve(ZeroInflationTermStructure):
     A seasonality installed later through set_seasonality() invalidates the
     bootstrap, so the next read re-solves every node against the correction.
     """
+    @staticmethod
+    def with_last_fixing_date(reference_date: time.Date, index: indexes.ZeroInflationIndex, frequency: time.Frequency, day_counter: time.DayCounter, helpers: typing.Sequence[ZeroInflationHelper], seasonality: typing.Optional[MultiplicativePriceSeasonality] = None) -> PiecewiseZeroInflationCurve:
+        r"""
+        Build a curve whose base date follows the index's last historical fixing.
+        The curve retains an unlinked index clone, sharing fixings and settings without a forecast cycle.
+        """
     def __init__(self, reference_date: time.Date, base_date: time.Date, frequency: time.Frequency, day_counter: time.DayCounter, helpers: typing.Sequence[ZeroInflationHelper]) -> None:
         r"""
         Build the curve over helpers, registering on them without solving.
