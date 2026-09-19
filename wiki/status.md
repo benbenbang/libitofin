@@ -39,6 +39,15 @@ see the [Go validation record](../docs/go-binding-test-gaps.md).
   [independent oracle generator](../crates/libitofin/tests/fixtures/credit_hazard_quadrature.py)
   pins the quadrature result separately from its analytical integration error.
 
+## Inflation extensions
+
+[#1018](https://github.com/benbenbang/libitofin/issues/1018) adds monthly Kerkhof
+seasonality in Rust, Python and Go. The cumulative correction matches 72
+[independent QuantLib rows](../crates/libitofin/tests/fixtures/kerkhof_seasonality.md);
+installing or clearing it recalibrates zero-inflation curves. Exactly twelve
+factors are supported; YoY corrections are rejected. This addition is on main
+and will ship after v0.25.0.
+
 ## Hull-White calibration
 
 [#400](https://github.com/benbenbang/libitofin/issues/400) covers fixed-reversion

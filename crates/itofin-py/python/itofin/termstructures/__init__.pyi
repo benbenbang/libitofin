@@ -36,6 +36,7 @@ __all__ = [
     "InterpolatedYoYInflationCurve",
     "InterpolatedZeroInflationCurve",
     "KInterpolatedYoYOptionletVolatilitySurface",
+    "KerkhofSeasonality",
     "MultiplicativePriceSeasonality",
     "OISRateHelper",
     "OptionletStripper1",
@@ -1820,6 +1821,19 @@ class KInterpolatedYoYOptionletVolatilitySurface:
         """
 
 @typing.final
+class KerkhofSeasonality(MultiplicativePriceSeasonality):
+    r"""
+    Monthly cumulative Kerkhof correction for zero inflation; YoY curves reject it.
+    """
+    def __init__(self, base_date: time.Date, factors: typing.Sequence[builtins.float]) -> None:
+        r"""
+        Build from exactly twelve monthly factors, retaining a copied factor set.
+        """
+    def seasonality_factor(self, to: time.Date) -> builtins.float:
+        r"""
+        Return the cumulative monthly factor relative to the anchor date.
+        """
+
 class MultiplicativePriceSeasonality:
     r"""
     The seasonal correction a price index carries, whose factors multiply

@@ -9,6 +9,7 @@ This inventory does not claim exhaustive QuantLib product coverage.
 
 | Scope | Executable evidence |
 | --- | --- |
+| Kerkhof monthly factors, independent zero corrections, copied factors, retained handles and YoY errors | `TestKerkhofSeasonalityQuantLibOracle`, `TestKerkhofSeasonalityOwnershipAndErrors` |
 | Zero/YoY index representations and retained ratio identity | `TestInflationCompletionIndexRepresentations` |
 | Piecewise zero/YoY dates, times, nodes and detached copies | `TestInflationCompletionPiecewiseDetachedOutputs` |
 | Zero/YoY helper latest and pillar dates, flat/linear interpolation | `TestInflationCompletionHelperDates` |
