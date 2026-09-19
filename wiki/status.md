@@ -85,8 +85,14 @@ convenience and OIS-underlying swaptions remain Rust-only, tracked in
 payer-only and has no overnight-index builder; SwapIndex clone variants and
 swaption implied volatility remain deferred.
 
-Advanced volatility work retains separate scope: matrix construction/observability
-[#570](https://github.com/benbenbang/libitofin/issues/570), backward-flat SABR cubes
+[#570](https://github.com/benbenbang/libitofin/issues/570) completes all five
+swaption volatility matrix constructors in Rust, Python and Go, including fixed
+live quotes, moving numeric values and explicit option dates. The
+[independent oracle](../crates/libitofin/tests/fixtures/swaption_matrix/README.md)
+pins 120 volatility nodes at `1e-16`; Rust also checks Black prices, volatility
+recovery through a test-only flat engine, and quote-handle relinks.
+
+Advanced volatility work retains separate scope: backward-flat SABR cubes
 [#606](https://github.com/benbenbang/libitofin/issues/606), SABR variants
 [#586](https://github.com/benbenbang/libitofin/issues/586), and ZABR
 [#597](https://github.com/benbenbang/libitofin/issues/597).
