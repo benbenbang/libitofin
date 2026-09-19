@@ -3,24 +3,54 @@ use crate::boundary::*;
 use crate::time_api::{date, day_counter};
 use libitofin::handle::Handle;
 use libitofin::math::interpolations::flat::BackwardFlat;
+use libitofin::math::interpolations::linear::Linear;
 use libitofin::quotes::{Quote, SimpleQuote};
 use libitofin::settings::Settings;
 use libitofin::shared::{Shared, shared};
 use libitofin::termstructures::credit::{
     defaultprobabilityhelpers::DefaultProbabilityHelper,
-    defaulttermstructure::DefaultProbabilityTermStructure, flathazardrate::FlatHazardRate,
+    defaulttermstructure::DefaultProbabilityTermStructure,
+    flathazardrate::FlatHazardRate,
+    interpolateddefaultdensitycurve::InterpolatedDefaultDensityCurve,
     interpolatedhazardratecurve::InterpolatedHazardRateCurve,
-    piecewisedefaultcurve::PiecewiseDefaultCurve, probabilitytraits::HazardRate,
+    piecewisedefaultcurve::PiecewiseDefaultCurve,
+    probabilitytraits::{DefaultDensity, HazardRate},
 };
 use libitofin::time::date::Date;
 
 type Interpolated = InterpolatedHazardRateCurve<BackwardFlat>;
 type Piecewise = PiecewiseDefaultCurve<HazardRate, BackwardFlat>;
 #[derive(Clone)]
+enum DensityCurve {
+    Backward(Shared<InterpolatedDefaultDensityCurve<BackwardFlat>>),
+    Linear(Shared<InterpolatedDefaultDensityCurve<Linear>>),
+    PiecewiseBackward(Shared<PiecewiseDefaultCurve<DefaultDensity, BackwardFlat>>),
+    PiecewiseLinear(Shared<PiecewiseDefaultCurve<DefaultDensity, Linear>>),
+}
+impl DensityCurve {
+    fn nodes(&self) -> BindingResult<(Vec<Date>, Vec<f64>, Vec<f64>)> {
+        Ok(match self {
+            Self::Backward(p) => (p.dates().to_vec(), p.times().to_vec(), p.data().to_vec()),
+            Self::Linear(p) => (p.dates().to_vec(), p.times().to_vec(), p.data().to_vec()),
+            Self::PiecewiseBackward(p) => (p.dates()?, p.times()?, p.data()?),
+            Self::PiecewiseLinear(p) => (p.dates()?, p.times()?, p.data()?),
+        })
+    }
+    fn calculate(&self) -> BindingResult<()> {
+        match self {
+            Self::PiecewiseBackward(p) => p.calculate()?,
+            Self::PiecewiseLinear(p) => p.calculate()?,
+            _ => return Err(BindingError::invalid("not a piecewise default curve")),
+        }
+        Ok(())
+    }
+}
+#[derive(Clone)]
 pub(crate) struct CreditCurve {
     pub handle: Handle<dyn DefaultProbabilityTermStructure>,
     interpolated: Option<Shared<Interpolated>>,
     piecewise: Option<Shared<Piecewise>>,
+    density: Option<DensityCurve>,
 }
 impl CreditCurve {
     fn flat(curve: FlatHazardRate) -> Self {
@@ -28,6 +58,7 @@ impl CreditCurve {
             handle: Handle::new(shared(curve)),
             interpolated: None,
             piecewise: None,
+            density: None,
         }
     }
 }
@@ -119,6 +150,7 @@ pub unsafe extern "C" fn itofin_interpolated_hazard_new(
                 handle: Handle::new(concrete.clone()),
                 interpolated: Some(concrete),
                 piecewise: None,
+                density: None,
             };
             output(out, c.insert(curve)?)
         })
@@ -152,8 +184,136 @@ pub unsafe extern "C" fn itofin_piecewise_default_new(
                 handle: Handle::new(concrete.clone()),
                 interpolated: None,
                 piecewise: Some(concrete),
+                density: None,
             };
             output(out, c.insert(curve)?)
+        })
+    }
+}
+#[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
+pub unsafe extern "C" fn itofin_interpolated_default_density_new(
+    ctx: *mut Context,
+    dates: *const i32,
+    densities: *const f64,
+    count: usize,
+    dc: u64,
+    calendar: u64,
+    interpolation: i32,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(out)?;
+            let dates = input_slice(dates, count)?
+                .iter()
+                .map(|v| date(*v))
+                .collect::<BindingResult<Vec<_>>>()?;
+            let densities = input_slice(densities, count)?.to_vec();
+            let dc = day_counter(c, dc)?;
+            let calendar = if calendar == 0 {
+                None
+            } else {
+                Some(crate::time_api::calendar(c, calendar)?)
+            };
+            let (handle, density): (Handle<dyn DefaultProbabilityTermStructure>, _) =
+                match interpolation {
+                    0 => {
+                        let p = shared(InterpolatedDefaultDensityCurve::with_calendar(
+                            dates,
+                            densities,
+                            dc,
+                            calendar,
+                            BackwardFlat,
+                        )?);
+                        (Handle::new(p.clone()), DensityCurve::Backward(p))
+                    }
+                    1 => {
+                        let p = shared(InterpolatedDefaultDensityCurve::with_calendar(
+                            dates, densities, dc, calendar, Linear,
+                        )?);
+                        (Handle::new(p.clone()), DensityCurve::Linear(p))
+                    }
+                    _ => {
+                        return Err(BindingError::invalid(
+                            "unknown default density interpolation",
+                        ));
+                    }
+                };
+            output(
+                out,
+                c.insert(CreditCurve {
+                    handle,
+                    interpolated: None,
+                    piecewise: None,
+                    density: Some(density),
+                })?,
+            )
+        })
+    }
+}
+#[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
+pub unsafe extern "C" fn itofin_piecewise_default_density_new(
+    ctx: *mut Context,
+    reference: i32,
+    helpers: *const u64,
+    count: usize,
+    dc: u64,
+    interpolation: i32,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(out)?;
+            let helpers = input_slice(helpers, count)?
+                .iter()
+                .map(|id| c.get::<Shared<dyn DefaultProbabilityHelper>>(*id))
+                .collect::<BindingResult<Vec<_>>>()?;
+            let reference = date(reference)?;
+            let dc = day_counter(c, dc)?;
+            let (handle, density): (Handle<dyn DefaultProbabilityTermStructure>, _) =
+                match interpolation {
+                    0 => {
+                        let p = PiecewiseDefaultCurve::<DefaultDensity, _>::new(
+                            reference,
+                            helpers,
+                            dc,
+                            BackwardFlat,
+                        )?;
+                        (Handle::new(p.clone()), DensityCurve::PiecewiseBackward(p))
+                    }
+                    1 => {
+                        let p = PiecewiseDefaultCurve::<DefaultDensity, _>::new(
+                            reference, helpers, dc, Linear,
+                        )?;
+                        (Handle::new(p.clone()), DensityCurve::PiecewiseLinear(p))
+                    }
+                    _ => {
+                        return Err(BindingError::invalid(
+                            "unknown default density interpolation",
+                        ));
+                    }
+                };
+            output(
+                out,
+                c.insert(CreditCurve {
+                    handle,
+                    interpolated: None,
+                    piecewise: None,
+                    density: Some(density),
+                })?,
+            )
         })
     }
 }
@@ -241,6 +401,8 @@ pub unsafe extern "C" fn itofin_default_curve_nodes(
                     p.times().to_vec(),
                     p.hazard_rates().to_vec(),
                 )
+            } else if let Some(p) = curve.density {
+                p.nodes()?
             } else {
                 return Err(BindingError::invalid("flat curve has no nodes"));
             };
@@ -279,11 +441,15 @@ pub unsafe extern "C" fn itofin_default_curve_calculate(
 ) -> i32 {
     unsafe {
         with_context(ctx, error, |c| {
-            c.get::<CreditCurve>(id)?
-                .piecewise
-                .ok_or_else(|| BindingError::invalid("not a piecewise default curve"))?
-                .calculate()?;
-            Ok(())
+            let curve = c.get::<CreditCurve>(id)?;
+            if let Some(p) = curve.piecewise {
+                p.calculate()?;
+                Ok(())
+            } else if let Some(p) = curve.density {
+                p.calculate()
+            } else {
+                Err(BindingError::invalid("not a piecewise default curve"))
+            }
         })
     }
 }
