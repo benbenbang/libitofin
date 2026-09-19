@@ -1099,6 +1099,39 @@ int32_t itofin_piecewise_default_new(struct ItofinContext *ctx,
                                      struct ItofinError *error);
 
 /**
+ * # Safety
+ * Pointers must be aligned, live and valid for their stated lengths. Outputs
+ * must not overlap inputs or other outputs. Any context and its handles must
+ * belong to the calling thread; serialize calls including destruction.
+ * See the crate-level C caller contract for lifetime requirements.
+ */
+int32_t itofin_interpolated_default_density_new(struct ItofinContext *ctx,
+                                                const int32_t *dates,
+                                                const double *densities,
+                                                size_t count,
+                                                uint64_t dc,
+                                                uint64_t calendar,
+                                                int32_t interpolation,
+                                                uint64_t *out,
+                                                struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers must be aligned, live and valid for their stated lengths. Outputs
+ * must not overlap inputs or other outputs. Any context and its handles must
+ * belong to the calling thread; serialize calls including destruction.
+ * See the crate-level C caller contract for lifetime requirements.
+ */
+int32_t itofin_piecewise_default_density_new(struct ItofinContext *ctx,
+                                             int32_t reference,
+                                             const uint64_t *helpers,
+                                             size_t count,
+                                             uint64_t dc,
+                                             int32_t interpolation,
+                                             uint64_t *out,
+                                             struct ItofinError *error);
+
+/**
  * kind: 0 survival, 1 default probability, 2 density, 3 hazard. use_date: 0 time, 1 date.
  * # Safety
  * Pointers must be aligned, live and valid for their stated lengths. Outputs
