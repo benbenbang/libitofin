@@ -5,7 +5,7 @@
 //! multi-curve bootstrap (a 3m curve and a 6m curve each reading the other
 //! through the same basis quotes). `OvernightIborBasisSwapRateHelper`
 //! (`basisswapratehelpers.hpp:85`, `.cpp:121`) is not ported here; it is
-//! omitted visibly and queued as its own follow-up.
+//! omitted visibly, to be ported under its own follow-up issue.
 
 use std::cell::RefCell;
 use std::rc::Weak;
