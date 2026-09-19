@@ -25,11 +25,17 @@ type RateVolGridConfig struct {
 }
 
 // All C arrays are Go-owned scalar buffers borrowed only during invoke.
-func (s *Session) volGrid(x RateVolGridConfig, swaption bool) (uint64, error) {
+func (s *Session) volGrid(x RateVolGridConfig, swaption bool, optionDates []Date) (uint64, error) {
 	if x.Calendar == nil || x.DayCounter == nil {
 		return 0, fmt.Errorf("calendar and day counter are required")
 	}
 	rows, cols := len(x.OptionTenors), len(x.Strikes)
+	if optionDates != nil {
+		if !swaption || len(x.OptionTenors) != 0 || x.Settings != nil || x.Quotes != nil {
+			return 0, fmt.Errorf("option dates require fixed numeric swaption data without option tenors")
+		}
+		rows = len(optionDates)
+	}
 	if swaption {
 		cols = len(x.SwapTenors)
 	}
@@ -57,6 +63,10 @@ func (s *Session) volGrid(x RateVolGridConfig, swaption bool) (uint64, error) {
 	for i, p := range x.OptionTenors {
 		ol[i] = C.int32_t(p.Length)
 		ou[i] = C.int32_t(p.Unit)
+	}
+	dateSerials := make([]C.int32_t, len(optionDates))
+	for i, date := range optionDates {
+		dateSerials[i] = C.int32_t(date.serial)
 	}
 	sl, su := make([]C.int32_t, cols), make([]C.int32_t, cols)
 	strikes := make([]C.double, cols)
@@ -110,9 +120,6 @@ func (s *Session) volGrid(x RateVolGridConfig, swaption bool) (uint64, error) {
 			return 0, err
 		}
 	}
-	if swaption && ((x.Settings != nil) != (x.Quotes != nil)) {
-		return 0, fmt.Errorf("swaption matrix supports fixed scalar grid or moving quote grid")
-	}
 	if x.Shifts != nil {
 		shifts, err = flatten(x.Shifts)
 		if err != nil {
@@ -159,14 +166,39 @@ func (s *Session) volGrid(x RateVolGridConfig, swaption bool) (uint64, error) {
 		}
 		var e C.ItofinError
 		if swaption {
+			if optionDates != nil {
+				return ffiError(C.itofin_swaption_vol_matrix_dates(s.ctx, &cfg, &dateSerials[0], C.size_t(len(dateSerials)), &id, &e), &e)
+			}
+			if x.Settings == nil && x.Quotes != nil {
+				return ffiError(C.itofin_swaption_vol_matrix_fixed_quotes(s.ctx, &cfg, &id, &e), &e)
+			}
+			if x.Settings != nil && x.Quotes == nil {
+				return ffiError(C.itofin_swaption_vol_matrix_moving_matrix(s.ctx, &cfg, &id, &e), &e)
+			}
 			return ffiError(C.itofin_swaption_vol_matrix_new(s.ctx, &cfg, &id, &e), &e)
 		}
 		return ffiError(C.itofin_capfloor_vol_surface_new(s.ctx, &cfg, &id, &e), &e)
 	})
 	return uint64(id), err
 }
+
+// SwaptionVolatilityMatrix selects moving dates with Settings and live data with Quotes independently.
+// Numeric volatility and shift grids are copied.
 func (s *Session) SwaptionVolatilityMatrix(cfg RateVolGridConfig) (*SwaptionVolatilityStructure, error) {
-	id, err := s.volGrid(cfg, true)
+	id, err := s.volGrid(cfg, true, nil)
+	if err != nil {
+		return nil, err
+	}
+	return &SwaptionVolatilityStructure{object{s, id}}, nil
+}
+
+// SwaptionVolatilityMatrixDates copies numeric market data on fixed option dates.
+// Config must omit OptionTenors, Settings and Quotes.
+func (s *Session) SwaptionVolatilityMatrixDates(cfg RateVolGridConfig, optionDates []Date) (*SwaptionVolatilityStructure, error) {
+	if len(optionDates) == 0 {
+		return nil, fmt.Errorf("option dates must be nonempty")
+	}
+	id, err := s.volGrid(cfg, true, optionDates)
 	if err != nil {
 		return nil, err
 	}
@@ -176,7 +208,7 @@ func (s *Session) SwaptionVolatilityMatrix(cfg RateVolGridConfig) (*SwaptionVola
 type CapFloorTermVolSurface struct{ object }
 
 func (s *Session) CapFloorTermVolSurface(cfg RateVolGridConfig) (*CapFloorTermVolSurface, error) {
-	id, err := s.volGrid(cfg, false)
+	id, err := s.volGrid(cfg, false, nil)
 	if err != nil {
 		return nil, err
 	}
