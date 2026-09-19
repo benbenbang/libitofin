@@ -201,15 +201,18 @@ impl MultiCurve {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cashflows::IborLeg;
     use crate::handle::Handle;
     use crate::indexes::IborIndex;
     use crate::indexes::ibor::euribor::Euribor;
+    use crate::indexes::index::Index;
     use crate::indexes::interestrateindex::InterestRateIndex;
     use crate::instrument::Instrument;
-    use crate::instruments::MakeVanillaSwap;
+    use crate::instruments::{ForwardRateAgreement, MakeVanillaSwap, Swap};
     use crate::interestrate::Compounding;
     use crate::math::interpolations::loglinear::LogLinear;
     use crate::patterns::observable::AsObservable;
+    use crate::position::Position;
     use crate::pricingengine::PricingEngine;
     use crate::pricingengines::swap::DiscountingSwapEngine;
     use crate::quotes::{Quote, SimpleQuote};
@@ -219,7 +222,8 @@ mod tests {
     use crate::termstructures::bootstraptraits::Discount;
     use crate::termstructures::globalbootstrap::GlobalBootstrap;
     use crate::termstructures::yields::{
-        DepositRateHelper, PiecewiseYieldCurve, Pillar, SwapRateHelper, ZeroSpreadedTermStructure,
+        DepositRateHelper, FlatForward, FraRateHelper, IborIborBasisSwapRateHelper,
+        PiecewiseYieldCurve, Pillar, SwapRateHelper, ZeroSpreadedTermStructure,
     };
     use crate::time::businessdayconvention::BusinessDayConvention;
     use crate::time::calendars::target::Target;
@@ -229,7 +233,9 @@ mod tests {
     use crate::time::daycounters::thirty360::{Convention, Thirty360};
     use crate::time::frequency::Frequency;
     use crate::time::period::Period;
+    use crate::time::schedule::MakeSchedule;
     use crate::time::timeunit::TimeUnit;
+    use crate::types::Integer;
 
     type BootCurve = PiecewiseYieldCurve<Discount, LogLinear, GlobalBootstrap>;
 
@@ -589,8 +595,8 @@ mod tests {
     /// this is an integration / self-consistency test, and the discriminating
     /// arm is the q-bump fan-out flag (a broken registration fails it). The
     /// strongest oracle (mutual basis, `testMultiCurveTwoPiecewiseYieldCurves`)
-    /// and a C++-matching solved-rate pin are deferred to #995 (they need
-    /// `IborIborBasisSwapRateHelper`); no C++ value pin here.
+    /// is [`multicurve_two_piecewise_yield_curves_reprice`]; no C++ value pin
+    /// here.
     #[test]
     fn multicurve_piecewise_and_spreaded_curve_self_reprice() {
         let calendar = Target::new();
@@ -704,5 +710,252 @@ mod tests {
             (zero_rate(&curveois) - zero_rate(&curve3m) - (-0.005)).abs() < 1.0e-10,
             "the bumped ois-3m spread is not the new -0.005"
         );
+    }
+
+    /// The basis swap of `piecewiseyieldcurve.cpp:1615-1638` / `:1640-1663`:
+    /// spot to `maturity`, the 3m leg paying `basis` over the index, the 6m leg
+    /// flat, both on notional 1, priced on the exogenous discount curve. Both
+    /// indices are the originals, reading the multi-curve's internal handles.
+    fn basis_swap_npv(
+        maturity: Date,
+        basis: Real,
+        euribor3m: &Shared<IborIndex>,
+        euribor6m: &Shared<IborIndex>,
+        settings: &Shared<Settings<Date>>,
+        discount: &Handle<dyn YieldTermStructure>,
+    ) -> Real {
+        let start = euribor3m.fixing_calendar().advance(
+            settings
+                .evaluation_date()
+                .expect("the evaluation date is set"),
+            euribor3m.fixing_days() as Integer,
+            TimeUnit::Days,
+            BusinessDayConvention::Following,
+            false,
+        );
+        let leg = |index: &Shared<IborIndex>, spread: Real| {
+            let schedule = MakeSchedule::new()
+                .from(start)
+                .to(maturity)
+                .with_tenor(index.tenor())
+                .with_calendar(index.fixing_calendar())
+                .with_convention(index.business_day_convention())
+                .end_of_month(index.end_of_month())
+                .forwards()
+                .build();
+            IborLeg::new(schedule, Shared::clone(index))
+                .with_spread(spread)
+                .with_notional(1.0)
+                .build()
+                .expect("the basis-swap leg builds")
+        };
+        let mut swap = Swap::two_leg(
+            leg(euribor3m, basis),
+            leg(euribor6m, 0.0),
+            Shared::clone(settings),
+        );
+        let engine = shared_mut(DiscountingSwapEngine::new(
+            discount.clone(),
+            None,
+            None,
+            None,
+            Shared::clone(settings),
+        ));
+        swap.base_mut()
+            .set_pricing_engine(engine as SharedMut<dyn PricingEngine>);
+        swap.npv().expect("the basis swap prices")
+    }
+
+    /// Ports `testMultiCurveTwoPiecewiseYieldCurves`
+    /// (`piecewiseyieldcurve.cpp:1547-1684`): a 3m curve over 9 FRAs and 9
+    /// basis swaps bootstrapping the 3m side, and a 6m curve over 3 basis swaps
+    /// bootstrapping the 6m side and 9 vanilla swaps, solved jointly. The
+    /// coupling is mutual and non-separable: every basis helper on one curve
+    /// forecasts its other leg off the other curve, so no sequential
+    /// single-curve pass converges. The oracle is the four self-reprice loops
+    /// of `:1608-1682`, at the C++ tolerances: the FRA loop is
+    /// `QL_CHECK_CLOSE(.., 1e-10)`, a Boost percentage and so 1e-12 relative,
+    /// and the three swap loops are `QL_CHECK_SMALL(.., 1e-10)`, absolute.
+    ///
+    /// The C++ FRA helpers use the from-scratch constructor (`:1572-1576`),
+    /// which builds a `"no-fix"` index of tenor `(i + 3) - i = 3M` with
+    /// Euribor3M's fixing days, calendar, convention, end-of-month flag and day
+    /// counter and `useIndexedCoupon = true`; [`FraRateHelper::from_months`]
+    /// over the Euribor3M index clones exactly those parameters (the name and
+    /// currency never enter a forecast), so the two forms are numerically the
+    /// same helper.
+    #[test]
+    fn multicurve_two_piecewise_yield_curves_reprice() {
+        let calendar = Target::new();
+        let settings = shared(Settings::<Date>::new());
+        let today = calendar.adjust(
+            Date::new(23, Month::October, 2025),
+            BusinessDayConvention::Following,
+        );
+        settings.set_evaluation_date(today);
+        let settlement = calendar.advance(
+            today,
+            2,
+            TimeUnit::Days,
+            BusinessDayConvention::Following,
+            false,
+        );
+        let accuracy = 1.0e-10;
+
+        let discount = Handle::new(shared(FlatForward::with_rate(
+            settlement,
+            0.02,
+            Actual360::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>);
+
+        let intcurve3m = RelinkableHandle::<dyn YieldTermStructure>::empty();
+        let intcurve6m = RelinkableHandle::<dyn YieldTermStructure>::empty();
+        let euribor3m = shared(Euribor::three_months(
+            intcurve3m.handle(),
+            Shared::clone(&settings),
+        ));
+        let euribor6m = shared(Euribor::six_months(
+            intcurve6m.handle(),
+            Shared::clone(&settings),
+        ));
+
+        let q = Handle::new(shared(SimpleQuote::new(0.03)) as Shared<dyn Quote>);
+        let b = Handle::new(shared(SimpleQuote::new(0.0020)) as Shared<dyn Quote>);
+
+        let basis_helper = |tenor: Period, bootstrap_base_curve: bool| {
+            IborIborBasisSwapRateHelper::new(
+                b.clone(),
+                tenor,
+                euribor3m.fixing_days(),
+                euribor3m.fixing_calendar(),
+                euribor3m.business_day_convention(),
+                euribor3m.end_of_month(),
+                &euribor3m,
+                &euribor6m,
+                discount.clone(),
+                bootstrap_base_curve,
+            ) as Shared<dyn RateHelper>
+        };
+
+        let mut helpers3m: Vec<Shared<dyn RateHelper>> = Vec::new();
+        for i in 1..=9u32 {
+            helpers3m.push(FraRateHelper::from_months(
+                q.clone(),
+                i,
+                &euribor3m,
+                true,
+                Pillar::LastRelevantDate,
+            ) as Shared<dyn RateHelper>);
+        }
+        for i in 2..=10i32 {
+            helpers3m.push(basis_helper(Period::new(i, TimeUnit::Years), true));
+        }
+
+        let mut helpers6m: Vec<Shared<dyn RateHelper>> = Vec::new();
+        for i in 1..=3i32 {
+            helpers6m.push(basis_helper(Period::new(i * 6, TimeUnit::Months), false));
+        }
+        for i in 2..=10i32 {
+            helpers6m.push(SwapRateHelper::with_details(
+                q.clone(),
+                Period::new(i, TimeUnit::Years),
+                euribor6m.fixing_calendar(),
+                Frequency::Annual,
+                BusinessDayConvention::Following,
+                Thirty360::with_convention(Convention::BondBasis),
+                &euribor6m,
+                Handle::empty(),
+                Period::new(0, TimeUnit::Days),
+                Some(discount.clone()),
+                Pillar::LastRelevantDate,
+            ) as Shared<dyn RateHelper>);
+        }
+
+        let build = |helpers: Vec<Shared<dyn RateHelper>>| {
+            PiecewiseYieldCurve::<Discount, LogLinear, GlobalBootstrap>::with_bootstrap(
+                today,
+                helpers,
+                Actual360::new(),
+                LogLinear,
+                GlobalBootstrap::new(Some(accuracy), None, Vec::new()),
+            )
+            .expect("the curve builds")
+        };
+        let ptr3m = build(helpers3m);
+        let ptr6m = build(helpers6m);
+
+        let multicurve = MultiCurve::new(accuracy);
+        let curve3m = multicurve
+            .add_bootstrapped_curve(&intcurve3m, ptr3m)
+            .expect("adds the 3m contributor");
+        let _curve6m = multicurve
+            .add_bootstrapped_curve(&intcurve6m, ptr6m)
+            .expect("adds the 6m contributor");
+
+        let tolerance = 1.0e-10;
+        let spot = euribor3m.fixing_calendar().advance(
+            today,
+            euribor3m.fixing_days() as Integer,
+            TimeUnit::Days,
+            BusinessDayConvention::Following,
+            false,
+        );
+
+        for i in 1..=9i32 {
+            let start = euribor3m.fixing_calendar().advance(
+                spot,
+                i,
+                TimeUnit::Months,
+                euribor3m.business_day_convention(),
+                euribor3m.end_of_month(),
+            );
+            let mut fra = ForwardRateAgreement::new(
+                Shared::clone(&euribor3m),
+                start,
+                Position::Long,
+                0.03,
+                1.0,
+                curve3m.clone(),
+            )
+            .expect("the FRA builds");
+            let rate = fra.forward_rate().expect("the FRA forwards").rate();
+            assert!(
+                (rate - 0.03).abs() <= 0.03 * tolerance * 1.0e-2,
+                "FRA {i}: forward {rate} is not the 3% quote"
+            );
+        }
+
+        for i in 2..=10i32 {
+            let maturity = euribor3m.fixing_calendar().advance_by_period(
+                spot,
+                Period::new(i, TimeUnit::Years),
+                euribor3m.business_day_convention(),
+                false,
+            );
+            let npv = basis_swap_npv(
+                maturity, 0.0020, &euribor3m, &euribor6m, &settings, &discount,
+            );
+            assert!(npv.abs() < tolerance, "{i}y basis swap NPV {npv}");
+        }
+
+        for i in 1..=3i32 {
+            let maturity = euribor3m.fixing_calendar().advance_by_period(
+                spot,
+                Period::new(i * 6, TimeUnit::Months),
+                euribor3m.business_day_convention(),
+                false,
+            );
+            let npv = basis_swap_npv(
+                maturity, 0.0020, &euribor3m, &euribor6m, &settings, &discount,
+            );
+            assert!(npv.abs() < tolerance, "{}m basis swap NPV {npv}", i * 6);
+        }
+
+        for i in 2..=10i32 {
+            let npv = swap_npv(i, 0.03, &euribor6m, &settings, &discount);
+            assert!(npv.abs() < tolerance, "{i}y vanilla swap NPV {npv}");
+        }
     }
 }
