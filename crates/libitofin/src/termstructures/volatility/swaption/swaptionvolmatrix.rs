@@ -31,11 +31,8 @@
 //!
 //! ## Divergences from QuantLib
 //!
-//! - Two of the five C++ constructors are ported: the floating-reference +
-//!   `Handle<Quote>` matrix form and the fixed-reference + `Matrix` form. The
-//!   remaining three (fixed-reference + handles, floating-reference + `Matrix`,
-//!   and the fixed-reference + option-dates + `Matrix` form) are convenience
-//!   shapes deferred to #570.
+//! - All five C++ constructor shapes are available. Numeric matrices are copied;
+//!   quote-backed constructors retain the handles and observe quote changes.
 //! - C++'s `flatExtrapolation` flag is exposed through the dedicated
 //!   [`moving_flat`](SwaptionVolatilityMatrix::moving_flat) and
 //!   [`new_flat`](SwaptionVolatilityMatrix::new_flat) constructors (#569), which
@@ -289,6 +286,93 @@ impl SwaptionVolatilityMatrix {
         )
     }
 
+    /// Fixed reference date and live quote handles, including handle relinks.
+    /// An empty `shifts` grid means zero shifts.
+    #[allow(clippy::too_many_arguments)]
+    pub fn fixed_quotes(
+        reference_date: Date,
+        calendar: Calendar,
+        business_day_convention: BusinessDayConvention,
+        option_tenors: Vec<Period>,
+        swap_tenors: Vec<Period>,
+        vols: Vec<Vec<Handle<dyn Quote>>>,
+        day_counter: DayCounter,
+        volatility_type: VolatilityType,
+        shifts: Vec<Vec<Real>>,
+        flat_extrapolation: bool,
+    ) -> QlResult<Self> {
+        let discrete = SwaptionVolatilityDiscrete::new(
+            option_tenors,
+            swap_tenors,
+            reference_date,
+            calendar,
+            business_day_convention,
+            day_counter,
+        )?;
+        Self::assemble(discrete, vols, volatility_type, shifts, flat_extrapolation)
+    }
+
+    /// Floating reference date with copied numeric volatilities and shifts.
+    /// The option dates follow the evaluation date from `settings`.
+    #[allow(clippy::too_many_arguments)]
+    pub fn moving_matrix(
+        calendar: Calendar,
+        business_day_convention: BusinessDayConvention,
+        option_tenors: Vec<Period>,
+        swap_tenors: Vec<Period>,
+        volatilities: &Matrix,
+        day_counter: DayCounter,
+        volatility_type: VolatilityType,
+        shifts: &Matrix,
+        settings: Shared<Settings<Date>>,
+        flat_extrapolation: bool,
+    ) -> QlResult<Self> {
+        Self::moving_with(
+            calendar,
+            business_day_convention,
+            option_tenors,
+            swap_tenors,
+            matrix_to_handles(volatilities),
+            day_counter,
+            volatility_type,
+            matrix_to_rows(shifts),
+            settings,
+            flat_extrapolation,
+        )
+    }
+
+    /// Fixed reference date and explicit exercise dates with copied market data.
+    /// Dates must increase strictly and follow the reference date.
+    #[allow(clippy::too_many_arguments)]
+    pub fn with_option_dates(
+        reference_date: Date,
+        calendar: Calendar,
+        business_day_convention: BusinessDayConvention,
+        option_dates: Vec<Date>,
+        swap_tenors: Vec<Period>,
+        volatilities: &Matrix,
+        day_counter: DayCounter,
+        volatility_type: VolatilityType,
+        shifts: &Matrix,
+        flat_extrapolation: bool,
+    ) -> QlResult<Self> {
+        let discrete = SwaptionVolatilityDiscrete::with_option_dates(
+            option_dates,
+            swap_tenors,
+            reference_date,
+            calendar,
+            business_day_convention,
+            day_counter,
+        )?;
+        Self::assemble(
+            discrete,
+            matrix_to_handles(volatilities),
+            volatility_type,
+            matrix_to_rows(shifts),
+            flat_extrapolation,
+        )
+    }
+
     fn assemble(
         discrete: SwaptionVolatilityDiscrete,
         vol_handles: Vec<Vec<Handle<dyn Quote>>>,
@@ -367,7 +451,7 @@ fn check_inputs(
     vol_handles: &[Vec<Handle<dyn Quote>>],
     shift_values: &[Vec<Real>],
 ) -> QlResult<()> {
-    let n_options = discrete.option_tenors().len();
+    let n_options = discrete.option_dates()?.len();
     let n_swaps = discrete.swap_tenors().len();
     require!(
         vol_handles.len() == n_options,
