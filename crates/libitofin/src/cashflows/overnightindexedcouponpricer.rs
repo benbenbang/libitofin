@@ -25,17 +25,17 @@
 //! that returns `None` on a miss (never enforcing, never forecasting). A past
 //! fixing that is missing is an error; today's, when missing, deliberately falls
 //! through to the forecast (`overnightindexedcouponpricer.cpp:141-156`) - which
-//! is what pins `testCurrentCouponRate`. Only the forward part forecasts, through
-//! [`Index::fixing`].
+//! is what pins `testCurrentCouponRate`. Only partial forward intervals call
+//! [`Index::fixing`], so they still honor today's fixing enforcement.
 //!
 //! ## Telescoping
 //!
 //! `canApplyTelescopicFormula()` is true on the default path, so C++ replaces the
-//! interior forward product with a discount ratio
-//! (`overnightindexedcouponpricer.cpp:176-197`). Telescoping is an algebraic
-//! identity - the interior daily forward growth factors multiply to exactly that
-//! ratio - so the port compounds the forward part as a plain product and
-//! reproduces the same rate without reading discount factors directly.
+//! interior forward product with a discount ratio. This also bypasses today's
+//! fixing enforcement and omits daily spread inside the telescoped range, as
+//! QuantLib does. Partial first/last intervals use individual forward fixings
+//! with daily spread and the usual fixing enforcement. Curve bounds cover the
+//! full value-date interval, including the end of a partially accrued fixing.
 //!
 //! ## Divergences from QuantLib
 //!
@@ -188,9 +188,11 @@ impl CompoundingOvernightIndexedCouponPricer {
         Ok(self.compute(date)?.0)
     }
 
-    /// The spread that reproduces the coupon amount as
-    /// `gearing * effectiveIndexFixing + effectiveSpread` (`effectiveSpread`):
-    /// the coupon's own spread unless it compounds daily.
+    /// The coupon's spread, or its compounded contribution when applied daily.
+    ///
+    /// With daily compounding, the rate is
+    /// `gearing * (effectiveIndexFixing + effectiveSpread)`; otherwise it is
+    /// `gearing * effectiveIndexFixing + effectiveSpread`.
     pub fn effective_spread(&self) -> QlResult<Spread> {
         if !self.compound_spread_daily {
             return Ok(self.spread);
@@ -263,12 +265,46 @@ impl CompoundingOvernightIndexedCouponPricer {
             i += 1;
         }
 
-        while i < n {
-            let fixing = index.fixing(schedule.fixing_dates[i], false)?;
-            let (gf, gf_spread) = growth_factor(fixing, i);
-            compound_factor_without_spread *= gf;
-            compound_factor *= gf_spread;
-            i += 1;
+        if i < n {
+            let curve_handle = index.forwarding_term_structure();
+            require!(
+                !curve_handle.is_empty(),
+                "null term structure set to this instance of {}",
+                index.name()
+            );
+            let curve = curve_handle.current_link()?;
+            curve.check_range_date(schedule.value_dates[i], false)?;
+            curve.check_range_date(schedule.value_dates[n], false)?;
+
+            let telescopic_start = if i == 0 && schedule.value_dates[0] < schedule.interest_dates[0]
+            {
+                1
+            } else {
+                i
+            };
+            let telescopic_end = n - usize::from(schedule.value_dates[n] > date);
+            if telescopic_start < telescopic_end {
+                while i < telescopic_start {
+                    let fixing = index.fixing(schedule.fixing_dates[i], false)?;
+                    let (gf, gf_spread) = growth_factor(fixing, i);
+                    compound_factor_without_spread *= gf;
+                    compound_factor *= gf_spread;
+                    i += 1;
+                }
+                let forward_growth = curve
+                    .discount_date(schedule.value_dates[telescopic_start], false)?
+                    / curve.discount_date(schedule.value_dates[telescopic_end], false)?;
+                compound_factor *= forward_growth;
+                compound_factor_without_spread *= forward_growth;
+                i = telescopic_end;
+            }
+            while i < n {
+                let fixing = index.fixing(schedule.fixing_dates[i], false)?;
+                let (gf, gf_spread) = growth_factor(fixing, i);
+                compound_factor_without_spread *= gf;
+                compound_factor *= gf_spread;
+                i += 1;
+            }
         }
 
         let rate_accrual_end = date.min(schedule.interest_dates[n]);

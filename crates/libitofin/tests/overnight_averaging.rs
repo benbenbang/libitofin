@@ -126,26 +126,11 @@ fn cases() -> Vec<Fields<'static>> {
         .collect()
 }
 
-fn compound_forecast_case_deferred_to_issue_1045(fields: &Fields<'_>) -> bool {
-    fields["averaging"] == "compound"
-        && matches!(fields["name"], "today_enforced_absent" | "daily_spread")
-}
-
 #[test]
 fn overnight_coupons_match_quantlib_for_both_averaging_methods() {
     let cases = cases();
-    assert_eq!(cases.len(), 24);
-    assert_eq!(
-        cases
-            .iter()
-            .filter(|fields| compound_forecast_case_deferred_to_issue_1045(fields))
-            .count(),
-        2
-    );
+    assert_eq!(cases.len(), 36);
     for fields in cases {
-        if compound_forecast_case_deferred_to_issue_1045(&fields) {
-            continue;
-        }
         let context = format!("{} {}", fields["name"], fields["averaging"]);
         let market = Market::from_fields(&fields);
         let coupon = market.coupon(&fields);
@@ -179,14 +164,25 @@ fn overnight_coupons_match_quantlib_for_both_averaging_methods() {
                 &format!("{context} {day}"),
             );
         }
+        close(
+            coupon.effective_spread().unwrap(),
+            fields["effective_spread"].parse().unwrap(),
+            if coupon.averaging_method() == RateAveraging::Simple {
+                1e-15
+            } else {
+                1e-12
+            },
+            &context,
+        );
         if coupon.averaging_method() == RateAveraging::Simple {
+            assert!(coupon.effective_index_fixing().is_err(), "{context}");
+        } else {
             close(
-                coupon.effective_spread().unwrap(),
-                fields["spread"].parse().unwrap(),
-                1e-15,
+                coupon.effective_index_fixing().unwrap(),
+                fields["effective_index_fixing"].parse().unwrap(),
+                1e-12,
                 &context,
             );
-            assert!(coupon.effective_index_fixing().is_err(), "{context}");
         }
     }
 }
@@ -276,4 +272,98 @@ fn simple_history_needs_no_curve_and_missing_forecasts_return_errors() {
     );
     settings.set_evaluation_date(date("2026-07-02"));
     assert!(coupon.rate().is_err());
+}
+
+#[test]
+fn a_retained_compound_coupon_reads_quotes_fixings_and_dates() {
+    let fields = cases()
+        .into_iter()
+        .find(|fields| {
+            fields["name"] == "today_enforced_absent" && fields["averaging"] == "compound"
+        })
+        .unwrap();
+    let market = Market::from_fields(&fields);
+    let coupon = market.coupon(&fields);
+    let original = coupon.rate().unwrap();
+    market.quote.set_value(0.08);
+    assert!(coupon.rate().unwrap() > original);
+    market.quote.set_value(0.04);
+    close(coupon.rate().unwrap(), original, 1e-15, "quote restored");
+    market.settings.set_enforces_todays_historic_fixings(false);
+    close(
+        coupon.rate().unwrap(),
+        original,
+        1e-15,
+        "enforcement disabled",
+    );
+    market.settings.set_enforces_todays_historic_fixings(true);
+    market.index.add_fixing(date("2026-07-07"), 0.09).unwrap();
+    let with_today = coupon.rate().unwrap();
+    assert!(with_today > original);
+    market.settings.set_evaluation_date(date("2026-07-08"));
+    close(
+        coupon.rate().unwrap(),
+        with_today,
+        1e-12,
+        "today becomes history",
+    );
+    market.settings.set_evaluation_date(date("2026-07-09"));
+    assert!(coupon.rate().unwrap_err().message().contains("Missing"));
+    market.index.add_fixing(date("2026-07-08"), 0.09).unwrap();
+    assert!(coupon.rate().unwrap() > with_today);
+    market.curve.link_to(shared(FlatForward::with_rate(
+        date("2026-07-01"),
+        -0.01,
+        Actual365Fixed::new(),
+        Compounding::Continuous,
+        Frequency::Annual,
+    )));
+    assert!(coupon.rate().unwrap() < with_today);
+    market.settings.reset_evaluation_date();
+    assert!(
+        coupon
+            .rate()
+            .unwrap_err()
+            .message()
+            .contains("no evaluation date")
+    );
+}
+
+#[test]
+fn compound_partial_accrual_checks_the_full_forward_interval() {
+    use libitofin::termstructures::TermStructure;
+    use libitofin::termstructures::yields::DiscountCurve;
+
+    let fields = cases()
+        .into_iter()
+        .find(|fields| fields["name"] == "daily_spread" && fields["averaging"] == "compound")
+        .unwrap();
+    let market = Market::from_fields(&fields);
+    let coupon = market.coupon(&fields);
+    let curve = shared(
+        DiscountCurve::new(
+            vec![date("2026-07-01"), date("2026-07-11")],
+            vec![1.0, 0.998],
+            Actual365Fixed::new(),
+            None,
+        )
+        .unwrap(),
+    );
+    market.curve.link_to(curve.clone());
+    assert!(coupon.accrued_amount(date("2026-07-10")).is_ok());
+    assert!(coupon.accrued_amount(date("2026-07-11")).is_err());
+    curve.enable_extrapolation();
+    assert!(coupon.accrued_amount(date("2026-07-11")).is_ok());
+    curve.disable_extrapolation();
+    assert!(coupon.rate().is_err());
+    market.curve.link_to(shared(FlatForward::with_rate(
+        date("2026-07-08"),
+        0.04,
+        Actual365Fixed::new(),
+        Compounding::Continuous,
+        Frequency::Annual,
+    )));
+    assert!(coupon.rate().is_err());
+    market.index.add_fixing(date("2026-07-07"), 0.03).unwrap();
+    assert!(coupon.rate().is_ok());
 }
