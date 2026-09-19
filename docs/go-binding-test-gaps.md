@@ -28,6 +28,7 @@ This inventory does not claim exhaustive QuantLib product coverage.
 | OIS today-to-history error recovery and live additive-spread rebootstrap | `TestOvernightTodayForecastRecoversAfterMissingPastFixing`, `TestOvernightAdditiveSpreadQuoteRebootstrapsExistingCurve` |
 | Heston PriceError/ImpliedVolError fitted parameters and signed residuals | `TestHestonCalibrationPriceAndImpliedVolOracles` |
 | Hull-White fixed reversion and mixed omitted/explicit optimizer and stopping settings | `TestHullWhiteCalibrationFixedReversionAndOptionalCombinations` |
+| Hull-White zero-start-delay calibration after input wrappers close, original QuantLib PAR cache at `1e-5` | `TestHullWhiteCachedNoStartDelayAfterInputsClosed` |
 
 The CDS builder includes the final accrual day; the current explicit Go
 constructor does not expose that convention. Each is checked against its own

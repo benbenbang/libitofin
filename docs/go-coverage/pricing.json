@@ -552,7 +552,8 @@
         "TestModelConstraintsParametersAndBondOption",
         "TestHullWhiteCalibrationCachedOracles",
         "TestHullWhiteCalibrationErrorVariantsAndDefaults",
-        "TestHullWhiteCalibrationFixedReversionAndOptionalCombinations"
+        "TestHullWhiteCalibrationFixedReversionAndOptionalCombinations",
+        "TestHullWhiteCachedNoStartDelayAfterInputsClosed"
       ],
       "validation": "Go feature-subset tests passed with Go 1.27.1"
     },
