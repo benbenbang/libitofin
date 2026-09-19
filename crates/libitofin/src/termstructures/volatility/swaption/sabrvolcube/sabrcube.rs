@@ -2106,6 +2106,15 @@ mod tests {
         is_atm_calibrated: bool,
         backward_flat: bool,
     ) -> SabrSwaptionVolatilityCube {
+        build_common_sabr_cube_with_quote(settings, is_atm_calibrated, backward_flat, None)
+    }
+
+    fn build_common_sabr_cube_with_quote(
+        settings: &Shared<Settings<Date>>,
+        is_atm_calibrated: bool,
+        backward_flat: bool,
+        live_spread: Option<&Shared<SimpleQuote>>,
+    ) -> SabrSwaptionVolatilityCube {
         let euribor6m = shared(Euribor::six_months(
             flat_curve(0.05),
             Shared::clone(settings),
@@ -2120,7 +2129,11 @@ mod tests {
             .map(|n| {
                 (0..5)
                     .map(|k| {
-                        Handle::new(shared(SimpleQuote::new(spreads[n][k])) as Shared<dyn Quote>)
+                        let quote = match (n, k, live_spread) {
+                            (3, 0, Some(quote)) => Shared::clone(quote),
+                            _ => shared(SimpleQuote::new(spreads[n][k])),
+                        };
+                        Handle::new(quote as Shared<dyn Quote>)
                     })
                     .collect()
             })
@@ -2314,6 +2327,51 @@ mod tests {
         );
 
         settings.set_evaluation_date(reference);
+    }
+
+    #[test]
+    fn backward_flat_recalibrates_after_live_quote_and_evaluation_date_updates() {
+        for is_atm_calibrated in [false, true] {
+            let settings = settings_today();
+            let quote = shared(SimpleQuote::new(common_vol_spreads()[3][0]));
+            let build = |backward_flat| {
+                build_common_sabr_cube_with_quote(
+                    &settings,
+                    is_atm_calibrated,
+                    backward_flat,
+                    Some(&quote),
+                )
+            };
+            let value = |cube: &SabrSwaptionVolatilityCube| {
+                cube.volatility_tenors(
+                    Period::new(2, TimeUnit::Years),
+                    Period::new(5, TimeUnit::Years),
+                    0.05,
+                    false,
+                )
+                .unwrap()
+            };
+            let cube = build(true);
+            let initial = value(&cube);
+            assert!((initial - value(&build(false))).abs() > 1e-3);
+
+            quote.set_value(common_vol_spreads()[3][0] + 0.01);
+            let after_quote = value(&cube);
+            assert!((after_quote - initial).abs() > 1e-7);
+            assert!((after_quote - value(&build(true))).abs() < 1e-14);
+            assert!((after_quote - value(&build(false))).abs() > 1e-3);
+
+            settings.set_evaluation_date(Target::new().advance_by_period(
+                today(),
+                Period::new(1, TimeUnit::Days),
+                BDC,
+                false,
+            ));
+            let after_date = value(&cube);
+            assert!((after_date - after_quote).abs() > 1e-10);
+            assert!((after_date - value(&build(true))).abs() < 1e-14);
+            assert!((after_date - value(&build(false))).abs() > 1e-3);
+        }
     }
 
     /// QuantLib 1.43 oracle for the `backwardFlat` flag
