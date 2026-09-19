@@ -74,6 +74,32 @@ func (s *Session) NewSwaption(a SwaptionConfig) (*Swaption, error) {
 	return &Swaption{object{s, uint64(id)}}, nil
 }
 
+type OisSwaptionConfig struct {
+	Swap             *OvernightIndexedSwap
+	Exercise         *EuropeanExercise
+	SettlementType   SettlementType
+	SettlementMethod SettlementMethod
+	Settings         *Settings
+}
+
+func (s *Session) NewOisSwaption(a OisSwaptionConfig) (*Swaption, error) {
+	if a.Swap == nil || a.Exercise == nil || a.Settings == nil {
+		return nil, fmt.Errorf("swap, exercise and settings required")
+	}
+	var id C.uint64_t
+	err := s.invoke(func() error {
+		if err := sameSession(s, a.Swap.object, a.Exercise.object, a.Settings.object); err != nil {
+			return err
+		}
+		var e C.ItofinError
+		return ffiError(C.itofin_swaption_from_ois(s.ctx, C.uint64_t(a.Swap.id), C.uint64_t(a.Exercise.id), C.int32_t(a.SettlementType), C.int32_t(a.SettlementMethod), C.uint64_t(a.Settings.id), &id, &e), &e)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &Swaption{object{s, uint64(id)}}, nil
+}
+
 type CapFloorConfig struct {
 	Type                CapFloorType
 	Tenor, ForwardStart Period

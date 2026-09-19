@@ -81,6 +81,48 @@ pub unsafe extern "C" fn itofin_swaption_new(
         })
     }
 }
+#[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
+pub unsafe extern "C" fn itofin_swaption_from_ois(
+    ctx: *mut Context,
+    swap: u64,
+    exercise: u64,
+    settlement_type: i32,
+    settlement_method: i32,
+    settings_id: u64,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(out)?;
+            let t = match settlement_type {
+                0 => SettlementType::Physical,
+                1 => SettlementType::Cash,
+                _ => return Err(BindingError::invalid("invalid settlement type")),
+            };
+            let m = match settlement_method {
+                0 => SettlementMethod::PhysicalOTC,
+                1 => SettlementMethod::PhysicalCleared,
+                2 => SettlementMethod::CollateralizedCashPrice,
+                3 => SettlementMethod::ParYieldCurve,
+                _ => return Err(BindingError::invalid("invalid settlement method")),
+            };
+            let s = Swaption::new(
+                c.get::<crate::rates_api::NativeOis>(swap)?.0,
+                c.get::<Shared<dyn Exercise>>(exercise)?,
+                t,
+                m,
+                settings(c, settings_id)?,
+            );
+            output(out, c.insert(shared_mut(s))?)
+        })
+    }
+}
 pub(crate) fn cap_type(t: i32) -> BindingResult<CapFloorType> {
     match t {
         0 => Ok(CapFloorType::Cap),

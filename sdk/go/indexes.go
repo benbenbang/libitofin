@@ -16,6 +16,7 @@ type GbpLibor = IborIndex
 type EurLibor = IborIndex
 type CustomIborIndex = IborIndex
 type Estr = OvernightIndex
+type Eonia = OvernightIndex
 
 func (s *Session) currency(kind int) (*Currency, error) {
 	var id C.uint64_t
@@ -177,6 +178,30 @@ func (s *Session) NewEstr(curve *YieldTermStructure, settings *Settings) (*Overn
 	}
 	return &OvernightIndex{object{s, uint64(id)}}, nil
 }
+func (s *Session) NewEonia(curve *YieldTermStructure, settings *Settings) (*OvernightIndex, error) {
+	if settings == nil {
+		return nil, errNilArgument("settings")
+	}
+	if err := sameSession(s, settings.object); err != nil {
+		return nil, err
+	}
+	var f uint64
+	if curve != nil {
+		if err := sameSession(s, curve.object); err != nil {
+			return nil, err
+		}
+		f = curve.id
+	}
+	var id C.uint64_t
+	err := s.invoke(func() error {
+		var e C.ItofinError
+		return ffiError(C.itofin_eonia_new(s.ctx, C.uint64_t(f), C.uint64_t(settings.id), &id, &e), &e)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &OvernightIndex{object{s, uint64(id)}}, nil
+}
 func indexFixing(o object, overnight bool, d Date, forecast bool) (float64, error) {
 	var v C.double
 	err := o.session.invoke(func() error {
@@ -267,4 +292,48 @@ func (i *IborIndex) Name() (string, error) {
 		value[j] = byte(buf[j])
 	}
 	return string(value), nil
+}
+
+func (i *OvernightIndex) component(query int32) (object, error) {
+	var id C.uint64_t
+	err := i.session.invoke(func() error {
+		if err := sameSession(i.session, i.object); err != nil {
+			return err
+		}
+		var e C.ItofinError
+		return ffiError(C.itofin_overnight_component(i.session.ctx, C.uint64_t(i.id), C.int32_t(query), &id, &e), &e)
+	})
+	return object{i.session, uint64(id)}, err
+}
+func (i *OvernightIndex) DayCounter() (*DayCounter, error) {
+	o, err := i.component(0)
+	if err != nil {
+		return nil, err
+	}
+	return &DayCounter{o}, nil
+}
+func (i *OvernightIndex) FixingCalendar() (*Calendar, error) {
+	o, err := i.component(1)
+	if err != nil {
+		return nil, err
+	}
+	return &Calendar{o}, nil
+}
+func (i *OvernightIndex) Currency() (*Currency, error) {
+	o, err := i.component(2)
+	if err != nil {
+		return nil, err
+	}
+	return &Currency{o}, nil
+}
+func (i *OvernightIndex) FixingDays() (uint32, error) {
+	var days C.uint32_t
+	err := i.session.invoke(func() error {
+		if err := sameSession(i.session, i.object); err != nil {
+			return err
+		}
+		var e C.ItofinError
+		return ffiError(C.itofin_overnight_fixing_days(i.session.ctx, C.uint64_t(i.id), &days, &e), &e)
+	})
+	return uint32(days), err
 }

@@ -5,7 +5,7 @@ use libitofin::handle::Handle;
 use libitofin::indexes::OvernightIndex;
 use libitofin::instrument::Instrument;
 use libitofin::instruments::{
-    FixedVsFloatingSwap, MakeOis, MakeVanillaSwap, OvernightIndexedSwap, SwapType, VanillaSwap,
+    FixedVsFloatingSwap, MakeOis, MakeVanillaSwap, SwapType, VanillaSwap,
 };
 use libitofin::pricingengine::PricingEngine;
 use libitofin::pricingengines::DiscountingSwapEngine;
@@ -38,6 +38,9 @@ pub(crate) fn curve(c: &Context, id: u64) -> BindingResult<Handle<dyn YieldTermS
 pub(crate) fn settings(c: &Context, id: u64) -> BindingResult<Shared<Settings<Date>>> {
     c.get(id)
 }
+
+#[derive(Clone)]
+pub(crate) struct NativeOis(pub SharedMut<FixedVsFloatingSwap>);
 
 #[repr(C)]
 pub struct ItofinVanillaSwapConfig {
@@ -170,7 +173,7 @@ pub unsafe extern "C" fn itofin_make_ois(
     unsafe {
         with_context(ctx, error, |c| {
             check_ptr(out)?;
-            if a.flags & !231 != 0 {
+            if a.flags & !247 != 0 {
                 return Err(BindingError::invalid("invalid OIS builder flags"));
             }
             let rate = if a.flags & 1 != 0 {
@@ -191,6 +194,9 @@ pub unsafe extern "C" fn itofin_make_ois(
             if a.flags & 4 != 0 {
                 builder = builder.with_nominal(finite(a.nominal)?);
             }
+            if a.flags & 16 != 0 {
+                builder = builder.with_fixed_leg_day_count(day_counter(c, a.fixed_day_counter)?);
+            }
             if a.flags & 32 != 0 {
                 builder = builder.with_payment_lag(a.payment_lag);
             }
@@ -204,7 +210,12 @@ pub unsafe extern "C" fn itofin_make_ois(
                     _ => return Err(BindingError::invalid("invalid averaging method")),
                 });
             }
-            output(out, c.insert(shared_mut(builder.build()?))?)
+            output(
+                out,
+                c.insert(NativeOis(shared_mut(
+                    builder.build()?.into_fixed_vs_floating(),
+                )))?,
+            )
         })
     }
 }
@@ -273,13 +284,13 @@ pub unsafe extern "C" fn itofin_swap_value(
                     }
                 }
                 1 => {
-                    let obj = c.get::<SharedMut<OvernightIndexedSwap>>(id)?;
+                    let obj = c.get::<NativeOis>(id)?.0;
                     let mut s = obj.borrow_mut();
                     match field {
                         0 => s.npv()?,
-                        1 => s.fixed_vs_floating_mut().fair_rate()?,
-                        2 => s.fixed_vs_floating().nominal()?,
-                        3 => s.fixed_vs_floating().fixed_rate(),
+                        1 => s.fair_rate()?,
+                        2 => s.nominal()?,
+                        3 => s.fixed_rate(),
                         4 => u8::from(s.base().is_calculated()) as Real,
                         5 => {
                             s.calculate()?;
@@ -318,7 +329,7 @@ pub unsafe extern "C" fn itofin_swap_results(
                     crate::results_api::snapshot(s.base())
                 }
                 1 => {
-                    let obj = c.get::<SharedMut<OvernightIndexedSwap>>(id)?;
+                    let obj = c.get::<NativeOis>(id)?.0;
                     let mut s = obj.borrow_mut();
                     s.calculate()?;
                     crate::results_api::snapshot(s.base())
