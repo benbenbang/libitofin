@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::currency::Currency;
+use crate::handle::RelinkableHandle;
 use crate::indexes::{SwapIndex, ibor::euribor::Euribor};
 use crate::instrument::Instrument;
 use crate::instruments::MakeSwaption;
@@ -12,6 +13,7 @@ use crate::pricingengines::swaption::{BlackSwaptionEngine, CashAnnuityModel};
 use crate::quotes::SimpleQuote;
 use crate::shared::shared;
 use crate::termstructures::{yields::FlatForward, yieldtermstructure::YieldTermStructure};
+use crate::test_support::{Flag, as_observer};
 use crate::time::calendars::target::Target;
 use crate::time::date::Month;
 use crate::time::daycounters::{
@@ -75,13 +77,18 @@ fn matrix() -> Matrix {
 
 struct Fixture {
     settings: Shared<Settings<Date>>,
+    quote: Shared<SimpleQuote>,
+    link: RelinkableHandle<dyn Quote>,
     surfaces: Vec<Shared<SwaptionVolatilityMatrix>>,
 }
 impl Fixture {
     fn new(flat: bool) -> Self {
         let settings = shared(Settings::new());
         settings.set_evaluation_date(today());
-        let handles = matrix_to_handles(&matrix());
+        let quote = shared(SimpleQuote::new(DATA[0][0]));
+        let link = RelinkableHandle::new(quote.clone() as Shared<dyn Quote>);
+        let mut handles = matrix_to_handles(&matrix());
+        handles[0][0] = link.handle();
         let moving = if flat {
             SwaptionVolatilityMatrix::moving_flat
         } else {
@@ -163,7 +170,12 @@ impl Fixture {
         .into_iter()
         .map(shared)
         .collect();
-        Self { settings, surfaces }
+        Self {
+            settings,
+            quote,
+            link,
+            surfaces,
+        }
     }
 }
 
@@ -286,4 +298,113 @@ fn five_constructor_forms_recover_nodes_and_black_vols_against_quantlib() {
         count += 1;
     }
     assert_eq!(count, 120);
+}
+
+#[test]
+fn every_form_observes_only_its_live_inputs_and_handle_relinks() {
+    for flat in [false, true] {
+        let fixture = Fixture::new(flat);
+        for line in ORACLE.lines().filter(|line| line.starts_with("observe,")) {
+            let fields: Vec<_> = line.split(',').collect();
+            let form: usize = fields[1].parse().unwrap();
+            let expected: Vec<f64> = fields[2..6].iter().map(|x| x.parse().unwrap()).collect();
+            let surface = &fixture.surfaces[form];
+            let value = || surface.volatility(dates()[0], 1.0, 0.02, false).unwrap();
+            assert!((value() - expected[0]).abs() <= 1e-16);
+            let flag = Flag::new();
+            surface.observable().register_observer(&as_observer(&flag));
+            fixture
+                .settings
+                .set_evaluation_date(Date::new(15, Month::June, 2025));
+            assert_eq!(Flag::is_up(&flag), form == 0 || form == 2);
+            assert!((value() - expected[1]).abs() <= 1e-16, "{line}");
+            fixture.settings.set_evaluation_date(today());
+            assert!((value() - expected[0]).abs() <= 1e-16);
+            let current = fixture.link.handle().current_link().unwrap();
+            fixture
+                .link
+                .link_to(fixture.quote.clone() as Shared<dyn Quote>);
+            fixture.quote.set_value(0.13);
+            Flag::lower(&flag);
+            fixture.quote.set_value(0.2);
+            assert_eq!(Flag::is_up(&flag), form < 2);
+            assert!((value() - expected[2]).abs() <= 1e-16);
+            Flag::lower(&flag);
+            fixture
+                .link
+                .link_to(shared(SimpleQuote::new(0.3)) as Shared<dyn Quote>);
+            assert_eq!(Flag::is_up(&flag), form < 2);
+            assert!((value() - expected[3]).abs() <= 1e-16);
+            Flag::lower(&flag);
+            fixture.quote.set_value(0.4);
+            assert!(!Flag::is_up(&flag));
+            assert!((value() - expected[3]).abs() <= 1e-16);
+            fixture.link.link_to(current);
+            fixture.quote.set_value(0.13);
+        }
+    }
+}
+
+#[test]
+fn explicit_dates_validate_shape_and_preserve_irregular_nodes_and_copied_shifts() {
+    let option_dates = vec![today() + 17, today() + 113, today() + 401];
+    let mut values = Matrix::with_size(3, 2);
+    let mut shifts = Matrix::with_size(3, 2);
+    for i in 0..3 {
+        for j in 0..2 {
+            values[(i, j)] = 0.1 + i as f64 * 0.03 + j as f64 * 0.01;
+            shifts[(i, j)] = 0.01 + i as f64 * 0.002 + j as f64 * 0.001;
+        }
+    }
+    let build = |dates: Vec<Date>, vols: &Matrix, shifts: &Matrix, flat| {
+        SwaptionVolatilityMatrix::with_option_dates(
+            today(),
+            Target::new(),
+            BDC,
+            dates,
+            swaps()[..2].to_vec(),
+            vols,
+            Actual365Fixed::new(),
+            VolatilityType::ShiftedLognormal,
+            shifts,
+            flat,
+        )
+    };
+    let surface = build(option_dates.clone(), &values, &shifts, true).unwrap();
+    let expected_vol = values[(2, 1)];
+    let expected_shift = shifts[(2, 1)];
+    values[(2, 1)] = 9.0;
+    shifts[(2, 1)] = 8.0;
+    assert_eq!(surface.discrete_grid().unwrap().option_dates, option_dates);
+    assert!(
+        (surface.volatility_time(10.0, 20.0, 0.05, true).unwrap() - expected_vol).abs() <= 1e-16
+    );
+    assert!((surface.shift_time(10.0, 20.0, true).unwrap() - expected_shift).abs() <= 1e-16);
+    for invalid in [
+        vec![],
+        vec![today(), today() + 1, today() + 2],
+        vec![today() + 2, today() + 2, today() + 3],
+        vec![today() + 3, today() + 2, today() + 4],
+    ] {
+        assert!(build(invalid, &values, &shifts, false).is_err());
+    }
+    assert!(
+        build(
+            option_dates.clone(),
+            &Matrix::with_size(2, 2),
+            &shifts,
+            false
+        )
+        .is_err()
+    );
+    assert!(
+        build(
+            option_dates.clone(),
+            &values,
+            &Matrix::with_size(3, 1),
+            false
+        )
+        .is_err()
+    );
+    assert!(build(option_dates, &Matrix::with_size(3, 1), &shifts, false).is_err());
 }
