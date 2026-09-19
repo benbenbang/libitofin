@@ -242,3 +242,280 @@ fn lazy_base_matches_upstream_fixed_curve_and_independent_recalibration_nodes() 
         previous = nodes;
     }
 }
+
+#[test]
+fn missing_inputs_fail_fallible_reads_and_repair_without_reconstruction() {
+    let market = MarketData::empty();
+    let curve = market.lazy_curve();
+    let missing = curve.try_base_date().unwrap_err();
+    assert!(missing.message().contains("no fixings stored"));
+    assert_eq!(curve.base_date(), Date::null());
+    assert!(
+        curve
+            .zero_rate(1.0, false)
+            .unwrap_err()
+            .message()
+            .contains("no fixings stored")
+    );
+    assert!(
+        curve
+            .zero_rate_date(reference(), false)
+            .unwrap_err()
+            .message()
+            .contains("no fixings stored")
+    );
+    market
+        .handle
+        .link_to(Shared::clone(&curve) as Shared<dyn ZeroInflationTermStructure>);
+    assert!(
+        market
+            .index
+            .fixing(Date::new(1, Month::August, 2012), false)
+            .unwrap_err()
+            .message()
+            .contains("no fixings stored")
+    );
+    market.populate_fixings(207.3);
+    assert!(curve.nodes().is_err());
+    market.populate();
+    assert_eq!(
+        curve.try_base_date().unwrap(),
+        Date::new(1, Month::July, 2007)
+    );
+    assert_eq!(curve.nodes().unwrap().len(), 15);
+}
+
+#[test]
+fn owned_unlinked_index_copy_survives_original_drop_and_does_not_retain_curve() {
+    let market = MarketData::empty();
+    let curve = market.lazy_curve();
+    market.populate();
+    market
+        .handle
+        .link_to(Shared::clone(&curve) as Shared<dyn ZeroInflationTermStructure>);
+    let before = curve.nodes().unwrap();
+    let weak_curve = Shared::downgrade(&curve);
+    let weak_original = Shared::downgrade(&market.index);
+    let settings = Shared::clone(&market.settings);
+    drop(market);
+    assert!(weak_original.upgrade().is_none());
+    assert_eq!(curve.nodes().unwrap(), before);
+    settings.set_evaluation_date(Date::new(13, Month::September, 2007));
+    assert_ne!(curve.nodes().unwrap(), before);
+    drop(curve);
+    assert!(weak_curve.upgrade().is_none());
+}
+
+#[test]
+fn relinking_the_original_forecast_handle_does_not_notify_the_base_date_source() {
+    use libitofin::termstructures::inflation::interpolatedzeroinflationcurve::ZeroInflationCurve;
+
+    let market = MarketData::empty();
+    market.populate();
+    let curve = market.lazy_curve();
+    let nodes = curve.nodes().unwrap();
+    let notifications = shared(Cell::new(0));
+    let observer =
+        shared_mut(Notifications(Shared::clone(&notifications))) as SharedMut<dyn Observer>;
+    curve.register_observer(&observer);
+    let other = shared(
+        ZeroInflationCurve::new(
+            reference(),
+            vec![
+                Date::new(1, Month::July, 2007),
+                Date::new(1, Month::July, 2060),
+            ],
+            vec![0.05, 0.05],
+            Frequency::Monthly,
+            dc(),
+            Linear,
+            None,
+        )
+        .unwrap(),
+    );
+    market
+        .handle
+        .link_to(other as Shared<dyn ZeroInflationTermStructure>);
+    assert_eq!(notifications.get(), 0);
+    assert_eq!(curve.nodes().unwrap(), nodes);
+    market
+        .handle
+        .link_to(Shared::clone(&curve) as Shared<dyn ZeroInflationTermStructure>);
+    assert_eq!(notifications.get(), 0);
+    drop(market);
+    let weak = Shared::downgrade(&curve);
+    drop(curve);
+    assert!(weak.upgrade().is_none());
+}
+
+#[test]
+fn arbitrary_callback_is_lazy_cached_owned_and_explicitly_invalidated() {
+    let market = MarketData::empty();
+    market.populate();
+    let date = shared(Cell::new(Date::null()));
+    let captured = Shared::clone(&date);
+    let calls = shared(Cell::new(0));
+    let captured_calls = Shared::clone(&calls);
+    let curve = PiecewiseZeroInflationCurve::with_base_date_func(
+        reference(),
+        move || {
+            captured_calls.set(captured_calls.get() + 1);
+            Ok(captured.get())
+        },
+        Frequency::Monthly,
+        dc(),
+        market.helpers.clone(),
+        None,
+    )
+    .unwrap();
+    assert_eq!(calls.get(), 0);
+    assert!(
+        curve
+            .try_base_date()
+            .unwrap_err()
+            .message()
+            .contains("null lazy base date")
+    );
+    date.set(Date::new(1, Month::July, 2007));
+    assert_eq!(curve.try_base_date().unwrap(), date.get());
+    assert_eq!(calls.get(), 2);
+    curve.nodes().unwrap();
+    assert_eq!(calls.get(), 2);
+    date.set(Date::new(1, Month::June, 2007));
+    assert_eq!(
+        curve.try_base_date().unwrap(),
+        Date::new(1, Month::July, 2007)
+    );
+    curve.update();
+    assert_eq!(curve.try_base_date().unwrap(), date.get());
+    assert_eq!(calls.get(), 3);
+    let weak_date = Shared::downgrade(&date);
+    drop(date);
+    assert!(weak_date.upgrade().is_some());
+    drop(curve);
+    assert!(weak_date.upgrade().is_none());
+    assert!(
+        PiecewiseZeroInflationCurve::with_last_fixing_date(
+            reference(),
+            &market.index,
+            Frequency::Monthly,
+            dc(),
+            Vec::new(),
+            None,
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn fixed_base_inspection_does_not_require_quotes_or_fixings() {
+    let market = MarketData::empty();
+    let base = Date::new(1, Month::July, 2007);
+    let curve = PiecewiseZeroInflationCurve::new(
+        reference(),
+        base,
+        Frequency::Monthly,
+        dc(),
+        market.helpers,
+        None,
+    )
+    .unwrap();
+    assert_eq!(curve.base_date(), base);
+    assert_eq!(curve.try_base_date().unwrap(), base);
+    assert!(curve.nodes().is_err());
+    assert_eq!(curve.try_base_date().unwrap(), base);
+}
+
+#[test]
+fn direct_seasonality_queries_and_installation_propagate_lazy_errors_and_repair() {
+    use libitofin::termstructures::inflation::seasonality::{
+        KerkhofSeasonality, MultiplicativePriceSeasonality, Seasonality,
+    };
+
+    for callback_failure in [false, true] {
+        let market = MarketData::empty();
+        let fail_callback = shared(Cell::new(callback_failure));
+        let captured = Shared::clone(&fail_callback);
+        let curve = if callback_failure {
+            PiecewiseZeroInflationCurve::with_base_date_func(
+                reference(),
+                move || {
+                    if captured.get() {
+                        libitofin::fail!("base-date callback unavailable");
+                    }
+                    Ok(Date::new(1, Month::July, 2007))
+                },
+                Frequency::Monthly,
+                dc(),
+                market.helpers.clone(),
+                None,
+            )
+            .unwrap()
+        } else {
+            market.lazy_curve()
+        };
+        let expected = if callback_failure {
+            "base-date callback unavailable"
+        } else {
+            "no fixings stored"
+        };
+        let seasonality = shared(
+            MultiplicativePriceSeasonality::new(
+                Date::new(31, Month::January, 2007),
+                Frequency::Monthly,
+                vec![1.0; 24],
+            )
+            .unwrap(),
+        );
+        let kerkhof =
+            KerkhofSeasonality::new(Date::new(31, Month::January, 2007), vec![1.0; 12]).unwrap();
+        let query = Date::new(1, Month::August, 2012);
+        for result in [
+            seasonality.correct_zero_rate(query, 0.03, curve.as_ref()),
+            seasonality.correct_yoy_rate(query, 0.03, curve.as_ref()),
+            kerkhof.correct_zero_rate(query, 0.03, curve.as_ref()),
+        ] {
+            assert!(result.unwrap_err().message().contains(expected));
+        }
+        assert!(
+            seasonality
+                .is_consistent(curve.as_ref())
+                .unwrap_err()
+                .message()
+                .contains(expected)
+        );
+        assert!(
+            curve
+                .set_seasonality(Some(Shared::clone(&seasonality) as Shared<dyn Seasonality>))
+                .unwrap_err()
+                .message()
+                .contains(expected)
+        );
+        assert!(curve.has_seasonality());
+        fail_callback.set(false);
+        market.populate();
+        assert_eq!(
+            curve.try_base_date().unwrap(),
+            Date::new(1, Month::July, 2007)
+        );
+        assert_eq!(curve.nodes().unwrap().len(), 15);
+        assert!(seasonality.is_consistent(curve.as_ref()).unwrap());
+        for corrected in [
+            kerkhof
+                .correct_zero_rate(query, 0.03, curve.as_ref())
+                .unwrap(),
+            seasonality
+                .correct_zero_rate(query, 0.03, curve.as_ref())
+                .unwrap(),
+            seasonality
+                .correct_yoy_rate(query, 0.03, curve.as_ref())
+                .unwrap(),
+        ] {
+            assert!((corrected - 0.03).abs() < 1e-14);
+        }
+        curve
+            .set_seasonality(Some(seasonality as Shared<dyn Seasonality>))
+            .unwrap();
+        assert!(curve.zero_rate_date(query, false).unwrap().is_finite());
+    }
+}
