@@ -1,0 +1,106 @@
+{
+  "coverage_target": "committed Python stubs",
+  "domain": "eonia-ois-swaption-and-vanilla-builder",
+  "entries": [
+    {
+      "c": [
+        "itofin_eonia_new"
+      ],
+      "go": [
+        "Session.NewEonia"
+      ],
+      "notes": "Go Eonia aliases OvernightIndex; construction retains settings and the optional forwarding curve.",
+      "python": "itofin.indexes.Eonia",
+      "status": "implemented",
+      "tests": [
+        "TestEoniaOisSwaptionCachedLifecycle",
+        "eonia_ois_swaption_c_handles_retain_dependencies_and_reprice"
+      ]
+    },
+    {
+      "c": [
+        "itofin_eonia_new"
+      ],
+      "go": [
+        "Session.NewEonia"
+      ],
+      "notes": "Go Eonia aliases OvernightIndex; construction retains settings and the optional forwarding curve.",
+      "python": "itofin.indexes.Eonia.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestEoniaOisSwaptionCachedLifecycle",
+        "eonia_ois_swaption_c_handles_retain_dependencies_and_reprice"
+      ]
+    },
+    {
+      "c": [
+        "itofin_index_fixing"
+      ],
+      "go": [
+        "OvernightIndex.Fixing"
+      ],
+      "python": "itofin.indexes.Eonia.fixing",
+      "status": "implemented",
+      "tests": [
+        "TestEoniaOisSwaptionCachedLifecycle",
+        "eonia_ois_swaption_c_handles_retain_dependencies_and_reprice"
+      ]
+    },
+    {
+      "c": [
+        "itofin_overnight_fixing_days"
+      ],
+      "go": [
+        "OvernightIndex.FixingDays"
+      ],
+      "python": "itofin.indexes.Eonia.fixing_days",
+      "status": "implemented",
+      "tests": [
+        "TestEoniaOisSwaptionCachedLifecycle",
+        "eonia_ois_swaption_c_handles_retain_dependencies_and_reprice"
+      ]
+    },
+    {
+      "c": [
+        "itofin_overnight_component"
+      ],
+      "go": [
+        "OvernightIndex.Currency"
+      ],
+      "python": "itofin.indexes.Eonia.currency",
+      "status": "implemented",
+      "tests": [
+        "TestEoniaOisSwaptionCachedLifecycle",
+        "eonia_ois_swaption_c_handles_retain_dependencies_and_reprice"
+      ]
+    },
+    {
+      "c": [
+        "itofin_overnight_component"
+      ],
+      "go": [
+        "OvernightIndex.FixingCalendar"
+      ],
+      "python": "itofin.indexes.Eonia.fixing_calendar",
+      "status": "implemented",
+      "tests": [
+        "TestEoniaOisSwaptionCachedLifecycle",
+        "eonia_ois_swaption_c_handles_retain_dependencies_and_reprice"
+      ]
+    },
+    {
+      "c": [
+        "itofin_overnight_component"
+      ],
+      "go": [
+        "OvernightIndex.DayCounter"
+      ],
+      "python": "itofin.indexes.Eonia.day_counter",
+      "status": "implemented",
+      "tests": [
+        "TestEoniaOisSwaptionCachedLifecycle",
+        "eonia_ois_swaption_c_handles_retain_dependencies_and_reprice"
+      ]
+    }
+  ]
+}
