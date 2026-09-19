@@ -9,7 +9,8 @@
   "scope": [
     "credit.rs",
     "creditengine.rs",
-    "credithelpers.rs"
+    "credithelpers.rs",
+    "creditdensity.rs"
   ],
   "symbols": [
     {
@@ -529,6 +530,60 @@
       "tests": [
         "TestCreditProtectionEndDate",
         "protection_end_rejects_invalid_outputs_and_handles"
+      ]
+    },
+    {
+      "c": "itofin_interpolated_default_density_new",
+      "go": "Session.NewInterpolatedDefaultDensityCurve",
+      "python": "InterpolatedDefaultDensityCurve.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestDefaultDensityInterpolationAndBoundary"
+      ]
+    },
+    {
+      "c": "itofin_default_curve_nodes",
+      "go": "InterpolatedDefaultDensityCurve.Dates",
+      "python": "InterpolatedDefaultDensityCurve.dates",
+      "status": "implemented",
+      "tests": [
+        "TestDefaultDensityInterpolationAndBoundary"
+      ]
+    },
+    {
+      "c": "itofin_default_curve_nodes",
+      "go": "InterpolatedDefaultDensityCurve.Times",
+      "python": "InterpolatedDefaultDensityCurve.times",
+      "status": "implemented",
+      "tests": [
+        "TestDefaultDensityInterpolationAndBoundary"
+      ]
+    },
+    {
+      "c": "itofin_default_curve_nodes",
+      "go": "InterpolatedDefaultDensityCurve.Data",
+      "python": "InterpolatedDefaultDensityCurve.data",
+      "status": "implemented",
+      "tests": [
+        "TestDefaultDensityInterpolationAndBoundary"
+      ]
+    },
+    {
+      "c": "itofin_default_curve_nodes",
+      "go": "InterpolatedDefaultDensityCurve.DefaultDensities",
+      "python": "InterpolatedDefaultDensityCurve.default_densities",
+      "status": "implemented",
+      "tests": [
+        "TestDefaultDensityInterpolationAndBoundary"
+      ]
+    },
+    {
+      "c": "itofin_default_curve_nodes",
+      "go": "InterpolatedDefaultDensityCurve.Nodes",
+      "python": "InterpolatedDefaultDensityCurve.nodes",
+      "status": "implemented",
+      "tests": [
+        "TestDefaultDensityInterpolationAndBoundary"
       ]
     }
   ]
