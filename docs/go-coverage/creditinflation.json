@@ -648,6 +648,46 @@
       "tests": [
         "TestDefaultDensityBootstrapLiveHelpers"
       ]
+    },
+    {
+      "c": "itofin_default_curve_jumps",
+      "go": "DefaultProbabilityTermStructure.JumpDates",
+      "python": "DefaultProbabilityTermStructure.jump_dates",
+      "status": "implemented",
+      "tests": [
+        "TestCreditJumpsQuantLibOracle",
+        "TestCreditJumpsInvalidArguments"
+      ]
+    },
+    {
+      "c": "itofin_default_curve_jumps",
+      "go": "DefaultProbabilityTermStructure.JumpTimes",
+      "python": "DefaultProbabilityTermStructure.jump_times",
+      "status": "implemented",
+      "tests": [
+        "TestCreditJumpsQuantLibOracle",
+        "TestCreditJumpsInvalidArguments"
+      ]
+    },
+    {
+      "c": "itofin_flat_hazard_with_jumps_new",
+      "go": "Session.NewFlatHazardRate",
+      "python": "FlatHazardRate.with_jumps",
+      "status": "implemented",
+      "tests": [
+        "TestCreditJumpsQuantLibOracle",
+        "TestCreditJumpsInvalidArguments"
+      ]
+    },
+    {
+      "c": "itofin_flat_hazard_with_jumps_new",
+      "go": "Session.NewFlatHazardRate",
+      "python": "FlatHazardRate.moving_with_jumps",
+      "status": "implemented",
+      "tests": [
+        "TestCreditJumpsQuantLibOracle",
+        "TestCreditJumpsInvalidArguments"
+      ]
     }
   ]
 }

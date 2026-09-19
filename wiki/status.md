@@ -17,6 +17,11 @@ see the [Go validation record](../docs/go-binding-test-gaps.md).
 
 ## Credit extensions
 
+- [#1021](https://github.com/benbenbang/libitofin/issues/1021): fixed and moving
+  FlatHazardRate curves accept observable survival jumps in Rust, Python and Go.
+  Other Rust curves can opt into the shared jump hook. Strict boundaries,
+  generated year-end dates and date updates match the
+  [QuantLib oracle](../sdk/go/testdata/credit_jumps_oracle.md).
 - [#1020](https://github.com/benbenbang/libitofin/issues/1020): default-density
   interpolation and CDS bootstrapping support BackwardFlat and Linear in Rust,
   Python and Go. [Analytic and binding tests](../crates/itofin-py/tests/test_credit_density.py)

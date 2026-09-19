@@ -871,6 +871,14 @@ class DefaultProbabilityTermStructure:
     the default density and the hazard rate, each in a year-fraction and a date
     form.
     """
+    def jump_dates(self) -> builtins.list[time.Date]:
+        r"""
+        Return copied jump dates in constructor order.
+        """
+    def jump_times(self) -> builtins.list[builtins.float]:
+        r"""
+        Return jump times relative to the current reference date.
+        """
     def survival_probability(self, t: builtins.float, extrapolate: builtins.bool = False) -> builtins.float:
         r"""
         Return the survival probability from the reference date to year-fraction t.
@@ -1144,6 +1152,17 @@ class FlatHazardRate(DefaultProbabilityTermStructure):
     quote. The moving forms fix the reference date settlement_days business days
     past the evaluation date carried by settings.
     """
+    @staticmethod
+    def with_jumps(reference_date: time.Date, hazard_rate: quotes.SimpleQuote, day_counter: time.DayCounter, jumps: typing.Sequence[quotes.SimpleQuote], jump_dates: typing.Optional[typing.Sequence[time.Date]] = None) -> FlatHazardRate:
+        r"""
+        Build a fixed-reference curve retaining multiplicative survival jump quotes.
+        Empty jump_dates selects consecutive year-end dates; jumps apply strictly after their date.
+        """
+    @staticmethod
+    def moving_with_jumps(settlement_days: builtins.int, calendar: time.Calendar, hazard_rate: quotes.SimpleQuote, day_counter: time.DayCounter, settings: itofin.Settings, jumps: typing.Sequence[quotes.SimpleQuote], jump_dates: typing.Optional[typing.Sequence[time.Date]] = None) -> FlatHazardRate:
+        r"""
+        Build a moving-reference curve with retained jump quotes and fixed jump dates.
+        """
     def __init__(self, reference_date: time.Date, hazard_rate: quotes.SimpleQuote, day_counter: time.DayCounter) -> None:
         r"""
         Build a curve reading its hazard rate live, on a pinned reference date.
