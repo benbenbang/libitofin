@@ -101,6 +101,63 @@
         "TestEoniaOisSwaptionCachedLifecycle",
         "eonia_ois_swaption_c_handles_retain_dependencies_and_reprice"
       ]
+    },
+    {
+      "c": [
+        "itofin_swaption_from_ois"
+      ],
+      "go": [
+        "Session.NewOisSwaption"
+      ],
+      "notes": "OisSwaptionConfig accepts the distinct OIS handle and retains the same shared underlying; the existing vanilla constructor is unchanged.",
+      "python": "itofin.instruments.Swaption.from_ois",
+      "status": "implemented",
+      "tests": [
+        "TestEoniaOisSwaptionCachedLifecycle",
+        "eonia_ois_swaption_c_handles_retain_dependencies_and_reprice"
+      ]
+    },
+    {
+      "c": [
+        "itofin_swaption_details"
+      ],
+      "go": [
+        "Swaption.ExerciseDate"
+      ],
+      "python": "itofin.instruments.Swaption.exercise_date",
+      "status": "implemented",
+      "tests": [
+        "TestMakeSwaptionCalendarAndForecastOracles",
+        "make_swaption_c_builder_validates_options_and_preserves_forecast"
+      ]
+    },
+    {
+      "c": [
+        "itofin_swaption_details"
+      ],
+      "go": [
+        "Swaption.UnderlyingFixedRate"
+      ],
+      "python": "itofin.instruments.Swaption.underlying_fixed_rate",
+      "status": "implemented",
+      "tests": [
+        "TestMakeSwaptionCalendarAndForecastOracles",
+        "make_swaption_c_builder_validates_options_and_preserves_forecast"
+      ]
+    },
+    {
+      "c": [
+        "itofin_swaption_details"
+      ],
+      "go": [
+        "Swaption.UnderlyingNominal"
+      ],
+      "python": "itofin.instruments.Swaption.underlying_nominal",
+      "status": "implemented",
+      "tests": [
+        "TestMakeSwaptionCalendarAndForecastOracles",
+        "make_swaption_c_builder_validates_options_and_preserves_forecast"
+      ]
     }
   ]
 }

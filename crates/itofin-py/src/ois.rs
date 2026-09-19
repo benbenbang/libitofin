@@ -11,16 +11,17 @@ use crate::curve::PyYieldTermStructure;
 use crate::helpers::{PyOvernightIndex, PyRateAveraging};
 use crate::results::Results;
 use crate::settings::PySettings;
-use crate::time::{PyDate, PyPeriod};
+use crate::time::{PyDate, PyDayCounter, PyPeriod};
 use libitofin::cashflows::RateAveraging;
 use libitofin::handle::Handle;
 use libitofin::indexes::OvernightIndex;
 use libitofin::instrument::Instrument;
-use libitofin::instruments::{MakeOis, OvernightIndexedSwap};
+use libitofin::instruments::{FixedVsFloatingSwap, MakeOis};
 use libitofin::settings::Settings;
 use libitofin::shared::{Shared, SharedMut, shared_mut};
 use libitofin::termstructures::yieldtermstructure::YieldTermStructure;
 use libitofin::time::date::Date;
+use libitofin::time::daycounter::DayCounter;
 use libitofin::time::period::Period;
 use libitofin::time::timeunit::TimeUnit;
 use libitofin::types::{Integer, Real};
@@ -42,7 +43,7 @@ use pyo3_stub_gen::derive::{
     module = "itofin.instruments"
 )]
 pub struct PyOvernightIndexedSwap {
-    inner: SharedMut<OvernightIndexedSwap>,
+    inner: SharedMut<FixedVsFloatingSwap>,
 }
 
 #[gen_stub_pymethods]
@@ -59,7 +60,6 @@ impl PyOvernightIndexedSwap {
         Ok(self
             .inner
             .borrow_mut()
-            .fixed_vs_floating_mut()
             .fair_rate()
             .map_err(PyQlError::from)?)
     }
@@ -135,12 +135,7 @@ impl PyOvernightIndexedSwap {
     ///     ItofinError: If the legs carry per-coupon nominals, which leaves no
     ///         single one to report.
     fn nominal(&self) -> PyResult<f64> {
-        Ok(self
-            .inner
-            .borrow()
-            .fixed_vs_floating()
-            .nominal()
-            .map_err(PyQlError::from)?)
+        Ok(self.inner.borrow().nominal().map_err(PyQlError::from)?)
     }
 
     /// Return the fixed-leg rate.
@@ -149,13 +144,17 @@ impl PyOvernightIndexedSwap {
     ///     float: The rate given to the builder, or the fair rate it filled in
     ///         for a par swap.
     fn fixed_rate(&self) -> f64 {
-        self.inner.borrow().fixed_vs_floating().fixed_rate()
+        self.inner.borrow().fixed_rate()
     }
 }
 
 impl PyOvernightIndexedSwap {
+    pub(crate) fn inner(&self) -> SharedMut<FixedVsFloatingSwap> {
+        SharedMut::clone(&self.inner)
+    }
+
     /// Wraps the swap MakeOis.build() hands back.
-    fn from_inner(inner: SharedMut<OvernightIndexedSwap>) -> PyOvernightIndexedSwap {
+    fn from_inner(inner: SharedMut<FixedVsFloatingSwap>) -> PyOvernightIndexedSwap {
         PyOvernightIndexedSwap { inner }
     }
 }
@@ -170,8 +169,8 @@ impl PyOvernightIndexedSwap {
 ///
 /// The core builder is a consumed-self fluent chain, which does not cross the
 /// FFI boundary; this facade takes the overrides as constructor keywords and
-/// assembles the chain inside build(). Only five overrides are exposed; every
-/// other core one keeps its default, and the four the core rejects outright
+/// assembles the chain inside build(). Unexposed core overrides keep their defaults;
+/// the four the core rejects outright
 /// (telescopic value dates, lookback, lockout and observation shift) are
 /// unreachable from here by construction. The built swap already carries its
 /// DiscountingSwapEngine.
@@ -188,6 +187,7 @@ pub struct PyMakeOis {
     payment_lag: Option<Integer>,
     discounting_term_structure: Option<Handle<dyn YieldTermStructure>>,
     averaging_method: Option<RateAveraging>,
+    fixed_leg_day_count: Option<DayCounter>,
 }
 
 #[gen_stub_pymethods]
@@ -212,6 +212,7 @@ impl PyMakeOis {
     ///         None keeps the core default.
     ///     discounting_term_structure (YieldTermStructure | None): The curve
     ///         the flows discount on; None keeps the core default.
+    ///     fixed_leg_day_count (DayCounter | None): Override the fixed-leg day count.
     ///     averaging_method (RateAveraging | None): Whether the overnight
     ///         fixings compound or are averaged; None keeps the core default.
     #[new]
@@ -227,6 +228,7 @@ impl PyMakeOis {
         payment_lag = None,
         discounting_term_structure = None,
         averaging_method = None,
+        fixed_leg_day_count = None,
     ))]
     fn new(
         swap_tenor: &PyPeriod,
@@ -239,6 +241,7 @@ impl PyMakeOis {
         payment_lag: Option<Integer>,
         discounting_term_structure: Option<&PyYieldTermStructure>,
         averaging_method: Option<PyRateAveraging>,
+        fixed_leg_day_count: Option<&PyDayCounter>,
     ) -> Self {
         PyMakeOis {
             swap_tenor: swap_tenor.inner(),
@@ -253,6 +256,7 @@ impl PyMakeOis {
             payment_lag,
             discounting_term_structure: discounting_term_structure.map(|curve| curve.handle()),
             averaging_method: averaging_method.map(|method| method.inner()),
+            fixed_leg_day_count: fixed_leg_day_count.map(PyDayCounter::inner),
         }
     }
 
@@ -289,7 +293,12 @@ impl PyMakeOis {
         if let Some(averaging_method) = self.averaging_method {
             maker = maker.with_averaging_method(averaging_method);
         }
+        if let Some(day_count) = &self.fixed_leg_day_count {
+            maker = maker.with_fixed_leg_day_count(day_count.clone());
+        }
         let swap = maker.build().map_err(PyQlError::from)?;
-        Ok(PyOvernightIndexedSwap::from_inner(shared_mut(swap)))
+        Ok(PyOvernightIndexedSwap::from_inner(shared_mut(
+            swap.into_fixed_vs_floating(),
+        )))
     }
 }
