@@ -1,5 +1,6 @@
 //! Interpolation framework and concrete interpolations from `ql/math/interpolations/`.
 
+pub mod backwardflatlinear;
 pub mod bicubic;
 pub mod bilinear;
 pub mod convexmonotone;
