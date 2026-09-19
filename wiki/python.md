@@ -85,6 +85,8 @@ print(f"{svol.volatility(Period(3, 'Years'), Period(3, 'Years'), 0.03):.4f}")  #
 
 ## More examples and reference
 
+- [Swaption example](../example/python/swaption.py) (requires current `main`): price vanilla payer and Eonia OIS swaptions, then reprice after a volatility update.
+
 - [Getting started](https://benbenbang.github.io/libitofin/getting-started/): runnable Python, Rust, and Go examples.
 - [Python example sources](../example/python/): yield curves, swaps, Monte Carlo, credit, and inflation.
 - [Python API reference](https://benbenbang.github.io/libitofin/api/core/): module-by-module signatures and documentation.

@@ -23,6 +23,7 @@ This inventory does not claim exhaustive QuantLib product coverage.
 | ISDA spread/upfront helper repricing, quote updates, ownership and settings restoration | `TestIsdaCreditHelpersOracleAndRetention`, `TestCreditHelperExplicitTermsErrors` |
 | CDS protection end independent of adjusted payment date | `TestCreditProtectionEndDate` |
 | All five swaption matrix constructors, explicit dates, live quotes/settings, copied values and retained dependencies | `TestSwaptionMatrixFiveConstructorOracles`, `TestSwaptionMatrixAdditionalConstructorErrors` |
+| Eonia OIS cached price, MakeSwaption calendar/forecast oracles, retained pricing and live volatility repricing | `TestEoniaOisSwaptionCachedLifecycle`, `TestMakeSwaptionCalendarAndForecastOracles` |
 | Swaption cash/physical settlement, both annuity models, unsupported combinations, payer/receiver fair rates | `TestRatesCompletionSwaptionSettlementAndReceiver` |
 | Dirty/clean bond quotes with nonzero accrued interest | `TestRatesCompletionDirtyBondWithAccruedInterest` |
 | Valid Custom/ASX futures dates, prices and analytical forward/discount factors | `TestRatesCompletionCustomAndASXFutures` |
