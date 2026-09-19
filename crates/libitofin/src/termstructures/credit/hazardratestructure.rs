@@ -57,8 +57,7 @@
 //!
 //! - The three C++ constructors (`hazardratestructure.cpp:52-71`) only forward
 //!   the day counter, jumps and jump dates to the base, so this adapter is a
-//!   stateless trait. The jump machinery is deferred with the rest of it; see
-//!   the
+//!   stateless trait. Concrete curves own optional jump state through the
 //!   [`defaulttermstructure`](crate::termstructures::credit::defaulttermstructure)
 //!   module documentation.
 

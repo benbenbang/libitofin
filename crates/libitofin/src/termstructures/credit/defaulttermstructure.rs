@@ -14,22 +14,11 @@
 //!
 //! ## Divergences from QuantLib
 //!
-//! - Jump quotes (the turn-of-year effect) are not ported: the `jumps` /
-//!   `jumpDates` constructor arguments (`defaulttermstructure.hpp:48-63`), the
-//!   jump-factor fold in `survivalProbability`
-//!   (`defaulttermstructure.cpp:86-97`), the `jumpDates()` / `jumpTimes()`
-//!   inspectors (`defaulttermstructure.hpp:138-139`) and the `setJumps()`
-//!   bookkeeping behind the `update()` override
-//!   (`defaulttermstructure.hpp:243-247`, `defaulttermstructure.cpp:64-79`).
-//!   This port takes no jumps parameter at all rather than accepting and
-//!   ignoring one. The omission is behaviour-free: with an empty `jumps_` the
-//!   C++ `survivalProbability` skips the loop and returns
-//!   `survivalProbabilityImpl(t)` unscaled (`defaulttermstructure.cpp:98-100`),
-//!   and `update()` reduces to `TermStructure::update()`, which
-//!   [`TermStructureBase::updater`](crate::termstructures::TermStructureBase::updater)
-//!   already provides. Jumps follow with the bootstrapped credit curves in
-//!   EPIC Credit (#676), matching the same deferral taken for
-//!   [`YieldTermStructure`](crate::termstructures::yieldtermstructure::YieldTermStructure).
+//! - Jump quotes and dates are held by [`DefaultProbabilityJumps`]. Curves opt
+//!   in through [`DefaultProbabilityTermStructure::jumps`]. As in QuantLib,
+//!   automatic year-end dates are generated once; moving reference dates
+//!   change jump times, not the generated dates. Times are calculated on demand
+//!   rather than cached by `setJumps()` (`defaulttermstructure.cpp:64-79`).
 //! - C++ overloads on `Date`/`Time` become distinct method names: the plain
 //!   name takes times and the `_date` / `_dates` suffix takes dates, so the
 //!   two-argument `defaultProbability` overloads are
@@ -42,10 +31,84 @@
 //!   rather than throwing.
 
 use crate::errors::QlResult;
-use crate::termstructures::TermStructure;
-use crate::time::date::Date;
+use crate::handle::Handle;
+use crate::quotes::Quote;
+use crate::termstructures::{TermStructure, TermStructureBase};
+use crate::time::date::{Date, Month};
 use crate::types::{Probability, Rate, Real, Time};
 use crate::{fail, require};
+
+/// Observable multiplicative survival jumps shared by credit curves.
+///
+/// This implements `defaulttermstructure.cpp:64-100`. Quote validation is lazy:
+/// only the consecutive jumps strictly before the requested time are read.
+/// Input order is preserved, including QuantLib's prefix traversal semantics.
+/// The owning curve must expose this state through its `jumps()` hook.
+pub struct DefaultProbabilityJumps {
+    quotes: Vec<Handle<dyn Quote>>,
+    dates: Vec<Date>,
+}
+
+impl DefaultProbabilityJumps {
+    /// Registers jump quotes with the curve's updater and resolves dates.
+    ///
+    /// Empty dates select December 31 of the initial reference year and each
+    /// subsequent year. Explicit dates must have one entry per quote.
+    ///
+    /// # Errors
+    /// Returns an error for mismatched lengths, null dates, an unavailable
+    /// reference date, or automatic dates beyond the supported date range.
+    pub fn new(
+        base: &TermStructureBase,
+        quotes: Vec<Handle<dyn Quote>>,
+        mut dates: Vec<Date>,
+    ) -> QlResult<Self> {
+        if dates.is_empty() && !quotes.is_empty() {
+            let year = base.reference_date()?.year();
+            require!(
+                quotes.len() <= (Date::max_date().year() - year + 1) as usize,
+                "automatic jump dates exceed the maximum supported date"
+            );
+            dates = (0..quotes.len())
+                .map(|i| Date::new(31, Month::December, year + i as i32))
+                .collect();
+        }
+        require!(
+            quotes.len() == dates.len(),
+            "mismatch between number of jumps ({}) and jump dates ({})",
+            quotes.len(),
+            dates.len()
+        );
+        require!(
+            dates.iter().all(|date| *date != Date::null()),
+            "null jump date"
+        );
+        for quote in &quotes {
+            quote.register_observer(&base.updater());
+        }
+        Ok(Self { quotes, dates })
+    }
+
+    /// The immutable jump dates, including any generated year-end dates.
+    pub fn dates(&self) -> &[Date] {
+        &self.dates
+    }
+
+    fn factor<T: TermStructure + ?Sized>(&self, curve: &T, t: Time) -> QlResult<Probability> {
+        let mut factor = 1.0;
+        for (date, handle) in self.dates.iter().zip(&self.quotes) {
+            if curve.time_from_reference(*date)? >= t {
+                break;
+            }
+            let quote = handle.current_link()?;
+            require!(quote.is_valid(), "invalid jump quote");
+            let value = quote.value()?;
+            require!(value > 0.0 && value <= 1.0, "invalid jump value: {value}");
+            factor *= value;
+        }
+        Ok(factor)
+    }
+}
 
 /// Default-probability term structure.
 ///
@@ -73,6 +136,24 @@ pub trait DefaultProbabilityTermStructure: TermStructure {
         None
     }
 
+    /// Optional observable jump state; existing curves default to no jumps.
+    fn jumps(&self) -> Option<&DefaultProbabilityJumps> {
+        None
+    }
+
+    /// Jump dates in constructor order.
+    fn jump_dates(&self) -> &[Date] {
+        self.jumps().map_or(&[], DefaultProbabilityJumps::dates)
+    }
+
+    /// Jump times recalculated against the current reference date.
+    fn jump_times(&self) -> QlResult<Vec<Time>> {
+        self.jump_dates()
+            .iter()
+            .map(|date| self.time_from_reference(*date))
+            .collect()
+    }
+
     /// Hazard-rate calculation, derived from the density and the survival
     /// probability; curves quoting the hazard rate override it with a more
     /// efficient implementation.
@@ -93,7 +174,11 @@ pub trait DefaultProbabilityTermStructure: TermStructure {
     /// the term structure.
     fn survival_probability(&self, t: Time, extrapolate: bool) -> QlResult<Probability> {
         self.check_range_time(t, extrapolate)?;
-        self.survival_probability_impl(t)
+        let factor = match self.jumps() {
+            Some(jumps) => jumps.factor(self, t)?,
+            None => 1.0,
+        };
+        Ok(factor * self.survival_probability_impl(t)?)
     }
 
     /// The survival probability from the reference date to `date`.

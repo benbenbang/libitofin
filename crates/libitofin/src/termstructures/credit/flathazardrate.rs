@@ -32,7 +32,9 @@ use crate::patterns::observable::{AsObservable, Observable, Observer, ResetThenN
 use crate::quotes::{Quote, SimpleQuote};
 use crate::settings::Settings;
 use crate::shared::{Shared, SharedMut, shared};
-use crate::termstructures::credit::defaulttermstructure::DefaultProbabilityTermStructure;
+use crate::termstructures::credit::defaulttermstructure::{
+    DefaultProbabilityJumps, DefaultProbabilityTermStructure,
+};
 use crate::termstructures::credit::hazardratestructure::HazardRateStructure;
 use crate::termstructures::{TermStructure, TermStructureBase};
 use crate::time::calendar::Calendar;
@@ -44,6 +46,7 @@ use crate::types::{Natural, Probability, Rate, Real, Time};
 pub struct FlatHazardRate {
     base: TermStructureBase,
     hazard_rate: Handle<dyn Quote>,
+    jumps: Option<DefaultProbabilityJumps>,
     _listener: SharedMut<ResetThenNotify>,
 }
 
@@ -54,6 +57,7 @@ impl FlatHazardRate {
         FlatHazardRate {
             base,
             hazard_rate,
+            jumps: None,
             _listener: listener,
         }
     }
@@ -111,6 +115,54 @@ impl FlatHazardRate {
         )
     }
 
+    /// Fixed-reference curve with multiplicative survival jumps.
+    ///
+    /// Empty `jump_dates` generates consecutive year-end dates. Jump values
+    /// are read and validated only after their dates have been crossed.
+    pub fn with_jumps(
+        reference_date: Date,
+        hazard_rate: Handle<dyn Quote>,
+        day_counter: DayCounter,
+        jumps: Vec<Handle<dyn Quote>>,
+        jump_dates: Vec<Date>,
+    ) -> QlResult<Self> {
+        let mut curve = Self::new(reference_date, hazard_rate, day_counter);
+        curve.jumps = Some(DefaultProbabilityJumps::new(
+            &curve.base,
+            jumps,
+            jump_dates,
+        )?);
+        Ok(curve)
+    }
+
+    /// Moving-reference curve with observable multiplicative survival jumps.
+    ///
+    /// Automatic dates are fixed at construction; their times follow the
+    /// reference date. Settings must provide a date when generating dates.
+    pub fn moving_with_jumps(
+        settlement_days: Natural,
+        calendar: Calendar,
+        hazard_rate: Handle<dyn Quote>,
+        day_counter: DayCounter,
+        settings: Shared<Settings<Date>>,
+        jumps: Vec<Handle<dyn Quote>>,
+        jump_dates: Vec<Date>,
+    ) -> QlResult<Self> {
+        let mut curve = Self::moving(
+            settlement_days,
+            calendar,
+            hazard_rate,
+            day_counter,
+            settings,
+        );
+        curve.jumps = Some(DefaultProbabilityJumps::new(
+            &curve.base,
+            jumps,
+            jump_dates,
+        )?);
+        Ok(curve)
+    }
+
     fn hazard_rate_value(&self) -> QlResult<Rate> {
         self.hazard_rate.current_link()?.value()
     }
@@ -139,6 +191,10 @@ impl HazardRateStructure for FlatHazardRate {
 }
 
 impl DefaultProbabilityTermStructure for FlatHazardRate {
+    fn jumps(&self) -> Option<&DefaultProbabilityJumps> {
+        self.jumps.as_ref()
+    }
+
     fn as_any(&self) -> Option<&dyn std::any::Any> {
         Some(self)
     }
