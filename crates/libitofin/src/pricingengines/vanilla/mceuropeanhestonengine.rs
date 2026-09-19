@@ -21,10 +21,10 @@
 //!   [`StrikedTypePayoff`], so the C++ "non-plain payoff given" downcast
 //!   (`mceuropeanhestonengine.hpp:116-119`) survives as a run-time `Err` in
 //!   [`calculate`](MCEuropeanHestonEngine::calculate).
-//! - **antithetic variate is SUPPORTED**: unlike the single-factor
-//!   [`MakeMcEuropeanEngine`](crate::pricingengines::vanilla::MakeMcEuropeanEngine),
-//!   whose antithetic path is a fail-loud deferral, the multi-factor
-//!   [`MultiPathGenerator`] wires the live antithetic negation, so
+//! - **antithetic variate is supported**: as in the single-factor engine, the
+//!   multi-factor
+//!   [`MultiPathGenerator`](crate::methods::montecarlo::MultiPathGenerator)
+//!   wires the live antithetic negation, so
 //!   [`with_antithetic_variate`](MakeMcEuropeanHestonEngine::with_antithetic_variate)
 //!   reaches [`MonteCarloModel`](crate::methods::montecarlo::MonteCarloModel)
 //!   averaging (the C++ `MakeMCEuropeanHestonEngine` default).

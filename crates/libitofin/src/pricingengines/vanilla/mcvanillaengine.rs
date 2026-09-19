@@ -26,13 +26,13 @@
 //! - **`Null` sentinels become [`Option`]**: the `timeSteps`,
 //!   `timeStepsPerYear`, `requiredSamples`, `requiredTolerance`, and
 //!   `maxSamples` sentinels (`mcvanillaengine.hpp:60-69`) are `Option` (D10).
-//! - **statistics fixed to [`GeneralStatistics`]**: C++ is generic over `S`,
-//!   defaulting to `Statistics` (`mcvanillaengine.hpp:36`); the one consumer
-//!   (`#452`) uses that default, so `S` is fixed rather than a third generic.
+//! - **statistics fixed to [`GeneralStatistics`](crate::math::statistics::GeneralStatistics)**: C++ is generic over `S`,
+//!   defaulting to `Statistics` (`mcvanillaengine.hpp:36`); both concrete engines
+//!   use that default, so `S` is fixed rather than a third generic.
 //!
 //! Deferred, rejected visibly rather than silently ignored:
-//! - **antithetic / control variate**: the flags thread to [`McSimulation`],
-//!   which rejects them as deferred; `controlVariateValue` and the control
+//! - **control variate**: the flag threads to [`McSimulation`], which rejects
+//!   it as deferred; `controlVariateValue` and the control
 //!   pricing engine (`mcvanillaengine.hpp:82,126`) are not ported.
 
 use std::marker::PhantomData;
