@@ -106,6 +106,29 @@ pub struct PyDefaultProbabilityTermStructure {
 #[gen_stub_pymethods]
 #[pymethods]
 impl PyDefaultProbabilityTermStructure {
+    /// Return copied jump dates in constructor order.
+    fn jump_dates(&self) -> PyResult<Vec<PyDate>> {
+        Ok(self
+            .inner
+            .current_link()
+            .map_err(PyQlError::from)?
+            .jump_dates()
+            .iter()
+            .copied()
+            .map(PyDate::from_inner)
+            .collect())
+    }
+
+    /// Return jump times relative to the current reference date.
+    fn jump_times(&self) -> PyResult<Vec<f64>> {
+        Ok(self
+            .inner
+            .current_link()
+            .map_err(PyQlError::from)?
+            .jump_times()
+            .map_err(PyQlError::from)?)
+    }
+
     /// Return the survival probability from the reference date to year-fraction t.
     ///
     /// Args:
@@ -312,6 +335,80 @@ pub struct PyFlatHazardRate;
 #[gen_stub_pymethods]
 #[pymethods]
 impl PyFlatHazardRate {
+    /// Build a fixed-reference curve retaining multiplicative survival jump quotes.
+    /// Empty jump_dates selects consecutive year-end dates; jumps apply strictly after their date.
+    #[staticmethod]
+    #[pyo3(signature = (reference_date, hazard_rate, day_counter, jumps, jump_dates = None))]
+    fn with_jumps(
+        py: Python<'_>,
+        reference_date: &PyDate,
+        hazard_rate: &PySimpleQuote,
+        day_counter: &PyDayCounter,
+        jumps: Vec<PyRef<PySimpleQuote>>,
+        jump_dates: Option<Vec<PyRef<PyDate>>>,
+    ) -> PyResult<Py<Self>> {
+        let curve = shared(
+            FlatHazardRate::with_jumps(
+                reference_date.inner(),
+                hazard_rate.handle(),
+                day_counter.inner(),
+                jumps.iter().map(|quote| quote.handle()).collect(),
+                jump_dates
+                    .unwrap_or_default()
+                    .iter()
+                    .map(|date| date.inner())
+                    .collect(),
+            )
+            .map_err(PyQlError::from)?,
+        ) as Shared<dyn DefaultProbabilityTermStructure>;
+        Py::new(
+            py,
+            PyClassInitializer::from(PyDefaultProbabilityTermStructure::from_handle(Handle::new(
+                curve,
+            )))
+            .add_subclass(Self),
+        )
+    }
+
+    /// Build a moving-reference curve with retained jump quotes and fixed jump dates.
+    #[staticmethod]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (settlement_days, calendar, hazard_rate, day_counter, settings, jumps, jump_dates = None))]
+    fn moving_with_jumps(
+        py: Python<'_>,
+        settlement_days: Natural,
+        calendar: &PyCalendar,
+        hazard_rate: &PySimpleQuote,
+        day_counter: &PyDayCounter,
+        settings: &PySettings,
+        jumps: Vec<PyRef<PySimpleQuote>>,
+        jump_dates: Option<Vec<PyRef<PyDate>>>,
+    ) -> PyResult<Py<Self>> {
+        let curve = shared(
+            FlatHazardRate::moving_with_jumps(
+                settlement_days,
+                calendar.inner(),
+                hazard_rate.handle(),
+                day_counter.inner(),
+                settings.inner(),
+                jumps.iter().map(|quote| quote.handle()).collect(),
+                jump_dates
+                    .unwrap_or_default()
+                    .iter()
+                    .map(|date| date.inner())
+                    .collect(),
+            )
+            .map_err(PyQlError::from)?,
+        ) as Shared<dyn DefaultProbabilityTermStructure>;
+        Py::new(
+            py,
+            PyClassInitializer::from(PyDefaultProbabilityTermStructure::from_handle(Handle::new(
+                curve,
+            )))
+            .add_subclass(Self),
+        )
+    }
+
     /// Build a curve reading its hazard rate live, on a pinned reference date.
     ///
     /// Args:
