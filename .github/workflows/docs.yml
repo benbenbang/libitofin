@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
     paths:
+      - "README.md"
+      - "wiki/**"
       - "docs/**"
       - "crates/itofin-py/python/**"
       - "crates/libitofin/examples/**"

@@ -71,6 +71,8 @@ jobs:
               - .github/workflows/*.yml
 
             docs:
+              - README.md
+              - wiki/**
               - docs/**
               - crates/itofin-py/python/**
               - crates/libitofin/examples/**
