@@ -134,6 +134,15 @@ typedef struct ItofinSpreadCdsConfig {
   uint64_t settings;
 } ItofinSpreadCdsConfig;
 
+typedef struct ItofinCdsHelperTerms {
+  int32_t model;
+  int32_t settles_accrual;
+  int32_t pays_at_default_time;
+  int32_t start_date;
+  uint64_t last_period_day_counter;
+  int32_t rebates_accrual;
+} ItofinCdsHelperTerms;
+
 /**
  * kind 0 = midpoint, 1 = ISDA. Fidelity enums follow Python declaration order.
  */
@@ -1207,6 +1216,35 @@ int32_t itofin_default_curve_jumps(struct ItofinContext *ctx,
                                    size_t capacity,
                                    size_t *count,
                                    struct ItofinError *error);
+
+/**
+ * Construct a spread (kind 0) or upfront (kind 1) helper with explicit terms.
+ * The config quote is the running spread for kind 0 and upfront for kind 1.
+ *
+ * # Safety
+ * Pointers must be aligned, live and valid. Output must not overlap inputs.
+ * The context and its handles must belong to the calling thread.
+ */
+int32_t itofin_cds_helper_with_terms(struct ItofinContext *ctx,
+                                     const struct ItofinSpreadCdsConfig *config,
+                                     const struct ItofinCdsHelperTerms *contract_terms,
+                                     int32_t kind,
+                                     double running_spread,
+                                     uint32_t upfront_settlement_days,
+                                     uint64_t *out,
+                                     struct ItofinError *error);
+
+/**
+ * Return a helper's implied spread or upfront after recalculation.
+ *
+ * # Safety
+ * Pointers must be aligned, live and valid. Output must not overlap inputs.
+ * The context and its handles must belong to the calling thread.
+ */
+int32_t itofin_cds_helper_implied_quote(struct ItofinContext *ctx,
+                                        uint64_t id,
+                                        double *out,
+                                        struct ItofinError *error);
 
 /**
  * # Safety
