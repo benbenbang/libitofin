@@ -42,6 +42,7 @@ __all__ = [
     "PiecewiseConvexMonotoneForward",
     "PiecewiseCubicZero",
     "PiecewiseDefaultCurve",
+    "PiecewiseDefaultDensityCurve",
     "PiecewiseFlatForward",
     "PiecewiseLinearForward",
     "PiecewiseLinearZero",
@@ -2251,6 +2252,40 @@ class PiecewiseDefaultCurve(DefaultProbabilityTermStructure):
 
         Raises:
             ItofinError: On a bootstrap failure.
+        """
+
+@typing.final
+class PiecewiseDefaultDensityCurve(DefaultProbabilityTermStructure):
+    r"""
+    A lazy CDS bootstrap solving default-density nodes with BackwardFlat or Linear interpolation.
+    """
+    def __init__(self, reference_date: time.Date, helpers: typing.Sequence[DefaultProbabilityHelper], day_counter: time.DayCounter, interpolation: builtins.str = 'BackwardFlat') -> None:
+        r"""
+        Retain helpers and bootstrap lazily; quote changes invalidate the solved nodes.
+        """
+    def calculate(self) -> None:
+        r"""
+        Run the bootstrap if its cache is stale.
+        """
+    def dates(self) -> builtins.list[time.Date]:
+        r"""
+        Return copied node dates after bootstrapping.
+        """
+    def times(self) -> builtins.list[builtins.float]:
+        r"""
+        Return copied node times after bootstrapping.
+        """
+    def data(self) -> builtins.list[builtins.float]:
+        r"""
+        Return copied solved densities after bootstrapping.
+        """
+    def default_densities(self) -> builtins.list[builtins.float]:
+        r"""
+        Return copied solved densities after bootstrapping.
+        """
+    def nodes(self) -> builtins.list[tuple[time.Date, builtins.float]]:
+        r"""
+        Return copied date and density pairs after bootstrapping.
         """
 
 @typing.final

@@ -17,6 +17,10 @@ see the [Go validation record](../docs/go-binding-test-gaps.md).
 
 ## Credit extensions
 
+- [#1020](https://github.com/benbenbang/libitofin/issues/1020): default-density
+  interpolation and CDS bootstrapping support BackwardFlat and Linear in Rust,
+  Python and Go. [Analytic and binding tests](../crates/itofin-py/tests/test_credit_density.py)
+  cover survival, density, quote recalibration and retained dependencies.
 - [#1024](https://github.com/benbenbang/libitofin/issues/1024): Rust, Python and Go
   expose the CDS protection end as the final coupon's accrual end, independent of
   payment-date adjustment. [Cross-language regression](../crates/itofin-py/tests/test_credit_protection_end.py).

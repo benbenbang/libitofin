@@ -585,6 +585,69 @@
       "tests": [
         "TestDefaultDensityInterpolationAndBoundary"
       ]
+    },
+    {
+      "c": "itofin_piecewise_default_density_new",
+      "go": "Session.NewPiecewiseDefaultDensityCurve",
+      "python": "PiecewiseDefaultDensityCurve.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestDefaultDensityBootstrapLiveHelpers"
+      ]
+    },
+    {
+      "c": "itofin_default_curve_nodes",
+      "go": "PiecewiseDefaultDensityCurve.Dates",
+      "python": "PiecewiseDefaultDensityCurve.dates",
+      "status": "implemented",
+      "tests": [
+        "TestDefaultDensityBootstrapLiveHelpers"
+      ]
+    },
+    {
+      "c": "itofin_default_curve_nodes",
+      "go": "PiecewiseDefaultDensityCurve.Times",
+      "python": "PiecewiseDefaultDensityCurve.times",
+      "status": "implemented",
+      "tests": [
+        "TestDefaultDensityBootstrapLiveHelpers"
+      ]
+    },
+    {
+      "c": "itofin_default_curve_nodes",
+      "go": "PiecewiseDefaultDensityCurve.Data",
+      "python": "PiecewiseDefaultDensityCurve.data",
+      "status": "implemented",
+      "tests": [
+        "TestDefaultDensityBootstrapLiveHelpers"
+      ]
+    },
+    {
+      "c": "itofin_default_curve_nodes",
+      "go": "PiecewiseDefaultDensityCurve.DefaultDensities",
+      "python": "PiecewiseDefaultDensityCurve.default_densities",
+      "status": "implemented",
+      "tests": [
+        "TestDefaultDensityBootstrapLiveHelpers"
+      ]
+    },
+    {
+      "c": "itofin_default_curve_nodes",
+      "go": "PiecewiseDefaultDensityCurve.Nodes",
+      "python": "PiecewiseDefaultDensityCurve.nodes",
+      "status": "implemented",
+      "tests": [
+        "TestDefaultDensityBootstrapLiveHelpers"
+      ]
+    },
+    {
+      "c": "itofin_default_curve_calculate",
+      "go": "PiecewiseDefaultDensityCurve.Calculate",
+      "python": "PiecewiseDefaultDensityCurve.calculate",
+      "status": "implemented",
+      "tests": [
+        "TestDefaultDensityBootstrapLiveHelpers"
+      ]
     }
   ]
 }

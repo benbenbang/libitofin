@@ -52,7 +52,7 @@ use credit::{
     PyInterpolatedHazardRateCurve, PyMakeCreditDefaultSwap, PyPiecewiseDefaultCurve,
     PyPricingModel, PyProtectionSide,
 };
-use creditdensity::PyInterpolatedDefaultDensityCurve;
+use creditdensity::{PyInterpolatedDefaultDensityCurve, PyPiecewiseDefaultDensityCurve};
 use creditengine::{
     PyAccrualBias, PyForwardsInCouponPeriod, PyIsdaCdsEngine, PyMidPointCdsEngine, PyNumericalFix,
 };
@@ -231,6 +231,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     termstructures.add_class::<PyFlatHazardRate>()?;
     termstructures.add_class::<PyInterpolatedHazardRateCurve>()?;
     termstructures.add_class::<PyInterpolatedDefaultDensityCurve>()?;
+    termstructures.add_class::<PyPiecewiseDefaultDensityCurve>()?;
     termstructures.add_class::<PyDefaultProbabilityHelper>()?;
     termstructures.add_class::<PySpreadCdsHelper>()?;
     termstructures.add_class::<PyPiecewiseDefaultCurve>()?;
