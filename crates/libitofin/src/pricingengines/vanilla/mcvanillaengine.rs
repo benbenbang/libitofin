@@ -3,9 +3,9 @@
 //! Port of `ql/pricingengines/vanilla/mcvanillaengine.hpp`: the shared plumbing
 //! every Monte Carlo vanilla engine builds on. It selects the simulation
 //! [`TimeGrid`] from the option's exercise date
-//! (`mcvanillaengine.hpp:153`), builds the [`PathGenerator`] from the RNG policy
-//! (`mcvanillaengine.hpp:72`), runs the [`McSimulation`], and writes the mean
-//! (and, when the policy supports it, the error estimate) into the option
+//! (`mcvanillaengine.hpp:153`), builds the policy's path generator from the RNG
+//! policy (`mcvanillaengine.hpp:72`), runs the [`McSimulation`], and writes the
+//! mean (and, when the policy supports it, the error estimate) into the option
 //! results (`mcvanillaengine.hpp:40`).
 //!
 //! Divergences from `mcvanillaengine.hpp`, all deliberate:
@@ -15,11 +15,14 @@
 //!   builds a fresh [`McSimulation`] per [`run`](McVanillaEngineBase::run). The
 //!   payoff-dependent path pricer, C++'s pure-virtual `pathPricer()`, is passed
 //!   into [`run`](McVanillaEngineBase::run) by the concrete engine (`#452`).
-//! - **single-factor process**: C++ holds a multi-factor `StochasticProcess`
-//!   and reads `process_->factors()` (`mcvanillaengine.hpp:74`). This stack's
-//!   [`PathGenerator`] is single-factor, so the process is a
-//!   `StochasticProcess1D` and `factors()` is fixed to 1; the path
-//!   dimensionality is `grid.size() - 1`.
+//! - **the MC policy names the process trait**: C++ holds the multi-factor
+//!   `StochasticProcess` for both policies because its `StochasticProcess1D`
+//!   IS-A `StochasticProcess`; here the two traits are siblings, so the
+//!   [`McTraits`] policy `MC` (`SingleVariate` by default, `MultiVariate` for
+//!   a multi-factor engine) fixes the process handle, the generator, and the
+//!   path type together (`mctraits.hpp:39-57`). The generator dimension is
+//!   `MC::factors(process) * (grid.size() - 1)` (`mcvanillaengine.hpp:74-77`),
+//!   which for `SingleVariate` is the plain `grid.size() - 1`.
 //! - **`Null` sentinels become [`Option`]**: the `timeSteps`,
 //!   `timeStepsPerYear`, `requiredSamples`, `requiredTolerance`, and
 //!   `maxSamples` sentinels (`mcvanillaengine.hpp:60-69`) are `Option` (D10).
@@ -39,24 +42,23 @@ use crate::instruments::{OneAssetOptionEngine, OneAssetOptionResults, OptionArgu
 use crate::math::randomnumbers::rngtraits::McRngTraits;
 use crate::math::statistics::MeanStdDev;
 use crate::math::timegrid::TimeGrid;
-use crate::methods::montecarlo::{McSimulation, Path, PathGen, PathGenerator, PathPricer};
+use crate::methods::montecarlo::{McSimulation, McTraits, PathGen, PathPricer, SingleVariate};
 use crate::patterns::observable::{AsObservable, Observable};
 use crate::pricingengine::{Arguments, Results};
-use crate::shared::Shared;
-use crate::stochasticprocess::StochasticProcess1D;
 use crate::types::{Real, Size};
 use crate::{fail, require};
 
 /// Shared Monte Carlo plumbing for vanilla-option engines, generic over the
-/// RNG policy `RNG` (the C++ `RNG` template argument).
+/// RNG policy `RNG` and the MC policy `MC` (the C++ `RNG` and `MC` template
+/// arguments, `mcvanillaengine.hpp:35`).
 ///
 /// A concrete engine embeds one, delegates its
 /// [`PricingEngine`](crate::pricingengine::PricingEngine) accessors to it, and
 /// drives a calculation by building a path pricer and calling
 /// [`run`](McVanillaEngineBase::run).
-pub struct McVanillaEngineBase<RNG> {
+pub struct McVanillaEngineBase<RNG, MC: McTraits = SingleVariate> {
     base: OneAssetOptionEngine,
-    process: Shared<dyn StochasticProcess1D>,
+    process: MC::Process,
     time_steps: Option<Size>,
     time_steps_per_year: Option<Size>,
     required_samples: Option<Size>,
@@ -69,7 +71,7 @@ pub struct McVanillaEngineBase<RNG> {
     _rng: PhantomData<RNG>,
 }
 
-impl<RNG: McRngTraits> McVanillaEngineBase<RNG> {
+impl<RNG: McRngTraits, MC: McTraits> McVanillaEngineBase<RNG, MC> {
     /// Builds the engine base (`mcvanillaengine.hpp:96`), registering with the
     /// process so its changes invalidate the attached instrument.
     ///
@@ -79,7 +81,7 @@ impl<RNG: McRngTraits> McVanillaEngineBase<RNG> {
     /// are set, or if either is `Some(0)` (`mcvanillaengine.hpp:111-122`).
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        process: Shared<dyn StochasticProcess1D>,
+        process: MC::Process,
         time_steps: Option<Size>,
         time_steps_per_year: Option<Size>,
         brownian_bridge: bool,
@@ -109,7 +111,7 @@ impl<RNG: McRngTraits> McVanillaEngineBase<RNG> {
 
         let base =
             OneAssetOptionEngine::new(OptionArguments::default(), OneAssetOptionResults::default());
-        base.register_with(process.observable());
+        base.register_with(MC::observable(&process));
 
         Ok(McVanillaEngineBase {
             base,
@@ -171,7 +173,7 @@ impl<RNG: McRngTraits> McVanillaEngineBase<RNG> {
         let Some(exercise) = &self.arguments().exercise else {
             fail!("no exercise given");
         };
-        let t = self.process.time(&exercise.last_date())?;
+        let t = MC::time(&self.process, &exercise.last_date())?;
         if let Some(steps) = self.time_steps {
             TimeGrid::new(t, steps)
         } else if let Some(per_year) = self.time_steps_per_year {
@@ -182,14 +184,14 @@ impl<RNG: McRngTraits> McVanillaEngineBase<RNG> {
         }
     }
 
-    /// The path generator, seeded from the RNG policy
+    /// The policy's path generator, seeded from the RNG policy
     /// (`mcvanillaengine.hpp:72`).
     ///
     /// # Errors
     ///
     /// Propagates a [`time_grid`](McVanillaEngineBase::time_grid),
-    /// sequence-generator, or [`PathGenerator`] failure.
-    pub fn path_generator(&self) -> QlResult<PathGenerator<RNG::RsgType>> {
+    /// sequence-generator, or generator-construction failure.
+    pub fn path_generator(&self) -> QlResult<MC::Generator<RNG::RsgType>> {
         self.path_generator_with_seed(self.seed)
     }
 
@@ -200,26 +202,21 @@ impl<RNG: McRngTraits> McVanillaEngineBase<RNG> {
     /// # Errors
     ///
     /// As [`path_generator`](McVanillaEngineBase::path_generator).
-    pub fn path_generator_with_seed(&self, seed: u32) -> QlResult<PathGenerator<RNG::RsgType>> {
+    pub fn path_generator_with_seed(&self, seed: u32) -> QlResult<MC::Generator<RNG::RsgType>> {
         let grid = self.time_grid()?;
-        let dimension = grid.size() - 1;
+        let dimension = MC::factors(&self.process) * (grid.size() - 1);
         let generator = RNG::make_sequence_generator(dimension, seed)?;
-        PathGenerator::from_time_grid(
-            Shared::clone(&self.process),
-            grid,
-            generator,
-            self.brownian_bridge,
-        )
+        MC::path_generator(self.process.clone(), grid, generator, self.brownian_bridge)
     }
 
-    /// Runs the single-factor simulation: builds the [`PathGenerator`] from the
-    /// RNG policy and prices each [`Path`] with `path_pricer`
+    /// Runs the simulation: builds the policy's path generator from the RNG
+    /// policy and prices each path with `path_pricer`
     /// (`mcvanillaengine.hpp:40,72`).
     ///
     /// # Errors
     ///
     /// Propagates a generator, simulation, or accumulation failure.
-    pub fn run<P: PathPricer<Path>>(&mut self, path_pricer: P) -> QlResult<()> {
+    pub fn run<P: PathPricer<MC::PathType>>(&mut self, path_pricer: P) -> QlResult<()> {
         let generator = self.path_generator()?;
         self.run_with(generator, path_pricer)
     }
@@ -228,10 +225,8 @@ impl<RNG: McRngTraits> McVanillaEngineBase<RNG> {
     /// writes the mean (and, when `RNG::ALLOWS_ERROR_ESTIMATE`, the error
     /// estimate) into the results (`mcvanillaengine.hpp:40`).
     ///
-    /// This is the generalization seam over the path type: [`run`](Self::run)
-    /// drives it with the single-factor [`PathGenerator`], and a multi-factor
-    /// engine drives it with a [`MultiPathGenerator`](crate::methods::montecarlo::MultiPathGenerator).
-    /// The mean/error result plumbing is path-type-agnostic.
+    /// This is the seam under [`run`](Self::run) for an engine that builds its
+    /// own generator; the mean/error result plumbing is path-type-agnostic.
     ///
     /// # Errors
     ///
@@ -271,10 +266,12 @@ mod tests {
     use crate::instruments::{PlainVanillaPayoff, StrikedTypePayoff};
     use crate::interestrate::Compounding;
     use crate::math::randomnumbers::rngtraits::PseudoRandom;
-    use crate::methods::montecarlo::Path;
+    use crate::methods::montecarlo::{MultiPath, MultiVariate, Path};
     use crate::option::OptionType;
+    use crate::processes::HestonProcess;
     use crate::quotes::make_quote_handle;
     use crate::shared::{Shared, shared};
+    use crate::stochasticprocess::{StochasticProcess, StochasticProcess1D};
     use crate::termstructures::volatility::{BlackConstantVol, BlackVolTermStructure};
     use crate::termstructures::yields::FlatForward;
     use crate::termstructures::yieldtermstructure::YieldTermStructure;
@@ -369,6 +366,55 @@ mod tests {
         let mut e = engine(Some(4), None, Some(1_000));
         set_option(&mut e, Date::new(15, Month::June, 2027));
         e.run(|_: &Path| K).unwrap();
+
+        let results = (e.results() as &dyn Any)
+            .downcast_ref::<OneAssetOptionResults>()
+            .unwrap();
+        assert_eq!(results.instrument.value, Some(K));
+        assert!(results.instrument.error_estimate.is_some());
+    }
+
+    /// The `MultiVariate` policy drives the same `run` over a
+    /// [`MultiPathGenerator`](crate::methods::montecarlo::MultiPathGenerator):
+    /// the RNG dimension is `factors * steps` (`mcvanillaengine.hpp:74-77`),
+    /// which the generator constructor checks, so a wrong factor count would
+    /// fail here rather than price.
+    #[test]
+    fn run_drives_the_multi_variate_policy() {
+        const K: Real = 3.5;
+        let process = shared(HestonProcess::new(
+            flat_yield(R),
+            flat_yield(Q),
+            make_quote_handle(SPOT).handle(),
+            0.04,
+            1.2,
+            0.06,
+            0.3,
+            -0.5,
+        )) as Shared<dyn StochasticProcess>;
+        let mut e = McVanillaEngineBase::<PseudoRandom, MultiVariate>::new(
+            process,
+            Some(4),
+            None,
+            false,
+            false,
+            false,
+            Some(1_000),
+            None,
+            None,
+            42,
+        )
+        .unwrap();
+        let args = (e.arguments_mut() as &mut dyn Any)
+            .downcast_mut::<OptionArguments>()
+            .unwrap();
+        args.exercise = Some(
+            shared(EuropeanExercise::new(Date::new(15, Month::June, 2027)))
+                as Shared<dyn crate::exercise::Exercise>,
+        );
+
+        assert_eq!(e.path_generator().unwrap().dimension(), 2 * 4);
+        e.run(|_: &MultiPath| K).unwrap();
 
         let results = (e.results() as &dyn Any)
             .downcast_ref::<OneAssetOptionResults>()
