@@ -120,6 +120,11 @@ func (v *SwaptionVolatilityStructure) query(kind int32, option, swap Period, dat
 func (v *SwaptionVolatilityStructure) Volatility(option, swap Period, strike float64, extrapolate bool) (float64, error) {
 	return v.query(0, option, swap, Date{}, 0, strike, extrapolate)
 }
+
+// VolatilityDate queries a fixed exercise date and swap length in years.
+func (v *SwaptionVolatilityStructure) VolatilityDate(date Date, swapLength, strike float64, extrapolate bool) (float64, error) {
+	return v.query(3, Period{}, Period{}, date, swapLength, strike, extrapolate)
+}
 func (v *SwaptionVolatilityStructure) BlackVariance(option, swap Period, strike float64, extrapolate bool) (float64, error) {
 	return v.query(1, option, swap, Date{}, 0, strike, extrapolate)
 }
