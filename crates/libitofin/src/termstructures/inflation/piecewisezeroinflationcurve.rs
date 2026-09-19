@@ -39,25 +39,36 @@
 //!   against the corrected rates. The consistency gate runs from this
 //!   constructor rather than from the base one; see the
 //!   [`inflationtermstructure`](super::inflationtermstructure) divergences.
-//! - The `BaseDateFunc` constructor overload (`:73-90`), whose base date is
-//!   resolved lazily inside `performCalculations` (`:168-169`), is deferred
-//!   with it, and with it its oracle `testZeroTermStructureLazyBaseDate`
-//!   (`inflation.cpp:512-593`); the base date here is always the caller's.
+//! - `BaseDateFunc` is a fallible Rust callback, resolved before each bootstrap
+//!   (`piecewisezeroinflationcurve.hpp:73-90,166-171`). Use `try_base_date` to
+//!   propagate failures; the legacy infallible `base_date` returns a null date
+//!   when lazy calculation fails. Fixed-base access remains immediate.
+//! - Callback captures are retained until the curve is dropped. Helper quote,
+//!   fixing and evaluation-date notifications invalidate the cache; arbitrary
+//!   callback dependencies require an explicit `update`. The concrete
+//!   `with_last_fixing_date` constructor owns an unlinked index copy, observes
+//!   its fixing/date notifications, and cannot retain its forecast curve.
+//! - On base-date changes, the existing Rust bootstrap rebuilds node zero.
+//!   QuantLib's fixed-reference bootstrap caches its initial date grid
+//!   (`iterativebootstrap.hpp:230`); Rust matches a fresh QuantLib grid instead.
 //! - Only [`Linear`] is constructible ([`new`](PiecewiseZeroInflationCurve::new)
 //!   builds the interpolator itself), so the C++ `Interpolator` argument
 //!   (`:63`) has no counterpart. The impls below are generic, so a second
 //!   constructor is all another local interpolator needs.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Weak;
 
 use crate::errors::QlResult;
+use crate::handle::Handle;
+use crate::indexes::Index;
+use crate::indexes::inflationindex::ZeroInflationIndex;
 use crate::math::interpolations::linear::Linear;
 use crate::math::interpolations::{Interpolation, Interpolator};
 use crate::patterns::lazyobject::LazyObject;
 use crate::patterns::observable::{AsObservable, Observable, Observer};
 use crate::require;
-use crate::shared::{Shared, SharedMut, shared_mut};
+use crate::shared::{Shared, SharedMut, shared, shared_mut};
 use crate::termstructures::bootstraptraits::CurveData;
 use crate::termstructures::inflation::inflationhelpers::ZeroInflationHelper;
 use crate::termstructures::inflation::inflationtermstructure::{
@@ -95,6 +106,8 @@ impl Observer for CurveUpdater {
 /// and the zero-rate lookups read back.
 pub struct PiecewiseZeroInflationCurve<I: Interpolator> {
     inflation: InflationTermStructureBase,
+    base_date_func: Option<Box<dyn Fn() -> QlResult<Date>>>,
+    resolved_base_date: Cell<Date>,
     instruments: Vec<Shared<dyn ZeroInflationHelper>>,
     interpolator: I,
     data: RefCell<CurveData<I>>,
@@ -128,6 +141,85 @@ impl PiecewiseZeroInflationCurve<Linear> {
         instruments: Vec<Shared<dyn ZeroInflationHelper>>,
         seasonality: Option<Shared<dyn Seasonality>>,
     ) -> QlResult<Shared<PiecewiseZeroInflationCurve<Linear>>> {
+        Self::build(
+            reference_date,
+            base_date,
+            None,
+            frequency,
+            day_counter,
+            instruments,
+            seasonality,
+        )
+    }
+
+    /// Builds a curve whose base date is resolved only when calculation is needed.
+    ///
+    /// Captures are owned by the curve. Helper notifications invalidate the cache;
+    /// call [`Self::update`] when other captured dependencies change. Avoid strong
+    /// captures of objects that themselves own this curve.
+    ///
+    /// # Errors
+    /// Rejects an empty helper set. Callback failures propagate from fallible reads.
+    pub fn with_base_date_func(
+        reference_date: Date,
+        base_date_func: impl Fn() -> QlResult<Date> + 'static,
+        frequency: Frequency,
+        day_counter: DayCounter,
+        instruments: Vec<Shared<dyn ZeroInflationHelper>>,
+        seasonality: Option<Shared<dyn Seasonality>>,
+    ) -> QlResult<Shared<Self>> {
+        Self::build(
+            reference_date,
+            Date::null(),
+            Some(Box::new(base_date_func)),
+            frequency,
+            day_counter,
+            instruments,
+            seasonality,
+        )
+    }
+
+    /// Uses the latest published fixing period of an owned, unlinked index copy.
+    ///
+    /// Fixings may be populated after construction. The copy shares the original
+    /// index's settings/history and observes fixing and evaluation-date changes,
+    /// but does not retain or observe the original index's forecast curve.
+    ///
+    /// # Errors
+    /// Rejects an empty helper set. Missing fixings fail on first calculation.
+    pub fn with_last_fixing_date(
+        reference_date: Date,
+        index: &Shared<ZeroInflationIndex>,
+        frequency: Frequency,
+        day_counter: DayCounter,
+        instruments: Vec<Shared<dyn ZeroInflationHelper>>,
+        seasonality: Option<Shared<dyn Seasonality>>,
+    ) -> QlResult<Shared<Self>> {
+        let index = shared(index.clone_linked_to(Handle::empty()));
+        let captured = Shared::clone(&index);
+        let curve = Self::with_base_date_func(
+            reference_date,
+            move || captured.last_fixing_date(),
+            frequency,
+            day_counter,
+            instruments,
+            seasonality,
+        )?;
+        index
+            .observable()
+            .register_observer(&(SharedMut::clone(&curve.updater) as SharedMut<dyn Observer>));
+        Ok(curve)
+    }
+
+    fn build(
+        reference_date: Date,
+        base_date: Date,
+        base_date_func: Option<Box<dyn Fn() -> QlResult<Date>>>,
+        frequency: Frequency,
+        day_counter: DayCounter,
+        instruments: Vec<Shared<dyn ZeroInflationHelper>>,
+        seasonality: Option<Shared<dyn Seasonality>>,
+    ) -> QlResult<Shared<Self>> {
         require!(!instruments.is_empty(), "no bootstrap helpers given");
 
         let curve = Shared::new_cyclic(|weak: &Weak<PiecewiseZeroInflationCurve<Linear>>| {
@@ -138,6 +230,8 @@ impl PiecewiseZeroInflationCurve<Linear> {
                 lazy: SharedMut::clone(&lazy),
             });
             PiecewiseZeroInflationCurve {
+                base_date_func,
+                resolved_base_date: Cell::new(base_date),
                 inflation: InflationTermStructureBase::with_reference_date(
                     reference_date,
                     base_date,
@@ -162,7 +256,9 @@ impl PiecewiseZeroInflationCurve<Linear> {
         for helper in &curve.instruments {
             helper.observable().register_observer(&observer);
         }
-        curve.check_seasonality()?;
+        if curve.base_date_func.is_none() {
+            curve.check_seasonality()?;
+        }
         Ok(curve)
     }
 }
@@ -181,9 +277,24 @@ impl<I: Interpolator + 'static> PiecewiseZeroInflationCurve<I> {
         if !self.lazy.borrow_mut().start_calculation() {
             return Ok(());
         }
-        let result = self.bootstrap.calculate(self);
+        let result = (|| {
+            if let Some(base_date_func) = &self.base_date_func {
+                let base_date = base_date_func()?;
+                require!(base_date != Date::null(), "null lazy base date");
+                self.resolved_base_date.set(base_date);
+                self.check_seasonality()?;
+            }
+            self.bootstrap.calculate(self)
+        })();
         self.lazy.borrow_mut().finish_calculation(&result);
         result
+    }
+
+    /// Invalidates cached nodes and notifies downstream observers.
+    pub fn update(&self) {
+        if let Some(update) = LazyObject::deferred_update(&self.lazy) {
+            update.notify_observers();
+        }
     }
 
     /// The node times, after bootstrapping (`:141-145`). The first is negative,
@@ -245,6 +356,17 @@ impl<I: Interpolator + 'static> TermStructure for PiecewiseZeroInflationCurve<I>
 impl<I: Interpolator + 'static> InflationTermStructure for PiecewiseZeroInflationCurve<I> {
     fn inflation_base(&self) -> &InflationTermStructureBase {
         &self.inflation
+    }
+
+    fn base_date(&self) -> Date {
+        self.try_base_date().unwrap_or_else(|_| Date::null())
+    }
+
+    fn try_base_date(&self) -> QlResult<Date> {
+        if self.base_date_func.is_some() {
+            self.calculate()?;
+        }
+        Ok(self.resolved_base_date.get())
     }
 
     fn as_inflation_term_structure(&self) -> &dyn InflationTermStructure {
@@ -315,7 +437,7 @@ impl<I: Interpolator + 'static> PiecewiseCurve for PiecewiseZeroInflationCurve<I
     /// The base date, where every other piecewise curve answers its reference
     /// date (`ZeroInflationTraits::initialDate`, `inflationtraits.hpp:46-48`).
     fn initial_date(&self) -> QlResult<Date> {
-        Ok(InflationTermStructure::base_date(self))
+        self.try_base_date()
     }
 
     fn time_from_reference(&self, date: Date) -> QlResult<Time> {

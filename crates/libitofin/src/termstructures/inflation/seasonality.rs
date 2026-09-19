@@ -284,7 +284,7 @@ impl Seasonality for MultiplicativePriceSeasonality {
     /// The zero rate corrected against the curve's *true* base date
     /// (`seasonality.cpp:123-133`).
     ///
-    /// The reference is `its.base_date()` itself, not the end of its inflation
+    /// The reference is `its.try_base_date()` itself, not the end of its inflation
     /// period, and `date` is quantized to the start of its own period, so this
     /// picks the same base date and effective fixing date
     /// [`ZeroInflationIndex::forecast_fixing`] does and the input seasonality
@@ -297,7 +297,7 @@ impl Seasonality for MultiplicativePriceSeasonality {
         rate: Rate,
         its: &dyn InflationTermStructure,
     ) -> QlResult<Rate> {
-        let curve_base_date = its.base_date();
+        let curve_base_date = its.try_base_date()?;
         let (effective_fixing_date, _) = inflation_period(date, its.frequency())?;
         self.seasonality_correction(
             rate,
@@ -320,7 +320,7 @@ impl Seasonality for MultiplicativePriceSeasonality {
         rate: Rate,
         its: &dyn InflationTermStructure,
     ) -> QlResult<Rate> {
-        let (_, curve_base_date) = inflation_period(its.base_date(), its.frequency())?;
+        let (_, curve_base_date) = inflation_period(its.try_base_date()?, its.frequency())?;
         self.seasonality_correction(
             rate,
             date,
@@ -349,7 +349,7 @@ impl Seasonality for MultiplicativePriceSeasonality {
         if frequency == self.seasonality_factors.len() {
             return Ok(true);
         }
-        let (_, curve_base_date) = inflation_period(its.base_date(), its.frequency())?;
+        let (_, curve_base_date) = inflation_period(its.try_base_date()?, its.frequency())?;
         let factor_base = self.seasonality_factor(curve_base_date)?;
         let available_years = (Date::max_date().year() - curve_base_date.year()) as usize;
         for year in 1..self.seasonality_factors.len() / frequency {
@@ -468,7 +468,7 @@ impl Seasonality for KerkhofSeasonality {
         its: &dyn InflationTermStructure,
     ) -> QlResult<Rate> {
         let (effective_date, _) = inflation_period(date, its.frequency())?;
-        let (base_month, _) = inflation_period(its.base_date(), Frequency::Monthly)?;
+        let (base_month, _) = inflation_period(its.try_base_date()?, Frequency::Monthly)?;
         let time = its
             .require_day_counter()?
             .year_fraction(base_month, effective_date);

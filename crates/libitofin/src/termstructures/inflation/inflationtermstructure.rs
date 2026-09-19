@@ -193,6 +193,16 @@ pub trait InflationTermStructure: TermStructure {
         self.inflation_base().base_date
     }
 
+    /// Resolves the base date, propagating lazy calculation failures.
+    ///
+    /// Fixed-base curves return their stored date without calculation.
+    ///
+    /// # Errors
+    /// Lazy curves propagate missing inputs, callback errors and bootstrap failure.
+    fn try_base_date(&self) -> QlResult<Date> {
+        Ok(self.base_date())
+    }
+
     /// The base rate, an error where C++ has `Null<Rate>`
     /// (`inflationtermstructure.hpp:265-268`); zero curves carry none.
     fn base_rate(&self) -> QlResult<Rate> {
@@ -271,7 +281,7 @@ pub trait InflationTermStructure: TermStructure {
     /// reference date, so dates in `[base_date, reference_date)` are valid
     /// here and rejected there.
     fn check_inflation_range_date(&self, date: Date, extrapolate: bool) -> QlResult<()> {
-        let base_date = self.base_date();
+        let base_date = self.try_base_date()?;
         require!(
             date >= base_date,
             "date ({date}) is before base date ({base_date})"
@@ -295,7 +305,7 @@ pub trait InflationTermStructure: TermStructure {
     /// does there. Unlike the sibling check this compares against the maximum
     /// time exactly, as the C++ does.
     fn check_inflation_range_time(&self, t: Time, extrapolate: bool) -> QlResult<()> {
-        let base_time = self.time_from_reference(self.base_date())?;
+        let base_time = self.time_from_reference(self.try_base_date()?)?;
         if t < base_time || t.is_nan() {
             fail!("time ({t}) is before base date");
         }
