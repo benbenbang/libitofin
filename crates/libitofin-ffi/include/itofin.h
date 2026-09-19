@@ -3496,7 +3496,7 @@ int32_t itofin_constant_optionlet_vol_new(struct ItofinContext *ctx,
                                           struct ItofinError *error);
 
 /**
- * Swaption query: 0 volatility, 1 variance, 2 date shift.
+ * Swaption query: 0 tenor volatility, 1 tenor variance, 2 date shift, 3 date volatility.
  * # Safety
  * Follow the crate C caller contract; arrays must have their stated lengths.
  */
@@ -4103,6 +4103,39 @@ int32_t itofin_swaption_vol_matrix_new(struct ItofinContext *ctx,
                                        const struct ItofinVolGridConfig *cfg,
                                        uint64_t *out,
                                        struct ItofinError *error);
+
+/**
+ * Fixed reference date with retained quote handles. Settings must be zero.
+ * # Safety
+ * Follow the crate C caller contract; arrays must have their stated lengths.
+ */
+int32_t itofin_swaption_vol_matrix_fixed_quotes(struct ItofinContext *ctx,
+                                                const struct ItofinVolGridConfig *cfg,
+                                                uint64_t *out,
+                                                struct ItofinError *error);
+
+/**
+ * Moving reference date with copied numeric data. Settings must be a valid handle.
+ * # Safety
+ * Follow the crate C caller contract; arrays must have their stated lengths.
+ */
+int32_t itofin_swaption_vol_matrix_moving_matrix(struct ItofinContext *ctx,
+                                                 const struct ItofinVolGridConfig *cfg,
+                                                 uint64_t *out,
+                                                 struct ItofinError *error);
+
+/**
+ * Fixed reference and exercise dates with copied numeric data.
+ * Settings must be zero; option tenor buffers are unused and may be null.
+ * # Safety
+ * Follow the crate C caller contract; arrays must have their stated lengths.
+ */
+int32_t itofin_swaption_vol_matrix_dates(struct ItofinContext *ctx,
+                                         const struct ItofinVolGridConfig *cfg,
+                                         const int32_t *option_dates,
+                                         size_t date_count,
+                                         uint64_t *out,
+                                         struct ItofinError *error);
 
 /**
  * # Safety

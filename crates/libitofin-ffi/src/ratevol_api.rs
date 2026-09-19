@@ -180,7 +180,7 @@ pub unsafe extern "C" fn itofin_constant_optionlet_vol_new(
         })
     }
 }
-/// Swaption query: 0 volatility, 1 variance, 2 date shift.
+/// Swaption query: 0 tenor volatility, 1 tenor variance, 2 date shift, 3 date volatility.
 /// # Safety
 /// Follow the crate C caller contract; arrays must have their stated lengths.
 #[unsafe(no_mangle)]
@@ -220,6 +220,7 @@ pub unsafe extern "C" fn itofin_swaption_vol_query(
                     }
                 }
                 2 => v.shift(date(serial)?, length, ext)?,
+                3 => v.volatility(date(serial)?, length, strike, ext)?,
                 _ => return Err(BindingError::invalid("unknown swaption volatility query")),
             };
             output(out, result)

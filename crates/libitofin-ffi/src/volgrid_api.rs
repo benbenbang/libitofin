@@ -167,6 +167,173 @@ pub unsafe extern "C" fn itofin_swaption_vol_matrix_new(
         })
     }
 }
+enum SwaptionMatrixForm {
+    FixedQuotes,
+    MovingMatrix,
+    OptionDates(*const i32, usize),
+}
+
+unsafe fn additional_swaption_matrix(
+    c: &Context,
+    x: &ItofinVolGridConfig,
+    form: SwaptionMatrixForm,
+) -> BindingResult<SwaptionVolatilityMatrix> {
+    validate(x)?;
+    let swaps = unsafe { periods(x.swap_lengths, x.swap_units, x.columns)? };
+    let cal = calendar(c, x.calendar)?;
+    let bdc = convention(x.convention)?;
+    let dc = day_counter(c, x.day_counter)?;
+    let kind = volatility_type(x.volatility_type)?;
+    let shifts = if x.shift_count == 0 {
+        Matrix::new()
+    } else {
+        unsafe { matrix(x.shifts, x.rows, x.columns)? }
+    };
+    let flat = match x.flat_extrapolation {
+        0 => false,
+        1 => true,
+        _ => return Err(BindingError::invalid("flat extrapolation must be 0 or 1")),
+    };
+    Ok(match form {
+        SwaptionMatrixForm::FixedQuotes => {
+            if x.settings != 0 {
+                return Err(BindingError::invalid(
+                    "fixed quote matrix does not take settings",
+                ));
+            }
+            SwaptionVolatilityMatrix::fixed_quotes(
+                date(x.reference_date)?,
+                cal,
+                bdc,
+                unsafe { periods(x.option_lengths, x.option_units, x.rows)? },
+                swaps,
+                unsafe { quotes(c, x)? },
+                dc,
+                kind,
+                (0..shifts.rows()).map(|i| shifts[i].to_vec()).collect(),
+                flat,
+            )?
+        }
+        SwaptionMatrixForm::MovingMatrix => SwaptionVolatilityMatrix::moving_matrix(
+            cal,
+            bdc,
+            unsafe { periods(x.option_lengths, x.option_units, x.rows)? },
+            swaps,
+            &unsafe { matrix(x.values, x.rows, x.columns)? },
+            dc,
+            kind,
+            &shifts,
+            settings(c, x.settings)?,
+            flat,
+        )?,
+        SwaptionMatrixForm::OptionDates(ptr, count) => {
+            if count != x.rows || x.settings != 0 {
+                return Err(BindingError::invalid(
+                    "option dates must match rows and use a fixed reference date",
+                ));
+            }
+            let dates = unsafe { input_slice(ptr, count)? }
+                .iter()
+                .map(|&serial| date(serial))
+                .collect::<BindingResult<Vec<_>>>()?;
+            SwaptionVolatilityMatrix::with_option_dates(
+                date(x.reference_date)?,
+                cal,
+                bdc,
+                dates,
+                swaps,
+                &unsafe { matrix(x.values, x.rows, x.columns)? },
+                dc,
+                kind,
+                &shifts,
+                flat,
+            )?
+        }
+    })
+}
+
+/// Fixed reference date with retained quote handles. Settings must be zero.
+/// # Safety
+/// Follow the crate C caller contract; arrays must have their stated lengths.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn itofin_swaption_vol_matrix_fixed_quotes(
+    ctx: *mut Context,
+    cfg: *const ItofinVolGridConfig,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(out)?;
+            check_ptr(cfg)?;
+            let surface = additional_swaption_matrix(c, &*cfg, SwaptionMatrixForm::FixedQuotes)?;
+            output(
+                out,
+                c.insert(Handle::new(
+                    shared(surface) as Shared<dyn SwaptionVolatilityStructure>
+                ))?,
+            )
+        })
+    }
+}
+
+/// Moving reference date with copied numeric data. Settings must be a valid handle.
+/// # Safety
+/// Follow the crate C caller contract; arrays must have their stated lengths.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn itofin_swaption_vol_matrix_moving_matrix(
+    ctx: *mut Context,
+    cfg: *const ItofinVolGridConfig,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(out)?;
+            check_ptr(cfg)?;
+            let surface = additional_swaption_matrix(c, &*cfg, SwaptionMatrixForm::MovingMatrix)?;
+            output(
+                out,
+                c.insert(Handle::new(
+                    shared(surface) as Shared<dyn SwaptionVolatilityStructure>
+                ))?,
+            )
+        })
+    }
+}
+
+/// Fixed reference and exercise dates with copied numeric data.
+/// Settings must be zero; option tenor buffers are unused and may be null.
+/// # Safety
+/// Follow the crate C caller contract; arrays must have their stated lengths.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn itofin_swaption_vol_matrix_dates(
+    ctx: *mut Context,
+    cfg: *const ItofinVolGridConfig,
+    option_dates: *const i32,
+    date_count: usize,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(out)?;
+            check_ptr(cfg)?;
+            let surface = additional_swaption_matrix(
+                c,
+                &*cfg,
+                SwaptionMatrixForm::OptionDates(option_dates, date_count),
+            )?;
+            output(
+                out,
+                c.insert(Handle::new(
+                    shared(surface) as Shared<dyn SwaptionVolatilityStructure>
+                ))?,
+            )
+        })
+    }
+}
+
 /// # Safety
 /// Follow the crate C caller contract; arrays must have their stated lengths.
 #[unsafe(no_mangle)]
@@ -275,3 +442,7 @@ pub unsafe extern "C" fn itofin_capfloor_vol_query(
         })
     }
 }
+
+#[cfg(test)]
+#[path = "volmatrix_completion_tests.rs"]
+mod completion_tests;
