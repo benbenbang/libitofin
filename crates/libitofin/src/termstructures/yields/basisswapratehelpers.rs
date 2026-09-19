@@ -5,7 +5,7 @@
 //! multi-curve bootstrap (a 3m curve and a 6m curve each reading the other
 //! through the same basis quotes). `OvernightIborBasisSwapRateHelper`
 //! (`basisswapratehelpers.hpp:85`, `.cpp:121`) is not ported here; it is
-//! omitted visibly, to be ported under its own follow-up issue.
+//! tracked separately in [#1060](https://github.com/benbenbang/libitofin/issues/1060).
 
 use std::cell::RefCell;
 use std::rc::Weak;
@@ -54,10 +54,10 @@ use crate::types::{Integer, Natural, Real};
 /// helper's pricing handle is weak-linked and unobserved, so cached results go
 /// stale as the bootstrap moves the curve.
 ///
-/// Observation follows `.cpp:53-55` minus the cloned index: the helper observes
-/// the kept index and the discount handle, and never its own clone (see the
-/// module doc of [`ratehelpers`](super::ratehelpers) for why the C++
-/// `unregisterWith(termStructureHandle_)` has no Rust counterpart).
+/// Observation follows `.cpp:53-55`: the helper observes the kept index, the
+/// discount handle, and the cloned index's fixing history. Subscribing directly
+/// to that history preserves fixing updates without observing the clone's
+/// forecasting handle, matching C++'s `unregisterWith(termStructureHandle_)`.
 pub struct IborIborBasisSwapRateHelper {
     base: BootstrapHelperBase,
     swap: RefCell<Option<Swap>>,
@@ -117,11 +117,14 @@ impl IborIborBasisSwapRateHelper {
                 true,
                 on_eval_change,
             );
-            let kept = if bootstrap_base_curve {
-                &other_index
+            let (cloned, kept) = if bootstrap_base_curve {
+                (&base_index, &other_index)
             } else {
-                &base_index
+                (&other_index, &base_index)
             };
+            cloned
+                .settings()
+                .register_fixing_observer(&cloned.name(), &base.observer());
             kept.observable().register_observer(&base.observer());
             discount_handle.register_observer(&base.observer());
             let helper = IborIborBasisSwapRateHelper {
@@ -258,8 +261,11 @@ mod tests {
     use super::*;
     use crate::indexes::ibor::euribor::Euribor;
     use crate::interestrate::Compounding;
+    use crate::math::interpolations::loglinear::LogLinear;
     use crate::quotes::SimpleQuote;
-    use crate::termstructures::yields::FlatForward;
+    use crate::termstructures::bootstraptraits::Discount;
+    use crate::termstructures::yields::{FlatForward, PiecewiseYieldCurve};
+    use crate::test_support::{Flag, as_observer};
     use crate::time::calendars::target::Target;
     use crate::time::date::Month;
     use crate::time::daycounters::actual360::Actual360;
@@ -409,5 +415,73 @@ mod tests {
         assert!(h.latest_relevant_date() >= h.maturity_date());
         assert_eq!(h.pillar_date(), h.latest_relevant_date());
         assert_eq!(h.latest_date(), h.latest_relevant_date());
+    }
+
+    #[test]
+    fn either_index_fixing_invalidates_and_recalibrates_the_live_curve() {
+        for bootstrap_base in [true, false] {
+            for change_base in [true, false] {
+                let m = market();
+                let h = helper(&m, bootstrap_base);
+                let today = m.settings.evaluation_date().unwrap();
+                let curve = PiecewiseYieldCurve::<Discount, LogLinear>::new(
+                    today,
+                    vec![Shared::clone(&h) as Shared<dyn RateHelper>],
+                    Actual360::new(),
+                    LogLinear,
+                )
+                .unwrap();
+                let before = curve.discount_date(h.pillar_date(), false).unwrap();
+                let helper_flag = Flag::new();
+                let curve_flag = Flag::new();
+                h.observable().register_observer(&as_observer(&helper_flag));
+                curve.register_observer(&as_observer(&curve_flag));
+                let index = if change_base {
+                    &m.euribor3m
+                } else {
+                    &m.euribor6m
+                };
+                index.add_fixing(today, 0.08).unwrap();
+                assert!(
+                    Flag::is_up(&helper_flag),
+                    "bootstrap_base={bootstrap_base}, change_base={change_base}"
+                );
+                assert!(Flag::is_up(&curve_flag));
+                let after = curve.discount_date(h.pillar_date(), false).unwrap();
+                assert!((after - before).abs() > 1e-4);
+                assert!(h.quote_error().unwrap().abs() < 1e-12);
+                let weak_curve = Shared::downgrade(&curve);
+                drop(curve);
+                assert!(weak_curve.upgrade().is_none());
+                assert!(h.implied_quote().is_err());
+            }
+        }
+    }
+
+    #[test]
+    fn fitted_curve_changes_and_relinks_do_not_notify_the_helper() {
+        for bootstrap_base in [true, false] {
+            let m = market();
+            let h = helper(&m, bootstrap_base);
+            let quote = shared(SimpleQuote::new(0.04));
+            let curve = shared(FlatForward::new(
+                m.settings.evaluation_date().unwrap(),
+                Handle::new(Shared::clone(&quote) as Shared<dyn Quote>),
+                Actual360::new(),
+                Compounding::Continuous,
+                Frequency::Annual,
+            )) as Shared<dyn YieldTermStructure>;
+            let flag = Flag::new();
+            h.observable().register_observer(&as_observer(&flag));
+            h.set_term_structure(&curve);
+            assert!(!Flag::is_up(&flag));
+            let before = h.implied_quote().unwrap();
+            quote.set_value(0.05);
+            assert!(!Flag::is_up(&flag));
+            let after = h.implied_quote().unwrap();
+            assert!((after - before).abs() > 1e-4);
+            h.set_term_structure(&m.curve3m);
+            assert!(!Flag::is_up(&flag));
+        }
     }
 }
