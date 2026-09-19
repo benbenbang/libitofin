@@ -59,10 +59,10 @@ oversight) and is documented at the point of divergence in the source.
   schedule the results are identical; once holidays are overridden they can
   differ, since QuantLib's name-keyed cache goes stale while this port always
   reflects the current holiday set.
-- **`Actual/Actual (ISMA)` uses the reference-date algorithm.** QuantLib picks a
-  schedule-driven implementation when a `Schedule` is supplied and a
-  reference-date one otherwise; the reference-date path is ported, with the
-  schedule-driven overload following as needed.
+- **`Actual/Actual (ISMA)` supports reference dates and schedules.** The
+  schedule path preserves QuantLib's both-stubs-irregular indexing bug. A
+  hand-derived regression test freezes that behavior; upstream reporting and
+  eventual unfreezing remain tracked in [#266](https://github.com/benbenbang/libitofin/issues/266).
 
 ## Core (EPIC-0)
 
