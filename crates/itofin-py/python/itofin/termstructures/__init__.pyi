@@ -3194,12 +3194,31 @@ class SwaptionVolatilityMatrix(SwaptionVolatilityStructure):
             ItofinError: On an empty or ragged grid, a mismatched shifts shape,
                 and on whatever the core rejects about the axes.
         """
+    @staticmethod
+    def fixed_quotes(reference_date: time.Date, calendar: time.Calendar, business_day_convention: time.BusinessDayConvention, option_tenors: typing.Sequence[time.Period], swap_tenors: typing.Sequence[time.Period], volatilities: typing.Sequence[typing.Sequence[quotes.SimpleQuote]], day_counter: time.DayCounter, volatility_type: VolatilityType, shifts: typing.Optional[typing.Sequence[typing.Sequence[builtins.float]]] = None, flat_extrapolation: builtins.bool = False) -> SwaptionVolatilityMatrix:
+        r"""
+        Build a fixed-reference grid retaining live volatility quotes.
+        """
+    @staticmethod
+    def moving_matrix(calendar: time.Calendar, business_day_convention: time.BusinessDayConvention, option_tenors: typing.Sequence[time.Period], swap_tenors: typing.Sequence[time.Period], volatilities: typing.Sequence[typing.Sequence[builtins.float]], day_counter: time.DayCounter, volatility_type: VolatilityType, settings: itofin.Settings, shifts: typing.Optional[typing.Sequence[typing.Sequence[builtins.float]]] = None, flat_extrapolation: builtins.bool = False) -> SwaptionVolatilityMatrix:
+        r"""
+        Build a moving-reference grid from copied volatility values.
+        """
+    @staticmethod
+    def with_option_dates(reference_date: time.Date, calendar: time.Calendar, business_day_convention: time.BusinessDayConvention, option_dates: typing.Sequence[time.Date], swap_tenors: typing.Sequence[time.Period], volatilities: typing.Sequence[typing.Sequence[builtins.float]], day_counter: time.DayCounter, volatility_type: VolatilityType, shifts: typing.Optional[typing.Sequence[typing.Sequence[builtins.float]]] = None, flat_extrapolation: builtins.bool = False) -> SwaptionVolatilityMatrix:
+        r"""
+        Build a fixed-reference grid with explicit option dates.
+        """
 
 class SwaptionVolatilityStructure:
     r"""
     Shared base for every swaption volatility surface: volatility, Black
     variance and lognormal shift, addressed by option and swap tenor.
     """
+    def volatility_date(self, option_date: time.Date, swap_length: builtins.float, strike: builtins.float, extrapolate: builtins.bool = False) -> builtins.float:
+        r"""
+        Return volatility at an explicit option date and swap length in years.
+        """
     def volatility(self, option_tenor: time.Period, swap_tenor: time.Period, strike: builtins.float, extrapolate: builtins.bool = False) -> builtins.float:
         r"""
         Return the volatility for an option tenor, swap tenor and strike.

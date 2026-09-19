@@ -56,6 +56,23 @@ pub struct PySwaptionVolatilityStructure {
 #[gen_stub_pymethods]
 #[pymethods]
 impl PySwaptionVolatilityStructure {
+    /// Return volatility at an explicit option date and swap length in years.
+    #[pyo3(signature = (option_date, swap_length, strike, extrapolate = false))]
+    fn volatility_date(
+        &self,
+        option_date: &PyDate,
+        swap_length: f64,
+        strike: f64,
+        extrapolate: bool,
+    ) -> PyResult<f64> {
+        Ok(self
+            .inner
+            .current_link()
+            .map_err(PyQlError::from)?
+            .volatility(option_date.inner(), swap_length, strike, extrapolate)
+            .map_err(PyQlError::from)?)
+    }
+
     /// Return the volatility for an option tenor, swap tenor and strike.
     ///
     /// Args:
@@ -599,6 +616,151 @@ impl PySwaptionVolatilityMatrix {
                 volatility_type.inner(),
                 shifts,
                 settings.inner(),
+            )
+            .map_err(PyQlError::from)?,
+        ) as Shared<dyn SwaptionVolatilityStructure>;
+        Py::new(
+            py,
+            PyClassInitializer::from(PySwaptionVolatilityStructure::from_handle(Handle::new(
+                surface,
+            )))
+            .add_subclass(PySwaptionVolatilityMatrix),
+        )
+    }
+
+    /// Build a fixed-reference grid retaining live volatility quotes.
+    #[staticmethod]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (reference_date, calendar, business_day_convention, option_tenors, swap_tenors, volatilities, day_counter, volatility_type, shifts = None, flat_extrapolation = false))]
+    fn fixed_quotes(
+        py: Python<'_>,
+        reference_date: &PyDate,
+        calendar: &PyCalendar,
+        business_day_convention: &PyBusinessDayConvention,
+        option_tenors: Vec<PyRef<'_, PyPeriod>>,
+        swap_tenors: Vec<PyRef<'_, PyPeriod>>,
+        volatilities: Vec<Vec<PyRef<'_, PySimpleQuote>>>,
+        day_counter: &PyDayCounter,
+        volatility_type: PyVolatilityType,
+        shifts: Option<Vec<Vec<f64>>>,
+        flat_extrapolation: bool,
+    ) -> PyResult<Py<Self>> {
+        check_grid(&volatilities, "volatility")?;
+        let volatilities: Vec<Vec<Handle<dyn Quote>>> = volatilities
+            .iter()
+            .map(|row| row.iter().map(|quote| quote.handle()).collect())
+            .collect();
+        let shifts = match shifts {
+            Some(rows) => {
+                check_grid(&rows, "shift")?;
+                rows
+            }
+            None => Vec::new(),
+        };
+        let surface = shared(
+            SwaptionVolatilityMatrix::fixed_quotes(
+                reference_date.inner(),
+                calendar.inner(),
+                business_day_convention.inner(),
+                tenors(&option_tenors),
+                tenors(&swap_tenors),
+                volatilities,
+                day_counter.inner(),
+                volatility_type.inner(),
+                shifts,
+                flat_extrapolation,
+            )
+            .map_err(PyQlError::from)?,
+        ) as Shared<dyn SwaptionVolatilityStructure>;
+        Py::new(
+            py,
+            PyClassInitializer::from(PySwaptionVolatilityStructure::from_handle(Handle::new(
+                surface,
+            )))
+            .add_subclass(PySwaptionVolatilityMatrix),
+        )
+    }
+
+    /// Build a moving-reference grid from copied volatility values.
+    #[staticmethod]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (calendar, business_day_convention, option_tenors, swap_tenors, volatilities, day_counter, volatility_type, settings, shifts = None, flat_extrapolation = false))]
+    fn moving_matrix(
+        py: Python<'_>,
+        calendar: &PyCalendar,
+        business_day_convention: &PyBusinessDayConvention,
+        option_tenors: Vec<PyRef<'_, PyPeriod>>,
+        swap_tenors: Vec<PyRef<'_, PyPeriod>>,
+        volatilities: Vec<Vec<f64>>,
+        day_counter: &PyDayCounter,
+        volatility_type: PyVolatilityType,
+        settings: &PySettings,
+        shifts: Option<Vec<Vec<f64>>>,
+        flat_extrapolation: bool,
+    ) -> PyResult<Py<Self>> {
+        let volatilities = matrix_from_rows(&volatilities, "volatility")?;
+        let shifts = match shifts {
+            Some(rows) => matrix_from_rows(&rows, "shift")?,
+            None => Matrix::new(),
+        };
+        let surface = shared(
+            SwaptionVolatilityMatrix::moving_matrix(
+                calendar.inner(),
+                business_day_convention.inner(),
+                tenors(&option_tenors),
+                tenors(&swap_tenors),
+                &volatilities,
+                day_counter.inner(),
+                volatility_type.inner(),
+                &shifts,
+                settings.inner(),
+                flat_extrapolation,
+            )
+            .map_err(PyQlError::from)?,
+        ) as Shared<dyn SwaptionVolatilityStructure>;
+        Py::new(
+            py,
+            PyClassInitializer::from(PySwaptionVolatilityStructure::from_handle(Handle::new(
+                surface,
+            )))
+            .add_subclass(PySwaptionVolatilityMatrix),
+        )
+    }
+
+    /// Build a fixed-reference grid with explicit option dates.
+    #[staticmethod]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (reference_date, calendar, business_day_convention, option_dates, swap_tenors, volatilities, day_counter, volatility_type, shifts = None, flat_extrapolation = false))]
+    fn with_option_dates(
+        py: Python<'_>,
+        reference_date: &PyDate,
+        calendar: &PyCalendar,
+        business_day_convention: &PyBusinessDayConvention,
+        option_dates: Vec<PyRef<'_, PyDate>>,
+        swap_tenors: Vec<PyRef<'_, PyPeriod>>,
+        volatilities: Vec<Vec<f64>>,
+        day_counter: &PyDayCounter,
+        volatility_type: PyVolatilityType,
+        shifts: Option<Vec<Vec<f64>>>,
+        flat_extrapolation: bool,
+    ) -> PyResult<Py<Self>> {
+        let volatilities = matrix_from_rows(&volatilities, "volatility")?;
+        let shifts = match shifts {
+            Some(rows) => matrix_from_rows(&rows, "shift")?,
+            None => Matrix::new(),
+        };
+        let surface = shared(
+            SwaptionVolatilityMatrix::with_option_dates(
+                reference_date.inner(),
+                calendar.inner(),
+                business_day_convention.inner(),
+                option_dates.iter().map(|date| date.inner()).collect(),
+                tenors(&swap_tenors),
+                &volatilities,
+                day_counter.inner(),
+                volatility_type.inner(),
+                &shifts,
+                flat_extrapolation,
             )
             .map_err(PyQlError::from)?,
         ) as Shared<dyn SwaptionVolatilityStructure>;

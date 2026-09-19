@@ -5,7 +5,7 @@
   "missing": [],
   "python_stub": "crates/itofin-py/python/itofin/termstructures/__init__.pyi",
   "scope": "vol.rs, smilesection.rs, swaptionvol.rs, optionletvol.rs, capfloortermvol.rs",
-  "symbol_count": 66,
+  "symbol_count": 70,
   "symbols": [
     {
       "c": "itofin_black_constant_vol_new",
@@ -637,7 +637,8 @@
       "rust_file": "crates/libitofin-ffi/src/volgrid_api.rs",
       "status": "implemented",
       "tests": [
-        "sdk/go/ratevol_test.go::TestRateVolatilityGridPinnedMemoryAndInterpolation"
+        "sdk/go/ratevol_test.go::TestRateVolatilityGridPinnedMemoryAndInterpolation",
+        "sdk/go/swaption_matrix_completion_test.go::TestSwaptionMatrixFiveConstructorOracles"
       ]
     },
     {
@@ -649,7 +650,8 @@
       "rust_file": "crates/libitofin-ffi/src/volgrid_api.rs",
       "status": "implemented",
       "tests": [
-        "sdk/go/ratevol_test.go::TestRateVolatilityGridPinnedMemoryAndInterpolation"
+        "sdk/go/ratevol_test.go::TestRateVolatilityGridPinnedMemoryAndInterpolation",
+        "sdk/go/swaption_matrix_completion_test.go::TestSwaptionMatrixFiveConstructorOracles"
       ]
     },
     {
@@ -660,7 +662,8 @@
       "rust_file": "crates/libitofin-ffi/src/ratevol_api.rs",
       "status": "implemented",
       "tests": [
-        "sdk/go/ratevol_test.go::TestRateVolatilityMovingQuoteAndDate"
+        "sdk/go/ratevol_test.go::TestRateVolatilityMovingQuoteAndDate",
+        "sdk/go/swaption_matrix_completion_test.go::TestSwaptionMatrixFiveConstructorOracles"
       ]
     },
     {
@@ -749,6 +752,57 @@
       "status": "implemented",
       "tests": [
         "sdk/go/vol_test.go::TestSABRLognormalLimitAndParameters"
+      ]
+    },
+    {
+      "c": "itofin_swaption_vol_matrix_fixed_quotes",
+      "configuration": "Quotes supplies live data; Settings must be nil for the fixed reference date.",
+      "go": "Session.SwaptionVolatilityMatrix",
+      "go_file": "sdk/go/volgrid.go",
+      "python": "itofin.termstructures.SwaptionVolatilityMatrix.fixed_quotes",
+      "rust_file": "crates/libitofin-ffi/src/volgrid_api.rs",
+      "status": "implemented",
+      "tests": [
+        "sdk/go/swaption_matrix_completion_test.go::TestSwaptionMatrixFiveConstructorOracles",
+        "sdk/go/swaption_matrix_completion_test.go::TestSwaptionMatrixAdditionalConstructorErrors"
+      ]
+    },
+    {
+      "c": "itofin_swaption_vol_matrix_moving_matrix",
+      "configuration": "Settings supplies moving dates; Quotes is empty and Volatilities supplies copied values.",
+      "go": "Session.SwaptionVolatilityMatrix",
+      "go_file": "sdk/go/volgrid.go",
+      "python": "itofin.termstructures.SwaptionVolatilityMatrix.moving_matrix",
+      "rust_file": "crates/libitofin-ffi/src/volgrid_api.rs",
+      "status": "implemented",
+      "tests": [
+        "sdk/go/swaption_matrix_completion_test.go::TestSwaptionMatrixFiveConstructorOracles",
+        "sdk/go/swaption_matrix_completion_test.go::TestSwaptionMatrixAdditionalConstructorErrors"
+      ]
+    },
+    {
+      "c": "itofin_swaption_vol_matrix_dates",
+      "configuration": "Explicit optionDates replace OptionTenors; Settings and Quotes must be empty.",
+      "go": "Session.SwaptionVolatilityMatrixDates",
+      "go_file": "sdk/go/volgrid.go",
+      "python": "itofin.termstructures.SwaptionVolatilityMatrix.with_option_dates",
+      "rust_file": "crates/libitofin-ffi/src/volgrid_api.rs",
+      "status": "implemented",
+      "tests": [
+        "sdk/go/swaption_matrix_completion_test.go::TestSwaptionMatrixFiveConstructorOracles",
+        "sdk/go/swaption_matrix_completion_test.go::TestSwaptionMatrixAdditionalConstructorErrors"
+      ]
+    },
+    {
+      "c": "itofin_swaption_vol_query",
+      "configuration": "Query kind 3 uses an option date and swap length in years.",
+      "go": "SwaptionVolatilityStructure.VolatilityDate",
+      "go_file": "sdk/go/ratevol.go",
+      "python": "itofin.termstructures.SwaptionVolatilityStructure.volatility_date",
+      "rust_file": "crates/libitofin-ffi/src/ratevol_api.rs",
+      "status": "implemented",
+      "tests": [
+        "sdk/go/swaption_matrix_completion_test.go::TestSwaptionMatrixFiveConstructorOracles"
       ]
     }
   ]
