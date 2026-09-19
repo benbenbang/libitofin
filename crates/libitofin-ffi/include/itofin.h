@@ -1703,6 +1703,19 @@ int32_t itofin_estr_new(struct ItofinContext *ctx,
  * belong to the calling thread; serialize calls including destruction.
  * See the crate-level C caller contract for lifetime requirements.
  */
+int32_t itofin_eonia_new(struct ItofinContext *ctx,
+                         uint64_t forwarding,
+                         uint64_t settings_id,
+                         uint64_t *out,
+                         struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers must be aligned, live and valid for their stated lengths. Outputs
+ * must not overlap inputs or other outputs. Any context and its handles must
+ * belong to the calling thread; serialize calls including destruction.
+ * See the crate-level C caller contract for lifetime requirements.
+ */
 int32_t itofin_index_fixing(struct ItofinContext *ctx,
                             uint64_t id,
                             bool overnight,
@@ -1766,6 +1779,29 @@ int32_t itofin_ibor_name(struct ItofinContext *ctx,
                          size_t capacity,
                          size_t *length,
                          struct ItofinError *error);
+
+/**
+ * Components: 0 day counter, 1 fixing calendar, 2 currency. Returned handles
+ * retain their values independently of the overnight index.
+ * # Safety
+ * Pointers must be aligned, live and valid. Context and handles must belong
+ * to the calling thread; serialize calls including destruction.
+ */
+int32_t itofin_overnight_component(struct ItofinContext *ctx,
+                                   uint64_t id,
+                                   int32_t query,
+                                   uint64_t *out,
+                                   struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers must be aligned, live and valid. Context and handles must belong
+ * to the calling thread; serialize calls including destruction.
+ */
+int32_t itofin_overnight_fixing_days(struct ItofinContext *ctx,
+                                     uint64_t id,
+                                     uint32_t *out,
+                                     struct ItofinError *error);
 
 /**
  * kind 0 UK RPI, 1 UK HICP, 2 EU HICP.
@@ -3388,6 +3424,22 @@ int32_t itofin_swaption_new(struct ItofinContext *ctx,
                             uint64_t settings_id,
                             uint64_t *out,
                             struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers must be aligned, live and valid for their stated lengths. Outputs
+ * must not overlap inputs or other outputs. Any context and its handles must
+ * belong to the calling thread; serialize calls including destruction.
+ * See the crate-level C caller contract for lifetime requirements.
+ */
+int32_t itofin_swaption_from_ois(struct ItofinContext *ctx,
+                                 uint64_t swap,
+                                 uint64_t exercise,
+                                 int32_t settlement_type,
+                                 int32_t settlement_method,
+                                 uint64_t settings_id,
+                                 uint64_t *out,
+                                 struct ItofinError *error);
 
 /**
  * # Safety

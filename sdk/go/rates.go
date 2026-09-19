@@ -102,6 +102,7 @@ type MakeOisConfig struct {
 	Tenor, ForwardStart Period
 	Index               *OvernightIndex
 	Settings            *Settings
+	FixedLegDayCounter  *DayCounter
 	FixedRate, Nominal  *float64
 	EffectiveDate       *Date
 	PaymentLag          *int32
@@ -116,6 +117,9 @@ func (s *Session) MakeOis(a MakeOisConfig) (*OvernightIndexedSwap, error) {
 	var id C.uint64_t
 	err := s.invoke(func() error {
 		objects := []object{a.Index.object, a.Settings.object}
+		if a.FixedLegDayCounter != nil {
+			objects = append(objects, a.FixedLegDayCounter.object)
+		}
 		if a.Discount != nil {
 			objects = append(objects, a.Discount.object)
 		}
@@ -134,6 +138,10 @@ func (s *Session) MakeOis(a MakeOisConfig) (*OvernightIndexedSwap, error) {
 		if a.Nominal != nil {
 			c.flags |= 4
 			c.nominal = C.double(*a.Nominal)
+		}
+		if a.FixedLegDayCounter != nil {
+			c.flags |= 16
+			c.fixed_day_counter = C.uint64_t(a.FixedLegDayCounter.id)
 		}
 		if a.PaymentLag != nil {
 			c.flags |= 32

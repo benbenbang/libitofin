@@ -6,7 +6,7 @@ use crate::time_api::{calendar, convention, date, day_counter};
 use libitofin::currency::Currency;
 use libitofin::indexes::ibor::{CustomIborIndex, EurLibor, GbpLibor, JpyLibor};
 use libitofin::indexes::{
-    Estr, Euribor, IborIndex, Index, InterestRateIndex, OvernightIndex, UsdLibor,
+    Eonia, Estr, Euribor, IborIndex, Index, InterestRateIndex, OvernightIndex, UsdLibor,
 };
 use libitofin::shared::{Shared, shared};
 use libitofin::time::{
@@ -254,6 +254,30 @@ pub unsafe extern "C" fn itofin_estr_new(
 /// must not overlap inputs or other outputs. Any context and its handles must
 /// belong to the calling thread; serialize calls including destruction.
 /// See the crate-level C caller contract for lifetime requirements.
+pub unsafe extern "C" fn itofin_eonia_new(
+    ctx: *mut Context,
+    forwarding: u64,
+    settings_id: u64,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(out)?;
+            let v = shared(Eonia::new(
+                optional_curve(c, forwarding)?,
+                settings(c, settings_id)?,
+            ));
+            output(out, c.insert(v)?)
+        })
+    }
+}
+#[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
 pub unsafe extern "C" fn itofin_index_fixing(
     ctx: *mut Context,
     id: u64,
@@ -416,6 +440,56 @@ pub unsafe extern "C" fn itofin_ibor_name(
                 output(out.add(i), b)?;
             }
             Ok(())
+        })
+    }
+}
+
+/// Components: 0 day counter, 1 fixing calendar, 2 currency. Returned handles
+/// retain their values independently of the overnight index.
+#[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid. Context and handles must belong
+/// to the calling thread; serialize calls including destruction.
+pub unsafe extern "C" fn itofin_overnight_component(
+    ctx: *mut Context,
+    id: u64,
+    query: i32,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(out)?;
+            let index = c.get::<Shared<OvernightIndex>>(id)?;
+            let value = match query {
+                0 => c.insert(index.day_counter().clone())?,
+                1 => c.insert(crate::calendar_api::NativeCalendar {
+                    inner: index.fixing_calendar(),
+                    horizon: None,
+                    first_year: 1901,
+                })?,
+                2 => c.insert(index.currency().clone())?,
+                _ => return Err(BindingError::invalid("unknown overnight index component")),
+            };
+            output(out, value)
+        })
+    }
+}
+
+#[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid. Context and handles must belong
+/// to the calling thread; serialize calls including destruction.
+pub unsafe extern "C" fn itofin_overnight_fixing_days(
+    ctx: *mut Context,
+    id: u64,
+    out: *mut u32,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(out)?;
+            output(out, c.get::<Shared<OvernightIndex>>(id)?.fixing_days())
         })
     }
 }
