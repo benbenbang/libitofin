@@ -2618,6 +2618,22 @@ int32_t itofin_seasonality_factors(struct ItofinContext *ctx,
                                    struct ItofinError *error);
 
 /**
+ * Creates twelve-factor monthly Kerkhof seasonality for zero inflation curves.
+ * Existing seasonality inspectors and curve setters accept the returned handle.
+ *
+ * # Safety
+ * Pointers must be aligned, live and valid for their stated lengths. Outputs
+ * must not overlap inputs or other outputs. Any context and its handles must
+ * belong to the calling thread; serialize calls including destruction.
+ */
+int32_t itofin_kerkhof_seasonality_new(struct ItofinContext *ctx,
+                                       int32_t base,
+                                       const double *factors,
+                                       size_t n,
+                                       uint64_t *out,
+                                       struct ItofinError *error);
+
+/**
  * # Safety
  * Pointers must be aligned, live and valid for their stated lengths. Outputs
  * must not overlap inputs or other outputs. Any context and its handles must

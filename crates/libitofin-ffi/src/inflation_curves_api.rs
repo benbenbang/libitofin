@@ -12,7 +12,6 @@ use libitofin::termstructures::inflation::{
     interpolatedzeroinflationcurve::InterpolatedZeroInflationCurve,
     piecewiseyoyinflationcurve::PiecewiseYoYInflationCurve,
     piecewisezeroinflationcurve::PiecewiseZeroInflationCurve,
-    seasonality::{MultiplicativePriceSeasonality, Seasonality},
 };
 use libitofin::time::frequency::Frequency;
 pub(crate) fn frequency_code(f: Frequency) -> BindingResult<i32> {
@@ -204,10 +203,10 @@ pub unsafe extern "C" fn itofin_zero_inflation_set_seasonality(
             let season = if seasonality == 0 {
                 None
             } else {
-                Some(
-                    c.get::<Shared<MultiplicativePriceSeasonality>>(seasonality)?
-                        as Shared<dyn Seasonality>,
-                )
+                Some(crate::inflation_seasonality_api::seasonality(
+                    c,
+                    seasonality,
+                )?)
             };
             zero_curve(c, id)?.current_link()?.set_seasonality(season)?;
             Ok(())
@@ -430,10 +429,10 @@ pub unsafe extern "C" fn itofin_yoy_inflation_set_seasonality(
             let season = if seasonality == 0 {
                 None
             } else {
-                Some(
-                    c.get::<Shared<MultiplicativePriceSeasonality>>(seasonality)?
-                        as Shared<dyn Seasonality>,
-                )
+                Some(crate::inflation_seasonality_api::seasonality(
+                    c,
+                    seasonality,
+                )?)
             };
             yoy_curve(c, id)?.current_link()?.set_seasonality(season)?;
             Ok(())
