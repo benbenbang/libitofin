@@ -65,3 +65,27 @@ func (p *MultiplicativePriceSeasonality) SeasonalityFactors() ([]float64, error)
 	})
 	return values, err
 }
+
+// KerkhofSeasonality accumulates twelve monthly factors for zero inflation rates.
+// It shares inspectors and curve setters with MultiplicativePriceSeasonality.
+// Year-on-year date queries return an error when this correction is installed.
+type KerkhofSeasonality = MultiplicativePriceSeasonality
+
+// NewKerkhofSeasonality copies twelve finite factors in calendar-month order.
+// Element zero is unused; January to February uses element one. Replacing or
+// clearing the correction through SetSeasonality notifies the curve's consumers.
+func (s *Session) NewKerkhofSeasonality(base Date, factors []float64) (*KerkhofSeasonality, error) {
+	var ptr *C.double
+	if len(factors) > 0 {
+		ptr = (*C.double)(unsafe.Pointer(&factors[0]))
+	}
+	var id C.uint64_t
+	err := s.invoke(func() error {
+		var e C.ItofinError
+		return ffiError(C.itofin_kerkhof_seasonality_new(s.ctx, C.int32_t(base.Serial()), ptr, C.size_t(len(factors)), &id, &e), &e)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &KerkhofSeasonality{object{s, uint64(id)}}, nil
+}
