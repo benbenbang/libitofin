@@ -76,8 +76,32 @@ pub unsafe extern "C" fn itofin_swaption_vol_cube_new(
     out: *mut ItofinVolCubeHandles,
     error: *mut ItofinError,
 ) -> i32 {
+    unsafe { vol_cube_new(ctx, kind, cfg, 0, out, error) }
+}
+/// Build a SABR cube with a backward-flat flag (0 or 1), retaining both handles.
+/// # Safety
+/// Follow the crate C caller contract; arrays must have their stated lengths.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn itofin_sabr_swaption_vol_cube_new(
+    ctx: *mut Context,
+    cfg: *const ItofinVolCubeConfig,
+    backward_flat: i32,
+    out: *mut ItofinVolCubeHandles,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe { vol_cube_new(ctx, 1, cfg, backward_flat, out, error) }
+}
+unsafe fn vol_cube_new(
+    ctx: *mut Context,
+    kind: i32,
+    cfg: *const ItofinVolCubeConfig,
+    backward_flat: i32,
+    out: *mut ItofinVolCubeHandles,
+    error: *mut ItofinError,
+) -> i32 {
     unsafe {
         with_context(ctx, error, |c| {
+            let backward_flat = flag(backward_flat)?;
             check_ptr(out)?;
             check_ptr(cfg)?;
             let x = &*cfg;
@@ -141,7 +165,7 @@ pub unsafe extern "C" fn itofin_swaption_vol_cube_new(
                         None,
                         flag(x.use_max_error)?,
                         x.max_guesses,
-                        false,
+                        backward_flat,
                         x.cutoff_strike,
                         settings,
                     )?);

@@ -217,15 +217,11 @@ func TestOptionletStripperGoQueriesAndAdapterOwnership(t *testing.T) {
 
 // Public QuantLib swaptionvolstructuresutilities fixture, matching the Python
 // facade's original 3e-4 ATM and 12e-4 spread calibration tolerances.
-func TestSABRCubeFreeCalibrationPythonOracle(t *testing.T) {
-	s, e := NewSession()
-	if e != nil {
-		t.Fatal(e)
-	}
-	defer s.Close()
+func sabrOracleConfig(t *testing.T, s *Session) (SwaptionVolatilityCubeConfig, []Period, []Period, [][]float64) {
+	t.Helper()
 	ref := volDate(t, 15, 6, 2026)
 	settings, _ := s.NewSettings()
-	if e = settings.SetEvaluationDate(ref); e != nil {
+	if e := settings.SetEvaluationDate(ref); e != nil {
 		t.Fatal(e)
 	}
 	dc, _ := s.Actual365Fixed()
@@ -278,6 +274,17 @@ func TestSABRCubeFreeCalibrationPythonOracle(t *testing.T) {
 		guesses[i] = []float64{.2, .5, .4, 0}
 	}
 	cfg := SwaptionVolatilityCubeConfig{ATMVol: atm, OptionTenors: []Period{{1, Years}, {10, Years}, {30, Years}}, SwapTenors: []Period{{2, Years}, {10, Years}, {30, Years}}, StrikeSpreads: []float64{-.020, -.005, 0, .005, .020}, VolSpreads: quoteRows(spreads), SwapIndexBase: index, ShortSwapIndexBase: short, Settings: settings, ParametersGuess: quoteRows(guesses), IsATMCalibrated: true}
+	return cfg, options, swaps, spreads
+}
+
+func TestSABRCubeFreeCalibrationPythonOracle(t *testing.T) {
+	s, e := NewSession()
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer s.Close()
+	cfg, options, swaps, spreads := sabrOracleConfig(t, s)
+	atm := cfg.ATMVol
 	cube, e := s.SabrSwaptionVolatilityCube(cfg)
 	if e != nil {
 		t.Fatal(e)

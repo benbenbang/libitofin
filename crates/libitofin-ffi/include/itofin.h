@@ -4177,6 +4177,17 @@ int32_t itofin_swaption_vol_cube_new(struct ItofinContext *ctx,
                                      struct ItofinError *error);
 
 /**
+ * Build a SABR cube with a backward-flat flag (0 or 1), retaining both handles.
+ * # Safety
+ * Follow the crate C caller contract; arrays must have their stated lengths.
+ */
+int32_t itofin_sabr_swaption_vol_cube_new(struct ItofinContext *ctx,
+                                          const struct ItofinVolCubeConfig *cfg,
+                                          int32_t backward_flat,
+                                          struct ItofinVolCubeHandles *out,
+                                          struct ItofinError *error);
+
+/**
  * # Safety
  * Follow the crate C caller contract; arrays must have their stated lengths.
  */
