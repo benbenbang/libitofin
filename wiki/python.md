@@ -91,3 +91,5 @@ print(f"{svol.volatility(Period(3, 'Years'), Period(3, 'Years'), 0.03):.4f}")  #
 - [Python example sources](../example/python/): yield curves, swaps, Monte Carlo, credit, and inflation.
 - [Python API reference](https://benbenbang.github.io/libitofin/api/core/): module-by-module signatures and documentation.
 - [Python bindings source](../crates/itofin-py/): implementation and tests.
+
+- [Coupled yield curves](../docs/docs/joint-curves.md): jointly fit Ibor basis markets with retained curve ownership.

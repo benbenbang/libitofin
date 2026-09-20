@@ -73,6 +73,7 @@ nav:
   - Home: index.md
   - Getting started: getting-started.md
   - Go SDK: go.md
+  - Joint yield curves: joint-curves.md
   - Python API:
       - Core: api/core.md
       - Time: api/time.md
