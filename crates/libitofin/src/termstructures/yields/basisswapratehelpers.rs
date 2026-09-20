@@ -7,11 +7,12 @@
 //! [`super::OvernightIborBasisSwapRateHelper`].
 
 use std::cell::RefCell;
+use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::rc::Weak;
 
 use crate::cashflow::CashFlow;
 use crate::cashflows::IborLeg;
-use crate::errors::QlResult;
+use crate::errors::{QlError, QlResult};
 use crate::handle::{Handle, RelinkableHandle};
 use crate::indexes::iborindex::IborIndex;
 use crate::indexes::index::Index;
@@ -60,6 +61,7 @@ use crate::types::{Integer, Natural, Real};
 pub struct IborIborBasisSwapRateHelper {
     base: BootstrapHelperBase,
     swap: RefCell<Option<Swap>>,
+    date_error: RefCell<Option<QlError>>,
     tenor: Period,
     settlement_days: Natural,
     calendar: Calendar,
@@ -90,8 +92,98 @@ impl IborIborBasisSwapRateHelper {
         discount_handle: Handle<dyn YieldTermStructure>,
         bootstrap_base_curve: bool,
     ) -> Shared<IborIborBasisSwapRateHelper> {
+        Self::build(
+            basis,
+            tenor,
+            settlement_days,
+            calendar,
+            convention,
+            end_of_month,
+            base_index,
+            other_index,
+            discount_handle,
+            bootstrap_base_curve,
+        )
+        .expect("valid basis-swap helper inputs")
+    }
+
+    /// Builds a helper, returning invalid inputs and schedule failures as errors.
+    #[allow(clippy::too_many_arguments)]
+    pub fn try_new(
+        basis: Handle<dyn Quote>,
+        tenor: Period,
+        settlement_days: Natural,
+        calendar: Calendar,
+        convention: BusinessDayConvention,
+        end_of_month: bool,
+        base_index: &Shared<IborIndex>,
+        other_index: &Shared<IborIndex>,
+        discount_handle: Handle<dyn YieldTermStructure>,
+        bootstrap_base_curve: bool,
+    ) -> QlResult<Shared<IborIborBasisSwapRateHelper>> {
+        crate::require!(!basis.is_empty(), "basis quote handle is empty");
+        crate::require!(
+            !discount_handle.is_empty(),
+            "discount curve handle is empty"
+        );
+        crate::require!(
+            Shared::ptr_eq(base_index.base().settings(), other_index.base().settings()),
+            "basis indices must share settings"
+        );
+        let date_span = Date::max_date() - Date::min_date();
+        crate::require!(
+            settlement_days <= date_span as Natural,
+            "settlement days exceed the supported date range"
+        );
+        for period in [tenor, base_index.tenor(), other_index.tenor()] {
+            let minimum_days = match period.units() {
+                TimeUnit::Days => 1,
+                TimeUnit::Weeks => 7,
+                TimeUnit::Months => 28,
+                TimeUnit::Years => 365,
+                _ => crate::fail!("basis swap periods must use days, weeks, months or years"),
+            };
+            crate::require!(
+                period.length() > 0
+                    && i64::from(period.length()) * minimum_days <= i64::from(date_span),
+                "basis swap periods must be positive and within the supported date range"
+            );
+        }
+        for index in [base_index, other_index] {
+            crate::require!(
+                index.fixing_days() <= date_span as Natural,
+                "index fixing days exceed the supported date range"
+            );
+        }
+        Self::build(
+            basis,
+            tenor,
+            settlement_days,
+            calendar,
+            convention,
+            end_of_month,
+            base_index,
+            other_index,
+            discount_handle,
+            bootstrap_base_curve,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn build(
+        basis: Handle<dyn Quote>,
+        tenor: Period,
+        settlement_days: Natural,
+        calendar: Calendar,
+        convention: BusinessDayConvention,
+        end_of_month: bool,
+        base_index: &Shared<IborIndex>,
+        other_index: &Shared<IborIndex>,
+        discount_handle: Handle<dyn YieldTermStructure>,
+        bootstrap_base_curve: bool,
+    ) -> QlResult<Shared<IborIborBasisSwapRateHelper>> {
         let settings = base_index.base().settings().clone();
-        Shared::new_cyclic(|weak: &Weak<IborIborBasisSwapRateHelper>| {
+        let helper = Shared::new_cyclic(|weak: &Weak<IborIborBasisSwapRateHelper>| {
             let weak = weak.clone();
             let on_eval_change = Box::new(move || {
                 if let Some(helper) = weak.upgrade() {
@@ -126,9 +218,10 @@ impl IborIborBasisSwapRateHelper {
                 .register_fixing_observer(&cloned.name(), &base.observer());
             kept.observable().register_observer(&base.observer());
             discount_handle.register_observer(&base.observer());
-            let helper = IborIborBasisSwapRateHelper {
+            IborIborBasisSwapRateHelper {
                 base,
                 swap: RefCell::new(None),
+                date_error: RefCell::new(None),
                 tenor,
                 settlement_days,
                 calendar,
@@ -139,18 +232,23 @@ impl IborIborBasisSwapRateHelper {
                 discount_handle,
                 settings,
                 term_structure_handle,
-            };
-            helper.initialize_dates();
-            helper
-        })
+            }
+        });
+        helper.try_initialize_dates()?;
+        Ok(helper)
     }
 
     /// One leg of the helper's swap on `index`, notional 100 (`.cpp:68-83`),
     /// with its last coupon's fixing end date.
-    fn leg(&self, index: &Shared<IborIndex>) -> (Vec<Shared<dyn CashFlow>>, Date) {
+    fn leg(
+        &self,
+        index: &Shared<IborIndex>,
+        earliest: Date,
+        maturity: Date,
+    ) -> QlResult<(Vec<Shared<dyn CashFlow>>, Date)> {
         let schedule = MakeSchedule::new()
-            .from(self.base.earliest_date())
-            .to(self.base.maturity_date())
+            .from(earliest)
+            .to(maturity)
             .with_tenor(index.tenor())
             .with_calendar(self.calendar.clone())
             .with_convention(self.convention)
@@ -159,18 +257,16 @@ impl IborIborBasisSwapRateHelper {
             .build();
         let coupons = IborLeg::new(schedule, Shared::clone(index))
             .with_notional(100.0)
-            .coupons()
-            .expect("a spot-to-maturity ibor leg with a notional builds");
+            .coupons()?;
         let last_fixing_end = coupons
             .last()
-            .expect("a leg over a non-empty schedule has a last coupon")
-            .fixing_end_date()
-            .expect("the last coupon's estimation period is well defined");
+            .ok_or_else(|| QlError::new("basis swap leg is empty", file!(), line!()))?
+            .fixing_end_date()?;
         let leg = coupons
             .into_iter()
             .map(|coupon| coupon as Shared<dyn CashFlow>)
             .collect();
-        (leg, last_fixing_end)
+        Ok((leg, last_fixing_end))
     }
 }
 
@@ -188,6 +284,9 @@ impl RateHelper for IborIborBasisSwapRateHelper {
     /// The basis that zeroes the swap on the current curve
     /// (`basisswapratehelpers.cpp:106-109`), after a forced recalculation.
     fn implied_quote(&self) -> QlResult<Real> {
+        if let Some(error) = self.date_error.borrow().as_ref() {
+            return Err(error.clone());
+        }
         self.base.term_structure()?;
         let mut guard = self.swap.borrow_mut();
         let swap = guard
@@ -208,18 +307,56 @@ impl RateHelper for IborIborBasisSwapRateHelper {
     }
 }
 
-impl RelativeDateRateHelper for IborIborBasisSwapRateHelper {
+impl IborIborBasisSwapRateHelper {
+    /// Rebuilds the swap, retaining any date failure for subsequent quote queries.
+    ///
+    /// Legacy date and schedule primitives assert on out-of-range arithmetic.
+    /// Containing that unwind here keeps evaluation-date notifications fallible
+    /// without unwinding through a binding session. The replacement is built
+    /// before committing dates or borrowing the cached swap mutably.
+    pub fn try_initialize_dates(&self) -> QlResult<()> {
+        let result =
+            catch_unwind(AssertUnwindSafe(|| self.rebuild_dates())).unwrap_or_else(|payload| {
+                let message = payload
+                    .downcast_ref::<String>()
+                    .map(String::as_str)
+                    .or_else(|| payload.downcast_ref::<&str>().copied())
+                    .unwrap_or("invalid basis swap schedule");
+                Err(QlError::new(message, file!(), line!()))
+            });
+        match result {
+            Ok((swap, earliest, maturity, latest_relevant)) => {
+                *self.swap.borrow_mut() = Some(swap);
+                self.base.set_earliest_date(earliest);
+                self.base.set_maturity_date(maturity);
+                self.base.set_latest_relevant_date(latest_relevant);
+                self.base.set_pillar_date(latest_relevant);
+                self.base.set_latest_date(latest_relevant);
+                *self.date_error.borrow_mut() = None;
+                Ok(())
+            }
+            Err(error) => {
+                *self.date_error.borrow_mut() = Some(error.clone());
+                Err(error)
+            }
+        }
+    }
+
     /// Rebuilds the swap off the current evaluation date (`initializeDates`,
     /// `.cpp:63-94`): spot is `settlement_days` business days after today
     /// (`Following`), maturity is `tenor` past spot on the helper's convention,
     /// and each leg runs spot to maturity on its index's tenor. The latest
     /// relevant date, which is also the pillar, is the latest of the maturity
     /// and both legs' last fixing end dates (`.cpp:87-90`).
-    fn initialize_dates(&self) {
+    fn rebuild_dates(&self) -> QlResult<(Swap, Date, Date, Date)> {
         let today = self
             .base
             .evaluation_date()
-            .expect("a relative-date helper always tracks an evaluation date");
+            .ok_or_else(|| QlError::new("evaluation date is not set", file!(), line!()))?;
+        crate::require!(
+            today >= Date::min_date() && today <= Date::max_date(),
+            "evaluation date is outside the supported range"
+        );
         let earliest = self.calendar.advance(
             today,
             self.settlement_days as Integer,
@@ -230,16 +367,13 @@ impl RelativeDateRateHelper for IborIborBasisSwapRateHelper {
         let maturity =
             self.calendar
                 .advance_by_period(earliest, self.tenor, self.convention, false);
-        self.base.set_earliest_date(earliest);
-        self.base.set_maturity_date(maturity);
-
-        let (base_leg, base_fixing_end) = self.leg(&self.base_index);
-        let (other_leg, other_fixing_end) = self.leg(&self.other_index);
-
+        crate::require!(
+            maturity > earliest,
+            "basis swap maturity must follow its spot date"
+        );
+        let (base_leg, base_fixing_end) = self.leg(&self.base_index, earliest, maturity)?;
+        let (other_leg, other_fixing_end) = self.leg(&self.other_index, earliest, maturity)?;
         let latest_relevant = maturity.max(base_fixing_end.max(other_fixing_end));
-        self.base.set_latest_relevant_date(latest_relevant);
-        self.base.set_pillar_date(latest_relevant);
-        self.base.set_latest_date(latest_relevant);
 
         let mut swap = Swap::two_leg(base_leg, other_leg, Shared::clone(&self.settings));
         let engine = shared_mut(DiscountingSwapEngine::new(
@@ -251,7 +385,13 @@ impl RelativeDateRateHelper for IborIborBasisSwapRateHelper {
         ));
         swap.base_mut()
             .set_pricing_engine(engine as SharedMut<dyn PricingEngine>);
-        *self.swap.borrow_mut() = Some(swap);
+        Ok((swap, earliest, maturity, latest_relevant))
+    }
+}
+
+impl RelativeDateRateHelper for IborIborBasisSwapRateHelper {
+    fn initialize_dates(&self) {
+        let _ = self.try_initialize_dates();
     }
 }
 
@@ -329,6 +469,105 @@ mod tests {
             m.discount.clone(),
             bootstrap_base_curve,
         )
+    }
+
+    #[test]
+    fn fallible_constructor_rejects_malformed_inputs() {
+        let m = market();
+        let create = |tenor, settlement_days, quote, discount, other: &Shared<IborIndex>| {
+            IborIborBasisSwapRateHelper::try_new(
+                quote,
+                tenor,
+                settlement_days,
+                Target::new(),
+                BusinessDayConvention::ModifiedFollowing,
+                false,
+                &m.euribor3m,
+                other,
+                discount,
+                true,
+            )
+        };
+        let quote = Handle::new(shared(SimpleQuote::new(0.002)) as Shared<dyn Quote>);
+        let valid = Period::new(5, TimeUnit::Years);
+        for tenor in [
+            Period::new(0, TimeUnit::Years),
+            Period::new(-1, TimeUnit::Months),
+            Period::new(1, TimeUnit::Hours),
+            Period::new(i32::MAX, TimeUnit::Months),
+        ] {
+            assert!(create(tenor, 2, quote.clone(), m.discount.clone(), &m.euribor6m).is_err());
+        }
+        assert!(
+            create(
+                valid,
+                u32::MAX,
+                quote.clone(),
+                m.discount.clone(),
+                &m.euribor6m
+            )
+            .is_err()
+        );
+        assert!(create(valid, 2, Handle::empty(), m.discount.clone(), &m.euribor6m).is_err());
+        assert!(create(valid, 2, quote.clone(), Handle::empty(), &m.euribor6m).is_err());
+        let other = market();
+        assert!(
+            create(
+                valid,
+                2,
+                quote.clone(),
+                m.discount.clone(),
+                &other.euribor6m
+            )
+            .is_err()
+        );
+        let h = create(valid, 2, quote.clone(), m.discount.clone(), &m.euribor6m).unwrap();
+        drop(h);
+        m.settings.set_evaluation_date(Date::max_date());
+        assert!(create(valid, 2, quote, m.discount.clone(), &m.euribor6m).is_err());
+    }
+
+    #[test]
+    fn date_range_failure_preserves_swap_and_recovers() {
+        let m = market();
+        let h = helper(&m, true);
+        h.set_term_structure(&m.curve3m);
+        let before = h.implied_quote().unwrap();
+        let spot = h.earliest_date();
+        let maturity = h.maturity_date();
+        let original_date = m.settings.evaluation_date().unwrap();
+        for invalid_date in [Date::max_date(), Date::null()] {
+            m.settings.set_evaluation_date(invalid_date);
+            assert!(h.implied_quote().is_err());
+            assert!(h.try_initialize_dates().is_err());
+            assert_eq!(h.earliest_date(), spot);
+            assert_eq!(h.maturity_date(), maturity);
+            m.settings.set_evaluation_date(original_date);
+            assert_eq!(h.implied_quote().unwrap(), before);
+        }
+    }
+
+    #[test]
+    fn legacy_constructor_keeps_deferred_handle_linking() {
+        let m = market();
+        let quote = RelinkableHandle::<dyn Quote>::empty();
+        let discount = RelinkableHandle::<dyn YieldTermStructure>::empty();
+        let h = IborIborBasisSwapRateHelper::new(
+            quote.handle(),
+            Period::new(5, TimeUnit::Years),
+            2,
+            Target::new(),
+            BusinessDayConvention::ModifiedFollowing,
+            false,
+            &m.euribor3m,
+            &m.euribor6m,
+            discount.handle(),
+            true,
+        );
+        quote.link_to(shared(SimpleQuote::new(0.002)) as Shared<dyn Quote>);
+        discount.link_to(m.discount.current_link().unwrap());
+        h.set_term_structure(&m.curve3m);
+        assert!(h.implied_quote().unwrap().is_finite());
     }
 
     /// An independent copy of the helper's swap on the original indices, with
