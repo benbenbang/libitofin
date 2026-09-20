@@ -243,3 +243,7 @@ pub unsafe extern "C" fn itofin_flat_forward_from_quote(
         })
     }
 }
+
+#[cfg(test)]
+#[path = "joint_curves_tests.rs"]
+mod tests;
