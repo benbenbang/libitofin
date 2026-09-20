@@ -9,6 +9,7 @@ This inventory does not claim exhaustive QuantLib product coverage.
 
 | Scope | Executable evidence |
 | --- | --- |
+| SABR backward-flat sparse/dense QuantLib oracle, quote/date recalibration, retained inputs and error recovery | `TestSABRBackwardFlatQuantLibOracle`, `TestSABRBackwardFlatUpdatesAndRetainedInputs`, `TestSABRBackwardFlatInvalidInputs` |
 | Kerkhof monthly factors, independent zero corrections, copied factors, retained handles and YoY errors | `TestKerkhofSeasonalityQuantLibOracle`, `TestKerkhofSeasonalityOwnershipAndErrors` |
 | Lazy zero-inflation base dates, independent nodes/forecasts, fixing/date/quote updates and retained dependencies | `TestLazyInflationBaseMatchesQuantLibAndRetainsDependencies` |
 | Zero/YoY index representations and retained ratio identity | `TestInflationCompletionIndexRepresentations` |

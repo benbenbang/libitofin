@@ -106,13 +106,20 @@ live quotes, moving numeric values and explicit option dates. The
 pins 120 volatility nodes at `1e-16`; Rust also checks Black prices, volatility
 recovery through a test-only flat engine, and quote-handle relinks.
 
-Rust supports backward-flat SABR parameter cubes
-([#606](https://github.com/benbenbang/libitofin/issues/606)), with independent
-QuantLib sparse/dense oracles and live quote/date recalculation checks. Both
-axes require at least two nodes. This feature will ship after v0.25.0;
-Python/C/Go flag exposure remains [#1065](https://github.com/benbenbang/libitofin/issues/1065).
-SABR variants [#586](https://github.com/benbenbang/libitofin/issues/586) and ZABR
-[#597](https://github.com/benbenbang/libitofin/issues/597) retain separate scope.
+Rust, Python and C/Go support backward-flat SABR parameter cubes
+([#606](https://github.com/benbenbang/libitofin/issues/606),
+[#1065](https://github.com/benbenbang/libitofin/issues/1065)). Python's trailing
+`backward_flat=False` and Go's `BackwardFlat` preserve bilinear defaults. The new
+C `itofin_sabr_swaption_vol_cube_new` accepts the unchanged config plus a 0/1 flag;
+the existing constructor retains its old behavior. Go rejects `BackwardFlat=true`
+for interpolated cubes. Both axes require at least two nodes. Parameter/forward
+layers 0-4 are backward-flat in option time and linear in swap length; market
+volatility and local-spread grids remain bilinear. All 72 independent QuantLib
+1.43 sparse/dense fixture rows are checked for both flags at `1e-6`, with live
+quote/date recalculation and retained-input tests in Python and Go.
+Normal SABR [#586](https://github.com/benbenbang/libitofin/issues/586), ZABR/generic
+XABR [#597](https://github.com/benbenbang/libitofin/issues/597), public section
+recalibration and standalone interpolation bindings retain separate scope.
 
 ## Dependency layers
 
