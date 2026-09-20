@@ -1,0 +1,84 @@
+{
+  "domain": "joint-yield-curves",
+  "entries": [
+    {
+      "c": "itofin_ibor_add_fixing",
+      "go": "IborIndex.AddFixing",
+      "python": "itofin.indexes.IborIndex.add_fixing",
+      "status": "implemented",
+      "tests": [
+        "TestJointYieldCurvesQuantLibRepricingAndUpdates",
+        "TestJointYieldCurvesFixingsAndCloseOrders",
+        "TestJointYieldCurvesInvalidInputs"
+      ]
+    },
+    {
+      "c": "itofin_flat_forward_from_quote",
+      "go": "Session.NewFlatForwardFromQuote",
+      "python": "itofin.termstructures.FlatForward.from_quote",
+      "status": "implemented",
+      "tests": [
+        "TestJointYieldCurvesQuantLibRepricingAndUpdates",
+        "TestJointYieldCurvesFixingsAndCloseOrders",
+        "TestJointYieldCurvesInvalidInputs"
+      ]
+    },
+    {
+      "c": "itofin_basis_helper_new",
+      "go": "Session.NewIborIborBasisSwapRateHelper",
+      "python": "itofin.termstructures.IborIborBasisSwapRateHelper",
+      "status": "implemented",
+      "tests": [
+        "TestJointYieldCurvesQuantLibRepricingAndUpdates",
+        "TestJointYieldCurvesFixingsAndCloseOrders",
+        "TestJointYieldCurvesInvalidInputs",
+        "TestStandaloneBasisHelperBothBootstrapSides"
+      ]
+    },
+    {
+      "c": "itofin_basis_helper_new",
+      "go": "Session.NewIborIborBasisSwapRateHelper",
+      "python": "itofin.termstructures.IborIborBasisSwapRateHelper.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestJointYieldCurvesQuantLibRepricingAndUpdates",
+        "TestJointYieldCurvesFixingsAndCloseOrders",
+        "TestJointYieldCurvesInvalidInputs",
+        "TestStandaloneBasisHelperBothBootstrapSides"
+      ]
+    },
+    {
+      "c": "itofin_joint_curves_new",
+      "go": "Session.NewJointYieldCurves",
+      "python": "itofin.termstructures.JointYieldCurves",
+      "status": "implemented",
+      "tests": [
+        "TestJointYieldCurvesQuantLibRepricingAndUpdates",
+        "TestJointYieldCurvesFixingsAndCloseOrders",
+        "TestJointYieldCurvesInvalidInputs"
+      ]
+    },
+    {
+      "c": "itofin_joint_curves_new",
+      "go": "Session.NewJointYieldCurves",
+      "python": "itofin.termstructures.JointYieldCurves.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestJointYieldCurvesQuantLibRepricingAndUpdates",
+        "TestJointYieldCurvesFixingsAndCloseOrders",
+        "TestJointYieldCurvesInvalidInputs"
+      ]
+    },
+    {
+      "c": "itofin_joint_curve",
+      "go": "JointYieldCurves.Curve",
+      "python": "itofin.termstructures.JointYieldCurves.curve",
+      "status": "implemented",
+      "tests": [
+        "TestJointYieldCurvesQuantLibRepricingAndUpdates",
+        "TestJointYieldCurvesFixingsAndCloseOrders",
+        "TestJointYieldCurvesInvalidInputs"
+      ]
+    }
+  ]
+}

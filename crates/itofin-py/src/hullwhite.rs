@@ -264,6 +264,17 @@ impl PyIborIndex {
         }
     }
 
+    /// Store a historical fixing and notify all same-name indices in these settings.
+    fn add_fixing(&self, fixing_date: &PyDate, value: f64) -> PyResult<()> {
+        if !value.is_finite() {
+            return Err(crate::ItofinError::new_err("fixing must be finite"));
+        }
+        self.inner
+            .add_fixing(fixing_date.inner(), value)
+            .map_err(PyQlError::from)?;
+        Ok(())
+    }
+
     /// Return the index fixing for fixing_date.
     ///
     /// Forecast off the forwarding curve for a future date, or read from the

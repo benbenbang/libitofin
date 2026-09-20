@@ -428,6 +428,10 @@ class IborIndex:
             settings (Settings): The explicit settings supplying the evaluation
                 date and the stored fixings.
         """
+    def add_fixing(self, fixing_date: time.Date, value: builtins.float) -> None:
+        r"""
+        Store a historical fixing and notify all same-name indices in these settings.
+        """
     def fixing(self, fixing_date: time.Date, forecast_todays_fixing: builtins.bool) -> builtins.float:
         r"""
         Return the index fixing for fixing_date.

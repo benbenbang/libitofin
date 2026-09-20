@@ -22,6 +22,7 @@ mod helpers;
 mod heston;
 mod hullwhite;
 mod inflation;
+mod jointcurves;
 mod makeswaption;
 mod market;
 mod mcengine;
@@ -198,6 +199,8 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     termstructures.add_class::<PyBlackVarianceCurve>()?;
     termstructures.add_class::<PyBlackVarianceSurface>()?;
     termstructures.add_class::<PyRateHelper>()?;
+    termstructures.add_class::<jointcurves::PyIborIborBasisSwapRateHelper>()?;
+    termstructures.add_class::<jointcurves::PyJointYieldCurves>()?;
     termstructures.add_class::<PyDepositRateHelper>()?;
     termstructures.add_class::<PySwapRateHelper>()?;
     termstructures.add_class::<PyFuturesType>()?;

@@ -388,12 +388,19 @@
       ]
     },
     {
-      "c": "itofin_swap_helper_new",
-      "go": "Session.NewSwapRateHelper",
+      "c": [
+        "itofin_swap_helper_new",
+        "itofin_swap_helper_with_discount"
+      ],
+      "go": [
+        "Session.NewSwapRateHelper",
+        "Session.NewSwapRateHelperWithDiscount"
+      ],
       "python": "itofin.termstructures.SwapRateHelper.__init__",
       "status": "implemented",
       "tests": [
-        "TestBootstrapAlgorithmsAndSwapHelpers"
+        "TestBootstrapAlgorithmsAndSwapHelpers",
+        "TestJointYieldCurvesQuantLibRepricingAndUpdates"
       ]
     },
     {

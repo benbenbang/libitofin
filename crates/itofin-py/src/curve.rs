@@ -3,6 +3,7 @@
 
 use crate::bootstrap::{PySimpleQuoteVariables, global_bootstrap};
 use crate::helpers::PyRateHelper;
+use crate::market::PySimpleQuote;
 use crate::time::{PyCalendar, PyDate, PyDayCounter};
 use crate::{ItofinError, PyQlError};
 use libitofin::handle::Handle;
@@ -208,6 +209,10 @@ impl PyYieldTermStructure {
 }
 
 impl PyYieldTermStructure {
+    pub(crate) fn from_inner(inner: Handle<dyn YieldTermStructure>) -> Self {
+        Self { inner }
+    }
+
     /// A clone of the inner curve handle for the process/model ctors (H1/W1).
     #[allow(dead_code)]
     pub(crate) fn handle(&self) -> Handle<dyn YieldTermStructure> {
@@ -252,6 +257,28 @@ impl PyFlatForward {
             inner: Handle::new(curve),
         })
         .add_subclass(PyFlatForward)
+    }
+
+    /// Build a flat curve backed by a retained, observable quote.
+    #[staticmethod]
+    fn from_quote(
+        py: Python<'_>,
+        reference_date: &PyDate,
+        quote: &PySimpleQuote,
+        day_counter: &PyDayCounter,
+    ) -> PyResult<Py<Self>> {
+        let curve = shared(FlatForward::new(
+            reference_date.inner(),
+            quote.handle(),
+            day_counter.inner(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>;
+        Py::new(
+            py,
+            PyClassInitializer::from(PyYieldTermStructure::from_inner(Handle::new(curve)))
+                .add_subclass(Self),
+        )
     }
 }
 

@@ -30,11 +30,13 @@ __all__ = [
     "FraRateHelper",
     "FuturesRateHelper",
     "FuturesType",
+    "IborIborBasisSwapRateHelper",
     "InterpolatedDefaultDensityCurve",
     "InterpolatedHazardRateCurve",
     "InterpolatedSwaptionVolatilityCube",
     "InterpolatedYoYInflationCurve",
     "InterpolatedZeroInflationCurve",
+    "JointYieldCurves",
     "KInterpolatedYoYOptionletVolatilitySurface",
     "KerkhofSeasonality",
     "MultiplicativePriceSeasonality",
@@ -1147,6 +1149,11 @@ class FlatForward(YieldTermStructure):
                 frequency.
             day_counter (DayCounter): The day count times are measured in.
         """
+    @staticmethod
+    def from_quote(reference_date: time.Date, quote: quotes.SimpleQuote, day_counter: time.DayCounter) -> FlatForward:
+        r"""
+        Build a flat curve backed by a retained, observable quote.
+        """
 
 @typing.final
 class FlatHazardRate(DefaultProbabilityTermStructure):
@@ -1437,6 +1444,21 @@ class FuturesRateHelper(RateHelper):
         """
 
 @typing.final
+class IborIborBasisSwapRateHelper(RateHelper):
+    r"""
+    A basis spread helper, with the spread paid on the base-index leg.
+
+    JointYieldCurves copies its construction inputs into private helpers. The
+    original helper remains independent and is not assigned to a joint curve;
+    its quote and date inspectors remain usable, but implied_quote needs a
+    standalone curve assignment. Quotes, indices and discount curves are retained.
+    """
+    def __init__(self, quote: quotes.SimpleQuote, tenor: time.Period, settlement_days: builtins.int, calendar: time.Calendar, convention: time.BusinessDayConvention, end_of_month: builtins.bool, base_index: indexes.IborIndex, other_index: indexes.IborIndex, discount: YieldTermStructure, bootstrap_base_curve: builtins.bool) -> None:
+        r"""
+        Construct a live basis helper fitting either the base or other index.
+        """
+
+@typing.final
 class InterpolatedDefaultDensityCurve(DefaultProbabilityTermStructure):
     r"""
     A density curve using BackwardFlat or Linear interpolation and flat-density extrapolation.
@@ -1691,6 +1713,26 @@ class InterpolatedZeroInflationCurve(ZeroInflationTermStructure):
 
         Returns:
             list[tuple[Date, float]]: One (date, zero rate) pair per node.
+        """
+
+@typing.final
+class JointYieldCurves:
+    r"""
+    Two mutually coupled Discount/LogLinear/GlobalBootstrap curves.
+
+    Member 0 forecasts the base index and member 1 the other index. Basis helpers
+    must include both bootstrap sides and share the same index objects/settings.
+    Plain helper strips are reserved for this assembly and must not be reused by
+    another curve. Returned curves retain both members and the joint owner after
+    this Python object is collected. No internal helper or forecast link escapes.
+    """
+    def __init__(self, reference_date: time.Date, first_helpers: typing.Sequence[RateHelper], second_helpers: typing.Sequence[RateHelper], basis_helpers: typing.Sequence[IborIborBasisSwapRateHelper], day_counter: time.DayCounter, accuracy: builtins.float = 1e-10) -> None:
+        r"""
+        Assemble both curves; numerical bootstrap errors are raised on query.
+        """
+    def curve(self, member: builtins.int) -> YieldTermStructure:
+        r"""
+        Return member 0 or 1, retaining the complete joint assembly.
         """
 
 @typing.final
@@ -3102,9 +3144,9 @@ class SwapRateHelper(RateHelper):
     A helper fitting a par swap rate (spot-starting, no spread).
 
     The spot-starting form the curve-consistency oracle builds: no spread, no
-    forward start, no exogenous discounting curve, and the default pillar.
+    forward start and the default pillar, with optional exogenous discounting.
     """
-    def __init__(self, quote: quotes.SimpleQuote, tenor: time.Period, calendar: time.Calendar, fixed_frequency: time.Frequency, fixed_convention: time.BusinessDayConvention, fixed_day_count: time.DayCounter, ibor_index: indexes.IborIndex) -> None:
+    def __init__(self, quote: quotes.SimpleQuote, tenor: time.Period, calendar: time.Calendar, fixed_frequency: time.Frequency, fixed_convention: time.BusinessDayConvention, fixed_day_count: time.DayCounter, ibor_index: indexes.IborIndex, discount: typing.Optional[YieldTermStructure] = None) -> None:
         r"""
         Build the helper over the schedule of a spot-starting swap.
 
@@ -3116,6 +3158,7 @@ class SwapRateHelper(RateHelper):
             fixed_convention (BusinessDayConvention): The fixed leg's roll.
             fixed_day_count (DayCounter): The fixed leg's day count.
             ibor_index (IborIndex): The index the floating leg fixes off.
+            discount (YieldTermStructure | None): Optional exogenous discount curve.
         """
 
 @typing.final
