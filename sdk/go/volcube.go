@@ -27,6 +27,7 @@ type SwaptionVolatilityCubeConfig struct {
 	ParametersGuess              [][]*SimpleQuote
 	IsParameterFixed             [4]bool
 	IsATMCalibrated, UseMaxError bool
+	BackwardFlat                 bool
 	MaxGuesses                   uint
 	CutoffStrike                 float64
 }
@@ -38,6 +39,9 @@ func (s *Session) SabrSwaptionVolatilityCube(x SwaptionVolatilityCubeConfig) (*S
 	return s.volCube(x, 1)
 }
 func (s *Session) volCube(x SwaptionVolatilityCubeConfig, kind int32) (*SwaptionVolatilityCube, error) {
+	if kind == 0 && x.BackwardFlat {
+		return nil, fmt.Errorf("backward-flat interpolation requires a SABR cube")
+	}
 	if x.ATMVol == nil || x.SwapIndexBase == nil || x.ShortSwapIndexBase == nil || x.Settings == nil {
 		return nil, fmt.Errorf("ATM surface, swap indices, and settings are required")
 	}
@@ -133,6 +137,13 @@ func (s *Session) volCube(x SwaptionVolatilityCubeConfig, kind int32) (*Swaption
 			cfg.use_max_error = 1
 		}
 		var e C.ItofinError
+		if kind == 1 {
+			var backwardFlat C.int32_t
+			if x.BackwardFlat {
+				backwardFlat = 1
+			}
+			return ffiError(C.itofin_sabr_swaption_vol_cube_new(s.ctx, &cfg, backwardFlat, &out, &e), &e)
+		}
 		return ffiError(C.itofin_swaption_vol_cube_new(s.ctx, C.int32_t(kind), &cfg, &out, &e), &e)
 	})
 	if err != nil {

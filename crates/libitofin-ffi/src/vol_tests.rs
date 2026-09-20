@@ -389,6 +389,53 @@ fn interpolated_cube_boundary_preserves_node_order_and_quote_updates() {
             0
         );
     }
+    let legacy = c
+        .get::<Handle<dyn SwaptionVolatilityStructure>>(result.surface)
+        .unwrap();
+    for backward_flat in [-1, 2] {
+        unsafe {
+            assert_eq!(
+                itofin_sabr_swaption_vol_cube_new(
+                    &mut c,
+                    &cfg,
+                    backward_flat,
+                    &mut result,
+                    std::ptr::null_mut()
+                ),
+                INVALID_ARGUMENT
+            );
+        }
+    }
+    for backward_flat in [0, 1] {
+        unsafe {
+            assert_eq!(
+                itofin_sabr_swaption_vol_cube_new(
+                    &mut c,
+                    &cfg,
+                    backward_flat,
+                    &mut result,
+                    std::ptr::null_mut()
+                ),
+                0
+            );
+        }
+        let surface = c
+            .get::<Handle<dyn SwaptionVolatilityStructure>>(result.surface)
+            .unwrap();
+        let query = |handle: &Handle<dyn SwaptionVolatilityStructure>| {
+            handle
+                .current_link()
+                .unwrap()
+                .volatility_tenors(
+                    Period::new(5, TimeUnit::Years),
+                    Period::new(5, TimeUnit::Years),
+                    0.05,
+                    true,
+                )
+                .unwrap()
+        };
+        assert_eq!(query(&surface), query(&legacy));
+    }
     let sabr = c
         .get::<Handle<dyn SwaptionVolatilityStructure>>(result.surface)
         .unwrap()
