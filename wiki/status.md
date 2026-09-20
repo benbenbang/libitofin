@@ -64,9 +64,16 @@ Rust exposes `IborIborBasisSwapRateHelper` and the genuinely coupled 3M/6M
 Both helper sets read the opposite curve; QuantLib's FRA and swap repricing
 tolerances are preserved. Fixing-history updates on either index invalidate
 and recalibrate the live curve without observing its own forecast handle.
-This work will ship after v0.25.0. Concrete Python/C/Go joint-curve assembly
-remains [#1066](https://github.com/benbenbang/libitofin/issues/1066); the overnight
-basis-helper sibling remains [#1060](https://github.com/benbenbang/libitofin/issues/1060).
+The Ibor-Ibor helper shipped in v0.26.0. Concrete Python/C/Go joint-curve
+assembly remains [#1066](https://github.com/benbenbang/libitofin/issues/1066).
+
+Rust also exposes `OvernightIborBasisSwapRateHelper` (#1060): it fits the Ibor
+forecast curve, with basis paid on the compounded overnight leg. An omitted
+discount curve uses fitted Ibor, matching QuantLib executable behavior despite
+the upstream header prose. The [independent oracle](../crates/libitofin/tests/fixtures/overnight_basis/README.md)
+covers both discount modes and coupled OIS/Ibor curves. Construction and date
+updates report errors and recover after valid inputs return. Python/C/Go
+exposure of this overnight helper remains outside the supported binding scope.
 
 ## Hull-White calibration
 
