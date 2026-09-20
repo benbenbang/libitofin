@@ -253,23 +253,6 @@ typedef struct ItofinBondHelperConfig {
   bool has_issue_date;
 } ItofinBondHelperConfig;
 
-/**
- * Inputs for a standalone basis helper and reusable joint template.
- */
-typedef struct ItofinBasisHelperConfig {
-  uint64_t quote;
-  int32_t tenor_length;
-  int32_t tenor_unit;
-  uint32_t settlement_days;
-  uint64_t calendar;
-  int32_t convention;
-  int32_t end_of_month;
-  uint64_t base_index;
-  uint64_t other_index;
-  uint64_t discount_curve;
-  int32_t bootstrap_base_curve;
-} ItofinBasisHelperConfig;
-
 typedef struct ItofinIborConfig {
   int32_t tenor_length;
   int32_t tenor_unit;
@@ -519,6 +502,23 @@ typedef struct ItofinKYoYVolConfig {
   double slope;
   uint64_t settings;
 } ItofinKYoYVolConfig;
+
+/**
+ * Inputs for a standalone basis helper and reusable joint template.
+ */
+typedef struct ItofinBasisHelperConfig {
+  uint64_t quote;
+  int32_t tenor_length;
+  int32_t tenor_unit;
+  uint32_t settlement_days;
+  uint64_t calendar;
+  int32_t convention;
+  int32_t end_of_month;
+  uint64_t base_index;
+  uint64_t other_index;
+  uint64_t discount_curve;
+  int32_t bootstrap_base_curve;
+} ItofinBasisHelperConfig;
 
 /**
  * Presence bits: steps=1, steps/year=2, samples=4, tolerance=8, max_samples=16,
@@ -1660,80 +1660,6 @@ int32_t itofin_helper_date(struct ItofinContext *ctx,
                            int32_t query,
                            int32_t *out,
                            struct ItofinError *error);
-
-/**
- * Construct a basis helper retaining its quotes, indices and discount curve.
- * # Safety
- * Follow the crate-level pointer and thread contract.
- */
-int32_t itofin_basis_helper_new(struct ItofinContext *ctx,
-                                const struct ItofinBasisHelperConfig *cfg,
-                                uint64_t *out,
-                                struct ItofinError *error);
-
-/**
- * Assemble two global discount/log-linear curves from plain strips and basis templates.
- * # Safety
- * Follow the crate-level pointer and thread contract. Each input slice contains
- * its stated number of live handles belonging to the context.
- */
-int32_t itofin_joint_curves_new(struct ItofinContext *ctx,
-                                int32_t reference,
-                                const uint64_t *first,
-                                size_t first_len,
-                                const uint64_t *second,
-                                size_t second_len,
-                                const uint64_t *basis,
-                                size_t basis_len,
-                                uint64_t dc,
-                                double accuracy,
-                                uint64_t *out,
-                                struct ItofinError *error);
-
-/**
- * Return member zero or one with retained ownership of both contributors.
- * # Safety
- * Follow the crate-level pointer and thread contract.
- */
-int32_t itofin_joint_curve(struct ItofinContext *ctx,
-                           uint64_t joint,
-                           int32_t member,
-                           uint64_t *out,
-                           struct ItofinError *error);
-
-/**
- * Construct a swap helper with an exogenous discount curve.
- * # Safety
- * Follow the crate-level pointer and thread contract.
- */
-int32_t itofin_swap_helper_with_discount(struct ItofinContext *ctx,
-                                         const struct ItofinSwapHelperConfig *cfg,
-                                         uint64_t discount,
-                                         uint64_t *out,
-                                         struct ItofinError *error);
-
-/**
- * Add a fixing, rejecting conflicting existing values.
- * # Safety
- * Follow the crate-level pointer and thread contract.
- */
-int32_t itofin_ibor_add_fixing(struct ItofinContext *ctx,
-                               uint64_t index,
-                               int32_t fixing_date,
-                               double value,
-                               struct ItofinError *error);
-
-/**
- * Construct a flat continuous discount curve retaining a live quote.
- * # Safety
- * Follow the crate-level pointer and thread contract.
- */
-int32_t itofin_flat_forward_from_quote(struct ItofinContext *ctx,
-                                       int32_t reference,
-                                       uint64_t quote_id,
-                                       uint64_t dc,
-                                       uint64_t *out,
-                                       struct ItofinError *error);
 
 /**
  * # Safety
@@ -2989,6 +2915,80 @@ int32_t itofin_k_yoy_vol_slice(struct ItofinContext *ctx,
                                size_t capacity,
                                size_t *required,
                                struct ItofinError *error);
+
+/**
+ * Construct a basis helper retaining its quotes, indices and discount curve.
+ * # Safety
+ * Follow the crate-level pointer and thread contract.
+ */
+int32_t itofin_basis_helper_new(struct ItofinContext *ctx,
+                                const struct ItofinBasisHelperConfig *cfg,
+                                uint64_t *out,
+                                struct ItofinError *error);
+
+/**
+ * Assemble two global discount/log-linear curves from plain strips and basis templates.
+ * # Safety
+ * Follow the crate-level pointer and thread contract. Each input slice contains
+ * its stated number of live handles belonging to the context.
+ */
+int32_t itofin_joint_curves_new(struct ItofinContext *ctx,
+                                int32_t reference,
+                                const uint64_t *first,
+                                size_t first_len,
+                                const uint64_t *second,
+                                size_t second_len,
+                                const uint64_t *basis,
+                                size_t basis_len,
+                                uint64_t dc,
+                                double accuracy,
+                                uint64_t *out,
+                                struct ItofinError *error);
+
+/**
+ * Return member zero or one with retained ownership of both contributors.
+ * # Safety
+ * Follow the crate-level pointer and thread contract.
+ */
+int32_t itofin_joint_curve(struct ItofinContext *ctx,
+                           uint64_t joint,
+                           int32_t member,
+                           uint64_t *out,
+                           struct ItofinError *error);
+
+/**
+ * Construct a swap helper with an exogenous discount curve.
+ * # Safety
+ * Follow the crate-level pointer and thread contract.
+ */
+int32_t itofin_swap_helper_with_discount(struct ItofinContext *ctx,
+                                         const struct ItofinSwapHelperConfig *cfg,
+                                         uint64_t discount,
+                                         uint64_t *out,
+                                         struct ItofinError *error);
+
+/**
+ * Add a fixing, rejecting conflicting existing values.
+ * # Safety
+ * Follow the crate-level pointer and thread contract.
+ */
+int32_t itofin_ibor_add_fixing(struct ItofinContext *ctx,
+                               uint64_t index,
+                               int32_t fixing_date,
+                               double value,
+                               struct ItofinError *error);
+
+/**
+ * Construct a flat continuous discount curve retaining a live quote.
+ * # Safety
+ * Follow the crate-level pointer and thread contract.
+ */
+int32_t itofin_flat_forward_from_quote(struct ItofinContext *ctx,
+                                       int32_t reference,
+                                       uint64_t quote_id,
+                                       uint64_t dc,
+                                       uint64_t *out,
+                                       struct ItofinError *error);
 
 /**
  * # Safety
