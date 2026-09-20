@@ -45,8 +45,8 @@ see the [Go validation record](../docs/go-binding-test-gaps.md).
 seasonality in Rust, Python and Go. The cumulative correction matches 72
 [independent QuantLib rows](../crates/libitofin/tests/fixtures/kerkhof_seasonality.md);
 installing or clearing it recalibrates zero-inflation curves. Exactly twelve
-factors are supported; YoY corrections are rejected. This addition is on main
-and will ship after v0.25.0.
+factors are supported; YoY corrections are rejected. This addition shipped in
+v0.26.0.
 
 [#1017](https://github.com/benbenbang/libitofin/issues/1017) adds lazy zero-inflation
 base dates. Python/C/Go expose a last-fixing constructor with linear interpolation;
@@ -106,7 +106,7 @@ convenience ([#1049](https://github.com/benbenbang/libitofin/issues/1049)).
 [Python](../crates/itofin-py/tests/test_swaption_facades.py) and
 [C/Go](../sdk/go/swaption_facades_test.go) tests preserve the Eonia OIS cached NPV
 `0.014101075767` at `1e-12`, independent forecast pins, exercise-calendar overrides,
-retained dependencies and live repricing. These facades will ship after v0.25.0.
+retained dependencies and live repricing. These facades shipped in v0.26.0.
 MakeSwaption is payer-only and has no overnight-index builder; SwapIndex clone
 variants and swaption implied volatility remain deferred.
 
