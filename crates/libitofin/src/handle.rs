@@ -137,6 +137,7 @@ impl<T: AsObservable + ?Sized> Link<T> {
 /// [`RelinkableHandle`] to relink it.
 pub struct Handle<T: ?Sized> {
     link: SharedMut<Link<T>>,
+    owner: Option<Shared<dyn std::any::Any>>,
 }
 
 impl<T: AsObservable + ?Sized> Handle<T> {
@@ -144,6 +145,7 @@ impl<T: AsObservable + ?Sized> Handle<T> {
     pub fn empty() -> Self {
         Handle {
             link: shared_mut(Link::new(None)),
+            owner: None,
         }
     }
 
@@ -151,6 +153,7 @@ impl<T: AsObservable + ?Sized> Handle<T> {
     pub fn new(pointee: Shared<T>) -> Self {
         Handle {
             link: shared_mut(Link::new(Some(pointee))),
+            owner: None,
         }
     }
 
@@ -166,11 +169,22 @@ impl<T: AsObservable + ?Sized> Handle<T> {
         link.link_unregistered(pointee);
         Handle {
             link: shared_mut(link),
+            owner: None,
         }
     }
 }
 
 impl<T: ?Sized> Handle<T> {
+    /// Retains an additional owner with this handle and its future clones.
+    ///
+    /// Existing copies of the link are unchanged. The raw pointer returned by
+    /// `current_link` does not carry this ownership. Do not retain an owner
+    /// that itself owns this handle, directly or through its consumers.
+    pub(crate) fn retaining(mut self, owner: Shared<dyn std::any::Any>) -> Self {
+        self.owner = Some(owner);
+        self
+    }
+
     /// Returns the current pointee, or an error if the handle is empty.
     ///
     /// Mirrors QuantLib's `currentLink`/`operator*`, which require a non-empty
@@ -215,6 +229,7 @@ impl<T: ?Sized> Clone for Handle<T> {
     fn clone(&self) -> Self {
         Handle {
             link: SharedMut::clone(&self.link),
+            owner: self.owner.clone(),
         }
     }
 }

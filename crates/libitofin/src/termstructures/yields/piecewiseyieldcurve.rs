@@ -161,10 +161,14 @@ where
         // `bootstrap_.setup(this)` -> `registerWithObservables`).
         let observer = SharedMut::clone(&curve.updater) as SharedMut<dyn Observer>;
         for helper in &curve.instruments {
+            helper.base().register_curve_owner(curve.self_weak.clone());
             helper.observable().register_observer(&observer);
         }
         // Helpers the bootstrap owns rather than fits - GlobalBootstrap's
         // additional helpers - register too (`globalbootstrap.hpp:219-220`).
+        curve
+            .bootstrap
+            .register_helper_owner(curve.self_weak.clone());
         for observable in curve.bootstrap.additional_observables() {
             observable.register_observer(&observer);
         }
