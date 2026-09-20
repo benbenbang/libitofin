@@ -76,6 +76,7 @@ use crate::types::Real;
 pub struct BootstrapHelperBase<TS: ?Sized = dyn YieldTermStructure> {
     quote: Handle<dyn Quote>,
     term_structure: RefCell<Option<Weak<TS>>>,
+    curve_owners: RefCell<Vec<Weak<TS>>>,
     earliest_date: Cell<Date>,
     latest_date: Cell<Date>,
     maturity_date: Cell<Date>,
@@ -107,6 +108,7 @@ impl<TS: ?Sized> BootstrapHelperBase<TS> {
         BootstrapHelperBase {
             quote,
             term_structure: RefCell::new(None),
+            curve_owners: RefCell::new(Vec::new()),
             earliest_date: Cell::new(Date::null()),
             latest_date: Cell::new(Date::null()),
             maturity_date: Cell::new(Date::null()),
@@ -205,11 +207,29 @@ impl<TS: ?Sized> BootstrapHelperBase<TS> {
         }
     }
 
+    pub(crate) fn has_curve_owner(&self) -> bool {
+        self.curve_owners
+            .borrow()
+            .iter()
+            .any(|owner| owner.strong_count() > 0)
+    }
+
+    pub(crate) fn register_curve_owner(&self, owner: Weak<TS>) {
+        let mut owners = self.curve_owners.borrow_mut();
+        owners.retain(|owner| owner.strong_count() > 0);
+        owners.push(owner);
+    }
+
     /// The evaluation date last seen by a relative-date helper, if any.
     pub fn evaluation_date(&self) -> Option<Date> {
         self.relative
             .as_ref()
             .and_then(|relative| relative.evaluation_date.get())
+    }
+
+    /// Settings used by a relative-date helper, absent for fixed-date helpers.
+    pub fn settings(&self) -> Option<&Shared<Settings<Date>>> {
+        self.relative.as_ref().map(|relative| &relative.settings)
     }
 
     /// Whether a relative-date helper rebuilds its schedule on date changes.

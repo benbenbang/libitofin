@@ -156,6 +156,9 @@ pub trait PiecewiseCurve {
 /// [`LocalBootstrap`](crate::termstructures::localbootstrap::LocalBootstrap)
 /// (the localised least-squares fit for the convex-monotone spline).
 pub trait Bootstrap<C: PiecewiseCurve> {
+    /// Record weak curve membership for additional helpers before calculation.
+    fn register_helper_owner(&self, _owner: std::rc::Weak<C::TS>) {}
+
     /// Bootstraps `curve` in place (C++'s `Bootstrap::calculate`).
     fn calculate(&self, curve: &C) -> QlResult<()>;
 

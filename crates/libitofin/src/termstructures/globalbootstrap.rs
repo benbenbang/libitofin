@@ -1091,6 +1091,12 @@ where
     C: PiecewiseCurve<Helper = dyn RateHelper, TS = dyn YieldTermStructure>,
     C::Traits: YieldBootstrapTraits,
 {
+    fn register_helper_owner(&self, owner: std::rc::Weak<dyn YieldTermStructure>) {
+        for helper in &self.additional_helpers {
+            helper.base().register_curve_owner(owner.clone());
+        }
+    }
+
     /// The additional helpers, all of them: the alive filter of `calculate`
     /// governs the solve, never observability (`globalbootstrap.hpp:219-220`).
     fn additional_observables(&self) -> Vec<Shared<Observable>> {
