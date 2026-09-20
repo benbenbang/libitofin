@@ -3,9 +3,8 @@
 //! Port of `ql/experimental/termstructures/basisswapratehelpers.{hpp,cpp}`:
 //! [`IborIborBasisSwapRateHelper`], the coupling instrument of a joint
 //! multi-curve bootstrap (a 3m curve and a 6m curve each reading the other
-//! through the same basis quotes). `OvernightIborBasisSwapRateHelper`
-//! (`basisswapratehelpers.hpp:85`, `.cpp:121`) is not ported here; it is
-//! tracked separately in [#1060](https://github.com/benbenbang/libitofin/issues/1060).
+//! through the same basis quotes). The overnight sibling is
+//! [`super::OvernightIborBasisSwapRateHelper`].
 
 use std::cell::RefCell;
 use std::rc::Weak;

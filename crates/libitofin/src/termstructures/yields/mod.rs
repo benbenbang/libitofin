@@ -12,6 +12,7 @@ mod forwardcurve;
 mod forwardspreadedtermstructure;
 mod forwardstructure;
 mod impliedtermstructure;
+mod overnightbasisswapratehelper;
 mod piecewiseyieldcurve;
 mod ratehelpers;
 mod simplezerocurve;
@@ -27,6 +28,7 @@ pub use forwardcurve::{ForwardCurve, InterpolatedForwardCurve};
 pub use forwardspreadedtermstructure::ForwardSpreadedTermStructure;
 pub use forwardstructure::ForwardRateStructure;
 pub use impliedtermstructure::ImpliedTermStructure;
+pub use overnightbasisswapratehelper::OvernightIborBasisSwapRateHelper;
 pub use piecewiseyieldcurve::PiecewiseYieldCurve;
 pub use ratehelpers::{
     DepositRateHelper, FraRateHelper, FuturesRateHelper, OISRateHelper, Pillar, SwapRateHelper,
