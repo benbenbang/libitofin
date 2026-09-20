@@ -22,6 +22,9 @@ use libitofin::time::{
 };
 
 pub(crate) fn helper(c: &Context, id: u64) -> BindingResult<Shared<dyn RateHelper>> {
+    if let Ok(value) = c.get::<crate::joint_curves_api::BasisHelper>(id) {
+        return Ok(value.helper);
+    }
     match c.get::<Shared<dyn RateHelper>>(id) {
         Ok(v) => Ok(v),
         Err(_) => Ok(c.get::<Shared<FuturesRateHelper>>(id)? as Shared<dyn RateHelper>),
