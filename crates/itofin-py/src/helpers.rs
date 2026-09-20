@@ -138,6 +138,10 @@ impl PyRateHelper {
 }
 
 impl PyRateHelper {
+    pub(crate) fn from_inner(inner: Shared<dyn RateHelper>) -> Self {
+        Self { inner }
+    }
+
     /// A clone of the upcast helper, for the piecewise-curve facade (T5), which
     /// takes a list of helpers and threads each into the bootstrap.
     #[allow(dead_code)]
@@ -192,7 +196,7 @@ impl PyDepositRateHelper {
 /// A helper fitting a par swap rate (spot-starting, no spread).
 ///
 /// The spot-starting form the curve-consistency oracle builds: no spread, no
-/// forward start, no exogenous discounting curve, and the default pillar.
+/// forward start and the default pillar, with optional exogenous discounting.
 #[gen_stub_pyclass]
 #[pyclass(name = "SwapRateHelper", extends = PyRateHelper, unsendable, module = "itofin.termstructures")]
 pub struct PySwapRateHelper;
@@ -210,8 +214,10 @@ impl PySwapRateHelper {
     ///     fixed_convention (BusinessDayConvention): The fixed leg's roll.
     ///     fixed_day_count (DayCounter): The fixed leg's day count.
     ///     ibor_index (IborIndex): The index the floating leg fixes off.
+    ///     discount (YieldTermStructure | None): Optional exogenous discount curve.
     #[gen_stub(override_return_type(type_repr = "SwapRateHelper"))]
     #[new]
+    #[pyo3(signature = (quote, tenor, calendar, fixed_frequency, fixed_convention, fixed_day_count, ibor_index, discount = None))]
     #[allow(clippy::too_many_arguments)]
     fn new(
         quote: &PySimpleQuote,
@@ -221,18 +227,30 @@ impl PySwapRateHelper {
         fixed_convention: &PyBusinessDayConvention,
         fixed_day_count: &PyDayCounter,
         ibor_index: &PyIborIndex,
-    ) -> PyClassInitializer<Self> {
+        discount: Option<&PyYieldTermStructure>,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        if tenor.inner().length() <= 0 {
+            return Err(crate::ItofinError::new_err("swap tenor must be positive"));
+        }
         let idx = ibor_index.inner();
-        let helper = SwapRateHelper::new(
-            quote.handle(),
-            tenor.inner(),
-            calendar.inner(),
-            fixed_frequency.inner(),
-            fixed_convention.inner(),
-            fixed_day_count.inner(),
-            &idx,
-        ) as Shared<dyn RateHelper>;
-        PyClassInitializer::from(PyRateHelper { inner: helper }).add_subclass(PySwapRateHelper)
+        let helper = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            SwapRateHelper::with_details(
+                quote.handle(),
+                tenor.inner(),
+                calendar.inner(),
+                fixed_frequency.inner(),
+                fixed_convention.inner(),
+                fixed_day_count.inner(),
+                &idx,
+                Handle::empty(),
+                libitofin::time::period::Period::new(0, libitofin::time::timeunit::TimeUnit::Days),
+                discount.map(PyYieldTermStructure::handle),
+                Pillar::LastRelevantDate,
+            )
+        }))
+        .map_err(|_| crate::ItofinError::new_err("invalid swap helper schedule"))?
+            as Shared<dyn RateHelper>;
+        Ok(PyClassInitializer::from(PyRateHelper { inner: helper }).add_subclass(PySwapRateHelper))
     }
 }
 
