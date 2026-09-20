@@ -594,7 +594,7 @@
       ]
     },
     {
-      "c": "itofin_swaption_vol_cube_new(kind=1)",
+      "c": "itofin_sabr_swaption_vol_cube_new",
       "go": "Session.SabrSwaptionVolatilityCube",
       "go_file": "sdk/go/volcube.go",
       "python": "itofin.termstructures.SabrSwaptionVolatilityCube.__init__",
@@ -602,7 +602,10 @@
       "status": "implemented",
       "tests": [
         "crates/libitofin-ffi/src/vol_tests.rs::interpolated_cube_boundary_preserves_node_order_and_quote_updates",
-        "sdk/go/vol_advanced_test.go::TestSABRCubeFreeCalibrationPythonOracle"
+        "sdk/go/vol_advanced_test.go::TestSABRCubeFreeCalibrationPythonOracle",
+        "sdk/go/sabr_backward_flat_test.go::TestSABRBackwardFlatQuantLibOracle",
+        "sdk/go/sabr_backward_flat_test.go::TestSABRBackwardFlatUpdatesAndRetainedInputs",
+        "sdk/go/sabr_backward_flat_test.go::TestSABRBackwardFlatInvalidInputs"
       ]
     },
     {
