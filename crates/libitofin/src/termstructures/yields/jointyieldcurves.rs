@@ -182,3 +182,7 @@ impl JointYieldCurves {
         Ok(self.curves[member].clone())
     }
 }
+
+#[cfg(test)]
+#[path = "jointyieldcurves_tests.rs"]
+mod tests;
