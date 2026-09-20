@@ -266,3 +266,7 @@ impl RelativeDateRateHelper for OvernightIborBasisSwapRateHelper {
         let _ = self.try_initialize_dates();
     }
 }
+
+#[cfg(test)]
+#[path = "overnightbasisswapratehelper_tests.rs"]
+mod tests;
