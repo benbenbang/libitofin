@@ -59,6 +59,24 @@ Prefer explicit Go configuration structs to long positional argument lists.
 Use Go-owned scalar arrays for synchronous native calls only; retain no Go memory
 in Rust. Batch large numerical work across the boundary.
 
+## Joint yield curves
+
+`JointYieldCurves` assembles exactly two global discount/log-linear curves. Basis
+helper templates must include both bootstrap sides and share their input index
+objects/settings. The assembler clones those indices onto private weak forecast
+links and copies the basis helper configurations; template helpers stay independent.
+Plain helper strips must be distinct and have no live curve owner, including an
+unqueried curve or a global bootstrap's additional-helper list. Do not reuse these
+plain helpers later in another curve; legacy generic constructors retain their
+existing behavior.
+
+Each exported curve handle retains the `MultiCurve` owner and both contributors.
+Closing the assembler, sibling curve, or input wrappers does not break consumers
+that retain an exported handle. Internal weak forecast links never retain that
+owner, so dropping the last external consumer releases the joint graph. Extracting
+only a raw Rust `current_link()` pointer does not retain the additional owner.
+See the [joint-curve guide](docs/joint-curves.md) for usage and executable examples.
+
 ## Global bootstrap callbacks
 
 `PiecewiseCurveConfig` accepts `AdditionalVariables`, `AdditionalDates`, and

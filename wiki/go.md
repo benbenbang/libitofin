@@ -34,3 +34,5 @@ for concurrency and callback restrictions.
 - [SDK ownership and validation guide](../sdk/go/README.md).
 - [Native distribution and migration](../docs/go-distribution.md).
 - [C ABI contract](../docs/go-binding-contract.md) and [header](../crates/libitofin-ffi/include/itofin.h).
+
+- [Coupled yield curves](../docs/docs/joint-curves.md): jointly fit Ibor basis markets with retained curve ownership.
