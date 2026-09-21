@@ -1281,7 +1281,7 @@ class FraRateHelper(RateHelper):
     forward. from_dates fixes the window at construction (it does not shift on an
     evaluation-date change).
     """
-    def __init__(self, quote: quotes.SimpleQuote, period_to_start: time.Period, index: indexes.IborIndex, use_indexed_coupon: builtins.bool = True, pillar: Pillar = Pillar.LastRelevantDate) -> None:
+    def __init__(self, quote: quotes.SimpleQuote, period_to_start: time.Period, index: indexes.IborIndex, use_indexed_coupon: builtins.bool = True, pillar: Pillar = Pillar.LastRelevantDate, custom_pillar_date: typing.Optional[time.Date] = None) -> None:
         r"""
         Build the helper over the window period_to_start past spot.
 
@@ -1297,7 +1297,7 @@ class FraRateHelper(RateHelper):
                 LastRelevantDate.
         """
     @staticmethod
-    def from_rate(rate: builtins.float, period_to_start: time.Period, index: indexes.IborIndex, use_indexed_coupon: builtins.bool = True, pillar: Pillar = Pillar.LastRelevantDate) -> FraRateHelper:
+    def from_rate(rate: builtins.float, period_to_start: time.Period, index: indexes.IborIndex, use_indexed_coupon: builtins.bool = True, pillar: Pillar = Pillar.LastRelevantDate, custom_pillar_date: typing.Optional[time.Date] = None) -> FraRateHelper:
         r"""
         Build the helper over a fixed rate.
 
@@ -1307,13 +1307,14 @@ class FraRateHelper(RateHelper):
             period_to_start (Period): How long after spot the window starts.
             index (IborIndex): The index whose tenor the window spans.
             use_indexed_coupon (bool): The implied-quote mode; see __init__.
+            custom_pillar_date (Date | None): Required with CustomDate.
             pillar (Pillar): The date the curve node sits at.
 
         Returns:
             FraRateHelper: The helper fitting that rate.
         """
     @staticmethod
-    def from_months(quote: quotes.SimpleQuote, months_to_start: builtins.int, index: indexes.IborIndex, use_indexed_coupon: builtins.bool = True, pillar: Pillar = Pillar.LastRelevantDate) -> FraRateHelper:
+    def from_months(quote: quotes.SimpleQuote, months_to_start: builtins.int, index: indexes.IborIndex, use_indexed_coupon: builtins.bool = True, pillar: Pillar = Pillar.LastRelevantDate, custom_pillar_date: typing.Optional[time.Date] = None) -> FraRateHelper:
         r"""
         Build the helper with a start given in months after spot.
 
@@ -1323,13 +1324,14 @@ class FraRateHelper(RateHelper):
                 starts.
             index (IborIndex): The index whose tenor the window spans.
             use_indexed_coupon (bool): The implied-quote mode; see __init__.
+            custom_pillar_date (Date | None): Required with CustomDate.
             pillar (Pillar): The date the curve node sits at.
 
         Returns:
             FraRateHelper: The helper over that window.
         """
     @staticmethod
-    def from_dates(quote: quotes.SimpleQuote, start_date: time.Date, end_date: time.Date, index: indexes.IborIndex, use_indexed_coupon: builtins.bool = True, pillar: Pillar = Pillar.LastRelevantDate) -> FraRateHelper:
+    def from_dates(quote: quotes.SimpleQuote, start_date: time.Date, end_date: time.Date, index: indexes.IborIndex, use_indexed_coupon: builtins.bool = True, pillar: Pillar = Pillar.LastRelevantDate, custom_pillar_date: typing.Optional[time.Date] = None) -> FraRateHelper:
         r"""
         Build the helper over an explicit window.
 
@@ -1342,6 +1344,7 @@ class FraRateHelper(RateHelper):
             end_date (Date): The window's end.
             index (IborIndex): The index the forward is read off.
             use_indexed_coupon (bool): The implied-quote mode; see __init__.
+            custom_pillar_date (Date | None): Required with CustomDate.
             pillar (Pillar): The date the curve node sits at.
 
         Returns:
@@ -1973,10 +1976,10 @@ class OISRateHelper(RateHelper):
     optional knobs trail with defaults. discounting_curve=None discounts off the
     bootstrapping curve; overnight_spread=None is an empty (zero) spread. The
     deferred core knobs past averaging_method (telescopic value dates, lookback,
-    lockout, observation shift, custom pillar, per-leg calendars) take benign
+    lockout, observation shift, per-leg calendars) take benign
     defaults.
     """
-    def __init__(self, settlement_days: builtins.int, tenor: time.Period, quote: quotes.SimpleQuote, overnight_index: indexes.OvernightIndex, payment_lag: builtins.int, payment_convention: time.BusinessDayConvention, payment_frequency: time.Frequency, forward_start: time.Period, settings: itofin.Settings, discounting_curve: typing.Optional[YieldTermStructure] = None, overnight_spread: typing.Optional[quotes.SimpleQuote] = None, pillar: Pillar = Pillar.LastRelevantDate, averaging_method: RateAveraging = RateAveraging.Compound) -> None:
+    def __init__(self, settlement_days: builtins.int, tenor: time.Period, quote: quotes.SimpleQuote, overnight_index: indexes.OvernightIndex, payment_lag: builtins.int, payment_convention: time.BusinessDayConvention, payment_frequency: time.Frequency, forward_start: time.Period, settings: itofin.Settings, discounting_curve: typing.Optional[YieldTermStructure] = None, overnight_spread: typing.Optional[quotes.SimpleQuote] = None, pillar: Pillar = Pillar.LastRelevantDate, averaging_method: RateAveraging = RateAveraging.Compound, custom_pillar_date: typing.Optional[time.Date] = None) -> None:
         r"""
         Build the helper over the schedule of a spot-starting OIS.
 
@@ -3157,9 +3160,9 @@ class SwapRateHelper(RateHelper):
     A helper fitting a par swap rate (spot-starting, no spread).
 
     The spot-starting form the curve-consistency oracle builds: no spread, no
-    forward start and the default pillar, with optional exogenous discounting.
+    forward start, with optional exogenous discounting and custom pillars.
     """
-    def __init__(self, quote: quotes.SimpleQuote, tenor: time.Period, calendar: time.Calendar, fixed_frequency: time.Frequency, fixed_convention: time.BusinessDayConvention, fixed_day_count: time.DayCounter, ibor_index: indexes.IborIndex, discount: typing.Optional[YieldTermStructure] = None) -> None:
+    def __init__(self, quote: quotes.SimpleQuote, tenor: time.Period, calendar: time.Calendar, fixed_frequency: time.Frequency, fixed_convention: time.BusinessDayConvention, fixed_day_count: time.DayCounter, ibor_index: indexes.IborIndex, discount: typing.Optional[YieldTermStructure] = None, pillar: Pillar = Pillar.LastRelevantDate, custom_pillar_date: typing.Optional[time.Date] = None) -> None:
         r"""
         Build the helper over the schedule of a spot-starting swap.
 
@@ -3172,6 +3175,8 @@ class SwapRateHelper(RateHelper):
             fixed_day_count (DayCounter): The fixed leg's day count.
             ibor_index (IborIndex): The index the floating leg fixes off.
             discount (YieldTermStructure | None): Optional exogenous discount curve.
+            pillar (Pillar): Node convention; defaults to LastRelevantDate.
+            custom_pillar_date (Date | None): Required with CustomDate.
         """
 
 @typing.final
@@ -3374,14 +3379,11 @@ class YearOnYearInflationSwapHelper(YoYInflationHelper):
     of index linked to a handle of its own, so the caller's index need not be
     linked to any curve.
 
-    pillar is accepted for signature parity but never read: it only ever
-    discriminates on the interpolated path, which is refused.
-
-    Fallible: CpiInterpolationType.Linear is refused outright, and the swap is
-    built here, so an observation lag its legs cannot be built under fails at
-    construction.
+    Linear interpolation supports schedule-derived or custom pillars within
+    the final fixing period. Flat interpolation uses its single fixing date.
+    Invalid observation lags or custom dates fail at construction.
     """
-    def __init__(self, quote: quotes.SimpleQuote, swap_obs_lag: time.Period, maturity: time.Date, calendar: time.Calendar, payment_convention: time.BusinessDayConvention, day_counter: time.DayCounter, index: indexes.YoYInflationIndex, interpolation: indexes.CpiInterpolationType, nominal_term_structure: YieldTermStructure, settings: itofin.Settings, pillar: Pillar = Pillar.LastRelevantDate) -> None:
+    def __init__(self, quote: quotes.SimpleQuote, swap_obs_lag: time.Period, maturity: time.Date, calendar: time.Calendar, payment_convention: time.BusinessDayConvention, day_counter: time.DayCounter, index: indexes.YoYInflationIndex, interpolation: indexes.CpiInterpolationType, nominal_term_structure: YieldTermStructure, settings: itofin.Settings, pillar: Pillar = Pillar.LastRelevantDate, custom_pillar_date: typing.Optional[time.Date] = None) -> None:
         r"""
         Build the helper on a swap maturing at maturity.
 
@@ -3406,14 +3408,12 @@ class YearOnYearInflationSwapHelper(YoYInflationHelper):
             settings (Settings): The explicit settings supplying the evaluation
                 date the swap starts at, which must be set before this
                 constructor runs.
-            pillar (Pillar): Accepted for signature parity but never read; it
-                only ever discriminates on the interpolated path.
+            pillar (Pillar): Node convention on the Linear interpolation path.
+            custom_pillar_date (Date | None): Required with CustomDate; Flat
+                interpolation keeps its single fixing date.
 
         Raises:
-            ItofinError: On Linear interpolation, which the core refuses
-                outright pending the interpolated branch (#847), and on an
-                observation lag the helper's own swap legs cannot be built
-                under.
+            ItofinError: On invalid observation lags or custom pillar dates.
         """
 
 class YieldTermStructure:
@@ -3781,7 +3781,7 @@ class ZeroCouponInflationSwapHelper(ZeroInflationHelper):
     pillar picks which of the two nodes an interpolated swap straddles the helper
     fits; a flat swap reads a single fixing and ignores it.
     """
-    def __init__(self, quote: quotes.SimpleQuote, swap_obs_lag: time.Period, maturity: time.Date, calendar: time.Calendar, payment_convention: time.BusinessDayConvention, day_counter: time.DayCounter, index: indexes.ZeroInflationIndex, observation_interpolation: indexes.CpiInterpolationType, settings: itofin.Settings, pillar: Pillar = Pillar.LastRelevantDate) -> None:
+    def __init__(self, quote: quotes.SimpleQuote, swap_obs_lag: time.Period, maturity: time.Date, calendar: time.Calendar, payment_convention: time.BusinessDayConvention, day_counter: time.DayCounter, index: indexes.ZeroInflationIndex, observation_interpolation: indexes.CpiInterpolationType, settings: itofin.Settings, pillar: Pillar = Pillar.LastRelevantDate, custom_pillar_date: typing.Optional[time.Date] = None) -> None:
         r"""
         Build the helper on a swap maturing at maturity.
 
@@ -3811,6 +3811,7 @@ class ZeroCouponInflationSwapHelper(ZeroInflationHelper):
             pillar (Pillar): Which of the two nodes an interpolated swap
                 straddles the helper fits; a flat swap reads a single fixing
                 and ignores it.
+            custom_pillar_date (Date | None): Required with CustomDate.
 
         Raises:
             ItofinError: On an observation lag the index cannot observe
@@ -4033,12 +4034,12 @@ class Pillar:
     r"""
     The date the curve node a helper fits sits at.
 
-    MaturityDate and LastRelevantDate (the default) are the two schedule-derived
-    choices. Pillar.CustomDate is deferred in the core (#343), so its omission
-    here is deliberate, not an oversight.
+    MaturityDate and LastRelevantDate are schedule-derived. CustomDate requires
+    the separate custom_pillar_date argument within the helper date bounds.
     """
     MaturityDate: typing.ClassVar[Pillar]
     LastRelevantDate: typing.ClassVar[Pillar]
+    CustomDate: typing.ClassVar[Pillar]
     def __new__(cls, _unconstructible: typing.NoReturn) -> Pillar: ...
     def __int__(self) -> builtins.int: ...
     __hash__: typing.ClassVar[None]  # type: ignore[assignment]
