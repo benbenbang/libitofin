@@ -63,3 +63,6 @@ pub use swaption::{
 pub use vanillaswap::VanillaSwap;
 pub use yearonyearinflationswap::YearOnYearInflationSwap;
 pub use zerocouponinflationswap::ZeroCouponInflationSwap;
+
+pub mod overnightindexfuture;
+pub use overnightindexfuture::OvernightIndexFuture;
