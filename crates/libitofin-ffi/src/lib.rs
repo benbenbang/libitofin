@@ -37,6 +37,7 @@ pub mod market_api;
 pub mod mc_api;
 pub mod models_api;
 pub mod options_api;
+pub mod poisson_rng_api;
 pub mod rates_api;
 pub mod rates_engines;
 pub mod rates_fra;
