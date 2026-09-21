@@ -1,7 +1,11 @@
 use crate::error::InvalidInput;
 
-/// Box bounds. An infinite entry leaves that side open; `NaN` is rejected,
-/// because `NaN` is reserved for nonfinite evaluations.
+/// Box bounds, one entry per coordinate.
+///
+/// A `-inf` lower bound or a `+inf` upper bound leaves that side open, and two
+/// equal finite endpoints fix the coordinate. `NaN` is rejected, because `NaN`
+/// is reserved for nonfinite evaluations, and so is a pair that admits no
+/// finite coordinate: a `+inf` lower bound or a `-inf` upper bound.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Bounds {
     /// One lower bound per coordinate.
@@ -20,7 +24,8 @@ pub struct Problem {
 }
 
 impl Problem {
-    /// Checks `x0` and, when present, the shape and ordering of the bounds.
+    /// Checks `x0` and, when present, the shape, the ordering and the
+    /// feasibility of the bounds.
     pub fn validate(&self) -> Result<(), InvalidInput> {
         if self.x0.is_empty() {
             return Err(InvalidInput::EmptyX0);
@@ -46,6 +51,9 @@ impl Problem {
         for (index, (lower, upper)) in bounds.lower.iter().zip(&bounds.upper).enumerate() {
             if lower > upper {
                 return Err(InvalidInput::BoundsOrder { index });
+            }
+            if *lower == f64::INFINITY || *upper == f64::NEG_INFINITY {
+                return Err(InvalidInput::InfeasibleBound { index });
             }
         }
         Ok(())
@@ -93,6 +101,41 @@ pub struct NelderMeadOptions {
     pub initial_simplex: Option<Vec<Vec<f64>>>,
 }
 
+impl NelderMeadOptions {
+    fn validate(&self, n: usize) -> Result<(), InvalidInput> {
+        for (option, tolerance) in [("xatol", self.xatol), ("fatol", self.fatol)] {
+            if !tolerance.is_finite() || tolerance < 0.0 {
+                return Err(InvalidInput::NotFiniteNonnegative { option });
+            }
+        }
+        let Some(simplex) = &self.initial_simplex else {
+            return Ok(());
+        };
+        let expected = n + 1;
+        if simplex.len() != expected {
+            return Err(InvalidInput::SimplexPointCount {
+                expected,
+                found: simplex.len(),
+            });
+        }
+        for (point, coordinates) in simplex.iter().enumerate() {
+            if coordinates.len() != n {
+                return Err(InvalidInput::SimplexPointLength {
+                    point,
+                    expected: n,
+                    found: coordinates.len(),
+                });
+            }
+        }
+        for (point, coordinates) in simplex.iter().enumerate() {
+            if let Some(index) = coordinates.iter().position(|value| !value.is_finite()) {
+                return Err(InvalidInput::NonfiniteSimplex { point, index });
+            }
+        }
+        Ok(())
+    }
+}
+
 impl Default for NelderMeadOptions {
     fn default() -> Self {
         Self {
@@ -127,7 +170,11 @@ impl Method {
         }
     }
 
-    /// Rejects a problem carrying an option this method cannot honour.
+    /// Rejects an option this method cannot honour and an option it cannot
+    /// read.
+    ///
+    /// The checks run in a fixed order: the unsupported options first, then the
+    /// tolerances, then the shape of an initial simplex, then its coordinates.
     pub fn validate(&self, problem: &Problem) -> Result<(), InvalidInput> {
         if problem.bounds.is_some() && !self.supports_bounds() {
             return Err(InvalidInput::Unsupported {
@@ -135,6 +182,8 @@ impl Method {
                 option: "bounds",
             });
         }
-        Ok(())
+        match self {
+            Method::NelderMead(options) => options.validate(problem.x0.len()),
+        }
     }
 }

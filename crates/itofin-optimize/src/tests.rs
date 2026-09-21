@@ -192,6 +192,100 @@ fn a_method_rejects_an_option_it_does_not_support() {
     assert_eq!(method.validate(&bounded), Err(expected));
 }
 
+fn nelder_mead(options: NelderMeadOptions) -> Method {
+    Method::NelderMead(options)
+}
+
+fn tolerances(xatol: f64, fatol: f64) -> NelderMeadOptions {
+    NelderMeadOptions {
+        xatol,
+        fatol,
+        ..NelderMeadOptions::default()
+    }
+}
+
+fn simplex(points: Vec<Vec<f64>>) -> NelderMeadOptions {
+    NelderMeadOptions {
+        initial_simplex: Some(points),
+        ..NelderMeadOptions::default()
+    }
+}
+
+#[test]
+fn a_nelder_mead_tolerance_must_be_finite_and_nonnegative() {
+    let rejected = [
+        ("xatol", tolerances(f64::NAN, 1e-4)),
+        ("xatol", tolerances(f64::INFINITY, 1e-4)),
+        ("fatol", tolerances(1e-4, -1.0)),
+    ];
+    for (option, options) in rejected {
+        let expected = InvalidInput::NotFiniteNonnegative { option };
+        assert_eq!(nelder_mead(options).validate(&problem()), Err(expected));
+    }
+}
+
+#[test]
+fn a_zero_nelder_mead_tolerance_is_legal() {
+    let method = nelder_mead(tolerances(0.0, 0.0));
+    assert_eq!(method.validate(&problem()), Ok(()));
+}
+
+#[test]
+fn an_initial_simplex_must_carry_one_point_more_than_coordinates() {
+    let too_few = simplex(vec![vec![0.0, 0.0], vec![1.0, 0.0]]);
+    let expected = InvalidInput::SimplexPointCount {
+        expected: 3,
+        found: 2,
+    };
+    assert_eq!(nelder_mead(too_few).validate(&problem()), Err(expected));
+    let too_many = simplex(vec![vec![0.0, 0.0]; 4]);
+    let expected = InvalidInput::SimplexPointCount {
+        expected: 3,
+        found: 4,
+    };
+    assert_eq!(nelder_mead(too_many).validate(&problem()), Err(expected));
+}
+
+#[test]
+fn every_initial_simplex_point_needs_one_coordinate_per_dimension() {
+    let options = simplex(vec![vec![0.0, 0.0], vec![1.0], vec![0.0, 1.0]]);
+    let expected = InvalidInput::SimplexPointLength {
+        point: 1,
+        expected: 2,
+        found: 1,
+    };
+    assert_eq!(nelder_mead(options).validate(&problem()), Err(expected));
+}
+
+#[test]
+fn every_initial_simplex_coordinate_must_be_finite() {
+    let options = simplex(vec![vec![0.0, 0.0], vec![1.0, 0.0], vec![0.0, f64::NAN]]);
+    let expected = InvalidInput::NonfiniteSimplex { point: 2, index: 1 };
+    assert_eq!(nelder_mead(options).validate(&problem()), Err(expected));
+}
+
+#[test]
+fn a_well_formed_initial_simplex_is_valid() {
+    let options = simplex(vec![vec![0.0, 0.0], vec![1.0, 0.0], vec![0.0, 1.0]]);
+    assert_eq!(nelder_mead(options).validate(&problem()), Ok(()));
+}
+
+#[test]
+fn bounds_that_admit_no_finite_coordinate_are_rejected() {
+    let positive = bounded(vec![f64::INFINITY, 0.0], vec![f64::INFINITY, 3.0]);
+    let expected = InvalidInput::InfeasibleBound { index: 0 };
+    assert_eq!(positive.validate(), Err(expected));
+    let negative = bounded(vec![0.0, f64::NEG_INFINITY], vec![3.0, f64::NEG_INFINITY]);
+    let expected = InvalidInput::InfeasibleBound { index: 1 };
+    assert_eq!(negative.validate(), Err(expected));
+}
+
+#[test]
+fn an_open_side_and_a_fixed_coordinate_stay_valid() {
+    let bounds = bounded(vec![f64::NEG_INFINITY, 1.0], vec![f64::INFINITY, 1.0]);
+    assert_eq!(bounds.validate(), Ok(()));
+}
+
 #[test]
 fn nelder_mead_options_default_to_the_scipy_values() {
     let options = NelderMeadOptions::default();
