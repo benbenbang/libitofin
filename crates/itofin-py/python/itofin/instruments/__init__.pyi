@@ -1184,6 +1184,14 @@ class VanillaOption:
             engine (MCEuropeanEngine): The engine, which already holds the
                 process it prices on.
         """
+    def set_qmc_engine(self, engine: pricingengines.QMCEuropeanEngine) -> None:
+        r"""
+        Attach the fixed-sample Sobol European engine.
+        """
+    def price_qmc(self, engine: pricingengines.QMCEuropeanEngine) -> builtins.float:
+        r"""
+        Attach the Sobol engine and return its NPV, without an error estimate.
+        """
     def set_mc_heston_engine(self, engine: pricingengines.MCEuropeanHestonEngine) -> None:
         r"""
         Attach the Monte Carlo Heston engine.

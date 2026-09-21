@@ -23,6 +23,7 @@ __all__ = [
     "MCEuropeanHestonEngine",
     "MidPointCdsEngine",
     "NumericalFix",
+    "QMCEuropeanEngine",
     "YoYInflationCapFloorEngine",
 ]
 
@@ -260,7 +261,7 @@ class MCAmericanEngine:
     r"""
     The Longstaff-Schwartz least-squares Monte Carlo engine for American
     payoffs, over the pseudo-random RNG policy. The low-discrepancy policy is
-    not exposed (#454), and the Monomial regression basis is not selectable
+    not exposed for this engine, and the Monomial regression basis is not selectable
     (#453).
 
     The option priced must come from VanillaOption.american(...): a
@@ -307,7 +308,7 @@ class MCAmericanEngine:
 class MCEuropeanEngine:
     r"""
     The Monte Carlo engine for European payoffs, over the pseudo-random RNG
-    policy. The low-discrepancy policy is not exposed (#454).
+    policy.
 
     Pricing is seeded and deterministic: the same seed reproduces the NPV
     bitwise, and the standard error is read back through
@@ -403,6 +404,20 @@ class MidPointCdsEngine:
                 on.
             settings (Settings): The explicit settings; must be the same object
                 the contract this engine prices was built with.
+        """
+
+@typing.final
+class QMCEuropeanEngine:
+    r"""
+    Fixed-sample Sobol European engine, without an error estimate.
+    """
+    def __init__(self, process: processes.BlackScholesProcess, steps: typing.Optional[builtins.int] = None, steps_per_year: typing.Optional[builtins.int] = None, samples: typing.Optional[builtins.int] = None, absolute_tolerance: typing.Optional[builtins.float] = None, max_samples: typing.Optional[builtins.int] = None, seed: typing.Optional[builtins.int] = None, antithetic: typing.Optional[builtins.bool] = None) -> None:
+        r"""
+        Build a Sobol engine with a positive fixed sample count.
+
+        No statistical error estimate is available. Absolute tolerance and
+        max_samples are rejected. Seed selects Sobol direction initialization;
+        it is deterministic even when omitted or zero.
         """
 
 @typing.final
