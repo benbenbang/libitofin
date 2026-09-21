@@ -114,3 +114,17 @@ dependency lifetimes, Close behavior, session isolation and concurrent callers.
 Never weaken tolerances to make tests pass. Coverage mappings must identify exact
 Python symbols and real C/Go implementations; unsupported symbols remain explicit.
 Private consumer source and test fixtures must not be copied into this repository.
+
+## Cap/floor lattice and normal calibration
+
+BachelierCapFloorEngine requires normal volatility. It observes retained quotes,
+surfaces and discount curves. TreeCapFloorEngine retains a concrete HullWhite
+model and uses either positive target steps or an explicit grid with all coupon
+reset/payment times. Fixed grids sort and deduplicate supplied nodes and prepend
+zero without subdivision. A negative first accrual start is rejected by the
+engine; the Rust discretized asset supports known historical fixings directly.
+
+CapHelper retains its quote, index and curve, refreshes the ATM cap for model and
+time queries, and supports normal or shifted-lognormal market values. The new
+HullWhite cap calibration method uses the tree engine and can fix mean reversion.
+Existing engine discriminants, constructors and C struct layouts are unchanged.
