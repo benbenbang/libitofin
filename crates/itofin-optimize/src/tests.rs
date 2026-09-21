@@ -1,6 +1,6 @@
 use crate::{
-    Bounds, Common, Converged, Flow, InvalidInput, IterationState, Method, Minimize, MinimizeError,
-    NelderMeadOptions, Objective, Problem, Termination,
+    Bounds, Common, Converged, Counters, Flow, Halt, InvalidInput, IterationState, Method,
+    Minimize, MinimizeError, NelderMeadOptions, Objective, Problem, Termination,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
@@ -199,4 +199,100 @@ fn nelder_mead_options_default_to_the_scipy_values() {
     assert_eq!(options.fatol, 1e-4);
     assert!(!options.adaptive);
     assert_eq!(options.initial_simplex, None);
+}
+
+fn step<O: Objective>(
+    counters: &mut Counters,
+    objective: &mut O,
+    x: &[f64],
+    fun: &mut f64,
+) -> Result<(), Halt<O::Error>> {
+    *fun = counters.value(objective, x)?;
+    counters.end_iteration(objective, x, *fun)
+}
+
+fn run<O: Objective>(
+    objective: &mut O,
+    problem: &Problem,
+    common: &Common,
+) -> Result<Minimize, MinimizeError<O::Error>> {
+    problem.validate()?;
+    common.validate()?;
+    let mut counters = Counters::new(common);
+    let x = problem.x0.clone();
+    let mut fun = f64::NAN;
+    loop {
+        match step(&mut counters, objective, &x, &mut fun) {
+            Ok(()) => {}
+            Err(Halt::Terminated(status)) => {
+                let (nit, nfev, njev) = (counters.nit(), counters.nfev(), counters.njev());
+                return Ok(Minimize::new(x, fun, nit, nfev, njev, status));
+            }
+            Err(Halt::Failed(error)) => return Err(error),
+        }
+    }
+}
+
+#[test]
+fn an_objective_error_reaches_the_caller_by_value() {
+    let mut objective = probe(true, Ok(Flow::Continue));
+    let error = run(&mut objective, &problem(), &Common::default()).unwrap_err();
+    assert!(matches!(error, MinimizeError::Objective(ProbeError::Boom)));
+}
+
+#[test]
+fn a_failing_callback_is_an_objective_error() {
+    let mut objective = probe(false, Err(ProbeError::Boom));
+    let error = run(&mut objective, &problem(), &Common::default()).unwrap_err();
+    assert!(matches!(error, MinimizeError::Objective(ProbeError::Boom)));
+}
+
+#[test]
+fn a_stopping_callback_cancels_the_run() {
+    let mut objective = probe(false, Ok(Flow::Stop));
+    let result = run(&mut objective, &problem(), &Common::default()).unwrap();
+    assert_eq!(result.status, Termination::Cancelled);
+    assert_eq!(result.nit, 1);
+    assert!(!result.success);
+    assert_eq!(result.message, "stopped by the callback");
+}
+
+#[test]
+fn an_exhausted_evaluation_budget_stops_with_max_evaluations() {
+    let mut objective = probe(false, Ok(Flow::Continue));
+    let result = run(&mut objective, &problem(), &common(None, Some(3), None)).unwrap();
+    assert_eq!(result.status, Termination::MaxEvaluations);
+    assert_eq!(result.nfev, 3);
+    assert_eq!(result.fun, 1.0);
+}
+
+#[test]
+fn an_exhausted_iteration_budget_stops_with_max_iterations() {
+    let mut objective = probe(false, Ok(Flow::Continue));
+    let result = run(&mut objective, &problem(), &common(Some(2), None, None)).unwrap();
+    assert_eq!(result.status, Termination::MaxIterations);
+    assert_eq!(result.nit, 2);
+    assert_eq!(result.njev, 0);
+}
+
+#[test]
+fn an_invalid_input_stops_the_run_before_any_evaluation() {
+    let mut objective = probe(true, Ok(Flow::Continue));
+    let empty = Problem {
+        x0: Vec::new(),
+        bounds: None,
+    };
+    let error = run(&mut objective, &empty, &Common::default()).unwrap_err();
+    assert!(matches!(
+        error,
+        MinimizeError::InvalidInput(InvalidInput::EmptyX0)
+    ));
+}
+
+#[test]
+fn a_closure_runs_through_the_counters() {
+    let mut objective = |x: &[f64]| -> Result<f64, ProbeError> { Ok(x[1]) };
+    let result = run(&mut objective, &problem(), &common(None, Some(1), None)).unwrap();
+    assert_eq!(result.fun, 2.0);
+    assert_eq!(result.nfev, 1);
 }
