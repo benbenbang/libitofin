@@ -12,7 +12,7 @@ use libitofin::shared::{Shared, shared};
 use libitofin::termstructures::bootstraphelper::RateHelper;
 use libitofin::termstructures::bootstraptraits::Discount;
 use libitofin::termstructures::yields::{
-    FlatForward, PiecewiseYieldCurve, Pillar, SofrFutureRateHelper,
+    FlatForward, OvernightIndexFutureRateHelper, PiecewiseYieldCurve, Pillar, SofrFutureRateHelper,
 };
 use libitofin::termstructures::yieldtermstructure::YieldTermStructure;
 use libitofin::time::date::{Date, Month};
@@ -245,3 +245,6 @@ fn quantlib_holiday_clipping_and_today_fixing_oracle() {
         near(future.npv().unwrap(), row[5].parse().unwrap(), 1e-9);
     }
 }
+
+#[path = "sofr_futures/lifecycle.rs"]
+mod lifecycle;
