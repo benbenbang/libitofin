@@ -9,6 +9,7 @@ This inventory does not claim exhaustive QuantLib product coverage.
 
 | Scope | Executable evidence |
 | --- | --- |
+| Hull-White Bermudan tree, six indexed/par QuantLib cached prices, bumped-quote oracle, retained inputs and invalid-input recovery | [Tree swaption tests](../sdk/go/tree_swaption_test.go) |
 | Mutually coupled Ibor basis curves, independent FRA/swap repricing, quote/discount/date/fixing updates and retained joint ownership | `TestJointYieldCurvesQuantLibRepricingAndUpdates`, `TestJointYieldCurvesFixingsAndCloseOrders`, `TestJointYieldCurvesInvalidInputs` |
 | SABR backward-flat sparse/dense QuantLib oracle, quote/date recalibration, retained inputs and error recovery | `TestSABRBackwardFlatQuantLibOracle`, `TestSABRBackwardFlatUpdatesAndRetainedInputs`, `TestSABRBackwardFlatInvalidInputs` |
 | Kerkhof monthly factors, independent zero corrections, copied factors, retained handles and YoY errors | `TestKerkhofSeasonalityQuantLibOracle`, `TestKerkhofSeasonalityOwnershipAndErrors` |
