@@ -109,6 +109,22 @@ covers both discount modes and coupled OIS/Ibor curves. Construction and date
 updates report errors and recover after valid inputs return. Python/C/Go
 exposure of this overnight helper remains outside the supported binding scope.
 
+## Custom pillars and overnight futures
+
+[#808](https://github.com/benbenbang/libitofin/issues/808) adds custom pillar dates
+for FRA, swap, OIS and inflation helpers across Rust/Python/C/Go. Dates must lie
+within the helper's relevant window; flat inflation helpers retain QuantLib's
+single-node behavior. Relative helpers retain their last valid dates after a
+failed update and report the error on pricing until the evaluation date recovers.
+Existing C layouts and default pillar choices are preserved.
+
+SOFR and generic overnight futures support Simple/Compound accrual, historical
+fixings, live convexity and fixed reference periods. Monthly SOFR helpers use
+Simple, quarterly helpers Compound. The [QuantLib fixtures](../crates/libitofin/tests/fixtures/sofr_futures/README.md)
+pin holiday clipping, Juneteenth and the upstream `1e-9` price gates, and describe
+the upstream monthly holiday-end bootstrap residuals. These additions await the
+next release.
+
 ## Hull-White calibration
 
 [#400](https://github.com/benbenbang/libitofin/issues/400) covers fixed-reversion
