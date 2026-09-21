@@ -23,6 +23,7 @@ mod helpers;
 mod heston;
 mod hullwhite;
 mod inflation;
+mod iterativebootstrap;
 mod jointcurves;
 mod makeswaption;
 mod market;
@@ -218,6 +219,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     termstructures.add_class::<PyBondPriceType>()?;
     termstructures.add_class::<PyFixedRateBondHelper>()?;
     termstructures.add_class::<bootstrap::PySimpleQuoteVariables>()?;
+    termstructures.add_class::<iterativebootstrap::PyIterativeBootstrapOptions>()?;
     termstructures.add_class::<PyPiecewiseYieldCurve>()?;
     termstructures.add_class::<PyPiecewiseLogLinearDiscount>()?;
     termstructures.add_class::<PyPiecewiseLinearZero>()?;

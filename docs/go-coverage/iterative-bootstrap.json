@@ -1,0 +1,88 @@
+{
+  "entries": [
+    {
+      "c": [
+        "itofin_iterative_bootstrap_options_default",
+        "itofin_piecewise_curve_new_with_options"
+      ],
+      "go": "DefaultIterativeBootstrapOptions",
+      "python": "itofin.termstructures.IterativeBootstrapOptions.__new__",
+      "status": "implemented",
+      "tests": [
+        "TestIterativeBootstrapQuantLibOracle",
+        "TestIterativeBootstrapInvalidOptions",
+        "iterative_options_flags_and_null_pointers_do_not_poison_context"
+      ]
+    },
+    {
+      "c": "itofin_piecewise_curve_new_with_options",
+      "go": "Session.NewPiecewiseYieldCurve",
+      "python": "itofin.termstructures.PiecewiseYieldCurve.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestIterativeBootstrapAllYieldFactories",
+        "TestIterativeBootstrapRetryRetentionAndErrors"
+      ]
+    },
+    {
+      "c": "itofin_piecewise_curve_new_with_options",
+      "go": "Session.NewPiecewiseLogLinearDiscount",
+      "python": "itofin.termstructures.PiecewiseLogLinearDiscount.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestIterativeBootstrapAllYieldFactories",
+        "TestIterativeBootstrapRetryRetentionAndErrors"
+      ]
+    },
+    {
+      "c": "itofin_piecewise_curve_new_with_options",
+      "go": "Session.NewPiecewiseLinearZero",
+      "python": "itofin.termstructures.PiecewiseLinearZero.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestIterativeBootstrapAllYieldFactories",
+        "TestIterativeBootstrapRetryRetentionAndErrors"
+      ]
+    },
+    {
+      "c": "itofin_piecewise_curve_new_with_options",
+      "go": "Session.NewPiecewiseCubicZero",
+      "python": "itofin.termstructures.PiecewiseCubicZero.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestIterativeBootstrapAllYieldFactories",
+        "TestIterativeBootstrapRetryRetentionAndErrors"
+      ]
+    },
+    {
+      "c": "itofin_piecewise_curve_new_with_options",
+      "go": "Session.NewPiecewiseLinearForward",
+      "python": "itofin.termstructures.PiecewiseLinearForward.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestIterativeBootstrapAllYieldFactories",
+        "TestIterativeBootstrapRetryRetentionAndErrors"
+      ]
+    },
+    {
+      "c": "itofin_piecewise_curve_new_with_options",
+      "go": "Session.NewPiecewiseConvexMonotoneForward",
+      "python": "itofin.termstructures.PiecewiseConvexMonotoneForward.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestIterativeBootstrapAllYieldFactories",
+        "TestIterativeBootstrapRetryRetentionAndErrors"
+      ]
+    },
+    {
+      "c": "itofin_piecewise_curve_new_with_options",
+      "go": "Session.NewPiecewiseFlatForward",
+      "python": "itofin.termstructures.PiecewiseFlatForward.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestIterativeBootstrapAllYieldFactories",
+        "TestIterativeBootstrapRetryRetentionAndErrors"
+      ]
+    }
+  ]
+}

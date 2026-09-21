@@ -3,6 +3,7 @@
 
 use crate::bootstrap::{PySimpleQuoteVariables, global_bootstrap};
 use crate::helpers::PyRateHelper;
+use crate::iterativebootstrap::{PyIterativeBootstrapOptions, strategy};
 use crate::market::PySimpleQuote;
 use crate::time::{PyCalendar, PyDate, PyDayCounter};
 use crate::{ItofinError, PyQlError};
@@ -533,6 +534,7 @@ impl PyPiecewiseYieldCurve {
         additional_penalties = None,
         additional_dates = None,
         additional_variables = None,
+        iterative_options = None,
     ))]
     fn new(
         py: Python<'_>,
@@ -547,7 +549,13 @@ impl PyPiecewiseYieldCurve {
         #[gen_stub(override_type(type_repr = "typing.Optional[typing.Callable[[], list[time.Date]]]", imports = ("typing", "itofin.time")))]
         additional_dates: Option<Py<PyAny>>,
         additional_variables: Option<PyRef<PySimpleQuoteVariables>>,
+        iterative_options: Option<&PyIterativeBootstrapOptions>,
     ) -> PyResult<PyClassInitializer<Self>> {
+        if bootstrap != "iterative" && iterative_options.is_some() {
+            return Err(ItofinError::new_err(
+                "iterative_options require bootstrap=\"iterative\"",
+            ));
+        }
         let instruments: Vec<Shared<dyn RateHelper>> =
             helpers.iter().map(|helper| helper.inner()).collect();
         let additional: Vec<Shared<dyn RateHelper>> = additional_helpers
@@ -565,25 +573,28 @@ impl PyPiecewiseYieldCurve {
                     ));
                 }
                 match interpolation {
-                    "LogLinear" => PiecewiseYieldCurve::<Discount, LogLinear>::new(
+                    "LogLinear" => PiecewiseYieldCurve::<Discount, LogLinear>::with_bootstrap(
                         reference_date.inner(),
                         instruments,
                         day_counter.inner(),
                         LogLinear,
+                        strategy(iterative_options)?,
                     )
                     .map_err(PyQlError::from)?,
-                    "Linear" => PiecewiseYieldCurve::<Discount, Linear>::new(
+                    "Linear" => PiecewiseYieldCurve::<Discount, Linear>::with_bootstrap(
                         reference_date.inner(),
                         instruments,
                         day_counter.inner(),
                         Linear,
+                        strategy(iterative_options)?,
                     )
                     .map_err(PyQlError::from)?,
-                    "Cubic" => PiecewiseYieldCurve::<Discount, Cubic>::new(
+                    "Cubic" => PiecewiseYieldCurve::<Discount, Cubic>::with_bootstrap(
                         reference_date.inner(),
                         instruments,
                         day_counter.inner(),
                         Cubic,
+                        strategy(iterative_options)?,
                     )
                     .map_err(PyQlError::from)?,
                     other => {
@@ -675,18 +686,21 @@ impl PyPiecewiseLogLinearDiscount {
     ///     ItofinError: On an empty helper list.
     #[gen_stub(override_return_type(type_repr = "PiecewiseLogLinearDiscount"))]
     #[new]
+    #[pyo3(signature = (reference_date, helpers, day_counter, iterative_options=None))]
     fn new(
         reference_date: &PyDate,
         helpers: Vec<PyRef<PyRateHelper>>,
         day_counter: &PyDayCounter,
+        iterative_options: Option<&PyIterativeBootstrapOptions>,
     ) -> PyResult<PyClassInitializer<Self>> {
         let instruments: Vec<Shared<dyn RateHelper>> =
             helpers.iter().map(|helper| helper.inner()).collect();
-        let concrete = PiecewiseYieldCurve::<Discount, LogLinear>::new(
+        let concrete = PiecewiseYieldCurve::<Discount, LogLinear>::with_bootstrap(
             reference_date.inner(),
             instruments,
             day_counter.inner(),
             LogLinear,
+            strategy(iterative_options)?,
         )
         .map_err(PyQlError::from)?;
         let erased = Shared::clone(&concrete) as Shared<dyn YieldTermStructure>;
@@ -750,18 +764,21 @@ impl PyPiecewiseLinearZero {
     ///     ItofinError: On an empty helper list.
     #[gen_stub(override_return_type(type_repr = "PiecewiseLinearZero"))]
     #[new]
+    #[pyo3(signature = (reference_date, helpers, day_counter, iterative_options=None))]
     fn new(
         reference_date: &PyDate,
         helpers: Vec<PyRef<PyRateHelper>>,
         day_counter: &PyDayCounter,
+        iterative_options: Option<&PyIterativeBootstrapOptions>,
     ) -> PyResult<PyClassInitializer<Self>> {
         let instruments: Vec<Shared<dyn RateHelper>> =
             helpers.iter().map(|helper| helper.inner()).collect();
-        let concrete = PiecewiseYieldCurve::<ZeroYield, Linear>::new(
+        let concrete = PiecewiseYieldCurve::<ZeroYield, Linear>::with_bootstrap(
             reference_date.inner(),
             instruments,
             day_counter.inner(),
             Linear,
+            strategy(iterative_options)?,
         )
         .map_err(PyQlError::from)?;
         let erased = Shared::clone(&concrete) as Shared<dyn YieldTermStructure>;
@@ -826,18 +843,21 @@ impl PyPiecewiseCubicZero {
     ///     ItofinError: On an empty helper list.
     #[gen_stub(override_return_type(type_repr = "PiecewiseCubicZero"))]
     #[new]
+    #[pyo3(signature = (reference_date, helpers, day_counter, iterative_options=None))]
     fn new(
         reference_date: &PyDate,
         helpers: Vec<PyRef<PyRateHelper>>,
         day_counter: &PyDayCounter,
+        iterative_options: Option<&PyIterativeBootstrapOptions>,
     ) -> PyResult<PyClassInitializer<Self>> {
         let instruments: Vec<Shared<dyn RateHelper>> =
             helpers.iter().map(|helper| helper.inner()).collect();
-        let concrete = PiecewiseYieldCurve::<ZeroYield, Cubic>::new(
+        let concrete = PiecewiseYieldCurve::<ZeroYield, Cubic>::with_bootstrap(
             reference_date.inner(),
             instruments,
             day_counter.inner(),
             Cubic,
+            strategy(iterative_options)?,
         )
         .map_err(PyQlError::from)?;
         let erased = Shared::clone(&concrete) as Shared<dyn YieldTermStructure>;
@@ -900,18 +920,21 @@ impl PyPiecewiseLinearForward {
     ///     ItofinError: On an empty helper list.
     #[gen_stub(override_return_type(type_repr = "PiecewiseLinearForward"))]
     #[new]
+    #[pyo3(signature = (reference_date, helpers, day_counter, iterative_options=None))]
     fn new(
         reference_date: &PyDate,
         helpers: Vec<PyRef<PyRateHelper>>,
         day_counter: &PyDayCounter,
+        iterative_options: Option<&PyIterativeBootstrapOptions>,
     ) -> PyResult<PyClassInitializer<Self>> {
         let instruments: Vec<Shared<dyn RateHelper>> =
             helpers.iter().map(|helper| helper.inner()).collect();
-        let concrete = PiecewiseYieldCurve::<ForwardRate, Linear>::new(
+        let concrete = PiecewiseYieldCurve::<ForwardRate, Linear>::with_bootstrap(
             reference_date.inner(),
             instruments,
             day_counter.inner(),
             Linear,
+            strategy(iterative_options)?,
         )
         .map_err(PyQlError::from)?;
         let erased = Shared::clone(&concrete) as Shared<dyn YieldTermStructure>;
@@ -990,22 +1013,29 @@ impl PyPiecewiseConvexMonotoneForward {
     ///         name.
     #[gen_stub(override_return_type(type_repr = "PiecewiseConvexMonotoneForward"))]
     #[new]
-    #[pyo3(signature = (reference_date, helpers, day_counter, bootstrap = "iterative"))]
+    #[pyo3(signature = (reference_date, helpers, day_counter, bootstrap = "iterative", iterative_options=None))]
     fn new(
         reference_date: &PyDate,
         helpers: Vec<PyRef<PyRateHelper>>,
         day_counter: &PyDayCounter,
         bootstrap: &str,
+        iterative_options: Option<&PyIterativeBootstrapOptions>,
     ) -> PyResult<PyClassInitializer<Self>> {
+        if bootstrap != "iterative" && iterative_options.is_some() {
+            return Err(ItofinError::new_err(
+                "iterative_options require bootstrap=\"iterative\"",
+            ));
+        }
         let instruments: Vec<Shared<dyn RateHelper>> =
             helpers.iter().map(|helper| helper.inner()).collect();
         let concrete = match bootstrap {
             "iterative" => ConvexMonotoneCurve::Iterative(
-                PiecewiseYieldCurve::<ForwardRate, ConvexMonotone>::new(
+                PiecewiseYieldCurve::<ForwardRate, ConvexMonotone>::with_bootstrap(
                     reference_date.inner(),
                     instruments,
                     day_counter.inner(),
                     ConvexMonotone::default(),
+                    strategy(iterative_options)?,
                 )
                 .map_err(PyQlError::from)?,
             ),
@@ -1099,18 +1129,21 @@ impl PyPiecewiseFlatForward {
     ///     ItofinError: On an empty helper list.
     #[gen_stub(override_return_type(type_repr = "PiecewiseFlatForward"))]
     #[new]
+    #[pyo3(signature = (reference_date, helpers, day_counter, iterative_options=None))]
     fn new(
         reference_date: &PyDate,
         helpers: Vec<PyRef<PyRateHelper>>,
         day_counter: &PyDayCounter,
+        iterative_options: Option<&PyIterativeBootstrapOptions>,
     ) -> PyResult<PyClassInitializer<Self>> {
         let instruments: Vec<Shared<dyn RateHelper>> =
             helpers.iter().map(|helper| helper.inner()).collect();
-        let concrete = PiecewiseYieldCurve::<ForwardRate, BackwardFlat>::new(
+        let concrete = PiecewiseYieldCurve::<ForwardRate, BackwardFlat>::with_bootstrap(
             reference_date.inner(),
             instruments,
             day_counter.inner(),
             BackwardFlat,
+            strategy(iterative_options)?,
         )
         .map_err(PyQlError::from)?;
         let erased = Shared::clone(&concrete) as Shared<dyn YieldTermStructure>;
