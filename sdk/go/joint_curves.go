@@ -117,7 +117,7 @@ func (s *Session) NewSwapRateHelperWithDiscount(cfg SwapRateHelperConfig, discou
 	var id C.uint64_t
 	err := s.invoke(func() error {
 		var e C.ItofinError
-		return ffiError(C.itofin_swap_helper_with_discount(s.ctx, &c, C.uint64_t(discount.id), &id, &e), &e)
+		return ffiError(C.itofin_swap_helper_new_with_pillar(s.ctx, &c, C.uint64_t(discount.id), C.int32_t(creditOptional(cfg.Pillar, LastRelevantDate)), customPillarSerial(cfg.CustomPillarDate), &id, &e), &e)
 	})
 	return helperResult(s, id, err)
 }

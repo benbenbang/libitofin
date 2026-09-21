@@ -1,5 +1,6 @@
 //! Inflation bootstrap helpers retain quotes and their native instrument graphs.
 use crate::boundary::*;
+use crate::helpers_api::pillar;
 use crate::inflation_api::{cpi_interpolation, yoy_index, zero_index};
 use crate::time_api::{calendar, convention, date, day_counter, time_unit};
 use libitofin::handle::Handle;
@@ -10,7 +11,6 @@ use libitofin::termstructures::inflation::inflationhelpers::{
     YearOnYearInflationSwapHelper, YoYInflationHelper, ZeroCouponInflationSwapHelper,
     ZeroInflationHelper,
 };
-use libitofin::termstructures::yields::Pillar;
 use libitofin::termstructures::yieldtermstructure::YieldTermStructure;
 use libitofin::time::{date::Date, period::Period};
 #[derive(Clone)]
@@ -39,14 +39,27 @@ pub struct ItofinInflationHelperConfig {
 }
 #[unsafe(no_mangle)]
 /// # Safety
-/// Pointers must be aligned, live and valid for their stated lengths. Outputs
-/// must not overlap inputs or other outputs. Any context and its handles must
-/// belong to the calling thread; serialize calls including destruction.
-/// See the crate-level C caller contract for lifetime requirements.
+/// Follow the crate-level context and pointer contract.
 pub unsafe extern "C" fn itofin_inflation_helper_new(
     ctx: *mut Context,
     a: *const ItofinInflationHelperConfig,
     kind: i32,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe { itofin_inflation_helper_new_with_pillar(ctx, a, kind, 0, out, error) }
+}
+#[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
+pub unsafe extern "C" fn itofin_inflation_helper_new_with_pillar(
+    ctx: *mut Context,
+    a: *const ItofinInflationHelperConfig,
+    kind: i32,
+    custom_pillar_date: i32,
     out: *mut u64,
     error: *mut ItofinError,
 ) -> i32 {
@@ -63,11 +76,7 @@ pub unsafe extern "C" fn itofin_inflation_helper_new(
             let dc = day_counter(c, a.day_counter)?;
             let interpolation = cpi_interpolation(a.interpolation)?;
             let settings = c.get::<Shared<Settings<Date>>>(a.settings)?;
-            let pillar = match a.pillar {
-                0 => Pillar::MaturityDate,
-                1 => Pillar::LastRelevantDate,
-                _ => return Err(BindingError::invalid("unknown pillar")),
-            };
+            let pillar = pillar(a.pillar, custom_pillar_date)?;
             let id = match kind {
                 0 => {
                     let p = ZeroCouponInflationSwapHelper::new(

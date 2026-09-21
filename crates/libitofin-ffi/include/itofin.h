@@ -1674,16 +1674,27 @@ int32_t itofin_swap_helper_new(struct ItofinContext *ctx,
 /**
  * Mode 0 quote+period, 1 fixed rate+period, 2 months, 3 explicit dates.
  * # Safety
- * Pointers must be aligned, live and valid for their stated lengths. Outputs
- * must not overlap inputs or other outputs. Any context and its handles must
- * belong to the calling thread; serialize calls including destruction.
- * See the crate-level C caller contract for lifetime requirements.
+ * Follow the crate-level context and pointer contract.
  */
 int32_t itofin_fra_helper_new(struct ItofinContext *ctx,
                               int32_t mode,
                               const struct ItofinFraHelperConfig *cfg,
                               uint64_t *out,
                               struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers must be aligned, live and valid for their stated lengths. Outputs
+ * must not overlap inputs or other outputs. Any context and its handles must
+ * belong to the calling thread; serialize calls including destruction.
+ * See the crate-level C caller contract for lifetime requirements.
+ */
+int32_t itofin_fra_helper_new_with_pillar(struct ItofinContext *ctx,
+                                          int32_t mode,
+                                          const struct ItofinFraHelperConfig *cfg,
+                                          int32_t custom_pillar_date,
+                                          uint64_t *out,
+                                          struct ItofinError *error);
 
 /**
  * Mode 0 tenor months, 1 explicit/optional end date, 2 index conventions.
@@ -1713,15 +1724,25 @@ int32_t itofin_futures_helper_new_with_observation(struct ItofinContext *ctx,
 
 /**
  * # Safety
- * Pointers must be aligned, live and valid for their stated lengths. Outputs
- * must not overlap inputs or other outputs. Any context and its handles must
- * belong to the calling thread; serialize calls including destruction.
- * See the crate-level C caller contract for lifetime requirements.
+ * Follow the crate-level context and pointer contract.
  */
 int32_t itofin_ois_helper_new(struct ItofinContext *ctx,
                               const struct ItofinOisHelperConfig *cfg,
                               uint64_t *out,
                               struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers must be aligned, live and valid for their stated lengths. Outputs
+ * must not overlap inputs or other outputs. Any context and its handles must
+ * belong to the calling thread; serialize calls including destruction.
+ * See the crate-level C caller contract for lifetime requirements.
+ */
+int32_t itofin_ois_helper_new_with_pillar(struct ItofinContext *ctx,
+                                          const struct ItofinOisHelperConfig *cfg,
+                                          int32_t custom_pillar_date,
+                                          uint64_t *out,
+                                          struct ItofinError *error);
 
 /**
  * # Safety
@@ -1764,6 +1785,19 @@ int32_t itofin_helper_date(struct ItofinContext *ctx,
                            int32_t query,
                            int32_t *out,
                            struct ItofinError *error);
+
+/**
+ * Construct a swap helper with an explicit pillar and optional discount handle.
+ * # Safety
+ * Follow the crate-level context and pointer contract.
+ */
+int32_t itofin_swap_helper_new_with_pillar(struct ItofinContext *ctx,
+                                           const struct ItofinSwapHelperConfig *cfg,
+                                           uint64_t discount,
+                                           int32_t pillar_choice,
+                                           int32_t custom_pillar_date,
+                                           uint64_t *out,
+                                           struct ItofinError *error);
 
 /**
  * # Safety
@@ -2430,16 +2464,27 @@ int32_t itofin_yoy_inflation_nodes(struct ItofinContext *ctx,
 
 /**
  * # Safety
- * Pointers must be aligned, live and valid for their stated lengths. Outputs
- * must not overlap inputs or other outputs. Any context and its handles must
- * belong to the calling thread; serialize calls including destruction.
- * See the crate-level C caller contract for lifetime requirements.
+ * Follow the crate-level context and pointer contract.
  */
 int32_t itofin_inflation_helper_new(struct ItofinContext *ctx,
                                     const struct ItofinInflationHelperConfig *a,
                                     int32_t kind,
                                     uint64_t *out,
                                     struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers must be aligned, live and valid for their stated lengths. Outputs
+ * must not overlap inputs or other outputs. Any context and its handles must
+ * belong to the calling thread; serialize calls including destruction.
+ * See the crate-level C caller contract for lifetime requirements.
+ */
+int32_t itofin_inflation_helper_new_with_pillar(struct ItofinContext *ctx,
+                                                const struct ItofinInflationHelperConfig *a,
+                                                int32_t kind,
+                                                int32_t custom_pillar_date,
+                                                uint64_t *out,
+                                                struct ItofinError *error);
 
 /**
  * query 0 pillar, 1 latest, 2 inflation fixing date (zero only).

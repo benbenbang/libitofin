@@ -37,10 +37,15 @@ fn optional_quote(c: &Context, id: u64) -> BindingResult<Handle<dyn Quote>> {
         quote(c, id)
     }
 }
-fn pillar(value: i32) -> BindingResult<Pillar> {
-    match value {
-        0 => Ok(Pillar::MaturityDate),
-        1 => Ok(Pillar::LastRelevantDate),
+pub(crate) fn pillar(value: i32, custom_date: i32) -> BindingResult<Pillar> {
+    match (value, custom_date) {
+        (0, 0) => Ok(Pillar::MaturityDate),
+        (1, 0) => Ok(Pillar::LastRelevantDate),
+        (2, 0) => Err(BindingError::invalid("custom pillar date must be provided")),
+        (2, serial) => Ok(Pillar::CustomDate(date(serial)?)),
+        (0 | 1, _) => Err(BindingError::invalid(
+            "custom pillar date requires CustomDate convention",
+        )),
         _ => Err(BindingError::invalid("unknown pillar")),
     }
 }
@@ -140,14 +145,27 @@ pub struct ItofinFraHelperConfig {
 /// Mode 0 quote+period, 1 fixed rate+period, 2 months, 3 explicit dates.
 #[unsafe(no_mangle)]
 /// # Safety
-/// Pointers must be aligned, live and valid for their stated lengths. Outputs
-/// must not overlap inputs or other outputs. Any context and its handles must
-/// belong to the calling thread; serialize calls including destruction.
-/// See the crate-level C caller contract for lifetime requirements.
+/// Follow the crate-level context and pointer contract.
 pub unsafe extern "C" fn itofin_fra_helper_new(
     ctx: *mut Context,
     mode: i32,
     cfg: *const ItofinFraHelperConfig,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe { itofin_fra_helper_new_with_pillar(ctx, mode, cfg, 0, out, error) }
+}
+#[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
+pub unsafe extern "C" fn itofin_fra_helper_new_with_pillar(
+    ctx: *mut Context,
+    mode: i32,
+    cfg: *const ItofinFraHelperConfig,
+    custom_pillar_date: i32,
     out: *mut u64,
     error: *mut ItofinError,
 ) -> i32 {
@@ -157,24 +175,24 @@ pub unsafe extern "C" fn itofin_fra_helper_new(
             check_ptr(cfg)?;
             let a = &*cfg;
             let i = crate::indexes_api::ibor_index(c, a.index)?;
-            let p = pillar(a.pillar)?;
+            let p = pillar(a.pillar, custom_pillar_date)?;
             let v = match mode {
-                0 => FraRateHelper::new(
+                0 => FraRateHelper::try_new(
                     quote(c, a.quote)?,
                     period(a.start_length, a.start_unit)?,
                     &i,
                     a.indexed,
                     p,
                 ),
-                1 => FraRateHelper::from_rate(
+                1 => FraRateHelper::try_from_rate(
                     a.rate,
                     period(a.start_length, a.start_unit)?,
                     &i,
                     a.indexed,
                     p,
                 ),
-                2 => FraRateHelper::from_months(quote(c, a.quote)?, a.months, &i, a.indexed, p),
-                3 => FraRateHelper::from_dates(
+                2 => FraRateHelper::try_from_months(quote(c, a.quote)?, a.months, &i, a.indexed, p),
+                3 => FraRateHelper::try_from_dates(
                     quote(c, a.quote)?,
                     date(a.start_date)?,
                     date(a.end_date)?,
@@ -183,7 +201,7 @@ pub unsafe extern "C" fn itofin_fra_helper_new(
                     p,
                 ),
                 _ => return Err(BindingError::invalid("unknown FRA constructor")),
-            };
+            }?;
             output(out, c.insert(v as Shared<dyn RateHelper>)?)
         })
     }
@@ -301,13 +319,25 @@ pub struct ItofinOisHelperConfig {
 }
 #[unsafe(no_mangle)]
 /// # Safety
+/// Follow the crate-level context and pointer contract.
+pub unsafe extern "C" fn itofin_ois_helper_new(
+    ctx: *mut Context,
+    cfg: *const ItofinOisHelperConfig,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe { itofin_ois_helper_new_with_pillar(ctx, cfg, 0, out, error) }
+}
+#[unsafe(no_mangle)]
+/// # Safety
 /// Pointers must be aligned, live and valid for their stated lengths. Outputs
 /// must not overlap inputs or other outputs. Any context and its handles must
 /// belong to the calling thread; serialize calls including destruction.
 /// See the crate-level C caller contract for lifetime requirements.
-pub unsafe extern "C" fn itofin_ois_helper_new(
+pub unsafe extern "C" fn itofin_ois_helper_new_with_pillar(
     ctx: *mut Context,
     cfg: *const ItofinOisHelperConfig,
+    custom_pillar_date: i32,
     out: *mut u64,
     error: *mut ItofinError,
 ) -> i32 {
@@ -322,7 +352,7 @@ pub unsafe extern "C" fn itofin_ois_helper_new(
                 1 => RateAveraging::Compound,
                 _ => return Err(BindingError::invalid("unknown averaging method")),
             };
-            let v = OISRateHelper::new(
+            let v = OISRateHelper::try_new(
                 a.settlement_days,
                 period(a.tenor_length, a.tenor_unit)?,
                 quote(c, a.quote)?,
@@ -337,10 +367,10 @@ pub unsafe extern "C" fn itofin_ois_helper_new(
                 frequency(a.frequency)?,
                 period(a.forward_length, a.forward_unit)?,
                 optional_quote(c, a.spread)?,
-                pillar(a.pillar)?,
+                pillar(a.pillar, custom_pillar_date)?,
                 averaging,
                 settings(c, a.settings)?,
-            );
+            )?;
             output(out, c.insert(v as Shared<dyn RateHelper>)?)
         })
     }
@@ -465,5 +495,112 @@ pub unsafe extern "C" fn itofin_helper_date(
             };
             output(out, d.serial_number())
         })
+    }
+}
+
+/// Construct a swap helper with an explicit pillar and optional discount handle.
+/// # Safety
+/// Follow the crate-level context and pointer contract.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn itofin_swap_helper_new_with_pillar(
+    ctx: *mut Context,
+    cfg: *const ItofinSwapHelperConfig,
+    discount: u64,
+    pillar_choice: i32,
+    custom_pillar_date: i32,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(out)?;
+            check_ptr(cfg)?;
+            let a = &*cfg;
+            let i = crate::indexes_api::ibor_index(c, a.index)?;
+            let v = SwapRateHelper::try_with_details(
+                quote(c, a.quote)?,
+                period(a.tenor_length, a.tenor_unit)?,
+                calendar(c, a.calendar)?,
+                frequency(a.frequency)?,
+                convention(a.convention)?,
+                day_counter(c, a.day_counter)?,
+                &i,
+                Handle::empty(),
+                libitofin::time::period::Period::new(0, libitofin::time::timeunit::TimeUnit::Days),
+                if discount == 0 {
+                    None
+                } else {
+                    Some(optional_curve(c, discount)?)
+                },
+                pillar(pillar_choice, custom_pillar_date)?,
+            )?;
+            output(out, c.insert(v as Shared<dyn RateHelper>)?)
+        })
+    }
+}
+
+#[cfg(test)]
+mod custom_pillar_tests {
+    use super::*;
+    use std::ptr::null_mut;
+
+    #[test]
+    fn custom_pillar_input_errors_preserve_outputs() {
+        assert!(pillar(2, 0).is_err());
+        assert!(pillar(2, -1).is_err());
+        assert!(pillar(1, 45000).is_err());
+        assert!(pillar(99, 0).is_err());
+        assert!(matches!(pillar(2, 45000), Ok(Pillar::CustomDate(_))));
+        assert!(matches!(pillar(0, 0), Ok(Pillar::MaturityDate)));
+        assert!(matches!(pillar(1, 0), Ok(Pillar::LastRelevantDate)));
+        let mut c = Context::new();
+        let mut out = 77;
+        unsafe {
+            assert_eq!(
+                itofin_fra_helper_new_with_pillar(
+                    &mut c,
+                    0,
+                    std::ptr::null(),
+                    45000,
+                    &mut out,
+                    null_mut()
+                ),
+                INVALID_ARGUMENT
+            );
+            assert_eq!(
+                itofin_swap_helper_new_with_pillar(
+                    &mut c,
+                    std::ptr::null(),
+                    0,
+                    2,
+                    45000,
+                    &mut out,
+                    null_mut()
+                ),
+                INVALID_ARGUMENT
+            );
+            assert_eq!(
+                itofin_ois_helper_new_with_pillar(
+                    &mut c,
+                    std::ptr::null(),
+                    45000,
+                    &mut out,
+                    null_mut()
+                ),
+                INVALID_ARGUMENT
+            );
+            assert_eq!(
+                crate::inflation_helpers_api::itofin_inflation_helper_new_with_pillar(
+                    &mut c,
+                    std::ptr::null(),
+                    0,
+                    45000,
+                    &mut out,
+                    null_mut()
+                ),
+                INVALID_ARGUMENT
+            );
+        }
+        assert_eq!(out, 77);
     }
 }
