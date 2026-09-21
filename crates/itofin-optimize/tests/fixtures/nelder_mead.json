@@ -1,0 +1,140 @@
+{
+  "cases": {
+    "adaptive_sphere10": {
+      "fun": 7.382057203064162e-17,
+      "message": "Optimization terminated successfully.",
+      "nfev": 1466,
+      "nit": 851,
+      "options": {
+        "adaptive": true,
+        "fatol": 1e-10,
+        "maxfev": 20000,
+        "maxiter": 20000,
+        "xatol": 1e-08
+      },
+      "status": 0,
+      "x": [
+        -2.8559291056668554e-09,
+        -3.814664273739279e-09,
+        1.760719328035269e-09,
+        1.4930138312187205e-09,
+        4.1730781740897046e-10,
+        1.002104950394648e-09,
+        4.027163337557932e-09,
+        2.2654980811602583e-09,
+        -2.264122059304884e-09,
+        4.257724703613153e-09
+      ],
+      "x0": [
+        0.6,
+        0.6,
+        0.6,
+        0.6,
+        0.6,
+        0.6,
+        0.6,
+        0.6,
+        0.6,
+        0.6
+      ]
+    },
+    "beale": {
+      "fun": 6.1142771278625556e-18,
+      "message": "Optimization terminated successfully.",
+      "nfev": 162,
+      "nit": 84,
+      "options": {
+        "fatol": 1e-10,
+        "maxfev": 20000,
+        "maxiter": 20000,
+        "xatol": 1e-08
+      },
+      "status": 0,
+      "x": [
+        2.999999999458363,
+        0.5000000003786065
+      ],
+      "x0": [
+        1.0,
+        1.0
+      ]
+    },
+    "quadratic4": {
+      "fun": 4.26500556979556e-17,
+      "message": "Optimization terminated successfully.",
+      "nfev": 636,
+      "nit": 371,
+      "options": {
+        "fatol": 1e-10,
+        "maxfev": 20000,
+        "maxiter": 20000,
+        "xatol": 1e-08
+      },
+      "status": 0,
+      "x": [
+        1.0000000039208645,
+        -1.999999999482714,
+        0.4999999970697605,
+        -0.999999999666302
+      ],
+      "x0": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "rosenbrock": {
+      "fun": 1.0990889519195732e-18,
+      "message": "Optimization terminated successfully.",
+      "nfev": 219,
+      "nit": 117,
+      "options": {
+        "fatol": 1e-10,
+        "maxfev": 20000,
+        "maxiter": 20000,
+        "xatol": 1e-08
+      },
+      "status": 0,
+      "x": [
+        0.9999999991878143,
+        0.9999999984419192
+      ],
+      "x0": [
+        -1.2,
+        1.0
+      ]
+    },
+    "sphere5": {
+      "fun": 4.3668778991777523e-17,
+      "message": "Optimization terminated successfully.",
+      "nfev": 585,
+      "nit": 347,
+      "options": {
+        "fatol": 1e-10,
+        "maxfev": 20000,
+        "maxiter": 20000,
+        "xatol": 1e-08
+      },
+      "status": 0,
+      "x": [
+        1.7830288173048072e-09,
+        5.389411078047834e-09,
+        -4.3413723836028155e-10,
+        -2.6706731509560285e-09,
+        -2.0304839913884892e-09
+      ],
+      "x0": [
+        1.0,
+        -2.0,
+        3.0,
+        0.5,
+        -1.5
+      ]
+    }
+  },
+  "provenance": {
+    "generated": "2026-09-21",
+    "scipy_version": "1.18.1"
+  }
+}
