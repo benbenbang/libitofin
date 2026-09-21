@@ -521,6 +521,26 @@ typedef struct ItofinKYoYVolConfig {
 } ItofinKYoYVolConfig;
 
 /**
+ * Initialize with itofin_iterative_bootstrap_options_default before overriding.
+ * Presence and dont_throw flags accept only 0/1. Absent scalar values are ignored.
+ * dont_throw opts into approximate curves; helper evaluation errors still fail.
+ */
+typedef struct ItofinIterativeBootstrapOptions {
+  double accuracy;
+  double min_value;
+  double max_value;
+  int32_t has_accuracy;
+  int32_t has_min_value;
+  int32_t has_max_value;
+  size_t max_attempts;
+  double max_factor;
+  double min_factor;
+  int32_t dont_throw;
+  size_t dont_throw_steps;
+  size_t max_evaluations;
+} ItofinIterativeBootstrapOptions;
+
+/**
  * Inputs for a standalone basis helper and reusable joint template.
  */
 typedef struct ItofinBasisHelperConfig {
@@ -2999,6 +3019,30 @@ int32_t itofin_k_yoy_vol_slice(struct ItofinContext *ctx,
                                size_t capacity,
                                size_t *required,
                                struct ItofinError *error);
+
+/**
+ * Write the strict, trait-bounded bootstrap defaults without creating handles.
+ * # Safety
+ * Output and error pointers must follow the crate C caller contract.
+ */
+int32_t itofin_iterative_bootstrap_options_default(struct ItofinIterativeBootstrapOptions *out,
+                                                   struct ItofinError *error);
+
+/**
+ * Construct an iterative yield curve; kind uses itofin_piecewise_curve_new values.
+ * Options are copied. Curves retain helpers and their dependencies.
+ * # Safety
+ * Pointers and arrays must follow the crate C caller contract.
+ */
+int32_t itofin_piecewise_curve_new_with_options(struct ItofinContext *ctx,
+                                                int32_t reference,
+                                                const uint64_t *helpers,
+                                                size_t len,
+                                                uint64_t dc,
+                                                int32_t kind,
+                                                const struct ItofinIterativeBootstrapOptions *options,
+                                                uint64_t *out,
+                                                struct ItofinError *error);
 
 /**
  * Construct a basis helper retaining its quotes, indices and discount curve.
