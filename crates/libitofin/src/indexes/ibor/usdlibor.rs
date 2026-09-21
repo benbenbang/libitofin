@@ -63,12 +63,7 @@ mod tests {
     //! (`piecewiseyieldcurve.cpp:1114`) plus maturity- and value-roll pins
     //! over the actual joint calendar.
     //!
-    //! `testSwapRateHelperLastRelevantDate` (`piecewiseyieldcurve.cpp:1092`)
-    //! is NOT ported: it exercises the max(maturity, last fixing-end-date)
-    //! pillar refinement, which this port defers to #341
-    //! (`latest_relevant_date` equals the maturity, see
-    //! `ratehelpers.rs::initialize_dates`), so a no-throw port here would
-    //! assert nothing USDLibor-specific and could not fail.
+    //! The last-relevant-date regression is covered by `tests/custom_pillars.rs`.
 
     use super::*;
     use crate::indexes::index::Index;

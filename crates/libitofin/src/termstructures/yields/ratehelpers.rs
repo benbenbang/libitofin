@@ -11,9 +11,7 @@
 //! constructors are deferred with the swap-index port. The `OISRateHelper`
 //! explicit-start/end-date constructor is deferred likewise.
 //!
-//! [`FraRateHelper`] defers three `FraRateHelper` constructor paths visibly: the
-//! `Pillar::CustomDate` variants (that enum arm is not ported, see [`Pillar`]),
-//! the from-scratch constructors that build a synthetic `"no-fix"` [`IborIndex`]
+//! [`FraRateHelper`] defers the from-scratch constructors that build a synthetic `"no-fix"` [`IborIndex`]
 //! (`ratehelpers.cpp:263,293`), and the IMM-offset constructors
 //! (`ratehelpers.cpp:322`, with the `nthImmDate` helper). None sit on the
 //! bootstrap oracle path. Unlike C++, which registers the helper with its cloned
@@ -24,7 +22,6 @@
 
 use std::cell::Cell;
 use std::cell::RefCell;
-use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::rc::Weak;
 
 use crate::cashflows::RateAveraging;
@@ -56,6 +53,7 @@ use crate::time::period::Period;
 use crate::time::timeunit::TimeUnit;
 use crate::time::{asx, imm};
 use crate::types::{Integer, Natural, Real};
+use std::panic::{AssertUnwindSafe, catch_unwind};
 
 /// Bootstrap helper over a deposit rate (`DepositRateHelper`).
 ///
@@ -420,28 +418,34 @@ impl RateHelper for FuturesRateHelper {
     }
 }
 
-/// The date the curve node a helper fits sits at (`Pillar::Choice`).
-///
-/// Only the two schedule-derived choices are ported: [`LastRelevantDate`] (the
-/// C++ default) and [`MaturityDate`]. `Pillar::CustomDate`, which needs an
-/// explicit pillar date threaded through construction plus its bounds check, is
-/// deferred to #343 with the constructors that pass one.
-///
-/// [`LastRelevantDate`]: Pillar::LastRelevantDate
-/// [`MaturityDate`]: Pillar::MaturityDate
+/// Selects the date at which a helper places its curve node.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Pillar {
     /// The instrument's maturity date.
     MaturityDate,
     /// The latest date the instrument needs data at.
     LastRelevantDate,
+    /// A fixed date within the helper's earliest and latest relevant dates.
+    CustomDate(Date),
 }
 
 impl Pillar {
-    pub(crate) fn resolve(self, _earliest: Date, maturity: Date, latest: Date) -> QlResult<Date> {
+    pub(crate) fn resolve(self, earliest: Date, maturity: Date, latest: Date) -> QlResult<Date> {
         match self {
             Self::MaturityDate => Ok(maturity),
             Self::LastRelevantDate => Ok(latest),
+            Self::CustomDate(date) => {
+                crate::require!(date != Date::null(), "custom pillar date must be provided");
+                crate::require!(
+                    date >= earliest,
+                    "pillar date must be later than or equal to the instrument's earliest date"
+                );
+                crate::require!(
+                    date <= latest,
+                    "pillar date must be before or equal to the instrument's latest relevant date"
+                );
+                Ok(date)
+            }
         }
     }
 }
