@@ -64,3 +64,6 @@ pub mod volgrid_api;
 
 #[cfg(test)]
 mod swaption_facades_tests;
+
+#[cfg(test)]
+mod cap_calibration_tests;
