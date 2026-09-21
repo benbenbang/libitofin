@@ -1,6 +1,6 @@
-//! PseudoRandom Monte Carlo engines; configuration preserves Python optionality.
+//! Concrete Monte Carlo engines; configuration preserves Python optionality.
 use crate::boundary::*;
-use libitofin::math::randomnumbers::rngtraits::PseudoRandom;
+use libitofin::math::randomnumbers::rngtraits::{LowDiscrepancy, PseudoRandom};
 use libitofin::pricingengine::PricingEngine;
 use libitofin::pricingengines::vanilla::{
     MakeMcAmericanEngine, MakeMcEuropeanEngine, MakeMcEuropeanHestonEngine,
@@ -52,7 +52,8 @@ macro_rules! configure {
         maker
     }};
 }
-/// Kind 0 European BSM, 1 European Heston, 2 American BSM.
+/// Kind 0 European BSM, 1 European Heston, 2 American BSM, 3 Sobol European BSM.
+/// Kind 3 requires positive fixed samples/steps and rejects max_samples.
 #[unsafe(no_mangle)]
 /// # Safety
 /// Pointers must be aligned, live and valid for their stated lengths. Outputs
@@ -118,6 +119,17 @@ pub unsafe extern "C" fn itofin_mc_engine_new(
                     }
                     shared_mut(maker.build()?)
                 }
+                3 => shared_mut(
+                    configure!(
+                        MakeMcEuropeanEngine::<LowDiscrepancy>::new(c.get::<Shared<
+                            GeneralizedBlackScholesProcess,
+                        >>(
+                            process
+                        )?),
+                        cfg
+                    )
+                    .build()?,
+                ),
                 _ => return Err(BindingError::invalid("unknown MC engine kind")),
             };
             output(out, c.insert(engine)?)

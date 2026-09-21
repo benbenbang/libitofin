@@ -191,3 +191,19 @@ func (o *VanillaOption) PriceMCAmerican(e *MCAmericanEngine) (float64, error) {
 	}
 	return o.price(e.object, 2, 0)
 }
+
+// SetQMCEngine attaches a Sobol European engine.
+func (o *VanillaOption) SetQMCEngine(e *QMCEuropeanEngine) error {
+	if e == nil {
+		return errNilArgument("engine")
+	}
+	return o.setEngine(e.object, 2, 0)
+}
+
+// PriceQMC attaches and evaluates the Sobol engine in one session operation.
+func (o *VanillaOption) PriceQMC(e *QMCEuropeanEngine) (float64, error) {
+	if e == nil {
+		return 0, errNilArgument("engine")
+	}
+	return o.price(e.object, 2, 0)
+}
