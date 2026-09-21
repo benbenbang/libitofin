@@ -128,3 +128,22 @@ CapHelper retains its quote, index and curve, refreshes the ATM cap for model an
 time queries, and supports normal or shifted-lognormal market values. The new
 HullWhite cap calibration method uses the tree engine and can fix mean reversion.
 Existing engine discriminants, constructors and C struct layouts are unchanged.
+
+## Iterative bootstrap options
+
+`PiecewiseCurveConfig.IterativeOptions` accepts `IterativeBootstrapOptions` from
+`DefaultIterativeBootstrapOptions()`. Nil retains the existing strict defaults.
+Python yield constructors accept trailing `iterative_options=None`; construct
+`IterativeBootstrapOptions` with named overrides. Options are copied, and curves
+retain helpers and their dependencies. Global/local algorithms reject them.
+
+C callers initialize the new `ItofinIterativeBootstrapOptions` with
+`itofin_iterative_bootstrap_options_default`, then call
+`itofin_piecewise_curve_new_with_options` with a non-null options pointer.
+Presence and `dont_throw` fields require 0/1. Existing constructors/layouts are
+unchanged. Explicit zero attempt/step/evaluation limits are invalid.
+
+Bounds are initial solver brackets, widened on retries; they are not constraints.
+`DontThrow`/`dont_throw` deliberately permits approximate curves that need not
+reprice helpers. Evaluation errors still propagate. These configuration facades
+cover iterative yield curves; credit/inflation constructors keep their defaults.

@@ -73,6 +73,20 @@ The [oracle](../crates/libitofin/tests/fixtures/lazy_inflation_base/README.md) c
 rebuilt node grids with fresh QuantLib curves and documents its persistent-grid
 difference. Existing fixed-base constructors remain available.
 
+## Iterative bootstrap recovery
+
+[#941](https://github.com/benbenbang/libitofin/issues/941) is implemented for the
+next release. The generic Rust driver retries a failed cached curve from fresh
+state before applying optional sign-aware bound widening. Explicit `dont_throw`
+permits an inclusive fallback scan or the final unconverged outer pass; it does
+not promise exact repricing. Defaults remain strict.
+
+Python/C/Go expose validated options on iterative yield-curve constructors.
+Credit and inflation retain their existing default configuration and share the
+cached-state recovery. Local/global bootstrap factories reject iterative options.
+The [QuantLib oracle](../crates/libitofin/tests/fixtures/iterative_bootstrap/README.md)
+checks widening, fallback values, cached recovery, and the outer iteration limit.
+
 ## Joint curve bootstrapping
 
 Rust exposes `IborIborBasisSwapRateHelper` and the genuinely coupled 3M/6M
