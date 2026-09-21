@@ -24,10 +24,11 @@
 
 use std::cell::Cell;
 use std::cell::RefCell;
+use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::rc::Weak;
 
 use crate::cashflows::RateAveraging;
-use crate::errors::QlResult;
+use crate::errors::{QlError, QlResult};
 use crate::handle::{Handle, RelinkableHandle};
 use crate::indexes::OvernightIndex;
 use crate::indexes::iborindex::IborIndex;
@@ -436,6 +437,25 @@ pub enum Pillar {
     LastRelevantDate,
 }
 
+impl Pillar {
+    pub(crate) fn resolve(self, _earliest: Date, maturity: Date, latest: Date) -> QlResult<Date> {
+        match self {
+            Self::MaturityDate => Ok(maturity),
+            Self::LastRelevantDate => Ok(latest),
+        }
+    }
+}
+
+fn rebuild_dates<T>(rebuild: impl FnOnce() -> QlResult<T>) -> QlResult<T> {
+    catch_unwind(AssertUnwindSafe(rebuild)).unwrap_or_else(|_| {
+        Err(QlError::new(
+            "helper dates exceed supported range",
+            file!(),
+            line!(),
+        ))
+    })
+}
+
 /// Bootstrap helper over a forward-rate-agreement rate (`FraRateHelper`).
 ///
 /// The helper fits the rate of a FRA that starts `period_to_start` after spot
@@ -454,6 +474,7 @@ pub enum Pillar {
 /// pinned at the maturity (`ratehelpers.cpp:361`).
 pub struct FraRateHelper {
     base: BootstrapHelperBase,
+    date_error: RefCell<Option<QlError>>,
     index: IborIndex,
     term_structure_handle: RelinkableHandle<dyn YieldTermStructure>,
     period_to_start: Option<Period>,
@@ -464,6 +485,82 @@ pub struct FraRateHelper {
 }
 
 impl FraRateHelper {
+    /// Builds the helper and returns schedule or custom-pillar errors.
+    #[allow(clippy::too_many_arguments)]
+    pub fn try_new(
+        quote: Handle<dyn Quote>,
+        period_to_start: Period,
+        index: &IborIndex,
+        use_indexed_coupon: bool,
+        pillar: Pillar,
+    ) -> QlResult<Shared<FraRateHelper>> {
+        let helper = Self::new(quote, period_to_start, index, use_indexed_coupon, pillar);
+        helper.validate_dates()?;
+        Ok(helper)
+    }
+
+    /// Builds the helper and returns schedule or custom-pillar errors.
+    #[allow(clippy::too_many_arguments)]
+    pub fn try_from_rate(
+        rate: Real,
+        period_to_start: Period,
+        index: &IborIndex,
+        use_indexed_coupon: bool,
+        pillar: Pillar,
+    ) -> QlResult<Shared<FraRateHelper>> {
+        let helper = Self::from_rate(rate, period_to_start, index, use_indexed_coupon, pillar);
+        helper.validate_dates()?;
+        Ok(helper)
+    }
+
+    /// Builds the helper and returns schedule or custom-pillar errors.
+    #[allow(clippy::too_many_arguments)]
+    pub fn try_from_months(
+        quote: Handle<dyn Quote>,
+        months_to_start: Natural,
+        index: &IborIndex,
+        use_indexed_coupon: bool,
+        pillar: Pillar,
+    ) -> QlResult<Shared<FraRateHelper>> {
+        crate::require!(
+            months_to_start <= i32::MAX as u32,
+            "months to start exceed supported range"
+        );
+        let helper = Self::from_months(quote, months_to_start, index, use_indexed_coupon, pillar);
+        helper.validate_dates()?;
+        Ok(helper)
+    }
+
+    /// Builds the helper and returns schedule or custom-pillar errors.
+    #[allow(clippy::too_many_arguments)]
+    pub fn try_from_dates(
+        quote: Handle<dyn Quote>,
+        start_date: Date,
+        end_date: Date,
+        index: &IborIndex,
+        use_indexed_coupon: bool,
+        pillar: Pillar,
+    ) -> QlResult<Shared<FraRateHelper>> {
+        let helper = Self::from_dates(
+            quote,
+            start_date,
+            end_date,
+            index,
+            use_indexed_coupon,
+            pillar,
+        );
+        helper.validate_dates()?;
+        Ok(helper)
+    }
+
+    /// Returns the last schedule error, if a date change invalidated the helper.
+    pub fn validate_dates(&self) -> QlResult<()> {
+        match self.date_error.borrow().as_ref() {
+            Some(error) => Err(error.clone()),
+            None => Ok(()),
+        }
+    }
+
     /// A FRA helper fitting `quote` over the window starting `period_to_start`
     /// after spot and spanning `index`'s tenor (the index-based `Period`
     /// constructor, `ratehelpers.cpp:305`).
@@ -561,6 +658,7 @@ impl FraRateHelper {
                 BootstrapHelperBase::new_relative(quote, settings, update_dates, on_eval_change);
             let helper = FraRateHelper {
                 base,
+                date_error: RefCell::new(None),
                 index,
                 term_structure_handle,
                 period_to_start,
@@ -597,6 +695,7 @@ impl RateHelper for FraRateHelper {
     /// forward `(discount(earliest)/discount(maturity) - 1)/spanning_time` read
     /// straight from the curve's discount factors.
     fn implied_quote(&self) -> QlResult<Real> {
+        self.validate_dates()?;
         let term_structure = self.base.term_structure()?;
         if self.use_indexed_coupon {
             self.index.fixing(self.fixing_date.get(), true)
@@ -633,53 +732,69 @@ impl RelativeDateRateHelper for FraRateHelper {
     /// `index.maturity_date(earliest)`, par mode at the maturity and caches the
     /// spanning year fraction.
     fn initialize_dates(&self) {
-        if self.base.update_dates() {
-            let evaluation_date = self
-                .base
-                .evaluation_date()
-                .expect("a relative-date helper always tracks an evaluation date");
-            let calendar = self.index.fixing_calendar();
-            let reference = calendar.adjust(evaluation_date, BusinessDayConvention::Following);
-            let spot = self
-                .index
-                .value_date(reference)
-                .expect("spot date of an adjusted business day is valid");
-            let period_to_start = self
-                .period_to_start
-                .expect("a relative-date FRA helper carries a period to start");
-            let convention = self.index.business_day_convention();
-            let end_of_month = self.index.end_of_month();
-            let earliest =
-                calendar.advance_by_period(spot, period_to_start, convention, end_of_month);
-            let maturity = calendar.advance_by_period(
-                spot,
-                period_to_start + self.index.tenor(),
-                convention,
-                end_of_month,
-            );
-            self.base.set_earliest_date(earliest);
-            self.base.set_maturity_date(maturity);
-        }
+        *self.date_error.borrow_mut() = self.try_initialize_dates().err();
+    }
+}
 
-        let earliest = self.base.earliest_date();
-        let maturity = self.base.maturity_date();
-        let latest_relevant = if self.use_indexed_coupon {
-            self.index
-                .maturity_date(earliest)
-                .expect("maturity date of a value date is valid")
-        } else {
-            self.spanning_time
-                .set(self.index.day_counter().year_fraction(earliest, maturity));
-            maturity
-        };
+impl FraRateHelper {
+    fn try_initialize_dates(&self) -> QlResult<()> {
+        let (earliest, maturity, latest_relevant, pillar, fixing_date, spanning_time) =
+            rebuild_dates(|| {
+                let (earliest, maturity) = if self.base.update_dates() {
+                    let evaluation_date = self
+                        .base
+                        .evaluation_date()
+                        .expect("a relative-date helper always tracks an evaluation date");
+                    let calendar = self.index.fixing_calendar();
+                    let reference =
+                        calendar.adjust(evaluation_date, BusinessDayConvention::Following);
+                    let spot = self
+                        .index
+                        .value_date(reference)
+                        .expect("spot date of an adjusted business day is valid");
+                    let period_to_start = self
+                        .period_to_start
+                        .expect("a relative-date FRA helper carries a period to start");
+                    let convention = self.index.business_day_convention();
+                    let end_of_month = self.index.end_of_month();
+                    let earliest =
+                        calendar.advance_by_period(spot, period_to_start, convention, end_of_month);
+                    let maturity = calendar.advance_by_period(
+                        spot,
+                        period_to_start + self.index.tenor(),
+                        convention,
+                        end_of_month,
+                    );
+                    (earliest, maturity)
+                } else {
+                    (self.base.earliest_date(), self.base.maturity_date())
+                };
+                let spanning_time = self.index.day_counter().year_fraction(earliest, maturity);
+                let latest_relevant = if self.use_indexed_coupon {
+                    self.index.maturity_date(earliest)?
+                } else {
+                    maturity
+                };
+                let pillar = self.pillar.resolve(earliest, maturity, latest_relevant)?;
+                let fixing_date = self.index.fixing_date(earliest);
+                Ok((
+                    earliest,
+                    maturity,
+                    latest_relevant,
+                    pillar,
+                    fixing_date,
+                    spanning_time,
+                ))
+            })?;
+        self.base.set_earliest_date(earliest);
+        self.base.set_maturity_date(maturity);
         self.base.set_latest_relevant_date(latest_relevant);
-        let pillar = match self.pillar {
-            Pillar::MaturityDate => maturity,
-            Pillar::LastRelevantDate => latest_relevant,
-        };
+
         self.base.set_pillar_date(pillar);
         self.base.set_latest_date(pillar);
-        self.fixing_date.set(self.index.fixing_date(earliest));
+        self.fixing_date.set(fixing_date);
+        self.spanning_time.set(spanning_time);
+        Ok(())
     }
 }
 
