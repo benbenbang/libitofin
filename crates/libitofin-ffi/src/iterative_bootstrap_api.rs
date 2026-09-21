@@ -170,12 +170,25 @@ pub unsafe extern "C" fn itofin_piecewise_curve_new_with_options(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use libitofin::indexes::Euribor;
+    use libitofin::settings::Settings;
+    use libitofin::shared::shared;
+    use libitofin::termstructures::yields::DepositRateHelper;
+    use libitofin::time::{date::Month, daycounters::actual360::Actual360};
     use std::mem::MaybeUninit;
     use std::ptr::{null, null_mut};
 
     #[test]
     fn iterative_options_flags_and_null_pointers_do_not_poison_context() {
         let mut context = Context::new();
+        let reference = Date::new(15, Month::June, 2026);
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(reference);
+        let index = Euribor::three_months(Handle::empty(), settings);
+        let helper = context
+            .insert(DepositRateHelper::from_rate(0.05, &index) as Shared<dyn RateHelper>)
+            .unwrap();
+        let dc = context.insert(Actual360::new()).unwrap();
         let mut value = MaybeUninit::uninit();
         unsafe {
             assert_eq!(
@@ -228,6 +241,9 @@ mod tests {
                 INVALID_ARGUMENT
             );
             for selector in 0..4 {
+                value.accuracy = 1e-12;
+                value.min_value = 0.5;
+                value.max_value = 1.5;
                 let flag = match selector {
                     0 => &mut value.has_accuracy,
                     1 => &mut value.has_min_value,
@@ -238,10 +254,10 @@ mod tests {
                 assert_eq!(
                     itofin_piecewise_curve_new_with_options(
                         &mut context,
-                        0,
-                        null(),
-                        0,
-                        0,
+                        reference.serial_number(),
+                        &helper,
+                        1,
+                        dc,
                         0,
                         &value,
                         &mut out,
@@ -255,7 +271,23 @@ mod tests {
                     0
                 );
             }
-            assert_eq!(with_context(&mut context, null_mut(), |_| Ok(())), 0);
+            assert_eq!(
+                itofin_piecewise_curve_new_with_options(
+                    &mut context,
+                    reference.serial_number(),
+                    &helper,
+                    1,
+                    dc,
+                    0,
+                    &value,
+                    &mut out,
+                    null_mut()
+                ),
+                0
+            );
+            let curve = context.get::<Handle<dyn YieldTermStructure>>(out).unwrap();
+            let discount = curve.current_link().unwrap().discount(0.1, false).unwrap();
+            assert!(discount.is_finite() && discount > 0.0 && discount < 1.0);
         }
     }
 }
