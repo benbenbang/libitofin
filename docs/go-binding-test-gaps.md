@@ -9,6 +9,8 @@ This inventory does not claim exhaustive QuantLib product coverage.
 
 | Scope | Executable evidence |
 | --- | --- |
+| Custom pillars: independent QuantLib helper dates and curve values, invalid bounds, retained inputs and date recovery | `TestCustomYieldPillarsQuantLibAndRecovery`, `TestCustomInflationPillarsQuantLib`, `TestCustomFraOverloadsAndSwapDiscount` |
+| Overnight futures: both accrual conventions, holiday clipping, live convexity/fixings, expiry and released inputs at `1e-9` | `TestOvernightFutureQuantLibAccrualAndRetention`, `TestSofrFutureBootstrapAndCustomPillars` |
 | Hull-White Bermudan tree, six indexed/par QuantLib cached prices, bumped-quote oracle, retained inputs and invalid-input recovery | [Tree swaption tests](../sdk/go/tree_swaption_test.go) |
 | Iterative bootstrap signed bound widening, approximate fallback, evaluation limits, cached retry and retained inputs | `TestIterativeBootstrapQuantLibOracle`, `TestIterativeBootstrapAllYieldFactories`, `TestIterativeBootstrapRetryRetentionAndErrors`, `TestIterativeBootstrapInvalidOptions` |
 | Mutually coupled Ibor basis curves, independent FRA/swap repricing, quote/discount/date/fixing updates and retained joint ownership | `TestJointYieldCurvesQuantLibRepricingAndUpdates`, `TestJointYieldCurvesFixingsAndCloseOrders`, `TestJointYieldCurvesInvalidInputs` |
@@ -58,9 +60,9 @@ covers all three language surfaces.
 forecast discount-ratio compounding, today's fixing enforcement and daily-spread
 treatment with QuantLib, including partial forecast intervals. Both previously
 excluded coupon cases now run. Exact enforcement and daily-spread switches remain
-Rust-only: Python/Go expose neither those settings nor fixing-history writes.
-Their OIS tests cover the exposed pricing and recovery from missing-history
-errors; they do not claim coverage of unexposed switches.
+Rust-only; #808 additionally exposes overnight fixing-history writes in Python/Go.
+The OIS tests cover exposed pricing and recovery from missing-history errors;
+they do not claim coverage of unexposed switches.
 [#1047](https://github.com/benbenbang/libitofin/issues/1047) registers the helper's
 additive-spread handle with its existing observer, so a live spread change
 invalidates and rebootstraps the same fitted curve in Rust, Python and Go.
@@ -103,10 +105,3 @@ bootstrap repricing, analytical hazard queries, inflation metadata and retained
 relinking tests. #1003/#1004 subsequently completed the RNG/calendar surface.
 The [historical validation record](go-bindings-followups.md) preserves those
 revision-specific counts; missing references never implied unexecuted code.
-
-Custom pillars: `TestCustomYieldPillarsQuantLibAndRecovery`, `TestCustomInflationPillarsQuantLib`
-and `TestCustomFraOverloadsAndSwapDiscount` cover independently generated QuantLib
-helper dates, curve values, invalid bounds, retained inputs and date recovery.
-Overnight futures: `TestOvernightFutureQuantLibAccrualAndRetention` and
-`TestSofrFutureBootstrapAndCustomPillars` cover both accrual conventions, holiday
-clipping, live convexity/fixings, expiry and released inputs at `1e-9`.
