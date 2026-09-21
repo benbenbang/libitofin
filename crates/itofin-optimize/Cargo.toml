@@ -1,0 +1,12 @@
+[package]
+name = "itofin-optimize"
+version.workspace = true
+edition.workspace = true
+description = "SciPy-inspired numerical optimization in Rust: a finance-independent minimize over plain float slices."
+license = "BSD-3-Clause"
+repository = "https://github.com/benbenbang/libitofin"
+keywords = ["optimization", "minimize", "nelder-mead", "bfgs", "slsqp"]
+categories = ["mathematics", "science", "algorithms"]
+
+[dependencies]
+thiserror = "2.0.12"
