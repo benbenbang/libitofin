@@ -270,6 +270,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     processes.add_class::<PyHestonProcess>()?;
 
     let indexes = PyModule::new(py, "indexes")?;
+    indexes.add_class::<overnightfuture::PySofr>()?;
     indexes.add_class::<PyCurrency>()?;
     indexes.add_class::<PyIborIndex>()?;
     indexes.add_class::<PyEuribor>()?;

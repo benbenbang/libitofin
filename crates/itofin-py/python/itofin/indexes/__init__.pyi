@@ -18,6 +18,7 @@ __all__ = [
     "IborIndex",
     "JpyLibor",
     "OvernightIndex",
+    "Sofr",
     "SwapIndex",
     "UsdLibor",
     "YoYInflationIndex",
@@ -597,10 +598,27 @@ class OvernightIndex:
 
     Abstract: it has no constructor, because the core builds an overnight index
     only through a family factory such as Estr. It exists so OISRateHelper and
-    MakeOis name one type and accept any family. The fixing accessor stays on
-    the family facade; lifting it here is deferred.
+    MakeOis name one type and accept any family. Shared fixing accessors and
+    historical updates are available on the base.
     """
-    ...
+    def fixing(self, fixing_date: time.Date, forecast_todays_fixing: builtins.bool = False) -> builtins.float:
+        r"""
+        Read a historical fixing or forecast through this index's curve.
+        """
+    def add_fixing(self, date: time.Date, value: builtins.float) -> None:
+        r"""
+        Add a finite historical fixing shared by indices with this name/settings.
+        """
+
+@typing.final
+class Sofr(OvernightIndex):
+    r"""
+    The SOFR overnight index, retaining its forecast curve and shared history.
+    """
+    def __init__(self, curve: typing.Optional[termstructures.YieldTermStructure], settings: itofin.Settings) -> None:
+        r"""
+        Construct SOFR with an optional forecast curve.
+        """
 
 @typing.final
 class SwapIndex:
