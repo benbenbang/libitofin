@@ -2,6 +2,12 @@
 
 [Project index](../README.md)
 
+## Random policies
+
+Unreleased: [QMC European pricing and fallible Poisson generators](../docs/docs/random-policies.md)
+are available in Rust, Python, C and Go (#454). The complete 108-case QuantLib
+QMC grid and stored Gaussian/Poisson seed oracles retain their original tolerances.
+
 ## Releases and binding delivery
 
 Rust, Python, and Go are published together. The Go module uses a matching
