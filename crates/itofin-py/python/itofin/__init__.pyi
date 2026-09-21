@@ -66,6 +66,16 @@ class Settings:
             date (time.Date): The new evaluation date. Observers are notified only when this
                 differs from the date already set.
         """
+    def set_using_at_par_coupons(self, value: builtins.bool) -> None:
+        r"""
+        Select par or indexed Ibor coupon forecasting before constructing instruments.
+
+        This setting does not invalidate already cached prices.
+        """
+    def using_at_par_coupons(self) -> builtins.bool:
+        r"""
+        Return whether Ibor coupons use par forecasting (the default).
+        """
     def set_include_todays_cash_flows(self, value: typing.Optional[builtins.bool]) -> None:
         r"""
         Set whether cash flows on today's date enter an NPV; None clears.

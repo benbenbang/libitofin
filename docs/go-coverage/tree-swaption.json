@@ -1,0 +1,36 @@
+{
+  "coverage_target": "committed Python stubs",
+  "domain": "bermudan-hull-white-tree-swaption",
+  "entries": [
+    {
+      "c": [
+        "itofin_settings_set_using_at_par_coupons"
+      ],
+      "go": [
+        "Settings.SetUsingAtParCoupons"
+      ],
+      "python": "itofin.Settings.set_using_at_par_coupons",
+      "status": "implemented",
+      "tests": [
+        "TestTreeSwaptionQuantLibRetentionAndUpdates",
+        "TestTreeSwaptionErrorsRecover",
+        "tree_swaption_c_inputs_copy_dates_and_recover_after_errors"
+      ]
+    },
+    {
+      "c": [
+        "itofin_settings_using_at_par_coupons"
+      ],
+      "go": [
+        "Settings.UsingAtParCoupons"
+      ],
+      "python": "itofin.Settings.using_at_par_coupons",
+      "status": "implemented",
+      "tests": [
+        "TestTreeSwaptionQuantLibRetentionAndUpdates",
+        "TestTreeSwaptionErrorsRecover",
+        "tree_swaption_c_inputs_copy_dates_and_recover_after_errors"
+      ]
+    }
+  ]
+}
