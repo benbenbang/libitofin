@@ -1,5 +1,6 @@
 //! Yield curve construction and queries. All curves retain the same erased handle type.
 use crate::boundary::*;
+use crate::iterative_bootstrap_api::iterative_curve;
 use crate::time_api::{calendar, date, day_counter};
 use libitofin::handle::Handle;
 use libitofin::interestrate::Compounding;
@@ -245,36 +246,7 @@ pub unsafe extern "C" fn itofin_piecewise_curve_new(
                 ));
             }
             let v: Shared<dyn YieldTermStructure> = match (kind, algorithm) {
-                (0, 0) => PiecewiseYieldCurve::<Discount, LogLinear>::new(
-                    reference, helpers, dc, LogLinear,
-                )?,
-                (1, 0) => {
-                    PiecewiseYieldCurve::<Discount, Linear>::new(reference, helpers, dc, Linear)?
-                }
-                (2, 0) => {
-                    PiecewiseYieldCurve::<Discount, Cubic>::new(reference, helpers, dc, Cubic)?
-                }
-                (3, 0) => {
-                    PiecewiseYieldCurve::<ZeroYield, Linear>::new(reference, helpers, dc, Linear)?
-                }
-                (4, 0) => {
-                    PiecewiseYieldCurve::<ZeroYield, Cubic>::new(reference, helpers, dc, Cubic)?
-                }
-                (5, 0) => {
-                    PiecewiseYieldCurve::<ForwardRate, Linear>::new(reference, helpers, dc, Linear)?
-                }
-                (6, 0) => PiecewiseYieldCurve::<ForwardRate, ConvexMonotone>::new(
-                    reference,
-                    helpers,
-                    dc,
-                    ConvexMonotone::default(),
-                )?,
-                (7, 0) => PiecewiseYieldCurve::<ForwardRate, BackwardFlat>::new(
-                    reference,
-                    helpers,
-                    dc,
-                    BackwardFlat,
-                )?,
+                (0..=7, 0) => iterative_curve(reference, helpers, dc, kind, Default::default())?,
                 (6, 2) => PiecewiseYieldCurve::<ForwardRate, ConvexMonotone, LocalBootstrap>::new(
                     reference,
                     helpers,

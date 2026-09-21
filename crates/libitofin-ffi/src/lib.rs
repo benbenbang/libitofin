@@ -33,6 +33,7 @@ pub mod inflation_products_api;
 pub mod inflation_seasonality_api;
 pub mod inflation_vol_api;
 pub mod inflation_volgrid_api;
+pub mod iterative_bootstrap_api;
 pub mod joint_curves_api;
 pub mod market_api;
 pub mod mc_api;
