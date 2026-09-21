@@ -103,3 +103,10 @@ bootstrap repricing, analytical hazard queries, inflation metadata and retained
 relinking tests. #1003/#1004 subsequently completed the RNG/calendar surface.
 The [historical validation record](go-bindings-followups.md) preserves those
 revision-specific counts; missing references never implied unexecuted code.
+
+Custom pillars: `TestCustomYieldPillarsQuantLibAndRecovery`, `TestCustomInflationPillarsQuantLib`
+and `TestCustomFraOverloadsAndSwapDiscount` cover independently generated QuantLib
+helper dates, curve values, invalid bounds, retained inputs and date recovery.
+Overnight futures: `TestOvernightFutureQuantLibAccrualAndRetention` and
+`TestSofrFutureBootstrapAndCustomPillars` cover both accrual conventions, holiday
+clipping, live convexity/fixings, expiry and released inputs at `1e-9`.
