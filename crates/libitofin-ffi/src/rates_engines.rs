@@ -5,7 +5,7 @@ use crate::time_api::day_counter;
 use libitofin::handle::Handle;
 use libitofin::pricingengines::swaption::CashAnnuityModel;
 use libitofin::pricingengines::{
-    BachelierSwaptionEngine, BlackCapFloorEngine, BlackSwaptionEngine,
+    BachelierCapFloorEngine, BachelierSwaptionEngine, BlackCapFloorEngine, BlackSwaptionEngine,
 };
 use libitofin::shared::{SharedMut, shared_mut};
 use libitofin::termstructures::volatility::OptionletVolatilityStructure;
@@ -14,7 +14,7 @@ use libitofin::types::Real;
 
 #[repr(C)]
 pub struct ItofinRateEngineConfig {
-    /// 0 Black swaption, 1 Bachelier swaption, 2 Black cap/floor.
+    /// 0 Black swaption, 1 Bachelier swaption, 2 Black cap/floor, 3 Bachelier cap/floor.
     pub kind: i32,
     pub discount: u64,
     pub volatility: u64,
@@ -110,6 +110,27 @@ pub unsafe extern "C" fn itofin_rate_engine_new(
                             } else {
                                 None
                             },
+                        )?
+                    };
+                    c.insert(shared_mut(engine))?
+                }
+                3 => {
+                    if finite(a.displacement)? != 0.0 {
+                        return Err(BindingError::invalid(
+                            "normal cap/floor displacement must be zero",
+                        ));
+                    }
+                    let engine = if a.flat == 1 {
+                        BachelierCapFloorEngine::with_flat_vol(
+                            discount,
+                            crate::market_api::quote(c, a.volatility)?,
+                            day_counter(c, a.day_counter)?,
+                            settings(c, a.settings)?,
+                        )?
+                    } else {
+                        BachelierCapFloorEngine::new(
+                            discount,
+                            c.get::<Handle<dyn OptionletVolatilityStructure>>(a.volatility)?,
                         )?
                     };
                     c.insert(shared_mut(engine))?

@@ -655,7 +655,7 @@ typedef struct ItofinMakeSwapConfig {
 
 typedef struct ItofinRateEngineConfig {
   /**
-   * 0 Black swaption, 1 Bachelier swaption, 2 Black cap/floor.
+   * 0 Black swaption, 1 Bachelier swaption, 2 Black cap/floor, 3 Bachelier cap/floor.
    */
   int32_t kind;
   uint64_t discount;
@@ -3703,7 +3703,9 @@ int32_t itofin_capfloor_from_leg(struct ItofinContext *ctx,
                                  struct ItofinError *error);
 
 /**
- * Kind: 0 swaption Black, 1 Bachelier, 2 HullWhite, 3 cap/floor Black, 6 swaption tree.
+ * Kind: 0 swaption Black, 1 swaption Bachelier, 2 swaption HullWhite,
+ * 3 cap/floor Black, 4 cap/floor Bachelier, 5 cap/floor HullWhite tree,
+ * 6 swaption HullWhite tree.
  * # Safety
  * Pointers must be aligned, live and valid for their stated lengths. Outputs
  * must not overlap inputs or other outputs. Any context and its handles must
