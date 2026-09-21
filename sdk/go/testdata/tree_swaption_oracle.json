@@ -1,0 +1,41 @@
+{
+  "quantlib": "1.43",
+  "rows": [
+    {
+      "at_par": false,
+      "bumped": 86.32622458322923,
+      "initial": 42.240242152229044,
+      "multiplier": 0.8
+    },
+    {
+      "at_par": false,
+      "bumped": 47.33765683904055,
+      "initial": 12.903199509170754,
+      "multiplier": 1.0
+    },
+    {
+      "at_par": false,
+      "bumped": 16.307145880293877,
+      "initial": 2.497576686092282,
+      "multiplier": 1.2
+    },
+    {
+      "at_par": true,
+      "bumped": 86.33229256742148,
+      "initial": 42.245971500545885,
+      "multiplier": 0.8
+    },
+    {
+      "at_par": true,
+      "bumped": 47.344988925585355,
+      "initial": 12.906866329650406,
+      "multiplier": 1.0
+    },
+    {
+      "at_par": true,
+      "bumped": 16.31227686701909,
+      "initial": 2.498579352565752,
+      "multiplier": 1.2
+    }
+  ]
+}
