@@ -1,7 +1,8 @@
 use crate::{
     Bounds, Common, Converged, Counters, Flow, Halt, InvalidInput, IterationState, Method,
-    Minimize, MinimizeError, NelderMeadOptions, Objective, Problem, Termination,
+    Minimize, MinimizeError, NelderMeadOptions, Objective, Problem, Termination, minimize,
 };
+use std::convert::Infallible;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 enum ProbeError {
@@ -390,4 +391,374 @@ fn a_closure_runs_through_the_counters() {
     let result = run(&mut objective, &problem(), &common(None, Some(1), None)).unwrap();
     assert_eq!(result.fun, 2.0);
     assert_eq!(result.nfev, 1);
+}
+
+fn solve(
+    objective: impl FnMut(&[f64]) -> f64,
+    x0: Vec<f64>,
+    options: NelderMeadOptions,
+    common: Common,
+) -> Minimize {
+    let mut objective = objective;
+    let mut wrapped = move |x: &[f64]| -> Result<f64, Infallible> { Ok(objective(x)) };
+    let problem = Problem { x0, bounds: None };
+    minimize(
+        &mut wrapped,
+        &problem,
+        &Method::NelderMead(options),
+        &common,
+    )
+    .expect("an infallible objective cannot fail")
+}
+
+fn with_defaults<O: Objective>(
+    objective: &mut O,
+    problem: &Problem,
+    common: Common,
+) -> Result<Minimize, MinimizeError<O::Error>> {
+    let method = Method::NelderMead(NelderMeadOptions::default());
+    minimize(objective, problem, &method, &common)
+}
+
+fn sphere(x: &[f64]) -> f64 {
+    x.iter().map(|value| value * value).sum()
+}
+
+fn rosenbrock(x: &[f64]) -> f64 {
+    100.0 * (x[1] - x[0] * x[0]).powi(2) + (1.0 - x[0]).powi(2)
+}
+
+fn beale(x: &[f64]) -> f64 {
+    (1.5 - x[0] + x[0] * x[1]).powi(2)
+        + (2.25 - x[0] + x[0] * x[1] * x[1]).powi(2)
+        + (2.625 - x[0] + x[0] * x[1].powi(3)).powi(2)
+}
+
+fn tight() -> NelderMeadOptions {
+    NelderMeadOptions {
+        xatol: Some(1e-10),
+        fatol: Some(1e-12),
+        ..NelderMeadOptions::default()
+    }
+}
+
+fn generous() -> Common {
+    common(Some(20_000), Some(20_000), None)
+}
+
+#[test]
+fn a_sphere_is_minimized_at_the_origin() {
+    for x0 in [vec![1.0, -2.0], vec![1.0, -2.0, 3.0, 0.5, -1.5]] {
+        let result = solve(sphere, x0, NelderMeadOptions::default(), generous());
+        assert_eq!(result.status, Termination::Converged(Converged::XTol));
+        assert!(result.success);
+        for coordinate in &result.x {
+            assert!(coordinate.abs() < 1e-4, "{:?}", result.x);
+        }
+    }
+}
+
+#[test]
+fn rosenbrock_reaches_its_valley_floor() {
+    let result = solve(rosenbrock, vec![-1.2, 1.0], tight(), generous());
+    assert_eq!(result.status, Termination::Converged(Converged::XTol));
+    assert!(result.fun < 1e-8, "{}", result.fun);
+    assert!((result.x[0] - 1.0).abs() < 1e-4);
+    assert!((result.x[1] - 1.0).abs() < 1e-4);
+}
+
+#[test]
+fn a_non_smooth_objective_still_converges() {
+    let absolute = |x: &[f64]| x.iter().map(|value| value.abs()).sum();
+    let result = solve(
+        absolute,
+        vec![1.3, -0.7],
+        NelderMeadOptions::default(),
+        generous(),
+    );
+    assert_eq!(result.status, Termination::Converged(Converged::XTol));
+    assert!(result.fun < 1e-3, "{}", result.fun);
+}
+
+#[test]
+fn beale_reaches_its_known_minimum() {
+    let result = solve(beale, vec![1.0, 1.0], tight(), generous());
+    assert!(result.fun < 1e-8, "{}", result.fun);
+    assert!((result.x[0] - 3.0).abs() < 1e-4);
+    assert!((result.x[1] - 0.5).abs() < 1e-4);
+}
+
+#[test]
+fn an_infinite_barrier_is_a_legal_worse_vertex() {
+    let barrier = |x: &[f64]| {
+        if sphere(x) > 1.0 {
+            f64::INFINITY
+        } else {
+            (x[0] - 0.3).powi(2) + (x[1] + 0.2).powi(2)
+        }
+    };
+    let result = solve(
+        barrier,
+        vec![0.5, 0.5],
+        NelderMeadOptions::default(),
+        generous(),
+    );
+    assert_eq!(result.status, Termination::Converged(Converged::XTol));
+    assert!(result.fun.is_finite());
+    assert!((result.x[0] - 0.3).abs() < 1e-3);
+    assert!((result.x[1] + 0.2).abs() < 1e-3);
+}
+
+#[test]
+fn adaptive_coefficients_minimize_a_ten_dimensional_sphere() {
+    let options = NelderMeadOptions {
+        adaptive: true,
+        ..NelderMeadOptions::default()
+    };
+    let result = solve(sphere, vec![0.6; 10], options, generous());
+    assert_eq!(result.status, Termination::Converged(Converged::XTol));
+    assert!(result.fun < 1e-6, "{}", result.fun);
+}
+
+#[derive(Debug, Default)]
+struct Recorder {
+    points: Vec<Vec<f64>>,
+    callbacks: usize,
+}
+
+impl Objective for Recorder {
+    type Error = Infallible;
+
+    fn value(&mut self, x: &[f64]) -> Result<f64, Self::Error> {
+        self.points.push(x.to_vec());
+        Ok(sphere(x))
+    }
+
+    fn callback(&mut self, _state: &IterationState<'_>) -> Result<Flow, Self::Error> {
+        self.callbacks += 1;
+        Ok(Flow::Continue)
+    }
+}
+
+fn record(options: NelderMeadOptions, common: Common) -> (Recorder, Minimize) {
+    let mut recorder = Recorder::default();
+    let problem = Problem {
+        x0: vec![1.0, -2.0],
+        bounds: None,
+    };
+    let result = minimize(
+        &mut recorder,
+        &problem,
+        &Method::NelderMead(options),
+        &common,
+    )
+    .expect("an infallible objective cannot fail");
+    (recorder, result)
+}
+
+#[test]
+fn the_counters_report_what_the_objective_and_the_callback_saw() {
+    let (recorder, result) = record(NelderMeadOptions::default(), generous());
+    assert_eq!(result.nfev, recorder.points.len());
+    assert_eq!(result.nit, recorder.callbacks);
+    assert_eq!(result.njev, 0);
+}
+
+#[test]
+fn an_explicit_initial_simplex_is_the_starting_simplex() {
+    let points = vec![vec![0.5, 0.5], vec![0.9, 0.4], vec![0.4, 0.9]];
+    let (recorder, result) = record(simplex(points.clone()), generous());
+    assert_eq!(recorder.points[..3], points[..]);
+    assert_eq!(result.status, Termination::Converged(Converged::XTol));
+}
+
+#[test]
+fn the_first_simplex_evaluation_is_not_an_iteration() {
+    let (_, result) = record(NelderMeadOptions::default(), common(Some(1), None, None));
+    assert_eq!(result.nit, 1);
+    assert!(result.nfev > 3);
+}
+
+#[test]
+fn an_evaluation_budget_stops_at_max_evaluations() {
+    let (_, result) = record(tight(), common(None, Some(25), None));
+    assert_eq!(result.status, Termination::MaxEvaluations);
+    assert_eq!(result.nfev, 25);
+    assert!(!result.success);
+}
+
+#[test]
+fn an_iteration_budget_stops_at_max_iterations() {
+    let (_, result) = record(tight(), common(Some(7), None, None));
+    assert_eq!(result.status, Termination::MaxIterations);
+    assert_eq!(result.nit, 7);
+}
+
+#[test]
+fn a_callback_that_stops_cancels_the_run() {
+    let mut objective = probe(false, Ok(Flow::Stop));
+    let result = with_defaults(&mut objective, &problem(), Common::default())
+        .expect("a cancellation is not an error");
+    assert_eq!(result.status, Termination::Cancelled);
+    assert_eq!(result.nit, 1);
+    assert!(!result.success);
+}
+
+#[test]
+fn a_failing_callback_reaches_the_caller_by_value() {
+    let mut objective = probe(false, Err(ProbeError::Boom));
+    let error = with_defaults(&mut objective, &problem(), Common::default())
+        .expect_err("the callback fails");
+    assert!(matches!(error, MinimizeError::Objective(ProbeError::Boom)));
+}
+
+#[test]
+fn a_failing_objective_reaches_the_caller_by_value() {
+    let mut objective = probe(true, Ok(Flow::Continue));
+    let error = with_defaults(&mut objective, &problem(), Common::default())
+        .expect_err("the objective fails");
+    assert!(matches!(error, MinimizeError::Objective(ProbeError::Boom)));
+}
+
+#[test]
+fn bounds_are_rejected_before_any_evaluation() {
+    let mut objective = probe(true, Ok(Flow::Continue));
+    let bounded = bounded(vec![0.0, 0.0], vec![3.0, 3.0]);
+    let error = with_defaults(&mut objective, &bounded, Common::default())
+        .expect_err("Nelder-Mead does not support bounds");
+    let expected = InvalidInput::Unsupported {
+        method: "Nelder-Mead",
+        option: "bounds",
+    };
+    assert!(matches!(error, MinimizeError::InvalidInput(found) if found == expected));
+}
+
+struct NanAfter {
+    calls: usize,
+    limit: usize,
+}
+
+impl Objective for NanAfter {
+    type Error = Infallible;
+
+    fn value(&mut self, x: &[f64]) -> Result<f64, Self::Error> {
+        self.calls += 1;
+        if self.calls > self.limit {
+            return Ok(f64::NAN);
+        }
+        Ok(sphere(x))
+    }
+}
+
+#[test]
+fn a_nan_value_ends_the_run_at_the_best_finite_vertex() {
+    let mut objective = NanAfter {
+        calls: 0,
+        limit: 12,
+    };
+    let problem = Problem {
+        x0: vec![2.0, 2.0],
+        bounds: None,
+    };
+    let result = with_defaults(&mut objective, &problem, Common::default())
+        .expect("a nonfinite value is a status, not an error");
+    assert_eq!(result.status, Termination::Nonfinite);
+    assert!(!result.success);
+    assert_eq!(result.nfev, 13);
+    assert!(result.fun.is_finite());
+    assert!(result.fun < sphere(&[2.0, 2.0]));
+    assert_eq!(result.fun, sphere(&result.x));
+}
+
+#[test]
+fn a_nan_at_the_starting_point_returns_that_point() {
+    let mut objective = NanAfter { calls: 0, limit: 0 };
+    let x0 = vec![1.0, 2.0];
+    let problem = Problem {
+        x0: x0.clone(),
+        bounds: None,
+    };
+    let result = with_defaults(&mut objective, &problem, Common::default())
+        .expect("a nonfinite value is a status, not an error");
+    assert_eq!(result.status, Termination::Nonfinite);
+    assert_eq!(result.x, x0);
+    assert!(result.fun.is_nan());
+    assert_eq!(result.nfev, 1);
+    assert!(!result.success);
+}
+
+#[test]
+fn a_shared_tolerance_fills_only_the_tolerances_left_unset() {
+    let loose = solve(
+        sphere,
+        vec![2.0, 2.0],
+        NelderMeadOptions::default(),
+        common(None, None, Some(0.5)),
+    );
+    let explicit = NelderMeadOptions {
+        xatol: Some(1e-10),
+        ..NelderMeadOptions::default()
+    };
+    let mixed = solve(
+        sphere,
+        vec![2.0, 2.0],
+        explicit,
+        common(None, None, Some(0.5)),
+    );
+    let fallback = solve(
+        sphere,
+        vec![2.0, 2.0],
+        NelderMeadOptions::default(),
+        Common::default(),
+    );
+    let by_value = NelderMeadOptions {
+        fatol: Some(1e-10),
+        ..NelderMeadOptions::default()
+    };
+    let tightened = solve(
+        sphere,
+        vec![2.0, 2.0],
+        by_value,
+        common(None, None, Some(0.5)),
+    );
+    assert_eq!(tightened.status, Termination::Converged(Converged::XTol));
+    assert!(
+        tightened.x.iter().all(|value| value.abs() < 1e-4),
+        "{:?}",
+        tightened.x
+    );
+    assert!(loose.nit < fallback.nit, "{} {}", loose.nit, fallback.nit);
+    assert!(fallback.nit < mixed.nit, "{} {}", fallback.nit, mixed.nit);
+    assert!(
+        mixed.x.iter().all(|value| value.abs() < 1e-9),
+        "{:?}",
+        mixed.x
+    );
+}
+
+#[test]
+fn unset_budgets_take_the_scipy_default_of_two_hundred_per_coordinate() {
+    let mut objective = probe(false, Ok(Flow::Continue));
+    let result = with_defaults(&mut objective, &problem(), Common::default())
+        .expect("a descending objective never converges");
+    assert_eq!(result.nfev, 400);
+    assert_eq!(result.status, Termination::MaxEvaluations);
+}
+
+#[test]
+fn setting_one_budget_leaves_the_other_unlimited() {
+    let mut objective = probe(false, Ok(Flow::Continue));
+    let result = with_defaults(&mut objective, &problem(), common(Some(500), None, None))
+        .expect("a descending objective never converges");
+    assert_eq!(result.status, Termination::MaxIterations);
+    assert_eq!(result.nit, 500);
+    assert!(result.nfev > 400, "{}", result.nfev);
+}
+
+#[test]
+fn a_shrink_rescues_a_simplex_that_straddles_the_valley() {
+    let straddling = simplex(vec![vec![-1.2, 1.0], vec![2.0, 4.0], vec![-2.0, 4.0]]);
+    let result = solve(rosenbrock, vec![-1.2, 1.0], straddling, generous());
+    assert_eq!(result.status, Termination::Converged(Converged::XTol));
+    assert!(result.fun < 1e-8, "{}", result.fun);
 }
