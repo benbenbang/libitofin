@@ -75,6 +75,7 @@ nav:
   - Go SDK: go.md
   - Joint yield curves: joint-curves.md
   - Random policies: random-policies.md
+  - Cap/floor engines: cap-engines.md
   - Python API:
       - Core: api/core.md
       - Time: api/time.md

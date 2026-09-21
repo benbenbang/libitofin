@@ -21,6 +21,16 @@ follow-ups [#1036](https://github.com/benbenbang/libitofin/issues/1036) are clos
 API accounting, numerical tests, and statement coverage measure different things;
 see the [Go validation record](../docs/go-binding-test-gaps.md).
 
+## Cap/floor normal and lattice engines
+
+[#440](https://github.com/benbenbang/libitofin/issues/440) adds Bachelier cap/floor
+pricing, Hull-White tree engines, and normal-volatility CapHelper calibration in
+Rust, Python and Go, awaiting release. Fixed grids preserve supplied nodes;
+missing coupon times are errors. The tree engine requires a nonnegative first
+accrual start; Rust's discretized asset also supports known historical fixings.
+Other short-rate models remain outside this concrete engine's API (#466).
+See the [independent oracles](../crates/libitofin/tests/fixtures/tree_capfloor/README.md).
+
 ## Credit extensions
 
 - [#1023](https://github.com/benbenbang/libitofin/issues/1023): spread and upfront
@@ -169,7 +179,7 @@ QuantLib parity.
 | **L8** | instruments | fixed-rate bonds, vanilla / OIS swaps, swaptions, caps & floors, vanilla options |
 | **L9** | methods | lattices, trees (trinomial + Hull-White), Monte Carlo (path generators + antithetic), finite differences (European, American and Bermudan Black-Scholes vanilla) |
 | **L10** | models | `CalibratedModel` + `calibrate()`, short-rate (Vasicek, CIR, Hull-White), Heston, calibration helpers |
-| **L11** | engines | analytic European & Heston (Fourier), swaption (Black / Bachelier / Jamshidian), discounting swap / bond, Black cap/floor |
+| **L11** | engines | analytic European & Heston (Fourier), swaption (Black / Bachelier / Jamshidian), discounting swap / bond, Black / Bachelier / Hull-White tree cap/floor |
 
 **Milestone 1 (done):** a European option prices end-to-end - quote → flat
 yield/vol curves → generalized Black-Scholes process → analytic engine → lazy
