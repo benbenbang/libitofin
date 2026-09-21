@@ -12,6 +12,7 @@ type YoYInflationHelper struct{ inflationHelper }
 type ZeroCouponInflationSwapHelper = ZeroInflationHelper
 type YearOnYearInflationSwapHelper = YoYInflationHelper
 type InflationHelperConfig struct {
+	CustomPillarDate         *Date
 	Quote                    *SimpleQuote
 	SwapObservationLag       Period
 	Maturity                 Date
@@ -40,7 +41,7 @@ func (s *Session) inflationHelperNew(a InflationHelperConfig, index object, disc
 			return e
 		}
 		var e C.ItofinError
-		return ffiError(C.itofin_inflation_helper_new(s.ctx, &cfg, C.int32_t(kind), &id, &e), &e)
+		return ffiError(C.itofin_inflation_helper_new_with_pillar(s.ctx, &cfg, C.int32_t(kind), customPillarSerial(a.CustomPillarDate), &id, &e), &e)
 	})
 	return inflationHelper{object{s, uint64(id)}, kind}, err
 }

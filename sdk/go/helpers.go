@@ -19,6 +19,7 @@ type Pillar int32
 const (
 	MaturityDate Pillar = iota
 	LastRelevantDate
+	CustomDate
 )
 
 type FuturesType int32
@@ -79,13 +80,15 @@ func (s *Session) NewDepositRateHelperFromRate(rate float64, index *IborIndex) (
 }
 
 type SwapRateHelperConfig struct {
-	Quote           *SimpleQuote
-	Tenor           Period
-	Calendar        *Calendar
-	FixedFrequency  Frequency
-	FixedConvention BusinessDayConvention
-	FixedDayCount   *DayCounter
-	IborIndex       *IborIndex
+	Pillar           *Pillar
+	CustomPillarDate *Date
+	Quote            *SimpleQuote
+	Tenor            Period
+	Calendar         *Calendar
+	FixedFrequency   Frequency
+	FixedConvention  BusinessDayConvention
+	FixedDayCount    *DayCounter
+	IborIndex        *IborIndex
 }
 
 func (s *Session) NewSwapRateHelper(cfg SwapRateHelperConfig) (*RateHelper, error) {
@@ -97,11 +100,15 @@ func (s *Session) NewSwapRateHelper(cfg SwapRateHelperConfig) (*RateHelper, erro
 	}
 	a := C.ItofinSwapHelperConfig{quote: C.uint64_t(cfg.Quote.id), tenor_length: C.int32_t(cfg.Tenor.Length), tenor_unit: C.int32_t(cfg.Tenor.Unit), calendar: C.uint64_t(cfg.Calendar.id), frequency: C.int32_t(cfg.FixedFrequency), convention: C.int32_t(cfg.FixedConvention), day_counter: C.uint64_t(cfg.FixedDayCount.id), index: C.uint64_t(cfg.IborIndex.id)}
 	var id C.uint64_t
-	err := s.invoke(func() error { var e C.ItofinError; return ffiError(C.itofin_swap_helper_new(s.ctx, &a, &id, &e), &e) })
+	err := s.invoke(func() error {
+		var e C.ItofinError
+		return ffiError(C.itofin_swap_helper_new_with_pillar(s.ctx, &a, 0, C.int32_t(creditOptional(cfg.Pillar, LastRelevantDate)), customPillarSerial(cfg.CustomPillarDate), &id, &e), &e)
+	})
 	return helperResult(s, id, err)
 }
 
 type FraRateHelperConfig struct {
+	CustomPillarDate   *Date
 	Quote              *SimpleQuote
 	Rate               float64 // FromRate constructor only.
 	PeriodToStart      Period
@@ -137,7 +144,7 @@ func (s *Session) fraHelper(cfg FraRateHelperConfig, mode int) (*RateHelper, err
 	var id C.uint64_t
 	err := s.invoke(func() error {
 		var e C.ItofinError
-		return ffiError(C.itofin_fra_helper_new(s.ctx, C.int32_t(mode), &a, &id, &e), &e)
+		return ffiError(C.itofin_fra_helper_new_with_pillar(s.ctx, C.int32_t(mode), &a, customPillarSerial(cfg.CustomPillarDate), &id, &e), &e)
 	})
 	return helperResult(s, id, err)
 }
@@ -256,6 +263,7 @@ func (h *RateHelper) LatestDate() (Date, error)         { return h.date(3) }
 func (h *RateHelper) LatestRelevantDate() (Date, error) { return h.date(4) }
 
 type OISRateHelperConfig struct {
+	CustomPillarDate  *Date
 	SettlementDays    uint32
 	Tenor             Period
 	Quote             *SimpleQuote
@@ -295,7 +303,10 @@ func (s *Session) NewOISRateHelper(cfg OISRateHelperConfig) (*RateHelper, error)
 		a.spread = C.uint64_t(cfg.OvernightSpread.id)
 	}
 	var id C.uint64_t
-	err := s.invoke(func() error { var e C.ItofinError; return ffiError(C.itofin_ois_helper_new(s.ctx, &a, &id, &e), &e) })
+	err := s.invoke(func() error {
+		var e C.ItofinError
+		return ffiError(C.itofin_ois_helper_new_with_pillar(s.ctx, &a, customPillarSerial(cfg.CustomPillarDate), &id, &e), &e)
+	})
 	return helperResult(s, id, err)
 }
 
@@ -331,4 +342,11 @@ func (s *Session) NewFixedRateBondHelper(cfg FixedRateBondHelperConfig) (*RateHe
 		return ffiError(C.itofin_bond_helper_new(s.ctx, &a, (*C.double)(unsafe.Pointer(unsafe.SliceData(cfg.Coupons))), C.size_t(len(cfg.Coupons)), &id, &e), &e)
 	})
 	return helperResult(s, id, err)
+}
+
+func customPillarSerial(date *Date) C.int32_t {
+	if date == nil {
+		return 0
+	}
+	return C.int32_t(date.Serial())
 }
