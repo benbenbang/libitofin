@@ -118,6 +118,8 @@ pub unsafe extern "C" fn itofin_swap_helper_new(
                 day_counter(c, a.day_counter)?,
                 &i,
             );
+            v.validate_dates()
+                .map_err(|e| BindingError::invalid(e.to_string()))?;
             output(out, c.insert(v as Shared<dyn RateHelper>)?)
         })
     }
