@@ -31,6 +31,7 @@ mod mcengine;
 mod ois;
 mod option;
 mod optionletvol;
+mod overnightfuture;
 mod poissonrng;
 mod randomnumbers;
 mod results;
@@ -305,6 +306,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     instruments.add_class::<PyPosition>()?;
     instruments.add_class::<PyForwardRateAgreement>()?;
     instruments.add_class::<PyOvernightIndexedSwap>()?;
+    instruments.add_class::<overnightfuture::PyOvernightIndexFuture>()?;
     instruments.add_class::<PyMakeOis>()?;
     instruments.add_class::<PyEuropeanExercise>()?;
     instruments.add_class::<PyBermudanExercise>()?;

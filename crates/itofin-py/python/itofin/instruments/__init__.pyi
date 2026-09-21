@@ -8,6 +8,7 @@ from itofin import indexes
 from itofin import models
 from itofin import pricingengines
 from itofin import processes
+from itofin import quotes
 from itofin import results
 from itofin import termstructures
 from itofin import time
@@ -25,6 +26,7 @@ __all__ = [
     "MakeVanillaSwap",
     "MakeYoYInflationCapFloor",
     "OptionType",
+    "OvernightIndexFuture",
     "OvernightIndexedSwap",
     "Position",
     "PricingModel",
@@ -906,6 +908,36 @@ class MakeYoYInflationCapFloor:
                 if the start date has to be derived and no evaluation date is
                 set; and on whatever the leg construction and the at-the-money
                 fill report.
+        """
+
+@typing.final
+class OvernightIndexFuture:
+    r"""
+    An overnight futures price, with live index fixings and convexity adjustment.
+    """
+    def __init__(self, index: indexes.OvernightIndex, value_date: time.Date, maturity_date: time.Date, convexity_adjustment: typing.Optional[quotes.SimpleQuote] = None, averaging_method: termstructures.RateAveraging = termstructures.RateAveraging.Compound) -> None:
+        r"""
+        Construct a fixed reference-period future; Compound is the default.
+        """
+    def npv(self) -> builtins.float:
+        r"""
+        Return the futures price, or zero after expiry.
+        """
+    def convexity_adjustment(self) -> builtins.float:
+        r"""
+        Return the current convexity adjustment.
+        """
+    def value_date(self) -> time.Date:
+        r"""
+        First accrual date.
+        """
+    def maturity_date(self) -> time.Date:
+        r"""
+        Exclusive end of the reference period.
+        """
+    def is_expired(self) -> builtins.bool:
+        r"""
+        Whether the settlement event has occurred under the index settings.
         """
 
 @typing.final
