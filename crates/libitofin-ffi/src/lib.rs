@@ -53,6 +53,7 @@ pub mod settings_api;
 pub mod smile_api;
 pub mod stripper_api;
 pub mod time_api;
+pub mod tree_swaption_api;
 pub mod version_api;
 pub mod vol_api;
 #[cfg(test)]

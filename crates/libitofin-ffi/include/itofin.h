@@ -3619,7 +3619,7 @@ int32_t itofin_capfloor_from_leg(struct ItofinContext *ctx,
                                  struct ItofinError *error);
 
 /**
- * Kind: 0 swaption Black, 1 swaption Bachelier, 2 swaption HullWhite, 3 cap/floor Black.
+ * Kind: 0 swaption Black, 1 Bachelier, 2 HullWhite, 3 cap/floor Black, 6 swaption tree.
  * # Safety
  * Pointers must be aligned, live and valid for their stated lengths. Outputs
  * must not overlap inputs or other outputs. Any context and its handles must
@@ -4200,6 +4200,65 @@ int32_t itofin_schedule_dates(struct ItofinContext *ctx,
                               size_t capacity,
                               size_t *required,
                               struct ItofinError *error);
+
+/**
+ * Copy and sort the exercise dates, rejecting an empty schedule.
+ * # Safety
+ * Pointers must be valid, aligned and non-overlapping for their stated sizes.
+ * Context and handles must belong to the calling thread.
+ */
+int32_t itofin_bermudan_exercise_new(struct ItofinContext *ctx,
+                                     const int32_t *dates,
+                                     size_t count,
+                                     uint64_t *out,
+                                     struct ItofinError *error);
+
+/**
+ * Copy the sorted dates; capacity zero returns the required length.
+ * # Safety
+ * Pointers must be valid, aligned and non-overlapping for their stated sizes.
+ * Context and handles must belong to the calling thread.
+ */
+int32_t itofin_bermudan_exercise_dates(struct ItofinContext *ctx,
+                                       uint64_t id,
+                                       int32_t *out,
+                                       size_t capacity,
+                                       size_t *required,
+                                       struct ItofinError *error);
+
+/**
+ * Retain the model and settings; steps must be positive.
+ * # Safety
+ * Pointers must be valid, aligned and non-overlapping for their stated sizes.
+ * Context and handles must belong to the calling thread.
+ */
+int32_t itofin_tree_swaption_engine_new(struct ItofinContext *ctx,
+                                        uint64_t model,
+                                        size_t steps,
+                                        uint64_t settings_id,
+                                        uint64_t *out,
+                                        struct ItofinError *error);
+
+/**
+ * Select par (true) or indexed Ibor forecasting before constructing instruments.
+ * Existing cached prices are not invalidated by this setting.
+ * # Safety
+ * Pointers and thread ownership must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_settings_set_using_at_par_coupons(struct ItofinContext *ctx,
+                                                 uint64_t id,
+                                                 bool value,
+                                                 struct ItofinError *error);
+
+/**
+ * Read the par Ibor coupon forecasting flag.
+ * # Safety
+ * Pointers and thread ownership must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_settings_using_at_par_coupons(struct ItofinContext *ctx,
+                                             uint64_t id,
+                                             bool *out,
+                                             struct ItofinError *error);
 
 /**
  * Returns the package version as a static, NUL-terminated UTF-8 string.
