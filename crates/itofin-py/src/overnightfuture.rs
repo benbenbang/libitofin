@@ -1,13 +1,15 @@
 //! Engine-free overnight futures and bootstrap helpers.
 
 use crate::PyQlError;
-use crate::helpers::{PyOvernightIndex, PyRateAveraging};
+use crate::helpers::{PyOvernightIndex, PyPillar, PyRateAveraging, PyRateHelper};
 use crate::market::PySimpleQuote;
 use crate::settings::PySettings;
-use crate::time::PyDate;
+use crate::time::{PyDate, PyFrequency};
 use libitofin::handle::Handle;
 use libitofin::instrument::Instrument;
 use libitofin::instruments::OvernightIndexFuture;
+use libitofin::termstructures::yields::{OvernightIndexFutureRateHelper, SofrFutureRateHelper};
+use libitofin::time::date::Month;
 use pyo3::prelude::*;
 use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 
@@ -72,6 +74,87 @@ impl PyOvernightIndexFuture {
             .map_err(|e| PyQlError::from(e).into())
     }
 }
+
+/// Bootstrap a quoted overnight futures price over explicit dates.
+#[gen_stub_pyclass]
+#[pyclass(name = "OvernightIndexFutureRateHelper", extends = PyRateHelper, unsendable, module = "itofin.termstructures")]
+pub struct PyOvernightIndexFutureRateHelper;
+
+#[gen_stub_pymethods]
+#[pymethods]
+impl PyOvernightIndexFutureRateHelper {
+    /// Construct a helper retaining the index history, price and convexity quote.
+    #[gen_stub(override_return_type(type_repr = "OvernightIndexFutureRateHelper"))]
+    #[new]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (price, value_date, maturity_date, index, convexity_adjustment = None, averaging_method = PyRateAveraging::Compound, pillar = PyPillar::LastRelevantDate, custom_pillar_date = None))]
+    fn new(
+        price: &PySimpleQuote,
+        value_date: &PyDate,
+        maturity_date: &PyDate,
+        index: &PyOvernightIndex,
+        convexity_adjustment: Option<&PySimpleQuote>,
+        averaging_method: PyRateAveraging,
+        pillar: PyPillar,
+        custom_pillar_date: Option<&PyDate>,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        let helper = OvernightIndexFutureRateHelper::new(
+            price.handle(),
+            value_date.inner(),
+            maturity_date.inner(),
+            &index.inner(),
+            convexity_adjustment.map_or_else(Handle::empty, PySimpleQuote::handle),
+            averaging_method.inner(),
+            pillar.with_custom(custom_pillar_date)?,
+        )
+        .map_err(PyQlError::from)?;
+        Ok(PyClassInitializer::from(PyRateHelper::from_inner(helper)).add_subclass(Self))
+    }
+}
+
+/// Monthly simple-average and quarterly compounded CME SOFR futures helpers.
+#[gen_stub_pyclass]
+#[pyclass(name = "SofrFutureRateHelper", extends = PyRateHelper, unsendable, module = "itofin.termstructures")]
+pub struct PySofrFutureRateHelper;
+
+#[gen_stub_pymethods]
+#[pymethods]
+impl PySofrFutureRateHelper {
+    /// Construct a SOFR helper using the supplied settings and shared SOFR history.
+    #[gen_stub(override_return_type(type_repr = "SofrFutureRateHelper"))]
+    #[new]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (price, reference_month, reference_year, reference_frequency, settings, convexity_adjustment = None, pillar = PyPillar::LastRelevantDate, custom_pillar_date = None))]
+    fn new(
+        price: &PySimpleQuote,
+        reference_month: u32,
+        reference_year: i32,
+        reference_frequency: &PyFrequency,
+        settings: &PySettings,
+        convexity_adjustment: Option<&PySimpleQuote>,
+        pillar: PyPillar,
+        custom_pillar_date: Option<&PyDate>,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        if !(1..=12).contains(&reference_month) {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "month outside 1-12",
+            ));
+        }
+        let month = Month::from_ordinal(reference_month as i32);
+        let helper = SofrFutureRateHelper::new(
+            price.handle(),
+            month,
+            reference_year,
+            reference_frequency.inner(),
+            convexity_adjustment.map_or_else(Handle::empty, PySimpleQuote::handle),
+            pillar.with_custom(custom_pillar_date)?,
+            settings.inner(),
+        )
+        .map_err(PyQlError::from)?;
+        Ok(PyClassInitializer::from(PyRateHelper::from_inner(helper)).add_subclass(Self))
+    }
+}
+
 /// The SOFR overnight index, retaining its forecast curve and shared history.
 #[gen_stub_pyclass]
 #[pyclass(name = "Sofr", extends = PyOvernightIndex, unsendable, module = "itofin.indexes")]

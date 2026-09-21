@@ -44,6 +44,7 @@ __all__ = [
     "OISRateHelper",
     "OptionletStripper1",
     "OptionletVolatilityStructure",
+    "OvernightIndexFutureRateHelper",
     "PiecewiseConvexMonotoneForward",
     "PiecewiseCubicZero",
     "PiecewiseDefaultCurve",
@@ -61,6 +62,7 @@ __all__ = [
     "SabrSmileSection",
     "SabrSwaptionVolatilityCube",
     "SimpleQuoteVariables",
+    "SofrFutureRateHelper",
     "SpreadCdsHelper",
     "StrippedOptionletAdapter",
     "SwapRateHelper",
@@ -2183,6 +2185,16 @@ class OptionletVolatilityStructure:
         """
 
 @typing.final
+class OvernightIndexFutureRateHelper(RateHelper):
+    r"""
+    Bootstrap a quoted overnight futures price over explicit dates.
+    """
+    def __init__(self, price: quotes.SimpleQuote, value_date: time.Date, maturity_date: time.Date, index: indexes.OvernightIndex, convexity_adjustment: typing.Optional[quotes.SimpleQuote] = None, averaging_method: RateAveraging = RateAveraging.Compound, pillar: Pillar = Pillar.LastRelevantDate, custom_pillar_date: typing.Optional[time.Date] = None) -> None:
+        r"""
+        Construct a helper retaining the index history, price and convexity quote.
+        """
+
+@typing.final
 class PiecewiseConvexMonotoneForward(YieldTermStructure):
     r"""
     A curve bootstrapped in forward-rate space with convex-monotone interpolation.
@@ -3070,6 +3082,16 @@ class SimpleQuoteVariables:
     def __init__(self, quotes: typing.Sequence[quotes.SimpleQuote], initial_guesses: typing.Optional[typing.Sequence[builtins.float]] = None, lower_bounds: typing.Optional[typing.Sequence[builtins.float]] = None) -> None:
         r"""
         Configure external quotes, optional initial guesses, and lower bounds.
+        """
+
+@typing.final
+class SofrFutureRateHelper(RateHelper):
+    r"""
+    Monthly simple-average and quarterly compounded CME SOFR futures helpers.
+    """
+    def __init__(self, price: quotes.SimpleQuote, reference_month: builtins.int, reference_year: builtins.int, reference_frequency: time.Frequency, settings: itofin.Settings, convexity_adjustment: typing.Optional[quotes.SimpleQuote] = None, pillar: Pillar = Pillar.LastRelevantDate, custom_pillar_date: typing.Optional[time.Date] = None) -> None:
+        r"""
+        Construct a SOFR helper using the supplied settings and shared SOFR history.
         """
 
 @typing.final
