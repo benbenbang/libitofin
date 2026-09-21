@@ -32,10 +32,8 @@
 //!
 //! ## Deferred
 //!
-//! - `addTimesTo(std::list<Time>&)` (hpp:81) serves only the tree/lattice
-//!   pricing path (not ported), so it is omitted from the trait surface rather
-//!   than stubbed. A helper that later needs it (`SwaptionHelper` on the lattice
-//!   engine) adds it then.
+//! - Mandatory lattice times are exposed by concrete helpers when needed;
+//!   `CapHelper::mandatory_times` provides the cap reset and payment nodes.
 
 use crate::errors::QlResult;
 use crate::handle::Handle;
@@ -284,16 +282,21 @@ impl<T: BlackCalibrationHelper> CalibrationHelper for T {
     /// `calibrationError()` (calibrationhelper.cpp:38-72): compares the market
     /// and model prices per the configured error type.
     fn calibration_error(&mut self) -> QlResult<Real> {
-        match self.base().calibration_error_type {
+        let market_vol = self.base().volatility.current_link()?.value()?;
+        crate::require!(
+            market_vol.is_finite() && market_vol >= 0.0,
+            "calibration volatility must be finite and non-negative"
+        );
+        let error = match self.base().calibration_error_type {
             CalibrationErrorType::RelativePriceError => {
                 let market = self.market_value()?;
                 let model = self.model_value()?;
-                Ok((market - model).abs() / market)
+                (market - model).abs() / market
             }
             CalibrationErrorType::PriceError => {
                 let market = self.market_value()?;
                 let model = self.model_value()?;
-                Ok(market - model)
+                market - model
             }
             CalibrationErrorType::ImpliedVolError => {
                 let (min_vol, max_vol) = match self.base().volatility_type {
@@ -310,10 +313,11 @@ impl<T: BlackCalibrationHelper> CalibrationHelper for T {
                 } else {
                     self.implied_volatility(model_price, 1e-12, 5000, min_vol, max_vol)?
                 };
-                let market_vol = self.base().volatility.current_link()?.value()?;
-                Ok(implied - market_vol)
+                implied - market_vol
             }
-        }
+        };
+        crate::require!(error.is_finite(), "non-finite calibration error");
+        Ok(error)
     }
 }
 
@@ -362,6 +366,31 @@ mod tests {
         }
         fn black_price(&self, volatility: Real) -> QlResult<Real> {
             Ok(volatility)
+        }
+    }
+
+    #[test]
+    fn live_invalid_volatility_errors_recover_in_every_error_mode() {
+        for kind in [
+            CalibrationErrorType::RelativePriceError,
+            CalibrationErrorType::PriceError,
+            CalibrationErrorType::ImpliedVolError,
+        ] {
+            let quote = shared(SimpleQuote::new(0.2));
+            let mut helper = StubHelper::new(quote.clone(), kind, 0.18);
+            let expected = helper.calibration_error().unwrap();
+            for invalid in [f64::NAN, f64::INFINITY, -0.1] {
+                quote.set_value(invalid);
+                assert!(helper.calibration_error().is_err());
+                quote.set_value(0.2);
+                assert_eq!(helper.calibration_error().unwrap(), expected);
+            }
+            if kind == CalibrationErrorType::RelativePriceError {
+                quote.set_value(0.0);
+                assert!(helper.calibration_error().is_err());
+                quote.set_value(0.2);
+                assert_eq!(helper.calibration_error().unwrap(), expected);
+            }
         }
     }
 
