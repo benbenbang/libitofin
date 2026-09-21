@@ -13,6 +13,7 @@ from itofin import termstructures
 from itofin import time
 import typing
 __all__ = [
+    "BermudanExercise",
     "CapFloor",
     "CapFloorType",
     "CreditDefaultSwap",
@@ -38,6 +39,20 @@ __all__ = [
     "YoYInflationCapFloor",
     "ZeroCouponInflationSwap",
 ]
+
+@typing.final
+class BermudanExercise:
+    r"""
+    A copied, sorted set of exercise dates. Duplicate dates are retained.
+    """
+    def __init__(self, dates: typing.Sequence[time.Date]) -> None:
+        r"""
+        Build an exercise schedule; an empty list raises ItofinError.
+        """
+    def dates(self) -> builtins.list[time.Date]:
+        r"""
+        Return a copy of the sorted exercise dates.
+        """
 
 @typing.final
 class CapFloor:
@@ -983,11 +998,11 @@ class OvernightIndexedSwap:
 @typing.final
 class Swaption:
     r"""
-    A European option to enter a vanilla or overnight swap.
+    An option to enter a vanilla or overnight swap.
 
     The swaption registers with the underlying swap and with the evaluation
     date on the Settings it was built with (D5). Pricing needs an engine: call
-    one of the three setters before npv.
+    an engine setter before npv.
     """
     def __init__(self, swap: VanillaSwap, exercise: EuropeanExercise, settlement_type: SettlementType, settlement_method: SettlementMethod, settings: itofin.Settings) -> None:
         r"""
@@ -1006,13 +1021,18 @@ class Swaption:
                 date the swaption prices against.
         """
     @staticmethod
+    def from_bermudan(swap: VanillaSwap, exercise: BermudanExercise, settlement_type: SettlementType, settlement_method: SettlementMethod, settings: itofin.Settings) -> Swaption:
+        r"""
+        Build a Bermudan option retaining the original vanilla swap.
+        """
+    @staticmethod
     def from_ois(swap: OvernightIndexedSwap, exercise: EuropeanExercise, settlement_type: SettlementType, settlement_method: SettlementMethod, settings: itofin.Settings) -> Swaption:
         r"""
         Build an option on an overnight swap, retaining the same shared underlying.
         """
     def exercise_date(self) -> time.Date:
         r"""
-        Return the single European exercise date.
+        Return the first exercise date (the sole date for a European option).
         """
     def underlying_fixed_rate(self) -> builtins.float:
         r"""
@@ -1044,6 +1064,10 @@ class Swaption:
         Args:
             engine (BlackSwaptionEngine): The engine and its volatility
                 surface.
+        """
+    def set_tree_engine(self, engine: pricingengines.TreeSwaptionEngine) -> None:
+        r"""
+        Attach a Hull-White tree engine. OIS underlyings are unsupported.
         """
     def set_bachelier_engine(self, engine: pricingengines.BachelierSwaptionEngine) -> None:
         r"""

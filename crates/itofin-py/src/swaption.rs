@@ -1,4 +1,4 @@
-//! European swaptions on vanilla or overnight swaps and the vanilla MakeSwaption builder.
+//! European and Bermudan swaptions with concrete pricing-engine facades.
 
 use crate::PyQlError;
 use crate::hullwhite::PyHullWhite;
@@ -8,6 +8,7 @@ use crate::settings::PySettings;
 use crate::swap::PyVanillaSwap;
 use crate::swaptionengine::{PyBachelierSwaptionEngine, PyBlackSwaptionEngine};
 use crate::time::PyDate;
+use crate::treeswaption::{PyBermudanExercise, PyTreeSwaptionEngine};
 use libitofin::exercise::{EuropeanExercise, Exercise};
 use libitofin::instrument::Instrument;
 use libitofin::instruments::{SettlementMethod, SettlementType, Swaption};
@@ -114,11 +115,11 @@ impl PySettlementMethod {
     }
 }
 
-/// A European option to enter a vanilla or overnight swap.
+/// An option to enter a vanilla or overnight swap.
 ///
 /// The swaption registers with the underlying swap and with the evaluation
 /// date on the Settings it was built with (D5). Pricing needs an engine: call
-/// one of the three setters before npv.
+/// an engine setter before npv.
 #[gen_stub_pyclass]
 #[pyclass(name = "Swaption", unsendable, module = "itofin.instruments")]
 pub struct PySwaption {
@@ -160,6 +161,24 @@ impl PySwaption {
         }
     }
 
+    /// Build a Bermudan option retaining the original vanilla swap.
+    #[staticmethod]
+    fn from_bermudan(
+        swap: &PyVanillaSwap,
+        exercise: &PyBermudanExercise,
+        settlement_type: &PySettlementType,
+        settlement_method: &PySettlementMethod,
+        settings: &PySettings,
+    ) -> Self {
+        Self::from_inner(Swaption::new(
+            swap.inner(),
+            exercise.inner(),
+            settlement_type.inner(),
+            settlement_method.inner(),
+            settings.inner(),
+        ))
+    }
+
     /// Build an option on an overnight swap, retaining the same shared underlying.
     #[staticmethod]
     fn from_ois(
@@ -180,7 +199,7 @@ impl PySwaption {
         }
     }
 
-    /// Return the single European exercise date.
+    /// Return the first exercise date (the sole date for a European option).
     fn exercise_date(&self) -> PyDate {
         PyDate::from_inner(self.inner.exercise().dates()[0])
     }
@@ -224,6 +243,11 @@ impl PySwaption {
     ///     engine (BlackSwaptionEngine): The engine and its volatility
     ///         surface.
     fn set_black_engine(&mut self, engine: &PyBlackSwaptionEngine) {
+        self.inner.base_mut().set_pricing_engine(engine.engine());
+    }
+
+    /// Attach a Hull-White tree engine. OIS underlyings are unsupported.
+    fn set_tree_engine(&mut self, engine: &PyTreeSwaptionEngine) {
         self.inner.base_mut().set_pricing_engine(engine.engine());
     }
 

@@ -40,6 +40,7 @@ mod swaption;
 mod swaptionengine;
 mod swaptionvol;
 mod time;
+mod treeswaption;
 mod vol;
 
 use calibration::{PyCalibrationErrorType, PyEndCriteria, PyLevenbergMarquardt};
@@ -124,6 +125,7 @@ use time::{
     PyBusinessDayConvention, PyCalendar, PyDate, PyDateGeneration, PyDayCounter, PyFrequency,
     PyPeriod, PySchedule,
 };
+use treeswaption::{PyBermudanExercise, PyTreeSwaptionEngine};
 use vol::{
     PyBlackConstantVol, PyBlackVarianceCurve, PyBlackVarianceSurface, PyBlackVolTermStructure,
     PyBlackVolTimeExtrapolation,
@@ -302,6 +304,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     instruments.add_class::<PyOvernightIndexedSwap>()?;
     instruments.add_class::<PyMakeOis>()?;
     instruments.add_class::<PyEuropeanExercise>()?;
+    instruments.add_class::<PyBermudanExercise>()?;
     instruments.add_class::<PySettlementType>()?;
     instruments.add_class::<PySettlementMethod>()?;
     instruments.add_class::<PySwaption>()?;
@@ -326,6 +329,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     let pricingengines = PyModule::new(py, "pricingengines")?;
     pricingengines.add_class::<PyCashAnnuityModel>()?;
     pricingengines.add_class::<PyBlackSwaptionEngine>()?;
+    pricingengines.add_class::<PyTreeSwaptionEngine>()?;
     pricingengines.add_class::<PyBachelierSwaptionEngine>()?;
     pricingengines.add_class::<PyBlackCapFloorEngine>()?;
     pricingengines.add_class::<PyMidPointCdsEngine>()?;
