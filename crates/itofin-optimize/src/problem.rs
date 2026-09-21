@@ -72,7 +72,8 @@ pub struct Common {
 }
 
 impl Common {
-    /// Checks that every budget and tolerance given is positive.
+    /// Checks that every budget given is positive and that a shared tolerance
+    /// is finite and positive.
     pub fn validate(&self) -> Result<(), InvalidInput> {
         for (option, budget) in [("maxiter", self.maxiter), ("maxfev", self.maxfev)] {
             if budget == Some(0) {
@@ -80,9 +81,9 @@ impl Common {
             }
         }
         if let Some(tol) = self.tol
-            && (tol.is_nan() || tol <= 0.0)
+            && (!tol.is_finite() || tol <= 0.0)
         {
-            return Err(InvalidInput::NotPositive { option: "tol" });
+            return Err(InvalidInput::NotFinitePositive { option: "tol" });
         }
         Ok(())
     }
