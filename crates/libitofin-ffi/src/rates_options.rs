@@ -11,6 +11,7 @@ use libitofin::instruments::{
 };
 use libitofin::models::HullWhite;
 use libitofin::pricingengine::PricingEngine;
+use libitofin::pricingengines::swaption::TreeSwaptionEngine;
 use libitofin::pricingengines::{
     BachelierSwaptionEngine, BlackCapFloorEngine, BlackSwaptionEngine, JamshidianSwaptionEngine,
 };
@@ -207,7 +208,7 @@ pub unsafe extern "C" fn itofin_capfloor_from_leg(
         })
     }
 }
-/// Kind: 0 swaption Black, 1 swaption Bachelier, 2 swaption HullWhite, 3 cap/floor Black.
+/// Kind: 0 swaption Black, 1 Bachelier, 2 HullWhite, 3 cap/floor Black, 6 swaption tree.
 #[unsafe(no_mangle)]
 /// # Safety
 /// Pointers must be aligned, live and valid for their stated lengths. Outputs
@@ -239,6 +240,8 @@ pub unsafe extern "C" fn itofin_rate_option_set_engine(
                 2 => shared_mut(JamshidianSwaptionEngine::new(
                     c.get::<SharedMut<HullWhite>>(engine_id)?,
                 )) as SharedMut<dyn PricingEngine>,
+                6 => c.get::<SharedMut<TreeSwaptionEngine>>(engine_id)?
+                    as SharedMut<dyn PricingEngine>,
                 _ => return Err(BindingError::invalid("invalid rate option engine")),
             };
             option.borrow_mut().base_mut().set_pricing_engine(engine);
