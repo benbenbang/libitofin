@@ -12,10 +12,10 @@
 //!   (`rngtraits.hpp:58`) is dropped (design decision D5, no global
 //!   singletons); [`PseudoRandom::make_sequence_generator`] always
 //!   default-constructs the inverse cumulative.
-//! - `GenericLowDiscrepancy`/`LowDiscrepancy` (Sobol, `rngtraits.hpp:81`) is
-//!   deferred: the pseudo-random path is all the European-option oracle needs.
-//! - the scalar `rng_type` (`InverseCumulativeRng`, `rngtraits.hpp:46`) is
-//!   deferred: the path generators consume only the sequence `rsg_type`.
+//! - Poisson factories use fallible draws because quantile inversion can fail.
+
+pub use super::lowdiscrepancy::{GenericLowDiscrepancy, LowDiscrepancy};
+pub use super::poissonpolicy::PoissonPseudoRandom;
 
 use super::inversecumulativersg::InverseCumulativeRsg;
 use super::mt19937uniformrng::MersenneTwisterUniformRng;
@@ -65,7 +65,10 @@ impl InverseCumulative for InverseCumulativeNormal {
     /// feed it uniform deviates that the sequence generator guarantees lie
     /// strictly in `(0, 1)`, where [`InverseCumulativeNormal::value`] is always
     /// finite, so the `expect` never fires. The public [`InverseCumulativeNormal`]
-    /// API stays fallible; only this local precondition is asserted here.
+    /// API stays fallible; Sobol skips the zeroth point and starts at 0.5. Its
+    /// nonzero 32-bit direction-matrix points stay interior until period exhaustion.
+    /// Generic or endpoint-capable sources should use `FallibleInverseCumulativeRsg`.
+    /// Only this local precondition is asserted here.
     fn evaluate(&self, x: Real) -> Real {
         self.value(x)
             .expect("inverse cumulative normal is finite for a uniform deviate in (0, 1)")
@@ -87,6 +90,9 @@ pub trait McRngTraits {
     /// (`rngtraits.hpp:50`).
     const ALLOWS_ERROR_ESTIMATE: bool;
 
+    /// Maximum number of sequence draws, when the underlying generator is finite.
+    const MAX_SAMPLES: Option<usize> = None;
+
     /// Builds a `dimension`-wide sequence generator seeded with `seed`.
     ///
     /// # Errors
@@ -98,6 +104,18 @@ pub trait McRngTraits {
 /// Default pseudo-random policy: Mersenne-Twister uniforms mapped through the
 /// inverse cumulative normal (`rngtraits.hpp:70`).
 pub struct PseudoRandom;
+
+impl PseudoRandom {
+    /// Build the scalar inverse-normal generator with fallible endpoint handling.
+    pub fn make_scalar_generator(
+        seed: u32,
+    ) -> super::InverseCumulativeRng<MersenneTwisterUniformRng, InverseCumulativeNormal> {
+        super::InverseCumulativeRng::new(
+            MersenneTwisterUniformRng::new(seed),
+            InverseCumulativeNormal::standard(),
+        )
+    }
+}
 
 impl McRngTraits for PseudoRandom {
     type RsgType = InverseCumulativeRsg<

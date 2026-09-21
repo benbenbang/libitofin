@@ -16,11 +16,14 @@ use crate::types::Real;
 
 pub mod boxmullergaussianrng;
 pub mod haltonrsg;
+pub mod inversecumulativerng;
 pub mod inversecumulativersg;
 pub mod knuthuniformrng;
 pub mod lattice;
 mod lattice_tables;
+pub mod lowdiscrepancy;
 pub mod mt19937uniformrng;
+pub mod poissonpolicy;
 pub mod randomsequencegenerator;
 pub mod ranluxuniformrng;
 pub mod rngtraits;
@@ -31,9 +34,14 @@ pub mod zigguratgaussianrng;
 
 pub use boxmullergaussianrng::BoxMullerGaussianRng;
 pub use haltonrsg::HaltonRsg;
+pub use inversecumulativerng::{
+    FallibleInverseCumulative, FallibleInverseCumulativeRsg, InverseCumulativeRng,
+};
 pub use inversecumulativersg::InverseCumulativeRsg;
 pub use knuthuniformrng::KnuthUniformRng;
+pub use lowdiscrepancy::{GenericLowDiscrepancy, LowDiscrepancy, SobolSequence};
 pub use mt19937uniformrng::MersenneTwisterUniformRng;
+pub use poissonpolicy::{PoissonPseudoRandom, PoissonRng, PoissonRsg};
 pub use randomsequencegenerator::RandomSequenceGenerator;
 pub use ranluxuniformrng::{Ranlux3UniformRng, Ranlux4UniformRng, Ranlux64UniformRng};
 pub use rngtraits::{InverseCumulative, McRngTraits, PseudoRandom, SequenceGenerator};
