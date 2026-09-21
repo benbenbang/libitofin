@@ -203,4 +203,138 @@ mod tests {
         }
         assert_eq!(out, 77);
     }
+    #[test]
+    fn qmc_invalid_inputs_preserve_output_and_recover() {
+        use crate::market_api::itofin_black_scholes_new;
+        use crate::options_api::{
+            itofin_option_new, itofin_option_set_engine, itofin_option_value,
+        };
+        use libitofin::settings::Settings;
+        use libitofin::shared::shared;
+        use libitofin::time::date::{Date, Month};
+        use libitofin::time::daycounters::actual360::Actual360;
+
+        let mut c = Context::new();
+        let today = Date::new(15, Month::June, 2026);
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(today);
+        let settings = c.insert(settings).unwrap();
+        let dc = c.insert(Actual360::new()).unwrap();
+        let mut process = 0;
+        let mut out = 77;
+        let cfg = McConfig {
+            present: 1 | 4,
+            steps: 1,
+            samples: 4095,
+            ..McConfig::default()
+        };
+        unsafe {
+            assert_eq!(
+                itofin_black_scholes_new(
+                    &mut c,
+                    100.0,
+                    0.05,
+                    0.02,
+                    0.2,
+                    today.serial_number(),
+                    dc,
+                    &mut process,
+                    null_mut()
+                ),
+                0
+            );
+            for bad in [
+                McConfig {
+                    present: 1024,
+                    ..cfg
+                },
+                McConfig {
+                    present: 1 | 4 | 64,
+                    antithetic: 2,
+                    ..cfg
+                },
+                McConfig {
+                    present: 1 | 4 | 128,
+                    ..cfg
+                },
+                McConfig { present: 4, ..cfg },
+                McConfig { present: 1, ..cfg },
+                McConfig { steps: 0, ..cfg },
+                McConfig { samples: 0, ..cfg },
+                McConfig {
+                    present: 1 | 4 | 8,
+                    absolute_tolerance: 0.01,
+                    ..cfg
+                },
+                McConfig {
+                    present: 1 | 4 | 16,
+                    max_samples: 8191,
+                    ..cfg
+                },
+            ] {
+                assert_ne!(
+                    itofin_mc_engine_new(&mut c, process, 3, bad, &mut out, null_mut()),
+                    0
+                );
+                assert_eq!(out, 77);
+            }
+            if let Some(samples) = (u32::MAX as usize).checked_add(1) {
+                let bad = McConfig { samples, ..cfg };
+                assert_ne!(
+                    itofin_mc_engine_new(&mut c, process, 3, bad, &mut out, null_mut()),
+                    0
+                );
+                assert_eq!(out, 77);
+            }
+            assert_ne!(
+                itofin_mc_engine_new(&mut c, process, 3, cfg, null_mut(), null_mut()),
+                0
+            );
+            assert_ne!(
+                itofin_mc_engine_new(&mut c, dc, 3, cfg, &mut out, null_mut()),
+                0
+            );
+            assert_eq!(out, 77);
+            assert_eq!(
+                itofin_mc_engine_new(&mut c, process, 3, cfg, &mut out, null_mut()),
+                0
+            );
+            let mut option = 0;
+            assert_eq!(
+                itofin_option_new(
+                    &mut c,
+                    0,
+                    100.0,
+                    0,
+                    today.serial_number() + 360,
+                    0,
+                    settings,
+                    &mut option,
+                    null_mut()
+                ),
+                0
+            );
+            assert_eq!(
+                itofin_option_set_engine(&mut c, option, out, 2, 0, null_mut()),
+                0
+            );
+            let mut value = f64::NAN;
+            assert_eq!(
+                itofin_option_value(&mut c, option, 0, &mut value, null_mut()),
+                0
+            );
+            assert!(value.is_finite());
+            value = 123.0;
+            assert_ne!(
+                itofin_option_value(&mut c, option, 7, &mut value, null_mut()),
+                0
+            );
+            assert_eq!(value, 123.0);
+            assert_eq!(
+                itofin_option_value(&mut c, option, 0, &mut value, null_mut()),
+                0
+            );
+            assert!(value.is_finite());
+        }
+    }
 }

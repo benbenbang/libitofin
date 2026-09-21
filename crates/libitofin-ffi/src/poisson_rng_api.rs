@@ -82,3 +82,64 @@ pub unsafe extern "C" fn itofin_poisson_rng_draw(
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::ptr::null_mut;
+
+    #[test]
+    fn malformed_poisson_calls_preserve_outputs_and_recover() {
+        let mut context = Context::new();
+        let mut id = 999;
+        unsafe {
+            for lambda in [0.0, -1.0, f64::NAN, f64::INFINITY, 750.0] {
+                assert_ne!(
+                    itofin_poisson_rng_new(&mut context, 100, 1234, lambda, &mut id, null_mut()),
+                    0
+                );
+                assert_eq!(id, 999);
+            }
+            assert_ne!(
+                itofin_poisson_rng_new(&mut context, 0, 1234, 1.0, &mut id, null_mut()),
+                0
+            );
+            assert_ne!(
+                itofin_poisson_rng_new(&mut context, 100, 1234, 1.0, null_mut(), null_mut()),
+                0
+            );
+            assert_eq!(
+                itofin_poisson_rng_new(&mut context, 100, 1234, 1.0, &mut id, null_mut()),
+                0
+            );
+            let mut values = [777.0; 100];
+            for (flag, capacity) in [(2, 100), (0, 99)] {
+                assert_ne!(
+                    itofin_poisson_rng_draw(
+                        &mut context,
+                        id,
+                        flag,
+                        values.as_mut_ptr(),
+                        capacity,
+                        null_mut()
+                    ),
+                    0
+                );
+                assert_eq!(values, [777.0; 100]);
+            }
+            assert_ne!(
+                itofin_poisson_rng_draw(&mut context, id, 0, null_mut(), 100, null_mut()),
+                0
+            );
+            assert_ne!(
+                itofin_poisson_rng_copy(&mut context, 0, &mut id, null_mut()),
+                0
+            );
+            assert_eq!(
+                itofin_poisson_rng_draw(&mut context, id, 0, values.as_mut_ptr(), 100, null_mut()),
+                0
+            );
+            assert_eq!(values.iter().sum::<f64>(), 108.0);
+        }
+    }
+}
