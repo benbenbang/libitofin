@@ -747,8 +747,8 @@ impl PyFraRateHelper {
 ///
 /// Abstract: it has no constructor, because the core builds an overnight index
 /// only through a family factory such as Estr. It exists so OISRateHelper and
-/// MakeOis name one type and accept any family. The fixing accessor stays on
-/// the family facade; lifting it here is deferred.
+/// MakeOis name one type and accept any family. Shared fixing accessors and
+/// historical updates are available on the base.
 #[gen_stub_pyclass]
 #[pyclass(
     name = "OvernightIndex",
@@ -761,6 +761,9 @@ pub struct PyOvernightIndex {
 }
 
 impl PyOvernightIndex {
+    pub(crate) fn from_inner(inner: Shared<OvernightIndex>) -> Self {
+        Self { inner }
+    }
     /// A clone of the inner index for the facades that take an overnight index
     /// and are generic over the family.
     pub(crate) fn inner(&self) -> Shared<OvernightIndex> {

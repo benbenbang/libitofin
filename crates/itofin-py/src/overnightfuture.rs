@@ -3,6 +3,7 @@
 use crate::PyQlError;
 use crate::helpers::{PyOvernightIndex, PyRateAveraging};
 use crate::market::PySimpleQuote;
+use crate::settings::PySettings;
 use crate::time::PyDate;
 use libitofin::handle::Handle;
 use libitofin::instrument::Instrument;
@@ -68,6 +69,55 @@ impl PyOvernightIndexFuture {
     fn is_expired(&self) -> PyResult<bool> {
         self.inner
             .is_expired()
+            .map_err(|e| PyQlError::from(e).into())
+    }
+}
+/// The SOFR overnight index, retaining its forecast curve and shared history.
+#[gen_stub_pyclass]
+#[pyclass(name = "Sofr", extends = PyOvernightIndex, unsendable, module = "itofin.indexes")]
+pub struct PySofr;
+
+#[gen_stub_pymethods]
+#[pymethods]
+impl PySofr {
+    /// Construct SOFR with an optional forecast curve.
+    #[gen_stub(override_return_type(type_repr = "Sofr"))]
+    #[new]
+    #[pyo3(signature = (curve, settings))]
+    fn new(
+        curve: Option<&crate::curve::PyYieldTermStructure>,
+        settings: &PySettings,
+    ) -> PyClassInitializer<Self> {
+        let index = libitofin::shared::shared(libitofin::indexes::ibor::Sofr::new(
+            curve.map_or_else(Handle::empty, crate::curve::PyYieldTermStructure::handle),
+            settings.inner(),
+        ));
+        PyClassInitializer::from(PyOvernightIndex::from_inner(index)).add_subclass(Self)
+    }
+}
+
+#[gen_stub_pymethods]
+#[pymethods]
+impl PyOvernightIndex {
+    /// Read a historical fixing or forecast through this index's curve.
+    #[pyo3(signature = (fixing_date, forecast_todays_fixing = false))]
+    fn fixing(&self, fixing_date: &PyDate, forecast_todays_fixing: bool) -> PyResult<f64> {
+        use libitofin::indexes::Index;
+        self.inner()
+            .fixing(fixing_date.inner(), forecast_todays_fixing)
+            .map_err(|e| PyQlError::from(e).into())
+    }
+
+    /// Add a finite historical fixing shared by indices with this name/settings.
+    fn add_fixing(&self, date: &PyDate, value: f64) -> PyResult<()> {
+        use libitofin::indexes::Index;
+        if !value.is_finite() {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "fixing must be finite",
+            ));
+        }
+        self.inner()
+            .add_fixing(date.inner(), value)
             .map_err(|e| PyQlError::from(e).into())
     }
 }

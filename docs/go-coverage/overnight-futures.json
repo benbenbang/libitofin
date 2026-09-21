@@ -20,6 +20,26 @@
       ]
     },
     {
+      "c": "itofin_sofr_new",
+      "go": "Session.NewSofr",
+      "python": "itofin.indexes.Sofr",
+      "status": "implemented",
+      "tests": [
+        "TestOvernightFutureQuantLibAccrualAndRetention",
+        "TestSofrFutureBootstrapAndCustomPillars"
+      ]
+    },
+    {
+      "c": "itofin_sofr_new",
+      "go": "Session.NewSofr",
+      "python": "itofin.indexes.Sofr.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestOvernightFutureQuantLibAccrualAndRetention",
+        "TestSofrFutureBootstrapAndCustomPillars"
+      ]
+    },
+    {
       "c": "itofin_overnight_future_value",
       "go": "OvernightIndexFuture.NPV",
       "python": "itofin.instruments.OvernightIndexFuture.npv",
@@ -62,6 +82,25 @@
       "status": "implemented",
       "tests": [
         "TestOvernightFutureQuantLibAccrualAndRetention"
+      ]
+    },
+    {
+      "c": "itofin_overnight_add_fixing",
+      "go": "OvernightIndex.AddFixing",
+      "python": "itofin.indexes.OvernightIndex.add_fixing",
+      "status": "implemented",
+      "tests": [
+        "TestOvernightFutureQuantLibAccrualAndRetention",
+        "TestSofrFutureBootstrapAndCustomPillars"
+      ]
+    },
+    {
+      "c": "itofin_index_fixing",
+      "go": "OvernightIndex.Fixing",
+      "python": "itofin.indexes.OvernightIndex.fixing",
+      "status": "implemented",
+      "tests": [
+        "TestSofrFutureBootstrapAndCustomPillars"
       ]
     }
   ]
