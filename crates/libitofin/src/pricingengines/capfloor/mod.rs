@@ -1,15 +1,13 @@
-//! Cap/floor pricing engines.
-//!
-//! Port of `ql/pricingengines/capfloor/`: the Black-formula engine that prices
-//! a [`CapFloor`](crate::instruments::CapFloor) optionlet by optionlet, and the
-//! analytic Hull-White engine that prices it as a portfolio of discount-bond
-//! options.
+//! Cap/floor engines: Black, Bachelier and concrete Hull-White analytic/lattice pricing.
 
 mod analyticcapfloorengine;
+mod bacheliercapfloorengine;
 mod blackcapfloorengine;
+mod discretizedcapfloor;
+mod treecapfloorengine;
 
 pub use analyticcapfloorengine::AnalyticCapFloorEngine;
-pub use blackcapfloorengine::BlackCapFloorEngine;
-
-mod bacheliercapfloorengine;
 pub use bacheliercapfloorengine::BachelierCapFloorEngine;
+pub use blackcapfloorengine::BlackCapFloorEngine;
+pub use discretizedcapfloor::DiscretizedCapFloor;
+pub use treecapfloorengine::TreeCapFloorEngine;
