@@ -188,6 +188,9 @@ pub unsafe extern "C" fn itofin_swap_helper_with_discount(
             .map_err(|_| {
                 BindingError::invalid("swap schedule inputs exceed the supported date range")
             })?;
+            helper
+                .validate_dates()
+                .map_err(|e| BindingError::invalid(e.to_string()))?;
             output(out, c.insert(helper as Shared<dyn RateHelper>)?)
         })
     }

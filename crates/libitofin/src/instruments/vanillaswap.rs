@@ -8,8 +8,8 @@
 //! The port composes rather than inherits: [`VanillaSwap`] holds a
 //! [`FixedVsFloatingSwap`] and delegates the [`Instrument`] face to it. Its
 //! embedded base is reached through [`fixed_vs_floating`](VanillaSwap::fixed_vs_floating)
-//! for the fair-rate, leg-NPV/BPS and other base accessors; the type adds no
-//! members of its own, exactly as C++ `VanillaSwap` adds no data over the base.
+//! for the fair-rate, leg-NPV/BPS and other base accessors. A retained final
+//! floating coupon provides its fixing-end date to bootstrap helpers.
 //!
 //! Deviations, all by existing design decisions or the inheritance-to-composition
 //! shift:
@@ -68,9 +68,17 @@ use crate::types::{Rate, Real, Spread};
 /// its [`Instrument`] face.
 pub struct VanillaSwap {
     base: FixedVsFloatingSwap,
+    last_coupon: Option<Shared<IborCoupon>>,
 }
 
 impl VanillaSwap {
+    pub(crate) fn last_fixing_end_date(&self) -> QlResult<crate::time::date::Date> {
+        self.last_coupon
+            .as_ref()
+            .ok_or_else(|| crate::errors::QlError::new("empty floating leg", file!(), line!()))?
+            .fixing_end_date()
+    }
+
     /// Builds a vanilla swap over a single `nominal` (the C++ ctor,
     /// `vanillaswap.cpp:29`).
     ///
@@ -112,6 +120,7 @@ impl VanillaSwap {
             .map(|coupon| Shared::clone(coupon) as Shared<dyn CashFlow>)
             .collect();
 
+        let last_coupon = coupons.last().cloned();
         let floating_arguments: FloatingArgumentsFn =
             Box::new(move |swap, args| fill_floating_arguments(&coupons, swap, args));
 
@@ -135,7 +144,7 @@ impl VanillaSwap {
         )?;
 
         base.is_vanilla = true;
-        Ok(VanillaSwap { base })
+        Ok(VanillaSwap { base, last_coupon })
     }
 
     /// The embedded fixed-vs-floating base (its fair-rate, leg and nominal
@@ -155,8 +164,8 @@ impl VanillaSwap {
     /// The Rust counterpart of C++'s `shared_ptr<VanillaSwap>` upcast to
     /// `shared_ptr<FixedVsFloatingSwap>` when a swaption takes ownership of its
     /// underlying: an `Rc` cannot project a field, so the base is moved out
-    /// wholesale. Behaviour is preserved because `VanillaSwap` adds no data over
-    /// the base and its one override, `setupFloatingArguments`, lives in the
+    /// wholesale. Pricing behaviour is preserved because the override,
+    /// `setupFloatingArguments`, lives in the
     /// base as a [`FloatingArgumentsFn`] closure rather than a vtable method.
     pub fn into_fixed_vs_floating(self) -> FixedVsFloatingSwap {
         self.base
