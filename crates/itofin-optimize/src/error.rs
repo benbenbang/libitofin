@@ -18,6 +18,10 @@ pub enum InvalidInput {
     /// A lower bound exceeds its upper bound.
     #[error("the lower bound at index {index} exceeds the upper bound")]
     BoundsOrder { index: usize },
+    /// A bound pair admits no finite coordinate: a `+inf` lower bound or a
+    /// `-inf` upper bound.
+    #[error("the bounds at index {index} admit no finite coordinate")]
+    InfeasibleBound { index: usize },
     /// An option that must be positive when given is not.
     #[error("{option} must be positive")]
     NotPositive { option: &'static str },
@@ -27,6 +31,25 @@ pub enum InvalidInput {
         method: &'static str,
         option: &'static str,
     },
+    /// A tolerance that must be finite and non-negative is not. Zero is legal,
+    /// which is why this is not [`InvalidInput::NotPositive`].
+    #[error("{option} must be finite and non-negative")]
+    NotFiniteNonnegative { option: &'static str },
+    /// An initial simplex does not carry one more point than there are
+    /// coordinates.
+    #[error("the initial simplex has {found} points, not the {expected} required")]
+    SimplexPointCount { expected: usize, found: usize },
+    /// A point of an initial simplex does not carry one coordinate per
+    /// dimension.
+    #[error("initial simplex point {point} has length {found}, not {expected}")]
+    SimplexPointLength {
+        point: usize,
+        expected: usize,
+        found: usize,
+    },
+    /// A coordinate of an initial simplex is infinite or `NaN`.
+    #[error("initial simplex point {point} is not finite at index {index}")]
+    NonfiniteSimplex { point: usize, index: usize },
 }
 
 /// Everything a run can fail with. Neither variant is a [`Termination`](crate::Termination).
