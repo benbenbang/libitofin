@@ -123,3 +123,7 @@ impl PricingEngine for TreeCapFloorEngine {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "treecapfloorengine_tests.rs"]
+mod tests;
