@@ -13,7 +13,8 @@ use libitofin::models::HullWhite;
 use libitofin::pricingengine::PricingEngine;
 use libitofin::pricingengines::swaption::TreeSwaptionEngine;
 use libitofin::pricingengines::{
-    BachelierSwaptionEngine, BlackCapFloorEngine, BlackSwaptionEngine, JamshidianSwaptionEngine,
+    BachelierCapFloorEngine, BachelierSwaptionEngine, BlackCapFloorEngine, BlackSwaptionEngine,
+    JamshidianSwaptionEngine,
 };
 use libitofin::shared::{Shared, SharedMut, shared, shared_mut};
 use libitofin::types::Real;
@@ -208,7 +209,9 @@ pub unsafe extern "C" fn itofin_capfloor_from_leg(
         })
     }
 }
-/// Kind: 0 swaption Black, 1 Bachelier, 2 HullWhite, 3 cap/floor Black, 6 swaption tree.
+/// Kind: 0 swaption Black, 1 swaption Bachelier, 2 swaption HullWhite,
+/// 3 cap/floor Black, 4 cap/floor Bachelier, 5 cap/floor HullWhite tree,
+/// 6 swaption HullWhite tree.
 #[unsafe(no_mangle)]
 /// # Safety
 /// Pointers must be aligned, live and valid for their stated lengths. Outputs
@@ -224,10 +227,19 @@ pub unsafe extern "C" fn itofin_rate_option_set_engine(
 ) -> i32 {
     unsafe {
         with_context(ctx, error, |c| {
-            if kind == 3 {
+            if (3..=5).contains(&kind) {
                 let cap = c.get::<SharedMut<CapFloor>>(id)?;
-                let engine = c.get::<SharedMut<BlackCapFloorEngine>>(engine_id)?
-                    as SharedMut<dyn PricingEngine>;
+                let engine = if kind == 3 {
+                    c.get::<SharedMut<BlackCapFloorEngine>>(engine_id)?
+                        as SharedMut<dyn PricingEngine>
+                } else if kind == 5 {
+                    c.get::<SharedMut<libitofin::pricingengines::capfloor::TreeCapFloorEngine>>(
+                        engine_id,
+                    )? as SharedMut<dyn PricingEngine>
+                } else {
+                    c.get::<SharedMut<BachelierCapFloorEngine>>(engine_id)?
+                        as SharedMut<dyn PricingEngine>
+                };
                 cap.borrow_mut().base_mut().set_pricing_engine(engine);
                 return Ok(());
             }
