@@ -36,6 +36,7 @@ __all__ = [
     "InterpolatedSwaptionVolatilityCube",
     "InterpolatedYoYInflationCurve",
     "InterpolatedZeroInflationCurve",
+    "IterativeBootstrapOptions",
     "JointYieldCurves",
     "KInterpolatedYoYOptionletVolatilitySurface",
     "KerkhofSeasonality",
@@ -1716,6 +1717,18 @@ class InterpolatedZeroInflationCurve(ZeroInflationTermStructure):
         """
 
 @typing.final
+class IterativeBootstrapOptions:
+    r"""
+    Immutable controls for iterative yield-curve bootstrap.
+
+    Bounds are initial guesses for the solver bracket, not constraints on the
+    final curve. Attempts widen those bounds by the specified factors.
+    dont_throw explicitly accepts an approximate fallback when solving fails;
+    helper evaluation errors still propagate. None accuracy uses curve accuracy.
+    """
+    def __new__(cls, accuracy: typing.Optional[builtins.float] = None, min_value: typing.Optional[builtins.float] = None, max_value: typing.Optional[builtins.float] = None, max_attempts: builtins.int = 1, max_factor: builtins.float = 2.0, min_factor: builtins.float = 2.0, dont_throw: builtins.bool = False, dont_throw_steps: builtins.int = 10, max_evaluations: builtins.int = 100) -> IterativeBootstrapOptions: ...
+
+@typing.final
 class JointYieldCurves:
     r"""
     Two mutually coupled Discount/LogLinear/GlobalBootstrap curves.
@@ -2178,7 +2191,7 @@ class PiecewiseConvexMonotoneForward(YieldTermStructure):
     convergence loop. data() are instantaneous forward rates; the interpolation
     ignores node [0], which only mirrors the first solved pillar.
     """
-    def __init__(self, reference_date: time.Date, helpers: typing.Sequence[RateHelper], day_counter: time.DayCounter, bootstrap: builtins.str = 'iterative') -> None:
+    def __init__(self, reference_date: time.Date, helpers: typing.Sequence[RateHelper], day_counter: time.DayCounter, bootstrap: builtins.str = 'iterative', iterative_options: typing.Optional[IterativeBootstrapOptions] = None) -> None:
         r"""
         Build the curve over helpers with a fixed reference date.
 
@@ -2228,7 +2241,7 @@ class PiecewiseCubicZero(YieldTermStructure):
     instead of a single pass. data() are continuously-compounded zero rates, so
     data()[0] mirrors the first solved pillar's rate rather than a 1.0 discount.
     """
-    def __init__(self, reference_date: time.Date, helpers: typing.Sequence[RateHelper], day_counter: time.DayCounter) -> None:
+    def __init__(self, reference_date: time.Date, helpers: typing.Sequence[RateHelper], day_counter: time.DayCounter, iterative_options: typing.Optional[IterativeBootstrapOptions] = None) -> None:
         r"""
         Build the curve over helpers with a fixed reference date.
 
@@ -2379,7 +2392,7 @@ class PiecewiseFlatForward(YieldTermStructure):
     identical to PiecewiseLogLinearDiscount under every query; only data(),
     forward rates against discount factors, tells the two apart.
     """
-    def __init__(self, reference_date: time.Date, helpers: typing.Sequence[RateHelper], day_counter: time.DayCounter) -> None:
+    def __init__(self, reference_date: time.Date, helpers: typing.Sequence[RateHelper], day_counter: time.DayCounter, iterative_options: typing.Optional[IterativeBootstrapOptions] = None) -> None:
         r"""
         Build the curve over helpers with a fixed reference date.
 
@@ -2420,7 +2433,7 @@ class PiecewiseLinearForward(YieldTermStructure):
     The verbatim QuantLib-SWIG name for the blessed (ForwardRate, Linear)
     combination. data() are instantaneous forward rates.
     """
-    def __init__(self, reference_date: time.Date, helpers: typing.Sequence[RateHelper], day_counter: time.DayCounter) -> None:
+    def __init__(self, reference_date: time.Date, helpers: typing.Sequence[RateHelper], day_counter: time.DayCounter, iterative_options: typing.Optional[IterativeBootstrapOptions] = None) -> None:
         r"""
         Build the curve over helpers with a fixed reference date.
 
@@ -2462,7 +2475,7 @@ class PiecewiseLinearZero(YieldTermStructure):
     combination. data() are continuously-compounded zero rates, so data()[0]
     mirrors the first solved pillar's rate rather than a 1.0 discount.
     """
-    def __init__(self, reference_date: time.Date, helpers: typing.Sequence[RateHelper], day_counter: time.DayCounter) -> None:
+    def __init__(self, reference_date: time.Date, helpers: typing.Sequence[RateHelper], day_counter: time.DayCounter, iterative_options: typing.Optional[IterativeBootstrapOptions] = None) -> None:
         r"""
         Build the curve over helpers with a fixed reference date.
 
@@ -2506,7 +2519,7 @@ class PiecewiseLogLinearDiscount(YieldTermStructure):
     handle discards. data() are discount factors, so data()[0] is the reference
     node's 1.0.
     """
-    def __init__(self, reference_date: time.Date, helpers: typing.Sequence[RateHelper], day_counter: time.DayCounter) -> None:
+    def __init__(self, reference_date: time.Date, helpers: typing.Sequence[RateHelper], day_counter: time.DayCounter, iterative_options: typing.Optional[IterativeBootstrapOptions] = None) -> None:
         r"""
         Build the curve over helpers with a fixed reference date.
 
@@ -2579,7 +2592,7 @@ class PiecewiseYieldCurve(YieldTermStructure):
     max_date is the exception: it swallows a bootstrap failure and reports the
     current grid bound, or the reference date before a grid has been installed.
     """
-    def __init__(self, reference_date: time.Date, helpers: typing.Sequence[RateHelper], day_counter: time.DayCounter, interpolation: builtins.str = 'LogLinear', bootstrap: builtins.str = 'iterative', additional_helpers: typing.Optional[typing.Sequence[RateHelper]] = None, *, additional_penalties: typing.Optional[typing.Callable[[list[float], list[float]], list[float]]] = None, additional_dates: typing.Optional[typing.Callable[[], list[time.Date]]] = None, additional_variables: typing.Optional[SimpleQuoteVariables] = None) -> None:
+    def __init__(self, reference_date: time.Date, helpers: typing.Sequence[RateHelper], day_counter: time.DayCounter, interpolation: builtins.str = 'LogLinear', bootstrap: builtins.str = 'iterative', additional_helpers: typing.Optional[typing.Sequence[RateHelper]] = None, *, additional_penalties: typing.Optional[typing.Callable[[list[float], list[float]], list[float]]] = None, additional_dates: typing.Optional[typing.Callable[[], list[time.Date]]] = None, additional_variables: typing.Optional[SimpleQuoteVariables] = None, iterative_options: typing.Optional[IterativeBootstrapOptions] = None) -> None:
         r"""
         Build the curve over helpers with a fixed reference date.
 
