@@ -179,7 +179,7 @@ QuantLib parity.
 | **L8** | instruments | fixed-rate bonds, vanilla / OIS swaps, swaptions, caps & floors, vanilla options |
 | **L9** | methods | lattices, trees (trinomial + Hull-White), Monte Carlo (path generators + antithetic), finite differences (European, American and Bermudan Black-Scholes vanilla) |
 | **L10** | models | `CalibratedModel` + `calibrate()`, short-rate (Vasicek, CIR, Hull-White), Heston, calibration helpers |
-| **L11** | engines | analytic European & Heston (Fourier), swaption (Black / Bachelier / Jamshidian), discounting swap / bond, Black / Bachelier / Hull-White tree cap/floor |
+| **L11** | engines | analytic European & Heston (Fourier), swaption (Black / Bachelier / Jamshidian / Hull-White tree), discounting swap / bond, Black / Bachelier / Hull-White tree cap/floor |
 
 **Milestone 1 (done):** a European option prices end-to-end - quote → flat
 yield/vol curves → generalized Black-Scholes process → analytic engine → lazy
