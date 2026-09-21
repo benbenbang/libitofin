@@ -44,6 +44,18 @@ impl PySettings {
         self.inner.set_evaluation_date(date.inner());
     }
 
+    /// Select par or indexed Ibor coupon forecasting before constructing instruments.
+    ///
+    /// This setting does not invalidate already cached prices.
+    fn set_using_at_par_coupons(&self, value: bool) {
+        self.inner.set_using_at_par_coupons(value);
+    }
+
+    /// Return whether Ibor coupons use par forecasting (the default).
+    fn using_at_par_coupons(&self) -> bool {
+        self.inner.using_at_par_coupons()
+    }
+
     /// Set whether cash flows on today's date enter an NPV; None clears.
     ///
     /// The flag is three-valued, as in the core.
