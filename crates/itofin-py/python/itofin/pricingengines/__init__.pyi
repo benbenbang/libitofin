@@ -432,7 +432,6 @@ class TreeSwaptionEngine:
         Retain the model and settings; zero steps raise ItofinError.
         """
 
-
 @typing.final
 class YoYInflationCapFloorEngine:
     r"""
