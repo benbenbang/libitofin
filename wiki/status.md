@@ -95,6 +95,15 @@ including calibration after input wrappers are released.
 
 ## Swaption foundation
 
+The next release completes [#467](https://github.com/benbenbang/libitofin/issues/467):
+Hull-White tree swaptions rebuild vanilla coupon schedules after inclusive
+seven-day exercise-date snapping. Rust, Python and C/Go support Bermudan exercise;
+all six indexed/par QuantLib cached values pass at `1e-4` absolute tolerance with
+50 steps, and the European convergence gate is retained. Original schedules and
+shared fixing history are preserved. The tree engine requires a vanilla Ibor
+underlying; OIS remains supported by the existing Black/Bachelier engines.
+
+
 [EPIC-10 #358](https://github.com/benbenbang/libitofin/issues/358) covers the
 constant volatility surface, swaption instrument, Black engine, Eonia, SwapIndex
 and vanilla MakeSwaption builder. Its five core issues (#359-#363) are complete.
