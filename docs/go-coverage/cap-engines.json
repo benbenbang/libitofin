@@ -1,0 +1,41 @@
+{
+  "domain": "cap-engines",
+  "entries": [
+    {
+      "c": "itofin_rate_engine_new",
+      "go": "Session.NewBachelierCapFloorEngine",
+      "python": "itofin.pricingengines.BachelierCapFloorEngine",
+      "status": "implemented",
+      "tests": [
+        "TestCapNormalAndTreeOracles"
+      ]
+    },
+    {
+      "c": "itofin_rate_engine_new",
+      "go": "Session.NewBachelierCapFloorEngine",
+      "python": "itofin.pricingengines.BachelierCapFloorEngine.__new__",
+      "status": "implemented",
+      "tests": [
+        "TestCapNormalAndTreeOracles"
+      ]
+    },
+    {
+      "c": "itofin_rate_engine_new",
+      "go": "Session.NewBachelierCapFloorEngineFlat",
+      "python": "itofin.pricingengines.BachelierCapFloorEngine.with_flat_vol",
+      "status": "implemented",
+      "tests": [
+        "TestCapNormalAndTreeOracles"
+      ]
+    },
+    {
+      "c": "itofin_rate_option_set_engine",
+      "go": "CapFloor.SetBachelierEngine",
+      "python": "itofin.instruments.CapFloor.set_bachelier_engine",
+      "status": "implemented",
+      "tests": [
+        "TestCapNormalAndTreeOracles"
+      ]
+    }
+  ]
+}

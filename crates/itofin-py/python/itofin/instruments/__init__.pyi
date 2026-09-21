@@ -190,6 +190,7 @@ class CapFloor:
             engine (BlackCapFloorEngine): The engine and its optionlet
                 volatility surface.
         """
+    def set_bachelier_engine(self, engine: pricingengines.BachelierCapFloorEngine) -> None: ...
     def calculate(self) -> None:
         r"""
         Force the valuation. Idempotent.

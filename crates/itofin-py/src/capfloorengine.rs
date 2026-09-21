@@ -9,9 +9,7 @@
 //! settlement days on a null calendar, so that surface's reference date IS the
 //! evaluation date carried by `settings`.
 //!
-//! Deferred (visible): the Bachelier cap/floor engine is not exposed - the core
-//! prices only the shifted-lognormal path, so a normal-volatility surface is
-//! rejected by the constructor rather than bound to a second engine here.
+//! Normal volatility is priced by the separate Bachelier engine.
 
 use crate::PyQlError;
 use crate::curve::PyYieldTermStructure;
@@ -20,7 +18,7 @@ use crate::optionletvol::PyOptionletVolatilityStructure;
 use crate::settings::PySettings;
 use crate::time::PyDayCounter;
 use libitofin::pricingengine::PricingEngine;
-use libitofin::pricingengines::capfloor::BlackCapFloorEngine;
+use libitofin::pricingengines::capfloor::{BachelierCapFloorEngine, BlackCapFloorEngine};
 use libitofin::shared::{SharedMut, shared_mut};
 use pyo3::prelude::*;
 #[allow(unused_imports)]
@@ -131,6 +129,57 @@ impl PyBlackCapFloorEngine {
 
 impl PyBlackCapFloorEngine {
     /// The erased engine the instrument facades install via `set_pricing_engine`.
+    pub(crate) fn engine(&self) -> SharedMut<dyn PricingEngine> {
+        SharedMut::clone(&self.inner) as SharedMut<dyn PricingEngine>
+    }
+}
+
+/// Normal-volatility engine for caps, floors and collars.
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "BachelierCapFloorEngine",
+    unsendable,
+    module = "itofin.pricingengines"
+)]
+pub struct PyBachelierCapFloorEngine {
+    inner: SharedMut<BachelierCapFloorEngine>,
+}
+#[gen_stub_pymethods]
+#[pymethods]
+impl PyBachelierCapFloorEngine {
+    #[new]
+    fn new(
+        vol: &PyOptionletVolatilityStructure,
+        discount: &PyYieldTermStructure,
+    ) -> PyResult<Self> {
+        Ok(Self {
+            inner: shared_mut(
+                BachelierCapFloorEngine::new(discount.handle(), vol.handle())
+                    .map_err(PyQlError::from)?,
+            ),
+        })
+    }
+    #[staticmethod]
+    fn with_flat_vol(
+        discount: &PyYieldTermStructure,
+        vol: &PySimpleQuote,
+        day_counter: &PyDayCounter,
+        settings: &PySettings,
+    ) -> PyResult<Self> {
+        Ok(Self {
+            inner: shared_mut(
+                BachelierCapFloorEngine::with_flat_vol(
+                    discount.handle(),
+                    vol.handle(),
+                    day_counter.inner(),
+                    settings.inner(),
+                )
+                .map_err(PyQlError::from)?,
+            ),
+        })
+    }
+}
+impl PyBachelierCapFloorEngine {
     pub(crate) fn engine(&self) -> SharedMut<dyn PricingEngine> {
         SharedMut::clone(&self.inner) as SharedMut<dyn PricingEngine>
     }
