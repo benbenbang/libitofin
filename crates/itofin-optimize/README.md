@@ -6,8 +6,8 @@ SciPy-inspired numerical optimization in Rust, over plain `f64` slices.
 
 A general-purpose `minimize` for Nelder-Mead, BFGS, L-BFGS-B and SLSQP, with an
 `Objective` trait carrying its own error type, explicit budgets, a cancellation
-hook and validated inputs. Solvers arrive one ticket at a time; this crate today
-holds the contracts they share and has no public `minimize` entry point yet.
+hook and validated inputs. Solvers arrive one ticket at a time, all reached
+through the single `minimize` entry point; Nelder-Mead is the first of them.
 
 ## Independent of libitofin
 
