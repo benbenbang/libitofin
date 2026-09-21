@@ -11,6 +11,7 @@
 mod error;
 mod objective;
 mod outcome;
+mod problem;
 
 #[cfg(test)]
 mod tests;
@@ -18,3 +19,4 @@ mod tests;
 pub use error::{InvalidInput, MinimizeError};
 pub use objective::{Flow, IterationState, Objective};
 pub use outcome::{Converged, Minimize, Termination};
+pub use problem::{Bounds, Common, Method, NelderMeadOptions, Problem};

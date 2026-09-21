@@ -1,5 +1,6 @@
 use crate::{
-    Converged, Flow, InvalidInput, IterationState, Minimize, MinimizeError, Objective, Termination,
+    Bounds, Common, Converged, Flow, InvalidInput, IterationState, Method, Minimize, MinimizeError,
+    NelderMeadOptions, Objective, Problem, Termination,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
@@ -83,4 +84,119 @@ fn a_result_derives_its_success_and_message_from_its_status() {
     assert!(result.success);
     assert_eq!(result.message, "converged: step below the x tolerance");
     assert_eq!((result.nit, result.nfev, result.njev), (3, 7, 2));
+}
+
+fn problem() -> Problem {
+    Problem {
+        x0: vec![1.0, 2.0],
+        bounds: None,
+    }
+}
+
+fn bounded(lower: Vec<f64>, upper: Vec<f64>) -> Problem {
+    Problem {
+        x0: vec![1.0, 2.0],
+        bounds: Some(Bounds { lower, upper }),
+    }
+}
+
+fn common(maxiter: Option<usize>, maxfev: Option<usize>, tol: Option<f64>) -> Common {
+    Common {
+        maxiter,
+        maxfev,
+        tol,
+    }
+}
+
+#[test]
+fn x0_must_not_be_empty() {
+    let problem = Problem {
+        x0: Vec::new(),
+        bounds: None,
+    };
+    assert_eq!(problem.validate(), Err(InvalidInput::EmptyX0));
+}
+
+#[test]
+fn x0_must_be_finite() {
+    let problem = Problem {
+        x0: vec![1.0, f64::INFINITY],
+        bounds: None,
+    };
+    let expected = InvalidInput::NonfiniteX0 { index: 1 };
+    assert_eq!(problem.validate(), Err(expected));
+}
+
+#[test]
+fn an_unbounded_problem_is_valid() {
+    assert_eq!(problem().validate(), Ok(()));
+}
+
+#[test]
+fn bounds_must_carry_one_entry_per_coordinate() {
+    let expected = InvalidInput::BoundsLength {
+        expected: 2,
+        found: 1,
+    };
+    assert_eq!(bounded(vec![0.0], vec![3.0, 3.0]).validate(), Err(expected));
+}
+
+#[test]
+fn a_nan_bound_is_rejected() {
+    let problem = bounded(vec![0.0, f64::NAN], vec![3.0, 3.0]);
+    assert_eq!(problem.validate(), Err(InvalidInput::NanBound { index: 1 }));
+}
+
+#[test]
+fn an_infinite_bound_leaves_that_side_open() {
+    let problem = bounded(vec![f64::NEG_INFINITY, 0.0], vec![3.0, f64::INFINITY]);
+    assert_eq!(problem.validate(), Ok(()));
+}
+
+#[test]
+fn a_lower_bound_must_not_exceed_its_upper_bound() {
+    let problem = bounded(vec![0.0, 4.0], vec![3.0, 3.0]);
+    let expected = InvalidInput::BoundsOrder { index: 1 };
+    assert_eq!(problem.validate(), Err(expected));
+}
+
+#[test]
+fn a_budget_must_be_positive_when_given() {
+    let maxiter = InvalidInput::NotPositive { option: "maxiter" };
+    assert_eq!(common(Some(0), None, None).validate(), Err(maxiter));
+    let maxfev = InvalidInput::NotPositive { option: "maxfev" };
+    assert_eq!(common(None, Some(0), None).validate(), Err(maxfev));
+    assert_eq!(common(Some(1), Some(1), Some(1e-8)).validate(), Ok(()));
+    assert_eq!(Common::default().validate(), Ok(()));
+}
+
+#[test]
+fn a_tolerance_must_be_positive_when_given() {
+    for tol in [0.0, -1.0, f64::NAN] {
+        let expected = InvalidInput::NotPositive { option: "tol" };
+        assert_eq!(common(None, None, Some(tol)).validate(), Err(expected));
+    }
+}
+
+#[test]
+fn a_method_rejects_an_option_it_does_not_support() {
+    let method = Method::NelderMead(NelderMeadOptions::default());
+    assert_eq!(method.name(), "Nelder-Mead");
+    assert!(!method.supports_bounds());
+    assert_eq!(method.validate(&problem()), Ok(()));
+    let expected = InvalidInput::Unsupported {
+        method: "Nelder-Mead",
+        option: "bounds",
+    };
+    let bounded = bounded(vec![0.0, 0.0], vec![3.0, 3.0]);
+    assert_eq!(method.validate(&bounded), Err(expected));
+}
+
+#[test]
+fn nelder_mead_options_default_to_the_scipy_values() {
+    let options = NelderMeadOptions::default();
+    assert_eq!(options.xatol, 1e-4);
+    assert_eq!(options.fatol, 1e-4);
+    assert!(!options.adaptive);
+    assert_eq!(options.initial_simplex, None);
 }
