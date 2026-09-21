@@ -3511,41 +3511,6 @@ int32_t itofin_option_results(struct ItofinContext *ctx,
                               struct ItofinError *error);
 
 /**
- * Construct a Poisson sequence. Dimension one also supplies scalar draws.
- * # Safety
- * Follow the crate-level C caller contract.
- */
-int32_t itofin_poisson_rng_new(struct ItofinContext *ctx,
-                               size_t dimension,
-                               uint32_t seed,
-                               double lambda,
-                               uint64_t *out,
-                               struct ItofinError *error);
-
-/**
- * Copy a generator's current state into an independent native owner.
- * # Safety
- * Follow the crate-level C caller contract.
- */
-int32_t itofin_poisson_rng_copy(struct ItofinContext *ctx,
-                                uint64_t source,
-                                uint64_t *out,
-                                struct ItofinError *error);
-
-/**
- * Draw one sequence when last=0, or copy the last success when last=1.
- * Errors preserve output and the last successful sequence; attempted draws advance state.
- * # Safety
- * Follow the crate-level C caller contract; out has capacity doubles.
- */
-int32_t itofin_poisson_rng_draw(struct ItofinContext *ctx,
-                                uint64_t id,
-                                int32_t last,
-                                double *out,
-                                size_t capacity,
-                                struct ItofinError *error);
-
-/**
  * # Safety
  * Pointers follow the crate-level C caller contract.
  */
@@ -3616,6 +3581,41 @@ int32_t itofin_overnight_add_fixing(struct ItofinContext *ctx,
                                     int32_t fixing_date,
                                     double value,
                                     struct ItofinError *error);
+
+/**
+ * Construct a Poisson sequence. Dimension one also supplies scalar draws.
+ * # Safety
+ * Follow the crate-level C caller contract.
+ */
+int32_t itofin_poisson_rng_new(struct ItofinContext *ctx,
+                               size_t dimension,
+                               uint32_t seed,
+                               double lambda,
+                               uint64_t *out,
+                               struct ItofinError *error);
+
+/**
+ * Copy a generator's current state into an independent native owner.
+ * # Safety
+ * Follow the crate-level C caller contract.
+ */
+int32_t itofin_poisson_rng_copy(struct ItofinContext *ctx,
+                                uint64_t source,
+                                uint64_t *out,
+                                struct ItofinError *error);
+
+/**
+ * Draw one sequence when last=0, or copy the last success when last=1.
+ * Errors preserve output and the last successful sequence; attempted draws advance state.
+ * # Safety
+ * Follow the crate-level C caller contract; out has capacity doubles.
+ */
+int32_t itofin_poisson_rng_draw(struct ItofinContext *ctx,
+                                uint64_t id,
+                                int32_t last,
+                                double *out,
+                                size_t capacity,
+                                struct ItofinError *error);
 
 /**
  * # Safety
