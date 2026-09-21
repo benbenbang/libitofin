@@ -637,6 +637,28 @@ typedef struct SwaptionHelperConfig {
   double nominal;
 } SwaptionHelperConfig;
 
+typedef struct ItofinOvernightFutureConfig {
+  uint64_t index;
+  int32_t value_date;
+  int32_t maturity_date;
+  uint64_t convexity;
+  /**
+   * Zero simple, one compound.
+   */
+  int32_t averaging;
+} ItofinOvernightFutureConfig;
+
+typedef struct ItofinSofrFutureHelperConfig {
+  uint64_t price;
+  uint32_t month;
+  int32_t year;
+  int32_t frequency;
+  uint64_t settings;
+  uint64_t convexity;
+  int32_t pillar;
+  int32_t custom_date;
+} ItofinSofrFutureHelperConfig;
+
 typedef struct ItofinVanillaSwapConfig {
   int32_t swap_type;
   ItofinReal nominal;
@@ -3522,6 +3544,78 @@ int32_t itofin_poisson_rng_draw(struct ItofinContext *ctx,
                                 double *out,
                                 size_t capacity,
                                 struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers follow the crate-level C caller contract.
+ */
+int32_t itofin_overnight_future_new(struct ItofinContext *ctx,
+                                    struct ItofinOvernightFutureConfig a,
+                                    uint64_t *out,
+                                    struct ItofinError *error);
+
+/**
+ * Query zero NPV, one convexity adjustment, two expired (zero or one).
+ * # Safety
+ * Pointers follow the crate-level C caller contract.
+ */
+int32_t itofin_overnight_future_value(struct ItofinContext *ctx,
+                                      uint64_t id,
+                                      int32_t field,
+                                      double *out,
+                                      struct ItofinError *error);
+
+/**
+ * Query zero value date, one maturity date.
+ * # Safety
+ * Pointers follow the crate-level C caller contract.
+ */
+int32_t itofin_overnight_future_date(struct ItofinContext *ctx,
+                                     uint64_t id,
+                                     int32_t field,
+                                     int32_t *out,
+                                     struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers follow the crate-level C caller contract.
+ */
+int32_t itofin_overnight_future_helper_new(struct ItofinContext *ctx,
+                                           struct ItofinOvernightFutureConfig a,
+                                           uint64_t price,
+                                           int32_t pillar_choice,
+                                           int32_t custom_date,
+                                           uint64_t *out,
+                                           struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers follow the crate-level C caller contract.
+ */
+int32_t itofin_sofr_future_helper_new(struct ItofinContext *ctx,
+                                      struct ItofinSofrFutureHelperConfig a,
+                                      uint64_t *out,
+                                      struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers follow the crate-level C caller contract.
+ */
+int32_t itofin_sofr_new(struct ItofinContext *ctx,
+                        uint64_t forwarding,
+                        uint64_t settings,
+                        uint64_t *out,
+                        struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers follow the crate-level C caller contract.
+ */
+int32_t itofin_overnight_add_fixing(struct ItofinContext *ctx,
+                                    uint64_t index,
+                                    int32_t fixing_date,
+                                    double value,
+                                    struct ItofinError *error);
 
 /**
  * # Safety
