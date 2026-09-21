@@ -902,6 +902,7 @@ impl PyZeroCouponInflationSwapHelper {
     ///     pillar (Pillar): Which of the two nodes an interpolated swap
     ///         straddles the helper fits; a flat swap reads a single fixing
     ///         and ignores it.
+    ///     custom_pillar_date (Date | None): Required with CustomDate.
     ///
     /// Raises:
     ///     ItofinError: On an observation lag the index cannot observe
@@ -920,6 +921,7 @@ impl PyZeroCouponInflationSwapHelper {
         observation_interpolation,
         settings,
         pillar = PyPillar::LastRelevantDate,
+        custom_pillar_date = None,
     ))]
     #[allow(clippy::too_many_arguments)]
     fn new(
@@ -933,6 +935,7 @@ impl PyZeroCouponInflationSwapHelper {
         observation_interpolation: &PyCpiInterpolationType,
         settings: &PySettings,
         pillar: PyPillar,
+        custom_pillar_date: Option<&PyDate>,
     ) -> PyResult<PyClassInitializer<Self>> {
         let concrete = ZeroCouponInflationSwapHelper::new(
             quote.handle(),
@@ -943,7 +946,7 @@ impl PyZeroCouponInflationSwapHelper {
             day_counter.inner(),
             &index.shared(),
             observation_interpolation.inner(),
-            pillar.inner(),
+            pillar.with_custom(custom_pillar_date)?,
             settings.inner(),
         )
         .map_err(PyQlError::from)?;
@@ -2041,12 +2044,9 @@ impl PyYoYInflationIndex {
 /// of index linked to a handle of its own, so the caller's index need not be
 /// linked to any curve.
 ///
-/// pillar is accepted for signature parity but never read: it only ever
-/// discriminates on the interpolated path, which is refused.
-///
-/// Fallible: CpiInterpolationType.Linear is refused outright, and the swap is
-/// built here, so an observation lag its legs cannot be built under fails at
-/// construction.
+/// Linear interpolation supports schedule-derived or custom pillars within
+/// the final fixing period. Flat interpolation uses its single fixing date.
+/// Invalid observation lags or custom dates fail at construction.
 #[gen_stub_pyclass]
 #[pyclass(
     name = "YearOnYearInflationSwapHelper",
@@ -2082,14 +2082,12 @@ impl PyYearOnYearInflationSwapHelper {
     ///     settings (Settings): The explicit settings supplying the evaluation
     ///         date the swap starts at, which must be set before this
     ///         constructor runs.
-    ///     pillar (Pillar): Accepted for signature parity but never read; it
-    ///         only ever discriminates on the interpolated path.
+    ///     pillar (Pillar): Node convention on the Linear interpolation path.
+    ///     custom_pillar_date (Date | None): Required with CustomDate; Flat
+    ///         interpolation keeps its single fixing date.
     ///
     /// Raises:
-    ///     ItofinError: On Linear interpolation, which the core refuses
-    ///         outright pending the interpolated branch (#847), and on an
-    ///         observation lag the helper's own swap legs cannot be built
-    ///         under.
+    ///     ItofinError: On invalid observation lags or custom pillar dates.
     #[gen_stub(override_return_type(type_repr = "None"))]
     #[new]
     #[pyo3(signature = (
@@ -2104,6 +2102,7 @@ impl PyYearOnYearInflationSwapHelper {
         nominal_term_structure,
         settings,
         pillar = PyPillar::LastRelevantDate,
+        custom_pillar_date = None,
     ))]
     #[allow(clippy::too_many_arguments)]
     fn new(
@@ -2118,6 +2117,7 @@ impl PyYearOnYearInflationSwapHelper {
         nominal_term_structure: &PyYieldTermStructure,
         settings: &PySettings,
         pillar: PyPillar,
+        custom_pillar_date: Option<&PyDate>,
     ) -> PyResult<PyClassInitializer<Self>> {
         let concrete = YearOnYearInflationSwapHelper::new(
             quote.handle(),
@@ -2129,7 +2129,7 @@ impl PyYearOnYearInflationSwapHelper {
             &index.shared(),
             interpolation.inner(),
             nominal_term_structure.handle(),
-            pillar.inner(),
+            pillar.with_custom(custom_pillar_date)?,
             settings.inner(),
         )
         .map_err(PyQlError::from)?;

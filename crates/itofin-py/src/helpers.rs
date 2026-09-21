@@ -196,7 +196,7 @@ impl PyDepositRateHelper {
 /// A helper fitting a par swap rate (spot-starting, no spread).
 ///
 /// The spot-starting form the curve-consistency oracle builds: no spread, no
-/// forward start and the default pillar, with optional exogenous discounting.
+/// forward start, with optional exogenous discounting and custom pillars.
 #[gen_stub_pyclass]
 #[pyclass(name = "SwapRateHelper", extends = PyRateHelper, unsendable, module = "itofin.termstructures")]
 pub struct PySwapRateHelper;
@@ -215,9 +215,11 @@ impl PySwapRateHelper {
     ///     fixed_day_count (DayCounter): The fixed leg's day count.
     ///     ibor_index (IborIndex): The index the floating leg fixes off.
     ///     discount (YieldTermStructure | None): Optional exogenous discount curve.
+    ///     pillar (Pillar): Node convention; defaults to LastRelevantDate.
+    ///     custom_pillar_date (Date | None): Required with CustomDate.
     #[gen_stub(override_return_type(type_repr = "SwapRateHelper"))]
     #[new]
-    #[pyo3(signature = (quote, tenor, calendar, fixed_frequency, fixed_convention, fixed_day_count, ibor_index, discount = None))]
+    #[pyo3(signature = (quote, tenor, calendar, fixed_frequency, fixed_convention, fixed_day_count, ibor_index, discount = None, pillar = PyPillar::LastRelevantDate, custom_pillar_date = None))]
     #[allow(clippy::too_many_arguments)]
     fn new(
         quote: &PySimpleQuote,
@@ -228,13 +230,16 @@ impl PySwapRateHelper {
         fixed_day_count: &PyDayCounter,
         ibor_index: &PyIborIndex,
         discount: Option<&PyYieldTermStructure>,
+        pillar: PyPillar,
+        custom_pillar_date: Option<&PyDate>,
     ) -> PyResult<PyClassInitializer<Self>> {
         if tenor.inner().length() <= 0 {
             return Err(crate::ItofinError::new_err("swap tenor must be positive"));
         }
         let idx = ibor_index.inner();
+        let pillar = pillar.with_custom(custom_pillar_date)?;
         let helper = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            SwapRateHelper::with_details(
+            SwapRateHelper::try_with_details(
                 quote.handle(),
                 tenor.inner(),
                 calendar.inner(),
@@ -245,11 +250,11 @@ impl PySwapRateHelper {
                 Handle::empty(),
                 libitofin::time::period::Period::new(0, libitofin::time::timeunit::TimeUnit::Days),
                 discount.map(PyYieldTermStructure::handle),
-                Pillar::LastRelevantDate,
+                pillar,
             )
         }))
         .map_err(|_| crate::ItofinError::new_err("invalid swap helper schedule"))?
-            as Shared<dyn RateHelper>;
+        .map_err(PyQlError::from)? as Shared<dyn RateHelper>;
         Ok(PyClassInitializer::from(PyRateHelper { inner: helper }).add_subclass(PySwapRateHelper))
     }
 }
@@ -503,9 +508,8 @@ fn init(helper: Shared<FuturesRateHelper>) -> PyClassInitializer<PyFuturesRateHe
 
 /// The date the curve node a helper fits sits at.
 ///
-/// MaturityDate and LastRelevantDate (the default) are the two schedule-derived
-/// choices. Pillar.CustomDate is deferred in the core (#343), so its omission
-/// here is deliberate, not an oversight.
+/// MaturityDate and LastRelevantDate are schedule-derived. CustomDate requires
+/// the separate custom_pillar_date argument within the helper date bounds.
 #[gen_stub_pyclass_enum]
 #[pyclass(
     name = "Pillar",
@@ -515,17 +519,26 @@ fn init(helper: Shared<FuturesRateHelper>) -> PyClassInitializer<PyFuturesRateHe
     module = "itofin.termstructures"
 )]
 #[derive(Clone, Copy, PartialEq)]
+#[allow(clippy::enum_variant_names)]
 pub enum PyPillar {
     MaturityDate,
     LastRelevantDate,
+    CustomDate,
 }
 
 impl PyPillar {
-    /// The core Pillar this variant stands for.
-    pub(crate) fn inner(&self) -> Pillar {
-        match self {
-            PyPillar::MaturityDate => Pillar::MaturityDate,
-            PyPillar::LastRelevantDate => Pillar::LastRelevantDate,
+    /// Resolve the selected convention and optional explicit date.
+    pub(crate) fn with_custom(&self, custom_pillar_date: Option<&PyDate>) -> PyResult<Pillar> {
+        match (self, custom_pillar_date) {
+            (Self::MaturityDate, None) => Ok(Pillar::MaturityDate),
+            (Self::LastRelevantDate, None) => Ok(Pillar::LastRelevantDate),
+            (Self::CustomDate, Some(date)) => Ok(Pillar::CustomDate(date.inner())),
+            (Self::CustomDate, None) => Err(crate::ItofinError::new_err(
+                "custom pillar date must be provided",
+            )),
+            _ => Err(crate::ItofinError::new_err(
+                "custom pillar date requires CustomDate convention",
+            )),
         }
     }
 }
@@ -562,6 +575,7 @@ impl PyFraRateHelper {
         index,
         use_indexed_coupon = true,
         pillar = PyPillar::LastRelevantDate,
+        custom_pillar_date = None,
     ))]
     fn new(
         quote: &PySimpleQuote,
@@ -569,16 +583,18 @@ impl PyFraRateHelper {
         index: &PyIborIndex,
         use_indexed_coupon: bool,
         pillar: PyPillar,
-    ) -> PyClassInitializer<Self> {
+        custom_pillar_date: Option<&PyDate>,
+    ) -> PyResult<PyClassInitializer<Self>> {
         let idx = index.inner();
-        let helper = FraRateHelper::new(
+        let helper = FraRateHelper::try_new(
             quote.handle(),
             period_to_start.inner(),
             &idx,
             use_indexed_coupon,
-            pillar.inner(),
-        ) as Shared<dyn RateHelper>;
-        PyClassInitializer::from(PyRateHelper { inner: helper }).add_subclass(PyFraRateHelper)
+            pillar.with_custom(custom_pillar_date)?,
+        )
+        .map_err(PyQlError::from)? as Shared<dyn RateHelper>;
+        Ok(PyClassInitializer::from(PyRateHelper { inner: helper }).add_subclass(PyFraRateHelper))
     }
 
     /// Build the helper over a fixed rate.
@@ -589,6 +605,7 @@ impl PyFraRateHelper {
     ///     period_to_start (Period): How long after spot the window starts.
     ///     index (IborIndex): The index whose tenor the window spans.
     ///     use_indexed_coupon (bool): The implied-quote mode; see __init__.
+    ///     custom_pillar_date (Date | None): Required with CustomDate.
     ///     pillar (Pillar): The date the curve node sits at.
     ///
     /// Returns:
@@ -600,6 +617,7 @@ impl PyFraRateHelper {
         index,
         use_indexed_coupon = true,
         pillar = PyPillar::LastRelevantDate,
+        custom_pillar_date = None,
     ))]
     fn from_rate(
         py: Python<'_>,
@@ -608,15 +626,17 @@ impl PyFraRateHelper {
         index: &PyIborIndex,
         use_indexed_coupon: bool,
         pillar: PyPillar,
+        custom_pillar_date: Option<&PyDate>,
     ) -> PyResult<Py<Self>> {
         let idx = index.inner();
-        let helper = FraRateHelper::from_rate(
+        let helper = FraRateHelper::try_from_rate(
             rate,
             period_to_start.inner(),
             &idx,
             use_indexed_coupon,
-            pillar.inner(),
-        ) as Shared<dyn RateHelper>;
+            pillar.with_custom(custom_pillar_date)?,
+        )
+        .map_err(PyQlError::from)? as Shared<dyn RateHelper>;
         Py::new(
             py,
             PyClassInitializer::from(PyRateHelper { inner: helper }).add_subclass(PyFraRateHelper),
@@ -631,6 +651,7 @@ impl PyFraRateHelper {
     ///         starts.
     ///     index (IborIndex): The index whose tenor the window spans.
     ///     use_indexed_coupon (bool): The implied-quote mode; see __init__.
+    ///     custom_pillar_date (Date | None): Required with CustomDate.
     ///     pillar (Pillar): The date the curve node sits at.
     ///
     /// Returns:
@@ -642,6 +663,7 @@ impl PyFraRateHelper {
         index,
         use_indexed_coupon = true,
         pillar = PyPillar::LastRelevantDate,
+        custom_pillar_date = None,
     ))]
     fn from_months(
         py: Python<'_>,
@@ -650,15 +672,17 @@ impl PyFraRateHelper {
         index: &PyIborIndex,
         use_indexed_coupon: bool,
         pillar: PyPillar,
+        custom_pillar_date: Option<&PyDate>,
     ) -> PyResult<Py<Self>> {
         let idx = index.inner();
-        let helper = FraRateHelper::from_months(
+        let helper = FraRateHelper::try_from_months(
             quote.handle(),
             months_to_start,
             &idx,
             use_indexed_coupon,
-            pillar.inner(),
-        ) as Shared<dyn RateHelper>;
+            pillar.with_custom(custom_pillar_date)?,
+        )
+        .map_err(PyQlError::from)? as Shared<dyn RateHelper>;
         Py::new(
             py,
             PyClassInitializer::from(PyRateHelper { inner: helper }).add_subclass(PyFraRateHelper),
@@ -676,6 +700,7 @@ impl PyFraRateHelper {
     ///     end_date (Date): The window's end.
     ///     index (IborIndex): The index the forward is read off.
     ///     use_indexed_coupon (bool): The implied-quote mode; see __init__.
+    ///     custom_pillar_date (Date | None): Required with CustomDate.
     ///     pillar (Pillar): The date the curve node sits at.
     ///
     /// Returns:
@@ -688,7 +713,9 @@ impl PyFraRateHelper {
         index,
         use_indexed_coupon = true,
         pillar = PyPillar::LastRelevantDate,
+        custom_pillar_date = None,
     ))]
+    #[allow(clippy::too_many_arguments)]
     fn from_dates(
         py: Python<'_>,
         quote: &PySimpleQuote,
@@ -697,16 +724,18 @@ impl PyFraRateHelper {
         index: &PyIborIndex,
         use_indexed_coupon: bool,
         pillar: PyPillar,
+        custom_pillar_date: Option<&PyDate>,
     ) -> PyResult<Py<Self>> {
         let idx = index.inner();
-        let helper = FraRateHelper::from_dates(
+        let helper = FraRateHelper::try_from_dates(
             quote.handle(),
             start_date.inner(),
             end_date.inner(),
             &idx,
             use_indexed_coupon,
-            pillar.inner(),
-        ) as Shared<dyn RateHelper>;
+            pillar.with_custom(custom_pillar_date)?,
+        )
+        .map_err(PyQlError::from)? as Shared<dyn RateHelper>;
         Py::new(
             py,
             PyClassInitializer::from(PyRateHelper { inner: helper }).add_subclass(PyFraRateHelper),
@@ -910,7 +939,7 @@ impl PyRateAveraging {
 /// optional knobs trail with defaults. discounting_curve=None discounts off the
 /// bootstrapping curve; overnight_spread=None is an empty (zero) spread. The
 /// deferred core knobs past averaging_method (telescopic value dates, lookback,
-/// lockout, observation shift, custom pillar, per-leg calendars) take benign
+/// lockout, observation shift, per-leg calendars) take benign
 /// defaults.
 #[gen_stub_pyclass]
 #[pyclass(name = "OISRateHelper", extends = PyRateHelper, unsendable, module = "itofin.termstructures")]
@@ -962,6 +991,7 @@ impl PyOISRateHelper {
         overnight_spread = None,
         pillar = PyPillar::LastRelevantDate,
         averaging_method = PyRateAveraging::Compound,
+        custom_pillar_date = None,
     ))]
     fn new(
         settlement_days: Natural,
@@ -977,9 +1007,10 @@ impl PyOISRateHelper {
         overnight_spread: Option<&PySimpleQuote>,
         pillar: PyPillar,
         averaging_method: PyRateAveraging,
-    ) -> PyClassInitializer<Self> {
+        custom_pillar_date: Option<&PyDate>,
+    ) -> PyResult<PyClassInitializer<Self>> {
         let idx = overnight_index.inner();
-        let helper = OISRateHelper::new(
+        let helper = OISRateHelper::try_new(
             settlement_days,
             tenor.inner(),
             quote.handle(),
@@ -992,11 +1023,12 @@ impl PyOISRateHelper {
             overnight_spread
                 .map(|spread| spread.handle())
                 .unwrap_or_else(Handle::empty),
-            pillar.inner(),
+            pillar.with_custom(custom_pillar_date)?,
             averaging_method.inner(),
             settings.inner(),
-        ) as Shared<dyn RateHelper>;
-        PyClassInitializer::from(PyRateHelper { inner: helper }).add_subclass(PyOISRateHelper)
+        )
+        .map_err(PyQlError::from)? as Shared<dyn RateHelper>;
+        Ok(PyClassInitializer::from(PyRateHelper { inner: helper }).add_subclass(PyOISRateHelper))
     }
 }
 

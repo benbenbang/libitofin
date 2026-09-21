@@ -1,0 +1,16 @@
+{
+  "domain": "custom-pillars",
+  "entries": [
+    {
+      "c": [],
+      "go": "CustomDate",
+      "python": "itofin.termstructures.Pillar.CustomDate",
+      "status": "implemented",
+      "tests": [
+        "TestCustomYieldPillarsQuantLibAndRecovery",
+        "TestCustomFraOverloadsAndSwapDiscount",
+        "TestCustomInflationPillarsQuantLib"
+      ]
+    }
+  ]
+}
