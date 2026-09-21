@@ -4,7 +4,9 @@ repos:
       hooks:
         - id: fmt
         - id: check
+          args: [--workspace, --all-targets]
         - id: clippy
+          args: [--workspace, --all-targets, --, -D, warnings]
         - id: test
     - repo: https://github.com/pre-commit/pre-commit-hooks
       rev: v6.0.0

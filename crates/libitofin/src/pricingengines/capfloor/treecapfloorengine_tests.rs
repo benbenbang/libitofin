@@ -112,7 +112,7 @@ fn fixed_grid_matches_steps_and_rejects_missing_nodes() {
     let mut engine = TreeCapFloorEngine::with_time_grid(model(), grid).unwrap();
     let want = price(&mut engine, args(CapFloorType::Cap));
     let mut shifted = args(CapFloorType::Cap);
-    shifted.start_dates[0] = shifted.start_dates[0] + 1;
+    shifted.start_dates[0] += 1;
     *(engine.arguments_mut() as &mut dyn Any)
         .downcast_mut::<CapFloorArguments>()
         .unwrap() = shifted;
