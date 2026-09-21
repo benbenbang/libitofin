@@ -164,7 +164,7 @@ mod tests {
     use super::*;
     use std::any::Any;
 
-    use crate::exercise::{EuropeanExercise, Exercise, ExerciseType};
+    use crate::exercise::{BermudanExercise, EuropeanExercise, Exercise};
     use crate::handle::Handle;
     use crate::indexes::IborIndex;
     use crate::indexes::ibor::Euribor;
@@ -268,23 +268,6 @@ mod tests {
         shared(EuropeanExercise::new(date)) as Shared<dyn Exercise>
     }
 
-    /// A multi-date Bermudan/American exercise, standing in for the unported
-    /// `BermudanExercise`, so the multi-exercise loop and optionality can be
-    /// pinned (mirrors the Jamshidian test's `StubExercise`).
-    struct StubExercise {
-        exercise_type: ExerciseType,
-        dates: Vec<Date>,
-    }
-
-    impl Exercise for StubExercise {
-        fn exercise_type(&self) -> ExerciseType {
-            self.exercise_type
-        }
-        fn dates(&self) -> &[Date] {
-            &self.dates
-        }
-    }
-
     /// Prices the fixture swaption with the on-main Jamshidian engine (the
     /// trusted European reference).
     fn jamshidian_npv(swap_type: SwapType) -> Real {
@@ -365,7 +348,7 @@ mod tests {
     /// COMMITTED INVARIANT: a Bermudan swaption (three exercise opportunities)
     /// is worth at least its European counterpart (a single exercise at the same
     /// first date) on the same underlying - more optionality cannot cost value.
-    /// Also exercises the multi-exercise loop the cached diagnostic leans on.
+    /// Also exercises the multi-exercise loop of the cached-value gate.
     #[test]
     fn bermudan_dominates_european() {
         let euro = tree_npv(
@@ -376,14 +359,17 @@ mod tests {
         let bermudan = tree_npv(
             SwapType::Payer,
             120,
-            shared(StubExercise {
-                exercise_type: ExerciseType::Bermudan,
-                dates: vec![
-                    Date::new(15, Month::January, 2027),
-                    Date::new(15, Month::January, 2028),
-                    Date::new(15, Month::January, 2029),
-                ],
-            }) as Shared<dyn Exercise>,
+            shared(
+                BermudanExercise::new(
+                    vec![
+                        Date::new(15, Month::January, 2027),
+                        Date::new(15, Month::January, 2028),
+                        Date::new(15, Month::January, 2029),
+                    ],
+                    false,
+                )
+                .unwrap(),
+            ) as Shared<dyn Exercise>,
         );
         assert!(
             bermudan >= euro - 1.0e-9,
@@ -414,19 +400,6 @@ mod tests {
             "cash settled (ParYieldCurve) swaptions not priced with TreeSwaptionEngine"
         );
     }
-
-    // ------------------------------------------------------------------
-    // DIAGNOSTIC (NOT a merge gate): QuantLib's only tree-swaption test,
-    // bermudanswaption.cpp:112 testCachedValues. HW(0.048696, 0.0058904),
-    // a 1y-into-5y payer Bermudan on a nominal of 1000, exercisable on each
-    // fixed accrual-start date, TreeSwaptionEngine(model, 50). Cached ITM/
-    // ATM/OTM = 42.2402 / 12.9032 / 2.49758 (the non-par / indexed arm;
-    // usingAtParCoupons = false). Reproduced to a LOOSE band only: the exact
-    // 1e-4 gate needs the deferred date-snapping (which shifts the semiannual
-    // floating resets that fall within a week of the annual exercise dates)
-    // plus near-bit-exact tree detail. A miss here is not a bug (see the
-    // discretizedswaption.rs deferral note); the deltas are printed.
-    // ------------------------------------------------------------------
 
     const BERM_A: Real = 0.048696;
     const BERM_SIGMA: Real = 0.0058904;
@@ -524,10 +497,7 @@ mod tests {
     ) -> Real {
         let mut swaption = Swaption::new(
             swap,
-            shared(StubExercise {
-                exercise_type: ExerciseType::Bermudan,
-                dates: exercise_dates,
-            }) as Shared<dyn Exercise>,
+            shared(BermudanExercise::new(exercise_dates, false).unwrap()) as Shared<dyn Exercise>,
             SettlementType::Physical,
             SettlementMethod::PhysicalOTC,
             Shared::clone(settings),
@@ -540,49 +510,50 @@ mod tests {
     }
 
     #[test]
-    fn cached_bermudan_diagnostic() {
-        let settings = shared(Settings::<Date>::new());
-        settings.set_evaluation_date(Date::new(15, Month::February, 2002));
-        settings.set_using_at_par_coupons(false);
-        let calendar = Target::new();
-        let settlement = calendar.advance(
-            Date::new(15, Month::February, 2002),
-            2,
-            TimeUnit::Days,
-            BusinessDayConvention::Following,
-            false,
-        );
-        let curve = berm_curve(settlement);
-
-        let atm_rate = berm_swap(&settings, &calendar, settlement, &curve, 0.0)
-            .borrow_mut()
-            .fair_rate()
-            .unwrap();
-
-        // Exercise on each fixed-coupon accrual-start date (bermudanswaption.cpp:141).
-        let atm_swap = berm_swap(&settings, &calendar, settlement, &curve, atm_rate);
-        let mut atm_args = FixedVsFloatingSwapArguments::default();
-        atm_swap.borrow().setup_arguments(&mut atm_args).unwrap();
-        let exercise_dates = atm_args.fixed_reset_dates.clone();
-        assert_eq!(exercise_dates.len(), 5, "five annual fixed accrual starts");
-
-        let cases = [
-            ("ITM", 0.8 * atm_rate, 42.2402_f64),
-            ("ATM", atm_rate, 12.9032),
-            ("OTM", 1.2 * atm_rate, 2.49758),
-        ];
-        for (label, rate, cached) in cases {
-            let swap = berm_swap(&settings, &calendar, settlement, &curve, rate);
-            let model = HullWhite::new(curve.clone(), BERM_A, BERM_SIGMA).unwrap();
-            let npv = berm_swaption_npv(swap, exercise_dates.clone(), model, &settings);
-            let rel = (npv - cached).abs() / cached;
-            eprintln!(
-                "[cached-bermudan diagnostic] {label}: tree {npv:.6} vs cached {cached} (rel {rel:.3e})"
+    fn cached_bermudan_values() {
+        for (at_par, cached) in [
+            (false, [42.2402, 12.9032, 2.49758]),
+            (true, [42.2460, 12.9069, 2.4985]),
+        ] {
+            let settings = shared(Settings::<Date>::new());
+            settings.set_evaluation_date(Date::new(15, Month::February, 2002));
+            settings.set_using_at_par_coupons(at_par);
+            let calendar = Target::new();
+            let settlement = calendar.advance(
+                Date::new(15, Month::February, 2002),
+                2,
+                TimeUnit::Days,
+                BusinessDayConvention::Following,
+                false,
             );
-            assert!(
-                rel < 1.0e-2,
-                "{label}: tree {npv} vs cached {cached} (rel {rel}) outside the loose diagnostic band"
-            );
+            let curve = berm_curve(settlement);
+
+            let atm_rate = berm_swap(&settings, &calendar, settlement, &curve, 0.0)
+                .borrow_mut()
+                .fair_rate()
+                .unwrap();
+
+            // Exercise on each fixed-coupon accrual-start date (bermudanswaption.cpp:141).
+            let atm_swap = berm_swap(&settings, &calendar, settlement, &curve, atm_rate);
+            let mut atm_args = FixedVsFloatingSwapArguments::default();
+            atm_swap.borrow().setup_arguments(&mut atm_args).unwrap();
+            let exercise_dates = atm_args.fixed_reset_dates.clone();
+            assert_eq!(exercise_dates.len(), 5, "five annual fixed accrual starts");
+
+            let cases = [
+                ("ITM", 0.8 * atm_rate, cached[0]),
+                ("ATM", atm_rate, cached[1]),
+                ("OTM", 1.2 * atm_rate, cached[2]),
+            ];
+            for (label, rate, cached) in cases {
+                let swap = berm_swap(&settings, &calendar, settlement, &curve, rate);
+                let model = HullWhite::new(curve.clone(), BERM_A, BERM_SIGMA).unwrap();
+                let npv = berm_swaption_npv(swap, exercise_dates.clone(), model, &settings);
+                assert!(
+                    (npv - cached).abs() <= 1.0e-4,
+                    "{label} at_par={at_par}: tree {npv} vs cached {cached}"
+                );
+            }
         }
     }
 }
