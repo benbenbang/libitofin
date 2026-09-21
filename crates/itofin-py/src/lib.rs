@@ -29,6 +29,7 @@ mod mcengine;
 mod ois;
 mod option;
 mod optionletvol;
+mod poissonrng;
 mod randomnumbers;
 mod results;
 mod settings;
@@ -344,6 +345,8 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     optimization.add_class::<PyEndCriteria>()?;
 
     let randomnumbers = PyModule::new(py, "randomnumbers")?;
+    randomnumbers.add_class::<poissonrng::PyPoissonRandomGenerator>()?;
+    randomnumbers.add_class::<poissonrng::PyPoissonRandomSequenceGenerator>()?;
     randomnumbers.add_class::<PyUniformRandomGenerator>()?;
     randomnumbers.add_class::<PyUniformRandomSequenceGenerator>()?;
     randomnumbers.add_class::<PyGaussianRandomGenerator>()?;
