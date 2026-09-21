@@ -16,27 +16,17 @@
 //! leaves the curve mispriced; the loop re-solves every node - each against
 //! the full-range interpolation seeded by the previous pass - until the
 //! largest node change of a pass is within the bootstrap accuracy. Exhausting
-//! `Traits::max_iterations` passes without converging is an explicit `Err`
+//! `Traits::max_iterations` passes without converging is an explicit `Err` by default
 //! (the C++ `dontThrow=false` branch, `:376-383`). For the local
 //! interpolators (`Linear`, `LogLinear`, `BackwardFlat`), whose wired helpers
 //! pin the pillar at the latest-relevant date, neither condition fires and the
 //! bootstrap stays a single forward pass.
 //!
-//! Two branches of the C++ algorithm are deliberately not ported:
-//!
-//! - **The `Linear` interpolation fallback** (`:296-308`), which substitutes
-//!   `Linear` while a global interpolation cannot yet span the solved prefix.
-//!   It is unreachable for the wired `Cubic` (`required_points()` is 2, so
-//!   every prefix of length >= 2 builds) and type-incompatible with the
-//!   monomorphized holder: `CurveData<I>` stores `Option<I::Output>`, which
-//!   cannot hold a `LinearInterpolation` where a `CubicInterpolation` is
-//!   expected - C++ only manages the swap through its type-erased
-//!   `Interpolation`. Only an interpolator needing >= 4 points (Akima,
-//!   Lagrange), none of which is wired, could ever reach it.
-//! - **The robustness fallbacks** - `dontThrow`, `maxAttempts` bound-widening
-//!   retries and the `validCurve_` invalidate-and-retry recursion
-//!   (`:318-358`) - deferred to #941. Every solve failure and non-convergence
-//!   here is an explicit `Err` (D4), never a silent partial curve.
+//! Optional retry bounds and an explicit `dont_throw` fallback follow QuantLib.
+//! A failed cached-curve solve first discards its cached state and retries fresh,
+//! independently of these options. Errors evaluating a fallback remain errors.
+//! The type-erased Linear interpolation fallback for interpolators requiring
+//! more than two points remains outside the wired interpolation families.
 //!
 //! Both solvers the C++ uses are wired: `Brent` runs the first (fresh) pass and
 //! `FiniteDifferenceNewtonSafe` runs a re-bootstrap seeded from a still-valid
@@ -72,6 +62,9 @@ use crate::termstructures::bootstraptraits::{BootstrapTraits, CurveData};
 use crate::time::date::Date;
 use crate::types::{Real, Size, Time};
 use crate::{fail, require};
+
+mod options;
+pub use options::IterativeBootstrapOptions;
 
 /// The curve surface the bootstrap drives.
 ///
@@ -181,18 +174,27 @@ pub trait Bootstrap<C: PiecewiseCurve> {
 
 /// The iterative bootstrap (`IterativeBootstrap`).
 ///
-/// Carries the stopping accuracy override; the solvers and the traits come from
+/// Carries validated retry controls; the solvers and the traits come from
 /// the curve. Defaults mirror the C++ constructor: accuracy taken from the
 /// term structure, a single attempt per node, throw on non-convergence.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct IterativeBootstrap {
-    accuracy: Option<Real>,
+    options: IterativeBootstrapOptions,
 }
 
 impl IterativeBootstrap {
     /// The default bootstrap: accuracy from the curve, throw on failure.
     pub fn new() -> IterativeBootstrap {
-        IterativeBootstrap { accuracy: None }
+        Self::default()
+    }
+
+    /// Configure explicit QuantLib retry and fallback controls.
+    ///
+    /// # Errors
+    /// Rejects nonfinite bounds, invalid accuracy, factors below one, and zero limits.
+    pub fn with_options(options: IterativeBootstrapOptions) -> QlResult<Self> {
+        options.validate()?;
+        Ok(Self { options })
     }
 
     /// Bootstraps `curve` in place, solving every alive pillar (C++'s
@@ -262,6 +264,7 @@ impl IterativeBootstrap {
                 cd.reset_data(initial_value, nodes);
             }
             cd.set_max_date(max_date);
+            cd.set_valid(false);
             reuse
         };
 
@@ -272,7 +275,12 @@ impl IterativeBootstrap {
             helper.set_term_structure(&term_structure);
         }
 
-        let accuracy = self.accuracy.unwrap_or_else(|| curve.accuracy());
+        let cached_valid = valid_data;
+        let accuracy = self.options.accuracy.unwrap_or_else(|| curve.accuracy());
+        require!(
+            accuracy.is_finite() && accuracy > 0.0,
+            "invalid bootstrap accuracy"
+        );
         let max_iterations = C::Traits::max_iterations() - 1;
         let mut previous_data: Vec<Real> = Vec::new();
 
@@ -284,64 +292,111 @@ impl IterativeBootstrap {
             }
 
             for (i, j) in (1..).zip(first_alive..n) {
-                let (min, max, guess) = {
+                let (mut min, mut max) = {
                     let cd = curve.curve_data().borrow();
-                    let min = C::Traits::min_value_after(i, cd.times(), cd.data(), valid_data);
-                    let max = C::Traits::max_value_after(i, cd.times(), cd.data(), valid_data);
-                    let mut guess = C::Traits::guess(i, cd.times(), cd.data(), valid_data);
-                    // Nudge a guess that sits on or past a bracket end back
-                    // inside it (`:290-293`).
+                    (
+                        self.options.min_value.unwrap_or_else(|| {
+                            C::Traits::min_value_after(i, cd.times(), cd.data(), valid_data)
+                        }),
+                        self.options.max_value.unwrap_or_else(|| {
+                            C::Traits::max_value_after(i, cd.times(), cd.data(), valid_data)
+                        }),
+                    )
+                };
+                let upto = if valid_data { alive } else { i };
+                let helper = &helpers[j];
+                let mut attempt = 1;
+                let mut used_fallback = false;
+                let root = loop {
+                    if cached_valid
+                        && !(min.is_finite()
+                            && max.is_finite()
+                            && min < max
+                            && (max - min).is_finite())
+                    {
+                        return self.calculate(curve);
+                    }
+                    require!(
+                        min.is_finite() && max.is_finite() && min < max && (max - min).is_finite(),
+                        "invalid bootstrap bracket [{min}, {max}]"
+                    );
+                    let mut guess = {
+                        let cd = curve.curve_data().borrow();
+                        C::Traits::guess(i, cd.times(), cd.data(), valid_data)
+                    };
                     if guess >= max {
                         guess = max - (max - min) / 5.0;
                     } else if guess <= min {
                         guess = min + (max - min) / 5.0;
                     }
-                    (min, max, guess)
-                };
-
-                // On a fresh pass the interpolation is extended a point at a
-                // time over the solved prefix; with valid data C++ keeps the
-                // full-range interpolation and only updates it (`:295-309`),
-                // so every re-solve spans all nodes.
-                let upto = if valid_data { alive } else { i };
-                let helper = &helpers[j];
-                let error_slot: RefCell<Option<QlError>> = RefCell::new(None);
-                let error = |g: Real| -> Real {
-                    match node_error::<C>(curve, i, upto, helper, g) {
-                        Ok(value) => value,
-                        Err(err) => {
-                            *error_slot.borrow_mut() = Some(err);
+                    let error_slot = RefCell::new(None);
+                    let error = |g: Real| match node_error::<C>(curve, i, upto, helper, g) {
+                        Ok(value) if value.is_finite() => value,
+                        result => {
+                            *error_slot.borrow_mut() = Some(result.err().unwrap_or_else(|| {
+                                QlError::new("nonfinite bootstrap quote error", file!(), line!())
+                            }));
                             Real::NAN
                         }
-                    }
-                };
-
-                let solved = if valid_data {
-                    FiniteDifferenceNewtonSafe::new()
-                        .solve_bracketed(error, accuracy, guess, min, max)
-                } else {
-                    Brent::new().solve_bracketed(error, accuracy, guess, min, max)
-                };
-
-                let root = match solved {
-                    Ok(root) => root,
-                    Err(solver_err) => {
-                        if let Some(inner) = error_slot.into_inner() {
-                            return Err(inner);
+                    };
+                    let solved = if valid_data {
+                        FiniteDifferenceNewtonSafe::new()
+                            .with_max_evaluations(self.options.max_evaluations)
+                            .solve_bracketed(error, accuracy, guess, min, max)
+                    } else {
+                        Brent::new()
+                            .with_max_evaluations(self.options.max_evaluations)
+                            .solve_bracketed(error, accuracy, guess, min, max)
+                    };
+                    let solved = match error_slot.into_inner() {
+                        Some(error) => Err(error),
+                        None => solved,
+                    };
+                    match solved {
+                        Ok(root) => {
+                            require!(root.is_finite(), "nonfinite bootstrap solver root");
+                            break root;
                         }
-                        fail!(
+                        Err(_) if cached_valid => return self.calculate(curve),
+                        Err(_) if attempt < self.options.max_attempts => {
+                            attempt += 1;
+                            min = if min < 0.0 {
+                                min * self.options.min_factor
+                            } else {
+                                min / self.options.min_factor
+                            };
+                            max = if max > 0.0 {
+                                max * self.options.max_factor
+                            } else {
+                                max / self.options.max_factor
+                            };
+                        }
+                        Err(_) if self.options.dont_throw => {
+                            used_fallback = true;
+                            break fallback(
+                                |g| node_error::<C>(curve, i, upto, helper, g),
+                                min,
+                                max,
+                                self.options.dont_throw_steps,
+                            )?;
+                        }
+                        Err(error) => fail!(
                             "bootstrap failed at pillar {} (maturity {}): {}",
                             helper.pillar_date(),
                             helper.maturity_date(),
-                            solver_err.message()
-                        );
+                            error.message()
+                        ),
                     }
                 };
 
                 // Pin the solved value and rebuild so the final curve holds
                 // the root exactly, not the solver's last trial point.
                 let mut cd = curve.curve_data().borrow_mut();
-                C::Traits::update_guess(cd.data_mut(), root, i);
+                if used_fallback {
+                    cd.data_mut()[i] = root;
+                } else {
+                    C::Traits::update_guess(cd.data_mut(), root, i);
+                }
                 cd.rebuild(curve.interpolator(), upto)?;
             }
 
@@ -363,6 +418,9 @@ impl IterativeBootstrap {
                 }
             }
 
+            if iteration == max_iterations && self.options.dont_throw {
+                break;
+            }
             require!(
                 iteration != max_iterations,
                 "convergence not reached after {iteration} iterations; \
@@ -375,6 +433,32 @@ impl IterativeBootstrap {
         curve.curve_data().borrow_mut().set_valid(true);
         Ok(())
     }
+}
+
+fn fallback(
+    mut error: impl FnMut(Real) -> QlResult<Real>,
+    min: Real,
+    max: Real,
+    steps: Size,
+) -> QlResult<Real> {
+    let mut best = min;
+    let mut best_error = error(min)?.abs();
+    require!(best_error.is_finite(), "nonfinite bootstrap fallback error");
+    let step = (max - min) / steps as Real;
+    let mut value = min;
+    for _ in 0..steps {
+        value += step;
+        let current_error = error(value)?.abs();
+        require!(
+            current_error.is_finite(),
+            "nonfinite bootstrap fallback error"
+        );
+        if current_error < best_error {
+            best = value;
+            best_error = current_error;
+        }
+    }
+    Ok(best)
 }
 
 impl<C: PiecewiseCurve> Bootstrap<C> for IterativeBootstrap {
@@ -692,6 +776,21 @@ mod tests {
             let error = helper.quote_error().unwrap();
             assert!(error.abs() < 1.0e-12, "deposit quote error {error}");
         }
+    }
+
+    #[test]
+    fn fallback_keeps_first_tie_and_rejects_nonfinite_evaluations() {
+        assert_eq!(fallback(|_| Ok(1.0), -1.0, 1.0, 10).unwrap(), -1.0);
+        assert!(fallback(|_| Ok(Real::NAN), -1.0, 1.0, 10).is_err());
+        assert!(
+            fallback(
+                |x| if x > 0.0 { Ok(Real::INFINITY) } else { Ok(x) },
+                -1.0,
+                1.0,
+                10
+            )
+            .is_err()
+        );
     }
 
     #[test]
