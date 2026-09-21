@@ -239,3 +239,7 @@ pub unsafe extern "C" fn itofin_overnight_add_fixing(
         })
     }
 }
+
+#[cfg(test)]
+#[path = "overnight_futures_tests.rs"]
+mod tests;
