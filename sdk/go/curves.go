@@ -152,6 +152,7 @@ func (c *YieldTermStructure) EnableExtrapolation() error  { return c.setExtrapol
 func (c *YieldTermStructure) DisableExtrapolation() error { return c.setExtrapolation(false) }
 
 type PiecewiseCurveConfig struct {
+	IterativeOptions    *IterativeBootstrapOptions
 	AdditionalVariables *SimpleQuoteVariables
 	AdditionalDates     func() ([]Date, error)
 	AdditionalPenalties func(BootstrapState) ([]float64, error)
@@ -197,6 +198,9 @@ func (s *Session) piecewise(cfg PiecewiseCurveConfig, kind int) (*YieldTermStruc
 	default:
 		return nil, fmt.Errorf("unknown bootstrap %q", cfg.Bootstrap)
 	}
+	if cfg.IterativeOptions != nil && algo != 0 {
+		return nil, fmt.Errorf("iterative options require iterative bootstrap")
+	}
 	globalOptions := cfg.AdditionalVariables != nil || cfg.AdditionalDates != nil || cfg.AdditionalPenalties != nil
 	if globalOptions && algo != 1 {
 		return nil, fmt.Errorf("additional variables, dates and penalties require global bootstrap")
@@ -205,6 +209,12 @@ func (s *Session) piecewise(cfg PiecewiseCurveConfig, kind int) (*YieldTermStruc
 	err := s.invoke(func() error {
 		if globalOptions {
 			return s.globalCurve(cfg, kind, ids, extra, &id)
+		}
+		if cfg.IterativeOptions != nil {
+			if len(extra) != 0 {
+				return fmt.Errorf("additional helpers require global bootstrap")
+			}
+			return s.iterativeCurve(cfg, kind, ids, &id)
 		}
 		var e C.ItofinError
 		return ffiError(C.itofin_piecewise_curve_new(s.ctx, C.int32_t(cfg.ReferenceDate.Serial()), unsafe.SliceData(ids), C.size_t(len(ids)), C.uint64_t(cfg.DayCounter.id), C.int32_t(kind), C.int32_t(algo), unsafe.SliceData(extra), C.size_t(len(extra)), &id, &e), &e)
