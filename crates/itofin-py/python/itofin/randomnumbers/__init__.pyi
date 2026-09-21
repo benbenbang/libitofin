@@ -11,6 +11,8 @@ __all__ = [
     "GaussianRandomGenerator",
     "GaussianRandomSequenceGenerator",
     "HaltonRsg",
+    "PoissonRandomGenerator",
+    "PoissonRandomSequenceGenerator",
     "SobolRsg",
     "UniformRandomGenerator",
     "UniformRandomSequenceGenerator",
@@ -256,6 +258,50 @@ class HaltonRsg:
 
         Raises:
             ItofinError: If a buffer of count points cannot be allocated.
+        """
+
+@typing.final
+class PoissonRandomGenerator:
+    r"""
+    Scalar Poisson variates from MT19937. Seed zero selects a random seed.
+    """
+    def __init__(self, seed: builtins.int = 0, lambda_: builtins.float = 1.0) -> None:
+        r"""
+        Construct with a finite positive rate; the default rate is one.
+        """
+    def next_real(self) -> builtins.float:
+        r"""
+        Draw the next count. Unresolvable quantiles raise ItofinError.
+        """
+    def copy(self) -> PoissonRandomGenerator:
+        r"""
+        Copy the current state without advancing either generator.
+        """
+
+@typing.final
+class PoissonRandomSequenceGenerator:
+    r"""
+    Weighted Poisson sequences from MT19937, with an explicit per-generator rate.
+    """
+    def __init__(self, dimension: builtins.int, seed: builtins.int = 0, lambda_: builtins.float = 1.0) -> None:
+        r"""
+        Construct a positive-dimensional sequence; the default rate is one.
+        """
+    def dimension(self) -> builtins.int:
+        r"""
+        Number of components per draw.
+        """
+    def next_sequence(self) -> builtins.list[builtins.float]:
+        r"""
+        Draw one sequence; an error preserves the last successful sequence.
+        """
+    def last_sequence(self) -> builtins.list[builtins.float]:
+        r"""
+        Last successful sequence, initially zeros.
+        """
+    def copy(self) -> PoissonRandomSequenceGenerator:
+        r"""
+        Copy the current state without advancing either generator.
         """
 
 @typing.final

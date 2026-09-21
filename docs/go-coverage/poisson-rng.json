@@ -1,0 +1,105 @@
+{
+  "domain": "poisson-rng",
+  "entries": [
+    {
+      "c": "itofin_poisson_rng_new",
+      "go": "Session.NewPoissonRandomGenerator",
+      "python": "itofin.randomnumbers.PoissonRandomGenerator",
+      "status": "implemented",
+      "tests": [
+        "TestPoissonQuantLibSeedOraclesAndCopies",
+        "TestPoissonInvalidInputsAndClosedState"
+      ]
+    },
+    {
+      "c": "itofin_poisson_rng_new",
+      "go": "Session.NewPoissonRandomGenerator",
+      "python": "itofin.randomnumbers.PoissonRandomGenerator.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestPoissonQuantLibSeedOraclesAndCopies",
+        "TestPoissonInvalidInputsAndClosedState"
+      ]
+    },
+    {
+      "c": "itofin_poisson_rng_draw",
+      "go": "PoissonRandomGenerator.NextReal",
+      "python": "itofin.randomnumbers.PoissonRandomGenerator.next_real",
+      "status": "implemented",
+      "tests": [
+        "TestPoissonQuantLibSeedOraclesAndCopies",
+        "TestPoissonInvalidInputsAndClosedState"
+      ]
+    },
+    {
+      "c": "itofin_poisson_rng_copy",
+      "go": "PoissonRandomGenerator.Copy",
+      "python": "itofin.randomnumbers.PoissonRandomGenerator.copy",
+      "status": "implemented",
+      "tests": [
+        "TestPoissonQuantLibSeedOraclesAndCopies",
+        "TestPoissonInvalidInputsAndClosedState"
+      ]
+    },
+    {
+      "c": "itofin_poisson_rng_new",
+      "go": "Session.NewPoissonRandomSequenceGenerator",
+      "python": "itofin.randomnumbers.PoissonRandomSequenceGenerator",
+      "status": "implemented",
+      "tests": [
+        "TestPoissonQuantLibSeedOraclesAndCopies",
+        "TestPoissonInvalidInputsAndClosedState"
+      ]
+    },
+    {
+      "c": "itofin_poisson_rng_new",
+      "go": "Session.NewPoissonRandomSequenceGenerator",
+      "python": "itofin.randomnumbers.PoissonRandomSequenceGenerator.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestPoissonQuantLibSeedOraclesAndCopies",
+        "TestPoissonInvalidInputsAndClosedState"
+      ]
+    },
+    {
+      "c": "itofin_poisson_rng_draw",
+      "go": "PoissonRandomSequenceGenerator.Dimension",
+      "python": "itofin.randomnumbers.PoissonRandomSequenceGenerator.dimension",
+      "status": "implemented",
+      "tests": [
+        "TestPoissonQuantLibSeedOraclesAndCopies",
+        "TestPoissonInvalidInputsAndClosedState"
+      ]
+    },
+    {
+      "c": "itofin_poisson_rng_draw",
+      "go": "PoissonRandomSequenceGenerator.NextSequence",
+      "python": "itofin.randomnumbers.PoissonRandomSequenceGenerator.next_sequence",
+      "status": "implemented",
+      "tests": [
+        "TestPoissonQuantLibSeedOraclesAndCopies",
+        "TestPoissonInvalidInputsAndClosedState"
+      ]
+    },
+    {
+      "c": "itofin_poisson_rng_draw",
+      "go": "PoissonRandomSequenceGenerator.LastSequence",
+      "python": "itofin.randomnumbers.PoissonRandomSequenceGenerator.last_sequence",
+      "status": "implemented",
+      "tests": [
+        "TestPoissonQuantLibSeedOraclesAndCopies",
+        "TestPoissonInvalidInputsAndClosedState"
+      ]
+    },
+    {
+      "c": "itofin_poisson_rng_copy",
+      "go": "PoissonRandomSequenceGenerator.Copy",
+      "python": "itofin.randomnumbers.PoissonRandomSequenceGenerator.copy",
+      "status": "implemented",
+      "tests": [
+        "TestPoissonQuantLibSeedOraclesAndCopies",
+        "TestPoissonInvalidInputsAndClosedState"
+      ]
+    }
+  ]
+}
