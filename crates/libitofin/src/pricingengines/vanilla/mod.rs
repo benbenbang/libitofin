@@ -1269,3 +1269,6 @@ mod test_greeks {
         }
     }
 }
+
+#[cfg(test)]
+mod qmc_oracle;
