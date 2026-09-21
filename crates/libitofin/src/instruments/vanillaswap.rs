@@ -115,7 +115,7 @@ impl VanillaSwap {
         let floating_arguments: FloatingArgumentsFn =
             Box::new(move |swap, args| fill_floating_arguments(&coupons, swap, args));
 
-        let base = FixedVsFloatingSwap::new(
+        let mut base = FixedVsFloatingSwap::new(
             swap_type,
             vec![nominal],
             fixed_schedule,
@@ -134,6 +134,7 @@ impl VanillaSwap {
             settings,
         )?;
 
+        base.is_vanilla = true;
         Ok(VanillaSwap { base })
     }
 
