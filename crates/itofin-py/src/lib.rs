@@ -45,7 +45,7 @@ mod vol;
 
 use calibration::{PyCalibrationErrorType, PyEndCriteria, PyLevenbergMarquardt};
 use capfloor::{PyCapFloor, PyCapFloorType};
-use capfloorengine::PyBlackCapFloorEngine;
+use capfloorengine::{PyBachelierCapFloorEngine, PyBlackCapFloorEngine};
 use capfloortermvol::PyCapFloorTermVolSurface;
 use cashflows::{
     PyCappedFlooredYoYInflationCoupon, PyCashFlow, PyIborLeg, PyLeg, PyYoYInflationCoupon,
@@ -332,6 +332,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     pricingengines.add_class::<PyTreeSwaptionEngine>()?;
     pricingengines.add_class::<PyBachelierSwaptionEngine>()?;
     pricingengines.add_class::<PyBlackCapFloorEngine>()?;
+    pricingengines.add_class::<PyBachelierCapFloorEngine>()?;
     pricingengines.add_class::<PyMidPointCdsEngine>()?;
     pricingengines.add_class::<PyIsdaCdsEngine>()?;
     pricingengines.add_class::<PyNumericalFix>()?;

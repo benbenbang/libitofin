@@ -12,6 +12,7 @@ from itofin import time
 import typing
 __all__ = [
     "AccrualBias",
+    "BachelierCapFloorEngine",
     "BachelierSwaptionEngine",
     "BlackCapFloorEngine",
     "BlackSwaptionEngine",
@@ -28,6 +29,15 @@ __all__ = [
     "TreeSwaptionEngine",
     "YoYInflationCapFloorEngine",
 ]
+
+@typing.final
+class BachelierCapFloorEngine:
+    r"""
+    Normal-volatility engine for caps, floors and collars.
+    """
+    def __new__(cls, vol: termstructures.OptionletVolatilityStructure, discount: termstructures.YieldTermStructure) -> BachelierCapFloorEngine: ...
+    @staticmethod
+    def with_flat_vol(discount: termstructures.YieldTermStructure, vol: quotes.SimpleQuote, day_counter: time.DayCounter, settings: itofin.Settings) -> BachelierCapFloorEngine: ...
 
 @typing.final
 class BachelierSwaptionEngine:
