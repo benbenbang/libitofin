@@ -191,6 +191,7 @@ class CapFloor:
                 volatility surface.
         """
     def set_bachelier_engine(self, engine: pricingengines.BachelierCapFloorEngine) -> None: ...
+    def set_tree_engine(self, engine: pricingengines.TreeCapFloorEngine) -> None: ...
     def calculate(self) -> None:
         r"""
         Force the valuation. Idempotent.

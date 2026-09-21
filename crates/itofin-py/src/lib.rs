@@ -10,6 +10,7 @@ mod calibration;
 mod capfloor;
 mod capfloorengine;
 mod capfloortermvol;
+mod caphelper;
 mod cashflows;
 mod credit;
 mod creditdensity;
@@ -331,6 +332,8 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     pricingengines.add_class::<PyBlackSwaptionEngine>()?;
     pricingengines.add_class::<PyTreeSwaptionEngine>()?;
     pricingengines.add_class::<PyBachelierSwaptionEngine>()?;
+    pricingengines.add_class::<caphelper::PyTreeCapFloorEngine>()?;
+    models.add_class::<caphelper::PyCapHelper>()?;
     pricingengines.add_class::<PyBlackCapFloorEngine>()?;
     pricingengines.add_class::<PyBachelierCapFloorEngine>()?;
     pricingengines.add_class::<PyMidPointCdsEngine>()?;
