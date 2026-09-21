@@ -152,14 +152,15 @@ QuantLib
 
 # Added by cargo
 /target
-.zed
-fable*.txt
-mutants*
 .mcp.json
+.zed
+docs/internal/
+fable*.txt
+graphify*.md
 graphify-out/
 graphify-out-ql/
-PORT_COVERAGE.md
-graphify*.md
 GRAPHIFY*.md
+mutants*
+PORT_COVERAGE.md
 *.patch
-docs/internal/
+review*.md
