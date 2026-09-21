@@ -3,7 +3,9 @@
 use crate::PyQlError;
 use crate::heston::PyHestonModel;
 use crate::market::PyBlackScholesProcess;
-use crate::mcengine::{PyMCAmericanEngine, PyMCEuropeanEngine, PyMCEuropeanHestonEngine};
+use crate::mcengine::{
+    PyMCAmericanEngine, PyMCEuropeanEngine, PyMCEuropeanHestonEngine, PyQMCEuropeanEngine,
+};
 use crate::results::Results;
 use crate::settings::PySettings;
 use crate::time::PyDate;
@@ -165,6 +167,17 @@ impl PyVanillaOption {
     ///         process it prices on.
     fn set_mc_engine(&mut self, engine: &PyMCEuropeanEngine) {
         self.inner.base_mut().set_pricing_engine(engine.engine());
+    }
+
+    /// Attach the fixed-sample Sobol European engine.
+    fn set_qmc_engine(&mut self, engine: &PyQMCEuropeanEngine) {
+        self.inner.base_mut().set_pricing_engine(engine.engine());
+    }
+
+    /// Attach the Sobol engine and return its NPV, without an error estimate.
+    fn price_qmc(&mut self, engine: &PyQMCEuropeanEngine) -> PyResult<f64> {
+        self.set_qmc_engine(engine);
+        self.npv()
     }
 
     /// Attach the Monte Carlo Heston engine.

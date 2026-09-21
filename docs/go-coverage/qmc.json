@@ -1,0 +1,49 @@
+{
+  "domain": "qmc-european",
+  "entries": [
+    {
+      "c": "itofin_mc_engine_new",
+      "go": "Session.NewQMCEuropeanEngine",
+      "python": "itofin.pricingengines.QMCEuropeanEngine",
+      "status": "implemented",
+      "tests": [
+        "TestQMCEuropeanQuantLib108Cases",
+        "TestQMCEuropeanLiveQuotesAndRetainedInputs",
+        "TestQMCEuropeanInvalidConfigurationAndRecovery"
+      ]
+    },
+    {
+      "c": "itofin_mc_engine_new",
+      "go": "Session.NewQMCEuropeanEngine",
+      "python": "itofin.pricingengines.QMCEuropeanEngine.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestQMCEuropeanQuantLib108Cases",
+        "TestQMCEuropeanLiveQuotesAndRetainedInputs",
+        "TestQMCEuropeanInvalidConfigurationAndRecovery"
+      ]
+    },
+    {
+      "c": "itofin_option_set_engine",
+      "go": "VanillaOption.SetQMCEngine",
+      "python": "itofin.instruments.VanillaOption.set_qmc_engine",
+      "status": "implemented",
+      "tests": [
+        "TestQMCEuropeanQuantLib108Cases",
+        "TestQMCEuropeanLiveQuotesAndRetainedInputs",
+        "TestQMCEuropeanInvalidConfigurationAndRecovery"
+      ]
+    },
+    {
+      "c": "itofin_option_value",
+      "go": "VanillaOption.PriceQMC",
+      "python": "itofin.instruments.VanillaOption.price_qmc",
+      "status": "implemented",
+      "tests": [
+        "TestQMCEuropeanQuantLib108Cases",
+        "TestQMCEuropeanLiveQuotesAndRetainedInputs",
+        "TestQMCEuropeanInvalidConfigurationAndRecovery"
+      ]
+    }
+  ]
+}

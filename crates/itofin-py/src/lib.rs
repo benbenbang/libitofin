@@ -89,7 +89,9 @@ use inflation::{
 };
 use libitofin::errors::QlError;
 use market::{PyBlackScholesProcess, PySimpleQuote};
-use mcengine::{PyMCAmericanEngine, PyMCEuropeanEngine, PyMCEuropeanHestonEngine};
+use mcengine::{
+    PyMCAmericanEngine, PyMCEuropeanEngine, PyMCEuropeanHestonEngine, PyQMCEuropeanEngine,
+};
 use ois::{PyMakeOis, PyOvernightIndexedSwap};
 use option::{PyOptionType, PyVanillaOption};
 use optionletvol::{
@@ -333,6 +335,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     pricingengines.add_class::<PyDiscountingSwapEngine>()?;
     pricingengines.add_class::<PyYoYInflationCapFloorEngine>()?;
     pricingengines.add_class::<PyMCEuropeanEngine>()?;
+    pricingengines.add_class::<PyQMCEuropeanEngine>()?;
     pricingengines.add_class::<PyMCEuropeanHestonEngine>()?;
     pricingengines.add_class::<PyMCAmericanEngine>()?;
 

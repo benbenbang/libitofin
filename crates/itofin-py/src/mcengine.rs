@@ -1,17 +1,9 @@
-//! Facades for the Monte Carlo pricing engines: MCEuropeanEngine,
-//! MCEuropeanHestonEngine and MCAmericanEngine.
-//!
-//! The core engines are generic over their RNG policy, which does not cross FFI
-//! (D7), so the facades pin `PseudoRandom` - the policy that carries an error
-//! estimate, and the one the core oracles price against.
-//!
-//! Deferred (visible): the low-discrepancy `LowDiscrepancy` policy behind
-//! `testQmcEngines` is not exposed; it lands with the Sobol RNG policy (#454).
+//! Concrete pseudo-random and low-discrepancy Monte Carlo engine facades.
 
 use crate::PyQlError;
 use crate::heston::PyHestonProcess;
 use crate::market::PyBlackScholesProcess;
-use libitofin::math::randomnumbers::rngtraits::PseudoRandom;
+use libitofin::math::randomnumbers::rngtraits::{LowDiscrepancy, PseudoRandom};
 use libitofin::pricingengine::PricingEngine;
 use libitofin::pricingengines::vanilla::{
     MCAmericanEngine, MCEuropeanEngine, MCEuropeanHestonEngine, MakeMcAmericanEngine,
@@ -25,7 +17,7 @@ use pyo3_stub_gen::derive::{
 };
 
 /// The Monte Carlo engine for European payoffs, over the pseudo-random RNG
-/// policy. The low-discrepancy policy is not exposed (#454).
+/// policy.
 ///
 /// Pricing is seeded and deterministic: the same seed reproduces the NPV
 /// bitwise, and the standard error is read back through
@@ -226,7 +218,7 @@ impl PyMCEuropeanHestonEngine {
 
 /// The Longstaff-Schwartz least-squares Monte Carlo engine for American
 /// payoffs, over the pseudo-random RNG policy. The low-discrepancy policy is
-/// not exposed (#454), and the Monomial regression basis is not selectable
+/// not exposed for this engine, and the Monomial regression basis is not selectable
 /// (#453).
 ///
 /// The option priced must come from VanillaOption.american(...): a
@@ -339,6 +331,83 @@ impl PyMCAmericanEngine {
 }
 
 impl PyMCAmericanEngine {
+    /// The erased engine the instrument facades install via `set_pricing_engine`.
+    pub(crate) fn engine(&self) -> SharedMut<dyn PricingEngine> {
+        SharedMut::clone(&self.inner) as SharedMut<dyn PricingEngine>
+    }
+}
+
+/// Fixed-sample Sobol European engine, without an error estimate.
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "QMCEuropeanEngine",
+    unsendable,
+    module = "itofin.pricingengines"
+)]
+pub struct PyQMCEuropeanEngine {
+    inner: SharedMut<MCEuropeanEngine<LowDiscrepancy>>,
+}
+
+#[gen_stub_pymethods]
+#[pymethods]
+impl PyQMCEuropeanEngine {
+    /// Build a Sobol engine with a positive fixed sample count.
+    ///
+    /// No statistical error estimate is available. Absolute tolerance and
+    /// max_samples are rejected. Seed selects Sobol direction initialization;
+    /// it is deterministic even when omitted or zero.
+    #[new]
+    #[pyo3(signature = (
+        process,
+        steps = None,
+        steps_per_year = None,
+        samples = None,
+        absolute_tolerance = None,
+        max_samples = None,
+        seed = None,
+        antithetic = None,
+    ))]
+    #[allow(clippy::too_many_arguments)]
+    fn new(
+        process: &PyBlackScholesProcess,
+        steps: Option<usize>,
+        steps_per_year: Option<usize>,
+        samples: Option<usize>,
+        absolute_tolerance: Option<f64>,
+        max_samples: Option<usize>,
+        seed: Option<u32>,
+        antithetic: Option<bool>,
+    ) -> PyResult<Self> {
+        let mut maker = MakeMcEuropeanEngine::<LowDiscrepancy>::new(process.inner());
+        if let Some(steps) = steps {
+            maker = maker.with_steps(steps);
+        }
+        if let Some(steps_per_year) = steps_per_year {
+            maker = maker.with_steps_per_year(steps_per_year);
+        }
+        if let Some(samples) = samples {
+            maker = maker.with_samples(samples);
+        }
+        if let Some(tolerance) = absolute_tolerance {
+            maker = maker.with_absolute_tolerance(tolerance);
+        }
+        if let Some(max_samples) = max_samples {
+            maker = maker.with_max_samples(max_samples);
+        }
+        if let Some(seed) = seed {
+            maker = maker.with_seed(seed);
+        }
+        if let Some(antithetic) = antithetic {
+            maker = maker.with_antithetic_variate(antithetic);
+        }
+        let engine = maker.build().map_err(PyQlError::from)?;
+        Ok(PyQMCEuropeanEngine {
+            inner: shared_mut(engine),
+        })
+    }
+}
+
+impl PyQMCEuropeanEngine {
     /// The erased engine the instrument facades install via `set_pricing_engine`.
     pub(crate) fn engine(&self) -> SharedMut<dyn PricingEngine> {
         SharedMut::clone(&self.inner) as SharedMut<dyn PricingEngine>
