@@ -4,6 +4,111 @@
   "entries": [
     {
       "c": [
+        "itofin_bermudan_exercise_new"
+      ],
+      "go": [
+        "Session.NewBermudanExercise"
+      ],
+      "python": "itofin.instruments.BermudanExercise",
+      "status": "implemented",
+      "tests": [
+        "TestTreeSwaptionQuantLibRetentionAndUpdates",
+        "TestTreeSwaptionErrorsRecover",
+        "tree_swaption_c_inputs_copy_dates_and_recover_after_errors"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bermudan_exercise_new"
+      ],
+      "go": [
+        "Session.NewBermudanExercise"
+      ],
+      "python": "itofin.instruments.BermudanExercise.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestTreeSwaptionQuantLibRetentionAndUpdates",
+        "TestTreeSwaptionErrorsRecover",
+        "tree_swaption_c_inputs_copy_dates_and_recover_after_errors"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bermudan_exercise_dates"
+      ],
+      "go": [
+        "BermudanExercise.Dates"
+      ],
+      "python": "itofin.instruments.BermudanExercise.dates",
+      "status": "implemented",
+      "tests": [
+        "TestTreeSwaptionQuantLibRetentionAndUpdates",
+        "TestTreeSwaptionErrorsRecover",
+        "tree_swaption_c_inputs_copy_dates_and_recover_after_errors"
+      ]
+    },
+    {
+      "c": [
+        "itofin_swaption_new"
+      ],
+      "go": [
+        "Session.NewBermudanSwaption"
+      ],
+      "python": "itofin.instruments.Swaption.from_bermudan",
+      "status": "implemented",
+      "tests": [
+        "TestTreeSwaptionQuantLibRetentionAndUpdates",
+        "TestTreeSwaptionErrorsRecover",
+        "tree_swaption_c_inputs_copy_dates_and_recover_after_errors"
+      ]
+    },
+    {
+      "c": [
+        "itofin_rate_option_set_engine"
+      ],
+      "go": [
+        "Swaption.SetTreeEngine"
+      ],
+      "python": "itofin.instruments.Swaption.set_tree_engine",
+      "status": "implemented",
+      "tests": [
+        "TestTreeSwaptionQuantLibRetentionAndUpdates",
+        "TestTreeSwaptionErrorsRecover",
+        "tree_swaption_c_inputs_copy_dates_and_recover_after_errors"
+      ]
+    },
+    {
+      "c": [
+        "itofin_tree_swaption_engine_new"
+      ],
+      "go": [
+        "Session.NewTreeSwaptionEngine"
+      ],
+      "python": "itofin.pricingengines.TreeSwaptionEngine",
+      "status": "implemented",
+      "tests": [
+        "TestTreeSwaptionQuantLibRetentionAndUpdates",
+        "TestTreeSwaptionErrorsRecover",
+        "tree_swaption_c_inputs_copy_dates_and_recover_after_errors"
+      ]
+    },
+    {
+      "c": [
+        "itofin_tree_swaption_engine_new"
+      ],
+      "go": [
+        "Session.NewTreeSwaptionEngine"
+      ],
+      "python": "itofin.pricingengines.TreeSwaptionEngine.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestTreeSwaptionQuantLibRetentionAndUpdates",
+        "TestTreeSwaptionErrorsRecover",
+        "tree_swaption_c_inputs_copy_dates_and_recover_after_errors"
+      ]
+    },
+    {
+      "c": [
         "itofin_settings_set_using_at_par_coupons"
       ],
       "go": [

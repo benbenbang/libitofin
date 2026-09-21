@@ -4,6 +4,7 @@
 import builtins
 import itofin
 from itofin import indexes
+from itofin import models
 from itofin import processes
 from itofin import quotes
 from itofin import termstructures
@@ -24,6 +25,7 @@ __all__ = [
     "MidPointCdsEngine",
     "NumericalFix",
     "QMCEuropeanEngine",
+    "TreeSwaptionEngine",
     "YoYInflationCapFloorEngine",
 ]
 
@@ -419,6 +421,17 @@ class QMCEuropeanEngine:
         max_samples are rejected. Seed selects Sobol direction initialization;
         it is deterministic even when omitted or zero.
         """
+
+@typing.final
+class TreeSwaptionEngine:
+    r"""
+    A Hull-White tree engine with a positive number of time steps.
+    """
+    def __init__(self, model: models.HullWhite, time_steps: builtins.int, settings: itofin.Settings) -> None:
+        r"""
+        Retain the model and settings; zero steps raise ItofinError.
+        """
+
 
 @typing.final
 class YoYInflationCapFloorEngine:
