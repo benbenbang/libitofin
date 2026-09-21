@@ -1171,6 +1171,7 @@ impl SwapRateHelper {
 /// with [`Instrument::recalculate`] before reading the legs.
 pub struct OISRateHelper {
     base: BootstrapHelperBase,
+    date_error: RefCell<Option<QlError>>,
     swap: RefCell<Option<OvernightIndexedSwap>>,
     overnight_index: Shared<OvernightIndex>,
     term_structure_handle: RelinkableHandle<dyn YieldTermStructure>,
@@ -1189,6 +1190,50 @@ pub struct OISRateHelper {
 }
 
 impl OISRateHelper {
+    /// Builds the helper and returns schedule or custom-pillar errors.
+    #[allow(clippy::too_many_arguments)]
+    pub fn try_new(
+        settlement_days: Natural,
+        tenor: Period,
+        quote: Handle<dyn Quote>,
+        overnight_index: &OvernightIndex,
+        discounting_curve: Option<Handle<dyn YieldTermStructure>>,
+        payment_lag: Integer,
+        payment_convention: BusinessDayConvention,
+        payment_frequency: Frequency,
+        forward_start: Period,
+        overnight_spread: Handle<dyn Quote>,
+        pillar: Pillar,
+        averaging_method: RateAveraging,
+        settings: Shared<Settings<Date>>,
+    ) -> QlResult<Shared<OISRateHelper>> {
+        let helper = Self::new(
+            settlement_days,
+            tenor,
+            quote,
+            overnight_index,
+            discounting_curve,
+            payment_lag,
+            payment_convention,
+            payment_frequency,
+            forward_start,
+            overnight_spread,
+            pillar,
+            averaging_method,
+            settings,
+        );
+        helper.validate_dates()?;
+        Ok(helper)
+    }
+
+    /// Returns the last schedule error, if a date change invalidated the helper.
+    pub fn validate_dates(&self) -> QlResult<()> {
+        match self.date_error.borrow().as_ref() {
+            Some(error) => Err(error.clone()),
+            None => Ok(()),
+        }
+    }
+
     /// An OIS helper fitting `quote` with the schedule of a swap of `tenor`
     /// starting `settlement_days` after the evaluation date, the form the
     /// bootstrap oracle builds (`overnightindexedswap.cpp:236-256`).
@@ -1233,6 +1278,7 @@ impl OISRateHelper {
             overnight_spread.register_observer(&base.observer());
             let helper = OISRateHelper {
                 base,
+                date_error: RefCell::new(None),
                 swap: RefCell::new(None),
                 overnight_index: cloned_index,
                 term_structure_handle,
@@ -1274,6 +1320,7 @@ impl RateHelper for OISRateHelper {
     /// overnight-leg BPS, and the fixed-leg BPS, rather than read from
     /// `fair_rate()`.
     fn implied_quote(&self) -> QlResult<Real> {
+        self.validate_dates()?;
         self.base.term_structure()?;
         let mut guard = self.swap.borrow_mut();
         let swap = guard
@@ -1324,65 +1371,70 @@ impl RelativeDateRateHelper for OISRateHelper {
     /// tenor built through [`MakeOis`]' whole builder chain with a 0% fixed rate
     /// so it does not price at construction.
     ///
-    /// The `latest_relevant_date` is `max(maturity, lastPaymentDate)`.  C++ also
-    /// maxes in `fixingEndDate = overnightIndex.maturityDate(valueDate(
-    /// lastFixingDate))` (`oisratehelper.cpp:170-172`); that term is dominated by
-    /// `lastPaymentDate` whenever the payment lag is at least one business day
-    /// (the bootstrap oracle uses lag 2), and reaching the last coupon's fixing
-    /// date needs a typed accessor the `dyn CashFlow` leg does not expose, so it
-    /// remains deferred.
+    /// The latest relevant date includes payments and the final fixing end.
     fn initialize_dates(&self) {
-        let swap = MakeOis::new(
-            self.tenor,
-            Shared::clone(&self.overnight_index),
-            Some(0.0),
-            self.forward_start,
-            Shared::clone(&self.settings),
-        )
-        .with_discounting_term_structure(self.discount_relinkable_handle.handle())
-        .with_telescopic_value_dates(false)
-        .with_payment_lag(self.payment_lag)
-        .with_payment_adjustment(self.payment_convention)
-        .with_payment_frequency(self.payment_frequency)
-        .with_averaging_method(self.averaging_method)
-        .with_lookback_days(None)
-        .with_lockout_days(0)
-        .with_rule(DateGeneration::Backward)
-        .with_convention(BusinessDayConvention::ModifiedFollowing)
-        .with_termination_date_convention(BusinessDayConvention::ModifiedFollowing)
-        .with_observation_shift(false)
-        .with_settlement_days(self.settlement_days)
-        .build()
-        .expect("a 0% fixed-rate OIS with benign deferred knobs builds without pricing");
+        *self.date_error.borrow_mut() = self.try_initialize_dates().err();
+    }
+}
 
-        let base_swap = swap.fixed_vs_floating();
-        let earliest = swap
-            .overnight_schedule()
-            .start_date()
-            .min(base_swap.fixed_schedule().start_date());
-        let maturity = swap
-            .overnight_schedule()
-            .end_date()
-            .max(base_swap.fixed_schedule().end_date());
+impl OISRateHelper {
+    fn try_initialize_dates(&self) -> QlResult<()> {
+        let (swap, earliest, maturity, latest_relevant, pillar) = rebuild_dates(|| {
+            let swap = MakeOis::new(
+                self.tenor,
+                Shared::clone(&self.overnight_index),
+                Some(0.0),
+                self.forward_start,
+                Shared::clone(&self.settings),
+            )
+            .with_discounting_term_structure(self.discount_relinkable_handle.handle())
+            .with_telescopic_value_dates(false)
+            .with_payment_lag(self.payment_lag)
+            .with_payment_adjustment(self.payment_convention)
+            .with_payment_frequency(self.payment_frequency)
+            .with_averaging_method(self.averaging_method)
+            .with_lookback_days(None)
+            .with_lockout_days(0)
+            .with_rule(DateGeneration::Backward)
+            .with_convention(BusinessDayConvention::ModifiedFollowing)
+            .with_termination_date_convention(BusinessDayConvention::ModifiedFollowing)
+            .with_observation_shift(false)
+            .with_settlement_days(self.settlement_days)
+            .build()?;
 
-        let last_overnight_payment = swap.overnight_leg().last().map_or(maturity, |cf| cf.date());
-        let last_fixed_payment = base_swap
-            .fixed_leg()
-            .last()
-            .map_or(maturity, |cf| cf.date());
-        let latest_relevant = maturity.max(last_overnight_payment).max(last_fixed_payment);
+            let base_swap = swap.fixed_vs_floating();
+            let earliest = swap
+                .overnight_schedule()
+                .start_date()
+                .min(base_swap.fixed_schedule().start_date());
+            let maturity = swap
+                .overnight_schedule()
+                .end_date()
+                .max(base_swap.fixed_schedule().end_date());
 
+            let last_overnight_payment =
+                swap.overnight_leg().last().map_or(maturity, |cf| cf.date());
+            let last_fixed_payment = base_swap
+                .fixed_leg()
+                .last()
+                .map_or(maturity, |cf| cf.date());
+            let latest_relevant = maturity
+                .max(last_overnight_payment)
+                .max(last_fixed_payment)
+                .max(swap.last_fixing_end_date()?);
+
+            let pillar = self.pillar.resolve(earliest, maturity, latest_relevant)?;
+            Ok((swap, earliest, maturity, latest_relevant, pillar))
+        })?;
         self.base.set_earliest_date(earliest);
         self.base.set_maturity_date(maturity);
         self.base.set_latest_relevant_date(latest_relevant);
         self.base.set_latest_date(latest_relevant);
-        let pillar = match self.pillar {
-            Pillar::MaturityDate => maturity,
-            Pillar::LastRelevantDate => latest_relevant,
-        };
+
         self.base.set_pillar_date(pillar);
 
         *self.swap.borrow_mut() = Some(swap);
+        Ok(())
     }
 }
 

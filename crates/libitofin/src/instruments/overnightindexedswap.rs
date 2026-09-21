@@ -102,6 +102,7 @@ use crate::types::{Integer, Rate, Real, Spread};
 /// its [`Instrument`] face.
 pub struct OvernightIndexedSwap {
     base: FixedVsFloatingSwap,
+    last_fixing_date: Option<Date>,
     overnight_index: Shared<OvernightIndex>,
     payment_lag: Integer,
     payment_calendar: Calendar,
@@ -109,6 +110,14 @@ pub struct OvernightIndexedSwap {
 }
 
 impl OvernightIndexedSwap {
+    pub(crate) fn last_fixing_end_date(&self) -> QlResult<Date> {
+        let date = self
+            .last_fixing_date
+            .ok_or_else(|| crate::errors::QlError::new("empty overnight leg", file!(), line!()))?;
+        self.overnight_index
+            .maturity_date(self.overnight_index.value_date(date)?)
+    }
+
     /// Builds an OIS over a single `nominal` shared by both legs (the C++
     /// single-nominal, two-schedule ctor, `overnightindexedswap.hpp:76`), the
     /// shape `MakeOIS` uses.
@@ -199,6 +208,7 @@ impl OvernightIndexedSwap {
             .map(|coupon| Shared::clone(coupon) as Shared<dyn CashFlow>)
             .collect();
 
+        let last_fixing_date = coupons.last().map(|coupon| coupon.fixing_date());
         let floating_arguments: FloatingArgumentsFn =
             Box::new(move |_swap, args| fill_floating_arguments(&coupons, args));
 
@@ -223,6 +233,7 @@ impl OvernightIndexedSwap {
 
         Ok(OvernightIndexedSwap {
             base,
+            last_fixing_date,
             overnight_index,
             payment_lag,
             payment_calendar: resolved_calendar,
