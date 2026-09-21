@@ -209,6 +209,8 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     termstructures.add_class::<PyRateHelper>()?;
     termstructures.add_class::<jointcurves::PyIborIborBasisSwapRateHelper>()?;
     termstructures.add_class::<jointcurves::PyJointYieldCurves>()?;
+    termstructures.add_class::<overnightfuture::PyOvernightIndexFutureRateHelper>()?;
+    termstructures.add_class::<overnightfuture::PySofrFutureRateHelper>()?;
     termstructures.add_class::<PyDepositRateHelper>()?;
     termstructures.add_class::<PySwapRateHelper>()?;
     termstructures.add_class::<PyFuturesType>()?;

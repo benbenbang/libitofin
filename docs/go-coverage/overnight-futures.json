@@ -20,6 +20,46 @@
       ]
     },
     {
+      "c": "itofin_overnight_future_helper_new",
+      "go": "Session.NewOvernightIndexFutureRateHelper",
+      "python": "itofin.termstructures.OvernightIndexFutureRateHelper",
+      "status": "implemented",
+      "tests": [
+        "TestSofrFutureBootstrapAndCustomPillars",
+        "TestMonthlyAndGenericOvernightHelperRepricing"
+      ]
+    },
+    {
+      "c": "itofin_overnight_future_helper_new",
+      "go": "Session.NewOvernightIndexFutureRateHelper",
+      "python": "itofin.termstructures.OvernightIndexFutureRateHelper.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestSofrFutureBootstrapAndCustomPillars",
+        "TestMonthlyAndGenericOvernightHelperRepricing"
+      ]
+    },
+    {
+      "c": "itofin_sofr_future_helper_new",
+      "go": "Session.NewSofrFutureRateHelper",
+      "python": "itofin.termstructures.SofrFutureRateHelper",
+      "status": "implemented",
+      "tests": [
+        "TestSofrFutureBootstrapAndCustomPillars",
+        "TestMonthlyAndGenericOvernightHelperRepricing"
+      ]
+    },
+    {
+      "c": "itofin_sofr_future_helper_new",
+      "go": "Session.NewSofrFutureRateHelper",
+      "python": "itofin.termstructures.SofrFutureRateHelper.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestSofrFutureBootstrapAndCustomPillars",
+        "TestMonthlyAndGenericOvernightHelperRepricing"
+      ]
+    },
+    {
       "c": "itofin_sofr_new",
       "go": "Session.NewSofr",
       "python": "itofin.indexes.Sofr",
