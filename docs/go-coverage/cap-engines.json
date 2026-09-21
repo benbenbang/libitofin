@@ -20,6 +20,24 @@
       ]
     },
     {
+      "c": "itofin_tree_capfloor_engine_new",
+      "go": "Session.NewTreeCapFloorEngine",
+      "python": "itofin.pricingengines.TreeCapFloorEngine",
+      "status": "implemented",
+      "tests": [
+        "TestCapNormalAndTreeOracles"
+      ]
+    },
+    {
+      "c": "itofin_tree_capfloor_engine_new",
+      "go": "Session.NewTreeCapFloorEngine",
+      "python": "itofin.pricingengines.TreeCapFloorEngine.__new__",
+      "status": "implemented",
+      "tests": [
+        "TestCapNormalAndTreeOracles"
+      ]
+    },
+    {
       "c": "itofin_rate_engine_new",
       "go": "Session.NewBachelierCapFloorEngineFlat",
       "python": "itofin.pricingengines.BachelierCapFloorEngine.with_flat_vol",
@@ -29,12 +47,111 @@
       ]
     },
     {
+      "c": "itofin_tree_capfloor_engine_new",
+      "go": "Session.NewTreeCapFloorEngineWithTimeGrid",
+      "python": "itofin.pricingengines.TreeCapFloorEngine.with_time_grid",
+      "status": "implemented",
+      "tests": [
+        "TestCapHelperNormalCalibrationAndRecovery"
+      ]
+    },
+    {
       "c": "itofin_rate_option_set_engine",
       "go": "CapFloor.SetBachelierEngine",
       "python": "itofin.instruments.CapFloor.set_bachelier_engine",
       "status": "implemented",
       "tests": [
         "TestCapNormalAndTreeOracles"
+      ]
+    },
+    {
+      "c": "itofin_rate_option_set_engine",
+      "go": "CapFloor.SetTreeEngine",
+      "python": "itofin.instruments.CapFloor.set_tree_engine",
+      "status": "implemented",
+      "tests": [
+        "TestCapNormalAndTreeOracles"
+      ]
+    },
+    {
+      "c": "itofin_cap_helper_new",
+      "go": "Session.NewCapHelper",
+      "python": "itofin.models.CapHelper",
+      "status": "implemented",
+      "tests": [
+        "TestCapHelperNormalCalibrationAndRecovery"
+      ]
+    },
+    {
+      "c": "itofin_cap_helper_new",
+      "go": "Session.NewCapHelper",
+      "python": "itofin.models.CapHelper.__new__",
+      "status": "implemented",
+      "tests": [
+        "TestCapHelperNormalCalibrationAndRecovery"
+      ]
+    },
+    {
+      "c": "itofin_cap_helper_value",
+      "go": "CapHelper.MarketValue",
+      "python": "itofin.models.CapHelper.market_value",
+      "status": "implemented",
+      "tests": [
+        "TestCapHelperNormalCalibrationAndRecovery"
+      ]
+    },
+    {
+      "c": "itofin_cap_helper_value",
+      "go": "CapHelper.BlackPrice",
+      "python": "itofin.models.CapHelper.black_price",
+      "status": "implemented",
+      "tests": [
+        "TestCapHelperNormalCalibrationAndRecovery"
+      ]
+    },
+    {
+      "c": "itofin_cap_helper_value",
+      "go": "CapHelper.ModelValue",
+      "python": "itofin.models.CapHelper.model_value",
+      "status": "implemented",
+      "tests": [
+        "TestCapHelperNormalCalibrationAndRecovery"
+      ]
+    },
+    {
+      "c": "itofin_cap_helper_value",
+      "go": "CapHelper.CalibrationError",
+      "python": "itofin.models.CapHelper.calibration_error",
+      "status": "implemented",
+      "tests": [
+        "TestCapHelperNormalCalibrationAndRecovery"
+      ]
+    },
+    {
+      "c": "itofin_cap_helper_times",
+      "go": "CapHelper.MandatoryTimes",
+      "python": "itofin.models.CapHelper.mandatory_times",
+      "status": "implemented",
+      "tests": [
+        "TestCapHelperNormalCalibrationAndRecovery"
+      ]
+    },
+    {
+      "c": "itofin_cap_helper_set_tree_engine",
+      "go": "CapHelper.SetTreeEngine",
+      "python": "itofin.models.CapHelper.set_tree_engine",
+      "status": "implemented",
+      "tests": [
+        "TestCapHelperNormalCalibrationAndRecovery"
+      ]
+    },
+    {
+      "c": "itofin_hullwhite_calibrate_caps",
+      "go": "HullWhite.CalibrateCaps",
+      "python": "itofin.models.HullWhite.calibrate_caps",
+      "status": "implemented",
+      "tests": [
+        "TestCapHelperNormalCalibrationAndRecovery"
       ]
     }
   ]

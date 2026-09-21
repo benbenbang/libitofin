@@ -6,17 +6,30 @@ import itofin
 from itofin import indexes
 from itofin import instruments
 from itofin import optimization
+from itofin import pricingengines
 from itofin import processes
+from itofin import quotes
 from itofin import termstructures
 from itofin import time
 import typing
 __all__ = [
     "CalibrationErrorType",
+    "CapHelper",
     "HestonModel",
     "HestonModelHelper",
     "HullWhite",
     "SwaptionHelper",
 ]
+
+@typing.final
+class CapHelper:
+    def __new__(cls, length: time.Period, volatility: quotes.SimpleQuote, index: indexes.IborIndex, fixed_leg_frequency: time.Frequency, fixed_leg_day_counter: time.DayCounter, include_first_swaplet: builtins.bool, curve: termstructures.YieldTermStructure, error_type: CalibrationErrorType, volatility_type: termstructures.VolatilityType, shift: builtins.float = 0.0) -> CapHelper: ...
+    def market_value(self) -> builtins.float: ...
+    def black_price(self, volatility: builtins.float) -> builtins.float: ...
+    def model_value(self) -> builtins.float: ...
+    def calibration_error(self) -> builtins.float: ...
+    def mandatory_times(self) -> builtins.list[builtins.float]: ...
+    def set_tree_engine(self, engine: pricingengines.TreeCapFloorEngine) -> None: ...
 
 @typing.final
 class HestonModel:
@@ -219,6 +232,7 @@ class HullWhite:
         Raises:
             ItofinError: If helpers is empty or the optimization itself fails.
         """
+    def calibrate_caps(self, helpers: typing.Sequence[CapHelper], method: optimization.LevenbergMarquardt, end_criteria: optimization.EndCriteria, fix_reversion: builtins.bool, time_steps: builtins.int) -> None: ...
 
 @typing.final
 class SwaptionHelper:

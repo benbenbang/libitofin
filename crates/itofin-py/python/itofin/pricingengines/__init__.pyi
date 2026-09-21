@@ -26,6 +26,7 @@ __all__ = [
     "MidPointCdsEngine",
     "NumericalFix",
     "QMCEuropeanEngine",
+    "TreeCapFloorEngine",
     "TreeSwaptionEngine",
     "YoYInflationCapFloorEngine",
 ]
@@ -431,6 +432,12 @@ class QMCEuropeanEngine:
         max_samples are rejected. Seed selects Sobol direction initialization;
         it is deterministic even when omitted or zero.
         """
+
+@typing.final
+class TreeCapFloorEngine:
+    def __new__(cls, model: models.HullWhite, time_steps: builtins.int) -> TreeCapFloorEngine: ...
+    @staticmethod
+    def with_time_grid(model: models.HullWhite, times: typing.Sequence[builtins.float]) -> TreeCapFloorEngine: ...
 
 @typing.final
 class TreeSwaptionEngine:

@@ -251,6 +251,9 @@ impl PyCapFloor {
     fn set_bachelier_engine(&mut self, engine: &PyBachelierCapFloorEngine) {
         self.inner.base_mut().set_pricing_engine(engine.engine());
     }
+    fn set_tree_engine(&mut self, engine: &crate::caphelper::PyTreeCapFloorEngine) {
+        self.inner.base_mut().set_pricing_engine(engine.engine());
+    }
 
     /// Force the valuation. Idempotent.
     ///
