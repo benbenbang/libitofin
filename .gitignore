@@ -162,3 +162,4 @@ PORT_COVERAGE.md
 graphify*.md
 GRAPHIFY*.md
 *.patch
+docs/internal/
