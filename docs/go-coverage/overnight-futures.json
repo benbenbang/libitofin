@@ -1,0 +1,68 @@
+{
+  "domain": "overnight-futures",
+  "entries": [
+    {
+      "c": "itofin_overnight_future_new",
+      "go": "Session.NewOvernightIndexFuture",
+      "python": "itofin.instruments.OvernightIndexFuture",
+      "status": "implemented",
+      "tests": [
+        "TestOvernightFutureQuantLibAccrualAndRetention"
+      ]
+    },
+    {
+      "c": "itofin_overnight_future_new",
+      "go": "Session.NewOvernightIndexFuture",
+      "python": "itofin.instruments.OvernightIndexFuture.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestOvernightFutureQuantLibAccrualAndRetention"
+      ]
+    },
+    {
+      "c": "itofin_overnight_future_value",
+      "go": "OvernightIndexFuture.NPV",
+      "python": "itofin.instruments.OvernightIndexFuture.npv",
+      "status": "implemented",
+      "tests": [
+        "TestOvernightFutureQuantLibAccrualAndRetention"
+      ]
+    },
+    {
+      "c": "itofin_overnight_future_value",
+      "go": "OvernightIndexFuture.ConvexityAdjustment",
+      "python": "itofin.instruments.OvernightIndexFuture.convexity_adjustment",
+      "status": "implemented",
+      "tests": [
+        "TestOvernightFutureQuantLibAccrualAndRetention"
+      ]
+    },
+    {
+      "c": "itofin_overnight_future_value",
+      "go": "OvernightIndexFuture.IsExpired",
+      "python": "itofin.instruments.OvernightIndexFuture.is_expired",
+      "status": "implemented",
+      "tests": [
+        "TestOvernightFutureQuantLibAccrualAndRetention"
+      ]
+    },
+    {
+      "c": "itofin_overnight_future_date",
+      "go": "OvernightIndexFuture.ValueDate",
+      "python": "itofin.instruments.OvernightIndexFuture.value_date",
+      "status": "implemented",
+      "tests": [
+        "TestOvernightFutureQuantLibAccrualAndRetention"
+      ]
+    },
+    {
+      "c": "itofin_overnight_future_date",
+      "go": "OvernightIndexFuture.MaturityDate",
+      "python": "itofin.instruments.OvernightIndexFuture.maturity_date",
+      "status": "implemented",
+      "tests": [
+        "TestOvernightFutureQuantLibAccrualAndRetention"
+      ]
+    }
+  ]
+}
