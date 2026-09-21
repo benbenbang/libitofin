@@ -309,6 +309,26 @@ impl<RNG: McRngTraits> MakeMcEuropeanEngine<RNG> {
                 "chosen random generator policy does not allow an error estimate"
             );
         }
+        if let (Some(samples), Some(maximum)) = (self.samples, RNG::MAX_SAMPLES) {
+            require!(
+                samples <= maximum,
+                "sample count exceeds random generator period"
+            );
+        }
+        if !RNG::ALLOWS_ERROR_ESTIMATE {
+            require!(
+                self.samples.is_some_and(|n| n > 0),
+                "QMC requires positive fixed samples"
+            );
+            require!(
+                self.steps.or(self.steps_per_year).is_some_and(|n| n > 0),
+                "QMC requires positive steps"
+            );
+            require!(
+                self.max_samples.is_none(),
+                "QMC does not support max_samples"
+            );
+        }
         MCEuropeanEngine::new(
             self.process,
             self.steps,
@@ -407,8 +427,7 @@ mod oracle {
     //! at a fixed seed, which is why QuantLib uses a relative band across
     //! moneyness.
     //!
-    //! The `testQmcEngines` low-discrepancy variant (`europeanoption.cpp:1288`)
-    //! is deferred with the Sobol RNG policy (tracked in #454).
+    //! The complete `testQmcEngines` grid is covered separately in `qmc_oracle`.
 
     use super::MakeMcEuropeanEngine;
     use crate::exercise::EuropeanExercise;
