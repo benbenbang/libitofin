@@ -88,13 +88,17 @@ impl Common {
     }
 }
 
-/// Nelder-Mead options, with the SciPy defaults.
-#[derive(Debug, Clone, PartialEq)]
+/// Nelder-Mead options.
+///
+/// An unset tolerance falls back to [`Common::tol`] and then to `1e-4`, so that
+/// a caller who sets only the shared tolerance spreads it over both, and a
+/// caller who sets one of them keeps the default for the other.
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct NelderMeadOptions {
     /// Absolute convergence tolerance on the simplex spread in `x`.
-    pub xatol: f64,
+    pub xatol: Option<f64>,
     /// Absolute convergence tolerance on the simplex spread in `f`.
-    pub fatol: f64,
+    pub fatol: Option<f64>,
     /// Whether to scale the reflection coefficients with the dimension.
     pub adaptive: bool,
     /// An explicit starting simplex of `n + 1` points.
@@ -104,7 +108,9 @@ pub struct NelderMeadOptions {
 impl NelderMeadOptions {
     fn validate(&self, n: usize) -> Result<(), InvalidInput> {
         for (option, tolerance) in [("xatol", self.xatol), ("fatol", self.fatol)] {
-            if !tolerance.is_finite() || tolerance < 0.0 {
+            if let Some(tolerance) = tolerance
+                && (!tolerance.is_finite() || tolerance < 0.0)
+            {
                 return Err(InvalidInput::NotFiniteNonnegative { option });
             }
         }
@@ -133,17 +139,6 @@ impl NelderMeadOptions {
             }
         }
         Ok(())
-    }
-}
-
-impl Default for NelderMeadOptions {
-    fn default() -> Self {
-        Self {
-            xatol: 1e-4,
-            fatol: 1e-4,
-            adaptive: false,
-            initial_simplex: None,
-        }
     }
 }
 

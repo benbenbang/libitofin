@@ -196,7 +196,7 @@ fn nelder_mead(options: NelderMeadOptions) -> Method {
     Method::NelderMead(options)
 }
 
-fn tolerances(xatol: f64, fatol: f64) -> NelderMeadOptions {
+fn tolerances(xatol: Option<f64>, fatol: Option<f64>) -> NelderMeadOptions {
     NelderMeadOptions {
         xatol,
         fatol,
@@ -214,9 +214,9 @@ fn simplex(points: Vec<Vec<f64>>) -> NelderMeadOptions {
 #[test]
 fn a_nelder_mead_tolerance_must_be_finite_and_nonnegative() {
     let rejected = [
-        ("xatol", tolerances(f64::NAN, 1e-4)),
-        ("xatol", tolerances(f64::INFINITY, 1e-4)),
-        ("fatol", tolerances(1e-4, -1.0)),
+        ("xatol", tolerances(Some(f64::NAN), None)),
+        ("xatol", tolerances(Some(f64::INFINITY), None)),
+        ("fatol", tolerances(None, Some(-1.0))),
     ];
     for (option, options) in rejected {
         let expected = InvalidInput::NotFiniteNonnegative { option };
@@ -226,7 +226,7 @@ fn a_nelder_mead_tolerance_must_be_finite_and_nonnegative() {
 
 #[test]
 fn a_zero_nelder_mead_tolerance_is_legal() {
-    let method = nelder_mead(tolerances(0.0, 0.0));
+    let method = nelder_mead(tolerances(Some(0.0), Some(0.0)));
     assert_eq!(method.validate(&problem()), Ok(()));
 }
 
@@ -287,12 +287,13 @@ fn an_open_side_and_a_fixed_coordinate_stay_valid() {
 }
 
 #[test]
-fn nelder_mead_options_default_to_the_scipy_values() {
+fn nelder_mead_options_leave_every_tolerance_to_be_resolved() {
     let options = NelderMeadOptions::default();
-    assert_eq!(options.xatol, 1e-4);
-    assert_eq!(options.fatol, 1e-4);
+    assert_eq!(options.xatol, None);
+    assert_eq!(options.fatol, None);
     assert!(!options.adaptive);
     assert_eq!(options.initial_simplex, None);
+    assert_eq!(nelder_mead(options).validate(&problem()), Ok(()));
 }
 
 fn step<O: Objective>(
