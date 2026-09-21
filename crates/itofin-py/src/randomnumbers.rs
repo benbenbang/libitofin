@@ -15,11 +15,9 @@
 //! `GaussianLowDiscrepancySequenceGenerator` is the inverse cumulative normal
 //! over a Sobol sequence.
 //!
-//! Deferred (visible): the Monte Carlo engines still pin the pseudo-random
-//! policy; the low-discrepancy policy behind `testQmcEngines` lands with the
-//! core's `LowDiscrepancy` traits (#454). The randomized Halton starts and
-//! shifts are deferred in the core, so `HaltonRsg` is the deterministic
-//! sequence.
+//! Monte Carlo engines retain their pseudo-random defaults; QMCEuropeanEngine
+//! uses the core LowDiscrepancy policy. Randomized Halton starts and shifts remain
+//! deferred in the core, so `HaltonRsg` is the deterministic sequence.
 //!
 //! Every draw is returned as a value, not as QuantLib's weighted `Sample`
 //! wrapper; the weight of a pseudo-random draw is always 1.0. Vector draws come
@@ -32,10 +30,8 @@ use libitofin::math::randomnumbers::rngtraits::SequenceGenerator;
 use libitofin::math::randomnumbers::sobol::{DirectionIntegers, PPMT_MAX_DIM, SobolRsg};
 use libitofin::math::randomnumbers::{
     BoxMullerGaussianRng, GaussianRng, HaltonRsg, InverseCumulativeRsg, MersenneTwisterUniformRng,
-    RandomSequenceGenerator, UniformRng,
+    RandomSequenceGenerator, SobolSequence, UniformRng,
 };
-use libitofin::methods::montecarlo::Sample;
-use libitofin::types::Real;
 use numpy::{PyArray1, PyArray2, PyArrayMethods};
 use pyo3::prelude::*;
 #[allow(unused_imports)]
@@ -760,43 +756,6 @@ impl PyHaltonRsg {
     ) -> PyResult<Bound<'py, PyArray2<f64>>> {
         let dimension = self.inner.dimension();
         draw_matrix(py, count, dimension, || self.inner.next_sequence().to_vec())
-    }
-}
-
-/// A Sobol generator presented as a weighted sequence generator, so the core
-/// `InverseCumulativeRsg` can map it as it maps the pseudo-random sequences.
-///
-/// The core `SobolRsg` returns bare slices because a low-discrepancy draw has
-/// unit weight; this adapter restores the `Sample` wrapper with that weight.
-/// It stands in for the core's deferred `LowDiscrepancy` policy (#454).
-#[derive(Clone)]
-pub(crate) struct SobolSequence {
-    rsg: SobolRsg,
-    sample: Sample<Vec<Real>>,
-}
-
-impl SobolSequence {
-    fn new(rsg: SobolRsg) -> Self {
-        let dimension = rsg.dimension();
-        SobolSequence {
-            rsg,
-            sample: Sample::new(vec![0.0; dimension], 1.0),
-        }
-    }
-}
-
-impl SequenceGenerator for SobolSequence {
-    fn next_sequence(&mut self) -> &Sample<Vec<Real>> {
-        self.sample.value.copy_from_slice(self.rsg.next_sequence());
-        &self.sample
-    }
-
-    fn last_sequence(&self) -> &Sample<Vec<Real>> {
-        &self.sample
-    }
-
-    fn dimension(&self) -> usize {
-        self.rsg.dimension()
     }
 }
 

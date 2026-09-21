@@ -70,3 +70,6 @@ pub trait GaussianRng {
     /// The next standard normal deviate.
     fn next_gaussian(&mut self) -> Real;
 }
+
+#[cfg(test)]
+mod policy_tests;
