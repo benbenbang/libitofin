@@ -3072,7 +3072,8 @@ int32_t itofin_black_scholes_rate(struct ItofinContext *ctx,
                                   struct ItofinError *error);
 
 /**
- * Kind 0 European BSM, 1 European Heston, 2 American BSM.
+ * Kind 0 European BSM, 1 European Heston, 2 American BSM, 3 Sobol European BSM.
+ * Kind 3 requires positive fixed samples/steps and rejects max_samples.
  * # Safety
  * Pointers must be aligned, live and valid for their stated lengths. Outputs
  * must not overlap inputs or other outputs. Any context and its handles must

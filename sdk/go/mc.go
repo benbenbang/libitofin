@@ -5,9 +5,9 @@ package itofin
 */
 import "C"
 
-// MCConfig preserves omitted versus explicit zero settings. Engines use the
-// native PseudoRandom policy; identical configuration with an explicit nonzero
-// seed repeats exactly. An omitted or zero seed uses native seed generation.
+// MCConfig preserves omitted versus explicit zero settings. Pseudo-random
+// engines repeat with an explicit nonzero seed; zero uses native seed generation.
+// QMCEuropeanEngine is deterministic even with an omitted or zero seed.
 type MCConfig struct {
 	Steps, StepsPerYear, Samples        *uint
 	AbsoluteTolerance                   *float64
@@ -17,6 +17,9 @@ type MCConfig struct {
 	PolynomialOrder, CalibrationSamples *uint
 }
 type MCEuropeanEngine struct{ object }
+
+// QMCEuropeanEngine uses deterministic Sobol paths without an error estimate.
+type QMCEuropeanEngine struct{ object }
 type MCEuropeanHestonEngine struct{ object }
 type MCAmericanEngine struct{ object }
 
@@ -105,4 +108,17 @@ func (s *Session) NewMCAmericanEngine(p *BlackScholesProcess, cfg MCConfig) (*MC
 		return nil, err
 	}
 	return &MCAmericanEngine{o}, nil
+}
+
+// NewQMCEuropeanEngine requires positive fixed samples and time steps.
+// AbsoluteTolerance, MaxSamples and regression settings are rejected.
+func (s *Session) NewQMCEuropeanEngine(p *BlackScholesProcess, cfg MCConfig) (*QMCEuropeanEngine, error) {
+	if p == nil {
+		return nil, errNilArgument("process")
+	}
+	o, err := s.newMCEngine(p.object, 3, cfg)
+	if err != nil {
+		return nil, err
+	}
+	return &QMCEuropeanEngine{o}, nil
 }
