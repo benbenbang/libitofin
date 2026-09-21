@@ -17,21 +17,6 @@
 //! discount curve, and solves `fairRate = 0.04 - NPV / (legBPS(fixed) / 1e-4)`
 //! off it.
 //!
-//! ## Deferred (visible, not silently stubbed)
-//!
-//! - **The Normal/Bachelier `black_price` branch** (`caphelper.cpp:78-81`): the
-//!   C++ switch prices a `Normal` volatility through a `BachelierCapFloorEngine`,
-//!   which is not ported (only [`BlackCapFloorEngine`] is on main). The
-//!   [`ShiftedLognormal`](VolatilityType::ShiftedLognormal) arm is ported; the
-//!   [`Normal`](VolatilityType::Normal) arm returns an error naming the deferral.
-//!   `ShiftedLognormal` is the C++ default, so the calibration oracle is
-//!   unaffected.
-//! - **`addTimesTo`** (`caphelper.cpp:51-61`) builds a `DiscretizedCapFloor` for
-//!   the tree/lattice pricing path, which is unported; it is already omitted from
-//!   the [`BlackCalibrationHelper`] trait surface (the lattice deferral of
-//!   `calibrationhelper.rs:35`), so there is nothing to implement. The analytic
-//!   cap engine never calls it.
-//!
 //! ## Divergences from QuantLib
 //!
 //! - **The dead `dummyIndex` is omitted.** C++ builds an `IborIndex("dummy", ...)`
@@ -47,12 +32,8 @@
 //!   `Settings::instance()`; the index already carries the explicit [`Settings`]
 //!   its fixings and evaluation date live on, and the helper reuses that handle
 //!   for the swap, the cap and both engines.
-//! - **`model_value` / `black_price` are `&self`; the cap is cached.** As
-//!   [`SwaptionHelper`](super::SwaptionHelper) does, the built cap is held in a
-//!   [`RefCell`]: [`black_price`](CapHelper::black_price) rebuilds and stores it on
-//!   every call (the stale market path or the implied-vol solver), and
-//!   [`model_value`](CapHelper::model_value) reuses the fresh instrument, building
-//!   it only if absent.
+//! - **Fresh ATM instruments.** Market, model and mandatory-time queries rebuild
+//!   the cap so live curve and date changes update its strike and schedule.
 //! - **A missing model engine is an explicit `Err`.** C++ `modelValue` would
 //!   dereference a null `engine_`; the port returns an error (D4).
 
@@ -61,7 +42,6 @@ use std::cell::RefCell;
 use crate::cashflow::{CashFlow, Leg};
 use crate::cashflows::{FixedRateLeg, IborLeg};
 use crate::errors::QlResult;
-use crate::fail;
 use crate::handle::Handle;
 use crate::indexes::IborIndex;
 use crate::indexes::index::Index;
@@ -73,7 +53,7 @@ use crate::models::calibrationhelper::{
     BlackCalibrationHelper, BlackCalibrationHelperBase, CalibrationErrorType,
 };
 use crate::pricingengine::PricingEngine;
-use crate::pricingengines::{BlackCapFloorEngine, DiscountingSwapEngine};
+use crate::pricingengines::{BachelierCapFloorEngine, BlackCapFloorEngine, DiscountingSwapEngine};
 use crate::quotes::{Quote, SimpleQuote};
 use crate::settings::Settings;
 use crate::shared::{Shared, SharedMut, shared, shared_mut};
@@ -87,6 +67,7 @@ use crate::time::frequency::Frequency;
 use crate::time::period::Period;
 use crate::time::schedule::Schedule;
 use crate::types::Real;
+use crate::{fail, require};
 
 /// The dummy fixed rate the swap is priced at to back out its fair rate
 /// (`caphelper.cpp:94`).
@@ -146,11 +127,70 @@ impl CapHelper {
         }
     }
 
+    /// Validates the inputs and builds the initial cap without panicking on invalid dates.
+    #[allow(clippy::too_many_arguments)]
+    pub fn try_new(
+        length: Period,
+        volatility: Handle<dyn Quote>,
+        index: Shared<IborIndex>,
+        fixed_leg_frequency: Frequency,
+        fixed_leg_day_counter: DayCounter,
+        include_first_swaplet: bool,
+        term_structure: Handle<dyn YieldTermStructure>,
+        error_type: CalibrationErrorType,
+        volatility_type: VolatilityType,
+        shift: Real,
+    ) -> QlResult<Self> {
+        require!(length.length() > 0, "cap length must be positive");
+        require!(shift.is_finite(), "cap shift must be finite");
+        require!(
+            volatility_type != VolatilityType::Normal || shift == 0.0,
+            "normal cap shift must be zero"
+        );
+        let value = volatility.current_link()?.value()?;
+        require!(
+            value.is_finite() && value >= 0.0,
+            "cap volatility must be finite and non-negative"
+        );
+        Period::try_from(fixed_leg_frequency)?;
+        let helper = Self::new(
+            length,
+            volatility,
+            index,
+            fixed_leg_frequency,
+            fixed_leg_day_counter,
+            include_first_swaplet,
+            term_structure,
+            error_type,
+            volatility_type,
+            shift,
+        );
+        helper.build_and_store()?;
+        Ok(helper)
+    }
+
+    /// Returns the non-negative reset and payment times needed by a cap lattice.
+    pub fn mandatory_times(&self) -> QlResult<Vec<Real>> {
+        use crate::discretizedasset::DiscretizedAsset;
+        use crate::instruments::CapFloorArguments;
+        use crate::pricingengines::capfloor::DiscretizedCapFloor;
+        let cap = self.build_and_store()?;
+        let mut args = CapFloorArguments::default();
+        cap.borrow().setup_arguments(&mut args)?;
+        let curve = self.term_structure.current_link()?;
+        let asset = DiscretizedCapFloor::new(
+            &args,
+            curve.reference_date()?,
+            &curve.require_day_counter()?,
+        )?;
+        Ok(asset.mandatory_times())
+    }
+
     /// The built at-the-money cap (`cap_`).
     ///
-    /// Builds it on first use; a subsequent [`black_price`](Self::black_price)
-    /// (via the market-value path) rebuilds it, leaving the model engine
-    /// installed.
+    /// Rebuilds a fresh ATM cap using current market inputs and dates, with
+    /// the configured model engine installed. Previously returned caps retain
+    /// their own strike and dates.
     ///
     /// # Errors
     ///
@@ -160,18 +200,26 @@ impl CapHelper {
         self.ensure_built()
     }
 
-    /// Returns the cached cap, building and caching it if absent.
+    /// Rebuilds the cap to refresh its ATM strike and dates.
     fn ensure_built(&self) -> QlResult<SharedMut<CapFloor>> {
-        let existing = self.cap.borrow().as_ref().map(SharedMut::clone);
-        match existing {
-            Some(cap) => Ok(cap),
-            None => self.build_and_store(),
-        }
+        self.build_and_store()
     }
 
     /// Rebuilds the cap and replaces the cache, returning the fresh one.
     fn build_and_store(&self) -> QlResult<SharedMut<CapFloor>> {
-        let cap = self.build_cap()?;
+        let cap = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.build_cap()))
+            .map_err(|_| {
+                crate::errors::QlError::new(
+                    "invalid cap helper dates or schedule",
+                    file!(),
+                    line!(),
+                )
+            })??;
+        if let Some(engine) = self.base.pricing_engine() {
+            cap.borrow_mut()
+                .base_mut()
+                .set_pricing_engine(SharedMut::clone(engine));
+        }
         *self.cap.borrow_mut() = Some(SharedMut::clone(&cap));
         Ok(cap)
     }
@@ -281,9 +329,12 @@ impl BlackCalibrationHelper for CapHelper {
     /// `blackPrice` (`caphelper.cpp:69-89`): prices the cap through a
     /// [`BlackCapFloorEngine`] (shifted-lognormal) at `sigma`, then restores the
     /// model engine (`:87`) so a later price on the installed engine reflects the
-    /// model, not this temporary Black engine. The `Normal` branch's
-    /// `BachelierCapFloorEngine` is not ported (see the module docs).
+    /// model, not this temporary market engine. Normal quotes use Bachelier.
     fn black_price(&self, sigma: Real) -> QlResult<Real> {
+        require!(
+            sigma.is_finite() && sigma >= 0.0,
+            "cap volatility must be finite and non-negative"
+        );
         let cap = self.build_and_store()?;
 
         let engine: SharedMut<dyn PricingEngine> = match self.base.volatility_type() {
@@ -298,20 +349,23 @@ impl BlackCalibrationHelper for CapHelper {
                     Shared::clone(&self.settings),
                 )?) as SharedMut<dyn PricingEngine>
             }
-            VolatilityType::Normal => fail!(
-                "CapHelper Normal volatility needs a BachelierCapFloorEngine, which is not ported"
-            ),
+            VolatilityType::Normal => shared_mut(BachelierCapFloorEngine::with_flat_vol(
+                self.term_structure.clone(),
+                Handle::new(shared(SimpleQuote::new(sigma)) as Shared<dyn Quote>),
+                crate::time::daycounters::actual365fixed::Actual365Fixed::new(),
+                Shared::clone(&self.settings),
+            )?) as SharedMut<dyn PricingEngine>,
         };
 
         cap.borrow_mut().base_mut().set_pricing_engine(engine);
-        let value = cap.borrow_mut().npv()?;
+        let value = cap.borrow_mut().npv();
 
         if let Some(model_engine) = self.base.pricing_engine() {
             cap.borrow_mut()
                 .base_mut()
                 .set_pricing_engine(SharedMut::clone(model_engine));
         }
-        Ok(value)
+        value
     }
 }
 
@@ -592,11 +646,9 @@ mod tests {
         );
     }
 
-    /// The Normal/Bachelier deferral (`caphelper.cpp:78-81`): `black_price` under
-    /// [`VolatilityType::Normal`] returns an error naming the unported engine
-    /// rather than silently pricing through the lognormal one.
+    /// Normal volatility prices through the Bachelier market engine.
     #[test]
-    fn normal_volatility_black_price_is_a_visible_deferral() {
+    fn normal_volatility_black_price_is_finite() {
         let fixture = Fixture::new();
         let vol: Handle<dyn Quote> =
             Handle::new(shared(SimpleQuote::new(0.01)) as Shared<dyn Quote>);
@@ -613,12 +665,7 @@ mod tests {
             0.0,
         );
 
-        let err = helper.black_price(0.01).unwrap_err();
-        assert!(
-            err.message().contains("BachelierCapFloorEngine"),
-            "unexpected error message: {}",
-            err.message()
-        );
+        assert!(helper.black_price(0.01).unwrap().is_finite());
     }
 
     /// The calibration-runs wiring oracle: Hull-White, pricing caps through the
