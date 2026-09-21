@@ -100,6 +100,23 @@ typedef struct ItofinGbmInput {
   int32_t terminal_only;
 } ItofinGbmInput;
 
+typedef struct ItofinCapHelperConfig {
+  int32_t length;
+  int32_t length_unit;
+  uint64_t volatility;
+  uint64_t index;
+  int32_t fixed_frequency;
+  uint64_t fixed_day_counter;
+  uint8_t include_first_swaplet;
+  uint64_t curve;
+  int32_t error_type;
+  /**
+   * 0 shifted lognormal, 1 normal.
+   */
+  int32_t volatility_type;
+  double shift;
+} ItofinCapHelperConfig;
+
 /**
  * A zero quote handle selects `rate`; a nonzero settings handle selects moving dates.
  */
@@ -980,6 +997,73 @@ int32_t itofin_calendar_holiday_list(struct ItofinContext *ctx,
                                      size_t capacity,
                                      size_t *required,
                                      struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers must be aligned and valid. Handles belong to the calling context and thread.
+ */
+int32_t itofin_cap_helper_new(struct ItofinContext *ctx,
+                              struct ItofinCapHelperConfig a,
+                              uint64_t *out,
+                              struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers must be aligned and valid. The times array has times_len elements.
+ */
+int32_t itofin_tree_capfloor_engine_new(struct ItofinContext *ctx,
+                                        uint64_t model,
+                                        size_t steps,
+                                        const double *times,
+                                        size_t times_len,
+                                        uint64_t *out,
+                                        struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers must be aligned and valid. Handles belong to the calling context and thread.
+ */
+int32_t itofin_cap_helper_set_tree_engine(struct ItofinContext *ctx,
+                                          uint64_t helper,
+                                          uint64_t engine,
+                                          struct ItofinError *error);
+
+/**
+ * Field 0 market value, 1 black price at volatility, 2 model value, 3 calibration error.
+ * # Safety
+ * Pointers must be aligned and valid. Handles belong to the calling context and thread.
+ */
+int32_t itofin_cap_helper_value(struct ItofinContext *ctx,
+                                uint64_t helper,
+                                int32_t field,
+                                double volatility,
+                                double *out,
+                                struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers must be aligned and valid. Buffer follows the crate's two-pass array contract.
+ */
+int32_t itofin_cap_helper_times(struct ItofinContext *ctx,
+                                uint64_t helper,
+                                double *out,
+                                size_t capacity,
+                                size_t *required,
+                                struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers must be aligned and valid. The helpers array has helpers_len elements.
+ */
+int32_t itofin_hullwhite_calibrate_caps(struct ItofinContext *ctx,
+                                        uint64_t model,
+                                        const uint64_t *helpers,
+                                        size_t helpers_len,
+                                        uint64_t method,
+                                        uint64_t criteria,
+                                        size_t steps,
+                                        uint8_t fix_reversion,
+                                        struct ItofinError *error);
 
 /**
  * # Safety
