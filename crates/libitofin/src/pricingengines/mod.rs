@@ -17,7 +17,7 @@ pub mod vanilla;
 
 pub use blackcalculator::BlackCalculator;
 pub use bond::{BondFunctions, DiscountingBondEngine};
-pub use capfloor::{AnalyticCapFloorEngine, BlackCapFloorEngine};
+pub use capfloor::{AnalyticCapFloorEngine, BachelierCapFloorEngine, BlackCapFloorEngine};
 pub use credit::{IntegralCdsEngine, MidPointCdsEngine};
 pub use inflation::{YoYInflationCapFloorEngine, yoy_optionlet_price};
 pub use mclongstaffschwartzengine::McLongstaffSchwartzEngineBase;

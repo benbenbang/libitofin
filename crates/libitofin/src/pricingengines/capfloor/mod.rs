@@ -10,3 +10,6 @@ mod blackcapfloorengine;
 
 pub use analyticcapfloorengine::AnalyticCapFloorEngine;
 pub use blackcapfloorengine::BlackCapFloorEngine;
+
+mod bacheliercapfloorengine;
+pub use bacheliercapfloorengine::BachelierCapFloorEngine;
