@@ -1,0 +1,55 @@
+{
+  "inflation": [
+    {
+      "flat": false,
+      "latest": "2008-07-01",
+      "pillar": "2008-06-15",
+      "yoy_latest": "2008-07-01",
+      "yoy_pillar": "2008-06-15",
+      "yoy_rate": 0.029499999999999995,
+      "zero_rate": 0.02757797999741466
+    },
+    {
+      "flat": true,
+      "latest": "2008-06-01",
+      "pillar": "2008-06-01",
+      "yoy_latest": "2008-06-01",
+      "yoy_pillar": "2008-06-01",
+      "yoy_rate": 0.0295,
+      "zero_rate": 0.026250783298904422
+    }
+  ],
+  "quantlib": "1.43-dev",
+  "yield": [
+    {
+      "discount": 0.9847588346990636,
+      "earliest": "2026-09-17",
+      "kind": 0,
+      "latest": "2026-10-15",
+      "latest_relevant": "2026-12-17",
+      "maturity": "2026-12-17",
+      "pillar": "2026-10-15",
+      "updated_discount": 0.9842567778039171
+    },
+    {
+      "discount": 0.9707165505593316,
+      "earliest": "2026-06-17",
+      "kind": 1,
+      "latest": "2027-03-15",
+      "latest_relevant": "2027-06-17",
+      "maturity": "2027-06-17",
+      "pillar": "2027-03-15",
+      "updated_discount": 0.9697698648649993
+    },
+    {
+      "discount": 0.970003307419005,
+      "earliest": "2026-06-17",
+      "kind": 2,
+      "latest": "2027-06-21",
+      "latest_relevant": "2027-06-21",
+      "maturity": "2027-06-17",
+      "pillar": "2027-03-15",
+      "updated_discount": 0.969034134833535
+    }
+  ]
+}
