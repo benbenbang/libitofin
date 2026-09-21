@@ -28,9 +28,6 @@
 //!   landed with #806 as [`with_start_date`](ZeroCouponInflationSwapHelper::with_start_date);
 //!   the year-on-year helper stays relative-date only, and the deprecated
 //!   nominal-curve constructor (`cpp:71-86`) stays out.
-//! - The `Pillar::CustomDate` choice, on both helpers (`cpp:140-150` and
-//!   `cpp:271-281`, #808), which needs an explicit pillar date threaded through
-//!   construction plus its bounds check.
 
 use std::cell::{Ref, RefCell, RefMut};
 use std::rc::Weak;
@@ -579,6 +576,11 @@ impl ZeroCouponInflationSwapHelper {
             CpiInterpolationType::Linear => {
                 let latest_date = fixing_period.1 + 1;
                 let pillar_date = match pillar {
+                    Pillar::CustomDate(date) => Some(Pillar::CustomDate(date).resolve(
+                        fixing_period.0,
+                        latest_date,
+                        latest_date,
+                    )?),
                     Pillar::MaturityDate => Some(latest_date),
                     Pillar::LastRelevantDate => {
                         let weight_date = start_date.unwrap_or(maturity);
@@ -897,6 +899,11 @@ impl YearOnYearInflationSwapHelper {
             CpiInterpolationType::Linear => {
                 let latest_date = fixing_period.1 + 1;
                 let pillar_date = match pillar {
+                    Pillar::CustomDate(date) => Some(Pillar::CustomDate(date).resolve(
+                        fixing_period.0,
+                        latest_date,
+                        latest_date,
+                    )?),
                     Pillar::MaturityDate => Some(latest_date),
                     Pillar::LastRelevantDate => {
                         let weight_period = inflation_period(maturity, yii.frequency())?;
