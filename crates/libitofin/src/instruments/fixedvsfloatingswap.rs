@@ -208,6 +208,7 @@ pub struct FixedVsFloatingSwap {
     fair_spread: Option<Spread>,
     constant_nominals: bool,
     same_nominals: bool,
+    pub(crate) is_vanilla: bool,
 }
 
 impl FixedVsFloatingSwap {
@@ -293,6 +294,7 @@ impl FixedVsFloatingSwap {
             fair_spread: None,
             constant_nominals,
             same_nominals,
+            is_vanilla: false,
         })
     }
 
