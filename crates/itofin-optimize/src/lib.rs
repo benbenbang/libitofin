@@ -8,6 +8,7 @@
 //! There is no public `minimize` entry point yet. It arrives with the first
 //! solver (Nelder-Mead).
 
+mod counters;
 mod error;
 mod objective;
 mod outcome;
@@ -16,6 +17,7 @@ mod problem;
 #[cfg(test)]
 mod tests;
 
+pub use counters::{Counters, Halt};
 pub use error::{InvalidInput, MinimizeError};
 pub use objective::{Flow, IterationState, Objective};
 pub use outcome::{Converged, Minimize, Termination};
