@@ -31,6 +31,11 @@ pub enum InvalidInput {
         method: &'static str,
         option: &'static str,
     },
+    /// A tolerance that must be finite and strictly positive is not. An
+    /// infinite tolerance is met by every simplex, so it is rejected rather
+    /// than honoured as an instant convergence.
+    #[error("{option} must be finite and positive")]
+    NotFinitePositive { option: &'static str },
     /// A tolerance that must be finite and non-negative is not. Zero is legal,
     /// which is why this is not [`InvalidInput::NotPositive`].
     #[error("{option} must be finite and non-negative")]

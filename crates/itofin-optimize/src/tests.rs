@@ -172,9 +172,9 @@ fn a_budget_must_be_positive_when_given() {
 }
 
 #[test]
-fn a_tolerance_must_be_positive_when_given() {
-    for tol in [0.0, -1.0, f64::NAN] {
-        let expected = InvalidInput::NotPositive { option: "tol" };
+fn a_shared_tolerance_must_be_finite_and_positive() {
+    for tol in [0.0, -1.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        let expected = InvalidInput::NotFinitePositive { option: "tol" };
         assert_eq!(common(None, None, Some(tol)).validate(), Err(expected));
     }
 }
@@ -633,18 +633,19 @@ fn bounds_are_rejected_before_any_evaluation() {
     assert!(matches!(error, MinimizeError::InvalidInput(found) if found == expected));
 }
 
-struct NanAfter {
+struct NonfiniteAfter {
     calls: usize,
     limit: usize,
+    after: f64,
 }
 
-impl Objective for NanAfter {
+impl Objective for NonfiniteAfter {
     type Error = Infallible;
 
     fn value(&mut self, x: &[f64]) -> Result<f64, Self::Error> {
         self.calls += 1;
         if self.calls > self.limit {
-            return Ok(f64::NAN);
+            return Ok(self.after);
         }
         Ok(sphere(x))
     }
@@ -652,9 +653,10 @@ impl Objective for NanAfter {
 
 #[test]
 fn a_nan_value_ends_the_run_at_the_best_finite_vertex() {
-    let mut objective = NanAfter {
+    let mut objective = NonfiniteAfter {
         calls: 0,
         limit: 12,
+        after: f64::NAN,
     };
     let problem = Problem {
         x0: vec![2.0, 2.0],
@@ -672,7 +674,11 @@ fn a_nan_value_ends_the_run_at_the_best_finite_vertex() {
 
 #[test]
 fn a_nan_at_the_starting_point_returns_that_point() {
-    let mut objective = NanAfter { calls: 0, limit: 0 };
+    let mut objective = NonfiniteAfter {
+        calls: 0,
+        limit: 0,
+        after: f64::NAN,
+    };
     let x0 = vec![1.0, 2.0];
     let problem = Problem {
         x0: x0.clone(),
@@ -761,4 +767,65 @@ fn a_shrink_rescues_a_simplex_that_straddles_the_valley() {
     let result = solve(rosenbrock, vec![-1.2, 1.0], straddling, generous());
     assert_eq!(result.status, Termination::Converged(Converged::XTol));
     assert!(result.fun < 1e-8, "{}", result.fun);
+}
+
+#[test]
+fn a_negative_infinity_vertex_ends_the_run_at_the_best_finite_point() {
+    let cliff = |x: &[f64]| {
+        if x[0] > 1.01 {
+            f64::NEG_INFINITY
+        } else {
+            x[0] * x[0]
+        }
+    };
+    let result = solve(
+        cliff,
+        vec![1.0],
+        NelderMeadOptions::default(),
+        Common::default(),
+    );
+    assert_eq!(result.status, Termination::Nonfinite);
+    assert!(!result.success);
+    assert_eq!(result.x, vec![1.0]);
+    assert_eq!(result.fun, 1.0);
+    assert_eq!(result.nfev, 2);
+}
+
+#[test]
+fn a_negative_infinity_after_progress_keeps_the_best_finite_point() {
+    let mut objective = NonfiniteAfter {
+        calls: 0,
+        limit: 12,
+        after: f64::NEG_INFINITY,
+    };
+    let problem = Problem {
+        x0: vec![2.0, 2.0],
+        bounds: None,
+    };
+    let result = with_defaults(&mut objective, &problem, Common::default())
+        .expect("a nonfinite value is a status, not an error");
+    assert_eq!(result.status, Termination::Nonfinite);
+    assert!(!result.success);
+    assert_eq!(result.nfev, 13);
+    assert!(result.fun.is_finite());
+    assert!(result.fun < sphere(&[2.0, 2.0]));
+    assert_eq!(result.fun, sphere(&result.x));
+}
+
+#[test]
+fn an_infinite_shared_tolerance_is_rejected_before_any_evaluation() {
+    let mut recorder = Recorder::default();
+    let problem = Problem {
+        x0: vec![1.0, -2.0],
+        bounds: None,
+    };
+    let error = with_defaults(
+        &mut recorder,
+        &problem,
+        common(None, None, Some(f64::INFINITY)),
+    )
+    .expect_err("an infinite tolerance is not a tolerance");
+    let expected = InvalidInput::NotFinitePositive { option: "tol" };
+    assert!(matches!(error, MinimizeError::InvalidInput(found) if found == expected));
+    assert!(recorder.points.is_empty());
 }

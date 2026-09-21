@@ -5,6 +5,10 @@
 //! or inside contraction, falling back to a shrink towards the best vertex when
 //! no candidate improves on it.
 //!
+//! A `+inf` value is a legal worse vertex, so a barrier objective converges
+//! inside its feasible region. A `NaN` or `-inf` value ends the run instead,
+//! reporting the best finite point reached.
+//!
 //! - Nelder, J. A. and Mead, R. (1965), "A simplex method for function
 //!   minimization", The Computer Journal 7(4), 308-313: the four moves.
 //! - Lagarias, J. C., Reeds, J. A., Wright, M. H. and Wright, P. E. (1998),
@@ -71,16 +75,19 @@ impl Search {
 
     /// Evaluates the objective at `x`, charging the call and recording it.
     ///
-    /// `NaN` ends the run with [`Termination::Nonfinite`]; `+inf` is a legal
-    /// worse value that simply never becomes the best. The first value seen is
-    /// kept whatever it is, so that a run whose every value is nonfinite still
-    /// has a point to report.
+    /// `NaN` and `-inf` end the run with [`Termination::Nonfinite`], because
+    /// neither gives the simplex a direction to follow: `NaN` orders against
+    /// nothing, and `-inf` is an optimum the search can never improve on or
+    /// move away from. `+inf` stays a legal worse value that simply never
+    /// becomes the best, which is what makes a barrier objective work. The
+    /// first value seen is kept whatever it is, so that a run whose every value
+    /// is nonfinite still has a point to report.
     fn value<O: Objective>(&mut self, objective: &mut O, x: &[f64]) -> Result<f64, Halt<O::Error>> {
         let value = self.counters.value(objective, x)?;
         if self.first.is_none() {
             self.first = Some((x.to_vec(), value));
         }
-        if value.is_nan() {
+        if value.is_nan() || value == f64::NEG_INFINITY {
             return Err(Halt::Terminated(Termination::Nonfinite));
         }
         if value.is_finite() && self.best.as_ref().is_none_or(|(_, best)| value < *best) {
