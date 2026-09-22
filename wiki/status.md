@@ -117,6 +117,15 @@ cached-state recovery. Local/global bootstrap factories reject iterative options
 The [QuantLib oracle](../crates/libitofin/tests/fixtures/iterative_bootstrap/README.md)
 checks widening, fallback values, cached recovery, and the outer iteration limit.
 
+## Municipal BMA swaps
+
+[#565](https://github.com/benbenbang/libitofin/issues/565) adds Rust/Python/C/Go
+BMA indexes, averaged coupons, municipal swaps and rate helpers. Original ten
+1Y-30Y quotes reprice at `1e-9` across iterative curve configurations; local
+bootstrap retains `1e-6`. Independent QuantLib prices, holiday fixing dates,
+live quotes/history, retained ownership and recovery are tested. See the
+[municipal swap guide](../docs/docs/bma.md). Awaiting release.
+
 ## Joint curve bootstrapping
 
 Rust exposes `IborIborBasisSwapRateHelper` and the genuinely coupled 3M/6M
