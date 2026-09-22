@@ -8,6 +8,7 @@
 //! Go enforces these rules through a session worker locked to one OS thread.
 #![deny(unsafe_op_in_unsafe_fn)]
 
+pub mod bma_api;
 pub mod bootstrap_api;
 pub mod bootstrap_callbacks;
 pub mod bootstrap_variables;
