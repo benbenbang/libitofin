@@ -47,7 +47,7 @@ mod volatilitytype;
 pub use blackconstantvol::BlackConstantVol;
 pub use blackvariancecurve::{BlackVarianceCurve, BlackVolTimeExtrapolation};
 pub use blackvariancesurface::{BlackVarianceSurface, Extrapolation};
-pub use capfloor::{CapFloorTermVolSurface, CapFloorTermVolatilityStructure};
+pub use capfloor::{CapFloorTermVolCurve, CapFloorTermVolSurface, CapFloorTermVolatilityStructure};
 pub use flatsmilesection::FlatSmileSection;
 pub use inflation::{
     ConstantYoYOptionletVolatility, InterpolatedYoYOptionletStripper,
