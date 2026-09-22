@@ -5,15 +5,19 @@
 //! contract. The generalized Black-Scholes process (with its Merton
 //! convenience) is the first resident; the sibling conveniences
 //! (`BlackScholesProcess`, `BlackProcess`, `GarmanKohlagenProcess`) and the
-//! pluggable discretization objects follow as noted on
+//! other process conveniences follow as noted on
 //! [`GeneralizedBlackScholesProcess`].
 
 mod blackscholesprocess;
+pub mod discretization;
 mod hestonprocess;
 mod ornsteinuhlenbeckprocess;
 mod stochasticprocessarray;
 
 pub use blackscholesprocess::{BlackScholesMertonProcess, GeneralizedBlackScholesProcess};
+pub use discretization::{
+    DiscretizedProcess1D, EulerDiscretization, ProcessDiscretization, ProcessDiscretization1D,
+};
 pub use hestonprocess::HestonProcess;
 pub use ornsteinuhlenbeckprocess::OrnsteinUhlenbeckProcess;
 pub use stochasticprocessarray::StochasticProcessArray;
