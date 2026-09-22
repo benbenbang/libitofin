@@ -270,6 +270,21 @@ typedef struct ItofinBondHelperConfig {
   bool has_issue_date;
 } ItofinBondHelperConfig;
 
+/**
+ * Alternative Heston engine options. Kind 0 COS, 1 exponential fitting.
+ * CV 0 Optimal, 1 AndersenPiterbarg, 2 AndersenPiterbargOptCV,
+ * 3 AsymptoticChF, 4 AngledContour, 5 AngledContourNoCV.
+ */
+typedef struct ItofinHestonEngineConfig {
+  int32_t kind;
+  double l;
+  size_t n;
+  int32_t control_variate;
+  int32_t has_scaling;
+  double scaling;
+  double alpha;
+} ItofinHestonEngineConfig;
+
 typedef struct ItofinIborConfig {
   int32_t tenor_length;
   int32_t tenor_unit;
@@ -1820,6 +1835,52 @@ int32_t itofin_swap_helper_new_with_pillar(struct ItofinContext *ctx,
                                            int32_t custom_pillar_date,
                                            uint64_t *out,
                                            struct ItofinError *error);
+
+/**
+ * Create a retained engine usable with option engine kind 2.
+ * # Safety
+ * Pointers must be aligned, live and valid for their stated lengths. Outputs
+ * must not overlap inputs or other outputs. Context and handles belong to the
+ * calling thread; serialize calls including destruction.
+ */
+int32_t itofin_heston_engine_new(struct ItofinContext *ctx,
+                                 uint64_t model,
+                                 const struct ItofinHestonEngineConfig *config,
+                                 uint64_t *out,
+                                 struct ItofinError *error);
+
+/**
+ * Calibrate a Heston model using the configured alternative engine.
+ * # Safety
+ * Pointers must be aligned, live and valid for their stated lengths. Outputs
+ * must not overlap inputs or other outputs. Context and handles belong to the
+ * calling thread; serialize calls including destruction.
+ */
+int32_t itofin_heston_calibrate_engine(struct ItofinContext *ctx,
+                                       uint64_t model,
+                                       const uint64_t *helpers,
+                                       size_t helpers_len,
+                                       uint64_t method,
+                                       uint64_t criteria,
+                                       const struct ItofinHestonEngineConfig *config,
+                                       struct ItofinError *error);
+
+/**
+ * COS inspector field: 0-3 cumulants, 4 log forward/spot, 5 characteristic function.
+ * Time must be finite and nonnegative; frequency must be finite. Scalar fields
+ * write zero to the imaginary output. The engine retains its live model.
+ * # Safety
+ * Pointers must be aligned, live and valid. Outputs must not overlap each other.
+ * Context and handles belong to the calling thread; serialize all calls.
+ */
+int32_t itofin_cos_heston_value(struct ItofinContext *ctx,
+                                uint64_t engine,
+                                int32_t field,
+                                double t,
+                                double u,
+                                double *out_real,
+                                double *out_imag,
+                                struct ItofinError *error);
 
 /**
  * # Safety
