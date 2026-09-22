@@ -128,8 +128,7 @@ pub unsafe extern "C" fn itofin_stripped_optionlet_adapter_new(
     unsafe {
         with_context(ctx, error, |c| {
             check_ptr(out)?;
-            let base =
-                c.get::<Shared<OptionletStripper1>>(stripper)? as Shared<dyn StrippedOptionletBase>;
+            let base = crate::stripper_completion_api::stripped(c, stripper)?;
             let v = shared(StrippedOptionletAdapter::new(base, settings(c, setting)?)?)
                 as Shared<dyn OptionletVolatilityStructure>;
             output(out, c.insert(Handle::new(v))?)
