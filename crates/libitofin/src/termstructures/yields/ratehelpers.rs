@@ -6,8 +6,8 @@
 //! long end over vanilla swaps, [`OISRateHelper`], the long end over
 //! overnight-indexed swaps, [`FuturesRateHelper`], the short-to-mid end over
 //! exchange-traded IMM/ASX futures, and [`FraRateHelper`], the mid end over
-//! forward-rate agreements. `BMASwapRateHelper` is deferred to a later ticket
-//! (#343); the `SwapIndex`-based and explicit-start/end-date `SwapRateHelper`
+//! forward-rate agreements. [`super::BMASwapRateHelper`] implements municipal swaps
+//! in its own module. The `SwapIndex`-based and explicit-start/end-date `SwapRateHelper`
 //! constructors are deferred with the swap-index port. The `OISRateHelper`
 //! explicit-start/end-date constructor is deferred likewise.
 //!

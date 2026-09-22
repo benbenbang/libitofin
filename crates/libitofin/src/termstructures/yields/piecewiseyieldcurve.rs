@@ -382,9 +382,9 @@ mod tests {
     //! 1e-9), the **deposits** (`:364-378`) and **swaps** (`:379-403`) sections
     //! only. The round-trip is self-consistent: each instrument is repriced off
     //! the bootstrapped curve and must reproduce its input quote, so there are
-    //! no external numbers. The bond, FRA and futures sections and the
-    //! `testBMACurveConsistency` half need helpers deferred to #343 and are not
-    //! ported here.
+    //! no external numbers. Bond, FRA and futures acceptance lives with their
+    //! helpers; BMA consistency and independent prices live in
+    //! `bmaswapratehelper_tests.rs`.
 
     use super::*;
     use crate::handle::Handle;
@@ -592,22 +592,21 @@ mod tests {
     }
 
     /// `testLogLinearDiscountConsistency` -> `<Discount, LogLinear>`
-    /// (`piecewiseyieldcurve.cpp:676,683`). The `testBMACurveConsistency` half
-    /// (`:684`) needs `BMASwapRateHelper` (#343) and is skipped.
+    /// (`piecewiseyieldcurve.cpp:676,683`). BMA consistency is covered in `bmaswapratehelper_tests.rs`.
     #[test]
     fn log_linear_discount_consistency() {
         check_curve_consistency::<Discount, LogLinear>();
     }
 
     /// `testLinearDiscountConsistency` -> `<Discount, Linear>`
-    /// (`piecewiseyieldcurve.cpp:687,694`). The BMA half (`:695`) is skipped.
+    /// (`piecewiseyieldcurve.cpp:687,694`). BMA consistency is covered in `bmaswapratehelper_tests.rs`.
     #[test]
     fn linear_discount_consistency() {
         check_curve_consistency::<Discount, Linear>();
     }
 
     /// `testLinearZeroConsistency` -> `<ZeroYield, Linear>`
-    /// (`piecewiseyieldcurve.cpp:698,705`). The BMA half (`:706`) is skipped.
+    /// (`piecewiseyieldcurve.cpp:698,705`). BMA consistency is covered in `bmaswapratehelper_tests.rs`.
     ///
     /// The consistency round-trip only prices instruments at exact solved
     /// nodes, so it cannot see the reference node: `ZeroYield::update_guess`
@@ -710,7 +709,7 @@ mod tests {
     }
 
     /// `testSplineZeroConsistency` -> `<ZeroYield, Cubic>`
-    /// (`piecewiseyieldcurve.cpp:709,716`). The BMA half (`:721`) is skipped.
+    /// (`piecewiseyieldcurve.cpp:709,716`). BMA consistency is covered in `bmaswapratehelper_tests.rs`.
     /// The bootstrap runs the convergence loop here: `Cubic` is global, so
     /// every pillar solve moves the whole curve and the driver re-solves all
     /// nodes until the largest per-pass change is within the bootstrap
@@ -742,7 +741,7 @@ mod tests {
     }
 
     /// `testLinearForwardConsistency` -> `<ForwardRate, Linear>`
-    /// (`piecewiseyieldcurve.cpp:728,735`). The BMA half (`:736`) is skipped.
+    /// (`piecewiseyieldcurve.cpp:728,735`). BMA consistency is covered in `bmaswapratehelper_tests.rs`.
     /// The node `[0]` assertion has the same rationale as
     /// [`linear_zero_consistency`]: `ForwardRate::update_guess` mirrors the
     /// first solved forward into the reference node and no repriced instrument
@@ -758,7 +757,7 @@ mod tests {
     }
 
     /// `testFlatForwardConsistency` -> `<ForwardRate, BackwardFlat>`
-    /// (`piecewiseyieldcurve.cpp:747,754`). The BMA half (`:755`) is skipped.
+    /// (`piecewiseyieldcurve.cpp:747,754`). BMA consistency is covered in `bmaswapratehelper_tests.rs`.
     #[test]
     fn flat_forward_consistency() {
         let curve = check_curve_consistency::<ForwardRate, BackwardFlat>();
@@ -770,8 +769,7 @@ mod tests {
     }
 
     /// `testConvexMonotoneForwardConsistency` -> `<ForwardRate, ConvexMonotone>`
-    /// (`piecewiseyieldcurve.cpp:772,777`). The BMA half (`:779`) needs
-    /// `BMASwapRateHelper` (#343) and is skipped.
+    /// (`piecewiseyieldcurve.cpp:772,777`). BMA consistency is covered in `bmaswapratehelper_tests.rs`.
     ///
     /// The first non-Cubic global interpolator through the convergence loop:
     /// `ConvexMonotone` reads the solved nodes as discrete forwards (ignoring
@@ -793,8 +791,7 @@ mod tests {
 
     /// `testLocalBootstrapConsistency` ->
     /// `<ForwardRate, ConvexMonotone, LocalBootstrap>` at tolerance 1e-6
-    /// (`piecewiseyieldcurve.cpp:783,788`). The BMA half (`:790-791`) needs
-    /// `BMASwapRateHelper` (#343) and is skipped.
+    /// (`piecewiseyieldcurve.cpp:783,788`). BMA consistency is covered in `bmaswapratehelper_tests.rs`.
     ///
     /// The looser tolerance is the C++ harness's own: each localised
     /// least-squares window stops at the bootstrap accuracy rather than at a
