@@ -3283,6 +3283,22 @@ int32_t itofin_mc_engine_new(struct ItofinContext *ctx,
                              struct ItofinError *error);
 
 /**
+ * American/Bermudan engine with an explicit basis: 0 Monomial, 1 Laguerre,
+ * 2 Hermite, 3 Hyperbolic, 6 Chebyshev2nd. Values 4 and 5 are unsupported.
+ * Chebyshev2nd supports put payoffs only; call pricing returns an error.
+ * The existing McConfig layout and default engine entrypoint are unchanged.
+ * # Safety
+ * Outputs must be aligned, live and non-overlapping. Context and handles must
+ * belong to the calling thread; serialize calls including destruction.
+ */
+int32_t itofin_mc_american_engine_new(struct ItofinContext *ctx,
+                                      uint64_t process,
+                                      struct McConfig cfg,
+                                      int32_t basis,
+                                      uint64_t *out,
+                                      struct ItofinError *error);
+
+/**
  * # Safety
  * Pointers must be aligned, live and valid for their stated lengths. Outputs
  * must not overlap inputs or other outputs. Any context and its handles must
@@ -3453,6 +3469,34 @@ int32_t itofin_option_new(struct ItofinContext *ctx,
                           uint64_t settings,
                           uint64_t *out,
                           struct ItofinError *error);
+
+/**
+ * Build an American option whose exercise window starts at Date::min_date().
+ * # Safety
+ * Outputs must be aligned, live and non-overlapping. Context and handles must
+ * belong to the calling thread; serialize calls including destruction.
+ */
+int32_t itofin_option_american_until_new(struct ItofinContext *ctx,
+                                         int32_t kind,
+                                         double strike,
+                                         int32_t expiry,
+                                         uint64_t settings,
+                                         uint64_t *out,
+                                         struct ItofinError *error);
+
+/**
+ * Build a vanilla option retaining a Bermudan exercise handle.
+ * # Safety
+ * Outputs must be aligned, live and non-overlapping. Context and handles must
+ * belong to the calling thread; serialize calls including destruction.
+ */
+int32_t itofin_option_bermudan_new(struct ItofinContext *ctx,
+                                   int32_t kind,
+                                   double strike,
+                                   uint64_t exercise,
+                                   uint64_t settings,
+                                   uint64_t *out,
+                                   struct ItofinError *error);
 
 /**
  * Engine kind: 0 analytic European (BSM process), 1 analytic Heston (model), 2 MC engine.
