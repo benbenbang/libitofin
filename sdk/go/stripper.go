@@ -16,13 +16,23 @@ type OptionletStripperConfig struct {
 	Displacement       float64
 	Discount           *YieldTermStructure
 	OptionletFrequency *Period
+	OvernightIndex     *OvernightIndex
+	SwitchStrike       *float64
+	DontThrow          bool
 }
 
 func (s *Session) OptionletStripper1(x OptionletStripperConfig) (*OptionletStripper1, error) {
-	if x.TermVolSurface == nil || x.IborIndex == nil {
-		return nil, fmt.Errorf("term volatility and ibor index are required")
+	if x.TermVolSurface == nil || (x.IborIndex == nil) == (x.OvernightIndex == nil) {
+		return nil, fmt.Errorf("term volatility and exactly one ibor or overnight index are required")
 	}
-	deps := []object{x.TermVolSurface.object, x.IborIndex.object}
+	deps := []object{x.TermVolSurface.object}
+	var index object
+	if x.IborIndex != nil {
+		index = x.IborIndex.object
+	} else {
+		index = x.OvernightIndex.object
+	}
+	deps = append(deps, index)
 	var discount uint64
 	if x.Discount != nil {
 		deps = append(deps, x.Discount.object)
@@ -46,7 +56,18 @@ func (s *Session) OptionletStripper1(x OptionletStripperConfig) (*OptionletStrip
 	var id C.uint64_t
 	err := s.invoke(func() error {
 		var e C.ItofinError
-		return ffiError(C.itofin_optionlet_stripper_new(s.ctx, C.uint64_t(x.TermVolSurface.id), C.uint64_t(x.IborIndex.id), C.int32_t(x.VolatilityType), C.double(x.Accuracy), C.uint32_t(x.MaxIterations), C.double(x.Displacement), C.uint64_t(discount), length, unit, present, &id, &e), &e)
+		cfg := C.ItofinOptionletStripperConfig{surface: C.uint64_t(x.TermVolSurface.id), index: C.uint64_t(index.id), discount: C.uint64_t(discount), volatility_type: C.int32_t(x.VolatilityType), accuracy: C.double(x.Accuracy), max_iterations: C.uint32_t(x.MaxIterations), displacement: C.double(x.Displacement), frequency_length: length, frequency_unit: unit, has_frequency: C.uint8_t(present)}
+		if x.SwitchStrike != nil {
+			cfg.has_switch_strike = 1
+			cfg.switch_strike = C.double(*x.SwitchStrike)
+		}
+		if x.DontThrow {
+			cfg.dont_throw = 1
+		}
+		if x.OvernightIndex != nil {
+			cfg.overnight = 1
+		}
+		return ffiError(C.itofin_optionlet_stripper_new_with_options(s.ctx, &cfg, &id, &e), &e)
 	})
 	if err != nil {
 		return nil, err
@@ -88,17 +109,33 @@ func (v *OptionletStripper1) ATMOptionletRates() ([]float64, error) {
 	})
 	return result, err
 }
-func (s *Session) StrippedOptionletAdapter(stripper *OptionletStripper1, settings *Settings) (*OptionletVolatilityStructure, error) {
+
+type OptionletStripper interface{ strippedObject() object }
+
+func (v *OptionletStripper1) strippedObject() object {
+	if v == nil {
+		return object{}
+	}
+	return v.object
+}
+func (v *OptionletStripper2) strippedObject() object {
+	if v == nil {
+		return object{}
+	}
+	return v.object
+}
+
+func (s *Session) StrippedOptionletAdapter(stripper OptionletStripper, settings *Settings) (*OptionletVolatilityStructure, error) {
 	if stripper == nil || settings == nil {
 		return nil, fmt.Errorf("stripper and settings are required")
 	}
-	if err := sameSession(s, stripper.object, settings.object); err != nil {
+	if err := sameSession(s, stripper.strippedObject(), settings.object); err != nil {
 		return nil, err
 	}
 	var id C.uint64_t
 	err := s.invoke(func() error {
 		var e C.ItofinError
-		return ffiError(C.itofin_stripped_optionlet_adapter_new(s.ctx, C.uint64_t(stripper.id), C.uint64_t(settings.id), &id, &e), &e)
+		return ffiError(C.itofin_stripped_optionlet_adapter_new(s.ctx, C.uint64_t(stripper.strippedObject().id), C.uint64_t(settings.id), &id, &e), &e)
 	})
 	if err != nil {
 		return nil, err
