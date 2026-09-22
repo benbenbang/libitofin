@@ -1,35 +1,31 @@
-//! Basis systems for Longstaff-Schwartz early-exercise Monte Carlo.
+//! Single-factor Longstaff-Schwartz regression bases.
 //!
-//! Port of `ql/methods/montecarlo/lsmbasissystem.{hpp,cpp}`: the family of
-//! functions the backward induction regresses the continuation value against.
-//! [`LsmBasisSystem::path_basis_system`] returns the `order + 1` monomials
-//! `{1, x, x^2, ..., x^order}` (`lsmbasissystem.cpp:109-114`).
-//!
-//! Deferred, rejected visibly rather than silently ignored:
-//! - **the Gauss families** (`Laguerre`, `Hermite`, `Hyperbolic`, `Legendre`,
-//!   `Chebyshev`, `Chebyshev2nd` - `lsmbasissystem.hpp:39-41`, built from
-//!   `GaussianQuadrature::weightedValue` at `lsmbasissystem.cpp:116-151`).
-//!   [`PolynomialType`] therefore carries the one ported variant rather than a
-//!   full set with unreachable arms. `MakeMCAmericanEngine` defaults to
-//!   `Monomial` (`mcamericanengine.hpp:136`), and the only test that varies the
-//!   family indexes its array by `0*(i*3+j)%5`
-//!   (`test-suite/mclongstaffschwartzengine.cpp:193`), whose `0*` factor pins
-//!   every iteration to element 0, `Monomial` (`:161-164`). No oracle in this
-//!   stack reaches the others.
-//! - **`multiPathBasisSystem`** (`lsmbasissystem.hpp:46-47`), the tensor
-//!   product over a `MultiPath` for multi-asset early exercise.
+//! Mirrors QuantLib's monomials and six Gaussian weighted-polynomial families.
+//! Multi-path tensor-product bases remain outside this single-factor module.
 
+use crate::math::integrals::gaussianorthogonalpolynomial::{
+    GaussHermitePolynomial, GaussHyperbolicPolynomial, GaussJacobiPolynomial,
+    GaussLaguerrePolynomial, GaussianOrthogonalPolynomial,
+};
 use crate::types::{Real, Size};
 
-/// The polynomial family a basis system is built from
-/// (`lsmbasissystem.hpp:38-41`).
-///
-/// Only `Monomial` is ported; see the module docs for the deferred Gauss
-/// families.
+/// Polynomial families of QuantLib's `LsmBasisSystem`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PolynomialType {
-    /// `x^i`, the family `MCAmericanEngine` uses.
+    /// Powers of the state.
     Monomial,
+    /// Weighted Gauss-Laguerre polynomials.
+    Laguerre,
+    /// Weighted Gauss-Hermite polynomials.
+    Hermite,
+    /// Weighted hyperbolic polynomials.
+    Hyperbolic,
+    /// Gauss-Legendre polynomials.
+    Legendre,
+    /// Weighted first-kind Chebyshev polynomials.
+    Chebyshev,
+    /// Weighted second-kind Chebyshev polynomials.
+    Chebyshev2nd,
 }
 
 /// `x^order`, evaluated as C++ does by iterated multiplication rather than
@@ -57,11 +53,29 @@ impl LsmBasisSystem {
         order: Size,
         poly_type: PolynomialType,
     ) -> Vec<Box<dyn Fn(Real) -> Real>> {
-        match poly_type {
-            PolynomialType::Monomial => (0..=order)
-                .map(|i| Box::new(move |x: Real| monomial(i, x)) as Box<dyn Fn(Real) -> Real>)
-                .collect(),
-        }
+        (0..=order)
+            .map(|i| {
+                Box::new(move |x| match poly_type {
+                    PolynomialType::Monomial => monomial(i, x),
+                    PolynomialType::Laguerre => GaussLaguerrePolynomial::new(0.0)
+                        .expect("zero is a valid Laguerre exponent")
+                        .weighted_value(i, x),
+                    PolynomialType::Hermite => GaussHermitePolynomial::new(0.0)
+                        .expect("zero is a valid Hermite exponent")
+                        .weighted_value(i, x),
+                    PolynomialType::Hyperbolic => GaussHyperbolicPolynomial.weighted_value(i, x),
+                    PolynomialType::Legendre => {
+                        GaussJacobiPolynomial::legendre().weighted_value(i, x)
+                    }
+                    PolynomialType::Chebyshev => {
+                        GaussJacobiPolynomial::chebyshev().weighted_value(i, x)
+                    }
+                    PolynomialType::Chebyshev2nd => {
+                        GaussJacobiPolynomial::chebyshev2nd().weighted_value(i, x)
+                    }
+                }) as Box<dyn Fn(Real) -> Real>
+            })
+            .collect()
     }
 }
 
@@ -124,5 +138,25 @@ mod tests {
         assert!((c[0] - 3.0).abs() < 1e-12, "constant term {}", c[0]);
         assert!((c[1] + 2.0).abs() < 1e-12, "linear term {}", c[1]);
         assert!((c[2] - 0.5).abs() < 1e-12, "quadratic term {}", c[2]);
+    }
+
+    #[test]
+    fn gaussian_families_match_independent_quantlib_weighted_values() {
+        let families = [
+            PolynomialType::Monomial,
+            PolynomialType::Laguerre,
+            PolynomialType::Hermite,
+            PolynomialType::Hyperbolic,
+            PolynomialType::Legendre,
+            PolynomialType::Chebyshev,
+            PolynomialType::Chebyshev2nd,
+        ];
+        for row in include_str!("../../../tests/fixtures/mc_american/basis.csv").lines() {
+            let values: Vec<Real> = row.split(',').map(|v| v.parse().unwrap()).collect();
+            let basis = LsmBasisSystem::path_basis_system(3, families[values[0] as usize]);
+            for (f, expected) in basis.iter().zip(&values[2..]) {
+                assert!((f(values[1]) - expected).abs() < 1e-13, "{row}");
+            }
+        }
     }
 }

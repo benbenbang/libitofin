@@ -36,7 +36,8 @@ impl GeneralLinearLeastSquares {
     /// # Errors
     ///
     /// Returns an error if `x` and `y` differ in length, if `v` is empty, or
-    /// if there are fewer samples than basis functions.
+    /// if there are fewer samples than basis functions, or if a response or
+    /// evaluated basis value is non-finite.
     #[allow(clippy::needless_range_loop)]
     pub fn new<X, F>(x: &[X], y: &[Real], v: &[F]) -> QlResult<Self>
     where
@@ -54,11 +55,17 @@ impl GeneralLinearLeastSquares {
         );
         require!(!v.is_empty(), "no basis functions given");
         require!(n >= m, "sample set is too small");
+        require!(
+            y.iter().all(|value| value.is_finite()),
+            "non-finite regression value"
+        );
 
         let mut design = Matrix::with_size(n, m);
         for j in 0..m {
             for i in 0..n {
-                design[(i, j)] = v[j](x[i]);
+                let value = v[j](x[i]);
+                require!(value.is_finite(), "non-finite regression basis value");
+                design[(i, j)] = value;
             }
         }
 
@@ -210,5 +217,18 @@ mod tests {
 
         let err = GeneralLinearLeastSquares::new(&x, &y, &basis).unwrap_err();
         assert!(err.message().contains("basis"), "{}", err);
+    }
+
+    #[test]
+    fn rejects_non_finite_responses_and_basis_before_svd() {
+        let x = [0.0, 1.0, 2.0];
+        for invalid in [Real::NAN, Real::INFINITY, Real::NEG_INFINITY] {
+            let values = [0.0, invalid, 2.0];
+            assert!(GeneralLinearLeastSquares::new(&x, &values, &monomials(1)).is_err());
+            let basis: Basis = vec![Box::new(move |_| invalid)];
+            assert!(GeneralLinearLeastSquares::new(&x, &x, &basis).is_err());
+        }
+        let fit = GeneralLinearLeastSquares::new(&x, &x, &monomials(1)).unwrap();
+        assert!((fit.coefficients()[1] - 1.0).abs() < 1e-14);
     }
 }
