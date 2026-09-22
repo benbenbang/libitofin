@@ -10,6 +10,7 @@ This inventory does not claim exhaustive QuantLib product coverage.
 | Scope | Executable evidence |
 | --- | --- |
 | LSM basis selection and rejection, latest-only American, date-only Bermudan QuantLib oracles, retained inputs and quote recovery | `TestMCAmericanBasisAndLatestOnly`, `TestMCBermudanRetentionUpdatesAndErrors`, `TestMCBermudanQuantLibOracles` |
+| COS/exponential Heston engines: four COS prices at `1e-10`, 88 fitted-quadrature prices at `1e-8`, six control variates, retained inputs, invalid options and live-model calibration | `TestCosHestonQuantLibRetentionAndErrors`, `TestExponentialFittingHestonQuantLibGrid`, `TestExponentialFittingHestonVariatesAndErrors`, `TestAlternativeHestonCalibrationAndLiveModel` |
 | Custom pillars: independent QuantLib helper dates and curve values, invalid bounds, retained inputs and date recovery | `TestCustomYieldPillarsQuantLibAndRecovery`, `TestCustomInflationPillarsQuantLib`, `TestCustomFraOverloadsAndSwapDiscount` |
 | Overnight futures: both accrual conventions, holiday clipping, live convexity/fixings, expiry and released inputs at `1e-9` | `TestOvernightFutureQuantLibAccrualAndRetention`, `TestSofrFutureBootstrapAndCustomPillars` |
 | Hull-White Bermudan tree, six indexed/par QuantLib cached prices, bumped-quote oracle, retained inputs and invalid-input recovery | [Tree swaption tests](../sdk/go/tree_swaption_test.go) |

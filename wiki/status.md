@@ -31,6 +31,26 @@ follow-ups [#1036](https://github.com/benbenbang/libitofin/issues/1036) are clos
 API accounting, numerical tests, and statement coverage measure different things;
 see the [Go validation record](../docs/go-binding-test-gaps.md).
 
+## Alternative Heston engines
+
+Rust, Python, C and Go expose COS and exponentially fitted Gauss-Laguerre
+pricing and calibration (#424), preserving existing analytic defaults. COS uses
+configurable truncation/series size; exponential fitting exposes all six supported
+control-variate choices, optional scaling and contour alpha. These engines price
+European plain-vanilla options and retain live models. COS cumulant, complex
+characteristic-function and forward-drift inspectors are available in each language.
+
+Validation preserves the QuantLib DAX SSE 177.2 +/- 1.0 for all three engines,
+COS cached prices at 1e-10, the 88 extreme-moneyness prices at 1e-8, and independent
+per-control-variate prices. Explicit asymptotic/no-CV quadratures need not match
+other modes at finite order; fixtures preserve QuantLib's differences. Asymptotic
+CV requires alpha -0.5. General analytic integration/formulations remain #418.
+
+The old issue's `testExpansionOn*` references concern separate HestonExpansion
+engines, and `testAnalyticVsBlack` concerns AnalyticHestonEngine; neither implies
+those unrelated engines were added. Table provenance and reproduction are in
+`crates/libitofin/THIRD_PARTY_NOTICES.md` and the Heston oracle fixture README.
+
 ## Cap/floor normal and lattice engines
 
 [#440](https://github.com/benbenbang/libitofin/issues/440) adds Bachelier cap/floor
