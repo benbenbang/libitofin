@@ -4,8 +4,8 @@
 
 ## Process discretization
 
-[#411](https://github.com/benbenbang/libitofin/issues/411) adds Rust-only scalar
-and multifactor strategy adapters with default Euler discretization. Explicit
+Unreleased [#411](https://github.com/benbenbang/libitofin/issues/411) adds Rust-only
+scalar and multifactor strategy adapters with default Euler discretization. Explicit
 wrapping replaces transition methods while retaining source coefficients,
 state composition, ownership and notifications. Existing concrete process
 constructors and exact transition overrides remain unchanged in all languages.
@@ -14,7 +14,7 @@ Custom strategy errors and invalid transition dimensions propagate as errors.
 
 ## Random policies
 
-Unreleased: [QMC European pricing and fallible Poisson generators](../docs/docs/random-policies.md)
+Since v0.27.0: [QMC European pricing and fallible Poisson generators](../docs/docs/random-policies.md)
 are available in Rust, Python, C and Go (#454). The complete 108-case QuantLib
 QMC grid and stored Gaussian/Poisson seed oracles retain their original tolerances.
 
@@ -33,7 +33,7 @@ see the [Go validation record](../docs/go-binding-test-gaps.md).
 
 ## Alternative Heston engines
 
-Rust, Python, C and Go expose COS and exponentially fitted Gauss-Laguerre
+Unreleased: Rust, Python, C and Go expose COS and exponentially fitted Gauss-Laguerre
 pricing and calibration (#424), preserving existing analytic defaults. COS uses
 configurable truncation/series size; exponential fitting exposes all six supported
 control-variate choices, optional scaling and contour alpha. These engines price
@@ -55,7 +55,7 @@ those unrelated engines were added. Table provenance and reproduction are in
 
 [#440](https://github.com/benbenbang/libitofin/issues/440) adds Bachelier cap/floor
 pricing, Hull-White tree engines, and normal-volatility CapHelper calibration in
-Rust, Python and Go, awaiting release. Fixed grids preserve supplied nodes;
+Rust, Python and Go since v0.27.0. Fixed grids preserve supplied nodes;
 missing coupon times are errors. The tree engine requires a nonnegative first
 accrual start; Rust's discretized asset also supports known historical fixings.
 Other short-rate models remain outside this concrete engine's API (#466).
@@ -123,9 +123,9 @@ difference. Existing fixed-base constructors remain available.
 
 ## Iterative bootstrap recovery
 
-[#941](https://github.com/benbenbang/libitofin/issues/941) is implemented for the
-next release. The generic Rust driver retries a failed cached curve from fresh
-state before applying optional sign-aware bound widening. Explicit `dont_throw`
+[#941](https://github.com/benbenbang/libitofin/issues/941) shipped in v0.27.0.
+The generic Rust driver retries a failed cached curve from fresh state before
+applying optional sign-aware bound widening. Explicit `dont_throw`
 permits an inclusive fallback scan or the final unconverged outer pass; it does
 not promise exact repricing. Defaults remain strict.
 
@@ -151,7 +151,7 @@ Rust exposes `IborIborBasisSwapRateHelper` and the genuinely coupled 3M/6M
 Both helper sets read the opposite curve; QuantLib's FRA and swap repricing
 tolerances are preserved. Fixing-history updates on either index invalidate
 and recalibrate the live curve without observing its own forecast handle.
-The Ibor-Ibor core shipped in v0.26.0. The next release adds the concrete
+The Ibor-Ibor core shipped in v0.26.0. Version 0.27.0 adds the concrete
 Python/C/Go `JointYieldCurves` assembly and basis-helper facade
 ([#1066](https://github.com/benbenbang/libitofin/issues/1066)), with retained joint
 ownership and live quote, discount, date and fixing updates. See the
@@ -179,8 +179,8 @@ SOFR and generic overnight futures support Simple/Compound accrual, historical
 fixings, live convexity and fixed reference periods. Monthly SOFR helpers use
 Simple, quarterly helpers Compound. The [QuantLib fixtures](../crates/libitofin/tests/fixtures/sofr_futures/README.md)
 pin holiday clipping, Juneteenth and the upstream `1e-9` price gates, and describe
-the upstream monthly holiday-end bootstrap residuals. These additions await the
-next release.
+the upstream monthly holiday-end bootstrap residuals. These additions shipped
+in v0.27.0.
 
 ## Hull-White calibration
 
@@ -192,7 +192,7 @@ including calibration after input wrappers are released.
 
 ## Swaption foundation
 
-The next release completes [#467](https://github.com/benbenbang/libitofin/issues/467):
+Version 0.27.0 completes [#467](https://github.com/benbenbang/libitofin/issues/467):
 Hull-White tree swaptions rebuild vanilla coupon schedules after inclusive
 seven-day exercise-date snapping. Rust, Python and C/Go support Bermudan exercise;
 all six indexed/par QuantLib cached values pass at `1e-4` absolute tolerance with
@@ -315,6 +315,7 @@ Verified end-to-end since then, each against the matching `test-suite/` oracle:
 
 ### MC American and Bermudan depth
 
+Unreleased [#763](https://github.com/benbenbang/libitofin/issues/763):
 Rust/Python/C/Go support latest-only American windows and Bermudan vanilla options
 with selectable LSM bases: Monomial, Laguerre, Hermite, Hyperbolic and Chebyshev2nd.
 The default remains Monomial; Legendre and Chebyshev are rejected by this engine,

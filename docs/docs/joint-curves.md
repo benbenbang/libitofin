@@ -2,8 +2,8 @@
 
 `JointYieldCurves` fits two mutually coupled curves in one solve. Both members use
 Discount traits, LogLinear interpolation and GlobalBootstrap. Member 0 forecasts
-the base Ibor index; member 1 forecasts the other index. This API requires the
-current development version until the next release.
+the base Ibor index; member 1 forecasts the other index. This API requires
+v0.27.0 or newer.
 
 Prepare two plain helper lists and `IborIborBasisSwapRateHelper` templates. Each
 template retains its live quote, tenor, calendar/convention, settlement lag,
