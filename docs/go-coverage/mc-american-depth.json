@@ -1,0 +1,25 @@
+{
+  "domain": "mc-american-depth",
+  "entries": [
+    {
+      "c": "itofin_option_american_until_new",
+      "go": "Session.NewAmericanOptionUntil",
+      "python": "itofin.instruments.VanillaOption.american_until",
+      "status": "implemented",
+      "tests": [
+        "TestMCAmericanBasisAndLatestOnly",
+        "TestMCAmericanBasisQuantLibOracles"
+      ]
+    },
+    {
+      "c": "itofin_option_bermudan_new",
+      "go": "Session.NewBermudanOption",
+      "python": "itofin.instruments.VanillaOption.from_bermudan",
+      "status": "implemented",
+      "tests": [
+        "TestMCBermudanRetentionUpdatesAndErrors",
+        "TestMCBermudanQuantLibOracles"
+      ]
+    }
+  ]
+}

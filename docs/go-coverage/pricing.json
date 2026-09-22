@@ -586,15 +586,24 @@
       "validation": "Go feature-subset tests passed with Go 1.27.1"
     },
     {
-      "c": "itofin_mc_engine_new",
-      "go": "Session.NewMCAmericanEngine",
+      "c": [
+        "itofin_mc_engine_new",
+        "itofin_mc_american_engine_new"
+      ],
+      "go": [
+        "Session.NewMCAmericanEngine",
+        "Session.NewMCAmericanEngineWithBasis"
+      ],
       "go_file": "sdk/go/mc.go",
       "native_file": "crates/libitofin-ffi/src/mc_api.rs",
       "python": "itofin.pricingengines.MCAmericanEngine.__init__",
       "source": "crates/itofin-py/python/itofin/pricingengines/__init__.pyi",
       "status": "implemented",
       "tests": [
-        "TestMCAmericanCachedOracle"
+        "TestMCAmericanCachedOracle",
+        "TestMCAmericanBasisAndLatestOnly",
+        "TestMCBermudanQuantLibOracles",
+        "TestMCAmericanBasisQuantLibOracles"
       ],
       "validation": "Go feature-subset tests passed with Go 1.27.1"
     },

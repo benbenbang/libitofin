@@ -273,11 +273,10 @@ class IsdaCdsEngine:
 class MCAmericanEngine:
     r"""
     The Longstaff-Schwartz least-squares Monte Carlo engine for American
-    payoffs, over the pseudo-random RNG policy. The low-discrepancy policy is
-    not exposed for this engine, and the Monomial regression basis is not selectable
-    (#453).
+    and Bermudan payoffs, over the pseudo-random RNG policy. Sobol, Brownian
+    bridge, control variates and multi-asset paths are not exposed.
 
-    The option priced must come from VanillaOption.american(...): a
+    The option must have American or Bermudan exercise: a
     European-exercise option raises ItofinError ("wrong exercise given") when
     priced here.
 
@@ -286,7 +285,7 @@ class MCAmericanEngine:
     VanillaOption.error_estimate() and the early-exercise fraction through
     VanillaOption.exercise_probability().
     """
-    def __init__(self, process: processes.BlackScholesProcess, steps: typing.Optional[builtins.int] = None, steps_per_year: typing.Optional[builtins.int] = None, samples: typing.Optional[builtins.int] = None, absolute_tolerance: typing.Optional[builtins.float] = None, max_samples: typing.Optional[builtins.int] = None, seed: typing.Optional[builtins.int] = None, antithetic: typing.Optional[builtins.bool] = None, polynomial_order: typing.Optional[builtins.int] = None, calibration_samples: typing.Optional[builtins.int] = None) -> None:
+    def __init__(self, process: processes.BlackScholesProcess, steps: typing.Optional[builtins.int] = None, steps_per_year: typing.Optional[builtins.int] = None, samples: typing.Optional[builtins.int] = None, absolute_tolerance: typing.Optional[builtins.float] = None, max_samples: typing.Optional[builtins.int] = None, seed: typing.Optional[builtins.int] = None, antithetic: typing.Optional[builtins.bool] = None, polynomial_order: typing.Optional[builtins.int] = None, calibration_samples: typing.Optional[builtins.int] = None, basis_system: builtins.int = 0) -> None:
         r"""
         Build an engine over process, configured through the core factory.
 
@@ -307,10 +306,14 @@ class MCAmericanEngine:
                 bitwise.
             antithetic (bool | None): The antithetic variate, supported here;
                 the core oracle prices with it on.
-            polynomial_order (int | None): The order of the Monomial regression
+            polynomial_order (int | None): The order of the selected regression
                 basis. The core default is 2.
             calibration_samples (int | None): The paths the regression is fitted
                 on. The core default is 2048.
+            basis_system (int): 0 Monomial (default), 1 Laguerre, 2 Hermite,
+                3 Hyperbolic, or 6 Chebyshev2nd. Legendre (4) and Chebyshev (5)
+                are rejected, matching QuantLib's American path pricer.
+                Chebyshev2nd supports put payoffs only; call pricing returns an error.
 
         Raises:
             ItofinError: If neither or both of steps and steps_per_year are

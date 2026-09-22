@@ -1211,6 +1211,16 @@ class VanillaOption:
         Raises:
             ItofinError: If earliest is after latest.
         """
+    @classmethod
+    def american_until(cls, option_type: OptionType, strike: builtins.float, latest: time.Date, settings: itofin.Settings) -> VanillaOption:
+        r"""
+        Build an American option exercisable from the minimum supported date.
+        """
+    @classmethod
+    def from_bermudan(cls, option_type: OptionType, strike: builtins.float, exercise: BermudanExercise, settings: itofin.Settings) -> VanillaOption:
+        r"""
+        Build an option retaining a copied Bermudan exercise schedule.
+        """
     def set_engine(self, process: processes.BlackScholesProcess) -> None:
         r"""
         Attach an analytic European engine built on process.
@@ -1262,7 +1272,7 @@ class VanillaOption:
         r"""
         Attach the Monte Carlo American engine.
 
-        The option must have been built through american(): a European-exercise
+        The option must have American or Bermudan exercise: a European-exercise
         option raises ItofinError ("wrong exercise given") from npv().
 
         Args:
@@ -1364,7 +1374,7 @@ class VanillaOption:
         Attach the Monte Carlo American engine and return the NPV.
 
         The one-shot form of set_mc_american_engine followed by npv. The option
-        must have been built through american(): a European-exercise option
+        must have American or Bermudan exercise: a European-exercise option
         raises ItofinError ("wrong exercise given").
 
         Args:
