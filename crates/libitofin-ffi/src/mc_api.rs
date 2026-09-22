@@ -1,6 +1,7 @@
 //! Concrete Monte Carlo engines; configuration preserves Python optionality.
 use crate::boundary::*;
 use libitofin::math::randomnumbers::rngtraits::{LowDiscrepancy, PseudoRandom};
+use libitofin::methods::montecarlo::PolynomialType;
 use libitofin::pricingengine::PricingEngine;
 use libitofin::pricingengines::vanilla::{
     MakeMcAmericanEngine, MakeMcEuropeanEngine, MakeMcEuropeanHestonEngine,
@@ -137,10 +138,204 @@ pub unsafe extern "C" fn itofin_mc_engine_new(
     }
 }
 
+/// American/Bermudan engine with an explicit basis: 0 Monomial, 1 Laguerre,
+/// 2 Hermite, 3 Hyperbolic, 6 Chebyshev2nd. Values 4 and 5 are unsupported.
+/// Chebyshev2nd supports put payoffs only; call pricing returns an error.
+/// The existing McConfig layout and default engine entrypoint are unchanged.
+/// # Safety
+/// Outputs must be aligned, live and non-overlapping. Context and handles must
+/// belong to the calling thread; serialize calls including destruction.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn itofin_mc_american_engine_new(
+    ctx: *mut Context,
+    process: u64,
+    cfg: McConfig,
+    basis: i32,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(out)?;
+            if cfg.present & !511 != 0
+                || (cfg.present & 64 != 0 && !(0..=1).contains(&cfg.antithetic))
+            {
+                return Err(BindingError::invalid("invalid MC presence mask or boolean"));
+            }
+            let basis = match basis {
+                0 => PolynomialType::Monomial,
+                1 => PolynomialType::Laguerre,
+                2 => PolynomialType::Hermite,
+                3 => PolynomialType::Hyperbolic,
+                4 => PolynomialType::Legendre,
+                5 => PolynomialType::Chebyshev,
+                6 => PolynomialType::Chebyshev2nd,
+                _ => return Err(BindingError::invalid("unknown polynomial basis")),
+            };
+            let mut maker = configure!(
+                MakeMcAmericanEngine::<PseudoRandom>::new(
+                    c.get::<Shared<GeneralizedBlackScholesProcess>>(process)?
+                ),
+                cfg
+            )
+            .with_basis_system(basis);
+            if cfg.present & 128 != 0 {
+                maker = maker.with_polynomial_order(cfg.polynomial_order);
+            }
+            if cfg.present & 256 != 0 {
+                maker = maker.with_calibration_samples(cfg.calibration_samples);
+            }
+            let engine = shared_mut(maker.build()?) as SharedMut<dyn PricingEngine>;
+            output(out, c.insert(engine)?)
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::ptr::null_mut;
+    #[test]
+    fn explicit_basis_errors_preserve_outputs_and_allow_recovery() {
+        use crate::market_api::itofin_black_scholes_new;
+        use crate::options_api::{itofin_option_american_until_new, itofin_option_bermudan_new};
+        use crate::tree_swaption_api::itofin_bermudan_exercise_new;
+        use libitofin::settings::Settings;
+        use libitofin::shared::shared;
+        use libitofin::time::date::{Date, Month};
+        use libitofin::time::daycounters::actual365fixed::Actual365Fixed;
+
+        let mut c = Context::new();
+        let today = Date::new(17, Month::May, 1998);
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(today);
+        let settings = c.insert(settings).unwrap();
+        let dc = c.insert(Actual365Fixed::new()).unwrap();
+        let mut process = 0;
+        let mut out = 77;
+        let cfg = McConfig {
+            present: 1 | 4 | 32,
+            steps: 25,
+            samples: 128,
+            seed: 42,
+            ..McConfig::default()
+        };
+        unsafe {
+            assert_eq!(
+                itofin_black_scholes_new(
+                    &mut c,
+                    36.0,
+                    0.06,
+                    0.0,
+                    0.2,
+                    today.serial_number(),
+                    dc,
+                    &mut process,
+                    null_mut()
+                ),
+                0
+            );
+            for basis in [-1, 4, 5, 7] {
+                assert_ne!(
+                    itofin_mc_american_engine_new(
+                        &mut c,
+                        process,
+                        cfg,
+                        basis,
+                        &mut out,
+                        null_mut()
+                    ),
+                    0
+                );
+                assert_eq!(out, 77);
+            }
+            for bad in [
+                McConfig {
+                    present: 1024,
+                    ..cfg
+                },
+                McConfig {
+                    present: cfg.present | 64,
+                    antithetic: 2,
+                    ..cfg
+                },
+            ] {
+                assert_eq!(
+                    itofin_mc_american_engine_new(&mut c, process, bad, 0, &mut out, null_mut()),
+                    INVALID_ARGUMENT
+                );
+                assert_eq!(out, 77);
+            }
+            assert_ne!(
+                itofin_mc_american_engine_new(&mut c, dc, cfg, 0, &mut out, null_mut()),
+                0
+            );
+            assert_eq!(out, 77);
+            assert_eq!(
+                itofin_mc_american_engine_new(&mut c, process, cfg, 0, null_mut(), null_mut()),
+                INVALID_ARGUMENT
+            );
+            assert_eq!(
+                itofin_mc_american_engine_new(&mut c, process, cfg, 1, &mut out, null_mut()),
+                0
+            );
+            out = 77;
+            assert_ne!(
+                itofin_option_american_until_new(
+                    &mut c,
+                    1,
+                    36.0,
+                    0,
+                    settings,
+                    &mut out,
+                    null_mut()
+                ),
+                0
+            );
+            assert_eq!(out, 77);
+            assert_ne!(
+                itofin_option_bermudan_new(&mut c, 1, 36.0, dc, settings, &mut out, null_mut()),
+                0
+            );
+            assert_eq!(out, 77);
+            let dates = [today.serial_number() + 180, today.serial_number() + 365];
+            let mut exercise = 0;
+            assert_eq!(
+                itofin_bermudan_exercise_new(
+                    &mut c,
+                    dates.as_ptr(),
+                    dates.len(),
+                    &mut exercise,
+                    null_mut()
+                ),
+                0
+            );
+            assert_eq!(
+                itofin_option_bermudan_new(
+                    &mut c,
+                    1,
+                    36.0,
+                    exercise,
+                    settings,
+                    &mut out,
+                    null_mut()
+                ),
+                0
+            );
+            assert_eq!(
+                itofin_option_american_until_new(
+                    &mut c,
+                    1,
+                    36.0,
+                    dates[1],
+                    settings,
+                    &mut out,
+                    null_mut()
+                ),
+                0
+            );
+        }
+    }
     #[test]
     fn invalid_masks_and_null_outputs_are_rejected_before_handle_access() {
         let mut context = Context::new();
