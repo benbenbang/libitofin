@@ -51,7 +51,7 @@ mod vol;
 use calibration::{PyCalibrationErrorType, PyEndCriteria, PyLevenbergMarquardt};
 use capfloor::{PyCapFloor, PyCapFloorType};
 use capfloorengine::{PyBachelierCapFloorEngine, PyBlackCapFloorEngine};
-use capfloortermvol::PyCapFloorTermVolSurface;
+use capfloortermvol::{PyCapFloorTermVolCurve, PyCapFloorTermVolSurface};
 use cashflows::{
     PyCappedFlooredYoYInflationCoupon, PyCashFlow, PyIborLeg, PyLeg, PyYoYInflationCoupon,
     PyYoYInflationLeg, PyYoYInflationOptionletCouponPricer,
@@ -102,8 +102,8 @@ use mcengine::{
 use ois::{PyMakeOis, PyOvernightIndexedSwap};
 use option::{PyOptionType, PyVanillaOption};
 use optionletvol::{
-    PyConstantOptionletVolatility, PyOptionletStripper1, PyOptionletVolatilityStructure,
-    PyStrippedOptionletAdapter,
+    PyConstantOptionletVolatility, PyOptionletSmileSection, PyOptionletStripper1,
+    PyOptionletStripper2, PyOptionletVolatilityStructure, PyStrippedOptionletAdapter,
 };
 
 use pyo3::exceptions::PyException;
@@ -244,6 +244,9 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     termstructures.add_class::<PyConstantOptionletVolatility>()?;
     termstructures.add_class::<PyCapFloorTermVolSurface>()?;
     termstructures.add_class::<PyOptionletStripper1>()?;
+    termstructures.add_class::<PyOptionletStripper2>()?;
+    termstructures.add_class::<PyOptionletSmileSection>()?;
+    termstructures.add_class::<PyCapFloorTermVolCurve>()?;
     termstructures.add_class::<PyStrippedOptionletAdapter>()?;
     termstructures.add_class::<PyDefaultProbabilityTermStructure>()?;
     termstructures.add_class::<PyFlatHazardRate>()?;
