@@ -44,6 +44,64 @@ typedef struct ItofinContext ItofinContext;
 typedef struct ItofinBootstrapOutput ItofinBootstrapOutput;
 
 /**
+ * Caller-owned error. Zero code means success; message is NUL-terminated UTF-8.
+ */
+typedef struct ItofinError {
+  int32_t code;
+  char message[1024];
+} ItofinError;
+
+/**
+ * Coupon constructor; zero reference dates use the accrual dates.
+ */
+typedef struct ItofinBmaCouponConfig {
+  int32_t payment_date;
+  double nominal;
+  int32_t start_date;
+  int32_t end_date;
+  uint64_t index;
+  uint64_t day_counter;
+  double gearing;
+  double spread;
+  int32_t reference_start;
+  int32_t reference_end;
+} ItofinBmaCouponConfig;
+
+/**
+ * Complete municipal swap conventions; payer pays BMA and receives Ibor.
+ */
+typedef struct ItofinBmaSwapConfig {
+  int32_t swap_type;
+  double nominal;
+  uint64_t libor_schedule;
+  double libor_fraction;
+  double libor_spread;
+  uint64_t libor_index;
+  uint64_t libor_day_counter;
+  uint64_t bma_schedule;
+  uint64_t bma_index;
+  uint64_t bma_day_counter;
+  uint64_t settings;
+} ItofinBmaSwapConfig;
+
+/**
+ * Conventions for the quoted municipal-to-Ibor fraction helper.
+ */
+typedef struct ItofinBmaHelperConfig {
+  uint64_t quote;
+  int32_t tenor_length;
+  int32_t tenor_unit;
+  uint32_t settlement_days;
+  uint64_t calendar;
+  int32_t bma_length;
+  int32_t bma_unit;
+  int32_t bma_convention;
+  uint64_t bma_day_counter;
+  uint64_t bma_index;
+  uint64_t libor_index;
+} ItofinBmaHelperConfig;
+
+/**
  * Borrowed arrays valid only during a penalty callback; consumers must copy them.
  */
 typedef struct ItofinBootstrapState {
@@ -55,14 +113,6 @@ typedef struct ItofinBootstrapState {
   const double *helper_errors;
   size_t helper_count;
 } ItofinBootstrapState;
-
-/**
- * Caller-owned error. Zero code means success; message is NUL-terminated UTF-8.
- */
-typedef struct ItofinError {
-  int32_t code;
-  char message[1024];
-} ItofinError;
 
 /**
  * Functions and integer userdata remain valid until release is called exactly once.
@@ -897,6 +947,161 @@ typedef struct ItofinVolGridConfig {
 #ifdef __cplusplus
 extern "C" {
 #endif // __cplusplus
+
+/**
+ * Construct a retained BMA index; zero forwarding creates an empty forecast handle.
+ * # Safety
+ * Follow the crate-level pointer and thread contract.
+ */
+int32_t itofin_bma_index_new(struct ItofinContext *ctx,
+                             uint64_t forwarding,
+                             uint64_t settings_id,
+                             uint64_t *out,
+                             struct ItofinError *error);
+
+/**
+ * Store a finite fixing on a valid weekly fixing date.
+ * # Safety
+ * Follow the crate-level pointer and thread contract.
+ */
+int32_t itofin_bma_add_fixing(struct ItofinContext *ctx,
+                              uint64_t id,
+                              int32_t serial,
+                              double value,
+                              struct ItofinError *error);
+
+/**
+ * Resolve a historical or forecast fixing.
+ * # Safety
+ * Follow the crate-level pointer and thread contract.
+ */
+int32_t itofin_bma_fixing(struct ItofinContext *ctx,
+                          uint64_t id,
+                          int32_t serial,
+                          uint8_t forecast_today,
+                          double *out,
+                          struct ItofinError *error);
+
+/**
+ * Query zero: value date; one: maturity date; two: valid-fixing flag; three: historical-fixing flag (0 or 1).
+ * # Safety
+ * Follow the crate-level pointer and thread contract.
+ */
+int32_t itofin_bma_date(struct ItofinContext *ctx,
+                        uint64_t id,
+                        int32_t query,
+                        int32_t serial,
+                        int32_t *out,
+                        struct ItofinError *error);
+
+/**
+ * Construct an average coupon retaining its index and historical fixings.
+ * # Safety
+ * Follow the crate-level pointer and thread contract.
+ */
+int32_t itofin_bma_coupon_new(struct ItofinContext *ctx,
+                              const struct ItofinBmaCouponConfig *cfg,
+                              uint64_t *out,
+                              struct ItofinError *error);
+
+/**
+ * Query zero: coupon rate; one: payment; two: accrual year fraction.
+ * # Safety
+ * Follow the crate-level pointer and thread contract.
+ */
+int32_t itofin_bma_coupon_value(struct ItofinContext *ctx,
+                                uint64_t id,
+                                int32_t query,
+                                double *out,
+                                struct ItofinError *error);
+
+/**
+ * Kind zero: index fixing schedule between start/end; one: coupon fixing dates.
+ * Capacity zero queries length; insufficient capacity preserves all outputs.
+ * # Safety
+ * Follow the crate-level pointer and thread contract. Output holds capacity serials.
+ */
+int32_t itofin_bma_dates(struct ItofinContext *ctx,
+                         uint64_t id,
+                         int32_t kind,
+                         int32_t start,
+                         int32_t end,
+                         int32_t *out,
+                         size_t capacity,
+                         size_t *length,
+                         struct ItofinError *error);
+
+/**
+ * Return the independently owned BMA fixing calendar.
+ * # Safety
+ * Follow the crate-level pointer and thread contract.
+ */
+int32_t itofin_bma_calendar(struct ItofinContext *ctx,
+                            uint64_t id,
+                            uint64_t *out,
+                            struct ItofinError *error);
+
+/**
+ * Clear this BMA fixing history, notifying retained consumers.
+ * # Safety
+ * Follow the crate-level pointer and thread contract.
+ */
+int32_t itofin_bma_clear_fixings(struct ItofinContext *ctx, uint64_t id, struct ItofinError *error);
+
+/**
+ * Read stored history without forecasting. An absent fixing returns found=0, value=0.
+ * # Safety
+ * Follow the crate-level pointer and thread contract. Both outputs must be valid.
+ */
+int32_t itofin_bma_past_fixing(struct ItofinContext *ctx,
+                               uint64_t id,
+                               int32_t serial,
+                               double *value,
+                               uint8_t *found,
+                               struct ItofinError *error);
+
+/**
+ * Construct a municipal swap retaining both legs and their market dependencies.
+ * # Safety
+ * Follow the crate-level pointer and thread contract.
+ */
+int32_t itofin_bma_swap_new(struct ItofinContext *ctx,
+                            const struct ItofinBmaSwapConfig *cfg,
+                            uint64_t *out,
+                            struct ItofinError *error);
+
+/**
+ * Attach a retained discounting engine with settings-driven defaults.
+ * # Safety
+ * Follow the crate-level pointer and thread contract.
+ */
+int32_t itofin_bma_swap_set_engine(struct ItofinContext *ctx,
+                                   uint64_t id,
+                                   uint64_t discount,
+                                   uint64_t settings_id,
+                                   struct ItofinError *error);
+
+/**
+ * Query zero: NPV; one: fair Ibor fraction; two: fair Ibor spread; three: cached flag;
+ * four/five: Ibor/BMA leg NPV; six/seven: Ibor/BMA leg BPS.
+ * # Safety
+ * Follow the crate-level pointer and thread contract.
+ */
+int32_t itofin_bma_swap_value(struct ItofinContext *ctx,
+                              uint64_t id,
+                              int32_t query,
+                              double *out,
+                              struct ItofinError *error);
+
+/**
+ * Construct a rate helper usable by existing piecewise yield curves.
+ * # Safety
+ * Follow the crate-level pointer and thread contract.
+ */
+int32_t itofin_bma_helper_new(struct ItofinContext *ctx,
+                              const struct ItofinBmaHelperConfig *cfg,
+                              uint64_t *out,
+                              struct ItofinError *error);
 
 /**
  * Construct a global discount curve, kind 0 log-linear or 1 linear.
