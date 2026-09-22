@@ -139,6 +139,24 @@
       ]
     },
     {
+      "c": "itofin_heston_calibrate_engine",
+      "go": "HestonModel.CalibrateCOS",
+      "python": "itofin.models.HestonModel.calibrate_cos",
+      "status": "implemented",
+      "tests": [
+        "TestAlternativeHestonCalibrationAndLiveModel"
+      ]
+    },
+    {
+      "c": "itofin_heston_calibrate_engine",
+      "go": "HestonModel.CalibrateExponentialFitting",
+      "python": "itofin.models.HestonModel.calibrate_exponential_fitting",
+      "status": "implemented",
+      "tests": [
+        "TestAlternativeHestonCalibrationAndLiveModel"
+      ]
+    },
+    {
       "go": "ExponentialFittingControlVariate: explicit integer conversion",
       "python": "itofin.pricingengines.ExponentialFittingControlVariate.__int__",
       "status": "implemented",

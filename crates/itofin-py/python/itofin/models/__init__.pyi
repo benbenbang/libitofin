@@ -106,6 +106,14 @@ class HestonModel:
             ItofinError: If integration_order exceeds 192, if helpers is empty,
                 or if the optimization itself fails.
         """
+    def calibrate_cos(self, helpers: typing.Sequence[HestonModelHelper], method: optimization.LevenbergMarquardt, end_criteria: optimization.EndCriteria, l: builtins.float = 16.0, n: builtins.int = 200) -> None:
+        r"""
+        Fit with a COS engine, retaining existing analytic calibration defaults.
+        """
+    def calibrate_exponential_fitting(self, helpers: typing.Sequence[HestonModelHelper], method: optimization.LevenbergMarquardt, end_criteria: optimization.EndCriteria, control_variate: pricingengines.ExponentialFittingControlVariate = pricingengines.ExponentialFittingControlVariate.Optimal, scaling: typing.Optional[builtins.float] = None, alpha: builtins.float = -0.5) -> None:
+        r"""
+        Fit with exponentially fitted quadrature and the selected control variate.
+        """
 
 @typing.final
 class HestonModelHelper:

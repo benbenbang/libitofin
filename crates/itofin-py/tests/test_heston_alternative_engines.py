@@ -11,6 +11,7 @@ import pytest
 from itofin import ItofinError, Settings
 from itofin.instruments import OptionType, VanillaOption
 from itofin.models import HestonModel
+from itofin.optimization import EndCriteria, LevenbergMarquardt
 from itofin.pricingengines import CosHestonEngine, ExponentialFittingControlVariate, ExponentialFittingHestonEngine
 from itofin.processes import HestonProcess
 from itofin.time import Date, DayCounter
@@ -80,6 +81,35 @@ def test_heston_engine_invalid_configuration_and_recovery():
     option = VanillaOption(OptionType.Call, 120, Date(7, 2, 2018), settings)
     engine = ExponentialFittingHestonEngine(model, scaling=1)
     assert abs(option.price_exponential_fitting_heston(engine) - fixture["fixed_scaling_price"]) < 1e-10
+
+
+@pytest.mark.parametrize("method", ["calibrate_cos", "calibrate_exponential_fitting"])
+def test_alternative_heston_calibration_and_live_model(method):
+    from test_heston_calibration import _build_helpers, _fixture_settings, _seed_model
+
+    settings = _fixture_settings()
+    helpers = _build_helpers(settings)
+    model = _seed_model()(.1)
+    option = VanillaOption(OptionType.Call, .7, Date(15, 1, 2027), settings)
+    engine = CosHestonEngine(model, 25, 600) if method == "calibrate_cos" else ExponentialFittingHestonEngine(model)
+    if isinstance(engine, CosHestonEngine):
+        before = option.price_cos_heston(engine)
+    else:
+        before = option.price_exponential_fitting_heston(engine)
+    before_c2 = engine.c2(1) if isinstance(engine, CosHestonEngine) else None
+    optimizer = LevenbergMarquardt(1e-8, 1e-8, 1e-8, False)
+    criteria = EndCriteria(400, 40, 1e-8, 1e-8, 1e-8)
+    with pytest.raises(ItofinError):
+        getattr(model, method)([], optimizer, criteria)
+    getattr(model, method)(helpers, optimizer, criteria)
+    if isinstance(engine, CosHestonEngine):
+        assert engine.c2(1) != before_c2
+    assert not option.is_calculated()
+    assert option.npv() != before
+    assert model.sigma() < 3e-3
+    assert abs(model.kappa() * (model.theta() - .01)) < 3e-3
+    assert abs(model.v0() - .01) < 3e-3
+    assert all(h.calibration_error() < 1e-2 for h in helpers)
 
 
 def test_exponential_fitting_control_variate_integer_contract():
