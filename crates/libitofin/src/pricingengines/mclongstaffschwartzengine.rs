@@ -15,11 +15,8 @@
 //!   whose grid, generator, and result plumbing are exactly the American branch
 //!   of those overrides; the `lsmPathPricer()` hook (`:88-89`) is the pricer
 //!   argument of [`calculate_with`](McLongstaffSchwartzEngineBase::calculate_with).
-//! - **the grid is the vanilla base's**: C++'s `timeGrid()` override
-//!   (`:218-231`) has an American branch (the last exercise time) and a Bermudan
-//!   one (every positive exercise time). [`McVanillaEngineBase::time_grid`] is
-//!   the American branch verbatim, so the Bermudan grid is DEFERRED; the engine
-//!   on top of this driver rejects any non-American exercise, closing the gap.
+//! - **the grid includes every positive Bermudan exercise date**; both simulation
+//!   passes and the regression use this same grid, as in the upstream driver.
 //! - **`Null` sentinels become [`Option`]** (D10): the unset
 //!   `nCalibrationSamples`, `antitheticVariateCalibration`, and
 //!   `seedCalibration` (`:141,145-147,148-149`) default to the same values.
@@ -152,13 +149,13 @@ impl<RNG: McRngTraits> McLongstaffSchwartzEngineBase<RNG> {
         self.seed_calibration
     }
 
-    /// The simulation time grid (`:218-231`, American branch).
+    /// The simulation grid, including positive Bermudan exercise dates (`:218-231`).
     ///
     /// # Errors
     ///
     /// Propagates a [`McVanillaEngineBase::time_grid`] failure.
     pub fn time_grid(&self) -> QlResult<TimeGrid> {
-        self.base.time_grid()
+        self.base.early_exercise_time_grid()
     }
 
     /// Runs both passes through `pricer` and fills the results (`:179-210`):
@@ -174,7 +171,10 @@ impl<RNG: McRngTraits> McLongstaffSchwartzEngineBase<RNG> {
     /// Propagates a grid, generator, sampling, regression, or simulation
     /// failure.
     pub fn calculate_with(&mut self, pricer: Shared<LongstaffSchwartzPathPricer>) -> QlResult<()> {
-        let generator = self.base.path_generator_with_seed(self.seed_calibration)?;
+        let grid = self.time_grid()?;
+        let generator = self
+            .base
+            .path_generator_on_grid(grid.clone(), Some(self.seed_calibration))?;
         let mut calibration_model = MonteCarloModel::new(
             generator,
             Shared::clone(&pricer),
@@ -184,7 +184,8 @@ impl<RNG: McRngTraits> McLongstaffSchwartzEngineBase<RNG> {
         calibration_model.add_samples(self.n_calibration_samples)?;
         pricer.calibrate()?;
 
-        self.base.run(Shared::clone(&pricer))?;
+        let generator = self.base.path_generator_on_grid(grid, None)?;
+        self.base.run_with(generator, Shared::clone(&pricer))?;
 
         let probability = pricer.exercise_probability()?;
         self.base

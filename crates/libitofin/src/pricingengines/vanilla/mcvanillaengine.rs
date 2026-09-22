@@ -184,6 +184,32 @@ impl<RNG: McRngTraits, MC: McTraits> McVanillaEngineBase<RNG, MC> {
         }
     }
 
+    pub(crate) fn early_exercise_time_grid(&self) -> QlResult<TimeGrid> {
+        let Some(exercise) = &self.arguments().exercise else {
+            fail!("no exercise given");
+        };
+        let dates = if exercise.exercise_type() == crate::exercise::ExerciseType::American {
+            &exercise.dates()[exercise.dates().len() - 1..]
+        } else {
+            exercise.dates()
+        };
+        let mut times = Vec::new();
+        for date in dates {
+            let time = MC::time(&self.process, date)?;
+            require!(time.is_finite(), "non-finite exercise time");
+            if time > 0.0 {
+                times.push(time);
+            }
+        }
+        let Some(&end) = times.last() else {
+            fail!("no positive exercise time");
+        };
+        let steps = self.time_steps.unwrap_or_else(|| {
+            (self.time_steps_per_year.unwrap_or(1) as Real * end).max(1.0) as Size
+        });
+        TimeGrid::with_mandatory_times(&times, steps)
+    }
+
     /// The policy's path generator, seeded from the RNG policy
     /// (`mcvanillaengine.hpp:72`).
     ///
@@ -203,7 +229,15 @@ impl<RNG: McRngTraits, MC: McTraits> McVanillaEngineBase<RNG, MC> {
     ///
     /// As [`path_generator`](McVanillaEngineBase::path_generator).
     pub fn path_generator_with_seed(&self, seed: u32) -> QlResult<MC::Generator<RNG::RsgType>> {
-        let grid = self.time_grid()?;
+        self.path_generator_on_grid(self.time_grid()?, Some(seed))
+    }
+
+    pub(crate) fn path_generator_on_grid(
+        &self,
+        grid: TimeGrid,
+        seed: Option<u32>,
+    ) -> QlResult<MC::Generator<RNG::RsgType>> {
+        let seed = seed.unwrap_or(self.seed);
         let dimension = MC::factors(&self.process) * (grid.size() - 1);
         let generator = RNG::make_sequence_generator(dimension, seed)?;
         MC::path_generator(self.process.clone(), grid, generator, self.brownian_bridge)
