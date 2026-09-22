@@ -16,9 +16,8 @@
 //! these two functions deliberately skip [`check_parameters`]: they validate
 //! only the standard deviation and discount, exactly as the C++ reference does.
 //!
-//! Out of scope, left as follow-ups with the quotes that need them: the
-//! implied-standard-deviation family (approximations and solvers), including
-//! its Bachelier variants.
+//! Black approximation-seeded and normal implied-volatility inversions support
+//! caplet stripping; other specialized approximation families remain separate.
 //!
 //! One deviation from the C++ reference: at `std_dev == 0` the reference's
 //! `blackFormulaAssetItmProbability` tests `forward * sign < strike * sign`,
@@ -328,12 +327,8 @@ pub fn black_formula_std_dev_second_derivative(
 /// still converges because [`NewtonSafe`] bisects whenever a Newton step leaves
 /// the bracket.
 ///
-/// # Divergence
-///
-/// C++ seeds the solve with `blackFormulaImpliedStdDevApproximation` when `guess`
-/// is `Null<Real>`; the Rust API instead requires a finite non-negative `guess`
-/// (the optionlet stripper always supplies one). The approximation-seeded
-/// overload is deferred to #577.
+/// Pass `None` for QuantLib's approximation-seeded null-guess branch; a finite
+/// scalar guess remains accepted for backwards compatibility.
 ///
 /// # Errors
 ///
@@ -348,7 +343,7 @@ pub fn black_formula_implied_std_dev(
     black_price: Real,
     discount: Real,
     displacement: Real,
-    guess: Real,
+    guess: impl Into<Option<Real>>,
     accuracy: Real,
     max_iterations: Natural,
 ) -> QlResult<Real> {
@@ -380,6 +375,17 @@ pub fn black_formula_implied_std_dev(
         black_price = other_option_price;
     }
 
+    let guess = match guess.into() {
+        Some(guess) => guess,
+        None => black_formula_implied_std_dev_approximation(
+            option_type,
+            strike,
+            forward,
+            black_price,
+            discount,
+            displacement,
+        )?,
+    };
     if !guess.is_finite() || guess < 0.0 {
         fail!("stdDev guess ({guess}) must be non-negative");
     }
@@ -414,6 +420,89 @@ pub fn black_formula_implied_std_dev(
         fail!("stdDev ({std_dev}) must be non-negative");
     }
     Ok(std_dev)
+}
+
+/// Corrado-Miller approximation, with the Brenner-Subrahmanyan ATM limit.
+///
+/// This is QuantLib's seed for an unspecified Black implied-standard-deviation guess.
+pub fn black_formula_implied_std_dev_approximation(
+    option_type: OptionType,
+    strike: Real,
+    forward: Real,
+    price: Real,
+    discount: Real,
+    displacement: Real,
+) -> QlResult<Real> {
+    check_parameters(strike, forward, displacement)?;
+    if !price.is_finite() || price < 0.0 || !discount.is_finite() || discount <= 0.0 {
+        fail!("invalid option price or discount for implied deviation approximation");
+    }
+    let forward = forward + displacement;
+    let strike = strike + displacement;
+    let scale = (2.0 * std::f64::consts::PI).sqrt();
+    if strike == forward {
+        return Ok(price / discount * scale / forward);
+    }
+    let delta = sign_of(option_type) * (forward - strike);
+    let value = price / discount - delta / 2.0;
+    Ok((value
+        + (value * value - delta * delta / std::f64::consts::PI)
+            .max(0.0)
+            .sqrt())
+        * scale
+        / (forward + strike))
+}
+
+/// Normal implied volatility, solved on out-of-the-money time value.
+///
+/// A bracketed inversion avoids subtracting intrinsic value inside the solver.
+/// Invalid prices and nonpositive expiry/discount return an error.
+pub fn bachelier_black_formula_implied_vol(
+    option_type: OptionType,
+    strike: Real,
+    forward: Real,
+    expiry: Real,
+    price: Real,
+    discount: Real,
+) -> QlResult<Real> {
+    use crate::math::solver1d::Solver1D;
+    use crate::math::solvers1d::brent::Brent;
+    if ![strike, forward, expiry, price, discount]
+        .iter()
+        .all(|v| v.is_finite())
+        || expiry <= 0.0
+        || price < 0.0
+        || discount <= 0.0
+    {
+        fail!("invalid normal implied-volatility inputs");
+    }
+    let premium = price / discount;
+    let intrinsic = (sign_of(option_type) * (forward - strike)).max(0.0);
+    let time_value = premium - intrinsic;
+    if time_value < 0.0 {
+        fail!("option price implies negative time value ({time_value})");
+    }
+    if time_value == 0.0 {
+        return Ok(0.0);
+    }
+    let distance = (forward - strike).abs();
+    let scale = (2.0 * std::f64::consts::PI).sqrt();
+    if distance == 0.0 {
+        return Ok(premium * scale / expiry.sqrt());
+    }
+    let upper = (time_value * scale + distance) * 2.0;
+    let objective = |std_dev| {
+        bachelier_black_formula(OptionType::Call, distance, 0.0, std_dev, 1.0).unwrap_or(Real::NAN)
+            - time_value
+    };
+    let std_dev = Brent::new().with_max_evaluations(200).solve_bracketed(
+        objective,
+        1e-14,
+        upper / 2.0,
+        0.0,
+        upper,
+    )?;
+    Ok(std_dev / expiry.sqrt())
 }
 
 /// Bachelier (normal-model) value of a European option on the given forward.

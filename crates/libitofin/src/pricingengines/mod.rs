@@ -29,8 +29,9 @@ pub use swaption::{
 pub use vanilla::AnalyticEuropeanEngine;
 
 pub use blackformula::{
-    black_formula, black_formula_asset_itm_probability, black_formula_cash_itm_probability,
-    black_formula_forward_derivative, black_formula_implied_std_dev,
+    bachelier_black_formula_implied_vol, black_formula, black_formula_asset_itm_probability,
+    black_formula_cash_itm_probability, black_formula_forward_derivative,
+    black_formula_implied_std_dev, black_formula_implied_std_dev_approximation,
     black_formula_std_dev_derivative, black_formula_std_dev_second_derivative,
     black_formula_vol_derivative,
 };
