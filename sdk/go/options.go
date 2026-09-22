@@ -207,3 +207,41 @@ func (o *VanillaOption) PriceQMC(e *QMCEuropeanEngine) (float64, error) {
 	}
 	return o.price(e.object, 2, 0)
 }
+
+// NewAmericanOptionUntil opens the exercise window at the minimum supported date.
+func (s *Session) NewAmericanOptionUntil(kind OptionType, strike float64, latest Date, settings *Settings) (*VanillaOption, error) {
+	if settings == nil {
+		return nil, errNilArgument("settings")
+	}
+	if err := sameSession(s, settings.object); err != nil {
+		return nil, err
+	}
+	var id C.uint64_t
+	err := s.invoke(func() error {
+		var e C.ItofinError
+		return ffiError(C.itofin_option_american_until_new(s.ctx, C.int32_t(kind), C.double(strike), C.int32_t(latest.Serial()), C.uint64_t(settings.id), &id, &e), &e)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &VanillaOption{object{s, uint64(id)}}, nil
+}
+
+// NewBermudanOption retains the exercise schedule and settings.
+func (s *Session) NewBermudanOption(kind OptionType, strike float64, exercise *BermudanExercise, settings *Settings) (*VanillaOption, error) {
+	if exercise == nil || settings == nil {
+		return nil, errNilArgument("exercise or settings")
+	}
+	if err := sameSession(s, exercise.object, settings.object); err != nil {
+		return nil, err
+	}
+	var id C.uint64_t
+	err := s.invoke(func() error {
+		var e C.ItofinError
+		return ffiError(C.itofin_option_bermudan_new(s.ctx, C.int32_t(kind), C.double(strike), C.uint64_t(exercise.id), C.uint64_t(settings.id), &id, &e), &e)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &VanillaOption{object{s, uint64(id)}}, nil
+}

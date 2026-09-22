@@ -122,3 +122,39 @@ func (s *Session) NewQMCEuropeanEngine(p *BlackScholesProcess, cfg MCConfig) (*Q
 	}
 	return &QMCEuropeanEngine{o}, nil
 }
+
+// PolynomialType selects the Longstaff-Schwartz regression basis.
+// Legendre and Chebyshev are available in the Rust basis utility but are
+// unsupported by the American engine, matching QuantLib.
+type PolynomialType int32
+
+const (
+	Monomial PolynomialType = iota
+	Laguerre
+	Hermite
+	Hyperbolic
+	Legendre
+	Chebyshev
+	Chebyshev2nd
+)
+
+// NewMCAmericanEngineWithBasis selects a regression family while preserving
+// the default constructor and MCConfig layout.
+// Chebyshev2nd supports put payoffs only; call pricing returns an error.
+func (s *Session) NewMCAmericanEngineWithBasis(p *BlackScholesProcess, cfg MCConfig, basis PolynomialType) (*MCAmericanEngine, error) {
+	if p == nil {
+		return nil, errNilArgument("process")
+	}
+	if err := sameSession(s, p.object); err != nil {
+		return nil, err
+	}
+	var id C.uint64_t
+	err := s.invoke(func() error {
+		var e C.ItofinError
+		return ffiError(C.itofin_mc_american_engine_new(s.ctx, C.uint64_t(p.id), cfg.native(), C.int32_t(basis), &id, &e), &e)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &MCAmericanEngine{object{s, uint64(id)}}, nil
+}
