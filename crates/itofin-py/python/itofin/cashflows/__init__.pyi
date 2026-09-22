@@ -8,6 +8,7 @@ from itofin import termstructures
 from itofin import time
 import typing
 __all__ = [
+    "AverageBMACoupon",
     "CappedFlooredYoYInflationCoupon",
     "CashFlow",
     "IborLeg",
@@ -17,6 +18,32 @@ __all__ = [
     "YoYInflationOptionletCouponPricer",
     "npv",
 ]
+
+@typing.final
+class AverageBMACoupon:
+    r"""
+    Calendar-day weighted municipal coupon with its arithmetic-average pricer.
+    """
+    def __init__(self, payment_date: time.Date, nominal: builtins.float, start_date: time.Date, end_date: time.Date, index: indexes.BMAIndex, day_counter: time.DayCounter, gearing: builtins.float = 1.0, spread: builtins.float = 0.0, reference_start: typing.Optional[time.Date] = None, reference_end: typing.Optional[time.Date] = None) -> None:
+        r"""
+        Create a calendar-day averaged coupon with explicit accrual conventions.
+        """
+    def rate(self) -> builtins.float:
+        r"""
+        Weighted rate after gearing and spread.
+        """
+    def amount(self) -> builtins.float:
+        r"""
+        Undiscounted coupon payment.
+        """
+    def accrual_period(self) -> builtins.float:
+        r"""
+        Coupon accrual year fraction, including explicit reference dates.
+        """
+    def fixing_dates(self) -> builtins.list[time.Date]:
+        r"""
+        Copy of weekly fixing boundaries.
+        """
 
 @typing.final
 class CappedFlooredYoYInflationCoupon:

@@ -1,0 +1,180 @@
+{
+  "domain": "bma",
+  "entries": [
+    {
+      "c": "itofin_bma_index_new",
+      "go": "Session.NewBMAIndex",
+      "python": "itofin.indexes.BMAIndex.__init__",
+      "status": "implemented",
+      "tests": "TestBMAQuantLibCurveSwapCouponAndHolidayOracles"
+    },
+    {
+      "c": "itofin_bma_add_fixing",
+      "go": "BMAIndex.AddFixing",
+      "python": "itofin.indexes.BMAIndex.add_fixing",
+      "status": "implemented",
+      "tests": "TestBMAQuantLibCurveSwapCouponAndHolidayOracles"
+    },
+    {
+      "c": "itofin_bma_fixing",
+      "go": "BMAIndex.Fixing",
+      "python": "itofin.indexes.BMAIndex.fixing",
+      "status": "implemented",
+      "tests": "TestBMAQuantLibCurveSwapCouponAndHolidayOracles"
+    },
+    {
+      "c": "itofin_bma_date",
+      "go": "BMAIndex.IsValidFixingDate",
+      "python": "itofin.indexes.BMAIndex.is_valid_fixing_date",
+      "status": "implemented",
+      "tests": "TestBMAQuantLibCurveSwapCouponAndHolidayOracles"
+    },
+    {
+      "c": "itofin_bma_date",
+      "go": "BMAIndex.ValueDate",
+      "python": "itofin.indexes.BMAIndex.value_date",
+      "status": "implemented",
+      "tests": "TestBMAQuantLibCurveSwapCouponAndHolidayOracles"
+    },
+    {
+      "c": "itofin_bma_date",
+      "go": "BMAIndex.MaturityDate",
+      "python": "itofin.indexes.BMAIndex.maturity_date",
+      "status": "implemented",
+      "tests": "TestBMAQuantLibCurveSwapCouponAndHolidayOracles"
+    },
+    {
+      "c": "itofin_bma_dates",
+      "go": "BMAIndex.FixingSchedule",
+      "python": "itofin.indexes.BMAIndex.fixing_schedule",
+      "status": "implemented",
+      "tests": "TestBMAQuantLibCurveSwapCouponAndHolidayOracles"
+    },
+    {
+      "c": "itofin_bma_calendar",
+      "go": "BMAIndex.FixingCalendar",
+      "python": "itofin.indexes.BMAIndex.fixing_calendar",
+      "status": "implemented",
+      "tests": "TestBMAQuantLibCurveSwapCouponAndHolidayOracles"
+    },
+    {
+      "c": "itofin_bma_clear_fixings",
+      "go": "BMAIndex.ClearFixings",
+      "python": "itofin.indexes.BMAIndex.clear_fixings",
+      "status": "implemented",
+      "tests": "TestBMAUpdatesHistoryRecoveryAndColdRetention"
+    },
+    {
+      "c": "itofin_bma_past_fixing",
+      "go": "BMAIndex.PastFixing",
+      "python": "itofin.indexes.BMAIndex.past_fixing",
+      "status": "implemented",
+      "tests": "TestBMAQuantLibCurveSwapCouponAndHolidayOracles"
+    },
+    {
+      "c": "itofin_bma_date",
+      "go": "BMAIndex.HasHistoricalFixing",
+      "python": "itofin.indexes.BMAIndex.has_historical_fixing",
+      "status": "implemented",
+      "tests": "TestBMAQuantLibCurveSwapCouponAndHolidayOracles"
+    },
+    {
+      "c": "itofin_bma_coupon_new",
+      "go": "Session.NewAverageBMACoupon",
+      "python": "itofin.cashflows.AverageBMACoupon.__init__",
+      "status": "implemented",
+      "tests": "TestBMAQuantLibCurveSwapCouponAndHolidayOracles"
+    },
+    {
+      "c": "itofin_bma_coupon_value",
+      "go": "AverageBMACoupon.Rate",
+      "python": "itofin.cashflows.AverageBMACoupon.rate",
+      "status": "implemented",
+      "tests": "TestBMAQuantLibCurveSwapCouponAndHolidayOracles"
+    },
+    {
+      "c": "itofin_bma_coupon_value",
+      "go": "AverageBMACoupon.Amount",
+      "python": "itofin.cashflows.AverageBMACoupon.amount",
+      "status": "implemented",
+      "tests": "TestBMAQuantLibCurveSwapCouponAndHolidayOracles"
+    },
+    {
+      "c": "itofin_bma_coupon_value",
+      "go": "AverageBMACoupon.AccrualPeriod",
+      "python": "itofin.cashflows.AverageBMACoupon.accrual_period",
+      "status": "implemented",
+      "tests": "TestBMAQuantLibCurveSwapCouponAndHolidayOracles"
+    },
+    {
+      "c": "itofin_bma_dates",
+      "go": "AverageBMACoupon.FixingDates",
+      "python": "itofin.cashflows.AverageBMACoupon.fixing_dates",
+      "status": "implemented",
+      "tests": "TestBMAQuantLibCurveSwapCouponAndHolidayOracles"
+    },
+    {
+      "c": "itofin_bma_swap_new",
+      "go": "Session.NewBMASwap",
+      "python": "itofin.instruments.BMASwap.__init__",
+      "status": "implemented",
+      "tests": "TestBMAQuantLibCurveSwapCouponAndHolidayOracles"
+    },
+    {
+      "c": "itofin_bma_swap_set_engine",
+      "go": "BMASwap.SetEngine",
+      "python": "itofin.instruments.BMASwap.set_engine",
+      "status": "implemented",
+      "tests": "TestBMAQuantLibCurveSwapCouponAndHolidayOracles"
+    },
+    {
+      "c": "itofin_bma_swap_value",
+      "go": "BMASwap.NPV",
+      "python": "itofin.instruments.BMASwap.npv",
+      "status": "implemented",
+      "tests": "TestBMAQuantLibCurveSwapCouponAndHolidayOracles"
+    },
+    {
+      "c": "itofin_bma_swap_value",
+      "go": "BMASwap.FairLiborFraction",
+      "python": "itofin.instruments.BMASwap.fair_libor_fraction",
+      "status": "implemented",
+      "tests": "TestBMAQuantLibCurveSwapCouponAndHolidayOracles"
+    },
+    {
+      "c": "itofin_bma_swap_value",
+      "go": "BMASwap.FairLiborSpread",
+      "python": "itofin.instruments.BMASwap.fair_libor_spread",
+      "status": "implemented",
+      "tests": "TestBMAQuantLibCurveSwapCouponAndHolidayOracles"
+    },
+    {
+      "c": "itofin_bma_swap_value",
+      "go": "BMASwap.LegNPV",
+      "python": "itofin.instruments.BMASwap.leg_npv",
+      "status": "implemented",
+      "tests": "TestBMAQuantLibCurveSwapCouponAndHolidayOracles"
+    },
+    {
+      "c": "itofin_bma_swap_value",
+      "go": "BMASwap.LegBPS",
+      "python": "itofin.instruments.BMASwap.leg_bps",
+      "status": "implemented",
+      "tests": "TestBMAQuantLibCurveSwapCouponAndHolidayOracles"
+    },
+    {
+      "c": "itofin_bma_swap_value",
+      "go": "BMASwap.IsCalculated",
+      "python": "itofin.instruments.BMASwap.is_calculated",
+      "status": "implemented",
+      "tests": "TestBMAQuantLibCurveSwapCouponAndHolidayOracles"
+    },
+    {
+      "c": "itofin_bma_helper_new",
+      "go": "Session.NewBMASwapRateHelper",
+      "python": "itofin.termstructures.BMASwapRateHelper.__init__",
+      "status": "implemented",
+      "tests": "TestBMAQuantLibCurveSwapCouponAndHolidayOracles"
+    }
+  ]
+}

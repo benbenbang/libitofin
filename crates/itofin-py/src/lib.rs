@@ -5,6 +5,7 @@
 //! ItofinError exception. The pricing facades land in follow-up tickets
 //! (#485-#487).
 
+mod bma;
 mod bootstrap;
 mod calibration;
 mod capfloor;
@@ -208,6 +209,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     termstructures.add_class::<PyBlackVarianceCurve>()?;
     termstructures.add_class::<PyBlackVarianceSurface>()?;
     termstructures.add_class::<PyRateHelper>()?;
+    termstructures.add_class::<bma::PyBMASwapRateHelper>()?;
     termstructures.add_class::<jointcurves::PyIborIborBasisSwapRateHelper>()?;
     termstructures.add_class::<jointcurves::PyJointYieldCurves>()?;
     termstructures.add_class::<overnightfuture::PyOvernightIndexFutureRateHelper>()?;
@@ -276,6 +278,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     indexes.add_class::<overnightfuture::PySofr>()?;
     indexes.add_class::<PyCurrency>()?;
     indexes.add_class::<PyIborIndex>()?;
+    indexes.add_class::<bma::PyBMAIndex>()?;
     indexes.add_class::<PyEuribor>()?;
     indexes.add_class::<PyUsdLibor>()?;
     indexes.add_class::<PyJpyLibor>()?;
@@ -296,6 +299,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     cashflows.add_class::<PyYoYInflationOptionletCouponPricer>()?;
     cashflows.add_class::<PyYoYInflationLeg>()?;
     cashflows.add_class::<PyIborLeg>()?;
+    cashflows.add_class::<bma::PyAverageBMACoupon>()?;
     cashflows.add_class::<PyCashFlow>()?;
     cashflows.add_class::<PyLeg>()?;
     cashflows.add_function(wrap_pyfunction!(cashflows::npv, &cashflows)?)?;
@@ -305,6 +309,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     instruments.add_class::<PyVanillaOption>()?;
     instruments.add_class::<PySwapType>()?;
     instruments.add_class::<PyVanillaSwap>()?;
+    instruments.add_class::<bma::PyBMASwap>()?;
     instruments.add_class::<PyMakeVanillaSwap>()?;
     instruments.add_class::<makeswaption::PyMakeSwaption>()?;
     instruments.add_class::<PyPosition>()?;
