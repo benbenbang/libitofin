@@ -16,6 +16,7 @@ __all__ = [
     "BlackVolTermStructure",
     "BlackVolTimeExtrapolation",
     "BondPriceType",
+    "CapFloorTermVolCurve",
     "CapFloorTermVolSurface",
     "ConstantOptionletVolatility",
     "ConstantSwaptionVolatility",
@@ -43,7 +44,9 @@ __all__ = [
     "KerkhofSeasonality",
     "MultiplicativePriceSeasonality",
     "OISRateHelper",
+    "OptionletSmileSection",
     "OptionletStripper1",
+    "OptionletStripper2",
     "OptionletVolatilityStructure",
     "OvernightIndexFutureRateHelper",
     "PiecewiseConvexMonotoneForward",
@@ -312,6 +315,29 @@ class BlackVolTermStructure:
     def disable_extrapolation(self) -> None:
         r"""
         Forbid extrapolation past the maximum date and time.
+        """
+
+@typing.final
+class CapFloorTermVolCurve:
+    r"""
+    ATM cap term volatilities with live quotes and fixed or moving dates.
+    """
+    def __init__(self, reference_date: time.Date, calendar: time.Calendar, business_day_convention: time.BusinessDayConvention, option_tenors: typing.Sequence[time.Period], volatilities: typing.Sequence[quotes.SimpleQuote], day_counter: time.DayCounter) -> None:
+        r"""
+        Build a fixed-reference ATM curve from retained live quotes.
+        """
+    @staticmethod
+    def moving(settlement_days: builtins.int, calendar: time.Calendar, business_day_convention: time.BusinessDayConvention, option_tenors: typing.Sequence[time.Period], volatilities: typing.Sequence[quotes.SimpleQuote], day_counter: time.DayCounter, settings: itofin.Settings) -> CapFloorTermVolCurve:
+        r"""
+        Build a moving-reference ATM curve from retained live quotes.
+        """
+    def volatility(self, option_tenor: time.Period, extrapolate: builtins.bool = False) -> builtins.float:
+        r"""
+        Return the ATM term volatility at a cap tenor.
+        """
+    def option_times(self) -> builtins.list[builtins.float]:
+        r"""
+        Return the node times measured from the current reference date.
         """
 
 @typing.final
@@ -2023,6 +2049,24 @@ class OISRateHelper(RateHelper):
         """
 
 @typing.final
+class OptionletSmileSection:
+    r"""
+    A snapshot of one optionlet expiry's volatility smile.
+    """
+    def volatility(self, strike: builtins.float) -> builtins.float:
+        r"""
+        Return volatility at a strike.
+        """
+    def variance(self, strike: builtins.float) -> builtins.float:
+        r"""
+        Return variance at a strike.
+        """
+    def exercise_time(self) -> builtins.float:
+        r"""
+        Return the exercise time.
+        """
+
+@typing.final
 class OptionletStripper1:
     r"""
     Bootstraps caplet volatilities out of a market cap/floor term-volatility
@@ -2034,10 +2078,9 @@ class OptionletStripper1:
 
     term_vol_surface must come from CapFloorTermVolSurface.moving or
     moving_with_quotes; a pinned-reference surface carries no settlement days
-    and fails the adapter. VolatilityType.Normal is deferred (#440/#577) and
-    fails at the strip, not at construction.
+    and fails the adapter. Normal and shifted-lognormal quotes are supported.
     """
-    def __init__(self, term_vol_surface: CapFloorTermVolSurface, ibor_index: indexes.IborIndex, volatility_type: VolatilityType, accuracy: builtins.float = 1e-06, max_iter: builtins.int = 100, displacement: builtins.float = 0.0, discount: typing.Optional[YieldTermStructure] = None, optionlet_frequency: typing.Optional[time.Period] = None) -> None:
+    def __init__(self, term_vol_surface: CapFloorTermVolSurface, ibor_index: indexes.IborIndex, volatility_type: VolatilityType, accuracy: builtins.float = 1e-06, max_iter: builtins.int = 100, displacement: builtins.float = 0.0, discount: typing.Optional[YieldTermStructure] = None, optionlet_frequency: typing.Optional[time.Period] = None, switch_strike: typing.Optional[builtins.float] = None, dont_throw: builtins.bool = False) -> None:
         r"""
         Build the stripper over a term-volatility surface and an index.
 
@@ -2050,8 +2093,7 @@ class OptionletStripper1:
                 volatilities; it must be one of the moving forms, a
                 pinned-reference surface carrying no settlement days.
             ibor_index (IborIndex): The index the caplets fix off.
-            volatility_type (VolatilityType): The quoting convention; Normal is
-                deferred and fails at the strip, not here.
+            volatility_type (VolatilityType): Normal or shifted-lognormal quotes.
             accuracy (float): The tolerance of the implied-volatility solve.
             max_iter (int): The iteration cap of that solve.
             displacement (float): The lognormal shift applied to forwards and
@@ -2065,6 +2107,11 @@ class OptionletStripper1:
             ItofinError: On whatever the core rejects about the surface, the
                 index or the solve parameters.
         """
+    @staticmethod
+    def overnight(term_vol_surface: CapFloorTermVolSurface, overnight_index: indexes.OvernightIndex, volatility_type: VolatilityType, optionlet_frequency: time.Period, accuracy: builtins.float = 1e-06, max_iter: builtins.int = 100, displacement: builtins.float = 0.0, discount: typing.Optional[YieldTermStructure] = None, switch_strike: typing.Optional[builtins.float] = None, dont_throw: builtins.bool = False) -> OptionletStripper1:
+        r"""
+        Build an overnight stripper with an explicit optionlet frequency.
+        """
     def switch_strike(self) -> builtins.float:
         r"""
         Return the floating switch strike, the mean at-the-money caplet rate.
@@ -2076,8 +2123,7 @@ class OptionletStripper1:
             float: The switch strike.
 
         Raises:
-            ItofinError: On a stripping failure, which a Normal volatility_type
-                always is.
+            ItofinError: On a stripping failure.
         """
     def atm_optionlet_rates(self) -> builtins.list[builtins.float]:
         r"""
@@ -2090,6 +2136,28 @@ class OptionletStripper1:
             ItofinError: On a stripping failure.
         """
 
+@typing.final
+class OptionletStripper2:
+    r"""
+    Correct a stripped lognormal grid to ATM cap term volatilities.
+    """
+    def __init__(self, stripper: OptionletStripper1, atm_curve: CapFloorTermVolCurve) -> None:
+        r"""
+        Retain the first-stage stripper and live ATM curve.
+        """
+    def spreads_vol(self) -> builtins.list[builtins.float]:
+        r"""
+        Return the calibrated additive volatility spreads.
+        """
+    def atm_cap_floor_strikes(self) -> builtins.list[builtins.float]:
+        r"""
+        Return the ATM cap strikes.
+        """
+    def atm_cap_floor_prices(self) -> builtins.list[builtins.float]:
+        r"""
+        Return the target ATM cap prices.
+        """
+
 class OptionletVolatilityStructure:
     r"""
     Shared base for every caplet/floorlet volatility surface: volatility,
@@ -2098,6 +2166,18 @@ class OptionletVolatilityStructure:
     A single option axis, unlike the swaption surfaces: a query takes one option
     tenor (or date) and a strike.
     """
+    def smile_section(self, option_time: builtins.float, extrapolate: builtins.bool = False) -> OptionletSmileSection:
+        r"""
+        Snapshot the volatility smile at an option time.
+        """
+    def smile_section_date(self, option_date: time.Date, extrapolate: builtins.bool = False) -> OptionletSmileSection:
+        r"""
+        Snapshot the volatility smile at an option date.
+        """
+    def smile_section_tenor(self, option_tenor: time.Period, extrapolate: builtins.bool = False) -> OptionletSmileSection:
+        r"""
+        Snapshot the volatility smile at an option tenor.
+        """
     def volatility(self, option_tenor: time.Period, strike: builtins.float, extrapolate: builtins.bool = False) -> builtins.float:
         r"""
         Return the caplet volatility for an option tenor and strike.
@@ -3168,7 +3248,7 @@ class StrippedOptionletAdapter(OptionletVolatilityStructure):
     last caplet fixing, so pricing a cap that reaches it wants
     enable_extrapolation().
     """
-    def __init__(self, stripper: OptionletStripper1, settings: itofin.Settings) -> None:
+    def __init__(self, stripper: OptionletStripper1 | OptionletStripper2, settings: itofin.Settings) -> None:
         r"""
         Build the interpolated surface over a stripper.
 
