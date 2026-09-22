@@ -20,6 +20,89 @@
       ]
     },
     {
+      "c": "itofin_heston_engine_new",
+      "go": "Session.NewExponentialFittingHestonEngine",
+      "python": "itofin.pricingengines.ExponentialFittingHestonEngine",
+      "status": "implemented",
+      "tests": [
+        "TestExponentialFittingHestonQuantLibGrid",
+        "TestExponentialFittingHestonVariatesAndErrors"
+      ]
+    },
+    {
+      "c": "itofin_heston_engine_new",
+      "go": "Session.NewExponentialFittingHestonEngine",
+      "python": "itofin.pricingengines.ExponentialFittingHestonEngine.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestExponentialFittingHestonQuantLibGrid",
+        "TestExponentialFittingHestonVariatesAndErrors"
+      ]
+    },
+    {
+      "c": "itofin_heston_engine_new",
+      "go": "ExponentialFittingControlVariate",
+      "python": "itofin.pricingengines.ExponentialFittingControlVariate",
+      "status": "implemented",
+      "tests": [
+        "TestExponentialFittingHestonVariatesAndErrors"
+      ]
+    },
+    {
+      "c": "itofin_heston_engine_new",
+      "go": "HestonOptimal",
+      "python": "itofin.pricingengines.ExponentialFittingControlVariate.Optimal",
+      "status": "implemented",
+      "tests": [
+        "TestExponentialFittingHestonVariatesAndErrors"
+      ]
+    },
+    {
+      "c": "itofin_heston_engine_new",
+      "go": "HestonAndersenPiterbarg",
+      "python": "itofin.pricingengines.ExponentialFittingControlVariate.AndersenPiterbarg",
+      "status": "implemented",
+      "tests": [
+        "TestExponentialFittingHestonVariatesAndErrors"
+      ]
+    },
+    {
+      "c": "itofin_heston_engine_new",
+      "go": "HestonAndersenPiterbargOptCV",
+      "python": "itofin.pricingengines.ExponentialFittingControlVariate.AndersenPiterbargOptCV",
+      "status": "implemented",
+      "tests": [
+        "TestExponentialFittingHestonVariatesAndErrors"
+      ]
+    },
+    {
+      "c": "itofin_heston_engine_new",
+      "go": "HestonAsymptoticChF",
+      "python": "itofin.pricingengines.ExponentialFittingControlVariate.AsymptoticChF",
+      "status": "implemented",
+      "tests": [
+        "TestExponentialFittingHestonVariatesAndErrors"
+      ]
+    },
+    {
+      "c": "itofin_heston_engine_new",
+      "go": "HestonAngledContour",
+      "python": "itofin.pricingengines.ExponentialFittingControlVariate.AngledContour",
+      "status": "implemented",
+      "tests": [
+        "TestExponentialFittingHestonVariatesAndErrors"
+      ]
+    },
+    {
+      "c": "itofin_heston_engine_new",
+      "go": "HestonAngledContourNoCV",
+      "python": "itofin.pricingengines.ExponentialFittingControlVariate.AngledContourNoCV",
+      "status": "implemented",
+      "tests": [
+        "TestExponentialFittingHestonVariatesAndErrors"
+      ]
+    },
+    {
       "c": "itofin_option_set_engine",
       "go": "VanillaOption.SetCosHestonEngine",
       "python": "itofin.instruments.VanillaOption.set_cos_heston_engine",
@@ -36,6 +119,39 @@
       "tests": [
         "TestCosHestonQuantLibRetentionAndErrors"
       ]
+    },
+    {
+      "c": "itofin_option_set_engine",
+      "go": "VanillaOption.SetExponentialFittingHestonEngine",
+      "python": "itofin.instruments.VanillaOption.set_exponential_fitting_heston_engine",
+      "status": "implemented",
+      "tests": [
+        "TestExponentialFittingHestonQuantLibGrid"
+      ]
+    },
+    {
+      "c": "itofin_option_value",
+      "go": "VanillaOption.PriceExponentialFittingHeston",
+      "python": "itofin.instruments.VanillaOption.price_exponential_fitting_heston",
+      "status": "implemented",
+      "tests": [
+        "TestExponentialFittingHestonQuantLibGrid"
+      ]
+    },
+    {
+      "go": "ExponentialFittingControlVariate: explicit integer conversion",
+      "python": "itofin.pricingengines.ExponentialFittingControlVariate.__int__",
+      "status": "implemented",
+      "tests": [
+        "TestExponentialFittingHestonVariatesAndErrors"
+      ]
+    },
+    {
+      "classification": "nonconstructible-enum",
+      "go": "ExponentialFittingControlVariate",
+      "python": "itofin.pricingengines.ExponentialFittingControlVariate.__new__",
+      "reason": "Python enum forbids construction; Go uses typed integer constants and native APIs validate discriminants.",
+      "status": "language-specific"
     },
     {
       "c": "itofin_cos_heston_value",

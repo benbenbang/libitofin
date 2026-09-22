@@ -2,9 +2,45 @@
 use crate::{PyQlError, heston::PyHestonModel};
 use libitofin::pricingengine::PricingEngine;
 use libitofin::pricingengines::vanilla::coshestonengine::CosHestonEngine;
+use libitofin::pricingengines::vanilla::exponentialfittinghestonengine::{
+    ExponentialFittingControlVariate, ExponentialFittingHestonEngine,
+};
 use libitofin::shared::{SharedMut, shared_mut};
 use pyo3::prelude::*;
-use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pymethods};
+
+/// Control variate used by the exponentially fitted Heston quadrature.
+#[gen_stub_pyclass_enum]
+#[pyclass(
+    name = "ExponentialFittingControlVariate",
+    eq,
+    eq_int,
+    from_py_object,
+    module = "itofin.pricingengines"
+)]
+#[derive(Clone, Copy, PartialEq)]
+pub enum PyExponentialFittingControlVariate {
+    Optimal,
+    AndersenPiterbarg,
+    AndersenPiterbargOptCV,
+    AsymptoticChF,
+    AngledContour,
+    AngledContourNoCV,
+}
+impl PyExponentialFittingControlVariate {
+    pub(crate) fn inner(self) -> ExponentialFittingControlVariate {
+        match self {
+            Self::Optimal => ExponentialFittingControlVariate::Optimal,
+            Self::AndersenPiterbarg => ExponentialFittingControlVariate::AndersenPiterbarg,
+            Self::AndersenPiterbargOptCV => {
+                ExponentialFittingControlVariate::AndersenPiterbargOptCV
+            }
+            Self::AsymptoticChF => ExponentialFittingControlVariate::AsymptoticChF,
+            Self::AngledContour => ExponentialFittingControlVariate::AngledContour,
+            Self::AngledContourNoCV => ExponentialFittingControlVariate::AngledContourNoCV,
+        }
+    }
+}
 
 /// Fourier cosine expansion retaining its live Heston model.
 #[gen_stub_pyclass]
@@ -87,6 +123,47 @@ impl PyCosHestonEngine {
     }
 }
 impl PyCosHestonEngine {
+    pub(crate) fn engine(&self) -> SharedMut<dyn PricingEngine> {
+        self.inner.clone()
+    }
+}
+
+/// Exponentially fitted quadrature retaining its live Heston model.
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "ExponentialFittingHestonEngine",
+    unsendable,
+    module = "itofin.pricingengines"
+)]
+pub struct PyExponentialFittingHestonEngine {
+    inner: SharedMut<dyn PricingEngine>,
+}
+#[gen_stub_pymethods]
+#[pymethods]
+impl PyExponentialFittingHestonEngine {
+    /// Construct the selected control variate with optional fixed scaling.
+    #[new]
+    #[pyo3(signature = (model, control_variate=PyExponentialFittingControlVariate::Optimal, scaling=None, alpha=-0.5))]
+    fn new(
+        model: &PyHestonModel,
+        control_variate: PyExponentialFittingControlVariate,
+        scaling: Option<f64>,
+        alpha: f64,
+    ) -> PyResult<Self> {
+        Ok(Self {
+            inner: shared_mut(
+                ExponentialFittingHestonEngine::new(
+                    model.inner(),
+                    control_variate.inner(),
+                    scaling,
+                    alpha,
+                )
+                .map_err(PyQlError::from)?,
+            ),
+        })
+    }
+}
+impl PyExponentialFittingHestonEngine {
     pub(crate) fn engine(&self) -> SharedMut<dyn PricingEngine> {
         self.inner.clone()
     }

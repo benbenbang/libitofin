@@ -2,7 +2,7 @@
 
 use crate::PyQlError;
 use crate::heston::PyHestonModel;
-use crate::heston_engines::PyCosHestonEngine;
+use crate::heston_engines::{PyCosHestonEngine, PyExponentialFittingHestonEngine};
 use crate::market::PyBlackScholesProcess;
 use crate::mcengine::{
     PyMCAmericanEngine, PyMCEuropeanEngine, PyMCEuropeanHestonEngine, PyQMCEuropeanEngine,
@@ -205,6 +205,20 @@ impl PyVanillaOption {
     /// Attach and price with a COS engine.
     fn price_cos_heston(&mut self, engine: &PyCosHestonEngine) -> PyResult<f64> {
         self.set_cos_heston_engine(engine);
+        self.npv()
+    }
+
+    /// Attach an exponentially fitted Heston engine retaining its model.
+    fn set_exponential_fitting_heston_engine(&mut self, engine: &PyExponentialFittingHestonEngine) {
+        self.inner.base_mut().set_pricing_engine(engine.engine());
+    }
+
+    /// Attach and price with an exponentially fitted Heston engine.
+    fn price_exponential_fitting_heston(
+        &mut self,
+        engine: &PyExponentialFittingHestonEngine,
+    ) -> PyResult<f64> {
+        self.set_exponential_fitting_heston_engine(engine);
         self.npv()
     }
 

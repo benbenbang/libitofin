@@ -354,6 +354,8 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     pricingengines.add_class::<PyMCEuropeanEngine>()?;
     pricingengines.add_class::<PyQMCEuropeanEngine>()?;
     pricingengines.add_class::<heston_engines::PyCosHestonEngine>()?;
+    pricingengines.add_class::<heston_engines::PyExponentialFittingHestonEngine>()?;
+    pricingengines.add_class::<heston_engines::PyExponentialFittingControlVariate>()?;
     pricingengines.add_class::<PyMCEuropeanHestonEngine>()?;
     pricingengines.add_class::<PyMCAmericanEngine>()?;
 

@@ -1252,6 +1252,14 @@ class VanillaOption:
         r"""
         Attach and price with a COS engine.
         """
+    def set_exponential_fitting_heston_engine(self, engine: pricingengines.ExponentialFittingHestonEngine) -> None:
+        r"""
+        Attach an exponentially fitted Heston engine retaining its model.
+        """
+    def price_exponential_fitting_heston(self, engine: pricingengines.ExponentialFittingHestonEngine) -> builtins.float:
+        r"""
+        Attach and price with an exponentially fitted Heston engine.
+        """
     def set_mc_engine(self, engine: pricingengines.MCEuropeanEngine) -> None:
         r"""
         Attach the Monte Carlo European engine.
