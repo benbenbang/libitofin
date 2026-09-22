@@ -167,6 +167,11 @@ pub trait InterestRateIndex {
     /// (pure virtual in C++).
     fn forecast_fixing(&self, fixing_date: Date) -> QlResult<Rate>;
 
+    /// Whether a calendar date is an admissible fixing date.
+    fn valid_fixing_date(&self, date: Date) -> bool {
+        self.base().fixing_calendar.is_business_day(date)
+    }
+
     /// The family name (e.g. `Euribor`).
     fn family_name(&self) -> &str {
         &self.base().family_name
@@ -210,7 +215,7 @@ pub trait InterestRateIndex {
     fn value_date(&self, fixing_date: Date) -> QlResult<Date> {
         let base = self.base();
         require!(
-            base.fixing_calendar.is_business_day(fixing_date),
+            self.valid_fixing_date(fixing_date),
             "{fixing_date:?} is not a valid fixing date"
         );
         Ok(base.fixing_calendar.advance(
@@ -236,7 +241,7 @@ impl<T: InterestRateIndex> Index for T {
     }
 
     fn is_valid_fixing_date(&self, fixing_date: Date) -> bool {
-        self.base().fixing_calendar.is_business_day(fixing_date)
+        self.valid_fixing_date(fixing_date)
     }
 
     fn settings(&self) -> &Settings<Date> {
