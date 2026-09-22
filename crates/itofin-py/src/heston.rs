@@ -3,6 +3,7 @@
 
 use crate::PyQlError;
 use crate::calibration::{PyCalibrationErrorType, PyEndCriteria, PyLevenbergMarquardt};
+use crate::heston_engines::PyExponentialFittingControlVariate;
 use crate::settings::PySettings;
 use crate::time::{PyCalendar, PyDate, PyDayCounter, PyPeriod};
 use libitofin::handle::Handle;
@@ -12,6 +13,8 @@ use libitofin::models::equity::HestonModelHelper;
 use libitofin::models::{HestonModel, calibrate};
 use libitofin::pricingengine::PricingEngine;
 use libitofin::pricingengines::vanilla::analytichestonengine::AnalyticHestonEngine;
+use libitofin::pricingengines::vanilla::coshestonengine::CosHestonEngine;
+use libitofin::pricingengines::vanilla::exponentialfittinghestonengine::ExponentialFittingHestonEngine;
 use libitofin::processes::HestonProcess;
 use libitofin::quotes::{Quote, SimpleQuote};
 use libitofin::shared::{Shared, SharedMut, shared, shared_mut};
@@ -244,6 +247,58 @@ impl PyHestonModel {
             AnalyticHestonEngine::new(SharedMut::clone(&self.inner), integration_order)
                 .map_err(PyQlError::from)?,
         ) as SharedMut<dyn PricingEngine>;
+        self.calibrate_engine(helpers, method, end_criteria, engine)
+    }
+
+    /// Fit with a COS engine, retaining existing analytic calibration defaults.
+    #[pyo3(signature = (helpers, method, end_criteria, l=16.0, n=200))]
+    fn calibrate_cos(
+        &mut self,
+        helpers: Vec<PyRef<PyHestonModelHelper>>,
+        #[gen_stub(override_type(type_repr = "optimization.LevenbergMarquardt", imports = ("itofin.optimization")))]
+        method: &mut PyLevenbergMarquardt,
+        end_criteria: &PyEndCriteria,
+        l: f64,
+        n: usize,
+    ) -> PyResult<()> {
+        let engine = shared_mut(CosHestonEngine::new(self.inner(), l, n).map_err(PyQlError::from)?);
+        self.calibrate_engine(helpers, method, end_criteria, engine)
+    }
+
+    /// Fit with exponentially fitted quadrature and the selected control variate.
+    #[pyo3(signature = (helpers, method, end_criteria, control_variate=PyExponentialFittingControlVariate::Optimal, scaling=None, alpha=-0.5))]
+    #[allow(clippy::too_many_arguments)]
+    fn calibrate_exponential_fitting(
+        &mut self,
+        helpers: Vec<PyRef<PyHestonModelHelper>>,
+        #[gen_stub(override_type(type_repr = "optimization.LevenbergMarquardt", imports = ("itofin.optimization")))]
+        method: &mut PyLevenbergMarquardt,
+        end_criteria: &PyEndCriteria,
+        control_variate: PyExponentialFittingControlVariate,
+        scaling: Option<f64>,
+        alpha: f64,
+    ) -> PyResult<()> {
+        let engine = shared_mut(
+            ExponentialFittingHestonEngine::new(
+                self.inner(),
+                control_variate.inner(),
+                scaling,
+                alpha,
+            )
+            .map_err(PyQlError::from)?,
+        );
+        self.calibrate_engine(helpers, method, end_criteria, engine)
+    }
+}
+
+impl PyHestonModel {
+    fn calibrate_engine(
+        &mut self,
+        helpers: Vec<PyRef<PyHestonModelHelper>>,
+        method: &mut PyLevenbergMarquardt,
+        end_criteria: &PyEndCriteria,
+        engine: SharedMut<dyn PricingEngine>,
+    ) -> PyResult<()> {
         for helper in &helpers {
             helper
                 .inner
@@ -267,9 +322,6 @@ impl PyHestonModel {
         .map_err(PyQlError::from)?;
         Ok(())
     }
-}
-
-impl PyHestonModel {
     /// A clone of the inner model handle for the engine facade (H2 also calibrates).
     pub(crate) fn inner(&self) -> SharedMut<HestonModel> {
         SharedMut::clone(&self.inner)
