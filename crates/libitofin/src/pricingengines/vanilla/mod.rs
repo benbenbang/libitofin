@@ -18,7 +18,10 @@
 //!   wrong price.
 
 pub mod analytichestonengine;
+pub mod coshestonengine;
 pub mod fdblackscholesvanillaengine;
+mod hestoncumulants;
+mod hestonmarket;
 pub mod mcamericanengine;
 pub mod mceuropeanengine;
 pub mod mceuropeanhestonengine;
