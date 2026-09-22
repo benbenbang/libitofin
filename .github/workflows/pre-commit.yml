@@ -59,6 +59,7 @@ jobs:
               - sdk/go/**
               - scripts/check_go_*
               - scripts/package_go_native.sh
+              - scripts/check_release_attribution.py
               - scripts/check_release_version.py
               - scripts/publish_go_release.py
               - scripts/test_*release*.py
