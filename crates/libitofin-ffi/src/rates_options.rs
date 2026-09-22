@@ -303,7 +303,7 @@ pub unsafe extern "C" fn itofin_rate_option_value(
                             v.calculate()?;
                             0.
                         }
-                        3 => v.coupons().len() as Real,
+                        3 => v.coupon_count() as Real,
                         _ => return Err(BindingError::invalid("invalid cap/floor field")),
                     }
                 }

@@ -195,6 +195,10 @@ impl OvernightLeg {
     /// preconditions, including nonzero gearing.
     pub fn coupons(&self) -> QlResult<Vec<Shared<OvernightIndexedCoupon>>> {
         require!(!self.notionals.is_empty(), "no notional given");
+        require!(
+            self.payment_lag.unsigned_abs() <= 366 * 300,
+            "overnight payment lag outside supported date range"
+        );
         let size = self.schedule.len();
         require!(size >= 2, "schedule with {size} date(s) spans no period");
         let periods = size - 1;
@@ -225,31 +229,42 @@ impl OvernightLeg {
         for i in 0..periods {
             let start = self.schedule.date(i);
             let end = self.schedule.date(i + 1);
-            let mut reference_start = start;
-            let mut reference_end = end;
-            if i == 0 && stub(1) {
-                reference_start = calendar.advance_by_period(
-                    end,
-                    -self.schedule.tenor(),
-                    self.payment_adjustment,
-                    false,
-                );
-            }
-            if i == periods - 1 && stub(i + 1) {
-                reference_end = calendar.advance_by_period(
-                    start,
-                    self.schedule.tenor(),
-                    self.payment_adjustment,
-                    false,
-                );
-            }
-            let payment_date = self.payment_calendar.advance(
-                end,
-                self.payment_lag,
-                TimeUnit::Days,
-                self.payment_adjustment,
-                false,
-            );
+            let (reference_start, reference_end, payment_date) =
+                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    let mut reference_start = start;
+                    let mut reference_end = end;
+                    if i == 0 && stub(1) {
+                        reference_start = calendar.advance_by_period(
+                            end,
+                            -self.schedule.tenor(),
+                            self.payment_adjustment,
+                            false,
+                        );
+                    }
+                    if i == periods - 1 && stub(i + 1) {
+                        reference_end = calendar.advance_by_period(
+                            start,
+                            self.schedule.tenor(),
+                            self.payment_adjustment,
+                            false,
+                        );
+                    }
+                    let payment_date = self.payment_calendar.advance(
+                        end,
+                        self.payment_lag,
+                        TimeUnit::Days,
+                        self.payment_adjustment,
+                        false,
+                    );
+                    (reference_start, reference_end, payment_date)
+                }))
+                .map_err(|_| {
+                    crate::errors::QlError::new(
+                        "overnight coupon dates outside supported range",
+                        file!(),
+                        line!(),
+                    )
+                })?;
             let coupon = OvernightIndexedCoupon::new(
                 payment_date,
                 broadcast(&self.notionals, i, 1.0),
