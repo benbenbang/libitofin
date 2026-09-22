@@ -61,3 +61,6 @@ pub use yoyinflationoptionletpricer::{
     YoYInflationOptionletCouponPricer, YoYOptionletDistribution,
 };
 pub use zeroinflationcashflow::ZeroInflationCashFlow;
+
+pub mod averagebmacoupon;
+pub use averagebmacoupon::{AverageBMACoupon, AverageBMACouponPricer, AverageBMALeg};
