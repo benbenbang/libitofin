@@ -238,3 +238,7 @@ impl RelativeDateRateHelper for BMASwapRateHelper {
         let _ = self.try_initialize_dates();
     }
 }
+
+#[cfg(test)]
+#[path = "bmaswapratehelper_tests.rs"]
+mod tests;
