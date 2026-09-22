@@ -1,7 +1,7 @@
 //! Monte Carlo American-option engine.
 //!
 //! Port of `ql/pricingengines/vanilla/mcamericanengine.{hpp,cpp}`: the
-//! Longstaff-Schwartz engine for American vanilla options.
+//! Longstaff-Schwartz engine for American and Bermudan vanilla options.
 //! [`AmericanPathPricer`] supplies the three things the backward induction needs
 //! from the option (`mcamericanengine.cpp:31-72`), [`MCAmericanEngine`] wires it
 //! into the two-pass [`McLongstaffSchwartzEngineBase`] driver, and
@@ -20,24 +20,21 @@
 //!   when the `dynamic_pointer_cast<StrikedTypePayoff>` succeeds (`:48-52`).
 //!   `OptionArguments::payoff` is already a `StrikedTypePayoff` here, so the
 //!   cast is a compile-time fact and the scaling is always `1 / strike`.
-//! - **the polynomial-family check is a compile-time fact**: the C++ ctor
-//!   rejects an unsupported `LsmBasisSystem::PolynomialType` at run time
-//!   (`:38-43`); [`PolynomialType`] carries only the ported `Monomial`.
 //! - **the process is concretely a [`GeneralizedBlackScholesProcess`]**, so the
 //!   "generalized Black-Scholes process required" downcast
 //!   (`mcamericanengine.hpp:190-193`) cannot fail at run time, as with
 //!   [`MCEuropeanEngine`](super::MCEuropeanEngine).
 //!
+//! Bermudan exercise is restricted to contractual dates in both calibration
+//! and pricing. QuantLib 1.43 instead permits exercise on refined simulation
+//! nodes; this deliberate correction is covered by deterministic path and FD
+//! oracles. All positive contractual dates remain mandatory simulation nodes.
+//!
 //! Deferred, rejected visibly rather than silently ignored:
-//! - **`payoffAtExpiry` rejection** (`mcamericanengine.hpp:197-198`): the flag
-//!   lives on the C++ `EarlyExercise` base, which arrives with
-//!   `AmericanExercise` in #762; the guard is owed by that ticket. What this
-//!   engine can check today, it does: a non-American exercise is rejected, which
-//!   also closes the deferred Bermudan time grid.
 //! - **control variate** (`mcamericanengine.hpp:74-77,176-180`): the CV path
 //!   pricer, the analytic control engine, and the `max(0, value)` floor
 //!   `calculate()` applies under it are omitted, as are the builder's
-//!   `withControlVariate` and `withBasisSystem` (one family ported).
+//!   `withControlVariate`.
 //! - **the multi-asset `MCAmericanBasketEngine`**, needing the `MultiPath` form
 //!   of the Longstaff-Schwartz pricer.
 
@@ -64,6 +61,7 @@ pub struct AmericanPathPricer {
     scaling_value: Real,
     polynomial_order: Size,
     polynomial_type: PolynomialType,
+    exercise_indices: Option<Vec<bool>>,
 }
 
 impl AmericanPathPricer {
@@ -80,6 +78,7 @@ impl AmericanPathPricer {
             scaling_value,
             polynomial_order,
             polynomial_type,
+            exercise_indices: None,
         }
     }
 }
@@ -91,6 +90,13 @@ impl EarlyExercisePathPricer<Path> for AmericanPathPricer {
     /// trips the state through the scaling rather than reading `path[t]`, and so
     /// does this, so the two agree to the last bit.
     fn value(&self, path: &Path, t: Size) -> Real {
+        if self
+            .exercise_indices
+            .as_ref()
+            .is_some_and(|indices| !indices[t])
+        {
+            return 0.0;
+        }
         self.payoff.value(self.state(path, t) / self.scaling_value)
     }
 
@@ -144,6 +150,13 @@ impl<RNG: McRngTraits> MCAmericanEngine<RNG> {
         antithetic_variate_calibration: Option<bool>,
         seed_calibration: Option<u32>,
     ) -> QlResult<MCAmericanEngine<RNG>> {
+        require!(
+            !matches!(
+                polynomial_type,
+                PolynomialType::Legendre | PolynomialType::Chebyshev
+            ),
+            "insufficient polynomial type"
+        );
         let base = McLongstaffSchwartzEngineBase::new(
             Shared::clone(&process) as Shared<dyn StochasticProcess1D>,
             time_steps,
@@ -184,15 +197,19 @@ impl<RNG: McRngTraits> MCAmericanEngine<RNG> {
     /// # Errors
     ///
     /// Errors on a missing payoff, a missing exercise, an exercise that is not
-    /// American (`:196`), or one paying at expiry (`:197-198`); propagates a
-    /// grid or discount failure.
+    /// American or Bermudan (`:196`), or one paying at expiry (`:197-198`); propagates a
+    /// grid or discount failure. Chebyshev2nd call payoffs are rejected because
+    /// their in-the-money states exceed the weighted basis domain.
     pub fn lsm_path_pricer(&self) -> QlResult<Shared<LongstaffSchwartzPathPricer>> {
         let arguments = self.base.arguments();
         let Some(exercise) = &arguments.exercise else {
             fail!("no exercise given");
         };
         require!(
-            exercise.exercise_type() == ExerciseType::American,
+            matches!(
+                exercise.exercise_type(),
+                ExerciseType::American | ExerciseType::Bermudan
+            ),
             "wrong exercise given"
         );
         require!(!exercise.payoff_at_expiry(), "payoff at expiry not handled");
@@ -200,15 +217,28 @@ impl<RNG: McRngTraits> MCAmericanEngine<RNG> {
             fail!("no payoff given");
         };
 
-        let early = shared(AmericanPathPricer::new(
+        require!(
+            self.polynomial_type != PolynomialType::Chebyshev2nd
+                || payoff.option_type() != crate::option::OptionType::Call,
+            "Chebyshev2nd basis is undefined for in-the-money call states"
+        );
+        let grid = self.base.time_grid()?;
+        let mut early = AmericanPathPricer::new(
             Shared::clone(payoff),
             self.polynomial_order,
             self.polynomial_type,
-        )) as Shared<dyn EarlyExercisePathPricer<Path, State = Real>>;
+        );
+        if exercise.exercise_type() == ExerciseType::Bermudan {
+            let mut indices = vec![false; grid.size()];
+            for &time in grid.mandatory_times() {
+                indices[grid.index(time)?] = true;
+            }
+            early.exercise_indices = Some(indices);
+        }
 
         Ok(shared(LongstaffSchwartzPathPricer::new(
-            &self.base.time_grid()?,
-            early,
+            &grid,
+            shared(early) as Shared<dyn EarlyExercisePathPricer<Path, State = Real>>,
             &self.process.risk_free_rate(),
         )?))
     }
@@ -263,6 +293,7 @@ pub struct MakeMcAmericanEngine<RNG> {
     seed: u32,
     polynomial_order: Size,
     calibration_samples: Option<Size>,
+    polynomial_type: PolynomialType,
     _rng: std::marker::PhantomData<RNG>,
 }
 
@@ -282,6 +313,7 @@ impl<RNG: McRngTraits> MakeMcAmericanEngine<RNG> {
             seed: 0,
             polynomial_order: 2,
             calibration_samples: None,
+            polynomial_type: PolynomialType::Monomial,
             _rng: std::marker::PhantomData,
         }
     }
@@ -344,6 +376,14 @@ impl<RNG: McRngTraits> MakeMcAmericanEngine<RNG> {
         self
     }
 
+    /// Selects the regression family. The engine rejects Legendre and
+    /// first-kind Chebyshev, matching QuantLib's American path pricer.
+    #[must_use]
+    pub fn with_basis_system(mut self, family: PolynomialType) -> Self {
+        self.polynomial_type = family;
+        self
+    }
+
     /// Sets the number of calibration paths (`mcamericanengine.hpp:325`).
     #[must_use]
     pub fn with_calibration_samples(mut self, samples: Size) -> Self {
@@ -388,7 +428,7 @@ impl<RNG: McRngTraits> MakeMcAmericanEngine<RNG> {
             self.max_samples,
             self.seed,
             self.polynomial_order,
-            PolynomialType::Monomial,
+            self.polynomial_type,
             self.calibration_samples,
             None,
             None,

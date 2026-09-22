@@ -13,15 +13,6 @@
 //! what the C++ engines see when their `dynamic_pointer_cast<EarlyExercise>`
 //! is not attempted.
 //!
-//! Deferred, omitted visibly rather than accepted and ignored:
-//! - **the Bermudan simulation grid of the Monte Carlo engines**
-//!   (`mclongstaffschwartzengine.hpp:218-231`). [`BermudanExercise`] itself is
-//!   ported and prices under the finite-difference engine; only the path
-//!   generator that would exercise it along a simulated path is missing.
-//! - **the latest-date-only `AmericanExercise` constructor**
-//!   (`exercise.cpp:43-50`): it opens the window at `Date::minDate()`, a
-//!   sentinel this stack has no date for.
-
 use crate::errors::QlResult;
 use crate::require;
 use crate::time::date::Date;
@@ -114,6 +105,14 @@ impl AmericanExercise {
             dates: [earliest, latest],
             payoff_at_expiry,
         })
+    }
+
+    /// Builds an exercise window from the earliest supported date to `latest`.
+    ///
+    /// # Errors
+    /// Returns an error if `latest` precedes `Date::min_date()`.
+    pub fn until(latest: Date, payoff_at_expiry: bool) -> QlResult<Self> {
+        Self::new(Date::min_date(), latest, payoff_at_expiry)
     }
 
     /// The window over `[earliest, latest]` paying on exercise, the C++
@@ -298,5 +297,16 @@ mod tests {
         let exercise: &dyn Exercise = &EuropeanExercise::new(expiry);
         assert_eq!(exercise.last_date(), expiry);
         assert_eq!(exercise.dates().len(), 1);
+    }
+
+    #[test]
+    fn latest_only_window_starts_at_minimum_supported_date() {
+        let expiry = Date::new(17, Month::May, 2027);
+        for deferred in [false, true] {
+            let exercise = AmericanExercise::until(expiry, deferred).unwrap();
+            assert_eq!(exercise.dates(), &[Date::min_date(), expiry]);
+            assert_eq!(exercise.payoff_at_expiry(), deferred);
+        }
+        assert!(AmericanExercise::until(Date::null(), false).is_err());
     }
 }
