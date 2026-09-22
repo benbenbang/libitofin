@@ -66,3 +66,6 @@ pub use zerocouponinflationswap::ZeroCouponInflationSwap;
 
 pub mod overnightindexfuture;
 pub use overnightindexfuture::OvernightIndexFuture;
+
+pub mod bmaswap;
+pub use bmaswap::BMASwap;
