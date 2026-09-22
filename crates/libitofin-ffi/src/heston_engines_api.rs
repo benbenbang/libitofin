@@ -195,3 +195,154 @@ pub unsafe extern "C" fn itofin_cos_heston_value(
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use libitofin::handle::Handle;
+    use libitofin::interestrate::Compounding;
+    use libitofin::processes::HestonProcess;
+    use libitofin::quotes::{Quote, SimpleQuote};
+    use libitofin::shared::{Shared, shared};
+    use libitofin::termstructures::yields::FlatForward;
+    use libitofin::termstructures::yieldtermstructure::YieldTermStructure;
+    use libitofin::time::date::{Date, Month};
+    use libitofin::time::daycounters::actual365fixed::Actual365Fixed;
+    use libitofin::time::frequency::Frequency;
+
+    fn model() -> SharedMut<HestonModel> {
+        let reference = Date::new(7, Month::February, 2017);
+        let flat = |rate| {
+            Handle::new(shared(FlatForward::with_rate(
+                reference,
+                rate,
+                Actual365Fixed::new(),
+                Compounding::Continuous,
+                Frequency::Annual,
+            )) as Shared<dyn YieldTermStructure>)
+        };
+        HestonModel::new(shared(HestonProcess::new(
+            flat(0.15),
+            flat(0.07),
+            Handle::new(shared(SimpleQuote::new(100.0)) as Shared<dyn Quote>),
+            0.1,
+            4.0,
+            0.22,
+            1.8,
+            -0.75,
+        )))
+        .unwrap()
+    }
+
+    #[test]
+    fn heston_engine_config_rejects_unknown_discriminants_with_valid_market() {
+        let model = model();
+        let valid = ItofinHestonEngineConfig {
+            kind: 1,
+            l: 16.0,
+            n: 200,
+            control_variate: 0,
+            has_scaling: 0,
+            scaling: 1.0,
+            alpha: -0.5,
+        };
+        assert!(engine(model.clone(), &valid).is_ok());
+        assert!(
+            engine(
+                model.clone(),
+                &ItofinHestonEngineConfig { kind: 2, ..valid }
+            )
+            .is_err()
+        );
+        assert!(
+            engine(
+                model.clone(),
+                &ItofinHestonEngineConfig {
+                    control_variate: 6,
+                    ..valid
+                }
+            )
+            .is_err()
+        );
+        assert!(
+            engine(
+                model.clone(),
+                &ItofinHestonEngineConfig {
+                    has_scaling: 2,
+                    ..valid
+                }
+            )
+            .is_err()
+        );
+        assert!(
+            engine(
+                model.clone(),
+                &ItofinHestonEngineConfig {
+                    has_scaling: 1,
+                    scaling: 0.0,
+                    ..valid
+                }
+            )
+            .is_err()
+        );
+        assert!(engine(model, &valid).is_ok());
+    }
+    #[test]
+    fn cos_inspector_failures_preserve_both_outputs_and_allow_recovery() {
+        use std::ptr::null_mut;
+        let mut context = Context::new();
+        let model = model();
+        let wrong = context.insert(model.clone()).unwrap();
+        let id = context
+            .insert(shared_mut(CosHestonEngine::new(model, 16.0, 200).unwrap()))
+            .unwrap();
+        let (mut real, mut imag) = (123.0, 456.0);
+        unsafe {
+            for (handle, field, status) in [(wrong, 0, INVALID_HANDLE), (id, 6, INVALID_ARGUMENT)] {
+                assert_eq!(
+                    itofin_cos_heston_value(
+                        &mut context,
+                        handle,
+                        field,
+                        1.0,
+                        0.5,
+                        &mut real,
+                        &mut imag,
+                        null_mut()
+                    ),
+                    status
+                );
+                assert_eq!((real, imag), (123.0, 456.0));
+            }
+            assert_eq!(
+                itofin_cos_heston_value(
+                    &mut context,
+                    id,
+                    5,
+                    1.0,
+                    0.5,
+                    &mut real,
+                    null_mut(),
+                    null_mut()
+                ),
+                INVALID_ARGUMENT
+            );
+            assert_eq!((real, imag), (123.0, 456.0));
+            assert_eq!(
+                itofin_cos_heston_value(
+                    &mut context,
+                    id,
+                    0,
+                    1.0,
+                    0.0,
+                    &mut real,
+                    &mut imag,
+                    null_mut()
+                ),
+                0
+            );
+            assert!(real.is_finite() && real < 0.0);
+            assert_eq!(imag, 0.0);
+        }
+    }
+}
