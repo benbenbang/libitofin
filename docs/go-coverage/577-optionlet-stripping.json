@@ -1,0 +1,171 @@
+{
+  "domain": "optionlet-stripping",
+  "entries": [
+    {
+      "c": "itofin_optionlet_stripper_new_with_options",
+      "go": "Session.OptionletStripper1",
+      "python": "itofin.termstructures.OptionletStripper1.__init__",
+      "status": "implemented",
+      "tests": [
+        "sdk/go/stripper_completion_test.go::TestOptionletStripperCompletion",
+        "sdk/go/stripper_completion_test.go::TestOptionletStripperOvernightAndFallback",
+        "sdk/go/stripper_completion_test.go::TestOptionletStripperRetainedCapRecovery"
+      ]
+    },
+    {
+      "c": "itofin_optionlet_stripper_new_with_options",
+      "go": "Session.OptionletStripper1",
+      "python": "itofin.termstructures.OptionletStripper1.overnight",
+      "status": "implemented",
+      "tests": [
+        "sdk/go/stripper_completion_test.go::TestOptionletStripperOvernightAndFallback"
+      ]
+    },
+    {
+      "c": "itofin_stripped_optionlet_adapter_new",
+      "go": "Session.StrippedOptionletAdapter",
+      "python": "itofin.termstructures.StrippedOptionletAdapter.__init__",
+      "status": "implemented",
+      "tests": [
+        "sdk/go/stripper_completion_test.go::TestOptionletStripperCompletion",
+        "sdk/go/stripper_completion_test.go::TestOptionletStripperOvernightAndFallback",
+        "sdk/go/stripper_completion_test.go::TestOptionletStripperRetainedCapRecovery"
+      ]
+    },
+    {
+      "c": "itofin_capfloor_term_vol_curve_new",
+      "go": "Session.CapFloorTermVolCurve",
+      "python": "itofin.termstructures.CapFloorTermVolCurve.__init__",
+      "status": "implemented",
+      "tests": [
+        "sdk/go/stripper_completion_test.go::TestOptionletStripperCompletion"
+      ]
+    },
+    {
+      "c": "itofin_capfloor_term_vol_curve_new",
+      "go": "Session.CapFloorTermVolCurve",
+      "python": "itofin.termstructures.CapFloorTermVolCurve.moving",
+      "status": "implemented",
+      "tests": [
+        "sdk/go/stripper_completion_test.go::TestOptionletStripperCompletion"
+      ]
+    },
+    {
+      "c": "itofin_capfloor_term_vol_curve_value",
+      "go": "CapFloorTermVolCurve.Volatility",
+      "python": "itofin.termstructures.CapFloorTermVolCurve.volatility",
+      "status": "implemented",
+      "tests": [
+        "sdk/go/stripper_completion_test.go::TestOptionletStripperCompletion"
+      ]
+    },
+    {
+      "c": "itofin_optionlet_completion_values",
+      "go": "CapFloorTermVolCurve.OptionTimes",
+      "python": "itofin.termstructures.CapFloorTermVolCurve.option_times",
+      "status": "implemented",
+      "tests": [
+        "sdk/go/stripper_completion_test.go::TestOptionletStripperCompletion"
+      ]
+    },
+    {
+      "c": "itofin_optionlet_stripper2_new",
+      "go": "Session.OptionletStripper2",
+      "python": "itofin.termstructures.OptionletStripper2.__init__",
+      "status": "implemented",
+      "tests": [
+        "sdk/go/stripper_completion_test.go::TestOptionletStripperCompletion"
+      ]
+    },
+    {
+      "c": "itofin_optionlet_completion_values",
+      "go": "OptionletStripper2.SpreadsVol",
+      "python": "itofin.termstructures.OptionletStripper2.spreads_vol",
+      "status": "implemented",
+      "tests": [
+        "sdk/go/stripper_completion_test.go::TestOptionletStripperCompletion"
+      ]
+    },
+    {
+      "c": "itofin_optionlet_completion_values",
+      "go": "OptionletStripper2.ATMCapFloorStrikes",
+      "python": "itofin.termstructures.OptionletStripper2.atm_cap_floor_strikes",
+      "status": "implemented",
+      "tests": [
+        "sdk/go/stripper_completion_test.go::TestOptionletStripperCompletion"
+      ]
+    },
+    {
+      "c": "itofin_optionlet_completion_values",
+      "go": "OptionletStripper2.ATMCapFloorPrices",
+      "python": "itofin.termstructures.OptionletStripper2.atm_cap_floor_prices",
+      "status": "implemented",
+      "tests": [
+        "sdk/go/stripper_completion_test.go::TestOptionletStripperCompletion"
+      ]
+    },
+    {
+      "c": "itofin_optionlet_smile_new",
+      "go": "OptionletVolatilityStructure.SmileSection",
+      "python": "itofin.termstructures.OptionletVolatilityStructure.smile_section",
+      "status": "implemented",
+      "tests": [
+        "sdk/go/stripper_completion_test.go::TestOptionletStripperCompletion"
+      ]
+    },
+    {
+      "c": "itofin_optionlet_smile_new",
+      "go": "OptionletVolatilityStructure.SmileSectionDate",
+      "python": "itofin.termstructures.OptionletVolatilityStructure.smile_section_date",
+      "status": "implemented",
+      "tests": [
+        "sdk/go/stripper_completion_test.go::TestOptionletStripperCompletion"
+      ]
+    },
+    {
+      "c": "itofin_optionlet_smile_new",
+      "go": "OptionletVolatilityStructure.SmileSectionTenor",
+      "python": "itofin.termstructures.OptionletVolatilityStructure.smile_section_tenor",
+      "status": "implemented",
+      "tests": [
+        "sdk/go/stripper_completion_test.go::TestOptionletStripperCompletion"
+      ]
+    },
+    {
+      "c": "itofin_optionlet_smile_value",
+      "go": "OptionletSmileSection.Volatility",
+      "python": "itofin.termstructures.OptionletSmileSection.volatility",
+      "status": "implemented",
+      "tests": [
+        "sdk/go/stripper_completion_test.go::TestOptionletStripperCompletion"
+      ]
+    },
+    {
+      "c": "itofin_optionlet_smile_value",
+      "go": "OptionletSmileSection.Variance",
+      "python": "itofin.termstructures.OptionletSmileSection.variance",
+      "status": "implemented",
+      "tests": [
+        "sdk/go/stripper_completion_test.go::TestOptionletStripperCompletion"
+      ]
+    },
+    {
+      "c": "itofin_optionlet_smile_value",
+      "go": "OptionletSmileSection.ExerciseTime",
+      "python": "itofin.termstructures.OptionletSmileSection.exercise_time",
+      "status": "implemented",
+      "tests": [
+        "sdk/go/stripper_completion_test.go::TestOptionletStripperCompletion"
+      ]
+    },
+    {
+      "c": "itofin_overnight_capfloor_new",
+      "go": "Session.NewOvernightCapFloor",
+      "python": "itofin.instruments.CapFloor.overnight",
+      "status": "implemented",
+      "tests": [
+        "sdk/go/stripper_completion_test.go::TestOvernightCapFloorOracle"
+      ]
+    }
+  ]
+}

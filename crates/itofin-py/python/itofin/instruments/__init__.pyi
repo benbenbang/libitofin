@@ -197,6 +197,12 @@ class CapFloor:
             ItofinError: On either list being empty, both being required, or on
                 a leg whose coupons cannot be built.
         """
+    @staticmethod
+    def overnight(kind: CapFloorType, schedule: time.Schedule, index: indexes.OvernightIndex, cap_rates: typing.Sequence[builtins.float], floor_rates: typing.Sequence[builtins.float], settings: itofin.Settings, nominal: builtins.float = 1.0, payment_lag: builtins.int = 0, payment_adjustment: time.BusinessDayConvention = time.BusinessDayConvention.Following) -> CapFloor:
+        r"""
+        Build a cap, floor or collar on a compounded overnight schedule.
+        Uses the index day counter; payment lag and adjustment are configurable.
+        """
     def cap_rates(self) -> builtins.list[builtins.float]:
         r"""
         Return the cap strikes, one per coupon.
