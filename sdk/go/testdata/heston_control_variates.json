@@ -1,0 +1,33 @@
+{
+  "alpha": -0.5,
+  "control_variates": [
+    "OptimalCV",
+    "AndersenPiterbarg",
+    "AndersenPiterbargOptCV",
+    "AsymptoticChF",
+    "AngledContour",
+    "AngledContourNoCV"
+  ],
+  "dividend": 0.07,
+  "expiry": "2018-02-07",
+  "fixed_scaling": 1.0,
+  "fixed_scaling_price": 9.364410588426033,
+  "kappa": 4,
+  "prices": [
+    9.364410588426033,
+    9.364410588426033,
+    9.364410588426024,
+    9.364387282993642,
+    9.364410588426033,
+    9.364393322731289
+  ],
+  "reference": "2017-02-07",
+  "rho": -0.75,
+  "risk_free": 0.15,
+  "sigma": 1.8,
+  "source": "QuantLib-Python 1.43 ExponentialFittingHestonEngine, testCosHestonEngine market",
+  "spot": 100,
+  "strike": 120,
+  "theta": 0.22,
+  "v0": 0.1
+}
