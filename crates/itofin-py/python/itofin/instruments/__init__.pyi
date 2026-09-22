@@ -14,6 +14,7 @@ from itofin import termstructures
 from itofin import time
 import typing
 __all__ = [
+    "BMASwap",
     "BermudanExercise",
     "CapFloor",
     "CapFloorType",
@@ -41,6 +42,44 @@ __all__ = [
     "YoYInflationCapFloor",
     "ZeroCouponInflationSwap",
 ]
+
+@typing.final
+class BMASwap:
+    r"""
+    Municipal swap: payer pays BMA and receives the specified fraction of Ibor.
+    """
+    def __init__(self, swap_type: SwapType, nominal: builtins.float, libor_schedule: time.Schedule, libor_fraction: builtins.float, libor_spread: builtins.float, libor_index: indexes.IborIndex, libor_day_counter: time.DayCounter, bma_schedule: time.Schedule, bma_index: indexes.BMAIndex, bma_day_counter: time.DayCounter, settings: itofin.Settings) -> None:
+        r"""
+        Create a municipal swap retaining both schedules, indexes and settings.
+        """
+    def set_engine(self, curve: termstructures.YieldTermStructure, settings: itofin.Settings) -> None:
+        r"""
+        Attach a retained discount curve using settings-driven engine defaults.
+        """
+    def npv(self) -> builtins.float:
+        r"""
+        Present value of both signed legs.
+        """
+    def fair_libor_fraction(self) -> builtins.float:
+        r"""
+        Fraction of Ibor that makes the swap's value zero.
+        """
+    def fair_libor_spread(self) -> builtins.float:
+        r"""
+        Ibor spread that makes the swap's value zero.
+        """
+    def leg_npv(self, leg: builtins.int) -> builtins.float:
+        r"""
+        Signed leg value: zero selects Ibor, one selects BMA.
+        """
+    def leg_bps(self, leg: builtins.int) -> builtins.float:
+        r"""
+        Signed basis-point value: zero selects Ibor, one selects BMA.
+        """
+    def is_calculated(self) -> builtins.bool:
+        r"""
+        Whether cached pricing results are currently valid.
+        """
 
 @typing.final
 class BermudanExercise:

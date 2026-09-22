@@ -7,6 +7,7 @@ from itofin import termstructures
 from itofin import time
 import typing
 __all__ = [
+    "BMAIndex",
     "CpiInterpolationType",
     "Currency",
     "CustomIborIndex",
@@ -24,6 +25,56 @@ __all__ = [
     "YoYInflationIndex",
     "ZeroInflationIndex",
 ]
+
+@typing.final
+class BMAIndex:
+    r"""
+    Weekly SIFMA municipal index retaining its curve and settings history.
+    """
+    def __init__(self, forwarding: typing.Optional[termstructures.YieldTermStructure], settings: itofin.Settings) -> None:
+        r"""
+        Create an index with a retained curve and settings history.
+        """
+    def fixing_calendar(self) -> time.Calendar:
+        r"""
+        Calendar used for fixing, value-date and maturity conventions.
+        """
+    def clear_fixings(self) -> None:
+        r"""
+        Remove this index history and invalidate all retained consumers.
+        """
+    def past_fixing(self, date: time.Date) -> typing.Optional[builtins.float]:
+        r"""
+        Stored fixing without forecasting; None denotes absent history.
+        """
+    def has_historical_fixing(self, date: time.Date) -> builtins.bool:
+        r"""
+        Whether this settings history contains the date.
+        """
+    def add_fixing(self, date: time.Date, value: builtins.float) -> None:
+        r"""
+        Store a valid weekly fixing in the retained settings history.
+        """
+    def fixing(self, date: time.Date, forecast_todays_fixing: builtins.bool = False) -> builtins.float:
+        r"""
+        Read a historical fixing or forecast a future fixing.
+        """
+    def is_valid_fixing_date(self, date: time.Date) -> builtins.bool:
+        r"""
+        Whether the date is the week's valid municipal fixing day.
+        """
+    def value_date(self, date: time.Date) -> time.Date:
+        r"""
+        First value date for the given weekly fixing.
+        """
+    def maturity_date(self, date: time.Date) -> time.Date:
+        r"""
+        Maturity of the weekly rate starting on the value date.
+        """
+    def fixing_schedule(self, start: time.Date, end: time.Date) -> builtins.list[time.Date]:
+        r"""
+        Copy of fixing dates bracketing both dates.
+        """
 
 @typing.final
 class Currency:

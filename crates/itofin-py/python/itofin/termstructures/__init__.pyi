@@ -9,6 +9,7 @@ from itofin import quotes
 from itofin import time
 import typing
 __all__ = [
+    "BMASwapRateHelper",
     "BlackConstantVol",
     "BlackVarianceCurve",
     "BlackVarianceSurface",
@@ -80,6 +81,16 @@ __all__ = [
     "ZeroInflationHelper",
     "ZeroInflationTermStructure",
 ]
+
+@typing.final
+class BMASwapRateHelper(RateHelper):
+    r"""
+    Bootstrap helper quoting the fair Ibor fraction of a municipal swap.
+    """
+    def __init__(self, quote: quotes.SimpleQuote, tenor: time.Period, settlement_days: builtins.int, calendar: time.Calendar, bma_period: time.Period, bma_convention: time.BusinessDayConvention, bma_day_counter: time.DayCounter, bma_index: indexes.BMAIndex, libor_index: indexes.IborIndex) -> None:
+        r"""
+        Create a helper quoting the municipal swap's fair Ibor fraction.
+        """
 
 @typing.final
 class BlackConstantVol(BlackVolTermStructure):
