@@ -19,9 +19,9 @@
 //! fallback follow with EPIC-4, so a non-constant Black volatility without an
 //! external local volatility is an `Err` for now instead of silently wrong.
 //!
-//! Not ported, noted as follow-up: the pluggable `discretization` strategy
-//! and `forceDiscretization` flag (the Euler scheme is the trait's provided
-//! default, see [`crate::stochasticprocess`]), and the sibling conveniences
+//! Explicit strategy adapters live in [`super::discretization`]; this concrete
+//! process retains its exact overrides. Its `forceDiscretization` constructor
+//! flag remains outside this API, as do the sibling conveniences
 //! `BlackScholesProcess` (its dividend-free curve needs a D5 settings
 //! decision), `BlackProcess` and `GarmanKohlagenProcess`.
 

@@ -2,6 +2,16 @@
 
 [Project index](../README.md)
 
+## Process discretization
+
+[#411](https://github.com/benbenbang/libitofin/issues/411) adds Rust-only scalar
+and multifactor strategy adapters with default Euler discretization. Explicit
+wrapping replaces transition methods while retaining source coefficients,
+state composition, ownership and notifications. Existing concrete process
+constructors and exact transition overrides remain unchanged in all languages.
+Correlated process arrays delegate date conversion to their first constituent.
+Custom strategy errors and invalid transition dimensions propagate as errors.
+
 ## Random policies
 
 Unreleased: [QMC European pricing and fallible Poisson generators](../docs/docs/random-policies.md)

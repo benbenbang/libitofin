@@ -17,11 +17,6 @@
 //! - C++ `QL_REQUIRE(process, "null 1-D stochastic process")` guards a raw
 //!   `shared_ptr`; a [`Shared`] cannot be null, so that check is a no-op here
 //!   and is omitted.
-//! - C++ `time(d)` delegates to `processes_[0]->time(d)`, but the Rust
-//!   [`StochasticProcess1D`](crate::stochasticprocess::StochasticProcess1D)
-//!   trait deliberately has no `time`. This port therefore inherits the
-//!   multi-factor trait's default `time`, which fails; growing the 1D trait a
-//!   `time` method just to forward it is out of scope.
 //! - `covariance` is overridden to route through this type's `std_deviation`
 //!   (matching C++ `stdDeviation * transpose(stdDeviation)`) rather than the
 //!   trait default, which composes from `diffusion`. The two agree whenever the
@@ -29,8 +24,8 @@
 //!   constituent free to redefine `std_deviation` makes them diverge, and C++
 //!   uses the per-constituent `std_deviation`.
 //!
-//! Deferred, visibly (tracked by #411): the pluggable discretization-strategy
-//! object; only the Euler surface QuantLib installs by default is ported.
+//! Constituents may select pluggable strategies through
+//! [`super::discretization::DiscretizedProcess1D`].
 
 use crate::errors::QlResult;
 use crate::fail;
@@ -40,6 +35,7 @@ use crate::math::matrixutilities::pseudosqrt::{SalvagingAlgorithm, pseudo_sqrt};
 use crate::patterns::observable::{AsObservable, Observable, Observer, ResetThenNotify};
 use crate::shared::{Shared, SharedMut, shared};
 use crate::stochasticprocess::{StochasticProcess, StochasticProcess1D};
+use crate::time::date::Date;
 use crate::types::{Size, Time};
 
 /// A container of correlated 1-D stochastic processes.
@@ -103,6 +99,10 @@ impl AsObservable for StochasticProcessArray {
 }
 
 impl StochasticProcess for StochasticProcessArray {
+    fn time(&self, date: &Date) -> QlResult<Time> {
+        self.processes[0].time(date)
+    }
+
     fn size(&self) -> Size {
         self.processes.len()
     }
@@ -552,7 +552,7 @@ mod tests {
     }
 
     #[test]
-    fn time_inherits_the_multifactor_default_error() {
+    fn time_forwards_the_first_constituents_default_error() {
         let a = array_of(vec![
             Stub1D::new(100.0, 0.0, 0.20),
             Stub1D::new(50.0, 0.0, 0.10),

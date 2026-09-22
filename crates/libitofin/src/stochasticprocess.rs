@@ -10,8 +10,8 @@
 //! like the C++ virtuals. The multi-factor [`StochasticProcess`] base
 //! (Array/Matrix interface) lives alongside it below; the two traits are
 //! deliberately independent (C++ derives 1D from the base through private
-//! bridges, a unification nothing in this crate needs). Out of scope, noted as
-//! follow-up (#411): the pluggable `discretization` strategy objects.
+//! bridges, a unification nothing in this crate needs). Explicit pluggable
+//! strategies are available through [`crate::processes::discretization`].
 //! `StochasticProcessArray` has since landed at
 //! [`processes::stochasticprocessarray`](crate::processes::StochasticProcessArray).
 //!
@@ -116,7 +116,7 @@ pub trait StochasticProcess1D: AsObservable {
 /// typically read quotes and term structures whose lookups can fail (D4:
 /// `QL_REQUIRE` maps to `Err`).
 ///
-/// Deferred (#411): the pluggable `discretization` strategy object.
+/// Explicit strategies are available through [`crate::processes::discretization`].
 /// `StochasticProcessArray` has since landed at
 /// [`processes::stochasticprocessarray`](crate::processes::StochasticProcessArray).
 pub trait StochasticProcess: AsObservable {
