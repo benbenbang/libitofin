@@ -872,6 +872,59 @@ typedef struct ItofinResultsFields {
   size_t additional_count;
 } ItofinResultsFields;
 
+/**
+ * Extended configuration; the original stripping ABI remains unchanged.
+ */
+typedef struct ItofinOptionletStripperConfig {
+  uint64_t surface;
+  uint64_t index;
+  uint64_t discount;
+  int32_t volatility_type;
+  double accuracy;
+  uint32_t max_iterations;
+  double displacement;
+  int32_t frequency_length;
+  int32_t frequency_unit;
+  uint8_t has_frequency;
+  double switch_strike;
+  uint8_t has_switch_strike;
+  uint8_t dont_throw;
+  uint8_t overnight;
+} ItofinOptionletStripperConfig;
+
+/**
+ * Live ATM cap term-volatility curve. Zero settings selects a fixed reference date.
+ */
+typedef struct ItofinCapFloorTermVolCurveConfig {
+  int32_t reference_date;
+  uint32_t settlement_days;
+  uint64_t calendar;
+  int32_t convention;
+  uint64_t day_counter;
+  uint64_t settings;
+  const int32_t *tenor_lengths;
+  const int32_t *tenor_units;
+  const uint64_t *quotes;
+  size_t count;
+} ItofinCapFloorTermVolCurveConfig;
+
+/**
+ * A compounded overnight cap/floor with index day count and Following payments.
+ */
+typedef struct ItofinOvernightCapFloorConfig {
+  int32_t kind;
+  uint64_t schedule;
+  uint64_t index;
+  uint64_t settings;
+  double nominal;
+  int32_t payment_lag;
+  int32_t payment_adjustment;
+  const double *caps;
+  size_t cap_count;
+  const double *floors;
+  size_t floor_count;
+} ItofinOvernightCapFloorConfig;
+
 typedef struct ItofinDateParts {
   int32_t day;
   int32_t month;
@@ -4613,6 +4666,97 @@ int32_t itofin_stripped_optionlet_adapter_new(struct ItofinContext *ctx,
                                               uint64_t setting,
                                               uint64_t *out,
                                               struct ItofinError *error);
+
+/**
+ * # Safety
+ * Follow the crate C caller contract; configuration and output must be valid.
+ */
+int32_t itofin_optionlet_stripper_new_with_options(struct ItofinContext *ctx,
+                                                   const struct ItofinOptionletStripperConfig *cfg,
+                                                   uint64_t *out,
+                                                   struct ItofinError *error);
+
+/**
+ * # Safety
+ * Follow the crate C caller contract; arrays must contain count entries.
+ */
+int32_t itofin_capfloor_term_vol_curve_new(struct ItofinContext *ctx,
+                                           const struct ItofinCapFloorTermVolCurveConfig *cfg,
+                                           uint64_t *out,
+                                           struct ItofinError *error);
+
+/**
+ * # Safety
+ * Follow the crate C caller contract.
+ */
+int32_t itofin_capfloor_term_vol_curve_value(struct ItofinContext *ctx,
+                                             uint64_t id,
+                                             int32_t length,
+                                             int32_t unit,
+                                             uint8_t extrapolate,
+                                             double *out,
+                                             struct ItofinError *error);
+
+/**
+ * # Safety
+ * Follow the crate C caller contract.
+ */
+int32_t itofin_optionlet_stripper2_new(struct ItofinContext *ctx,
+                                       uint64_t stripper,
+                                       uint64_t curve,
+                                       uint64_t *out,
+                                       struct ItofinError *error);
+
+/**
+ * Query 0 ATM curve times, 1 correction spreads, 2 ATM strikes, 3 ATM prices.
+ * Pass null output/capacity zero to size the caller-owned buffer.
+ * # Safety
+ * Follow the crate C caller contract; output must have capacity entries.
+ */
+int32_t itofin_optionlet_completion_values(struct ItofinContext *ctx,
+                                           uint64_t id,
+                                           int32_t kind,
+                                           double *out,
+                                           size_t capacity,
+                                           size_t *written,
+                                           struct ItofinError *error);
+
+/**
+ * Query kind 0 time, 1 date serial, 2 tenor.
+ * # Safety
+ * Follow the crate C caller contract.
+ */
+int32_t itofin_optionlet_smile_new(struct ItofinContext *ctx,
+                                   uint64_t id,
+                                   int32_t kind,
+                                   double time,
+                                   int32_t date_serial,
+                                   int32_t length,
+                                   int32_t unit,
+                                   uint8_t extrapolate,
+                                   uint64_t *out,
+                                   struct ItofinError *error);
+
+/**
+ * Query kind 0 volatility, 1 variance, 2 exercise time.
+ * # Safety
+ * Follow the crate C caller contract.
+ */
+int32_t itofin_optionlet_smile_value(struct ItofinContext *ctx,
+                                     uint64_t id,
+                                     int32_t kind,
+                                     double strike,
+                                     double *out,
+                                     struct ItofinError *error);
+
+/**
+ * # Safety
+ * Follow the crate C caller contract; strike arrays must have their stated lengths.
+ */
+int32_t itofin_overnight_capfloor_new(struct ItofinContext *ctx,
+                                      const struct ItofinOvernightCapFloorConfig *cfg,
+                                      uint64_t *out,
+                                      struct ItofinError *error);
 
 /**
  * # Safety
