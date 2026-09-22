@@ -280,3 +280,7 @@ pub unsafe extern "C" fn itofin_bma_past_fixing(
         })
     }
 }
+
+#[cfg(test)]
+#[path = "bma_tests.rs"]
+mod tests;
