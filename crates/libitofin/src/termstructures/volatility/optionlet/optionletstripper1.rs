@@ -14,23 +14,9 @@
 //! [`calculate`](OptionletStripper1::calculate), so a bumped surface quote or a
 //! relinked index re-strips on the next query.
 //!
-//! ## Divergences from QuantLib
-//!
-//! - ShiftedLognormal only. The `Normal` path prices through
-//!   `BachelierCapFloorEngine` (deferred #440), so it is rejected with a
-//!   documented error rather than stripped (#577).
-//! - The explicit `switchStrike` constructor parameter is not ported: the switch
-//!   strike is always the floating mean of the at-the-money optionlet rates
-//!   (`optionletstripper1.cpp:86-92`). The fixed-strike form is deferred to #577.
-//! - The `dontThrow` mode is not ported: a caplet that fails to bootstrap
-//!   propagates the error (fail-loud, D4) instead of writing a zero standard
-//!   deviation (#577).
-//! - The warm-restart guess matrix seeds to `0.14`, the C++ `firstGuess`
-//!   (`optionletstripper1.cpp:57`), and is reused across recalculations exactly
-//!   as C++ warm-starts each cell off its previous solve.
-//! - The legacy `capletVols_`/`capFloorPrices_`/`capFloorVolatilities_`/
-//!   `optionletPrices_` result accessors are omitted: they are not part of the
-//!   [`StrippedOptionletBase`] interface and are unused by #576.
+//! Shifted-lognormal and normal inversions share transactional result caches.
+//! Optional fixed switch strikes and inversion-only `dont_throw` retain QuantLib
+//! behavior. Surface, discount, index and date changes invalidate downstream users.
 
 use std::cell::{Cell, RefCell};
 
@@ -40,14 +26,17 @@ use crate::event::Event;
 use crate::fail;
 use crate::handle::Handle;
 use crate::indexes::interestrateindex::InterestRateIndex;
-use crate::indexes::{IborIndex, Index};
+use crate::indexes::{IborIndex, Index, OvernightIndex};
 use crate::instrument::Instrument;
 use crate::instruments::{CapFloorType, MakeCapFloor};
 use crate::option::OptionType;
 use crate::patterns::lazyobject::LazyObject;
-use crate::patterns::observable::{AsObservable, Observer};
+use crate::patterns::observable::{AsObservable, Observable, Observer};
 use crate::pricingengine::PricingEngine;
-use crate::pricingengines::{BlackCapFloorEngine, black_formula_implied_std_dev};
+use crate::pricingengines::{
+    BachelierCapFloorEngine, BlackCapFloorEngine, bachelier_black_formula_implied_vol,
+    black_formula_implied_std_dev,
+};
 use crate::quotes::{Quote, SimpleQuote};
 use crate::shared::{Shared, SharedMut, shared, shared_mut};
 use crate::termstructures::TermStructure;
@@ -72,17 +61,30 @@ const FIRST_GUESS: Real = 0.14;
 /// so the next [`calculate`](OptionletStripper1::calculate) re-strips.
 struct StripperUpdater {
     lazy: SharedMut<LazyObject>,
+    observable: Shared<Observable>,
 }
 
 impl Observer for StripperUpdater {
     fn update(&mut self) {
         self.lazy.borrow_mut().invalidate_silently();
+        self.observable.notify_observers();
     }
+}
+
+/// Optional fixed switch strike and inversion-failure fallback.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct OptionletStripperOptions {
+    /// `None` recomputes the mean forward rate after each market update.
+    pub switch_strike: Option<Rate>,
+    /// Replace failed implied-volatility solves with zero, never pricing errors.
+    pub dont_throw: bool,
 }
 
 /// Caplet-volatility bootstrapping stripper.
 pub struct OptionletStripper1 {
     base: OptionletStripper,
+    options: OptionletStripperOptions,
+    observable: Shared<Observable>,
     accuracy: Real,
     max_iter: Natural,
     switch_strike: Cell<Rate>,
@@ -97,7 +99,7 @@ impl OptionletStripper1 {
     /// `discount` is the discount curve caps are priced on (empty defaults to the
     /// index forwarding curve, `optionletstripper1.cpp:94-97`). `accuracy` and
     /// `max_iter` size the implied-standard-deviation solve; `volatility_type`
-    /// must be [`ShiftedLognormal`](VolatilityType::ShiftedLognormal) and
+    /// selects the normal or shifted-lognormal model and
     /// `displacement` its lognormal shift. `optionlet_frequency` overrides the
     /// index tenor as the optionlet step when set.
     ///
@@ -116,6 +118,38 @@ impl OptionletStripper1 {
         displacement: Real,
         optionlet_frequency: Option<Period>,
     ) -> QlResult<OptionletStripper1> {
+        Self::new_with_options(
+            term_vol_surface,
+            ibor_index,
+            discount,
+            accuracy,
+            max_iter,
+            volatility_type,
+            displacement,
+            optionlet_frequency,
+            OptionletStripperOptions::default(),
+        )
+    }
+
+    /// Builds a stripper with explicit switch-strike and inversion fallback controls.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_with_options(
+        term_vol_surface: Shared<CapFloorTermVolSurface>,
+        ibor_index: Shared<IborIndex>,
+        discount: Handle<dyn YieldTermStructure>,
+        accuracy: Real,
+        max_iter: Natural,
+        volatility_type: VolatilityType,
+        displacement: Real,
+        optionlet_frequency: Option<Period>,
+        options: OptionletStripperOptions,
+    ) -> QlResult<Self> {
+        if !accuracy.is_finite() || accuracy <= 0.0 || max_iter == 0 {
+            fail!("accuracy and maximum iterations must be positive");
+        }
+        if options.switch_strike.is_some_and(|v| !v.is_finite()) {
+            fail!("switch strike must be finite");
+        }
         let base = OptionletStripper::new(
             Shared::clone(&term_vol_surface),
             Shared::clone(&ibor_index),
@@ -129,15 +163,24 @@ impl OptionletStripper1 {
         let n_strikes = base.n_strikes();
 
         let lazy = shared_mut(LazyObject::new(true));
+        let observable = shared(Observable::new());
         let updater = shared_mut(StripperUpdater {
             lazy: SharedMut::clone(&lazy),
+            observable: Shared::clone(&observable),
         });
         let observer = SharedMut::clone(&updater) as SharedMut<dyn Observer>;
         term_vol_surface.observable().register_observer(&observer);
         ibor_index.observable().register_observer(&observer);
+        base.discount().register_observer(&observer);
+        ibor_index
+            .base()
+            .settings()
+            .register_eval_date_observer(&observer);
 
         Ok(OptionletStripper1 {
             base,
+            options,
+            observable,
             accuracy,
             max_iter,
             switch_strike: Cell::new(0.0),
@@ -147,9 +190,66 @@ impl OptionletStripper1 {
         })
     }
 
+    /// Overnight-index form; frequency controls the output optionlet grid.
+    ///
+    /// QuantLib prices the upcast index through vanilla Ibor coupons here;
+    /// the frequency does not override the daily tenor of those coupons.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_overnight(
+        term_vol_surface: Shared<CapFloorTermVolSurface>,
+        index: Shared<OvernightIndex>,
+        discount: Handle<dyn YieldTermStructure>,
+        accuracy: Real,
+        max_iter: Natural,
+        volatility_type: VolatilityType,
+        displacement: Real,
+        optionlet_frequency: Option<Period>,
+        options: OptionletStripperOptions,
+    ) -> QlResult<Self> {
+        if optionlet_frequency.is_none() {
+            fail!("an optionlet frequency is required for an overnight index");
+        }
+        Self::new_with_options(
+            term_vol_surface,
+            index.ibor_index(),
+            discount,
+            accuracy,
+            max_iter,
+            volatility_type,
+            displacement,
+            optionlet_frequency,
+            options,
+        )
+    }
+
+    /// Immutable setup shared with the ATM correction layer.
+    pub fn base(&self) -> &OptionletStripper {
+        &self.base
+    }
+
+    /// Payment dates corresponding to the stripped optionlets.
+    pub fn optionlet_payment_dates(&self) -> QlResult<Vec<Date>> {
+        self.calculate()?;
+        Ok(self.base.caches().borrow().optionlet_payment_dates.clone())
+    }
+
+    /// Accrual periods corresponding to the stripped optionlets.
+    pub fn optionlet_accrual_periods(&self) -> QlResult<Vec<Time>> {
+        self.calculate()?;
+        Ok(self
+            .base
+            .caches()
+            .borrow()
+            .optionlet_accrual_periods
+            .clone())
+    }
+
     /// The floating switch strike (mean at-the-money optionlet rate), computed on
     /// demand (`optionletstripper1.cpp:199-204`).
     pub fn switch_strike(&self) -> QlResult<Rate> {
+        if let Some(strike) = self.options.switch_strike {
+            return Ok(strike);
+        }
         self.calculate()?;
         Ok(self.switch_strike.get())
     }
@@ -161,19 +261,20 @@ impl OptionletStripper1 {
         if !self.lazy.borrow_mut().start_calculation() {
             return Ok(());
         }
-        let result = self.perform_calculations();
+        let result =
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.perform_calculations()))
+                .unwrap_or_else(|_| {
+                    Err(crate::errors::QlError::new(
+                        "optionlet schedule date outside supported range",
+                        file!(),
+                        line!(),
+                    ))
+                });
         self.lazy.borrow_mut().finish_calculation(&result);
         result
     }
 
     fn perform_calculations(&self) -> QlResult<()> {
-        if self.base.volatility_type() == VolatilityType::Normal {
-            fail!(
-                "normal (Bachelier) optionlet stripping needs BachelierCapFloorEngine, \
-                 deferred to #440/#577"
-            );
-        }
-
         let surface = Shared::clone(self.base.term_vol_surface());
         let index = Shared::clone(self.base.ibor_index());
         let settings = index.base().settings().clone();
@@ -222,11 +323,17 @@ impl OptionletStripper1 {
             optionlet_payment_dates[i] = coupon.date();
             optionlet_accrual_periods[i] = coupon.accrual_period();
             optionlet_times[i] = surface.time_from_reference(optionlet_dates[i])?;
+            crate::require!(
+                optionlet_times[i].is_finite() && optionlet_times[i] > 0.0,
+                "optionlet fixing time must be positive"
+            );
             atm_optionlet_rate[i] = coupon.index_fixing()?;
         }
 
-        let switch_strike = atm_optionlet_rate.iter().sum::<Rate>() / n_optionlet as Real;
-        self.switch_strike.set(switch_strike);
+        let switch_strike = self
+            .options
+            .switch_strike
+            .unwrap_or_else(|| atm_optionlet_rate.iter().sum::<Rate>() / n_optionlet as Real);
 
         let discount_handle = if self.base.discount().is_empty() {
             index.forwarding_term_structure().clone()
@@ -236,16 +343,26 @@ impl OptionletStripper1 {
         let discount_curve = discount_handle.current_link()?;
 
         let vol_quote = shared(SimpleQuote::new(Some(0.20)));
-        let engine = shared_mut(BlackCapFloorEngine::with_flat_vol(
-            discount_handle,
-            Handle::new(Shared::clone(&vol_quote) as Shared<dyn Quote>),
-            day_counter,
-            displacement,
-            Shared::clone(&settings),
-        )?) as SharedMut<dyn PricingEngine>;
+        let engine: SharedMut<dyn PricingEngine> =
+            if self.base.volatility_type() == VolatilityType::Normal {
+                shared_mut(BachelierCapFloorEngine::with_flat_vol(
+                    discount_handle,
+                    Handle::new(Shared::clone(&vol_quote) as Shared<dyn Quote>),
+                    day_counter,
+                    Shared::clone(&settings),
+                )?)
+            } else {
+                shared_mut(BlackCapFloorEngine::with_flat_vol(
+                    discount_handle,
+                    Handle::new(Shared::clone(&vol_quote) as Shared<dyn Quote>),
+                    day_counter,
+                    displacement,
+                    Shared::clone(&settings),
+                )?)
+            };
 
         let mut optionlet_volatilities = vec![vec![0.0; n_strikes]; n_optionlet];
-        let mut std_devs = self.optionlet_std_devs.borrow_mut();
+        let mut std_devs = self.optionlet_std_devs.borrow().clone();
 
         for j in 0..n_strikes {
             let below_switch = strikes[j] < switch_strike;
@@ -281,22 +398,40 @@ impl OptionletStripper1 {
                 let discount_factor =
                     discount_curve.discount_date(optionlet_payment_dates[i], false)?;
                 let annuity = optionlet_accrual_periods[i] * discount_factor;
-                let std_dev = black_formula_implied_std_dev(
-                    optionlet_type,
-                    strikes[j],
-                    atm_optionlet_rate[i],
-                    optionlet_price,
-                    annuity,
-                    displacement,
-                    std_devs[i][j],
-                    self.accuracy,
-                    self.max_iter,
-                )?;
+                let solved = if self.base.volatility_type() == VolatilityType::Normal {
+                    bachelier_black_formula_implied_vol(
+                        optionlet_type,
+                        strikes[j],
+                        atm_optionlet_rate[i],
+                        optionlet_times[i],
+                        optionlet_price,
+                        annuity,
+                    )
+                    .map(|v| v * optionlet_times[i].sqrt())
+                } else {
+                    black_formula_implied_std_dev(
+                        optionlet_type,
+                        strikes[j],
+                        atm_optionlet_rate[i],
+                        optionlet_price,
+                        annuity,
+                        displacement,
+                        std_devs[i][j],
+                        self.accuracy,
+                        self.max_iter,
+                    )
+                };
+                let std_dev = match solved {
+                    Ok(value) => value,
+                    Err(_) if self.options.dont_throw => 0.0,
+                    Err(error) => return Err(error),
+                };
                 std_devs[i][j] = std_dev;
                 optionlet_volatilities[i][j] = std_dev / optionlet_times[i].sqrt();
             }
         }
-        drop(std_devs);
+        *self.optionlet_std_devs.borrow_mut() = std_devs;
+        self.switch_strike.set(switch_strike);
 
         let mut caches = self.base.caches().borrow_mut();
         caches.optionlet_dates = optionlet_dates;
@@ -309,15 +444,48 @@ impl OptionletStripper1 {
     }
 }
 
+impl AsObservable for OptionletStripper1 {
+    fn observable(&self) -> &Observable {
+        &self.observable
+    }
+}
+
 impl StrippedOptionletBase for OptionletStripper1 {
+    fn observable(&self) -> Option<&Observable> {
+        Some(&self.observable)
+    }
     fn optionlet_strikes(&self, i: usize) -> QlResult<Vec<Rate>> {
         self.calculate()?;
-        Ok(self.base.caches().borrow().optionlet_strikes[i].clone())
+        self.base
+            .caches()
+            .borrow()
+            .optionlet_strikes
+            .get(i)
+            .cloned()
+            .ok_or_else(|| {
+                crate::errors::QlError::new(
+                    format!("optionlet index {i} out of range"),
+                    file!(),
+                    line!(),
+                )
+            })
     }
 
     fn optionlet_volatilities(&self, i: usize) -> QlResult<Vec<Volatility>> {
         self.calculate()?;
-        Ok(self.base.caches().borrow().optionlet_volatilities[i].clone())
+        self.base
+            .caches()
+            .borrow()
+            .optionlet_volatilities
+            .get(i)
+            .cloned()
+            .ok_or_else(|| {
+                crate::errors::QlError::new(
+                    format!("optionlet index {i} out of range"),
+                    file!(),
+                    line!(),
+                )
+            })
     }
 
     fn optionlet_fixing_dates(&self) -> QlResult<Vec<Date>> {
@@ -504,11 +672,16 @@ mod tests {
         assert!((0.035..0.045).contains(&switch), "switch strike {switch}");
     }
 
-    /// The normal (Bachelier) stripping path is deferred (#440/#577): an accessor
-    /// that triggers the strip errors instead of stripping.
+    /// The same flat surface now supports the normal-model inversion.
     #[test]
-    fn normal_volatility_type_is_rejected() {
+    fn normal_volatility_type_is_supported() {
         let stripper = stripper(VolatilityType::Normal);
-        assert!(stripper.optionlet_volatilities(0).is_err());
+        assert!(
+            stripper
+                .optionlet_volatilities(0)
+                .unwrap()
+                .iter()
+                .all(|v| (*v - 0.20).abs() < 1e-10)
+        );
     }
 }
