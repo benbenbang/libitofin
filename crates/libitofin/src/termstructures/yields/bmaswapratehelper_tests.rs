@@ -235,6 +235,9 @@ fn bma_helper_weak_curve_and_invalid_date_recovery() {
     assert!(h.implied_quote().is_err());
 }
 
+#[path = "bmaswap_oracle_tests.rs"]
+mod oracle_tests;
+
 #[test]
 fn bma_fixing_invalidation_and_retained_inputs() {
     let m = Market::new();
