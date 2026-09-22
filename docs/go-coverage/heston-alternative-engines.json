@@ -1,0 +1,101 @@
+{
+  "domain": "heston-alternative-engines",
+  "entries": [
+    {
+      "c": "itofin_heston_engine_new",
+      "go": "Session.NewCosHestonEngine",
+      "python": "itofin.pricingengines.CosHestonEngine",
+      "status": "implemented",
+      "tests": [
+        "TestCosHestonQuantLibRetentionAndErrors"
+      ]
+    },
+    {
+      "c": "itofin_heston_engine_new",
+      "go": "Session.NewCosHestonEngine",
+      "python": "itofin.pricingengines.CosHestonEngine.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestCosHestonQuantLibRetentionAndErrors"
+      ]
+    },
+    {
+      "c": "itofin_option_set_engine",
+      "go": "VanillaOption.SetCosHestonEngine",
+      "python": "itofin.instruments.VanillaOption.set_cos_heston_engine",
+      "status": "implemented",
+      "tests": [
+        "TestCosHestonQuantLibRetentionAndErrors"
+      ]
+    },
+    {
+      "c": "itofin_option_value",
+      "go": "VanillaOption.PriceCosHeston",
+      "python": "itofin.instruments.VanillaOption.price_cos_heston",
+      "status": "implemented",
+      "tests": [
+        "TestCosHestonQuantLibRetentionAndErrors"
+      ]
+    },
+    {
+      "c": "itofin_cos_heston_value",
+      "go": "CosHestonEngine.C1",
+      "python": "itofin.pricingengines.CosHestonEngine.c1",
+      "status": "implemented",
+      "tests": [
+        "TestCosHestonInspectorsQuantLibRetentionAndErrors",
+        "TestAlternativeHestonCalibrationAndLiveModel"
+      ]
+    },
+    {
+      "c": "itofin_cos_heston_value",
+      "go": "CosHestonEngine.C2",
+      "python": "itofin.pricingengines.CosHestonEngine.c2",
+      "status": "implemented",
+      "tests": [
+        "TestCosHestonInspectorsQuantLibRetentionAndErrors",
+        "TestAlternativeHestonCalibrationAndLiveModel"
+      ]
+    },
+    {
+      "c": "itofin_cos_heston_value",
+      "go": "CosHestonEngine.C3",
+      "python": "itofin.pricingengines.CosHestonEngine.c3",
+      "status": "implemented",
+      "tests": [
+        "TestCosHestonInspectorsQuantLibRetentionAndErrors",
+        "TestAlternativeHestonCalibrationAndLiveModel"
+      ]
+    },
+    {
+      "c": "itofin_cos_heston_value",
+      "go": "CosHestonEngine.C4",
+      "python": "itofin.pricingengines.CosHestonEngine.c4",
+      "status": "implemented",
+      "tests": [
+        "TestCosHestonInspectorsQuantLibRetentionAndErrors",
+        "TestAlternativeHestonCalibrationAndLiveModel"
+      ]
+    },
+    {
+      "c": "itofin_cos_heston_value",
+      "go": "CosHestonEngine.MuT",
+      "python": "itofin.pricingengines.CosHestonEngine.mu_t",
+      "status": "implemented",
+      "tests": [
+        "TestCosHestonInspectorsQuantLibRetentionAndErrors",
+        "TestAlternativeHestonCalibrationAndLiveModel"
+      ]
+    },
+    {
+      "c": "itofin_cos_heston_value",
+      "go": "CosHestonEngine.CHF",
+      "python": "itofin.pricingengines.CosHestonEngine.chf",
+      "status": "implemented",
+      "tests": [
+        "TestCosHestonInspectorsQuantLibRetentionAndErrors",
+        "TestAlternativeHestonCalibrationAndLiveModel"
+      ]
+    }
+  ]
+}

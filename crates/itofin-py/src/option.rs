@@ -2,6 +2,7 @@
 
 use crate::PyQlError;
 use crate::heston::PyHestonModel;
+use crate::heston_engines::PyCosHestonEngine;
 use crate::market::PyBlackScholesProcess;
 use crate::mcengine::{
     PyMCAmericanEngine, PyMCEuropeanEngine, PyMCEuropeanHestonEngine, PyQMCEuropeanEngine,
@@ -194,6 +195,17 @@ impl PyVanillaOption {
             .base_mut()
             .set_pricing_engine(shared_mut(engine) as SharedMut<dyn PricingEngine>);
         Ok(())
+    }
+
+    /// Attach a COS engine retaining its model.
+    fn set_cos_heston_engine(&mut self, engine: &PyCosHestonEngine) {
+        self.inner.base_mut().set_pricing_engine(engine.engine());
+    }
+
+    /// Attach and price with a COS engine.
+    fn price_cos_heston(&mut self, engine: &PyCosHestonEngine) -> PyResult<f64> {
+        self.set_cos_heston_engine(engine);
+        self.npv()
     }
 
     /// Attach the Monte Carlo European engine.

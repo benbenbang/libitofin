@@ -17,6 +17,7 @@ __all__ = [
     "BlackCapFloorEngine",
     "BlackSwaptionEngine",
     "CashAnnuityModel",
+    "CosHestonEngine",
     "DiscountingSwapEngine",
     "ForwardsInCouponPeriod",
     "IsdaCdsEngine",
@@ -199,6 +200,40 @@ class BlackSwaptionEngine:
 
         Returns:
             BlackSwaptionEngine: The engine over the flat surface.
+        """
+
+@typing.final
+class CosHestonEngine:
+    r"""
+    Fourier cosine expansion retaining its live Heston model.
+    """
+    def __init__(self, model: models.HestonModel, l: builtins.float = 16.0, n: builtins.int = 200) -> None:
+        r"""
+        Construct a COS engine with positive truncation width and series size.
+        """
+    def c1(self, t: builtins.float) -> builtins.float:
+        r"""
+        Return normalized log-return cumulant 1 at nonnegative time.
+        """
+    def c2(self, t: builtins.float) -> builtins.float:
+        r"""
+        Return normalized log-return cumulant 2 at nonnegative time.
+        """
+    def c3(self, t: builtins.float) -> builtins.float:
+        r"""
+        Return normalized log-return cumulant 3 at nonnegative time.
+        """
+    def c4(self, t: builtins.float) -> builtins.float:
+        r"""
+        Return normalized log-return cumulant 4 at nonnegative time.
+        """
+    def chf(self, u: builtins.float, t: builtins.float) -> tuple[builtins.float, builtins.float]:
+        r"""
+        Return the normalized characteristic function as (real, imaginary).
+        """
+    def mu_t(self, t: builtins.float) -> builtins.float:
+        r"""
+        Return the logarithm of the forward-to-spot ratio.
         """
 
 @typing.final

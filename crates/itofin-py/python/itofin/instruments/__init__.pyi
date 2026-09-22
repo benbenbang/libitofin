@@ -1244,6 +1244,14 @@ class VanillaOption:
         Raises:
             ItofinError: If integration_order exceeds 192.
         """
+    def set_cos_heston_engine(self, engine: pricingengines.CosHestonEngine) -> None:
+        r"""
+        Attach a COS engine retaining its model.
+        """
+    def price_cos_heston(self, engine: pricingengines.CosHestonEngine) -> builtins.float:
+        r"""
+        Attach and price with a COS engine.
+        """
     def set_mc_engine(self, engine: pricingengines.MCEuropeanEngine) -> None:
         r"""
         Attach the Monte Carlo European engine.

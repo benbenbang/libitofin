@@ -21,6 +21,7 @@ mod curve;
 mod fra;
 mod helpers;
 mod heston;
+mod heston_engines;
 mod hullwhite;
 mod inflation;
 mod iterativebootstrap;
@@ -352,6 +353,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     pricingengines.add_class::<PyYoYInflationCapFloorEngine>()?;
     pricingengines.add_class::<PyMCEuropeanEngine>()?;
     pricingengines.add_class::<PyQMCEuropeanEngine>()?;
+    pricingengines.add_class::<heston_engines::PyCosHestonEngine>()?;
     pricingengines.add_class::<PyMCEuropeanHestonEngine>()?;
     pricingengines.add_class::<PyMCAmericanEngine>()?;
 
