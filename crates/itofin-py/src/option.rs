@@ -9,6 +9,7 @@ use crate::mcengine::{
 use crate::results::Results;
 use crate::settings::PySettings;
 use crate::time::PyDate;
+use crate::treeswaption::PyBermudanExercise;
 use libitofin::exercise::{AmericanExercise, EuropeanExercise, Exercise};
 use libitofin::instrument::Instrument;
 use libitofin::instruments::{PlainVanillaPayoff, StrikedTypePayoff, VanillaOption};
@@ -123,6 +124,41 @@ impl PyVanillaOption {
         })
     }
 
+    /// Build an American option exercisable from the minimum supported date.
+    #[classmethod]
+    fn american_until(
+        _cls: &Bound<'_, PyType>,
+        option_type: PyOptionType,
+        strike: f64,
+        latest: &PyDate,
+        settings: &PySettings,
+    ) -> PyResult<Self> {
+        let payoff = shared(PlainVanillaPayoff::new(option_type.inner(), strike))
+            as Shared<dyn StrikedTypePayoff>;
+        let exercise =
+            shared(AmericanExercise::until(latest.inner(), false).map_err(PyQlError::from)?)
+                as Shared<dyn Exercise>;
+        Ok(Self {
+            inner: VanillaOption::new(payoff, exercise, settings.inner()),
+        })
+    }
+
+    /// Build an option retaining a copied Bermudan exercise schedule.
+    #[classmethod]
+    fn from_bermudan(
+        _cls: &Bound<'_, PyType>,
+        option_type: PyOptionType,
+        strike: f64,
+        exercise: &PyBermudanExercise,
+        settings: &PySettings,
+    ) -> Self {
+        let payoff = shared(PlainVanillaPayoff::new(option_type.inner(), strike))
+            as Shared<dyn StrikedTypePayoff>;
+        Self {
+            inner: VanillaOption::new(payoff, exercise.inner(), settings.inner()),
+        }
+    }
+
     /// Attach an analytic European engine built on process.
     ///
     /// Args:
@@ -191,7 +227,7 @@ impl PyVanillaOption {
 
     /// Attach the Monte Carlo American engine.
     ///
-    /// The option must have been built through american(): a European-exercise
+    /// The option must have American or Bermudan exercise: a European-exercise
     /// option raises ItofinError ("wrong exercise given") from npv().
     ///
     /// Args:
@@ -308,7 +344,7 @@ impl PyVanillaOption {
     /// Attach the Monte Carlo American engine and return the NPV.
     ///
     /// The one-shot form of set_mc_american_engine followed by npv. The option
-    /// must have been built through american(): a European-exercise option
+    /// must have American or Bermudan exercise: a European-exercise option
     /// raises ItofinError ("wrong exercise given").
     ///
     /// Args:

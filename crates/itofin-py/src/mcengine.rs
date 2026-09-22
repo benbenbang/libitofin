@@ -4,6 +4,7 @@ use crate::PyQlError;
 use crate::heston::PyHestonProcess;
 use crate::market::PyBlackScholesProcess;
 use libitofin::math::randomnumbers::rngtraits::{LowDiscrepancy, PseudoRandom};
+use libitofin::methods::montecarlo::PolynomialType;
 use libitofin::pricingengine::PricingEngine;
 use libitofin::pricingengines::vanilla::{
     MCAmericanEngine, MCEuropeanEngine, MCEuropeanHestonEngine, MakeMcAmericanEngine,
@@ -217,11 +218,10 @@ impl PyMCEuropeanHestonEngine {
 }
 
 /// The Longstaff-Schwartz least-squares Monte Carlo engine for American
-/// payoffs, over the pseudo-random RNG policy. The low-discrepancy policy is
-/// not exposed for this engine, and the Monomial regression basis is not selectable
-/// (#453).
+/// and Bermudan payoffs, over the pseudo-random RNG policy. Sobol, Brownian
+/// bridge, control variates and multi-asset paths are not exposed.
 ///
-/// The option priced must come from VanillaOption.american(...): a
+/// The option must have American or Bermudan exercise: a
 /// European-exercise option raises ItofinError ("wrong exercise given") when
 /// priced here.
 ///
@@ -261,10 +261,14 @@ impl PyMCAmericanEngine {
     ///         bitwise.
     ///     antithetic (bool | None): The antithetic variate, supported here;
     ///         the core oracle prices with it on.
-    ///     polynomial_order (int | None): The order of the Monomial regression
+    ///     polynomial_order (int | None): The order of the selected regression
     ///         basis. The core default is 2.
     ///     calibration_samples (int | None): The paths the regression is fitted
     ///         on. The core default is 2048.
+    ///     basis_system (int): 0 Monomial (default), 1 Laguerre, 2 Hermite,
+    ///         3 Hyperbolic, or 6 Chebyshev2nd. Legendre (4) and Chebyshev (5)
+    ///         are rejected, matching QuantLib's American path pricer.
+    ///         Chebyshev2nd supports put payoffs only; call pricing returns an error.
     ///
     /// Raises:
     ///     ItofinError: If neither or both of steps and steps_per_year are
@@ -281,6 +285,7 @@ impl PyMCAmericanEngine {
         antithetic = None,
         polynomial_order = None,
         calibration_samples = None,
+        basis_system = 0,
     ))]
     #[allow(clippy::too_many_arguments)]
     fn new(
@@ -294,8 +299,24 @@ impl PyMCAmericanEngine {
         antithetic: Option<bool>,
         polynomial_order: Option<usize>,
         calibration_samples: Option<usize>,
+        basis_system: i32,
     ) -> PyResult<Self> {
-        let mut maker = MakeMcAmericanEngine::<PseudoRandom>::new(process.inner());
+        let basis = match basis_system {
+            0 => PolynomialType::Monomial,
+            1 => PolynomialType::Laguerre,
+            2 => PolynomialType::Hermite,
+            3 => PolynomialType::Hyperbolic,
+            4 => PolynomialType::Legendre,
+            5 => PolynomialType::Chebyshev,
+            6 => PolynomialType::Chebyshev2nd,
+            _ => {
+                return Err(pyo3::exceptions::PyValueError::new_err(
+                    "unknown polynomial basis",
+                ));
+            }
+        };
+        let mut maker =
+            MakeMcAmericanEngine::<PseudoRandom>::new(process.inner()).with_basis_system(basis);
         if let Some(steps) = steps {
             maker = maker.with_steps(steps);
         }
