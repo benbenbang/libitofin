@@ -188,6 +188,22 @@ impl VolatilityTermStructure for ConstantOptionletVolatility {
 }
 
 impl OptionletVolatilityStructure for ConstantOptionletVolatility {
+    fn smile_section_impl(&self, time: Time) -> QlResult<Shared<dyn super::super::SmileSection>> {
+        let day_counter = self.day_counter().ok_or_else(|| {
+            crate::errors::QlError::new("missing optionlet day counter", file!(), line!())
+        })?;
+        Ok(crate::shared::shared(
+            super::super::FlatSmileSection::with_exercise_time(
+                time,
+                self.volatility_impl(time, 0.0)?,
+                day_counter,
+                None,
+                self.volatility_type(),
+                self.displacement(),
+            )?,
+        ))
+    }
+
     fn volatility_impl(&self, _option_time: Time, _strike: Rate) -> QlResult<Volatility> {
         self.volatility.current_link()?.value()
     }

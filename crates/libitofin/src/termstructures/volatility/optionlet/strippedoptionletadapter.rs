@@ -12,30 +12,9 @@
 //! (`volatilityImpl`, `strippedoptionletadapter.cpp:66-80`). Both interpolation
 //! layers extrapolate, matching the C++ `(..., true)` evaluations.
 //!
-//! ## Divergences from QuantLib
-//!
-//! - `smileSectionImpl` (`strippedoptionletadapter.cpp:44-64`) is omitted: the
-//!   smile-section layer is unported and the Rust
-//!   [`OptionletVolatilityStructure`] base defers it (as
-//!   [`ConstantOptionletVolatility`](super::ConstantOptionletVolatility) does).
-//! - The constructor takes an explicit [`Settings`] handle and returns a
-//!   [`QlResult`] (D5): the adapter is a moving term structure whose reference
-//!   date tracks the evaluation date, and the [`StrippedOptionletBase`] interface
-//!   carries no settings to thread through, so the caller supplies it.
-//! - The infallible base accessors `min_strike`/`max_strike`/`max_date` read the
-//!   stripped strikes and fixing dates, whose data path runs through the
-//!   stripper's fallible strip. They are snapshotted once in
-//!   [`new`](StrippedOptionletAdapter::new), which therefore strips eagerly
-//!   rather than lazily as C++ does. This is harmless (the adapter is always
-//!   priced immediately) but means the snapshot does not track a later
-//!   evaluation-date change.
-//! - Change propagation from the stripper to the adapter is not wired: the #575
-//!   [`OptionletStripper1`](super::OptionletStripper1) invalidates its lazy state
-//!   silently and exposes no observable, so a surface or index change is not
-//!   forwarded here. The adapter still observes nothing upstream and recomputes
-//!   its interpolations on first use, which is what the strip-and-reprice oracle
-//!   needs; full propagation is deferred with the stripper's own silent
-//!   invalidation (#577).
+//! Source notifications invalidate the interpolation grid and propagate to pricing
+//! engines, so failed updates and moving dates cannot
+//! leave stale cached volatilities. Smile sections use QuantLib's cubic boundaries.
 
 use std::cell::RefCell;
 
@@ -44,9 +23,9 @@ use crate::fail;
 use crate::math::interpolations::Interpolation;
 use crate::math::interpolations::linear::LinearInterpolation;
 use crate::patterns::lazyobject::LazyObject;
-use crate::patterns::observable::{AsObservable, Observable};
+use crate::patterns::observable::{AsObservable, Observable, Observer};
 use crate::settings::Settings;
-use crate::shared::Shared;
+use crate::shared::{Shared, SharedMut, shared_mut};
 use crate::termstructures::volatility::{VolatilityTermStructure, VolatilityType};
 use crate::termstructures::{TermStructure, TermStructureBase};
 use crate::time::businessdayconvention::BusinessDayConvention;
@@ -55,6 +34,15 @@ use crate::types::{Rate, Real, Time, Volatility};
 
 use super::{OptionletVolatilityStructure, StrippedOptionletBase};
 
+struct AdapterUpdater {
+    lazy: SharedMut<LazyObject>,
+}
+impl Observer for AdapterUpdater {
+    fn update(&mut self) {
+        self.lazy.borrow_mut().invalidate_silently();
+    }
+}
+
 /// Adapts a [`StrippedOptionletBase`] into an [`OptionletVolatilityStructure`].
 pub struct StrippedOptionletAdapter {
     base: TermStructureBase,
@@ -62,9 +50,9 @@ pub struct StrippedOptionletAdapter {
     n_interpolations: usize,
     min_strike: Rate,
     max_strike: Rate,
-    max_date: Date,
     strike_interpolations: RefCell<Vec<LinearInterpolation>>,
-    lazy: RefCell<LazyObject>,
+    lazy: SharedMut<LazyObject>,
+    _updater: SharedMut<AdapterUpdater>,
 }
 
 impl StrippedOptionletAdapter {
@@ -73,8 +61,8 @@ impl StrippedOptionletAdapter {
     ///
     /// The settlement days, calendar, business-day convention and day counter are
     /// taken from the stripper (`strippedoptionletadapter.cpp:32-42`). The strikes
-    /// and fixing dates are read once here to snapshot the strike domain and
-    /// maximum date, which strips the surface eagerly.
+    /// and fixing dates are validated eagerly. The maximum date subsequently
+    /// follows the source; range checks preserve source calculation errors.
     ///
     /// # Errors
     ///
@@ -97,11 +85,18 @@ impl StrippedOptionletAdapter {
             fail!("stripped-optionlet adapter needs at least one strike");
         };
         let fixing_dates = stripper.optionlet_fixing_dates()?;
-        let Some(&max_date) = fixing_dates.last() else {
+        let Some(_) = fixing_dates.last() else {
             fail!("stripped-optionlet adapter needs at least one fixing date");
         };
 
         let base = TermStructureBase::moving(settlement_days, calendar, day_counter, settings);
+        let lazy = shared_mut(LazyObject::new(true));
+        let updater = shared_mut(AdapterUpdater { lazy: lazy.clone() });
+        base.observable()
+            .register_observer(&(updater.clone() as SharedMut<dyn Observer>));
+        if let Some(observable) = stripper.observable() {
+            observable.register_observer(&base.updater());
+        }
 
         Ok(StrippedOptionletAdapter {
             base,
@@ -109,9 +104,9 @@ impl StrippedOptionletAdapter {
             n_interpolations,
             min_strike,
             max_strike,
-            max_date,
             strike_interpolations: RefCell::new(Vec::new()),
-            lazy: RefCell::new(LazyObject::new(true)),
+            lazy,
+            _updater: updater,
         })
     }
 
@@ -150,8 +145,37 @@ impl TermStructure for StrippedOptionletAdapter {
         &self.base
     }
 
+    fn max_time(&self) -> QlResult<Time> {
+        let dates = self.stripper.optionlet_fixing_dates()?;
+        let date = dates.last().copied().ok_or_else(|| {
+            crate::errors::QlError::new("stripper has no fixing dates", file!(), line!())
+        })?;
+        self.time_from_reference(date)
+    }
+
+    fn check_range_date(&self, date: Date, extrapolate: bool) -> QlResult<()> {
+        let reference = self.reference_date()?;
+        crate::require!(
+            date >= reference,
+            "date ({date}) before reference date ({reference})"
+        );
+        let dates = self.stripper.optionlet_fixing_dates()?;
+        let max = dates.last().copied().ok_or_else(|| {
+            crate::errors::QlError::new("stripper has no fixing dates", file!(), line!())
+        })?;
+        crate::require!(
+            extrapolate || self.allows_extrapolation() || date <= max,
+            "date ({date}) is past max curve date ({max})"
+        );
+        Ok(())
+    }
+
     fn max_date(&self) -> Date {
-        self.max_date
+        self.stripper
+            .optionlet_fixing_dates()
+            .ok()
+            .and_then(|dates| dates.last().copied())
+            .unwrap_or_else(Date::null)
     }
 }
 
@@ -170,6 +194,23 @@ impl VolatilityTermStructure for StrippedOptionletAdapter {
 }
 
 impl OptionletVolatilityStructure for StrippedOptionletAdapter {
+    fn smile_section_impl(&self, time: Time) -> QlResult<Shared<dyn super::super::SmileSection>> {
+        let strikes = self.stripper.optionlet_strikes(0)?;
+        let vols = strikes
+            .iter()
+            .map(|&k| self.volatility_impl(time, k))
+            .collect::<QlResult<Vec<_>>>()?;
+        Ok(crate::shared::shared(
+            super::cubicsmile::OptionletCubicSmile::new(
+                time,
+                strikes,
+                vols,
+                self.volatility_type(),
+                self.displacement(),
+            )?,
+        ))
+    }
+
     fn volatility_impl(&self, option_time: Time, strike: Rate) -> QlResult<Volatility> {
         self.calculate()?;
 

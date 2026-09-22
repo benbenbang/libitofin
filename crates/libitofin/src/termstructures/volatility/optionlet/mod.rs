@@ -7,22 +7,8 @@
 //! before dispatching to the volatility hook. The volatility type and
 //! displacement select the pricing model the surface feeds the coupon pricer.
 //!
-//! ## Divergences from QuantLib
-//!
-//! - The `smileSection` family and the `smileSectionImpl` hook are not ported:
-//!   the smile-section layer itself now exists
-//!   ([`SmileSection`](crate::termstructures::volatility::SmileSection), #584),
-//!   but wiring this surface's `smileSectionImpl` bridge to it stays unported. The
-//!   required hook is therefore [`volatility_impl`](OptionletVolatilityStructure::volatility_impl)
-//!   alone, mirroring C++'s pure-virtual `volatilityImpl(Time, Rate)`; the
-//!   `Date`-based volatility path converts to time and dispatches to it, as the
-//!   C++ default `volatilityImpl(Date, Rate)` does.
-//! - The constant surface ([`ConstantOptionletVolatility`]) and the stripped,
-//!   linearly interpolated surface ([`StrippedOptionletAdapter`] over
-//!   [`OptionletStripper1`]) are ported. The smile-section layer the C++ adapter
-//!   also exposes is deferred.
-
 mod constantoptionletvol;
+mod cubicsmile;
 mod optionletstripper;
 mod optionletstripper1;
 mod strippedoptionletadapter;
@@ -48,6 +34,43 @@ use crate::types::{Rate, Real, Time, Volatility};
 /// variance as `volatility^2 * time`. Volatilities are expressed on an annual
 /// basis.
 pub trait OptionletVolatilityStructure: VolatilityTermStructure {
+    /// Smile implementation for a checked option time.
+    fn smile_section_impl(
+        &self,
+        _time: Time,
+    ) -> QlResult<crate::shared::Shared<dyn super::SmileSection>> {
+        crate::fail!("smile sections are not implemented for this optionlet surface")
+    }
+
+    /// Smile at an option time, with the same range checks as volatility queries.
+    fn smile_section(
+        &self,
+        time: Time,
+        extrapolate: bool,
+    ) -> QlResult<crate::shared::Shared<dyn super::SmileSection>> {
+        self.check_range_time(time, extrapolate)?;
+        self.smile_section_impl(time)
+    }
+
+    /// Smile at an option date.
+    fn smile_section_date(
+        &self,
+        date: Date,
+        extrapolate: bool,
+    ) -> QlResult<crate::shared::Shared<dyn super::SmileSection>> {
+        self.check_range_date(date, extrapolate)?;
+        self.smile_section_impl(self.time_from_reference(date)?)
+    }
+
+    /// Smile at an option tenor.
+    fn smile_section_tenor(
+        &self,
+        tenor: Period,
+        extrapolate: bool,
+    ) -> QlResult<crate::shared::Shared<dyn super::SmileSection>> {
+        self.smile_section_date(self.option_date_from_tenor(tenor)?, extrapolate)
+    }
+
     /// Volatility calculation hook; range and strike checks have already run.
     fn volatility_impl(&self, option_time: Time, strike: Rate) -> QlResult<Volatility>;
 
