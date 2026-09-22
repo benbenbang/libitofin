@@ -19,7 +19,9 @@
 
 pub mod analytichestonengine;
 pub mod coshestonengine;
+pub mod exponentialfittinghestonengine;
 pub mod fdblackscholesvanillaengine;
+mod heston_fitting_table;
 mod hestoncumulants;
 mod hestonmarket;
 pub mod mcamericanengine;

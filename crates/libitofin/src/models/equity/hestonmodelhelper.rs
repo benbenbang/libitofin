@@ -283,6 +283,7 @@ mod tests {
     use crate::math::optimization::endcriteria::EndCriteria;
     use crate::math::optimization::levenbergmarquardt::LevenbergMarquardt;
     use crate::models::calibrationhelper::CalibrationHelper;
+    use crate::models::model::CalibratedModelHolder;
     use crate::models::{HestonModel, calibrate};
     use crate::pricingengine::PricingEngine;
     use crate::pricingengines::vanilla::analytichestonengine::AnalyticHestonEngine;
@@ -728,20 +729,8 @@ mod tests {
         }
     }
 
-    /// ORACLE `testDAXCalibration` (`hestonmodel.cpp:313-370`), the
-    /// [`AnalyticHestonEngine`] arm only. Calibrate the Heston model to the A. Sepp
-    /// DAX implied-vol matrix (104 helpers) from the seed (v0=0.1, kappa=1.0,
-    /// theta=0.1, sigma=0.5, rho=-0.5, cpp:329-333) with `AnalyticHestonEngine(model, 64)`
-    /// and a [`LevenbergMarquardt`] fit, then reproduce the sum of squared
-    /// calibration errors sse ~= 177.2 (`|sse - 177.2| < 1.0`, cpp:358-364).
-    ///
-    /// DEFERRAL (#262-class, visible): C++ loops THREE engines (cpp:342-346) -
-    /// `AnalyticHestonEngine(model, 64)`, `COSHestonEngine(model, 12, 75)` and
-    /// `ExponentialFittingHestonEngine(model)` - asserting sse ~= 177.2 for each.
-    /// The latter two are separate, unported Heston engines (tracked by issue
-    /// #424); only the Analytic arm is ported here. Because the single arm
-    /// calibrates straight from the seed, the `model.setParams(params)` reset the
-    /// C++ multi-engine loop needs between arms (cpp:348-350) is not required.
+    /// QuantLib DAX calibration oracle: all three engines must reproduce
+    /// the original SSE 177.2 within 1.0 from the same initial parameters.
     #[test]
     fn heston_calibrates_to_dax_vol_data() {
         let market = dax_market_data();
@@ -757,43 +746,50 @@ mod tests {
             -0.5,
         ));
         let model = HestonModel::new(process).unwrap();
-        let engine = shared_mut(AnalyticHestonEngine::new(SharedMut::clone(&model), 64).unwrap())
-            as SharedMut<dyn PricingEngine>;
+        let params = model.borrow().calibrated_model().params();
+        let engines: [SharedMut<dyn PricingEngine>; 3] = [
+            shared_mut(AnalyticHestonEngine::new(model.clone(), 64).unwrap()),
+            shared_mut(crate::pricingengines::vanilla::coshestonengine::CosHestonEngine::new(model.clone(),12.0,75).unwrap()),
+            shared_mut(crate::pricingengines::vanilla::exponentialfittinghestonengine::ExponentialFittingHestonEngine::new(model.clone(),Default::default(),None,-0.5).unwrap()),
+        ];
+        for engine in engines {
+            model.borrow_mut().set_params(&params).unwrap();
 
-        for helper in &market.options {
-            helper
-                .borrow_mut()
-                .base_mut()
-                .set_pricing_engine(SharedMut::clone(&engine));
+            for helper in &market.options {
+                helper
+                    .borrow_mut()
+                    .base_mut()
+                    .set_pricing_engine(SharedMut::clone(&engine));
+            }
+            let dyn_helpers: Vec<SharedMut<dyn CalibrationHelper>> = market
+                .options
+                .iter()
+                .map(|helper| SharedMut::clone(helper) as SharedMut<dyn CalibrationHelper>)
+                .collect();
+
+            let mut method = LevenbergMarquardt::new(1e-8, 1e-8, 1e-8, false);
+            let end_criteria = EndCriteria::new(400, Some(40), 1e-8, 1e-8, Some(1e-8)).unwrap();
+            calibrate(
+                &model,
+                &dyn_helpers,
+                &mut method,
+                &end_criteria,
+                None,
+                Vec::new(),
+                Vec::new(),
+            )
+            .unwrap();
+
+            let mut sse = 0.0;
+            for helper in &market.options {
+                let diff = helper.borrow_mut().calibration_error().unwrap() * 100.0;
+                sse += diff * diff;
+            }
+            assert!(
+                (sse - 177.2).abs() < 1.0,
+                "sse {sse} vs expected 177.2 (error {})",
+                (sse - 177.2).abs()
+            );
         }
-        let dyn_helpers: Vec<SharedMut<dyn CalibrationHelper>> = market
-            .options
-            .iter()
-            .map(|helper| SharedMut::clone(helper) as SharedMut<dyn CalibrationHelper>)
-            .collect();
-
-        let mut method = LevenbergMarquardt::new(1e-8, 1e-8, 1e-8, false);
-        let end_criteria = EndCriteria::new(400, Some(40), 1e-8, 1e-8, Some(1e-8)).unwrap();
-        calibrate(
-            &model,
-            &dyn_helpers,
-            &mut method,
-            &end_criteria,
-            None,
-            Vec::new(),
-            Vec::new(),
-        )
-        .unwrap();
-
-        let mut sse = 0.0;
-        for helper in &market.options {
-            let diff = helper.borrow_mut().calibration_error().unwrap() * 100.0;
-            sse += diff * diff;
-        }
-        assert!(
-            (sse - 177.2).abs() < 1.0,
-            "sse {sse} vs expected 177.2 (error {})",
-            (sse - 177.2).abs()
-        );
     }
 }
