@@ -20,7 +20,9 @@
 //!   required hook is [`volatility_impl`](CapFloorTermVolatilityStructure::volatility_impl)
 //!   alone, mirroring C++'s pure-virtual `volatilityImpl(Time, Rate)`.
 
+mod capfloortermvolcurve;
 mod capfloortermvolsurface;
+pub use capfloortermvolcurve::CapFloorTermVolCurve;
 
 pub use capfloortermvolsurface::CapFloorTermVolSurface;
 

@@ -13,8 +13,8 @@
 //!   `calculate()` and can therefore fail, so each returns a [`QlResult`] and an
 //!   owned vector rather than the C++ `const&`. The laziness itself lives on the
 //!   concrete stripper (#575), not on this interface.
-//! - Observability (the `LazyObject` base) is deferred to the concrete stripper,
-//!   which is where the notification graph is wired.
+//! - Concrete strippers expose their notification graph through the optional
+//!   observable accessor; custom legacy implementations can retain the default.
 
 use crate::errors::QlResult;
 use crate::termstructures::volatility::VolatilityType;
@@ -27,6 +27,11 @@ use crate::types::{Natural, Rate, Real, Time, Volatility};
 /// Abstract interface for a (time-indexed) vector of (strike-indexed) optionlet
 /// volatilities (`StrippedOptionletBase`).
 pub trait StrippedOptionletBase {
+    /// Change notifications, when supported by the concrete source.
+    fn observable(&self) -> Option<&crate::patterns::observable::Observable> {
+        None
+    }
+
     /// The optionlet strikes for the `i`-th maturity.
     fn optionlet_strikes(&self, i: usize) -> QlResult<Vec<Rate>>;
 

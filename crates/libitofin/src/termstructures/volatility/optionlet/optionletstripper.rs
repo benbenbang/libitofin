@@ -26,10 +26,8 @@
 //!   (`performCalculations`) and the lazy accessor bodies live on the concrete
 //!   stripper (#575); the caches are exposed to it through
 //!   [`caches`](Self::caches).
-//! - The C++ overnight-index guard (`optionletstripper.cpp:49-51`, which requires
-//!   an explicit frequency for an `OvernightIndex`) is deferred: a
-//!   [`Shared<IborIndex>`] carries no runtime overnight tag to dispatch on, so
-//!   the distinction is unavailable here (#577).
+//! - The typed `OptionletStripper1::new_overnight` entrypoint enforces the
+//!   explicit overnight frequency before upcasting to the shared Ibor setup.
 //! - Observer registration (surface / index / discount / evaluation date) is
 //!   deferred to the concrete stripper, which owns the notification graph.
 
@@ -117,8 +115,22 @@ impl OptionletStripper {
             crate::fail!("non-null displacement is not allowed with Normal model");
         }
 
+        if !displacement.is_finite() || displacement < 0.0 {
+            crate::fail!("displacement must be finite and nonnegative");
+        }
         let n_strikes = surface.strikes().len();
         let index_tenor = optionlet_frequency.unwrap_or_else(|| ibor_index.tenor());
+
+        let max_length = match index_tenor.units() {
+            crate::time::timeunit::TimeUnit::Days => 366 * 300,
+            crate::time::timeunit::TimeUnit::Weeks => 53 * 300,
+            crate::time::timeunit::TimeUnit::Months => 12 * 300,
+            crate::time::timeunit::TimeUnit::Years => 300,
+            _ => crate::fail!("optionlet frequency must use days, weeks, months or years"),
+        };
+        if index_tenor.length() <= 0 || index_tenor.length() > max_length {
+            crate::fail!("optionlet frequency outside supported date range");
+        }
 
         let Some(&max_cap_floor_tenor) = surface.option_tenors().last() else {
             crate::fail!("cap/floor term vol surface has no option tenors");
