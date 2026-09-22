@@ -144,7 +144,12 @@ pub unsafe extern "C" fn itofin_option_set_engine(
                         c.get::<SharedMut<HestonModel>>(source)?,
                         integration_order,
                     )?),
-                    2 => c.get(source)?,
+                    2 => c.get::<SharedMut<dyn PricingEngine>>(source).or_else(|_| {
+                        c.get::<SharedMut<
+                            libitofin::pricingengines::vanilla::coshestonengine::CosHestonEngine,
+                        >>(source)
+                            .map(|engine| engine as SharedMut<dyn PricingEngine>)
+                    })?,
                     _ => return Err(BindingError::invalid("unknown option engine kind")),
                 };
             option.borrow_mut().base_mut().set_pricing_engine(engine);

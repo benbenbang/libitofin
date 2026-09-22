@@ -1,0 +1,197 @@
+//! Alternative Heston engines and additive calibration entrypoints.
+use crate::boundary::*;
+use libitofin::math::optimization::{
+    endcriteria::EndCriteria, levenbergmarquardt::LevenbergMarquardt,
+};
+use libitofin::models::calibrationhelper::{BlackCalibrationHelper, CalibrationHelper};
+use libitofin::models::equity::HestonModelHelper;
+use libitofin::models::{HestonModel, calibrate};
+use libitofin::pricingengine::PricingEngine;
+use libitofin::pricingengines::vanilla::coshestonengine::CosHestonEngine;
+use libitofin::pricingengines::vanilla::exponentialfittinghestonengine::{
+    ExponentialFittingControlVariate, ExponentialFittingHestonEngine,
+};
+use libitofin::shared::{SharedMut, shared_mut};
+
+/// Alternative Heston engine options. Kind 0 COS, 1 exponential fitting.
+/// CV 0 Optimal, 1 AndersenPiterbarg, 2 AndersenPiterbargOptCV,
+/// 3 AsymptoticChF, 4 AngledContour, 5 AngledContourNoCV.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct ItofinHestonEngineConfig {
+    pub kind: i32,
+    pub l: f64,
+    pub n: usize,
+    pub control_variate: i32,
+    pub has_scaling: i32,
+    pub scaling: f64,
+    pub alpha: f64,
+}
+fn engine(
+    model: SharedMut<HestonModel>,
+    cfg: &ItofinHestonEngineConfig,
+) -> BindingResult<SharedMut<dyn PricingEngine>> {
+    match cfg.kind {
+        0 => Ok(shared_mut(CosHestonEngine::new(model, cfg.l, cfg.n)?)),
+        1 => {
+            let cv = match cfg.control_variate {
+                0 => ExponentialFittingControlVariate::Optimal,
+                1 => ExponentialFittingControlVariate::AndersenPiterbarg,
+                2 => ExponentialFittingControlVariate::AndersenPiterbargOptCV,
+                3 => ExponentialFittingControlVariate::AsymptoticChF,
+                4 => ExponentialFittingControlVariate::AngledContour,
+                5 => ExponentialFittingControlVariate::AngledContourNoCV,
+                _ => {
+                    return Err(BindingError::invalid(
+                        "unknown exponential fitting control variate",
+                    ));
+                }
+            };
+            let scaling = match cfg.has_scaling {
+                0 => None,
+                1 => Some(cfg.scaling),
+                _ => return Err(BindingError::invalid("has_scaling must be 0 or 1")),
+            };
+            Ok(shared_mut(ExponentialFittingHestonEngine::new(
+                model, cv, scaling, cfg.alpha,
+            )?))
+        }
+        _ => Err(BindingError::invalid("unknown Heston engine kind")),
+    }
+}
+
+/// Create a retained engine usable with option engine kind 2.
+#[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Context and handles belong to the
+/// calling thread; serialize calls including destruction.
+pub unsafe extern "C" fn itofin_heston_engine_new(
+    ctx: *mut Context,
+    model: u64,
+    config: *const ItofinHestonEngineConfig,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(config)?;
+            check_ptr(out)?;
+            let model = c.get::<SharedMut<HestonModel>>(model)?;
+            let cfg = &*config;
+            let id = if cfg.kind == 0 {
+                c.insert(shared_mut(CosHestonEngine::new(model, cfg.l, cfg.n)?))?
+            } else {
+                c.insert(engine(model, cfg)?)?
+            };
+            output(out, id)
+        })
+    }
+}
+
+/// Calibrate a Heston model using the configured alternative engine.
+#[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Context and handles belong to the
+/// calling thread; serialize calls including destruction.
+pub unsafe extern "C" fn itofin_heston_calibrate_engine(
+    ctx: *mut Context,
+    model: u64,
+    helpers: *const u64,
+    helpers_len: usize,
+    method: u64,
+    criteria: u64,
+    config: *const ItofinHestonEngineConfig,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(config)?;
+            let ids = input_slice(helpers, helpers_len)?;
+            if ids.is_empty() {
+                return Err(BindingError::invalid(
+                    "calibration helpers must not be empty",
+                ));
+            }
+            let model = c.get::<SharedMut<HestonModel>>(model)?;
+            let method = c.get::<SharedMut<LevenbergMarquardt>>(method)?;
+            let criteria = c.get::<EndCriteria>(criteria)?;
+            let helpers = ids
+                .iter()
+                .map(|id| c.get::<SharedMut<HestonModelHelper>>(*id))
+                .collect::<BindingResult<Vec<_>>>()?;
+            let engine = engine(model.clone(), &*config)?;
+            for helper in &helpers {
+                helper
+                    .borrow_mut()
+                    .base_mut()
+                    .set_pricing_engine(engine.clone());
+            }
+            let helpers: Vec<SharedMut<dyn CalibrationHelper>> = helpers
+                .into_iter()
+                .map(|h| h as SharedMut<dyn CalibrationHelper>)
+                .collect();
+            calibrate(
+                &model,
+                &helpers,
+                &mut *method.borrow_mut(),
+                &criteria,
+                None,
+                vec![],
+                vec![],
+            )?;
+            Ok(())
+        })
+    }
+}
+
+/// COS inspector field: 0-3 cumulants, 4 log forward/spot, 5 characteristic function.
+/// Time must be finite and nonnegative; frequency must be finite. Scalar fields
+/// write zero to the imaginary output. The engine retains its live model.
+#[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid. Outputs must not overlap each other.
+/// Context and handles belong to the calling thread; serialize all calls.
+pub unsafe extern "C" fn itofin_cos_heston_value(
+    ctx: *mut Context,
+    engine: u64,
+    field: i32,
+    t: f64,
+    u: f64,
+    out_real: *mut f64,
+    out_imag: *mut f64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(out_real)?;
+            check_ptr(out_imag)?;
+            if !t.is_finite() || t < 0.0 || !u.is_finite() {
+                return Err(BindingError::invalid(
+                    "finite nonnegative time and finite frequency required",
+                ));
+            }
+            let engine = c.get::<SharedMut<CosHestonEngine>>(engine)?;
+            let engine = engine.borrow();
+            let (real, imag) = match field {
+                0..=3 if t == 0.0 => (0.0, 0.0),
+                0 => (engine.c1(t), 0.0),
+                1 => (engine.c2(t), 0.0),
+                2 => (engine.c3(t), 0.0),
+                3 => (engine.c4(t), 0.0),
+                4 => (engine.mu_t(t)?, 0.0),
+                5 => {
+                    let value = engine.chf(u, t);
+                    (value.re, value.im)
+                }
+                _ => return Err(BindingError::invalid("unknown COS inspector field")),
+            };
+            if !real.is_finite() || !imag.is_finite() {
+                return Err(BindingError::invalid("COS inspector result is not finite"));
+            }
+            output(out_real, real)?;
+            output(out_imag, imag)
+        })
+    }
+}
