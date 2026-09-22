@@ -674,6 +674,99 @@ mod tests {
                 .is_ok()
         );
     }
+
+    #[test]
+    fn bermudan_grid_retains_only_positive_mandatory_dates() {
+        use crate::exercise::BermudanExercise;
+        let market = flat_market();
+        let mut engine = engine(&market);
+        set_option(
+            &mut engine,
+            shared(
+                BermudanExercise::new(
+                    vec![
+                        today() - 3,
+                        today(),
+                        today() + 91,
+                        today() + 91,
+                        today() + 203,
+                        today() + 365,
+                    ],
+                    false,
+                )
+                .unwrap(),
+            ),
+        );
+        let grid = engine.lsm_base().time_grid().unwrap();
+        assert_eq!(
+            grid.mandatory_times(),
+            &[91.0 / 360.0, 203.0 / 360.0, 365.0 / 360.0]
+        );
+        assert_eq!(grid.size(), 5);
+        assert_eq!(grid[1], 91.0 / 360.0);
+        assert_eq!(grid[2], 203.0 / 360.0);
+        assert!(engine.lsm_path_pricer().is_ok());
+        set_option(
+            &mut engine,
+            shared(BermudanExercise::new(vec![today()], false).unwrap()),
+        );
+        assert!(
+            engine
+                .lsm_path_pricer()
+                .err()
+                .unwrap()
+                .message()
+                .contains("no positive exercise time")
+        );
+        set_option(
+            &mut engine,
+            shared(BermudanExercise::new(vec![today() + 365], true).unwrap()),
+        );
+        assert_eq!(
+            engine.lsm_path_pricer().err().unwrap().message(),
+            "payoff at expiry not handled"
+        );
+    }
+
+    #[test]
+    fn bermudan_mask_forbids_exercise_between_contract_dates_in_both_passes() {
+        use crate::methods::montecarlo::PathPricer;
+        let market = flat_market();
+        let grid = TimeGrid::new(1.0, 2).unwrap();
+        for (allowed, expected_positive) in [(false, false), (true, true)] {
+            let mut early = put_pricer(2);
+            early.exercise_indices = Some(vec![false, allowed, true]);
+            let lsm = LongstaffSchwartzPathPricer::new(
+                &grid,
+                shared(early),
+                &market.process.risk_free_rate(),
+            )
+            .unwrap();
+            let sample = path([40.0, 1.0, 40.0]);
+            assert_eq!(lsm.price(&sample), 0.0);
+            lsm.calibrate().unwrap();
+            assert_eq!(lsm.price(&sample) > 0.0, expected_positive);
+            assert_eq!(
+                lsm.exercise_probability().unwrap(),
+                if allowed { 1.0 } else { 0.0 }
+            );
+        }
+    }
+
+    #[test]
+    fn unsupported_engine_bases_are_rejected_before_sampling() {
+        let market = flat_market();
+        for family in [PolynomialType::Legendre, PolynomialType::Chebyshev] {
+            let error = MakeMcAmericanEngine::<PseudoRandom>::new(Shared::clone(&market.process))
+                .with_steps(4)
+                .with_samples(16)
+                .with_basis_system(family)
+                .build()
+                .err()
+                .unwrap();
+            assert_eq!(error.message(), "insufficient polynomial type");
+        }
+    }
 }
 
 #[cfg(test)]
@@ -693,10 +786,9 @@ mod oracle {
     //!
     //! REFERENCE SUBSTITUTION, stated plainly. The C++ test reprices the option
     //! with `FdBlackScholesVanillaEngine(process, 401, 200)` and checks
-    //! `|mc - fd| < 2.34 * errorEstimate` (`:201-206`). This crate's
-    //! [`FdBlackScholesVanillaEngine`](super::FdBlackScholesVanillaEngine)
-    //! rejects an American exercise (`fdblackscholesvanillaengine.rs:129`), so
-    //! the reference here is the MC value QuantLib itself produces on this
+    //! `|mc - fd| < 2.34 * errorEstimate` (`:201-206`). This historical test
+    //! predates this crate's American FD support and retains its cached MC
+    //! reference. The reference is the MC value QuantLib itself produces on this
     //! fixture, measured on a locally built QuantLib 1.43 dylib:
     //! `mc = 2.054422273006143`, `errorEstimate = 0.01775722870215829`,
     //! `exerciseProbability = 0.4897360703812317`, `fd = 2.08679820123328`.
@@ -722,9 +814,10 @@ mod oracle {
     //! 1.5% tolerance (`:154,214`), and the never-early-exercise floor, since
     //! an American put cannot be worth less than its European twin.
     //!
-    //! Deferred with the ticket: the other five cases of the parameter grid, the
-    //! four other basis families, the Brownian bridge (#453), the
-    //! low-discrepancy variant (#454), and the control variate.
+    //! The five remaining parameter cases below use independently generated
+    //! QuantLib FD references and the original band/probability tolerances.
+    //! The first-case cached-MC exception above remains explicit and unchanged.
+    //! Brownian bridge, control variate and multi-asset LSM remain separate work.
 
     use super::MakeMcAmericanEngine;
     use crate::exercise::{AmericanExercise, EuropeanExercise, Exercise};
@@ -779,11 +872,15 @@ mod oracle {
     }
 
     fn process() -> Shared<GeneralizedBlackScholesProcess> {
+        process_with_vol(VOLATILITY)
+    }
+
+    fn process_with_vol(volatility: Real) -> Shared<GeneralizedBlackScholesProcess> {
         let spot = Handle::new(shared(SimpleQuote::new(UNDERLYING)) as Shared<dyn Quote>);
         let vol = Handle::new(shared(BlackConstantVol::new(
             settlement_date(),
             None,
-            VOLATILITY,
+            volatility,
             Actual365Fixed::new(),
         )) as Shared<dyn BlackVolTermStructure>);
         shared(GeneralizedBlackScholesProcess::new(
@@ -850,5 +947,93 @@ mod oracle {
             "an American put {calculated} cannot be worth less than its \
              European twin {european_value}"
         );
+    }
+
+    #[test]
+    fn five_remaining_american_cases_preserve_upstream_acceptance() {
+        let references = [
+            (36.0, 0.2 + 0.1, 3.430219464343261, 0.51678),
+            (36.0, 0.4, 4.785433883245219, 0.54598),
+            (40.0, 0.2, 4.485350467454564, 0.75549),
+            (40.0, 0.2 + 0.1, 5.736716960463202, 0.67569),
+            (40.0, 0.4, 7.107644070425648, 0.65562),
+        ];
+        for (strike, volatility, fd, probability) in references {
+            let settings = shared(Settings::new());
+            settings.set_evaluation_date(todays_date());
+            let process = process_with_vol(volatility);
+            let exercise = shared(AmericanExercise::until(maturity(), false).unwrap());
+            let mut option = VanillaOption::new(
+                shared(PlainVanillaPayoff::new(OptionType::Put, strike)),
+                exercise,
+                settings,
+            );
+            option.base_mut().set_pricing_engine(shared_mut(
+                MakeMcAmericanEngine::<PseudoRandom>::new(process)
+                    .with_steps(75)
+                    .with_antithetic_variate(true)
+                    .with_absolute_tolerance(0.02)
+                    .with_seed(42)
+                    .with_polynomial_order(3)
+                    .build()
+                    .unwrap(),
+            ));
+            let value = option.npv().unwrap();
+            let error = option.error_estimate().unwrap();
+            assert!(
+                error.is_finite() && error > 0.0,
+                "invalid standard error {error}"
+            );
+            let exercise = option.result::<Real>("exerciseProbability").unwrap();
+            assert!(
+                (value - fd).abs() <= 2.34 * error,
+                "strike={strike}, vol={volatility}: {value} +/- {error} vs FD {fd}"
+            );
+            assert!(
+                (exercise - probability).abs() <= 0.015,
+                "strike={strike}, vol={volatility}: exercise {exercise} vs {probability}"
+            );
+        }
+    }
+
+    #[test]
+    fn bermudan_exercise_only_and_refined_grids_match_independent_oracles() {
+        use crate::exercise::BermudanExercise;
+        for (steps, expected) in [(3, 4.331587683099873), (75, 4.334758948830429)] {
+            let settings = shared(Settings::new());
+            settings.set_evaluation_date(todays_date());
+            let exercise = shared(
+                BermudanExercise::new(
+                    vec![settlement_date() + 91, settlement_date() + 203, maturity()],
+                    false,
+                )
+                .unwrap(),
+            );
+            let mut option = VanillaOption::new(
+                shared(PlainVanillaPayoff::new(OptionType::Put, 40.0)),
+                exercise,
+                settings,
+            );
+            option.base_mut().set_pricing_engine(shared_mut(
+                MakeMcAmericanEngine::<PseudoRandom>::new(process())
+                    .with_steps(steps)
+                    .with_samples(32768)
+                    .with_calibration_samples(8192)
+                    .with_seed(42)
+                    .with_antithetic_variate(true)
+                    .build()
+                    .unwrap(),
+            ));
+            let value = option.npv().unwrap();
+            let error = option.error_estimate().unwrap();
+            assert!(
+                error.is_finite() && error > 0.0,
+                "invalid standard error {error}"
+            );
+            assert!(
+                (value - expected).abs() <= 2.34 * error,
+                "steps={steps}: {value} +/- {error} vs {expected}"
+            );
+        }
     }
 }
