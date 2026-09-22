@@ -19,6 +19,8 @@ __all__ = [
     "CashAnnuityModel",
     "CosHestonEngine",
     "DiscountingSwapEngine",
+    "ExponentialFittingControlVariate",
+    "ExponentialFittingHestonEngine",
     "ForwardsInCouponPeriod",
     "IsdaCdsEngine",
     "MCAmericanEngine",
@@ -259,6 +261,16 @@ class DiscountingSwapEngine:
                 the swap this engine prices was built with, or the two resolve
                 their dates against different evaluation dates and the NPV is
                 silently wrong.
+        """
+
+@typing.final
+class ExponentialFittingHestonEngine:
+    r"""
+    Exponentially fitted quadrature retaining its live Heston model.
+    """
+    def __init__(self, model: models.HestonModel, control_variate: ExponentialFittingControlVariate = ExponentialFittingControlVariate.Optimal, scaling: typing.Optional[builtins.float] = None, alpha: builtins.float = -0.5) -> None:
+        r"""
+        Construct the selected control variate with optional fixed scaling.
         """
 
 @typing.final
@@ -589,6 +601,21 @@ class CashAnnuityModel:
     SwapRate: typing.ClassVar[CashAnnuityModel]
     DiscountCurve: typing.ClassVar[CashAnnuityModel]
     def __new__(cls, _unconstructible: typing.NoReturn) -> CashAnnuityModel: ...
+    def __int__(self) -> builtins.int: ...
+    __hash__: typing.ClassVar[None]  # type: ignore[assignment]
+
+@typing.final
+class ExponentialFittingControlVariate:
+    r"""
+    Control variate used by the exponentially fitted Heston quadrature.
+    """
+    Optimal: typing.ClassVar[ExponentialFittingControlVariate]
+    AndersenPiterbarg: typing.ClassVar[ExponentialFittingControlVariate]
+    AndersenPiterbargOptCV: typing.ClassVar[ExponentialFittingControlVariate]
+    AsymptoticChF: typing.ClassVar[ExponentialFittingControlVariate]
+    AngledContour: typing.ClassVar[ExponentialFittingControlVariate]
+    AngledContourNoCV: typing.ClassVar[ExponentialFittingControlVariate]
+    def __new__(cls, _unconstructible: typing.NoReturn) -> ExponentialFittingControlVariate: ...
     def __int__(self) -> builtins.int: ...
     __hash__: typing.ClassVar[None]  # type: ignore[assignment]
 

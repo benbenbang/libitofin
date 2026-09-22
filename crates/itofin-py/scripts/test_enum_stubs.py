@@ -70,7 +70,7 @@ class Other:
                     f"{cls.name}()", f"{cls.name}(0)", f"{instance}.{members[0]} = {instance}",
                     f"h_{cls.name}: Hashable = {instance}",
                 ])
-        self.assertEqual(len(imports), 25)
+        self.assertEqual(len(imports), 26)
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             fixture = root / "enum_contract.py"
