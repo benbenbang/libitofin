@@ -46,11 +46,7 @@ B. The switch strike at 1e-12 against the mean of the at-the-money caplet rates,
    ``atm_optionlet_rates()`` rather than pinned as a literal, so the arm is
    self-contained.
 
-C. VolatilityType.Normal is deferred (#440/#577) and is rejected AT THE STRIP,
-   not at construction: ``OptionletStripper1.__init__`` succeeds, and the error
-   surfaces from the first call that needs the grid (``optionletstripper1.rs:
-   170-175``, mirrored by the core test at ``:510``). Both the stripper query and
-   the adapter constructor must raise, since the adapter's constructor strips.
+C. Normal stripping is covered by test_optionlet_stripping_completion.py.
 
 D. The pinned-reference surface is rejected by the adapter, which is why arm A
    uses ``moving``. This pins the constraint that made the moving constructors
@@ -214,15 +210,6 @@ def test_the_optionlet_frequency_overrides_the_index_tenor_as_the_caplet_step():
     )
     assert by_override == pytest.approx(by_index_tenor / 2, abs=1)
     assert by_override < by_index_tenor
-
-
-def test_a_normal_volatility_type_is_rejected_at_the_strip_not_at_construction():
-    curve = _curve()
-    stripper = _stripper(curve, volatility_type=VolatilityType.Normal)
-    with pytest.raises(ItofinError):
-        stripper.switch_strike()
-    with pytest.raises(ItofinError):
-        StrippedOptionletAdapter(_stripper(curve, volatility_type=VolatilityType.Normal), SETTINGS)
 
 
 def test_a_pinned_reference_surface_is_rejected_by_the_adapter():

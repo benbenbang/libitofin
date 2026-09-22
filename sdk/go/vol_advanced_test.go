@@ -198,21 +198,7 @@ func TestOptionletStripperGoQueriesAndAdapterOwnership(t *testing.T) {
 	if e != nil || math.IsNaN(x) || x <= 0 {
 		t.Fatal(x, e)
 	}
-	// Normal stripping is rejected by the core at the lazy solve, not construction.
-	surface, e = s.CapFloorTermVolSurface(grid)
-	if e != nil {
-		t.Fatal(e)
-	}
-	normal, e := s.OptionletStripper1(OptionletStripperConfig{TermVolSurface: surface, IborIndex: index, VolatilityType: Normal})
-	if e != nil {
-		t.Fatal(e)
-	}
-	if _, e = normal.SwitchStrike(); e == nil {
-		t.Fatal("unsupported normal stripping succeeded")
-	}
-	if _, e = s.StrippedOptionletAdapter(normal, settings); e == nil {
-		t.Fatal("adapter accepted failed normal strip")
-	}
+
 }
 
 // Public QuantLib swaptionvolstructuresutilities fixture, matching the Python

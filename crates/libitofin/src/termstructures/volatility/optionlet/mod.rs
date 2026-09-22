@@ -30,7 +30,7 @@ mod strippedoptionletbase;
 
 pub use constantoptionletvol::ConstantOptionletVolatility;
 pub use optionletstripper::{OptionletStripper, OptionletStripperCaches};
-pub use optionletstripper1::OptionletStripper1;
+pub use optionletstripper1::{OptionletStripper1, OptionletStripperOptions};
 pub use strippedoptionletadapter::StrippedOptionletAdapter;
 pub use strippedoptionletbase::StrippedOptionletBase;
 

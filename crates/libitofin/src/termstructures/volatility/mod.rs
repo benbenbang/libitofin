@@ -63,7 +63,8 @@ pub use localvolsurface::LocalVolSurface;
 pub use localvoltermstructure::LocalVolTermStructure;
 pub use optionlet::{
     ConstantOptionletVolatility, OptionletStripper, OptionletStripper1, OptionletStripperCaches,
-    OptionletVolatilityStructure, StrippedOptionletAdapter, StrippedOptionletBase,
+    OptionletStripperOptions, OptionletVolatilityStructure, StrippedOptionletAdapter,
+    StrippedOptionletBase,
 };
 pub use sabr::{sabr_volatility, unsafe_sabr_volatility, validate_sabr_parameters};
 pub use sabrsmilesection::SabrSmileSection;
