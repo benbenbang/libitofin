@@ -404,3 +404,88 @@ pub(crate) fn matrix_from_rows(rows: &[Vec<f64>]) -> PyResult<Matrix> {
     }
     Ok(matrix)
 }
+
+/// ATM cap term volatilities with live quotes and fixed or moving dates.
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "CapFloorTermVolCurve",
+    unsendable,
+    module = "itofin.termstructures"
+)]
+pub struct PyCapFloorTermVolCurve {
+    inner: Shared<libitofin::termstructures::volatility::CapFloorTermVolCurve>,
+}
+
+#[gen_stub_pymethods]
+#[pymethods]
+impl PyCapFloorTermVolCurve {
+    /// Build a fixed-reference ATM curve from retained live quotes.
+    #[new]
+    fn new(
+        reference_date: &PyDate,
+        calendar: &PyCalendar,
+        business_day_convention: &PyBusinessDayConvention,
+        option_tenors: Vec<PyRef<'_, PyPeriod>>,
+        volatilities: Vec<PyRef<'_, PySimpleQuote>>,
+        day_counter: &PyDayCounter,
+    ) -> PyResult<Self> {
+        Ok(Self {
+            inner: shared(
+                libitofin::termstructures::volatility::CapFloorTermVolCurve::with_reference_date(
+                    reference_date.inner(),
+                    calendar.inner(),
+                    business_day_convention.inner(),
+                    tenors(&option_tenors),
+                    volatilities.iter().map(|q| q.handle()).collect(),
+                    day_counter.inner(),
+                )
+                .map_err(PyQlError::from)?,
+            ),
+        })
+    }
+    /// Build a moving-reference ATM curve from retained live quotes.
+    #[staticmethod]
+    fn moving(
+        settlement_days: u32,
+        calendar: &PyCalendar,
+        business_day_convention: &PyBusinessDayConvention,
+        option_tenors: Vec<PyRef<'_, PyPeriod>>,
+        volatilities: Vec<PyRef<'_, PySimpleQuote>>,
+        day_counter: &PyDayCounter,
+        settings: &PySettings,
+    ) -> PyResult<Self> {
+        Ok(Self {
+            inner: shared(
+                libitofin::termstructures::volatility::CapFloorTermVolCurve::moving(
+                    settlement_days,
+                    calendar.inner(),
+                    business_day_convention.inner(),
+                    tenors(&option_tenors),
+                    volatilities.iter().map(|q| q.handle()).collect(),
+                    day_counter.inner(),
+                    settings.inner(),
+                )
+                .map_err(PyQlError::from)?,
+            ),
+        })
+    }
+    /// Return the ATM term volatility at a cap tenor.
+    #[pyo3(signature = (option_tenor, extrapolate = false))]
+    fn volatility(&self, option_tenor: &PyPeriod, extrapolate: bool) -> PyResult<f64> {
+        Ok(self
+            .inner
+            .volatility_tenor(option_tenor.inner(), 0.0, extrapolate)
+            .map_err(PyQlError::from)?)
+    }
+    /// Return the node times measured from the current reference date.
+    fn option_times(&self) -> PyResult<Vec<f64>> {
+        Ok(self.inner.option_times().map_err(PyQlError::from)?)
+    }
+}
+impl PyCapFloorTermVolCurve {
+    pub(crate) fn inner(
+        &self,
+    ) -> Shared<libitofin::termstructures::volatility::CapFloorTermVolCurve> {
+        Shared::clone(&self.inner)
+    }
+}

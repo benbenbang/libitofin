@@ -20,8 +20,9 @@
 //! calendar, as for the constant swaption surface.
 
 use crate::PyQlError;
-use crate::capfloortermvol::PyCapFloorTermVolSurface;
+use crate::capfloortermvol::{PyCapFloorTermVolCurve, PyCapFloorTermVolSurface};
 use crate::curve::PyYieldTermStructure;
+use crate::helpers::PyOvernightIndex;
 use crate::hullwhite::PyIborIndex;
 use crate::market::PySimpleQuote;
 use crate::settings::PySettings;
@@ -30,8 +31,8 @@ use crate::time::{PyBusinessDayConvention, PyCalendar, PyDate, PyDayCounter, PyP
 use libitofin::handle::Handle;
 use libitofin::shared::{Shared, shared};
 use libitofin::termstructures::volatility::{
-    ConstantOptionletVolatility, OptionletStripper1, OptionletVolatilityStructure,
-    StrippedOptionletAdapter, StrippedOptionletBase,
+    ConstantOptionletVolatility, OptionletStripper1, OptionletStripper2, OptionletStripperOptions,
+    OptionletVolatilityStructure, SmileSection, StrippedOptionletAdapter, StrippedOptionletBase,
 };
 use libitofin::termstructures::yieldtermstructure::YieldTermStructure;
 use pyo3::prelude::*;
@@ -59,6 +60,57 @@ pub struct PyOptionletVolatilityStructure {
 #[gen_stub_pymethods]
 #[pymethods]
 impl PyOptionletVolatilityStructure {
+    /// Snapshot the volatility smile at an option time.
+    #[pyo3(signature = (option_time, extrapolate = false))]
+    fn smile_section(
+        &self,
+        option_time: f64,
+        extrapolate: bool,
+    ) -> PyResult<PyOptionletSmileSection> {
+        Ok(PyOptionletSmileSection {
+            inner: self
+                .inner
+                .current_link()
+                .map_err(PyQlError::from)?
+                .smile_section(option_time, extrapolate)
+                .map_err(PyQlError::from)?,
+        })
+    }
+
+    /// Snapshot the volatility smile at an option date.
+    #[pyo3(signature = (option_date, extrapolate = false))]
+    fn smile_section_date(
+        &self,
+        option_date: &PyDate,
+        extrapolate: bool,
+    ) -> PyResult<PyOptionletSmileSection> {
+        Ok(PyOptionletSmileSection {
+            inner: self
+                .inner
+                .current_link()
+                .map_err(PyQlError::from)?
+                .smile_section_date(option_date.inner(), extrapolate)
+                .map_err(PyQlError::from)?,
+        })
+    }
+
+    /// Snapshot the volatility smile at an option tenor.
+    #[pyo3(signature = (option_tenor, extrapolate = false))]
+    fn smile_section_tenor(
+        &self,
+        option_tenor: &PyPeriod,
+        extrapolate: bool,
+    ) -> PyResult<PyOptionletSmileSection> {
+        Ok(PyOptionletSmileSection {
+            inner: self
+                .inner
+                .current_link()
+                .map_err(PyQlError::from)?
+                .smile_section_tenor(option_tenor.inner(), extrapolate)
+                .map_err(PyQlError::from)?,
+        })
+    }
+
     /// Return the caplet volatility for an option tenor and strike.
     ///
     /// Args:
@@ -458,8 +510,7 @@ impl PyConstantOptionletVolatility {
 ///
 /// term_vol_surface must come from CapFloorTermVolSurface.moving or
 /// moving_with_quotes; a pinned-reference surface carries no settlement days
-/// and fails the adapter. VolatilityType.Normal is deferred (#440/#577) and
-/// fails at the strip, not at construction.
+/// and fails the adapter. Normal and shifted-lognormal quotes are supported.
 #[gen_stub_pyclass]
 #[pyclass(
     name = "OptionletStripper1",
@@ -467,7 +518,7 @@ impl PyConstantOptionletVolatility {
     module = "itofin.termstructures"
 )]
 pub struct PyOptionletStripper1 {
-    inner: Shared<OptionletStripper1>,
+    pub(crate) inner: Shared<OptionletStripper1>,
 }
 
 #[gen_stub_pymethods]
@@ -484,8 +535,7 @@ impl PyOptionletStripper1 {
     ///         volatilities; it must be one of the moving forms, a
     ///         pinned-reference surface carrying no settlement days.
     ///     ibor_index (IborIndex): The index the caplets fix off.
-    ///     volatility_type (VolatilityType): The quoting convention; Normal is
-    ///         deferred and fails at the strip, not here.
+    ///     volatility_type (VolatilityType): Normal or shifted-lognormal quotes.
     ///     accuracy (float): The tolerance of the implied-volatility solve.
     ///     max_iter (int): The iteration cap of that solve.
     ///     displacement (float): The lognormal shift applied to forwards and
@@ -500,7 +550,7 @@ impl PyOptionletStripper1 {
     ///         index or the solve parameters.
     #[new]
     #[allow(clippy::too_many_arguments)]
-    #[pyo3(signature = (term_vol_surface, ibor_index, volatility_type, accuracy = 1e-6, max_iter = 100, displacement = 0.0, discount = None, optionlet_frequency = None))]
+    #[pyo3(signature = (term_vol_surface, ibor_index, volatility_type, accuracy = 1e-6, max_iter = 100, displacement = 0.0, discount = None, optionlet_frequency = None, switch_strike = None, dont_throw = false))]
     fn new(
         term_vol_surface: &PyCapFloorTermVolSurface,
         ibor_index: &PyIborIndex,
@@ -510,6 +560,8 @@ impl PyOptionletStripper1 {
         displacement: f64,
         discount: Option<&PyYieldTermStructure>,
         optionlet_frequency: Option<&PyPeriod>,
+        switch_strike: Option<f64>,
+        dont_throw: bool,
     ) -> PyResult<Self> {
         let discount = match discount {
             Some(curve) => curve.handle(),
@@ -517,7 +569,7 @@ impl PyOptionletStripper1 {
         };
         Ok(PyOptionletStripper1 {
             inner: shared(
-                OptionletStripper1::new(
+                OptionletStripper1::new_with_options(
                     term_vol_surface.inner(),
                     ibor_index.inner(),
                     discount,
@@ -526,6 +578,47 @@ impl PyOptionletStripper1 {
                     volatility_type.inner(),
                     displacement,
                     optionlet_frequency.map(|period| period.inner()),
+                    OptionletStripperOptions {
+                        switch_strike,
+                        dont_throw,
+                    },
+                )
+                .map_err(PyQlError::from)?,
+            ),
+        })
+    }
+
+    /// Build an overnight stripper with an explicit optionlet frequency.
+    #[staticmethod]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (term_vol_surface, overnight_index, volatility_type, optionlet_frequency, accuracy = 1e-6, max_iter = 100, displacement = 0.0, discount = None, switch_strike = None, dont_throw = false))]
+    fn overnight(
+        term_vol_surface: &PyCapFloorTermVolSurface,
+        overnight_index: &PyOvernightIndex,
+        volatility_type: PyVolatilityType,
+        optionlet_frequency: &PyPeriod,
+        accuracy: f64,
+        max_iter: u32,
+        displacement: f64,
+        discount: Option<&PyYieldTermStructure>,
+        switch_strike: Option<f64>,
+        dont_throw: bool,
+    ) -> PyResult<Self> {
+        Ok(Self {
+            inner: shared(
+                OptionletStripper1::new_overnight(
+                    term_vol_surface.inner(),
+                    overnight_index.inner(),
+                    discount.map_or_else(Handle::empty, PyYieldTermStructure::handle),
+                    accuracy,
+                    max_iter,
+                    volatility_type.inner(),
+                    displacement,
+                    Some(optionlet_frequency.inner()),
+                    OptionletStripperOptions {
+                        switch_strike,
+                        dont_throw,
+                    },
                 )
                 .map_err(PyQlError::from)?,
             ),
@@ -541,8 +634,7 @@ impl PyOptionletStripper1 {
     ///     float: The switch strike.
     ///
     /// Raises:
-    ///     ItofinError: On a stripping failure, which a Normal volatility_type
-    ///         always is.
+    ///     ItofinError: On a stripping failure.
     fn switch_strike(&self) -> PyResult<f64> {
         Ok(self.inner.switch_strike().map_err(PyQlError::from)?)
     }
@@ -561,7 +653,7 @@ impl PyOptionletStripper1 {
 
 impl PyOptionletStripper1 {
     /// The wrapped stripper, erased to the trait the adapter takes.
-    fn erased(&self) -> Shared<dyn StrippedOptionletBase> {
+    pub(crate) fn erased(&self) -> Shared<dyn StrippedOptionletBase> {
         Shared::clone(&self.inner) as Shared<dyn StrippedOptionletBase>
     }
 }
@@ -601,12 +693,21 @@ impl PyStrippedOptionletAdapter {
     #[gen_stub(override_return_type(type_repr = "StrippedOptionletAdapter"))]
     #[new]
     fn new(
-        stripper: &PyOptionletStripper1,
+        #[gen_stub(override_type(type_repr = "OptionletStripper1 | OptionletStripper2"))]
+        stripper: &Bound<'_, PyAny>,
         settings: &PySettings,
     ) -> PyResult<PyClassInitializer<Self>> {
+        let stripped = if let Ok(value) = stripper.extract::<PyRef<'_, PyOptionletStripper1>>() {
+            value.erased()
+        } else if let Ok(value) = stripper.extract::<PyRef<'_, PyOptionletStripper2>>() {
+            Shared::clone(&value.inner) as Shared<dyn StrippedOptionletBase>
+        } else {
+            return Err(pyo3::exceptions::PyTypeError::new_err(
+                "expected OptionletStripper1 or OptionletStripper2",
+            ));
+        };
         let adapter = shared(
-            StrippedOptionletAdapter::new(stripper.erased(), settings.inner())
-                .map_err(PyQlError::from)?,
+            StrippedOptionletAdapter::new(stripped, settings.inner()).map_err(PyQlError::from)?,
         ) as Shared<dyn OptionletVolatilityStructure>;
         Ok(
             PyClassInitializer::from(PyOptionletVolatilityStructure::from_handle(Handle::new(
@@ -614,5 +715,74 @@ impl PyStrippedOptionletAdapter {
             )))
             .add_subclass(PyStrippedOptionletAdapter),
         )
+    }
+}
+
+/// A snapshot of one optionlet expiry's volatility smile.
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "OptionletSmileSection",
+    unsendable,
+    module = "itofin.termstructures"
+)]
+pub struct PyOptionletSmileSection {
+    inner: Shared<dyn SmileSection>,
+}
+
+#[gen_stub_pymethods]
+#[pymethods]
+impl PyOptionletSmileSection {
+    /// Return volatility at a strike.
+    fn volatility(&self, strike: f64) -> PyResult<f64> {
+        Ok(self.inner.volatility(strike).map_err(PyQlError::from)?)
+    }
+    /// Return variance at a strike.
+    fn variance(&self, strike: f64) -> PyResult<f64> {
+        Ok(self.inner.variance(strike).map_err(PyQlError::from)?)
+    }
+    /// Return the exercise time.
+    fn exercise_time(&self) -> f64 {
+        self.inner.exercise_time()
+    }
+}
+
+/// Correct a stripped lognormal grid to ATM cap term volatilities.
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "OptionletStripper2",
+    unsendable,
+    module = "itofin.termstructures"
+)]
+pub struct PyOptionletStripper2 {
+    inner: Shared<OptionletStripper2>,
+}
+
+#[gen_stub_pymethods]
+#[pymethods]
+impl PyOptionletStripper2 {
+    /// Retain the first-stage stripper and live ATM curve.
+    #[new]
+    fn new(stripper: &PyOptionletStripper1, atm_curve: &PyCapFloorTermVolCurve) -> PyResult<Self> {
+        Ok(Self {
+            inner: shared(
+                OptionletStripper2::new(Shared::clone(&stripper.inner), atm_curve.inner())
+                    .map_err(PyQlError::from)?,
+            ),
+        })
+    }
+    /// Return the calibrated additive volatility spreads.
+    fn spreads_vol(&self) -> PyResult<Vec<f64>> {
+        Ok(self.inner.spreads_vol().map_err(PyQlError::from)?)
+    }
+    /// Return the ATM cap strikes.
+    fn atm_cap_floor_strikes(&self) -> PyResult<Vec<f64>> {
+        Ok(self
+            .inner
+            .atm_cap_floor_strikes()
+            .map_err(PyQlError::from)?)
+    }
+    /// Return the target ATM cap prices.
+    fn atm_cap_floor_prices(&self) -> PyResult<Vec<f64>> {
+        Ok(self.inner.atm_cap_floor_prices().map_err(PyQlError::from)?)
     }
 }
