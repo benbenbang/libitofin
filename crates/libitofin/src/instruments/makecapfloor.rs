@@ -30,9 +30,8 @@
 //!
 //! ## Divergences from QuantLib
 //!
-//! - The strike is a required [`Rate`]; the C++ `Null<Rate>` sentinel that
-//!   triggers an ATM fill off the engine's discount curve
-//!   (`makecapfloor.cpp:63-88`) is deferred to #577.
+//! - The strike is explicit. The ATM stripping correction computes it through
+//!   `CapFloor::atm_rate` before calling this builder.
 //! - Only [`with_pricing_engine`](Self::with_pricing_engine) is ported. The other
 //!   `with*` knobs (`withNominal`, `withEffectiveDate`, `withTenor`, the schedule
 //!   overrides) and `asOptionlet` are omitted: the optionlet stripper and its

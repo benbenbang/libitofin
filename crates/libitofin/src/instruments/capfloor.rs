@@ -9,20 +9,13 @@
 //!
 //! ## Leg shape
 //!
-//! C++ holds a generic `Leg` of `FloatingRateCoupon`s and, in `setupArguments`,
-//! `dynamic_pointer_cast`s each flow back to a `FloatingRateCoupon`. The port
-//! cannot downcast an erased [`Leg`](crate::cashflow::Leg), and the par/indexed
-//! forecast that drives the cached price lives only on the concrete
-//! [`IborCoupon`] (its mode-aware [`rate`](crate::cashflows::coupon::Coupon::rate)),
-//! not on the base `FloatingRateCoupon`. So [`CapFloor`] holds concrete
-//! `Vec<Shared<IborCoupon>>`, the same choice [`IborLeg::coupons`] makes for the
-//! same reason. The forward the engine prices from is the coupon's adjusted
-//! fixing `(rate - spread) / gearing`, read off the mode-aware rate.
+//! Ibor and overnight constructors retain their concrete coupons. Both feed the
+//! same engine arguments using `(rate - spread) / gearing`; overnight coupons
+//! supply their last fixing date. Legacy Ibor coupon inspectors remain unchanged.
 //!
 //! ## Divergences from QuantLib
 //!
-//! - The generic `Leg`/`FloatingRateCoupon` surface becomes the concrete
-//!   `IborCoupon`, as above; the fixture only ever builds ibor legs.
+//! - Arbitrary user-defined floating coupon types are not accepted.
 //! - [`MakeCapFloor`](super::MakeCapFloor) builds the market cap/floor and
 //!   [`CapFloor::last_floating_rate_coupon`] exposes the trailing coupon the
 //!   optionlet stripper reads; `optionlet`, `impliedVolatility` and `deepUpdate`
@@ -37,7 +30,7 @@
 use std::any::Any;
 
 use crate::cashflow::{CashFlow, Leg};
-use crate::cashflows::{CashFlows, Coupon, IborCoupon};
+use crate::cashflows::{CashFlows, Coupon, IborCoupon, OvernightIndexedCoupon};
 use crate::errors::QlResult;
 use crate::event::Event;
 use crate::instrument::{Instrument, InstrumentBase};
@@ -109,11 +102,12 @@ impl Arguments for CapFloorArguments {
     }
 }
 
-/// A cap, floor or collar over a floating (ibor) leg.
+/// A cap, floor or collar over an Ibor or overnight leg.
 pub struct CapFloor {
     base: InstrumentBase,
     cap_floor_type: CapFloorType,
     coupons: Vec<Shared<IborCoupon>>,
+    overnight_coupons: Vec<Shared<OvernightIndexedCoupon>>,
     cap_rates: Vec<Rate>,
     floor_rates: Vec<Rate>,
     settings: Shared<Settings<Date>>,
@@ -157,10 +151,45 @@ impl CapFloor {
             base,
             cap_floor_type,
             coupons,
+            overnight_coupons: Vec::new(),
             cap_rates,
             floor_rates,
             settings,
         })
+    }
+
+    /// Cap, floor or collar over retained overnight coupons.
+    ///
+    /// Engine arguments use each coupon's last fixing date and averaged rate,
+    /// matching QuantLib's generic floating-coupon cap/floor path.
+    pub fn from_overnight(
+        kind: CapFloorType,
+        coupons: Vec<Shared<OvernightIndexedCoupon>>,
+        cap_rates: Vec<Rate>,
+        floor_rates: Vec<Rate>,
+        settings: Shared<Settings<Date>>,
+    ) -> QlResult<Self> {
+        let mut result = Self::new(kind, Vec::new(), cap_rates, floor_rates, settings)?;
+        if result.cap_rates.len() < coupons.len()
+            && let Some(&last) = result.cap_rates.last()
+        {
+            result.cap_rates.resize(coupons.len(), last);
+        }
+        if result.floor_rates.len() < coupons.len()
+            && let Some(&last) = result.floor_rates.last()
+        {
+            result.floor_rates.resize(coupons.len(), last);
+        }
+        for coupon in &coupons {
+            result.base.register_with(coupon.observable());
+        }
+        result.overnight_coupons = coupons;
+        Ok(result)
+    }
+
+    /// Overnight coupons; empty on a legacy Ibor-leg cap/floor.
+    pub fn overnight_coupons(&self) -> &[Shared<OvernightIndexedCoupon>] {
+        &self.overnight_coupons
     }
 
     /// A cap over `coupons` struck at `strikes` (the C++ `Cap`).
@@ -213,6 +242,11 @@ impl CapFloor {
         &self.floor_rates
     }
 
+    /// Number of Ibor or overnight coupons in the instrument.
+    pub fn coupon_count(&self) -> usize {
+        self.coupons.len() + self.overnight_coupons.len()
+    }
+
     /// The floating coupons.
     pub fn coupons(&self) -> &[Shared<IborCoupon>] {
         &self.coupons
@@ -255,6 +289,11 @@ impl CapFloor {
         self.coupons
             .iter()
             .map(|coupon| Shared::clone(coupon) as Shared<dyn CashFlow>)
+            .chain(
+                self.overnight_coupons
+                    .iter()
+                    .map(|coupon| Shared::clone(coupon) as Shared<dyn CashFlow>),
+            )
             .collect()
     }
 }
@@ -269,7 +308,7 @@ impl Instrument for CapFloor {
     }
 
     fn is_expired(&self) -> QlResult<bool> {
-        for coupon in self.coupons.iter().rev() {
+        for coupon in self.cash_flows().iter().rev() {
             if !coupon.has_occurred(&self.settings, None, None)? {
                 return Ok(false);
             }
@@ -286,7 +325,7 @@ impl Instrument for CapFloor {
             None => fail!("no evaluation date set: a cap/floor needs a reference date"),
         };
 
-        let n = self.coupons.len();
+        let n = self.coupons.len() + self.overnight_coupons.len();
         args.cap_floor_type = Some(self.cap_floor_type);
         args.start_dates = Vec::with_capacity(n);
         args.fixing_dates = Vec::with_capacity(n);
@@ -307,13 +346,30 @@ impl Instrument for CapFloor {
             CapFloorType::Floor | CapFloorType::Collar
         );
 
-        for (i, coupon) in self.coupons.iter().enumerate() {
-            let spread = coupon.spread();
-            let gearing = coupon.gearing();
-            let end_date = coupon.date();
-
+        let coupons = self
+            .coupons
+            .iter()
+            .map(|c| {
+                (
+                    c.as_ref() as &dyn Coupon,
+                    c.fixing_date(),
+                    c.spread(),
+                    c.gearing(),
+                    c.date(),
+                )
+            })
+            .chain(self.overnight_coupons.iter().map(|c| {
+                (
+                    c.as_ref() as &dyn Coupon,
+                    c.fixing_date(),
+                    c.spread(),
+                    c.gearing(),
+                    c.date(),
+                )
+            }));
+        for (i, (coupon, fixing_date, spread, gearing, end_date)) in coupons.enumerate() {
             args.start_dates.push(coupon.accrual_start_date());
-            args.fixing_dates.push(coupon.fixing_date());
+            args.fixing_dates.push(fixing_date);
             args.end_dates.push(end_date);
             args.accrual_times.push(coupon.accrual_period());
             args.nominals.push(coupon.nominal());

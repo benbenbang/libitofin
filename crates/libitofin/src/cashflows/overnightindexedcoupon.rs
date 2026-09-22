@@ -179,6 +179,11 @@ impl OvernightIndexedCoupon {
         self.base.spread()
     }
 
+    /// The gearing applied to the averaged overnight rate.
+    pub fn gearing(&self) -> Real {
+        self.base.gearing()
+    }
+
     /// The date the coupon is fully determined: the last fixing date
     /// (`fixingDate`, overriding the base).
     pub fn fixing_date(&self) -> Date {

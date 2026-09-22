@@ -23,10 +23,11 @@
 use crate::PyQlError;
 use crate::capfloorengine::{PyBachelierCapFloorEngine, PyBlackCapFloorEngine};
 use crate::cashflows::PyIborLeg;
+use crate::helpers::PyOvernightIndex;
 use crate::hullwhite::PyIborIndex;
 use crate::results::Results;
 use crate::settings::PySettings;
-use crate::time::PyPeriod;
+use crate::time::{PyBusinessDayConvention, PyPeriod, PySchedule};
 use libitofin::instrument::Instrument;
 use libitofin::instruments::{CapFloor, CapFloorType, MakeCapFloor};
 use pyo3::prelude::*;
@@ -210,6 +211,45 @@ impl PyCapFloor {
         })
     }
 
+    /// Build a cap, floor or collar on a compounded overnight schedule.
+    /// Uses the index day counter; payment lag and adjustment are configurable.
+    #[allow(clippy::too_many_arguments)]
+    #[staticmethod]
+    #[pyo3(signature = (kind, schedule, index, cap_rates, floor_rates, settings, nominal = 1.0, payment_lag = 0, payment_adjustment = PyBusinessDayConvention::Following))]
+    fn overnight(
+        kind: PyCapFloorType,
+        schedule: &PySchedule,
+        index: &PyOvernightIndex,
+        cap_rates: Vec<f64>,
+        floor_rates: Vec<f64>,
+        settings: &PySettings,
+        nominal: f64,
+        payment_lag: i32,
+        payment_adjustment: PyBusinessDayConvention,
+    ) -> PyResult<Self> {
+        if !nominal.is_finite() || cap_rates.iter().chain(&floor_rates).any(|v| !v.is_finite()) {
+            return Err(crate::ItofinError::new_err(
+                "nominal and strikes must be finite",
+            ));
+        }
+        let coupons = libitofin::cashflows::OvernightLeg::new(schedule.inner(), index.inner())
+            .with_notional(nominal)
+            .with_payment_lag(payment_lag)
+            .with_payment_adjustment(payment_adjustment.inner())
+            .coupons()
+            .map_err(PyQlError::from)?;
+        Ok(Self {
+            inner: CapFloor::from_overnight(
+                kind.inner(),
+                coupons,
+                cap_rates,
+                floor_rates,
+                settings.inner(),
+            )
+            .map_err(PyQlError::from)?,
+        })
+    }
+
     /// Return the cap strikes, one per coupon.
     ///
     /// Returns:
@@ -231,7 +271,7 @@ impl PyCapFloor {
     /// Returns:
     ///     int: One per floating coupon on the leg.
     fn coupon_count(&self) -> usize {
-        self.inner.coupons().len()
+        self.inner.coupon_count()
     }
 
     /// Attach a Black engine, pricing each optionlet off a volatility surface.
