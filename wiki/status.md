@@ -61,6 +61,24 @@ accrual start; Rust's discretized asset also supports known historical fixings.
 Other short-rate models remain outside this concrete engine's API (#466).
 See the [independent oracles](../crates/libitofin/tests/fixtures/tree_capfloor/README.md).
 
+## Optionlet stripping
+
+Unreleased [#577](https://github.com/benbenbang/libitofin/issues/577) adds normal
+and non-flat stripping, fixed/floating switch strikes, ATM correction through
+`OptionletStripper2`, and optionlet smile snapshots in Rust, Python, C and Go.
+ATM curves retain live quotes with fixed or moving reference dates. Surface
+volatility interpolation remains linear; adapter smiles use cubic interpolation.
+
+`dontThrow` substitutes zero only for failed implied-volatility inversions;
+invalid market data and pricing errors still propagate. Stripper2 uses Black
+pricing and rejects normal inputs. The typed overnight constructor requires an
+optionlet frequency and follows QuantLib's daily Ibor cap construction. Separate
+`CapFloor.overnight` constructors price actual compounded overnight legs; flat
+and stripped normal-volatility prices have independent QuantLib checks at `2.5e-8`.
+The upstream overnight test compares the same adapter twice, so the extracted
+surface also has an [independent overnight oracle](../crates/libitofin/tests/fixtures/optionlet_stripping/overnight_oracle.py).
+See [binding evidence](../docs/go-binding-test-gaps.md) for lifecycle tests and scope.
+
 ## Credit extensions
 
 - [#1023](https://github.com/benbenbang/libitofin/issues/1023): spread and upfront
