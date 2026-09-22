@@ -1,6 +1,7 @@
 //! Boundary tests use public QuantLib/core oracle conventions, without Python.
 use crate::boundary::*;
 use crate::stripper_api::*;
+use crate::stripper_completion_api::*;
 use crate::volcube_api::*;
 use libitofin::currency::Currency;
 use libitofin::handle::Handle;
@@ -87,6 +88,156 @@ fn optionlet_boundary_round_trips_caps_and_rejects_bad_buffers() {
                 std::ptr::null_mut()
             ),
             0
+        );
+        let mut extended = ItofinOptionletStripperConfig {
+            surface: surface_id,
+            index: index_id,
+            discount: 0,
+            volatility_type: 0,
+            accuracy: 1e-6,
+            max_iterations: 100,
+            displacement: 0.0,
+            frequency_length: 6,
+            frequency_unit: 2,
+            has_frequency: 0,
+            switch_strike: 0.03,
+            has_switch_strike: 1,
+            dont_throw: 0,
+            overnight: 0,
+        };
+        let mut extended_id = 0;
+        assert_eq!(
+            itofin_optionlet_stripper_new_with_options(
+                &mut c,
+                &extended,
+                &mut extended_id,
+                std::ptr::null_mut()
+            ),
+            0
+        );
+        let mut fixed_switch = 0.0;
+        assert_eq!(
+            itofin_optionlet_stripper_switch_strike(
+                &mut c,
+                extended_id,
+                &mut fixed_switch,
+                std::ptr::null_mut()
+            ),
+            0
+        );
+        assert_eq!(fixed_switch, 0.03);
+        for flag in 0..4 {
+            match flag {
+                0 => extended.has_frequency = 2,
+                1 => extended.has_switch_strike = 2,
+                2 => extended.dont_throw = 2,
+                _ => extended.overnight = 2,
+            }
+            assert_eq!(
+                itofin_optionlet_stripper_new_with_options(
+                    &mut c,
+                    &extended,
+                    &mut extended_id,
+                    std::ptr::null_mut()
+                ),
+                INVALID_ARGUMENT
+            );
+            extended.has_frequency = 0;
+            extended.has_switch_strike = 1;
+            extended.dont_throw = 0;
+            extended.overnight = 0;
+        }
+        extended.index = surface_id;
+        assert_ne!(
+            itofin_optionlet_stripper_new_with_options(
+                &mut c,
+                &extended,
+                &mut extended_id,
+                std::ptr::null_mut()
+            ),
+            0
+        );
+        extended.index = index_id;
+        extended.volatility_type = 7;
+        assert_eq!(
+            itofin_optionlet_stripper_new_with_options(
+                &mut c,
+                &extended,
+                &mut extended_id,
+                std::ptr::null_mut()
+            ),
+            INVALID_ARGUMENT
+        );
+        let atm = shared(
+            CapFloorTermVolCurve::moving(
+                0,
+                Target::new(),
+                BDC::Following,
+                vec![
+                    Period::new(1, TimeUnit::Years),
+                    Period::new(3, TimeUnit::Years),
+                ],
+                vec![
+                    make_quote_handle(0.2).handle(),
+                    make_quote_handle(0.2).handle(),
+                ],
+                Actual365Fixed::new(),
+                settings.clone(),
+            )
+            .unwrap(),
+        );
+        let atm_id = c.insert(atm).unwrap();
+        let mut size = 0;
+        assert_eq!(
+            itofin_optionlet_completion_values(
+                &mut c,
+                atm_id,
+                0,
+                std::ptr::null_mut(),
+                0,
+                &mut size,
+                std::ptr::null_mut()
+            ),
+            0
+        );
+        assert_eq!(size, 2);
+        let mut times = [0.0; 2];
+        assert_eq!(
+            itofin_optionlet_completion_values(
+                &mut c,
+                atm_id,
+                0,
+                times.as_mut_ptr(),
+                1,
+                &mut size,
+                std::ptr::null_mut()
+            ),
+            INVALID_ARGUMENT
+        );
+        assert_eq!(
+            itofin_optionlet_completion_values(
+                &mut c,
+                atm_id,
+                0,
+                times.as_mut_ptr(),
+                2,
+                &mut size,
+                std::ptr::null_mut()
+            ),
+            0
+        );
+        assert!(times[0] > 0.0 && times[1] > times[0]);
+        assert_eq!(
+            itofin_optionlet_completion_values(
+                &mut c,
+                atm_id,
+                99,
+                times.as_mut_ptr(),
+                2,
+                &mut size,
+                std::ptr::null_mut()
+            ),
+            INVALID_ARGUMENT
         );
         let mut n = 0;
         assert_eq!(
