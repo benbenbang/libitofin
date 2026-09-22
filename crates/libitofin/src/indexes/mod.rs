@@ -27,3 +27,6 @@ pub use inflationindex::{
 pub use interestrateindex::{InterestRateIndex, InterestRateIndexBase};
 pub use region::Region;
 pub use swapindex::SwapIndex;
+
+pub mod bmaindex;
+pub use bmaindex::BMAIndex;
