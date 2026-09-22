@@ -45,6 +45,8 @@ print(native.itofin_abi_version())
 PYTHON
 )
 cp LICENSE "$package/"
+mkdir -p "$package/licenses/libitofin"
+cp crates/libitofin/{THIRD_PARTY_NOTICES.md,QUANTLIB_LICENSE.txt} "$package/licenses/libitofin/"
 {
   printf 'version=%s\nabi=%s\nplatform=%s\n' "$version" "$abi" "$platform"
   printf 'revision=%s\n' "$(git rev-parse HEAD)"
@@ -52,11 +54,12 @@ cp LICENSE "$package/"
 } > "$package/VERSION"
 (
   cd "$package"
-  shasum -a 256 include/itofin.h "lib/$library" LICENSE VERSION > SHA256SUMS
+  shasum -a 256 include/itofin.h "lib/$library" LICENSE VERSION licenses/libitofin/* > SHA256SUMS
 )
 COPYFILE_DISABLE=1 tar -czf "$output/$name.tar.gz" -C "$stage" "$name"
 (
   cd "$output"
   shasum -a 256 "$name.tar.gz" > "$name.tar.gz.sha256"
 )
+python3 scripts/check_release_attribution.py "$output/$name.tar.gz" >&2
 printf '%s\n' "$output/$name.tar.gz"

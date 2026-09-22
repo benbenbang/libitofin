@@ -69,7 +69,7 @@ repos:
           entry: python -m unittest discover -s scripts -p test_*release*.py
           language: python
           language_version: python3.13
-          files: ^(scripts/.*release.*|\.releaserc\.json$|\.github/workflows/(semantic-release|go-(release|package))\.yml$)
+          files: ^(crates/libitofin/(THIRD_PARTY_NOTICES\.md|QUANTLIB_LICENSE\.txt)$|crates/itofin-py/python/itofin/licenses/|scripts/.*release.*|\.releaserc\.json$|\.github/workflows/(semantic-release|go-(release|package))\.yml$)
           pass_filenames: false
         - id: validate-commit-msg
           name: commit message is valid
