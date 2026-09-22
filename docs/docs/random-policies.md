@@ -1,6 +1,6 @@
 # Random generation policies
 
-The next release adds European QMC pricing across Rust, Python, C and Go.
+Version 0.27.0 adds European QMC pricing across Rust, Python, C and Go.
 Rust uses `MakeMcEuropeanEngine::<LowDiscrepancy>`; Python and Go expose
 `QMCEuropeanEngine`, and the C engine factory selects kind 3. All use
 Sobol/Jaeckel points transformed to standard normal variates. Supply positive

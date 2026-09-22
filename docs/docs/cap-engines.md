@@ -1,7 +1,7 @@
 # Normal and lattice cap/floor pricing
 
-The development version adds `BachelierCapFloorEngine`, `TreeCapFloorEngine`, and
-`CapHelper` in Rust, Python and Go. These additions await the next release.
+Version 0.27.0 adds `BachelierCapFloorEngine`, `TreeCapFloorEngine`, and
+`CapHelper` in Rust, Python and Go.
 
 Use the Bachelier engine for normal volatility, including negative rates and
 strikes. Volatility is expressed in absolute rate units: `0.01` means 100 basis
