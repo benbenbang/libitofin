@@ -12,6 +12,10 @@ This inventory does not claim exhaustive QuantLib product coverage.
 | LSM basis selection and rejection, latest-only American, date-only Bermudan QuantLib oracles, retained inputs and quote recovery | `TestMCAmericanBasisAndLatestOnly`, `TestMCBermudanRetentionUpdatesAndErrors`, `TestMCBermudanQuantLibOracles` |
 | COS/exponential Heston engines: four COS prices at `1e-10`, 88 fitted-quadrature prices at `1e-8`, six control variates, retained inputs, invalid options and live-model calibration | `TestCosHestonQuantLibRetentionAndErrors`, `TestExponentialFittingHestonQuantLibGrid`, `TestExponentialFittingHestonVariatesAndErrors`, `TestAlternativeHestonCalibrationAndLiveModel` |
 | BMA ten-tenor QuantLib curve/swap/coupon values, weekly holidays, live quotes/history, recovery and cold retained ownership | `TestBMAQuantLibCurveSwapCouponAndHolidayOracles`, `TestBMAUpdatesHistoryRecoveryAndColdRetention`, `TestBMANilForeignSessionAndInvalidConstructors` |
+| Normal non-flat optionlet stripping, independent ATM corrections, fixed/moving quote curves, off-node cubic smiles and retained adapters | `TestOptionletStripperCompletion` |
+| Overnight stripping constructor/frequency and retained inputs, inversion fallback, foreign-session and nil rejection | `TestOptionletStripperOvernightAndFallback` |
+| Actual compounded overnight cap prices with flat and stripped normal volatility, coupon counts and retained inputs | `TestOvernightCapFloorOracle` |
+| Retained cap quote/date observations, moving maximum-date bounds and invalid-discount recovery with fallback enabled | `TestOptionletStripperRetainedCapRecovery` |
 | Custom pillars: independent QuantLib helper dates and curve values, invalid bounds, retained inputs and date recovery | `TestCustomYieldPillarsQuantLibAndRecovery`, `TestCustomInflationPillarsQuantLib`, `TestCustomFraOverloadsAndSwapDiscount` |
 | Overnight futures: both accrual conventions, holiday clipping, live convexity/fixings, expiry and released inputs at `1e-9` | `TestOvernightFutureQuantLibAccrualAndRetention`, `TestSofrFutureBootstrapAndCustomPillars` |
 | Hull-White Bermudan tree, six indexed/par QuantLib cached prices, bumped-quote oracle, retained inputs and invalid-input recovery | [Tree swaption tests](../sdk/go/tree_swaption_test.go) |
@@ -74,6 +78,16 @@ invalidates and rebootstraps the same fitted curve in Rust, Python and Go.
 
 Sources and fixtures live in [`sdk/go/testdata`](../sdk/go/testdata/):
 
+- [Optionlet stripping oracle](../crates/libitofin/tests/fixtures/optionlet_stripping/oracle.cpp):
+  QuantLib 1.43 runtime with 1.43-dev headers; the companion `extract.py` preserves
+  the vendored upstream non-flat matrices. Binding cap prices retain `2.5e-8`;
+  independent ATM prices, strikes and spreads are pinned separately from cap
+  repricing. The off-node cubic smile uses `1e-10`; spread estimates use `1e-7`.
+  The vendored overnight test constructs both adapters from the same stripper,
+  so that self-comparison is not evidence of overnight/Ibor equivalence. Separate
+  actual overnight-cap prices use independent QuantLib expectations at `2.5e-8`;
+  the [overnight generator](../crates/libitofin/tests/fixtures/optionlet_stripping/overnight_oracle.py)
+  also checks the extracted upstream overnight surface against a compounded leg.
 - `credit_completion_oracle.py` and `rates_completion_oracle.py`: QuantLib 1.43;
   CDS prices retain 1e-8 and fair quotes 1e-12; rate discounts retain 1e-12.
 - `credit_jumps_oracle.cpp`: QuantLib 1.43; strict-boundary survival retains 1e-15.
