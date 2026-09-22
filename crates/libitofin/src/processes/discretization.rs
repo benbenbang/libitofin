@@ -29,7 +29,7 @@ use crate::require;
 use crate::shared::{Shared, shared};
 use crate::stochasticprocess::{StochasticProcess, StochasticProcess1D};
 use crate::time::date::Date;
-use crate::types::{Real, Time};
+use crate::types::{Real, Size, Time};
 
 fn finite(value: Real) -> QlResult<Real> {
     require!(
@@ -45,6 +45,30 @@ fn step(t: Time, dt: Time) -> QlResult<()> {
         "invalid discretization time step"
     );
     Ok(())
+}
+
+fn state(value: &Array, size: Size) -> QlResult<()> {
+    require!(
+        value.size() == size,
+        "discretization state dimension mismatch"
+    );
+    require!(
+        value.iter().all(|x| x.is_finite()),
+        "nonfinite discretization state"
+    );
+    Ok(())
+}
+
+fn matrix(value: Matrix, rows: Size, columns: Size) -> QlResult<Matrix> {
+    require!(
+        value.rows() == rows && value.columns() == columns,
+        "discretization matrix dimension mismatch"
+    );
+    require!(
+        (0..rows).all(|i| value.row(i).iter().all(|x| x.is_finite())),
+        "nonfinite discretization matrix"
+    );
+    Ok(value)
 }
 
 /// Finite-step scalar drift, standard deviation and variance.
@@ -256,3 +280,103 @@ impl StochasticProcess1D for DiscretizedProcess1D {
         self.process.time(date)
     }
 }
+
+/// A process using an explicitly selected transition strategy.
+///
+/// Wrapping intentionally replaces the source's expectation, standard deviation,
+/// variance/covariance and evolution overrides. Instantaneous coefficients,
+/// state composition, date conversion and observable remain the source's.
+pub struct DiscretizedProcess {
+    process: Shared<dyn StochasticProcess>,
+    discretization: Shared<dyn ProcessDiscretization>,
+}
+
+impl DiscretizedProcess {
+    /// Selects Euler discretization, retaining the original process.
+    pub fn new(process: Shared<dyn StochasticProcess>) -> Self {
+        Self::with_discretization(process, shared(EulerDiscretization))
+    }
+
+    /// Selects a custom strategy, retaining both inputs.
+    pub fn with_discretization(
+        process: Shared<dyn StochasticProcess>,
+        discretization: Shared<dyn ProcessDiscretization>,
+    ) -> Self {
+        Self {
+            process,
+            discretization,
+        }
+    }
+}
+
+impl AsObservable for DiscretizedProcess {
+    fn observable(&self) -> &Observable {
+        self.process.observable()
+    }
+}
+
+impl StochasticProcess for DiscretizedProcess {
+    fn size(&self) -> Size {
+        self.process.size()
+    }
+    fn factors(&self) -> Size {
+        self.process.factors()
+    }
+    fn initial_values(&self) -> QlResult<Array> {
+        self.process.initial_values()
+    }
+    fn drift(&self, t: Time, x: &Array) -> QlResult<Array> {
+        self.process.drift(t, x)
+    }
+    fn diffusion(&self, t: Time, x: &Array) -> QlResult<Matrix> {
+        self.process.diffusion(t, x)
+    }
+    fn expectation(&self, t: Time, x: &Array, dt: Time) -> QlResult<Array> {
+        step(t, dt)?;
+        state(x, self.size())?;
+        let drift = self.discretization.drift(self.process.as_ref(), t, x, dt)?;
+        state(&drift, self.size())?;
+        let result = self.apply(x, &drift);
+        state(&result, self.size())?;
+        Ok(result)
+    }
+    fn std_deviation(&self, t: Time, x: &Array, dt: Time) -> QlResult<Matrix> {
+        step(t, dt)?;
+        state(x, self.size())?;
+        matrix(
+            self.discretization
+                .diffusion(self.process.as_ref(), t, x, dt)?,
+            self.size(),
+            self.factors(),
+        )
+    }
+    fn covariance(&self, t: Time, x: &Array, dt: Time) -> QlResult<Matrix> {
+        step(t, dt)?;
+        state(x, self.size())?;
+        matrix(
+            self.discretization
+                .covariance(self.process.as_ref(), t, x, dt)?,
+            self.size(),
+            self.size(),
+        )
+    }
+    fn evolve(&self, t: Time, x: &Array, dt: Time, dw: &Array) -> QlResult<Array> {
+        state(dw, self.factors())?;
+        let expectation = self.expectation(t, x, dt)?;
+        let increment = &self.std_deviation(t, x, dt)? * dw;
+        state(&increment, self.size())?;
+        let result = self.apply(&expectation, &increment);
+        state(&result, self.size())?;
+        Ok(result)
+    }
+    fn apply(&self, x: &Array, dx: &Array) -> Array {
+        self.process.apply(x, dx)
+    }
+    fn time(&self, date: &Date) -> QlResult<Time> {
+        self.process.time(date)
+    }
+}
+
+#[cfg(test)]
+#[path = "discretization_tests.rs"]
+mod tests;
