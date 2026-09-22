@@ -11,6 +11,8 @@ mod constantoptionletvol;
 mod cubicsmile;
 mod optionletstripper;
 mod optionletstripper1;
+mod optionletstripper2;
+pub use optionletstripper2::OptionletStripper2;
 mod strippedoptionletadapter;
 mod strippedoptionletbase;
 
