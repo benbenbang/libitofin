@@ -1,0 +1,158 @@
+name: Python wheels
+
+on:
+  workflow_call:
+    inputs:
+      release_tag:
+        description: "Exact release tag; empty builds the current checkout"
+        type: string
+        default: ''
+      fail_leg:
+        description: "Matrix leg name whose smoke test is forced to fail"
+        type: string
+        default: ''
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Exact release tag; empty builds the current checkout"
+        type: string
+        default: ''
+      fail_leg:
+        description: "Matrix leg name whose smoke test is forced to fail"
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  wheels:
+    name: build itofin wheel (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            name: linux-x86_64
+            target: x86_64
+            python_arch: ''
+            sdist: true
+            optional: false
+          - os: ubuntu-24.04-arm
+            name: linux-aarch64
+            target: aarch64
+            python_arch: ''
+            sdist: false
+            optional: false
+          - os: macos-14
+            name: macos-arm64
+            target: aarch64
+            python_arch: ''
+            sdist: false
+            optional: false
+          - os: macos-15-intel
+            name: macos-x86_64
+            target: x86_64
+            python_arch: ''
+            sdist: false
+            optional: false
+          - os: windows-latest
+            name: windows-x64
+            target: x86_64
+            python_arch: ''
+            sdist: false
+            optional: true
+          - os: windows-11-arm
+            name: windows-arm64
+            target: aarch64
+            python_arch: arm64
+            sdist: false
+            optional: true
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: checkout the release source
+        id: checkout
+        continue-on-error: ${{ matrix.optional }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_tag }}
+      - name: set up Python
+        id: python
+        continue-on-error: ${{ matrix.optional }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          architecture: ${{ matrix.python_arch }}
+      - name: Verify the committed release version
+        id: tag
+        if: inputs.release_tag != ''
+        continue-on-error: ${{ matrix.optional }}
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: python scripts/check_release_version.py "$RELEASE_TAG"
+      - name: resolve the expected version
+        id: version
+        continue-on-error: ${{ matrix.optional }}
+        run: |
+          version=$(cargo metadata --locked --no-deps --format-version 1 | python -c 'import json,sys; print(next(p["version"] for p in json.load(sys.stdin)["packages"] if p["name"] == "itofin-py"))')
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: build wheel
+        id: build
+        continue-on-error: ${{ matrix.optional }}
+        uses: PyO3/maturin-action@v1
+        with:
+          command: build
+          target: ${{ matrix.target }}
+          args: --release --out dist -m crates/itofin-py/Cargo.toml
+          manylinux: auto
+      - name: build sdist
+        if: matrix.sdist
+        uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist -m crates/itofin-py/Cargo.toml
+      - name: Verify bundled third-party attribution
+        id: attribution
+        if: steps.build.outcome == 'success'
+        continue-on-error: ${{ matrix.optional }}
+        run: python scripts/check_release_attribution.py dist
+      - name: smoke test the wheel
+        id: smoke
+        if: steps.build.outcome == 'success'
+        continue-on-error: ${{ matrix.optional }}
+        env:
+          EXPECTED_VERSION: ${{ steps.version.outputs.version }}
+          FAIL_LEG: ${{ inputs.fail_leg }}
+          LEG: ${{ matrix.name }}
+        run: |
+          if [ "$FAIL_LEG" = "$LEG" ]; then echo "forced failure for $LEG"; exit 1; fi
+          python -m venv .venv
+          if [ -d .venv/Scripts ]; then py=.venv/Scripts/python; else py=.venv/bin/python; fi
+          "$py" -m pip install --only-binary=:all: dist/*.whl
+          "$py" -c 'import os, itofin; v = itofin.__version__; e = os.environ["EXPECTED_VERSION"]; assert e and v == e, f"itofin {v} != {e}"; print(v)'
+      - name: upload the built distributions
+        if: steps.tag.outcome != 'failure' && steps.build.outcome == 'success' && steps.attribution.outcome == 'success' && steps.smoke.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.name }}
+          path: dist
+      - name: report the leg outcome
+        if: always()
+        env:
+          LEG: ${{ matrix.name }}
+          OPTIONAL: ${{ matrix.optional }}
+          OUTCOMES: >-
+            checkout=${{ steps.checkout.outcome }}
+            python=${{ steps.python.outcome }}
+            tag=${{ steps.tag.outcome }}
+            version=${{ steps.version.outcome }}
+            build=${{ steps.build.outcome }}
+            attribution=${{ steps.attribution.outcome }}
+            smoke=${{ steps.smoke.outcome }}
+        run: |
+          echo "### itofin wheel $LEG (optional: $OPTIONAL)" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          for outcome in $OUTCOMES; do echo "- $outcome" >> "$GITHUB_STEP_SUMMARY"; done
