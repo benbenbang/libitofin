@@ -2,9 +2,10 @@
 
 The external Go module uses a matching native C ABI package. The Go module does
 not bundle native binaries or headers. Go 1.27.1, cgo, and a C compiler are
-required. Native releases initially target Linux amd64 (Ubuntu 24.04, glibc 2.39
-or a compatible newer system) and macOS arm64 (macOS 14 or newer). Windows,
-Linux musl, and other architectures are not release targets yet.
+required. Native releases target Linux amd64 and Linux arm64 (Ubuntu 24.04,
+glibc 2.39 or a compatible newer system), macOS arm64 (macOS 14 or newer), and
+macOS amd64 (Intel, macOS 15 or newer). Windows, Linux musl, and other
+architectures are not release targets yet.
 
 ## Build a native package
 
@@ -33,7 +34,8 @@ between releases that add symbols. Keep the header and library together.
 The module is `github.com/benbenbang/libitofin/sdk/go`. Choose a release with
 a matching `sdk/go/vVERSION` tag and native assets. Set `version` to that
 release number without `v`,
-and `platform` to `darwin-arm64` or `linux-amd64`. Download the archive and
+and `platform` to `darwin-arm64`, `darwin-amd64`, `linux-amd64`, or
+`linux-arm64`. Download the archive and
 checksum from the main LibItoFin release:
 
 ```sh
@@ -113,14 +115,15 @@ The main `semantic-release.yml` workflow publishes one LibItoFin release at
 committed workspace version, and every local Cargo.lock package must agree;
 publication jobs validate those files instead of rewriting them after tagging.
 
-Go publication builds and validates Linux amd64 and macOS arm64 packages from
-that exact tag. It attaches both archives and checksums to the same public
-release, then creates `sdk/go/vVERSION` at the same commit. This extra tag
+Go publication builds and validates Linux amd64, Linux arm64, macOS amd64, and
+macOS arm64 packages from that exact tag, each on a native GitHub-hosted runner.
+It attaches all four archives and checksums to the same public release, then
+creates `sdk/go/vVERSION` at the same commit. This extra tag
 is visible under GitHub Tags and resolves the nested Go module; it does not
 create another release page. Go documents the prefix in
 [Mapping versions to commits](https://go.dev/ref/mod#vcs-version).
 
-After publication, both platforms install the uploaded assets and fetch the Go
+After publication, every platform installs the uploaded assets and fetches the Go
 module through the public module proxy into a fresh cache, without local
 replacements. The check verifies module/native versions, source revision,
 checksums, runtime linking, and the portfolio/session acceptance fixture.
@@ -139,7 +142,10 @@ byte-for-byte. An interrupted archive-only upload can have its checksum repaired
 conflicting Go tags, invalid archives, or mismatched checksums fail without an
 overwrite. The workflow never creates a second Go-specific release.
 
-PRs call `go-package.yml` and include both platforms in `workflow-success`.
+PRs call `go-package.yml` and include all four platforms in `workflow-success`.
+The macOS amd64 leg runs on the `macos-15-intel` image. All four platforms are
+required, so retiring that image blocks releases until the leg moves to another
+Intel image or becomes optional.
 PR validation does not publish tags or assets. Native Linux compatibility must
 be checked on deployment targets; these are not manylinux or musl packages.
 Private application migration and production budgets remain consumer work.
