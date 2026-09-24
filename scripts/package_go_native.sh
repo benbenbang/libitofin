@@ -7,8 +7,10 @@ mkdir -p "$output"
 output=$(cd "$output" && pwd)
 case "$(uname -s)-$(uname -m)" in
   Linux-x86_64) platform=linux-amd64; host=x86_64-unknown-linux-gnu; library=libitofin_ffi.so ;;
+  Linux-aarch64) platform=linux-arm64; host=aarch64-unknown-linux-gnu; library=libitofin_ffi.so ;;
   Darwin-arm64) platform=darwin-arm64; host=aarch64-apple-darwin; library=libitofin_ffi.dylib ;;
-  *) echo 'Supported native package hosts: Linux amd64 and macOS arm64' >&2; exit 1 ;;
+  Darwin-x86_64) platform=darwin-amd64; host=x86_64-apple-darwin; library=libitofin_ffi.dylib ;;
+  *) echo 'Supported native package hosts: Linux amd64/arm64 and macOS amd64/arm64' >&2; exit 1 ;;
 esac
 if [[ $(cbindgen --version) != 'cbindgen 0.29.2' ]]; then
   echo 'Install cbindgen 0.29.2: cargo install cbindgen --version 0.29.2 --locked' >&2
@@ -26,7 +28,7 @@ cbindgen --config crates/libitofin-ffi/cbindgen.toml --crate libitofin-ffi --out
 cmp crates/libitofin-ffi/include/itofin.h "$package/include/itofin.h"
 cargo build --locked -p libitofin-ffi --release --target "$host"
 cp "$target_dir/$host/release/$library" "$package/lib/"
-if [[ $platform == darwin-arm64 ]]; then
+if [[ $platform == darwin-* ]]; then
   install_name_tool -id "@rpath/$library" "$package/lib/$library"
   codesign --force --sign - "$package/lib/$library"
 fi

@@ -23,6 +23,10 @@ jobs:
         include:
           - os: ubuntu-24.04
             platform: linux-amd64
+          - os: ubuntu-24.04-arm
+            platform: linux-arm64
+          - os: macos-15-intel
+            platform: darwin-amd64
           - os: macos-14
             platform: darwin-arm64
     runs-on: ${{ matrix.os }}
