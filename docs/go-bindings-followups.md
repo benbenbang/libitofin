@@ -86,7 +86,7 @@ Rust 1.96.0:
 
 ## Delivery limits
 
-The coordinated release workflow validates Linux amd64 and macOS arm64 packages,
+The coordinated release workflow validates Linux amd64/arm64 and macOS amd64/arm64 packages,
 attaches them to the main `vVERSION` release, and publishes the matching
 `sdk/go/vVERSION` tag. SDK-path publication and platform acceptance are tracked
 in [#1037](https://github.com/benbenbang/libitofin/issues/1037). Fresh external
