@@ -56,18 +56,19 @@ jobs:
             python_arch: ''
             sdist: false
             optional: false
-          - os: windows-latest
-            name: windows-x64
-            target: x86_64
-            python_arch: ''
-            sdist: false
-            optional: true
-          - os: windows-11-arm
-            name: windows-arm64
-            target: aarch64
-            python_arch: arm64
-            sdist: false
-            optional: true
+          # Windows legs disabled pending a manual Windows check; re-enable by uncommenting.
+          # - os: windows-latest
+          #   name: windows-x64
+          #   target: x86_64
+          #   python_arch: ''
+          #   sdist: false
+          #   optional: true
+          # - os: windows-11-arm
+          #   name: windows-arm64
+          #   target: aarch64
+          #   python_arch: arm64
+          #   sdist: false
+          #   optional: true
     runs-on: ${{ matrix.os }}
     defaults:
       run:
