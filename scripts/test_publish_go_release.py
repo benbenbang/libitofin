@@ -4,6 +4,7 @@ import hashlib
 import io
 import json
 from pathlib import Path
+import re
 import subprocess
 import tarfile
 import tempfile
@@ -17,7 +18,8 @@ VERSION = "0.23.0"
 REVISION = "a" * 40
 TAG = f"v{VERSION}"
 REPOSITORY = "example/libitofin"
-PLATFORMS = ("linux-amd64", "darwin-arm64")
+PLATFORMS = release.REQUIRED_PLATFORMS
+WORKFLOWS = (".github/workflows/go-package.yml", ".github/workflows/go-release.yml")
 
 
 def archive_name(platform):
@@ -156,9 +158,10 @@ class PublicationTests(unittest.TestCase):
             self.publish(VERSION)
         self.assertEqual(self.mutations, [])
 
-    def test_tag_created_only_after_both_platform_assets(self):
+    def test_tag_created_only_after_all_platform_assets(self):
         result = self.publish()
-        self.assertEqual([action for action, _ in self.mutations], ["upload"] * 4 + ["tag", "edit"])
+        uploads = ["upload"] * (2 * len(PLATFORMS))
+        self.assertEqual([action for action, _ in self.mutations], uploads + ["tag", "edit"])
         self.assertEqual(result["revision"], REVISION)
         self.assertEqual(result["go_tag"], f"sdk/go/v{VERSION}")
         self.assertEqual(set(result["sha256"]), {archive_name(p) for p in PLATFORMS})
@@ -183,8 +186,15 @@ class PublicationTests(unittest.TestCase):
 
     def test_server_missing_uploaded_assets_prevents_tag(self):
         self.drop_uploads = True
-        with self.assertRaisesRegex(ValueError, "both native platforms"):
+        with self.assertRaisesRegex(ValueError, "all required native platforms"):
             self.publish()
+        self.assertNotIn(f"sdk/go/v{VERSION}", self.references)
+
+    def test_missing_required_platform_prevents_tag(self):
+        (self.local / archive_name("linux-arm64")).unlink()
+        with self.assertRaisesRegex(ValueError, "missing native archive for linux-arm64"):
+            self.publish()
+        self.assertEqual(self.mutations, [])
         self.assertNotIn(f"sdk/go/v{VERSION}", self.references)
 
     def test_rerun_preserves_remote_assets_when_rebuilt_bytes_differ(self):
@@ -219,6 +229,16 @@ class PublicationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "checksum mismatch"):
             self.publish()
         self.assertEqual(self.mutations, [])
+
+
+class WorkflowPlatformTests(unittest.TestCase):
+    def test_workflow_matrices_match_required_platforms(self):
+        root = Path(__file__).resolve().parents[1]
+        for workflow in WORKFLOWS:
+            with self.subTest(workflow=workflow):
+                text = (root / workflow).read_text()
+                platforms = re.findall(r"^\s+platform:\s+(\S+)\s*$", text, re.MULTILINE)
+                self.assertEqual(sorted(platforms), sorted(PLATFORMS))
 
 
 class RemoteCommitTests(unittest.TestCase):
