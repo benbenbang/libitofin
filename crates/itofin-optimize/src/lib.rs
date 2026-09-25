@@ -28,6 +28,7 @@
 //! - Lawson, C. L. and Hanson, R. J. (1974), Solving Least Squares Problems,
 //!   Prentice-Hall.
 
+mod bfgs;
 mod counters;
 mod error;
 mod finite_difference;
@@ -43,9 +44,10 @@ mod tests;
 
 pub use counters::{Counters, Halt};
 pub use error::{InvalidInput, MinimizeError};
+pub use finite_difference::FiniteDifference;
 pub use objective::{Flow, IterationState, Objective};
 pub use outcome::{Converged, Minimize, Termination};
-pub use problem::{Bounds, Common, Method, NelderMeadOptions, Problem};
+pub use problem::{BfgsOptions, Bounds, Common, Method, NelderMeadOptions, Norm, Problem};
 
 /// Minimizes `objective` from `problem.x0` with the chosen `method`.
 ///
@@ -91,5 +93,6 @@ pub fn minimize<O: Objective>(
     method.validate(problem)?;
     match method {
         Method::NelderMead(options) => nelder_mead::minimize(objective, problem, options, common),
+        Method::Bfgs(options) => bfgs::minimize(objective, problem, options, common),
     }
 }

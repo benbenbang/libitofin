@@ -9,18 +9,16 @@
 //! - Nocedal, J. and Wright, S. J. (2006), Numerical Optimization, 2nd edition,
 //!   Springer, Section 8.1: the forward and central formulas and their step
 //!   rules.
-//!
-//! OPT-5 (#1083) is the first caller and removes the `dead_code` allowance.
-#![cfg_attr(not(test), allow(dead_code))]
 
 use crate::counters::{Counters, Halt};
 use crate::objective::Objective;
 use crate::outcome::Termination;
 
 /// How a gradient is approximated when the objective supplies none.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum FiniteDifference {
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum FiniteDifference {
     /// `(f(x + h e_i) - f(x)) / h`: one extra evaluation per coordinate.
+    #[default]
     Forward,
     /// `(f(x + h e_i) - f(x - h e_i)) / 2h`: two extra evaluations per
     /// coordinate, second-order accurate.

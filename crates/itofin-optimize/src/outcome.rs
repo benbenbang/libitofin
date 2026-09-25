@@ -25,6 +25,9 @@ pub enum Termination {
     Cancelled,
     /// A value the method cannot continue from ended the search.
     Nonfinite,
+    /// No step along the search direction satisfied the strong Wolfe
+    /// conditions.
+    LineSearchFailed,
 }
 
 impl Termination {
@@ -44,6 +47,9 @@ impl fmt::Display for Termination {
             Termination::MaxEvaluations => "maximum number of function evaluations reached",
             Termination::Cancelled => "stopped by the callback",
             Termination::Nonfinite => "a nonfinite value ended the search",
+            Termination::LineSearchFailed => {
+                "line search failed: no step satisfies the strong Wolfe conditions"
+            }
         })
     }
 }
