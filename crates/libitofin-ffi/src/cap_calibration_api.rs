@@ -1,9 +1,7 @@
 //! Cap helpers and concrete Hull-White cap lattice engines.
 use crate::boundary::*;
 use crate::rates_api::{curve, finite};
-use libitofin::math::optimization::{
-    endcriteria::EndCriteria, levenbergmarquardt::LevenbergMarquardt,
-};
+use libitofin::math::optimization::{endcriteria::EndCriteria, method::OptimizationMethod};
 use libitofin::math::timegrid::TimeGrid;
 use libitofin::models::calibrationhelper::{BlackCalibrationHelper, CalibrationHelper};
 use libitofin::models::shortrate::calibrationhelpers::CapHelper;
@@ -203,7 +201,7 @@ pub unsafe extern "C" fn itofin_hullwhite_calibrate_caps(
                 .map(|id| c.get::<SharedMut<CapHelper>>(*id))
                 .collect::<BindingResult<Vec<_>>>()?;
             let model = c.get::<SharedMut<HullWhite>>(model)?;
-            let method = c.get::<SharedMut<LevenbergMarquardt>>(method)?;
+            let method = c.get::<SharedMut<dyn OptimizationMethod>>(method)?;
             let criteria = c.get::<EndCriteria>(criteria)?;
             let engine = shared_mut(TreeCapFloorEngine::new(model.clone(), steps)?)
                 as SharedMut<dyn PricingEngine>;

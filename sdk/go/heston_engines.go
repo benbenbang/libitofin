@@ -98,11 +98,15 @@ func (o *VanillaOption) PriceExponentialFittingHeston(e *ExponentialFittingHesto
 	}
 	return o.price(e.object, 2, 0)
 }
-func (m *HestonModel) calibrateHestonEngine(helpers []*HestonModelHelper, method *LevenbergMarquardt, criteria *EndCriteria, cfg C.ItofinHestonEngineConfig) error {
-	if m == nil || method == nil || criteria == nil {
+func (m *HestonModel) calibrateHestonEngine(helpers []*HestonModelHelper, method OptimizationMethod, criteria *EndCriteria, cfg C.ItofinHestonEngineConfig) error {
+	if m == nil || criteria == nil {
 		return errNilArgument("model, method or criteria")
 	}
-	objects := []object{m.object, method.object, criteria.object}
+	methodObject, err := optimizationMethodObject(method)
+	if err != nil {
+		return err
+	}
+	objects := []object{m.object, methodObject, criteria.object}
 	ids := make([]C.uint64_t, len(helpers))
 	for i, h := range helpers {
 		if h == nil {
@@ -120,17 +124,17 @@ func (m *HestonModel) calibrateHestonEngine(helpers []*HestonModelHelper, method
 	}
 	return m.session.invoke(func() error {
 		var e C.ItofinError
-		return ffiError(C.itofin_heston_calibrate_engine(m.session.ctx, C.uint64_t(m.id), ptr, C.size_t(len(ids)), C.uint64_t(method.id), C.uint64_t(criteria.id), &cfg, &e), &e)
+		return ffiError(C.itofin_heston_calibrate_engine(m.session.ctx, C.uint64_t(m.id), ptr, C.size_t(len(ids)), C.uint64_t(methodObject.id), C.uint64_t(criteria.id), &cfg, &e), &e)
 	})
 }
 
 // CalibrateCOS fits the model using the COS pricing engine.
-func (m *HestonModel) CalibrateCOS(helpers []*HestonModelHelper, method *LevenbergMarquardt, criteria *EndCriteria, l float64, n uint) error {
+func (m *HestonModel) CalibrateCOS(helpers []*HestonModelHelper, method OptimizationMethod, criteria *EndCriteria, l float64, n uint) error {
 	return m.calibrateHestonEngine(helpers, method, criteria, cosHestonConfig(l, n))
 }
 
 // CalibrateExponentialFitting fits using exponentially fitted quadrature.
-func (m *HestonModel) CalibrateExponentialFitting(helpers []*HestonModelHelper, method *LevenbergMarquardt, criteria *EndCriteria, cfg *ExponentialFittingHestonConfig) error {
+func (m *HestonModel) CalibrateExponentialFitting(helpers []*HestonModelHelper, method OptimizationMethod, criteria *EndCriteria, cfg *ExponentialFittingHestonConfig) error {
 	return m.calibrateHestonEngine(helpers, method, criteria, exponentialHestonConfig(cfg))
 }
 

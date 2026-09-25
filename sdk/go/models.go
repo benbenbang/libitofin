@@ -298,12 +298,16 @@ func (h *SwaptionHelper) CalibrationError() (float64, error) {
 	}
 	return helperError(h.object, 1)
 }
-func calibrateModel(model object, kind int32, helpers []object, method *LevenbergMarquardt, criteria *EndCriteria, order uint, fix bool) error {
-	if method == nil || criteria == nil {
+func calibrateModel(model object, kind int32, helpers []object, method OptimizationMethod, criteria *EndCriteria, order uint, fix bool) error {
+	if criteria == nil {
 		return errNilArgument("method or criteria")
 	}
+	methodObject, err := optimizationMethodObject(method)
+	if err != nil {
+		return err
+	}
 	s := model.session
-	objects := append([]object{model, method.object, criteria.object}, helpers...)
+	objects := append([]object{model, methodObject, criteria.object}, helpers...)
 	if err := sameSession(s, objects...); err != nil {
 		return err
 	}
@@ -321,10 +325,10 @@ func calibrateModel(model object, kind int32, helpers []object, method *Levenber
 	}
 	return s.invoke(func() error {
 		var e C.ItofinError
-		return ffiError(C.itofin_model_calibrate(s.ctx, C.uint64_t(model.id), C.int32_t(kind), ptr, C.size_t(len(ids)), C.uint64_t(method.id), C.uint64_t(criteria.id), C.size_t(order), fixed, &e), &e)
+		return ffiError(C.itofin_model_calibrate(s.ctx, C.uint64_t(model.id), C.int32_t(kind), ptr, C.size_t(len(ids)), C.uint64_t(methodObject.id), C.uint64_t(criteria.id), C.size_t(order), fixed, &e), &e)
 	})
 }
-func (m *HestonModel) Calibrate(helpers []*HestonModelHelper, method *LevenbergMarquardt, criteria *EndCriteria, integrationOrder uint) error {
+func (m *HestonModel) Calibrate(helpers []*HestonModelHelper, method OptimizationMethod, criteria *EndCriteria, integrationOrder uint) error {
 	if m == nil {
 		return errNilArgument("model")
 	}
@@ -337,7 +341,7 @@ func (m *HestonModel) Calibrate(helpers []*HestonModelHelper, method *LevenbergM
 	}
 	return calibrateModel(m.object, 0, objects, method, criteria, integrationOrder, false)
 }
-func (m *HullWhite) Calibrate(helpers []*SwaptionHelper, method *LevenbergMarquardt, criteria *EndCriteria, fixReversion bool) error {
+func (m *HullWhite) Calibrate(helpers []*SwaptionHelper, method OptimizationMethod, criteria *EndCriteria, fixReversion bool) error {
 	if m == nil {
 		return errNilArgument("model")
 	}
