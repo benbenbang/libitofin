@@ -1,8 +1,6 @@
 //! Alternative Heston engines and additive calibration entrypoints.
 use crate::boundary::*;
-use libitofin::math::optimization::{
-    endcriteria::EndCriteria, levenbergmarquardt::LevenbergMarquardt,
-};
+use libitofin::math::optimization::{endcriteria::EndCriteria, method::OptimizationMethod};
 use libitofin::models::calibrationhelper::{BlackCalibrationHelper, CalibrationHelper};
 use libitofin::models::equity::HestonModelHelper;
 use libitofin::models::{HestonModel, calibrate};
@@ -115,7 +113,7 @@ pub unsafe extern "C" fn itofin_heston_calibrate_engine(
                 ));
             }
             let model = c.get::<SharedMut<HestonModel>>(model)?;
-            let method = c.get::<SharedMut<LevenbergMarquardt>>(method)?;
+            let method = c.get::<SharedMut<dyn OptimizationMethod>>(method)?;
             let criteria = c.get::<EndCriteria>(criteria)?;
             let helpers = ids
                 .iter()

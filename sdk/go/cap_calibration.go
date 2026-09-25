@@ -102,12 +102,16 @@ func (h *CapHelper) MandatoryTimes() ([]float64, error) {
 	})
 	return result, err
 }
-func (m *HullWhite) CalibrateCaps(helpers []*CapHelper, method *LevenbergMarquardt, criteria *EndCriteria, fixReversion bool, steps uint) error {
-	if m == nil || method == nil || criteria == nil {
+func (m *HullWhite) CalibrateCaps(helpers []*CapHelper, method OptimizationMethod, criteria *EndCriteria, fixReversion bool, steps uint) error {
+	if m == nil || criteria == nil {
 		return errNilArgument("model, method and criteria")
 	}
+	methodObject, err := optimizationMethodObject(method)
+	if err != nil {
+		return err
+	}
 	s := m.session
-	objects := []object{m.object, method.object, criteria.object}
+	objects := []object{m.object, methodObject, criteria.object}
 	ids := make([]C.uint64_t, len(helpers))
 	for i, h := range helpers {
 		if h == nil {
@@ -129,6 +133,6 @@ func (m *HullWhite) CalibrateCaps(helpers []*CapHelper, method *LevenbergMarquar
 			fixed = 1
 		}
 		var e C.ItofinError
-		return ffiError(C.itofin_hullwhite_calibrate_caps(s.ctx, C.uint64_t(m.id), ptr, C.size_t(len(ids)), C.uint64_t(method.id), C.uint64_t(criteria.id), C.size_t(steps), fixed, &e), &e)
+		return ffiError(C.itofin_hullwhite_calibrate_caps(s.ctx, C.uint64_t(m.id), ptr, C.size_t(len(ids)), C.uint64_t(methodObject.id), C.uint64_t(criteria.id), C.size_t(steps), fixed, &e), &e)
 	})
 }

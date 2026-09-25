@@ -4,7 +4,12 @@ use crate::time_api::{date, day_counter};
 use libitofin::handle::Handle;
 use libitofin::interestrate::Compounding;
 use libitofin::math::optimization::{
-    endcriteria::EndCriteria, levenbergmarquardt::LevenbergMarquardt,
+    conjugategradient::ConjugateGradient,
+    endcriteria::{EndCriteria, EndCriteriaType},
+    levenbergmarquardt::LevenbergMarquardt,
+    method::OptimizationMethod,
+    simplex::Simplex,
+    steepestdescent::SteepestDescent,
 };
 use libitofin::models::calibrationhelper::{BlackCalibrationHelper, CalibrationHelper};
 use libitofin::models::equity::HestonModelHelper;
@@ -229,12 +234,70 @@ pub unsafe extern "C" fn itofin_levenberg_marquardt_new(
             }
             output(
                 out,
-                c.insert(shared_mut(LevenbergMarquardt::new(
-                    epsfcn,
-                    xtol,
-                    gtol,
-                    jacobian != 0,
-                )))?,
+                c.insert(
+                    shared_mut(LevenbergMarquardt::new(epsfcn, xtol, gtol, jacobian != 0))
+                        as SharedMut<dyn OptimizationMethod>,
+                )?,
+            )
+        })
+    }
+}
+#[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid. Context and handles belong to
+/// the calling thread; serialize calls including destruction.
+pub unsafe extern "C" fn itofin_simplex_new(
+    ctx: *mut Context,
+    lambda: f64,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(out)?;
+            if !lambda.is_finite() || lambda <= 0.0 {
+                return Err(BindingError::invalid(
+                    "simplex lambda must be finite and positive",
+                ));
+            }
+            output(
+                out,
+                c.insert(shared_mut(Simplex::new(lambda)) as SharedMut<dyn OptimizationMethod>)?,
+            )
+        })
+    }
+}
+#[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid. Context and handles belong to
+/// the calling thread; serialize calls including destruction.
+pub unsafe extern "C" fn itofin_conjugate_gradient_new(
+    ctx: *mut Context,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(out)?;
+            output(out, c.insert(shared_mut(ConjugateGradient::new()) as SharedMut<dyn OptimizationMethod>)?)
+        })
+    }
+}
+#[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid. Context and handles belong to
+/// the calling thread; serialize calls including destruction.
+pub unsafe extern "C" fn itofin_steepest_descent_new(
+    ctx: *mut Context,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(out)?;
+            output(
+                out,
+                c.insert(shared_mut(SteepestDescent::new()) as SharedMut<dyn OptimizationMethod>)?,
             )
         })
     }
@@ -453,7 +516,7 @@ pub unsafe extern "C" fn itofin_model_calibrate(
                     "calibration helpers must not be empty",
                 ));
             }
-            let method = c.get::<SharedMut<LevenbergMarquardt>>(method)?;
+            let method = c.get::<SharedMut<dyn OptimizationMethod>>(method)?;
             let criteria = c.get::<EndCriteria>(criteria)?;
             match kind {
                 0 => {
@@ -528,9 +591,59 @@ pub unsafe extern "C" fn itofin_model_calibrate(
     }
 }
 
+#[unsafe(no_mangle)]
+/// Calibration kind 0 is Heston and 1 is Hull-White. Result codes follow
+/// `EndCriteriaType`: None 0, MaxIterations 1, StationaryPoint 2,
+/// StationaryFunctionValue 3, StationaryFunctionAccuracy 4,
+/// ZeroGradientNorm 5, FunctionEpsilonTooSmall 6, Unknown 7.
+/// # Safety
+/// Pointers must be aligned, live and valid. Context and handles belong to
+/// the calling thread; serialize calls including destruction.
+pub unsafe extern "C" fn itofin_model_end_criteria_type(
+    ctx: *mut Context,
+    model: u64,
+    kind: i32,
+    out: *mut i32,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(out)?;
+            let result = match kind {
+                0 => c
+                    .get::<SharedMut<HestonModel>>(model)?
+                    .borrow()
+                    .calibrated_model()
+                    .end_criteria(),
+                1 => c
+                    .get::<SharedMut<HullWhite>>(model)?
+                    .borrow()
+                    .calibrated_model()
+                    .end_criteria(),
+                _ => return Err(BindingError::invalid("unknown calibration kind")),
+            };
+            let code = match result {
+                EndCriteriaType::None => 0,
+                EndCriteriaType::MaxIterations => 1,
+                EndCriteriaType::StationaryPoint => 2,
+                EndCriteriaType::StationaryFunctionValue => 3,
+                EndCriteriaType::StationaryFunctionAccuracy => 4,
+                EndCriteriaType::ZeroGradientNorm => 5,
+                EndCriteriaType::FunctionEpsilonTooSmall => 6,
+                EndCriteriaType::Unknown => 7,
+            };
+            output(out, code)
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use libitofin::math::array::Array;
+    use libitofin::math::optimization::constraint::NoConstraint;
+    use libitofin::math::optimization::costfunction::CostFunction;
+    use libitofin::math::optimization::problem::Problem;
     use std::ptr::null_mut;
     #[test]
     fn calibration_enum_and_optional_criteria_are_checked() {
@@ -570,6 +683,83 @@ mod tests {
                 itofin_end_criteria_new(&mut c, config, &mut id, null_mut()),
                 INVALID_ARGUMENT
             );
+        }
+    }
+
+    #[test]
+    fn optimization_methods_share_one_handle_kind() {
+        let mut c = Context::new();
+        let mut id = 0;
+        unsafe {
+            assert_eq!(
+                itofin_levenberg_marquardt_new(&mut c, 1e-8, 1e-8, 1e-8, 0, &mut id, null_mut()),
+                0
+            );
+            assert!(c.get::<SharedMut<dyn OptimizationMethod>>(id).is_ok());
+            assert_eq!(itofin_simplex_new(&mut c, 0.1, &mut id, null_mut()), 0);
+            assert!(c.get::<SharedMut<dyn OptimizationMethod>>(id).is_ok());
+            assert_eq!(
+                itofin_conjugate_gradient_new(&mut c, &mut id, null_mut()),
+                0
+            );
+            assert!(c.get::<SharedMut<dyn OptimizationMethod>>(id).is_ok());
+            assert_eq!(itofin_steepest_descent_new(&mut c, &mut id, null_mut()), 0);
+            assert!(c.get::<SharedMut<dyn OptimizationMethod>>(id).is_ok());
+            for lambda in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+                assert_eq!(
+                    itofin_simplex_new(&mut c, lambda, &mut id, null_mut()),
+                    INVALID_ARGUMENT
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn ffi_method_handles_match_core_parabola_oracles() {
+        struct Parabola;
+        impl CostFunction for Parabola {
+            fn values(&self, x: &Array) -> Array {
+                Array::from([x[0] * x[0] + x[0] + 1.0])
+            }
+        }
+        let mut c = Context::new();
+        let mut id = 0;
+        let mut methods: Vec<(&str, u64, Box<dyn OptimizationMethod>)> = Vec::new();
+        unsafe {
+            assert_eq!(itofin_simplex_new(&mut c, 0.1, &mut id, null_mut()), 0);
+            methods.push(("simplex", id, Box::new(Simplex::new(0.1))));
+            assert_eq!(
+                itofin_conjugate_gradient_new(&mut c, &mut id, null_mut()),
+                0
+            );
+            methods.push(("conjugate gradient", id, Box::new(ConjugateGradient::new())));
+            assert_eq!(itofin_steepest_descent_new(&mut c, &mut id, null_mut()), 0);
+            methods.push(("steepest descent", id, Box::new(SteepestDescent::new())));
+        }
+        let cost = Parabola;
+        let constraint = NoConstraint;
+        let criteria = EndCriteria::new(10_000, Some(100), 1e-8, 1e-8, Some(1e-8)).unwrap();
+        for (name, id, mut core) in methods {
+            let mut direct = Problem::new(&cost, &constraint, Array::from([-100.0]));
+            let mut bridged = Problem::new(&cost, &constraint, Array::from([-100.0]));
+            let direct_reason = core.minimize(&mut direct, &criteria).unwrap();
+            let handle = c.get::<SharedMut<dyn OptimizationMethod>>(id).unwrap();
+            let bridged_reason = handle
+                .borrow_mut()
+                .minimize(&mut bridged, &criteria)
+                .unwrap();
+            assert_eq!(bridged_reason, direct_reason, "{name}");
+            assert!(
+                (bridged.current_value()[0] - direct.current_value()[0]).abs() <= 1e-12,
+                "{name}"
+            );
+            assert!(
+                (bridged.function_value() - direct.function_value()).abs() <= 1e-12,
+                "{name}"
+            );
+            let x_error = (bridged.current_value()[0] + 0.5).abs();
+            let y_error = (bridged.function_value() - 0.75).abs();
+            assert!(x_error <= 1e-8 || y_error <= 1e-8, "{name}");
         }
     }
 }

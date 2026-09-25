@@ -3803,6 +3803,34 @@ int32_t itofin_levenberg_marquardt_new(struct ItofinContext *ctx,
 
 /**
  * # Safety
+ * Pointers must be aligned, live and valid. Context and handles belong to
+ * the calling thread; serialize calls including destruction.
+ */
+int32_t itofin_simplex_new(struct ItofinContext *ctx,
+                           double lambda,
+                           uint64_t *out,
+                           struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers must be aligned, live and valid. Context and handles belong to
+ * the calling thread; serialize calls including destruction.
+ */
+int32_t itofin_conjugate_gradient_new(struct ItofinContext *ctx,
+                                      uint64_t *out,
+                                      struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers must be aligned, live and valid. Context and handles belong to
+ * the calling thread; serialize calls including destruction.
+ */
+int32_t itofin_steepest_descent_new(struct ItofinContext *ctx,
+                                    uint64_t *out,
+                                    struct ItofinError *error);
+
+/**
+ * # Safety
  * Pointers must be aligned, live and valid for their stated lengths. Outputs
  * must not overlap inputs or other outputs. Any context and its handles must
  * belong to the calling thread; serialize calls including destruction.
@@ -3887,6 +3915,21 @@ int32_t itofin_optimize_nelder_mead(const struct ItofinObjective *objective,
                                     const struct ItofinOptimizeOptions *options,
                                     struct ItofinOptimizeResult *out_result,
                                     struct ItofinError *error);
+
+/**
+ * Calibration kind 0 is Heston and 1 is Hull-White. Result codes follow
+ * `EndCriteriaType`: None 0, MaxIterations 1, StationaryPoint 2,
+ * StationaryFunctionValue 3, StationaryFunctionAccuracy 4,
+ * ZeroGradientNorm 5, FunctionEpsilonTooSmall 6, Unknown 7.
+ * # Safety
+ * Pointers must be aligned, live and valid. Context and handles belong to
+ * the calling thread; serialize calls including destruction.
+ */
+int32_t itofin_model_end_criteria_type(struct ItofinContext *ctx,
+                                       uint64_t model,
+                                       int32_t kind,
+                                       int32_t *out,
+                                       struct ItofinError *error);
 
 /**
  * `american`: 0 European, 1 American; earliest ignored for European exercise.
