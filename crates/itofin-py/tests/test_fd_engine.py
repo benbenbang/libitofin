@@ -1,7 +1,11 @@
 """Finite-difference vanilla prices shared with the Go and Rust fixtures."""
 
 import gc
+import json
 import math
+import os
+import subprocess
+from pathlib import Path
 from typing import Any, cast
 
 import pytest
@@ -22,25 +26,45 @@ def _market():
     return today, expiry, settings, process
 
 
+@pytest.fixture(scope="module")
+def core_oracle():
+    oracle_path = os.environ.get("ITOFIN_FD_ORACLE_JSON")
+    if oracle_path:
+        source = Path(oracle_path).read_text()
+    else:
+        assert os.environ.get("GITHUB_ACTIONS") != "true", "CI must provide the same-profile Rust FD oracle"
+        source = subprocess.check_output(
+            ["cargo", "run", "--quiet", "--release", "-p", "libitofin", "--example", "fd_binding_oracle"],
+            cwd=Path(__file__).resolve().parents[3],
+            text=True,
+        )
+    oracle = json.loads(source)
+    assert set(oracle) == {"european", "american", "bermudan"}
+    for values in oracle.values():
+        assert set(values) == {"npv", "delta", "gamma", "theta"}
+        assert all(isinstance(value, (int, float)) and math.isfinite(value) for value in values.values())
+    return oracle
+
+
 @pytest.mark.parametrize(
     ("exercise", "expected"),
     [
         (
             "european",
-            (18.266147644485358, -0.71491824907787493, 0.016981361087847299, 0.37758711159122471),
+            (18.266147644485358, -0.71491824907787493, 0.016981361087847299),
         ),
         (
             "american",
-            (20.357667204554883, -0.85902979493468978, 0.026600330114210077, -0.86325809371658702),
+            (20.357667204554883, -0.85902979493468978, 0.026600330114210077),
         ),
         (
             "bermudan",
-            (19.954434523211695, -0.81750545328763524, 0.019414167279763642, 0.38521081736987667),
+            (19.954434523211695, -0.81750545328763524, 0.019414167279763642),
         ),
     ],
 )
-def test_fd_core_and_go_prices_and_greeks(exercise, expected):
-    """Each exercise type matches the same deterministic core and Go fixture."""
+def test_fd_core_and_go_prices_and_greeks(exercise, expected, core_oracle):
+    """Stable Go values and same-profile Rust Greeks cover each exercise."""
     today, expiry, settings, process = _market()
     if exercise == "european":
         option = VanillaOption(OptionType.Put, 100.0, expiry, settings)
@@ -53,7 +77,10 @@ def test_fd_core_and_go_prices_and_greeks(exercise, expected):
     engine = FdBlackScholesVanillaEngine(process, t_grid=200, x_grid=200)
     option.set_fd_engine(engine)
     got = (option.npv(), option.delta(), option.gamma(), option.theta())
-    assert got == pytest.approx(expected, rel=0, abs=1e-12)
+    assert got[:3] == pytest.approx(expected, rel=0, abs=1e-12)
+    core = core_oracle[exercise]
+    core_values = tuple(core[key] for key in ("npv", "delta", "gamma", "theta"))
+    assert got == pytest.approx(core_values, rel=0, abs=1e-12)
     assert option.price_fd(engine) == pytest.approx(got[0], rel=0, abs=1e-12)
 
     del process, engine

@@ -159,6 +159,13 @@ jobs:
           python -m unittest discover -s crates/itofin-py/scripts -p 'test_*.py'
           python crates/itofin-py/scripts/check_typing.py
 
+      - name: build the same-profile Rust FD oracle
+        run: |
+          oracle="$RUNNER_TEMP/fd-binding-oracle.json"
+          cargo run --quiet --release -p libitofin --example fd_binding_oracle > "$oracle"
+          python -m json.tool "$oracle" > /dev/null
+          echo "ITOFIN_FD_ORACLE_JSON=$oracle" >> "$GITHUB_ENV"
+
       - name: run the pytest oracle
         run: |
           . .venv/bin/activate
