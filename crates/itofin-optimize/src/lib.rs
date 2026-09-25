@@ -31,6 +31,7 @@
 mod counters;
 mod error;
 mod finite_difference;
+mod line_search;
 mod lsq;
 mod nelder_mead;
 mod objective;
