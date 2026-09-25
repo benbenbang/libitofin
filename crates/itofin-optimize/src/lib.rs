@@ -30,6 +30,7 @@
 
 mod counters;
 mod error;
+mod finite_difference;
 mod lsq;
 mod nelder_mead;
 mod objective;

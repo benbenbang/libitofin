@@ -81,6 +81,12 @@ impl Counters {
         Ok(supplied)
     }
 
+    /// Charges one gradient evaluation the objective did not supply itself,
+    /// such as a finite-difference approximation.
+    pub(crate) fn charge_gradient(&mut self) {
+        self.njev += 1;
+    }
+
     /// Closes an iteration: counts it, dispatches the callback, then checks the
     /// iteration budget. A cancellation wins over budget exhaustion.
     pub fn end_iteration<O: Objective>(
