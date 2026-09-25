@@ -48,7 +48,9 @@ pub use error::{InvalidInput, MinimizeError};
 pub use finite_difference::FiniteDifference;
 pub use objective::{ConstraintKind, Flow, IterationState, Objective};
 pub use outcome::{Converged, Minimize, Termination};
-pub use problem::{BfgsOptions, Bounds, Common, Method, NelderMeadOptions, Norm, Problem};
+pub use problem::{
+    BfgsOptions, Bounds, Common, Method, NelderMeadOptions, Norm, Problem, SlsqpOptions,
+};
 
 /// Minimizes `objective` from `problem.x0` with the chosen `method`.
 ///
@@ -93,7 +95,7 @@ pub fn minimize<O: Objective>(
     problem.validate()?;
     common.validate()?;
     method.validate(problem)?;
-    if objective.constraint_count() > 0 {
+    if objective.constraint_count() > 0 && !matches!(method, Method::Slsqp(_)) {
         return Err(InvalidInput::Unsupported {
             method: method.name(),
             option: "constraints",
@@ -103,5 +105,6 @@ pub fn minimize<O: Objective>(
     match method {
         Method::NelderMead(options) => nelder_mead::minimize(objective, problem, options, common),
         Method::Bfgs(options) => bfgs::minimize(objective, problem, options, common),
+        Method::Slsqp(options) => slsqp::minimize(objective, problem, options, common),
     }
 }

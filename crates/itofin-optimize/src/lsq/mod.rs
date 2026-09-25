@@ -18,10 +18,6 @@
 //! construction and application (Algorithms H1 and H2), the pivoted
 //! triangularization behind HFTI (Chapter 14), NNLS (Algorithm 23.10), LDP
 //! (23.27) and the LSI and LSEI reductions (Chapter 23).
-//!
-//! The allowance for unused items is temporary: OPT-10 (#1088) removes it once
-//! the SLSQP driver calls these kernels.
-#![cfg_attr(not(test), allow(dead_code))]
 
 pub(crate) mod householder;
 pub(crate) mod lsei;
