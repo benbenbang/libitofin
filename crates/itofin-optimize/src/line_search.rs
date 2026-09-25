@@ -298,7 +298,7 @@ fn dot(u: &[f64], v: &[f64]) -> f64 {
 mod tests {
     use super::{LineSearchError, LineSearchFailure, Start, Step, Wolfe, dot, strong_wolfe};
     use crate::finite_difference::{FiniteDifference, gradient};
-    use crate::{Common, Counters, Objective};
+    use crate::{Common, Counters, Halt, Objective, Termination};
     use std::convert::Infallible;
 
     const C1: f64 = 1e-4;
@@ -393,5 +393,57 @@ mod tests {
         let failure = LineSearchFailure::NotDescent;
         assert!(matches!(step, Err(LineSearchError::Failure(f)) if f == failure));
         assert_eq!((counters.nfev(), counters.njev()), (0, 0));
+    }
+
+    #[test]
+    fn finite_difference_gradients_serve_the_search() {
+        let mut objective = |x: &[f64]| -> Result<f64, Infallible> { Ok(quadratic(x).0) };
+        let (step, counters) = plain(&mut objective, &[1.0, -2.0], &[-1.0, 2.0]);
+        assert_eq!(step.ok().unwrap().alpha, 1.0);
+        assert_eq!((counters.nfev(), counters.njev()), (3, 1));
+    }
+
+    #[test]
+    fn an_unbounded_line_finds_no_strong_wolfe_step() {
+        let mut objective = |x: &[f64]| -> Result<f64, Infallible> { Ok(-x[0]) };
+        for (amax, maxiter, trials) in [(4.0, 20, 3), (1e6, 2, 2)] {
+            let w = Wolfe::new(1.0, amax, maxiter);
+            let (step, counters) = run(&mut objective, &[0.0], &[1.0], w, &Common::default());
+            let failure = LineSearchFailure::NoStrongWolfeStep;
+            assert!(matches!(step, Err(LineSearchError::Failure(f)) if f == failure));
+            assert_eq!((counters.nfev(), counters.njev()), (2 * trials, trials));
+        }
+    }
+
+    #[test]
+    fn an_exhausted_budget_halts_the_search() {
+        let common = Common {
+            maxfev: Some(1),
+            ..Common::default()
+        };
+        let w = Wolfe::new(1.0, 10.0, 20);
+        let (step, counters) = run(
+            &mut Analytic(rosenbrock),
+            &[-1.2, 1.0],
+            &[215.6, 88.0],
+            w,
+            &common,
+        );
+        let budget = Termination::MaxEvaluations;
+        assert!(matches!(step, Err(LineSearchError::Halt(Halt::Terminated(t))) if t == budget));
+        assert_eq!((counters.nfev(), counters.njev()), (1, 0));
+    }
+
+    #[test]
+    fn a_nonfinite_trial_value_halts_the_search() {
+        for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let mut objective =
+                |x: &[f64]| -> Result<f64, Infallible> { Ok(if x[0] > 0.5 { bad } else { -x[0] }) };
+            let (step, _) = plain(&mut objective, &[0.0], &[1.0]);
+            let nonfinite = Termination::Nonfinite;
+            assert!(
+                matches!(step, Err(LineSearchError::Halt(Halt::Terminated(t))) if t == nonfinite)
+            );
+        }
     }
 }
