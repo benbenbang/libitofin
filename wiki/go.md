@@ -28,6 +28,32 @@ errors, and keep objects from different sessions separate. See
 [sessions and errors](https://benbenbang.github.io/libitofin/go/#sessions-and-errors)
 for concurrency and callback restrictions.
 
+## Optimization
+
+`itofin.Minimize` runs the finance-independent Nelder-Mead solver from the
+`itofin-optimize` crate on the calling goroutine, outside any session, so the
+objective may call session methods such as `SimpleQuote.SetValue` and
+`VanillaSwap.NPV`:
+
+```go
+result, err := itofin.Minimize(ctx, func(x []float64) (float64, error) {
+	if err := rate.SetValue(x[0]); err != nil {
+		return 0, err
+	}
+	npv, err := swap.NPV()
+	return npv * npv, err
+}, []float64{0.05}, itofin.NelderMeadOptions{XAtol: 1e-10})
+```
+
+- An error returned by the objective ends the run and comes back unchanged,
+  so `errors.Is` works; a panic in the objective is recovered and returned as
+  an error.
+- Cancelling `ctx` stops the run at the end of the current iteration and
+  returns the partial `OptimizeResult` with `ctx.Err()`, so
+  `errors.Is(err, context.Canceled)` and `context.DeadlineExceeded` work.
+- A zero `NelderMeadOptions` field keeps the solver default.
+  `OptimizeStatus` values match Python `itofin.optimize.Status`.
+
 ## Reference
 
 - [Go API reference](https://pkg.go.dev/github.com/benbenbang/libitofin/sdk/go).
