@@ -242,6 +242,7 @@ dependencies = [
 name = "itofin-py"
 version = "0.28.0"
 dependencies = [
+ "itofin-optimize",
  "libitofin",
  "numpy",
  "pyo3",

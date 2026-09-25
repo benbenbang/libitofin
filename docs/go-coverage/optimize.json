@@ -1,0 +1,128 @@
+{
+  "domain": "optimize",
+  "entries": [
+    {
+      "c": "itofin_optimize_nelder_mead",
+      "go": "Minimize",
+      "python": "itofin.optimize.minimize",
+      "status": "implemented",
+      "tests": [
+        "TestMinimizeNelderMeadRosenbrock",
+        "TestMinimizeObjectiveCallsSessionPricing",
+        "TestMinimizeObjectiveClosesSession",
+        "TestMinimizeErrorsCancellationAndPanics"
+      ]
+    },
+    {
+      "c": "itofin_optimize_nelder_mead",
+      "go": "OptimizeResult.X",
+      "python": "itofin.optimize.OptimizeResult.x",
+      "status": "implemented",
+      "tests": "TestMinimizeNelderMeadRosenbrock"
+    },
+    {
+      "c": "itofin_optimize_nelder_mead",
+      "go": "OptimizeResult.Fun",
+      "python": "itofin.optimize.OptimizeResult.fun",
+      "status": "implemented",
+      "tests": "TestMinimizeNelderMeadRosenbrock"
+    },
+    {
+      "c": "itofin_optimize_nelder_mead",
+      "go": "OptimizeResult.Nit",
+      "python": "itofin.optimize.OptimizeResult.nit",
+      "status": "implemented",
+      "tests": "TestMinimizeNelderMeadRosenbrock"
+    },
+    {
+      "c": "itofin_optimize_nelder_mead",
+      "go": "OptimizeResult.Nfev",
+      "python": "itofin.optimize.OptimizeResult.nfev",
+      "status": "implemented",
+      "tests": "TestMinimizeNelderMeadRosenbrock"
+    },
+    {
+      "c": "itofin_optimize_nelder_mead",
+      "go": "OptimizeResult.Njev",
+      "python": "itofin.optimize.OptimizeResult.njev",
+      "status": "implemented",
+      "tests": "TestMinimizeNelderMeadRosenbrock"
+    },
+    {
+      "c": "itofin_optimize_nelder_mead",
+      "go": "OptimizeResult.Status",
+      "python": "itofin.optimize.OptimizeResult.status",
+      "status": "implemented",
+      "tests": "TestMinimizeNelderMeadRosenbrock"
+    },
+    {
+      "c": "itofin_optimize_nelder_mead",
+      "go": "OptimizeResult.Success",
+      "python": "itofin.optimize.OptimizeResult.success",
+      "status": "implemented",
+      "tests": "TestMinimizeNelderMeadRosenbrock"
+    },
+    {
+      "c": "itofin_optimize_nelder_mead",
+      "go": "OptimizeResult.Message",
+      "python": "itofin.optimize.OptimizeResult.message",
+      "status": "implemented",
+      "tests": "TestMinimizeNelderMeadRosenbrock"
+    },
+    {
+      "go": "OptimizeConvergedXTol",
+      "python": "itofin.optimize.Status.ConvergedXTol",
+      "status": "implemented",
+      "tests": "TestMinimizeStatusValues"
+    },
+    {
+      "go": "OptimizeConvergedFTol",
+      "python": "itofin.optimize.Status.ConvergedFTol",
+      "status": "implemented",
+      "tests": "TestMinimizeStatusValues"
+    },
+    {
+      "go": "OptimizeConvergedGTol",
+      "python": "itofin.optimize.Status.ConvergedGTol",
+      "status": "implemented",
+      "tests": "TestMinimizeStatusValues"
+    },
+    {
+      "go": "OptimizeMaxIterations",
+      "python": "itofin.optimize.Status.MaxIterations",
+      "status": "implemented",
+      "tests": "TestMinimizeStatusValues"
+    },
+    {
+      "go": "OptimizeMaxEvaluations",
+      "python": "itofin.optimize.Status.MaxEvaluations",
+      "status": "implemented",
+      "tests": "TestMinimizeStatusValues"
+    },
+    {
+      "go": "OptimizeCancelled",
+      "python": "itofin.optimize.Status.Cancelled",
+      "status": "implemented",
+      "tests": "TestMinimizeStatusValues"
+    },
+    {
+      "go": "OptimizeNonfinite",
+      "python": "itofin.optimize.Status.Nonfinite",
+      "status": "implemented",
+      "tests": "TestMinimizeStatusValues"
+    },
+    {
+      "go": "OptimizeStatus: explicit integer conversion",
+      "python": "itofin.optimize.Status.__int__",
+      "status": "implemented",
+      "tests": "TestMinimizeStatusValues"
+    },
+    {
+      "classification": "nonconstructible-enum",
+      "go": "OptimizeStatus",
+      "python": "itofin.optimize.Status.__new__",
+      "reason": "Python Status forbids construction; Go uses typed integer constants. The status is only ever returned, never accepted.",
+      "status": "language-specific"
+    }
+  ]
+}
