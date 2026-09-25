@@ -18,6 +18,16 @@ func TestGaussianDeterminism(t *testing.T) {
 	if !reflect.DeepEqual(a, b) {
 		t.Fatal("seed changed stream")
 	}
+	want := []uint64{
+		0xbfd478762ac42baf, 0x3fea89ecaa3ca273,
+		0x3ffa6dda2828b3f9, 0xbfece0129fc56c99,
+		0x3fe3cda83f040d7c, 0x3fe8ad42d74057e8,
+	}
+	for i, bits := range want {
+		if got := math.Float64bits(a[i]); got != bits {
+			t.Fatalf("draw %d bits: got %016x, want %016x", i, got, bits)
+		}
+	}
 	if _, e = GaussianDraws(1, 0); e == nil {
 		t.Fatal("accepted zero seed")
 	}
@@ -27,6 +37,19 @@ func TestGBMLayoutAndTerminalConsistency(t *testing.T) {
 	full, e := SimulateGBM(c)
 	if e != nil {
 		t.Fatal(e)
+	}
+	want := []uint64{
+		0x4059000000000000, 0x4051800000000000,
+		0x40589a9feaa855df, 0x40524487f14699fc,
+		0x405b223b02e57074, 0x40523d3520f9416d,
+		0x405c30ec5ee1b1af, 0x4053be21d0059094,
+		0x405cac1f016d9a59, 0x405437d45b70e53e,
+		0x405b1d4a6f41824d, 0x40530d4da919e6c0,
+	}
+	for i, bits := range want {
+		if got := math.Float64bits(full.Values[i]); got != bits {
+			t.Fatalf("path prefix %d bits: got %016x, want %016x", i, got, bits)
+		}
 	}
 	c.TerminalOnly = true
 	terminal, e := SimulateGBM(c)
