@@ -3935,7 +3935,8 @@ int32_t itofin_option_bermudan_new(struct ItofinContext *ctx,
                                    struct ItofinError *error);
 
 /**
- * Engine kind: 0 analytic European (BSM process), 1 analytic Heston (model), 2 MC engine.
+ * Engine kind: 0 analytic European (BSM process), 1 analytic Heston (model),
+ * 2 preconstructed pricing engine (including MC and FD).
  * # Safety
  * Pointers must be aligned, live and valid for their stated lengths. Outputs
  * must not overlap inputs or other outputs. Any context and its handles must

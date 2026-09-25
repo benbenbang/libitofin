@@ -728,6 +728,73 @@ mod test_fd_bermudan {
         (settings, process())
     }
 
+    #[test]
+    fn binding_oracles_match_european_american_and_quarterly_bermudan_greeks() {
+        let (settings, process) = fixture();
+        let rows: [(&str, Shared<dyn Exercise>, [Real; 4]); 3] = [
+            (
+                "European",
+                shared(EuropeanExercise::new(maturity())),
+                [
+                    18.266147644485358,
+                    -0.714_918_249_077_874_9,
+                    0.016_981_361_087_847_3,
+                    0.377_587_111_591_224_7,
+                ],
+            ),
+            (
+                "American",
+                shared(AmericanExercise::over(today(), maturity()).unwrap()),
+                [
+                    20.357667204554883,
+                    -0.859_029_794_934_689_8,
+                    0.026600330114210077,
+                    -0.863_258_093_716_587,
+                ],
+            ),
+            (
+                "Bermudan",
+                every(&[3, 6, 9, 12]),
+                [
+                    19.954434523211695,
+                    -0.817_505_453_287_635_2,
+                    0.019414167279763642,
+                    0.38521081736987667,
+                ],
+            ),
+        ];
+
+        for (name, exercise, expected) in rows {
+            let mut option = OneAssetOption::new(
+                shared(PlainVanillaPayoff::new(Put, STRIKE)),
+                exercise,
+                Shared::clone(&settings),
+            );
+            let engine = shared_mut(FdBlackScholesVanillaEngine::new(
+                Shared::clone(&process),
+                T_GRID,
+                X_GRID,
+                0,
+                FdmSchemeDesc::douglas(),
+            ));
+            option
+                .base_mut()
+                .set_pricing_engine(engine as SharedMut<dyn PricingEngine>);
+            let actual = [
+                option.npv().unwrap(),
+                option.delta().unwrap(),
+                option.gamma().unwrap(),
+                option.theta().unwrap(),
+            ];
+            for (field, (actual, expected)) in actual.into_iter().zip(expected).enumerate() {
+                assert!(
+                    (actual - expected).abs() <= 1.0e-12,
+                    "{name} field {field}: {actual} != {expected}"
+                );
+            }
+        }
+    }
+
     /// The single-date form, whose one exercise opportunity is the expiry, is
     /// the European option. It agrees to `3.8e-7`, not to the last bit, and the
     /// residual is mechanism rather than noise: that lone exercise time reaches
