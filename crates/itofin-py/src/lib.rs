@@ -51,7 +51,10 @@ mod time;
 mod treeswaption;
 mod vol;
 
-use calibration::{PyCalibrationErrorType, PyEndCriteria, PyLevenbergMarquardt};
+use calibration::{
+    PyCalibrationErrorType, PyConjugateGradient, PyEndCriteria, PyLevenbergMarquardt, PySimplex,
+    PySteepestDescent,
+};
 use capfloor::{PyCapFloor, PyCapFloorType};
 use capfloorengine::{PyBachelierCapFloorEngine, PyBlackCapFloorEngine};
 use capfloortermvol::{PyCapFloorTermVolCurve, PyCapFloorTermVolSurface};
@@ -381,6 +384,9 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     let optimization = PyModule::new(py, "optimization")?;
     optimization.add_class::<PyLevenbergMarquardt>()?;
+    optimization.add_class::<PySimplex>()?;
+    optimization.add_class::<PyConjugateGradient>()?;
+    optimization.add_class::<PySteepestDescent>()?;
     optimization.add_class::<PyEndCriteria>()?;
 
     let optimize = PyModule::new(py, "optimize")?;

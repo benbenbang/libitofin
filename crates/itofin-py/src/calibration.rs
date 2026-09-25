@@ -1,14 +1,18 @@
-//! Facades for the calibration machinery: LevenbergMarquardt, EndCriteria and
-//! CalibrationErrorType.
+//! Facades for calibration methods, end criteria and error measures.
 //!
-//! These are the optimizer, stopping rule and error measure shared by the
-//! Heston and Hull-White calibrations (follow-up tickets H2/W2).
+//! Heston and Hull-White share these methods, stopping rules and error measures.
 
 use crate::PyQlError;
+use libitofin::math::optimization::conjugategradient::ConjugateGradient;
 use libitofin::math::optimization::endcriteria::EndCriteria;
 use libitofin::math::optimization::levenbergmarquardt::LevenbergMarquardt;
+use libitofin::math::optimization::method::OptimizationMethod;
+use libitofin::math::optimization::simplex::Simplex;
+use libitofin::math::optimization::steepestdescent::SteepestDescent;
 use libitofin::models::CalibrationErrorType;
+use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
+use pyo3::types::PyAny;
 #[allow(unused_imports)]
 use pyo3_stub_gen::derive::{
     gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pyfunction, gen_stub_pymethods,
@@ -49,6 +53,95 @@ impl PyLevenbergMarquardt {
             inner: LevenbergMarquardt::new(epsfcn, xtol, gtol, use_cost_functions_jacobian),
         }
     }
+}
+
+/// The downhill simplex method for derivative-free calibration.
+#[gen_stub_pyclass]
+#[pyclass(name = "Simplex", unsendable, module = "itofin.optimization")]
+pub struct PySimplex {
+    inner: Simplex,
+}
+
+#[gen_stub_pymethods]
+#[pymethods]
+impl PySimplex {
+    /// Build a simplex with a finite, positive characteristic length.
+    ///
+    /// Raises:
+    ///     ValueError: If lambda_ is zero, negative or non-finite.
+    #[new]
+    #[pyo3(signature = (lambda_))]
+    fn new(lambda_: f64) -> PyResult<Self> {
+        if !lambda_.is_finite() || lambda_ <= 0.0 {
+            return Err(PyValueError::new_err("lambda_ must be finite and positive"));
+        }
+        Ok(Self {
+            inner: Simplex::new(lambda_),
+        })
+    }
+}
+
+/// The conjugate-gradient method for calibration.
+#[gen_stub_pyclass]
+#[pyclass(name = "ConjugateGradient", unsendable, module = "itofin.optimization")]
+pub struct PyConjugateGradient {
+    inner: ConjugateGradient,
+}
+
+#[gen_stub_pymethods]
+#[pymethods]
+impl PyConjugateGradient {
+    /// Build a conjugate-gradient method with the core Armijo line search.
+    #[new]
+    fn new() -> Self {
+        Self {
+            inner: ConjugateGradient::new(),
+        }
+    }
+}
+
+/// The steepest-descent method for calibration.
+#[gen_stub_pyclass]
+#[pyclass(name = "SteepestDescent", unsendable, module = "itofin.optimization")]
+pub struct PySteepestDescent {
+    inner: SteepestDescent,
+}
+
+#[gen_stub_pymethods]
+#[pymethods]
+impl PySteepestDescent {
+    /// Build a steepest-descent method with the core Armijo line search.
+    #[new]
+    fn new() -> Self {
+        Self {
+            inner: SteepestDescent::new(),
+        }
+    }
+}
+
+pub(crate) fn with_method<R>(
+    method: &Bound<'_, PyAny>,
+    run: impl FnOnce(&mut dyn OptimizationMethod) -> PyResult<R>,
+) -> PyResult<R> {
+    if method.is_instance_of::<PyLevenbergMarquardt>() {
+        let mut method = method.extract::<PyRefMut<'_, PyLevenbergMarquardt>>()?;
+        return run(method.inner_mut());
+    }
+    if method.is_instance_of::<PySimplex>() {
+        let mut method = method.extract::<PyRefMut<'_, PySimplex>>()?;
+        return run(&mut method.inner);
+    }
+    if method.is_instance_of::<PyConjugateGradient>() {
+        let mut method = method.extract::<PyRefMut<'_, PyConjugateGradient>>()?;
+        return run(&mut method.inner);
+    }
+    if method.is_instance_of::<PySteepestDescent>() {
+        let mut method = method.extract::<PyRefMut<'_, PySteepestDescent>>()?;
+        return run(&mut method.inner);
+    }
+    Err(PyTypeError::new_err(
+        "method must be LevenbergMarquardt, Simplex, ConjugateGradient or SteepestDescent",
+    ))
 }
 
 impl PyLevenbergMarquardt {

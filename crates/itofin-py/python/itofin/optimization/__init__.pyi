@@ -4,9 +4,22 @@
 import builtins
 import typing
 __all__ = [
+    "ConjugateGradient",
     "EndCriteria",
     "LevenbergMarquardt",
+    "Simplex",
+    "SteepestDescent",
 ]
+
+@typing.final
+class ConjugateGradient:
+    r"""
+    The conjugate-gradient method for calibration.
+    """
+    def __init__(self) -> None:
+        r"""
+        Build a conjugate-gradient method with the core Armijo line search.
+        """
 
 @typing.final
 class EndCriteria:
@@ -59,4 +72,27 @@ class LevenbergMarquardt:
             use_cost_functions_jacobian (bool): Use the cost function's own jacobian
                 method (a central difference, order 2 but costlier) instead of
                 the built-in forward-difference scheme.
+        """
+
+@typing.final
+class Simplex:
+    r"""
+    The downhill simplex method for derivative-free calibration.
+    """
+    def __init__(self, lambda_: builtins.float) -> None:
+        r"""
+        Build a simplex with a finite, positive characteristic length.
+
+        Raises:
+            ValueError: If lambda_ is zero, negative or non-finite.
+        """
+
+@typing.final
+class SteepestDescent:
+    r"""
+    The steepest-descent method for calibration.
+    """
+    def __init__(self) -> None:
+        r"""
+        Build a steepest-descent method with the core Armijo line search.
         """

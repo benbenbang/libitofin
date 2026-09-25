@@ -1,0 +1,59 @@
+{
+  "domain": "simopt-optimization-methods",
+  "entries": [
+    {
+      "c": "itofin_simplex_new",
+      "go": "Simplex",
+      "python": "itofin.optimization.Simplex",
+      "status": "implemented",
+      "tests": [
+        "TestCalibrationOptimizationMethods"
+      ]
+    },
+    {
+      "c": "itofin_simplex_new",
+      "go": "Session.NewSimplex",
+      "python": "itofin.optimization.Simplex.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestOptimizationMethodConstructorsAndOwnership"
+      ]
+    },
+    {
+      "c": "itofin_conjugate_gradient_new",
+      "go": "ConjugateGradient",
+      "python": "itofin.optimization.ConjugateGradient",
+      "status": "implemented",
+      "tests": [
+        "TestCalibrationOptimizationMethods"
+      ]
+    },
+    {
+      "c": "itofin_conjugate_gradient_new",
+      "go": "Session.NewConjugateGradient",
+      "python": "itofin.optimization.ConjugateGradient.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestOptimizationMethodConstructorsAndOwnership"
+      ]
+    },
+    {
+      "c": "itofin_steepest_descent_new",
+      "go": "SteepestDescent",
+      "python": "itofin.optimization.SteepestDescent",
+      "status": "implemented",
+      "tests": [
+        "TestCalibrationOptimizationMethods"
+      ]
+    },
+    {
+      "c": "itofin_steepest_descent_new",
+      "go": "Session.NewSteepestDescent",
+      "python": "itofin.optimization.SteepestDescent.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestOptimizationMethodConstructorsAndOwnership"
+      ]
+    }
+  ]
+}
