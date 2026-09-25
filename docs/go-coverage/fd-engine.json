@@ -1,0 +1,71 @@
+{
+  "domain": "finite-difference-vanilla-engine",
+  "entries": [
+    {
+      "c": "itofin_fd_black_scholes_engine_new",
+      "go": "Session.NewFdBlackScholesVanillaEngine",
+      "python": "itofin.pricingengines.FdBlackScholesVanillaEngine.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestFdBlackScholesVanillaCoreOracles"
+      ]
+    },
+    {
+      "go": "FdScheme",
+      "python": "itofin.pricingengines.FdScheme",
+      "status": "implemented",
+      "tests": [
+        "TestFdBlackScholesVanillaConfigAndSessions"
+      ]
+    },
+    {
+      "go": "FdDouglas",
+      "python": "itofin.pricingengines.FdScheme.Douglas",
+      "status": "implemented",
+      "tests": [
+        "TestFdBlackScholesVanillaConfigAndSessions"
+      ]
+    },
+    {
+      "go": "FdImplicitEuler",
+      "python": "itofin.pricingengines.FdScheme.ImplicitEuler",
+      "status": "implemented",
+      "tests": [
+        "TestFdBlackScholesVanillaConfigAndSessions"
+      ]
+    },
+    {
+      "go": "FdScheme: explicit integer conversion",
+      "python": "itofin.pricingengines.FdScheme.__int__",
+      "status": "implemented",
+      "tests": [
+        "TestFdBlackScholesVanillaConfigAndSessions"
+      ]
+    },
+    {
+      "classification": "nonconstructible-enum",
+      "go": "FdScheme",
+      "python": "itofin.pricingengines.FdScheme.__new__",
+      "reason": "Python enum forbids construction; Go has typed integer constants and validates scheme values at the native boundary.",
+      "status": "language-specific"
+    },
+    {
+      "c": "itofin_option_set_engine",
+      "go": "VanillaOption.SetFdEngine",
+      "python": "itofin.instruments.VanillaOption.set_fd_engine",
+      "status": "implemented",
+      "tests": [
+        "TestFdBlackScholesVanillaCoreOracles"
+      ]
+    },
+    {
+      "c": "itofin_option_value",
+      "go": "VanillaOption.PriceFd",
+      "python": "itofin.instruments.VanillaOption.price_fd",
+      "status": "implemented",
+      "tests": [
+        "TestFdBlackScholesVanillaCoreOracles"
+      ]
+    }
+  ]
+}

@@ -1313,6 +1313,14 @@ class VanillaOption:
             engine (MCEuropeanEngine): The engine, which already holds the
                 process it prices on.
         """
+    def set_fd_engine(self, engine: pricingengines.FdBlackScholesVanillaEngine) -> None:
+        r"""
+        Attach an FD engine, retaining its process for later lazy repricing.
+        """
+    def price_fd(self, engine: pricingengines.FdBlackScholesVanillaEngine) -> builtins.float:
+        r"""
+        Attach an FD engine and return the option value.
+        """
     def set_qmc_engine(self, engine: pricingengines.QMCEuropeanEngine) -> None:
         r"""
         Attach the fixed-sample Sobol European engine.

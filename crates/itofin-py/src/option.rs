@@ -1,6 +1,7 @@
 //! Facades for the option instrument: OptionType and VanillaOption.
 
 use crate::PyQlError;
+use crate::fdengine::PyFdBlackScholesVanillaEngine;
 use crate::heston::PyHestonModel;
 use crate::heston_engines::{PyCosHestonEngine, PyExponentialFittingHestonEngine};
 use crate::market::PyBlackScholesProcess;
@@ -229,6 +230,17 @@ impl PyVanillaOption {
     ///         process it prices on.
     fn set_mc_engine(&mut self, engine: &PyMCEuropeanEngine) {
         self.inner.base_mut().set_pricing_engine(engine.engine());
+    }
+
+    /// Attach an FD engine, retaining its process for later lazy repricing.
+    fn set_fd_engine(&mut self, engine: &PyFdBlackScholesVanillaEngine) {
+        self.inner.base_mut().set_pricing_engine(engine.engine());
+    }
+
+    /// Attach an FD engine and return the option value.
+    fn price_fd(&mut self, engine: &PyFdBlackScholesVanillaEngine) -> PyResult<f64> {
+        self.set_fd_engine(engine);
+        self.npv()
     }
 
     /// Attach the fixed-sample Sobol European engine.

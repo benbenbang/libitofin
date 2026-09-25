@@ -1,0 +1,82 @@
+"""Finite-difference vanilla prices shared with the Go and Rust fixtures."""
+
+import gc
+import math
+from typing import Any, cast
+
+import pytest
+
+from itofin import Settings
+from itofin.instruments import BermudanExercise, OptionType, VanillaOption
+from itofin.pricingengines import FdBlackScholesVanillaEngine, FdScheme
+from itofin.processes import BlackScholesProcess
+from itofin.time import Date, DayCounter
+
+
+def _market():
+    today = Date(15, 1, 2025)
+    expiry = Date(15, 1, 2026)
+    settings = Settings()
+    settings.set_evaluation_date(today)
+    process = BlackScholesProcess(80.0, 0.05, 0.0, 0.25, today, DayCounter.actual365_fixed())
+    return today, expiry, settings, process
+
+
+@pytest.mark.parametrize(
+    ("exercise", "expected"),
+    [
+        (
+            "european",
+            (18.266147644485358, -0.71491824907787493, 0.016981361087847299, 0.37758711159122471),
+        ),
+        (
+            "american",
+            (20.357667204554883, -0.85902979493468978, 0.026600330114210077, -0.86325809371658702),
+        ),
+        (
+            "bermudan",
+            (19.954434523211695, -0.81750545328763524, 0.019414167279763642, 0.38521081736987667),
+        ),
+    ],
+)
+def test_fd_core_and_go_prices_and_greeks(exercise, expected):
+    """Each exercise type matches the same deterministic core and Go fixture."""
+    today, expiry, settings, process = _market()
+    if exercise == "european":
+        option = VanillaOption(OptionType.Put, 100.0, expiry, settings)
+    elif exercise == "american":
+        option = VanillaOption.american(OptionType.Put, 100.0, today, expiry, settings)
+    else:
+        dates = [Date(15, month, 2025) for month in (4, 7, 10)] + [expiry]
+        option = VanillaOption.from_bermudan(OptionType.Put, 100.0, BermudanExercise(dates), settings)
+
+    engine = FdBlackScholesVanillaEngine(process, t_grid=200, x_grid=200)
+    option.set_fd_engine(engine)
+    got = (option.npv(), option.delta(), option.gamma(), option.theta())
+    assert got == pytest.approx(expected, rel=0, abs=1e-12)
+    assert option.price_fd(engine) == pytest.approx(got[0], rel=0, abs=1e-12)
+
+    del process, engine
+    gc.collect()
+    settings.set_evaluation_date(today + 1)
+    assert math.isfinite(option.npv())
+
+
+def test_fd_grid_validation_and_supported_schemes():
+    """Reject invalid grids and restrict rollback to supported schemes."""
+    _, expiry, settings, process = _market()
+    for config in ({"t_grid": 0}, {"x_grid": 2}, {"t_grid": 2, "damping_steps": 2**64 - 1}):
+        with pytest.raises((ValueError, OverflowError)):
+            FdBlackScholesVanillaEngine(process, **cast(dict[str, Any], config))
+
+    assert int(FdScheme.Douglas) == 0
+    assert int(FdScheme.ImplicitEuler) == 1
+    with pytest.raises(TypeError):
+        FdBlackScholesVanillaEngine(process, scheme=cast(Any, 2))
+
+    option = VanillaOption(OptionType.Put, 100.0, expiry, settings)
+    default = option.price_fd(FdBlackScholesVanillaEngine(process))
+    implicit = option.price_fd(FdBlackScholesVanillaEngine(process, scheme=FdScheme.ImplicitEuler))
+    assert math.isfinite(default)
+    assert math.isfinite(implicit)
+    assert implicit != default
