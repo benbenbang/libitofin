@@ -298,7 +298,7 @@ func (h *SwaptionHelper) CalibrationError() (float64, error) {
 	}
 	return helperError(h.object, 1)
 }
-func calibrateModel(model object, kind int32, helpers []object, method OptimizationMethod, criteria *EndCriteria, order uint, fix bool) error {
+func calibrateModel(model object, kind int32, helpers []object, method OptimizationMethod, criteria *EndCriteria, order uint, fix bool, options []*CalibrationOptions) error {
 	if criteria == nil {
 		return errNilArgument("method or criteria")
 	}
@@ -311,6 +311,11 @@ func calibrateModel(model object, kind int32, helpers []object, method Optimizat
 	if err := sameSession(s, objects...); err != nil {
 		return err
 	}
+	args, err := newCalibrationArgs(s, options, fix)
+	if err != nil {
+		return err
+	}
+	defer args.release()
 	ids := make([]C.uint64_t, len(helpers))
 	for i, h := range helpers {
 		ids[i] = C.uint64_t(h.id)
@@ -325,10 +330,10 @@ func calibrateModel(model object, kind int32, helpers []object, method Optimizat
 	}
 	return s.invoke(func() error {
 		var e C.ItofinError
-		return ffiError(C.itofin_model_calibrate(s.ctx, C.uint64_t(model.id), C.int32_t(kind), ptr, C.size_t(len(ids)), C.uint64_t(methodObject.id), C.uint64_t(criteria.id), C.size_t(order), fixed, &e), &e)
+		return ffiError(C.itofin_model_calibrate_with_options(s.ctx, C.uint64_t(model.id), C.int32_t(kind), ptr, C.size_t(len(ids)), C.uint64_t(methodObject.id), C.uint64_t(criteria.id), C.size_t(order), fixed, &args.cfg, &e), &e)
 	})
 }
-func (m *HestonModel) Calibrate(helpers []*HestonModelHelper, method OptimizationMethod, criteria *EndCriteria, integrationOrder uint) error {
+func (m *HestonModel) Calibrate(helpers []*HestonModelHelper, method OptimizationMethod, criteria *EndCriteria, integrationOrder uint, options ...*CalibrationOptions) error {
 	if m == nil {
 		return errNilArgument("model")
 	}
@@ -339,9 +344,9 @@ func (m *HestonModel) Calibrate(helpers []*HestonModelHelper, method Optimizatio
 		}
 		objects[i] = h.object
 	}
-	return calibrateModel(m.object, 0, objects, method, criteria, integrationOrder, false)
+	return calibrateModel(m.object, 0, objects, method, criteria, integrationOrder, false, options)
 }
-func (m *HullWhite) Calibrate(helpers []*SwaptionHelper, method OptimizationMethod, criteria *EndCriteria, fixReversion bool) error {
+func (m *HullWhite) Calibrate(helpers []*SwaptionHelper, method OptimizationMethod, criteria *EndCriteria, fixReversion bool, options ...*CalibrationOptions) error {
 	if m == nil {
 		return errNilArgument("model")
 	}
@@ -352,5 +357,5 @@ func (m *HullWhite) Calibrate(helpers []*SwaptionHelper, method OptimizationMeth
 		}
 		objects[i] = h.object
 	}
-	return calibrateModel(m.object, 1, objects, method, criteria, 0, fixReversion)
+	return calibrateModel(m.object, 1, objects, method, criteria, 0, fixReversion, options)
 }
