@@ -30,6 +30,9 @@
 mod hessian;
 mod subproblem;
 
+#[cfg(test)]
+mod tests;
+
 use crate::counters::{Counters, Halt};
 use crate::error::MinimizeError;
 use crate::finite_difference::{FiniteDifference, gradient};
