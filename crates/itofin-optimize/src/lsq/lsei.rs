@@ -10,22 +10,30 @@ use super::{Failure, MatRef, norm};
 /// admits minimum-norm points up to `||x||` of about `2e6`.
 const INFEASIBILITY: f64 = 1e3 * f64::EPSILON;
 
-/// A constrained least-squares solution and its residual norm `||E x - f||`.
-#[derive(Debug, Clone)]
+/// A constrained least-squares solution, its residual norm `||E x - f||` and
+/// the multipliers of its constraints.
+///
+/// The multipliers list the equalities first, then the inequalities, and
+/// satisfy the stationarity condition `E' (E x - f) = C' mu + G' lambda` with
+/// `lambda >= 0`: they belong to the objective `||E x - f||^2 / 2`. LDP reads
+/// as `E = I`, `f = 0`.
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Lsq {
     pub(crate) x: Vec<f64>,
     pub(crate) residual_norm: f64,
+    pub(crate) multipliers: Vec<f64>,
 }
 
 /// Solves LDP, `min ||x||` subject to `G x >= h`, through NNLS on its dual
 /// (Lawson and Hanson 23.27): with `E = [G'; h']` and `f = (0, ..., 0, 1)`,
-/// the NNLS residual `r = E u - f` gives `x = r_{1..n} / (-r_{n+1})`.
+/// the NNLS residual `r = E u - f` gives `x = r_{1..n} / (-r_{n+1})`, and
+/// since `x = G' u / (-r_{n+1})` the multipliers are `u / (-r_{n+1})`.
 ///
 /// # Errors
 ///
 /// [`Failure::Infeasible`] when `-r_{n+1} = 1 - h' u` is at most
 /// [`INFEASIBILITY`], and [`Failure::IterationCap`] from NNLS.
-pub(crate) fn ldp(g: MatRef<'_>, h: &[f64]) -> Result<Vec<f64>, Failure> {
+pub(crate) fn ldp(g: MatRef<'_>, h: &[f64]) -> Result<Lsq, Failure> {
     let (m, n) = (g.rows, g.cols);
     let mut e = vec![0.0; (n + 1) * m];
     for i in 0..m {
@@ -50,12 +58,18 @@ pub(crate) fn ldp(g: MatRef<'_>, h: &[f64]) -> Result<Vec<f64>, Failure> {
     if denominator <= INFEASIBILITY {
         return Err(Failure::Infeasible);
     }
-    Ok(r[..n].iter().map(|r| r / denominator).collect())
+    let x: Vec<f64> = r[..n].iter().map(|r| r / denominator).collect();
+    Ok(Lsq {
+        residual_norm: norm(x.iter().copied()),
+        x,
+        multipliers: u.iter().map(|u| u / denominator).collect(),
+    })
 }
 
 /// Solves LSI, `min ||E x - f||` subject to `G x >= h`, for `E` of full column
 /// rank. With `E P = Q R` and `Q' f = (f_1, f_2)`, the substitution
-/// `u = R P' x - f_1` turns it into LDP on `G P R^-1 u >= h - G P R^-1 f_1`.
+/// `u = R P' x - f_1` turns it into LDP on `G P R^-1 u >= h - G P R^-1 f_1`,
+/// whose multipliers are those of `G x >= h` unchanged.
 ///
 /// # Errors
 ///
@@ -83,7 +97,9 @@ pub(crate) fn lsi(e: MatRef<'_>, f: &[f64], g: MatRef<'_>, h: &[f64]) -> Result<
         cols: n,
         stride: n,
     };
-    let u = ldp(reduced, &bound)?;
+    let Lsq {
+        x: u, multipliers, ..
+    } = ldp(reduced, &bound)?;
     let mut z: Vec<f64> = u.iter().zip(&qf).map(|(u, f)| u + f).collect();
     qr.solve_r(&mut z);
     let mut x = vec![0.0; n];
@@ -91,12 +107,18 @@ pub(crate) fn lsi(e: MatRef<'_>, f: &[f64], g: MatRef<'_>, h: &[f64]) -> Result<
         x[j] = z[k];
     }
     let residual_norm = norm(u.iter().copied()).hypot(norm(qf[n..].iter().copied()));
-    Ok(Lsq { x, residual_norm })
+    Ok(Lsq {
+        x,
+        residual_norm,
+        multipliers,
+    })
 }
 
 /// Solves LSEI, `min ||E x - f||` subject to `C x = d` and `G x >= h`. With
 /// `C' P = Q R`, the substitution `x = Q (y_1, y_2)` fixes `y_1` by
 /// `R' y_1 = P' d` and leaves LSI in `y_2` on the rows of `E Q` and `G Q`.
+/// The inequality multipliers carry over from LSI, and the equality ones
+/// solve `C' mu = E' (E x - f) - G' lambda` through the same factorization.
 ///
 /// # Errors
 ///
@@ -152,9 +174,27 @@ pub(crate) fn lsei(
     )?;
     y.extend_from_slice(&reduced.x);
     qr.apply_q(&mut y);
+    let lambda = &reduced.multipliers;
+    let residual: Vec<f64> = (0..e.rows)
+        .map(|i| (0..n).map(|j| e.at(i, j) * y[j]).sum::<f64>() - f[i])
+        .collect();
+    let mut v: Vec<f64> = (0..n)
+        .map(|j| {
+            (0..e.rows).map(|i| e.at(i, j) * residual[i]).sum::<f64>()
+                - (0..g.rows).map(|k| g.at(k, j) * lambda[k]).sum::<f64>()
+        })
+        .collect();
+    qr.apply_qt(&mut v);
+    qr.solve_r(&mut v);
+    let mut multipliers = vec![0.0; mc];
+    for (k, &i) in qr.perm().iter().enumerate() {
+        multipliers[i] = v[k];
+    }
+    multipliers.extend_from_slice(lambda);
     Ok(Lsq {
         x: y,
         residual_norm: reduced.residual_norm,
+        multipliers,
     })
 }
 
