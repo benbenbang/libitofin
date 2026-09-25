@@ -702,6 +702,66 @@ typedef struct SwaptionHelperConfig {
   double nominal;
 } SwaptionHelperConfig;
 
+/**
+ * Borrowed solver state, valid only during an iteration callback.
+ */
+typedef struct ItofinIterationState {
+  const double *x;
+  size_t n;
+  double fun;
+  size_t nit;
+  size_t nfev;
+  size_t njev;
+} ItofinIterationState;
+
+/**
+ * A caller-supplied objective. `value` writes f(x) to its output and returns
+ * zero, or returns nonzero after filling the error. The optional `callback`
+ * runs after every iteration and sets `*stop` to cancel the run; a nonzero
+ * return fails it. `release`, when set, is called exactly once before
+ * `itofin_optimize_nelder_mead` returns whenever `objective` is non-null.
+ * Callbacks must not unwind.
+ */
+typedef struct ItofinObjective {
+  size_t userdata;
+  int32_t (*value)(size_t, const double*, size_t, double*, struct ItofinError*);
+  int32_t (*callback)(size_t, const struct ItofinIterationState*, bool*, struct ItofinError*);
+  void (*release)(size_t);
+} ItofinObjective;
+
+/**
+ * Nelder-Mead options. A zero field keeps the solver default, so a
+ * zero-initialized struct is valid; a zero tolerance is therefore not
+ * expressible here.
+ */
+typedef struct ItofinOptimizeOptions {
+  size_t maxiter;
+  size_t maxfev;
+  double xatol;
+  double fatol;
+  bool adaptive;
+} ItofinOptimizeOptions;
+
+/**
+ * Why a run stopped. Values are fixed and append-only: `7` (line search
+ * failed) and `8` (infeasible) are reserved for later solvers.
+ */
+typedef int32_t ItofinOptimizeStatus;
+
+/**
+ * Run outcome. The caller sets `x` to a writable buffer of `n` values before
+ * the call; every other field is written by it.
+ */
+typedef struct ItofinOptimizeResult {
+  double *x;
+  double fun;
+  size_t nit;
+  size_t nfev;
+  size_t njev;
+  ItofinOptimizeStatus status;
+  bool success;
+} ItofinOptimizeResult;
+
 typedef struct ItofinOvernightFutureConfig {
   uint64_t index;
   int32_t value_date;
@@ -996,6 +1056,20 @@ typedef struct ItofinVolGridConfig {
   int32_t volatility_type;
   int32_t flat_extrapolation;
 } ItofinVolGridConfig;
+
+#define ITOFIN_OPTIMIZE_CONVERGED_XTOL 0
+
+#define ITOFIN_OPTIMIZE_CONVERGED_FTOL 1
+
+#define ITOFIN_OPTIMIZE_CONVERGED_GTOL 2
+
+#define ITOFIN_OPTIMIZE_MAX_ITERATIONS 3
+
+#define ITOFIN_OPTIMIZE_MAX_EVALUATIONS 4
+
+#define ITOFIN_OPTIMIZE_CANCELLED 5
+
+#define ITOFIN_OPTIMIZE_NONFINITE 6
 
 #ifdef __cplusplus
 extern "C" {
@@ -3770,6 +3844,24 @@ int32_t itofin_model_calibrate(struct ItofinContext *ctx,
                                size_t integration_order,
                                int32_t fix_reversion,
                                struct ItofinError *error);
+
+/**
+ * Minimize `objective` from `x0` (length `n`) with Nelder-Mead.
+ *
+ * Returns zero with `out_result` filled when the run reached the solver,
+ * whatever its status. A rejected input returns `ITOFIN_INVALID_ARGUMENT`;
+ * a failing `value` or `callback` returns `ITOFIN_CORE_ERROR` carrying its
+ * message, truncated to 1023 bytes.
+ * # Safety
+ * `objective`, `x0`, `options` and `out_result` must satisfy the C caller
+ * contract, and `out_result->x` must be writable for `n` values.
+ */
+int32_t itofin_optimize_nelder_mead(const struct ItofinObjective *objective,
+                                    const double *x0,
+                                    size_t n,
+                                    const struct ItofinOptimizeOptions *options,
+                                    struct ItofinOptimizeResult *out_result,
+                                    struct ItofinError *error);
 
 /**
  * `american`: 0 European, 1 American; earliest ignored for European exercise.
