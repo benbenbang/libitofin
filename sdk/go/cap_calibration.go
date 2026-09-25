@@ -102,7 +102,7 @@ func (h *CapHelper) MandatoryTimes() ([]float64, error) {
 	})
 	return result, err
 }
-func (m *HullWhite) CalibrateCaps(helpers []*CapHelper, method OptimizationMethod, criteria *EndCriteria, fixReversion bool, steps uint) error {
+func (m *HullWhite) CalibrateCaps(helpers []*CapHelper, method OptimizationMethod, criteria *EndCriteria, fixReversion bool, steps uint, options ...*CalibrationOptions) error {
 	if m == nil || criteria == nil {
 		return errNilArgument("model, method and criteria")
 	}
@@ -120,6 +120,11 @@ func (m *HullWhite) CalibrateCaps(helpers []*CapHelper, method OptimizationMetho
 		objects = append(objects, h.object)
 		ids[i] = C.uint64_t(h.id)
 	}
+	args, err := newCalibrationArgs(s, options, fixReversion)
+	if err != nil {
+		return err
+	}
+	defer args.release()
 	return s.invoke(func() error {
 		if err := sameSession(s, objects...); err != nil {
 			return err
@@ -133,6 +138,6 @@ func (m *HullWhite) CalibrateCaps(helpers []*CapHelper, method OptimizationMetho
 			fixed = 1
 		}
 		var e C.ItofinError
-		return ffiError(C.itofin_hullwhite_calibrate_caps(s.ctx, C.uint64_t(m.id), ptr, C.size_t(len(ids)), C.uint64_t(methodObject.id), C.uint64_t(criteria.id), C.size_t(steps), fixed, &e), &e)
+		return ffiError(C.itofin_hullwhite_calibrate_caps_with_options(s.ctx, C.uint64_t(m.id), ptr, C.size_t(len(ids)), C.uint64_t(methodObject.id), C.uint64_t(criteria.id), C.size_t(steps), fixed, &args.cfg, &e), &e)
 	})
 }

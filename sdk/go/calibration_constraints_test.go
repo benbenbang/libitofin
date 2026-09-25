@@ -1,0 +1,164 @@
+package itofin
+
+import (
+	"math"
+	"strings"
+	"testing"
+)
+
+func constrainedHestonMarket(t *testing.T) (*Session, []*HestonModelHelper, func() *HestonModel, *EndCriteria) {
+	t.Helper()
+	oracle := loadCalibrationCompletionOracle(t)
+	s := pricingMust(NewSession())
+	t.Cleanup(func() { pricingOK(t, s.Close()) })
+	ref := pricingMust(NewDate(15, 1, 2026))
+	dc := pricingMust(s.Actual365Fixed())
+	cal := pricingMust(s.NullCalendar())
+	settings := pricingMust(s.NewSettings())
+	pricingOK(t, settings.SetEvaluationDate(ref))
+	var helpers []*HestonModelHelper
+	for _, quote := range oracle.Quotes {
+		helpers = append(helpers, pricingMust(s.NewHestonModelHelper(HestonHelperConfig{
+			Maturity: Period{int32(quote[0]), Months}, Calendar: cal, Spot: 100,
+			Strike: quote[1], Volatility: quote[2], RiskFreeRate: .03, DividendYield: .01,
+			ErrorType: PriceError, ReferenceDate: ref, DayCounter: dc, Settings: settings,
+		})))
+	}
+	newModel := func() *HestonModel {
+		process := pricingMust(s.NewHestonProcess(HestonProcessConfig{
+			RiskFreeRate: .03, DividendYield: .01, Spot: 100, V0: .035,
+			Kappa: 1, Theta: .045, Sigma: .25, Rho: -.4,
+			ReferenceDate: ref, DayCounter: dc,
+		}))
+		return pricingMust(s.NewHestonModel(process))
+	}
+	criteria := pricingMust(s.NewEndCriteria(EndCriteriaConfig{
+		MaxIterations: 1000, MaxStationaryStateIterations: pricingPtr(uint(100)),
+		RootEpsilon: 1e-8, FunctionEpsilon: 1e-8,
+		GradientNormEpsilon: pricingPtr(1e-8),
+	}))
+	return s, helpers, newModel, criteria
+}
+
+func hestonParams(t *testing.T, model *HestonModel) [5]float64 {
+	t.Helper()
+	return [5]float64{
+		pricingMust(model.Theta()), pricingMust(model.Kappa()), pricingMust(model.Sigma()),
+		pricingMust(model.Rho()), pricingMust(model.V0()),
+	}
+}
+
+func TestCalibrationConstraintHandlesAndOptions(t *testing.T) {
+	s, helpers, newModel, criteria := constrainedHestonMarket(t)
+	if _, err := s.NewBoundaryConstraint(2, 1); err == nil {
+		t.Fatal("reversed bounds accepted")
+	}
+	if _, err := s.NewBoundaryConstraint(math.NaN(), 1); err == nil {
+		t.Fatal("non-finite bound accepted")
+	}
+	boundary := pricingMust(s.NewBoundaryConstraint(-.75, 1.1))
+	no := pricingMust(s.NewNoConstraint())
+	composite := pricingMust(s.NewCompositeConstraint(no, boundary))
+	pricingOK(t, no.Close())
+	pricingOK(t, boundary.Close())
+	options := &CalibrationOptions{Constraint: composite}
+	var first [5]float64
+	for run := 0; run < 2; run++ {
+		model := newModel()
+		method := pricingMust(s.NewLevenbergMarquardt(nil))
+		pricingOK(t, model.Calibrate(helpers, method, criteria, 96, options))
+		params := hestonParams(t, model)
+		if !(params[1] > 1.099 && params[1] <= 1.1+1e-12) {
+			t.Fatalf("boundary did not bind kappa: %v", params)
+		}
+		if run == 0 {
+			first = params
+		} else {
+			for i := range params {
+				pricingNear(t, params[i], first[i], 1e-12)
+			}
+		}
+	}
+	pricingOK(t, composite.Close())
+	if err := newModel().Calibrate(helpers, pricingMust(s.NewLevenbergMarquardt(nil)), criteria, 96, options); err == nil {
+		t.Fatal("released constraint accepted")
+	}
+	positive := pricingMust(s.NewPositiveConstraint())
+	if err := newModel().Calibrate(helpers, pricingMust(s.NewLevenbergMarquardt(nil)), criteria, 96,
+		&CalibrationOptions{Constraint: positive}); err == nil || !strings.Contains(err.Error(), "initial guess") {
+		t.Fatalf("LM projected an infeasible rho instead of rejecting it: %v", err)
+	}
+	other := pricingMust(NewSession())
+	foreign := pricingMust(other.NewNoConstraint())
+	if _, err := s.NewCompositeConstraint(positive, foreign); err != ErrSessionMismatch {
+		t.Fatalf("cross-session composite constraint: %v", err)
+	}
+	if err := newModel().Calibrate(helpers, pricingMust(s.NewLevenbergMarquardt(nil)), criteria, 96,
+		&CalibrationOptions{Constraint: foreign}); err != ErrSessionMismatch {
+		t.Fatalf("cross-session calibration constraint: %v", err)
+	}
+	pricingOK(t, other.Close())
+
+	model := newModel()
+	pricingOK(t, model.Calibrate(helpers, pricingMust(s.NewLevenbergMarquardt(nil)), criteria, 96,
+		&CalibrationOptions{FixParameters: []bool{false, false, false, true, false}}))
+	pricingNear(t, pricingMust(model.Rho()), -.4, 1e-15)
+
+	weights := []float64{5, 5, 5, 1, 1, 1, 1, 1, 1}
+	weighted := newModel()
+	pricingOK(t, weighted.Calibrate(helpers, pricingMust(s.NewLevenbergMarquardt(nil)), criteria, 96,
+		&CalibrationOptions{Weights: weights}))
+	unweighted := newModel()
+	pricingOK(t, unweighted.Calibrate(helpers, pricingMust(s.NewLevenbergMarquardt(nil)), criteria, 96))
+	if math.Abs(pricingMust(weighted.Kappa())-pricingMust(unweighted.Kappa())) < 1e-5 {
+		t.Fatalf("nonuniform weights did not move fitted kappa: %v vs %v", hestonParams(t, weighted), hestonParams(t, unweighted))
+	}
+}
+
+func TestCalibrationOptionsPreserveCoreErrors(t *testing.T) {
+	s, helpers, newModel, criteria := constrainedHestonMarket(t)
+	cases := []struct {
+		options *CalibrationOptions
+		message string
+	}{
+		{&CalibrationOptions{Weights: []float64{1, 1}}, "mismatch between number of instruments (9) and weights (2)"},
+		{&CalibrationOptions{FixParameters: []bool{true, false}}, "mismatch between number of parameters (5) and fixed-parameter specs (2)"},
+		{&CalibrationOptions{FixParameters: []bool{true, true, true, true, true}}, "numberOfFreeParameters==0"},
+	}
+	for _, test := range cases {
+		model := newModel()
+		method := pricingMust(s.NewLevenbergMarquardt(nil))
+		if err := model.Calibrate(helpers, method, criteria, 96, test.options); err == nil || !strings.Contains(err.Error(), test.message) {
+			t.Fatalf("wanted %q, got %v", test.message, err)
+		}
+	}
+	for _, fit := range []func(*HestonModel, *LevenbergMarquardt, *CalibrationOptions) error{
+		func(model *HestonModel, method *LevenbergMarquardt, opts *CalibrationOptions) error {
+			return model.CalibrateCOS(helpers, method, criteria, 16, 200, opts)
+		},
+		func(model *HestonModel, method *LevenbergMarquardt, opts *CalibrationOptions) error {
+			return model.CalibrateExponentialFitting(helpers, method, criteria, nil, opts)
+		},
+	} {
+		if err := fit(newModel(), pricingMust(s.NewLevenbergMarquardt(nil)), &CalibrationOptions{Weights: []float64{1, 1}}); err == nil || !strings.Contains(err.Error(), "mismatch between number of instruments (9) and weights (2)") {
+			t.Fatalf("alternative Heston engine dropped calibration options: %v", err)
+		}
+	}
+	curve := pricingMust(s.NewFlatForward(pricingMust(NewDate(15, 1, 2026)), .03, pricingMust(s.Actual365Fixed())))
+	hw := pricingMust(s.NewHullWhite(curve, .05, .01))
+	method := pricingMust(s.NewLevenbergMarquardt(nil))
+	if err := hw.Calibrate(nil, method, criteria, true, &CalibrationOptions{FixParameters: []bool{true, false}}); err == nil || !strings.Contains(err.Error(), "fixReversion and FixParameters") {
+		t.Fatalf("ambiguous Hull-White mask: %v", err)
+	}
+	settings := pricingMust(s.NewSettings())
+	pricingOK(t, settings.SetEvaluationDate(pricingMust(NewDate(15, 1, 2026))))
+	index := pricingMust(s.NewEuriborSixMonths(curve, settings))
+	cap := pricingMust(s.NewCapHelper(CapHelperConfig{
+		Length: Period{5, Years}, Volatility: pricingMust(s.NewSimpleQuote(.01)),
+		Index: index, FixedLegFrequency: Annual, FixedLegDayCounter: pricingMust(s.Actual365Fixed()),
+		Curve: curve, ErrorType: RelativePriceError, VolatilityType: Normal,
+	}))
+	if err := hw.CalibrateCaps([]*CapHelper{cap}, method, criteria, false, 30, &CalibrationOptions{Weights: []float64{1, 1}}); err == nil || !strings.Contains(err.Error(), "mismatch between number of instruments (1) and weights (2)") {
+		t.Fatalf("cap engine dropped calibration options: %v", err)
+	}
+}
