@@ -94,7 +94,139 @@ BFGS = {
     },
 }
 
-CASES: dict[str, object] = {"nelder_mead": NELDER_MEAD, "bfgs": BFGS}
+
+
+def hs35(x):
+    """Hock-Schittkowski 35, minimized at (4/3, 7/9, 4/9) with f = 1/9."""
+    return 9 - 8 * x[0] - 6 * x[1] - 4 * x[2] + 2 * x[0] ** 2 + 2 * x[1] ** 2 + x[2] ** 2 + 2 * x[0] * x[1] + 2 * x[0] * x[2]
+
+
+def hs71(x):
+    """Hock-Schittkowski 71, minimized near (1, 4.743, 3.821, 1.379) with f = 17.014."""
+    return x[0] * x[3] * (x[0] + x[1] + x[2]) + x[2]
+
+
+def tutorial(x):
+    """The distance to (1, 2.5), cut off by three half-planes."""
+    return (x[0] - 1.0) ** 2 + (x[1] - 2.5) ** 2
+
+
+def weighted(x):
+    """A diagonal quadratic, paired with the plane x0 + x1 + x2 = 1."""
+    return x[0] ** 2 + 2.0 * x[1] ** 2 + 3.0 * x[2] ** 2
+
+
+SLSQP = {
+    "hs35": {
+        "objective": hs35,
+        "constraints": [("ineq", lambda x: 3 - x[0] - x[1] - 2 * x[2])],
+        "x0": [0.5, 0.5, 0.5],
+        "bounds": [[0.0, None]] * 3,
+    },
+    "hs71": {
+        "objective": hs71,
+        "constraints": [
+            ("ineq", lambda x: x[0] * x[1] * x[2] * x[3] - 25.0),
+            ("eq", lambda x: sum(v * v for v in x) - 40.0),
+        ],
+        "x0": [1.0, 5.0, 5.0, 1.0],
+        "bounds": [[1.0, 5.0]] * 4,
+    },
+    "tutorial": {
+        "objective": tutorial,
+        "constraints": [
+            ("ineq", lambda x: x[0] - 2 * x[1] + 2),
+            ("ineq", lambda x: -x[0] - 2 * x[1] + 6),
+            ("ineq", lambda x: -x[0] + 2 * x[1] + 2),
+        ],
+        "x0": [2.0, 0.0],
+        "bounds": [[0.0, None]] * 2,
+    },
+    "rosenbrock_disc": {
+        "objective": rosenbrock,
+        "constraints": [("ineq", lambda x: 1.5 - x[0] ** 2 - x[1] ** 2)],
+        "x0": [-1.0, 0.5],
+        "bounds": None,
+    },
+    "weighted_plane": {
+        "objective": weighted,
+        "constraints": [("eq", lambda x: x[0] + x[1] + x[2] - 1.0)],
+        "x0": [1.0, 1.0, 1.0],
+        "bounds": None,
+    },
+}
+
+
+def central_gradient(function, x, h=1e-6):
+    """The central-difference gradient, the same rule the Rust test applies."""
+    gradient = []
+    for i in range(len(x)):
+        plus, minus = list(x), list(x)
+        plus[i] += h
+        minus[i] -= h
+        gradient.append((function(plus) - function(minus)) / (2 * h))
+    return gradient
+
+
+def kkt_residual(case, x, multipliers):
+    """The largest component of g - A' lambda, projected onto the bound cone at x."""
+    residual = central_gradient(case["objective"], x)
+    for (_, constraint), multiplier in zip(case["constraints"], multipliers):
+        for i, component in enumerate(central_gradient(constraint, x)):
+            residual[i] -= multiplier * component
+    worst = 0.0
+    for i, r in enumerate(residual):
+        lower, upper = case["bounds"][i] if case["bounds"] else (None, None)
+        if lower is not None and abs(x[i] - lower) <= 1e-10:
+            r = min(r, 0.0)
+        if upper is not None and abs(x[i] - upper) <= 1e-10:
+            r = max(r, 0.0)
+        worst = max(worst, abs(r))
+    return worst
+
+
+def solved_slsqp(definitions: dict) -> dict:
+    """Run SciPy SLSQP over every case and record the optimum and its residuals.
+
+    SciPy lists the multipliers equalities first; they are put back in the
+    order the constraints are declared, which is the order the Rust solver uses.
+    """
+    from scipy.optimize import minimize
+
+    results = {}
+    for name, case in definitions.items():
+        constraints = [{"type": kind, "fun": function} for kind, function in case["constraints"]]
+        outcome = minimize(
+            case["objective"], case["x0"], method="SLSQP", bounds=case["bounds"], constraints=constraints, options={"ftol": 1e-10, "maxiter": 200}
+        )
+        if not outcome.success:
+            raise SystemExit(f"case {name} did not converge: {outcome.message}")
+        x = outcome.x.tolist()
+        order = [i for i, (kind, _) in enumerate(case["constraints"]) if kind == "eq"]
+        order += [i for i, (kind, _) in enumerate(case["constraints"]) if kind == "ineq"]
+        multipliers = [0.0] * len(order)
+        for slot, index in enumerate(order):
+            multipliers[index] = float(outcome.multipliers[slot])
+        violation = max(
+            [abs(f(x)) if kind == "eq" else max(0.0, -f(x)) for kind, f in case["constraints"]],
+            default=0.0,
+        )
+        results[name] = {
+            "x0": case["x0"],
+            "bounds": case["bounds"],
+            "ftol": 1e-10,
+            "x": x,
+            "fun": float(outcome.fun),
+            "multipliers": multipliers,
+            "max_violation": violation,
+            "kkt_residual": kkt_residual(case, x, multipliers),
+            "nit": int(outcome.nit),
+            "message": str(outcome.message),
+        }
+    return results
+
+
+CASES: dict[str, object] = {"nelder_mead": NELDER_MEAD, "bfgs": BFGS, "slsqp": SLSQP}
 
 
 def solved(definitions: dict) -> dict:
@@ -156,7 +288,7 @@ def solved_bfgs(definitions: dict) -> dict:
     return results
 
 
-SOLVERS = {"bfgs": solved_bfgs}
+SOLVERS = {"bfgs": solved_bfgs, "slsqp": solved_slsqp}
 
 
 def provenance(scipy_version: str) -> dict[str, str]:
