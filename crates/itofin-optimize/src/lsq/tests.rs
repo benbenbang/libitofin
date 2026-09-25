@@ -1,6 +1,7 @@
 use super::householder::Qr;
+use super::lsei::{ldp, lsei, lsi};
 use super::nnls::{Nnls, nnls};
-use super::{MatRef, norm};
+use super::{Failure, MatRef, norm};
 
 /// A 64-bit linear congruential generator returning uniform values in `[-1, 1)`.
 struct Lcg(u64);
@@ -179,4 +180,135 @@ fn nnls_safeguard_terminates_on_proportional_columns() {
     assert_kkt(a, &b, &solution);
     assert!(solution.iterations <= 3);
     assert!(solution.residual_norm <= 1e-14);
+}
+
+fn assert_close(actual: &[f64], expected: &[f64], tol: f64) {
+    assert_eq!(actual.len(), expected.len());
+    for (a, e) in actual.iter().zip(expected) {
+        assert!((a - e).abs() <= tol, "{actual:?} != {expected:?}");
+    }
+}
+
+const NONE: MatRef<'static> = MatRef {
+    data: &[],
+    rows: 0,
+    cols: 0,
+    stride: 0,
+};
+
+#[test]
+fn ldp_projects_the_origin_onto_the_active_half_plane() {
+    let g = [1.0, 1.0, 1.0, -1.0];
+    let x = ldp(mat(&g, 2, 2), &[1.0, -5.0]).expect("feasible");
+    assert_close(&x, &[0.5, 0.5], 1e-14);
+}
+
+#[test]
+fn ldp_returns_the_origin_when_it_is_feasible() {
+    let g = [1.0, 2.0, -3.0, 1.0];
+    let x = ldp(mat(&g, 2, 2), &[-1.0, 0.0]).expect("feasible");
+    assert_close(&x, &[0.0, 0.0], 0.0);
+}
+
+#[test]
+fn ldp_reports_contradictory_inequalities_as_infeasible() {
+    let g = [1.0, -1.0];
+    assert_eq!(ldp(mat(&g, 2, 1), &[1.0, 0.0]), Err(Failure::Infeasible));
+}
+
+#[test]
+fn lsi_moves_the_unconstrained_minimizer_onto_the_violated_constraint() {
+    let e = [2.0, 0.0, 0.0, 1.0];
+    let g = [-1.0, -1.0, 1.0, 0.0];
+    let solution = lsi(mat(&e, 2, 2), &[4.0, 2.0], mat(&g, 2, 2), &[-3.0, 0.0]).expect("feasible");
+    assert_close(&solution.x, &[1.8, 1.2], 1e-14);
+    assert!((solution.residual_norm - 0.8_f64.sqrt()).abs() <= 1e-14);
+}
+
+#[test]
+fn lsi_keeps_the_unconstrained_minimizer_when_the_constraints_are_inactive() {
+    let e = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
+    let x_true = [1.0, -1.0];
+    let f: Vec<f64> = (0..3).map(|i| e[i * 2] - e[i * 2 + 1]).collect();
+    let g = [1.0, 0.0];
+    let solution = lsi(mat(&e, 3, 2), &f, mat(&g, 1, 2), &[0.0]).expect("feasible");
+    assert_close(&solution.x, &x_true, 1e-13);
+    assert!(solution.residual_norm <= 1e-13);
+}
+
+#[test]
+fn lsi_rejects_a_rank_deficient_objective_matrix() {
+    let e = [1.0, 1.0, 2.0, 2.0];
+    let result = lsi(mat(&e, 2, 2), &[1.0, 1.0], NONE, &[]);
+    assert!(matches!(result, Err(Failure::RankDeficient)));
+}
+
+#[test]
+fn lsei_solves_equality_and_active_inequality_together() {
+    let identity = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0];
+    let c = [1.0, 1.0, 1.0];
+    let g = [0.0, 0.0, -1.0];
+    let solution = lsei(
+        mat(&c, 1, 3),
+        &[3.0],
+        mat(&identity, 3, 3),
+        &[1.0, 2.0, 3.0],
+        mat(&g, 1, 3),
+        &[-1.0],
+    )
+    .expect("feasible");
+    assert_close(&solution.x, &[0.5, 1.5, 1.0], 1e-14);
+    assert!((solution.residual_norm - 4.5_f64.sqrt()).abs() <= 1e-14);
+}
+
+#[test]
+fn lsei_with_two_equalities_satisfies_them_at_the_active_bound() {
+    let identity = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0];
+    let c = [1.0, 0.0, 1.0, 0.0, 2.0, -1.0];
+    let g = [1.0, 0.0, 0.0];
+    let solution = lsei(
+        mat(&c, 2, 3),
+        &[1.0, 0.0],
+        mat(&identity, 3, 3),
+        &[0.0, 0.0, 0.0],
+        mat(&g, 1, 3),
+        &[0.7],
+    )
+    .expect("feasible");
+    let x = &solution.x;
+    assert!((x[0] + x[2] - 1.0).abs() <= 1e-14);
+    assert!((2.0 * x[1] - x[2]).abs() <= 1e-14);
+    assert!(x[0] >= 0.7 - 1e-14);
+    assert_close(x, &[0.7, 0.15, 0.3], 1e-14);
+}
+
+#[test]
+fn lsei_rejects_dependent_equalities_even_when_consistent() {
+    let c = [1.0, 1.0, 0.0, 2.0, 2.0, 0.0];
+    let identity = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0];
+    let result = lsei(
+        mat(&c, 2, 3),
+        &[1.0, 2.0],
+        mat(&identity, 3, 3),
+        &[0.0; 3],
+        NONE,
+        &[],
+    );
+    assert!(matches!(result, Err(Failure::RankDeficient)));
+}
+
+#[test]
+fn lsei_reports_an_inequality_that_contradicts_the_equalities_as_infeasible() {
+    let c = [1.0, 0.0];
+    let g = [-1.0, 0.0];
+    let identity = [1.0, 0.0, 0.0, 1.0];
+    let result = lsei(
+        mat(&c, 1, 2),
+        &[1.0],
+        mat(&identity, 2, 2),
+        &[0.0, 0.0],
+        mat(&g, 1, 2),
+        &[0.0],
+    );
+    assert!(matches!(result, Err(Failure::Infeasible)));
 }
