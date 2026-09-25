@@ -1,12 +1,50 @@
 package itofin
 
 import (
+	"encoding/json"
 	"errors"
 	"math"
+	"os"
+	"os/exec"
+	"strings"
 	"testing"
 )
 
+type fdOracleValues struct {
+	NPV   float64 `json:"npv"`
+	Delta float64 `json:"delta"`
+	Gamma float64 `json:"gamma"`
+	Theta float64 `json:"theta"`
+}
+
+func fdCoreOracle(t *testing.T) map[string]fdOracleValues {
+	t.Helper()
+	var data []byte
+	var err error
+	if path := os.Getenv("ITOFIN_FD_ORACLE_JSON"); path != "" {
+		data, err = os.ReadFile(path)
+	} else {
+		cmd := exec.Command("cargo", "run", "--quiet", "--release", "-p", "libitofin", "--example", "fd_binding_oracle")
+		cmd.Dir = "../.."
+		data, err = cmd.Output()
+	}
+	if err != nil {
+		t.Fatalf("load Rust FD oracle: %v", err)
+	}
+	var oracle map[string]fdOracleValues
+	if err := json.Unmarshal(data, &oracle); err != nil {
+		t.Fatalf("decode Rust FD oracle: %v", err)
+	}
+	for _, exercise := range []string{"european", "american", "bermudan"} {
+		if _, ok := oracle[exercise]; !ok {
+			t.Fatalf("Rust FD oracle missing %s", exercise)
+		}
+	}
+	return oracle
+}
+
 func TestFdBlackScholesVanillaCoreOracles(t *testing.T) {
+	oracle := fdCoreOracle(t)
 	s := pricingMust(NewSession())
 	defer s.Close()
 	today := pricingMust(NewDate(15, 1, 2025))
@@ -31,11 +69,11 @@ func TestFdBlackScholesVanillaCoreOracles(t *testing.T) {
 	for _, row := range []struct {
 		name   string
 		option *VanillaOption
-		want   [4]float64
+		want   [3]float64
 	}{
-		{"European", european, [4]float64{18.266147644485358, -0.71491824907787493, 0.016981361087847299, 0.37758711159122471}},
-		{"American", american, [4]float64{20.357667204554883, -0.85902979493468978, 0.026600330114210077, -0.86325809371658702}},
-		{"Bermudan", bermudan, [4]float64{19.954434523211695, -0.81750545328763524, 0.019414167279763642, 0.38521081736987667}},
+		{"European", european, [3]float64{18.266147644485358, -0.71491824907787493, 0.016981361087847299}},
+		{"American", american, [3]float64{20.357667204554883, -0.85902979493468978, 0.026600330114210077}},
+		{"Bermudan", bermudan, [3]float64{19.954434523211695, -0.81750545328763524, 0.019414167279763642}},
 	} {
 		t.Run(row.name, func(t *testing.T) {
 			pricingOK(t, row.option.SetFdEngine(engine))
@@ -43,8 +81,13 @@ func TestFdBlackScholesVanillaCoreOracles(t *testing.T) {
 			delta := pricingMust(row.option.Delta())
 			gamma := pricingMust(row.option.Gamma())
 			theta := pricingMust(row.option.Theta())
-			for i, got := range [4]float64{value, delta, gamma, theta} {
-				pricingNear(t, got, row.want[i], 1e-12)
+			got := [4]float64{value, delta, gamma, theta}
+			core := oracle[strings.ToLower(row.name)]
+			for i, want := range [4]float64{core.NPV, core.Delta, core.Gamma, core.Theta} {
+				pricingNear(t, got[i], want, 1e-12)
+			}
+			for i, want := range row.want {
+				pricingNear(t, got[i], want, 1e-12)
 			}
 			pricingNear(t, pricingMust(row.option.PriceFd(engine)), value, 1e-12)
 		})
