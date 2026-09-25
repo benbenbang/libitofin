@@ -1,4 +1,5 @@
 use super::householder::Qr;
+use super::nnls::{Nnls, nnls};
 use super::{MatRef, norm};
 
 /// A 64-bit linear congruential generator returning uniform values in `[-1, 1)`.
@@ -41,6 +42,25 @@ fn gradient(a: MatRef<'_>, b: &[f64], x: &[f64]) -> Vec<f64> {
 fn dual_scale(a: MatRef<'_>, b: &[f64]) -> f64 {
     let frobenius = a.data.iter().map(|v| v * v).sum::<f64>().sqrt();
     frobenius * b.iter().map(|v| v * v).sum::<f64>().sqrt()
+}
+
+/// Asserts `x >= 0`, `w <= tol`, and `|w_j| <= tol` wherever `x_j > 0`, with
+/// `tol = 1e-10 ||A||_F ||b||`.
+fn assert_kkt(a: MatRef<'_>, b: &[f64], solution: &Nnls) {
+    let tol = 1e-10 * dual_scale(a, b);
+    let w = gradient(a, b, &solution.x);
+    for (x, w) in solution.x.iter().zip(&w) {
+        assert!(*x >= 0.0, "x = {x}");
+        assert!(*w <= tol, "w = {w}");
+        if *x > 0.0 {
+            assert!(w.abs() <= tol, "x = {x}, w = {w}");
+        }
+    }
+    let r: Vec<f64> = (0..a.rows)
+        .map(|i| b[i] - (0..a.cols).map(|j| a.at(i, j) * solution.x[j]).sum::<f64>())
+        .collect();
+    let expected = r.iter().map(|v| v * v).sum::<f64>().sqrt();
+    assert!((solution.residual_norm - expected).abs() <= 1e-12 * (1.0 + expected));
 }
 
 #[test]
@@ -90,6 +110,45 @@ fn qr_reads_through_the_row_stride() {
 }
 
 #[test]
+fn nnls_satisfies_kkt_on_random_ten_by_four_systems() {
+    for seed in 0..40 {
+        let mut rng = Lcg(seed);
+        let (a, b) = (rng.fill(40), rng.fill(10));
+        let a = mat(&a, 10, 4);
+        let solution = nnls(a, &b).expect("random system");
+        assert_kkt(a, &b, &solution);
+    }
+}
+
+#[test]
+fn nnls_satisfies_kkt_when_a_is_rank_deficient() {
+    for seed in 100..120 {
+        let mut rng = Lcg(seed);
+        let mut a = rng.fill(40);
+        for i in 0..10 {
+            a[i * 4 + 2] = a[i * 4] - 2.0 * a[i * 4 + 1];
+        }
+        let b = rng.fill(10);
+        let a = mat(&a, 10, 4);
+        let solution = nnls(a, &b).expect("rank-deficient system");
+        assert_kkt(a, &b, &solution);
+    }
+}
+
+#[test]
+fn nnls_returns_the_unconstrained_solution_when_it_is_nonnegative() {
+    let a = [1.0, 0.0, 0.0, 2.0, 1.0, 1.0];
+    let x_true = [1.5, 0.25];
+    let b: Vec<f64> = (0..3)
+        .map(|i| a[i * 2] * x_true[0] + a[i * 2 + 1] * x_true[1])
+        .collect();
+    let solution = nnls(mat(&a, 3, 2), &b).expect("consistent system");
+    assert!((solution.x[0] - 1.5).abs() <= 1e-14);
+    assert!((solution.x[1] - 0.25).abs() <= 1e-14);
+    assert!(solution.residual_norm <= 1e-14);
+}
+
+#[test]
 fn qr_reflectors_are_orthogonal_and_the_pivots_permute_the_columns() {
     let mut rng = Lcg(3);
     let a = rng.fill(40);
@@ -103,4 +162,21 @@ fn qr_reflectors_are_orthogonal_and_the_pivots_permute_the_columns() {
     let mut perm = qr.perm().to_vec();
     perm.sort_unstable();
     assert_eq!(perm, [0, 1, 2, 3]);
+}
+
+/// Column 1 is exactly three times column 0, so once column 1 is passive the
+/// dual component of column 0 is rounding noise and may be positive. Without
+/// the finite-termination safeguard column 0 enters, gets a zero trial
+/// component, leaves at a zero step, and re-enters until the iteration cap.
+#[test]
+fn nnls_safeguard_terminates_on_proportional_columns() {
+    let a = [1.0, 3.0, 1.0, 2.0, 6.0, 0.0, 3.0, 9.0, -1.0, 4.0, 12.0, 0.5];
+    let b: Vec<f64> = (0..4)
+        .map(|i| 0.7 * a[i * 3] + 0.2 * a[i * 3 + 2])
+        .collect();
+    let a = mat(&a, 4, 3);
+    let solution = nnls(a, &b).expect("the safeguard terminates");
+    assert_kkt(a, &b, &solution);
+    assert!(solution.iterations <= 3);
+    assert!(solution.residual_norm <= 1e-14);
 }
