@@ -19,6 +19,7 @@ mod creditengine;
 mod credithelpers;
 mod currency;
 mod curve;
+mod fdengine;
 mod fra;
 mod helpers;
 mod heston;
@@ -368,6 +369,8 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     pricingengines.add_class::<PyForwardsInCouponPeriod>()?;
     pricingengines.add_class::<PyDiscountingSwapEngine>()?;
     pricingengines.add_class::<PyYoYInflationCapFloorEngine>()?;
+    pricingengines.add_class::<fdengine::PyFdScheme>()?;
+    pricingengines.add_class::<fdengine::PyFdBlackScholesVanillaEngine>()?;
     pricingengines.add_class::<PyMCEuropeanEngine>()?;
     pricingengines.add_class::<PyQMCEuropeanEngine>()?;
     pricingengines.add_class::<heston_engines::PyCosHestonEngine>()?;

@@ -21,6 +21,8 @@ __all__ = [
     "DiscountingSwapEngine",
     "ExponentialFittingControlVariate",
     "ExponentialFittingHestonEngine",
+    "FdBlackScholesVanillaEngine",
+    "FdScheme",
     "ForwardsInCouponPeriod",
     "IsdaCdsEngine",
     "MCAmericanEngine",
@@ -271,6 +273,26 @@ class ExponentialFittingHestonEngine:
     def __init__(self, model: models.HestonModel, control_variate: ExponentialFittingControlVariate = ExponentialFittingControlVariate.Optimal, scaling: typing.Optional[builtins.float] = None, alpha: builtins.float = -0.5) -> None:
         r"""
         Construct the selected control variate with optional fixed scaling.
+        """
+
+@typing.final
+class FdBlackScholesVanillaEngine:
+    r"""
+    Finite-difference engine for European, American and Bermudan vanilla options.
+    """
+    def __init__(self, process: processes.BlackScholesProcess, t_grid: builtins.int = 100, x_grid: builtins.int = 100, damping_steps: builtins.int = 0, scheme: FdScheme = FdScheme.Douglas) -> None:
+        r"""
+        Build a grid engine retaining the Black-Scholes process.
+
+        Args:
+            process (BlackScholesProcess): The market process to price under.
+            t_grid (int): Positive number of time steps; defaults to 100.
+            x_grid (int): Spatial grid size, at least 3; defaults to 100.
+            damping_steps (int): Initial implicit-Euler steps; defaults to 0.
+            scheme (FdScheme): Douglas by default; ImplicitEuler is also supported.
+
+        Raises:
+            ValueError: If the grid dimensions are invalid or overflow.
         """
 
 @typing.final
@@ -616,6 +638,17 @@ class ExponentialFittingControlVariate:
     AngledContour: typing.ClassVar[ExponentialFittingControlVariate]
     AngledContourNoCV: typing.ClassVar[ExponentialFittingControlVariate]
     def __new__(cls, _unconstructible: typing.NoReturn) -> ExponentialFittingControlVariate: ...
+    def __int__(self) -> builtins.int: ...
+    __hash__: typing.ClassVar[None]  # type: ignore[assignment]
+
+@typing.final
+class FdScheme:
+    r"""
+    Supported rollback schemes for a one-dimensional Black-Scholes grid.
+    """
+    Douglas: typing.ClassVar[FdScheme]
+    ImplicitEuler: typing.ClassVar[FdScheme]
+    def __new__(cls, _unconstructible: typing.NoReturn) -> FdScheme: ...
     def __int__(self) -> builtins.int: ...
     __hash__: typing.ClassVar[None]  # type: ignore[assignment]
 
