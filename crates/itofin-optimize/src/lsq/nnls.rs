@@ -4,7 +4,11 @@ use super::householder::Qr;
 use super::{Failure, MatRef, norm};
 
 /// A solution of `min ||A x - b||` subject to `x >= 0`.
+///
+/// LDP reads only `x`; the residual norm and the iteration count are
+/// diagnostics the kernel tests check.
 #[derive(Debug, Clone)]
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) struct Nnls {
     pub(crate) x: Vec<f64>,
     pub(crate) residual_norm: f64,

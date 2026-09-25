@@ -178,6 +178,28 @@ impl BfgsOptions {
     }
 }
 
+/// SLSQP options.
+///
+/// An unset `ftol` falls back to [`Common::tol`] and then to `1e-6`. The
+/// iteration budget comes from [`Common::maxiter`], `100` when unset.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct SlsqpOptions {
+    /// The convergence tolerance on the change in the objective, which the
+    /// maximum constraint violation must also meet.
+    pub ftol: Option<f64>,
+}
+
+impl SlsqpOptions {
+    fn validate(&self) -> Result<(), InvalidInput> {
+        if let Some(ftol) = self.ftol
+            && (!ftol.is_finite() || ftol <= 0.0)
+        {
+            return Err(InvalidInput::NotFinitePositive { option: "ftol" });
+        }
+        Ok(())
+    }
+}
+
 /// The solver to run. Later tickets add variants, hence `#[non_exhaustive]`.
 #[non_exhaustive]
 #[derive(Debug, Clone, PartialEq)]
@@ -186,6 +208,9 @@ pub enum Method {
     NelderMead(NelderMeadOptions),
     /// The quasi-Newton method of Broyden, Fletcher, Goldfarb and Shanno.
     Bfgs(BfgsOptions),
+    /// Sequential least-squares quadratic programming, which honours box
+    /// bounds and general constraints.
+    Slsqp(SlsqpOptions),
 }
 
 impl Method {
@@ -194,6 +219,7 @@ impl Method {
         match self {
             Method::NelderMead(_) => "Nelder-Mead",
             Method::Bfgs(_) => "BFGS",
+            Method::Slsqp(_) => "SLSQP",
         }
     }
 
@@ -201,6 +227,7 @@ impl Method {
     pub fn supports_bounds(&self) -> bool {
         match self {
             Method::NelderMead(_) | Method::Bfgs(_) => false,
+            Method::Slsqp(_) => true,
         }
     }
 
@@ -219,6 +246,7 @@ impl Method {
         match self {
             Method::NelderMead(options) => options.validate(problem.x0.len()),
             Method::Bfgs(options) => options.validate(),
+            Method::Slsqp(options) => options.validate(),
         }
     }
 }
