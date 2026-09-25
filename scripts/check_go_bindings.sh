@@ -8,6 +8,8 @@ if [[ "$go_version" != go1.27.1 ]]; then
 fi
 cargo test -p libitofin-ffi --release
 cargo build -p libitofin-ffi --release
+ITOFIN_HCAL_CORE_ORACLE=$(cargo run --quiet --release -p libitofin-ffi --example calibration_constraints_oracle)
+export ITOFIN_HCAL_CORE_ORACLE
 ITOFIN_EXPECTED_VERSION=$(cargo metadata --no-deps --format-version 1 | python3 -c '
 import json, sys
 print(next(package["version"] for package in json.load(sys.stdin)["packages"]
