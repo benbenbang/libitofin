@@ -2,7 +2,7 @@
 use crate::boundary::{
     BindingError, BindingResult, ItofinError, check_ptr, input_slice, without_context,
 };
-use crate::simulation_kernel::{self, GbmRequest};
+use libitofin::methods::montecarlo::simulation_kernel::{self, GbmRequest};
 use libitofin::types::Real;
 
 /// GBM inputs; arrays each contain `assets` doubles, correlation `assets*assets`.

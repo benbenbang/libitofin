@@ -1,15 +1,15 @@
-//! Stateless, seeded Monte Carlo building blocks for foreign-language bindings.
+//! Stateless, seeded Monte Carlo building blocks shared across bindings.
 //!
 //! Draws use the core Mersenne Twister / inverse-normal policy, consumed in
 //! path, time, asset order. Nonzero seeds reproduce the native sequence; zero
 //! is rejected because the native RNG interprets it as a nondeterministic seed.
 
-use libitofin::errors::{QlError, QlResult};
-use libitofin::math::matrix::Matrix;
-use libitofin::math::matrixutilities::choleskydecomposition::cholesky_decomposition;
-use libitofin::math::randomnumbers::rngtraits::{McRngTraits, PseudoRandom, SequenceGenerator};
-use libitofin::require;
-use libitofin::types::{Natural, Rate, Real, Size, Time, Volatility};
+use crate::errors::{QlError, QlResult};
+use crate::math::matrix::Matrix;
+use crate::math::matrixutilities::choleskydecomposition::cholesky_decomposition;
+use crate::math::randomnumbers::rngtraits::{McRngTraits, PseudoRandom, SequenceGenerator};
+use crate::require;
+use crate::types::{Natural, Rate, Real, Size, Time, Volatility};
 
 fn error(message: &str) -> QlError {
     QlError::new(message, file!(), line!())
@@ -112,7 +112,10 @@ fn correlation_factor(values: &[Real], assets: Size) -> QlResult<Matrix> {
     let tolerance = 64.0 * Real::EPSILON * assets as Real;
     for i in 0..assets {
         require!(
-            factor[(i, i)] > 0.0,
+            matches!(
+                factor[(i, i)].partial_cmp(&0.0),
+                Some(std::cmp::Ordering::Greater)
+            ),
             "correlation must be positive definite"
         );
         for j in 0..=i {
@@ -138,7 +141,7 @@ fn correlation_factor(values: &[Real], assets: Size) -> QlResult<Matrix> {
 /// horizon, zero steps/paths/seed, inconsistent shapes, non-SPD correlation,
 /// and nonfinite or underflowed prices. Supports at most 1,024 assets to bound
 /// the core Cholesky routine's infallibly allocated matrix workspace. Output
-/// and binding-owned scratch allocations use `try_reserve_exact`.
+/// and simulation-owned scratch allocations use `try_reserve_exact`.
 pub fn gbm_paths(request: &GbmRequest<'_>) -> QlResult<Vec<Real>> {
     let assets = request.initial.len();
     require!(

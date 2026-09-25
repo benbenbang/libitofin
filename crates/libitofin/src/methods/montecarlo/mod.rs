@@ -16,6 +16,7 @@ mod path;
 mod pathgen;
 mod pathgenerator;
 mod sample;
+pub mod simulation_kernel;
 
 pub use earlyexercisepathpricer::EarlyExercisePathPricer;
 pub use longstaffschwartzpathpricer::LongstaffSchwartzPathPricer;

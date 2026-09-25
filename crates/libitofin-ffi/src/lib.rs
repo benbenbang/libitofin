@@ -15,7 +15,6 @@ pub mod bootstrap_callbacks;
 pub mod bootstrap_variables;
 pub mod boundary;
 pub mod simulation_api;
-pub mod simulation_kernel;
 pub use boundary::{Context, ItofinError};
 pub mod calendar_api;
 pub mod cap_calibration_api;
