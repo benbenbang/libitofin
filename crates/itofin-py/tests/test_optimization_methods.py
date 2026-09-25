@@ -15,7 +15,7 @@ from itofin.quotes import SimpleQuote
 from itofin.termstructures import FlatForward, VolatilityType
 from itofin.time import Calendar, Date, DayCounter, Frequency, Period
 
-from test_heston_calibration import MATURITIES, _fixture_settings, _seed_model
+from test_heston_calibration import MATURITIES, _build_helpers, _fixture_settings, _seed_model
 
 
 STRIKE_BITS = [
@@ -163,3 +163,14 @@ def test_simplex_calibrates_hull_white_caps():
     assert model.a() == 0.05
     assert math.isfinite(model.sigma()) and model.sigma() > 0
     assert all(math.isfinite(helper.calibration_error()) for helper in helpers)
+
+
+@pytest.mark.parametrize("entrypoint", ["calibrate_cos", "calibrate_exponential_fitting"])
+def test_simplex_calibrates_alternative_heston_engines(entrypoint):
+    """Fit a small market through both non-analytic Heston entrypoints."""
+    settings = _fixture_settings()
+    instruments = _build_helpers(settings)[:5]
+    model = _seed_model()(0.3)
+    getattr(model, entrypoint)(instruments, Simplex(0.05), EndCriteria(30, 5, 1e-6, 1e-6, 1e-6))
+    assert model.sigma() < 0.1
+    assert max(abs(instrument.calibration_error()) for instrument in instruments) < 0.1

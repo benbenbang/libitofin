@@ -140,7 +140,7 @@ jobs:
           python -m venv .venv
           . .venv/bin/activate
           pip install -r crates/itofin-py/typing-requirements.txt
-          maturin develop -m crates/itofin-py/Cargo.toml
+          maturin develop --release -m crates/itofin-py/Cargo.toml
 
       - name: check the committed stubs and shims match the rust facade
         run: |
@@ -160,6 +160,8 @@ jobs:
           python crates/itofin-py/scripts/check_typing.py
 
       - name: run the pytest oracle
+        env:
+          ITOFIN_RELEASE_PARITY: "1"
         run: |
           . .venv/bin/activate
           pytest crates/itofin-py/tests -v
