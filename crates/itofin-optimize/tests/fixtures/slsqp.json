@@ -1,0 +1,158 @@
+{
+  "cases": {
+    "hs35": {
+      "bounds": [
+        [
+          0.0,
+          null
+        ],
+        [
+          0.0,
+          null
+        ],
+        [
+          0.0,
+          null
+        ]
+      ],
+      "ftol": 1e-10,
+      "fun": 0.1111111111111116,
+      "kkt_residual": 6.844179642473414e-08,
+      "max_violation": 2.220446049250313e-16,
+      "message": "Optimization terminated successfully",
+      "multipliers": [
+        0.22222222056650864
+      ],
+      "nit": 6,
+      "x": [
+        1.3333333345766347,
+        0.777777760614421,
+        0.4444444524044722
+      ],
+      "x0": [
+        0.5,
+        0.5,
+        0.5
+      ]
+    },
+    "hs71": {
+      "bounds": [
+        [
+          1.0,
+          5.0
+        ],
+        [
+          1.0,
+          5.0
+        ],
+        [
+          1.0,
+          5.0
+        ],
+        [
+          1.0,
+          5.0
+        ]
+      ],
+      "ftol": 1e-10,
+      "fun": 17.01401728913542,
+      "kkt_residual": 6.207377434286343e-08,
+      "max_violation": 3.296918293926865e-11,
+      "message": "Optimization terminated successfully",
+      "multipliers": [
+        0.552293657312249,
+        -0.16146856800681195
+      ],
+      "nit": 6,
+      "x": [
+        1.0,
+        4.742999613441913,
+        3.8211500153151103,
+        1.3794082888616293
+      ],
+      "x0": [
+        1.0,
+        5.0,
+        5.0,
+        1.0
+      ]
+    },
+    "rosenbrock_disc": {
+      "bounds": null,
+      "ftol": 1e-10,
+      "fun": 0.008615650659896912,
+      "kkt_residual": 4.8508112777817525e-06,
+      "max_violation": 3.7414515929867775e-13,
+      "message": "Optimization terminated successfully",
+      "multipliers": [
+        0.03864936066944087
+      ],
+      "nit": 29,
+      "x": [
+        0.9072339586545041,
+        0.8227554583619922
+      ],
+      "x0": [
+        -1.0,
+        0.5
+      ]
+    },
+    "tutorial": {
+      "bounds": [
+        [
+          0.0,
+          null
+        ],
+        [
+          0.0,
+          null
+        ]
+      ],
+      "ftol": 1e-10,
+      "fun": 0.8000000000000005,
+      "kkt_residual": 1.0912057923917473e-08,
+      "max_violation": 0.0,
+      "message": "Optimization terminated successfully",
+      "multipliers": [
+        0.7999999970197684,
+        0.0,
+        0.0
+      ],
+      "nit": 4,
+      "x": [
+        1.3999999950387756,
+        1.6999999975193876
+      ],
+      "x0": [
+        2.0,
+        0.0
+      ]
+    },
+    "weighted_plane": {
+      "bounds": null,
+      "ftol": 1e-10,
+      "fun": 0.5454545454545454,
+      "kkt_residual": 4.5307474660916114e-08,
+      "max_violation": 0.0,
+      "message": "Optimization terminated successfully",
+      "multipliers": [
+        1.0909091159701347
+      ],
+      "nit": 6,
+      "x": [
+        0.5454545501981071,
+        0.27272727135738073,
+        0.18181817844451215
+      ],
+      "x0": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    }
+  },
+  "provenance": {
+    "generated": "2026-09-25",
+    "scipy_version": "1.18.1"
+  }
+}
