@@ -1,4 +1,5 @@
 use crate::error::InvalidInput;
+use crate::finite_difference::FiniteDifference;
 
 /// Box bounds, one entry per coordinate.
 ///
@@ -143,12 +144,48 @@ impl NelderMeadOptions {
     }
 }
 
+/// The vector norm a gradient tolerance is measured in.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum Norm {
+    /// The largest absolute component.
+    #[default]
+    Inf,
+    /// The Euclidean length.
+    Two,
+}
+
+/// BFGS options.
+///
+/// An unset `gtol` falls back to [`Common::tol`] and then to `1e-5`.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct BfgsOptions {
+    /// The run converges once the gradient norm is at most `gtol`.
+    pub gtol: Option<f64>,
+    /// The norm `gtol` is measured in.
+    pub norm: Norm,
+    /// The approximation used when the objective supplies no gradient.
+    pub finite_difference: FiniteDifference,
+}
+
+impl BfgsOptions {
+    fn validate(&self) -> Result<(), InvalidInput> {
+        if let Some(gtol) = self.gtol
+            && (!gtol.is_finite() || gtol <= 0.0)
+        {
+            return Err(InvalidInput::NotFinitePositive { option: "gtol" });
+        }
+        Ok(())
+    }
+}
+
 /// The solver to run. Later tickets add variants, hence `#[non_exhaustive]`.
 #[non_exhaustive]
 #[derive(Debug, Clone, PartialEq)]
 pub enum Method {
     /// The simplex method of Nelder and Mead.
     NelderMead(NelderMeadOptions),
+    /// The quasi-Newton method of Broyden, Fletcher, Goldfarb and Shanno.
+    Bfgs(BfgsOptions),
 }
 
 impl Method {
@@ -156,13 +193,14 @@ impl Method {
     pub fn name(&self) -> &'static str {
         match self {
             Method::NelderMead(_) => "Nelder-Mead",
+            Method::Bfgs(_) => "BFGS",
         }
     }
 
     /// Whether the method honours box bounds.
     pub fn supports_bounds(&self) -> bool {
         match self {
-            Method::NelderMead(_) => false,
+            Method::NelderMead(_) | Method::Bfgs(_) => false,
         }
     }
 
@@ -180,6 +218,7 @@ impl Method {
         }
         match self {
             Method::NelderMead(options) => options.validate(problem.x0.len()),
+            Method::Bfgs(options) => options.validate(),
         }
     }
 }

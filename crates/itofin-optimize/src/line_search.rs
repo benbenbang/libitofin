@@ -15,9 +15,6 @@
 //!   Springer, Section 3.5: Algorithm 3.5 (the bracketing phase) and
 //!   Algorithm 3.6 (zoom); equation 3.59 for the cubic interpolant, and the
 //!   quadratic interpolant of Section 3.5 when only one endpoint slope is known.
-//!
-//! OPT-5 (#1083) is the first caller and removes the `dead_code` allowance.
-#![cfg_attr(not(test), allow(dead_code))]
 
 use crate::counters::{Counters, Halt};
 use crate::finite_difference::{self, FiniteDifference};
