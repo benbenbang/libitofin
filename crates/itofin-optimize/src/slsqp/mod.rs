@@ -14,3 +14,4 @@
 #![cfg_attr(not(test), allow(dead_code))]
 
 mod hessian;
+mod subproblem;
