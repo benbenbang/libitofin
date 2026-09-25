@@ -30,6 +30,7 @@
 
 mod counters;
 mod error;
+mod lsq;
 mod nelder_mead;
 mod objective;
 mod outcome;
