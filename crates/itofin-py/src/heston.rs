@@ -2,7 +2,9 @@
 //! HestonModelHelper.
 
 use crate::PyQlError;
-use crate::calibration::{PyCalibrationErrorType, PyEndCriteria, with_method};
+use crate::calibration::{
+    CalibrationOptions, PyCalibrationErrorType, PyEndCriteria, calibration_options, with_method,
+};
 use crate::heston_engines::PyExponentialFittingControlVariate;
 use crate::settings::PySettings;
 use crate::time::{PyCalendar, PyDate, PyDayCounter, PyPeriod};
@@ -232,10 +234,16 @@ impl PyHestonModel {
     ///     end_criteria (EndCriteria): The stopping rule handed to the optimizer.
     ///     integration_order (int): The order of the Gauss-Laguerre integration the
     ///         engine uses; at most 192.
+    ///     constraint (Constraint | None): Additional reusable parameter constraint.
+    ///     weights (list[float] | None): One weight per calibration helper.
+    ///     fix_parameters (list[bool] | None): Fixed mask in theta, kappa, sigma,
+    ///         rho, v0 order.
     ///
     /// Raises:
     ///     ItofinError: If integration_order exceeds 192, if helpers is empty,
     ///         or if the optimization itself fails.
+    #[pyo3(signature = (helpers, method, end_criteria, integration_order, *, constraint=None, weights=None, fix_parameters=None))]
+    #[allow(clippy::too_many_arguments)]
     fn calibrate(
         &mut self,
         helpers: Vec<PyRef<PyHestonModelHelper>>,
@@ -243,16 +251,22 @@ impl PyHestonModel {
         method: &Bound<'_, PyAny>,
         end_criteria: &PyEndCriteria,
         integration_order: usize,
+        #[gen_stub(override_type(type_repr = "optimization.NoConstraint | optimization.PositiveConstraint | optimization.BoundaryConstraint | optimization.CompositeConstraint | None", imports = ("itofin.optimization")))]
+        constraint: Option<&Bound<'_, PyAny>>,
+        weights: Option<Vec<f64>>,
+        fix_parameters: Option<Vec<bool>>,
     ) -> PyResult<()> {
+        let options = calibration_options(constraint, weights, fix_parameters, false)?;
         let engine = shared_mut(
             AnalyticHestonEngine::new(SharedMut::clone(&self.inner), integration_order)
                 .map_err(PyQlError::from)?,
         ) as SharedMut<dyn PricingEngine>;
-        self.calibrate_engine(helpers, method, end_criteria, engine)
+        self.calibrate_engine(helpers, method, end_criteria, engine, options)
     }
 
     /// Fit with a COS engine, retaining existing analytic calibration defaults.
-    #[pyo3(signature = (helpers, method, end_criteria, l=16.0, n=200))]
+    #[pyo3(signature = (helpers, method, end_criteria, l=16.0, n=200, *, constraint=None, weights=None, fix_parameters=None))]
+    #[allow(clippy::too_many_arguments)]
     fn calibrate_cos(
         &mut self,
         helpers: Vec<PyRef<PyHestonModelHelper>>,
@@ -261,13 +275,18 @@ impl PyHestonModel {
         end_criteria: &PyEndCriteria,
         l: f64,
         n: usize,
+        #[gen_stub(override_type(type_repr = "optimization.NoConstraint | optimization.PositiveConstraint | optimization.BoundaryConstraint | optimization.CompositeConstraint | None", imports = ("itofin.optimization")))]
+        constraint: Option<&Bound<'_, PyAny>>,
+        weights: Option<Vec<f64>>,
+        fix_parameters: Option<Vec<bool>>,
     ) -> PyResult<()> {
+        let options = calibration_options(constraint, weights, fix_parameters, false)?;
         let engine = shared_mut(CosHestonEngine::new(self.inner(), l, n).map_err(PyQlError::from)?);
-        self.calibrate_engine(helpers, method, end_criteria, engine)
+        self.calibrate_engine(helpers, method, end_criteria, engine, options)
     }
 
     /// Fit with exponentially fitted quadrature and the selected control variate.
-    #[pyo3(signature = (helpers, method, end_criteria, control_variate=PyExponentialFittingControlVariate::Optimal, scaling=None, alpha=-0.5))]
+    #[pyo3(signature = (helpers, method, end_criteria, control_variate=PyExponentialFittingControlVariate::Optimal, scaling=None, alpha=-0.5, *, constraint=None, weights=None, fix_parameters=None))]
     #[allow(clippy::too_many_arguments)]
     fn calibrate_exponential_fitting(
         &mut self,
@@ -278,7 +297,12 @@ impl PyHestonModel {
         control_variate: PyExponentialFittingControlVariate,
         scaling: Option<f64>,
         alpha: f64,
+        #[gen_stub(override_type(type_repr = "optimization.NoConstraint | optimization.PositiveConstraint | optimization.BoundaryConstraint | optimization.CompositeConstraint | None", imports = ("itofin.optimization")))]
+        constraint: Option<&Bound<'_, PyAny>>,
+        weights: Option<Vec<f64>>,
+        fix_parameters: Option<Vec<bool>>,
     ) -> PyResult<()> {
+        let options = calibration_options(constraint, weights, fix_parameters, false)?;
         let engine = shared_mut(
             ExponentialFittingHestonEngine::new(
                 self.inner(),
@@ -288,7 +312,7 @@ impl PyHestonModel {
             )
             .map_err(PyQlError::from)?,
         );
-        self.calibrate_engine(helpers, method, end_criteria, engine)
+        self.calibrate_engine(helpers, method, end_criteria, engine, options)
     }
 }
 
@@ -299,6 +323,7 @@ impl PyHestonModel {
         method: &Bound<'_, PyAny>,
         end_criteria: &PyEndCriteria,
         engine: SharedMut<dyn PricingEngine>,
+        options: CalibrationOptions,
     ) -> PyResult<()> {
         for helper in &helpers {
             helper
@@ -317,9 +342,9 @@ impl PyHestonModel {
                 &dyn_helpers,
                 method,
                 end_criteria.inner(),
-                None,
-                Vec::new(),
-                Vec::new(),
+                options.constraint,
+                options.weights,
+                options.fix_parameters,
             )
             .map_err(PyQlError::from)?;
             Ok(())

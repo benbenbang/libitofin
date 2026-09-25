@@ -86,7 +86,7 @@ class HestonModel:
         Returns:
             float: The current value of v0.
         """
-    def calibrate(self, helpers: typing.Sequence[HestonModelHelper], method: optimization.LevenbergMarquardt | optimization.Simplex | optimization.ConjugateGradient | optimization.SteepestDescent, end_criteria: optimization.EndCriteria, integration_order: builtins.int) -> None:
+    def calibrate(self, helpers: typing.Sequence[HestonModelHelper], method: optimization.LevenbergMarquardt | optimization.Simplex | optimization.ConjugateGradient | optimization.SteepestDescent, end_criteria: optimization.EndCriteria, integration_order: builtins.int, *, constraint: optimization.NoConstraint | optimization.PositiveConstraint | optimization.BoundaryConstraint | optimization.CompositeConstraint | None = None, weights: typing.Optional[typing.Sequence[builtins.float]] = None, fix_parameters: typing.Optional[typing.Sequence[builtins.bool]] = None) -> None:
         r"""
         Fit the five parameters to the helpers and write them back.
 
@@ -101,16 +101,20 @@ class HestonModel:
             end_criteria (EndCriteria): The stopping rule handed to the optimizer.
             integration_order (int): The order of the Gauss-Laguerre integration the
                 engine uses; at most 192.
+            constraint (Constraint | None): Additional reusable parameter constraint.
+            weights (list[float] | None): One weight per calibration helper.
+            fix_parameters (list[bool] | None): Fixed mask in theta, kappa, sigma,
+                rho, v0 order.
 
         Raises:
             ItofinError: If integration_order exceeds 192, if helpers is empty,
                 or if the optimization itself fails.
         """
-    def calibrate_cos(self, helpers: typing.Sequence[HestonModelHelper], method: optimization.LevenbergMarquardt | optimization.Simplex | optimization.ConjugateGradient | optimization.SteepestDescent, end_criteria: optimization.EndCriteria, l: builtins.float = 16.0, n: builtins.int = 200) -> None:
+    def calibrate_cos(self, helpers: typing.Sequence[HestonModelHelper], method: optimization.LevenbergMarquardt | optimization.Simplex | optimization.ConjugateGradient | optimization.SteepestDescent, end_criteria: optimization.EndCriteria, l: builtins.float = 16.0, n: builtins.int = 200, *, constraint: optimization.NoConstraint | optimization.PositiveConstraint | optimization.BoundaryConstraint | optimization.CompositeConstraint | None = None, weights: typing.Optional[typing.Sequence[builtins.float]] = None, fix_parameters: typing.Optional[typing.Sequence[builtins.bool]] = None) -> None:
         r"""
         Fit with a COS engine, retaining existing analytic calibration defaults.
         """
-    def calibrate_exponential_fitting(self, helpers: typing.Sequence[HestonModelHelper], method: optimization.LevenbergMarquardt | optimization.Simplex | optimization.ConjugateGradient | optimization.SteepestDescent, end_criteria: optimization.EndCriteria, control_variate: pricingengines.ExponentialFittingControlVariate = pricingengines.ExponentialFittingControlVariate.Optimal, scaling: typing.Optional[builtins.float] = None, alpha: builtins.float = -0.5) -> None:
+    def calibrate_exponential_fitting(self, helpers: typing.Sequence[HestonModelHelper], method: optimization.LevenbergMarquardt | optimization.Simplex | optimization.ConjugateGradient | optimization.SteepestDescent, end_criteria: optimization.EndCriteria, control_variate: pricingengines.ExponentialFittingControlVariate = pricingengines.ExponentialFittingControlVariate.Optimal, scaling: typing.Optional[builtins.float] = None, alpha: builtins.float = -0.5, *, constraint: optimization.NoConstraint | optimization.PositiveConstraint | optimization.BoundaryConstraint | optimization.CompositeConstraint | None = None, weights: typing.Optional[typing.Sequence[builtins.float]] = None, fix_parameters: typing.Optional[typing.Sequence[builtins.bool]] = None) -> None:
         r"""
         Fit with exponentially fitted quadrature and the selected control variate.
         """
@@ -222,7 +226,7 @@ class HullWhite:
             ItofinError: If the fitted curve is not linked or the arguments are
                 rejected by the underlying Black formula.
         """
-    def calibrate(self, helpers: typing.Sequence[SwaptionHelper], method: optimization.LevenbergMarquardt | optimization.Simplex | optimization.ConjugateGradient | optimization.SteepestDescent, end_criteria: optimization.EndCriteria, fix_reversion: builtins.bool) -> None:
+    def calibrate(self, helpers: typing.Sequence[SwaptionHelper], method: optimization.LevenbergMarquardt | optimization.Simplex | optimization.ConjugateGradient | optimization.SteepestDescent, end_criteria: optimization.EndCriteria, fix_reversion: builtins.bool, *, constraint: optimization.NoConstraint | optimization.PositiveConstraint | optimization.BoundaryConstraint | optimization.CompositeConstraint | None = None, weights: typing.Optional[typing.Sequence[builtins.float]] = None, fix_parameters: typing.Optional[typing.Sequence[builtins.bool]] = None) -> None:
         r"""
         Fit a and sigma to the helpers and write them back.
 
@@ -236,11 +240,15 @@ class HullWhite:
             end_criteria (EndCriteria): The stopping rule handed to the optimizer.
             fix_reversion (bool): Pin the mean reversion a and free only sigma; when
                 False both parameters are free.
+            constraint (Constraint | None): Additional reusable parameter constraint.
+            weights (list[float] | None): One weight per calibration helper.
+            fix_parameters (list[bool] | None): Fixed mask in a, sigma order;
+                cannot be combined with fix_reversion=True.
 
         Raises:
             ItofinError: If helpers is empty or the optimization itself fails.
         """
-    def calibrate_caps(self, helpers: typing.Sequence[CapHelper], method: optimization.LevenbergMarquardt | optimization.Simplex | optimization.ConjugateGradient | optimization.SteepestDescent, end_criteria: optimization.EndCriteria, fix_reversion: builtins.bool, time_steps: builtins.int) -> None: ...
+    def calibrate_caps(self, helpers: typing.Sequence[CapHelper], method: optimization.LevenbergMarquardt | optimization.Simplex | optimization.ConjugateGradient | optimization.SteepestDescent, end_criteria: optimization.EndCriteria, fix_reversion: builtins.bool, time_steps: builtins.int, *, constraint: optimization.NoConstraint | optimization.PositiveConstraint | optimization.BoundaryConstraint | optimization.CompositeConstraint | None = None, weights: typing.Optional[typing.Sequence[builtins.float]] = None, fix_parameters: typing.Optional[typing.Sequence[builtins.bool]] = None) -> None: ...
 
 @typing.final
 class SwaptionHelper:

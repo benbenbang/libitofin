@@ -1,0 +1,77 @@
+{
+  "domain": "simopt-calibration-constraints",
+  "entries": [
+    {
+      "c": "itofin_no_constraint_new",
+      "go": "Constraint",
+      "python": "itofin.optimization.NoConstraint",
+      "status": "implemented",
+      "tests": [
+        "TestCalibrationConstraintHandlesAndOptions"
+      ]
+    },
+    {
+      "c": "itofin_no_constraint_new",
+      "go": "Session.NewNoConstraint",
+      "python": "itofin.optimization.NoConstraint.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestCalibrationConstraintHandlesAndOptions"
+      ]
+    },
+    {
+      "c": "itofin_positive_constraint_new",
+      "go": "Constraint",
+      "python": "itofin.optimization.PositiveConstraint",
+      "status": "implemented",
+      "tests": [
+        "TestCalibrationConstraintHandlesAndOptions"
+      ]
+    },
+    {
+      "c": "itofin_positive_constraint_new",
+      "go": "Session.NewPositiveConstraint",
+      "python": "itofin.optimization.PositiveConstraint.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestCalibrationConstraintHandlesAndOptions"
+      ]
+    },
+    {
+      "c": "itofin_boundary_constraint_new",
+      "go": "Constraint",
+      "python": "itofin.optimization.BoundaryConstraint",
+      "status": "implemented",
+      "tests": [
+        "TestCalibrationConstraintHandlesAndOptions"
+      ]
+    },
+    {
+      "c": "itofin_boundary_constraint_new",
+      "go": "Session.NewBoundaryConstraint",
+      "python": "itofin.optimization.BoundaryConstraint.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestCalibrationConstraintHandlesAndOptions"
+      ]
+    },
+    {
+      "c": "itofin_composite_constraint_new",
+      "go": "Constraint",
+      "python": "itofin.optimization.CompositeConstraint",
+      "status": "implemented",
+      "tests": [
+        "TestCalibrationConstraintHandlesAndOptions"
+      ]
+    },
+    {
+      "c": "itofin_composite_constraint_new",
+      "go": "Session.NewCompositeConstraint",
+      "python": "itofin.optimization.CompositeConstraint.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestCalibrationConstraintHandlesAndOptions"
+      ]
+    }
+  ]
+}

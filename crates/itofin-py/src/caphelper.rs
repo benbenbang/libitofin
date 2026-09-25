@@ -1,6 +1,6 @@
 //! Cap calibration and Hull-White lattice engine facades.
 use crate::PyQlError;
-use crate::calibration::{PyCalibrationErrorType, PyEndCriteria, with_method};
+use crate::calibration::{CalibrationOptions, PyCalibrationErrorType, PyEndCriteria, with_method};
 use crate::curve::PyYieldTermStructure;
 use crate::hullwhite::{PyHullWhite, PyIborIndex};
 use crate::market::PySimpleQuote;
@@ -147,8 +147,8 @@ impl PyHullWhite {
         helpers: Vec<PyRef<PyCapHelper>>,
         method: &Bound<'_, PyAny>,
         end_criteria: &PyEndCriteria,
-        fix_reversion: bool,
         time_steps: usize,
+        options: CalibrationOptions,
     ) -> PyResult<()> {
         let engine =
             shared_mut(TreeCapFloorEngine::new(self.inner(), time_steps).map_err(PyQlError::from)?)
@@ -170,13 +170,9 @@ impl PyHullWhite {
                 &helpers,
                 method,
                 end_criteria.inner(),
-                None,
-                Vec::new(),
-                if fix_reversion {
-                    vec![true, false]
-                } else {
-                    Vec::new()
-                },
+                options.constraint,
+                options.weights,
+                options.fix_parameters,
             )
             .map_err(PyQlError::from)?;
             Ok(())
