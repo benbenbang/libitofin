@@ -10,6 +10,9 @@ repository = "https://github.com/benbenbang/libitofin"
 name = "itofin_ffi"
 crate-type = ["cdylib", "staticlib", "rlib"]
 
+[features]
+optimization-method-oracle = []
+
 [dependencies]
 itofin-optimize = { path = "../itofin-optimize" }
 libitofin = { path = "../libitofin" }
