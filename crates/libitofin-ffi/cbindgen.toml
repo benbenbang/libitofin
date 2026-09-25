@@ -29,3 +29,6 @@ CORE_ERROR = "ITOFIN_CORE_ERROR"
 WRONG_THREAD = "ITOFIN_WRONG_THREAD"
 PANIC = "ITOFIN_PANIC"
 POISONED = "ITOFIN_POISONED"
+
+[export]
+exclude = ["ItofinOptimizationParabolaOracle", "itofin_optimization_parabola_oracle"]

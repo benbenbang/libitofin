@@ -28,6 +28,87 @@ use libitofin::termstructures::yields::FlatForward;
 use libitofin::termstructures::yieldtermstructure::YieldTermStructure;
 use libitofin::time::frequency::Frequency;
 use libitofin::time::{date::Date, daycounter::DayCounter};
+#[cfg(feature = "optimization-method-oracle")]
+use libitofin::{
+    math::{
+        array::Array,
+        optimization::{constraint::NoConstraint, costfunction::CostFunction, problem::Problem},
+    },
+    types::Real,
+};
+
+#[cfg(feature = "optimization-method-oracle")]
+struct OptimizationParabola;
+
+#[cfg(feature = "optimization-method-oracle")]
+impl CostFunction for OptimizationParabola {
+    fn values(&self, x: &Array) -> Array {
+        Array::from([x[0] * x[0] + x[0] + 1.0])
+    }
+
+    fn value(&self, x: &Array) -> Real {
+        x[0] * x[0] + x[0] + 1.0
+    }
+}
+
+#[cfg(feature = "optimization-method-oracle")]
+#[repr(C)]
+pub struct ItofinOptimizationParabolaOracle {
+    pub bridged_x: f64,
+    pub bridged_value: f64,
+    pub bridged_reason: i32,
+    pub core_x: f64,
+    pub core_value: f64,
+    pub core_reason: i32,
+}
+
+#[cfg(feature = "optimization-method-oracle")]
+#[unsafe(no_mangle)]
+/// Runs the QuantLib parabola fixture through a session-owned method handle
+/// and a newly created Rust core method of the same kind.
+/// # Safety
+/// Pointers must be aligned, live and valid. Outputs must not overlap inputs.
+/// Context and its handles must belong to the calling thread; serialize calls.
+pub unsafe extern "C" fn itofin_optimization_parabola_oracle(
+    ctx: *mut Context,
+    method: u64,
+    kind: i32,
+    out: *mut ItofinOptimizationParabolaOracle,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(out)?;
+            let mut core: Box<dyn OptimizationMethod> = match kind {
+                0 => Box::new(Simplex::new(0.1)),
+                1 => Box::new(ConjugateGradient::new()),
+                2 => Box::new(SteepestDescent::new()),
+                _ => return Err(BindingError::invalid("unknown optimization method kind")),
+            };
+            let bridged = c.get::<SharedMut<dyn OptimizationMethod>>(method)?;
+            let cost = OptimizationParabola;
+            let constraint = NoConstraint;
+            let criteria = EndCriteria::new(10_000, Some(100), 1e-8, 1e-8, Some(1e-8))?;
+            let mut bridged_problem = Problem::new(&cost, &constraint, Array::from([-100.0]));
+            let mut core_problem = Problem::new(&cost, &constraint, Array::from([-100.0]));
+            let core_reason = core.minimize(&mut core_problem, &criteria)?;
+            let bridged_reason = bridged
+                .borrow_mut()
+                .minimize(&mut bridged_problem, &criteria)?;
+            output(
+                out,
+                ItofinOptimizationParabolaOracle {
+                    bridged_x: bridged_problem.current_value()[0],
+                    bridged_value: bridged_problem.function_value(),
+                    bridged_reason: bridged_reason as i32,
+                    core_x: core_problem.current_value()[0],
+                    core_value: core_problem.function_value(),
+                    core_reason: core_reason as i32,
+                },
+            )
+        })
+    }
+}
 
 pub(crate) fn error_type(value: i32) -> BindingResult<CalibrationErrorType> {
     match value {
