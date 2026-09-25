@@ -52,7 +52,8 @@ mod treeswaption;
 mod vol;
 
 use calibration::{
-    PyCalibrationErrorType, PyConjugateGradient, PyEndCriteria, PyLevenbergMarquardt, PySimplex,
+    PyBoundaryConstraint, PyCalibrationErrorType, PyCompositeConstraint, PyConjugateGradient,
+    PyEndCriteria, PyLevenbergMarquardt, PyNoConstraint, PyPositiveConstraint, PySimplex,
     PySteepestDescent,
 };
 use capfloor::{PyCapFloor, PyCapFloorType};
@@ -388,6 +389,10 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     optimization.add_class::<PyConjugateGradient>()?;
     optimization.add_class::<PySteepestDescent>()?;
     optimization.add_class::<PyEndCriteria>()?;
+    optimization.add_class::<PyNoConstraint>()?;
+    optimization.add_class::<PyPositiveConstraint>()?;
+    optimization.add_class::<PyBoundaryConstraint>()?;
+    optimization.add_class::<PyCompositeConstraint>()?;
 
     let optimize = PyModule::new(py, "optimize")?;
     optimize.add_function(wrap_pyfunction!(optimize::minimize, &optimize)?)?;
