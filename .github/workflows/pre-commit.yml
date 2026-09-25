@@ -162,6 +162,8 @@ jobs:
       - name: run the pytest oracle
         run: |
           . .venv/bin/activate
+          ITOFIN_HCAL_CORE_ORACLE="$(cargo run --quiet --release -p libitofin-ffi --example calibration_constraints_oracle)"
+          export ITOFIN_HCAL_CORE_ORACLE
           pytest crates/itofin-py/tests -v
 
   pr-labeler:
