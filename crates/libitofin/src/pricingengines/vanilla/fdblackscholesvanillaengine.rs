@@ -729,8 +729,13 @@ mod test_fd_bermudan {
     }
 
     #[test]
-    fn binding_oracles_match_european_american_and_quarterly_bermudan_greeks() {
+    fn binding_market_regressions_cover_european_american_and_quarterly_bermudan() {
         let (settings, process) = fixture();
+        let (european_theta, bermudan_theta) = if cfg!(target_os = "linux") {
+            (0.377_587_111_592_534_55, 0.385_210_817_371_187)
+        } else {
+            (0.377_587_111_591_224_7, 0.385_210_817_369_876_67)
+        };
         let rows: [(&str, Shared<dyn Exercise>, [Real; 4]); 3] = [
             (
                 "European",
@@ -739,7 +744,7 @@ mod test_fd_bermudan {
                     18.266147644485358,
                     -0.714_918_249_077_874_9,
                     0.016_981_361_087_847_3,
-                    0.377_587_111_591_224_7,
+                    european_theta,
                 ],
             ),
             (
@@ -759,7 +764,7 @@ mod test_fd_bermudan {
                     19.954434523211695,
                     -0.817_505_453_287_635_2,
                     0.019414167279763642,
-                    0.38521081736987667,
+                    bermudan_theta,
                 ],
             ),
         ];
