@@ -280,8 +280,12 @@ mod tests {
     use super::*;
     use crate::interestrate::Compounding;
     use crate::math::interpolations::linear::Linear;
-    use crate::math::optimization::endcriteria::EndCriteria;
+    use crate::math::optimization::conjugategradient::ConjugateGradient;
+    use crate::math::optimization::endcriteria::{EndCriteria, EndCriteriaType};
     use crate::math::optimization::levenbergmarquardt::LevenbergMarquardt;
+    use crate::math::optimization::method::OptimizationMethod;
+    use crate::math::optimization::simplex::Simplex;
+    use crate::math::optimization::steepestdescent::SteepestDescent;
     use crate::models::calibrationhelper::CalibrationHelper;
     use crate::models::model::CalibratedModelHolder;
     use crate::models::{HestonModel, calibrate};
@@ -596,6 +600,94 @@ mod tests {
                 (model.v0() - expected_variance).abs() < tolerance,
                 "v0 {} vs vol^2 {expected_variance} exceeds {tolerance} (start {sigma})",
                 model.v0()
+            );
+        }
+    }
+
+    #[test]
+    fn heston_calibrates_with_alternative_optimization_methods() {
+        let fixture = Fixture::new();
+        let maturities = [
+            Period::new(1, TimeUnit::Months),
+            Period::new(2, TimeUnit::Months),
+            Period::new(3, TimeUnit::Months),
+            Period::new(6, TimeUnit::Months),
+            Period::new(9, TimeUnit::Months),
+            Period::new(1, TimeUnit::Years),
+            Period::new(2, TimeUnit::Years),
+        ];
+        let helpers: Vec<SharedMut<HestonModelHelper>> = maturities
+            .iter()
+            .flat_map(|&maturity| {
+                let fixture = &fixture;
+                [-1.0_f64, 0.0, 1.0].map(move |moneyness| {
+                    let tau = fixture.tau(maturity);
+                    let strike = fixture.forward(tau) * (-moneyness * VOL * tau.sqrt()).exp();
+                    shared_mut(fixture.helper(maturity, strike))
+                })
+            })
+            .collect();
+        let dyn_helpers: Vec<SharedMut<dyn CalibrationHelper>> = helpers
+            .iter()
+            .map(|helper| helper.clone() as SharedMut<dyn CalibrationHelper>)
+            .collect();
+        for (name, mut method) in [
+            (
+                "simplex",
+                Box::new(Simplex::new(0.1)) as Box<dyn OptimizationMethod>,
+            ),
+            ("conjugate_gradient", Box::new(ConjugateGradient::new())),
+            ("steepest_descent", Box::new(SteepestDescent::new())),
+        ] {
+            let process = shared(HestonProcess::new(
+                fixture.risk_free.clone(),
+                fixture.dividend.clone(),
+                fixture.s0.clone(),
+                0.01,
+                0.2,
+                0.02,
+                0.3,
+                -0.75,
+            ));
+            let model = HestonModel::new(process).unwrap();
+            let engine = shared_mut(AnalyticHestonEngine::new(model.clone(), 96).unwrap())
+                as SharedMut<dyn PricingEngine>;
+            for helper in &helpers {
+                helper
+                    .borrow_mut()
+                    .base_mut()
+                    .set_pricing_engine(engine.clone());
+            }
+            let end_criteria = EndCriteria::new(400, Some(40), 1e-8, 1e-8, Some(1e-8)).unwrap();
+            calibrate(
+                &model,
+                &dyn_helpers,
+                &mut *method,
+                &end_criteria,
+                None,
+                vec![],
+                vec![],
+            )
+            .unwrap();
+            let model = model.borrow();
+            let values = [
+                model.v0(),
+                model.kappa(),
+                model.theta(),
+                model.sigma(),
+                model.rho(),
+            ];
+            assert!(
+                values.iter().all(|value| value.is_finite()),
+                "{name}: {values:?}"
+            );
+            assert!(model.sigma() < 0.3, "{name}: {values:?}");
+            assert!(
+                !matches!(
+                    model.calibrated_model().end_criteria(),
+                    EndCriteriaType::None | EndCriteriaType::Unknown
+                ),
+                "{name}"
             );
         }
     }
