@@ -249,6 +249,18 @@ typedef struct ItofinMakeCdsConfig {
   int32_t trade_date;
 } ItofinMakeCdsConfig;
 
+/**
+ * Optional fields: time grid=1, equity grid=2, damping steps=4, scheme=8.
+ * Scheme 0 is Douglas and scheme 1 is implicit Euler.
+ */
+typedef struct ItofinFdConfig {
+  uint32_t present;
+  uint64_t t_grid;
+  uint64_t x_grid;
+  uint64_t damping_steps;
+  int32_t scheme;
+} ItofinFdConfig;
+
 typedef struct ItofinSwapHelperConfig {
   uint64_t quote;
   int32_t tenor_length;
@@ -2012,6 +2024,19 @@ int32_t itofin_curve_nodes(struct ItofinContext *ctx,
                            size_t capacity,
                            size_t *length,
                            struct ItofinError *error);
+
+/**
+ * Construct an FD engine retaining the Black-Scholes process. Attach it to a
+ * vanilla option with `itofin_option_set_engine` kind 2.
+ * # Safety
+ * Outputs must be aligned, live and non-overlapping. Context and handles must
+ * belong to the calling thread; serialize calls including destruction.
+ */
+int32_t itofin_fd_black_scholes_engine_new(struct ItofinContext *ctx,
+                                           uint64_t process,
+                                           struct ItofinFdConfig cfg,
+                                           uint64_t *out,
+                                           struct ItofinError *error);
 
 /**
  * # Safety
