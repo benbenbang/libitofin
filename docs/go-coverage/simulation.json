@@ -1,0 +1,19 @@
+{
+  "domain": "gbm-simulation",
+  "entries": [
+    {
+      "c": "itofin_gaussian_draws",
+      "go": "GaussianDraws",
+      "python": "itofin.gaussian_draws",
+      "status": "implemented",
+      "tests": "TestGaussianDeterminism"
+    },
+    {
+      "c": "itofin_gbm_paths",
+      "go": "SimulateGBM",
+      "python": "itofin.simulate_gbm",
+      "status": "implemented",
+      "tests": "TestGBMLayoutAndTerminalConsistency"
+    }
+  ]
+}

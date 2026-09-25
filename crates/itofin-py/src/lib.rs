@@ -39,6 +39,7 @@ mod poissonrng;
 mod randomnumbers;
 mod results;
 mod settings;
+mod simulation;
 mod smilesection;
 mod swap;
 mod swapindex;
@@ -147,6 +148,7 @@ Every fallible core call surfaces as this exception, whose message is the
 located form "file:line: message"."#
 );
 pyo3_stub_gen::module_variable!("itofin", "__version__", String);
+pyo3_stub_gen::module_variable!("itofin", "DEFAULT_MAX_OUTPUT_VALUES", usize);
 
 /// Newtype bridging QlError to Err across the crate boundary.
 ///
@@ -181,7 +183,13 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     let py = m.py();
 
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
+    m.add(
+        "DEFAULT_MAX_OUTPUT_VALUES",
+        simulation::DEFAULT_MAX_OUTPUT_VALUES,
+    )?;
     m.add("ItofinError", py.get_type::<ItofinError>())?;
+    m.add_function(wrap_pyfunction!(simulation::gaussian_draws, m)?)?;
+    m.add_function(wrap_pyfunction!(simulation::simulate_gbm, m)?)?;
     m.add_class::<PySettings>()?;
 
     let time = PyModule::new(py, "time")?;
