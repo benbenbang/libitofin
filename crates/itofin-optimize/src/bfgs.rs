@@ -3,13 +3,15 @@
 //! Each iteration searches along `p = -H g`, where `H` approximates the
 //! inverse Hessian, for a step satisfying the strong Wolfe conditions, then
 //! updates `H` from the step `s` and the gradient change `y`. `H` starts as the
-//! identity and is rescaled to `(y's / y'y) I` once the first step is known.
-//! An update whose curvature `y's` is not positive would lose positive
+//! identity, as in SciPy, and is never rescaled by 6.20: with the loose
+//! curvature constant `c2 = 0.9` the rescaled start accepts the unit step at
+//! once and loses the near-exact line searches, which on a diagonal quadratic
+//! of condition `1e6` in 10 dimensions took 100 iterations against 11 from the
+//! identity. An update whose curvature `y's` is not positive would lose positive
 //! definiteness, so it is skipped and counted instead.
 //!
 //! - Nocedal, J. and Wright, S. J. (2006), Numerical Optimization, 2nd edition,
-//!   Springer, Section 6.1: Algorithm 6.1, the inverse update 6.17 and the
-//!   initial scaling 6.20.
+//!   Springer, Section 6.1: Algorithm 6.1 and the inverse update 6.17.
 
 use crate::counters::{Counters, Halt};
 use crate::error::MinimizeError;
@@ -64,7 +66,6 @@ fn dot(u: &[f64], v: &[f64]) -> f64 {
 struct InverseHessian {
     n: usize,
     h: Vec<f64>,
-    scaled: bool,
 }
 
 impl InverseHessian {
@@ -73,29 +74,20 @@ impl InverseHessian {
         for i in 0..n {
             h[i * n + i] = 1.0;
         }
-        Self {
-            n,
-            h,
-            scaled: false,
-        }
+        Self { n, h }
     }
 
     fn times(&self, v: &[f64]) -> Vec<f64> {
         self.h.chunks(self.n).map(|row| dot(row, v)).collect()
     }
 
-    /// Applies the update 6.17 for the step `s` and gradient change `y`, first
-    /// rescaling the identity by 6.20. Returns `false`, leaving `H` untouched,
-    /// when the curvature `y's` is not positive.
+    /// Applies the update 6.17 for the step `s` and gradient change `y`.
+    /// Returns `false`, leaving `H` untouched, when the curvature `y's` is not
+    /// positive.
     fn update(&mut self, s: &[f64], y: &[f64]) -> bool {
         let sy = dot(s, y);
         if !(sy.is_finite() && sy > 0.0) {
             return false;
-        }
-        if !self.scaled {
-            let gamma = sy / dot(y, y);
-            self.h.iter_mut().for_each(|entry| *entry *= gamma);
-            self.scaled = true;
         }
         let rho = 1.0 / sy;
         let hy = self.times(y);
@@ -305,7 +297,7 @@ mod tests {
     }
 
     #[test]
-    fn an_ill_conditioned_quadratic_converges_within_15_n_iterations() {
+    fn an_ill_conditioned_quadratic_converges_within_3_n_iterations() {
         let n = 10;
         let d: Vec<f64> = (0..n).map(|i| 10f64.powf(6.0 * i as f64 / 9.0)).collect();
         let mut quadratic = Analytic(|x: &[f64]| {
@@ -323,7 +315,7 @@ mod tests {
         assert_eq!(result.status, Termination::Converged(Converged::GTol));
         let g: Vec<f64> = result.x.iter().zip(&d).map(|(xi, di)| di * xi).collect();
         assert!(inf_norm(&g) <= 1e-5);
-        assert!(result.nit <= 15 * n, "nit {}", result.nit);
+        assert!(result.nit <= 3 * n, "nit {}", result.nit);
     }
 
     struct Analytic<F>(F);
