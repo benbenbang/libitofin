@@ -160,8 +160,6 @@ jobs:
           python crates/itofin-py/scripts/check_typing.py
 
       - name: run the pytest oracle
-        env:
-          ITOFIN_RELEASE_PARITY: "1"
         run: |
           . .venv/bin/activate
           pytest crates/itofin-py/tests -v
