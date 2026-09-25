@@ -2,6 +2,8 @@
 # ruff: noqa: E501, F401, F403, F405
 
 import builtins
+import numpy
+import numpy.typing
 import typing
 from . import cashflows
 from . import indexes
@@ -17,9 +19,11 @@ from . import results
 from . import termstructures
 from . import time
 __all__ = [
+    "DEFAULT_MAX_OUTPUT_VALUES",
     "ItofinError",
     "Settings",
     "cashflows",
+    "gaussian_draws",
     "indexes",
     "instruments",
     "models",
@@ -30,10 +34,12 @@ __all__ = [
     "quotes",
     "randomnumbers",
     "results",
+    "simulate_gbm",
     "termstructures",
     "time",
 ]
 
+DEFAULT_MAX_OUTPUT_VALUES: builtins.int
 __version__: builtins.str
 class ItofinError(builtins.Exception):
     r"""
@@ -98,3 +104,47 @@ class Settings:
             bool | None: The three-valued flag last set, or None if it has never been set or
             was cleared.
         """
+
+def gaussian_draws(count: builtins.int, seed: builtins.int) -> numpy.typing.NDArray[numpy.float64]:
+    r"""
+    Draw standard normal values in the same MT19937/inverse-normal order as Go.
+
+    Args:
+        count (int): Number of draws, at most 16,777,216.
+        seed (int): Nonzero 32-bit seed. Each call restarts the stream.
+
+    Returns:
+        numpy.ndarray: A float64 array of shape `(count,)`.
+
+    Raises:
+        ItofinError: If the count is outside the limit or the seed is zero.
+    """
+
+def simulate_gbm(initial: typing.Sequence[builtins.float], drift: typing.Sequence[builtins.float], volatility: typing.Sequence[builtins.float], horizon: builtins.float, steps: builtins.int, paths: builtins.int, seed: builtins.int, correlation: typing.Optional[typing.Sequence[builtins.float]] = None, terminal_only: builtins.bool = False, max_output_values: builtins.int = 0) -> numpy.typing.NDArray[numpy.float64]:
+    r"""
+    Generate exact-discretization correlated geometric Brownian paths.
+
+    Draws are consumed path, time, asset; equal nonzero seeds and inputs are
+    bit-identical to Go `SimulateGBM`. Initial values appear at time zero.
+
+    Args:
+        initial (list[float]): Positive initial asset values.
+        drift (list[float]): Annualized arithmetic drifts, one per asset.
+        volatility (list[float]): Nonnegative annualized volatilities.
+        horizon (float): Nonnegative time horizon in units matching the rates.
+        steps (int): Positive number of time intervals per path.
+        paths (int): Positive number of independent paths.
+        seed (int): Nonzero 32-bit seed.
+        correlation (list[float] | None): Positive-definite row-major matrix;
+            None selects identity.
+        terminal_only (bool): Return final asset values without intermediate rows.
+        max_output_values (int): Zero selects 16,777,216 float64 values (128 MiB);
+            a positive value overrides this limit.
+
+    Returns:
+        numpy.ndarray: Float64 values shaped `(paths, steps + 1, assets)` or,
+            with `terminal_only`, `(paths, assets)`.
+
+    Raises:
+        ItofinError: If inputs, correlation, or output size are invalid.
+    """
