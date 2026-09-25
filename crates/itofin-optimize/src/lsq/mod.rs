@@ -8,6 +8,7 @@
 //!   factorization at step `k` when the largest remaining column norm is at
 //!   most `tau = max(m, n) * f64::EPSILON * |R_11|`, where `|R_11|` is the
 //!   largest column norm of the input.
+//! - [`nnls`](nnls::nnls): nonnegative least squares by the active-set method.
 //!
 //! Reference: Lawson, C. L. and Hanson, R. J. (1974), Solving Least Squares
 //! Problems, Prentice-Hall (SIAM Classics reprint 1995): the Householder
@@ -19,9 +20,18 @@
 #![cfg_attr(not(test), allow(dead_code))]
 
 pub(crate) mod householder;
+pub(crate) mod nnls;
 
 #[cfg(test)]
 mod tests;
+
+/// Why a kernel returned no solution.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub(crate) enum Failure {
+    /// The active-set loop reached its iteration cap.
+    #[error("the active-set iteration cap was reached")]
+    IterationCap,
+}
 
 /// A read-only dense matrix stored row-major: entry `(i, j)` sits at
 /// `data[i * stride + j]`, with `stride >= cols`.
