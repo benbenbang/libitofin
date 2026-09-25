@@ -127,6 +127,12 @@ jobs:
         with:
           components: rustfmt, clippy
 
+      - name: set up go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: sdk/go/go.mod
+          cache: false
+
       - name: set up python
         uses: actions/setup-python@v5
         with:
@@ -165,6 +171,15 @@ jobs:
           cargo run --quiet --release -p libitofin --example fd_binding_oracle > "$oracle"
           python -m json.tool "$oracle" > /dev/null
           echo "ITOFIN_FD_ORACLE_JSON=$oracle" >> "$GITHUB_ENV"
+
+      - name: build the same-profile Go Heston method oracle
+        run: |
+          cargo build --release -p libitofin-ffi
+          oracle="$RUNNER_TEMP/heston-methods-go-oracle.json"
+          cd sdk/go
+          LD_LIBRARY_PATH="$GITHUB_WORKSPACE/target/release" go run ./examples/optimization_methods_oracle > "$oracle"
+          python -m json.tool "$oracle" > /dev/null
+          echo "ITOFIN_HCAL_METHODS_GO_ORACLE=$oracle" >> "$GITHUB_ENV"
 
       - name: run the pytest oracle
         run: |

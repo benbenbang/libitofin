@@ -1,8 +1,10 @@
-"""Calibration fixtures; set ITOFIN_RELEASE_PARITY=1 with a release wheel for exact Go vectors."""
+"""Calibration fixtures shared with the same-profile Go and Rust gates."""
 
+import json
 import math
 import os
 import struct
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -53,25 +55,9 @@ def helpers(settings):
     ]
 
 
-@pytest.mark.parametrize(
-    "factory,expected",
-    [
-        (
-            Simplex,
-            [0.01000000000107512, 0.1483535700303218, 0.01000000000679777, 5.030267915404000e-11, -0.4546235848312395],
-        ),
-        (
-            ConjugateGradient,
-            [0.008655748461209384, 0.20302231484372477, 0.03241055121479137, 0.05583023664447662, -0.36675046501506725],
-        ),
-        (
-            SteepestDescent,
-            [0.009279646471165427, 0.2003282187710104, 0.01137238386842711, 0.27757131213875286, -0.708882936730623],
-        ),
-    ],
-)
-def test_heston_methods_match_go_and_core(factory, expected):
-    """Match release-profile Go vectors or improve the same market in CI."""
+@pytest.mark.parametrize("factory", [Simplex, ConjugateGradient, SteepestDescent])
+def test_heston_methods_match_go_and_core(factory):
+    """Compare against the Go release build when its same-runner oracle is available."""
     settings = _fixture_settings()
     model = _seed_model()(0.3)
     method = factory(0.1) if factory is Simplex else factory()
@@ -83,7 +69,12 @@ def test_heston_methods_match_go_and_core(factory, expected):
     assert -1 <= actual[4] <= 1
     error = sum(instrument.calibration_error() ** 2 for instrument in instruments)
     assert math.isfinite(error)
-    if os.getenv("ITOFIN_RELEASE_PARITY") == "1":
+    oracle_path = os.getenv("ITOFIN_HCAL_METHODS_GO_ORACLE")
+    if oracle_path:
+        oracle = json.loads(Path(oracle_path).read_text())
+        expected = oracle[factory.__name__]
+        assert len(expected) == 5
+        assert all(math.isfinite(value) for value in expected)
         assert actual == pytest.approx(expected, rel=0, abs=1e-12)
     else:
         early_instruments = helpers(_fixture_settings())
