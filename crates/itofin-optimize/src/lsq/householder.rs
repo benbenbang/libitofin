@@ -128,6 +128,15 @@ impl Qr {
         }
     }
 
+    /// Solves `R_11' z = y` in place on `y[..rank]`.
+    pub(crate) fn solve_rt(&self, y: &mut [f64]) {
+        let n = self.cols;
+        for i in 0..self.rank() {
+            let head: f64 = (0..i).map(|j| self.r[j * n + i] * y[j]).sum();
+            y[i] = (y[i] - head) / self.r[i * n + i];
+        }
+    }
+
     /// The basic least-squares solution of `A x = b`, with the coordinates
     /// past the rank set to zero, and its residual norm.
     pub(crate) fn solve(&self, b: &[f64]) -> (Vec<f64>, f64) {

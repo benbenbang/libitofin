@@ -9,17 +9,22 @@
 //!   most `tau = max(m, n) * f64::EPSILON * |R_11|`, where `|R_11|` is the
 //!   largest column norm of the input.
 //! - [`nnls`](nnls::nnls): nonnegative least squares by the active-set method.
+//! - [`ldp`](lsei::ldp), [`lsi`](lsei::lsi) and [`lsei`](lsei::lsei): least
+//!   distance, inequality-constrained and equality-and-inequality-constrained
+//!   least squares, each reduced to the one before it.
 //!
 //! Reference: Lawson, C. L. and Hanson, R. J. (1974), Solving Least Squares
 //! Problems, Prentice-Hall (SIAM Classics reprint 1995): the Householder
 //! construction and application (Algorithms H1 and H2), the pivoted
-//! triangularization behind HFTI (Chapter 14) and NNLS (Algorithm 23.10).
+//! triangularization behind HFTI (Chapter 14), NNLS (Algorithm 23.10), LDP
+//! (23.27) and the LSI and LSEI reductions (Chapter 23).
 //!
 //! The allowance for unused items is temporary: OPT-10 (#1088) removes it once
 //! the SLSQP driver calls these kernels.
 #![cfg_attr(not(test), allow(dead_code))]
 
 pub(crate) mod householder;
+pub(crate) mod lsei;
 pub(crate) mod nnls;
 
 #[cfg(test)]
@@ -31,6 +36,12 @@ pub(crate) enum Failure {
     /// The active-set loop reached its iteration cap.
     #[error("the active-set iteration cap was reached")]
     IterationCap,
+    /// The inequality constraints admit no point.
+    #[error("the inequality constraints are infeasible")]
+    Infeasible,
+    /// A matrix that must have full rank does not.
+    #[error("a matrix that must have full rank is rank deficient")]
+    RankDeficient,
 }
 
 /// A read-only dense matrix stored row-major: entry `(i, j)` sits at
