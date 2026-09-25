@@ -43,6 +43,33 @@ def quadratic(x):
     return a * a + 2.0 * b * b + 3.0 * c * c + 4.0 * d * d + 0.5 * a * b + 0.25 * b * c + 0.1 * c * d
 
 
+def rosenbrock_gradient(x):
+    """The analytic gradient of `rosenbrock`."""
+    r = x[1] - x[0] * x[0]
+    return [-400.0 * x[0] * r - 2.0 * (1.0 - x[0]), 200.0 * r]
+
+
+def powell_singular(x):
+    """Powell's singular function, minimized at the origin with a singular Hessian there."""
+    return (
+        (x[0] + 10.0 * x[1]) ** 2
+        + 5.0 * (x[2] - x[3]) ** 2
+        + (x[1] - 2.0 * x[2]) ** 4
+        + 10.0 * (x[0] - x[3]) ** 4
+    )
+
+
+def powell_singular_gradient(x):
+    """The analytic gradient of `powell_singular`."""
+    a, b, c, d = x[0] + 10.0 * x[1], x[2] - x[3], x[1] - 2.0 * x[2], x[0] - x[3]
+    return [
+        2.0 * a + 40.0 * d**3,
+        20.0 * a + 4.0 * c**3,
+        10.0 * b - 8.0 * c**3,
+        -10.0 * b - 40.0 * d**3,
+    ]
+
+
 TIGHT = {"xatol": 1e-08, "fatol": 1e-10, "maxiter": 20000, "maxfev": 20000}
 
 NELDER_MEAD = {
@@ -57,7 +84,17 @@ NELDER_MEAD = {
     },
 }
 
-CASES: dict[str, object] = {"nelder_mead": NELDER_MEAD}
+BFGS = {
+    "rosenbrock": {"objective": rosenbrock, "jac": rosenbrock_gradient, "x0": [-1.2, 1.0]},
+    "beale": {"objective": beale, "jac": None, "x0": [1.0, 1.0]},
+    "powell_singular": {
+        "objective": powell_singular,
+        "jac": powell_singular_gradient,
+        "x0": [3.0, -1.0, 0.0, 1.0],
+    },
+}
+
+CASES: dict[str, object] = {"nelder_mead": NELDER_MEAD, "bfgs": BFGS}
 
 
 def solved(definitions: dict) -> dict:
@@ -91,6 +128,37 @@ def solved(definitions: dict) -> dict:
     return results
 
 
+def solved_bfgs(definitions: dict) -> dict:
+    """Run SciPy BFGS with its default `gtol` over every case.
+
+    A case without `jac` uses SciPy's forward differences. The gradient norm
+    at the optimum is recorded so the residual has a named oracle.
+    """
+    from scipy.optimize import minimize
+
+    results = {}
+    for name, case in definitions.items():
+        outcome = minimize(case["objective"], case["x0"], jac=case["jac"], method="BFGS")
+        if not outcome.success:
+            raise SystemExit(f"case {name} did not converge: {outcome.message}")
+        results[name] = {
+            "x0": case["x0"],
+            "analytic_gradient": case["jac"] is not None,
+            "x": outcome.x.tolist(),
+            "fun": float(outcome.fun),
+            "gnorm": float(abs(outcome.jac).max()),
+            "nit": int(outcome.nit),
+            "nfev": int(outcome.nfev),
+            "njev": int(outcome.njev),
+            "status": int(outcome.status),
+            "message": str(outcome.message),
+        }
+    return results
+
+
+SOLVERS = {"bfgs": solved_bfgs}
+
+
 def provenance(scipy_version: str) -> dict[str, str]:
     """Stamp every fixture with the SciPy release and day that produced it."""
     return {
@@ -117,7 +185,8 @@ def main() -> None:
     import scipy
 
     for name, definitions in CASES.items():
-        print(write_fixture(args.output, name, solved(definitions), scipy.__version__))
+        solve = SOLVERS.get(name, solved)
+        print(write_fixture(args.output, name, solve(definitions), scipy.__version__))
 
 
 if __name__ == "__main__":

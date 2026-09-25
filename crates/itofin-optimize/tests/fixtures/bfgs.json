@@ -1,0 +1,66 @@
+{
+  "cases": {
+    "beale": {
+      "analytic_gradient": false,
+      "fun": 1.9911047414880613e-14,
+      "gnorm": 1.2947272979231531e-07,
+      "message": "Optimization terminated successfully.",
+      "nfev": 51,
+      "nit": 15,
+      "njev": 17,
+      "status": 0,
+      "x": [
+        2.9999996694909887,
+        0.4999999077869235
+      ],
+      "x0": [
+        1.0,
+        1.0
+      ]
+    },
+    "powell_singular": {
+      "analytic_gradient": true,
+      "fun": 3.977536241639192e-09,
+      "gnorm": 3.5543898589519495e-06,
+      "message": "Optimization terminated successfully.",
+      "nfev": 40,
+      "nit": 35,
+      "njev": 40,
+      "status": 0,
+      "x": [
+        0.005723600625919227,
+        -0.000572357184993775,
+        0.0012853164105802815,
+        0.001285417993754783
+      ],
+      "x0": [
+        3.0,
+        -1.0,
+        0.0,
+        1.0
+      ]
+    },
+    "rosenbrock": {
+      "analytic_gradient": true,
+      "fun": 2.5353073555215442e-15,
+      "gnorm": 1.7045150626433253e-06,
+      "message": "Optimization terminated successfully.",
+      "nfev": 39,
+      "nit": 32,
+      "njev": 39,
+      "status": 0,
+      "x": [
+        0.9999999710013947,
+        0.999999946119085
+      ],
+      "x0": [
+        -1.2,
+        1.0
+      ]
+    }
+  },
+  "provenance": {
+    "generated": "2026-09-25",
+    "scipy_version": "1.18.1"
+  }
+}
