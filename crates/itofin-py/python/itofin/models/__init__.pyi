@@ -86,7 +86,7 @@ class HestonModel:
         Returns:
             float: The current value of v0.
         """
-    def calibrate(self, helpers: typing.Sequence[HestonModelHelper], method: optimization.LevenbergMarquardt, end_criteria: optimization.EndCriteria, integration_order: builtins.int) -> None:
+    def calibrate(self, helpers: typing.Sequence[HestonModelHelper], method: optimization.LevenbergMarquardt | optimization.Simplex | optimization.ConjugateGradient | optimization.SteepestDescent, end_criteria: optimization.EndCriteria, integration_order: builtins.int) -> None:
         r"""
         Fit the five parameters to the helpers and write them back.
 
@@ -97,7 +97,7 @@ class HestonModel:
 
         Args:
             helpers (list[HestonModelHelper]): The calibration instruments to fit; must not be empty.
-            method (LevenbergMarquardt): The optimizer driving the fit.
+            method (LevenbergMarquardt | Simplex | ConjugateGradient | SteepestDescent): The optimizer driving the fit.
             end_criteria (EndCriteria): The stopping rule handed to the optimizer.
             integration_order (int): The order of the Gauss-Laguerre integration the
                 engine uses; at most 192.
@@ -106,11 +106,11 @@ class HestonModel:
             ItofinError: If integration_order exceeds 192, if helpers is empty,
                 or if the optimization itself fails.
         """
-    def calibrate_cos(self, helpers: typing.Sequence[HestonModelHelper], method: optimization.LevenbergMarquardt, end_criteria: optimization.EndCriteria, l: builtins.float = 16.0, n: builtins.int = 200) -> None:
+    def calibrate_cos(self, helpers: typing.Sequence[HestonModelHelper], method: optimization.LevenbergMarquardt | optimization.Simplex | optimization.ConjugateGradient | optimization.SteepestDescent, end_criteria: optimization.EndCriteria, l: builtins.float = 16.0, n: builtins.int = 200) -> None:
         r"""
         Fit with a COS engine, retaining existing analytic calibration defaults.
         """
-    def calibrate_exponential_fitting(self, helpers: typing.Sequence[HestonModelHelper], method: optimization.LevenbergMarquardt, end_criteria: optimization.EndCriteria, control_variate: pricingengines.ExponentialFittingControlVariate = pricingengines.ExponentialFittingControlVariate.Optimal, scaling: typing.Optional[builtins.float] = None, alpha: builtins.float = -0.5) -> None:
+    def calibrate_exponential_fitting(self, helpers: typing.Sequence[HestonModelHelper], method: optimization.LevenbergMarquardt | optimization.Simplex | optimization.ConjugateGradient | optimization.SteepestDescent, end_criteria: optimization.EndCriteria, control_variate: pricingengines.ExponentialFittingControlVariate = pricingengines.ExponentialFittingControlVariate.Optimal, scaling: typing.Optional[builtins.float] = None, alpha: builtins.float = -0.5) -> None:
         r"""
         Fit with exponentially fitted quadrature and the selected control variate.
         """
@@ -222,7 +222,7 @@ class HullWhite:
             ItofinError: If the fitted curve is not linked or the arguments are
                 rejected by the underlying Black formula.
         """
-    def calibrate(self, helpers: typing.Sequence[SwaptionHelper], method: optimization.LevenbergMarquardt, end_criteria: optimization.EndCriteria, fix_reversion: builtins.bool) -> None:
+    def calibrate(self, helpers: typing.Sequence[SwaptionHelper], method: optimization.LevenbergMarquardt | optimization.Simplex | optimization.ConjugateGradient | optimization.SteepestDescent, end_criteria: optimization.EndCriteria, fix_reversion: builtins.bool) -> None:
         r"""
         Fit a and sigma to the helpers and write them back.
 
@@ -232,7 +232,7 @@ class HullWhite:
 
         Args:
             helpers (list[SwaptionHelper]): The calibration instruments to fit; must not be empty.
-            method (LevenbergMarquardt): The optimizer driving the fit.
+            method (LevenbergMarquardt | Simplex | ConjugateGradient | SteepestDescent): The optimizer driving the fit.
             end_criteria (EndCriteria): The stopping rule handed to the optimizer.
             fix_reversion (bool): Pin the mean reversion a and free only sigma; when
                 False both parameters are free.
@@ -240,7 +240,7 @@ class HullWhite:
         Raises:
             ItofinError: If helpers is empty or the optimization itself fails.
         """
-    def calibrate_caps(self, helpers: typing.Sequence[CapHelper], method: optimization.LevenbergMarquardt, end_criteria: optimization.EndCriteria, fix_reversion: builtins.bool, time_steps: builtins.int) -> None: ...
+    def calibrate_caps(self, helpers: typing.Sequence[CapHelper], method: optimization.LevenbergMarquardt | optimization.Simplex | optimization.ConjugateGradient | optimization.SteepestDescent, end_criteria: optimization.EndCriteria, fix_reversion: builtins.bool, time_steps: builtins.int) -> None: ...
 
 @typing.final
 class SwaptionHelper:

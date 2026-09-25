@@ -2,7 +2,7 @@
 //! HestonModelHelper.
 
 use crate::PyQlError;
-use crate::calibration::{PyCalibrationErrorType, PyEndCriteria, PyLevenbergMarquardt};
+use crate::calibration::{PyCalibrationErrorType, PyEndCriteria, with_method};
 use crate::heston_engines::PyExponentialFittingControlVariate;
 use crate::settings::PySettings;
 use crate::time::{PyCalendar, PyDate, PyDayCounter, PyPeriod};
@@ -22,6 +22,7 @@ use libitofin::termstructures::yields::FlatForward;
 use libitofin::termstructures::yieldtermstructure::YieldTermStructure;
 use libitofin::time::frequency::Frequency;
 use pyo3::prelude::*;
+use pyo3::types::PyAny;
 #[allow(unused_imports)]
 use pyo3_stub_gen::derive::{
     gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pyfunction, gen_stub_pymethods,
@@ -227,7 +228,7 @@ impl PyHestonModel {
     ///
     /// Args:
     ///     helpers (list[HestonModelHelper]): The calibration instruments to fit; must not be empty.
-    ///     method (LevenbergMarquardt): The optimizer driving the fit.
+    ///     method (LevenbergMarquardt | Simplex | ConjugateGradient | SteepestDescent): The optimizer driving the fit.
     ///     end_criteria (EndCriteria): The stopping rule handed to the optimizer.
     ///     integration_order (int): The order of the Gauss-Laguerre integration the
     ///         engine uses; at most 192.
@@ -238,8 +239,8 @@ impl PyHestonModel {
     fn calibrate(
         &mut self,
         helpers: Vec<PyRef<PyHestonModelHelper>>,
-        #[gen_stub(override_type(type_repr = "optimization.LevenbergMarquardt", imports = ("itofin.optimization")))]
-        method: &mut PyLevenbergMarquardt,
+        #[gen_stub(override_type(type_repr = "optimization.LevenbergMarquardt | optimization.Simplex | optimization.ConjugateGradient | optimization.SteepestDescent", imports = ("itofin.optimization")))]
+        method: &Bound<'_, PyAny>,
         end_criteria: &PyEndCriteria,
         integration_order: usize,
     ) -> PyResult<()> {
@@ -255,8 +256,8 @@ impl PyHestonModel {
     fn calibrate_cos(
         &mut self,
         helpers: Vec<PyRef<PyHestonModelHelper>>,
-        #[gen_stub(override_type(type_repr = "optimization.LevenbergMarquardt", imports = ("itofin.optimization")))]
-        method: &mut PyLevenbergMarquardt,
+        #[gen_stub(override_type(type_repr = "optimization.LevenbergMarquardt | optimization.Simplex | optimization.ConjugateGradient | optimization.SteepestDescent", imports = ("itofin.optimization")))]
+        method: &Bound<'_, PyAny>,
         end_criteria: &PyEndCriteria,
         l: f64,
         n: usize,
@@ -271,8 +272,8 @@ impl PyHestonModel {
     fn calibrate_exponential_fitting(
         &mut self,
         helpers: Vec<PyRef<PyHestonModelHelper>>,
-        #[gen_stub(override_type(type_repr = "optimization.LevenbergMarquardt", imports = ("itofin.optimization")))]
-        method: &mut PyLevenbergMarquardt,
+        #[gen_stub(override_type(type_repr = "optimization.LevenbergMarquardt | optimization.Simplex | optimization.ConjugateGradient | optimization.SteepestDescent", imports = ("itofin.optimization")))]
+        method: &Bound<'_, PyAny>,
         end_criteria: &PyEndCriteria,
         control_variate: PyExponentialFittingControlVariate,
         scaling: Option<f64>,
@@ -295,7 +296,7 @@ impl PyHestonModel {
     fn calibrate_engine(
         &mut self,
         helpers: Vec<PyRef<PyHestonModelHelper>>,
-        method: &mut PyLevenbergMarquardt,
+        method: &Bound<'_, PyAny>,
         end_criteria: &PyEndCriteria,
         engine: SharedMut<dyn PricingEngine>,
     ) -> PyResult<()> {
@@ -310,16 +311,19 @@ impl PyHestonModel {
             .iter()
             .map(|helper| SharedMut::clone(&helper.inner) as SharedMut<dyn CalibrationHelper>)
             .collect();
-        calibrate(
-            &self.inner,
-            &dyn_helpers,
-            method.inner_mut(),
-            end_criteria.inner(),
-            None,
-            Vec::new(),
-            Vec::new(),
-        )
-        .map_err(PyQlError::from)?;
+        with_method(method, |method| {
+            calibrate(
+                &self.inner,
+                &dyn_helpers,
+                method,
+                end_criteria.inner(),
+                None,
+                Vec::new(),
+                Vec::new(),
+            )
+            .map_err(PyQlError::from)?;
+            Ok(())
+        })?;
         Ok(())
     }
     /// A clone of the inner model handle for the engine facade (H2 also calibrates).

@@ -1,6 +1,6 @@
 //! Cap calibration and Hull-White lattice engine facades.
 use crate::PyQlError;
-use crate::calibration::{PyCalibrationErrorType, PyEndCriteria, PyLevenbergMarquardt};
+use crate::calibration::{PyCalibrationErrorType, PyEndCriteria, with_method};
 use crate::curve::PyYieldTermStructure;
 use crate::hullwhite::{PyHullWhite, PyIborIndex};
 use crate::market::PySimpleQuote;
@@ -14,6 +14,7 @@ use libitofin::pricingengine::PricingEngine;
 use libitofin::pricingengines::capfloor::TreeCapFloorEngine;
 use libitofin::shared::{SharedMut, shared_mut};
 use pyo3::prelude::*;
+use pyo3::types::PyAny;
 use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 
 #[gen_stub_pyclass]
@@ -144,7 +145,7 @@ impl PyHullWhite {
     pub(crate) fn calibrate_caps_impl(
         &self,
         helpers: Vec<PyRef<PyCapHelper>>,
-        method: &mut PyLevenbergMarquardt,
+        method: &Bound<'_, PyAny>,
         end_criteria: &PyEndCriteria,
         fix_reversion: bool,
         time_steps: usize,
@@ -163,20 +164,23 @@ impl PyHullWhite {
             .iter()
             .map(|h| h.inner.clone() as SharedMut<dyn CalibrationHelper>)
             .collect();
-        calibrate(
-            &self.inner(),
-            &helpers,
-            method.inner_mut(),
-            end_criteria.inner(),
-            None,
-            Vec::new(),
-            if fix_reversion {
-                vec![true, false]
-            } else {
-                Vec::new()
-            },
-        )
-        .map_err(PyQlError::from)?;
+        with_method(method, |method| {
+            calibrate(
+                &self.inner(),
+                &helpers,
+                method,
+                end_criteria.inner(),
+                None,
+                Vec::new(),
+                if fix_reversion {
+                    vec![true, false]
+                } else {
+                    Vec::new()
+                },
+            )
+            .map_err(PyQlError::from)?;
+            Ok(())
+        })?;
         Ok(())
     }
 }
