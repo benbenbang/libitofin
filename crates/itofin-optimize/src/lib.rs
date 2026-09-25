@@ -45,14 +45,15 @@ mod tests;
 pub use counters::{Counters, Halt};
 pub use error::{InvalidInput, MinimizeError};
 pub use finite_difference::FiniteDifference;
-pub use objective::{Flow, IterationState, Objective};
+pub use objective::{ConstraintKind, Flow, IterationState, Objective};
 pub use outcome::{Converged, Minimize, Termination};
 pub use problem::{BfgsOptions, Bounds, Common, Method, NelderMeadOptions, Norm, Problem};
 
 /// Minimizes `objective` from `problem.x0` with the chosen `method`.
 ///
 /// Validation runs first and in a fixed order: the problem, then the shared
-/// options, then the method against the problem. A run that reaches a solver
+/// options, then the method against the problem, then the method against the
+/// constraints the objective declares. A run that reaches a solver
 /// always returns `Ok`, carrying the best point found and the
 /// [`Termination`] that ended it; only a rejected input or a failing objective
 /// is an `Err`.
@@ -61,8 +62,8 @@ pub use problem::{BfgsOptions, Bounds, Common, Method, NelderMeadOptions, Norm, 
 ///
 /// [`MinimizeError::InvalidInput`] when the problem, the budgets, the
 /// tolerances or the method combination is rejected, and
-/// [`MinimizeError::Objective`] when the objective or its callback fails,
-/// carrying that error by value.
+/// [`MinimizeError::Objective`] when the objective, a constraint or the
+/// callback fails, carrying that error by value.
 ///
 /// # Examples
 ///
@@ -91,6 +92,13 @@ pub fn minimize<O: Objective>(
     problem.validate()?;
     common.validate()?;
     method.validate(problem)?;
+    if objective.constraint_count() > 0 {
+        return Err(InvalidInput::Unsupported {
+            method: method.name(),
+            option: "constraints",
+        }
+        .into());
+    }
     match method {
         Method::NelderMead(options) => nelder_mead::minimize(objective, problem, options, common),
         Method::Bfgs(options) => bfgs::minimize(objective, problem, options, common),

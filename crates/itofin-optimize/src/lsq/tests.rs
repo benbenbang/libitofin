@@ -199,15 +199,17 @@ const NONE: MatRef<'static> = MatRef {
 #[test]
 fn ldp_projects_the_origin_onto_the_active_half_plane() {
     let g = [1.0, 1.0, 1.0, -1.0];
-    let x = ldp(mat(&g, 2, 2), &[1.0, -5.0]).expect("feasible");
-    assert_close(&x, &[0.5, 0.5], 1e-14);
+    let solution = ldp(mat(&g, 2, 2), &[1.0, -5.0]).expect("feasible");
+    assert_close(&solution.x, &[0.5, 0.5], 1e-14);
+    assert_close(&solution.multipliers, &[0.5, 0.0], 1e-14);
 }
 
 #[test]
 fn ldp_returns_the_origin_when_it_is_feasible() {
     let g = [1.0, 2.0, -3.0, 1.0];
-    let x = ldp(mat(&g, 2, 2), &[-1.0, 0.0]).expect("feasible");
-    assert_close(&x, &[0.0, 0.0], 0.0);
+    let solution = ldp(mat(&g, 2, 2), &[-1.0, 0.0]).expect("feasible");
+    assert_close(&solution.x, &[0.0, 0.0], 0.0);
+    assert_close(&solution.multipliers, &[0.0, 0.0], 0.0);
 }
 
 #[test]
@@ -223,6 +225,7 @@ fn lsi_moves_the_unconstrained_minimizer_onto_the_violated_constraint() {
     let solution = lsi(mat(&e, 2, 2), &[4.0, 2.0], mat(&g, 2, 2), &[-3.0, 0.0]).expect("feasible");
     assert_close(&solution.x, &[1.8, 1.2], 1e-14);
     assert!((solution.residual_norm - 0.8_f64.sqrt()).abs() <= 1e-14);
+    assert_close(&solution.multipliers, &[0.8, 0.0], 1e-14);
 }
 
 #[test]
@@ -259,6 +262,7 @@ fn lsei_solves_equality_and_active_inequality_together() {
     .expect("feasible");
     assert_close(&solution.x, &[0.5, 1.5, 1.0], 1e-14);
     assert!((solution.residual_norm - 4.5_f64.sqrt()).abs() <= 1e-14);
+    assert_close(&solution.multipliers, &[-0.5, 1.5], 1e-14);
 }
 
 #[test]
