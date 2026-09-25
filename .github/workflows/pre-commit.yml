@@ -172,14 +172,18 @@ jobs:
           python -m json.tool "$oracle" > /dev/null
           echo "ITOFIN_FD_ORACLE_JSON=$oracle" >> "$GITHUB_ENV"
 
-      - name: build the same-profile Go Heston method oracle
+      - name: build the same-profile Heston method oracles
         run: |
+          core_oracle="$RUNNER_TEMP/heston-methods-core-oracle.json"
+          cargo run --quiet --release -p libitofin-ffi --example optimization_methods_oracle > "$core_oracle"
+          python -m json.tool "$core_oracle" > /dev/null
+          echo "ITOFIN_HCAL_METHODS_CORE_ORACLE=$core_oracle" >> "$GITHUB_ENV"
           cargo build --release -p libitofin-ffi
-          oracle="$RUNNER_TEMP/heston-methods-go-oracle.json"
+          go_oracle="$RUNNER_TEMP/heston-methods-go-oracle.json"
           cd sdk/go
-          LD_LIBRARY_PATH="$GITHUB_WORKSPACE/target/release" go run ./examples/optimization_methods_oracle > "$oracle"
-          python -m json.tool "$oracle" > /dev/null
-          echo "ITOFIN_HCAL_METHODS_GO_ORACLE=$oracle" >> "$GITHUB_ENV"
+          LD_LIBRARY_PATH="$GITHUB_WORKSPACE/target/release" go run ./examples/optimization_methods_oracle > "$go_oracle"
+          python -m json.tool "$go_oracle" > /dev/null
+          echo "ITOFIN_HCAL_METHODS_GO_ORACLE=$go_oracle" >> "$GITHUB_ENV"
 
       - name: run the pytest oracle
         run: |

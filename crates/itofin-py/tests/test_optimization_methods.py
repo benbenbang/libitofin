@@ -69,13 +69,22 @@ def test_heston_methods_match_go_and_core(factory):
     assert -1 <= actual[4] <= 1
     error = sum(instrument.calibration_error() ** 2 for instrument in instruments)
     assert math.isfinite(error)
-    oracle_path = os.getenv("ITOFIN_HCAL_METHODS_GO_ORACLE")
-    if oracle_path:
-        oracle = json.loads(Path(oracle_path).read_text())
-        expected = oracle[factory.__name__]
-        assert len(expected) == 5
-        assert all(math.isfinite(value) for value in expected)
-        assert actual == pytest.approx(expected, rel=0, abs=1e-12)
+    go_path = os.getenv("ITOFIN_HCAL_METHODS_GO_ORACLE")
+    core_path = os.getenv("ITOFIN_HCAL_METHODS_CORE_ORACLE")
+    assert bool(go_path) == bool(core_path)
+    if go_path and core_path:
+        go = json.loads(Path(go_path).read_text())[factory.__name__]
+        core_name = {
+            Simplex: "simplex",
+            ConjugateGradient: "conjugate_gradient",
+            SteepestDescent: "steepest_descent",
+        }[factory]
+        core = json.loads(Path(core_path).read_text())[core_name]["params"]
+        assert len(go) == len(core) == 5
+        assert all(math.isfinite(value) for value in go + core)
+        assert actual == pytest.approx(go, rel=0, abs=1e-12)
+        assert actual == pytest.approx(core, rel=0, abs=1e-12)
+        assert go == pytest.approx(core, rel=0, abs=1e-12)
     else:
         early_instruments = helpers(_fixture_settings())
         early_model = _seed_model()(0.3)
