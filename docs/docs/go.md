@@ -138,6 +138,37 @@ go run ./examples/portfolio
 The [European option walkthrough](getting-started.md#price-a-european-option)
 uses the same inputs as Python and returns NPV `2.1333684449`.
 
+## Finite-difference vanilla options
+
+Current source builds can price European, American and Bermudan vanilla options
+with a Black-Scholes process. Once `session`, `process` and `option` belong to
+the same session, construct an engine and price in one operation:
+
+```go
+timeSteps, priceNodes := uint(200), uint(200)
+engine, err := session.NewFdBlackScholesVanillaEngine(process, itofin.FdConfig{
+    TGrid: &timeSteps, XGrid: &priceNodes,
+})
+if err != nil { return err }
+value, err := option.PriceFd(engine)
+if err != nil { return err }
+delta, err := option.Delta()
+if err != nil { return err }
+gamma, err := option.Gamma()
+if err != nil { return err }
+theta, err := option.Theta()
+if err != nil { return err }
+fmt.Println(value, delta, gamma, theta)
+```
+
+`FdConfig{}` selects a 100 by 100 grid, zero damping steps and Douglas
+rollback. `FdImplicitEuler` is the other supported scheme; set it through
+`Scheme: &scheme`. Grid and damping values are optional pointers, so an explicit
+zero time grid or undersized equity grid is rejected instead of silently
+becoming a default. The engine retains its process, and the option retains an
+attached engine. Cash dividends, quanto and local-volatility settings are not
+part of this binding.
+
 ## Portfolio simulation
 
 This runnable example simulates two correlated assets with synthetic initial
