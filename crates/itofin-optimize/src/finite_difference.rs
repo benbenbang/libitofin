@@ -52,7 +52,8 @@ impl FiniteDifference {
 ///
 /// A [`Halt`] when the evaluation budget runs out, the objective fails or a
 /// value is nonfinite. `out` then holds a partial gradient and must not be
-/// used, and no gradient evaluation is charged.
+/// used. A finite-difference gradient cut short is not charged; an analytic
+/// gradient with a nonfinite component already was.
 pub(crate) fn gradient<O: Objective>(
     counters: &mut Counters,
     objective: &mut O,
