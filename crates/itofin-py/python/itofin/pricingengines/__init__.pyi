@@ -292,7 +292,8 @@ class FdBlackScholesVanillaEngine:
             scheme (FdScheme): Douglas by default; ImplicitEuler is also supported.
 
         Raises:
-            ValueError: If the grid dimensions are invalid or overflow.
+            ValueError: If the grid dimensions are invalid.
+            OverflowError: If a grid integer is outside the accepted range.
         """
 
 @typing.final
