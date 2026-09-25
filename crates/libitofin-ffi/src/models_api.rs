@@ -1,5 +1,6 @@
 //! Native model handles and calibration adapters.
 use crate::boundary::*;
+use crate::constraint_api::{ItofinCalibrationOptions, read_options};
 use crate::time_api::{date, day_counter};
 use libitofin::handle::Handle;
 use libitofin::interestrate::Compounding;
@@ -509,7 +510,44 @@ pub unsafe extern "C" fn itofin_model_calibrate(
     error: *mut ItofinError,
 ) -> i32 {
     unsafe {
+        itofin_model_calibrate_with_options(
+            ctx,
+            model,
+            kind,
+            helpers,
+            helpers_len,
+            method,
+            criteria,
+            integration_order,
+            fix_reversion,
+            std::ptr::null(),
+            error,
+        )
+    }
+}
+
+/// Calibration with an optional constraint, helper weights, and fixed-parameter mask.
+#[unsafe(no_mangle)]
+/// # Safety
+/// Pointers and handles must obey the C caller contract. Option arrays are copied
+/// before calibration and are never retained.
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn itofin_model_calibrate_with_options(
+    ctx: *mut Context,
+    model: u64,
+    kind: i32,
+    helpers: *const u64,
+    helpers_len: usize,
+    method: u64,
+    criteria: u64,
+    integration_order: usize,
+    fix_reversion: i32,
+    options: *const ItofinCalibrationOptions,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
         with_context(ctx, error, |c| {
+            let options = read_options(c, options)?;
             let ids = input_slice(helpers, helpers_len)?;
             if ids.is_empty() {
                 return Err(BindingError::invalid(
@@ -543,14 +581,19 @@ pub unsafe extern "C" fn itofin_model_calibrate(
                         &helpers,
                         &mut *method.borrow_mut(),
                         &criteria,
-                        None,
-                        vec![],
-                        vec![],
+                        options.constraint,
+                        options.weights,
+                        options.fix_parameters,
                     )?;
                 }
                 1 => {
                     if !(0..=1).contains(&fix_reversion) {
                         return Err(BindingError::invalid("fix_reversion must be 0 or 1"));
+                    }
+                    if fix_reversion != 0 && !options.fix_parameters.is_empty() {
+                        return Err(BindingError::invalid(
+                            "fix_reversion and fix_parameters cannot both be set",
+                        ));
                     }
                     let model = c.get::<SharedMut<HullWhite>>(model)?;
                     let helpers = ids
@@ -572,15 +615,15 @@ pub unsafe extern "C" fn itofin_model_calibrate(
                     let fixed = if fix_reversion != 0 {
                         vec![true, false]
                     } else {
-                        vec![]
+                        options.fix_parameters
                     };
                     calibrate(
                         &model,
                         &helpers,
                         &mut *method.borrow_mut(),
                         &criteria,
-                        None,
-                        vec![],
+                        options.constraint,
+                        options.weights,
                         fixed,
                     )?;
                 }

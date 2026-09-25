@@ -167,6 +167,14 @@ typedef struct ItofinCapHelperConfig {
   double shift;
 } ItofinCapHelperConfig;
 
+typedef struct ItofinCalibrationOptions {
+  uint64_t constraint;
+  const double *weights;
+  size_t weights_len;
+  const uint8_t *fix_parameters;
+  size_t fix_parameters_len;
+} ItofinCalibrationOptions;
+
 /**
  * A zero quote handle selects `rate`; a nonzero settings handle selects moving dates.
  */
@@ -1468,6 +1476,22 @@ int32_t itofin_hullwhite_calibrate_caps(struct ItofinContext *ctx,
 
 /**
  * # Safety
+ * Pointers and handles must obey the C caller contract. Option arrays are copied
+ * before calibration and are never retained.
+ */
+int32_t itofin_hullwhite_calibrate_caps_with_options(struct ItofinContext *ctx,
+                                                     uint64_t model,
+                                                     const uint64_t *helpers,
+                                                     size_t helpers_len,
+                                                     uint64_t method,
+                                                     uint64_t criteria,
+                                                     size_t steps,
+                                                     uint8_t fix_reversion,
+                                                     const struct ItofinCalibrationOptions *options,
+                                                     struct ItofinError *error);
+
+/**
+ * # Safety
  * Pointers must be aligned, live and valid for their stated lengths. Outputs
  * must not overlap inputs or other outputs. Any context and its handles must
  * belong to the calling thread; serialize calls including destruction.
@@ -1586,6 +1610,42 @@ int32_t itofin_leg_npv(struct ItofinContext *ctx,
                        int32_t npv_date,
                        ItofinReal *out,
                        struct ItofinError *error);
+
+/**
+ * # Safety
+ * Outputs and context must obey the C caller contract.
+ */
+int32_t itofin_no_constraint_new(struct ItofinContext *ctx,
+                                 uint64_t *out,
+                                 struct ItofinError *error);
+
+/**
+ * # Safety
+ * Outputs and context must obey the C caller contract.
+ */
+int32_t itofin_positive_constraint_new(struct ItofinContext *ctx,
+                                       uint64_t *out,
+                                       struct ItofinError *error);
+
+/**
+ * # Safety
+ * Bounds must be finite and ordered. Outputs and context obey the C caller contract.
+ */
+int32_t itofin_boundary_constraint_new(struct ItofinContext *ctx,
+                                       double low,
+                                       double high,
+                                       uint64_t *out,
+                                       struct ItofinError *error);
+
+/**
+ * # Safety
+ * Handles, outputs and context must obey the C caller contract.
+ */
+int32_t itofin_composite_constraint_new(struct ItofinContext *ctx,
+                                        uint64_t left,
+                                        uint64_t right,
+                                        uint64_t *out,
+                                        struct ItofinError *error);
 
 /**
  * # Safety
@@ -2221,6 +2281,21 @@ int32_t itofin_heston_calibrate_engine(struct ItofinContext *ctx,
                                        uint64_t criteria,
                                        const struct ItofinHestonEngineConfig *config,
                                        struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers and handles must obey the C caller contract. Option arrays are copied
+ * before calibration and are never retained.
+ */
+int32_t itofin_heston_calibrate_engine_with_options(struct ItofinContext *ctx,
+                                                    uint64_t model,
+                                                    const uint64_t *helpers,
+                                                    size_t helpers_len,
+                                                    uint64_t method,
+                                                    uint64_t criteria,
+                                                    const struct ItofinHestonEngineConfig *config,
+                                                    const struct ItofinCalibrationOptions *options,
+                                                    struct ItofinError *error);
 
 /**
  * COS inspector field: 0-3 cumulants, 4 log forward/spot, 5 characteristic function.
@@ -3915,6 +3990,24 @@ int32_t itofin_optimize_nelder_mead(const struct ItofinObjective *objective,
                                     const struct ItofinOptimizeOptions *options,
                                     struct ItofinOptimizeResult *out_result,
                                     struct ItofinError *error);
+
+/**
+ * Calibration with an optional constraint, helper weights, and fixed-parameter mask.
+ * # Safety
+ * Pointers and handles must obey the C caller contract. Option arrays are copied
+ * before calibration and are never retained.
+ */
+int32_t itofin_model_calibrate_with_options(struct ItofinContext *ctx,
+                                            uint64_t model,
+                                            int32_t kind,
+                                            const uint64_t *helpers,
+                                            size_t helpers_len,
+                                            uint64_t method,
+                                            uint64_t criteria,
+                                            size_t integration_order,
+                                            int32_t fix_reversion,
+                                            const struct ItofinCalibrationOptions *options,
+                                            struct ItofinError *error);
 
 /**
  * Calibration kind 0 is Heston and 1 is Hull-White. Result codes follow
