@@ -115,7 +115,8 @@ pub unsafe extern "C" fn itofin_option_bermudan_new(
     }
 }
 
-/// Engine kind: 0 analytic European (BSM process), 1 analytic Heston (model), 2 MC engine.
+/// Engine kind: 0 analytic European (BSM process), 1 analytic Heston (model),
+/// 2 preconstructed pricing engine (including MC and FD).
 #[unsafe(no_mangle)]
 /// # Safety
 /// Pointers must be aligned, live and valid for their stated lengths. Outputs
