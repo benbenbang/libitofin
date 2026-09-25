@@ -31,6 +31,7 @@ mod makeswaption;
 mod market;
 mod mcengine;
 mod ois;
+mod optimize;
 mod option;
 mod optionletvol;
 mod overnightfuture;
@@ -168,7 +169,7 @@ impl From<PyQlError> for PyErr {
     }
 }
 
-/// Registers the twelve `ql/`-faithful submodules on `itofin`.
+/// Registers the twelve `ql/`-faithful submodules and `optimize` on `itofin`.
 ///
 /// Nested native modules give attribute access (`itofin.time.Date`) but do not
 /// form a Python package, so `import itofin.time` / `from itofin.time import
@@ -371,6 +372,11 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     optimization.add_class::<PyLevenbergMarquardt>()?;
     optimization.add_class::<PyEndCriteria>()?;
 
+    let optimize = PyModule::new(py, "optimize")?;
+    optimize.add_function(wrap_pyfunction!(optimize::minimize, &optimize)?)?;
+    optimize.add_class::<optimize::PyOptimizeResult>()?;
+    optimize.add_class::<optimize::PyStatus>()?;
+
     let randomnumbers = PyModule::new(py, "randomnumbers")?;
     randomnumbers.add_class::<poissonrng::PyPoissonRandomGenerator>()?;
     randomnumbers.add_class::<poissonrng::PyPoissonRandomSequenceGenerator>()?;
@@ -397,6 +403,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
         ("models", &models),
         ("pricingengines", &pricingengines),
         ("optimization", &optimization),
+        ("optimize", &optimize),
         ("randomnumbers", &randomnumbers),
         ("results", &results),
     ];

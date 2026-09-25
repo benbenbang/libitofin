@@ -8,6 +8,7 @@ from . import indexes
 from . import instruments
 from . import models
 from . import optimization
+from . import optimize
 from . import pricingengines
 from . import processes
 from . import quotes
@@ -23,6 +24,7 @@ __all__ = [
     "instruments",
     "models",
     "optimization",
+    "optimize",
     "pricingengines",
     "processes",
     "quotes",
