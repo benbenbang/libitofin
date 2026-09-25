@@ -38,6 +38,7 @@ mod nelder_mead;
 mod objective;
 mod outcome;
 mod problem;
+mod slsqp;
 
 #[cfg(test)]
 mod tests;
