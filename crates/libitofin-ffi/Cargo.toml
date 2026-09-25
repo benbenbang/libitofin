@@ -11,4 +11,5 @@ name = "itofin_ffi"
 crate-type = ["cdylib", "staticlib", "rlib"]
 
 [dependencies]
+itofin-optimize = { path = "../itofin-optimize" }
 libitofin = { path = "../libitofin" }

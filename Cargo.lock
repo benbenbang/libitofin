@@ -284,6 +284,7 @@ dependencies = [
 name = "libitofin-ffi"
 version = "0.28.0"
 dependencies = [
+ "itofin-optimize",
  "libitofin",
 ]
 
