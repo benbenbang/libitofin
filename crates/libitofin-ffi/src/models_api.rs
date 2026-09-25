@@ -762,4 +762,231 @@ mod tests {
             assert!(x_error <= 1e-8 || y_error <= 1e-8, "{name}");
         }
     }
+
+    #[test]
+    fn ffi_heston_calibration_matches_core_in_same_profile() {
+        let mut c = Context::new();
+        let mut reference_date = 0;
+        let mut dc = 0;
+        let mut calendar = 0;
+        let mut settings = 0;
+        let mut process = 0;
+        let mut criteria = 0;
+        unsafe {
+            assert_eq!(
+                crate::time_api::itofin_date_new(15, 1, 2026, &mut reference_date, null_mut()),
+                0
+            );
+            assert_eq!(
+                crate::time_api::itofin_day_counter_new(&mut c, 0, &mut dc, null_mut()),
+                0
+            );
+            assert_eq!(
+                crate::time_api::itofin_calendar_new(&mut c, 1, &mut calendar, null_mut()),
+                0
+            );
+            assert_eq!(
+                crate::settings_api::itofin_settings_new(&mut c, &mut settings, null_mut()),
+                0
+            );
+            assert_eq!(
+                crate::settings_api::itofin_settings_set_evaluation_date(
+                    &mut c,
+                    settings,
+                    reference_date,
+                    null_mut(),
+                ),
+                0
+            );
+            assert_eq!(
+                itofin_heston_process_new(
+                    &mut c,
+                    HestonProcessConfig {
+                        risk_free_rate: 0.04,
+                        dividend_yield: 0.50,
+                        spot: 1.0,
+                        v0: 0.01,
+                        kappa: 0.2,
+                        theta: 0.02,
+                        sigma: 0.3,
+                        rho: -0.75,
+                        reference_date,
+                        day_counter: dc,
+                    },
+                    &mut process,
+                    null_mut(),
+                ),
+                0
+            );
+            assert_eq!(
+                itofin_end_criteria_new(
+                    &mut c,
+                    EndCriteriaConfig {
+                        max_iterations: 400,
+                        stationary_iterations: 40,
+                        root_epsilon: 1e-8,
+                        function_epsilon: 1e-8,
+                        gradient_epsilon: 1e-8,
+                        has_stationary: 1,
+                        has_gradient: 1,
+                    },
+                    &mut criteria,
+                    null_mut(),
+                ),
+                0
+            );
+        }
+        // Exact bits match the Go Heston fixture across optimization methods.
+        let strikes = [
+            [0x3fefac53e80821cf, 0x3feec1d93a138c3f, 0x3fedde266b06edcb],
+            [0x3feee6fc4e5c066b, 0x3fedad1ea01315b6, 0x3fec7fb4cb280859],
+            [0x3fedfc74e7ab4083, 0x3fec86124a9aed52, 0x3feb21f1fa31573d],
+            [0x3feb422c40cceb6b, 0x3fe96481fc737590, 0x3fe7a78a19df52fa],
+            [0x3fe8a167781bf00b, 0x3fe6938b2fef7da4, 0x3fe4b18a04b47ab2],
+            [0x3fe632e5c3c88016, 0x3fe4128a7c687e73, 0x3fe22653d92d71bf],
+            [0x3fdd08fc2bc78913, 0x3fd92e6fb34bcd0d, 0x3fd5d6d3fbc52310],
+        ];
+        let maturities = [(1, 2), (2, 2), (3, 2), (6, 2), (9, 2), (1, 3), (2, 3)];
+        let mut helper_ids = Vec::new();
+        for ((length, unit), row) in maturities.into_iter().zip(strikes) {
+            for bits in row {
+                let mut id = 0;
+                let config = HestonHelperConfig {
+                    maturity_length: length,
+                    maturity_unit: unit,
+                    calendar,
+                    spot: 1.0,
+                    strike: f64::from_bits(bits),
+                    volatility: 0.1,
+                    risk_free_rate: 0.04,
+                    dividend_yield: 0.50,
+                    error_type: 0,
+                    reference_date,
+                    day_counter: dc,
+                    settings,
+                };
+                unsafe {
+                    assert_eq!(
+                        itofin_heston_helper_new(&mut c, config, &mut id, null_mut()),
+                        0
+                    );
+                }
+                helper_ids.push(id);
+            }
+        }
+        for (name, constructor, mut direct_method) in [
+            (
+                "simplex",
+                0,
+                Box::new(Simplex::new(0.1)) as Box<dyn OptimizationMethod>,
+            ),
+            ("conjugate gradient", 1, Box::new(ConjugateGradient::new())),
+            ("steepest descent", 2, Box::new(SteepestDescent::new())),
+        ] {
+            let mut bridged_model_id = 0;
+            let mut method_id = 0;
+            unsafe {
+                assert_eq!(
+                    itofin_heston_model_new(&mut c, process, &mut bridged_model_id, null_mut()),
+                    0
+                );
+                let status = match constructor {
+                    0 => itofin_simplex_new(&mut c, 0.1, &mut method_id, null_mut()),
+                    1 => itofin_conjugate_gradient_new(&mut c, &mut method_id, null_mut()),
+                    _ => itofin_steepest_descent_new(&mut c, &mut method_id, null_mut()),
+                };
+                assert_eq!(status, 0, "{name}");
+                assert_eq!(
+                    itofin_model_calibrate(
+                        &mut c,
+                        bridged_model_id,
+                        0,
+                        helper_ids.as_ptr(),
+                        helper_ids.len(),
+                        method_id,
+                        criteria,
+                        96,
+                        0,
+                        null_mut(),
+                    ),
+                    0,
+                    "{name}"
+                );
+            }
+
+            let core_model =
+                HestonModel::new(c.get::<Shared<HestonProcess>>(process).unwrap()).unwrap();
+            let engine = shared_mut(AnalyticHestonEngine::new(core_model.clone(), 96).unwrap())
+                as SharedMut<dyn PricingEngine>;
+            let helpers: Vec<SharedMut<dyn CalibrationHelper>> = helper_ids
+                .iter()
+                .map(|id| {
+                    let helper = c.get::<SharedMut<HestonModelHelper>>(*id).unwrap();
+                    helper
+                        .borrow_mut()
+                        .base_mut()
+                        .set_pricing_engine(engine.clone());
+                    helper as SharedMut<dyn CalibrationHelper>
+                })
+                .collect();
+            calibrate(
+                &core_model,
+                &helpers,
+                &mut *direct_method,
+                &c.get::<EndCriteria>(criteria).unwrap(),
+                None,
+                vec![],
+                vec![],
+            )
+            .unwrap();
+            let core = core_model.borrow();
+            let expected = [
+                core.v0(),
+                core.kappa(),
+                core.theta(),
+                core.sigma(),
+                core.rho(),
+            ];
+            for (field, expected) in expected.into_iter().enumerate() {
+                let mut actual = 0.0;
+                unsafe {
+                    assert_eq!(
+                        itofin_model_parameter(
+                            &mut c,
+                            bridged_model_id,
+                            1,
+                            field,
+                            &mut actual,
+                            null_mut(),
+                        ),
+                        0,
+                        "{name}"
+                    );
+                }
+                assert!(
+                    (actual - expected).abs() <= 1e-12,
+                    "{name} field {field}: {actual} vs {expected}"
+                );
+            }
+            let mut actual_reason = -1;
+            unsafe {
+                assert_eq!(
+                    itofin_model_end_criteria_type(
+                        &mut c,
+                        bridged_model_id,
+                        0,
+                        &mut actual_reason,
+                        null_mut(),
+                    ),
+                    0,
+                    "{name}"
+                );
+            }
+            assert_eq!(
+                actual_reason,
+                core.calibrated_model().end_criteria() as i32,
+                "{name}"
+            );
+        }
+    }
 }
