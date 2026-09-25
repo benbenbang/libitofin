@@ -3974,24 +3974,6 @@ int32_t itofin_model_calibrate(struct ItofinContext *ctx,
                                struct ItofinError *error);
 
 /**
- * Minimize `objective` from `x0` (length `n`) with Nelder-Mead.
- *
- * Returns zero with `out_result` filled when the run reached the solver,
- * whatever its status. A rejected input returns `ITOFIN_INVALID_ARGUMENT`;
- * a failing `value` or `callback` returns `ITOFIN_CORE_ERROR` carrying its
- * message, truncated to 1023 bytes.
- * # Safety
- * `objective`, `x0`, `options` and `out_result` must satisfy the C caller
- * contract, and `out_result->x` must be writable for `n` values.
- */
-int32_t itofin_optimize_nelder_mead(const struct ItofinObjective *objective,
-                                    const double *x0,
-                                    size_t n,
-                                    const struct ItofinOptimizeOptions *options,
-                                    struct ItofinOptimizeResult *out_result,
-                                    struct ItofinError *error);
-
-/**
  * Calibration with an optional constraint, helper weights, and fixed-parameter mask.
  * # Safety
  * Pointers and handles must obey the C caller contract. Option arrays are copied
@@ -4023,6 +4005,24 @@ int32_t itofin_model_end_criteria_type(struct ItofinContext *ctx,
                                        int32_t kind,
                                        int32_t *out,
                                        struct ItofinError *error);
+
+/**
+ * Minimize `objective` from `x0` (length `n`) with Nelder-Mead.
+ *
+ * Returns zero with `out_result` filled when the run reached the solver,
+ * whatever its status. A rejected input returns `ITOFIN_INVALID_ARGUMENT`;
+ * a failing `value` or `callback` returns `ITOFIN_CORE_ERROR` carrying its
+ * message, truncated to 1023 bytes.
+ * # Safety
+ * `objective`, `x0`, `options` and `out_result` must satisfy the C caller
+ * contract, and `out_result->x` must be writable for `n` values.
+ */
+int32_t itofin_optimize_nelder_mead(const struct ItofinObjective *objective,
+                                    const double *x0,
+                                    size_t n,
+                                    const struct ItofinOptimizeOptions *options,
+                                    struct ItofinOptimizeResult *out_result,
+                                    struct ItofinError *error);
 
 /**
  * `american`: 0 European, 1 American; earliest ignored for European exercise.

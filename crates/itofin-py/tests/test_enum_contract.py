@@ -54,5 +54,5 @@ def test_fieldless_enum_runtime_contract() -> None:
                 assert not hasattr(value, "name")
                 with pytest.raises(AttributeError):
                     setattr(value, next(iter(members)), value)
-    assert len(checked) == 26
+    assert len(checked) == 27
     assert "DirectionIntegers" in checked
