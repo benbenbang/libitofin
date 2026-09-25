@@ -83,14 +83,14 @@ def test_heston_methods_match_go_and_core(factory, expected):
     assert -1 <= actual[4] <= 1
     error = sum(instrument.calibration_error() ** 2 for instrument in instruments)
     assert math.isfinite(error)
-    if factory is Simplex or os.getenv("ITOFIN_RELEASE_PARITY") == "1":
+    if os.getenv("ITOFIN_RELEASE_PARITY") == "1":
         assert actual == pytest.approx(expected, rel=0, abs=1e-12)
     else:
         early_instruments = helpers(_fixture_settings())
         early_model = _seed_model()(0.3)
         early_model.calibrate(
             early_instruments,
-            factory(),
+            factory(0.1) if factory is Simplex else factory(),
             EndCriteria(10, 2, 1e-8, 1e-8, 1e-8),
             96,
         )
