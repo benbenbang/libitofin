@@ -1,9 +1,41 @@
 package itofin
 
 import (
+	"encoding/json"
 	"math"
+	"os"
+	"os/exec"
 	"testing"
 )
+
+type optimizationMethodsCoreResult struct {
+	Params [5]float64      `json:"params"`
+	End    EndCriteriaType `json:"end"`
+}
+
+func optimizationMethodsCoreOracle(t *testing.T) map[string]optimizationMethodsCoreResult {
+	t.Helper()
+	var data []byte
+	var err error
+	if path := os.Getenv("ITOFIN_OPTIMIZATION_METHODS_CORE_ORACLE_JSON"); path != "" {
+		data, err = os.ReadFile(path)
+	} else {
+		cmd := exec.Command("cargo", "run", "--quiet", "--release", "-p", "libitofin-ffi", "--example", "optimization_methods_oracle")
+		cmd.Dir = "../.."
+		data, err = cmd.Output()
+	}
+	if err != nil {
+		t.Fatalf("load Rust optimization-method oracle: %v", err)
+	}
+	var results map[string]optimizationMethodsCoreResult
+	if err := json.Unmarshal(data, &results); err != nil {
+		t.Fatalf("decode Rust optimization-method oracle: %v", err)
+	}
+	if len(results) != 3 {
+		t.Fatalf("Rust optimization-method oracle contains %d methods, want 3", len(results))
+	}
+	return results
+}
 
 func TestOptimizationMethodConstructorsAndOwnership(t *testing.T) {
 	s := pricingMust(NewSession())
@@ -39,6 +71,7 @@ func TestOptimizationMethodConstructorsAndOwnership(t *testing.T) {
 }
 
 func TestCalibrationOptimizationMethods(t *testing.T) {
+	core := optimizationMethodsCoreOracle(t)
 	for _, variant := range []struct {
 		name string
 		new  func(*Session) (OptimizationMethod, error)
@@ -49,6 +82,10 @@ func TestCalibrationOptimizationMethods(t *testing.T) {
 		{"steepest_descent", func(s *Session) (OptimizationMethod, error) { return s.NewSteepestDescent() }, EndCriteriaMaxIterations},
 	} {
 		t.Run(variant.name, func(t *testing.T) {
+			want, ok := core[variant.name]
+			if !ok {
+				t.Fatalf("Rust optimization-method oracle missing %s", variant.name)
+			}
 			s := pricingMust(NewSession())
 			defer s.Close()
 			ref := pricingMust(NewDate(15, 1, 2026))
@@ -87,12 +124,15 @@ func TestCalibrationOptimizationMethods(t *testing.T) {
 				if math.IsInf(value, 0) || math.IsNaN(value) {
 					t.Fatalf("parameter %d is not finite: %.17g", i, value)
 				}
+				if math.Abs(value-want.Params[i]) > 1e-12 {
+					t.Fatalf("parameter %d: Go %.17g, Rust core %.17g", i, value, want.Params[i])
+				}
 			}
 			if result[3] >= 0.3 {
 				t.Fatalf("sigma did not fall from initial 0.3: %.17g", result[3])
 			}
-			if kind := pricingMust(model.EndCriteriaType()); kind != variant.end {
-				t.Fatalf("end criterion: got %v, Rust core %v", kind, variant.end)
+			if kind := pricingMust(model.EndCriteriaType()); kind != variant.end || kind != want.End {
+				t.Fatalf("end criterion: Go %v, Rust core %v, regression %v", kind, want.End, variant.end)
 			}
 		})
 	}

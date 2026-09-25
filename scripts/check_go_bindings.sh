@@ -10,6 +10,9 @@ cargo test -p libitofin-ffi --release
 cargo build -p libitofin-ffi --release
 ITOFIN_HCAL_CORE_ORACLE=$(cargo run --quiet --release -p libitofin-ffi --example calibration_constraints_oracle)
 export ITOFIN_HCAL_CORE_ORACLE
+cargo run --quiet --release -p libitofin-ffi --example optimization_methods_oracle > target/optimization-methods-oracle.json
+python3 -m json.tool target/optimization-methods-oracle.json > /dev/null
+export ITOFIN_OPTIMIZATION_METHODS_CORE_ORACLE_JSON="$PWD/target/optimization-methods-oracle.json"
 cargo run --quiet --release -p libitofin --example fd_binding_oracle > target/fd-binding-oracle.json
 export ITOFIN_FD_ORACLE_JSON="$PWD/target/fd-binding-oracle.json"
 ITOFIN_EXPECTED_VERSION=$(cargo metadata --no-deps --format-version 1 | python3 -c '
