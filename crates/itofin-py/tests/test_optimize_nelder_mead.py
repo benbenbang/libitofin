@@ -41,14 +41,14 @@ def test_budgets_status_values_and_invalid_input() -> None:
     result = minimize(rosenbrock, [-1.2, 1.0], method="nelder-mead", options={"maxiter": 5})
     assert result.status == Status.MaxIterations and result.nit == 5 and not result.success
     expected = ["ConvergedXTol", "ConvergedFTol", "ConvergedGTol", "MaxIterations", "MaxEvaluations"]
-    for value, name in enumerate([*expected, "Cancelled", "Nonfinite"]):
+    for value, name in enumerate([*expected, "Cancelled", "Nonfinite", "LineSearchFailed"]):
         assert int(getattr(Status, name)) == value
     with pytest.raises(ItofinError, match="x0 must not be empty"):
         minimize(rosenbrock, [])
     with pytest.raises(ItofinError, match="does not support option tol"):
         minimize(rosenbrock, [1.0, 1.0], options={"tol": 1e-3})
-    with pytest.raises(ItofinError, match="unknown method BFGS"):
-        minimize(rosenbrock, [1.0, 1.0], method="BFGS")
+    with pytest.raises(ItofinError, match="unknown method SLSQP"):
+        minimize(rosenbrock, [1.0, 1.0], method="SLSQP")
 
 
 def test_objective_exception_is_reraised_as_the_same_object() -> None:
