@@ -42,8 +42,8 @@ class Status:
     Why a minimize run stopped.
 
     The integer values are fixed and append-only, matching the C
-    ItofinOptimizeStatus and the Go OptimizeStatus: 7 and 8 are reserved for
-    the line-search and constrained solvers.
+    ItofinOptimizeStatus and the Go OptimizeStatus: 8 is reserved for
+    a constrained solver.
     """
     ConvergedXTol: typing.ClassVar[Status]
     ConvergedFTol: typing.ClassVar[Status]
@@ -52,28 +52,32 @@ class Status:
     MaxEvaluations: typing.ClassVar[Status]
     Cancelled: typing.ClassVar[Status]
     Nonfinite: typing.ClassVar[Status]
+    LineSearchFailed: typing.ClassVar[Status]
     def __new__(cls, _unconstructible: typing.NoReturn) -> Status: ...
     def __int__(self) -> builtins.int: ...
     __hash__: typing.ClassVar[None]  # type: ignore[assignment]
 
-def minimize(fun: typing.Callable[[numpy.typing.NDArray[numpy.float64]], float], x0: typing.Sequence[builtins.float], method: builtins.str = 'Nelder-Mead', options: typing.Optional[dict] = None, callback: typing.Optional[typing.Callable[[numpy.typing.NDArray[numpy.float64]], object]] = None) -> OptimizeResult:
+def minimize(fun: typing.Callable[[numpy.typing.NDArray[numpy.float64]], float], x0: typing.Sequence[builtins.float], method: builtins.str = 'Nelder-Mead', options: typing.Optional[dict] = None, callback: typing.Optional[typing.Callable[[numpy.typing.NDArray[numpy.float64]], object]] = None, jac: typing.Optional[typing.Callable[[numpy.typing.NDArray[numpy.float64]], typing.Sequence[float]]] = None, bounds: typing.Optional[typing.Any] = None) -> OptimizeResult:
     r"""
     Minimize a scalar function of one or more variables.
 
     Args:
         fun (Callable): Called as fun(x) with a float64 array; returns a float.
         x0 (Sequence[float]): The starting point.
-        method (str): The solver; only "Nelder-Mead" (any case) for now.
-        options (dict | None): maxiter, maxfev, xatol, fatol and adaptive;
-            any other key is rejected.
+        method (str): "Nelder-Mead" or "BFGS" (any case).
+        options (dict | None): Nelder-Mead accepts maxiter, maxfev, xatol,
+            fatol and adaptive. BFGS accepts maxiter, gtol and eps; other
+            keys are rejected.
         callback (Callable | None): Called as callback(xk) after every
             iteration. Raising StopIteration stops the run with
             Status.Cancelled.
+        jac (Callable | None): BFGS analytic gradient, called as jac(x).
+        bounds: Rejected; neither exposed method supports bounds.
 
     Returns:
         OptimizeResult: The best point found and why the run stopped.
 
     Raises:
         ItofinError: On an unknown method or option, or a rejected input.
-        Exception: Whatever fun or callback raised, re-raised unchanged.
+        Exception: Whatever fun, jac or callback raised, re-raised unchanged.
     """

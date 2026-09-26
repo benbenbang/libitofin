@@ -2,7 +2,10 @@
   "domain": "optimize",
   "entries": [
     {
-      "c": "itofin_optimize_nelder_mead",
+      "c": [
+        "itofin_optimize_nelder_mead",
+        "itofin_optimize_bfgs"
+      ],
       "go": "Minimize",
       "python": "itofin.optimize.minimize",
       "status": "implemented",
@@ -10,7 +13,8 @@
         "TestMinimizeNelderMeadRosenbrock",
         "TestMinimizeObjectiveCallsSessionPricing",
         "TestMinimizeObjectiveClosesSession",
-        "TestMinimizeErrorsCancellationAndPanics"
+        "TestMinimizeErrorsCancellationAndPanics",
+        "TestMinimizeBFGSGradientAndInvalidBounds"
       ]
     },
     {
@@ -108,6 +112,12 @@
     {
       "go": "OptimizeNonfinite",
       "python": "itofin.optimize.Status.Nonfinite",
+      "status": "implemented",
+      "tests": "TestMinimizeStatusValues"
+    },
+    {
+      "go": "OptimizeLineSearchFailed",
+      "python": "itofin.optimize.Status.LineSearchFailed",
       "status": "implemented",
       "tests": "TestMinimizeStatusValues"
     },
