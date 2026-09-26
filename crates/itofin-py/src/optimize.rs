@@ -7,8 +7,8 @@
 
 use crate::ItofinError;
 use itofin_optimize::{
-    BfgsOptions, Common, Converged, Flow, IterationState, Method, Minimize, MinimizeError,
-    NelderMeadOptions, Objective, Problem, Termination, minimize as run,
+    BfgsOptions, Bounds, Common, Converged, Flow, IterationState, LbfgsbOptions, Method, Minimize,
+    MinimizeError, NelderMeadOptions, Objective, Problem, Termination, minimize as run,
 };
 use numpy::PyArray1;
 use pyo3::exceptions::{PyStopIteration, PyValueError};
@@ -174,20 +174,42 @@ fn bfgs(options: Option<&Bound<'_, PyDict>>) -> PyResult<(BfgsOptions, Common)> 
     Ok((method, common))
 }
 
+fn lbfgsb(options: Option<&Bound<'_, PyDict>>) -> PyResult<(LbfgsbOptions, Common)> {
+    let mut method = LbfgsbOptions::default();
+    let mut common = Common::default();
+    for (key, value) in options.into_iter().flat_map(|options| options.iter()) {
+        match key.extract::<String>()?.as_str() {
+            "maxiter" => common.maxiter = value.extract()?,
+            "maxfev" => common.maxfev = value.extract()?,
+            "maxcor" => method.maxcor = value.extract()?,
+            "ftol" => method.ftol = value.extract()?,
+            "gtol" => method.gtol = value.extract()?,
+            "eps" => method.eps = value.extract()?,
+            other => {
+                return Err(PyValueError::new_err(format!(
+                    "method L-BFGS-B does not support option {other}"
+                )));
+            }
+        }
+    }
+    Ok((method, common))
+}
+
 /// Minimize a scalar function of one or more variables.
 ///
 /// Args:
 ///     fun (Callable): Called as fun(x) with a float64 array; returns a float.
 ///     x0 (Sequence[float]): The starting point.
-///     method (str): "Nelder-Mead" or "BFGS" (any case).
+///     method (str): "Nelder-Mead", "BFGS", or "L-BFGS-B" (any case).
 ///     options (dict | None): Nelder-Mead accepts maxiter, maxfev, xatol,
-///         fatol and adaptive. BFGS accepts maxiter, gtol and eps; other
-///         keys are rejected.
+///         fatol and adaptive. BFGS accepts maxiter, gtol and eps. L-BFGS-B
+///         accepts maxiter, maxfev, maxcor, ftol, gtol and eps.
 ///     callback (Callable | None): Called as callback(xk) after every
 ///         iteration. Raising StopIteration stops the run with
 ///         Status.Cancelled.
-///     jac (Callable | None): BFGS analytic gradient, called as jac(x).
-///     bounds: Rejected; neither exposed method supports bounds.
+///     jac (Callable | None): BFGS or L-BFGS-B analytic gradient, called as jac(x).
+///     bounds: L-BFGS-B pairs of (lower, upper), with None for an open side.
+///         Other methods reject bounds.
 ///
 /// Returns:
 ///     OptimizeResult: The best point found and why the run stopped.
@@ -208,9 +230,11 @@ pub(crate) fn minimize(
     callback: Option<Bound<'_, PyAny>>,
     #[gen_stub(override_type(type_repr = "typing.Optional[typing.Callable[[numpy.typing.NDArray[numpy.float64]], typing.Sequence[float]]]", imports = ("typing", "numpy", "numpy.typing")))]
     jac: Option<Bound<'_, PyAny>>,
+    #[gen_stub(override_type(type_repr = "typing.Optional[typing.Sequence[tuple[typing.Optional[float], typing.Optional[float]]]]", imports = ("typing")))]
     bounds: Option<Bound<'_, PyAny>>,
 ) -> PyResult<PyOptimizeResult> {
-    if bounds.is_some() {
+    let is_lbfgsb = method.eq_ignore_ascii_case("l-bfgs-b");
+    if bounds.is_some() && !is_lbfgsb {
         return Err(PyValueError::new_err(format!(
             "method {method} does not support bounds"
         )));
@@ -226,10 +250,26 @@ pub(crate) fn minimize(
     } else if method.eq_ignore_ascii_case("bfgs") {
         let (options, common) = bfgs(options.as_ref())?;
         (Method::Bfgs(options), common)
+    } else if is_lbfgsb {
+        let (options, common) = lbfgsb(options.as_ref())?;
+        (Method::Lbfgsb(options), common)
     } else {
         return Err(ItofinError::new_err(format!("unknown method {method}")));
     };
-    let problem = Problem { x0, bounds: None };
+    let bounds = if let Some(bounds) = bounds {
+        let pairs: Vec<(Option<f64>, Option<f64>)> = bounds.extract()?;
+        if pairs.len() != x0.len() {
+            return Err(PyValueError::new_err("bounds length must match x0"));
+        }
+        let (lower, upper) = pairs
+            .into_iter()
+            .map(|(lo, hi)| (lo.unwrap_or(f64::NEG_INFINITY), hi.unwrap_or(f64::INFINITY)))
+            .unzip();
+        Some(Bounds { lower, upper })
+    } else {
+        None
+    };
+    let problem = Problem { x0, bounds };
     let mut objective = PyObjective { fun, jac, callback };
     let result: Minimize = match run(&mut objective, &problem, &method, &common) {
         Ok(result) => result,
