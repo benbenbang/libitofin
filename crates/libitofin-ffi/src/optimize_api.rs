@@ -4,8 +4,8 @@
 //! point, including context APIs, while the solver runs.
 use crate::boundary::*;
 use itofin_optimize::{
-    BfgsOptions, Common, Converged, FiniteDifference, Flow, IterationState, Method, MinimizeError,
-    NelderMeadOptions, Objective, Problem, Termination, minimize,
+    BfgsOptions, Bounds, Common, Converged, FiniteDifference, Flow, IterationState, LbfgsbOptions,
+    Method, MinimizeError, NelderMeadOptions, Objective, Problem, Termination, minimize,
 };
 use std::ffi::c_char;
 use std::fmt;
@@ -99,6 +99,19 @@ pub struct ItofinBfgsOptions {
     pub eps: f64,
     pub finite_difference: i32,
     pub maxiter: usize,
+}
+
+/// L-BFGS-B options. Zero values select solver defaults. Bounds are supplied
+/// separately to `itofin_optimize_lbfgsb` as two equally sized arrays.
+#[derive(Clone, Copy, Default)]
+#[repr(C)]
+pub struct ItofinLbfgsbOptions {
+    pub maxcor: usize,
+    pub ftol: f64,
+    pub gtol: f64,
+    pub eps: f64,
+    pub maxiter: usize,
+    pub maxfev: usize,
 }
 
 /// Run outcome. The caller sets `x` to a writable buffer of `n` values before
@@ -372,6 +385,90 @@ pub unsafe extern "C" fn itofin_optimize_bfgs(
     }
 }
 
+/// Minimize with box-constrained L-BFGS-B. `lower` and `upper` each contain
+/// `n` values, with `-INFINITY` or `INFINITY` marking an open lower or upper
+/// side respectively. Both null pointers with zero lengths mean no bounds.
+/// The optional gradient writes `n` components; otherwise bounded finite
+/// differences are used. Zero option fields select solver defaults.
+/// # Safety
+/// `objective`, `x0`, `options` and `out_result` follow the same contract as
+/// `itofin_optimize_bfgs`. Each non-null bound pointer must be readable for
+/// its declared length. `lower_len` and `upper_len` are checked against `n`
+/// before either array is read.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn itofin_optimize_lbfgsb(
+    objective: *const ItofinObjective,
+    x0: *const f64,
+    n: usize,
+    lower: *const f64,
+    lower_len: usize,
+    upper: *const f64,
+    upper_len: usize,
+    options: *const ItofinLbfgsbOptions,
+    out_result: *mut ItofinOptimizeResult,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        without_context(error, || {
+            check_ptr(objective)?;
+            let mut objective = Released(*objective);
+            if objective.0.value.is_none() {
+                return Err(BindingError::invalid("objective value must not be null"));
+            }
+            check_ptr(options)?;
+            check_ptr(out_result)?;
+            let options = *options;
+            let bounds = if lower.is_null() && upper.is_null() && lower_len == 0 && upper_len == 0 {
+                None
+            } else {
+                if lower_len != n || upper_len != n {
+                    return Err(BindingError::invalid("bounds length must match x0"));
+                }
+                Some(Bounds {
+                    lower: input_slice(lower, lower_len)?.to_vec(),
+                    upper: input_slice(upper, upper_len)?.to_vec(),
+                })
+            };
+            let problem = Problem {
+                x0: input_slice(x0, n)?.to_vec(),
+                bounds,
+            };
+            if n > 0 {
+                check_ptr((*out_result).x)?;
+            }
+            let method = Method::Lbfgsb(LbfgsbOptions {
+                maxcor: nonzero(options.maxcor),
+                ftol: nonzero(options.ftol),
+                gtol: nonzero(options.gtol),
+                eps: nonzero(options.eps),
+                ..LbfgsbOptions::default()
+            });
+            let common = Common {
+                maxiter: nonzero(options.maxiter),
+                maxfev: nonzero(options.maxfev),
+                ..Common::default()
+            };
+            let run =
+                minimize(&mut objective, &problem, &method, &common).map_err(|e| match e {
+                    MinimizeError::InvalidInput(e) => BindingError::invalid(e.to_string()),
+                    MinimizeError::Objective(e) => BindingError {
+                        code: CORE_ERROR,
+                        message: e.0,
+                    },
+                })?;
+            let result = &mut *out_result;
+            std::slice::from_raw_parts_mut(result.x, n).copy_from_slice(&run.x);
+            result.fun = run.fun;
+            result.nit = run.nit;
+            result.nfev = run.nfev;
+            result.njev = run.njev;
+            result.status = status(run.status)?;
+            result.success = run.success;
+            Ok(())
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -590,5 +687,90 @@ mod tests {
         };
         assert_eq!(code, INVALID_ARGUMENT);
         assert_eq!(RELEASES.load(Ordering::SeqCst) - before, 3);
+    }
+
+    #[test]
+    fn lbfgsb_bounds_length_and_single_release() {
+        let _guard = RELEASE_LOCK.lock().unwrap();
+        let x0 = [0.0, 0.0];
+        let lower = [0.0, -f64::INFINITY];
+        let upper = [0.5, f64::INFINITY];
+        let mut x = [0.0; 2];
+        let mut result = ItofinOptimizeResult {
+            x: x.as_mut_ptr(),
+            fun: 0.0,
+            nit: 0,
+            nfev: 0,
+            njev: 0,
+            status: 0,
+            success: false,
+        };
+        let options = ItofinLbfgsbOptions::default();
+        let mut error = blank();
+        let before = RELEASES.load(Ordering::SeqCst);
+        let code = unsafe {
+            itofin_optimize_lbfgsb(
+                &objective(true),
+                x0.as_ptr(),
+                2,
+                lower.as_ptr(),
+                2,
+                upper.as_ptr(),
+                2,
+                &options,
+                &mut result,
+                &mut error,
+            )
+        };
+        assert_eq!(code, 0);
+        assert!(result.success && x[0] >= 0.0 && x[0] <= 0.5);
+        let code = unsafe {
+            itofin_optimize_lbfgsb(
+                &objective(true),
+                x0.as_ptr(),
+                2,
+                lower.as_ptr(),
+                1,
+                upper.as_ptr(),
+                2,
+                &options,
+                &mut result,
+                &mut error,
+            )
+        };
+        assert_eq!(code, INVALID_ARGUMENT);
+        assert_eq!(message(&error), "bounds length must match x0");
+        let mut rejected = |lo, lo_n, hi, hi_n, n| unsafe {
+            itofin_optimize_lbfgsb(
+                &objective(true),
+                x0.as_ptr(),
+                n,
+                lo,
+                lo_n,
+                hi,
+                hi_n,
+                &options,
+                &mut result,
+                &mut error,
+            )
+        };
+        assert_eq!(
+            rejected(lower.as_ptr(), 2, upper.as_ptr(), 1, 2),
+            INVALID_ARGUMENT
+        );
+        assert_eq!(
+            rejected(std::ptr::null(), 2, upper.as_ptr(), 2, 2),
+            INVALID_ARGUMENT
+        );
+        let inverted = [-1.0, -1.0];
+        assert_eq!(
+            rejected(lower.as_ptr(), 2, inverted.as_ptr(), 2, 2),
+            INVALID_ARGUMENT
+        );
+        assert_eq!(
+            rejected(std::ptr::null(), 0, std::ptr::null(), 0, 0),
+            INVALID_ARGUMENT
+        );
+        assert_eq!(RELEASES.load(Ordering::SeqCst) - before, 6);
     }
 }

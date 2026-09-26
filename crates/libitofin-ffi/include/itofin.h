@@ -796,6 +796,19 @@ typedef struct ItofinBfgsOptions {
   size_t maxiter;
 } ItofinBfgsOptions;
 
+/**
+ * L-BFGS-B options. Zero values select solver defaults. Bounds are supplied
+ * separately to `itofin_optimize_lbfgsb` as two equally sized arrays.
+ */
+typedef struct ItofinLbfgsbOptions {
+  size_t maxcor;
+  double ftol;
+  double gtol;
+  double eps;
+  size_t maxiter;
+  size_t maxfev;
+} ItofinLbfgsbOptions;
+
 typedef struct ItofinOvernightFutureConfig {
   uint64_t index;
   int32_t value_date;
@@ -4052,6 +4065,29 @@ int32_t itofin_optimize_bfgs(const struct ItofinObjective *objective,
                              const struct ItofinBfgsOptions *options,
                              struct ItofinOptimizeResult *out_result,
                              struct ItofinError *error);
+
+/**
+ * Minimize with box-constrained L-BFGS-B. `lower` and `upper` each contain
+ * `n` values, with `-INFINITY` or `INFINITY` marking an open lower or upper
+ * side respectively. Both null pointers with zero lengths mean no bounds.
+ * The optional gradient writes `n` components; otherwise bounded finite
+ * differences are used. Zero option fields select solver defaults.
+ * # Safety
+ * `objective`, `x0`, `options` and `out_result` follow the same contract as
+ * `itofin_optimize_bfgs`. Each non-null bound pointer must be readable for
+ * its declared length. `lower_len` and `upper_len` are checked against `n`
+ * before either array is read.
+ */
+int32_t itofin_optimize_lbfgsb(const struct ItofinObjective *objective,
+                               const double *x0,
+                               size_t n,
+                               const double *lower,
+                               size_t lower_len,
+                               const double *upper,
+                               size_t upper_len,
+                               const struct ItofinLbfgsbOptions *options,
+                               struct ItofinOptimizeResult *out_result,
+                               struct ItofinError *error);
 
 /**
  * `american`: 0 European, 1 American; earliest ignored for European exercise.
