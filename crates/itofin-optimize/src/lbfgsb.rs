@@ -11,6 +11,8 @@
 
 use std::collections::VecDeque;
 
+mod geometry;
+
 fn dot(a: &[f64], b: &[f64]) -> f64 {
     a.iter().zip(b).map(|(ai, bi)| ai * bi).sum()
 }
@@ -59,7 +61,7 @@ impl Compact {
         true
     }
 
-    pub(crate) fn inverse_times(&self, v: &[f64]) -> Vec<f64> {
+    pub(crate) fn inverse_times(&self, v: &[f64]) -> Option<Vec<f64>> {
         assert_eq!(v.len(), self.n);
         let mut q = v.to_vec();
         let mut alpha = vec![0.0; self.pairs.len()];
@@ -78,22 +80,38 @@ impl Compact {
                 *qi += (alpha_i - beta) * si;
             }
         }
-        q
+        q.iter().all(|qi| qi.is_finite()).then_some(q)
     }
 
-    pub(crate) fn times(&self, v: &[f64]) -> Vec<f64> {
+    pub(crate) fn times(&self, v: &[f64]) -> Option<Vec<f64>> {
         assert_eq!(v.len(), self.n);
-        let count = self.pairs.len();
-        if count == 0 {
-            return v.iter().map(|vi| self.theta * vi).collect();
+        if self.pairs.is_empty() {
+            let result: Vec<f64> = v.iter().map(|vi| self.theta * vi).collect();
+            return result.iter().all(|ri| ri.is_finite()).then_some(result);
         }
+        let (columns, block) = self.columns_and_block();
+        let rhs: Vec<f64> = columns.iter().map(|column| dot(column, v)).collect();
+        let weights = solve(block, rhs)?;
+        let mut result: Vec<f64> = v.iter().map(|vi| self.theta * vi).collect();
+        for (column, weight) in columns.iter().zip(weights) {
+            for (ri, wi) in result.iter_mut().zip(column) {
+                *ri -= weight * wi;
+            }
+        }
+        result.iter().all(|ri| ri.is_finite()).then_some(result)
+    }
+
+    fn columns_and_block(&self) -> (Vec<Vec<f64>>, Vec<Vec<f64>>) {
+        let count = self.pairs.len();
         let size = 2 * count;
+        let mut columns = vec![vec![0.0; self.n]; size];
         let mut block = vec![vec![0.0; size]; size];
-        let mut rhs = vec![0.0; size];
         for (i, pi) in self.pairs.iter().enumerate() {
             block[i][i] = -pi.sy;
-            rhs[i] = dot(&pi.y, v);
-            rhs[count + i] = self.theta * dot(&pi.s, v);
+            columns[i].copy_from_slice(&pi.y);
+            for (wi, si) in columns[count + i].iter_mut().zip(&pi.s) {
+                *wi = self.theta * si;
+            }
             for (j, pj) in self.pairs.iter().enumerate() {
                 block[count + i][count + j] = self.theta * dot(&pi.s, &pj.s);
                 if i > j {
@@ -103,19 +121,20 @@ impl Compact {
                 }
             }
         }
-        let weights = solve(block, rhs);
-        let mut result: Vec<f64> = v.iter().map(|vi| self.theta * vi).collect();
-        for (i, pair) in self.pairs.iter().enumerate() {
-            for (ri, (&yi, &si)) in result.iter_mut().zip(pair.y.iter().zip(&pair.s)) {
-                *ri -= weights[i] * yi + self.theta * weights[count + i] * si;
-            }
-        }
-        result
+        (columns, block)
     }
 }
 
-fn solve(mut a: Vec<Vec<f64>>, mut b: Vec<f64>) -> Vec<f64> {
+fn solve(mut a: Vec<Vec<f64>>, mut b: Vec<f64>) -> Option<Vec<f64>> {
     let n = b.len();
+    let scale = a
+        .iter()
+        .flatten()
+        .map(|entry| entry.abs())
+        .fold(0.0, f64::max);
+    if !scale.is_finite() || scale == 0.0 || !b.iter().all(|entry| entry.is_finite()) {
+        return None;
+    }
     for k in 0..n {
         let pivot = (k..n)
             .max_by(|&i, &j| a[i][k].abs().total_cmp(&a[j][k].abs()))
@@ -123,6 +142,9 @@ fn solve(mut a: Vec<Vec<f64>>, mut b: Vec<f64>) -> Vec<f64> {
         a.swap(k, pivot);
         b.swap(k, pivot);
         let diagonal = a[k][k];
+        if !diagonal.is_finite() || diagonal.abs() <= 64.0 * f64::EPSILON * scale {
+            return None;
+        }
         let (upper, lower) = a.split_at_mut(k + 1);
         for (offset, row) in lower.iter_mut().enumerate() {
             let i = k + 1 + offset;
@@ -137,12 +159,12 @@ fn solve(mut a: Vec<Vec<f64>>, mut b: Vec<f64>) -> Vec<f64> {
     for i in (0..n).rev() {
         x[i] = (b[i] - dot(&a[i][i + 1..], &x[i + 1..])) / a[i][i];
     }
-    x
+    x.iter().all(|xi| xi.is_finite()).then_some(x)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Compact, dot};
+    use super::{Compact, dot, solve};
 
     fn dense_update(b: &mut [Vec<f64>], s: &[f64], y: &[f64]) {
         let bs: Vec<f64> = b.iter().map(|row| dot(row, s)).collect();
@@ -175,12 +197,14 @@ mod tests {
             dense_update(&mut dense, &s, &y);
         }
         for v in [[1.0, -2.0, 3.0, -4.0, 5.0], [0.1, 0.2, 0.3, 0.4, 0.5]] {
-            let actual = compact.times(&v);
+            let actual = compact.times(&v).expect("well-conditioned compact product");
             let expected: Vec<f64> = dense.iter().map(|row| dot(row, &v)).collect();
             for (a, e) in actual.iter().zip(expected) {
                 assert!((a - e).abs() < 1e-12, "{a} vs {e}");
             }
-            let recovered = compact.inverse_times(&actual);
+            let recovered = compact
+                .inverse_times(&actual)
+                .expect("finite inverse product");
             for (r, e) in recovered.iter().zip(v) {
                 assert!((r - e).abs() < 1e-12, "{r} vs {e}");
             }
@@ -194,5 +218,12 @@ mod tests {
         assert!(compact.update(vec![0.0, 1.0], vec![0.0, 3.0]));
         assert_eq!(compact.pairs.len(), 1);
         assert_eq!(compact.pairs[0].s, vec![0.0, 1.0]);
+    }
+
+    #[test]
+    fn singular_and_nonfinite_small_systems_fail_without_a_nan_step() {
+        assert!(solve(vec![vec![1.0, 1.0], vec![1.0, 1.0]], vec![1.0, 1.0]).is_none());
+        assert!(solve(vec![vec![f64::NAN]], vec![1.0]).is_none());
+        assert!(solve(vec![vec![1.0]], vec![f64::INFINITY]).is_none());
     }
 }
