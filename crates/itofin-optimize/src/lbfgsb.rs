@@ -12,6 +12,7 @@
 use std::collections::VecDeque;
 
 mod geometry;
+mod gradient;
 
 fn dot(a: &[f64], b: &[f64]) -> f64 {
     a.iter().zip(b).map(|(ai, bi)| ai * bi).sum()
