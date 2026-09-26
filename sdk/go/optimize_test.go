@@ -22,6 +22,11 @@ func TestMinimizeNelderMeadRosenbrock(t *testing.T) {
 	if result.Nit == 0 || result.Nfev <= result.Nit || result.Njev != 0 || result.Message != result.Status.String() {
 		t.Fatalf("%+v", result)
 	}
+	pointer, err := Minimize(context.Background(), rosenbrock, []float64{-1.2, 1}, &NelderMeadOptions{XAtol: 1e-8, FAtol: 1e-8})
+	ratesOK(t, err)
+	if !pointer.Success || pointer.Fun > 1e-10 {
+		t.Fatalf("pointer method: %+v", pointer)
+	}
 	result, err = Minimize(context.Background(), rosenbrock, []float64{-1.2, 1}, NelderMeadOptions{MaxIter: 5})
 	ratesOK(t, err)
 	if result.Status != OptimizeMaxIterations || result.Nit != 5 || result.Success {
@@ -37,11 +42,48 @@ func TestMinimizeNelderMeadRosenbrock(t *testing.T) {
 
 func TestMinimizeStatusValues(t *testing.T) {
 	statuses := []OptimizeStatus{OptimizeConvergedXTol, OptimizeConvergedFTol, OptimizeConvergedGTol,
-		OptimizeMaxIterations, OptimizeMaxEvaluations, OptimizeCancelled, OptimizeNonfinite}
+		OptimizeMaxIterations, OptimizeMaxEvaluations, OptimizeCancelled, OptimizeNonfinite,
+		OptimizeLineSearchFailed}
 	for want, status := range statuses {
 		if int(status) != want || strings.HasPrefix(status.String(), "OptimizeStatus(") {
 			t.Fatalf("%d: %d %q", want, status, status)
 		}
+	}
+}
+
+func TestMinimizeBFGSGradientAndInvalidBounds(t *testing.T) {
+	fn := func(x []float64) (float64, error) { return math.Pow(x[0]-2, 2) + 4*math.Pow(x[1]+1, 2), nil }
+	grad := func(x, out []float64) error { out[0] = 2 * (x[0] - 2); out[1] = 8 * (x[1] + 1); return nil }
+	analytic, err := Minimize(context.Background(), fn, []float64{0, 0}, BFGS{Gradient: grad})
+	ratesOK(t, err)
+	numeric, err := Minimize(context.Background(), fn, []float64{0, 0}, BFGS{})
+	ratesOK(t, err)
+	pointer, err := Minimize(context.Background(), fn, []float64{0, 0}, &BFGS{Gradient: grad})
+	ratesOK(t, err)
+	if !analytic.Success || !numeric.Success || analytic.Nfev >= numeric.Nfev || analytic.Njev == 0 ||
+		math.Abs(analytic.X[0]-2) > 1e-4 || math.Abs(analytic.X[1]+1) > 1e-4 || !pointer.Success {
+		t.Fatalf("analytic=%+v numeric=%+v pointer=%+v", analytic, numeric, pointer)
+	}
+	_, err = Minimize(context.Background(), fn, []float64{0, 0}, (*BFGS)(nil))
+	if !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("nil BFGS: %v", err)
+	}
+	_, err = Minimize(context.Background(), fn, []float64{0, 0}, (*NelderMeadOptions)(nil))
+	if !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("nil Nelder-Mead: %v", err)
+	}
+	_, err = Minimize(context.Background(), fn, []float64{0, 0}, BFGS{Bounds: &OptimizeBounds{Lower: []float64{0, 0}, Upper: []float64{1, 1}}})
+	if !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("bounds: %v", err)
+	}
+	_, err = Minimize(context.Background(), fn, []float64{0, 0}, BFGS{Eps: math.NaN()})
+	if !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("nonfinite eps: %v", err)
+	}
+	sentinel := errors.New("gradient failed")
+	_, err = Minimize(context.Background(), fn, []float64{0, 0}, BFGS{Gradient: func([]float64, []float64) error { return sentinel }})
+	if err != sentinel {
+		t.Fatalf("gradient error identity: %v", err)
 	}
 }
 
