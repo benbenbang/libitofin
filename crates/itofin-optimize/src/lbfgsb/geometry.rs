@@ -18,12 +18,19 @@ fn free_indices(x: &[f64], bounds: &Bounds) -> Vec<usize> {
         .collect()
 }
 
-fn point_on_path(x: &[f64], displacement: &[f64], bounds: &Bounds) -> Option<Cauchy> {
+fn point_on_path(
+    x: &[f64],
+    displacement: &[f64],
+    active: &[Option<f64>],
+    bounds: &Bounds,
+) -> Option<Cauchy> {
     let point: Vec<f64> = x
         .iter()
         .zip(displacement)
         .enumerate()
-        .map(|(i, (&xi, &di))| (xi + di).clamp(bounds.lower[i], bounds.upper[i]))
+        .map(|(i, (&xi, &di))| {
+            active[i].unwrap_or_else(|| (xi + di).clamp(bounds.lower[i], bounds.upper[i]))
+        })
         .collect();
     if !point.iter().all(|xi| xi.is_finite()) {
         return None;
@@ -58,11 +65,12 @@ pub(super) fn generalized_cauchy(
     }
     breakpoints.sort_by(|a, b| a.0.total_cmp(&b.0));
     let mut displacement = vec![0.0; x.len()];
+    let mut active = vec![None; x.len()];
     let mut previous = 0.0;
     let mut event = 0;
     loop {
         if direction.iter().all(|&di| di == 0.0) {
-            return point_on_path(x, &displacement, bounds);
+            return point_on_path(x, &displacement, &active, bounds);
         }
         let bd = b.times(&direction)?;
         let bz = b.times(&displacement)?;
@@ -72,7 +80,7 @@ pub(super) fn generalized_cauchy(
             return None;
         }
         if slope >= 0.0 {
-            return point_on_path(x, &displacement, bounds);
+            return point_on_path(x, &displacement, &active, bounds);
         }
         let next = breakpoints.get(event).map_or(f64::INFINITY, |&(t, _)| t);
         let segment = next - previous;
@@ -80,22 +88,24 @@ pub(super) fn generalized_cauchy(
         if !minimizer.is_finite() {
             return None;
         }
-        if minimizer <= segment {
+        if minimizer < segment {
             for (zi, di) in displacement.iter_mut().zip(&direction) {
                 *zi += minimizer * di;
             }
-            return point_on_path(x, &displacement, bounds);
+            return point_on_path(x, &displacement, &active, bounds);
         }
         for (zi, di) in displacement.iter_mut().zip(&direction) {
             *zi += segment * di;
         }
         while event < breakpoints.len() && breakpoints[event].0 == next {
             let i = breakpoints[event].1;
-            displacement[i] = if direction[i] > 0.0 {
-                bounds.upper[i] - x[i]
+            let bound = if direction[i] > 0.0 {
+                bounds.upper[i]
             } else {
-                bounds.lower[i] - x[i]
+                bounds.lower[i]
             };
+            displacement[i] = bound - x[i];
+            active[i] = Some(bound);
             direction[i] = 0.0;
             event += 1;
         }
@@ -204,5 +214,32 @@ mod tests {
         assert_eq!(cauchy.point[0], 1.0);
         assert!(cauchy.point[2] >= 0.0 && cauchy.point[2] <= 2.0);
         assert!(!cauchy.free.contains(&0));
+    }
+
+    #[test]
+    fn a_breakpoint_retains_the_exact_active_bound_after_cancellation() {
+        let b = Compact::new(1, 2);
+        let upper = 6.09363334202361e-158;
+        let bounds = Bounds {
+            lower: vec![f64::NEG_INFINITY],
+            upper: vec![upper],
+        };
+        let point = generalized_cauchy(&[-32.82972637320486], &[-100.0], &bounds, &b)
+            .expect("finite Cauchy point");
+        assert_eq!(point.point, vec![upper]);
+        assert!(point.free.is_empty());
+    }
+
+    #[test]
+    fn a_minimizer_on_tied_breakpoints_activates_both_faces() {
+        let b = Compact::new(2, 2);
+        let bounds = Bounds {
+            lower: vec![f64::NEG_INFINITY; 2],
+            upper: vec![1.0; 2],
+        };
+        let point = generalized_cauchy(&[0.0, 0.0], &[-1.0, -1.0], &bounds, &b)
+            .expect("finite Cauchy point");
+        assert_eq!(point.point, vec![1.0, 1.0]);
+        assert!(point.free.is_empty());
     }
 }
