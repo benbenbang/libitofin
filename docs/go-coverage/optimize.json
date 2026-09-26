@@ -4,7 +4,8 @@
     {
       "c": [
         "itofin_optimize_nelder_mead",
-        "itofin_optimize_bfgs"
+        "itofin_optimize_bfgs",
+        "itofin_optimize_lbfgsb"
       ],
       "go": "Minimize",
       "python": "itofin.optimize.minimize",
@@ -14,7 +15,8 @@
         "TestMinimizeObjectiveCallsSessionPricing",
         "TestMinimizeObjectiveClosesSession",
         "TestMinimizeErrorsCancellationAndPanics",
-        "TestMinimizeBFGSGradientAndInvalidBounds"
+        "TestMinimizeBFGSGradientAndInvalidBounds",
+        "TestMinimizeLBFGSBBoundsAndErrors"
       ]
     },
     {

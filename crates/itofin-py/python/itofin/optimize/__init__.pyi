@@ -57,22 +57,23 @@ class Status:
     def __int__(self) -> builtins.int: ...
     __hash__: typing.ClassVar[None]  # type: ignore[assignment]
 
-def minimize(fun: typing.Callable[[numpy.typing.NDArray[numpy.float64]], float], x0: typing.Sequence[builtins.float], method: builtins.str = 'Nelder-Mead', options: typing.Optional[dict] = None, callback: typing.Optional[typing.Callable[[numpy.typing.NDArray[numpy.float64]], object]] = None, jac: typing.Optional[typing.Callable[[numpy.typing.NDArray[numpy.float64]], typing.Sequence[float]]] = None, bounds: typing.Optional[typing.Any] = None) -> OptimizeResult:
+def minimize(fun: typing.Callable[[numpy.typing.NDArray[numpy.float64]], float], x0: typing.Sequence[builtins.float], method: builtins.str = 'Nelder-Mead', options: typing.Optional[dict] = None, callback: typing.Optional[typing.Callable[[numpy.typing.NDArray[numpy.float64]], object]] = None, jac: typing.Optional[typing.Callable[[numpy.typing.NDArray[numpy.float64]], typing.Sequence[float]]] = None, bounds: typing.Optional[typing.Sequence[tuple[typing.Optional[float], typing.Optional[float]]]] = None) -> OptimizeResult:
     r"""
     Minimize a scalar function of one or more variables.
 
     Args:
         fun (Callable): Called as fun(x) with a float64 array; returns a float.
         x0 (Sequence[float]): The starting point.
-        method (str): "Nelder-Mead" or "BFGS" (any case).
+        method (str): "Nelder-Mead", "BFGS", or "L-BFGS-B" (any case).
         options (dict | None): Nelder-Mead accepts maxiter, maxfev, xatol,
-            fatol and adaptive. BFGS accepts maxiter, gtol and eps; other
-            keys are rejected.
+            fatol and adaptive. BFGS accepts maxiter, gtol and eps. L-BFGS-B
+            accepts maxiter, maxfev, maxcor, ftol, gtol and eps.
         callback (Callable | None): Called as callback(xk) after every
             iteration. Raising StopIteration stops the run with
             Status.Cancelled.
-        jac (Callable | None): BFGS analytic gradient, called as jac(x).
-        bounds: Rejected; neither exposed method supports bounds.
+        jac (Callable | None): BFGS or L-BFGS-B analytic gradient, called as jac(x).
+        bounds: L-BFGS-B pairs of (lower, upper), with None for an open side.
+            Other methods reject bounds.
 
     Returns:
         OptimizeResult: The best point found and why the run stopped.
