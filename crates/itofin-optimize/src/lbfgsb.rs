@@ -11,8 +11,14 @@
 
 use std::collections::VecDeque;
 
+mod driver;
 mod geometry;
 mod gradient;
+
+#[cfg(test)]
+mod tests_driver;
+
+pub(crate) use driver::minimize;
 
 fn dot(a: &[f64], b: &[f64]) -> f64 {
     a.iter().zip(b).map(|(ai, bi)| ai * bi).sum()
@@ -62,6 +68,10 @@ impl Compact {
         true
     }
 
+    #[allow(
+        dead_code,
+        reason = "two-loop inverse product is verified against dense BFGS"
+    )]
     pub(crate) fn inverse_times(&self, v: &[f64]) -> Option<Vec<f64>> {
         assert_eq!(v.len(), self.n);
         let mut q = v.to_vec();

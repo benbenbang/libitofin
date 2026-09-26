@@ -32,7 +32,6 @@ mod bfgs;
 mod counters;
 mod error;
 mod finite_difference;
-#[cfg(test)]
 mod lbfgsb;
 mod line_search;
 mod lsq;
@@ -51,7 +50,8 @@ pub use finite_difference::FiniteDifference;
 pub use objective::{ConstraintKind, Flow, IterationState, Objective};
 pub use outcome::{Converged, Minimize, Termination};
 pub use problem::{
-    BfgsOptions, Bounds, Common, Method, NelderMeadOptions, Norm, Problem, SlsqpOptions,
+    BfgsOptions, Bounds, Common, LbfgsbOptions, Method, NelderMeadOptions, Norm, Problem,
+    SlsqpOptions,
 };
 
 /// Minimizes `objective` from `problem.x0` with the chosen `method`.
@@ -107,6 +107,7 @@ pub fn minimize<O: Objective>(
     match method {
         Method::NelderMead(options) => nelder_mead::minimize(objective, problem, options, common),
         Method::Bfgs(options) => bfgs::minimize(objective, problem, options, common),
+        Method::Lbfgsb(options) => lbfgsb::minimize(objective, problem, options, common),
         Method::Slsqp(options) => slsqp::minimize(objective, problem, options, common),
     }
 }
