@@ -10,6 +10,28 @@ import (
 
 var _ OptimizeMethod = SLSQP{Constraints: []SLSQPConstraint{{Kind: SLSQPEquality}}}
 
+func TestMinimizeSLSQPConstraintCallsSession(t *testing.T) {
+	session, err := NewSession()
+	ratesOK(t, err)
+	defer session.Close()
+	quote, err := session.NewSimpleQuote(0.5)
+	ratesOK(t, err)
+	defer quote.Close()
+	objective := func(x []float64) (float64, error) { return math.Pow(x[0]-0.3, 2), nil }
+	constraint := SLSQPConstraint{Kind: SLSQPInequality, Fun: func(x []float64) ([]float64, error) {
+		floor, err := quote.Value()
+		if err != nil {
+			return nil, err
+		}
+		return []float64{x[0] - floor}, nil
+	}}
+	result, err := Minimize(context.Background(), objective, []float64{0}, SLSQP{Constraints: []SLSQPConstraint{constraint}})
+	ratesOK(t, err)
+	if !result.Success || math.Abs(result.X[0]-0.5) > 1e-5 {
+		t.Fatalf("session constraint result: %+v", result)
+	}
+}
+
 func TestMinimizeSLSQPVectorArityAndProjectedProbe(t *testing.T) {
 	probe := math.NaN()
 	constraints := []SLSQPConstraint{{
