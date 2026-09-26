@@ -32,6 +32,8 @@ mod bfgs;
 mod counters;
 mod error;
 mod finite_difference;
+#[cfg(test)]
+mod lbfgsb;
 mod line_search;
 mod lsq;
 mod nelder_mead;
