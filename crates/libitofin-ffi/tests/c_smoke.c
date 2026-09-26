@@ -11,6 +11,14 @@ static int32_t shifted_square(size_t userdata, const double *x, size_t n, double
     return 0;
 }
 
+static int32_t shifted_gradient(size_t userdata, const double *x, size_t n, double *out, ItofinError *error) {
+    (void)userdata;
+    (void)n;
+    (void)error;
+    out[0] = 2.0 * (x[0] - 3.0);
+    return 0;
+}
+
 static int32_t cancel_first(size_t userdata, const ItofinIterationState *state, bool *stop, ItofinError *error) {
     (void)userdata;
     (void)error;
@@ -34,6 +42,7 @@ static void smoke_optimize(void) {
     double x = 0.0;
     objective.userdata = 0;
     objective.value = shifted_square;
+    objective.gradient = NULL;
     objective.callback = NULL;
     objective.release = count_release;
     memset(&options, 0, sizeof options);
@@ -46,6 +55,13 @@ static void smoke_optimize(void) {
     assert(!result.success && result.status == ITOFIN_OPTIMIZE_CANCELLED && result.nit == 1);
     assert(itofin_optimize_nelder_mead(&objective, &x0, 0, &options, &result, &error) == ITOFIN_INVALID_ARGUMENT);
     assert(error.code == ITOFIN_INVALID_ARGUMENT && releases == 3);
+    ItofinBfgsOptions bfgs;
+    memset(&bfgs, 0, sizeof bfgs);
+    objective.callback = NULL;
+    objective.gradient = shifted_gradient;
+    assert(itofin_optimize_bfgs(&objective, &x0, 1, &bfgs, &result, &error) == 0);
+    assert(result.success && result.status == ITOFIN_OPTIMIZE_CONVERGED_GTOL && result.njev > 0);
+    assert(x > 2.99 && x < 3.01 && releases == 4);
 }
 
 int main(void) {
