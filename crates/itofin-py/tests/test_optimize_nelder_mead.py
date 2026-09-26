@@ -47,8 +47,8 @@ def test_budgets_status_values_and_invalid_input() -> None:
         minimize(rosenbrock, [])
     with pytest.raises(ItofinError, match="does not support option tol"):
         minimize(rosenbrock, [1.0, 1.0], options={"tol": 1e-3})
-    with pytest.raises(ItofinError, match="unknown method SLSQP"):
-        minimize(rosenbrock, [1.0, 1.0], method="SLSQP")
+    with pytest.raises(ItofinError, match="unknown method COBYLA"):
+        minimize(rosenbrock, [1.0, 1.0], method="COBYLA")
 
 
 def test_objective_exception_is_reraised_as_the_same_object() -> None:
