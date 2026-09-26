@@ -34,9 +34,12 @@ fn projected_norm(x: &[f64], g: &[f64], bounds: &Bounds) -> f64 {
         .zip(g)
         .enumerate()
         .fold(0.0, |largest, (i, (&xi, &gi))| {
-            let blocked =
-                (xi <= bounds.lower[i] && gi > 0.0) || (xi >= bounds.upper[i] && gi < 0.0);
-            largest.max(if blocked { 0.0 } else { gi.abs() })
+            let projected = if gi > 0.0 {
+                gi.min((xi - bounds.lower[i]).max(0.0))
+            } else {
+                (-gi).min((bounds.upper[i] - xi).max(0.0))
+            };
+            largest.max(projected)
         })
 }
 
@@ -91,7 +94,7 @@ fn search<O: Objective>(
     if !slope0.is_finite() || slope0 >= 0.0 {
         return Ok(None);
     }
-    let mut amax: f64 = 10.0;
+    let mut amax: f64 = 1e10;
     let mut limiting_face = false;
     for (i, &di) in direction.iter().enumerate() {
         let distance = if di > 0.0 {
