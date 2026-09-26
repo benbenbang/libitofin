@@ -5,10 +5,13 @@ package itofin
 typedef int32_t (*goOptimizeValueFn)(size_t, const double*, size_t, double*, ItofinError*);
 typedef int32_t (*goOptimizeGradientFn)(size_t, const double*, size_t, double*, ItofinError*);
 typedef int32_t (*goOptimizeCallbackFn)(size_t, const ItofinIterationState*, bool*, ItofinError*);
+typedef int32_t (*goOptimizeConstraintFn)(size_t, const double*, size_t, double*, size_t, ItofinError*);
 typedef void (*goOptimizeDrop)(size_t);
 extern int32_t goOptimizeValue(uintptr_t, double*, size_t, double*, ItofinError*);
 extern int32_t goOptimizeGradient(uintptr_t, double*, size_t, double*, ItofinError*);
 extern int32_t goOptimizeCallback(uintptr_t, ItofinIterationState*, bool*, ItofinError*);
+extern int32_t goOptimizeConstraintValue(uintptr_t, double*, size_t, double*, size_t, ItofinError*);
+extern int32_t goOptimizeConstraintJac(uintptr_t, double*, size_t, double*, size_t, ItofinError*);
 extern void goOptimizeRelease(uintptr_t);
 */
 import "C"
@@ -23,8 +26,7 @@ import (
 )
 
 // OptimizeStatus says why a Minimize run stopped. Values match Python
-// itofin.optimize.Status and are append-only; 8 is reserved for a
-// constrained solver.
+// itofin.optimize.Status and are append-only.
 type OptimizeStatus int32
 
 const (
@@ -36,6 +38,7 @@ const (
 	OptimizeCancelled        OptimizeStatus = C.ITOFIN_OPTIMIZE_CANCELLED
 	OptimizeNonfinite        OptimizeStatus = C.ITOFIN_OPTIMIZE_NONFINITE
 	OptimizeLineSearchFailed OptimizeStatus = C.ITOFIN_OPTIMIZE_LINE_SEARCH_FAILED
+	OptimizeInfeasible       OptimizeStatus = C.ITOFIN_OPTIMIZE_INFEASIBLE
 )
 
 var optimizeMessages = map[OptimizeStatus]string{
@@ -47,6 +50,7 @@ var optimizeMessages = map[OptimizeStatus]string{
 	OptimizeCancelled:        "stopped by the callback",
 	OptimizeNonfinite:        "a nonfinite value ended the search",
 	OptimizeLineSearchFailed: "the line search failed",
+	OptimizeInfeasible:       "the constraints are infeasible",
 }
 
 // String returns the same human reading as the Rust and Python results.
@@ -121,11 +125,17 @@ type optimizeState struct {
 	err      error
 }
 
+type optimizeConstraintState struct {
+	parent     *optimizeState
+	constraint SLSQPConstraint
+	dimension  int
+}
+
 // Minimize runs the selected method on fn from x0 on the calling goroutine, outside
 // any Session, so fn may call Session methods. An error returned by fn, or a
 // panic in it, ends the run and is returned as is. Cancelling ctx stops the
 // run at the end of the current iteration and returns the partial result
-// together with ctx.Err().
+// together with ctx.Err(). Constraint errors are returned unchanged too.
 func Minimize(ctx context.Context, fn func(x []float64) (float64, error), x0 []float64, method OptimizeMethod) (OptimizeResult, error) {
 	if ctx == nil || fn == nil {
 		return OptimizeResult{}, errNilArgument("context and objective")
@@ -133,8 +143,10 @@ func Minimize(ctx context.Context, fn func(x []float64) (float64, error), x0 []f
 	var nm NelderMeadOptions
 	var bfgs BFGS
 	var lbfgsb LBFGSB
+	var slsqp SLSQP
 	isBFGS := false
 	isLBFGSB := false
+	isSLSQP := false
 	switch selected := method.(type) {
 	case NelderMeadOptions:
 		nm = selected
@@ -161,9 +173,22 @@ func Minimize(ctx context.Context, fn func(x []float64) (float64, error), x0 []f
 		}
 		isLBFGSB = true
 		lbfgsb = *selected
+	case SLSQP:
+		isSLSQP = true
+		slsqp = selected
+	case *SLSQP:
+		if selected == nil {
+			return OptimizeResult{}, fmt.Errorf("%w: nil method", ErrInvalidArgument)
+		}
+		isSLSQP = true
+		slsqp = *selected
 	default:
 		return OptimizeResult{}, fmt.Errorf("%w: unknown method", ErrInvalidArgument)
 	}
+	if err := ctx.Err(); err != nil {
+		return OptimizeResult{}, err
+	}
+	var dimensions []int
 	if isBFGS {
 		if bfgs.Bounds != nil || bfgs.MaxIter < 0 || bfgs.GTol < 0 || bfgs.Eps < 0 {
 			return OptimizeResult{}, fmt.Errorf("%w: unsupported bounds or invalid BFGS option", ErrInvalidArgument)
@@ -182,15 +207,20 @@ func Minimize(ctx context.Context, fn func(x []float64) (float64, error), x0 []f
 				return OptimizeResult{}, fmt.Errorf("%w: invalid L-BFGS-B bounds", ErrInvalidArgument)
 			}
 		}
+	} else if isSLSQP {
+		var err error
+		dimensions, err = validateSLSQP(slsqp, x0)
+		if err != nil {
+			return OptimizeResult{}, err
+		}
 	} else if nm.MaxIter < 0 || nm.MaxFev < 0 {
 		return OptimizeResult{}, fmt.Errorf("%w: negative budget", ErrInvalidArgument)
-	}
-	if err := ctx.Err(); err != nil {
-		return OptimizeResult{}, err
 	}
 	gradient := bfgs.Gradient
 	if isLBFGSB {
 		gradient = lbfgsb.Gradient
+	} else if isSLSQP {
+		gradient = slsqp.Gradient
 	}
 	state := &optimizeState{ctx: ctx, fn: fn, gradient: gradient}
 	objective := C.ItofinObjective{
@@ -233,6 +263,35 @@ func Minimize(ctx context.Context, fn func(x []float64) (float64, error), x0 []f
 			(*C.double)(unsafe.Pointer(unsafe.SliceData(x0))), C.size_t(len(x0)),
 			(*C.double)(unsafe.Pointer(unsafe.SliceData(lower))), C.size_t(len(lower)),
 			(*C.double)(unsafe.Pointer(unsafe.SliceData(upper))), C.size_t(len(upper)),
+			&options, &out, &e)
+	} else if isSLSQP {
+		options := C.ItofinSlsqpOptions{ftol: C.double(slsqp.FTol), maxiter: C.size_t(slsqp.MaxIter), maxfev: C.size_t(slsqp.MaxFev)}
+		var lower, upper []float64
+		if slsqp.Bounds != nil {
+			lower = make([]float64, len(slsqp.Bounds))
+			upper = make([]float64, len(slsqp.Bounds))
+			for i, pair := range slsqp.Bounds {
+				lower[i], upper[i] = pair[0], pair[1]
+			}
+		}
+		constraints := make([]C.ItofinConstraint, len(slsqp.Constraints))
+		for i, constraint := range slsqp.Constraints {
+			bridge := &optimizeConstraintState{parent: state, constraint: constraint, dimension: dimensions[i]}
+			constraints[i] = C.ItofinConstraint{
+				kind: C.int32_t(constraint.Kind), dimension: C.size_t(dimensions[i]),
+				userdata: C.size_t(cgo.NewHandle(bridge)),
+				fun:      (C.goOptimizeConstraintFn)(C.goOptimizeConstraintValue),
+				release:  (C.goOptimizeDrop)(C.goOptimizeRelease),
+			}
+			if constraint.Jac != nil {
+				constraints[i].jac = (C.goOptimizeConstraintFn)(C.goOptimizeConstraintJac)
+			}
+		}
+		status = C.itofin_optimize_slsqp(&objective,
+			(*C.double)(unsafe.Pointer(unsafe.SliceData(x0))), C.size_t(len(x0)),
+			(*C.double)(unsafe.Pointer(unsafe.SliceData(lower))), C.size_t(len(lower)),
+			(*C.double)(unsafe.Pointer(unsafe.SliceData(upper))), C.size_t(len(upper)),
+			(*C.ItofinConstraint)(unsafe.Pointer(unsafe.SliceData(constraints))), C.size_t(len(constraints)),
 			&options, &out, &e)
 	} else {
 		options := C.ItofinOptimizeOptions{maxiter: C.size_t(nm.MaxIter), maxfev: C.size_t(nm.MaxFev),
@@ -307,6 +366,59 @@ func goOptimizeValue(handle C.uintptr_t, x *C.double, n C.size_t, out *C.double,
 //export goOptimizeCallback
 func goOptimizeCallback(handle C.uintptr_t, state *C.ItofinIterationState, stop *C.bool, e *C.ItofinError) C.int32_t {
 	*stop = C.bool(cgo.Handle(handle).Value().(*optimizeState).ctx.Err() != nil)
+	return 0
+}
+
+//export goOptimizeConstraintValue
+func goOptimizeConstraintValue(handle C.uintptr_t, x *C.double, n C.size_t, out *C.double, dimension C.size_t, e *C.ItofinError) (status C.int32_t) {
+	bridge := cgo.Handle(handle).Value().(*optimizeConstraintState)
+	defer func() {
+		if value := recover(); value != nil {
+			bridge.parent.err = fmt.Errorf("itofin: constraint panic: %v", value)
+			status = C.ITOFIN_CORE_ERROR
+		}
+	}()
+	point := append([]float64(nil), unsafe.Slice((*float64)(unsafe.Pointer(x)), int(n))...)
+	values, err := bridge.constraint.Fun(point)
+	if err != nil {
+		bridge.parent.err = err
+		return C.ITOFIN_CORE_ERROR
+	}
+	if len(values) != bridge.dimension || int(dimension) != bridge.dimension {
+		bridge.parent.err = fmt.Errorf("%w: constraint returned the wrong vector length", ErrInvalidArgument)
+		return C.ITOFIN_CORE_ERROR
+	}
+	copy(unsafe.Slice((*float64)(unsafe.Pointer(out)), bridge.dimension), values)
+	return 0
+}
+
+//export goOptimizeConstraintJac
+func goOptimizeConstraintJac(handle C.uintptr_t, x *C.double, n C.size_t, out *C.double, length C.size_t, e *C.ItofinError) (status C.int32_t) {
+	bridge := cgo.Handle(handle).Value().(*optimizeConstraintState)
+	defer func() {
+		if value := recover(); value != nil {
+			bridge.parent.err = fmt.Errorf("itofin: constraint Jacobian panic: %v", value)
+			status = C.ITOFIN_CORE_ERROR
+		}
+	}()
+	point := append([]float64(nil), unsafe.Slice((*float64)(unsafe.Pointer(x)), int(n))...)
+	rows, err := bridge.constraint.Jac(point)
+	if err != nil {
+		bridge.parent.err = err
+		return C.ITOFIN_CORE_ERROR
+	}
+	if len(rows) != bridge.dimension || int(length) != bridge.dimension*len(point) {
+		bridge.parent.err = fmt.Errorf("%w: constraint Jacobian returned the wrong shape", ErrInvalidArgument)
+		return C.ITOFIN_CORE_ERROR
+	}
+	output := unsafe.Slice((*float64)(unsafe.Pointer(out)), int(length))
+	for i, row := range rows {
+		if len(row) != len(point) {
+			bridge.parent.err = fmt.Errorf("%w: constraint Jacobian returned the wrong shape", ErrInvalidArgument)
+			return C.ITOFIN_CORE_ERROR
+		}
+		copy(output[i*len(point):(i+1)*len(point)], row)
+	}
 	return 0
 }
 
