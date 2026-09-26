@@ -95,6 +95,37 @@ BFGS = {
 }
 
 
+def extended_rosenbrock(x):
+    """Adjacent-pair Rosenbrock chain with a 25-dimensional test instance."""
+    return sum(100.0 * (x[i + 1] - x[i] * x[i]) ** 2 + (1.0 - x[i]) ** 2 for i in range(len(x) - 1))
+
+
+def extended_rosenbrock_gradient(x):
+    gradient = [0.0] * len(x)
+    for i in range(len(x) - 1):
+        residual = x[i + 1] - x[i] * x[i]
+        gradient[i] += -400.0 * x[i] * residual - 2.0 * (1.0 - x[i])
+        gradient[i + 1] += 200.0 * residual
+    return gradient
+
+
+LBFGSB = {
+    "rosenbrock_box": {
+        "objective": rosenbrock, "jac": rosenbrock_gradient,
+        "x0": [-1.2, 1.0], "bounds": [[-2.0, 2.0]] * 2, "maxcor": 10,
+    },
+    "rosenbrock_face": {
+        "objective": rosenbrock, "jac": rosenbrock_gradient,
+        "x0": [-1.2, 1.0], "bounds": [[0.0, 0.5], [-2.0, 2.0]], "maxcor": 10,
+    },
+    "extended_rosenbrock25": {
+        "objective": extended_rosenbrock, "jac": extended_rosenbrock_gradient,
+        "x0": [-1.2 if i % 2 == 0 else 1.0 for i in range(25)],
+        "bounds": [[-2.0, 2.0]] * 25, "maxcor": 5,
+    },
+}
+
+
 
 def hs35(x):
     """Hock-Schittkowski 35, minimized at (4/3, 7/9, 4/9) with f = 1/9."""
@@ -226,7 +257,7 @@ def solved_slsqp(definitions: dict) -> dict:
     return results
 
 
-CASES: dict[str, object] = {"nelder_mead": NELDER_MEAD, "bfgs": BFGS, "slsqp": SLSQP}
+CASES: dict[str, object] = {"nelder_mead": NELDER_MEAD, "bfgs": BFGS, "lbfgsb": LBFGSB, "slsqp": SLSQP}
 
 
 def solved(definitions: dict) -> dict:
@@ -288,7 +319,34 @@ def solved_bfgs(definitions: dict) -> dict:
     return results
 
 
-SOLVERS = {"bfgs": solved_bfgs, "slsqp": solved_slsqp}
+def solved_lbfgsb(definitions: dict) -> dict:
+    """Record objective quality, box feasibility and projected KKT residual."""
+    from scipy.optimize import minimize
+
+    results = {}
+    for name, case in definitions.items():
+        outcome = minimize(case["objective"], case["x0"], jac=case["jac"],
+            method="L-BFGS-B", bounds=case["bounds"],
+            options={"maxcor": case["maxcor"], "ftol": 1e-12, "gtol": 1e-5})
+        if not outcome.success:
+            raise SystemExit(f"case {name} did not converge: {outcome.message}")
+        projected = []
+        for value, component, (lower, upper) in zip(outcome.x, outcome.jac, case["bounds"]):
+            if component > 0:
+                projected.append(min(float(component), max(float(value - lower), 0.0)))
+            else:
+                projected.append(min(float(-component), max(float(upper - value), 0.0)))
+        bounds = case["bounds"]
+        compact_bounds = bounds[:1] if len(set(map(tuple, bounds))) == 1 else bounds
+        results[name] = {
+            "x0": case["x0"], "bounds": compact_bounds, "maxcor": case["maxcor"],
+            "fun": float(outcome.fun), "projected_gnorm": max(projected),
+            "status": int(outcome.status),
+        }
+    return results
+
+
+SOLVERS = {"bfgs": solved_bfgs, "lbfgsb": solved_lbfgsb, "slsqp": solved_slsqp}
 
 
 def provenance(scipy_version: str) -> dict[str, str]:

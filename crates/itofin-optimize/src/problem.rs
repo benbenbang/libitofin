@@ -188,7 +188,10 @@ impl BfgsOptions {
 /// Limited-memory BFGS with box constraints.
 ///
 /// An unset `ftol` uses `1e-9`; an unset `gtol` uses `1e-5`. The gradient
-/// tolerance applies to the infinity norm of the projected gradient.
+/// tolerance applies to the infinity norm of the projected gradient. An
+/// out-of-box [`Problem::x0`] is projected before the first evaluation.
+/// The corresponding `fmin_l_bfgs_b` names are `factr = ftol / f64::EPSILON`
+/// and `pgtol = gtol`.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct LbfgsbOptions {
     /// Relative decrease tolerance on the objective.
