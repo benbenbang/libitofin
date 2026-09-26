@@ -28,10 +28,37 @@ static int32_t cancel_first(size_t userdata, const ItofinIterationState *state, 
 }
 
 static int releases = 0;
+static int constraint_releases = 0;
 
 static void count_release(size_t userdata) {
     (void)userdata;
     releases += 1;
+}
+
+static void count_constraint_release(size_t userdata) {
+    (void)userdata;
+    constraint_releases += 1;
+}
+
+static int32_t interval_constraint(size_t userdata, const double *x, size_t n, double *out, size_t dimension, ItofinError *error) {
+    (void)userdata;
+    (void)n;
+    (void)error;
+    assert(dimension == 2);
+    out[0] = x[0] - 1.0;
+    out[1] = 2.0 - x[0];
+    return 0;
+}
+
+static int32_t interval_jacobian(size_t userdata, const double *x, size_t n, double *out, size_t length, ItofinError *error) {
+    (void)userdata;
+    (void)x;
+    (void)n;
+    (void)error;
+    assert(length == 2);
+    out[0] = 1.0;
+    out[1] = -1.0;
+    return 0;
 }
 
 static void smoke_optimize(void) {
@@ -71,6 +98,23 @@ static void smoke_optimize(void) {
     assert(result.success && x > 0.999 && x <= 1.0 && releases == 5);
     assert(itofin_optimize_lbfgsb(&objective, &x0, 1, &lower, 0, &upper, 1, &lbfgsb, &result, &error) == ITOFIN_INVALID_ARGUMENT);
     assert(releases == 6);
+    ItofinSlsqpOptions slsqp;
+    memset(&slsqp, 0, sizeof slsqp);
+    ItofinConstraint constraints[2];
+    memset(constraints, 0, sizeof constraints);
+    constraints[0].kind = 1;
+    constraints[0].dimension = 2;
+    constraints[0].fun = interval_constraint;
+    constraints[0].jac = interval_jacobian;
+    constraints[0].release = count_constraint_release;
+    assert(itofin_optimize_slsqp(&objective, &x0, 1, NULL, 0, NULL, 0, constraints, 1, &slsqp, &result, &error) == 0);
+    assert(result.success && fabs(x - 2.0) < 1e-6 && releases == 7 && constraint_releases == 1);
+    constraints[1] = constraints[0];
+    constraints[1].kind = 5;
+    assert(itofin_optimize_slsqp(&objective, &x0, 1, NULL, 0, NULL, 0, constraints, 2, &slsqp, &result, &error) == ITOFIN_INVALID_ARGUMENT);
+    assert(releases == 8 && constraint_releases == 3);
+    assert(itofin_optimize_slsqp(&objective, &x0, 1, NULL, 0, NULL, 0, NULL, 1, &slsqp, &result, &error) == ITOFIN_INVALID_ARGUMENT);
+    assert(releases == 9 && constraint_releases == 3);
 }
 
 int main(void) {
