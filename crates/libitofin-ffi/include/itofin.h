@@ -739,7 +739,9 @@ typedef struct ItofinIterationState {
  * zero, or returns nonzero after filling the error. The optional `callback`
  * runs after every iteration and sets `*stop` to cancel the run; a nonzero
  * return fails it. `release`, when set, is called exactly once before
- * `itofin_optimize_nelder_mead` returns whenever `objective` is non-null.
+ * either optimizer returns whenever `objective` is non-null. `gradient` is
+ * appended to preserve the original field offsets; Nelder-Mead only reads
+ * the original prefix for compatibility with existing compiled callers.
  * Callbacks must not unwind.
  */
 typedef struct ItofinObjective {
@@ -747,6 +749,7 @@ typedef struct ItofinObjective {
   int32_t (*value)(size_t, const double*, size_t, double*, struct ItofinError*);
   int32_t (*callback)(size_t, const struct ItofinIterationState*, bool*, struct ItofinError*);
   void (*release)(size_t);
+  int32_t (*gradient)(size_t, const double*, size_t, double*, struct ItofinError*);
 } ItofinObjective;
 
 /**
@@ -763,8 +766,8 @@ typedef struct ItofinOptimizeOptions {
 } ItofinOptimizeOptions;
 
 /**
- * Why a run stopped. Values are fixed and append-only: `7` (line search
- * failed) and `8` (infeasible) are reserved for later solvers.
+ * Why a run stopped. Values are fixed and append-only: `8` (infeasible)
+ * is reserved for a constrained solver.
  */
 typedef int32_t ItofinOptimizeStatus;
 
@@ -781,6 +784,17 @@ typedef struct ItofinOptimizeResult {
   ItofinOptimizeStatus status;
   bool success;
 } ItofinOptimizeResult;
+
+/**
+ * BFGS options. Zero values select defaults. `finite_difference` is 0 for
+ * forward and 1 for central differences; any other value is rejected.
+ */
+typedef struct ItofinBfgsOptions {
+  double gtol;
+  double eps;
+  int32_t finite_difference;
+  size_t maxiter;
+} ItofinBfgsOptions;
 
 typedef struct ItofinOvernightFutureConfig {
   uint64_t index;
@@ -1090,6 +1104,8 @@ typedef struct ItofinVolGridConfig {
 #define ITOFIN_OPTIMIZE_CANCELLED 5
 
 #define ITOFIN_OPTIMIZE_NONFINITE 6
+
+#define ITOFIN_OPTIMIZE_LINE_SEARCH_FAILED 7
 
 #ifdef __cplusplus
 extern "C" {
@@ -4023,6 +4039,19 @@ int32_t itofin_optimize_nelder_mead(const struct ItofinObjective *objective,
                                     const struct ItofinOptimizeOptions *options,
                                     struct ItofinOptimizeResult *out_result,
                                     struct ItofinError *error);
+
+/**
+ * Minimize `objective` from `x0` with BFGS. The optional gradient writes `n`
+ * components; without it, the selected finite difference is used.
+ * # Safety
+ * Pointers must satisfy the same contract as `itofin_optimize_nelder_mead`.
+ */
+int32_t itofin_optimize_bfgs(const struct ItofinObjective *objective,
+                             const double *x0,
+                             size_t n,
+                             const struct ItofinBfgsOptions *options,
+                             struct ItofinOptimizeResult *out_result,
+                             struct ItofinError *error);
 
 /**
  * `american`: 0 European, 1 American; earliest ignored for European exercise.
