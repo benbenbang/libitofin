@@ -1,6 +1,7 @@
 /* Compile and execute as both C and C++ against the generated public header. */
 #include "itofin.h"
 #include <assert.h>
+#include <math.h>
 #include <string.h>
 
 static int32_t shifted_square(size_t userdata, const double *x, size_t n, double *out, ItofinError *error) {
@@ -62,6 +63,14 @@ static void smoke_optimize(void) {
     assert(itofin_optimize_bfgs(&objective, &x0, 1, &bfgs, &result, &error) == 0);
     assert(result.success && result.status == ITOFIN_OPTIMIZE_CONVERGED_GTOL && result.njev > 0);
     assert(x > 2.99 && x < 3.01 && releases == 4);
+    ItofinLbfgsbOptions lbfgsb;
+    memset(&lbfgsb, 0, sizeof lbfgsb);
+    double lower = -INFINITY;
+    double upper = 1.0;
+    assert(itofin_optimize_lbfgsb(&objective, &x0, 1, &lower, 1, &upper, 1, &lbfgsb, &result, &error) == 0);
+    assert(result.success && x > 0.999 && x <= 1.0 && releases == 5);
+    assert(itofin_optimize_lbfgsb(&objective, &x0, 1, &lower, 0, &upper, 1, &lbfgsb, &result, &error) == ITOFIN_INVALID_ARGUMENT);
+    assert(releases == 6);
 }
 
 int main(void) {
