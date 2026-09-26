@@ -696,6 +696,9 @@ pub unsafe extern "C" fn itofin_optimize_slsqp(
                 if descriptor.dimension > max_values
                     || matrix_len.is_none_or(|len| len > max_values)
                     || total_components.is_none_or(|len| len > max_components)
+                    || total_components
+                        .and_then(|len| len.checked_mul(n))
+                        .is_none_or(|len| len > max_values)
                 {
                     return Err(BindingError::invalid(
                         "constraint shape overflows address space",
