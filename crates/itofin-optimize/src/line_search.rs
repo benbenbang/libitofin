@@ -38,6 +38,7 @@ pub(crate) struct Wolfe {
     pub amax: f64,
     /// The largest number of trial steps, bracketing and zoom together.
     pub maxiter: usize,
+    pub eps: Option<f64>,
 }
 
 impl Wolfe {
@@ -49,6 +50,7 @@ impl Wolfe {
             alpha0,
             amax,
             maxiter,
+            eps: None,
         }
     }
 }
@@ -223,7 +225,15 @@ impl<O: Objective> Search<'_, '_, O> {
 
     fn slope(&mut self, x: &[f64], f: f64) -> Result<(f64, Vec<f64>), LineSearchError<O::Error>> {
         let mut g = vec![0.0; x.len()];
-        finite_difference::gradient(self.counters, self.objective, x, f, self.scheme, &mut g)?;
+        finite_difference::gradient_with_step(
+            self.counters,
+            self.objective,
+            x,
+            f,
+            self.scheme,
+            self.params.eps,
+            &mut g,
+        )?;
         Ok((dot(&g, self.p), g))
     }
 

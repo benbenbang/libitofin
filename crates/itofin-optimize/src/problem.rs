@@ -161,6 +161,8 @@ pub enum Norm {
 pub struct BfgsOptions {
     /// The run converges once the gradient norm is at most `gtol`.
     pub gtol: Option<f64>,
+    /// Absolute finite-difference step; defaults to the scheme's relative step.
+    pub eps: Option<f64>,
     /// The norm `gtol` is measured in.
     pub norm: Norm,
     /// The approximation used when the objective supplies no gradient.
@@ -173,6 +175,11 @@ impl BfgsOptions {
             && (!gtol.is_finite() || gtol <= 0.0)
         {
             return Err(InvalidInput::NotFinitePositive { option: "gtol" });
+        }
+        if let Some(eps) = self.eps
+            && (!eps.is_finite() || eps <= 0.0)
+        {
+            return Err(InvalidInput::NotFinitePositive { option: "eps" });
         }
         Ok(())
     }

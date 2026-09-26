@@ -60,17 +60,35 @@ pub(crate) fn gradient<O: Objective>(
     scheme: FiniteDifference,
     out: &mut [f64],
 ) -> Result<(), Halt<O::Error>> {
+    gradient_with_step(counters, objective, x, fx, scheme, None, out)
+}
+
+pub(crate) fn gradient_with_step<O: Objective>(
+    counters: &mut Counters,
+    objective: &mut O,
+    x: &[f64],
+    fx: f64,
+    scheme: FiniteDifference,
+    eps: Option<f64>,
+    out: &mut [f64],
+) -> Result<(), Halt<O::Error>> {
     if !counters.gradient(objective, x, out)? {
         let mut point = x.to_vec();
         for (i, &xi) in x.iter().enumerate() {
-            let h = scheme.relative_step() * xi.abs().max(1.0);
-            let plus = xi + h;
+            let h = eps.unwrap_or_else(|| scheme.relative_step() * xi.abs().max(1.0));
+            let mut plus = xi + h;
+            if eps.is_some() && plus == xi {
+                plus = xi.next_up();
+            }
             point[i] = plus;
             let f_plus = finite(counters.value(objective, &point)?)?;
             out[i] = match scheme {
                 FiniteDifference::Forward => (f_plus - fx) / (plus - xi),
                 FiniteDifference::Central => {
-                    let minus = xi - h;
+                    let mut minus = xi - h;
+                    if eps.is_some() && minus == xi {
+                        minus = xi.next_down();
+                    }
                     point[i] = minus;
                     let f_minus = finite(counters.value(objective, &point)?)?;
                     (f_plus - f_minus) / (plus - minus)
@@ -97,7 +115,7 @@ fn finite<E: std::error::Error + 'static>(value: f64) -> Result<f64, Halt<E>> {
 
 #[cfg(test)]
 mod tests {
-    use super::{FiniteDifference, gradient};
+    use super::{FiniteDifference, gradient, gradient_with_step};
     use crate::{Common, Counters, Halt, Objective, Termination};
     use std::convert::Infallible;
 
@@ -149,6 +167,50 @@ mod tests {
                 &Common::default(),
             );
             assert_close(&g.unwrap(), &quadratic_gradient(&x), 1e-6);
+        }
+    }
+
+    #[test]
+    fn explicit_eps_is_an_absolute_step() {
+        let mut points = Vec::new();
+        let mut objective = |x: &[f64]| -> Result<f64, Infallible> {
+            points.push(x[0]);
+            Ok(x[0] * x[0])
+        };
+        let mut counters = Counters::new(&Common::default());
+        let mut out = [0.0];
+        gradient_with_step(
+            &mut counters,
+            &mut objective,
+            &[4.0],
+            16.0,
+            FiniteDifference::Forward,
+            Some(0.1),
+            &mut out,
+        )
+        .unwrap();
+        assert!((points[0] - 4.1).abs() < 1e-12);
+        assert!((out[0] - 8.1).abs() < 1e-12);
+        assert_eq!((counters.nfev(), counters.njev()), (1, 1));
+    }
+
+    #[test]
+    fn explicit_eps_smaller_than_an_ulp_still_probes_a_distinct_point() {
+        for scheme in [FiniteDifference::Forward, FiniteDifference::Central] {
+            let mut objective = |x: &[f64]| -> Result<f64, Infallible> { Ok(x[0] / 1e20) };
+            let mut counters = Counters::new(&Common::default());
+            let mut out = [0.0];
+            gradient_with_step(
+                &mut counters,
+                &mut objective,
+                &[1e20],
+                1.0,
+                scheme,
+                Some(1e-6),
+                &mut out,
+            )
+            .unwrap();
+            assert!(out[0].is_finite() && out[0] > 0.0, "{scheme:?}: {}", out[0]);
         }
     }
 

@@ -124,8 +124,17 @@ fn run<O: Objective>(
     }
     let scheme = options.finite_difference;
     let mut g = vec![0.0; n];
-    finite_difference::gradient(counters, objective, &at.x, at.f, scheme, &mut g)?;
-    let wolfe = Wolfe::new(1.0, LINE_SEARCH_AMAX, LINE_SEARCH_MAXITER);
+    finite_difference::gradient_with_step(
+        counters,
+        objective,
+        &at.x,
+        at.f,
+        scheme,
+        options.eps,
+        &mut g,
+    )?;
+    let mut wolfe = Wolfe::new(1.0, LINE_SEARCH_AMAX, LINE_SEARCH_MAXITER);
+    wolfe.eps = options.eps;
     let mut inverse = InverseHessian::identity(n);
     loop {
         if norm(options.norm, &g) <= gtol {
@@ -462,6 +471,43 @@ mod tests {
             let invalid = InvalidInput::NotFinitePositive { option: "gtol" };
             assert!(matches!(result, Err(MinimizeError::InvalidInput(e)) if e == invalid));
         }
+        for eps in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+            let options = BfgsOptions {
+                eps: Some(eps),
+                ..BfgsOptions::default()
+            };
+            let result = run(&mut analytic(), vec![0.0, 0.0], options, &Common::default());
+            let invalid = InvalidInput::NotFinitePositive { option: "eps" };
+            assert!(matches!(result, Err(MinimizeError::InvalidInput(e)) if e == invalid));
+        }
+    }
+
+    #[test]
+    fn explicit_eps_shifts_the_forward_difference_stationary_point() {
+        let objective =
+            |x: &[f64]| -> Result<f64, std::convert::Infallible> { Ok((x[0] - 2.0).powi(2)) };
+        let ordinary = run(
+            &mut objective.clone(),
+            vec![0.0],
+            BfgsOptions::default(),
+            &Common::default(),
+        )
+        .unwrap();
+        let shifted = run(
+            &mut objective.clone(),
+            vec![0.0],
+            BfgsOptions {
+                eps: Some(0.01),
+                ..BfgsOptions::default()
+            },
+            &Common::default(),
+        )
+        .unwrap();
+        assert!(ordinary.success);
+        assert!((ordinary.x[0] - 2.0).abs() < 1e-5);
+        assert!(shifted.x[0].is_finite() && shifted.fun.is_finite());
+        assert!((shifted.x[0] - ordinary.x[0]).abs() > 1e-4);
+        assert!(shifted.nfev > ordinary.nfev);
     }
 
     #[test]
@@ -475,6 +521,7 @@ mod tests {
         assert!(inf_norm(&g) <= 1e-1 && inf_norm(&g) > 1e-5);
         let options = BfgsOptions {
             gtol: Some(1e-8),
+            eps: None,
             norm: Norm::Two,
             finite_difference: FiniteDifference::Central,
         };
