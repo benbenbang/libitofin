@@ -43,7 +43,7 @@ func TestMinimizeNelderMeadRosenbrock(t *testing.T) {
 func TestMinimizeStatusValues(t *testing.T) {
 	statuses := []OptimizeStatus{OptimizeConvergedXTol, OptimizeConvergedFTol, OptimizeConvergedGTol,
 		OptimizeMaxIterations, OptimizeMaxEvaluations, OptimizeCancelled, OptimizeNonfinite,
-		OptimizeLineSearchFailed}
+		OptimizeLineSearchFailed, OptimizeInfeasible}
 	for want, status := range statuses {
 		if int(status) != want || strings.HasPrefix(status.String(), "OptimizeStatus(") {
 			t.Fatalf("%d: %d %q", want, status, status)
