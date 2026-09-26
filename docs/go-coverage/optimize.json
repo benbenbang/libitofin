@@ -5,7 +5,8 @@
       "c": [
         "itofin_optimize_nelder_mead",
         "itofin_optimize_bfgs",
-        "itofin_optimize_lbfgsb"
+        "itofin_optimize_lbfgsb",
+        "itofin_optimize_slsqp"
       ],
       "go": "Minimize",
       "python": "itofin.optimize.minimize",
@@ -16,7 +17,12 @@
         "TestMinimizeObjectiveClosesSession",
         "TestMinimizeErrorsCancellationAndPanics",
         "TestMinimizeBFGSGradientAndInvalidBounds",
-        "TestMinimizeLBFGSBBoundsAndErrors"
+        "TestMinimizeLBFGSBBoundsAndErrors",
+        "TestMinimizeSLSQPVectorArityAndProjectedProbe",
+        "TestMinimizeSLSQPHockSchittkowski71",
+        "TestMinimizeSLSQPInfeasibleAndCancellation",
+        "TestMinimizeSLSQPConstraintErrorsAndShapes",
+        "TestMinimizeSLSQPConstraintCallsSession"
       ]
     },
     {
@@ -122,6 +128,12 @@
       "python": "itofin.optimize.Status.LineSearchFailed",
       "status": "implemented",
       "tests": "TestMinimizeStatusValues"
+    },
+    {
+      "go": "OptimizeInfeasible",
+      "python": "itofin.optimize.Status.Infeasible",
+      "status": "implemented",
+      "tests": "TestMinimizeSLSQPInfeasibleAndCancellation"
     },
     {
       "go": "OptimizeStatus: explicit integer conversion",
