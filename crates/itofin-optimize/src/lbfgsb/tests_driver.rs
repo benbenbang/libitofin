@@ -127,6 +127,94 @@ fn a_linear_objective_accepts_the_limiting_face_step() {
 }
 
 #[test]
+fn a_narrow_box_has_a_small_projected_gradient_before_any_step() {
+    let bounds = Bounds {
+        lower: vec![0.0],
+        upper: vec![1e-8],
+    };
+    let mut objective = |x: &[f64]| -> Result<f64, Infallible> { Ok(-x[0]) };
+    let result = run(&mut objective, vec![0.0], bounds, LbfgsbOptions::default()).unwrap();
+    assert_eq!(result.status, Termination::Converged(Converged::GTol));
+    assert_eq!(result.nit, 0);
+}
+
+#[test]
+fn an_interior_wolfe_search_expands_past_ten_to_a_distant_minimum() {
+    let bounds = Bounds {
+        lower: vec![f64::NEG_INFINITY],
+        upper: vec![f64::INFINITY],
+    };
+    let mut objective = |x: &[f64]| -> Result<f64, Infallible> { Ok(5e-7 * x[0] * x[0] - x[0]) };
+    let result = run(&mut objective, vec![0.0], bounds, LbfgsbOptions::default()).unwrap();
+    assert!(result.success, "{result:?}");
+    assert!((result.x[0] - 1e6).abs() < 20.0, "{result:?}");
+}
+
+#[test]
+fn nonfinite_trial_and_analytic_gradient_report_nonfinite() {
+    let bounds = Bounds {
+        lower: vec![0.0],
+        upper: vec![1.0],
+    };
+    let mut bad_trial =
+        |x: &[f64]| -> Result<f64, Infallible> { Ok(if x[0] > 0.5 { f64::NAN } else { -x[0] }) };
+    let trial = run(
+        &mut bad_trial,
+        vec![0.0],
+        bounds.clone(),
+        LbfgsbOptions::default(),
+    )
+    .unwrap();
+    assert_eq!(trial.status, Termination::Nonfinite);
+    assert_eq!(trial.x, vec![0.0]);
+
+    struct BadGradient;
+    impl Objective for BadGradient {
+        type Error = Infallible;
+        fn value(&mut self, x: &[f64]) -> Result<f64, Self::Error> {
+            Ok(-x[0])
+        }
+        fn gradient(&mut self, _: &[f64], out: &mut [f64]) -> Result<bool, Self::Error> {
+            out[0] = f64::NAN;
+            Ok(true)
+        }
+    }
+    let gradient = run(
+        &mut BadGradient,
+        vec![0.0],
+        bounds,
+        LbfgsbOptions::default(),
+    )
+    .unwrap();
+    assert_eq!(gradient.status, Termination::Nonfinite);
+    assert_eq!(gradient.x, vec![0.0]);
+}
+
+#[test]
+fn objective_errors_keep_their_typed_payload() {
+    #[derive(Debug, PartialEq, Eq, thiserror::Error)]
+    #[error("broken objective {0}")]
+    struct Boom(u8);
+    struct Failing;
+    impl Objective for Failing {
+        type Error = Boom;
+        fn value(&mut self, x: &[f64]) -> Result<f64, Self::Error> {
+            if x[0] > 0.5 { Err(Boom(7)) } else { Ok(-x[0]) }
+        }
+        fn gradient(&mut self, _: &[f64], out: &mut [f64]) -> Result<bool, Self::Error> {
+            out[0] = -1.0;
+            Ok(true)
+        }
+    }
+    let bounds = Bounds {
+        lower: vec![0.0],
+        upper: vec![1.0],
+    };
+    let result = run(&mut Failing, vec![0.0], bounds, LbfgsbOptions::default());
+    assert!(matches!(result, Err(MinimizeError::Objective(Boom(7)))));
+}
+
+#[test]
 fn method_rejects_constraints_and_invalid_options_before_evaluation() {
     struct Constrained;
     impl Objective for Constrained {

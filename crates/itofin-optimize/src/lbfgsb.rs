@@ -43,7 +43,7 @@ impl Compact {
         Self {
             n,
             maxcor,
-            pairs: VecDeque::with_capacity(maxcor),
+            pairs: VecDeque::new(),
             theta: 1.0,
         }
     }
@@ -229,6 +229,14 @@ mod tests {
         assert!(compact.update(vec![0.0, 1.0], vec![0.0, 3.0]));
         assert_eq!(compact.pairs.len(), 1);
         assert_eq!(compact.pairs[0].s, vec![0.0, 1.0]);
+    }
+
+    #[test]
+    fn a_large_memory_limit_does_not_preallocate() {
+        let mut compact = Compact::new(1, usize::MAX);
+        assert_eq!(compact.pairs.capacity(), 0);
+        assert!(compact.update(vec![1.0], vec![2.0]));
+        assert_eq!(compact.pairs.len(), 1);
     }
 
     #[test]
