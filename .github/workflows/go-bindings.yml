@@ -2,7 +2,16 @@ name: Go and C ABI bindings
 
 on:
   workflow_dispatch:
+    inputs:
+      fail_optional_windows:
+        description: Prove that a failed Windows step does not fail the workflow
+        type: boolean
+        default: false
   workflow_call:
+    inputs:
+      fail_optional_windows:
+        type: boolean
+        default: false
   push:
     branches: [main, 'feat/go-cabi-*', 'feat/go-bindings-*']
     paths: ['crates/**', 'sdk/go/**', 'scripts/check_go_*', 'docs/go-coverage/**', 'Cargo.*', 'rust-toolchain.toml', '.github/workflows/go-bindings.yml']
@@ -15,38 +24,126 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            optional: false
+          - os: macos-latest
+            optional: false
+          - os: windows-latest
+            optional: true
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v5
+        id: checkout
+        continue-on-error: ${{ matrix.optional }}
         with:
           fetch-depth: 0
       - uses: actions/setup-go@v6
+        id: setup_go
+        continue-on-error: ${{ matrix.optional }}
         with:
           go-version: '1.27.1'
           cache: false
       - name: Install pinned Rust toolchain
+        id: rust_toolchain
+        continue-on-error: ${{ matrix.optional }}
         run: rustup toolchain install
       - uses: Swatinem/rust-cache@v2
+        id: rust_cache
+        continue-on-error: ${{ matrix.optional }}
       - name: Check native formatting and lints
+        if: runner.os != 'Windows'
         run: |
           cargo fmt -p libitofin-ffi -- --check
           cargo clippy -p libitofin-ffi --all-targets -- -D warnings
       - name: Check generated header
+        if: runner.os != 'Windows'
         run: |
           cargo install cbindgen --version 0.29.2 --locked
           cbindgen --config crates/libitofin-ffi/cbindgen.toml --crate libitofin-ffi --output crates/libitofin-ffi/include/itofin.h
           git diff --exit-code -- crates/libitofin-ffi/include/itofin.h
       - name: Check Go formatting
+        if: runner.os != 'Windows'
         run: test -z "$(gofmt -l sdk/go)"
+      - name: Probe Windows compiler and shell tools
+        id: windows_tools
+        if: runner.os == 'Windows'
+        continue-on-error: ${{ matrix.optional }}
+        run: |
+          rustc -vV
+          rustup target list --installed
+          go env GOOS GOARCH CGO_ENABLED CC
+          git config --show-origin --get core.autocrlf || true
+          for tool in gcc cc c++ shasum python3 /usr/bin/time; do
+            if command -v "$tool"; then
+              if [[ "$tool" == gcc ]]; then gcc -dumpmachine; fi
+            else
+              printf 'Missing tool: %s\n' "$tool"
+            fi
+          done
+      - name: Put native DLL on Windows PATH
+        id: windows_path
+        if: runner.os == 'Windows'
+        continue-on-error: ${{ matrix.optional }}
+        run: echo "$GITHUB_WORKSPACE/target/release" >> "$GITHUB_PATH"
+      - name: Build Windows native import library
+        id: windows_native
+        if: runner.os == 'Windows'
+        continue-on-error: ${{ matrix.optional }}
+        run: cargo build -p libitofin-ffi --release
+      - name: Inspect Windows native artifacts
+        id: windows_artifacts
+        if: runner.os == 'Windows'
+        continue-on-error: ${{ matrix.optional }}
+        run: |
+          find target/release -maxdepth 1 -iname '*itofin_ffi*' -print
+          find target/release -maxdepth 1 \( -name '*.dll.a' -o -name '*.dll.lib' \) -print
       - name: Test native and Go bindings
+        id: bindings_test
+        continue-on-error: ${{ matrix.optional }}
         run: bash scripts/check_go_bindings.sh
+      - name: Probe Windows cgo race detector
+        id: windows_race
+        if: runner.os == 'Windows'
+        continue-on-error: ${{ matrix.optional }}
+        working-directory: sdk/go
+        run: go test -race -run '^$' ./...
+      - name: Force optional Windows failure
+        id: windows_forced_failure
+        if: ${{ runner.os == 'Windows' && inputs.fail_optional_windows }}
+        continue-on-error: ${{ matrix.optional }}
+        run: exit 1
       - uses: actions/setup-python@v5
+        if: runner.os != 'Windows'
         with:
           python-version: '3.13'
       - name: Verify clean and incremental Python/C ABI build orders
+        if: runner.os != 'Windows'
         run: |
           python -m venv .venv
           . .venv/bin/activate
           pip install 'maturin>=1.5,<2' numpy pytest
           bash scripts/check_go_mixed_builds.sh
+      - name: Report optional Windows outcome
+        if: ${{ always() && runner.os == 'Windows' }}
+        continue-on-error: ${{ matrix.optional }}
+        run: |
+          {
+            echo '### Optional Windows Go/C ABI feasibility'
+            echo '| Step | Outcome |'
+            echo '| --- | --- |'
+            echo '| Checkout | ${{ steps.checkout.outcome }} |'
+            echo '| Go setup | ${{ steps.setup_go.outcome }} |'
+            echo '| Rust toolchain | ${{ steps.rust_toolchain.outcome }} |'
+            echo '| Rust cache | ${{ steps.rust_cache.outcome }} |'
+            echo '| Compiler and shell tools | ${{ steps.windows_tools.outcome }} |'
+            echo '| DLL PATH | ${{ steps.windows_path.outcome }} |'
+            echo '| Native build | ${{ steps.windows_native.outcome }} |'
+            echo '| Native artifacts | ${{ steps.windows_artifacts.outcome }} |'
+            echo '| Go/C ABI gate | ${{ steps.bindings_test.outcome }} |'
+            echo '| cgo race detector | ${{ steps.windows_race.outcome }} |'
+            echo '| Deliberate failure | ${{ steps.windows_forced_failure.outcome }} |'
+          } >> "$GITHUB_STEP_SUMMARY"
