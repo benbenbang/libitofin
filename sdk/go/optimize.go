@@ -17,6 +17,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"runtime/cgo"
 	"unsafe"
 )
@@ -87,6 +88,19 @@ type OptimizeBounds struct{ Lower, Upper []float64 }
 
 func (BFGS) optimizeMethod() {}
 
+// LBFGSB configures the box-constrained gradient solver. Each Bounds pair is
+// [lower, upper]; math.Inf(-1) and math.Inf(1) leave the respective side open.
+// A nil Bounds slice leaves every coordinate unbounded.
+type LBFGSB struct {
+	Bounds          [][2]float64
+	Gradient        func(x, out []float64) error
+	MaxCor          int
+	FTol, GTol, Eps float64
+	MaxIter, MaxFev int
+}
+
+func (LBFGSB) optimizeMethod() {}
+
 // ErrInvalidArgument marks a method option that cannot be accepted.
 var ErrInvalidArgument = errors.New("itofin: invalid optimizer argument")
 
@@ -118,7 +132,9 @@ func Minimize(ctx context.Context, fn func(x []float64) (float64, error), x0 []f
 	}
 	var nm NelderMeadOptions
 	var bfgs BFGS
+	var lbfgsb LBFGSB
 	isBFGS := false
+	isLBFGSB := false
 	switch selected := method.(type) {
 	case NelderMeadOptions:
 		nm = selected
@@ -136,6 +152,15 @@ func Minimize(ctx context.Context, fn func(x []float64) (float64, error), x0 []f
 		}
 		isBFGS = true
 		bfgs = *selected
+	case LBFGSB:
+		isLBFGSB = true
+		lbfgsb = selected
+	case *LBFGSB:
+		if selected == nil {
+			return OptimizeResult{}, fmt.Errorf("%w: nil method", ErrInvalidArgument)
+		}
+		isLBFGSB = true
+		lbfgsb = *selected
 	default:
 		return OptimizeResult{}, fmt.Errorf("%w: unknown method", ErrInvalidArgument)
 	}
@@ -143,13 +168,31 @@ func Minimize(ctx context.Context, fn func(x []float64) (float64, error), x0 []f
 		if bfgs.Bounds != nil || bfgs.MaxIter < 0 || bfgs.GTol < 0 || bfgs.Eps < 0 {
 			return OptimizeResult{}, fmt.Errorf("%w: unsupported bounds or invalid BFGS option", ErrInvalidArgument)
 		}
+	} else if isLBFGSB {
+		if lbfgsb.MaxCor < 0 || lbfgsb.MaxIter < 0 || lbfgsb.MaxFev < 0 ||
+			!validNonnegative(lbfgsb.FTol) || !validNonnegative(lbfgsb.GTol) || !validNonnegative(lbfgsb.Eps) {
+			return OptimizeResult{}, fmt.Errorf("%w: invalid L-BFGS-B option", ErrInvalidArgument)
+		}
+		if lbfgsb.Bounds != nil && len(lbfgsb.Bounds) != len(x0) {
+			return OptimizeResult{}, fmt.Errorf("%w: bounds length must match x0", ErrInvalidArgument)
+		}
+		for _, pair := range lbfgsb.Bounds {
+			if math.IsNaN(pair[0]) || math.IsNaN(pair[1]) || pair[0] > pair[1] ||
+				math.IsInf(pair[0], 1) || math.IsInf(pair[1], -1) {
+				return OptimizeResult{}, fmt.Errorf("%w: invalid L-BFGS-B bounds", ErrInvalidArgument)
+			}
+		}
 	} else if nm.MaxIter < 0 || nm.MaxFev < 0 {
 		return OptimizeResult{}, fmt.Errorf("%w: negative budget", ErrInvalidArgument)
 	}
 	if err := ctx.Err(); err != nil {
 		return OptimizeResult{}, err
 	}
-	state := &optimizeState{ctx: ctx, fn: fn, gradient: bfgs.Gradient}
+	gradient := bfgs.Gradient
+	if isLBFGSB {
+		gradient = lbfgsb.Gradient
+	}
+	state := &optimizeState{ctx: ctx, fn: fn, gradient: gradient}
 	objective := C.ItofinObjective{
 		userdata: C.size_t(cgo.NewHandle(state)),
 		value:    (C.goOptimizeValueFn)(C.goOptimizeValue),
@@ -157,7 +200,7 @@ func Minimize(ctx context.Context, fn func(x []float64) (float64, error), x0 []f
 		callback: (C.goOptimizeCallbackFn)(C.goOptimizeCallback),
 		release:  (C.goOptimizeDrop)(C.goOptimizeRelease),
 	}
-	if bfgs.Gradient != nil {
+	if gradient != nil {
 		objective.gradient = (C.goOptimizeGradientFn)(C.goOptimizeGradient)
 	}
 	x := make([]float64, len(x0))
@@ -175,6 +218,22 @@ func Minimize(ctx context.Context, fn func(x []float64) (float64, error), x0 []f
 		}
 		options := C.ItofinBfgsOptions{gtol: C.double(bfgs.GTol), eps: C.double(bfgs.Eps), finite_difference: fd, maxiter: C.size_t(bfgs.MaxIter)}
 		status = C.itofin_optimize_bfgs(&objective, (*C.double)(unsafe.Pointer(unsafe.SliceData(x0))), C.size_t(len(x0)), &options, &out, &e)
+	} else if isLBFGSB {
+		options := C.ItofinLbfgsbOptions{maxcor: C.size_t(lbfgsb.MaxCor), ftol: C.double(lbfgsb.FTol),
+			gtol: C.double(lbfgsb.GTol), eps: C.double(lbfgsb.Eps), maxiter: C.size_t(lbfgsb.MaxIter), maxfev: C.size_t(lbfgsb.MaxFev)}
+		var lower, upper []float64
+		if lbfgsb.Bounds != nil {
+			lower = make([]float64, len(lbfgsb.Bounds))
+			upper = make([]float64, len(lbfgsb.Bounds))
+			for i, pair := range lbfgsb.Bounds {
+				lower[i], upper[i] = pair[0], pair[1]
+			}
+		}
+		status = C.itofin_optimize_lbfgsb(&objective,
+			(*C.double)(unsafe.Pointer(unsafe.SliceData(x0))), C.size_t(len(x0)),
+			(*C.double)(unsafe.Pointer(unsafe.SliceData(lower))), C.size_t(len(lower)),
+			(*C.double)(unsafe.Pointer(unsafe.SliceData(upper))), C.size_t(len(upper)),
+			&options, &out, &e)
 	} else {
 		options := C.ItofinOptimizeOptions{maxiter: C.size_t(nm.MaxIter), maxfev: C.size_t(nm.MaxFev),
 			xatol: C.double(nm.XAtol), fatol: C.double(nm.FAtol), adaptive: C.bool(nm.Adaptive)}
@@ -198,6 +257,10 @@ func Minimize(ctx context.Context, fn func(x []float64) (float64, error), x0 []f
 		return result, ctx.Err()
 	}
 	return result, nil
+}
+
+func validNonnegative(value float64) bool {
+	return !math.IsNaN(value) && !math.IsInf(value, 0) && value >= 0
 }
 
 //export goOptimizeGradient

@@ -87,6 +87,45 @@ func TestMinimizeBFGSGradientAndInvalidBounds(t *testing.T) {
 	}
 }
 
+func TestMinimizeLBFGSBBoundsAndErrors(t *testing.T) {
+	fn := func(x []float64) (float64, error) {
+		return math.Pow(x[0]-3, 2) + math.Pow(x[1]+2, 2), nil
+	}
+	method := LBFGSB{Bounds: [][2]float64{{0, 1}, {math.Inf(-1), math.Inf(1)}}}
+	result, err := Minimize(context.Background(), fn, []float64{0, 0}, method)
+	ratesOK(t, err)
+	if !result.Success || math.Abs(result.X[0]-1) > 1e-8 || math.Abs(result.X[1]+2) > 1e-4 {
+		t.Fatalf("bounded result: %+v", result)
+	}
+	result, err = Minimize(context.Background(), fn, []float64{0, 0}, &method)
+	ratesOK(t, err)
+	if !result.Success || math.Abs(result.X[0]-1) > 1e-8 {
+		t.Fatalf("pointer method: %+v", result)
+	}
+	invalid := []LBFGSB{
+		{Bounds: make([][2]float64, 1)},
+		{Bounds: [][2]float64{{2, 1}, {0, 1}}},
+		{Bounds: [][2]float64{{math.NaN(), 1}, {0, 1}}},
+		{MaxCor: -1},
+		{GTol: math.Inf(1)},
+	}
+	for _, method := range invalid {
+		if _, err := Minimize(context.Background(), fn, []float64{0, 0}, method); !errors.Is(err, ErrInvalidArgument) {
+			t.Fatalf("invalid %+v: %v", method, err)
+		}
+	}
+	if _, err := Minimize(context.Background(), fn, []float64{0, 0}, (*LBFGSB)(nil)); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("nil L-BFGS-B: %v", err)
+	}
+	sentinel := errors.New("gradient failed")
+	_, err = Minimize(context.Background(), fn, []float64{0, 0}, LBFGSB{
+		Gradient: func([]float64, []float64) error { return sentinel },
+	})
+	if err != sentinel {
+		t.Fatalf("gradient identity: %v", err)
+	}
+}
+
 func TestMinimizeObjectiveCallsSessionPricing(t *testing.T) {
 	s, e := NewSession()
 	ratesOK(t, e)
