@@ -185,6 +185,45 @@ impl BfgsOptions {
     }
 }
 
+/// Limited-memory BFGS with box constraints.
+///
+/// An unset `ftol` uses `1e-9`; an unset `gtol` uses `1e-5`. The gradient
+/// tolerance applies to the infinity norm of the projected gradient.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct LbfgsbOptions {
+    /// Relative decrease tolerance on the objective.
+    pub ftol: Option<f64>,
+    /// Infinity-norm tolerance on the projected gradient.
+    pub gtol: Option<f64>,
+    /// Maximum stored correction pairs, `10` when unset.
+    pub maxcor: Option<usize>,
+    /// Absolute finite-difference step, if no analytic gradient is supplied.
+    pub eps: Option<f64>,
+    /// Finite-difference scheme used when no analytic gradient is supplied.
+    pub finite_difference: FiniteDifference,
+}
+
+impl LbfgsbOptions {
+    fn validate(&self) -> Result<(), InvalidInput> {
+        for (option, value) in [("ftol", self.ftol), ("gtol", self.gtol)] {
+            if let Some(value) = value
+                && (!value.is_finite() || value < 0.0)
+            {
+                return Err(InvalidInput::NotFiniteNonnegative { option });
+            }
+        }
+        if self.maxcor == Some(0) {
+            return Err(InvalidInput::NotPositive { option: "maxcor" });
+        }
+        if let Some(eps) = self.eps
+            && (!eps.is_finite() || eps <= 0.0)
+        {
+            return Err(InvalidInput::NotFinitePositive { option: "eps" });
+        }
+        Ok(())
+    }
+}
+
 /// SLSQP options.
 ///
 /// An unset `ftol` falls back to [`Common::tol`] and then to `1e-6`. The
@@ -215,6 +254,8 @@ pub enum Method {
     NelderMead(NelderMeadOptions),
     /// The quasi-Newton method of Broyden, Fletcher, Goldfarb and Shanno.
     Bfgs(BfgsOptions),
+    /// Limited-memory BFGS with a projected path and box-constrained subspace.
+    Lbfgsb(LbfgsbOptions),
     /// Sequential least-squares quadratic programming, which honours box
     /// bounds and general constraints.
     Slsqp(SlsqpOptions),
@@ -226,6 +267,7 @@ impl Method {
         match self {
             Method::NelderMead(_) => "Nelder-Mead",
             Method::Bfgs(_) => "BFGS",
+            Method::Lbfgsb(_) => "L-BFGS-B",
             Method::Slsqp(_) => "SLSQP",
         }
     }
@@ -234,7 +276,7 @@ impl Method {
     pub fn supports_bounds(&self) -> bool {
         match self {
             Method::NelderMead(_) | Method::Bfgs(_) => false,
-            Method::Slsqp(_) => true,
+            Method::Lbfgsb(_) | Method::Slsqp(_) => true,
         }
     }
 
@@ -253,6 +295,7 @@ impl Method {
         match self {
             Method::NelderMead(options) => options.validate(problem.x0.len()),
             Method::Bfgs(options) => options.validate(),
+            Method::Lbfgsb(options) => options.validate(),
             Method::Slsqp(options) => options.validate(),
         }
     }
