@@ -33,6 +33,10 @@ typedef double ItofinReal;
 
 #define ITOFIN_POISONED 6
 
+#define ITOFIN_CONSTRAINT_EQ 0
+
+#define ITOFIN_CONSTRAINT_INEQ 1
+
 /**
  * Opaque thread-confined owner of live native objects. Never copy this value.
  */
@@ -809,6 +813,35 @@ typedef struct ItofinLbfgsbOptions {
   size_t maxfev;
 } ItofinLbfgsbOptions;
 
+/**
+ * One vector constraint with `dimension` scalar components. `kind` is 0 for
+ * equality (`c(x) = 0`) or 1 for inequality (`c(x) >= 0`). `fun` fills
+ * `dimension` values. Optional `jac` fills a row-major `dimension * n`
+ * Jacobian. A nonzero callback return propagates its `ItofinError` message.
+ * Borrowed input and output buffers are valid only during the callback.
+ * Each supplied descriptor independently owns its `release` callback. It
+ * runs exactly once after the descriptor array is accepted, including for
+ * rejected descriptors and callback errors.
+ * Callbacks must not unwind.
+ */
+typedef struct ItofinConstraint {
+  int32_t kind;
+  size_t dimension;
+  size_t userdata;
+  int32_t (*fun)(size_t, const double*, size_t, double*, size_t, struct ItofinError*);
+  int32_t (*jac)(size_t, const double*, size_t, double*, size_t, struct ItofinError*);
+  void (*release)(size_t);
+} ItofinConstraint;
+
+/**
+ * SLSQP options. Zero fields select solver defaults.
+ */
+typedef struct ItofinSlsqpOptions {
+  double ftol;
+  size_t maxiter;
+  size_t maxfev;
+} ItofinSlsqpOptions;
+
 typedef struct ItofinOvernightFutureConfig {
   uint64_t index;
   int32_t value_date;
@@ -1119,6 +1152,8 @@ typedef struct ItofinVolGridConfig {
 #define ITOFIN_OPTIMIZE_NONFINITE 6
 
 #define ITOFIN_OPTIMIZE_LINE_SEARCH_FAILED 7
+
+#define ITOFIN_OPTIMIZE_INFEASIBLE 8
 
 #ifdef __cplusplus
 extern "C" {
@@ -4088,6 +4123,29 @@ int32_t itofin_optimize_lbfgsb(const struct ItofinObjective *objective,
                                const struct ItofinLbfgsbOptions *options,
                                struct ItofinOptimizeResult *out_result,
                                struct ItofinError *error);
+
+/**
+ * Minimize with SLSQP and optional box and vector constraints. Bounds use
+ * the same open-side sentinels and length contract as L-BFGS-B. Each
+ * constraint vector is flattened in descriptor order, then component order.
+ * Constraint callbacks do not contribute to `nfev` or `njev`.
+ * # Safety
+ * Pointers satisfy the `itofin_optimize_lbfgsb` contract. `constraints`
+ * points to `constraint_count` readable descriptors when the count is nonzero.
+ * Every descriptor's callbacks and userdata remain valid until release.
+ */
+int32_t itofin_optimize_slsqp(const struct ItofinObjective *objective,
+                              const double *x0,
+                              size_t n,
+                              const double *lower,
+                              size_t lower_len,
+                              const double *upper,
+                              size_t upper_len,
+                              const struct ItofinConstraint *constraints,
+                              size_t constraint_count,
+                              const struct ItofinSlsqpOptions *options,
+                              struct ItofinOptimizeResult *out_result,
+                              struct ItofinError *error);
 
 /**
  * `american`: 0 European, 1 American; earliest ignored for European exercise.

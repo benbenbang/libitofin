@@ -4,8 +4,9 @@
 //! point, including context APIs, while the solver runs.
 use crate::boundary::*;
 use itofin_optimize::{
-    BfgsOptions, Bounds, Common, Converged, FiniteDifference, Flow, IterationState, LbfgsbOptions,
-    Method, MinimizeError, NelderMeadOptions, Objective, Problem, Termination, minimize,
+    BfgsOptions, Bounds, Common, ConstraintKind, Converged, FiniteDifference, Flow, IterationState,
+    LbfgsbOptions, Method, MinimizeError, NelderMeadOptions, Objective, Problem, SlsqpOptions,
+    Termination, minimize,
 };
 use std::ffi::c_char;
 use std::fmt;
@@ -21,6 +22,9 @@ pub const ITOFIN_OPTIMIZE_MAX_EVALUATIONS: ItofinOptimizeStatus = 4;
 pub const ITOFIN_OPTIMIZE_CANCELLED: ItofinOptimizeStatus = 5;
 pub const ITOFIN_OPTIMIZE_NONFINITE: ItofinOptimizeStatus = 6;
 pub const ITOFIN_OPTIMIZE_LINE_SEARCH_FAILED: ItofinOptimizeStatus = 7;
+pub const ITOFIN_OPTIMIZE_INFEASIBLE: ItofinOptimizeStatus = 8;
+pub const ITOFIN_CONSTRAINT_EQ: i32 = 0;
+pub const ITOFIN_CONSTRAINT_INEQ: i32 = 1;
 
 /// Borrowed solver state, valid only during an iteration callback.
 #[repr(C)]
@@ -114,6 +118,39 @@ pub struct ItofinLbfgsbOptions {
     pub maxfev: usize,
 }
 
+/// SLSQP options. Zero fields select solver defaults.
+#[derive(Clone, Copy, Default)]
+#[repr(C)]
+pub struct ItofinSlsqpOptions {
+    pub ftol: f64,
+    pub maxiter: usize,
+    pub maxfev: usize,
+}
+
+/// One vector constraint with `dimension` scalar components. `kind` is 0 for
+/// equality (`c(x) = 0`) or 1 for inequality (`c(x) >= 0`). `fun` fills
+/// `dimension` values. Optional `jac` fills a row-major `dimension * n`
+/// Jacobian. A nonzero callback return propagates its `ItofinError` message.
+/// Borrowed input and output buffers are valid only during the callback.
+/// Each supplied descriptor independently owns its `release` callback. It
+/// runs exactly once after the descriptor array is accepted, including for
+/// rejected descriptors and callback errors.
+/// Callbacks must not unwind.
+#[derive(Clone, Copy)]
+#[repr(C)]
+pub struct ItofinConstraint {
+    pub kind: i32,
+    pub dimension: usize,
+    pub userdata: usize,
+    pub fun: Option<
+        unsafe extern "C" fn(usize, *const f64, usize, *mut f64, usize, *mut ItofinError) -> i32,
+    >,
+    pub jac: Option<
+        unsafe extern "C" fn(usize, *const f64, usize, *mut f64, usize, *mut ItofinError) -> i32,
+    >,
+    pub release: Option<unsafe extern "C" fn(usize)>,
+}
+
 /// Run outcome. The caller sets `x` to a writable buffer of `n` values before
 /// the call; every other field is written by it.
 #[repr(C)]
@@ -139,6 +176,108 @@ impl fmt::Display for CallbackError {
 impl std::error::Error for CallbackError {}
 
 struct Released(ItofinObjective);
+
+struct ReleasedConstraints(Vec<ItofinConstraint>);
+
+impl Drop for ReleasedConstraints {
+    fn drop(&mut self) {
+        for constraint in &self.0 {
+            if let Some(release) = constraint.release {
+                unsafe { release(constraint.userdata) }
+            }
+        }
+    }
+}
+
+struct ConstrainedObjective {
+    base: Released,
+    constraints: ReleasedConstraints,
+    components: Vec<(usize, usize)>,
+}
+
+impl Objective for ConstrainedObjective {
+    type Error = CallbackError;
+
+    fn value(&mut self, x: &[f64]) -> Result<f64, Self::Error> {
+        self.base.value(x)
+    }
+
+    fn gradient(&mut self, x: &[f64], out: &mut [f64]) -> Result<bool, Self::Error> {
+        self.base.gradient(x, out)
+    }
+
+    fn callback(&mut self, state: &IterationState<'_>) -> Result<Flow, Self::Error> {
+        self.base.callback(state)
+    }
+
+    fn constraint_count(&self) -> usize {
+        self.components.len()
+    }
+
+    fn constraint_kind(&self, i: usize) -> ConstraintKind {
+        match self.constraints.0[self.components[i].0].kind {
+            ITOFIN_CONSTRAINT_EQ => ConstraintKind::Eq,
+            ITOFIN_CONSTRAINT_INEQ => ConstraintKind::Ineq,
+            _ => unreachable!("constraint kind validated before minimizing"),
+        }
+    }
+
+    fn constraint(&mut self, i: usize, x: &[f64]) -> Result<f64, Self::Error> {
+        let (descriptor, component) = self.components[i];
+        let constraint = &self.constraints.0[descriptor];
+        let mut values = vec![f64::NAN; constraint.dimension];
+        let mut error = blank();
+        let fun = constraint
+            .fun
+            .expect("constraint callback validated before minimizing");
+        let code = unsafe {
+            fun(
+                constraint.userdata,
+                x.as_ptr(),
+                x.len(),
+                values.as_mut_ptr(),
+                values.len(),
+                &mut error,
+            )
+        };
+        if code == 0 {
+            Ok(values[component])
+        } else {
+            Err(CallbackError(message(&error)))
+        }
+    }
+
+    fn constraint_jacobian(
+        &mut self,
+        i: usize,
+        x: &[f64],
+        out: &mut [f64],
+    ) -> Result<bool, Self::Error> {
+        let (descriptor, component) = self.components[i];
+        let constraint = &self.constraints.0[descriptor];
+        let Some(jac) = constraint.jac else {
+            return Ok(false);
+        };
+        let len = constraint.dimension * x.len();
+        let mut rows = vec![f64::NAN; len];
+        let mut error = blank();
+        let code = unsafe {
+            jac(
+                constraint.userdata,
+                x.as_ptr(),
+                x.len(),
+                rows.as_mut_ptr(),
+                rows.len(),
+                &mut error,
+            )
+        };
+        if code != 0 {
+            return Err(CallbackError(message(&error)));
+        }
+        out.copy_from_slice(&rows[component * x.len()..(component + 1) * x.len()]);
+        Ok(true)
+    }
+}
 
 impl Drop for Released {
     fn drop(&mut self) {
@@ -232,6 +371,7 @@ fn status(termination: Termination) -> BindingResult<ItofinOptimizeStatus> {
         Termination::Cancelled => ITOFIN_OPTIMIZE_CANCELLED,
         Termination::Nonfinite => ITOFIN_OPTIMIZE_NONFINITE,
         Termination::LineSearchFailed => ITOFIN_OPTIMIZE_LINE_SEARCH_FAILED,
+        Termination::Infeasible => ITOFIN_OPTIMIZE_INFEASIBLE,
         other => {
             return Err(BindingError {
                 code: CORE_ERROR,
@@ -442,6 +582,137 @@ pub unsafe extern "C" fn itofin_optimize_lbfgsb(
                 gtol: nonzero(options.gtol),
                 eps: nonzero(options.eps),
                 ..LbfgsbOptions::default()
+            });
+            let common = Common {
+                maxiter: nonzero(options.maxiter),
+                maxfev: nonzero(options.maxfev),
+                ..Common::default()
+            };
+            let run =
+                minimize(&mut objective, &problem, &method, &common).map_err(|e| match e {
+                    MinimizeError::InvalidInput(e) => BindingError::invalid(e.to_string()),
+                    MinimizeError::Objective(e) => BindingError {
+                        code: CORE_ERROR,
+                        message: e.0,
+                    },
+                })?;
+            let result = &mut *out_result;
+            std::slice::from_raw_parts_mut(result.x, n).copy_from_slice(&run.x);
+            result.fun = run.fun;
+            result.nit = run.nit;
+            result.nfev = run.nfev;
+            result.njev = run.njev;
+            result.status = status(run.status)?;
+            result.success = run.success;
+            Ok(())
+        })
+    }
+}
+
+/// Minimize with SLSQP and optional box and vector constraints. Bounds use
+/// the same open-side sentinels and length contract as L-BFGS-B. Each
+/// constraint vector is flattened in descriptor order, then component order.
+/// Constraint callbacks do not contribute to `nfev` or `njev`.
+/// # Safety
+/// Pointers satisfy the `itofin_optimize_lbfgsb` contract. `constraints`
+/// points to `constraint_count` readable descriptors when the count is nonzero.
+/// Every descriptor's callbacks and userdata remain valid until release.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn itofin_optimize_slsqp(
+    objective: *const ItofinObjective,
+    x0: *const f64,
+    n: usize,
+    lower: *const f64,
+    lower_len: usize,
+    upper: *const f64,
+    upper_len: usize,
+    constraints: *const ItofinConstraint,
+    constraint_count: usize,
+    options: *const ItofinSlsqpOptions,
+    out_result: *mut ItofinOptimizeResult,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        without_context(error, || {
+            check_ptr(objective)?;
+            let base = Released(*objective);
+            if constraint_count > isize::MAX as usize / std::mem::size_of::<ItofinConstraint>() {
+                return Err(BindingError::invalid(
+                    "constraint count exceeds address space",
+                ));
+            }
+            if constraint_count > 0 {
+                check_ptr(constraints)?;
+            }
+            let descriptors = if constraint_count == 0 {
+                Vec::new()
+            } else {
+                input_slice(constraints, constraint_count)?.to_vec()
+            };
+            let constraints = ReleasedConstraints(descriptors);
+            if base.0.value.is_none() {
+                return Err(BindingError::invalid("objective value must not be null"));
+            }
+            check_ptr(options)?;
+            check_ptr(out_result)?;
+            let options = *options;
+            let bounds = if lower.is_null() && upper.is_null() && lower_len == 0 && upper_len == 0 {
+                None
+            } else {
+                if lower_len != n || upper_len != n {
+                    return Err(BindingError::invalid("bounds length must match x0"));
+                }
+                Some(Bounds {
+                    lower: input_slice(lower, lower_len)?.to_vec(),
+                    upper: input_slice(upper, upper_len)?.to_vec(),
+                })
+            };
+            let problem = Problem {
+                x0: input_slice(x0, n)?.to_vec(),
+                bounds,
+            };
+            if n > 0 {
+                check_ptr((*out_result).x)?;
+            }
+            let mut components = Vec::new();
+            for (index, descriptor) in constraints.0.iter().enumerate() {
+                if descriptor.kind != ITOFIN_CONSTRAINT_EQ
+                    && descriptor.kind != ITOFIN_CONSTRAINT_INEQ
+                {
+                    return Err(BindingError::invalid("invalid constraint kind"));
+                }
+                if descriptor.dimension == 0 {
+                    return Err(BindingError::invalid(
+                        "constraint dimension must be positive",
+                    ));
+                }
+                if descriptor.fun.is_none() {
+                    return Err(BindingError::invalid("constraint fun must not be null"));
+                }
+                let max_values = isize::MAX as usize / std::mem::size_of::<f64>();
+                let max_components = isize::MAX as usize / std::mem::size_of::<(usize, usize)>();
+                let matrix_len = descriptor.dimension.checked_mul(n);
+                let total_components = components.len().checked_add(descriptor.dimension);
+                if descriptor.dimension > max_values
+                    || matrix_len.is_none_or(|len| len > max_values)
+                    || total_components.is_none_or(|len| len > max_components)
+                {
+                    return Err(BindingError::invalid(
+                        "constraint shape overflows address space",
+                    ));
+                }
+                components
+                    .try_reserve(descriptor.dimension)
+                    .map_err(|_| BindingError::invalid("constraint shape cannot be allocated"))?;
+                components.extend((0..descriptor.dimension).map(|component| (index, component)));
+            }
+            let mut objective = ConstrainedObjective {
+                base,
+                constraints,
+                components,
+            };
+            let method = Method::Slsqp(SlsqpOptions {
+                ftol: nonzero(options.ftol),
             });
             let common = Common {
                 maxiter: nonzero(options.maxiter),
