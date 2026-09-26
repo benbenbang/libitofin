@@ -42,8 +42,7 @@ class Status:
     Why a minimize run stopped.
 
     The integer values are fixed and append-only, matching the C
-    ItofinOptimizeStatus and the Go OptimizeStatus: 8 is reserved for
-    a constrained solver.
+    ItofinOptimizeStatus and the Go OptimizeStatus.
     """
     ConvergedXTol: typing.ClassVar[Status]
     ConvergedFTol: typing.ClassVar[Status]
@@ -53,32 +52,38 @@ class Status:
     Cancelled: typing.ClassVar[Status]
     Nonfinite: typing.ClassVar[Status]
     LineSearchFailed: typing.ClassVar[Status]
+    Infeasible: typing.ClassVar[Status]
     def __new__(cls, _unconstructible: typing.NoReturn) -> Status: ...
     def __int__(self) -> builtins.int: ...
     __hash__: typing.ClassVar[None]  # type: ignore[assignment]
 
-def minimize(fun: typing.Callable[[numpy.typing.NDArray[numpy.float64]], float], x0: typing.Sequence[builtins.float], method: builtins.str = 'Nelder-Mead', options: typing.Optional[dict] = None, callback: typing.Optional[typing.Callable[[numpy.typing.NDArray[numpy.float64]], object]] = None, jac: typing.Optional[typing.Callable[[numpy.typing.NDArray[numpy.float64]], typing.Sequence[float]]] = None, bounds: typing.Optional[typing.Sequence[tuple[typing.Optional[float], typing.Optional[float]]]] = None) -> OptimizeResult:
+def minimize(fun: typing.Callable[[numpy.typing.NDArray[numpy.float64]], float], x0: typing.Sequence[builtins.float], method: builtins.str = 'Nelder-Mead', options: typing.Optional[dict] = None, callback: typing.Optional[typing.Callable[[numpy.typing.NDArray[numpy.float64]], object]] = None, jac: typing.Optional[typing.Callable[[numpy.typing.NDArray[numpy.float64]], typing.Sequence[float]]] = None, bounds: typing.Optional[typing.Sequence[tuple[typing.Optional[float], typing.Optional[float]]]] = None, constraints: typing.Optional[typing.Sequence[dict[str, object]]] = None) -> OptimizeResult:
     r"""
     Minimize a scalar function of one or more variables.
 
     Args:
         fun (Callable): Called as fun(x) with a float64 array; returns a float.
         x0 (Sequence[float]): The starting point.
-        method (str): "Nelder-Mead", "BFGS", or "L-BFGS-B" (any case).
+        method (str): "Nelder-Mead", "BFGS", "L-BFGS-B", or "SLSQP" (any case).
         options (dict | None): Nelder-Mead accepts maxiter, maxfev, xatol,
             fatol and adaptive. BFGS accepts maxiter, gtol and eps. L-BFGS-B
-            accepts maxiter, maxfev, maxcor, ftol, gtol and eps.
+            accepts maxiter, maxfev, maxcor, ftol, gtol and eps. SLSQP accepts
+            maxiter, maxfev and ftol.
         callback (Callable | None): Called as callback(xk) after every
             iteration. Raising StopIteration stops the run with
             Status.Cancelled.
-        jac (Callable | None): BFGS or L-BFGS-B analytic gradient, called as jac(x).
-        bounds: L-BFGS-B pairs of (lower, upper), with None for an open side.
-            Other methods reject bounds.
+        jac (Callable | None): Analytic objective gradient for BFGS, L-BFGS-B
+            or SLSQP, called as jac(x).
+        bounds: L-BFGS-B or SLSQP pairs of (lower, upper), with None for an
+            open side. Other methods reject bounds.
+        constraints (Sequence[dict] | None): SLSQP constraints with type "eq"
+            (fun(x) == 0) or "ineq" (fun(x) >= 0), fun(x) returning a scalar
+            or vector, and optional jac(x) returning a gradient or 2-D rows.
 
     Returns:
         OptimizeResult: The best point found and why the run stopped.
 
     Raises:
         ItofinError: On an unknown method or option, or a rejected input.
-        Exception: Whatever fun, jac or callback raised, re-raised unchanged.
+        Exception: Whatever fun, jac, a constraint or callback raised, re-raised unchanged.
     """
