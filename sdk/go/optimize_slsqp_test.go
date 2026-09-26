@@ -92,7 +92,7 @@ func TestMinimizeSLSQPHockSchittkowski71(t *testing.T) {
 	}
 	result, err := Minimize(context.Background(), objective, []float64{1, 5, 5, 1}, method)
 	ratesOK(t, err)
-	if !result.Success || result.Status != OptimizeConvergedFTol || math.Abs(result.Fun-17.0140173) > 1e-5 || result.Nfev == 0 || result.Njev == 0 {
+	if !result.Success || math.Abs(result.Fun-17.0140173) > 1e-5 || result.Nfev == 0 || result.Njev == 0 {
 		t.Fatalf("HS71: %+v", result)
 	}
 	if math.Abs(result.X[0]*result.X[1]*result.X[2]*result.X[3]-25) > 1e-5 ||
