@@ -280,4 +280,6 @@ oversight) and is documented at the point of divergence in the source.
   (`svd.cpp:528`) and the default `CostFunction::gradient` / `jacobian` have no
   `QL_REQUIRE`; a wrongly-sized output leaves stale entries the optimiser reads
   as real derivatives. These are caller errors, not market-data errors, so the
-  port asserts rather than returning `Err`.
+  port asserts rather than returning `Err`. If a Rust panic occurs within a C
+  entry point, the boundary returns `PANIC` (5); a context involved in the call
+  is invalidated, later calls return `POISONED` (6), and it can still be destroyed.
