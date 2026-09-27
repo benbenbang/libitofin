@@ -264,8 +264,10 @@ oversight) and is documented at the point of divergence in the source.
   (`discrete.rs`), Black-Scholes process arguments (`blackscholesprocess.rs`),
   and the volatility and variance an implementation returns
   (`termstructures/volatility/`). Each site names the C++ guard it extends, or
-  states that none exists. The only behavioural change is for infinities; every
-  finite input QuantLib accepts is still accepted, so no priced number moves.
+  states that none exists. This also rejects NaN where C++ has no guard (such
+  as solver callback values and quadrature samples), and a finite negative
+  process evolution step. For inputs valid in both implementations, the
+  numerical formulas are unchanged.
 - **Statistics accumulators reject a NaN sample value, and accept infinities.**
   QuantLib's only sample guard is `QL_REQUIRE(weight >= 0.0)`
   (`generalstatistics.hpp:233`, `incrementalstatistics.cpp:127`), which this
