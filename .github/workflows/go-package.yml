@@ -72,3 +72,67 @@ jobs:
             dist/*.tar.gz
             dist/*.sha256
           if-no-files-found: error
+
+  package-windows:
+    runs-on: windows-2025
+    timeout-minutes: 60
+    continue-on-error: true
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Preserve LF checkout
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.release_revision || inputs.release_ref }}
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.27.1'
+          cache: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Install Windows GNU tools
+        run: |
+          rustup toolchain install 1.96.0-x86_64-pc-windows-gnu --profile minimal
+          test "$(gcc -dumpmachine)" = x86_64-w64-mingw32
+          cargo +1.96.0-x86_64-pc-windows-gnu install cbindgen --version 0.29.2 --locked
+      - name: Build and verify Windows archive
+        id: windows_build
+        continue-on-error: true
+        env:
+          RUSTUP_TOOLCHAIN: 1.96.0-x86_64-pc-windows-gnu
+          CGO_ENABLED: '1'
+          CC: gcc
+          RELEASE_REF: ${{ inputs.release_ref }}
+        run: |
+          bash scripts/package_go_native.sh dist
+          cd dist
+          sha256sum -c ./*.sha256
+          mkdir unpacked
+          tar -xzf ./*-windows-amd64.tar.gz -C unpacked
+          native=$(find "$PWD/unpacked" -mindepth 1 -maxdepth 1 -type d)
+          (cd "$native" && sha256sum -c SHA256SUMS)
+          version=$(sed -n 's/^version=//p' "$native/VERSION")
+          cd ..
+          if [[ -n "$RELEASE_REF" ]]; then
+            test "$version" = "$(python scripts/check_release_version.py "$RELEASE_REF")"
+          fi
+          bash scripts/check_go_consumer.sh "$native"
+          bash scripts/check_go_install_failures.sh "$native"
+      - uses: actions/upload-artifact@v4
+        if: steps.windows_build.outcome == 'success'
+        with:
+          name: native-windows-amd64
+          path: |
+            dist/*.tar.gz
+            dist/*.sha256
+          if-no-files-found: error
+      - name: Report Windows package outcome
+        if: ${{ always() }}
+        env:
+          JOB_STATUS: ${{ job.status }}
+          BUILD_OUTCOME: ${{ steps.windows_build.outcome }}
+        run: |
+          echo "Windows amd64 GNU package: build=$BUILD_OUTCOME, job=$JOB_STATUS" >> "$GITHUB_STEP_SUMMARY"
