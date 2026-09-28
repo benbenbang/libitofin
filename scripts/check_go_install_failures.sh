@@ -102,11 +102,18 @@ import re
 import sys
 
 exports = pathlib.Path(sys.argv[1]).read_text()
-if "[Ordinal/Name Pointer] Table" not in exports:
+marker = "[Ordinal/Name Pointer] Table"
+_, found, table = exports.partition(marker)
+if not found:
     raise SystemExit("Native DLL has no readable export table")
-names = set(re.findall(r"^\s*\[\s*\d+\]\s+(itofin_[A-Za-z_0-9]+)\s*$", exports.split("[Ordinal/Name Pointer] Table", 1)[1], re.M))
-if "itofin_abi_version" not in names or "itofin_context_new" not in names:
-    raise SystemExit("Native DLL exports do not include the session ABI")
+names = set(re.findall(r"\b(itofin_[A-Za-z_0-9]+)\b", table))
+required = {"itofin_abi_version", "itofin_context_new"}
+if not required <= names:
+    excerpt = "\n".join(table.splitlines()[:24])
+    raise SystemExit(
+        f"Native DLL exports do not include the session ABI: missing {sorted(required - names)}; "
+        f"found {len(names)} itofin symbols\nExport-table excerpt:\n{excerpt}"
+    )
 lines = ["LIBRARY itofin_ffi", "EXPORTS", "    itofin_abi_version"]
 lines.extend(f"    {name}=itofin_ffi_real.{name}" for name in sorted(names - {"itofin_abi_version"}))
 pathlib.Path(sys.argv[2]).write_text("\n".join(lines) + "\n")
