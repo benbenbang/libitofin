@@ -18,11 +18,16 @@ if command -v python3 >/dev/null 2>&1; then
 else
   python=python
 fi
-if command -v shasum >/dev/null 2>&1; then
-  checksum=(shasum -a 256)
-else
-  checksum=(sha256sum)
-fi
+write_checksums() {
+  "$python" - "$@" <<'PYTHON'
+import hashlib
+from pathlib import Path
+import sys
+
+for name in sys.argv[1:]:
+    print(f"{hashlib.sha256(Path(name).read_bytes()).hexdigest()}  {name}")
+PYTHON
+}
 if [[ $(cbindgen --version) != 'cbindgen 0.29.2' ]]; then
   echo 'Install cbindgen 0.29.2: cargo install cbindgen --version 0.29.2 --locked' >&2
   exit 1
@@ -77,12 +82,12 @@ cp crates/libitofin/{THIRD_PARTY_NOTICES.md,QUANTLIB_LICENSE.txt} "$package/lice
   if [[ -n ${import_library:-} ]]; then
     libraries+=("lib/$import_library")
   fi
-  "${checksum[@]}" include/itofin.h "${libraries[@]}" LICENSE VERSION licenses/libitofin/* > SHA256SUMS
+  write_checksums include/itofin.h "${libraries[@]}" LICENSE VERSION licenses/libitofin/* > SHA256SUMS
 )
 COPYFILE_DISABLE=1 tar -czf "$output/$name.tar.gz" -C "$stage" "$name"
 (
   cd "$output"
-  "${checksum[@]}" "$name.tar.gz" > "$name.tar.gz.sha256"
+  write_checksums "$name.tar.gz" > "$name.tar.gz.sha256"
 )
 "$python" scripts/check_release_attribution.py "$output/$name.tar.gz" >&2
 printf '%s\n' "$output/$name.tar.gz"
