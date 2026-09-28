@@ -29,14 +29,38 @@ def archive_name(platform):
 def write_archive(directory, platform, revision=REVISION, build="local"):
     path = directory / archive_name(platform)
     manifest = f"version={VERSION}\nrevision={revision}\nplatform={platform}\nbuild={build}\n"
-    data = manifest.encode()
-    member = tarfile.TarInfo(path.name.removesuffix(".tar.gz") + "/VERSION")
-    member.size = len(data)
+    files = {"VERSION": manifest.encode()}
+    if platform == "windows-amd64":
+        files.update({name: name.encode() for name in (
+            "include/itofin.h", "lib/itofin_ffi.dll", "lib/libitofin_ffi.dll.a",
+            "LICENSE", "licenses/libitofin/THIRD_PARTY_NOTICES.md",
+            "licenses/libitofin/QUANTLIB_LICENSE.txt")})
+        files["SHA256SUMS"] = "".join(
+            f"{hashlib.sha256(data).hexdigest()}  {name}\n"
+            for name, data in files.items()).encode()
     with tarfile.open(path, "w:gz") as archive:
-        archive.addfile(member, io.BytesIO(data))
+        for name, data in files.items():
+            member = tarfile.TarInfo(path.name.removesuffix(".tar.gz") + "/" + name)
+            member.size = len(data)
+            archive.addfile(member, io.BytesIO(data))
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
     path.with_name(path.name + ".sha256").write_text(f"{digest}  {path.name}\n")
     return path
+
+
+def corrupt_windows_dll(path):
+    with tarfile.open(path, "r:gz") as archive:
+        files = [(member.name, archive.extractfile(member).read())
+                 for member in archive.getmembers() if member.isfile()]
+    with tarfile.open(path, "w:gz") as archive:
+        for name, data in files:
+            if name.endswith("/lib/itofin_ffi.dll"):
+                data = b"changed without updating the inner manifest"
+            member = tarfile.TarInfo(name)
+            member.size = len(data)
+            archive.addfile(member, io.BytesIO(data))
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    path.with_name(path.name + ".sha256").write_text(f"{digest}  {path.name}\n")
 
 
 class PublicationTests(unittest.TestCase):
@@ -86,7 +110,7 @@ class PublicationTests(unittest.TestCase):
                 self.assets[path.name] = path.read_bytes()
         elif action == "edit":
             notes = Path(args[args.index("--notes-file") + 1]).read_text()
-            self.assertTrue(notes.startswith(self.body))
+            self.assertTrue(notes.startswith("Core release notes."))
             self.assertIn("## Go bindings", notes)
             self.assertIn(f"github.com/{REPOSITORY}/sdk/go@v{VERSION}", notes)
             self.assertNotIn("/bindings/go@", notes)
@@ -229,6 +253,133 @@ class PublicationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "checksum mismatch"):
             self.publish()
         self.assertEqual(self.mutations, [])
+
+    def test_absent_optional_archive_does_not_block_required_assets(self):
+        result = self.publish()
+        self.assertEqual(result["optional"]["windows-amd64"], {"status": "absent"})
+        self.assertIn(f"sdk/go/v{VERSION}", self.references)
+        self.assertNotIn("Windows amd64", self.body)
+
+    def test_valid_optional_archive_is_verified_and_announced(self):
+        local = write_archive(self.local, "windows-amd64")
+        result = self.publish()
+        self.assertEqual(result["optional"]["windows-amd64"]["status"], "published")
+        self.assertEqual(self.assets[local.name], local.read_bytes())
+        self.assertIn("Windows amd64", self.body)
+        self.mutations.clear()
+        self.publish()
+        self.assertEqual(self.mutations, [])
+
+    def test_windows_note_is_added_on_later_successful_rerun(self):
+        self.publish()
+        self.mutations.clear()
+        write_archive(self.local, "windows-amd64")
+        result = self.publish()
+        self.assertEqual(result["optional"]["windows-amd64"]["status"], "published")
+        self.assertEqual([action for action, _ in self.mutations], ["upload", "upload", "edit"])
+        self.assertEqual(self.body.count("Windows amd64"), 1)
+
+    def test_bad_local_optional_archive_is_skipped(self):
+        local = write_archive(self.local, "windows-amd64", revision="b" * 40)
+        result = self.publish()
+        self.assertEqual(result["optional"]["windows-amd64"]["status"], "skipped")
+        self.assertNotIn(local.name, self.assets)
+        self.assertIn(f"sdk/go/v{VERSION}", self.references)
+
+    def test_remote_optional_bytes_win_and_missing_checksum_is_repaired(self):
+        remote = self.root / "remote"
+        remote.mkdir()
+        old = write_archive(remote, "windows-amd64", build="earlier-build")
+        self.assets[old.name] = old.read_bytes()
+        write_archive(self.local, "windows-amd64")
+        result = self.publish()
+        self.assertEqual(result["optional"]["windows-amd64"]["status"], "published")
+        self.assertEqual(self.assets[old.name], old.read_bytes())
+        self.assertEqual(self.assets[old.name + ".sha256"],
+                         old.with_name(old.name + ".sha256").read_bytes())
+
+    def test_orphan_optional_checksum_requires_matching_local_archive(self):
+        local = write_archive(self.local, "windows-amd64")
+        self.assets[local.name + ".sha256"] = local.with_name(local.name + ".sha256").read_bytes()
+        result = self.publish()
+        self.assertEqual(result["optional"]["windows-amd64"]["status"], "published")
+        self.assertEqual(self.assets[local.name], local.read_bytes())
+
+    def test_invalid_remote_optional_pair_does_not_block_tag(self):
+        remote = self.root / "remote"
+        remote.mkdir()
+        old = write_archive(remote, "windows-amd64")
+        self.assets[old.name] = old.read_bytes()
+        self.assets[old.name + ".sha256"] = b"invalid checksum"
+        result = self.publish()
+        self.assertEqual(result["optional"]["windows-amd64"]["status"], "skipped")
+        self.assertIn(f"sdk/go/v{VERSION}", self.references)
+        self.assertNotIn("Windows amd64", self.body)
+
+    def test_remote_only_optional_pair_is_verified(self):
+        remote = self.root / "remote"
+        remote.mkdir()
+        path = write_archive(remote, "windows-amd64")
+        self.assets[path.name] = path.read_bytes()
+        self.assets[path.name + ".sha256"] = path.with_name(path.name + ".sha256").read_bytes()
+        result = self.publish()
+        self.assertEqual(result["optional"]["windows-amd64"]["status"], "published")
+        self.assertIn("Windows amd64", self.body)
+
+    def test_orphan_optional_checksum_mismatch_is_skipped(self):
+        path = write_archive(self.local, "windows-amd64")
+        self.assets[path.name + ".sha256"] = f"{'0' * 64}  {path.name}\n".encode()
+        result = self.publish()
+        self.assertEqual(result["optional"]["windows-amd64"]["status"], "skipped")
+        self.assertNotIn(path.name, self.assets)
+        self.assertIn(f"sdk/go/v{VERSION}", self.references)
+
+    def test_partial_optional_upload_is_retried(self):
+        self.seed_remote()
+        path = write_archive(self.local, "windows-amd64")
+        self.drop_uploads = True
+        self.assertEqual(self.publish()["optional"]["windows-amd64"]["status"], "skipped")
+        self.drop_uploads = False
+        self.assertEqual(self.publish()["optional"]["windows-amd64"]["status"], "published")
+        self.assertEqual(self.assets[path.name], path.read_bytes())
+
+    def test_bad_inner_windows_package_is_not_published_or_advertised(self):
+        remote = self.root / "remote"
+        remote.mkdir()
+        path = write_archive(remote, "windows-amd64")
+        corrupt_windows_dll(path)
+        self.assets[path.name] = path.read_bytes()
+        self.assets[path.name + ".sha256"] = path.with_name(path.name + ".sha256").read_bytes()
+        result = self.publish()
+        self.assertEqual(result["optional"]["windows-amd64"]["status"], "skipped")
+        self.assertNotIn("Windows amd64", self.body)
+
+    def test_windows_archive_with_traversal_directory_is_rejected(self):
+        path = write_archive(self.local, "windows-amd64")
+        with tarfile.open(path, "r:gz") as archive:
+            files = [(member.name, archive.extractfile(member).read())
+                     for member in archive.getmembers() if member.isfile()]
+        with tarfile.open(path, "w:gz") as archive:
+            for name, data in files:
+                member = tarfile.TarInfo(name)
+                member.size = len(data)
+                archive.addfile(member, io.BytesIO(data))
+            directory = tarfile.TarInfo(path.name.removesuffix(".tar.gz") + "/../../outside/")
+            directory.type = tarfile.DIRTYPE
+            archive.addfile(directory)
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        path.with_name(path.name + ".sha256").write_text(f"{digest}  {path.name}\n")
+        result = self.publish()
+        self.assertEqual(result["optional"]["windows-amd64"]["status"], "skipped")
+        self.assertNotIn(path.name, self.assets)
+
+    def test_windows_note_is_removed_when_remote_pair_becomes_invalid(self):
+        path = write_archive(self.local, "windows-amd64")
+        self.publish()
+        self.assertIn("Windows amd64", self.body)
+        self.assets[path.name + ".sha256"] = b"invalid checksum"
+        self.publish()
+        self.assertNotIn("Windows amd64", self.body)
 
 
 class WorkflowPlatformTests(unittest.TestCase):
