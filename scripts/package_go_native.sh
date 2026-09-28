@@ -25,7 +25,8 @@ from pathlib import Path
 import sys
 
 for name in sys.argv[1:]:
-    print(f"{hashlib.sha256(Path(name).read_bytes()).hexdigest()}  {name}")
+    digest = hashlib.sha256(Path(name).read_bytes()).hexdigest()
+    sys.stdout.buffer.write(f"{digest}  {name}\n".encode())
 PYTHON
 }
 if [[ $(cbindgen --version) != 'cbindgen 0.29.2' ]]; then
