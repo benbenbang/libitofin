@@ -11,9 +11,15 @@ version=$2 revision=$3
 case "$(uname -s)" in
   Darwin) library=libitofin_ffi.dylib ;;
   Linux) library=libitofin_ffi.so ;;
-  *) echo 'Release consumer supports Linux and macOS' >&2; exit 1 ;;
+  MINGW*) library=itofin_ffi.dll; import_library=libitofin_ffi.dll.a ;;
+  *) echo 'Release consumer supports Linux, macOS, and Windows GNU' >&2; exit 1 ;;
 esac
-python3 - "$native_root/VERSION" "$version" "$revision" <<'PYTHON'
+if command -v python3 >/dev/null 2>&1; then
+  python=python3
+else
+  python=python
+fi
+"$python" - "$native_root/VERSION" "$version" "$revision" <<'PYTHON'
 import pathlib
 import sys
 
@@ -29,6 +35,9 @@ for key, expected in zip(("version", "revision"), sys.argv[2:]):
 PYTHON
 test -f "$native_root/include/itofin.h"
 test -f "$native_root/lib/$library"
+if [[ -n ${import_library:-} ]]; then
+  test -f "$native_root/lib/$import_library"
+fi
 work="$(mktemp -d "${TMPDIR:-/tmp}/itofin-release-consumer.XXXXXX")"
 trap 'chmod -R u+w "$work"; rm -rf "$work"' EXIT
 cp -R "$native_root" "$work/native"
@@ -39,9 +48,20 @@ cp "$repo_root/scripts/fixtures/go-install-failures/main.go" "$work/consumer/ses
 export GOWORK=off GOENV=off GOFLAGS="" CGO_ENABLED=1
 export GOPROXY=https://proxy.golang.org,direct GOSUMDB=sum.golang.org
 export GOPRIVATE="" GONOPROXY="" GONOSUMDB=""
-export GOMODCACHE="$work/modcache" GOCACHE="$work/buildcache"
-export CGO_CFLAGS="\"-I$work/native/include\""
-export CGO_LDFLAGS="\"$work/native/lib/$library\" \"-Wl,-rpath,$work/native/lib\""
+link_root=$work/native
+build_root=$work
+session_executable=$work/session
+if [[ -n ${import_library:-} ]]; then
+  link_root=$(cygpath -m "$link_root")
+  build_root=$(cygpath -m "$build_root")
+  session_executable=$work/session.exe
+  export PATH="$work/native/lib:$PATH"
+  export CGO_LDFLAGS="\"-L$link_root/lib\" -litofin_ffi"
+else
+  export CGO_LDFLAGS="\"$link_root/lib/$library\" \"-Wl,-rpath,$link_root/lib\""
+fi
+export GOMODCACHE="$build_root/modcache" GOCACHE="$build_root/buildcache"
+export CGO_CFLAGS="\"-I$link_root/include\""
 export ITOFIN_EXPECTED_VERSION="$version"
 unset CGO_CPPFLAGS CGO_CXXFLAGS LIBRARY_PATH CPATH C_INCLUDE_PATH
 unset LD_LIBRARY_PATH LD_PRELOAD DYLD_LIBRARY_PATH DYLD_INSERT_LIBRARIES DYLD_FALLBACK_LIBRARY_PATH
@@ -63,7 +83,7 @@ for query in "v$version" "$revision"; do
     sleep 20
   done
 done
-python3 - "$work/v$version.json" "$work/$revision.json" "$module" "v$version" "$revision" <<'PYTHON'
+"$python" - "$work/v$version.json" "$work/$revision.json" "$module" "v$version" "$revision" <<'PYTHON'
 import json
 import sys
 
@@ -85,7 +105,7 @@ PYTHON
 go mod tidy
 go mod edit -json > "$work/go-mod.json"
 go list -m -json "$module" > "$work/resolved.json"
-python3 - "$work/go-mod.json" "$work/resolved.json" "$module" "v$version" <<'PYTHON'
+"$python" - "$work/go-mod.json" "$work/resolved.json" "$module" "v$version" <<'PYTHON'
 import json
 import sys
 
@@ -99,6 +119,6 @@ go mod verify
 test "$(go list -tags itofin_external -f '{{.CgoCFLAGS}} {{.CgoLDFLAGS}}' "$module")" = '[] []'
 go vet -tags itofin_external ./...
 GOEXPERIMENT=cgocheck2 go test -tags itofin_external -race -count=1 -v ./...
-go build -tags itofin_external -o "$work/session" ./session
-test "$("$work/session")" = 'native session ready'
+go build -tags itofin_external -o "$session_executable" ./session
+test "$("$session_executable")" = 'native session ready'
 printf 'PASS: published Go v%s and native package at %s\n' "$version" "$revision"
