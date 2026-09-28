@@ -1,0 +1,70 @@
+name: Temporary Windows GNU binding probe
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/windows-gnu-probe.yml
+
+permissions:
+  contents: read
+
+jobs:
+  windows-gnu:
+    runs-on: windows-2025
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Preserve LF checkout
+        run: git config --global core.autocrlf false
+
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: sdk/go/go.mod
+          cache: false
+
+      - name: Install and inspect Windows GNU toolchain
+        run: |
+          rustup toolchain install 1.96.0-x86_64-pc-windows-gnu --profile minimal
+          test "$(git config --get core.autocrlf)" = false
+          test "$(gcc -dumpmachine)" = x86_64-w64-mingw32
+          gcc --version
+          go version
+
+      - name: Build matching Rust DLL and import library
+        env:
+          RUSTUP_TOOLCHAIN: 1.96.0-x86_64-pc-windows-gnu
+        run: |
+          rustc -vV
+          cargo build --locked -p libitofin-ffi --release
+          test -f target/release/itofin_ffi.dll
+          test -f target/release/libitofin_ffi.dll.a
+          ls -l target/release/*itofin_ffi*
+
+      - name: Compile and run C ABI smoke test
+        run: |
+          native_dir="$(pwd)/target/release"
+          export PATH="$native_dir:$PATH"
+          gcc -std=c11 -Wall -Wextra -Werror \
+            -Icrates/libitofin-ffi/include \
+            crates/libitofin-ffi/tests/c_smoke.c \
+            -Ltarget/release -litofin_ffi -o target/c-smoke.exe
+          ./target/c-smoke.exe
+
+      - name: Compile and run race-enabled Go cgo smoke test
+        env:
+          CGO_ENABLED: '1'
+          CC: gcc
+        run: |
+          native_dir="$(pwd)/target/release"
+          export PATH="$native_dir:$PATH"
+          go env GOOS GOARCH CGO_ENABLED CC
+          cd sdk/go
+          go test -race -c -o ../../target/go-smoke.exe .
+          ../../target/go-smoke.exe -test.run '^TestSessionCloseWaitsForAdmittedWork$' -test.v
