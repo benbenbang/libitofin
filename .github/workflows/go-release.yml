@@ -111,3 +111,73 @@ jobs:
           (cd "$native" && shasum -a 256 -c SHA256SUMS)
           cd ..
           bash scripts/check_go_release_consumer.sh "$native" "$RELEASE_VERSION" "$RELEASE_REVISION"
+
+  verify-published-windows:
+    needs: [resolve, publish]
+    runs-on: windows-2025
+    timeout-minutes: 30
+    continue-on-error: true
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Preserve LF checkout
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.resolve.outputs.revision }}
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: sdk/go/go.mod
+          cache: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Check optional Windows assets
+        id: assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
+        run: |
+          name="itofin-native-$RELEASE_VERSION-windows-amd64.tar.gz"
+          gh release view "$RELEASE_TAG" --json assets > assets.json
+          state=$(python - "$name" <<'PYTHON'
+          import json
+          import sys
+          names = {asset["name"] for asset in json.load(open("assets.json"))["assets"]}
+          pair = {sys.argv[1], sys.argv[1] + ".sha256"}
+          print("complete" if pair <= names else "incomplete" if pair & names else "absent")
+          PYTHON
+          )
+          if [[ "$state" == complete ]]; then
+            echo 'available=true' >> "$GITHUB_OUTPUT"
+          else
+            echo "Optional Windows archive/checksum pair $state" >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Install optional Windows archive from public release
+        if: steps.assets.outputs.available == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
+          RELEASE_REVISION: ${{ needs.resolve.outputs.revision }}
+          CGO_ENABLED: '1'
+          CC: gcc
+        run: |
+          test "$(gcc -dumpmachine)" = x86_64-w64-mingw32
+          mkdir published
+          gh release download "$RELEASE_TAG" --pattern "itofin-native-$RELEASE_VERSION-windows-amd64.tar.gz*" --dir published
+          cd published
+          sha256sum -c ./*.sha256
+          tar -xzf "itofin-native-$RELEASE_VERSION-windows-amd64.tar.gz"
+          native="$PWD/itofin-native-$RELEASE_VERSION-windows-amd64"
+          (cd "$native" && sha256sum -c SHA256SUMS)
+          cd ..
+          bash scripts/check_go_release_consumer.sh "$native" "$RELEASE_VERSION" "$RELEASE_REVISION"
+      - name: Report Windows installation outcome
+        if: ${{ always() }}
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          echo "Windows amd64 published consumer: $JOB_STATUS" >> "$GITHUB_STEP_SUMMARY"
