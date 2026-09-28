@@ -13,17 +13,35 @@ export ITOFIN_EXPECTED_VERSION
 cp "$repo_root/scripts/fixtures/go-consumer/"* "$consumer_root/"
 cp -R "$go_source" "$consumer_root/binding"
 export GOWORK=off GOPROXY=off CGO_ENABLED=1
-export CGO_CFLAGS="\"-I$native_root/include\""
-export CGO_LDFLAGS="\"-L$native_root/lib\" -litofin_ffi \"-Wl,-rpath,$native_root/lib\""
+link_root=$native_root
+binding_root=$consumer_root/binding
+if [[ $(uname -s) == MINGW* ]]; then
+  test -f "$native_root/lib/itofin_ffi.dll"
+  test -f "$native_root/lib/libitofin_ffi.dll.a"
+  link_root=$(cygpath -m "$native_root")
+  binding_root=$(cygpath -m "$binding_root")
+  export PATH="$native_root/lib:$PATH"
+  export CGO_LDFLAGS="\"-L$link_root/lib\" -litofin_ffi"
+else
+  export CGO_LDFLAGS="\"-L$link_root/lib\" -litofin_ffi \"-Wl,-rpath,$link_root/lib\""
+fi
+export CGO_CFLAGS="\"-I$link_root/include\""
 unset LD_LIBRARY_PATH DYLD_LIBRARY_PATH
 cd "$consumer_root"
 go version
-go mod edit -replace="github.com/benbenbang/libitofin/sdk/go=$consumer_root/binding"
+go mod edit -replace="github.com/benbenbang/libitofin/sdk/go=$binding_root"
 go vet -tags itofin_external ./...
 GOEXPERIMENT=cgocheck2 go test -tags itofin_external -race -count=1 -v ./...
-go test -tags itofin_external -c -o "$consumer_root/consumer.test" .
 case "$(uname -s)" in
-  Darwin) /usr/bin/time -l "$consumer_root/consumer.test" -test.run '^$' -test.bench . -test.benchtime=1x -test.benchmem ;;
-  Linux) /usr/bin/time -v "$consumer_root/consumer.test" -test.run '^$' -test.bench . -test.benchtime=1x -test.benchmem ;;
-  *) echo 'Consumer memory measurement supports Linux and macOS' >&2; exit 1 ;;
+  Darwin)
+    go test -tags itofin_external -c -o "$consumer_root/consumer.test" .
+    /usr/bin/time -l "$consumer_root/consumer.test" -test.run '^$' -test.bench . -test.benchtime=1x -test.benchmem ;;
+  Linux)
+    go test -tags itofin_external -c -o "$consumer_root/consumer.test" .
+    /usr/bin/time -v "$consumer_root/consumer.test" -test.run '^$' -test.bench . -test.benchtime=1x -test.benchmem ;;
+  MINGW*)
+    go test -tags itofin_external -c -o "$consumer_root/consumer.test.exe" .
+    "$consumer_root/consumer.test.exe" -test.run '^$' -test.bench . -test.benchtime=1x -test.benchmem
+    printf '%s\n' 'Windows: external RSS measurement skipped; Go benchmark allocations reported' ;;
+  *) echo 'Consumer memory measurement supports Linux, macOS, and Windows GNU' >&2; exit 1 ;;
 esac
