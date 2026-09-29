@@ -2,17 +2,20 @@
 # ruff: noqa: E501, F401, F403, F405
 
 import builtins
+from itofin import time
 import numpy
 import numpy.typing
 import typing
 __all__ = [
     "BollingerBands",
     "ChartSeries",
+    "DatedIntervalPrice",
     "Kd",
     "Macd",
     "VolumeBars",
     "bollinger_bands",
     "ema",
+    "interval_prices",
     "kd",
     "macd",
     "rsi",
@@ -59,6 +62,37 @@ class ChartSeries:
     def to_list(self) -> builtins.list[typing.Optional[builtins.float]]:
         r"""
         Copy values with `None` in warmup slots for JSON or chart libraries.
+        """
+
+@typing.final
+class DatedIntervalPrice:
+    r"""
+    One validated OHLC bar and its calendar date.
+    """
+    @property
+    def date(self) -> time.Date:
+        r"""
+        Calendar date of this bar.
+        """
+    @property
+    def open(self) -> builtins.float:
+        r"""
+        Opening price.
+        """
+    @property
+    def high(self) -> builtins.float:
+        r"""
+        Highest price.
+        """
+    @property
+    def low(self) -> builtins.float:
+        r"""
+        Lowest price.
+        """
+    @property
+    def close(self) -> builtins.float:
+        r"""
+        Closing price.
         """
 
 @typing.final
@@ -127,6 +161,11 @@ def bollinger_bands(close: typing.Sequence[builtins.float], period: builtins.int
 def ema(close: typing.Sequence[builtins.float], period: builtins.int) -> ChartSeries:
     r"""
     Exponential moving average seeded by the first `period`-bar SMA.
+    """
+
+def interval_prices(dates: typing.Sequence[time.Date], open: typing.Sequence[builtins.float], high: typing.Sequence[builtins.float], low: typing.Sequence[builtins.float], close: typing.Sequence[builtins.float]) -> builtins.list[DatedIntervalPrice]:
+    r"""
+    Build sorted dated OHLC bars; duplicate dates retain their last input bar.
     """
 
 def kd(high: typing.Sequence[builtins.float], low: typing.Sequence[builtins.float], close: typing.Sequence[builtins.float], period: builtins.int = 9, k_smooth: builtins.int = 3, d_smooth: builtins.int = 3) -> Kd:
