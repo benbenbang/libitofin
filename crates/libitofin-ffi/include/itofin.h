@@ -1420,6 +1420,36 @@ int32_t itofin_chart_ema(const ItofinReal *close,
                          struct ItofinError *error);
 
 /**
+ * Compute population-standard-deviation Bollinger bands. Output is channel
+ * major: middle, upper, then lower, with `len` values per channel.
+ * # Safety
+ * Follow the crate-level pointer/non-overlap contract. `out` holds
+ * `capacity` doubles and `first_valid` holds one size_t.
+ */
+int32_t itofin_chart_bollinger(const ItofinReal *close,
+                               size_t len,
+                               size_t period,
+                               ItofinReal multiplier,
+                               ItofinReal *out,
+                               size_t capacity,
+                               size_t *first_valid,
+                               struct ItofinError *error);
+
+/**
+ * Compute Wilder RSI from closing prices, aligned to input bars.
+ * # Safety
+ * Follow the crate-level pointer/non-overlap contract. `out` holds
+ * `capacity` doubles and `first_valid` holds one size_t.
+ */
+int32_t itofin_chart_rsi(const ItofinReal *close,
+                         size_t len,
+                         size_t period,
+                         ItofinReal *out,
+                         size_t capacity,
+                         size_t *first_valid,
+                         struct ItofinError *error);
+
+/**
  * Copy volume and classify close relative to open as -1, 0, or 1.
  * # Safety
  * Each input has `len` doubles. `out_volume` and `out_direction` each hold

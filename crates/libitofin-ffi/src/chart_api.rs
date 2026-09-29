@@ -3,7 +3,7 @@
 use crate::boundary::{
     BindingError, BindingResult, ItofinError, check_ptr, input_slice, without_context,
 };
-use libitofin::math::chart::{ChartSeries, ema, sma, volume_bars};
+use libitofin::math::chart::{ChartSeries, bollinger_bands, ema, rsi, sma, volume_bars};
 use libitofin::types::Real;
 
 /// # Safety
@@ -75,6 +75,69 @@ pub unsafe extern "C" fn itofin_chart_ema(
     }
 }
 
+/// Compute population-standard-deviation Bollinger bands. Output is channel
+/// major: middle, upper, then lower, with `len` values per channel.
+/// # Safety
+/// Follow the crate-level pointer/non-overlap contract. `out` holds
+/// `capacity` doubles and `first_valid` holds one size_t.
+#[unsafe(no_mangle)]
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn itofin_chart_bollinger(
+    close: *const Real,
+    len: usize,
+    period: usize,
+    multiplier: Real,
+    out: *mut Real,
+    capacity: usize,
+    first_valid: *mut usize,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        without_context(error, || {
+            let count = len
+                .checked_mul(3)
+                .filter(|count| *count <= isize::MAX as usize / size_of::<Real>())
+                .ok_or_else(|| BindingError::invalid("chart output size overflow"))?;
+            if capacity < count {
+                return Err(BindingError::invalid("output capacity too small"));
+            }
+            check_ptr(first_valid)?;
+            if count > 0 {
+                check_ptr(out)?;
+            }
+            let bands = bollinger_bands(input_slice(close, len)?, period, multiplier)?;
+            if len > 0 {
+                std::ptr::copy_nonoverlapping(bands.middle.values.as_ptr(), out, len);
+                std::ptr::copy_nonoverlapping(bands.upper.values.as_ptr(), out.add(len), len);
+                std::ptr::copy_nonoverlapping(bands.lower.values.as_ptr(), out.add(len * 2), len);
+            }
+            first_valid.write(bands.middle.first_valid);
+            Ok(())
+        })
+    }
+}
+
+/// Compute Wilder RSI from closing prices, aligned to input bars.
+/// # Safety
+/// Follow the crate-level pointer/non-overlap contract. `out` holds
+/// `capacity` doubles and `first_valid` holds one size_t.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn itofin_chart_rsi(
+    close: *const Real,
+    len: usize,
+    period: usize,
+    out: *mut Real,
+    capacity: usize,
+    first_valid: *mut usize,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        without_context(error, || {
+            average(close, len, period, out, capacity, first_valid, rsi)
+        })
+    }
+}
+
 /// Copy volume and classify close relative to open as -1, 0, or 1.
 /// # Safety
 /// Each input has `len` doubles. `out_volume` and `out_direction` each hold
@@ -120,7 +183,10 @@ pub unsafe extern "C" fn itofin_chart_volume_bars(
 
 #[cfg(test)]
 mod tests {
-    use super::{itofin_chart_ema, itofin_chart_sma, itofin_chart_volume_bars};
+    use super::{
+        itofin_chart_bollinger, itofin_chart_ema, itofin_chart_rsi, itofin_chart_sma,
+        itofin_chart_volume_bars,
+    };
     use crate::boundary::ItofinError;
 
     fn blank_error() -> ItofinError {
@@ -229,5 +295,62 @@ mod tests {
         assert_ne!(code, 0);
         assert_eq!(out_volume, volume);
         assert_eq!(direction, [1, -1, 0]);
+    }
+
+    #[test]
+    fn bollinger_and_rsi_copy_aligned_results() {
+        let close = [1.0, 2.0, 3.0, 4.0];
+        let mut bands = [9.0; 12];
+        let mut first_valid = usize::MAX;
+        let mut error = blank_error();
+        let code = unsafe {
+            itofin_chart_bollinger(
+                close.as_ptr(),
+                close.len(),
+                3,
+                2.0,
+                bands.as_mut_ptr(),
+                bands.len(),
+                &mut first_valid,
+                &mut error,
+            )
+        };
+        assert_eq!(code, 0);
+        assert_eq!(first_valid, 2);
+        assert_eq!(&bands[..4], &[0.0, 0.0, 2.0, 3.0]);
+        assert!((bands[6] - (2.0 + 2.0 * (2.0_f64 / 3.0).sqrt())).abs() < 1e-12);
+        assert!((bands[10] - (2.0 - 2.0 * (2.0_f64 / 3.0).sqrt())).abs() < 1e-12);
+
+        let mut output = [9.0; 4];
+        let code = unsafe {
+            itofin_chart_rsi(
+                [1.0, 2.0, 3.0, 2.0].as_ptr(),
+                4,
+                2,
+                output.as_mut_ptr(),
+                output.len(),
+                &mut first_valid,
+                &mut error,
+            )
+        };
+        assert_eq!(code, 0);
+        assert_eq!(first_valid, 2);
+        assert_eq!(output, [0.0, 0.0, 100.0, 50.0]);
+
+        output.fill(9.0);
+        let code = unsafe {
+            itofin_chart_rsi(
+                close.as_ptr(),
+                close.len(),
+                0,
+                output.as_mut_ptr(),
+                output.len(),
+                &mut first_valid,
+                &mut error,
+            )
+        };
+        assert_ne!(code, 0);
+        assert_eq!(output, [9.0; 4]);
+        assert_eq!(first_valid, 2);
     }
 }
