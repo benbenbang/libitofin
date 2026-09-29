@@ -73,6 +73,47 @@ deviation. The output retains the input's alignment and warmup slots.
     _ = constant.NullableValues()
     ```
 
+## Pointwise OHLC volatility
+
+`ohlc_point_volatility` returns four annualized QuantLib estimators for each
+bar: `simple_sigma`, `parkinson_sigma`, `garman_klass_sigma4`, and
+`garman_klass_sigma5`. Simple Sigma uses the current close/open return, unlike
+the consecutive-close estimator above. All four series start at index zero;
+there is no warmup bar. Supply one positive year fraction per bar, or use the
+constant-fraction helper. OHLC prices must be positive and finite, with open
+and close inside the low-to-high range. Input order is preserved.
+
+With `u = ln(high/open)`, `d = ln(low/open)`, and `c = ln(close/open)`, the four
+point variances are `c²`, `(u-d)²/(4 ln 2)`,
+`0.511(u-d)² - 0.019(c(u+d)-2ud) - 0.383c²`, and
+`0.5(u-d)² - (2 ln 2-1)c²`. Each reported volatility is
+`sqrt(abs(point variance)/year fraction)`.
+
+=== "Python"
+
+    ```python
+    from itofin import chart
+
+    estimates = chart.ohlc_point_volatility_constant_fraction(
+        open=[100.0], high=[110.0], low=[90.0], close=[105.0],
+        year_fraction=1 / 252,
+    )
+    assert estimates.parkinson_sigma.first_valid == 0
+    assert abs(estimates.parkinson_sigma.values[0] - 1.9131168640323526) < 1e-12
+    ```
+
+=== "Go"
+
+    ```go
+    import itofin "github.com/benbenbang/libitofin/sdk/go"
+
+    estimates, err := itofin.OHLCPointVolatilityConstantFraction(
+        []float64{100}, []float64{110}, []float64{90}, []float64{105}, 1.0/252,
+    )
+    if err != nil { panic(err) }
+    _ = estimates.ParkinsonSigma.NullableValues()
+    ```
+
 ## Indicator series
 
 Chart calculations use one Rust implementation for Python and Go. Every result
