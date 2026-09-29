@@ -1,5 +1,41 @@
 # Chart indicators
 
+## Dated OHLC prices
+
+Use `interval_prices` to validate OHLC bars and return them in date order.
+Duplicate dates keep the last input bar. Prices must be finite, with open and
+close inside the low-to-high range; negative prices are valid.
+
+=== "Python"
+
+    ```python
+    from itofin import chart
+    from itofin.time import Date
+
+    dates = [Date(2, 1, 2024), Date(1, 1, 2024)]
+    bars = chart.interval_prices(dates, [11, 10], [12, 11], [9, 8], [10, 9])
+    assert bars[0].date == dates[1]
+    assert bars[0].close == 9
+    ```
+
+=== "Go"
+
+    ```go
+    import itofin "github.com/benbenbang/libitofin/sdk/go"
+
+    // dates is a []itofin.Date in input order.
+    bars, err := itofin.IntervalPrices(dates,
+        []float64{11, 10}, []float64{12, 11},
+        []float64{9, 8}, []float64{10, 9})
+    if err != nil { panic(err) }
+    // bars[0] is the earliest date.
+    ```
+
+The five input arrays must have equal lengths. The output contains one bar per
+distinct date and leaves the input arrays unchanged.
+
+## Indicator series
+
 Chart calculations use one Rust implementation for Python and Go. Every result
 has one value per input bar. `first_valid` marks the first usable result;
 earlier zeroes are warmup placeholders. Use Python's `to_list()` or Go's

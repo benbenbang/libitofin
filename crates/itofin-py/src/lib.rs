@@ -14,6 +14,7 @@ mod capfloortermvol;
 mod caphelper;
 mod cashflows;
 mod chart;
+mod chart_prices;
 mod credit;
 mod creditdensity;
 mod creditengine;
@@ -421,6 +422,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     chart.add_class::<chart::PyBollingerBands>()?;
     chart.add_class::<chart::PyKd>()?;
     chart.add_class::<chart::PyMacd>()?;
+    chart.add_class::<chart_prices::PyDatedIntervalPrice>()?;
     chart.add_function(wrap_pyfunction!(chart::sma, &chart)?)?;
     chart.add_function(wrap_pyfunction!(chart::ema, &chart)?)?;
     chart.add_function(wrap_pyfunction!(chart::volume_bars, &chart)?)?;
@@ -428,6 +430,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     chart.add_function(wrap_pyfunction!(chart::rsi, &chart)?)?;
     chart.add_function(wrap_pyfunction!(chart::kd, &chart)?)?;
     chart.add_function(wrap_pyfunction!(chart::macd, &chart)?)?;
+    chart.add_function(wrap_pyfunction!(chart_prices::interval_prices, &chart)?)?;
 
     let submodules = [
         ("time", &time),

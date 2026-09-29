@@ -1,0 +1,47 @@
+{
+  "domain": "dated-interval-prices",
+  "entries": [
+    {
+      "c": "itofin_interval_prices_normalize",
+      "go": "IntervalPrices",
+      "python": "itofin.chart.interval_prices",
+      "status": "implemented",
+      "tests": "TestIntervalPrices"
+    },
+    {
+      "c": "itofin_interval_prices_normalize",
+      "go": "DatedIntervalPrice.Date",
+      "python": "itofin.chart.DatedIntervalPrice.date",
+      "status": "implemented",
+      "tests": "TestIntervalPrices"
+    },
+    {
+      "c": "itofin_interval_prices_normalize",
+      "go": "DatedIntervalPrice.Open",
+      "python": "itofin.chart.DatedIntervalPrice.open",
+      "status": "implemented",
+      "tests": "TestIntervalPrices"
+    },
+    {
+      "c": "itofin_interval_prices_normalize",
+      "go": "DatedIntervalPrice.High",
+      "python": "itofin.chart.DatedIntervalPrice.high",
+      "status": "implemented",
+      "tests": "TestIntervalPrices"
+    },
+    {
+      "c": "itofin_interval_prices_normalize",
+      "go": "DatedIntervalPrice.Low",
+      "python": "itofin.chart.DatedIntervalPrice.low",
+      "status": "implemented",
+      "tests": "TestIntervalPrices"
+    },
+    {
+      "c": "itofin_interval_prices_normalize",
+      "go": "DatedIntervalPrice.Close",
+      "python": "itofin.chart.DatedIntervalPrice.close",
+      "status": "implemented",
+      "tests": "TestIntervalPrices"
+    }
+  ]
+}
