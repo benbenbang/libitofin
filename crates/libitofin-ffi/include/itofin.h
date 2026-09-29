@@ -5674,6 +5674,44 @@ int32_t itofin_volatility_ohlc_point_constant_fraction(const ItofinReal *open,
                                                        struct ItofinError *error);
 
 /**
+ * Compute Sigma1, Sigma3, and Sigma6 using each interval's year fraction.
+ * Index zero is a missing-prefix placeholder and its year fraction is unused.
+ * # Safety
+ * Inputs hold `len` doubles; `out` holds `capacity` doubles and `first_valid`
+ * one size_t. Follow the crate-level pointer/non-overlap contract.
+ */
+int32_t itofin_volatility_ohlc_overnight(const ItofinReal *open,
+                                         const ItofinReal *high,
+                                         const ItofinReal *low,
+                                         const ItofinReal *close,
+                                         const ItofinReal *year_fractions,
+                                         size_t len,
+                                         ItofinReal overnight_fraction,
+                                         ItofinReal *out,
+                                         size_t capacity,
+                                         size_t *first_valid,
+                                         struct ItofinError *error);
+
+/**
+ * Compute Sigma1, Sigma3, and Sigma6 with one common year fraction.
+ * Index zero is a missing-prefix placeholder.
+ * # Safety
+ * Inputs hold `len` doubles; `out` holds `capacity` doubles and `first_valid`
+ * one size_t. Follow the crate-level pointer/non-overlap contract.
+ */
+int32_t itofin_volatility_ohlc_overnight_constant_fraction(const ItofinReal *open,
+                                                           const ItofinReal *high,
+                                                           const ItofinReal *low,
+                                                           const ItofinReal *close,
+                                                           size_t len,
+                                                           ItofinReal year_fraction,
+                                                           ItofinReal overnight_fraction,
+                                                           ItofinReal *out,
+                                                           size_t capacity,
+                                                           size_t *first_valid,
+                                                           struct ItofinError *error);
+
+/**
  * Kind: 0 interpolated, 1 SABR. Both returned handles must be released.
  * # Safety
  * Follow the crate C caller contract; arrays must have their stated lengths.
