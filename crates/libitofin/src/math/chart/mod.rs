@@ -8,6 +8,7 @@ mod bands_rsi;
 mod kd_macd;
 mod trend_volume;
 
+pub use bands_rsi::{BollingerBands, bollinger_bands, rsi};
 pub use trend_volume::{VolumeBars, ema, sma, volume_bars};
 
 /// Dense chart values aligned with the input bars. Entries before
