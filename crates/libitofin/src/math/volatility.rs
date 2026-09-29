@@ -1,9 +1,113 @@
-//! Close-price volatility estimators aligned with chart input bars.
+//! Close-price and OHLC volatility estimators aligned with chart input bars.
 
 use crate::errors::QlResult;
 use crate::math::chart::ChartSeries;
+use crate::prices::IntervalPrice;
 use crate::require;
 use crate::types::Real;
+
+/// Annualized point estimates aligned with every input OHLC bar.
+#[derive(Clone, Debug, PartialEq)]
+pub struct OhlcPointEstimates {
+    pub simple_sigma: ChartSeries,
+    pub parkinson_sigma: ChartSeries,
+    pub garman_klass_sigma4: ChartSeries,
+    pub garman_klass_sigma5: ChartSeries,
+}
+
+/// Estimates four QuantLib point volatilities using one fraction per OHLC bar.
+/// All bars, including the first, have a valid estimate.
+///
+/// # Errors
+/// Returns an error for mismatched lengths, nonpositive or nonfinite OHLC
+/// prices or year fractions, or a nonfinite annualized estimate.
+pub fn ohlc_point_volatility(
+    prices: &[IntervalPrice],
+    year_fractions: &[Real],
+) -> QlResult<OhlcPointEstimates> {
+    require!(
+        prices.len() == year_fractions.len(),
+        "OHLC and year-fraction lengths differ"
+    );
+    for (index, fraction) in year_fractions.iter().enumerate() {
+        require!(
+            fraction.is_finite() && *fraction > 0.0,
+            "invalid year fraction at index {index}"
+        );
+    }
+    ohlc_points(prices, |index| year_fractions[index])
+}
+
+/// Estimates four QuantLib point volatilities with a common year fraction.
+/// All bars, including the first, have a valid estimate.
+///
+/// # Errors
+/// Returns an error for a nonpositive or nonfinite fraction, nonpositive or
+/// nonfinite OHLC prices, or a nonfinite annualized estimate.
+pub fn ohlc_point_volatility_constant_fraction(
+    prices: &[IntervalPrice],
+    year_fraction: Real,
+) -> QlResult<OhlcPointEstimates> {
+    require!(
+        year_fraction.is_finite() && year_fraction > 0.0,
+        "year fraction must be positive and finite"
+    );
+    ohlc_points(prices, |_| year_fraction)
+}
+
+fn ohlc_points(
+    prices: &[IntervalPrice],
+    year_fraction: impl Fn(usize) -> Real,
+) -> QlResult<OhlcPointEstimates> {
+    let len = prices.len();
+    let mut result = OhlcPointEstimates {
+        simple_sigma: ChartSeries::zeroed(len, 0)?,
+        parkinson_sigma: ChartSeries::zeroed(len, 0)?,
+        garman_klass_sigma4: ChartSeries::zeroed(len, 0)?,
+        garman_klass_sigma5: ChartSeries::zeroed(len, 0)?,
+    };
+    for (index, price) in prices.iter().enumerate() {
+        let (open, high, low, close) = (price.open(), price.high(), price.low(), price.close());
+        require!(
+            [open, high, low, close]
+                .iter()
+                .all(|value| value.is_finite() && *value > 0.0),
+            "invalid OHLC price at index {index}"
+        );
+        let u = log_ratio(high, open);
+        let d = log_ratio(low, open);
+        let c = log_ratio(close, open);
+        let range = u - d;
+        let simple = c * c;
+        let parkinson = range * range / (4.0 * std::f64::consts::LN_2);
+        let sigma4 = 0.511 * range * range - 0.019 * (c * (u + d) - 2.0 * u * d) - 0.383 * c * c;
+        let sigma5 = 0.5 * range * range - (2.0 * std::f64::consts::LN_2 - 1.0) * c * c;
+        let divisor = year_fraction(index).sqrt();
+        for (point, series) in [
+            (simple, &mut result.simple_sigma),
+            (parkinson, &mut result.parkinson_sigma),
+            (sigma4, &mut result.garman_klass_sigma4),
+            (sigma5, &mut result.garman_klass_sigma5),
+        ] {
+            let volatility = point.abs().sqrt() / divisor;
+            require!(
+                volatility.is_finite(),
+                "nonfinite OHLC point volatility at index {index}"
+            );
+            series.values[index] = volatility;
+        }
+    }
+    Ok(result)
+}
+
+fn log_ratio(numerator: Real, denominator: Real) -> Real {
+    let ratio = numerator / denominator;
+    if ratio.is_finite() && ratio > 0.0 {
+        ratio.ln()
+    } else {
+        numerator.ln() - denominator.ln()
+    }
+}
 
 /// Estimates annualized local volatility from consecutive positive closes.
 /// `year_fractions[i]` belongs to the interval ending at `i`; index zero is unused.
@@ -114,6 +218,109 @@ pub fn constant_volatility(input: &ChartSeries, window: usize) -> QlResult<Chart
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn bar(open: Real, high: Real, low: Real, close: Real) -> IntervalPrice {
+        IntervalPrice::new(open, high, low, close).unwrap()
+    }
+
+    #[test]
+    fn ohlc_quantlib_fixture() {
+        let result =
+            ohlc_point_volatility_constant_fraction(&[bar(100.0, 110.0, 90.0, 105.0)], 1.0 / 252.0)
+                .unwrap();
+        for (series, expected) in [
+            (&result.simple_sigma, 0.7745198449099887),
+            (&result.parkinson_sigma, 1.9131168640323526),
+            (&result.garman_klass_sigma4, 2.204975405342331),
+            (&result.garman_klass_sigma5, 2.2004838300550182),
+        ] {
+            assert_eq!(series.first_valid, 0);
+            assert_eq!(series.values.len(), 1);
+            assert!((series.values[0] - expected).abs() < 1e-12);
+        }
+    }
+
+    #[test]
+    fn ohlc_scalar_indexed_parity_and_input_immutability() {
+        let prices = [
+            bar(100.0, 110.0, 90.0, 105.0),
+            bar(105.0, 106.0, 95.0, 96.0),
+        ];
+        let original = prices;
+        let fractions = [1.0 / 252.0; 2];
+        let indexed = ohlc_point_volatility(&prices, &fractions).unwrap();
+        let scalar = ohlc_point_volatility_constant_fraction(&prices, 1.0 / 252.0).unwrap();
+        assert_eq!(indexed, scalar);
+        assert_eq!(prices, original);
+        assert_eq!(fractions, [1.0 / 252.0; 2]);
+        assert!(indexed.garman_klass_sigma4.values[1] > 0.0);
+    }
+
+    #[test]
+    fn ohlc_validates_all_bars_and_fractions() {
+        let valid = bar(1.0, 2.0, 0.5, 1.5);
+        assert!(ohlc_point_volatility(&[valid], &[]).is_err());
+        assert!(ohlc_point_volatility(&[], &[1.0]).is_err());
+        for invalid in [0.0, -1.0, Real::NAN, Real::INFINITY] {
+            assert!(ohlc_point_volatility(&[valid], &[invalid]).is_err());
+            assert!(ohlc_point_volatility_constant_fraction(&[], invalid).is_err());
+        }
+        for invalid in [
+            bar(0.0, 1.0, 0.0, 0.5),
+            bar(-1.0, -0.5, -2.0, -1.5),
+            bar(1.0, 1.0, -1.0, 0.5),
+        ] {
+            assert!(ohlc_point_volatility(&[valid, invalid], &[1.0, 1.0]).is_err());
+            assert!(ohlc_point_volatility_constant_fraction(&[invalid], 1.0).is_err());
+        }
+    }
+
+    #[test]
+    fn ohlc_empty_and_short_series_are_valid_from_zero() {
+        let empty = ohlc_point_volatility(&[], &[]).unwrap();
+        for series in [
+            &empty.simple_sigma,
+            &empty.parkinson_sigma,
+            &empty.garman_klass_sigma4,
+            &empty.garman_klass_sigma5,
+        ] {
+            assert_eq!(series.first_valid, 0);
+            assert!(series.values.is_empty());
+        }
+        assert_eq!(
+            empty,
+            ohlc_point_volatility_constant_fraction(&[], 1.0).unwrap()
+        );
+        let flat =
+            ohlc_point_volatility_constant_fraction(&[bar(1.0, 1.0, 1.0, 1.0)], 1.0).unwrap();
+        for series in [
+            flat.simple_sigma,
+            flat.parkinson_sigma,
+            flat.garman_klass_sigma4,
+            flat.garman_klass_sigma5,
+        ] {
+            assert_eq!(series.first_valid, 0);
+            assert_eq!(series.values, [0.0]);
+        }
+    }
+
+    #[test]
+    fn ohlc_extreme_finite_ratios_and_fractions() {
+        let extreme = bar(Real::MIN_POSITIVE, Real::MAX, Real::MIN_POSITIVE, Real::MAX);
+        let result = ohlc_point_volatility_constant_fraction(&[extreme], 1.0).unwrap();
+        for series in [
+            result.simple_sigma,
+            result.parkinson_sigma,
+            result.garman_klass_sigma4,
+            result.garman_klass_sigma5,
+        ] {
+            assert!(series.values[0].is_finite());
+            assert!(series.values[0] > 0.0);
+        }
+        let tiny_fraction =
+            ohlc_point_volatility_constant_fraction(&[extreme], Real::MIN_POSITIVE).unwrap();
+        assert!(tiny_fraction.simple_sigma.values[0].is_finite());
+    }
 
     fn close_fixture() -> [Real; 3] {
         [100.0, 110.0, 99.0]
