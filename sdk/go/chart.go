@@ -8,6 +8,7 @@ import "C"
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"unsafe"
 )
 
@@ -45,7 +46,22 @@ type VolumeBars struct {
 	Direction []int8      `json:"direction"`
 }
 
-func chartAverage(close []float64, period int, exponential bool) (ChartSeries, error) {
+// BollingerBands contains population-deviation bands aligned to input closes.
+type BollingerBands struct {
+	Middle ChartSeries `json:"middle"`
+	Upper  ChartSeries `json:"upper"`
+	Lower  ChartSeries `json:"lower"`
+}
+
+type chartLineKind uint8
+
+const (
+	chartSimple chartLineKind = iota
+	chartExponential
+	chartRelativeStrength
+)
+
+func chartLine(close []float64, period int, kind chartLineKind) (ChartSeries, error) {
 	if period <= 0 {
 		return ChartSeries{}, fmt.Errorf("itofin: chart period must be positive")
 	}
@@ -56,9 +72,12 @@ func chartAverage(close []float64, period int, exponential bool) (ChartSeries, e
 	var firstValid C.size_t
 	var e C.ItofinError
 	var status C.int32_t
-	if exponential {
+	switch kind {
+	case chartExponential:
 		status = C.itofin_chart_ema(doubles(close), C.size_t(len(close)), C.size_t(period), doubles(result.Values), C.size_t(len(result.Values)), &firstValid, &e)
-	} else {
+	case chartRelativeStrength:
+		status = C.itofin_chart_rsi(doubles(close), C.size_t(len(close)), C.size_t(period), doubles(result.Values), C.size_t(len(result.Values)), &firstValid, &e)
+	default:
 		status = C.itofin_chart_sma(doubles(close), C.size_t(len(close)), C.size_t(period), doubles(result.Values), C.size_t(len(result.Values)), &firstValid, &e)
 	}
 	if err := ffiError(status, &e); err != nil {
@@ -71,13 +90,59 @@ func chartAverage(close []float64, period int, exponential bool) (ChartSeries, e
 // SMA computes the trailing simple moving average of close. Its first valid
 // value is at period-1; shorter inputs have no valid values.
 func SMA(close []float64, period int) (ChartSeries, error) {
-	return chartAverage(close, period, false)
+	return chartLine(close, period, chartSimple)
 }
 
 // EMA computes an exponential moving average seeded by the first period-bar
 // SMA, then weighted by 2/(period+1).
 func EMA(close []float64, period int) (ChartSeries, error) {
-	return chartAverage(close, period, true)
+	return chartLine(close, period, chartExponential)
+}
+
+// ChartBollingerBands computes trailing population-standard-deviation bands.
+// The three series first become valid at period-1. Multiplier must be finite
+// and nonnegative.
+func ChartBollingerBands(close []float64, period int, multiplier float64) (BollingerBands, error) {
+	if period <= 0 || math.IsNaN(multiplier) || math.IsInf(multiplier, 0) || multiplier < 0 {
+		return BollingerBands{}, fmt.Errorf("itofin: invalid Bollinger period or multiplier")
+	}
+	n := len(close)
+	if n > DefaultMaxOutputValues/3 {
+		return BollingerBands{}, fmt.Errorf("itofin: chart result exceeds output limit")
+	}
+	values := make([]float64, n*3)
+	var firstValid C.size_t
+	var e C.ItofinError
+	status := C.itofin_chart_bollinger(
+		doubles(close), C.size_t(n), C.size_t(period), C.double(multiplier),
+		doubles(values), C.size_t(len(values)), &firstValid, &e,
+	)
+	if err := ffiError(status, &e); err != nil {
+		return BollingerBands{}, err
+	}
+	valid := int(firstValid)
+	return BollingerBands{
+		Middle: ChartSeries{Values: values[:n:n], FirstValid: valid},
+		Upper:  ChartSeries{Values: values[n : 2*n : 2*n], FirstValid: valid},
+		Lower:  ChartSeries{Values: values[2*n:], FirstValid: valid},
+	}, nil
+}
+
+// DefaultBollingerBands uses a 20-bar window and two standard deviations.
+func DefaultBollingerBands(close []float64) (BollingerBands, error) {
+	return ChartBollingerBands(close, 20, 2)
+}
+
+// RSI computes Wilder's relative strength index from closing prices.
+// It first becomes valid after period price changes, at index period.
+// Flat input yields 50, pure gains 100, and pure losses 0.
+func RSI(close []float64, period int) (ChartSeries, error) {
+	return chartLine(close, period, chartRelativeStrength)
+}
+
+// DefaultRSI uses a 14-change Wilder window.
+func DefaultRSI(close []float64) (ChartSeries, error) {
+	return RSI(close, 14)
 }
 
 // ChartVolumeBars copies volume and classifies close relative to open.

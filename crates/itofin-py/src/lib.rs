@@ -418,9 +418,12 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     let chart = PyModule::new(py, "chart")?;
     chart.add_class::<chart::PyChartSeries>()?;
     chart.add_class::<chart::PyVolumeBars>()?;
+    chart.add_class::<chart::PyBollingerBands>()?;
     chart.add_function(wrap_pyfunction!(chart::sma, &chart)?)?;
     chart.add_function(wrap_pyfunction!(chart::ema, &chart)?)?;
     chart.add_function(wrap_pyfunction!(chart::volume_bars, &chart)?)?;
+    chart.add_function(wrap_pyfunction!(chart::bollinger_bands, &chart)?)?;
+    chart.add_function(wrap_pyfunction!(chart::rsi, &chart)?)?;
 
     let submodules = [
         ("time", &time),

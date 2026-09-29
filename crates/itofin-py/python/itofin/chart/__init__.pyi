@@ -6,12 +6,36 @@ import numpy
 import numpy.typing
 import typing
 __all__ = [
+    "BollingerBands",
     "ChartSeries",
     "VolumeBars",
+    "bollinger_bands",
     "ema",
+    "rsi",
     "sma",
     "volume_bars",
 ]
+
+@typing.final
+class BollingerBands:
+    r"""
+    Bollinger middle, upper, and lower bands aligned with input closes.
+    """
+    @property
+    def middle(self) -> ChartSeries:
+        r"""
+        Rolling arithmetic mean.
+        """
+    @property
+    def upper(self) -> ChartSeries:
+        r"""
+        Middle plus population standard deviation times the multiplier.
+        """
+    @property
+    def lower(self) -> ChartSeries:
+        r"""
+        Middle minus population standard deviation times the multiplier.
+        """
 
 @typing.final
 class ChartSeries:
@@ -49,9 +73,19 @@ class VolumeBars:
         Per-bar direction: -1 for down, 0 for flat, 1 for up.
         """
 
+def bollinger_bands(close: typing.Sequence[builtins.float], period: builtins.int = 20, multiplier: builtins.float = 2.0) -> BollingerBands:
+    r"""
+    Bollinger bands using a population standard deviation over each window.
+    """
+
 def ema(close: typing.Sequence[builtins.float], period: builtins.int) -> ChartSeries:
     r"""
     Exponential moving average seeded by the first `period`-bar SMA.
+    """
+
+def rsi(close: typing.Sequence[builtins.float], period: builtins.int = 14) -> ChartSeries:
+    r"""
+    Wilder RSI, seeded after `period` closing-price changes.
     """
 
 def sma(close: typing.Sequence[builtins.float], period: builtins.int) -> ChartSeries:

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"math"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -90,5 +91,91 @@ func TestChartVolumeBars(t *testing.T) {
 	empty, err := ChartVolumeBars(nil, nil, nil, nil, nil)
 	if err != nil || len(empty.Volume.Values) != 0 || len(empty.Direction) != 0 {
 		t.Fatalf("empty volume bars: %+v, %v", empty, err)
+	}
+}
+
+func TestChartBollingerBands(t *testing.T) {
+	got, err := ChartBollingerBands([]float64{1, 2, 3, 4}, 3, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Middle.FirstValid != 2 || got.Upper.FirstValid != 2 || got.Lower.FirstValid != 2 {
+		t.Fatalf("unexpected band warmup: %+v", got)
+	}
+	if !reflect.DeepEqual(got.Middle.Values, []float64{0, 0, 2, 3}) {
+		t.Fatalf("unexpected band midpoint: %v", got.Middle.Values)
+	}
+	offset := 2 * math.Sqrt(2.0/3.0)
+	for i := 2; i < 4; i++ {
+		if math.Abs(got.Upper.Values[i]-(got.Middle.Values[i]+offset)) > 1e-12 ||
+			math.Abs(got.Lower.Values[i]-(got.Middle.Values[i]-offset)) > 1e-12 {
+			t.Fatalf("unexpected band at %d: %+v", i, got)
+		}
+	}
+	encoded, err := json.Marshal(got.Upper)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(string(encoded), `{"values":[null,null,`) {
+		t.Fatalf("band warmup did not serialize as null: %s", encoded)
+	}
+	short, err := ChartBollingerBands([]float64{1}, 3, 2)
+	if err != nil || short.Middle.FirstValid != 1 || short.Upper.NullableValues()[0] != nil {
+		t.Fatalf("short bands: %+v, %v", short, err)
+	}
+	defaults, err := DefaultBollingerBands(make([]float64, 20))
+	if err != nil || defaults.Middle.FirstValid != 19 {
+		t.Fatalf("default bands: %+v, %v", defaults, err)
+	}
+}
+
+func TestChartRSI(t *testing.T) {
+	got, err := RSI([]float64{1, 2, 3, 2, 2}, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.FirstValid != 2 || !reflect.DeepEqual(got.Values, []float64{0, 0, 100, 50, 50}) {
+		t.Fatalf("unexpected Wilder RSI: %+v", got)
+	}
+	encoded, err := json.Marshal(got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(encoded) != `{"values":[null,null,100,50,50],"first_valid":2}` {
+		t.Fatalf("unexpected RSI JSON: %s", encoded)
+	}
+	flat, err := RSI([]float64{4, 4, 4}, 2)
+	if err != nil || flat.Values[2] != 50 {
+		t.Fatalf("flat RSI: %+v, %v", flat, err)
+	}
+	short, err := RSI([]float64{1}, 2)
+	if err != nil || short.FirstValid != 1 || short.NullableValues()[0] != nil {
+		t.Fatalf("short RSI: %+v, %v", short, err)
+	}
+	defaults, err := DefaultRSI(make([]float64, 15))
+	if err != nil || defaults.FirstValid != 14 || defaults.Values[14] != 50 {
+		t.Fatalf("default RSI: %+v, %v", defaults, err)
+	}
+}
+
+func TestChartBandsAndRSIRejectInvalidInputs(t *testing.T) {
+	for _, input := range []struct {
+		period     int
+		multiplier float64
+	}{
+		{0, 2}, {2, -1}, {2, math.NaN()}, {2, math.Inf(1)},
+	} {
+		if _, err := ChartBollingerBands([]float64{1, 2}, input.period, input.multiplier); err == nil {
+			t.Fatalf("accepted invalid bands parameter: %+v", input)
+		}
+	}
+	if _, err := ChartBollingerBands([]float64{math.NaN()}, 2, 2); err == nil {
+		t.Fatal("accepted nonfinite band close")
+	}
+	if _, err := RSI(nil, 0); err == nil {
+		t.Fatal("accepted zero RSI period")
+	}
+	if _, err := RSI([]float64{math.Inf(1)}, 2); err == nil {
+		t.Fatal("accepted nonfinite RSI close")
 	}
 }
