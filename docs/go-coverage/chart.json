@@ -65,6 +65,41 @@
       "python": "itofin.chart.VolumeBars.direction",
       "status": "implemented",
       "tests": "TestChartVolumeBars"
+    },
+    {
+      "c": "itofin_chart_bollinger",
+      "go": "ChartBollingerBands",
+      "python": "itofin.chart.bollinger_bands",
+      "status": "implemented",
+      "tests": "TestChartBollingerBands"
+    },
+    {
+      "c": "itofin_chart_rsi",
+      "go": "RSI",
+      "python": "itofin.chart.rsi",
+      "status": "implemented",
+      "tests": "TestChartRSI"
+    },
+    {
+      "c": "itofin_chart_bollinger",
+      "go": "BollingerBands.Middle",
+      "python": "itofin.chart.BollingerBands.middle",
+      "status": "implemented",
+      "tests": "TestChartBollingerBands"
+    },
+    {
+      "c": "itofin_chart_bollinger",
+      "go": "BollingerBands.Upper",
+      "python": "itofin.chart.BollingerBands.upper",
+      "status": "implemented",
+      "tests": "TestChartBollingerBands"
+    },
+    {
+      "c": "itofin_chart_bollinger",
+      "go": "BollingerBands.Lower",
+      "python": "itofin.chart.BollingerBands.lower",
+      "status": "implemented",
+      "tests": "TestChartBollingerBands"
     }
   ]
 }

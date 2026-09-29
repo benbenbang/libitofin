@@ -1,7 +1,7 @@
 //! Python chart indicators backed by the shared Rust calculations.
 
 use crate::PyQlError;
-use libitofin::math::chart::{self, ChartSeries, VolumeBars};
+use libitofin::math::chart::{self, BollingerBands, ChartSeries, VolumeBars};
 use numpy::PyArray1;
 use pyo3::prelude::*;
 use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pyfunction, gen_stub_pymethods};
@@ -84,6 +84,47 @@ impl PyVolumeBars {
     }
 }
 
+/// Bollinger middle, upper, and lower bands aligned with input closes.
+#[gen_stub_pyclass]
+#[pyclass(name = "BollingerBands", frozen, module = "itofin.chart")]
+pub(crate) struct PyBollingerBands {
+    middle: PyChartSeries,
+    upper: PyChartSeries,
+    lower: PyChartSeries,
+}
+
+impl From<BollingerBands> for PyBollingerBands {
+    fn from(bands: BollingerBands) -> Self {
+        Self {
+            middle: PyChartSeries::from_core(bands.middle),
+            upper: PyChartSeries::from_core(bands.upper),
+            lower: PyChartSeries::from_core(bands.lower),
+        }
+    }
+}
+
+#[gen_stub_pymethods]
+#[pymethods]
+impl PyBollingerBands {
+    /// Rolling arithmetic mean.
+    #[getter]
+    fn middle(&self) -> PyChartSeries {
+        self.middle.clone()
+    }
+
+    /// Middle plus population standard deviation times the multiplier.
+    #[getter]
+    fn upper(&self) -> PyChartSeries {
+        self.upper.clone()
+    }
+
+    /// Middle minus population standard deviation times the multiplier.
+    #[getter]
+    fn lower(&self) -> PyChartSeries {
+        self.lower.clone()
+    }
+}
+
 /// Simple moving average, seeded after `period` closing prices.
 #[gen_stub_pyfunction(module = "itofin.chart")]
 #[pyfunction]
@@ -116,6 +157,32 @@ pub(crate) fn volume_bars(
 ) -> PyResult<PyVolumeBars> {
     chart::volume_bars(&open, &high, &low, &close, &volume)
         .map(PyVolumeBars::from)
+        .map_err(PyQlError::from)
+        .map_err(Into::into)
+}
+
+/// Bollinger bands using a population standard deviation over each window.
+#[gen_stub_pyfunction(module = "itofin.chart")]
+#[pyfunction]
+#[pyo3(signature = (close, period = 20, multiplier = 2.0))]
+pub(crate) fn bollinger_bands(
+    close: Vec<f64>,
+    period: usize,
+    multiplier: f64,
+) -> PyResult<PyBollingerBands> {
+    chart::bollinger_bands(&close, period, multiplier)
+        .map(PyBollingerBands::from)
+        .map_err(PyQlError::from)
+        .map_err(Into::into)
+}
+
+/// Wilder RSI, seeded after `period` closing-price changes.
+#[gen_stub_pyfunction(module = "itofin.chart")]
+#[pyfunction]
+#[pyo3(signature = (close, period = 14))]
+pub(crate) fn rsi(close: Vec<f64>, period: usize) -> PyResult<PyChartSeries> {
+    chart::rsi(&close, period)
+        .map(PyChartSeries::from_core)
         .map_err(PyQlError::from)
         .map_err(Into::into)
 }
