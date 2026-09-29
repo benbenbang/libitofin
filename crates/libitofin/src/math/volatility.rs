@@ -15,6 +15,134 @@ pub struct OhlcPointEstimates {
     pub garman_klass_sigma5: ChartSeries,
 }
 
+/// Annualized overnight-aware estimates aligned with every input OHLC bar.
+#[derive(Clone, Debug, PartialEq)]
+pub struct OhlcOvernightEstimates {
+    pub garman_klass_sigma1: ChartSeries,
+    pub garman_klass_sigma3: ChartSeries,
+    pub garman_klass_sigma6: ChartSeries,
+}
+
+/// Estimates three QuantLib overnight volatilities from consecutive OHLC bars.
+/// `year_fractions[i]` belongs to the interval ending at `i`; index zero is unused.
+/// `overnight_fraction` is the fraction of each interval while the market is closed.
+///
+/// # Errors
+/// Returns an error for mismatched lengths, invalid OHLC prices or used fractions,
+/// or a negative or nonfinite annualized variance.
+pub fn ohlc_overnight_volatility(
+    prices: &[IntervalPrice],
+    year_fractions: &[Real],
+    overnight_fraction: Real,
+) -> QlResult<OhlcOvernightEstimates> {
+    require!(
+        prices.len() == year_fractions.len(),
+        "OHLC and year-fraction lengths differ"
+    );
+    for (index, fraction) in year_fractions.iter().enumerate().skip(1) {
+        require!(
+            fraction.is_finite() && *fraction > 0.0,
+            "invalid year fraction at index {index}"
+        );
+    }
+    ohlc_overnight(prices, overnight_fraction, |index| year_fractions[index])
+}
+
+/// Estimates three QuantLib overnight volatilities with a common year fraction.
+/// The first bar is a zero placeholder because it has no preceding close.
+///
+/// # Errors
+/// Returns an error for invalid OHLC prices or fractions, or a negative or
+/// nonfinite annualized variance.
+pub fn ohlc_overnight_volatility_constant_fraction(
+    prices: &[IntervalPrice],
+    year_fraction: Real,
+    overnight_fraction: Real,
+) -> QlResult<OhlcOvernightEstimates> {
+    require!(
+        year_fraction.is_finite() && year_fraction > 0.0,
+        "year fraction must be positive and finite"
+    );
+    ohlc_overnight(prices, overnight_fraction, |_| year_fraction)
+}
+
+fn ohlc_overnight(
+    prices: &[IntervalPrice],
+    overnight_fraction: Real,
+    year_fraction: impl Fn(usize) -> Real,
+) -> QlResult<OhlcOvernightEstimates> {
+    require!(
+        overnight_fraction.is_finite() && overnight_fraction > 0.0 && overnight_fraction < 1.0,
+        "overnight fraction must be finite and between zero and one"
+    );
+    let len = prices.len();
+    let mut result = OhlcOvernightEstimates {
+        garman_klass_sigma1: ChartSeries::zeroed(len, 1)?,
+        garman_klass_sigma3: ChartSeries::zeroed(len, 1)?,
+        garman_klass_sigma6: ChartSeries::zeroed(len, 1)?,
+    };
+    for (index, price) in prices.iter().copied().enumerate() {
+        let [simple, parkinson, sigma4, _] = ohlc_point_terms(price, index)?;
+        if index == 0 {
+            continue;
+        }
+        let gap = log_ratio(price.open(), prices[index - 1].close());
+        for (weight, point, series) in [
+            (0.5, simple, &mut result.garman_klass_sigma1),
+            (0.17, parkinson, &mut result.garman_klass_sigma3),
+            (0.012, sigma4, &mut result.garman_klass_sigma6),
+        ] {
+            series.values[index] = overnight_volatility(
+                gap,
+                point,
+                weight,
+                overnight_fraction,
+                year_fraction(index),
+                index,
+            )?;
+        }
+    }
+    Ok(result)
+}
+
+fn overnight_volatility(
+    gap: Real,
+    point: Real,
+    weight: Real,
+    overnight_fraction: Real,
+    year_fraction: Real,
+    index: usize,
+) -> QlResult<Real> {
+    let variance = weight * gap * gap / overnight_fraction
+        + (1.0 - weight) * point / (1.0 - overnight_fraction);
+    let root = if variance.is_finite() {
+        require!(
+            variance.is_sign_positive() || variance == 0.0,
+            "negative overnight variance at index {index}"
+        );
+        variance.sqrt()
+    } else {
+        let overnight = gap.abs() * weight.sqrt() / overnight_fraction.sqrt();
+        let intraday =
+            point.abs().sqrt() * (1.0 - weight).sqrt() / (1.0 - overnight_fraction).sqrt();
+        if point < 0.0 {
+            require!(
+                overnight.total_cmp(&intraday).is_ge(),
+                "negative overnight variance at index {index}"
+            );
+            overnight * (1.0 - (intraday / overnight).powi(2)).sqrt()
+        } else {
+            overnight.hypot(intraday)
+        }
+    };
+    let volatility = root / year_fraction.sqrt();
+    require!(
+        volatility.is_finite(),
+        "nonfinite overnight volatility at index {index}"
+    );
+    Ok(volatility)
+}
+
 /// Estimates four QuantLib point volatilities using one fraction per OHLC bar.
 /// All bars, including the first, have a valid estimate.
 ///
@@ -66,22 +194,8 @@ fn ohlc_points(
         garman_klass_sigma4: ChartSeries::zeroed(len, 0)?,
         garman_klass_sigma5: ChartSeries::zeroed(len, 0)?,
     };
-    for (index, price) in prices.iter().enumerate() {
-        let (open, high, low, close) = (price.open(), price.high(), price.low(), price.close());
-        require!(
-            [open, high, low, close]
-                .iter()
-                .all(|value| value.is_finite() && *value > 0.0),
-            "invalid OHLC price at index {index}"
-        );
-        let u = log_ratio(high, open);
-        let d = log_ratio(low, open);
-        let c = log_ratio(close, open);
-        let range = u - d;
-        let simple = c * c;
-        let parkinson = range * range / (4.0 * std::f64::consts::LN_2);
-        let sigma4 = 0.511 * range * range - 0.019 * (c * (u + d) - 2.0 * u * d) - 0.383 * c * c;
-        let sigma5 = 0.5 * range * range - (2.0 * std::f64::consts::LN_2 - 1.0) * c * c;
+    for (index, price) in prices.iter().copied().enumerate() {
+        let [simple, parkinson, sigma4, sigma5] = ohlc_point_terms(price, index)?;
         let divisor = year_fraction(index).sqrt();
         for (point, series) in [
             (simple, &mut result.simple_sigma),
@@ -98,6 +212,26 @@ fn ohlc_points(
         }
     }
     Ok(result)
+}
+
+fn ohlc_point_terms(price: IntervalPrice, index: usize) -> QlResult<[Real; 4]> {
+    let (open, high, low, close) = (price.open(), price.high(), price.low(), price.close());
+    require!(
+        [open, high, low, close]
+            .iter()
+            .all(|value| value.is_finite() && *value > 0.0),
+        "invalid OHLC price at index {index}"
+    );
+    let u = log_ratio(high, open);
+    let d = log_ratio(low, open);
+    let c = log_ratio(close, open);
+    let range = u - d;
+    Ok([
+        c * c,
+        range * range / (4.0 * std::f64::consts::LN_2),
+        0.511 * range * range - 0.019 * (c * (u + d) - 2.0 * u * d) - 0.383 * c * c,
+        0.5 * range * range - (2.0 * std::f64::consts::LN_2 - 1.0) * c * c,
+    ])
 }
 
 fn log_ratio(numerator: Real, denominator: Real) -> Real {
@@ -320,6 +454,119 @@ mod tests {
         let tiny_fraction =
             ohlc_point_volatility_constant_fraction(&[extreme], Real::MIN_POSITIVE).unwrap();
         assert!(tiny_fraction.simple_sigma.values[0].is_finite());
+    }
+
+    #[test]
+    fn overnight_quantlib_fixture() {
+        let prices = [
+            bar(100.0, 100.0, 100.0, 100.0),
+            bar(110.0, 120.0, 105.0, 115.0),
+        ];
+        let result = ohlc_overnight_volatility(&prices, &[Real::NAN, 1.0 / 252.0], 0.25).unwrap();
+        for (series, expected) in [
+            (&result.garman_klass_sigma1, 2.2159224836472786),
+            (&result.garman_klass_sigma3, 1.8303355611439194),
+            (&result.garman_klass_sigma6, 1.6795672145926133),
+        ] {
+            assert_eq!(series.first_valid, 1);
+            assert_eq!(series.values.len(), 2);
+            assert_eq!(series.values[0], 0.0);
+            assert!((series.values[1] - expected).abs() < 1e-12);
+        }
+    }
+
+    #[test]
+    fn overnight_scalar_indexed_parity_and_immutability() {
+        let prices = [
+            bar(100.0, 100.0, 100.0, 100.0),
+            bar(110.0, 120.0, 105.0, 115.0),
+            bar(112.0, 118.0, 108.0, 110.0),
+        ];
+        let original = prices;
+        let fractions = [0.0, 1.0 / 252.0, 1.0 / 252.0];
+        let indexed = ohlc_overnight_volatility(&prices, &fractions, 0.25).unwrap();
+        let scalar =
+            ohlc_overnight_volatility_constant_fraction(&prices, 1.0 / 252.0, 0.25).unwrap();
+        assert_eq!(indexed, scalar);
+        assert_eq!(prices, original);
+        assert_eq!(fractions, [0.0, 1.0 / 252.0, 1.0 / 252.0]);
+        assert!(indexed.garman_klass_sigma1.values[2] > 0.0);
+        let differing =
+            ohlc_overnight_volatility(&prices, &[0.0, 1.0 / 252.0, 1.0 / 365.0], 0.25).unwrap();
+        assert!(differing.garman_klass_sigma3.values[2] > indexed.garman_klass_sigma3.values[2]);
+    }
+
+    #[test]
+    fn overnight_validates_prices_and_fractions() {
+        let valid = bar(1.0, 2.0, 0.5, 1.5);
+        assert!(ohlc_overnight_volatility(&[valid], &[], 0.25).is_err());
+        for invalid in [0.0, 1.0, -0.5, Real::NAN, Real::INFINITY] {
+            assert!(ohlc_overnight_volatility(&[], &[], invalid).is_err());
+            assert!(ohlc_overnight_volatility_constant_fraction(&[], 1.0, invalid).is_err());
+        }
+        for invalid in [0.0, -1.0, Real::NAN, Real::INFINITY] {
+            assert!(ohlc_overnight_volatility(&[valid, valid], &[0.0, invalid], 0.25).is_err());
+            assert!(ohlc_overnight_volatility_constant_fraction(&[], invalid, 0.25).is_err());
+        }
+        for invalid in [bar(0.0, 1.0, 0.0, 0.5), bar(-1.0, -0.5, -2.0, -1.5)] {
+            assert!(ohlc_overnight_volatility(&[invalid], &[Real::NAN], 0.25).is_err());
+            assert!(ohlc_overnight_volatility(&[valid, invalid], &[0.0, 1.0], 0.25).is_err());
+        }
+        assert!(overnight_volatility(0.0, -1.0, 0.5, 0.25, 1.0, 1).is_err());
+    }
+
+    #[test]
+    fn overnight_short_series_have_zero_warmup() {
+        let empty = ohlc_overnight_volatility(&[], &[], 0.25).unwrap();
+        let single =
+            ohlc_overnight_volatility(&[bar(1.0, 1.0, 1.0, 1.0)], &[Real::NAN], 0.25).unwrap();
+        for series in [
+            &empty.garman_klass_sigma1,
+            &empty.garman_klass_sigma3,
+            &empty.garman_klass_sigma6,
+        ] {
+            assert_eq!(series.first_valid, 0);
+            assert!(series.values.is_empty());
+        }
+        for series in [
+            &single.garman_klass_sigma1,
+            &single.garman_klass_sigma3,
+            &single.garman_klass_sigma6,
+        ] {
+            assert_eq!(series.first_valid, 1);
+            assert_eq!(series.values, [0.0]);
+        }
+    }
+
+    #[test]
+    fn overnight_extreme_finite_inputs_avoid_intermediate_overflow() {
+        let prices = [
+            bar(
+                Real::MIN_POSITIVE,
+                Real::MIN_POSITIVE,
+                Real::MIN_POSITIVE,
+                Real::MIN_POSITIVE,
+            ),
+            bar(Real::MAX, Real::MAX, Real::MIN_POSITIVE, Real::MAX),
+        ];
+        let result =
+            ohlc_overnight_volatility_constant_fraction(&prices, 1.0, Real::MIN_POSITIVE).unwrap();
+        for series in [
+            result.garman_klass_sigma1,
+            result.garman_klass_sigma3,
+            result.garman_klass_sigma6,
+        ] {
+            assert!(series.values[1].is_finite());
+            assert!(series.values[1] > 1e150);
+        }
+        assert!(
+            ohlc_overnight_volatility_constant_fraction(
+                &prices,
+                Real::MIN_POSITIVE,
+                Real::MIN_POSITIVE
+            )
+            .is_err()
+        );
     }
 
     fn close_fixture() -> [Real; 3] {
