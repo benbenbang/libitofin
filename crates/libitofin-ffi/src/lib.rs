@@ -69,6 +69,7 @@ pub mod version_api;
 pub mod vol_api;
 #[cfg(test)]
 mod vol_tests;
+pub mod volatility_estimators_api;
 pub mod volcube_api;
 pub mod volgrid_api;
 

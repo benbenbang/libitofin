@@ -5591,6 +5591,53 @@ int32_t itofin_black_vol_control(struct ItofinContext *ctx,
                                  struct ItofinError *error);
 
 /**
+ * Estimate annualized local volatility from closes and per-bar year fractions.
+ * The fraction at index zero is unused. `first_valid` is one when closes are
+ * present; earlier output slots are zero warmup placeholders.
+ * # Safety
+ * `close` and `year_fractions` hold `len` doubles; output pointers follow the
+ * crate-level non-overlap contract.
+ */
+int32_t itofin_volatility_simple_local(const ItofinReal *close,
+                                       const ItofinReal *year_fractions,
+                                       size_t len,
+                                       ItofinReal *out,
+                                       size_t capacity,
+                                       size_t *first_valid,
+                                       struct ItofinError *error);
+
+/**
+ * Estimate local volatility using a single year fraction for every interval.
+ * # Safety
+ * `close` holds `len` doubles; output pointers follow the crate-level
+ * non-overlap contract.
+ */
+int32_t itofin_volatility_simple_local_constant_fraction(const ItofinReal *close,
+                                                         size_t len,
+                                                         ItofinReal year_fraction,
+                                                         ItofinReal *out,
+                                                         size_t capacity,
+                                                         size_t *first_valid,
+                                                         struct ItofinError *error);
+
+/**
+ * Compose a volatility series from the preceding `window` valid inputs.
+ * `input_first_valid` identifies the first real input; earlier values are
+ * warmup placeholders and never enter a window.
+ * # Safety
+ * `values` holds `len` doubles; output pointers follow the crate-level
+ * non-overlap contract.
+ */
+int32_t itofin_volatility_constant(const ItofinReal *values,
+                                   size_t len,
+                                   size_t input_first_valid,
+                                   size_t window,
+                                   ItofinReal *out,
+                                   size_t capacity,
+                                   size_t *first_valid,
+                                   struct ItofinError *error);
+
+/**
  * Kind: 0 interpolated, 1 SABR. Both returned handles must be released.
  * # Safety
  * Follow the crate C caller contract; arrays must have their stated lengths.
