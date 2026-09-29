@@ -1450,6 +1450,43 @@ int32_t itofin_chart_rsi(const ItofinReal *close,
                          struct ItofinError *error);
 
 /**
+ * Compute Taiwan KD. Output is channel major: RSV, K, then D, with `len`
+ * values per channel. All channels share the returned first-valid index.
+ * # Safety
+ * Follow the crate-level pointer/non-overlap contract. `out` holds
+ * `capacity` doubles and `first_valid` holds one size_t.
+ */
+int32_t itofin_chart_kd(const ItofinReal *high,
+                        const ItofinReal *low,
+                        const ItofinReal *close,
+                        size_t len,
+                        size_t period,
+                        size_t k_smooth,
+                        size_t d_smooth,
+                        ItofinReal *out,
+                        size_t capacity,
+                        size_t *first_valid,
+                        struct ItofinError *error);
+
+/**
+ * Compute SMA-seeded MACD. Output is channel major: line, signal, then
+ * histogram. `first_valid` receives three corresponding size_t indices.
+ * # Safety
+ * Follow the crate-level pointer/non-overlap contract. `out` holds
+ * `capacity` doubles and `first_valid` holds `first_valid_capacity` size_t.
+ */
+int32_t itofin_chart_macd(const ItofinReal *close,
+                          size_t len,
+                          size_t fast_period,
+                          size_t slow_period,
+                          size_t signal_period,
+                          ItofinReal *out,
+                          size_t capacity,
+                          size_t *first_valid,
+                          size_t first_valid_capacity,
+                          struct ItofinError *error);
+
+/**
  * Copy volume and classify close relative to open as -1, 0, or 1.
  * # Safety
  * Each input has `len` doubles. `out_volume` and `out_direction` each hold
