@@ -49,4 +49,37 @@ contain both open and close, and volume must be nonnegative. Volume direction
 compares each close with its open: `-1` down, `0` flat, `1` up. Chart colors
 remain the caller's choice.
 
+## Bollinger Bands and RSI
+
+Bollinger Bands use a trailing population standard deviation. The default is
+20 closes with a multiplier of 2; the middle, upper, and lower series all
+become valid at index `period - 1`. Wilder RSI uses 14 price changes by default,
+so its first valid index is `period`. A flat window returns 50, a gain-only
+window 100, and a loss-only window 0.
+
+=== "Python"
+
+    ```python
+    close = [100.0] * 34
+    bands = chart.bollinger_bands(close, period=20, multiplier=2.0)
+    strength = chart.rsi(close, period=14)
+    upper_for_json = bands.upper.to_list()
+    ```
+
+=== "Go"
+
+    ```go
+    close := make([]float64, 34)
+    bands, err := itofin.DefaultBollingerBands(close)
+    if err != nil { panic(err) }
+    strength, err := itofin.DefaultRSI(close)
+    if err != nil { panic(err) }
+    _ = bands.Upper.NullableValues()
+    _ = strength.NullableValues()
+    ```
+
+Python functions accept explicit periods and also provide these defaults. Go
+offers `ChartBollingerBands` and `RSI` for explicit parameters, alongside the
+default helpers.
+
 ::: itofin.chart
