@@ -430,6 +430,12 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     chart.add_function(wrap_pyfunction!(chart::rsi, &chart)?)?;
     chart.add_function(wrap_pyfunction!(chart::kd, &chart)?)?;
     chart.add_function(wrap_pyfunction!(chart::macd, &chart)?)?;
+    chart.add_function(wrap_pyfunction!(chart::simple_local_volatility, &chart)?)?;
+    chart.add_function(wrap_pyfunction!(
+        chart::simple_local_volatility_constant_fraction,
+        &chart
+    )?)?;
+    chart.add_function(wrap_pyfunction!(chart::constant_volatility, &chart)?)?;
     chart.add_function(wrap_pyfunction!(chart_prices::interval_prices, &chart)?)?;
 
     let submodules = [

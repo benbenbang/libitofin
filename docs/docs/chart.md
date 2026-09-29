@@ -34,6 +34,45 @@ close inside the low-to-high range; negative prices are valid.
 The five input arrays must have equal lengths. The output contains one bar per
 distinct date and leaves the input arrays unchanged.
 
+## Close-price volatility
+
+The simple local estimator uses the absolute log return between consecutive
+positive closes, divided by the square root of the interval's year fraction.
+The first bar is warmup. Pass one fraction per close for varying intervals;
+the fraction at index zero is unused. The constant-fraction helper applies one
+positive year fraction to every interval.
+
+The constant estimator uses the **previous** `window` valid volatility values,
+excluding the current value. It follows QuantLib's formula
+`sqrt(sum(u²)/window - sum(u)²/(window*(window+1)))`, not a rolling standard
+deviation. The output retains the input's alignment and warmup slots.
+
+=== "Python"
+
+    ```python
+    from itofin import chart
+
+    close = [100.0, 110.0, 99.0]
+    local = chart.simple_local_volatility_constant_fraction(close, 1 / 252)
+    constant = chart.constant_volatility(local, window=1)
+    assert local.to_list()[0] is None
+    assert constant.first_valid == 2
+    assert abs(constant.to_list()[2] - 1.0698541148988145) < 1e-12
+    ```
+
+=== "Go"
+
+    ```go
+    import itofin "github.com/benbenbang/libitofin/sdk/go"
+
+    close := []float64{100, 110, 99}
+    local, err := itofin.SimpleLocalVolatilityConstantFraction(close, 1.0/252)
+    if err != nil { panic(err) }
+    constant, err := itofin.ConstantVolatility(local, 1)
+    if err != nil { panic(err) }
+    _ = constant.NullableValues()
+    ```
+
 ## Indicator series
 
 Chart calculations use one Rust implementation for Python and Go. Every result
