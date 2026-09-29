@@ -1,7 +1,7 @@
 //! Python chart indicators backed by the shared Rust calculations.
 
 use crate::PyQlError;
-use libitofin::math::chart::{self, BollingerBands, ChartSeries, VolumeBars};
+use libitofin::math::chart::{self, BollingerBands, ChartSeries, Kd, Macd, VolumeBars};
 use numpy::PyArray1;
 use pyo3::prelude::*;
 use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pyfunction, gen_stub_pymethods};
@@ -125,6 +125,88 @@ impl PyBollingerBands {
     }
 }
 
+/// Taiwan stochastic oscillator lines aligned with input bars.
+#[gen_stub_pyclass]
+#[pyclass(name = "Kd", frozen, module = "itofin.chart")]
+pub(crate) struct PyKd {
+    rsv: PyChartSeries,
+    k: PyChartSeries,
+    d: PyChartSeries,
+}
+
+impl From<Kd> for PyKd {
+    fn from(values: Kd) -> Self {
+        Self {
+            rsv: PyChartSeries::from_core(values.rsv),
+            k: PyChartSeries::from_core(values.k),
+            d: PyChartSeries::from_core(values.d),
+        }
+    }
+}
+
+#[gen_stub_pymethods]
+#[pymethods]
+impl PyKd {
+    /// Raw stochastic value, with a flat range set to 50.
+    #[getter]
+    fn rsv(&self) -> PyChartSeries {
+        self.rsv.clone()
+    }
+
+    /// Smoothed K line, seeded at 50.
+    #[getter]
+    fn k(&self) -> PyChartSeries {
+        self.k.clone()
+    }
+
+    /// Smoothed D line, seeded at 50.
+    #[getter]
+    fn d(&self) -> PyChartSeries {
+        self.d.clone()
+    }
+}
+
+/// MACD line, signal, and histogram aligned with input closes.
+#[gen_stub_pyclass]
+#[pyclass(name = "Macd", frozen, module = "itofin.chart")]
+pub(crate) struct PyMacd {
+    line: PyChartSeries,
+    signal: PyChartSeries,
+    histogram: PyChartSeries,
+}
+
+impl From<Macd> for PyMacd {
+    fn from(values: Macd) -> Self {
+        Self {
+            line: PyChartSeries::from_core(values.line),
+            signal: PyChartSeries::from_core(values.signal),
+            histogram: PyChartSeries::from_core(values.histogram),
+        }
+    }
+}
+
+#[gen_stub_pymethods]
+#[pymethods]
+impl PyMacd {
+    /// Difference between SMA-seeded fast and slow EMAs.
+    #[getter]
+    fn line(&self) -> PyChartSeries {
+        self.line.clone()
+    }
+
+    /// SMA-seeded EMA of valid MACD line values.
+    #[getter]
+    fn signal(&self) -> PyChartSeries {
+        self.signal.clone()
+    }
+
+    /// Line minus signal.
+    #[getter]
+    fn histogram(&self) -> PyChartSeries {
+        self.histogram.clone()
+    }
+}
+
 /// Simple moving average, seeded after `period` closing prices.
 #[gen_stub_pyfunction(module = "itofin.chart")]
 #[pyfunction]
@@ -183,6 +265,40 @@ pub(crate) fn bollinger_bands(
 pub(crate) fn rsi(close: Vec<f64>, period: usize) -> PyResult<PyChartSeries> {
     chart::rsi(&close, period)
         .map(PyChartSeries::from_core)
+        .map_err(PyQlError::from)
+        .map_err(Into::into)
+}
+
+/// Taiwan KD with RSV and recursive K/D smoothing seeded at 50.
+#[gen_stub_pyfunction(module = "itofin.chart")]
+#[pyfunction]
+#[pyo3(signature = (high, low, close, period = 9, k_smooth = 3, d_smooth = 3))]
+pub(crate) fn kd(
+    high: Vec<f64>,
+    low: Vec<f64>,
+    close: Vec<f64>,
+    period: usize,
+    k_smooth: usize,
+    d_smooth: usize,
+) -> PyResult<PyKd> {
+    chart::kd(&high, &low, &close, period, k_smooth, d_smooth)
+        .map(PyKd::from)
+        .map_err(PyQlError::from)
+        .map_err(Into::into)
+}
+
+/// MACD with SMA-seeded fast, slow, and signal exponential averages.
+#[gen_stub_pyfunction(module = "itofin.chart")]
+#[pyfunction]
+#[pyo3(signature = (close, fast_period = 12, slow_period = 26, signal_period = 9))]
+pub(crate) fn macd(
+    close: Vec<f64>,
+    fast_period: usize,
+    slow_period: usize,
+    signal_period: usize,
+) -> PyResult<PyMacd> {
+    chart::macd(&close, fast_period, slow_period, signal_period)
+        .map(PyMacd::from)
         .map_err(PyQlError::from)
         .map_err(Into::into)
 }

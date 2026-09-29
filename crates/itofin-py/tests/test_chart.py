@@ -89,3 +89,53 @@ def test_wilder_rsi_warmup_flat_and_invalid():
         chart.rsi([1.0], period=0)
     with pytest.raises(itofin.ItofinError):
         chart.rsi([float("nan")], period=1)
+
+
+def test_taiwan_kd_seed_warmup_and_flat_range():
+    """KD uses rolling RSV and recursive K/D lines seeded at 50."""
+    values = chart.kd(
+        [12.0, 14.0, 16.0, 18.0],
+        [8.0, 10.0, 12.0, 14.0],
+        [10.0, 12.0, 14.0, 16.0],
+        period=3,
+    )
+    assert values.rsv.to_list() == [None, None, 75.0, 75.0]
+    assert values.k.first_valid == values.d.first_valid == 2
+    np.testing.assert_allclose(values.k.values[2:], [58.333333333333336, 63.88888888888889])
+    np.testing.assert_allclose(values.d.values[2:], [52.77777777777778, 56.48148148148148])
+    flat = chart.kd([2.0] * 9, [2.0] * 9, [2.0] * 9)
+    assert flat.rsv.to_list()[-1] == 50.0
+    assert flat.k.to_list()[-1] == 50.0
+    assert flat.d.to_list()[-1] == 50.0
+    assert flat.rsv.first_valid == flat.k.first_valid == flat.d.first_valid == 8
+    assert chart.kd([], [], []).rsv.to_list() == []
+    with pytest.raises(itofin.ItofinError):
+        chart.kd([1.0], [], [0.5], period=1)
+    with pytest.raises(itofin.ItofinError):
+        chart.kd([1.0], [0.0], [2.0], period=1)
+    with pytest.raises(itofin.ItofinError):
+        chart.kd([1.0], [0.0], [0.5], period=0)
+    with pytest.raises(itofin.ItofinError):
+        chart.kd([float("nan")], [0.0], [0.5], period=1)
+
+
+def test_macd_sma_seeded_signal_and_default_warmup():
+    """The signal waits for valid line values and uses their first SMA."""
+    values = chart.macd([1.0, 2.0, 3.0, 4.0], fast_period=2, slow_period=3, signal_period=2)
+    assert values.line.to_list() == [None, None, 0.5, 0.5]
+    assert values.signal.to_list() == [None, None, None, 0.5]
+    assert values.histogram.to_list() == [None, None, None, 0.0]
+    assert values.line.values.dtype == np.float64
+    assert values.line.first_valid == 2
+    assert values.signal.first_valid == values.histogram.first_valid == 3
+    default = chart.macd(list(range(1, 35)))
+    assert default.line.first_valid == 25
+    assert default.signal.first_valid == default.histogram.first_valid == 33
+    assert default.signal.to_list()[:33] == [None] * 33
+    assert chart.macd([]).line.to_list() == []
+    with pytest.raises(itofin.ItofinError):
+        chart.macd([1.0], fast_period=2, slow_period=2, signal_period=1)
+    with pytest.raises(itofin.ItofinError):
+        chart.macd([1.0], fast_period=1, slow_period=2, signal_period=0)
+    with pytest.raises(itofin.ItofinError):
+        chart.macd([float("inf")])

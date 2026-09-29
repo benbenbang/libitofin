@@ -8,9 +8,13 @@ import typing
 __all__ = [
     "BollingerBands",
     "ChartSeries",
+    "Kd",
+    "Macd",
     "VolumeBars",
     "bollinger_bands",
     "ema",
+    "kd",
+    "macd",
     "rsi",
     "sma",
     "volume_bars",
@@ -58,6 +62,48 @@ class ChartSeries:
         """
 
 @typing.final
+class Kd:
+    r"""
+    Taiwan stochastic oscillator lines aligned with input bars.
+    """
+    @property
+    def rsv(self) -> ChartSeries:
+        r"""
+        Raw stochastic value, with a flat range set to 50.
+        """
+    @property
+    def k(self) -> ChartSeries:
+        r"""
+        Smoothed K line, seeded at 50.
+        """
+    @property
+    def d(self) -> ChartSeries:
+        r"""
+        Smoothed D line, seeded at 50.
+        """
+
+@typing.final
+class Macd:
+    r"""
+    MACD line, signal, and histogram aligned with input closes.
+    """
+    @property
+    def line(self) -> ChartSeries:
+        r"""
+        Difference between SMA-seeded fast and slow EMAs.
+        """
+    @property
+    def signal(self) -> ChartSeries:
+        r"""
+        SMA-seeded EMA of valid MACD line values.
+        """
+    @property
+    def histogram(self) -> ChartSeries:
+        r"""
+        Line minus signal.
+        """
+
+@typing.final
 class VolumeBars:
     r"""
     Raw volume and the per-bar direction relative to the open.
@@ -81,6 +127,16 @@ def bollinger_bands(close: typing.Sequence[builtins.float], period: builtins.int
 def ema(close: typing.Sequence[builtins.float], period: builtins.int) -> ChartSeries:
     r"""
     Exponential moving average seeded by the first `period`-bar SMA.
+    """
+
+def kd(high: typing.Sequence[builtins.float], low: typing.Sequence[builtins.float], close: typing.Sequence[builtins.float], period: builtins.int = 9, k_smooth: builtins.int = 3, d_smooth: builtins.int = 3) -> Kd:
+    r"""
+    Taiwan KD with RSV and recursive K/D smoothing seeded at 50.
+    """
+
+def macd(close: typing.Sequence[builtins.float], fast_period: builtins.int = 12, slow_period: builtins.int = 26, signal_period: builtins.int = 9) -> Macd:
+    r"""
+    MACD with SMA-seeded fast, slow, and signal exponential averages.
     """
 
 def rsi(close: typing.Sequence[builtins.float], period: builtins.int = 14) -> ChartSeries:
