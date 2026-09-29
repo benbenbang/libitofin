@@ -1391,6 +1391,52 @@ int32_t itofin_handle_release(struct ItofinContext *ctx,
                               struct ItofinError *error);
 
 /**
+ * Compute an input-aligned simple moving average. Prefix values before
+ * `first_valid` are zero placeholders, not observations.
+ * # Safety
+ * Follow the crate-level pointer/non-overlap contract. `out` holds `capacity`
+ * doubles and `first_valid` holds one size_t.
+ */
+int32_t itofin_chart_sma(const ItofinReal *close,
+                         size_t len,
+                         size_t period,
+                         ItofinReal *out,
+                         size_t capacity,
+                         size_t *first_valid,
+                         struct ItofinError *error);
+
+/**
+ * Compute an input-aligned exponential moving average seeded by SMA.
+ * # Safety
+ * Follow the crate-level pointer/non-overlap contract. `out` holds `capacity`
+ * doubles and `first_valid` holds one size_t.
+ */
+int32_t itofin_chart_ema(const ItofinReal *close,
+                         size_t len,
+                         size_t period,
+                         ItofinReal *out,
+                         size_t capacity,
+                         size_t *first_valid,
+                         struct ItofinError *error);
+
+/**
+ * Copy volume and classify close relative to open as -1, 0, or 1.
+ * # Safety
+ * Each input has `len` doubles. `out_volume` and `out_direction` each hold
+ * `capacity` entries and obey the crate-level non-overlap contract.
+ */
+int32_t itofin_chart_volume_bars(const ItofinReal *open,
+                                 const ItofinReal *high,
+                                 const ItofinReal *low,
+                                 const ItofinReal *close,
+                                 const ItofinReal *volume,
+                                 size_t len,
+                                 ItofinReal *out_volume,
+                                 int8_t *out_direction,
+                                 size_t capacity,
+                                 struct ItofinError *error);
+
+/**
  * Generate `count` standard normal values with a deterministic nonzero seed.
  * # Safety
  * Follow the crate-level pointer contract. Output contains `count` doubles.
