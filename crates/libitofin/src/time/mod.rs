@@ -22,5 +22,6 @@ pub mod frequency;
 pub mod imm;
 pub mod period;
 pub mod schedule;
+pub mod timeseries;
 pub mod timeunit;
 pub mod weekday;
