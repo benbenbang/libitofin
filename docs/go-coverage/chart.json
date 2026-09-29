@@ -1,0 +1,70 @@
+{
+  "domain": "chart-indicators",
+  "entries": [
+    {
+      "c": "itofin_chart_sma",
+      "go": "SMA",
+      "python": "itofin.chart.sma",
+      "status": "implemented",
+      "tests": "TestChartAveragesAndWarmup"
+    },
+    {
+      "c": "itofin_chart_ema",
+      "go": "EMA",
+      "python": "itofin.chart.ema",
+      "status": "implemented",
+      "tests": "TestChartAveragesAndWarmup"
+    },
+    {
+      "c": "itofin_chart_volume_bars",
+      "go": "ChartVolumeBars",
+      "python": "itofin.chart.volume_bars",
+      "status": "implemented",
+      "tests": "TestChartVolumeBars"
+    },
+    {
+      "c": [
+        "itofin_chart_sma",
+        "itofin_chart_ema"
+      ],
+      "go": "ChartSeries.FirstValid",
+      "python": "itofin.chart.ChartSeries.first_valid",
+      "status": "implemented",
+      "tests": "TestChartAveragesAndWarmup"
+    },
+    {
+      "c": [
+        "itofin_chart_sma",
+        "itofin_chart_ema"
+      ],
+      "go": "ChartSeries.Values",
+      "python": "itofin.chart.ChartSeries.values",
+      "status": "implemented",
+      "tests": "TestChartAveragesAndWarmup"
+    },
+    {
+      "c": [
+        "itofin_chart_sma",
+        "itofin_chart_ema"
+      ],
+      "go": "ChartSeries.NullableValues",
+      "python": "itofin.chart.ChartSeries.to_list",
+      "status": "implemented",
+      "tests": "TestChartAveragesAndWarmup"
+    },
+    {
+      "c": "itofin_chart_volume_bars",
+      "go": "VolumeBars.Volume",
+      "python": "itofin.chart.VolumeBars.volume",
+      "status": "implemented",
+      "tests": "TestChartVolumeBars"
+    },
+    {
+      "c": "itofin_chart_volume_bars",
+      "go": "VolumeBars.Direction",
+      "python": "itofin.chart.VolumeBars.direction",
+      "status": "implemented",
+      "tests": "TestChartVolumeBars"
+    }
+  ]
+}
