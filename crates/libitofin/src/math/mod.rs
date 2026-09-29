@@ -22,3 +22,4 @@ pub mod solver1d;
 pub mod solvers1d;
 pub mod statistics;
 pub mod timegrid;
+pub mod volatility;
