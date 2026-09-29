@@ -5638,6 +5638,42 @@ int32_t itofin_volatility_constant(const ItofinReal *values,
                                    struct ItofinError *error);
 
 /**
+ * Compute SimpleSigma, ParkinsonSigma, Sigma4 and Sigma5 in channel-major
+ * order using one positive year fraction per bar. Every bar is valid.
+ * # Safety
+ * Inputs hold `len` doubles; `out` holds `capacity` doubles and `first_valid`
+ * one size_t. Follow the crate-level pointer/non-overlap contract.
+ */
+int32_t itofin_volatility_ohlc_point(const ItofinReal *open,
+                                     const ItofinReal *high,
+                                     const ItofinReal *low,
+                                     const ItofinReal *close,
+                                     const ItofinReal *year_fractions,
+                                     size_t len,
+                                     ItofinReal *out,
+                                     size_t capacity,
+                                     size_t *first_valid,
+                                     struct ItofinError *error);
+
+/**
+ * Compute SimpleSigma, ParkinsonSigma, Sigma4 and Sigma5 in channel-major
+ * order using one positive year fraction for every bar. Every bar is valid.
+ * # Safety
+ * Inputs hold `len` doubles; `out` holds `capacity` doubles and `first_valid`
+ * one size_t. Follow the crate-level pointer/non-overlap contract.
+ */
+int32_t itofin_volatility_ohlc_point_constant_fraction(const ItofinReal *open,
+                                                       const ItofinReal *high,
+                                                       const ItofinReal *low,
+                                                       const ItofinReal *close,
+                                                       size_t len,
+                                                       ItofinReal year_fraction,
+                                                       ItofinReal *out,
+                                                       size_t capacity,
+                                                       size_t *first_valid,
+                                                       struct ItofinError *error);
+
+/**
  * Kind: 0 interpolated, 1 SABR. Both returned handles must be released.
  * # Safety
  * Follow the crate C caller contract; arrays must have their stated lengths.
