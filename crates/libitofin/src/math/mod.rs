@@ -2,6 +2,7 @@
 
 pub mod array;
 pub mod beta;
+pub mod chart;
 pub mod comparison;
 pub mod copulas;
 pub mod distributions;
