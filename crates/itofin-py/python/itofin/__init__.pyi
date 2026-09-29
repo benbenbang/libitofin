@@ -6,6 +6,7 @@ import numpy
 import numpy.typing
 import typing
 from . import cashflows
+from . import chart
 from . import indexes
 from . import instruments
 from . import models
@@ -23,6 +24,7 @@ __all__ = [
     "ItofinError",
     "Settings",
     "cashflows",
+    "chart",
     "gaussian_draws",
     "indexes",
     "instruments",
