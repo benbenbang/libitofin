@@ -1,0 +1,59 @@
+{
+  "domain": "pointwise-ohlc-volatility",
+  "entries": [
+    {
+      "c": "itofin_volatility_ohlc_point",
+      "go": "OHLCPointVolatility",
+      "python": "itofin.chart.ohlc_point_volatility",
+      "status": "implemented",
+      "tests": "TestOHLCPointVolatility"
+    },
+    {
+      "c": "itofin_volatility_ohlc_point_constant_fraction",
+      "go": "OHLCPointVolatilityConstantFraction",
+      "python": "itofin.chart.ohlc_point_volatility_constant_fraction",
+      "status": "implemented",
+      "tests": "TestOHLCPointVolatility"
+    },
+    {
+      "c": [
+        "itofin_volatility_ohlc_point",
+        "itofin_volatility_ohlc_point_constant_fraction"
+      ],
+      "go": "OHLCPointEstimates.SimpleSigma",
+      "python": "itofin.chart.OhlcPointEstimates.simple_sigma",
+      "status": "implemented",
+      "tests": "TestOHLCPointVolatility"
+    },
+    {
+      "c": [
+        "itofin_volatility_ohlc_point",
+        "itofin_volatility_ohlc_point_constant_fraction"
+      ],
+      "go": "OHLCPointEstimates.ParkinsonSigma",
+      "python": "itofin.chart.OhlcPointEstimates.parkinson_sigma",
+      "status": "implemented",
+      "tests": "TestOHLCPointVolatility"
+    },
+    {
+      "c": [
+        "itofin_volatility_ohlc_point",
+        "itofin_volatility_ohlc_point_constant_fraction"
+      ],
+      "go": "OHLCPointEstimates.GarmanKlassSigma4",
+      "python": "itofin.chart.OhlcPointEstimates.garman_klass_sigma4",
+      "status": "implemented",
+      "tests": "TestOHLCPointVolatility"
+    },
+    {
+      "c": [
+        "itofin_volatility_ohlc_point",
+        "itofin_volatility_ohlc_point_constant_fraction"
+      ],
+      "go": "OHLCPointEstimates.GarmanKlassSigma5",
+      "python": "itofin.chart.OhlcPointEstimates.garman_klass_sigma5",
+      "status": "implemented",
+      "tests": "TestOHLCPointVolatility"
+    }
+  ]
+}
