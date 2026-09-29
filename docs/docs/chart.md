@@ -114,6 +114,51 @@ point variances are `c²`, `(u-d)²/(4 ln 2)`,
     _ = estimates.ParkinsonSigma.NullableValues()
     ```
 
+## Overnight OHLC volatility
+
+`ohlc_overnight_volatility` returns annualized Garman-Klass Sigma1, Sigma3,
+and Sigma6 estimates. Each result combines the current bar with the previous
+bar's close, so index zero is a missing prefix and `first_valid` is one for a
+nonempty series. Indexed year fractions belong to the interval ending at each
+bar; the fraction at index zero is unused. The constant-fraction helper uses
+one positive year fraction for every interval.
+
+Let `g = ln(open[i]/close[i-1])`, `f` be the overnight fraction with `0 < f < 1`,
+and `p` be the current bar's Simple, Parkinson, or Sigma4 point variance from
+above. The corresponding coefficients `a` are `0.5`, `0.17`, and `0.012`.
+Each estimate is `sqrt((a*g²/f + (1-a)*p/(1-f))/year_fraction[i])`.
+An invalid or negative combined variance returns an error; unlike the
+pointwise estimators, the overnight formula does not take its absolute value.
+All OHLC prices must be positive and finite, with open and close inside the
+low-to-high range.
+
+=== "Python"
+
+    ```python
+    from itofin import chart
+
+    estimates = chart.ohlc_overnight_volatility_constant_fraction(
+        open=[100.0, 110.0], high=[100.0, 120.0],
+        low=[100.0, 105.0], close=[100.0, 115.0],
+        year_fraction=1 / 252, overnight_fraction=0.25,
+    )
+    assert estimates.garman_klass_sigma1.first_valid == 1
+    assert abs(estimates.garman_klass_sigma1.values[1] - 2.2159224836472786) < 1e-12
+    ```
+
+=== "Go"
+
+    ```go
+    import itofin "github.com/benbenbang/libitofin/sdk/go"
+
+    estimates, err := itofin.OHLCOvernightVolatilityConstantFraction(
+        []float64{100, 110}, []float64{100, 120},
+        []float64{100, 105}, []float64{100, 115}, 1.0/252, 0.25,
+    )
+    if err != nil { panic(err) }
+    _ = estimates.GarmanKlassSigma1.NullableValues()
+    ```
+
 ## Indicator series
 
 Chart calculations use one Rust implementation for Python and Go. Every result
