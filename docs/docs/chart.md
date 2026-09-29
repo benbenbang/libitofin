@@ -82,4 +82,38 @@ Python functions accept explicit periods and also provide these defaults. Go
 offers `ChartBollingerBands` and `RSI` for explicit parameters, alongside the
 default helpers.
 
+## Taiwan KD and MACD
+
+Taiwan KD uses a nine-bar highest-high/lowest-low RSV by default. A flat range
+sets RSV to 50. K and D each use recursive smoothing with periods of three and
+start from 50; all three series first become valid at index `period - 1`.
+MACD defaults to fast/slow/signal periods of `(12, 26, 9)`. The price EMAs and
+signal EMA each start from a simple average. The line first becomes valid at
+index 25, and signal and histogram at index 33 with these defaults.
+
+=== "Python"
+
+    ```python
+    close = [100.0] * 34
+    oscillator = chart.kd(close, close, close)
+    momentum = chart.macd(close)
+    assert oscillator.k.to_list()[8] == 50.0
+    assert momentum.signal.first_valid == 33
+    ```
+
+=== "Go"
+
+    ```go
+    close := make([]float64, 34)
+    oscillator, err := itofin.DefaultKD(close, close, close)
+    if err != nil { panic(err) }
+    momentum, err := itofin.DefaultMACD(close)
+    if err != nil { panic(err) }
+    _ = oscillator.K.NullableValues()
+    _ = momentum.Histogram.NullableValues()
+    ```
+
+Both bindings also accept explicit periods through Python keyword arguments
+or Go's `ChartKD` and `ChartMACD` functions.
+
 ::: itofin.chart

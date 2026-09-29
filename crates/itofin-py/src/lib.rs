@@ -419,11 +419,15 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     chart.add_class::<chart::PyChartSeries>()?;
     chart.add_class::<chart::PyVolumeBars>()?;
     chart.add_class::<chart::PyBollingerBands>()?;
+    chart.add_class::<chart::PyKd>()?;
+    chart.add_class::<chart::PyMacd>()?;
     chart.add_function(wrap_pyfunction!(chart::sma, &chart)?)?;
     chart.add_function(wrap_pyfunction!(chart::ema, &chart)?)?;
     chart.add_function(wrap_pyfunction!(chart::volume_bars, &chart)?)?;
     chart.add_function(wrap_pyfunction!(chart::bollinger_bands, &chart)?)?;
     chart.add_function(wrap_pyfunction!(chart::rsi, &chart)?)?;
+    chart.add_function(wrap_pyfunction!(chart::kd, &chart)?)?;
+    chart.add_function(wrap_pyfunction!(chart::macd, &chart)?)?;
 
     let submodules = [
         ("time", &time),
