@@ -47,6 +47,7 @@ pub mod optimize_api;
 pub mod options_api;
 pub mod overnight_futures_api;
 pub mod poisson_rng_api;
+pub mod prices_api;
 pub mod rates_api;
 pub mod rates_engines;
 pub mod rates_fra;

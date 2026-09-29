@@ -864,6 +864,17 @@ typedef struct ItofinSofrFutureHelperConfig {
   int32_t custom_date;
 } ItofinSofrFutureHelperConfig;
 
+/**
+ * One dated OHLC observation. Dates are QuantLib-compatible serial numbers.
+ */
+typedef struct ItofinDatedIntervalPrice {
+  int32_t date;
+  ItofinReal open;
+  ItofinReal high;
+  ItofinReal low;
+  ItofinReal close;
+} ItofinDatedIntervalPrice;
+
 typedef struct ItofinVanillaSwapConfig {
   int32_t swap_type;
   ItofinReal nominal;
@@ -4469,6 +4480,21 @@ int32_t itofin_poisson_rng_draw(struct ItofinContext *ctx,
                                 double *out,
                                 size_t capacity,
                                 struct ItofinError *error);
+
+/**
+ * Validate dated OHLC prices, sort by date, and keep the last input for a
+ * repeated date. `capacity` must hold at least `len` rows. Neither output is
+ * changed on error.
+ * # Safety
+ * Follow the crate-level pointer/non-overlap contract. `input` holds `len`
+ * rows, `out` holds `capacity` rows, and `out_len` holds one size_t.
+ */
+int32_t itofin_interval_prices_normalize(const struct ItofinDatedIntervalPrice *input,
+                                         size_t len,
+                                         struct ItofinDatedIntervalPrice *out,
+                                         size_t capacity,
+                                         size_t *out_len,
+                                         struct ItofinError *error);
 
 /**
  * # Safety
