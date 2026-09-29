@@ -12,6 +12,7 @@ __all__ = [
     "DatedIntervalPrice",
     "Kd",
     "Macd",
+    "OhlcOvernightEstimates",
     "OhlcPointEstimates",
     "VolumeBars",
     "bollinger_bands",
@@ -20,6 +21,8 @@ __all__ = [
     "interval_prices",
     "kd",
     "macd",
+    "ohlc_overnight_volatility",
+    "ohlc_overnight_volatility_constant_fraction",
     "ohlc_point_volatility",
     "ohlc_point_volatility_constant_fraction",
     "rsi",
@@ -144,6 +147,27 @@ class Macd:
         """
 
 @typing.final
+class OhlcOvernightEstimates:
+    r"""
+    Annualized overnight estimates aligned with the input OHLC bars.
+    """
+    @property
+    def garman_klass_sigma1(self) -> ChartSeries:
+        r"""
+        Garman-Klass Sigma1 estimate using the preceding close.
+        """
+    @property
+    def garman_klass_sigma3(self) -> ChartSeries:
+        r"""
+        Garman-Klass Sigma3 estimate using the preceding close.
+        """
+    @property
+    def garman_klass_sigma6(self) -> ChartSeries:
+        r"""
+        Garman-Klass Sigma6 estimate using the preceding close.
+        """
+
+@typing.final
 class OhlcPointEstimates:
     r"""
     Annualized volatility estimates aligned with the input OHLC bars.
@@ -213,6 +237,16 @@ def kd(high: typing.Sequence[builtins.float], low: typing.Sequence[builtins.floa
 def macd(close: typing.Sequence[builtins.float], fast_period: builtins.int = 12, slow_period: builtins.int = 26, signal_period: builtins.int = 9) -> Macd:
     r"""
     MACD with SMA-seeded fast, slow, and signal exponential averages.
+    """
+
+def ohlc_overnight_volatility(open: typing.Sequence[builtins.float], high: typing.Sequence[builtins.float], low: typing.Sequence[builtins.float], close: typing.Sequence[builtins.float], year_fractions: typing.Sequence[builtins.float], overnight_fraction: builtins.float) -> OhlcOvernightEstimates:
+    r"""
+    Estimate three annualized overnight series using each bar's year fraction.
+    """
+
+def ohlc_overnight_volatility_constant_fraction(open: typing.Sequence[builtins.float], high: typing.Sequence[builtins.float], low: typing.Sequence[builtins.float], close: typing.Sequence[builtins.float], year_fraction: builtins.float, overnight_fraction: builtins.float) -> OhlcOvernightEstimates:
+    r"""
+    Estimate three annualized overnight series with one year fraction per interval.
     """
 
 def ohlc_point_volatility(open: typing.Sequence[builtins.float], high: typing.Sequence[builtins.float], low: typing.Sequence[builtins.float], close: typing.Sequence[builtins.float], year_fractions: typing.Sequence[builtins.float]) -> OhlcPointEstimates:
