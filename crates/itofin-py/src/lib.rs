@@ -13,6 +13,7 @@ mod capfloorengine;
 mod capfloortermvol;
 mod caphelper;
 mod cashflows;
+mod chart;
 mod credit;
 mod creditdensity;
 mod creditengine;
@@ -414,6 +415,13 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     let results = PyModule::new(py, "results")?;
     results.add_class::<Results>()?;
 
+    let chart = PyModule::new(py, "chart")?;
+    chart.add_class::<chart::PyChartSeries>()?;
+    chart.add_class::<chart::PyVolumeBars>()?;
+    chart.add_function(wrap_pyfunction!(chart::sma, &chart)?)?;
+    chart.add_function(wrap_pyfunction!(chart::ema, &chart)?)?;
+    chart.add_function(wrap_pyfunction!(chart::volume_bars, &chart)?)?;
+
     let submodules = [
         ("time", &time),
         ("quotes", &quotes),
@@ -428,6 +436,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
         ("optimize", &optimize),
         ("randomnumbers", &randomnumbers),
         ("results", &results),
+        ("chart", &chart),
     ];
 
     let sys_modules = PyModule::import(py, "sys")?.getattr("modules")?;
