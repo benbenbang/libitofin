@@ -14,6 +14,7 @@ mod capfloortermvol;
 mod caphelper;
 mod cashflows;
 mod chart;
+mod chart_ohlc_overnight;
 mod chart_ohlc_volatility;
 mod chart_prices;
 mod credit;
@@ -423,6 +424,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     chart.add_class::<chart::PyBollingerBands>()?;
     chart.add_class::<chart::PyKd>()?;
     chart.add_class::<chart::PyMacd>()?;
+    chart.add_class::<chart_ohlc_overnight::PyOhlcOvernightEstimates>()?;
     chart.add_class::<chart_ohlc_volatility::PyOhlcPointEstimates>()?;
     chart.add_class::<chart_prices::PyDatedIntervalPrice>()?;
     chart.add_function(wrap_pyfunction!(chart::sma, &chart)?)?;
@@ -438,6 +440,14 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
         &chart
     )?)?;
     chart.add_function(wrap_pyfunction!(chart::constant_volatility, &chart)?)?;
+    chart.add_function(wrap_pyfunction!(
+        chart_ohlc_overnight::ohlc_overnight_volatility,
+        &chart
+    )?)?;
+    chart.add_function(wrap_pyfunction!(
+        chart_ohlc_overnight::ohlc_overnight_volatility_constant_fraction,
+        &chart
+    )?)?;
     chart.add_function(wrap_pyfunction!(
         chart_ohlc_volatility::ohlc_point_volatility,
         &chart

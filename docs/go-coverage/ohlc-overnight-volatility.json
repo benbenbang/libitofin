@@ -1,0 +1,49 @@
+{
+  "domain": "overnight-ohlc-volatility",
+  "entries": [
+    {
+      "c": "itofin_volatility_ohlc_overnight",
+      "go": "OHLCOvernightVolatility",
+      "python": "itofin.chart.ohlc_overnight_volatility",
+      "status": "implemented",
+      "tests": "TestOHLCOvernightVolatility"
+    },
+    {
+      "c": "itofin_volatility_ohlc_overnight_constant_fraction",
+      "go": "OHLCOvernightVolatilityConstantFraction",
+      "python": "itofin.chart.ohlc_overnight_volatility_constant_fraction",
+      "status": "implemented",
+      "tests": "TestOHLCOvernightVolatility"
+    },
+    {
+      "c": [
+        "itofin_volatility_ohlc_overnight",
+        "itofin_volatility_ohlc_overnight_constant_fraction"
+      ],
+      "go": "OHLCOvernightEstimates.GarmanKlassSigma1",
+      "python": "itofin.chart.OhlcOvernightEstimates.garman_klass_sigma1",
+      "status": "implemented",
+      "tests": "TestOHLCOvernightVolatility"
+    },
+    {
+      "c": [
+        "itofin_volatility_ohlc_overnight",
+        "itofin_volatility_ohlc_overnight_constant_fraction"
+      ],
+      "go": "OHLCOvernightEstimates.GarmanKlassSigma3",
+      "python": "itofin.chart.OhlcOvernightEstimates.garman_klass_sigma3",
+      "status": "implemented",
+      "tests": "TestOHLCOvernightVolatility"
+    },
+    {
+      "c": [
+        "itofin_volatility_ohlc_overnight",
+        "itofin_volatility_ohlc_overnight_constant_fraction"
+      ],
+      "go": "OHLCOvernightEstimates.GarmanKlassSigma6",
+      "python": "itofin.chart.OhlcOvernightEstimates.garman_klass_sigma6",
+      "status": "implemented",
+      "tests": "TestOHLCOvernightVolatility"
+    }
+  ]
+}
