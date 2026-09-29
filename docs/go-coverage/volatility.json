@@ -1,0 +1,26 @@
+{
+  "domain": "close-volatility-estimators",
+  "entries": [
+    {
+      "c": "itofin_volatility_simple_local",
+      "go": "SimpleLocalVolatility",
+      "python": "itofin.chart.simple_local_volatility",
+      "status": "implemented",
+      "tests": "TestVolatilityEstimators"
+    },
+    {
+      "c": "itofin_volatility_simple_local_constant_fraction",
+      "go": "SimpleLocalVolatilityConstantFraction",
+      "python": "itofin.chart.simple_local_volatility_constant_fraction",
+      "status": "implemented",
+      "tests": "TestVolatilityEstimators"
+    },
+    {
+      "c": "itofin_volatility_constant",
+      "go": "ConstantVolatility",
+      "python": "itofin.chart.constant_volatility",
+      "status": "implemented",
+      "tests": "TestVolatilityEstimators"
+    }
+  ]
+}

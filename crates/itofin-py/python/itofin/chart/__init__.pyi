@@ -14,11 +14,14 @@ __all__ = [
     "Macd",
     "VolumeBars",
     "bollinger_bands",
+    "constant_volatility",
     "ema",
     "interval_prices",
     "kd",
     "macd",
     "rsi",
+    "simple_local_volatility",
+    "simple_local_volatility_constant_fraction",
     "sma",
     "volume_bars",
 ]
@@ -158,6 +161,11 @@ def bollinger_bands(close: typing.Sequence[builtins.float], period: builtins.int
     Bollinger bands using a population standard deviation over each window.
     """
 
+def constant_volatility(input: ChartSeries, window: builtins.int) -> ChartSeries:
+    r"""
+    Rolling volatility from preceding valid local values, excluding the current bar.
+    """
+
 def ema(close: typing.Sequence[builtins.float], period: builtins.int) -> ChartSeries:
     r"""
     Exponential moving average seeded by the first `period`-bar SMA.
@@ -181,6 +189,16 @@ def macd(close: typing.Sequence[builtins.float], fast_period: builtins.int = 12,
 def rsi(close: typing.Sequence[builtins.float], period: builtins.int = 14) -> ChartSeries:
     r"""
     Wilder RSI, seeded after `period` closing-price changes.
+    """
+
+def simple_local_volatility(close: typing.Sequence[builtins.float], year_fractions: typing.Sequence[builtins.float]) -> ChartSeries:
+    r"""
+    Absolute log returns annualized by each bar's year fraction.
+    """
+
+def simple_local_volatility_constant_fraction(close: typing.Sequence[builtins.float], year_fraction: builtins.float) -> ChartSeries:
+    r"""
+    Absolute log returns annualized by one year fraction for every bar.
     """
 
 def sma(close: typing.Sequence[builtins.float], period: builtins.int) -> ChartSeries:

@@ -2,6 +2,7 @@
 
 use crate::PyQlError;
 use libitofin::math::chart::{self, BollingerBands, ChartSeries, Kd, Macd, VolumeBars};
+use libitofin::math::volatility;
 use numpy::PyArray1;
 use pyo3::prelude::*;
 use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pyfunction, gen_stub_pymethods};
@@ -299,6 +300,46 @@ pub(crate) fn macd(
 ) -> PyResult<PyMacd> {
     chart::macd(&close, fast_period, slow_period, signal_period)
         .map(PyMacd::from)
+        .map_err(PyQlError::from)
+        .map_err(Into::into)
+}
+
+/// Absolute log returns annualized by each bar's year fraction.
+#[gen_stub_pyfunction(module = "itofin.chart")]
+#[pyfunction]
+pub(crate) fn simple_local_volatility(
+    close: Vec<f64>,
+    year_fractions: Vec<f64>,
+) -> PyResult<PyChartSeries> {
+    volatility::simple_local_volatility(&close, &year_fractions)
+        .map(PyChartSeries::from_core)
+        .map_err(PyQlError::from)
+        .map_err(Into::into)
+}
+
+/// Absolute log returns annualized by one year fraction for every bar.
+#[gen_stub_pyfunction(module = "itofin.chart")]
+#[pyfunction]
+pub(crate) fn simple_local_volatility_constant_fraction(
+    close: Vec<f64>,
+    year_fraction: f64,
+) -> PyResult<PyChartSeries> {
+    volatility::simple_local_volatility_constant_fraction(&close, year_fraction)
+        .map(PyChartSeries::from_core)
+        .map_err(PyQlError::from)
+        .map_err(Into::into)
+}
+
+/// Rolling volatility from preceding valid local values, excluding the current bar.
+#[gen_stub_pyfunction(module = "itofin.chart")]
+#[pyfunction]
+pub(crate) fn constant_volatility(
+    input: PyRef<PyChartSeries>,
+    window: i64,
+) -> PyResult<PyChartSeries> {
+    let window = usize::try_from(window).unwrap_or(0);
+    volatility::constant_volatility(&input.inner, window)
+        .map(PyChartSeries::from_core)
         .map_err(PyQlError::from)
         .map_err(Into::into)
 }
