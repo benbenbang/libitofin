@@ -2287,6 +2287,37 @@ int32_t itofin_fd_black_scholes_engine_new(struct ItofinContext *ctx,
                                            struct ItofinError *error);
 
 /**
+ * Filter returns into conditional volatility and forecast the next variance.
+ * The first output slot is a zero warmup placeholder; `first_valid` is one.
+ * # Safety
+ * `returns` holds `len` doubles and `out` holds `capacity` doubles. All
+ * pointers follow the crate-level non-overlap contract.
+ */
+int32_t itofin_garch11_filter(const ItofinReal *returns,
+                              size_t len,
+                              ItofinReal alpha,
+                              ItofinReal beta,
+                              ItofinReal long_run_variance,
+                              ItofinReal *out,
+                              size_t capacity,
+                              size_t *first_valid,
+                              ItofinReal *next_variance,
+                              struct ItofinError *error);
+
+/**
+ * Forecast one variance from the latest return and current variance.
+ * # Safety
+ * `out_variance` is writable and follows the crate-level pointer contract.
+ */
+int32_t itofin_garch11_forecast(ItofinReal last_return,
+                                ItofinReal current_variance,
+                                ItofinReal alpha,
+                                ItofinReal beta,
+                                ItofinReal long_run_variance,
+                                ItofinReal *out_variance,
+                                struct ItofinError *error);
+
+/**
  * # Safety
  * Pointers must be aligned, live and valid for their stated lengths. Outputs
  * must not overlap inputs or other outputs. Any context and its handles must
