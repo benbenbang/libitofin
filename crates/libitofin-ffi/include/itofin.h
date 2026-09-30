@@ -5181,6 +5181,31 @@ int32_t itofin_sabr_smile_query(struct ItofinContext *ctx,
                                 struct ItofinError *error);
 
 /**
+ * Evaluate one weighted batch statistic into caller-owned storage.
+ *
+ * `measure` selects mean (0), sample variance (1), standard deviation (2),
+ * percentile (3), value at risk (4), or expected shortfall (5). `probability`
+ * is used for percentile and risk measures only. Null `weights` with zero
+ * `weights_len` selects unit weights. Inputs are signed observations; VaR and
+ * expected shortfall return nonnegative loss magnitudes. On error, `out` is
+ * unchanged.
+ *
+ * # Safety
+ *
+ * `values` holds `values_len` readable doubles. If supplied, `weights` holds
+ * `weights_len` readable doubles. `out` holds one writable double. All
+ * pointers follow the crate-level alignment and non-overlap contract.
+ */
+int32_t itofin_statistics_evaluate(const ItofinReal *values,
+                                   size_t values_len,
+                                   const ItofinReal *weights,
+                                   size_t weights_len,
+                                   int32_t measure,
+                                   ItofinReal probability,
+                                   ItofinReal *out,
+                                   struct ItofinError *error);
+
+/**
  * # Safety
  * Follow the crate C caller contract; arrays must have their stated lengths.
  */
