@@ -159,6 +159,46 @@ low-to-high range.
     _ = estimates.GarmanKlassSigma1.NullableValues()
     ```
 
+## Fixed-parameter GARCH(1,1)
+
+`garch11_filter` consumes **returns**, not prices. Given `alpha`, `beta`, and
+`long_run_variance`, it uses `omega = (1-alpha-beta)*long_run_variance` and
+`next_variance = omega + alpha*return² + beta*current_variance`. The last
+parameter is a variance, despite QuantLib's historical `ltVol` name. Returns
+and conditional volatility use the same units; the API does not annualize or
+fit parameters.
+
+The first return seeds variance as its square. Conditional volatility at index
+`i >= 1` uses returns through index `i-1`; index zero is a zero placeholder and
+`first_valid` is one. `next_variance` uses the final return and is the forecast
+for the step after the input series. A single return has no valid conditional
+volatility yet, but still produces a forecast. Use `garch11_forecast` to advance
+the recurrence separately. Parameters must be finite and nonnegative, with
+`alpha+beta < 1`; returns and all intermediate variances must be finite.
+
+=== "Python"
+
+    ```python
+    from itofin import chart
+
+    result = chart.garch11_filter([0.1] * 10, 0.2, 0.3, 0.4)
+    assert result.conditional_volatility.first_valid == 1
+    assert abs(result.conditional_volatility.values[1] - 0.452769) < 1e-6
+    assert abs(result.next_variance**0.5 - 0.537187) < 1e-6
+    ```
+
+=== "Go"
+
+    ```go
+    import itofin "github.com/benbenbang/libitofin/sdk/go"
+
+    returns := []float64{0.1, 0.1, 0.1}
+    result, err := itofin.Garch11Filter(returns, 0.2, 0.3, 0.4)
+    if err != nil { panic(err) }
+    _ = result.ConditionalVolatility.NullableValues()
+    _ = result.NextVariance
+    ```
+
 ## Indicator series
 
 Chart calculations use one Rust implementation for Python and Go. Every result
