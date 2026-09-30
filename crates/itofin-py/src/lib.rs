@@ -26,6 +26,7 @@ mod currency;
 mod curve;
 mod fdengine;
 mod fra;
+mod general_statistics;
 mod helpers;
 mod heston;
 mod heston_engines;
@@ -421,6 +422,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     results.add_class::<Results>()?;
 
     let statistics = PyModule::new(py, "statistics")?;
+    statistics.add_class::<general_statistics::PyGeneralStatistics>()?;
     statistics.add_function(wrap_pyfunction!(statistics::mean, &statistics)?)?;
     statistics.add_function(wrap_pyfunction!(statistics::variance, &statistics)?)?;
     statistics.add_function(wrap_pyfunction!(
