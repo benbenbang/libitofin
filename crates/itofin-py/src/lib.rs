@@ -433,6 +433,24 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
         statistics::expected_shortfall,
         &statistics
     )?)?;
+    statistics.add_function(wrap_pyfunction!(statistics::semi_variance, &statistics)?)?;
+    statistics.add_function(wrap_pyfunction!(statistics::semi_deviation, &statistics)?)?;
+    statistics.add_function(wrap_pyfunction!(
+        statistics::downside_variance,
+        &statistics
+    )?)?;
+    statistics.add_function(wrap_pyfunction!(
+        statistics::downside_deviation,
+        &statistics
+    )?)?;
+    statistics.add_function(wrap_pyfunction!(statistics::regret, &statistics)?)?;
+    statistics.add_function(wrap_pyfunction!(statistics::potential_upside, &statistics)?)?;
+    statistics.add_function(wrap_pyfunction!(statistics::shortfall, &statistics)?)?;
+    statistics.add_function(wrap_pyfunction!(
+        statistics::average_shortfall,
+        &statistics
+    )?)?;
+    statistics.add_function(wrap_pyfunction!(statistics::top_percentile, &statistics)?)?;
 
     let chart = PyModule::new(py, "chart")?;
     chart.add_class::<chart::PyChartSeries>()?;

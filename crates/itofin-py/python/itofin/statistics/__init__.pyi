@@ -4,13 +4,37 @@
 import builtins
 import typing
 __all__ = [
+    "average_shortfall",
+    "downside_deviation",
+    "downside_variance",
     "expected_shortfall",
     "mean",
     "percentile",
+    "potential_upside",
+    "regret",
+    "semi_deviation",
+    "semi_variance",
+    "shortfall",
     "standard_deviation",
+    "top_percentile",
     "value_at_risk",
     "variance",
 ]
+
+def average_shortfall(observations: typing.Sequence[builtins.float], target: builtins.float, *, weights: typing.Optional[typing.Sequence[builtins.float]] = None) -> builtins.float:
+    r"""
+    Weighted mean of target minus observations strictly below target.
+    """
+
+def downside_deviation(observations: typing.Sequence[builtins.float], *, weights: typing.Optional[typing.Sequence[builtins.float]] = None) -> builtins.float:
+    r"""
+    Square root of downside variance.
+    """
+
+def downside_variance(observations: typing.Sequence[builtins.float], *, weights: typing.Optional[typing.Sequence[builtins.float]] = None) -> builtins.float:
+    r"""
+    Count-corrected conditional variance below zero.
+    """
 
 def expected_shortfall(observations: typing.Sequence[builtins.float], confidence: builtins.float, *, weights: typing.Optional[typing.Sequence[builtins.float]] = None) -> builtins.float:
     r"""
@@ -27,9 +51,39 @@ def percentile(observations: typing.Sequence[builtins.float], probability: built
     Weighted empirical percentile for a probability in (0, 1].
     """
 
+def potential_upside(observations: typing.Sequence[builtins.float], confidence: builtins.float, *, weights: typing.Optional[typing.Sequence[builtins.float]] = None) -> builtins.float:
+    r"""
+    Nonnegative upper percentile at confidence in [0.9, 1).
+    """
+
+def regret(observations: typing.Sequence[builtins.float], target: builtins.float, *, weights: typing.Optional[typing.Sequence[builtins.float]] = None) -> builtins.float:
+    r"""
+    Count-corrected conditional variance below a finite target.
+    """
+
+def semi_deviation(observations: typing.Sequence[builtins.float], *, weights: typing.Optional[typing.Sequence[builtins.float]] = None) -> builtins.float:
+    r"""
+    Square root of semi variance.
+    """
+
+def semi_variance(observations: typing.Sequence[builtins.float], *, weights: typing.Optional[typing.Sequence[builtins.float]] = None) -> builtins.float:
+    r"""
+    Count-corrected conditional variance below the weighted mean.
+    """
+
+def shortfall(observations: typing.Sequence[builtins.float], target: builtins.float, *, weights: typing.Optional[typing.Sequence[builtins.float]] = None) -> builtins.float:
+    r"""
+    Weighted probability of observations strictly below a finite target.
+    """
+
 def standard_deviation(observations: typing.Sequence[builtins.float], *, weights: typing.Optional[typing.Sequence[builtins.float]] = None) -> builtins.float:
     r"""
     Square root of weighted sample variance.
+    """
+
+def top_percentile(observations: typing.Sequence[builtins.float], probability: builtins.float, *, weights: typing.Optional[typing.Sequence[builtins.float]] = None) -> builtins.float:
+    r"""
+    Weighted empirical percentile traversing observations from high to low.
     """
 
 def value_at_risk(observations: typing.Sequence[builtins.float], confidence: builtins.float, *, weights: typing.Optional[typing.Sequence[builtins.float]] = None) -> builtins.float:

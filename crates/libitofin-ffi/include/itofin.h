@@ -5184,11 +5184,14 @@ int32_t itofin_sabr_smile_query(struct ItofinContext *ctx,
  * Evaluate one weighted batch statistic into caller-owned storage.
  *
  * `measure` selects mean (0), sample variance (1), standard deviation (2),
- * percentile (3), value at risk (4), or expected shortfall (5). `probability`
- * is used for percentile and risk measures only. Null `weights` with zero
- * `weights_len` selects unit weights. Inputs are signed observations; VaR and
- * expected shortfall return nonnegative loss magnitudes. On error, `out` is
- * unchanged.
+ * percentile (3), value at risk (4), expected shortfall (5), semi variance
+ * (6), semi deviation (7), downside variance (8), downside deviation (9),
+ * regret (10), potential upside (11), shortfall (12), average shortfall (13),
+ * or top percentile (14). `probability` carries a target for measures 10,
+ * 12 and 13, a percentile for 3 and 14, and a confidence for 4, 5 and 11.
+ * Null `weights` with zero `weights_len` selects unit weights. Inputs are
+ * signed observations; VaR and expected shortfall return nonnegative loss
+ * magnitudes. On error, `out` is unchanged.
  *
  * # Safety
  *

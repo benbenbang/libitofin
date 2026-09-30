@@ -42,6 +42,69 @@
       "python": "itofin.statistics.expected_shortfall",
       "status": "implemented",
       "tests": "TestStatisticsEmpiricalRisk"
+    },
+    {
+      "c": "itofin_statistics_evaluate",
+      "go": "StatisticsSemiVariance",
+      "python": "itofin.statistics.semi_variance",
+      "status": "implemented",
+      "tests": "TestStatisticsConditionalRiskAndUpperTail"
+    },
+    {
+      "c": "itofin_statistics_evaluate",
+      "go": "StatisticsSemiDeviation",
+      "python": "itofin.statistics.semi_deviation",
+      "status": "implemented",
+      "tests": "TestStatisticsConditionalRiskAndUpperTail"
+    },
+    {
+      "c": "itofin_statistics_evaluate",
+      "go": "StatisticsDownsideVariance",
+      "python": "itofin.statistics.downside_variance",
+      "status": "implemented",
+      "tests": "TestStatisticsConditionalRiskAndUpperTail"
+    },
+    {
+      "c": "itofin_statistics_evaluate",
+      "go": "StatisticsDownsideDeviation",
+      "python": "itofin.statistics.downside_deviation",
+      "status": "implemented",
+      "tests": "TestStatisticsConditionalRiskAndUpperTail"
+    },
+    {
+      "c": "itofin_statistics_evaluate",
+      "go": "StatisticsRegret",
+      "python": "itofin.statistics.regret",
+      "status": "implemented",
+      "tests": "TestStatisticsConditionalRiskAndUpperTail"
+    },
+    {
+      "c": "itofin_statistics_evaluate",
+      "go": "StatisticsPotentialUpside",
+      "python": "itofin.statistics.potential_upside",
+      "status": "implemented",
+      "tests": "TestStatisticsConditionalRiskAndUpperTail"
+    },
+    {
+      "c": "itofin_statistics_evaluate",
+      "go": "StatisticsShortfall",
+      "python": "itofin.statistics.shortfall",
+      "status": "implemented",
+      "tests": "TestStatisticsConditionalRiskAndUpperTail"
+    },
+    {
+      "c": "itofin_statistics_evaluate",
+      "go": "StatisticsAverageShortfall",
+      "python": "itofin.statistics.average_shortfall",
+      "status": "implemented",
+      "tests": "TestStatisticsConditionalRiskAndUpperTail"
+    },
+    {
+      "c": "itofin_statistics_evaluate",
+      "go": "StatisticsTopPercentile",
+      "python": "itofin.statistics.top_percentile",
+      "status": "implemented",
+      "tests": "TestStatisticsConditionalRiskAndUpperTail"
     }
   ]
 }
