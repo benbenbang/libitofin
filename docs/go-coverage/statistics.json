@@ -1,0 +1,47 @@
+{
+  "domain": "statistics",
+  "entries": [
+    {
+      "c": "itofin_statistics_evaluate",
+      "go": "StatisticsMean",
+      "python": "itofin.statistics.mean",
+      "status": "implemented",
+      "tests": "TestStatisticsWeightedHandCases"
+    },
+    {
+      "c": "itofin_statistics_evaluate",
+      "go": "StatisticsSampleVariance",
+      "python": "itofin.statistics.variance",
+      "status": "implemented",
+      "tests": "TestStatisticsWeightedHandCases"
+    },
+    {
+      "c": "itofin_statistics_evaluate",
+      "go": "StatisticsStandardDeviation",
+      "python": "itofin.statistics.standard_deviation",
+      "status": "implemented",
+      "tests": "TestStatisticsWeightedHandCases"
+    },
+    {
+      "c": "itofin_statistics_evaluate",
+      "go": "StatisticsPercentile",
+      "python": "itofin.statistics.percentile",
+      "status": "implemented",
+      "tests": "TestStatisticsWeightedHandCases"
+    },
+    {
+      "c": "itofin_statistics_evaluate",
+      "go": "StatisticsValueAtRisk",
+      "python": "itofin.statistics.value_at_risk",
+      "status": "implemented",
+      "tests": "TestStatisticsEmpiricalRisk"
+    },
+    {
+      "c": "itofin_statistics_evaluate",
+      "go": "StatisticsExpectedShortfall",
+      "python": "itofin.statistics.expected_shortfall",
+      "status": "implemented",
+      "tests": "TestStatisticsEmpiricalRisk"
+    }
+  ]
+}

@@ -47,6 +47,7 @@ mod results;
 mod settings;
 mod simulation;
 mod smilesection;
+mod statistics;
 mod swap;
 mod swapindex;
 mod swaption;
@@ -419,6 +420,20 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     let results = PyModule::new(py, "results")?;
     results.add_class::<Results>()?;
 
+    let statistics = PyModule::new(py, "statistics")?;
+    statistics.add_function(wrap_pyfunction!(statistics::mean, &statistics)?)?;
+    statistics.add_function(wrap_pyfunction!(statistics::variance, &statistics)?)?;
+    statistics.add_function(wrap_pyfunction!(
+        statistics::standard_deviation,
+        &statistics
+    )?)?;
+    statistics.add_function(wrap_pyfunction!(statistics::percentile, &statistics)?)?;
+    statistics.add_function(wrap_pyfunction!(statistics::value_at_risk, &statistics)?)?;
+    statistics.add_function(wrap_pyfunction!(
+        statistics::expected_shortfall,
+        &statistics
+    )?)?;
+
     let chart = PyModule::new(py, "chart")?;
     chart.add_class::<chart::PyChartSeries>()?;
     chart.add_class::<chart_garch::PyGarch11Result>()?;
@@ -478,6 +493,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
         ("optimize", &optimize),
         ("randomnumbers", &randomnumbers),
         ("results", &results),
+        ("statistics", &statistics),
         ("chart", &chart),
     ];
 
