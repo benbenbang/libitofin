@@ -27,6 +27,7 @@ pub mod credit_instruments_api;
 pub mod curves_api;
 pub mod fd_engine_api;
 pub mod garch_api;
+pub mod general_statistics_api;
 pub mod helpers_api;
 pub mod heston_engines_api;
 pub mod indexes_api;
