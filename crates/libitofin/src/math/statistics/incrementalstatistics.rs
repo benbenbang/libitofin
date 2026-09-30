@@ -46,6 +46,23 @@ impl IncrementalStatistics {
         self.downside_weight_sum
     }
 
+    /// Whether every stored floating-point accumulator is finite.
+    pub fn has_finite_state(&self) -> bool {
+        [
+            self.weight_sum,
+            self.mean,
+            self.m2,
+            self.m3,
+            self.m4,
+            self.min,
+            self.max,
+            self.downside_weight_sum,
+            self.downside_second_moment_sum,
+        ]
+        .iter()
+        .all(|value| value.is_finite())
+    }
+
     /// The downside variance, `N/(N-1) Σ wᵢ xᵢ² / Σ wᵢ` over the negative
     /// samples.
     ///
@@ -370,6 +387,15 @@ mod tests {
         s.add(3.0).unwrap();
         assert_eq!(s.mean().unwrap(), 2.0);
         assert_eq!(s.min().unwrap(), -5.0);
+    }
+
+    #[test]
+    fn finite_state_detects_hidden_moment_overflow() {
+        let mut s = IncrementalStatistics::new();
+        assert!(s.has_finite_state());
+        s.add(1e100).unwrap();
+        assert!(!s.has_finite_state());
+        assert!(s.mean().unwrap().is_finite());
     }
 
     #[test]
