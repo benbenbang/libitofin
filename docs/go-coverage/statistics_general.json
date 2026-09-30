@@ -1,0 +1,187 @@
+{
+  "domain": "statistics-general",
+  "entries": [
+    {
+      "c": "itofin_general_statistics_new",
+      "go": "Session.NewGeneralStatistics",
+      "python": "itofin.statistics.GeneralStatistics.__init__",
+      "status": "implemented",
+      "tests": "TestGeneralStatisticsWeightedStateAndLifecycle"
+    },
+    {
+      "c": "itofin_general_statistics_add",
+      "go": "GeneralStatistics.Add",
+      "python": "itofin.statistics.GeneralStatistics.add",
+      "status": "implemented",
+      "tests": "TestGeneralStatisticsWeightedStateAndLifecycle"
+    },
+    {
+      "c": "itofin_general_statistics_add_batch",
+      "go": "GeneralStatistics.AddBatch",
+      "python": "itofin.statistics.GeneralStatistics.add_batch",
+      "status": "implemented",
+      "tests": "TestGeneralStatisticsWeightedStateAndLifecycle"
+    },
+    {
+      "c": "itofin_general_statistics_reset",
+      "go": "GeneralStatistics.Reset",
+      "python": "itofin.statistics.GeneralStatistics.reset",
+      "status": "implemented",
+      "tests": "TestGeneralStatisticsWeightedStateAndLifecycle"
+    },
+    {
+      "c": "itofin_general_statistics_summary",
+      "go": "GeneralStatistics.Samples",
+      "python": "itofin.statistics.GeneralStatistics.samples",
+      "status": "implemented",
+      "tests": "TestGeneralStatisticsWeightedStateAndLifecycle"
+    },
+    {
+      "c": "itofin_general_statistics_summary",
+      "go": "GeneralStatistics.WeightSum",
+      "python": "itofin.statistics.GeneralStatistics.weight_sum",
+      "status": "implemented",
+      "tests": "TestGeneralStatisticsWeightedStateAndLifecycle"
+    },
+    {
+      "c": "itofin_general_statistics_query",
+      "go": "GeneralStatistics.Min",
+      "python": "itofin.statistics.GeneralStatistics.min",
+      "status": "implemented",
+      "tests": "TestGeneralStatisticsWeightedStateAndLifecycle"
+    },
+    {
+      "c": "itofin_general_statistics_query",
+      "go": "GeneralStatistics.Max",
+      "python": "itofin.statistics.GeneralStatistics.max",
+      "status": "implemented",
+      "tests": "TestGeneralStatisticsWeightedStateAndLifecycle"
+    },
+    {
+      "c": "itofin_general_statistics_query",
+      "go": "GeneralStatistics.Mean",
+      "python": "itofin.statistics.GeneralStatistics.mean",
+      "status": "implemented",
+      "tests": "TestGeneralStatisticsWeightedStateAndLifecycle"
+    },
+    {
+      "c": "itofin_general_statistics_query",
+      "go": "GeneralStatistics.Variance",
+      "python": "itofin.statistics.GeneralStatistics.variance",
+      "status": "implemented",
+      "tests": "TestGeneralStatisticsWeightedStateAndLifecycle"
+    },
+    {
+      "c": "itofin_general_statistics_query",
+      "go": "GeneralStatistics.StandardDeviation",
+      "python": "itofin.statistics.GeneralStatistics.standard_deviation",
+      "status": "implemented",
+      "tests": "TestGeneralStatisticsWeightedStateAndLifecycle"
+    },
+    {
+      "c": "itofin_general_statistics_query",
+      "go": "GeneralStatistics.ErrorEstimate",
+      "python": "itofin.statistics.GeneralStatistics.error_estimate",
+      "status": "implemented",
+      "tests": "TestGeneralStatisticsWeightedStateAndLifecycle"
+    },
+    {
+      "c": "itofin_general_statistics_query",
+      "go": "GeneralStatistics.Skewness",
+      "python": "itofin.statistics.GeneralStatistics.skewness",
+      "status": "implemented",
+      "tests": "TestGeneralStatisticsWeightedStateAndLifecycle"
+    },
+    {
+      "c": "itofin_general_statistics_query",
+      "go": "GeneralStatistics.Kurtosis",
+      "python": "itofin.statistics.GeneralStatistics.kurtosis",
+      "status": "implemented",
+      "tests": "TestGeneralStatisticsWeightedStateAndLifecycle"
+    },
+    {
+      "c": "itofin_general_statistics_query",
+      "go": "GeneralStatistics.Percentile",
+      "python": "itofin.statistics.GeneralStatistics.percentile",
+      "status": "implemented",
+      "tests": "TestGeneralStatisticsWeightedStateAndLifecycle"
+    },
+    {
+      "c": "itofin_general_statistics_query",
+      "go": "GeneralStatistics.TopPercentile",
+      "python": "itofin.statistics.GeneralStatistics.top_percentile",
+      "status": "implemented",
+      "tests": "TestGeneralStatisticsWeightedStateAndLifecycle"
+    },
+    {
+      "c": "itofin_general_statistics_query",
+      "go": "GeneralStatistics.SemiVariance",
+      "python": "itofin.statistics.GeneralStatistics.semi_variance",
+      "status": "implemented",
+      "tests": "TestGeneralStatisticsWeightedStateAndLifecycle"
+    },
+    {
+      "c": "itofin_general_statistics_query",
+      "go": "GeneralStatistics.SemiDeviation",
+      "python": "itofin.statistics.GeneralStatistics.semi_deviation",
+      "status": "implemented",
+      "tests": "TestGeneralStatisticsWeightedStateAndLifecycle"
+    },
+    {
+      "c": "itofin_general_statistics_query",
+      "go": "GeneralStatistics.DownsideVariance",
+      "python": "itofin.statistics.GeneralStatistics.downside_variance",
+      "status": "implemented",
+      "tests": "TestGeneralStatisticsWeightedStateAndLifecycle"
+    },
+    {
+      "c": "itofin_general_statistics_query",
+      "go": "GeneralStatistics.DownsideDeviation",
+      "python": "itofin.statistics.GeneralStatistics.downside_deviation",
+      "status": "implemented",
+      "tests": "TestGeneralStatisticsWeightedStateAndLifecycle"
+    },
+    {
+      "c": "itofin_general_statistics_query",
+      "go": "GeneralStatistics.Regret",
+      "python": "itofin.statistics.GeneralStatistics.regret",
+      "status": "implemented",
+      "tests": "TestGeneralStatisticsWeightedStateAndLifecycle"
+    },
+    {
+      "c": "itofin_general_statistics_query",
+      "go": "GeneralStatistics.PotentialUpside",
+      "python": "itofin.statistics.GeneralStatistics.potential_upside",
+      "status": "implemented",
+      "tests": "TestGeneralStatisticsWeightedStateAndLifecycle"
+    },
+    {
+      "c": "itofin_general_statistics_query",
+      "go": "GeneralStatistics.ValueAtRisk",
+      "python": "itofin.statistics.GeneralStatistics.value_at_risk",
+      "status": "implemented",
+      "tests": "TestGeneralStatisticsWeightedStateAndLifecycle"
+    },
+    {
+      "c": "itofin_general_statistics_query",
+      "go": "GeneralStatistics.ExpectedShortfall",
+      "python": "itofin.statistics.GeneralStatistics.expected_shortfall",
+      "status": "implemented",
+      "tests": "TestGeneralStatisticsWeightedStateAndLifecycle"
+    },
+    {
+      "c": "itofin_general_statistics_query",
+      "go": "GeneralStatistics.Shortfall",
+      "python": "itofin.statistics.GeneralStatistics.shortfall",
+      "status": "implemented",
+      "tests": "TestGeneralStatisticsWeightedStateAndLifecycle"
+    },
+    {
+      "c": "itofin_general_statistics_query",
+      "go": "GeneralStatistics.AverageShortfall",
+      "python": "itofin.statistics.GeneralStatistics.average_shortfall",
+      "status": "implemented",
+      "tests": "TestGeneralStatisticsWeightedStateAndLifecycle"
+    }
+  ]
+}
