@@ -12,12 +12,14 @@ use crate::errors::QlResult;
 use crate::fail;
 use crate::types::{Real, Size};
 
+mod batch;
 mod gaussianstatistics;
 mod generalstatistics;
 mod histogram;
 mod incrementalstatistics;
 mod riskstatistics;
 
+pub use batch::{BatchStatistic, evaluate_batch};
 pub use gaussianstatistics::{GaussianStatistics, StatsHolder};
 pub use generalstatistics::GeneralStatistics;
 pub use histogram::{Histogram, HistogramAlgorithm};
