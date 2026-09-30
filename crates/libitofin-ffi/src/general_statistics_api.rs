@@ -263,3 +263,7 @@ pub unsafe extern "C" fn itofin_general_statistics_query(
         })
     }
 }
+
+#[cfg(test)]
+#[path = "general_statistics_api_tests.rs"]
+mod tests;
