@@ -1,6 +1,48 @@
 {
-  "domain": "fixed-garch11",
+  "domain": "garch11",
   "entries": [
+    {
+      "c": "itofin_garch11_fit",
+      "go": "Garch11Fit",
+      "python": "itofin.chart.garch11_fit",
+      "status": "implemented",
+      "tests": "TestGarch11FitQuantLibFixture"
+    },
+    {
+      "c": "itofin_garch11_fit",
+      "go": "Garch11FitResult.Alpha",
+      "python": "itofin.chart.Garch11FitResult.alpha",
+      "status": "implemented",
+      "tests": "TestGarch11FitQuantLibFixture"
+    },
+    {
+      "c": "itofin_garch11_fit",
+      "go": "Garch11FitResult.Beta",
+      "python": "itofin.chart.Garch11FitResult.beta",
+      "status": "implemented",
+      "tests": "TestGarch11FitQuantLibFixture"
+    },
+    {
+      "c": "itofin_garch11_fit",
+      "go": "Garch11FitResult.Omega",
+      "python": "itofin.chart.Garch11FitResult.omega",
+      "status": "implemented",
+      "tests": "TestGarch11FitQuantLibFixture"
+    },
+    {
+      "c": "itofin_garch11_fit",
+      "go": "Garch11FitResult.LogLikelihood",
+      "python": "itofin.chart.Garch11FitResult.log_likelihood",
+      "status": "implemented",
+      "tests": "TestGarch11FitQuantLibFixture"
+    },
+    {
+      "c": "itofin_garch11_fit",
+      "go": "Garch11FitResult.NextVariance",
+      "python": "itofin.chart.Garch11FitResult.next_variance",
+      "status": "implemented",
+      "tests": "TestGarch11FitQuantLibFixture"
+    },
     {
       "c": "itofin_garch11_filter",
       "go": "Garch11Filter",
