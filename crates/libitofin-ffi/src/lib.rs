@@ -62,6 +62,7 @@ pub mod rng_low_discrepancy;
 pub mod rng_sequence_api;
 pub mod settings_api;
 pub mod smile_api;
+pub mod statistics_api;
 pub mod stripper_api;
 pub mod stripper_completion_api;
 pub mod time_api;
