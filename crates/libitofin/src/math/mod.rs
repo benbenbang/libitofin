@@ -9,6 +9,7 @@ pub mod distributions;
 pub mod errorfunction;
 pub mod expm1;
 pub mod gammafunction;
+pub mod garch;
 pub mod generallinearleastsquares;
 pub mod incompletegamma;
 pub mod integrals;
