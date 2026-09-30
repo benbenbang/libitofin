@@ -14,6 +14,39 @@ type Garch11Result struct {
 	NextVariance          float64     `json:"next_variance"`
 }
 
+// Garch11FitResult holds stationary fitted parameters and a one-step forecast.
+// Omega is the variance intercept; LogLikelihood is per return and omits log(2π).
+type Garch11FitResult struct {
+	Alpha         float64 `json:"alpha"`
+	Beta          float64 `json:"beta"`
+	Omega         float64 `json:"omega"`
+	LogLikelihood float64 `json:"log_likelihood"`
+	NextVariance  float64 `json:"next_variance"`
+}
+
+// Garch11Fit estimates stationary GARCH(1,1) parameters from returns.
+func Garch11Fit(returns []float64) (Garch11FitResult, error) {
+	if len(returns) > 100_000 {
+		return Garch11FitResult{}, fmt.Errorf("itofin: GARCH fit supports at most 100000 returns")
+	}
+	var alpha, beta, omega, logLikelihood, nextVariance C.double
+	var e C.ItofinError
+	status := C.itofin_garch11_fit(
+		doubles(returns), C.size_t(len(returns)),
+		&alpha, &beta, &omega, &logLikelihood, &nextVariance, &e,
+	)
+	if err := ffiError(status, &e); err != nil {
+		return Garch11FitResult{}, err
+	}
+	return Garch11FitResult{
+		Alpha:         float64(alpha),
+		Beta:          float64(beta),
+		Omega:         float64(omega),
+		LogLikelihood: float64(logLikelihood),
+		NextVariance:  float64(nextVariance),
+	}, nil
+}
+
 // Garch11Filter applies fixed GARCH(1,1) parameters to returns. The first
 // return seeds the variance, so volatility becomes valid at index 1.
 // longRunVariance is the unconditional variance, not the intercept.
