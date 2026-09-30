@@ -442,4 +442,116 @@ mod tests {
         assert!(model.forecast(f64::NAN, 0.1).is_err());
         assert!(model.forecast(f64::MAX, 0.1).is_err());
     }
+
+    #[test]
+    fn fitted_parameters_are_stationary_and_forecast_matches_filter() {
+        let returns: Vec<Real> = (0..320)
+            .map(|index| {
+                let t = index as Real;
+                (0.3 * (t * 2.41).sin() + 0.2 * (t * 0.39).cos()) * (1.0 + 0.4 * (t * 0.09).sin())
+            })
+            .collect();
+        for fit in [
+            Garch11::fit(&returns).unwrap(),
+            Garch11::fit_with_start(&returns, 0.2, 0.3, 0.2).unwrap(),
+        ] {
+            assert!(fit.alpha >= 0.0 && fit.beta >= 0.0);
+            assert!(fit.alpha + fit.beta < 1.0 - FIT_MARGIN);
+            assert!(fit.omega > 0.0 && fit.log_likelihood.is_finite());
+            let model = Garch11::new(
+                fit.alpha,
+                fit.beta,
+                fit.omega / (1.0 - fit.alpha - fit.beta),
+            )
+            .unwrap();
+            let forecast = model.filter(&returns).unwrap().next_variance;
+            assert!((fit.next_variance - forecast).abs() < 1.0e-12);
+        }
+    }
+
+    #[test]
+    fn fitted_parameters_match_quantlib_seed_48_oracle() {
+        let bytes = std::fs::read(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/garch_fit/returns.bin"
+        ))
+        .unwrap();
+        let returns: Vec<Real> = bytes
+            .chunks_exact(8)
+            .map(|chunk| Real::from_le_bytes(chunk.try_into().unwrap()))
+            .collect();
+        assert_eq!(returns.len(), 50_000);
+        let expected = [
+            0.207_591_659_556_347_29,
+            0.281_978_985_012_917_74,
+            0.204_647_052_450_554_6,
+            -0.021_741_348_447_339_62,
+            0.593_706_642_894_903_7,
+        ];
+        for fit in [
+            Garch11::fit(&returns).unwrap(),
+            Garch11::fit_with_start(&returns, 0.265_749, 0.156_956, 0.230_964).unwrap(),
+        ] {
+            for (actual, expected) in [
+                fit.alpha,
+                fit.beta,
+                fit.omega,
+                fit.log_likelihood,
+                fit.next_variance,
+            ]
+            .into_iter()
+            .zip(expected)
+            {
+                assert!((actual - expected).abs() < 1.0e-6, "{actual} vs {expected}");
+            }
+        }
+    }
+
+    #[test]
+    fn fit_rejects_degenerate_samples_and_invalid_starts() {
+        for sample in [
+            vec![],
+            vec![0.1, 0.2, 0.3],
+            vec![0.0; 8],
+            vec![0.1, -0.1, 0.1, -0.1],
+            vec![0.1, f64::NAN, 0.2, 0.3],
+            vec![0.1, f64::MAX, 0.2, 0.3],
+        ] {
+            assert!(Garch11::fit(&sample).is_err());
+        }
+        let sample = [0.1, 0.2, 0.3, 0.4, 0.2, 0.5];
+        for (alpha, beta, omega) in [
+            (-0.1, 0.2, 0.3),
+            (0.2, f64::NAN, 0.3),
+            (0.2, 0.8, 0.3),
+            (0.2, 0.3, 0.0),
+            (0.2, 0.3, f64::INFINITY),
+        ] {
+            assert!(Garch11::fit_with_start(&sample, alpha, beta, omega).is_err());
+        }
+    }
+
+    #[test]
+    fn explicit_start_skips_acf_and_fit_length_is_bounded() {
+        let constant_squares = [0.1, -0.1, 0.1, -0.1];
+        let (squared, mean) = fit_sample(&constant_squares).unwrap();
+        assert!(fit_acf(&squared, mean).is_err());
+        assert!(Garch11::fit_with_start(&constant_squares, 0.2, 0.3, 0.2).is_ok());
+
+        let maximum = vec![0.1; MAX_FIT_RETURNS];
+        assert!(fit_sample(&maximum).is_ok());
+        let too_long = vec![0.1; MAX_FIT_RETURNS + 1];
+        assert!(
+            Garch11::fit(&too_long)
+                .unwrap_err()
+                .message()
+                .contains("at most")
+        );
+        assert!(
+            Garch11::fit_with_start(&too_long, 0.2, 0.3, 0.2)
+                .unwrap_err()
+                .message()
+                .contains("at most")
+        );
+    }
 }

@@ -1,0 +1,40 @@
+{
+  "expected": {
+    "alpha": 0.20759165955634729,
+    "beta": 0.28197898501291774,
+    "log_likelihood": -0.02174134844733962,
+    "next_variance": 0.5937066428949037,
+    "omega": 0.2046470524505546
+  },
+  "input": {
+    "count": 50000,
+    "first_returns": [
+      -0.9429872726352687,
+      -0.12263486086752749,
+      0.7140905866757085,
+      -0.3954779424806142,
+      -0.33725021621013074
+    ],
+    "initial_return": 0.0,
+    "initial_variance": 0.0,
+    "last_returns": [
+      0.6841387725686093,
+      0.3120235192571124,
+      -0.6046070633286567,
+      1.33057074469398,
+      0.9764168377338498
+    ],
+    "process_alpha": 0.2,
+    "process_beta": 0.3,
+    "process_long_term_variance": 0.4,
+    "returns_sha256_f64_le": "7708c7e60cdf1b6f307cd8eb088364f40cfcf14f5e5e3ca9a01bb6de95ff9d37",
+    "seed": 48,
+    "start_date": "1962-07-07"
+  },
+  "source": {
+    "quantlib_headers": "1.43-dev",
+    "quantlib_source_commit": "9863b578af0caa4cecabf697196533e84a8308b6",
+    "quantlib_wheel": "1.43",
+    "upstream_test": "test-suite/garch.cpp::testCalibration"
+  }
+}
