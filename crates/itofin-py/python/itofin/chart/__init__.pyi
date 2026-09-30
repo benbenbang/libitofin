@@ -10,6 +10,7 @@ __all__ = [
     "BollingerBands",
     "ChartSeries",
     "DatedIntervalPrice",
+    "Garch11FitResult",
     "Garch11Result",
     "Kd",
     "Macd",
@@ -20,6 +21,7 @@ __all__ = [
     "constant_volatility",
     "ema",
     "garch11_filter",
+    "garch11_fit",
     "garch11_forecast",
     "interval_prices",
     "kd",
@@ -105,6 +107,37 @@ class DatedIntervalPrice:
     def close(self) -> builtins.float:
         r"""
         Closing price.
+        """
+
+@typing.final
+class Garch11FitResult:
+    r"""
+    Fitted stationary GARCH(1,1) parameters and one-step variance forecast.
+    """
+    @property
+    def alpha(self) -> builtins.float:
+        r"""
+        Fitted response to the preceding squared return.
+        """
+    @property
+    def beta(self) -> builtins.float:
+        r"""
+        Fitted persistence of conditional variance.
+        """
+    @property
+    def omega(self) -> builtins.float:
+        r"""
+        Fitted variance intercept.
+        """
+    @property
+    def log_likelihood(self) -> builtins.float:
+        r"""
+        Gaussian log likelihood per return, excluding the constant term.
+        """
+    @property
+    def next_variance(self) -> builtins.float:
+        r"""
+        Conditional variance forecast following the final return.
         """
 
 @typing.final
@@ -246,6 +279,11 @@ def ema(close: typing.Sequence[builtins.float], period: builtins.int) -> ChartSe
 def garch11_filter(returns: typing.Sequence[builtins.float], alpha: builtins.float, beta: builtins.float, long_run_variance: builtins.float) -> Garch11Result:
     r"""
     Filter returns with fixed GARCH(1,1) parameters and long-run variance.
+    """
+
+def garch11_fit(returns: typing.Sequence[builtins.float]) -> Garch11FitResult:
+    r"""
+    Fit stationary GARCH(1,1) parameters to observed returns.
     """
 
 def garch11_forecast(last_return: builtins.float, current_variance: builtins.float, alpha: builtins.float, beta: builtins.float, long_run_variance: builtins.float) -> builtins.float:

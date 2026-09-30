@@ -1,6 +1,8 @@
-"""Fixed-parameter GARCH(1,1) filtering and forecasting via Python."""
+"""GARCH(1,1) fitting, filtering, and forecasting via Python."""
 
+import json
 import math
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -110,3 +112,77 @@ def test_garch11_forecast_rejects_invalid_state(last_return, current_variance):
     """Forecast inputs cannot produce invalid conditional variance."""
     with pytest.raises(itofin.ItofinError):
         chart.garch11_forecast(last_return, current_variance, ALPHA, BETA, LONG_RUN_VARIANCE)
+
+
+def test_garch11_fit_deterministic_returns():
+    """Fitting is reproducible and returns a frozen stationary model snapshot."""
+    returns = [0.01 * math.sin(index * 1.7) + 0.007 * math.cos(index * 0.31) for index in range(160)]
+    original_returns = returns.copy()
+
+    result = chart.garch11_fit(returns)
+    repeated = chart.garch11_fit(returns)
+
+    assert isinstance(result, chart.Garch11FitResult)
+    assert 0.0 <= result.alpha < 1.0
+    assert 0.0 <= result.beta < 1.0
+    assert result.alpha + result.beta < 1.0
+    assert result.omega > 0.0
+    assert math.isfinite(result.log_likelihood)
+    assert math.isfinite(result.next_variance)
+    assert result.next_variance > 0.0
+    filtered = chart.garch11_filter(
+        returns,
+        result.alpha,
+        result.beta,
+        result.omega / (1.0 - result.alpha - result.beta),
+    )
+    assert result.next_variance == pytest.approx(filtered.next_variance, rel=1e-12)
+    assert (
+        result.alpha,
+        result.beta,
+        result.omega,
+        result.log_likelihood,
+        result.next_variance,
+    ) == (
+        repeated.alpha,
+        repeated.beta,
+        repeated.omega,
+        repeated.log_likelihood,
+        repeated.next_variance,
+    )
+    assert returns == original_returns
+    with pytest.raises(AttributeError):
+        setattr(result, "alpha", 0.0)
+
+
+def test_garch11_fit_quantlib_oracle():
+    fixture = Path(__file__).resolve().parents[3] / "crates/libitofin/tests/fixtures/garch_fit"
+    oracle = json.loads((fixture / "oracle.json").read_text())
+    returns = np.fromfile(fixture / "returns.bin", dtype="<f8")
+    assert len(returns) == oracle["input"]["count"]
+
+    result = chart.garch11_fit(returns.tolist())
+    for field, expected in oracle["expected"].items():
+        assert getattr(result, field) == pytest.approx(expected, abs=1e-6)
+
+
+@pytest.mark.parametrize(
+    "returns",
+    [
+        [],
+        [0.01, -0.02, 0.015],
+        [0.0] * 6,
+        [0.01, -0.02, float("nan"), -0.025, 0.005, -0.01],
+        [0.01, -0.02, float("inf"), -0.025, 0.005, -0.01],
+        [0.01, -0.02, 1e308, -0.025, 0.005, -0.01],
+    ],
+)
+def test_garch11_fit_rejects_invalid_returns(returns):
+    """Invalid input series raise the same error type as fixed-parameter filtering."""
+    with pytest.raises(itofin.ItofinError):
+        chart.garch11_fit(returns)
+
+
+def test_garch11_fit_rejects_too_many_returns():
+    with pytest.raises(itofin.ItofinError, match="at most 100000 returns"):
+        chart.garch11_fit([0.0] * 100_001)

@@ -199,6 +199,48 @@ the recurrence separately. Parameters must be finite and nonnegative, with
     _ = result.NextVariance
     ```
 
+## Fitted GARCH(1,1)
+
+`garch11_fit` estimates stationary GARCH parameters from returns. It reports
+`alpha`, `beta`, the intercept `omega`, QuantLib's mean Gaussian log likelihood
+without the constant `log(2π)`, and the next conditional variance. Unlike the
+fixed-parameter API, `omega` is an intercept; its implied long-run variance is
+`omega / (1-alpha-beta)`.
+
+The likelihood recurrence starts with zero previous variance and squared
+return, as in QuantLib. The returned forecast uses the fitted parameters with
+the filtering convention above, seeded by the first squared return. Fitting
+requires 4 to 100,000 finite returns with nonzero variation in squared returns;
+invalid or non-convergent fits raise an error. The upper bound keeps the
+autocovariance calculation bounded.
+
+=== "Python"
+
+    ```python
+    from itofin import chart
+
+    returns = [0.2, -0.3, 0.1, 0.5, -0.4, 0.25, -0.1, 0.3]
+    fitted = chart.garch11_fit(returns)
+    filtered = chart.garch11_filter(
+        returns, fitted.alpha, fitted.beta,
+        fitted.omega / (1 - fitted.alpha - fitted.beta),
+    )
+    assert abs(fitted.next_variance - filtered.next_variance) < 1e-12
+    ```
+
+=== "Go"
+
+    ```go
+    import itofin "github.com/benbenbang/libitofin/sdk/go"
+
+    returns := []float64{0.2, -0.3, 0.1, 0.5, -0.4, 0.25, -0.1, 0.3}
+    fitted, err := itofin.Garch11Fit(returns)
+    if err != nil { panic(err) }
+    longRunVariance := fitted.Omega / (1 - fitted.Alpha - fitted.Beta)
+    _ = longRunVariance
+    _ = fitted.NextVariance
+    ```
+
 ## Indicator series
 
 Chart calculations use one Rust implementation for Python and Go. Every result
