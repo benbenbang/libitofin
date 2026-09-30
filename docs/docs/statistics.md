@@ -69,3 +69,45 @@ cumulative weight reaches probability in `(0, 1]`.
 
 Use `nil` weights in Go, or omit `weights` in Python, for unit weights. The
 same signed-observation and tail conventions apply in both languages.
+## Stored samples
+
+`GeneralStatistics` retains observations so you can add data and query moments,
+percentiles, and empirical risk repeatedly. `add_batch` is atomic: an invalid
+value, weight, or length leaves the prior sample set unchanged. A zero-weight
+observation increases `samples` and contributes to count-based moment
+corrections. Weight-dependent queries need a positive total weight; min/max
+need only samples. `reset` empties the set.
+
+=== "Python"
+
+    ```python
+    from itofin import statistics
+
+    samples = statistics.GeneralStatistics()
+    samples.add_batch([-10.0, -5.0, 1.0], weights=[1.0, 2.0, 17.0])
+    assert samples.value_at_risk(0.9) == 5.0
+    assert samples.expected_shortfall(0.9) == 10.0
+    samples.add(-20.0)
+    assert samples.percentile(0.01) == -20.0
+    ```
+
+=== "Go"
+
+    ```go
+    import itofin "github.com/benbenbang/libitofin/sdk/go"
+
+    session, err := itofin.NewSession()
+    if err != nil { panic(err) }
+    defer session.Close()
+    samples, err := session.NewGeneralStatistics()
+    if err != nil { panic(err) }
+    defer samples.Close()
+    if err := samples.AddBatch([]float64{-10, -5, 1}, []float64{1, 2, 17}); err != nil { panic(err) }
+    var90, err := samples.ValueAtRisk(0.9)
+    if err != nil { panic(err) }
+    _ = var90
+    ```
+
+Python owns the accumulator directly. Go accumulators belong to their creating
+session; close each handle and the session when finished. The same count-based
+variance and signed-loss rules as the batch functions apply.
