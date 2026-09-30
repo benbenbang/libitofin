@@ -21,22 +21,42 @@ pub enum BatchStatistic {
     ValueAtRisk,
     /// Positive mean loss strictly beyond value at risk.
     ExpectedShortfall,
+    /// Count-corrected conditional variance below the weighted mean.
+    SemiVariance,
+    /// Square root of semi variance.
+    SemiDeviation,
+    /// Count-corrected conditional variance below zero.
+    DownsideVariance,
+    /// Square root of downside variance.
+    DownsideDeviation,
+    /// Count-corrected conditional variance below a target.
+    Regret,
+    /// Nonnegative gain at a selected confidence.
+    PotentialUpside,
+    /// Weighted probability of falling strictly below a target.
+    Shortfall,
+    /// Mean distance below a target, conditional on falling below it.
+    AverageShortfall,
+    /// Upper empirical percentile.
+    TopPercentile,
 }
 
 /// Evaluate one statistic without retaining the sample set.
 ///
-/// Omit `weights` for unit weights. The probability is used only by
-/// [`BatchStatistic::Percentile`] (`(0, 1]`) and the two risk measures
-/// (`[0.9, 1)`). Risk observations are signed returns: losses are negative,
-/// and risk results are nonnegative loss magnitudes. Variance retains the
-/// core's `N/(N-1)` correction based on the number of observations, including
-/// those with zero weight.
+/// Omit `weights` for unit weights. The fourth argument selects a percentile
+/// for `Percentile` and `TopPercentile` (`(0, 1]`), a confidence for
+/// `ValueAtRisk`, `ExpectedShortfall` and `PotentialUpside` (`[0.9, 1)`), or
+/// a target for `Regret`, `Shortfall` and `AverageShortfall`. It is ignored by
+/// the other measures. Risk observations are signed returns: losses are
+/// negative, and VaR and expected shortfall return nonnegative loss magnitudes.
+/// Variance and conditional risk measures use the core's count correction,
+/// including observations with zero weight in the sample count.
 ///
 /// # Errors
 ///
 /// Returns an error for empty or nonfinite samples, invalid weights, invalid
-/// probability, insufficient samples for variance, a zero-weight tail for
-/// expected shortfall, or nonfinite arithmetic results.
+/// probability or target, insufficient samples for variance or conditional
+/// risk measures, a zero-weight conditional tail, or nonfinite arithmetic.
 pub fn evaluate_batch(
     observations: &[Real],
     weights: Option<&[Real]>,
@@ -69,17 +89,22 @@ pub fn evaluate_batch(
         "total weight must be finite and positive"
     );
     match measure {
-        BatchStatistic::Percentile => {
+        BatchStatistic::Percentile | BatchStatistic::TopPercentile => {
             require!(
                 probability.is_finite() && probability > 0.0 && probability <= 1.0,
                 "percentile must be in (0, 1]"
             );
         }
-        BatchStatistic::ValueAtRisk | BatchStatistic::ExpectedShortfall => {
+        BatchStatistic::ValueAtRisk
+        | BatchStatistic::ExpectedShortfall
+        | BatchStatistic::PotentialUpside => {
             require!(
                 probability.is_finite() && (0.9..1.0).contains(&probability),
                 "confidence must be in [0.9, 1)"
             );
+        }
+        BatchStatistic::Regret | BatchStatistic::Shortfall | BatchStatistic::AverageShortfall => {
+            require!(probability.is_finite(), "target must be finite");
         }
         _ => {}
     }
@@ -106,9 +131,49 @@ pub fn evaluate_batch(
             );
             statistics.expected_shortfall(probability)?
         }
+        BatchStatistic::SemiVariance | BatchStatistic::SemiDeviation => {
+            let threshold = statistics.mean()?;
+            ensure!(threshold.is_finite(), "statistic result is nonfinite");
+            require_positive_tail(&statistics, threshold)?;
+            if measure == BatchStatistic::SemiVariance {
+                statistics.semi_variance()?
+            } else {
+                statistics.semi_deviation()?
+            }
+        }
+        BatchStatistic::DownsideVariance | BatchStatistic::DownsideDeviation => {
+            require_positive_tail(&statistics, 0.0)?;
+            if measure == BatchStatistic::DownsideVariance {
+                statistics.downside_variance()?
+            } else {
+                statistics.downside_deviation()?
+            }
+        }
+        BatchStatistic::Regret => {
+            require_positive_tail(&statistics, probability)?;
+            statistics.regret(probability)?
+        }
+        BatchStatistic::PotentialUpside => statistics.potential_upside(probability)?,
+        BatchStatistic::Shortfall => statistics.shortfall(probability)?,
+        BatchStatistic::AverageShortfall => {
+            require_positive_tail(&statistics, probability)?;
+            statistics.average_shortfall(probability)?
+        }
+        BatchStatistic::TopPercentile => statistics.top_percentile(probability)?,
     };
     ensure!(result.is_finite(), "statistic result is nonfinite");
     Ok(result)
+}
+
+fn require_positive_tail(statistics: &GeneralStatistics, threshold: Real) -> QlResult<()> {
+    ensure!(
+        statistics
+            .data()
+            .iter()
+            .any(|&(value, weight)| value < threshold && weight > 0.0),
+        "no positive-weight data below the target"
+    );
+    Ok(())
 }
 
 #[cfg(test)]
@@ -260,6 +325,45 @@ mod tests {
             expected_shortfall,
             expected_shortfall * 1e-2,
         );
+        check(
+            "potential upside",
+            0.0,
+            1.0,
+            evaluate(BatchStatistic::PotentialUpside, confidence),
+            2.0,
+            2e-3,
+        );
+        check(
+            "shortfall",
+            0.0,
+            1.0,
+            evaluate(BatchStatistic::Shortfall, 0.0),
+            0.5,
+            5e-4,
+        );
+        let average_shortfall = (2.0 / std::f64::consts::PI).sqrt();
+        check(
+            "average shortfall",
+            0.0,
+            1.0,
+            evaluate(BatchStatistic::AverageShortfall, 0.0),
+            average_shortfall,
+            average_shortfall * 1e-3,
+        );
+        for kind in [
+            BatchStatistic::SemiVariance,
+            BatchStatistic::DownsideVariance,
+            BatchStatistic::Regret,
+        ] {
+            check(
+                "conditional variance",
+                0.0,
+                1.0,
+                evaluate(kind, 0.0),
+                1.0,
+                1e-1,
+            );
+        }
     }
 
     #[test]
@@ -280,5 +384,80 @@ mod tests {
             .unwrap(),
             5.0
         );
+    }
+
+    #[test]
+    fn remaining_weighted_risk_measures_follow_conditional_conventions() {
+        let values = [-4.0, -2.0, 2.0, 8.0];
+        let weights = [1.0, 2.0, 1.0, 0.0];
+        let measure =
+            |kind, argument| evaluate_batch(&values, Some(&weights), kind, argument).unwrap();
+        assert_eq!(measure(BatchStatistic::SemiVariance, 0.0), 4.5);
+        assert_eq!(measure(BatchStatistic::SemiDeviation, 0.0), 4.5_f64.sqrt());
+        assert_eq!(measure(BatchStatistic::DownsideVariance, 0.0), 16.0);
+        assert_eq!(measure(BatchStatistic::DownsideDeviation, 0.0), 4.0);
+        assert_eq!(measure(BatchStatistic::Regret, 1.0), 86.0 / 3.0);
+        assert_eq!(measure(BatchStatistic::PotentialUpside, 0.9), 2.0);
+        assert_eq!(measure(BatchStatistic::Shortfall, 1.0), 0.75);
+        assert_eq!(measure(BatchStatistic::AverageShortfall, 1.0), 11.0 / 3.0);
+        assert_eq!(measure(BatchStatistic::TopPercentile, 0.5), -2.0);
+        assert_eq!(measure(BatchStatistic::TopPercentile, 0.25), 2.0);
+        assert_eq!(measure(BatchStatistic::Shortfall, -5.0), 0.0);
+    }
+
+    #[test]
+    fn conditional_measures_reject_empty_or_zero_weight_tails() {
+        for kind in [
+            BatchStatistic::SemiVariance,
+            BatchStatistic::SemiDeviation,
+            BatchStatistic::DownsideVariance,
+            BatchStatistic::DownsideDeviation,
+        ] {
+            assert!(evaluate_batch(&[1.0, 2.0], None, kind, 0.0).is_err());
+        }
+        for kind in [
+            BatchStatistic::SemiVariance,
+            BatchStatistic::SemiDeviation,
+            BatchStatistic::Regret,
+            BatchStatistic::AverageShortfall,
+        ] {
+            let target =
+                if kind == BatchStatistic::Regret || kind == BatchStatistic::AverageShortfall {
+                    1.5
+                } else {
+                    0.0
+                };
+            assert!(evaluate_batch(&[-1.0, 2.0], Some(&[0.0, 1.0]), kind, target).is_err());
+        }
+        assert!(evaluate_batch(&[-1.0, 2.0], None, BatchStatistic::Regret, -1.0).is_err());
+        assert!(
+            evaluate_batch(&[-1.0, 2.0], None, BatchStatistic::AverageShortfall, -1.0).is_err()
+        );
+        assert!(evaluate_batch(&[-1.0, 2.0], None, BatchStatistic::Regret, 0.0).is_err());
+        assert!(evaluate_batch(&[-1.0, 2.0], None, BatchStatistic::AverageShortfall, 0.0).is_ok());
+    }
+
+    #[test]
+    fn new_parameters_and_nonfinite_arithmetic_fail() {
+        let values = [-1.0, 2.0];
+        for kind in [
+            BatchStatistic::Regret,
+            BatchStatistic::Shortfall,
+            BatchStatistic::AverageShortfall,
+        ] {
+            assert!(evaluate_batch(&values, None, kind, Real::NAN).is_err());
+            assert!(evaluate_batch(&values, None, kind, Real::INFINITY).is_err());
+        }
+        for kind in [
+            BatchStatistic::PotentialUpside,
+            BatchStatistic::TopPercentile,
+        ] {
+            assert!(evaluate_batch(&values, None, kind, Real::NAN).is_err());
+        }
+        assert!(evaluate_batch(&values, None, BatchStatistic::PotentialUpside, 0.89).is_err());
+        assert!(evaluate_batch(&values, None, BatchStatistic::PotentialUpside, 1.0).is_err());
+        assert!(evaluate_batch(&values, None, BatchStatistic::TopPercentile, 0.0).is_err());
+        assert!(evaluate_batch(&values, None, BatchStatistic::TopPercentile, 1.1).is_err());
+        assert!(evaluate_batch(&[1e300, -1e300], None, BatchStatistic::Regret, 0.0).is_err());
     }
 }
