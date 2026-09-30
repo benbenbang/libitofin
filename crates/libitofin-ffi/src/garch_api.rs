@@ -1,8 +1,50 @@
-//! Fixed-parameter GARCH(1,1) with caller-owned aligned output.
+//! GARCH(1,1) filtering and fitting with caller-owned output.
 
 use crate::boundary::{BindingError, ItofinError, check_ptr, input_slice, without_context};
 use libitofin::math::garch::Garch11;
 use libitofin::types::Real;
+
+/// Fit a stationary GARCH(1,1) model to a return series and forecast one variance.
+/// # Safety
+/// `returns` holds `len` doubles. All output pointers hold one double and
+/// follow the crate-level non-overlap contract.
+#[unsafe(no_mangle)]
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn itofin_garch11_fit(
+    returns: *const Real,
+    len: usize,
+    out_alpha: *mut Real,
+    out_beta: *mut Real,
+    out_omega: *mut Real,
+    out_log_likelihood: *mut Real,
+    out_next_variance: *mut Real,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        without_context(error, || {
+            if len == 0 || len > isize::MAX as usize / size_of::<Real>() {
+                return Err(BindingError::invalid("invalid GARCH return length"));
+            }
+            for pointer in [
+                out_alpha,
+                out_beta,
+                out_omega,
+                out_log_likelihood,
+                out_next_variance,
+            ] {
+                check_ptr(pointer)?;
+            }
+            let input = input_slice(returns, len)?;
+            let result = Garch11::fit(input)?;
+            out_alpha.write(result.alpha);
+            out_beta.write(result.beta);
+            out_omega.write(result.omega);
+            out_log_likelihood.write(result.log_likelihood);
+            out_next_variance.write(result.next_variance);
+            Ok(())
+        })
+    }
+}
 
 /// Filter returns into conditional volatility and forecast the next variance.
 /// The first output slot is a zero warmup placeholder; `first_valid` is one.
@@ -76,13 +118,98 @@ pub unsafe extern "C" fn itofin_garch11_forecast(
 
 #[cfg(test)]
 mod tests {
-    use super::{itofin_garch11_filter, itofin_garch11_forecast};
+    use super::{itofin_garch11_filter, itofin_garch11_fit, itofin_garch11_forecast};
     use crate::boundary::ItofinError;
 
     fn blank_error() -> ItofinError {
         ItofinError {
             code: 0,
             message: [0; 1024],
+        }
+    }
+
+    #[test]
+    fn fitted_result_and_error_preserve_outputs() {
+        let returns: Vec<f64> = (0..320)
+            .map(|index| {
+                let t = index as f64;
+                (0.3 * (t * 2.41).sin() + 0.2 * (t * 0.39).cos()) * (1.0 + 0.4 * (t * 0.09).sin())
+            })
+            .collect();
+        let mut values = [f64::NAN; 5];
+        let mut error = blank_error();
+        let output = values.as_mut_ptr();
+        let status = unsafe {
+            itofin_garch11_fit(
+                returns.as_ptr(),
+                returns.len(),
+                output.add(0),
+                output.add(1),
+                output.add(2),
+                output.add(3),
+                output.add(4),
+                &mut error,
+            )
+        };
+        assert_eq!(status, 0);
+        assert!(values.iter().all(|value| value.is_finite()));
+        assert!(values[0] >= 0.0 && values[1] >= 0.0 && values[0] + values[1] < 1.0);
+        assert!(values[2] > 0.0 && values[4] > 0.0);
+
+        values = [91.0; 5];
+        let output = values.as_mut_ptr();
+        let status = unsafe {
+            itofin_garch11_fit(
+                returns.as_ptr(),
+                1,
+                output.add(0),
+                output.add(1),
+                output.add(2),
+                output.add(3),
+                output.add(4),
+                &mut error,
+            )
+        };
+        assert_ne!(status, 0);
+        assert_eq!(values, [91.0; 5]);
+    }
+
+    #[test]
+    fn quantlib_fitted_oracle() {
+        let bytes = include_bytes!("../../libitofin/tests/fixtures/garch_fit/returns.bin");
+        let returns: Vec<f64> = bytes
+            .chunks_exact(8)
+            .map(|chunk| {
+                let mut word = [0_u8; 8];
+                word.copy_from_slice(chunk);
+                f64::from_le_bytes(word)
+            })
+            .collect();
+        assert_eq!(returns.len(), 50_000);
+        let mut values = [f64::NAN; 5];
+        let output = values.as_mut_ptr();
+        let mut error = blank_error();
+        let status = unsafe {
+            itofin_garch11_fit(
+                returns.as_ptr(),
+                returns.len(),
+                output.add(0),
+                output.add(1),
+                output.add(2),
+                output.add(3),
+                output.add(4),
+                &mut error,
+            )
+        };
+        assert_eq!(status, 0);
+        for (actual, expected) in values.into_iter().zip([
+            0.207_591_659_556_347_29,
+            0.281_978_985_012_917_74,
+            0.204_647_052_450_554_6,
+            -0.021_741_348_447_339_62,
+            0.593_706_642_894_903_7,
+        ]) {
+            assert!((actual - expected).abs() < 1e-6, "{actual} != {expected}");
         }
     }
 
