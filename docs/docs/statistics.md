@@ -18,6 +18,22 @@ accept a confidence level in `[0.9, 1)`. VaR is the negative of the lower
 **strictly below** the negative VaR threshold, negates that average, and floors
 it at zero. ES raises an error when that tail has no positive-weight samples.
 
+The remaining conditional risk measures use the same signed observations.
+`semi_variance` measures squared distance below the weighted mean;
+`downside_variance` uses zero; `regret` uses a supplied target. They apply the
+count correction to the number of observations **strictly below** the threshold,
+including zero-weight observations, and require at least two such observations
+with a positive total tail weight. Their deviation forms are square roots.
+`shortfall(target)` is the weighted probability below target, and
+`average_shortfall(target)` is the conditional mean of `target - observation`
+there. Average shortfall requires a positive-weight tail; shortfall returns zero
+if none lies below target. Targets must be finite.
+
+`potential_upside(confidence)` is the upper percentile floored at zero, with
+confidence in `[0.9, 1)`. `top_percentile(probability)` walks the sorted
+observations from highest to lowest and returns the first value whose
+cumulative weight reaches probability in `(0, 1]`.
+
 === "Python"
 
     ```python
@@ -28,6 +44,8 @@ it at zero. ES raises an error when that tail has no positive-weight samples.
     assert statistics.value_at_risk(observations, 0.9, weights=weights) == 2.0
     assert statistics.expected_shortfall(observations, 0.9, weights=weights) == 5.0
     assert statistics.mean([1.0, 3.0], weights=[1.0, 3.0]) == 2.5
+    assert statistics.shortfall(observations, 0.0, weights=weights) == 11 / 20
+    assert statistics.top_percentile(observations, 0.5, weights=weights) == -2.0
     ```
 
 === "Go"
@@ -42,6 +60,11 @@ it at zero. ES raises an error when that tail has no positive-weight samples.
     es90, err := itofin.StatisticsExpectedShortfall(observations, weights, 0.9)
     if err != nil { panic(err) }
     _, _ = var90, es90
+    missed, err := itofin.StatisticsShortfall(observations, weights, 0)
+    if err != nil { panic(err) }
+    upper, err := itofin.StatisticsTopPercentile(observations, weights, 0.5)
+    if err != nil { panic(err) }
+    _, _ = missed, upper
     ```
 
 Use `nil` weights in Go, or omit `weights` in Python, for unit weights. The

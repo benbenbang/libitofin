@@ -117,3 +117,49 @@ func TestStatisticsRejectsInvalidInputs(t *testing.T) {
 		}
 	}
 }
+
+func TestStatisticsConditionalRiskAndUpperTail(t *testing.T) {
+	values := []float64{-4, -2, 1, 5}
+	weights := []float64{1, 2, 1, 2}
+	cases := []struct {
+		name string
+		want float64
+		call func() (float64, error)
+	}{
+		{"semi variance", 131.0 / 6, func() (float64, error) { return StatisticsSemiVariance(values, weights) }},
+		{"semi deviation", math.Sqrt(131.0 / 6), func() (float64, error) { return StatisticsSemiDeviation(values, weights) }},
+		{"downside variance", 16, func() (float64, error) { return StatisticsDownsideVariance(values, weights) }},
+		{"downside deviation", 4, func() (float64, error) { return StatisticsDownsideDeviation(values, weights) }},
+		{"regret", 86.0 / 3, func() (float64, error) { return StatisticsRegret(values, weights, 1) }},
+		{"potential upside", 5, func() (float64, error) { return StatisticsPotentialUpside(values, weights, 0.9) }},
+		{"shortfall", 0.5, func() (float64, error) { return StatisticsShortfall(values, weights, 0) }},
+		{"average shortfall", 8.0 / 3, func() (float64, error) { return StatisticsAverageShortfall(values, weights, 0) }},
+		{"top percentile", 1, func() (float64, error) { return StatisticsTopPercentile(values, weights, 0.5) }},
+	}
+	for _, test := range cases {
+		got, err := test.call()
+		statisticsClose(t, test.name, test.want, got, err)
+	}
+	got, err := StatisticsDownsideVariance([]float64{-4, -2, 1}, []float64{1, 0, 1})
+	statisticsClose(t, "zero-weight conditional count", 32, got, err)
+}
+
+func TestStatisticsConditionalRiskRejectsInvalidTailAndArguments(t *testing.T) {
+	values := []float64{-4, -2, 1}
+	for _, call := range []func() (float64, error){
+		func() (float64, error) { return StatisticsSemiVariance([]float64{1, 2}, nil) },
+		func() (float64, error) { return StatisticsDownsideVariance([]float64{-4, 1}, nil) },
+		func() (float64, error) { return StatisticsRegret(values, []float64{0, 0, 1}, 0) },
+		func() (float64, error) { return StatisticsAverageShortfall(values, []float64{0, 0, 1}, 0) },
+		func() (float64, error) { return StatisticsRegret(values, nil, math.NaN()) },
+		func() (float64, error) { return StatisticsShortfall(values, nil, math.Inf(1)) },
+		func() (float64, error) { return StatisticsPotentialUpside(values, nil, 0.89) },
+		func() (float64, error) { return StatisticsTopPercentile(values, nil, 0) },
+	} {
+		if _, err := call(); err == nil {
+			t.Fatal("accepted invalid conditional statistic")
+		}
+	}
+	got, err := StatisticsShortfall(values, []float64{0, 0, 1}, 0)
+	statisticsClose(t, "zero-weight shortfall probability", 0, got, err)
+}
