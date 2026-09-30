@@ -7,11 +7,14 @@ use libitofin::types::Real;
 /// Evaluate one weighted batch statistic into caller-owned storage.
 ///
 /// `measure` selects mean (0), sample variance (1), standard deviation (2),
-/// percentile (3), value at risk (4), or expected shortfall (5). `probability`
-/// is used for percentile and risk measures only. Null `weights` with zero
-/// `weights_len` selects unit weights. Inputs are signed observations; VaR and
-/// expected shortfall return nonnegative loss magnitudes. On error, `out` is
-/// unchanged.
+/// percentile (3), value at risk (4), expected shortfall (5), semi variance
+/// (6), semi deviation (7), downside variance (8), downside deviation (9),
+/// regret (10), potential upside (11), shortfall (12), average shortfall (13),
+/// or top percentile (14). `probability` carries a target for measures 10,
+/// 12 and 13, a percentile for 3 and 14, and a confidence for 4, 5 and 11.
+/// Null `weights` with zero `weights_len` selects unit weights. Inputs are
+/// signed observations; VaR and expected shortfall return nonnegative loss
+/// magnitudes. On error, `out` is unchanged.
 ///
 /// # Safety
 ///
@@ -40,6 +43,15 @@ pub unsafe extern "C" fn itofin_statistics_evaluate(
                 3 => BatchStatistic::Percentile,
                 4 => BatchStatistic::ValueAtRisk,
                 5 => BatchStatistic::ExpectedShortfall,
+                6 => BatchStatistic::SemiVariance,
+                7 => BatchStatistic::SemiDeviation,
+                8 => BatchStatistic::DownsideVariance,
+                9 => BatchStatistic::DownsideDeviation,
+                10 => BatchStatistic::Regret,
+                11 => BatchStatistic::PotentialUpside,
+                12 => BatchStatistic::Shortfall,
+                13 => BatchStatistic::AverageShortfall,
+                14 => BatchStatistic::TopPercentile,
                 _ => return Err(BindingError::invalid("unknown batch statistic measure")),
             };
             let weights = if weights.is_null() && weights_len == 0 {
@@ -148,7 +160,7 @@ mod tests {
             (values.as_ptr(), 2, std::ptr::null(), 0, 3, Real::NAN),
             (values.as_ptr(), 2, std::ptr::null(), 0, 4, 1.0),
             (values.as_ptr(), 2, std::ptr::null(), 0, 5, 0.9),
-            (values.as_ptr(), 2, std::ptr::null(), 0, 6, 0.0),
+            (values.as_ptr(), 2, std::ptr::null(), 0, 15, 0.0),
         ];
         for (pointer, len, weights, weights_len, measure, probability) in cases {
             let status = unsafe {
@@ -180,5 +192,83 @@ mod tests {
             )
         };
         assert_eq!(status, INVALID_ARGUMENT);
+    }
+
+    #[test]
+    fn new_weighted_measures_match_core_and_preserve_output_on_errors() {
+        let values = [-4.0, -2.0, 2.0, 8.0];
+        let weights = [1.0, 2.0, 1.0, 0.0];
+        let mut out = 91.0;
+        let mut error = blank_error();
+        for (measure, argument, expected) in [
+            (6, 0.0, 4.5),
+            (7, 0.0, 4.5_f64.sqrt()),
+            (8, 0.0, 16.0),
+            (9, 0.0, 4.0),
+            (10, 1.0, 86.0 / 3.0),
+            (11, 0.9, 2.0),
+            (12, 1.0, 0.75),
+            (13, 1.0, 11.0 / 3.0),
+            (14, 0.5, -2.0),
+        ] {
+            let status = unsafe {
+                itofin_statistics_evaluate(
+                    values.as_ptr(),
+                    values.len(),
+                    weights.as_ptr(),
+                    weights.len(),
+                    measure,
+                    argument,
+                    &mut out,
+                    &mut error,
+                )
+            };
+            assert_eq!(status, 0);
+            assert_eq!(error.code, 0);
+            assert_eq!(out, expected);
+        }
+        for (measure, argument) in [
+            (10, Real::NAN),
+            (11, 1.0),
+            (12, Real::NAN),
+            (13, Real::INFINITY),
+            (14, 0.0),
+        ] {
+            out = 91.0;
+            let status = unsafe {
+                itofin_statistics_evaluate(
+                    values.as_ptr(),
+                    values.len(),
+                    weights.as_ptr(),
+                    weights.len(),
+                    measure,
+                    argument,
+                    &mut out,
+                    &mut error,
+                )
+            };
+            assert!(status == CORE_ERROR || status == INVALID_ARGUMENT);
+            assert_eq!(error.code, status);
+            assert_eq!(out, 91.0);
+        }
+        let values = [1.0, 2.0];
+        let weights = [0.0, 1.0];
+        for (measure, argument) in [(6, 0.0), (7, 0.0), (8, 0.0), (9, 0.0), (10, 1.5), (13, 1.5)] {
+            let status = unsafe {
+                itofin_statistics_evaluate(
+                    values.as_ptr(),
+                    values.len(),
+                    weights.as_ptr(),
+                    weights.len(),
+                    measure,
+                    argument,
+                    &mut out,
+                    &mut error,
+                )
+            };
+            assert_eq!(status, CORE_ERROR);
+            assert_eq!(error.code, status);
+            assert_eq!(out, 91.0);
+        }
     }
 }
