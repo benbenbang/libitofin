@@ -2621,6 +2621,79 @@ int32_t itofin_cos_heston_value(struct ItofinContext *ctx,
                                 struct ItofinError *error);
 
 /**
+ * Create an empty incremental accumulator in the caller's context.
+ *
+ * # Safety
+ * Follow the crate-level C caller contract; `out` is writable.
+ */
+int32_t itofin_incremental_statistics_new(struct ItofinContext *ctx,
+                                          uint64_t *out,
+                                          struct ItofinError *error);
+
+/**
+ * Add one signed observation with its nonnegative weight.
+ *
+ * # Safety
+ * Follow the crate-level C caller contract.
+ */
+int32_t itofin_incremental_statistics_add(struct ItofinContext *ctx,
+                                          uint64_t id,
+                                          ItofinReal value,
+                                          ItofinReal weight,
+                                          struct ItofinError *error);
+
+/**
+ * Atomically add a batch; null weights and zero weight length mean unit weights.
+ *
+ * # Safety
+ * `values` and optional `weights` hold readable `len` doubles.
+ */
+int32_t itofin_incremental_statistics_add_batch(struct ItofinContext *ctx,
+                                                uint64_t id,
+                                                const ItofinReal *values,
+                                                size_t len,
+                                                const ItofinReal *weights,
+                                                size_t weights_len,
+                                                struct ItofinError *error);
+
+/**
+ * Reset the accumulator without releasing its handle.
+ *
+ * # Safety
+ * Follow the crate-level C caller contract.
+ */
+int32_t itofin_incremental_statistics_reset(struct ItofinContext *ctx,
+                                            uint64_t id,
+                                            struct ItofinError *error);
+
+/**
+ * Read the total sample count (0) or negative sample count (1).
+ *
+ * # Safety
+ * `out` is writable and does not overlap context or error storage.
+ */
+int32_t itofin_incremental_statistics_count(struct ItofinContext *ctx,
+                                            uint64_t id,
+                                            int32_t which,
+                                            size_t *out,
+                                            struct ItofinError *error);
+
+/**
+ * Read a scalar statistic: weight sum (0), downside weight sum (1),
+ * min (2), max (3), mean (4), variance (5), standard deviation (6),
+ * error estimate (7), skewness (8), kurtosis (9), downside variance (10),
+ * or downside deviation (11).
+ *
+ * # Safety
+ * `out` is writable and does not overlap context or error storage.
+ */
+int32_t itofin_incremental_statistics_query(struct ItofinContext *ctx,
+                                            uint64_t id,
+                                            int32_t measure,
+                                            ItofinReal *out,
+                                            struct ItofinError *error);
+
+/**
  * # Safety
  * Pointers must be aligned, live and valid for their stated lengths. Outputs
  * must not overlap inputs or other outputs. Any context and its handles must
