@@ -1,0 +1,33 @@
+{
+  "domain": "fixed-garch11",
+  "entries": [
+    {
+      "c": "itofin_garch11_filter",
+      "go": "Garch11Filter",
+      "python": "itofin.chart.garch11_filter",
+      "status": "implemented",
+      "tests": "TestGarch11FilterQuantLibFixture"
+    },
+    {
+      "c": "itofin_garch11_forecast",
+      "go": "Garch11Forecast",
+      "python": "itofin.chart.garch11_forecast",
+      "status": "implemented",
+      "tests": "TestGarch11FilterOneReturnAndForecast"
+    },
+    {
+      "c": "itofin_garch11_filter",
+      "go": "Garch11Result.ConditionalVolatility",
+      "python": "itofin.chart.Garch11Result.conditional_volatility",
+      "status": "implemented",
+      "tests": "TestGarch11FilterQuantLibFixture"
+    },
+    {
+      "c": "itofin_garch11_filter",
+      "go": "Garch11Result.NextVariance",
+      "python": "itofin.chart.Garch11Result.next_variance",
+      "status": "implemented",
+      "tests": "TestGarch11FilterQuantLibFixture"
+    }
+  ]
+}

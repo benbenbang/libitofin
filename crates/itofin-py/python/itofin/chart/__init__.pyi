@@ -10,6 +10,7 @@ __all__ = [
     "BollingerBands",
     "ChartSeries",
     "DatedIntervalPrice",
+    "Garch11Result",
     "Kd",
     "Macd",
     "OhlcOvernightEstimates",
@@ -18,6 +19,8 @@ __all__ = [
     "bollinger_bands",
     "constant_volatility",
     "ema",
+    "garch11_filter",
+    "garch11_forecast",
     "interval_prices",
     "kd",
     "macd",
@@ -102,6 +105,22 @@ class DatedIntervalPrice:
     def close(self) -> builtins.float:
         r"""
         Closing price.
+        """
+
+@typing.final
+class Garch11Result:
+    r"""
+    Conditional volatility aligned with returns and one-step variance forecast.
+    """
+    @property
+    def conditional_volatility(self) -> ChartSeries:
+        r"""
+        Per-return conditional standard deviation in the return input's units.
+        """
+    @property
+    def next_variance(self) -> builtins.float:
+        r"""
+        Conditional variance forecast following the final return.
         """
 
 @typing.final
@@ -222,6 +241,16 @@ def constant_volatility(input: ChartSeries, window: builtins.int) -> ChartSeries
 def ema(close: typing.Sequence[builtins.float], period: builtins.int) -> ChartSeries:
     r"""
     Exponential moving average seeded by the first `period`-bar SMA.
+    """
+
+def garch11_filter(returns: typing.Sequence[builtins.float], alpha: builtins.float, beta: builtins.float, long_run_variance: builtins.float) -> Garch11Result:
+    r"""
+    Filter returns with fixed GARCH(1,1) parameters and long-run variance.
+    """
+
+def garch11_forecast(last_return: builtins.float, current_variance: builtins.float, alpha: builtins.float, beta: builtins.float, long_run_variance: builtins.float) -> builtins.float:
+    r"""
+    Forecast the next variance from the last return and current variance.
     """
 
 def interval_prices(dates: typing.Sequence[time.Date], open: typing.Sequence[builtins.float], high: typing.Sequence[builtins.float], low: typing.Sequence[builtins.float], close: typing.Sequence[builtins.float]) -> builtins.list[DatedIntervalPrice]:

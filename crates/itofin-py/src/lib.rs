@@ -14,6 +14,7 @@ mod capfloortermvol;
 mod caphelper;
 mod cashflows;
 mod chart;
+mod chart_garch;
 mod chart_ohlc_overnight;
 mod chart_ohlc_volatility;
 mod chart_prices;
@@ -420,6 +421,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     let chart = PyModule::new(py, "chart")?;
     chart.add_class::<chart::PyChartSeries>()?;
+    chart.add_class::<chart_garch::PyGarch11Result>()?;
     chart.add_class::<chart::PyVolumeBars>()?;
     chart.add_class::<chart::PyBollingerBands>()?;
     chart.add_class::<chart::PyKd>()?;
@@ -440,6 +442,8 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
         &chart
     )?)?;
     chart.add_function(wrap_pyfunction!(chart::constant_volatility, &chart)?)?;
+    chart.add_function(wrap_pyfunction!(chart_garch::garch11_filter, &chart)?)?;
+    chart.add_function(wrap_pyfunction!(chart_garch::garch11_forecast, &chart)?)?;
     chart.add_function(wrap_pyfunction!(
         chart_ohlc_overnight::ohlc_overnight_volatility,
         &chart
