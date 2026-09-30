@@ -2333,6 +2333,78 @@ int32_t itofin_garch11_forecast(ItofinReal last_return,
                                 struct ItofinError *error);
 
 /**
+ * Create an empty accumulator. Release the handle with `itofin_handle_release`.
+ * # Safety
+ * Follow the crate-level C caller contract; `out` holds one handle.
+ */
+int32_t itofin_general_statistics_new(struct ItofinContext *ctx,
+                                      uint64_t *out,
+                                      struct ItofinError *error);
+
+/**
+ * Add one finite weighted observation. Zero weight still increases count.
+ * # Safety
+ * Follow the crate-level C caller contract.
+ */
+int32_t itofin_general_statistics_add(struct ItofinContext *ctx,
+                                      uint64_t id,
+                                      ItofinReal value,
+                                      ItofinReal weight,
+                                      struct ItofinError *error);
+
+/**
+ * Atomically append a batch. Null weights with zero length selects unit weights.
+ * An invalid row or weight sum leaves the accumulator unchanged.
+ * # Safety
+ * `values` holds `len` doubles; when present, `weights` holds `weights_len`
+ * doubles. Follow the crate-level C pointer contract.
+ */
+int32_t itofin_general_statistics_add_batch(struct ItofinContext *ctx,
+                                            uint64_t id,
+                                            const ItofinReal *values,
+                                            size_t len,
+                                            const ItofinReal *weights,
+                                            size_t weights_len,
+                                            struct ItofinError *error);
+
+/**
+ * Reset to an empty accumulator.
+ * # Safety
+ * Follow the crate-level C caller contract.
+ */
+int32_t itofin_general_statistics_reset(struct ItofinContext *ctx,
+                                        uint64_t id,
+                                        struct ItofinError *error);
+
+/**
+ * Copy the observation count and total weight. Either output may be null.
+ * # Safety
+ * Non-null outputs hold one value and follow the crate-level pointer contract.
+ */
+int32_t itofin_general_statistics_summary(struct ItofinContext *ctx,
+                                          uint64_t id,
+                                          size_t *out_samples,
+                                          ItofinReal *out_weight_sum,
+                                          struct ItofinError *error);
+
+/**
+ * Query a statistic. Selectors 0-19 are min, max, mean, variance, standard
+ * deviation, error estimate, skewness, kurtosis, percentile, top percentile,
+ * semi variance, semi deviation, downside variance, downside deviation,
+ * regret, potential upside, VaR, ES, shortfall, and average shortfall.
+ * `argument` supplies a probability, confidence, or target where applicable.
+ * Nonfinite results and invalid selectors leave `out` unchanged.
+ * # Safety
+ * `out` holds one double and follows the crate-level C caller contract.
+ */
+int32_t itofin_general_statistics_query(struct ItofinContext *ctx,
+                                        uint64_t id,
+                                        int32_t selector,
+                                        ItofinReal argument,
+                                        ItofinReal *out,
+                                        struct ItofinError *error);
+
+/**
  * # Safety
  * Pointers must be aligned, live and valid for their stated lengths. Outputs
  * must not overlap inputs or other outputs. Any context and its handles must
