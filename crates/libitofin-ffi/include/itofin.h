@@ -2287,6 +2287,21 @@ int32_t itofin_fd_black_scholes_engine_new(struct ItofinContext *ctx,
                                            struct ItofinError *error);
 
 /**
+ * Fit a stationary GARCH(1,1) model to a return series and forecast one variance.
+ * # Safety
+ * `returns` holds `len` doubles. All output pointers hold one double and
+ * follow the crate-level non-overlap contract.
+ */
+int32_t itofin_garch11_fit(const ItofinReal *returns,
+                           size_t len,
+                           ItofinReal *out_alpha,
+                           ItofinReal *out_beta,
+                           ItofinReal *out_omega,
+                           ItofinReal *out_log_likelihood,
+                           ItofinReal *out_next_variance,
+                           struct ItofinError *error);
+
+/**
  * Filter returns into conditional volatility and forecast the next variance.
  * The first output slot is a zero warmup placeholder; `first_valid` is one.
  * # Safety
