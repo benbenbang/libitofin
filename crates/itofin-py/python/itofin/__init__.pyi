@@ -38,6 +38,7 @@ __all__ = [
     "randomnumbers",
     "results",
     "simulate_gbm",
+    "simulate_heston",
     "simulate_ou",
     "statistics",
     "termstructures",
@@ -152,6 +153,20 @@ def simulate_gbm(initial: typing.Sequence[builtins.float], drift: typing.Sequenc
 
     Raises:
         ItofinError: If inputs, correlation, or output size are invalid.
+    """
+
+def simulate_heston(spot: builtins.float, variance: builtins.float, risk_free_rate: builtins.float, dividend_yield: builtins.float, kappa: builtins.float, theta: builtins.float, sigma: builtins.float, rho: builtins.float, horizon: builtins.float, steps: builtins.int, paths: builtins.int, seed: builtins.int, scheme: builtins.str = 'qem', terminal_only: builtins.bool = False, max_output_values: builtins.int = 0) -> numpy.typing.NDArray[numpy.float64]:
+    r"""
+    Generate seeded Heston spot/variance paths with flat rates.
+
+    `scheme` is `"qe"` or `"qem"`. Independent normal draws are consumed in
+    path, time, spot-factor, variance-factor order. Component zero is spot and
+    component one is variance. Full output includes time zero; terminal output
+    matches the last full row for the same seed.
+
+    Returns:
+        numpy.ndarray: Float64 values shaped `(paths, steps + 1, 2)` or
+            `(paths, 2)` in terminal mode.
     """
 
 def simulate_ou(initial: builtins.float, level: builtins.float, speed: builtins.float, volatility: builtins.float, horizon: builtins.float, steps: builtins.int, paths: builtins.int, seed: builtins.int, terminal_only: builtins.bool = False, max_output_values: builtins.int = 0) -> numpy.typing.NDArray[numpy.float64]:

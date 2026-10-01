@@ -1,7 +1,8 @@
 //! Stateless Python simulation calls backed by the shared Rust/Go kernel.
 
 use crate::{ItofinError, PyQlError};
-use libitofin::methods::montecarlo::simulation_kernel::{self, GbmRequest};
+use libitofin::methods::montecarlo::simulation_kernel::{self, GbmRequest, HestonRequest};
+use libitofin::processes::HestonDiscretization as Discretization;
 use numpy::ndarray::IxDyn;
 use numpy::{PyArray1, PyArrayDyn, PyArrayMethods};
 use pyo3::prelude::*;
@@ -128,6 +129,75 @@ pub(crate) fn simulate_gbm<'py>(
         vec![paths, assets]
     } else {
         vec![paths, steps + 1, assets]
+    };
+    PyArray1::from_vec(py, values).reshape(IxDyn(&shape))
+}
+
+/// Generate seeded Heston spot/variance paths with flat rates.
+///
+/// `scheme` is `"qe"` or `"qem"`. Independent normal draws are consumed in
+/// path, time, spot-factor, variance-factor order. Component zero is spot and
+/// component one is variance. Full output includes time zero; terminal output
+/// matches the last full row for the same seed.
+///
+/// Returns:
+///     numpy.ndarray: Float64 values shaped `(paths, steps + 1, 2)` or
+///         `(paths, 2)` in terminal mode.
+#[gen_stub_pyfunction(module = "itofin")]
+#[pyfunction]
+#[pyo3(signature = (spot, variance, risk_free_rate, dividend_yield, kappa, theta, sigma, rho, horizon, steps, paths, seed, scheme = "qem", terminal_only = false, max_output_values = 0))]
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn simulate_heston<'py>(
+    py: Python<'py>,
+    spot: f64,
+    variance: f64,
+    risk_free_rate: f64,
+    dividend_yield: f64,
+    kappa: f64,
+    theta: f64,
+    sigma: f64,
+    rho: f64,
+    horizon: f64,
+    steps: usize,
+    paths: usize,
+    seed: u32,
+    scheme: &str,
+    terminal_only: bool,
+    max_output_values: isize,
+) -> PyResult<Bound<'py, PyArrayDyn<f64>>> {
+    let discretization = match scheme {
+        "qe" => Discretization::QuadraticExponential,
+        "qem" => Discretization::QuadraticExponentialMartingale,
+        _ => return Err(ItofinError::new_err("unsupported Heston discretization")),
+    };
+    let request = HestonRequest {
+        spot,
+        variance,
+        risk_free_rate,
+        dividend_yield,
+        kappa,
+        theta,
+        sigma,
+        rho,
+        horizon,
+        steps,
+        paths,
+        seed,
+        discretization,
+        terminal_only,
+    };
+    let count = simulation_kernel::heston_output_len(&request).map_err(PyQlError::from)?;
+    let limit = output_limit(max_output_values)?;
+    if count > limit || count > isize::MAX as usize / size_of::<f64>() {
+        return Err(ItofinError::new_err(
+            "result exceeds output limit; use terminal mode or smaller batches",
+        ));
+    }
+    let values = simulation_kernel::heston_paths(&request).map_err(PyQlError::from)?;
+    let shape = if terminal_only {
+        vec![paths, 2]
+    } else {
+        vec![paths, steps + 1, 2]
     };
     PyArray1::from_vec(py, values).reshape(IxDyn(&shape))
 }

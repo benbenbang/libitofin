@@ -21,6 +21,13 @@
       "python": "itofin.simulate_ou",
       "status": "implemented",
       "tests": "TestOULayoutAndTerminalConsistency"
+    },
+    {
+      "c": "itofin_heston_paths",
+      "go": "SimulateHeston",
+      "python": "itofin.simulate_heston",
+      "status": "implemented",
+      "tests": "TestHestonLayoutTerminalSeedAndZeroTime"
     }
   ]
 }

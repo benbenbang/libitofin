@@ -204,6 +204,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("ItofinError", py.get_type::<ItofinError>())?;
     m.add_function(wrap_pyfunction!(simulation::gaussian_draws, m)?)?;
     m.add_function(wrap_pyfunction!(simulation::simulate_gbm, m)?)?;
+    m.add_function(wrap_pyfunction!(simulation::simulate_heston, m)?)?;
     m.add_function(wrap_pyfunction!(ou_simulation::simulate_ou, m)?)?;
     m.add_class::<PySettings>()?;
 
