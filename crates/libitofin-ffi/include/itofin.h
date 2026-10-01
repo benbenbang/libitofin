@@ -136,6 +136,24 @@ typedef struct ItofinBootstrapCallbacks {
 } ItofinBootstrapCallbacks;
 
 /**
+ * Scalar inputs for exact OU simulation.
+ */
+typedef struct ItofinOuInput {
+  ItofinReal initial;
+  ItofinReal level;
+  ItofinReal speed;
+  ItofinReal volatility;
+  ItofinReal horizon;
+  size_t steps;
+  size_t paths;
+  uint32_t seed;
+  /**
+   * 0: full `[path,time]`; 1: terminal `[path]`.
+   */
+  int32_t terminal_only;
+} ItofinOuInput;
+
+/**
  * GBM inputs; arrays each contain `assets` doubles, correlation `assets*assets`.
  */
 typedef struct ItofinGbmInput {
@@ -1513,6 +1531,18 @@ int32_t itofin_chart_volume_bars(const ItofinReal *open,
                                  int8_t *out_direction,
                                  size_t capacity,
                                  struct ItofinError *error);
+
+/**
+ * Generate OU paths into a caller-owned buffer.
+ *
+ * # Safety
+ * Input, output and error pointers obey the crate-level pointer contract;
+ * `out` must hold at least `capacity` doubles and must not overlap `input`.
+ */
+int32_t itofin_ou_paths(const struct ItofinOuInput *input,
+                        ItofinReal *out,
+                        size_t capacity,
+                        struct ItofinError *error);
 
 /**
  * Generate `count` standard normal values with a deterministic nonzero seed.
