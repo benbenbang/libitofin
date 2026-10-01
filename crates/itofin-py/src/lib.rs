@@ -31,6 +31,7 @@ mod helpers;
 mod heston;
 mod heston_engines;
 mod hullwhite;
+mod incremental_statistics;
 mod inflation;
 mod iterativebootstrap;
 mod jointcurves;
@@ -423,6 +424,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     let statistics = PyModule::new(py, "statistics")?;
     statistics.add_class::<general_statistics::PyGeneralStatistics>()?;
+    statistics.add_class::<incremental_statistics::PyIncrementalStatistics>()?;
     statistics.add_function(wrap_pyfunction!(statistics::mean, &statistics)?)?;
     statistics.add_function(wrap_pyfunction!(statistics::variance, &statistics)?)?;
     statistics.add_function(wrap_pyfunction!(

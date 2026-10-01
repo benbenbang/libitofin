@@ -1,0 +1,131 @@
+{
+  "domain": "statistics-incremental",
+  "entries": [
+    {
+      "c": "itofin_incremental_statistics_new",
+      "go": "NewIncrementalStatistics",
+      "python": "itofin.statistics.IncrementalStatistics.__init__",
+      "status": "implemented",
+      "tests": "TestIncrementalStatisticsWeightedState"
+    },
+    {
+      "c": "itofin_incremental_statistics_add",
+      "go": "IncrementalStatistics.Add",
+      "python": "itofin.statistics.IncrementalStatistics.add",
+      "status": "implemented",
+      "tests": "TestIncrementalStatisticsStableMomentAndSessionClose"
+    },
+    {
+      "c": "itofin_incremental_statistics_add_batch",
+      "go": "IncrementalStatistics.AddBatch",
+      "python": "itofin.statistics.IncrementalStatistics.add_batch",
+      "status": "implemented",
+      "tests": "TestIncrementalStatisticsWeightedState"
+    },
+    {
+      "c": "itofin_incremental_statistics_reset",
+      "go": "IncrementalStatistics.Reset",
+      "python": "itofin.statistics.IncrementalStatistics.reset",
+      "status": "implemented",
+      "tests": "TestIncrementalStatisticsWeightedState"
+    },
+    {
+      "c": "itofin_incremental_statistics_count",
+      "go": "IncrementalStatistics.Samples",
+      "python": "itofin.statistics.IncrementalStatistics.samples",
+      "status": "implemented",
+      "tests": "TestIncrementalStatisticsWeightedState"
+    },
+    {
+      "c": "itofin_incremental_statistics_count",
+      "go": "IncrementalStatistics.DownsideSamples",
+      "python": "itofin.statistics.IncrementalStatistics.downside_samples",
+      "status": "implemented",
+      "tests": "TestIncrementalStatisticsWeightedState"
+    },
+    {
+      "c": "itofin_incremental_statistics_query",
+      "go": "IncrementalStatistics.WeightSum",
+      "python": "itofin.statistics.IncrementalStatistics.weight_sum",
+      "status": "implemented",
+      "tests": "TestIncrementalStatisticsWeightedState"
+    },
+    {
+      "c": "itofin_incremental_statistics_query",
+      "go": "IncrementalStatistics.DownsideWeightSum",
+      "python": "itofin.statistics.IncrementalStatistics.downside_weight_sum",
+      "status": "implemented",
+      "tests": "TestIncrementalStatisticsWeightedState"
+    },
+    {
+      "c": "itofin_incremental_statistics_query",
+      "go": "IncrementalStatistics.Min",
+      "python": "itofin.statistics.IncrementalStatistics.min",
+      "status": "implemented",
+      "tests": "TestIncrementalStatisticsWeightedState"
+    },
+    {
+      "c": "itofin_incremental_statistics_query",
+      "go": "IncrementalStatistics.Max",
+      "python": "itofin.statistics.IncrementalStatistics.max",
+      "status": "implemented",
+      "tests": "TestIncrementalStatisticsWeightedState"
+    },
+    {
+      "c": "itofin_incremental_statistics_query",
+      "go": "IncrementalStatistics.Mean",
+      "python": "itofin.statistics.IncrementalStatistics.mean",
+      "status": "implemented",
+      "tests": "TestIncrementalStatisticsWeightedState"
+    },
+    {
+      "c": "itofin_incremental_statistics_query",
+      "go": "IncrementalStatistics.Variance",
+      "python": "itofin.statistics.IncrementalStatistics.variance",
+      "status": "implemented",
+      "tests": "TestIncrementalStatisticsStableMomentAndSessionClose"
+    },
+    {
+      "c": "itofin_incremental_statistics_query",
+      "go": "IncrementalStatistics.StandardDeviation",
+      "python": "itofin.statistics.IncrementalStatistics.standard_deviation",
+      "status": "implemented",
+      "tests": "TestIncrementalStatisticsWeightedState"
+    },
+    {
+      "c": "itofin_incremental_statistics_query",
+      "go": "IncrementalStatistics.ErrorEstimate",
+      "python": "itofin.statistics.IncrementalStatistics.error_estimate",
+      "status": "implemented",
+      "tests": "TestIncrementalStatisticsWeightedState"
+    },
+    {
+      "c": "itofin_incremental_statistics_query",
+      "go": "IncrementalStatistics.Skewness",
+      "python": "itofin.statistics.IncrementalStatistics.skewness",
+      "status": "implemented",
+      "tests": "TestIncrementalStatisticsWeightedState"
+    },
+    {
+      "c": "itofin_incremental_statistics_query",
+      "go": "IncrementalStatistics.Kurtosis",
+      "python": "itofin.statistics.IncrementalStatistics.kurtosis",
+      "status": "implemented",
+      "tests": "TestIncrementalStatisticsWeightedState"
+    },
+    {
+      "c": "itofin_incremental_statistics_query",
+      "go": "IncrementalStatistics.DownsideVariance",
+      "python": "itofin.statistics.IncrementalStatistics.downside_variance",
+      "status": "implemented",
+      "tests": "TestIncrementalStatisticsWeightedState"
+    },
+    {
+      "c": "itofin_incremental_statistics_query",
+      "go": "IncrementalStatistics.DownsideDeviation",
+      "python": "itofin.statistics.IncrementalStatistics.downside_deviation",
+      "status": "implemented",
+      "tests": "TestIncrementalStatisticsWeightedState"
+    }
+  ]
+}
