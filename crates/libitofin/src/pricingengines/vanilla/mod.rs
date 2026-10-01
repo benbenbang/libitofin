@@ -24,6 +24,7 @@ pub mod fdblackscholesvanillaengine;
 mod heston_fitting_table;
 mod hestoncumulants;
 mod hestonmarket;
+pub mod jumpdiffusionengine;
 pub mod mcamericanengine;
 pub mod mceuropeanengine;
 pub mod mceuropeanhestonengine;
@@ -31,6 +32,7 @@ pub mod mcvanillaengine;
 
 pub use analytichestonengine::HestonChf;
 pub use fdblackscholesvanillaengine::FdBlackScholesVanillaEngine;
+pub use jumpdiffusionengine::JumpDiffusionEngine;
 pub use mcamericanengine::{AmericanPathPricer, MCAmericanEngine, MakeMcAmericanEngine};
 pub use mceuropeanengine::{EuropeanPathPricer, MCEuropeanEngine, MakeMcEuropeanEngine};
 pub use mceuropeanhestonengine::{
