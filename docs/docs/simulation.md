@@ -1,4 +1,4 @@
-# Correlated GBM simulation
+# Seeded simulation
 
 `itofin.simulate_gbm` generates geometric Brownian paths with a fixed,
 nonzero seed. It shares the Rust simulation kernel with Go's `SimulateGBM`:
@@ -111,3 +111,70 @@ math libraries; the fixture never recomputes expectations through the shared
 kernel under test.
 
 ::: itofin.simulate_ou
+
+## Heston spot and variance paths
+
+`itofin.simulate_heston` and Go `SimulateHeston` use the existing Heston
+process's Andersen quadratic-exponential (`qe`) and martingale-corrected
+quadratic-exponential (`qem`) schemes. Python and Go default to `qem`; Go can
+select `HestonQE` or `HestonQEM`. C uses scheme 0 for QEM and 1 for QE.
+Other process schemes remain outside this facade.
+
+```python
+paths = itofin.simulate_heston(
+    spot=100.0, variance=0.04,
+    risk_free_rate=0.05, dividend_yield=0.02,
+    kappa=1.2, theta=0.06, sigma=0.3, rho=-0.5,
+    horizon=1.0, steps=12, paths=100, seed=42, scheme="qem",
+)
+assert paths.shape == (100, 13, 2)
+assert paths[0, 0].tolist() == [100.0, 0.04]
+terminal = itofin.simulate_heston(
+    spot=100.0, variance=0.04,
+    risk_free_rate=0.05, dividend_yield=0.02,
+    kappa=1.2, theta=0.06, sigma=0.3, rho=-0.5,
+    horizon=1.0, steps=12, paths=100, seed=42,
+    terminal_only=True,
+)
+assert (terminal == paths[:, -1, :]).all()
+```
+
+```go
+paths, err := itofin.SimulateHeston(itofin.HestonConfig{
+    Spot: 100, Variance: 0.04, RiskFreeRate: 0.05, DividendYield: 0.02,
+    Kappa: 1.2, Theta: 0.06, Sigma: 0.3, Rho: -0.5,
+    Horizon: 1, Steps: 12, Paths: 100, Seed: 42, Scheme: itofin.HestonQEM,
+})
+if err != nil { return err }
+fmt.Println(paths.Paths, paths.Times, paths.Assets)
+```
+
+Full output is C-ordered `[path, time, component]`, including time zero;
+terminal output is `[path, component]`. Component 0 is spot and component 1
+is variance. Two independent standard normals per path and step are consumed
+in spot-factor then variance-factor order. The process applies `rho` internally.
+A nonzero seed restarts the same MT19937/inverse-normal stream on every call.
+Zero horizon repeats the initial state exactly. Flat risk-free and dividend
+rates use the horizon's time unit.
+
+Spot must be positive, initial variance nonnegative, `kappa`, `theta`, and
+`sigma` positive, `rho` between -1 and 1, and horizon nonnegative. All scalar
+inputs must be finite. Steps, paths, and seed must be positive. The same
+16,777,216-value default allocation limit and terminal-mode option apply as
+for GBM; an explicit positive `max_output_values` overrides the limit.
+
+Tests pin independent one-step Andersen QE calculations with seed 42's first
+normal pair `(-0.31985239197154675, 0.8293364834726858)`, in spot/variance
+order. Both cases use spot 100, rates 0.05/0.02 and rho -0.5:
+
+| Scheme | Initial variance | kappa | theta | sigma | Time step | Spot | Variance |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| QEM | 0.04 | 1.2 | 0.06 | 0.3 | 0.25 | 93.21873664131503 | 0.06567515852602028 |
+| QE, high-psi branch | 0.01 | 0.5 | 0.01 | 0.2 | 1 | 96.55317400157244 | 0.018076059597846472 |
+
+Rust, C, Go and Python compare spot at absolute tolerance `1e-11` and variance
+at `1e-13`. Same-build full/terminal values must match exactly. Separate seeded
+Monte Carlo tests check analytic variance moments and the QEM discounted-spot
+expectation with statistical tolerances.
+
+::: itofin.simulate_heston
