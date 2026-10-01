@@ -296,3 +296,5 @@ fn unsupported_payoffs_exercises_and_path_methods_return_errors() {
     ));
     assert!(engine.calculate().is_err());
 }
+
+mod oracle;
