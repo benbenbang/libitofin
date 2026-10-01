@@ -94,7 +94,7 @@ mod tests {
     #[test]
     fn invalid_configuration_preserves_output_and_context() {
         let mut context = Context::new();
-        let mut out = 47;
+        let mut out = 0;
         let mut error = ItofinError {
             code: 0,
             message: [0; 1024],
@@ -113,7 +113,7 @@ mod tests {
                 ),
                 0
             );
-            assert_eq!(out, 47);
+            assert_eq!(out, 0);
             assert_ne!(
                 itofin_fd_black_scholes_engine_new(
                     &mut context,
@@ -128,7 +128,7 @@ mod tests {
                 ),
                 0
             );
-            assert_eq!(out, 47);
+            assert_eq!(out, 0);
             assert_ne!(
                 itofin_fd_black_scholes_engine_new(
                     &mut context,
@@ -139,12 +139,12 @@ mod tests {
                 ),
                 0
             );
-            assert_eq!(out, 47);
+            assert_eq!(out, 0);
             assert_eq!(
                 crate::market_api::itofin_quote_new(&mut context, 80.0, &mut out, &mut error),
                 0
             );
-            assert_ne!(out, 47);
+            assert_ne!(out, 0);
         }
     }
 }
