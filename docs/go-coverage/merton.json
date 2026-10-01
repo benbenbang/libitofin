@@ -3,6 +3,123 @@
   "scope": "Merton76 process, European jump pricing and observable constant volatility",
   "symbols": [
     {
+      "c": "itofin_merton76_new",
+      "go": "Session.NewMerton76Process",
+      "go_file": "sdk/go/merton.go",
+      "native_file": "crates/libitofin-ffi/src/merton_api.rs",
+      "python": "itofin.processes.Merton76Process.__init__",
+      "source": "crates/itofin-py/python/itofin/processes/__init__.pyi",
+      "status": "implemented",
+      "tests": [
+        "TestMertonOracleAndAllLiveInputs"
+      ],
+      "validation": "Shared QuantLib price/Greek fixtures, live input updates, retained lifetimes and invalid input recovery"
+    },
+    {
+      "c": "itofin_merton76_value",
+      "go": "Merton76Process.Spot",
+      "go_file": "sdk/go/merton.go",
+      "native_file": "crates/libitofin-ffi/src/merton_api.rs",
+      "python": "itofin.processes.Merton76Process.spot",
+      "source": "crates/itofin-py/python/itofin/processes/__init__.pyi",
+      "status": "implemented",
+      "tests": [
+        "TestMertonOracleAndAllLiveInputs"
+      ],
+      "validation": "Shared QuantLib price/Greek fixtures, live input updates, retained lifetimes and invalid input recovery"
+    },
+    {
+      "c": "itofin_merton76_value",
+      "go": "Merton76Process.JumpIntensity",
+      "go_file": "sdk/go/merton.go",
+      "native_file": "crates/libitofin-ffi/src/merton_api.rs",
+      "python": "itofin.processes.Merton76Process.jump_intensity",
+      "source": "crates/itofin-py/python/itofin/processes/__init__.pyi",
+      "status": "implemented",
+      "tests": [
+        "TestMertonOracleAndAllLiveInputs"
+      ],
+      "validation": "Shared QuantLib price/Greek fixtures, live input updates, retained lifetimes and invalid input recovery"
+    },
+    {
+      "c": "itofin_merton76_value",
+      "go": "Merton76Process.LogMeanJump",
+      "go_file": "sdk/go/merton.go",
+      "native_file": "crates/libitofin-ffi/src/merton_api.rs",
+      "python": "itofin.processes.Merton76Process.log_mean_jump",
+      "source": "crates/itofin-py/python/itofin/processes/__init__.pyi",
+      "status": "implemented",
+      "tests": [
+        "TestMertonOracleAndAllLiveInputs"
+      ],
+      "validation": "Shared QuantLib price/Greek fixtures, live input updates, retained lifetimes and invalid input recovery"
+    },
+    {
+      "c": "itofin_merton76_value",
+      "go": "Merton76Process.LogJumpVolatility",
+      "go_file": "sdk/go/merton.go",
+      "native_file": "crates/libitofin-ffi/src/merton_api.rs",
+      "python": "itofin.processes.Merton76Process.log_jump_volatility",
+      "source": "crates/itofin-py/python/itofin/processes/__init__.pyi",
+      "status": "implemented",
+      "tests": [
+        "TestMertonOracleAndAllLiveInputs"
+      ],
+      "validation": "Shared QuantLib price/Greek fixtures, live input updates, retained lifetimes and invalid input recovery"
+    },
+    {
+      "c": "itofin_merton76_time",
+      "go": "Merton76Process.Time",
+      "go_file": "sdk/go/merton.go",
+      "native_file": "crates/libitofin-ffi/src/merton_api.rs",
+      "python": "itofin.processes.Merton76Process.time",
+      "source": "crates/itofin-py/python/itofin/processes/__init__.pyi",
+      "status": "implemented",
+      "tests": [
+        "TestMertonOracleAndAllLiveInputs"
+      ],
+      "validation": "Shared QuantLib price/Greek fixtures, live input updates, retained lifetimes and invalid input recovery"
+    },
+    {
+      "c": "itofin_jump_diffusion_engine_new",
+      "go": "Session.NewJumpDiffusionEngine",
+      "go_file": "sdk/go/merton.go",
+      "native_file": "crates/libitofin-ffi/src/merton_api.rs",
+      "python": "itofin.pricingengines.JumpDiffusionEngine.__init__",
+      "source": "crates/itofin-py/python/itofin/pricingengines/__init__.pyi",
+      "status": "implemented",
+      "tests": [
+        "TestMertonNativeQuantLibOracle"
+      ],
+      "validation": "Shared QuantLib price/Greek fixtures, live input updates, retained lifetimes and invalid input recovery"
+    },
+    {
+      "c": "itofin_option_set_engine",
+      "go": "VanillaOption.SetJumpDiffusionEngine",
+      "go_file": "sdk/go/merton.go",
+      "native_file": "crates/libitofin-ffi/src/options_api.rs",
+      "python": "itofin.instruments.VanillaOption.set_jump_diffusion_engine",
+      "source": "crates/itofin-py/python/itofin/instruments/__init__.pyi",
+      "status": "implemented",
+      "tests": [
+        "TestMertonNativeQuantLibOracle"
+      ],
+      "validation": "Shared QuantLib price/Greek fixtures, live input updates, retained lifetimes and invalid input recovery"
+    },
+    {
+      "c": "itofin_option_value",
+      "go": "VanillaOption.PriceJumpDiffusion",
+      "go_file": "sdk/go/merton.go",
+      "native_file": "crates/libitofin-ffi/src/options_api.rs",
+      "python": "itofin.instruments.VanillaOption.price_jump_diffusion",
+      "source": "crates/itofin-py/python/itofin/instruments/__init__.pyi",
+      "status": "implemented",
+      "tests": [
+        "TestMertonOracleAndAllLiveInputs"
+      ],
+      "validation": "Shared QuantLib price/Greek fixtures, live input updates, retained lifetimes and invalid input recovery"
+    },
+    {
       "c": "itofin_black_constant_vol_from_quote",
       "go": "Session.NewBlackConstantVolFromQuote",
       "go_file": "sdk/go/vol.go",

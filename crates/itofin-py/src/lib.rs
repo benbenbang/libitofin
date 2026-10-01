@@ -38,6 +38,7 @@ mod jointcurves;
 mod makeswaption;
 mod market;
 mod mcengine;
+mod merton;
 mod ois;
 mod optimize;
 mod option;
@@ -301,6 +302,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     let processes = PyModule::new(py, "processes")?;
     processes.add_class::<PyBlackScholesProcess>()?;
     processes.add_class::<PyHestonProcess>()?;
+    processes.add_class::<merton::PyMerton76Process>()?;
 
     let indexes = PyModule::new(py, "indexes")?;
     indexes.add_class::<overnightfuture::PySofr>()?;
@@ -387,6 +389,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     pricingengines.add_class::<fdengine::PyFdScheme>()?;
     pricingengines.add_class::<fdengine::PyFdBlackScholesVanillaEngine>()?;
     pricingengines.add_class::<PyMCEuropeanEngine>()?;
+    pricingengines.add_class::<merton::PyJumpDiffusionEngine>()?;
     pricingengines.add_class::<PyQMCEuropeanEngine>()?;
     pricingengines.add_class::<heston_engines::PyCosHestonEngine>()?;
     pricingengines.add_class::<heston_engines::PyExponentialFittingHestonEngine>()?;

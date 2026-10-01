@@ -1274,6 +1274,14 @@ class VanillaOption:
             process (BlackScholesProcess): The process the engine prices on;
                 the exact object this Python instance holds is threaded in.
         """
+    def set_jump_diffusion_engine(self, engine: pricingengines.JumpDiffusionEngine) -> None:
+        r"""
+        Attach a European jump-diffusion engine retaining its live inputs.
+        """
+    def price_jump_diffusion(self, engine: pricingengines.JumpDiffusionEngine) -> builtins.float:
+        r"""
+        Attach the jump-diffusion engine and return the option value.
+        """
     def set_heston_engine(self, model: models.HestonModel, integration_order: builtins.int) -> None:
         r"""
         Attach an analytic Heston engine built on model.
