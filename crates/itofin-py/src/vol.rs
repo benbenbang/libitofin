@@ -1,6 +1,7 @@
 //! Facade for the Black-volatility term-structure base: BlackVolTermStructure.
 
 use crate::PyQlError;
+use crate::market::PySimpleQuote;
 use crate::time::{PyCalendar, PyDate, PyDayCounter};
 use libitofin::handle::Handle;
 use libitofin::math::interpolations::linear::Linear;
@@ -293,6 +294,42 @@ impl PyBlackConstantVol {
             inner: Handle::new(structure),
         })
         .add_subclass(PyBlackConstantVol)
+    }
+
+    /// Build a flat surface retaining an observable volatility quote.
+    #[staticmethod]
+    #[pyo3(signature = (reference_date, volatility, day_counter, calendar=None))]
+    fn from_quote(
+        py: Python<'_>,
+        reference_date: &PyDate,
+        volatility: &PySimpleQuote,
+        day_counter: &PyDayCounter,
+        calendar: Option<&PyCalendar>,
+    ) -> PyResult<Py<Self>> {
+        let value = volatility
+            .handle()
+            .current_link()
+            .map_err(PyQlError::from)?
+            .value()
+            .map_err(PyQlError::from)?;
+        if !value.is_finite() || value < 0.0 {
+            return Err(crate::ItofinError::new_err(
+                "volatility must be finite and nonnegative",
+            ));
+        }
+        let structure = shared(BlackConstantVol::with_quote(
+            reference_date.inner(),
+            calendar.map(PyCalendar::inner),
+            volatility.handle(),
+            day_counter.inner(),
+        )) as Shared<dyn BlackVolTermStructure>;
+        Py::new(
+            py,
+            PyClassInitializer::from(PyBlackVolTermStructure {
+                inner: Handle::new(structure),
+            })
+            .add_subclass(Self),
+        )
     }
 }
 

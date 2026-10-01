@@ -1,0 +1,19 @@
+{
+  "implementation_gaps": [],
+  "scope": "Merton76 process, European jump pricing and observable constant volatility",
+  "symbols": [
+    {
+      "c": "itofin_black_constant_vol_from_quote",
+      "go": "Session.NewBlackConstantVolFromQuote",
+      "go_file": "sdk/go/vol.go",
+      "native_file": "crates/libitofin-ffi/src/vol_api.rs",
+      "python": "itofin.termstructures.BlackConstantVol.from_quote",
+      "source": "crates/itofin-py/python/itofin/termstructures/__init__.pyi",
+      "status": "implemented",
+      "tests": [
+        "TestMertonBoundariesAndFailureRecovery"
+      ],
+      "validation": "Shared QuantLib price/Greek fixtures, live input updates, retained lifetimes and invalid input recovery"
+    }
+  ]
+}

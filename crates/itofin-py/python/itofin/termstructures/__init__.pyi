@@ -113,6 +113,11 @@ class BlackConstantVol(BlackVolTermStructure):
             day_counter (DayCounter): The day count turning dates into times.
             calendar (Calendar | None): The surface's calendar, if any.
         """
+    @staticmethod
+    def from_quote(reference_date: time.Date, volatility: quotes.SimpleQuote, day_counter: time.DayCounter, calendar: typing.Optional[time.Calendar] = None) -> BlackConstantVol:
+        r"""
+        Build a flat surface retaining an observable volatility quote.
+        """
 
 @typing.final
 class BlackVarianceCurve(BlackVolTermStructure):
