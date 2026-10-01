@@ -295,3 +295,6 @@ fn poisson_tail_bound(log_mass: Real, mean: Real, count: Real) -> Real {
     }
     (log_mass + mean.ln() - (count + 1.0).ln()).exp() / (1.0 - ratio)
 }
+
+#[cfg(test)]
+mod tests;
