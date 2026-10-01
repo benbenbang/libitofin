@@ -5,10 +5,22 @@
 //! is rejected because the native RNG interprets it as a nondeterministic seed.
 
 use crate::errors::{QlError, QlResult};
+use crate::handle::Handle;
+use crate::interestrate::Compounding;
+use crate::math::array::Array;
 use crate::math::matrix::Matrix;
 use crate::math::matrixutilities::choleskydecomposition::cholesky_decomposition;
 use crate::math::randomnumbers::rngtraits::{McRngTraits, PseudoRandom, SequenceGenerator};
+use crate::processes::{HestonDiscretization as Discretization, HestonProcess};
+use crate::quotes::make_quote_handle;
 use crate::require;
+use crate::shared::{Shared, shared};
+use crate::stochasticprocess::StochasticProcess;
+use crate::termstructures::yields::FlatForward;
+use crate::termstructures::yieldtermstructure::YieldTermStructure;
+use crate::time::date::{Date, Month};
+use crate::time::daycounters::actual365fixed::Actual365Fixed;
+use crate::time::frequency::Frequency;
 use crate::types::{Natural, Rate, Real, Size, Time, Volatility};
 
 fn error(message: &str) -> QlError {
@@ -222,6 +234,162 @@ pub fn gbm_paths(request: &GbmRequest<'_>) -> QlResult<Vec<Real>> {
         if request.terminal_only {
             output[cursor..cursor + assets].copy_from_slice(&current);
             cursor += assets;
+        }
+    }
+    Ok(output)
+}
+
+/// Parameters for stateless Heston paths under flat risk-free and dividend rates.
+///
+/// The two independent normals at each step are consumed in path, time,
+/// spot-factor, variance-factor order. Correlation is applied by the process.
+pub struct HestonRequest {
+    pub spot: Real,
+    pub variance: Real,
+    pub risk_free_rate: Rate,
+    pub dividend_yield: Rate,
+    pub kappa: Real,
+    pub theta: Real,
+    pub sigma: Real,
+    pub rho: Real,
+    pub horizon: Time,
+    pub steps: Size,
+    pub paths: Size,
+    pub seed: Natural,
+    pub discretization: Discretization,
+    pub terminal_only: bool,
+}
+
+/// Number of spot/variance result elements, checked before allocation.
+pub fn heston_output_len(request: &HestonRequest) -> QlResult<Size> {
+    let times = if request.terminal_only {
+        1
+    } else {
+        request
+            .steps
+            .checked_add(1)
+            .ok_or_else(|| error("step count overflows"))?
+    };
+    product(product(request.paths, times)?, 2)
+}
+
+fn flat_curve(rate: Rate) -> Handle<dyn YieldTermStructure> {
+    Handle::new(shared(FlatForward::with_rate(
+        Date::new(1, Month::January, 2026),
+        rate,
+        Actual365Fixed::new(),
+        Compounding::Continuous,
+        Frequency::Annual,
+    )) as Shared<dyn YieldTermStructure>)
+}
+
+/// Generate Heston spot/variance paths in `[path, time, component]` order.
+///
+/// Component zero is spot and component one is variance. Full output includes
+/// time zero; terminal output is `[path, component]` and equals the last full
+/// time row for the same seed. Zero horizon repeats the initial state exactly.
+///
+/// # Errors
+/// Rejects invalid dimensions, zero seed, nonfinite values, spot <= 0,
+/// variance < 0, kappa/theta/sigma <= 0, rho outside [-1,1], negative
+/// horizon, unsupported schemes, allocation failures, and nonfinite states.
+pub fn heston_paths(request: &HestonRequest) -> QlResult<Vec<Real>> {
+    require!(
+        request.steps > 0 && request.paths > 0,
+        "steps and paths must be positive"
+    );
+    require!(request.seed != 0, "seed must be nonzero");
+    require!(
+        request.spot.is_finite() && request.spot > 0.0,
+        "invalid initial spot"
+    );
+    require!(
+        request.variance.is_finite() && request.variance >= 0.0,
+        "invalid initial variance"
+    );
+    require!(
+        request.risk_free_rate.is_finite() && request.dividend_yield.is_finite(),
+        "invalid rate"
+    );
+    require!(
+        request.kappa.is_finite() && request.kappa > 0.0,
+        "invalid kappa"
+    );
+    require!(
+        request.theta.is_finite() && request.theta > 0.0,
+        "invalid theta"
+    );
+    require!(
+        request.sigma.is_finite() && request.sigma > 0.0,
+        "invalid sigma"
+    );
+    require!(
+        request.rho.is_finite() && request.rho.abs() <= 1.0,
+        "invalid rho"
+    );
+    require!(
+        request.horizon.is_finite() && request.horizon >= 0.0,
+        "invalid horizon"
+    );
+    require!(
+        matches!(
+            request.discretization,
+            Discretization::QuadraticExponential | Discretization::QuadraticExponentialMartingale
+        ),
+        "unsupported Heston discretization"
+    );
+    product(product(request.paths, request.steps)?, 2)?;
+    let count = heston_output_len(request)?;
+    let dt = request.horizon / request.steps as Real;
+    require!(request.horizon == 0.0 || dt > 0.0, "time step underflow");
+    let process = HestonProcess::with_discretization(
+        flat_curve(request.risk_free_rate),
+        flat_curve(request.dividend_yield),
+        make_quote_handle(request.spot).handle(),
+        request.variance,
+        request.kappa,
+        request.theta,
+        request.sigma,
+        request.rho,
+        request.discretization,
+    );
+    let mut output = zeros(count)?;
+    let mut rng = PseudoRandom::make_sequence_generator(1, request.seed)?;
+    let initial = [request.spot, request.variance];
+    let mut cursor = 0;
+    for _ in 0..request.paths {
+        let mut state = Array::from(initial);
+        if !request.terminal_only {
+            output[cursor..cursor + 2].copy_from_slice(&initial);
+            cursor += 2;
+        }
+        for step in 0..request.steps {
+            let z_spot = rng.next_sequence().value[0];
+            let z_variance = rng.next_sequence().value[0];
+            if request.horizon > 0.0 {
+                state = process.evolve(
+                    step as Real * dt,
+                    &state,
+                    dt,
+                    &Array::from([z_spot, z_variance]),
+                )?;
+                require!(
+                    state[0].is_finite() && state[0] > 0.0,
+                    "simulated spot overflow or underflow"
+                );
+                require!(
+                    state[1].is_finite() && state[1] >= 0.0,
+                    "invalid simulated variance"
+                );
+            }
+            if !request.terminal_only {
+                output[cursor..cursor + 2].copy_from_slice(&[state[0], state[1]]);
+                cursor += 2;
+            }
+        }
+        if request.terminal_only {
+            output[cursor..cursor + 2].copy_from_slice(&[state[0], state[1]]);
+            cursor += 2;
         }
     }
     Ok(output)

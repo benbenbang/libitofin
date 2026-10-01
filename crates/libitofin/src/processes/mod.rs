@@ -19,6 +19,6 @@ pub use discretization::{
     DiscretizedProcess, DiscretizedProcess1D, EulerDiscretization, ProcessDiscretization,
     ProcessDiscretization1D,
 };
-pub use hestonprocess::HestonProcess;
+pub use hestonprocess::{Discretization as HestonDiscretization, HestonProcess};
 pub use ornsteinuhlenbeckprocess::OrnsteinUhlenbeckProcess;
 pub use stochasticprocessarray::StochasticProcessArray;
