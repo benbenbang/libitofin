@@ -4232,6 +4232,61 @@ int32_t itofin_mc_american_engine_new(struct ItofinContext *ctx,
                                       struct ItofinError *error);
 
 /**
+ * Retain live spot, market curves, volatility and three jump quotes.
+ * # Safety
+ * Pointers must be aligned, live and non-overlapping. Context and handles
+ * belong to the calling thread; serialize calls including destruction.
+ */
+int32_t itofin_merton76_new(struct ItofinContext *ctx,
+                            uint64_t spot,
+                            uint64_t risk_free,
+                            uint64_t dividend,
+                            uint64_t volatility,
+                            uint64_t jump_intensity,
+                            uint64_t log_mean_jump,
+                            uint64_t log_jump_volatility,
+                            uint64_t *out,
+                            struct ItofinError *error);
+
+/**
+ * Field: 0 spot, 1 jump intensity, 2 log mean jump, 3 log jump volatility.
+ * # Safety
+ * Pointers must be aligned, live and non-overlapping. Context and handles
+ * belong to the calling thread; serialize calls including destruction.
+ */
+int32_t itofin_merton76_value(struct ItofinContext *ctx,
+                              uint64_t process,
+                              int32_t field,
+                              double *out,
+                              struct ItofinError *error);
+
+/**
+ * Convert a date using the retained market's risk-free day counter.
+ * # Safety
+ * Pointers must be aligned, live and non-overlapping. Context and handles
+ * belong to the calling thread; serialize calls including destruction.
+ */
+int32_t itofin_merton76_time(struct ItofinContext *ctx,
+                             uint64_t process,
+                             int32_t date_serial,
+                             double *out,
+                             struct ItofinError *error);
+
+/**
+ * Retain a Merton76 process for European plain-vanilla option engine kind 2.
+ * Conventional settings are relative_accuracy=1e-4, max_iterations=100.
+ * # Safety
+ * Pointers must be aligned, live and non-overlapping. Context and handles
+ * belong to the calling thread; serialize calls including destruction.
+ */
+int32_t itofin_jump_diffusion_engine_new(struct ItofinContext *ctx,
+                                         uint64_t process,
+                                         double relative_accuracy,
+                                         size_t max_iterations,
+                                         uint64_t *out,
+                                         struct ItofinError *error);
+
+/**
  * # Safety
  * Pointers must be aligned, live and valid for their stated lengths. Outputs
  * must not overlap inputs or other outputs. Any context and its handles must
@@ -5796,6 +5851,19 @@ int32_t itofin_black_constant_vol_new(struct ItofinContext *ctx,
                                       uint64_t cal,
                                       uint64_t *out,
                                       struct ItofinError *error);
+
+/**
+ * Retain an observable volatility quote with a fixed reference date.
+ * # Safety
+ * Follow the crate C caller contract; outputs must be live and non-overlapping.
+ */
+int32_t itofin_black_constant_vol_from_quote(struct ItofinContext *ctx,
+                                             int32_t reference_date,
+                                             uint64_t volatility,
+                                             uint64_t dc,
+                                             uint64_t cal,
+                                             uint64_t *out,
+                                             struct ItofinError *error);
 
 /**
  * # Safety

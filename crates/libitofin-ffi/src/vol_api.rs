@@ -55,6 +55,39 @@ pub unsafe extern "C" fn itofin_black_constant_vol_new(
         })
     }
 }
+/// Retain an observable volatility quote with a fixed reference date.
+/// # Safety
+/// Follow the crate C caller contract; outputs must be live and non-overlapping.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn itofin_black_constant_vol_from_quote(
+    ctx: *mut Context,
+    reference_date: i32,
+    volatility: u64,
+    dc: u64,
+    cal: u64,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(out)?;
+            let volatility = crate::market_api::quote(c, volatility)?;
+            let value = volatility.current_link()?.value()?;
+            if !value.is_finite() || value < 0.0 {
+                return Err(BindingError::invalid(
+                    "volatility must be finite and nonnegative",
+                ));
+            }
+            let v = shared(BlackConstantVol::with_quote(
+                date(reference_date)?,
+                calendar(c, cal)?,
+                volatility,
+                day_counter(c, dc)?,
+            )) as Shared<dyn BlackVolTermStructure>;
+            output(out, c.insert(Handle::new(v))?)
+        })
+    }
+}
 /// # Safety
 /// Follow the crate C caller contract; arrays must have their stated lengths.
 #[unsafe(no_mangle)]
