@@ -1,0 +1,353 @@
+{
+  "cases": [
+    {
+      "expected": {
+        "delta": 0.6175760317781934,
+        "dividend_rho": -61.75760317781934,
+        "gamma": 0.012393297925041149,
+        "rho": 47.17064699304032,
+        "theta": -8.239240639178727,
+        "value": 14.586956184779012,
+        "vega": 24.78659585008232
+      },
+      "independent_price": 14.5869561847792,
+      "input": {
+        "clock_variant": 0,
+        "dividend_yield": 0.02,
+        "jump_intensity": 1.0,
+        "log_jump_volatility": 0.3,
+        "log_mean_jump": -0.1,
+        "maturity_days": 360,
+        "max_iterations": 4096,
+        "option_type": "call",
+        "relative_accuracy": 1e-12,
+        "risk_free_rate": 0.05,
+        "spot": 100.0,
+        "strike": 100.0,
+        "volatility": 0.2
+      },
+      "name": "call"
+    },
+    {
+      "expected": {
+        "delta": -0.3626226415285577,
+        "dividend_rho": 36.26226415285577,
+        "gamma": 0.012393297925041173,
+        "rho": -47.95229545703078,
+        "theta": -5.443490863290569,
+        "value": 11.690031304174994,
+        "vega": 24.78659585008237
+      },
+      "independent_price": 11.69003130417508,
+      "input": {
+        "clock_variant": 0,
+        "dividend_yield": 0.02,
+        "jump_intensity": 1.0,
+        "log_jump_volatility": 0.3,
+        "log_mean_jump": -0.1,
+        "maturity_days": 360,
+        "max_iterations": 4096,
+        "option_type": "put",
+        "relative_accuracy": 1e-12,
+        "risk_free_rate": 0.05,
+        "spot": 100.0,
+        "strike": 100.0,
+        "volatility": 0.2
+      },
+      "name": "put"
+    },
+    {
+      "expected": {
+        "delta": 0.5881096362288443,
+        "dividend_rho": -58.810963622884444,
+        "gamma": 0.005316638728967413,
+        "rho": 32.01172579358976,
+        "theta": -12.993719078787757,
+        "value": 26.799237829294686,
+        "vega": 10.633277457934824
+      },
+      "independent_price": 26.799237829295883,
+      "input": {
+        "clock_variant": 0,
+        "dividend_yield": 0.02,
+        "jump_intensity": 2.5,
+        "log_jump_volatility": 0.3,
+        "log_mean_jump": 0.2,
+        "maturity_days": 360,
+        "max_iterations": 4096,
+        "option_type": "call",
+        "relative_accuracy": 1e-12,
+        "risk_free_rate": 0.05,
+        "spot": 100.0,
+        "strike": 100.0,
+        "volatility": 0.2
+      },
+      "name": "positive_mean_call"
+    },
+    {
+      "expected": {
+        "delta": -0.22001528452903665,
+        "dividend_rho": 110.0076422645183,
+        "gamma": 0.0027058771720590165,
+        "rho": -249.47923881155612,
+        "theta": -0.969877184352032,
+        "value": 27.894319309407567,
+        "vega": 27.05877172059017
+      },
+      "independent_price": 27.894319309937195,
+      "input": {
+        "clock_variant": 0,
+        "dividend_yield": 0.02,
+        "jump_intensity": 5.0,
+        "log_jump_volatility": 0.01,
+        "log_mean_jump": -0.2,
+        "maturity_days": 1800,
+        "max_iterations": 4096,
+        "option_type": "put",
+        "relative_accuracy": 1e-12,
+        "risk_free_rate": 0.05,
+        "spot": 100.0,
+        "strike": 100.0,
+        "volatility": 0.2
+      },
+      "name": "negative_mean_put"
+    },
+    {
+      "expected": {
+        "delta": 0.5868511461347649,
+        "dividend_rho": -58.68511461347645,
+        "gamma": 0.01895057875500871,
+        "rho": 49.45810910532239,
+        "theta": -5.089318913998339,
+        "value": 9.227005508154061,
+        "vega": 37.90115751001742
+      },
+      "independent_price": 9.22700550815405,
+      "input": {
+        "clock_variant": 0,
+        "dividend_yield": 0.02,
+        "jump_intensity": 0.0,
+        "log_jump_volatility": 0.3,
+        "log_mean_jump": -0.1,
+        "maturity_days": 360,
+        "max_iterations": 4096,
+        "option_type": "call",
+        "relative_accuracy": 1e-12,
+        "risk_free_rate": 0.05,
+        "spot": 100.0,
+        "strike": 100.0,
+        "volatility": 0.2
+      },
+      "name": "zero_jump_call"
+    },
+    {
+      "expected": {
+        "delta": -0.39334752717199073,
+        "dividend_rho": 39.33475271719908,
+        "gamma": 0.01895057875500871,
+        "rho": -45.664833344749,
+        "theta": -2.2935691381082712,
+        "value": 6.330080627549918,
+        "vega": 37.90115751001742
+      },
+      "independent_price": 6.3300806275499255,
+      "input": {
+        "clock_variant": 0,
+        "dividend_yield": 0.02,
+        "jump_intensity": 0.0,
+        "log_jump_volatility": 0.3,
+        "log_mean_jump": -0.1,
+        "maturity_days": 360,
+        "max_iterations": 4096,
+        "option_type": "put",
+        "relative_accuracy": 1e-12,
+        "risk_free_rate": 0.05,
+        "spot": 100.0,
+        "strike": 100.0,
+        "volatility": 0.2
+      },
+      "name": "zero_jump_put"
+    },
+    {
+      "expected": {
+        "delta": 0.5797189785696198,
+        "dividend_rho": -57.97189785696202,
+        "gamma": 0.01656025464287714,
+        "rho": 47.59667559446084,
+        "theta": -5.613586080223574,
+        "value": 10.375222262501174,
+        "vega": 33.12050928575426
+      },
+      "independent_price": 10.375222262501381,
+      "input": {
+        "clock_variant": 0,
+        "dividend_yield": 0.02,
+        "jump_intensity": 2.0,
+        "log_jump_volatility": 0.0,
+        "log_mean_jump": 0.08,
+        "maturity_days": 360,
+        "max_iterations": 4096,
+        "option_type": "call",
+        "relative_accuracy": 1e-12,
+        "risk_free_rate": 0.05,
+        "spot": 100.0,
+        "strike": 100.0,
+        "volatility": 0.2
+      },
+      "name": "deterministic_jump_call"
+    },
+    {
+      "expected": {
+        "delta": 0.586851146134717,
+        "dividend_rho": -58.68511461347167,
+        "gamma": 0.01895057875500715,
+        "rho": 49.458109105318364,
+        "theta": -5.089318913976321,
+        "value": 9.227005508153308,
+        "vega": 37.90115751001434
+      },
+      "independent_price": 9.227005508154036,
+      "input": {
+        "clock_variant": 0,
+        "dividend_yield": 0.02,
+        "jump_intensity": 8.0,
+        "log_jump_volatility": 0.0,
+        "log_mean_jump": 0.0,
+        "maturity_days": 360,
+        "max_iterations": 4096,
+        "option_type": "call",
+        "relative_accuracy": 1e-12,
+        "risk_free_rate": 0.05,
+        "spot": 100.0,
+        "strike": 100.0,
+        "volatility": 0.2
+      },
+      "name": "no_jump_size_call"
+    },
+    {
+      "expected": {
+        "delta": 0.6241657093580795,
+        "dividend_rho": -62.41657093580786,
+        "gamma": 0.006132118812473648,
+        "rho": 38.167915286974676,
+        "theta": -11.696711504971956,
+        "value": 24.248655648833182,
+        "vega": 12.264237624947306
+      },
+      "independent_price": 24.24865565313033,
+      "input": {
+        "clock_variant": 0,
+        "dividend_yield": 0.02,
+        "jump_intensity": 800.0,
+        "log_jump_volatility": 0.02,
+        "log_mean_jump": 0.0,
+        "maturity_days": 360,
+        "max_iterations": 4096,
+        "option_type": "call",
+        "relative_accuracy": 1e-12,
+        "risk_free_rate": 0.05,
+        "spot": 100.0,
+        "strike": 100.0,
+        "volatility": 0.2
+      },
+      "name": "high_poisson_mean_call"
+    },
+    {
+      "expected": {
+        "delta": -0.35603296377505017,
+        "dividend_rho": 35.60329637750505,
+        "gamma": 0.006132118812473648,
+        "rho": -56.955027146256214,
+        "theta": -8.900961731202003,
+        "value": 21.351730768751178,
+        "vega": 12.264237624947306
+      },
+      "independent_price": 21.351730772526786,
+      "input": {
+        "clock_variant": 0,
+        "dividend_yield": 0.02,
+        "jump_intensity": 800.0,
+        "log_jump_volatility": 0.02,
+        "log_mean_jump": 0.0,
+        "maturity_days": 360,
+        "max_iterations": 4096,
+        "option_type": "put",
+        "relative_accuracy": 1e-12,
+        "risk_free_rate": 0.05,
+        "spot": 100.0,
+        "strike": 100.0,
+        "volatility": 0.2
+      },
+      "name": "high_poisson_mean_put"
+    },
+    {
+      "expected": {
+        "delta": 0.6108593616328124,
+        "dividend_rho": -60.2491425172089,
+        "gamma": 0.012360216923478787,
+        "rho": 46.65515332471622,
+        "theta": -8.011973418209974,
+        "value": 14.430782838565015,
+        "vega": 24.72043384695758
+      },
+      "independent_price": 14.430782838565671,
+      "input": {
+        "clock_variant": 1,
+        "dividend_yield": 0.02,
+        "jump_intensity": 1.0,
+        "log_jump_volatility": 0.3,
+        "log_mean_jump": -0.1,
+        "maturity_days": 360,
+        "max_iterations": 4096,
+        "option_type": "call",
+        "relative_accuracy": 1e-12,
+        "risk_free_rate": 0.05,
+        "spot": 100.0,
+        "strike": 100.0,
+        "volatility": 0.2
+      },
+      "name": "different_curve_clocks"
+    },
+    {
+      "expected": {
+        "delta": -4.7515558693588004e-05,
+        "dividend_rho": 0.0047515558693587995,
+        "gamma": 0.0,
+        "rho": -0.9485950938080461,
+        "theta": 0.03975721215915383,
+        "value": 0.9438435379386874,
+        "vega": 0.0
+      },
+      "independent_price": 0.943843537938688,
+      "input": {
+        "clock_variant": 0,
+        "dividend_yield": 0.02,
+        "jump_intensity": 10.0,
+        "log_jump_volatility": 0.0,
+        "log_mean_jump": -5.0,
+        "maturity_days": 360,
+        "max_iterations": 4096,
+        "option_type": "put",
+        "relative_accuracy": 1e-12,
+        "risk_free_rate": 0.05,
+        "spot": 100.0,
+        "strike": 1.0,
+        "volatility": 0.001
+      },
+      "name": "negative_large_jump_put_tail"
+    }
+  ],
+  "provenance": {
+    "calendar": "NullCalendar",
+    "compounding": "Continuous",
+    "default_daycount": "Actual360",
+    "finite_difference_absolute_tolerance": 1e-06,
+    "greek_absolute_tolerance": 1e-08,
+    "max_iterations": 4096,
+    "pinned_quantlib_commit": "9863b578af0caa4cecabf697196533e84a8308b6",
+    "price_absolute_tolerance": 1e-08,
+    "quantlib_version": "1.42",
+    "reference_date": "2026-10-02",
+    "relative_accuracy": 1e-12
+  }
+}
