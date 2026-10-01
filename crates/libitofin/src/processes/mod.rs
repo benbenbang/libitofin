@@ -11,6 +11,7 @@
 mod blackscholesprocess;
 pub mod discretization;
 mod hestonprocess;
+mod merton76process;
 mod ornsteinuhlenbeckprocess;
 mod stochasticprocessarray;
 
@@ -20,5 +21,6 @@ pub use discretization::{
     ProcessDiscretization1D,
 };
 pub use hestonprocess::{Discretization as HestonDiscretization, HestonProcess};
+pub use merton76process::Merton76Process;
 pub use ornsteinuhlenbeckprocess::OrnsteinUhlenbeckProcess;
 pub use stochasticprocessarray::StochasticProcessArray;
