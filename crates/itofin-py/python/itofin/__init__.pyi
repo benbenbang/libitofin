@@ -38,6 +38,7 @@ __all__ = [
     "randomnumbers",
     "results",
     "simulate_gbm",
+    "simulate_ou",
     "statistics",
     "termstructures",
     "time",
@@ -151,4 +152,31 @@ def simulate_gbm(initial: typing.Sequence[builtins.float], drift: typing.Sequenc
 
     Raises:
         ItofinError: If inputs, correlation, or output size are invalid.
+    """
+
+def simulate_ou(initial: builtins.float, level: builtins.float, speed: builtins.float, volatility: builtins.float, horizon: builtins.float, steps: builtins.int, paths: builtins.int, seed: builtins.int, terminal_only: builtins.bool = False, max_output_values: builtins.int = 0) -> numpy.typing.NDArray[numpy.float64]:
+    r"""
+    Generate exact Ornstein-Uhlenbeck paths with a deterministic seed.
+
+    One standard normal is consumed per path and step. Full output has shape
+    `(paths, steps + 1)` and includes time zero; terminal output has shape
+    `(paths,)`. Zero horizon and zero volatility remain deterministic.
+
+    Args:
+        initial (float): Initial state.
+        level (float): Long-run mean.
+        speed (float): Nonnegative mean-reversion speed.
+        volatility (float): Nonnegative diffusion volatility.
+        horizon (float): Nonnegative simulation horizon.
+        steps (int): Positive intervals per path.
+        paths (int): Positive independent paths.
+        seed (int): Nonzero 32-bit seed.
+        terminal_only (bool): Return only final states.
+        max_output_values (int): Zero selects 16,777,216 values (128 MiB).
+
+    Returns:
+        numpy.ndarray: Contiguous float64 paths.
+
+    Raises:
+        ItofinError: If inputs, output size or simulated values are invalid.
     """
