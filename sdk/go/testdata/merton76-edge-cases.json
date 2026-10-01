@@ -1,0 +1,189 @@
+{
+  "cases": [
+    {
+      "absolute_tolerance": 1e-06,
+      "expected": {
+        "delta": 0.727923385342851,
+        "dividend_rho": -72.79233853430877,
+        "gamma": 0.006742450870215559,
+        "rho": 61.0810267626638,
+        "theta": -7.938350512148121,
+        "value": 11.711311771578648,
+        "vega": 2.9605947323337505e-12
+      },
+      "input": {
+        "clock_variant": 0,
+        "dividend_yield": 0.02,
+        "jump_intensity": 1.0,
+        "log_jump_volatility": 0.3,
+        "log_mean_jump": -0.1,
+        "maturity_days": 360,
+        "max_iterations": 4096,
+        "option_type": "call",
+        "relative_accuracy": 1e-12,
+        "risk_free_rate": 0.05,
+        "spot": 100.0,
+        "strike": 100.0,
+        "volatility": 0.0
+      },
+      "name": "zero_diffusion_with_jumps",
+      "source": "Independent original-intensity price mixture plus five-point derivatives"
+    },
+    {
+      "absolute_tolerance": 1e-06,
+      "expected": {
+        "delta": 0.9801986733075789,
+        "dividend_rho": -98.01986733063946,
+        "gamma": 1.8947806286936006e-10,
+        "rho": 95.12294245003734,
+        "theta": -2.7957497758990253,
+        "value": 2.896924880604118,
+        "vega": 0.0
+      },
+      "input": {
+        "clock_variant": 0,
+        "dividend_yield": 0.02,
+        "jump_intensity": 0.0,
+        "log_jump_volatility": 0.3,
+        "log_mean_jump": -0.1,
+        "maturity_days": 360,
+        "max_iterations": 4096,
+        "option_type": "call",
+        "relative_accuracy": 1e-12,
+        "risk_free_rate": 0.05,
+        "spot": 100.0,
+        "strike": 100.0,
+        "volatility": 0.0
+      },
+      "name": "fully_deterministic",
+      "source": "Independent original-intensity price mixture plus five-point derivatives"
+    },
+    {
+      "absolute_tolerance": 1e-10,
+      "expected": {
+        "delta": 3.2151283928639927e-06,
+        "dividend_rho": -0.0003215128392863766,
+        "gamma": -3.162256336416055e-16,
+        "rho": 0.0001573539436001241,
+        "theta": -0.0004885479016182441,
+        "value": 0.00016415889568634478,
+        "vega": -4.517509052022935e-17
+      },
+      "input": {
+        "clock_variant": 0,
+        "dividend_yield": 0.02,
+        "jump_intensity": 0.01,
+        "log_jump_volatility": 0.0,
+        "log_mean_jump": 1.0,
+        "maturity_days": 360,
+        "max_iterations": 4096,
+        "option_type": "call",
+        "relative_accuracy": 1e-12,
+        "risk_free_rate": 0.05,
+        "spot": 100.0,
+        "strike": 1000.0,
+        "volatility": 0.001
+      },
+      "name": "zero_prefix_before_nonzero_jump_payoffs",
+      "source": "Independent original-intensity price mixture plus five-point derivatives"
+    }
+  ],
+  "upstream_edge_behavior": [
+    {
+      "input": {
+        "clock_variant": 0,
+        "dividend_yield": 0.02,
+        "jump_intensity": 1.0,
+        "log_jump_volatility": 0.3,
+        "log_mean_jump": -0.1,
+        "maturity_days": 360,
+        "max_iterations": 1,
+        "option_type": "call",
+        "relative_accuracy": 1e-12,
+        "risk_free_rate": 0.05,
+        "spot": 100.0,
+        "strike": 100.0,
+        "volatility": 0.2
+      },
+      "name": "insufficient_iterations",
+      "result": {
+        "error": "1 iterations have been not enough to reach the required 1e-12 accuracy. The 1st addendum was 2.22948 while the running sum was 4.68182"
+      }
+    },
+    {
+      "input": {
+        "clock_variant": 0,
+        "dividend_yield": 0.02,
+        "jump_intensity": 800.0,
+        "log_jump_volatility": 0.02,
+        "log_mean_jump": 0.0,
+        "maturity_days": 360,
+        "max_iterations": 100,
+        "option_type": "call",
+        "relative_accuracy": 1e-12,
+        "risk_free_rate": 0.05,
+        "spot": 100.0,
+        "strike": 100.0,
+        "volatility": 0.2
+      },
+      "name": "high_mean_small_budget",
+      "result": {
+        "error": "800 iterations have been not enough to reach the required 1e-12 accuracy. The 800th addendum was 0.0843902 while the running sum was 11.7311"
+      }
+    },
+    {
+      "input": {
+        "clock_variant": 0,
+        "dividend_yield": 0.02,
+        "jump_intensity": 1.0,
+        "log_jump_volatility": 0.3,
+        "log_mean_jump": -0.1,
+        "maturity_days": 360,
+        "max_iterations": 4096,
+        "option_type": "call",
+        "relative_accuracy": 1e-12,
+        "risk_free_rate": 0.05,
+        "spot": 100.0,
+        "strike": 100.0,
+        "volatility": 0.0
+      },
+      "name": "zero_diffusion_with_jumps",
+      "result": {
+        "delta": 0.7279233853427451,
+        "dividend_rho": -72.79233853427453,
+        "gamma": 0.006742450823982472,
+        "rho": 61.08102676269588,
+        "theta": "NaN",
+        "value": 11.711311771578655,
+        "vega": "NaN"
+      }
+    },
+    {
+      "input": {
+        "clock_variant": 0,
+        "dividend_yield": 0.02,
+        "jump_intensity": 0.0,
+        "log_jump_volatility": 0.3,
+        "log_mean_jump": -0.1,
+        "maturity_days": 360,
+        "max_iterations": 4096,
+        "option_type": "call",
+        "relative_accuracy": 1e-12,
+        "risk_free_rate": 0.05,
+        "spot": 100.0,
+        "strike": 100.0,
+        "volatility": 0.0
+      },
+      "name": "fully_deterministic",
+      "result": {
+        "delta": 0.9801986733067553,
+        "dividend_rho": -98.01986733067554,
+        "gamma": 0.0,
+        "rho": 95.12294245007139,
+        "theta": "NaN",
+        "value": 2.8969248806041428,
+        "vega": "NaN"
+      }
+    }
+  ]
+}
