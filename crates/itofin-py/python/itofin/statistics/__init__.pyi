@@ -5,6 +5,7 @@ import builtins
 import typing
 __all__ = [
     "GeneralStatistics",
+    "IncrementalStatistics",
     "average_shortfall",
     "downside_deviation",
     "downside_variance",
@@ -72,6 +73,84 @@ class GeneralStatistics:
     def expected_shortfall(self, confidence: builtins.float) -> builtins.float: ...
     def shortfall(self, target: builtins.float) -> builtins.float: ...
     def average_shortfall(self, target: builtins.float) -> builtins.float: ...
+
+@typing.final
+class IncrementalStatistics:
+    r"""
+    Weighted streaming moments with fixed memory use, independent of sample count.
+    """
+    def __init__(self) -> None:
+        r"""
+        Create an empty accumulator.
+        """
+    def add(self, value: builtins.float, weight: builtins.float = 1.0) -> None:
+        r"""
+        Append one finite observation and finite nonnegative weight.
+        """
+    def add_batch(self, values: typing.Sequence[builtins.float], *, weights: typing.Optional[typing.Sequence[builtins.float]] = None) -> None:
+        r"""
+        Append a batch atomically; omitted weights give unit weights.
+        """
+    def reset(self) -> None:
+        r"""
+        Clear all observations while retaining this object.
+        """
+    def samples(self) -> builtins.int:
+        r"""
+        Number of observations, including zero-weight observations.
+        """
+    def downside_samples(self) -> builtins.int:
+        r"""
+        Number of strictly negative observations.
+        """
+    def weight_sum(self) -> builtins.float:
+        r"""
+        Sum of all observation weights.
+        """
+    def downside_weight_sum(self) -> builtins.float:
+        r"""
+        Sum of weights on strictly negative observations.
+        """
+    def min(self) -> builtins.float:
+        r"""
+        Lowest observation.
+        """
+    def max(self) -> builtins.float:
+        r"""
+        Highest observation.
+        """
+    def mean(self) -> builtins.float:
+        r"""
+        Weighted arithmetic mean.
+        """
+    def variance(self) -> builtins.float:
+        r"""
+        Weighted variance corrected by the sample count N/(N-1).
+        """
+    def standard_deviation(self) -> builtins.float:
+        r"""
+        Square root of the corrected variance.
+        """
+    def error_estimate(self) -> builtins.float:
+        r"""
+        Standard error of the mean.
+        """
+    def skewness(self) -> builtins.float:
+        r"""
+        Bias-corrected weighted skewness.
+        """
+    def kurtosis(self) -> builtins.float:
+        r"""
+        Bias-corrected excess kurtosis.
+        """
+    def downside_variance(self) -> builtins.float:
+        r"""
+        Corrected second moment of strictly negative observations.
+        """
+    def downside_deviation(self) -> builtins.float:
+        r"""
+        Square root of the downside variance.
+        """
 
 def average_shortfall(observations: typing.Sequence[builtins.float], target: builtins.float, *, weights: typing.Optional[typing.Sequence[builtins.float]] = None) -> builtins.float:
     r"""
