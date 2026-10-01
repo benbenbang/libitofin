@@ -26,7 +26,7 @@ pub use swaption::{
     BachelierSpec, BachelierSwaptionEngine, Black76Spec, BlackStyleSpec, BlackStyleSwaptionEngine,
     BlackSwaptionEngine, CashAnnuityModel, DiscretizedSwap, JamshidianSwaptionEngine,
 };
-pub use vanilla::AnalyticEuropeanEngine;
+pub use vanilla::{AnalyticEuropeanEngine, JumpDiffusionEngine};
 
 pub use blackformula::{
     bachelier_black_formula_implied_vol, black_formula, black_formula_asset_itm_probability,
