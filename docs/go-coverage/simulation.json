@@ -14,6 +14,13 @@
       "python": "itofin.simulate_gbm",
       "status": "implemented",
       "tests": "TestGBMLayoutAndTerminalConsistency"
+    },
+    {
+      "c": "itofin_ou_paths",
+      "go": "SimulateOU",
+      "python": "itofin.simulate_ou",
+      "status": "implemented",
+      "tests": "TestOULayoutAndTerminalConsistency"
     }
   ]
 }
