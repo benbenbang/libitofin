@@ -206,3 +206,7 @@ pub unsafe extern "C" fn itofin_incremental_statistics_query(
         })
     }
 }
+
+#[cfg(test)]
+#[path = "incremental_statistics_api_tests.rs"]
+mod tests;
