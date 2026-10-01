@@ -12,6 +12,7 @@ mod mctraits;
 mod montecarlomodel;
 mod multipath;
 mod multipathgenerator;
+pub mod ou_paths;
 mod path;
 mod pathgen;
 mod pathgenerator;
