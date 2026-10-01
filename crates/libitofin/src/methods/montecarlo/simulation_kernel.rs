@@ -399,6 +399,209 @@ pub fn heston_paths(request: &HestonRequest) -> QlResult<Vec<Real>> {
 mod tests {
     use super::*;
 
+    fn heston_request() -> HestonRequest {
+        HestonRequest {
+            spot: 100.0,
+            variance: 0.04,
+            risk_free_rate: 0.05,
+            dividend_yield: 0.02,
+            kappa: 1.2,
+            theta: 0.06,
+            sigma: 0.3,
+            rho: -0.5,
+            horizon: 1.0,
+            steps: 4,
+            paths: 3,
+            seed: 42,
+            discretization: Discretization::QuadraticExponentialMartingale,
+            terminal_only: false,
+        }
+    }
+
+    #[test]
+    fn heston_draw_order_layout_and_terminal_match_process() {
+        let request = heston_request();
+        let full = heston_paths(&request).unwrap();
+        assert_eq!(full.len(), 30);
+        assert_eq!(&full[..2], &[100.0, 0.04]);
+        let process = HestonProcess::with_discretization(
+            flat_curve(request.risk_free_rate),
+            flat_curve(request.dividend_yield),
+            make_quote_handle(request.spot).handle(),
+            request.variance,
+            request.kappa,
+            request.theta,
+            request.sigma,
+            request.rho,
+            request.discretization,
+        );
+        let mut draws = PseudoRandom::make_sequence_generator(1, request.seed).unwrap();
+        let z0 = draws.next_sequence().value[0];
+        let z1 = draws.next_sequence().value[0];
+        let first = process
+            .evolve(
+                0.0,
+                &Array::from([100.0, 0.04]),
+                0.25,
+                &Array::from([z0, z1]),
+            )
+            .unwrap();
+        assert_eq!(&full[2..4], &[first[0], first[1]]);
+        assert!((full[2] - 93.218_736_641_315_03).abs() < 1e-11);
+        assert!((full[3] - 0.065_675_158_526_020_28).abs() < 1e-13);
+        let terminal = heston_paths(&HestonRequest {
+            terminal_only: true,
+            ..request
+        })
+        .unwrap();
+        for (path, row) in terminal.chunks_exact(2).enumerate() {
+            assert_eq!(row, &full[path * 10 + 8..path * 10 + 10]);
+        }
+        assert_eq!(full, heston_paths(&heston_request()).unwrap());
+        assert_ne!(
+            full,
+            heston_paths(&HestonRequest {
+                seed: 43,
+                ..heston_request()
+            })
+            .unwrap()
+        );
+    }
+
+    #[test]
+    fn heston_qe_high_psi_fixed_fixture() {
+        let request = HestonRequest {
+            variance: 0.01,
+            kappa: 0.5,
+            theta: 0.01,
+            sigma: 0.2,
+            horizon: 1.0,
+            steps: 1,
+            paths: 1,
+            discretization: Discretization::QuadraticExponential,
+            terminal_only: true,
+            ..heston_request()
+        };
+        let result = heston_paths(&request).unwrap();
+        assert!((result[0] - 96.553_174_001_572_44).abs() < 1e-11);
+        assert!((result[1] - 0.018_076_059_597_846_472).abs() < 1e-13);
+    }
+
+    #[test]
+    fn heston_zero_horizon_and_invalid_inputs() {
+        let zero = HestonRequest {
+            horizon: 0.0,
+            ..heston_request()
+        };
+        for state in heston_paths(&zero).unwrap().chunks_exact(2) {
+            assert_eq!(state, &[100.0, 0.04]);
+        }
+        let cases = [
+            HestonRequest {
+                steps: 0,
+                ..heston_request()
+            },
+            HestonRequest {
+                paths: 0,
+                ..heston_request()
+            },
+            HestonRequest {
+                seed: 0,
+                ..heston_request()
+            },
+            HestonRequest {
+                spot: 0.0,
+                ..heston_request()
+            },
+            HestonRequest {
+                variance: -0.1,
+                ..heston_request()
+            },
+            HestonRequest {
+                risk_free_rate: Real::NAN,
+                ..heston_request()
+            },
+            HestonRequest {
+                dividend_yield: Real::INFINITY,
+                ..heston_request()
+            },
+            HestonRequest {
+                kappa: 0.0,
+                ..heston_request()
+            },
+            HestonRequest {
+                theta: 0.0,
+                ..heston_request()
+            },
+            HestonRequest {
+                sigma: 0.0,
+                ..heston_request()
+            },
+            HestonRequest {
+                rho: 1.1,
+                ..heston_request()
+            },
+            HestonRequest {
+                horizon: -1.0,
+                ..heston_request()
+            },
+            HestonRequest {
+                steps: Size::MAX,
+                ..heston_request()
+            },
+            HestonRequest {
+                paths: Size::MAX,
+                ..heston_request()
+            },
+            HestonRequest {
+                discretization: Discretization::FullTruncation,
+                ..heston_request()
+            },
+        ];
+        for request in cases {
+            assert!(heston_paths(&request).is_err());
+        }
+    }
+
+    #[test]
+    fn heston_variance_moment_and_discounted_spot() {
+        let request = HestonRequest {
+            variance: 0.09,
+            theta: 0.09,
+            kappa: 1.0,
+            sigma: 0.3,
+            rho: -0.8,
+            horizon: 0.1,
+            steps: 1,
+            paths: 30_000,
+            terminal_only: true,
+            ..heston_request()
+        };
+        let result = heston_paths(&request).unwrap();
+        let n = request.paths as Real;
+        let mean_v = result.chunks_exact(2).map(|v| v[1]).sum::<Real>() / n;
+        let var_v = result
+            .chunks_exact(2)
+            .map(|v| (v[1] - mean_v).powi(2))
+            .sum::<Real>()
+            / n;
+        let ex = (-request.kappa * request.horizon).exp();
+        let target_v = request.theta + (request.variance - request.theta) * ex;
+        let target_var = request.variance * request.sigma.powi(2) * ex / request.kappa * (1.0 - ex)
+            + request.theta * request.sigma.powi(2) / (2.0 * request.kappa) * (1.0 - ex).powi(2);
+        assert!((mean_v - target_v).abs() < 6.0 * (target_var / n).sqrt());
+        assert!((var_v - target_var).abs() < 0.05 * target_var);
+        let mean_spot = result.chunks_exact(2).map(|v| v[0]).sum::<Real>() / n;
+        let spot_var = result
+            .chunks_exact(2)
+            .map(|v| (v[0] - mean_spot).powi(2))
+            .sum::<Real>()
+            / n;
+        let target_spot = request.spot
+            * ((request.risk_free_rate - request.dividend_yield) * request.horizon).exp();
+        assert!((mean_spot - target_spot).abs() < 6.0 * (spot_var / n).sqrt());
+    }
+
     fn request() -> GbmRequest<'static> {
         GbmRequest {
             initial: &[100.0, 80.0],
