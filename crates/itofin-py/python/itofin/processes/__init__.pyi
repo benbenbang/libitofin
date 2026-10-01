@@ -2,12 +2,14 @@
 # ruff: noqa: E501, F401, F403, F405
 
 import builtins
+from itofin import quotes
 from itofin import termstructures
 from itofin import time
 import typing
 __all__ = [
     "BlackScholesProcess",
     "HestonProcess",
+    "Merton76Process",
 ]
 
 @typing.final
@@ -129,4 +131,40 @@ class HestonProcess:
 
         Returns:
             float: The spot/variance correlation rho.
+        """
+
+@typing.final
+class Merton76Process:
+    r"""
+    Merton's lognormal-jump model retaining observable market and jump inputs.
+
+    This process supports European pricing. Generic drift, diffusion and path
+    generation are unavailable because a Gaussian step cannot represent jumps.
+    """
+    def __init__(self, spot: quotes.SimpleQuote, risk_free: termstructures.YieldTermStructure, dividend: termstructures.YieldTermStructure, volatility: termstructures.BlackVolTermStructure, jump_intensity: quotes.SimpleQuote, log_mean_jump: quotes.SimpleQuote, log_jump_volatility: quotes.SimpleQuote) -> None:
+        r"""
+        Retain the diffusion market and the three live lognormal-jump quotes.
+
+        Jump intensity and log-jump volatility must be finite and nonnegative;
+        the log-jump mean must be finite. Invalid inputs raise ItofinError.
+        """
+    def spot(self) -> builtins.float:
+        r"""
+        Return the current spot held by the diffusion market.
+        """
+    def jump_intensity(self) -> builtins.float:
+        r"""
+        Return the current jump intensity.
+        """
+    def log_mean_jump(self) -> builtins.float:
+        r"""
+        Return the current mean of the logarithmic jump size.
+        """
+    def log_jump_volatility(self) -> builtins.float:
+        r"""
+        Return the current standard deviation of the logarithmic jump size.
+        """
+    def time(self, date: time.Date) -> builtins.float:
+        r"""
+        Convert a date with the risk-free curve's reference date and day count.
         """
