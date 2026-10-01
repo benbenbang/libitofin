@@ -1,5 +1,7 @@
 # Weighted statistics and empirical risk
 
+## Batch statistics
+
 These stateless functions accept signed observations. A negative observation is
 a loss; value at risk (VaR) and expected shortfall (ES) return a nonnegative
 loss magnitude. Pass one nonnegative weight per observation, or omit weights
@@ -111,3 +113,45 @@ need only samples. `reset` empties the set.
 Python owns the accumulator directly. Go accumulators belong to their creating
 session; close each handle and the session when finished. The same count-based
 variance and signed-loss rules as the batch functions apply.
+
+## Incremental statistics
+
+`IncrementalStatistics` keeps weighted moments in fixed memory as observations
+arrive. It accepts finite values and finite nonnegative weights; a zero-weight
+value still counts and can set the minimum or maximum. A batch is added all at
+once or leaves the accumulator unchanged on error. `reset` clears the samples.
+
+Variance, standard deviation, error estimate, skewness and kurtosis use the
+core's observation-count corrections. Downside statistics include strictly
+negative observations. Downside variance requires two such observations with
+positive combined weight. Percentile, VaR and ES require the stored-sample
+statistics facade; the incremental accumulator has no empirical tail queries.
+
+=== "Python"
+
+    ```python
+    from itofin import statistics
+
+    stream = statistics.IncrementalStatistics()
+    stream.add_batch([-4.0, -2.0, 2.0, 8.0], weights=[1.0, 2.0, 1.0, 0.0])
+    assert stream.samples() == 4
+    assert stream.mean() == -1.5
+    assert stream.downside_deviation() == 4.0
+    stream.reset()
+    ```
+
+=== "Go"
+
+    ```go
+    session, err := itofin.NewSession()
+    if err != nil { panic(err) }
+    defer session.Close()
+    stream, err := session.NewIncrementalStatistics()
+    if err != nil { panic(err) }
+    defer stream.Close()
+    err = stream.AddBatch([]float64{-4, -2, 2, 8}, []float64{1, 2, 1, 0})
+    if err != nil { panic(err) }
+    mean, err := stream.Mean()
+    if err != nil { panic(err) }
+    _ = mean
+    ```
