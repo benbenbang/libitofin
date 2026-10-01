@@ -200,3 +200,29 @@ func (v *BlackVolTermStructure) AllowsExtrapolation() (bool, error) {
 }
 func (v *BlackVolTermStructure) EnableExtrapolation() error  { _, err := v.control(2); return err }
 func (v *BlackVolTermStructure) DisableExtrapolation() error { _, err := v.control(3); return err }
+
+// NewBlackConstantVolFromQuote retains a live volatility quote. A nil calendar
+// uses no calendar; its external quote handle may close after construction.
+func (s *Session) NewBlackConstantVolFromQuote(reference Date, volatility *SimpleQuote, dc *DayCounter, calendar *Calendar) (*BlackVolTermStructure, error) {
+	if volatility == nil || dc == nil {
+		return nil, errNilArgument("volatility quote or day counter")
+	}
+	deps := []object{volatility.object, dc.object}
+	var cal uint64
+	if calendar != nil {
+		deps = append(deps, calendar.object)
+		cal = calendar.id
+	}
+	if err := sameSession(s, deps...); err != nil {
+		return nil, err
+	}
+	var id C.uint64_t
+	err := s.invoke(func() error {
+		var e C.ItofinError
+		return ffiError(C.itofin_black_constant_vol_from_quote(s.ctx, C.int32_t(reference.Serial()), C.uint64_t(volatility.id), C.uint64_t(dc.id), C.uint64_t(cal), &id, &e), &e)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &BlackVolTermStructure{object{s, uint64(id)}}, nil
+}
