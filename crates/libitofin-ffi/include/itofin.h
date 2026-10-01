@@ -172,6 +172,26 @@ typedef struct ItofinGbmInput {
   int32_t terminal_only;
 } ItofinGbmInput;
 
+/**
+ * Heston inputs with flat rates. Scheme 0 is QEM; scheme 1 is QE.
+ */
+typedef struct ItofinHestonInput {
+  ItofinReal spot;
+  ItofinReal variance;
+  ItofinReal risk_free_rate;
+  ItofinReal dividend_yield;
+  ItofinReal kappa;
+  ItofinReal theta;
+  ItofinReal sigma;
+  ItofinReal rho;
+  ItofinReal horizon;
+  size_t steps;
+  size_t paths;
+  uint32_t seed;
+  int32_t scheme;
+  int32_t terminal_only;
+} ItofinHestonInput;
+
 typedef struct ItofinCapHelperConfig {
   int32_t length;
   int32_t length_unit;
@@ -1565,6 +1585,17 @@ int32_t itofin_gbm_paths(const struct ItofinGbmInput *input,
                          ItofinReal *out,
                          size_t capacity,
                          struct ItofinError *error);
+
+/**
+ * Generate Heston spot/variance paths in path/time/component order.
+ * # Safety
+ * Input and output obey the crate-level pointer/non-overlap contract.
+ * Full capacity is paths*(steps+1)*2; terminal capacity is paths*2.
+ */
+int32_t itofin_heston_paths(const struct ItofinHestonInput *input,
+                            ItofinReal *out,
+                            size_t capacity,
+                            struct ItofinError *error);
 
 /**
  * # Safety
