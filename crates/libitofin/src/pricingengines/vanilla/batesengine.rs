@@ -119,3 +119,6 @@ impl PricingEngine for BatesEngine {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests;
