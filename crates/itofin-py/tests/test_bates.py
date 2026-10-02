@@ -291,3 +291,147 @@ def test_calibration_fixed_mask_weights_and_constraint():
     assert result[4] != initial[4]
     assert option.npv() != before
     assert all(math.isfinite(h.calibration_error()) for h in helpers)
+
+
+def oracle_fixture():
+    """Oracle fixture."""
+    path = Path(__file__).resolve().parents[3] / "sdk/go/testdata/bates-oracle.json"
+    return json.loads(path.read_text())
+
+
+@pytest.mark.parametrize("row", oracle_fixture()["cases"], ids=lambda row: row[0])
+def test_independent_quantlib_price_fixture(row):
+    """Independent quantlib price fixture."""
+    case = dict(zip(oracle_fixture()["columns"], row))
+    reference = Date(*case["reference"])
+    expiry = Date(*case["expiry"])
+    day_counters = {
+        "Actual360": DayCounter.actual360,
+        "Actual365Fixed": DayCounter.actual365_fixed,
+        "ActualActualISDA": DayCounter.actual_actual_isda,
+    }
+    dc = day_counters[case["day_counter"]]()
+    settings = Settings()
+    settings.set_evaluation_date(reference)
+    theta, kappa, sigma, rho, v0, nu, delta, intensity = case["parameters"]
+    process = BatesProcess(
+        SimpleQuote(case["spot"]),
+        FlatForward(reference, case["risk_free"], dc),
+        FlatForward(reference, case["dividend"], dc),
+        v0,
+        kappa,
+        theta,
+        sigma,
+        rho,
+        intensity,
+        nu,
+        delta,
+    )
+    model = BatesModel(process)
+    engine = BatesEngine(model, case["integration_order"])
+    kind = OptionType.Call if case["kind"] == "call" else OptionType.Put
+    option = VanillaOption(kind, case["strike"], expiry, settings)
+    actual = option.price_bates(engine)
+    assert actual == pytest.approx(case["price"], rel=0, abs=oracle_fixture()["price_absolute_tolerance"])
+
+
+@pytest.mark.parametrize("fit", oracle_fixture()["calibration"]["fits"], ids=lambda fit: fit["name"])
+def test_independent_quantlib_jump_calibration_fixture(fit):
+    """Independent quantlib jump calibration fixture."""
+    case = oracle_fixture()["calibration"]
+    reference = Date(*case["reference"])
+    settings = Settings()
+    settings.set_evaluation_date(reference)
+    dc = DayCounter.actual365_fixed()
+    theta, kappa, sigma, rho, v0, nu, delta, intensity = fit["start"]
+    process = BatesProcess(
+        SimpleQuote(case["spot"]),
+        FlatForward(reference, case["risk_free"], dc),
+        FlatForward(reference, case["dividend"], dc),
+        v0,
+        kappa,
+        theta,
+        sigma,
+        rho,
+        intensity,
+        nu,
+        delta,
+    )
+    model = BatesModel(process)
+    helpers = [
+        HestonModelHelper(
+            Period(months, "Months"),
+            Calendar.null_calendar(),
+            case["spot"],
+            strike,
+            volatility,
+            case["risk_free"],
+            case["dividend"],
+            CalibrationErrorType.RelativePriceError,
+            reference,
+            dc,
+            settings,
+        )
+        for months, strike, volatility, _ in case["helpers"]
+    ]
+    tolerance = fit["optimizer_tolerance"]
+    model.calibrate(
+        helpers,
+        LevenbergMarquardt(tolerance, tolerance, tolerance, False),
+        EndCriteria(fit["max_iterations"], fit["stationary_iterations"], tolerance, tolerance, tolerance),
+        case["integration_order"],
+        fix_parameters=fit["fixed"],
+    )
+    assert model.params() == pytest.approx(case["target"], rel=0, abs=case["parameter_tolerance"])
+    errors = [abs(helper.calibration_error()) for helper in helpers]
+    assert max(errors) < case["max_relative_error_tolerance"]
+    for actual, seeded, fixed in zip(model.params(), fit["start"], fit["fixed"]):
+        if fixed:
+            assert actual == seeded
+
+
+@pytest.mark.parametrize("bad", [0.0, -1.0, math.nan, math.inf])
+def test_invalid_constructor_spot_rejected(bad):
+    """Reject invalid spot already present at construction."""
+    values = list(MARKET)
+    values[0] = bad
+    with pytest.raises(ItofinError):
+        market(values=values)
+
+
+def test_process_keyword_names_default_engine_and_owned_initial_values():
+    """Expose Python-safe jump names and return independently owned state."""
+    settings, quotes, curves, _, _, _, _ = market()
+    process = BatesProcess(
+        spot=quotes[0],
+        risk_free=curves[0],
+        dividend=curves[1],
+        v0=PARAMS[0],
+        kappa=PARAMS[1],
+        theta=PARAMS[2],
+        sigma=PARAMS[3],
+        rho=PARAMS[4],
+        lambda_=PARAMS[5],
+        nu=PARAMS[6],
+        delta=PARAMS[7],
+    )
+    values = process.initial_values()
+    values[0] = -999.0
+    assert process.initial_values() == [MARKET[0], PARAMS[0]]
+    engine = BatesEngine(BatesModel(process))
+    option = VanillaOption(OptionType.Call, 100.0, EXPIRY, settings)
+    assert option.price_bates(engine) > 0.0
+
+
+def test_invalid_optimizer_does_not_install_helper_engine():
+    """Validate optimizer dispatch before mutating helper engine ownership."""
+    settings, _, _, _, model, _, _ = market()
+    unpriced = helper(settings)
+    criteria = EndCriteria(100, 20, 1e-8, 1e-8, 1e-8)
+    with pytest.raises(ItofinError):
+        unpriced.calibration_error()
+    with pytest.raises(TypeError):
+        model.calibrate([unpriced], cast(Any, object()), criteria)
+    with pytest.raises(ItofinError):
+        unpriced.calibration_error()
+    assert model.params() == list(MODEL_PARAMS)
