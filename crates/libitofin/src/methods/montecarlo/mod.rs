@@ -9,6 +9,7 @@ mod longstaffschwartzpathpricer;
 mod lsmbasissystem;
 mod mcsimulation;
 mod mctraits;
+pub mod merton_paths;
 mod montecarlomodel;
 mod multipath;
 mod multipathgenerator;
