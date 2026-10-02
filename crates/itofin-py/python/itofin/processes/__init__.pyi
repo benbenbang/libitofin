@@ -7,10 +7,70 @@ from itofin import termstructures
 from itofin import time
 import typing
 __all__ = [
+    "BatesProcess",
     "BlackScholesProcess",
     "HestonProcess",
     "Merton76Process",
 ]
+
+@typing.final
+class BatesProcess:
+    r"""
+    Heston variance with independent constant-intensity lognormal jumps.
+
+    Retains live spot and yield curves for analytic pricing, not path generation.
+    """
+    def __init__(self, spot: quotes.SimpleQuote, risk_free: termstructures.YieldTermStructure, dividend: termstructures.YieldTermStructure, v0: builtins.float, kappa: builtins.float, theta: builtins.float, sigma: builtins.float, rho: builtins.float, lambda_: builtins.float, nu: builtins.float, delta: builtins.float) -> None:
+        r"""
+        Retain the market and validate eight finite Bates parameters.
+
+        Variance, mean reversion and variance volatility must be positive;
+        correlation is in [-1, 1], and lambda_ and delta are nonnegative.
+        """
+    def v0(self) -> builtins.float:
+        r"""
+        Return the initial variance.
+        """
+    def kappa(self) -> builtins.float:
+        r"""
+        Return the variance mean-reversion speed.
+        """
+    def theta(self) -> builtins.float:
+        r"""
+        Return the long-run variance.
+        """
+    def sigma(self) -> builtins.float:
+        r"""
+        Return the volatility of variance.
+        """
+    def rho(self) -> builtins.float:
+        r"""
+        Return the spot/variance correlation.
+        """
+    def lambda_(self) -> builtins.float:
+        r"""
+        Return the Poisson jump intensity.
+        """
+    def nu(self) -> builtins.float:
+        r"""
+        Return the logarithmic jump mean.
+        """
+    def delta(self) -> builtins.float:
+        r"""
+        Return the logarithmic jump standard deviation.
+        """
+    def spot(self) -> builtins.float:
+        r"""
+        Return the current retained spot quote.
+        """
+    def initial_values(self) -> builtins.list[builtins.float]:
+        r"""
+        Return the current spot and initial variance.
+        """
+    def time(self, date: time.Date) -> builtins.float:
+        r"""
+        Convert a date using the risk-free curve's clock.
+        """
 
 @typing.final
 class BlackScholesProcess:

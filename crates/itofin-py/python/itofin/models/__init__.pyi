@@ -13,6 +13,7 @@ from itofin import termstructures
 from itofin import time
 import typing
 __all__ = [
+    "BatesModel",
     "CalibrationErrorType",
     "CapHelper",
     "HestonModel",
@@ -20,6 +21,63 @@ __all__ = [
     "HullWhite",
     "SwaptionHelper",
 ]
+
+@typing.final
+class BatesModel:
+    r"""
+    Eight-parameter Bates model retaining the original observable market.
+    """
+    def __init__(self, process: processes.BatesProcess) -> None:
+        r"""
+        Seed the calibrated model from its process.
+        """
+    def v0(self) -> builtins.float:
+        r"""
+        Return the fitted initial variance.
+        """
+    def kappa(self) -> builtins.float:
+        r"""
+        Return the fitted variance mean-reversion speed.
+        """
+    def theta(self) -> builtins.float:
+        r"""
+        Return the fitted long-run variance.
+        """
+    def sigma(self) -> builtins.float:
+        r"""
+        Return the fitted volatility of variance.
+        """
+    def rho(self) -> builtins.float:
+        r"""
+        Return the fitted spot/variance correlation.
+        """
+    def lambda_(self) -> builtins.float:
+        r"""
+        Return the fitted Poisson jump intensity.
+        """
+    def nu(self) -> builtins.float:
+        r"""
+        Return the fitted logarithmic jump mean.
+        """
+    def delta(self) -> builtins.float:
+        r"""
+        Return the fitted logarithmic jump standard deviation.
+        """
+    def params(self) -> builtins.list[builtins.float]:
+        r"""
+        Return theta, kappa, sigma, rho, v0, nu, delta, lambda_ in that order.
+        """
+    def set_params(self, params: typing.Sequence[builtins.float]) -> None:
+        r"""
+        Atomically replace eight validated parameters and invalidate engines.
+        """
+    def calibrate(self, helpers: typing.Sequence[HestonModelHelper], method: optimization.LevenbergMarquardt | optimization.Simplex | optimization.ConjugateGradient | optimization.SteepestDescent, end_criteria: optimization.EndCriteria, integration_order: builtins.int = 144, *, constraint: optimization.NoConstraint | optimization.PositiveConstraint | optimization.BoundaryConstraint | optimization.CompositeConstraint | None = None, weights: typing.Optional[typing.Sequence[builtins.float]] = None, fix_parameters: typing.Optional[typing.Sequence[builtins.bool]] = None) -> None:
+        r"""
+        Fit existing Heston helpers with a retained Bates engine.
+
+        Optional weights correspond to helpers. The eight-element fixed mask is
+        ordered theta, kappa, sigma, rho, v0, nu, delta, lambda_.
+        """
 
 @typing.final
 class CapHelper:

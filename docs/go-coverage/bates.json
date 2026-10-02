@@ -1,0 +1,275 @@
+{
+  "domain": "bates",
+  "entries": [
+    {
+      "c": "itofin_bates_process_new",
+      "go": "Session.NewBatesProcess",
+      "python": "itofin.processes.BatesProcess",
+      "status": "implemented",
+      "tests": [
+        "TestBatesParametersLiveInputsAndRetainedGraph"
+      ]
+    },
+    {
+      "c": "itofin_bates_process_new",
+      "go": "Session.NewBatesProcess",
+      "python": "itofin.processes.BatesProcess.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestBatesParametersLiveInputsAndRetainedGraph"
+      ]
+    },
+    {
+      "c": "itofin_bates_parameter",
+      "go": "BatesProcess.V0",
+      "python": "itofin.processes.BatesProcess.v0",
+      "status": "implemented",
+      "tests": [
+        "TestBatesParametersLiveInputsAndRetainedGraph"
+      ]
+    },
+    {
+      "c": "itofin_bates_parameter",
+      "go": "BatesProcess.Kappa",
+      "python": "itofin.processes.BatesProcess.kappa",
+      "status": "implemented",
+      "tests": [
+        "TestBatesParametersLiveInputsAndRetainedGraph"
+      ]
+    },
+    {
+      "c": "itofin_bates_parameter",
+      "go": "BatesProcess.Theta",
+      "python": "itofin.processes.BatesProcess.theta",
+      "status": "implemented",
+      "tests": [
+        "TestBatesParametersLiveInputsAndRetainedGraph"
+      ]
+    },
+    {
+      "c": "itofin_bates_parameter",
+      "go": "BatesProcess.Sigma",
+      "python": "itofin.processes.BatesProcess.sigma",
+      "status": "implemented",
+      "tests": [
+        "TestBatesParametersLiveInputsAndRetainedGraph"
+      ]
+    },
+    {
+      "c": "itofin_bates_parameter",
+      "go": "BatesProcess.Rho",
+      "python": "itofin.processes.BatesProcess.rho",
+      "status": "implemented",
+      "tests": [
+        "TestBatesParametersLiveInputsAndRetainedGraph"
+      ]
+    },
+    {
+      "c": "itofin_bates_parameter",
+      "go": "BatesProcess.Lambda",
+      "python": "itofin.processes.BatesProcess.lambda_",
+      "status": "implemented",
+      "tests": [
+        "TestBatesParametersLiveInputsAndRetainedGraph"
+      ]
+    },
+    {
+      "c": "itofin_bates_parameter",
+      "go": "BatesProcess.Nu",
+      "python": "itofin.processes.BatesProcess.nu",
+      "status": "implemented",
+      "tests": [
+        "TestBatesParametersLiveInputsAndRetainedGraph"
+      ]
+    },
+    {
+      "c": "itofin_bates_parameter",
+      "go": "BatesProcess.Delta",
+      "python": "itofin.processes.BatesProcess.delta",
+      "status": "implemented",
+      "tests": [
+        "TestBatesParametersLiveInputsAndRetainedGraph"
+      ]
+    },
+    {
+      "c": "itofin_bates_process_initial_values",
+      "go": "BatesProcess.Spot",
+      "python": "itofin.processes.BatesProcess.spot",
+      "status": "implemented",
+      "tests": [
+        "TestBatesParametersLiveInputsAndRetainedGraph"
+      ]
+    },
+    {
+      "c": "itofin_bates_process_initial_values",
+      "go": "BatesProcess.InitialValues",
+      "python": "itofin.processes.BatesProcess.initial_values",
+      "status": "implemented",
+      "tests": [
+        "TestBatesParametersLiveInputsAndRetainedGraph"
+      ]
+    },
+    {
+      "c": "itofin_bates_process_time",
+      "go": "BatesProcess.Time",
+      "python": "itofin.processes.BatesProcess.time",
+      "status": "implemented",
+      "tests": [
+        "TestBatesParametersLiveInputsAndRetainedGraph"
+      ]
+    },
+    {
+      "c": "itofin_bates_model_new",
+      "go": "Session.NewBatesModel",
+      "python": "itofin.models.BatesModel",
+      "status": "implemented",
+      "tests": [
+        "TestBatesParametersLiveInputsAndRetainedGraph"
+      ]
+    },
+    {
+      "c": "itofin_bates_model_new",
+      "go": "Session.NewBatesModel",
+      "python": "itofin.models.BatesModel.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestBatesParametersLiveInputsAndRetainedGraph"
+      ]
+    },
+    {
+      "c": "itofin_bates_parameter",
+      "go": "BatesModel.V0",
+      "python": "itofin.models.BatesModel.v0",
+      "status": "implemented",
+      "tests": [
+        "TestBatesParametersLiveInputsAndRetainedGraph"
+      ]
+    },
+    {
+      "c": "itofin_bates_parameter",
+      "go": "BatesModel.Kappa",
+      "python": "itofin.models.BatesModel.kappa",
+      "status": "implemented",
+      "tests": [
+        "TestBatesParametersLiveInputsAndRetainedGraph"
+      ]
+    },
+    {
+      "c": "itofin_bates_parameter",
+      "go": "BatesModel.Theta",
+      "python": "itofin.models.BatesModel.theta",
+      "status": "implemented",
+      "tests": [
+        "TestBatesParametersLiveInputsAndRetainedGraph"
+      ]
+    },
+    {
+      "c": "itofin_bates_parameter",
+      "go": "BatesModel.Sigma",
+      "python": "itofin.models.BatesModel.sigma",
+      "status": "implemented",
+      "tests": [
+        "TestBatesParametersLiveInputsAndRetainedGraph"
+      ]
+    },
+    {
+      "c": "itofin_bates_parameter",
+      "go": "BatesModel.Rho",
+      "python": "itofin.models.BatesModel.rho",
+      "status": "implemented",
+      "tests": [
+        "TestBatesParametersLiveInputsAndRetainedGraph"
+      ]
+    },
+    {
+      "c": "itofin_bates_parameter",
+      "go": "BatesModel.Lambda",
+      "python": "itofin.models.BatesModel.lambda_",
+      "status": "implemented",
+      "tests": [
+        "TestBatesParametersLiveInputsAndRetainedGraph"
+      ]
+    },
+    {
+      "c": "itofin_bates_parameter",
+      "go": "BatesModel.Nu",
+      "python": "itofin.models.BatesModel.nu",
+      "status": "implemented",
+      "tests": [
+        "TestBatesParametersLiveInputsAndRetainedGraph"
+      ]
+    },
+    {
+      "c": "itofin_bates_parameter",
+      "go": "BatesModel.Delta",
+      "python": "itofin.models.BatesModel.delta",
+      "status": "implemented",
+      "tests": [
+        "TestBatesParametersLiveInputsAndRetainedGraph"
+      ]
+    },
+    {
+      "c": "itofin_bates_model_params",
+      "go": "BatesModel.Params",
+      "python": "itofin.models.BatesModel.params",
+      "status": "implemented",
+      "tests": [
+        "TestBatesParametersLiveInputsAndRetainedGraph"
+      ]
+    },
+    {
+      "c": "itofin_bates_model_set_params",
+      "go": "BatesModel.SetParams",
+      "python": "itofin.models.BatesModel.set_params",
+      "status": "implemented",
+      "tests": [
+        "TestBatesParametersLiveInputsAndRetainedGraph"
+      ]
+    },
+    {
+      "c": "itofin_bates_calibrate_with_options",
+      "go": "BatesModel.Calibrate",
+      "python": "itofin.models.BatesModel.calibrate",
+      "status": "implemented",
+      "tests": [
+        "TestBatesIndependentCalibrationOracles"
+      ]
+    },
+    {
+      "c": "itofin_bates_engine_new",
+      "go": "Session.NewBatesEngine",
+      "python": "itofin.pricingengines.BatesEngine",
+      "status": "implemented",
+      "tests": [
+        "TestBatesIndependentPriceOracles"
+      ]
+    },
+    {
+      "c": "itofin_bates_engine_new",
+      "go": "Session.NewBatesEngine",
+      "python": "itofin.pricingengines.BatesEngine.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestBatesIndependentPriceOracles"
+      ]
+    },
+    {
+      "c": "itofin_option_set_engine",
+      "go": "VanillaOption.SetBatesEngine",
+      "python": "itofin.instruments.VanillaOption.set_bates_engine",
+      "status": "implemented",
+      "tests": [
+        "TestBatesParametersLiveInputsAndRetainedGraph"
+      ]
+    },
+    {
+      "c": "itofin_option_set_engine",
+      "go": "VanillaOption.PriceBates",
+      "python": "itofin.instruments.VanillaOption.price_bates",
+      "status": "implemented",
+      "tests": [
+        "TestBatesParametersLiveInputsAndRetainedGraph"
+      ]
+    }
+  ]
+}

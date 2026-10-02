@@ -1282,6 +1282,14 @@ class VanillaOption:
         r"""
         Attach the jump-diffusion engine and return the option value.
         """
+    def set_bates_engine(self, engine: pricingengines.BatesEngine) -> None:
+        r"""
+        Attach a European Bates engine retaining its observable model.
+        """
+    def price_bates(self, engine: pricingengines.BatesEngine) -> builtins.float:
+        r"""
+        Attach the Bates engine and return the option value.
+        """
     def set_heston_engine(self, model: models.HestonModel, integration_order: builtins.int) -> None:
         r"""
         Attach an analytic Heston engine built on model.
