@@ -418,7 +418,8 @@ impl<M: CalibratedModelHolder> CostFunction for CalibrationFunction<M> {
 /// # Errors
 ///
 /// Fails on empty `instruments`, a `weights` or `fix_parameters` length that
-/// does not match, an all-fixed projection, or a failure of `method.minimize`.
+/// does not match, negative or nonfinite weights, an all-fixed projection,
+/// failed minimization, or nonfinite residuals or cost at the final point.
 pub fn calibrate<M: CalibratedModelHolder>(
     model: &SharedMut<M>,
     instruments: &[SharedMut<dyn CalibrationHelper>],
@@ -441,6 +442,12 @@ pub fn calibrate<M: CalibratedModelHolder>(
         "mismatch between number of instruments ({}) and weights ({})",
         instruments.len(),
         weights.len()
+    );
+    require!(
+        weights
+            .iter()
+            .all(|weight| weight.is_finite() && *weight >= 0.0),
+        "calibration weights must be finite and non-negative"
     );
     let weights = if weights.is_empty() {
         vec![1.0; instruments.len()]
@@ -470,6 +477,18 @@ pub fn calibrate<M: CalibratedModelHolder>(
         .borrow_mut()
         .set_params(&projection.include(&result))?;
     let problem_values = problem.values(&result);
+    require!(
+        problem_values.iter().all(|value| value.is_finite()),
+        "nonfinite final calibration residuals"
+    );
+    require!(
+        problem_values
+            .iter()
+            .map(|value| value * value)
+            .sum::<Real>()
+            .is_finite(),
+        "nonfinite final calibration cost"
+    );
     let function_evaluation = problem.function_evaluation();
 
     {
@@ -1083,5 +1102,118 @@ mod tests {
         // C++'s setParams inside value()).
         assert_eq!(model.borrow().calibrated_model().params()[0], 2.0);
         assert!((derived.get() - 4.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn calibration_rejects_negative_and_nonfinite_weights_without_mutation() {
+        let derived = Rc::new(Cell::new(0.0));
+        let model = DerivedModel::new(1.0, Rc::clone(&derived));
+        let instruments = vec![helper(&derived, 6.0)];
+        let mut method = LevenbergMarquardt::default();
+        for weight in [-1.0, Real::NAN, Real::INFINITY, Real::NEG_INFINITY] {
+            assert!(
+                calibrate(
+                    &model,
+                    &instruments,
+                    &mut method,
+                    &criteria(),
+                    None,
+                    vec![weight],
+                    Vec::new()
+                )
+                .is_err()
+            );
+            assert_eq!(
+                model.borrow().calibrated_model().params(),
+                Array::from([1.0])
+            );
+            assert_eq!(derived.get(), 2.0);
+            assert_eq!(
+                model.borrow().calibrated_model().end_criteria(),
+                EndCriteriaType::None
+            );
+        }
+    }
+
+    #[test]
+    fn calibration_supports_positive_and_zero_helper_weights() {
+        for weights in [vec![1.0, 3.0], vec![0.0, 1.0]] {
+            let derived = Rc::new(Cell::new(0.0));
+            let model = DerivedModel::new(1.0, Rc::clone(&derived));
+            let instruments = vec![helper(&derived, 6.0), helper(&derived, 10.0)];
+            let mut method = LevenbergMarquardt::default();
+            let expected = if weights[0] == 0.0 { 5.0 } else { 4.5 };
+            calibrate(
+                &model,
+                &instruments,
+                &mut method,
+                &criteria(),
+                None,
+                weights,
+                Vec::new(),
+            )
+            .unwrap();
+            assert!((model.borrow().calibrated_model().params()[0] - expected).abs() < 1e-4);
+        }
+    }
+
+    struct FailedHelper;
+    impl CalibrationHelper for FailedHelper {
+        fn calibration_error(&mut self) -> QlResult<Real> {
+            crate::fail!("unpriceable calibration helper")
+        }
+    }
+
+    #[test]
+    fn calibration_never_reports_success_for_unpriceable_final_helpers() {
+        use crate::math::optimization::simplex::Simplex;
+        let derived = Rc::new(Cell::new(0.0));
+        let model = DerivedModel::new(1.0, derived);
+        let instruments = vec![shared_mut(FailedHelper) as SharedMut<dyn CalibrationHelper>];
+        let mut method = Simplex::new(0.1);
+        assert!(
+            calibrate(
+                &model,
+                &instruments,
+                &mut method,
+                &criteria(),
+                None,
+                Vec::new(),
+                Vec::new()
+            )
+            .is_err()
+        );
+        let borrowed = model.borrow();
+        assert_eq!(
+            borrowed.calibrated_model().end_criteria(),
+            EndCriteriaType::None
+        );
+        assert!(borrowed.calibrated_model().problem_values().is_empty());
+    }
+
+    #[test]
+    fn calibration_rejects_overflowing_cost_from_finite_final_residuals() {
+        use crate::math::optimization::simplex::Simplex;
+        let derived = Rc::new(Cell::new(0.0));
+        let model = DerivedModel::new(1.0, Rc::clone(&derived));
+        let instruments = vec![helper(&derived, 1e200)];
+        let mut method = Simplex::new(0.1);
+        let error = calibrate(
+            &model,
+            &instruments,
+            &mut method,
+            &criteria(),
+            None,
+            Vec::new(),
+            Vec::new(),
+        )
+        .unwrap_err();
+        assert_eq!(error.message(), "nonfinite final calibration cost");
+        let borrowed = model.borrow();
+        assert_eq!(
+            borrowed.calibrated_model().end_criteria(),
+            EndCriteriaType::None
+        );
+        assert!(borrowed.calibrated_model().problem_values().is_empty());
     }
 }
