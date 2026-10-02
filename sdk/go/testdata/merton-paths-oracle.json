@@ -1,0 +1,275 @@
+{
+  "cases": [
+    {
+      "expected_full": [
+        100.0,
+        55.496279986665456,
+        61.56714406017473,
+        73.98365027969385,
+        69.02629897681246,
+        100.0,
+        108.62856072310466,
+        119.8125070496225,
+        111.58288619351339,
+        116.76538287683597,
+        100.0,
+        92.29161151619682,
+        154.0450892411835,
+        142.169262692087,
+        127.70559854247949
+      ],
+      "expected_terminal": [
+        69.02629897681246,
+        116.76538287683597,
+        127.70559854247949
+      ],
+      "input": {
+        "drift": 0.05,
+        "horizon": 1.0,
+        "jump_intensity": 1.0,
+        "log_jump_volatility": 0.3,
+        "log_mean_jump": -0.1,
+        "paths": 3,
+        "seed": 42,
+        "spot": 100.0,
+        "steps": 4,
+        "terminal_only": false,
+        "volatility": 0.2
+      },
+      "name": "base",
+      "seeds": {
+        "diffusion": 42,
+        "jump": 3144134319,
+        "poisson": 2654435811
+      }
+    },
+    {
+      "expected_full": [
+        100.0,
+        28.00041450333543,
+        26.378803084925767,
+        28.4339161265367,
+        22.752796237247246,
+        100.0,
+        119.29332236764716,
+        144.49285526648308,
+        107.6294091848049,
+        51.95116780562126,
+        100.0,
+        126.107229774437,
+        294.7096444500288,
+        256.4689457575154,
+        286.139272112366
+      ],
+      "expected_terminal": [
+        22.752796237247246,
+        51.95116780562126,
+        286.139272112366
+      ],
+      "input": {
+        "drift": 0.05,
+        "horizon": 1.0,
+        "jump_intensity": 8.0,
+        "log_jump_volatility": 0.3,
+        "log_mean_jump": -0.1,
+        "paths": 3,
+        "seed": 42,
+        "spot": 100.0,
+        "steps": 4,
+        "terminal_only": false,
+        "volatility": 0.2
+      },
+      "name": "multiple_jumps",
+      "seeds": {
+        "diffusion": 42,
+        "jump": 3144134319,
+        "poisson": 2654435811
+      }
+    },
+    {
+      "expected_full": [
+        100.0,
+        52.730096030553106,
+        52.2353089695446,
+        75.69290879235727,
+        63.060077181577874,
+        100.0,
+        96.99838318766764,
+        95.53072982707711,
+        102.30871162211999,
+        74.6299781910955,
+        100.0,
+        120.43204744873255,
+        299.0918211843931,
+        246.4806667545246,
+        197.70040356791543
+      ],
+      "expected_terminal": [
+        63.060077181577874,
+        74.6299781910955,
+        197.70040356791543
+      ],
+      "input": {
+        "drift": 0.05,
+        "horizon": 1.0,
+        "jump_intensity": 3.0,
+        "log_jump_volatility": 0.3,
+        "log_mean_jump": 0.08,
+        "paths": 3,
+        "seed": 42,
+        "spot": 100.0,
+        "steps": 4,
+        "terminal_only": false,
+        "volatility": 0.2
+      },
+      "name": "positive_log_mean",
+      "seeds": {
+        "diffusion": 42,
+        "jump": 3144134319,
+        "poisson": 2654435811
+      }
+    },
+    {
+      "expected_full": [
+        100.0,
+        79.12351485783925,
+        85.77854551855636,
+        82.66332429758566,
+        83.29311774545027,
+        100.0,
+        129.6554845624747,
+        170.68520977207467,
+        142.96985064552015,
+        132.28771142198252,
+        100.0,
+        81.60574839290943,
+        72.68282889871548,
+        72.44477938826813,
+        70.2795122968073
+      ],
+      "expected_terminal": [
+        83.29311774545027,
+        132.28771142198252,
+        70.2795122968073
+      ],
+      "input": {
+        "drift": 0.05,
+        "horizon": 1.0,
+        "jump_intensity": 8.0,
+        "log_jump_volatility": 0.0,
+        "log_mean_jump": -0.1,
+        "paths": 3,
+        "seed": 42,
+        "spot": 100.0,
+        "steps": 4,
+        "terminal_only": false,
+        "volatility": 0.2
+      },
+      "name": "deterministic_jump_size",
+      "seeds": {
+        "diffusion": 42,
+        "jump": 3144134319,
+        "poisson": 2654435811
+      }
+    },
+    {
+      "expected_full": [
+        100.0,
+        97.5812092582015,
+        106.81716078633639,
+        126.95091719935475,
+        116.87035809017503,
+        100.0,
+        107.1849288852535,
+        116.6491432268552,
+        120.50102770905656,
+        124.42193945169578,
+        100.0,
+        91.06509145679009,
+        90.50950181010404,
+        82.42173004218758,
+        73.05259550932476
+      ],
+      "expected_terminal": [
+        116.87035809017503,
+        124.42193945169578,
+        73.05259550932476
+      ],
+      "input": {
+        "drift": 0.05,
+        "horizon": 1.0,
+        "jump_intensity": 0.0,
+        "log_jump_volatility": 0.3,
+        "log_mean_jump": -0.1,
+        "paths": 3,
+        "seed": 42,
+        "spot": 100.0,
+        "steps": 4,
+        "terminal_only": false,
+        "volatility": 0.2
+      },
+      "name": "zero_intensity",
+      "seeds": {
+        "diffusion": 42,
+        "jump": 3144134319,
+        "poisson": 2654435811
+      }
+    },
+    {
+      "expected_full": [
+        100.0,
+        29.055405826404364,
+        25.32044988390155,
+        23.25342226573439,
+        20.46657290764477,
+        100.0,
+        112.6966719094299,
+        127.00539859461685,
+        92.73127871099057,
+        43.894799725600876,
+        100.0,
+        140.22218767953282,
+        333.8547319075621,
+        323.05696110490584,
+        411.7717436492832
+      ],
+      "expected_terminal": [
+        20.46657290764477,
+        43.894799725600876,
+        411.7717436492832
+      ],
+      "input": {
+        "drift": 0.05,
+        "horizon": 1.0,
+        "jump_intensity": 8.0,
+        "log_jump_volatility": 0.3,
+        "log_mean_jump": -0.1,
+        "paths": 3,
+        "seed": 42,
+        "spot": 100.0,
+        "steps": 4,
+        "terminal_only": false,
+        "volatility": 0.0
+      },
+      "name": "zero_diffusion",
+      "seeds": {
+        "diffusion": 42,
+        "jump": 3144134319,
+        "poisson": 2654435811
+      }
+    }
+  ],
+  "provenance": {
+    "absolute_tolerance": 2e-14,
+    "counts": "original jump_intensity * dt, upward Poisson CDF recurrence",
+    "diffusion_seed": "seed",
+    "generator": "Independent Python standard-library MT19937/Acklam/Poisson",
+    "jump_seed_offset": 3144134277,
+    "model": "Exact constant-parameter Merton transition",
+    "normal": "Acklam, no refinement",
+    "poisson_seed_offset": 2654435769,
+    "relative_tolerance": 2e-14,
+    "shifted_seed": "1 + ((seed - 1 + offset) % 4294967295)",
+    "uniform": "(word + 0.5) / 4294967296"
+  }
+}
