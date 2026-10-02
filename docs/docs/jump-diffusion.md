@@ -103,5 +103,5 @@ record the source, curve clocks and tolerances.
 
 This process provides pricing inputs and date conversion. Like QuantLib's
 `Merton76Process`, it does not provide drift, diffusion or apply operations
-for path generation. Seeded jump paths are tracked separately in
-[#1162](https://github.com/benbenbang/libitofin/issues/1162).
+for path generation. The separate [seeded Merton kernel](simulation.md#merton-jump-paths)
+generates constant-parameter paths from explicit scalar assumptions.
