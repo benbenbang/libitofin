@@ -1,0 +1,32 @@
+{
+  "all_full_terminal_exact": true,
+  "analytical_mean": 105.12710963760242,
+  "analytical_second_moment": 12055.983113903118,
+  "canonical_mt_vector_verified": true,
+  "expected_count_mean_variance": 2.0,
+  "input": {
+    "drift": 0.05,
+    "horizon": 1.0,
+    "jump_intensity": 2.0,
+    "log_jump_volatility": 0.15,
+    "log_mean_jump": -0.07,
+    "paths": 40000,
+    "seed": 42,
+    "spot": 100.0,
+    "steps": 4,
+    "terminal_only": false,
+    "volatility": 0.2
+  },
+  "observed_count_mean": 1.99245,
+  "observed_count_variance": 2.004993122328058,
+  "observed_mean": 105.39045083976414,
+  "observed_second_moment": 12113.29232753789,
+  "standard_deviations": [
+    1.6619682173753711,
+    1.5146045527738796
+  ],
+  "standard_errors": [
+    0.15845140683713085,
+    37.83774024039202
+  ]
+}
