@@ -1,6 +1,7 @@
 //! Facades for the option instrument: OptionType and VanillaOption.
 
 use crate::PyQlError;
+use crate::bates::PyBatesEngine;
 use crate::fdengine::PyFdBlackScholesVanillaEngine;
 use crate::heston::PyHestonModel;
 use crate::heston_engines::{PyCosHestonEngine, PyExponentialFittingHestonEngine};
@@ -182,6 +183,17 @@ impl PyVanillaOption {
     /// Attach the jump-diffusion engine and return the option value.
     fn price_jump_diffusion(&mut self, engine: &PyJumpDiffusionEngine) -> PyResult<f64> {
         self.set_jump_diffusion_engine(engine);
+        self.npv()
+    }
+
+    /// Attach a European Bates engine retaining its observable model.
+    fn set_bates_engine(&mut self, engine: &PyBatesEngine) {
+        self.inner.base_mut().set_pricing_engine(engine.engine());
+    }
+
+    /// Attach the Bates engine and return the option value.
+    fn price_bates(&mut self, engine: &PyBatesEngine) -> PyResult<f64> {
+        self.set_bates_engine(engine);
         self.npv()
     }
 
