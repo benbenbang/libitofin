@@ -1,0 +1,272 @@
+{
+  "cases": [
+    {
+      "expected_full": [
+        100.0,
+        100.0,
+        100.0,
+        100.0,
+        100.0,
+        100.0,
+        100.0,
+        100.0,
+        100.0,
+        100.0,
+        100.0,
+        100.0,
+        100.0,
+        100.0,
+        100.0
+      ],
+      "expected_terminal": [
+        100.0,
+        100.0,
+        100.0
+      ],
+      "input": {
+        "drift": 0.05,
+        "horizon": 0.0,
+        "jump_intensity": 1.0,
+        "log_jump_volatility": 0.3,
+        "log_mean_jump": -0.1,
+        "paths": 3,
+        "seed": 42,
+        "spot": 100.0,
+        "steps": 4,
+        "terminal_only": false,
+        "volatility": 0.2
+      },
+      "name": "zero_horizon",
+      "seeds": {
+        "diffusion": 42,
+        "jump": 3144134319,
+        "poisson": 2654435811
+      }
+    },
+    {
+      "expected_full": [
+        100.0,
+        85.07209653331171,
+        91.88988474720588,
+        111.86718253199972,
+        98.97443243097436,
+        100.0,
+        106.52644819557457,
+        121.379805268405,
+        124.42007481503202,
+        117.20987247105326,
+        100.0,
+        98.39877950292181,
+        115.14777562147074,
+        103.21079694553978,
+        96.22922553539328
+      ],
+      "expected_terminal": [
+        98.97443243097436,
+        117.20987247105326,
+        96.22922553539328
+      ],
+      "input": {
+        "drift": 0.05,
+        "horizon": 1.0,
+        "jump_intensity": 240.0,
+        "log_jump_volatility": 0.01,
+        "log_mean_jump": 0.0,
+        "paths": 3,
+        "seed": 42,
+        "spot": 100.0,
+        "steps": 4,
+        "terminal_only": false,
+        "volatility": 0.2
+      },
+      "name": "poisson_mean_60",
+      "seeds": {
+        "diffusion": 42,
+        "jump": 3144134319,
+        "poisson": 2654435811
+      }
+    },
+    {
+      "expected_full": [
+        100.0,
+        77.93839728960181,
+        83.08319141327475,
+        102.28974557578935,
+        87.53792780554767,
+        100.0,
+        105.64487739592774,
+        124.6128914958248,
+        126.62897791928475,
+        111.9462977128842,
+        100.0,
+        103.17522029749924,
+        133.41307015954908,
+        117.72298618514692,
+        113.90689127728312
+      ],
+      "expected_terminal": [
+        87.53792780554767,
+        111.9462977128842,
+        113.90689127728312
+      ],
+      "input": {
+        "drift": 0.05,
+        "horizon": 1.0,
+        "jump_intensity": 2800.0,
+        "log_jump_volatility": 0.005,
+        "log_mean_jump": 0.0,
+        "paths": 3,
+        "seed": 42,
+        "spot": 100.0,
+        "steps": 4,
+        "terminal_only": false,
+        "volatility": 0.2
+      },
+      "name": "poisson_mean_700",
+      "seeds": {
+        "diffusion": 42,
+        "jump": 3144134319,
+        "poisson": 2654435811
+      }
+    },
+    {
+      "expected_full": [
+        100.0,
+        109.11208955820642,
+        113.52957184903286,
+        110.39627791575722,
+        123.34251604418205,
+        100.0,
+        116.34286607788984,
+        113.55453664968753,
+        108.65911224413465,
+        99.97302818165801,
+        100.0,
+        100.37033282547205,
+        100.3584256219746,
+        93.73678036452743,
+        93.36924947679067
+      ],
+      "expected_terminal": [
+        123.34251604418205,
+        99.97302818165801,
+        93.36924947679067
+      ],
+      "input": {
+        "drift": 0.05,
+        "horizon": 1.0,
+        "jump_intensity": 1.0,
+        "log_jump_volatility": 0.3,
+        "log_mean_jump": -0.1,
+        "paths": 3,
+        "seed": 20261002,
+        "spot": 100.0,
+        "steps": 4,
+        "terminal_only": false,
+        "volatility": 0.2
+      },
+      "name": "different_seed",
+      "seeds": {
+        "diffusion": 20261002,
+        "jump": 3164395279,
+        "poisson": 2674696771
+      }
+    },
+    {
+      "expected_full": [
+        100.0,
+        89.70554768896989,
+        55.996246105362985,
+        65.47843847864941,
+        106.16254807197446,
+        100.0,
+        110.64830452945884,
+        113.73122893373791,
+        125.45376360906589,
+        110.24876857514285,
+        100.0,
+        82.78274911297181,
+        79.82758182827156,
+        98.30805290829555,
+        100.49260191207966
+      ],
+      "expected_terminal": [
+        106.16254807197446,
+        110.24876857514285,
+        100.49260191207966
+      ],
+      "input": {
+        "drift": 0.05,
+        "horizon": 1.0,
+        "jump_intensity": 1.0,
+        "log_jump_volatility": 0.3,
+        "log_mean_jump": -0.1,
+        "paths": 3,
+        "seed": 4294967295,
+        "spot": 100.0,
+        "steps": 4,
+        "terminal_only": false,
+        "volatility": 0.2
+      },
+      "name": "maximum_seed",
+      "seeds": {
+        "diffusion": 4294967295,
+        "jump": 3144134277,
+        "poisson": 2654435769
+      }
+    },
+    {
+      "expected_full": [
+        100.0,
+        101.17349876564472,
+        102.36076852481912,
+        103.56197087996233,
+        100.0,
+        101.17349876564472,
+        102.36076852481912,
+        103.56197087996233,
+        100.0,
+        101.17349876564472,
+        102.36076852481912,
+        103.56197087996233
+      ],
+      "expected_terminal": [
+        103.56197087996233,
+        103.56197087996233,
+        103.56197087996233
+      ],
+      "input": {
+        "drift": 0.05,
+        "horizon": 0.7,
+        "jump_intensity": 0.0,
+        "log_jump_volatility": 0.3,
+        "log_mean_jump": -0.1,
+        "paths": 3,
+        "seed": 42,
+        "spot": 100.0,
+        "steps": 3,
+        "terminal_only": false,
+        "volatility": 0.0
+      },
+      "name": "zero_intensity_and_diffusion",
+      "seeds": {
+        "diffusion": 42,
+        "jump": 3144134319,
+        "poisson": 2654435811
+      }
+    }
+  ],
+  "provenance": {
+    "absolute_tolerance": 2e-14,
+    "counts": "original jump_intensity * dt, upward Poisson CDF recurrence",
+    "diffusion_seed": "seed",
+    "generator": "Independent Python standard-library MT19937/Acklam/Poisson",
+    "jump_seed_offset": 3144134277,
+    "model": "Exact constant-parameter Merton transition",
+    "normal": "Acklam, no refinement",
+    "poisson_seed_offset": 2654435769,
+    "relative_tolerance": 2e-14,
+    "shifted_seed": "1 + ((seed - 1 + offset) % 4294967295)",
+    "uniform": "(word + 0.5) / 4294967296"
+  }
+}
