@@ -1,0 +1,71 @@
+//! Bates calibration using retained Heston helpers and existing optimizers.
+use crate::bates_api::with_bates_context;
+use crate::boundary::*;
+use crate::constraint_api::{ItofinCalibrationOptions, read_options};
+use libitofin::math::optimization::{endcriteria::EndCriteria, method::OptimizationMethod};
+use libitofin::models::calibrationhelper::{BlackCalibrationHelper, CalibrationHelper};
+use libitofin::models::equity::HestonModelHelper;
+use libitofin::models::{BatesModel, calibrate};
+use libitofin::pricingengine::PricingEngine;
+use libitofin::pricingengines::vanilla::BatesEngine;
+use libitofin::shared::{SharedMut, shared_mut};
+
+/// Calibrate eight Bates parameters with copied constraints, weights and fixed mask.
+/// The parameter-mask order is theta,kappa,sigma,rho,v0,nu,delta,lambda.
+/// # Safety
+/// Pointers and handles obey the C caller contract. Input arrays are copied,
+/// not retained. Context and handles belong to the calling thread.
+#[unsafe(no_mangle)]
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn itofin_bates_calibrate_with_options(
+    ctx: *mut Context,
+    model: u64,
+    helpers: *const u64,
+    helpers_len: usize,
+    method: u64,
+    criteria: u64,
+    integration_order: usize,
+    options: *const ItofinCalibrationOptions,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_bates_context(ctx, error, |c| {
+            let options = read_options(c, options)?;
+            let ids = input_slice(helpers, helpers_len)?;
+            if ids.is_empty() {
+                return Err(BindingError::invalid(
+                    "calibration helpers must not be empty",
+                ));
+            }
+            let model = c.get::<SharedMut<BatesModel>>(model)?;
+            let method = c.get::<SharedMut<dyn OptimizationMethod>>(method)?;
+            let criteria = c.get::<EndCriteria>(criteria)?;
+            let helpers = ids
+                .iter()
+                .map(|id| c.get::<SharedMut<HestonModelHelper>>(*id))
+                .collect::<BindingResult<Vec<_>>>()?;
+            let engine: SharedMut<dyn PricingEngine> =
+                shared_mut(BatesEngine::new(model.clone(), integration_order)?);
+            for helper in &helpers {
+                helper
+                    .borrow_mut()
+                    .base_mut()
+                    .set_pricing_engine(engine.clone());
+            }
+            let helpers: Vec<SharedMut<dyn CalibrationHelper>> = helpers
+                .into_iter()
+                .map(|h| h as SharedMut<dyn CalibrationHelper>)
+                .collect();
+            calibrate(
+                &model,
+                &helpers,
+                &mut *method.borrow_mut(),
+                &criteria,
+                options.constraint,
+                options.weights,
+                options.fix_parameters,
+            )?;
+            Ok(())
+        })
+    }
+}
