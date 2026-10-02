@@ -14,6 +14,7 @@ __all__ = [
     "AccrualBias",
     "BachelierCapFloorEngine",
     "BachelierSwaptionEngine",
+    "BatesEngine",
     "BlackCapFloorEngine",
     "BlackSwaptionEngine",
     "CashAnnuityModel",
@@ -94,6 +95,18 @@ class BachelierSwaptionEngine:
 
         Returns:
             BachelierSwaptionEngine: The engine over the flat surface.
+        """
+
+@typing.final
+class BatesEngine:
+    r"""
+    European plain-vanilla Bates pricing by Gauss-Laguerre integration.
+    """
+    def __init__(self, model: models.BatesModel, integration_order: builtins.int = 144) -> None:
+        r"""
+        Retain the live model with an integration order from 1 through 192.
+
+        Only NPV is supplied. Unsupported exercises and Greeks raise ItofinError.
         """
 
 @typing.final
