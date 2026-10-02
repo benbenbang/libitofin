@@ -242,3 +242,6 @@ fn bates_live_inputs_parameters_and_retained_graph() {
 
 #[path = "bates/boundaries.rs"]
 mod boundaries;
+
+#[path = "bates/oracle.rs"]
+mod oracle;
