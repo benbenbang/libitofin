@@ -48,12 +48,34 @@ typedef struct ItofinContext ItofinContext;
 typedef struct ItofinBootstrapOutput ItofinBootstrapOutput;
 
 /**
+ * Physical constructor order, distinct from calibrated parameter-array order.
+ */
+typedef struct ItofinBatesParameters {
+  double v0;
+  double kappa;
+  double theta;
+  double sigma;
+  double rho;
+  double lambda;
+  double nu;
+  double delta;
+} ItofinBatesParameters;
+
+/**
  * Caller-owned error. Zero code means success; message is NUL-terminated UTF-8.
  */
 typedef struct ItofinError {
   int32_t code;
   char message[1024];
 } ItofinError;
+
+typedef struct ItofinCalibrationOptions {
+  uint64_t constraint;
+  const double *weights;
+  size_t weights_len;
+  const uint8_t *fix_parameters;
+  size_t fix_parameters_len;
+} ItofinCalibrationOptions;
 
 /**
  * Coupon constructor; zero reference dates use the accrual dates.
@@ -229,14 +251,6 @@ typedef struct ItofinCapHelperConfig {
   int32_t volatility_type;
   double shift;
 } ItofinCapHelperConfig;
-
-typedef struct ItofinCalibrationOptions {
-  uint64_t constraint;
-  const double *weights;
-  size_t weights_len;
-  const uint8_t *fix_parameters;
-  size_t fix_parameters_len;
-} ItofinCalibrationOptions;
 
 /**
  * A zero quote handle selects `rate`; a nonzero settings handle selects moving dates.
@@ -1228,6 +1242,117 @@ typedef struct ItofinVolGridConfig {
 #ifdef __cplusplus
 extern "C" {
 #endif // __cplusplus
+
+/**
+ * Retain live spot, risk-free and dividend inputs with constant parameters.
+ * # Safety
+ * Pointers must be aligned, live and non-overlapping. Context and handles
+ * belong to the calling thread; serialize calls including destruction.
+ */
+int32_t itofin_bates_process_new(struct ItofinContext *ctx,
+                                 uint64_t spot,
+                                 uint64_t risk_free,
+                                 uint64_t dividend,
+                                 const struct ItofinBatesParameters *parameters,
+                                 uint64_t *out,
+                                 struct ItofinError *error);
+
+/**
+ * Retain the process and seed eight calibrated parameters.
+ * # Safety
+ * Pointers, context and handles must obey the C caller contract.
+ */
+int32_t itofin_bates_model_new(struct ItofinContext *ctx,
+                               uint64_t process,
+                               uint64_t *out,
+                               struct ItofinError *error);
+
+/**
+ * Kind 0 process, 1 model; field 0 v0, 1 kappa, 2 theta, 3 sigma,
+ * 4 rho, 5 lambda, 6 nu, 7 delta.
+ * # Safety
+ * Pointers, context and handles must obey the C caller contract.
+ */
+int32_t itofin_bates_parameter(struct ItofinContext *ctx,
+                               uint64_t handle,
+                               int32_t kind,
+                               size_t field,
+                               double *out,
+                               struct ItofinError *error);
+
+/**
+ * Convert a date with the retained risk-free curve's clock.
+ * # Safety
+ * Pointers, context and handles must obey the C caller contract.
+ */
+int32_t itofin_bates_process_time(struct ItofinContext *ctx,
+                                  uint64_t process,
+                                  int32_t date_serial,
+                                  double *out,
+                                  struct ItofinError *error);
+
+/**
+ * Copy the current spot and initial variance, without partial writes on error.
+ * # Safety
+ * `out` must hold two writable doubles. Other arguments obey the C contract.
+ */
+int32_t itofin_bates_process_initial_values(struct ItofinContext *ctx,
+                                            uint64_t process,
+                                            double *out,
+                                            size_t capacity,
+                                            struct ItofinError *error);
+
+/**
+ * Copy theta,kappa,sigma,rho,v0,nu,delta,lambda atomically.
+ * # Safety
+ * `out` must hold eight writable doubles. Other arguments obey the C contract.
+ */
+int32_t itofin_bates_model_params(struct ItofinContext *ctx,
+                                  uint64_t model,
+                                  double *out,
+                                  size_t capacity,
+                                  struct ItofinError *error);
+
+/**
+ * Validate and atomically replace theta,kappa,sigma,rho,v0,nu,delta,lambda.
+ * Input is copied and never retained.
+ * # Safety
+ * `parameters` must hold `len` readable doubles. Other arguments obey the C contract.
+ */
+int32_t itofin_bates_model_set_params(struct ItofinContext *ctx,
+                                      uint64_t model,
+                                      const double *parameters,
+                                      size_t len,
+                                      struct ItofinError *error);
+
+/**
+ * Retain a Bates engine for option engine kind 2. Orders 1..192;
+ * 144 is conventional. European plain-vanilla NPV only, no Greeks.
+ * # Safety
+ * Pointers, context and handles must obey the C caller contract.
+ */
+int32_t itofin_bates_engine_new(struct ItofinContext *ctx,
+                                uint64_t model,
+                                size_t integration_order,
+                                uint64_t *out,
+                                struct ItofinError *error);
+
+/**
+ * Calibrate eight Bates parameters with copied constraints, weights and fixed mask.
+ * The parameter-mask order is theta,kappa,sigma,rho,v0,nu,delta,lambda.
+ * # Safety
+ * Pointers and handles obey the C caller contract. Input arrays are copied,
+ * not retained. Context and handles belong to the calling thread.
+ */
+int32_t itofin_bates_calibrate_with_options(struct ItofinContext *ctx,
+                                            uint64_t model,
+                                            const uint64_t *helpers,
+                                            size_t helpers_len,
+                                            uint64_t method,
+                                            uint64_t criteria,
+                                            size_t integration_order,
+                                            const struct ItofinCalibrationOptions *options,
+                                            struct ItofinError *error);
 
 /**
  * Construct a retained BMA index; zero forwarding creates an empty forecast handle.
