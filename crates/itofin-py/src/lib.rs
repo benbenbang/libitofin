@@ -39,6 +39,7 @@ mod makeswaption;
 mod market;
 mod mcengine;
 mod merton;
+mod merton_simulation;
 mod ois;
 mod optimize;
 mod option;
@@ -207,6 +208,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(simulation::simulate_gbm, m)?)?;
     m.add_function(wrap_pyfunction!(simulation::simulate_heston, m)?)?;
     m.add_function(wrap_pyfunction!(ou_simulation::simulate_ou, m)?)?;
+    m.add_function(wrap_pyfunction!(merton_simulation::simulate_merton, m)?)?;
     m.add_class::<PySettings>()?;
 
     let time = PyModule::new(py, "time")?;

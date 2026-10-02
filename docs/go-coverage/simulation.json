@@ -28,6 +28,13 @@
       "python": "itofin.simulate_heston",
       "status": "implemented",
       "tests": "TestHestonLayoutTerminalSeedAndZeroTime"
+    },
+    {
+      "c": "itofin_merton_paths",
+      "go": "SimulateMerton",
+      "python": "itofin.simulate_merton",
+      "status": "implemented",
+      "tests": "TestMertonSimulationLayoutSeedTerminalAndOwnedOutput"
     }
   ]
 }
