@@ -136,6 +136,27 @@ typedef struct ItofinBootstrapCallbacks {
 } ItofinBootstrapCallbacks;
 
 /**
+ * Scalar annualized Merton parameters and seeded path dimensions.
+ * Drift includes jumps; risk-neutral callers supply risk-free minus dividend.
+ */
+typedef struct ItofinMertonInput {
+  double spot;
+  double drift;
+  double volatility;
+  double jump_intensity;
+  double log_mean_jump;
+  double log_jump_volatility;
+  double horizon;
+  size_t steps;
+  size_t paths;
+  uint32_t seed;
+  /**
+   * 0 full `[path,time]` including initial spot; 1 terminal `[path]`.
+   */
+  int32_t terminal_only;
+} ItofinMertonInput;
+
+/**
  * Scalar inputs for exact OU simulation.
  */
 typedef struct ItofinOuInput {
@@ -1551,6 +1572,17 @@ int32_t itofin_chart_volume_bars(const ItofinReal *open,
                                  int8_t *out_direction,
                                  size_t capacity,
                                  struct ItofinError *error);
+
+/**
+ * Generate exact constant-parameter paths, preserving outputs on any error.
+ * # Safety
+ * All pointers obey the crate-level C caller contract. Output must hold
+ * `capacity` doubles and must not overlap input or error. No pointer is retained.
+ */
+int32_t itofin_merton_paths(const struct ItofinMertonInput *input,
+                            double *out,
+                            size_t capacity,
+                            struct ItofinError *error);
 
 /**
  * Generate OU paths into a caller-owned buffer.
