@@ -241,3 +241,6 @@ pub fn merton_paths(request: &MertonRequest) -> QlResult<Vec<Real>> {
     }
     Ok(output)
 }
+
+#[cfg(test)]
+mod tests;
