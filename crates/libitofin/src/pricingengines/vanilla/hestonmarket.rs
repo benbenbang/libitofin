@@ -6,7 +6,9 @@ use crate::exercise::ExerciseType;
 use crate::instruments::{OptionArguments, PlainVanillaPayoff, StrikedTypePayoff, TypePayoff};
 use crate::models::HestonModel;
 use crate::option::OptionType;
+use crate::processes::HestonProcess;
 use crate::stochasticprocess::StochasticProcess;
+use crate::time::date::Date;
 use crate::types::Real;
 use crate::{fail, require};
 use std::any::Any;
@@ -22,6 +24,10 @@ pub(super) struct HestonMarket {
 
 impl HestonMarket {
     pub fn new(arguments: &OptionArguments, model: &HestonModel) -> QlResult<Self> {
+        Self::from_process(arguments, &model.process())
+    }
+
+    pub fn from_process(arguments: &OptionArguments, process: &HestonProcess) -> QlResult<Self> {
         let Some(exercise) = &arguments.exercise else {
             fail!("no exercise given");
         };
@@ -36,8 +42,13 @@ impl HestonMarket {
         let Some(payoff) = (payoff as &dyn Any).downcast_ref::<PlainVanillaPayoff>() else {
             fail!("non plain vanilla payoff given");
         };
-        let process = model.process();
         let date = exercise.last_date();
+        require!(date != Date::null(), "non-null exercise date required");
+        require!(
+            process.risk_free_rate().current_link()?.reference_date()? != Date::null()
+                && process.dividend_yield().current_link()?.reference_date()? != Date::null(),
+            "non-null curve reference dates required"
+        );
         let time = process.time(&date)?;
         let spot = process.s0().current_link()?.value()?;
         let discount = process
@@ -72,11 +83,11 @@ impl HestonMarket {
         );
         Ok(Self {
             chf: HestonChf::new(
-                model.kappa(),
-                model.theta(),
-                model.sigma(),
-                model.rho(),
-                model.v0(),
+                process.kappa(),
+                process.theta(),
+                process.sigma(),
+                process.rho(),
+                process.v0(),
             ),
             time,
             discount,

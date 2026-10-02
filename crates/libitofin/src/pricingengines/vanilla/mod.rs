@@ -18,6 +18,7 @@
 //!   wrong price.
 
 pub mod analytichestonengine;
+pub mod batesengine;
 pub mod coshestonengine;
 pub mod exponentialfittinghestonengine;
 pub mod fdblackscholesvanillaengine;
@@ -31,6 +32,7 @@ pub mod mceuropeanhestonengine;
 pub mod mcvanillaengine;
 
 pub use analytichestonengine::HestonChf;
+pub use batesengine::BatesEngine;
 pub use fdblackscholesvanillaengine::FdBlackScholesVanillaEngine;
 pub use jumpdiffusionengine::JumpDiffusionEngine;
 pub use mcamericanengine::{AmericanPathPricer, MCAmericanEngine, MakeMcAmericanEngine};
