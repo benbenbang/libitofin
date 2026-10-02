@@ -16,7 +16,7 @@ pub mod shortrate;
 pub use calibrationhelper::{
     BlackCalibrationHelper, BlackCalibrationHelperBase, CalibrationErrorType, CalibrationHelper,
 };
-pub use equity::{FellerConstraint, HestonModel};
+pub use equity::{BatesModel, FellerConstraint, HestonModel};
 pub use model::{
     CalibratedModel, CalibratedModelHolder, PrivateConstraint, TermStructureConsistentModel,
     calibrate, calibration_value, register_with_term_structure,

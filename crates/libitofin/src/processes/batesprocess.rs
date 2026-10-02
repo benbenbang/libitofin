@@ -105,6 +105,24 @@ impl BatesProcess {
         Ok(())
     }
 
+    pub(crate) fn with_parameters(&self, params: &Array) -> Self {
+        Self {
+            heston: shared(HestonProcess::new(
+                self.risk_free_rate(),
+                self.dividend_yield(),
+                self.s0(),
+                params[4],
+                params[1],
+                params[0],
+                params[2],
+                params[3],
+            )),
+            nu: params[5],
+            delta: params[6],
+            lambda: params[7],
+        }
+    }
+
     /// The retained Heston component, for analytic parameter access only.
     pub fn heston_process(&self) -> Shared<HestonProcess> {
         self.heston.clone()
