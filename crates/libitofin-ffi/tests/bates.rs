@@ -239,3 +239,6 @@ fn bates_live_inputs_parameters_and_retained_graph() {
     );
     assert_eq!(value, 123.0);
 }
+
+#[path = "bates/boundaries.rs"]
+mod boundaries;
