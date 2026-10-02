@@ -17,6 +17,13 @@ fn request() -> MertonRequest {
     }
 }
 
+fn assert_close(actual: Real, expected: Real, tolerance: Real) {
+    assert!(
+        (actual - expected).abs() <= tolerance,
+        "actual={actual:.17}, expected={expected:.17}, tolerance={tolerance}"
+    );
+}
+
 #[test]
 fn zero_jump_matches_scalar_gbm_bits_in_both_volatility_branches() {
     for volatility in [0.0, 0.2, 0.731] {
@@ -310,3 +317,29 @@ fn simulated_spot_overflow_underflow_and_mid_path_failure_return_errors() {
         );
     }
 }
+
+mod distribution;
+
+fn assert_fixture(r: &MertonRequest, expected: &[Real]) {
+    let full = merton_paths(r).unwrap();
+    assert_eq!(full.len(), expected.len());
+    for (&actual, &expected) in full.iter().zip(expected) {
+        assert_close(actual, expected, 2e-14 * expected.abs().max(1.0));
+    }
+    let terminal = merton_paths(&MertonRequest {
+        terminal_only: true,
+        ..*r
+    })
+    .unwrap();
+    for (path, &actual) in terminal.iter().enumerate() {
+        let last = path * (r.steps + 1) + r.steps;
+        assert_close(
+            actual,
+            expected[last],
+            2e-14 * expected[last].abs().max(1.0),
+        );
+        assert_eq!(actual.to_bits(), full[last].to_bits());
+    }
+}
+
+mod oracle;
