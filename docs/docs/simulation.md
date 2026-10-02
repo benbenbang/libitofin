@@ -178,3 +178,111 @@ Monte Carlo tests check analytic variance moments and the QEM discounted-spot
 expectation with statistical tolerances.
 
 ::: itofin.simulate_heston
+
+## Merton jump paths
+
+`itofin.simulate_merton` and Go's `SimulateMerton` generate scalar,
+constant-parameter lognormal jump-diffusion paths through the shared Rust
+kernel. Each grid transition is exact for this model. Outputs contain grid
+spots; individual jump times and sizes within an interval are not returned.
+The [Merton pricing process](jump-diffusion.md) remains a live market-input
+carrier: simulation takes explicit scalar assumptions rather than reading
+or changing its quotes and curves.
+
+```python
+import itofin
+
+parameters = dict(
+    spot=100.0, drift=0.05, volatility=0.2,
+    jump_intensity=1.0, log_mean_jump=-0.1, log_jump_volatility=0.3,
+    horizon=1.0, steps=12, paths=100, seed=42,
+)
+full = itofin.simulate_merton(**parameters)
+terminal = itofin.simulate_merton(**parameters, terminal_only=True)
+assert full.shape == (100, 13)
+assert terminal.shape == (100,)
+assert (full[:, 0] == 100.0).all()
+assert (terminal == full[:, -1]).all()
+```
+
+```go
+config := itofin.MertonConfig{
+    Spot: 100, Drift: 0.05, Volatility: 0.2,
+    JumpIntensity: 1, LogMeanJump: -0.1, LogJumpVolatility: 0.3,
+    Horizon: 1, Steps: 12, Paths: 100, Seed: 42,
+}
+full, err := itofin.SimulateMerton(config)
+if err != nil {
+    return err
+}
+config.TerminalOnly = true
+terminal, err := itofin.SimulateMerton(config)
+if err != nil {
+    return err
+}
+fmt.Println(full.Paths, full.Times, full.Assets)
+fmt.Println(terminal.Values[0] == full.Values[12])
+```
+
+### Drift and jump conventions
+
+All rates use matching annual time units. `drift` means total expected
+arithmetic spot growth, including jumps. Supply `r-q` for constant-rate
+risk-neutral simulation; for a real-world forecast, supply your own drift
+assumption. Option calibration does not determine a real-world forecast drift.
+`jump_intensity` is the original Poisson event intensity, rather than the
+asset-weighted intensity used inside the European pricing series.
+`log_mean_jump` and `log_jump_volatility` are the mean and standard deviation
+of a jump's logarithmic multiplier.
+
+With `dt=horizon/steps`, diffusion normal `Zd`, independent jump normal `Zj`
+and `N ~ Poisson(jump_intensity*dt)`, the transition is:
+
+```text
+kappa = expm1(log_mean_jump + log_jump_volatility^2/2)
+S_next = S * exp((drift - jump_intensity*kappa - volatility^2/2)*dt
+                + volatility*sqrt(dt)*Zd
+                + N*log_mean_jump + sqrt(N)*log_jump_volatility*Zj)
+```
+
+The kernel subtracts the compensator internally, giving
+`E[S(T)] = spot*exp(drift*T)`. Do not subtract it again in the input drift.
+
+### Seed, layout and limits
+
+Three MT19937 streams use the nonzero 32-bit input seed for diffusion and
+`1 + ((seed-1+offset) % 4294967295)` for counts and aggregate jumps, with
+respective offsets `0x9E3779B9` and `0xBB67AE85`. Uniforms use
+`(word+0.5)/2^32`; normals use the existing Acklam inverse without refinement.
+Every step consumes one diffusion draw, one count draw and one jump draw,
+including zero horizon, zero volatility and zero count. Streams advance in
+path then time order and continue across paths.
+
+Python returns an owned, C-contiguous NumPy `float64` array. Go returns owned
+`Simulation.Values` in row-major `[path,time]` order, with `Assets=1`.
+Full output includes the initial spot; terminal output matches each last full
+value bit for bit. Zero jump intensity matches scalar GBM with the same seed,
+including its zero-volatility deterministic convention. Zero horizon returns
+the initial spot. Calls do not require a session and can run independently.
+
+Spot must be finite and positive. Drift and log-jump mean must be finite;
+volatilities, intensity and horizon must be finite and nonnegative. Steps,
+paths and seed must be positive. Invalid or overflowing dimensions,
+unrepresentable coefficients, positive time-step/count-mean underflow and
+nonfinite or nonpositive simulated spots return errors.
+The existing inverse-Poisson recurrence requires its initial mass to stay
+normal, restricting the mean per step to approximately 708.396. Use more
+steps when needed; no large-mean approximation is substituted.
+
+Both bindings default to 16,777,216 output values (128 MiB). Zero
+`max_output_values`/`MaxOutputValues` selects that default; a positive value
+overrides it and a negative value fails. The limit bounds returned values,
+not total peak memory. Terminal mode or smaller batches reduce output size.
+C accepts caller-owned capacity through `itofin_merton_paths` and preserves
+its output buffer on every error, including failures after earlier steps.
+
+The [independent fixture notes](https://github.com/benbenbang/libitofin/blob/main/sdk/go/testdata/merton-paths-oracle.md)
+include a dependency-free generator, seed/draw records, twelve numerical
+cases and analytical moment checks. Rust, C, Go and Python share these gates.
+
+::: itofin.simulate_merton
