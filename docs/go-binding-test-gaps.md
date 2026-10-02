@@ -78,6 +78,11 @@ invalidates and rebootstraps the same fitted curve in Rust, Python and Go.
 
 Sources and fixtures live in [`sdk/go/testdata`](../sdk/go/testdata/):
 
+- [Bates oracle](../sdk/go/testdata/bates-oracle.md): 52 independent prices at
+  `2e-10` absolute and two 20-helper fits at `1e-6` parameter / `1e-8` residual
+  bounds. Includes upstream named markets, zero-intensity Heston and deterministic
+  jump mixtures. Local C/Go/Python NPV values match bit for bit; lifecycle and
+  boundary tests retain live inputs and reject invalid parameters and weights.
 - [Optionlet stripping oracle](../crates/libitofin/tests/fixtures/optionlet_stripping/oracle.cpp):
   QuantLib 1.43 runtime with 1.43-dev headers; the companion `extract.py` preserves
   the vendored upstream non-flat matrices. Binding cap prices retain `2.5e-8`;

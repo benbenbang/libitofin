@@ -51,6 +51,16 @@ engines, and `testAnalyticVsBlack` concerns AnalyticHestonEngine; neither implie
 those unrelated engines were added. Table provenance and reproduction are in
 `crates/libitofin/THIRD_PARTY_NOTICES.md` and the Heston oracle fixture README.
 
+## Bates analytic pricing
+
+Unreleased [#1163](https://github.com/benbenbang/libitofin/issues/1163) adds
+constant-intensity lognormal jumps to Heston with a live eight-parameter Bates
+model in Rust, Python, C and Go. The retained engine supports European
+plain-vanilla NPV and existing Heston calibration helpers; zero intensity
+recovers Heston. Generic process evolution, Bates forecast paths, alternate
+jump variants and finite-difference Bates pricing remain outside this slice.
+See [parameters, limits and runnable examples](../docs/docs/bates.md).
+
 ## Cap/floor normal and lattice engines
 
 [#440](https://github.com/benbenbang/libitofin/issues/440) adds Bachelier cap/floor

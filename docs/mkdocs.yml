@@ -75,6 +75,7 @@ nav:
   - Go SDK: go.md
   - Finite-difference options: finite-difference.md
   - Merton jump diffusion: jump-diffusion.md
+  - Bates stochastic volatility: bates.md
   - Joint yield curves: joint-curves.md
   - Municipal BMA swaps: bma.md
   - Random policies: random-policies.md
