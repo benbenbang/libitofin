@@ -122,3 +122,8 @@ impl PricingEngine for BatesEngine {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod oracle_tests;
+#[cfg(test)]
+mod regression_tests;
