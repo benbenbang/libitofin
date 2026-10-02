@@ -343,3 +343,4 @@ fn assert_fixture(r: &MertonRequest, expected: &[Real]) {
 }
 
 mod oracle;
+mod oracle_additional;
