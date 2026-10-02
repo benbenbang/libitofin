@@ -456,6 +456,12 @@ impl PyHestonModelHelper {
     }
 }
 
+impl PyHestonModelHelper {
+    pub(crate) fn inner(&self) -> SharedMut<HestonModelHelper> {
+        SharedMut::clone(&self.inner)
+    }
+}
+
 #[cfg(test)]
 mod optimization_parity_tests {
     use super::*;

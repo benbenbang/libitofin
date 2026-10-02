@@ -5,6 +5,7 @@
 //! ItofinError exception. The pricing facades land in follow-up tickets
 //! (#485-#487).
 
+mod bates;
 mod bma;
 mod bootstrap;
 mod calibration;
@@ -304,6 +305,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     let processes = PyModule::new(py, "processes")?;
     processes.add_class::<PyBlackScholesProcess>()?;
     processes.add_class::<PyHestonProcess>()?;
+    processes.add_class::<bates::PyBatesProcess>()?;
     processes.add_class::<merton::PyMerton76Process>()?;
 
     let indexes = PyModule::new(py, "indexes")?;
@@ -367,6 +369,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     let models = PyModule::new(py, "models")?;
     models.add_class::<PyHestonModel>()?;
+    models.add_class::<bates::PyBatesModel>()?;
     models.add_class::<PyHullWhite>()?;
     models.add_class::<PyHestonModelHelper>()?;
     models.add_class::<PySwaptionHelper>()?;
@@ -392,6 +395,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     pricingengines.add_class::<fdengine::PyFdBlackScholesVanillaEngine>()?;
     pricingengines.add_class::<PyMCEuropeanEngine>()?;
     pricingengines.add_class::<merton::PyJumpDiffusionEngine>()?;
+    pricingengines.add_class::<bates::PyBatesEngine>()?;
     pricingengines.add_class::<PyQMCEuropeanEngine>()?;
     pricingengines.add_class::<heston_engines::PyCosHestonEngine>()?;
     pricingengines.add_class::<heston_engines::PyExponentialFittingHestonEngine>()?;
