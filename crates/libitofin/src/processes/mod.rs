@@ -8,6 +8,7 @@
 //! other process conveniences follow as noted on
 //! [`GeneralizedBlackScholesProcess`].
 
+mod batesprocess;
 mod blackscholesprocess;
 pub mod discretization;
 mod hestonprocess;
@@ -15,6 +16,7 @@ mod merton76process;
 mod ornsteinuhlenbeckprocess;
 mod stochasticprocessarray;
 
+pub use batesprocess::BatesProcess;
 pub use blackscholesprocess::{BlackScholesMertonProcess, GeneralizedBlackScholesProcess};
 pub use discretization::{
     DiscretizedProcess, DiscretizedProcess1D, EulerDiscretization, ProcessDiscretization,
