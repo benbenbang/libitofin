@@ -388,6 +388,24 @@ typedef struct ItofinGjrInput {
   int32_t terminal_only;
 } ItofinGjrInput;
 
+/**
+ * Zero means unset for step/sample/tolerance/max-sample fields. Set exactly
+ * one step mode and one sampling mode. Seed is limited to u32; antithetic is
+ * 0 or 1; seed 0 requests a randomized seed. Fixed samples require at least 2.
+ * Tolerance mode defaults to 50,000 max samples and requires a maximum of at
+ * least 1,023. Core checked work limits also apply. No control variate,
+ * Brownian bridge or Sobol mode is supported.
+ */
+typedef struct ItofinGjrMcConfig {
+  size_t steps;
+  size_t steps_per_year;
+  size_t samples;
+  double absolute_tolerance;
+  size_t max_samples;
+  uint64_t seed;
+  int32_t antithetic;
+} ItofinGjrMcConfig;
+
 typedef struct ItofinSwapHelperConfig {
   uint64_t quote;
   int32_t tenor_length;
@@ -2735,6 +2753,93 @@ int32_t itofin_gjr_paths(const struct ItofinGjrInput *input,
                          double *out,
                          size_t capacity,
                          struct ItofinError *error);
+
+/**
+ * Retain the live process inputs and seed six daily model parameters.
+ * # Safety
+ * Pointers and thread-confined handles obey the crate-level C caller contract.
+ */
+int32_t itofin_gjr_model_new(struct ItofinContext *ctx,
+                             uint64_t process,
+                             uint64_t *out,
+                             struct ItofinError *error);
+
+/**
+ * Copy omega, alpha, beta, gamma, lambda, v0 without partial writes on error.
+ * Variance and omega are daily quantities, not annualized values.
+ * # Safety
+ * Output holds `capacity` writable doubles; pointers obey the C caller contract.
+ */
+int32_t itofin_gjr_model_params(struct ItofinContext *ctx,
+                                uint64_t model,
+                                double *out,
+                                size_t capacity,
+                                struct ItofinError *error);
+
+/**
+ * Atomically replace omega, alpha, beta, gamma, lambda, v0.
+ * Inputs are copied, never retained; invalid parameters leave the model unchanged.
+ * # Safety
+ * Input holds `len` readable doubles; pointers obey the C caller contract.
+ */
+int32_t itofin_gjr_model_set_params(struct ItofinContext *ctx,
+                                    uint64_t model,
+                                    const double *parameters,
+                                    size_t len,
+                                    struct ItofinError *error);
+
+/**
+ * Retain the current generated process, usable with all GJR process APIs.
+ * The returned process is a snapshot: later parameter updates replace the
+ * model's process but do not change this retained process's parameters.
+ * Live market handles remain shared; generated processes use FullTruncation.
+ * # Safety
+ * Pointers and thread-confined handles obey the crate-level C caller contract.
+ */
+int32_t itofin_gjr_model_process(struct ItofinContext *ctx,
+                                 uint64_t model,
+                                 uint64_t *out,
+                                 struct ItofinError *error);
+
+/**
+ * Retain an analytic European engine, attachable with option engine kind 2.
+ * Only European plain-vanilla NPV is supported; Greeks are unavailable.
+ * # Safety
+ * Pointers and thread-confined handles obey the crate-level C caller contract.
+ */
+int32_t itofin_gjr_analytic_engine_new(struct ItofinContext *ctx,
+                                       uint64_t model,
+                                       uint64_t *out,
+                                       struct ItofinError *error);
+
+/**
+ * Calibrate omega, alpha, beta, gamma, lambda, v0 with copied options.
+ * The fixed-mask order matches model parameters. Helpers retain an analytic
+ * GJR engine. Failed calibration preserves model parameters and diagnostics.
+ * # Safety
+ * Input arrays are read during this call only. Pointers and handles obey the
+ * C caller contract; context and handles belong to the calling thread.
+ */
+int32_t itofin_gjr_calibrate_with_options(struct ItofinContext *ctx,
+                                          uint64_t model,
+                                          const uint64_t *helpers,
+                                          size_t helpers_len,
+                                          uint64_t method,
+                                          uint64_t criteria,
+                                          const struct ItofinCalibrationOptions *options,
+                                          struct ItofinError *error);
+
+/**
+ * Retain a European GJR Monte Carlo engine, attachable with option kind 2.
+ * Nonzero fixed-seed engines restart their random stream on every repricing.
+ * # Safety
+ * Config is read during this call only. Pointers and handles obey the C contract.
+ */
+int32_t itofin_gjr_mc_engine_new(struct ItofinContext *ctx,
+                                 uint64_t process,
+                                 const struct ItofinGjrMcConfig *config,
+                                 uint64_t *out,
+                                 struct ItofinError *error);
 
 /**
  * # Safety
