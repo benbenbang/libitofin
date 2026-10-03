@@ -61,6 +61,21 @@ recovers Heston. Generic process evolution, Bates forecast paths, alternate
 jump variants and finite-difference Bates pricing remain outside this slice.
 See [parameters, limits and runnable examples](../docs/docs/bates.md).
 
+## GJR-GARCH process and paths
+
+Unreleased [#1164](https://github.com/benbenbang/libitofin/issues/1164) adds a
+live two-factor GJR-GARCH process and seeded full/terminal spot/variance paths
+in Rust, Python, C and Go. Daily inputs are explicitly annualized; Partial
+Truncation, Full Truncation and Reflection preserve QuantLib's raw variance
+and signed-diffusion conventions. Finite-horizon simulation does not require
+a stationary mean. This is separate from the historical `Garch11` estimator.
+
+Validation uses 27 native QuantLib transition cases, six independent seeded
+path cases and analytic conditional moments. Retained live market inputs,
+invalid domains/dimensions, bounded allocation and concurrent Go calls are
+covered. See [units, schemes and examples](../docs/docs/gjrgarch.md).
+Models, calibration and European engines remain #1165.
+
 ## Cap/floor normal and lattice engines
 
 [#440](https://github.com/benbenbang/libitofin/issues/440) adds Bachelier cap/floor
