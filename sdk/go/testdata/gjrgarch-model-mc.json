@@ -1,0 +1,358 @@
+{
+  "contract_commit": "9863b578af0caa4cecabf697196533e84a8308b6",
+  "day_counter": "Actual365Fixed",
+  "quantlib_version": "1.43",
+  "reference_date": "2026-01-15",
+  "rows": [
+    {
+      "effective_samples": 2048,
+      "error": 0.1328629977339088,
+      "input": {
+        "alpha": 0.3,
+        "beta": 0.4,
+        "daily_variance": 0.002,
+        "days_per_year": 252.0,
+        "discretization": 0,
+        "dividend_yield": 0.01,
+        "gamma": 0.9,
+        "lambda_parameter": -0.4,
+        "omega": 2e-06,
+        "risk_free_rate": 0.03,
+        "spot": 100.0
+      },
+      "maturity_days": 7,
+      "option_type": 1,
+      "price": 3.572206680094478,
+      "settings": {
+        "antitheticVariate": false,
+        "requiredSamples": 2048,
+        "seed": 42,
+        "timeSteps": 4
+      },
+      "strike": 100
+    },
+    {
+      "effective_samples": 2048,
+      "error": 0.13074308412142557,
+      "input": {
+        "alpha": 0.3,
+        "beta": 0.4,
+        "daily_variance": 0.002,
+        "days_per_year": 252.0,
+        "discretization": 0,
+        "dividend_yield": 0.01,
+        "gamma": 0.9,
+        "lambda_parameter": -0.4,
+        "omega": 2e-06,
+        "risk_free_rate": 0.03,
+        "spot": 100.0
+      },
+      "maturity_days": 7,
+      "option_type": -1,
+      "price": 3.735814655627582,
+      "settings": {
+        "antitheticVariate": false,
+        "requiredSamples": 2048,
+        "seed": 42,
+        "timeSteps": 4
+      },
+      "strike": 100
+    },
+    {
+      "effective_samples": 2048,
+      "error": 0.08293455900966888,
+      "input": {
+        "alpha": 0.3,
+        "beta": 0.4,
+        "daily_variance": 0.002,
+        "days_per_year": 252.0,
+        "discretization": 0,
+        "dividend_yield": 0.01,
+        "gamma": 0.9,
+        "lambda_parameter": -0.4,
+        "omega": 2e-06,
+        "risk_free_rate": 0.03,
+        "spot": 100.0
+      },
+      "maturity_days": 7,
+      "option_type": 1,
+      "price": 3.7194782912203133,
+      "settings": {
+        "antitheticVariate": true,
+        "requiredSamples": 2048,
+        "seed": 42,
+        "timeSteps": 4
+      },
+      "strike": 100
+    },
+    {
+      "effective_samples": 2048,
+      "error": 0.07692502229097962,
+      "input": {
+        "alpha": 0.3,
+        "beta": 0.4,
+        "daily_variance": 0.002,
+        "days_per_year": 252.0,
+        "discretization": 0,
+        "dividend_yield": 0.01,
+        "gamma": 0.9,
+        "lambda_parameter": -0.4,
+        "omega": 2e-06,
+        "risk_free_rate": 0.03,
+        "spot": 100.0
+      },
+      "maturity_days": 7,
+      "option_type": -1,
+      "price": 3.6167937775496353,
+      "settings": {
+        "antitheticVariate": true,
+        "requiredSamples": 2048,
+        "seed": 42,
+        "timeSteps": 4
+      },
+      "strike": 100
+    },
+    {
+      "effective_samples": 2048,
+      "error": 0.1328629927802038,
+      "input": {
+        "alpha": 0.3,
+        "beta": 0.4,
+        "daily_variance": 0.002,
+        "days_per_year": 252.0,
+        "discretization": 1,
+        "dividend_yield": 0.01,
+        "gamma": 0.9,
+        "lambda_parameter": -0.4,
+        "omega": 2e-06,
+        "risk_free_rate": 0.03,
+        "spot": 100.0
+      },
+      "maturity_days": 7,
+      "option_type": 1,
+      "price": 3.57220751431153,
+      "settings": {
+        "antitheticVariate": false,
+        "requiredSamples": 2048,
+        "seed": 42,
+        "timeSteps": 4
+      },
+      "strike": 100
+    },
+    {
+      "effective_samples": 2048,
+      "error": 0.13074308412142557,
+      "input": {
+        "alpha": 0.3,
+        "beta": 0.4,
+        "daily_variance": 0.002,
+        "days_per_year": 252.0,
+        "discretization": 1,
+        "dividend_yield": 0.01,
+        "gamma": 0.9,
+        "lambda_parameter": -0.4,
+        "omega": 2e-06,
+        "risk_free_rate": 0.03,
+        "spot": 100.0
+      },
+      "maturity_days": 7,
+      "option_type": -1,
+      "price": 3.735814655627582,
+      "settings": {
+        "antitheticVariate": false,
+        "requiredSamples": 2048,
+        "seed": 42,
+        "timeSteps": 4
+      },
+      "strike": 100
+    },
+    {
+      "effective_samples": 2048,
+      "error": 0.08293459726774713,
+      "input": {
+        "alpha": 0.3,
+        "beta": 0.4,
+        "daily_variance": 0.002,
+        "days_per_year": 252.0,
+        "discretization": 1,
+        "dividend_yield": 0.01,
+        "gamma": 0.9,
+        "lambda_parameter": -0.4,
+        "omega": 2e-06,
+        "risk_free_rate": 0.03,
+        "spot": 100.0
+      },
+      "maturity_days": 7,
+      "option_type": 1,
+      "price": 3.7194822860840895,
+      "settings": {
+        "antitheticVariate": true,
+        "requiredSamples": 2048,
+        "seed": 42,
+        "timeSteps": 4
+      },
+      "strike": 100
+    },
+    {
+      "effective_samples": 2048,
+      "error": 0.07692503246404672,
+      "input": {
+        "alpha": 0.3,
+        "beta": 0.4,
+        "daily_variance": 0.002,
+        "days_per_year": 252.0,
+        "discretization": 1,
+        "dividend_yield": 0.01,
+        "gamma": 0.9,
+        "lambda_parameter": -0.4,
+        "omega": 2e-06,
+        "risk_free_rate": 0.03,
+        "spot": 100.0
+      },
+      "maturity_days": 7,
+      "option_type": -1,
+      "price": 3.6167930613577863,
+      "settings": {
+        "antitheticVariate": true,
+        "requiredSamples": 2048,
+        "seed": 42,
+        "timeSteps": 4
+      },
+      "strike": 100
+    },
+    {
+      "effective_samples": 2048,
+      "error": 0.14498983462806309,
+      "input": {
+        "alpha": 0.3,
+        "beta": 0.4,
+        "daily_variance": 0.002,
+        "days_per_year": 252.0,
+        "discretization": 2,
+        "dividend_yield": 0.01,
+        "gamma": 0.9,
+        "lambda_parameter": -0.4,
+        "omega": 2e-06,
+        "risk_free_rate": 0.03,
+        "spot": 100.0
+      },
+      "maturity_days": 7,
+      "option_type": 1,
+      "price": 3.884892840856974,
+      "settings": {
+        "antitheticVariate": false,
+        "requiredSamples": 2048,
+        "seed": 42,
+        "timeSteps": 4
+      },
+      "strike": 100
+    },
+    {
+      "effective_samples": 2048,
+      "error": 0.13685334467116847,
+      "input": {
+        "alpha": 0.3,
+        "beta": 0.4,
+        "daily_variance": 0.002,
+        "days_per_year": 252.0,
+        "discretization": 2,
+        "dividend_yield": 0.01,
+        "gamma": 0.9,
+        "lambda_parameter": -0.4,
+        "omega": 2e-06,
+        "risk_free_rate": 0.03,
+        "spot": 100.0
+      },
+      "maturity_days": 7,
+      "option_type": -1,
+      "price": 4.073996361284169,
+      "settings": {
+        "antitheticVariate": false,
+        "requiredSamples": 2048,
+        "seed": 42,
+        "timeSteps": 4
+      },
+      "strike": 100
+    },
+    {
+      "effective_samples": 2048,
+      "error": 0.0841233780095511,
+      "input": {
+        "alpha": 0.3,
+        "beta": 0.4,
+        "daily_variance": 0.002,
+        "days_per_year": 252.0,
+        "discretization": 2,
+        "dividend_yield": 0.01,
+        "gamma": 0.9,
+        "lambda_parameter": -0.4,
+        "omega": 2e-06,
+        "risk_free_rate": 0.03,
+        "spot": 100.0
+      },
+      "maturity_days": 7,
+      "option_type": 1,
+      "price": 4.024609001698537,
+      "settings": {
+        "antitheticVariate": true,
+        "requiredSamples": 2048,
+        "seed": 42,
+        "timeSteps": 4
+      },
+      "strike": 100
+    },
+    {
+      "effective_samples": 2048,
+      "error": 0.07427644681162955,
+      "input": {
+        "alpha": 0.3,
+        "beta": 0.4,
+        "daily_variance": 0.002,
+        "days_per_year": 252.0,
+        "discretization": 2,
+        "dividend_yield": 0.01,
+        "gamma": 0.9,
+        "lambda_parameter": -0.4,
+        "omega": 2e-06,
+        "risk_free_rate": 0.03,
+        "spot": 100.0
+      },
+      "maturity_days": 7,
+      "option_type": -1,
+      "price": 3.9368383385172816,
+      "settings": {
+        "antitheticVariate": true,
+        "requiredSamples": 2048,
+        "seed": 42,
+        "timeSteps": 4
+      },
+      "strike": 100
+    }
+  ],
+  "tolerance": {
+    "effective_samples": 12095,
+    "error": 0.03921333473521664,
+    "input": {
+      "alpha": 0.04,
+      "beta": 0.88,
+      "daily_variance": 0.00015873015873015873,
+      "days_per_year": 252.0,
+      "discretization": 1,
+      "dividend_yield": 0.01,
+      "gamma": 0.08,
+      "lambda_parameter": -0.4,
+      "omega": 2e-06,
+      "risk_free_rate": 0.03,
+      "spot": 100.0
+    },
+    "maturity_days": 90,
+    "price": 2.9423120714228577,
+    "settings": {
+      "maxSamples": 100000,
+      "requiredTolerance": 0.04,
+      "seed": 1234,
+      "timeSteps": 8
+    },
+    "strike": 100
+  }
+}
