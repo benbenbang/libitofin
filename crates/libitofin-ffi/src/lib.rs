@@ -32,6 +32,7 @@ pub mod curves_api;
 pub mod fd_engine_api;
 pub mod garch_api;
 pub mod general_statistics_api;
+pub mod gjr_api;
 pub mod helpers_api;
 pub mod heston_engines_api;
 pub mod incremental_statistics_api;

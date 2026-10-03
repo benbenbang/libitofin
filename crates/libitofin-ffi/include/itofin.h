@@ -346,6 +346,48 @@ typedef struct ItofinFdConfig {
   int32_t scheme;
 } ItofinFdConfig;
 
+/**
+ * Daily variance parameters; live states contain annualized variance.
+ */
+typedef struct ItofinGjrParameters {
+  double daily_variance;
+  double omega;
+  double alpha;
+  double beta;
+  double gamma;
+  double lambda;
+  double days_per_year;
+} ItofinGjrParameters;
+
+/**
+ * Flat-rate parameters and seeded path dimensions. Full output is
+ * `[path,time,2]`; terminal output is `[path,2]`, with spot then annual variance.
+ */
+typedef struct ItofinGjrInput {
+  double spot;
+  double daily_variance;
+  double risk_free_rate;
+  double dividend_yield;
+  double omega;
+  double alpha;
+  double beta;
+  double gamma;
+  double lambda;
+  double days_per_year;
+  double horizon;
+  size_t steps;
+  size_t paths;
+  uint32_t seed;
+  /**
+   * 0 partial truncation, 1 full truncation, 2 reflection.
+   */
+  int32_t discretization;
+  /**
+   * 0 full paths including initial values; 1 terminal states only.
+   */
+  int32_t terminal_only;
+} ItofinGjrInput;
+
 typedef struct ItofinSwapHelperConfig {
   uint64_t quote;
   int32_t tenor_length;
@@ -2621,6 +2663,78 @@ int32_t itofin_general_statistics_query(struct ItofinContext *ctx,
                                         ItofinReal argument,
                                         ItofinReal *out,
                                         struct ItofinError *error);
+
+/**
+ * Retain a live spot quote and live risk-free/dividend curves.
+ * # Safety
+ * All pointers obey the crate-level C caller contract. Parameters are read
+ * during this call only. Context and handles belong to the calling thread.
+ */
+int32_t itofin_gjr_process_new(struct ItofinContext *ctx,
+                               uint64_t spot,
+                               uint64_t risk_free,
+                               uint64_t dividend,
+                               const struct ItofinGjrParameters *params,
+                               int32_t discretization,
+                               uint64_t *out,
+                               struct ItofinError *error);
+
+/**
+ * Query kind 0 initial state (2), 1 drift (2), 2 row-major diffusion (4),
+ * 3 daily parameters (7, ordered as ItofinGjrParameters), or 4 scheme (1).
+ * # Safety
+ * Follow the crate-level caller contract. State is exactly two doubles for
+ * kinds 1/2; it is ignored for kinds 0/3/4. Output holds `capacity` doubles.
+ */
+int32_t itofin_gjr_process_query(struct ItofinContext *ctx,
+                                 uint64_t process,
+                                 int32_t kind,
+                                 double t,
+                                 const double *state,
+                                 size_t state_len,
+                                 double *out,
+                                 size_t capacity,
+                                 struct ItofinError *error);
+
+/**
+ * Evolve a two-component state with two independent standard Gaussian draws.
+ * # Safety
+ * Follow the crate-level caller contract. State/draws contain their stated
+ * lengths, each exactly 2. Output contains at least `capacity` doubles.
+ */
+int32_t itofin_gjr_process_evolve(struct ItofinContext *ctx,
+                                  uint64_t process,
+                                  double t0,
+                                  const double *state,
+                                  size_t state_len,
+                                  double dt,
+                                  const double *draws,
+                                  size_t draws_len,
+                                  double *out,
+                                  size_t capacity,
+                                  struct ItofinError *error);
+
+/**
+ * Convert a date using the retained risk-free curve's reference date/day counter.
+ * # Safety
+ * Follow the crate-level context, pointer and thread contract.
+ */
+int32_t itofin_gjr_process_time(struct ItofinContext *ctx,
+                                uint64_t process,
+                                int32_t date_serial,
+                                double *out,
+                                struct ItofinError *error);
+
+/**
+ * Generate deterministic seeded paths, preserving output on any failure.
+ * # Safety
+ * Follow the crate-level caller contract; no pointer is retained. Output holds
+ * `capacity` doubles and does not overlap input or error.
+ */
+int32_t itofin_gjr_paths(const struct ItofinGjrInput *input,
+                         double *out,
+                         size_t capacity,
+                         struct ItofinError *error);
 
 /**
  * # Safety
