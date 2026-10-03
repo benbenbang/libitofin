@@ -1,0 +1,173 @@
+{
+  "contract_commit": "9863b578af0caa4cecabf697196533e84a8308b6",
+  "cumulative_live_bumps": [
+    {
+      "name": "initial",
+      "price": 2.8789192933036944
+    },
+    {
+      "name": "spot",
+      "native_cached_price": 6.311412224517475,
+      "price": 6.311412224517475,
+      "value": 105
+    },
+    {
+      "name": "risk_free_rate",
+      "native_cached_price": 6.311412224517475,
+      "price": 6.701813968799624,
+      "value": 0.05
+    },
+    {
+      "name": "dividend_yield",
+      "native_cached_price": 6.311412224517475,
+      "price": 6.311412224517455,
+      "value": 0.03
+    },
+    {
+      "name": "omega",
+      "price": 6.3466963579376,
+      "value": 2.2e-06
+    }
+  ],
+  "day_counter": "Actual365Fixed",
+  "input": {
+    "alpha": 0.04,
+    "beta": 0.88,
+    "daily_variance": 0.00015873015873015873,
+    "days_per_year": 252.0,
+    "discretization": 1,
+    "dividend_yield": 0.01,
+    "gamma": 0.08,
+    "lambda_parameter": -0.4,
+    "omega": 2e-06,
+    "risk_free_rate": 0.03,
+    "spot": 100.0
+  },
+  "quantlib_version": "1.43",
+  "reference_date": "2026-01-15",
+  "rows": [
+    {
+      "call": 1.9716700045188926,
+      "changes": {},
+      "maturity_days": 30,
+      "name": "base",
+      "parity": 0.1642485258694819,
+      "put": 1.8074214786494167,
+      "strike": 100
+    },
+    {
+      "call": 2.8789192933036944,
+      "changes": {},
+      "maturity_days": 90,
+      "name": "ninety",
+      "parity": 0.49193669336368373,
+      "put": 2.386982599940012,
+      "strike": 100
+    },
+    {
+      "call": 3.778638631218509,
+      "changes": {},
+      "maturity_days": 180,
+      "name": "one_eighty",
+      "parity": 0.9814533696245888,
+      "put": 2.797185261593924,
+      "strike": 100
+    },
+    {
+      "call": 5.316599738704635,
+      "changes": {},
+      "maturity_days": 365,
+      "name": "one_year",
+      "parity": 1.980132669324476,
+      "put": 3.336467069380163,
+      "strike": 100
+    },
+    {
+      "call": 3.2531807492449336,
+      "changes": {
+        "lambda_parameter": 0.3
+      },
+      "maturity_days": 90,
+      "name": "positive_lambda",
+      "parity": 0.49193669336368373,
+      "put": 2.7612440558812494,
+      "strike": 100
+    },
+    {
+      "call": 3.0821210743197587,
+      "changes": {
+        "lambda_parameter": 0.0
+      },
+      "maturity_days": 90,
+      "name": "zero_lambda",
+      "parity": 0.49193669336368373,
+      "put": 2.5901843809560745,
+      "strike": 100
+    },
+    {
+      "call": 2.362430076938076,
+      "changes": {
+        "gamma": -0.02,
+        "lambda_parameter": 0.3
+      },
+      "maturity_days": 90,
+      "name": "negative_gamma",
+      "parity": 0.49193669336368373,
+      "put": 1.8704933835743986,
+      "strike": 100
+    },
+    {
+      "call": 2.8948908321546556,
+      "changes": {
+        "days_per_year": 252.5
+      },
+      "maturity_days": 91,
+      "name": "noninteger_days",
+      "parity": 0.497389040602485,
+      "put": 2.3975017915521875,
+      "strike": 100
+    },
+    {
+      "call": 1.8076321583378827,
+      "changes": {
+        "risk_free_rate": -0.01
+      },
+      "maturity_days": 30,
+      "name": "negative_rate",
+      "parity": -0.16451874548370427,
+      "put": 1.9721509038215999,
+      "strike": 100
+    },
+    {
+      "call": 2.0741656446504115,
+      "changes": {
+        "dividend_yield": 0.08
+      },
+      "maturity_days": 90,
+      "name": "high_dividend",
+      "parity": -1.2405079663386402,
+      "put": 3.3146736109890327,
+      "strike": 100
+    },
+    {
+      "call": 3.271736288583927,
+      "changes": {
+        "beta": 0.99
+      },
+      "maturity_days": 30,
+      "name": "nonstationary",
+      "parity": 0.1642485258694819,
+      "put": 3.1074877627144417,
+      "strike": 100
+    },
+    {
+      "call": 0.5065798144041416,
+      "changes": {},
+      "maturity_days": 1,
+      "name": "one_day",
+      "parity": 0.0054793019355656725,
+      "put": 0.5011005124685681,
+      "strike": 100
+    }
+  ]
+}
