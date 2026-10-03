@@ -1,0 +1,111 @@
+{
+  "calibrated_params": [
+    1.9999954810951823e-06,
+    0.04,
+    0.88,
+    0.08,
+    -0.4,
+    0.00015873026667458383
+  ],
+  "contract_commit": "9863b578af0caa4cecabf697196533e84a8308b6",
+  "day_counter": "Actual365Fixed",
+  "fixed_params": [
+    false,
+    true,
+    true,
+    true,
+    true,
+    false
+  ],
+  "initial_params": [
+    1.4e-06,
+    0.04,
+    0.88,
+    0.08,
+    -0.4,
+    0.0001111111111111111
+  ],
+  "input": {
+    "alpha": 0.04,
+    "beta": 0.88,
+    "daily_variance": 0.00015873015873015873,
+    "days_per_year": 252.0,
+    "discretization": 1,
+    "dividend_yield": 0.0,
+    "gamma": 0.08,
+    "lambda_parameter": -0.4,
+    "omega": 2e-06,
+    "risk_free_rate": 0.03,
+    "spot": 100.0
+  },
+  "max_iterations": 500,
+  "quantlib_version": "1.43",
+  "reference_date": "2026-01-15",
+  "rows": [
+    {
+      "calibration_error": 3.275370433208913e-08,
+      "market_vol": 0.2179813606260463,
+      "maturity_days": 14,
+      "model_price": 0.008238949916687943,
+      "strike": 90,
+      "target_price": 0.008238939122577449
+    },
+    {
+      "calibration_error": 4.717039464585682e-08,
+      "market_vol": 0.20084652082605864,
+      "maturity_days": 14,
+      "model_price": 0.011427391280996808,
+      "strike": 110,
+      "target_price": 0.011427369273177793
+    },
+    {
+      "calibration_error": 2.2867683052707477e-08,
+      "market_vol": 0.1742514366431745,
+      "maturity_days": 35,
+      "model_price": 0.04270610274680564,
+      "strike": 90,
+      "target_price": 0.042706066968165146
+    },
+    {
+      "calibration_error": 2.069947271921002e-08,
+      "market_vol": 0.16993201995496995,
+      "maturity_days": 35,
+      "model_price": 0.0876705840241339,
+      "strike": 110,
+      "target_price": 0.08767052678946662
+    },
+    {
+      "calibration_error": -2.2186842918436867e-09,
+      "market_vol": 0.1518589783473844,
+      "maturity_days": 63,
+      "model_price": 0.09602623289616474,
+      "strike": 90,
+      "target_price": 0.09602624038969054
+    },
+    {
+      "calibration_error": -4.708416295740037e-09,
+      "market_vol": 0.1482819224412038,
+      "maturity_days": 63,
+      "model_price": 0.20527119395630294,
+      "strike": 110,
+      "target_price": 0.20527122193644423
+    }
+  ],
+  "simplex_lambda": 2e-05,
+  "solver": "Simplex",
+  "stationary_iterations": 40,
+  "tolerances": [
+    1e-10,
+    1e-10,
+    1e-10
+  ],
+  "weighted_sse": 8.963190781594514e-15,
+  "weights": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+  ]
+}

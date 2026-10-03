@@ -1,0 +1,153 @@
+{
+  "contract_commit": "9863b578af0caa4cecabf697196533e84a8308b6",
+  "day_counter": "ActualActual ISDA",
+  "input": {
+    "alpha": 0.024,
+    "beta": 0.93,
+    "daily_variance": 0.0004096412811524548,
+    "days_per_year": 365.0,
+    "discretization": 1,
+    "dividend_yield": 0.0,
+    "gamma": 0.059,
+    "lambda_parameter": 0.2,
+    "omega": 2e-06,
+    "risk_free_rate": 0.05,
+    "spot": 50.0
+  },
+  "quantlib_version": "1.43",
+  "reference_date": "2026-01-15",
+  "rows": [
+    {
+      "cached_analytic": 15.8,
+      "cached_mc": 15.6619,
+      "call": 15.78358723238972,
+      "maturity_days": 90,
+      "mc_error": 0.01997260564373964,
+      "mc_price": 15.631041633897246,
+      "mc_samples": 195865,
+      "put": 0.3547294590141874,
+      "strike": 35
+    },
+    {
+      "cached_analytic": 11.2734,
+      "cached_mc": 11.1263,
+      "call": 11.258534771284525,
+      "maturity_days": 90,
+      "mc_error": 0.019954133368336346,
+      "mc_price": 11.12830261130513,
+      "mc_samples": 167878,
+      "put": 0.7684116017124865,
+      "strike": 40
+    },
+    {
+      "cached_analytic": 7.0376,
+      "cached_mc": 7.0968,
+      "call": 7.025860841126486,
+      "maturity_days": 90,
+      "mc_error": 0.019995684742718445,
+      "mc_price": 7.136612196689018,
+      "mc_samples": 124246,
+      "put": 1.4744722753579467,
+      "strike": 45
+    },
+    {
+      "cached_analytic": 3.6767,
+      "cached_mc": 3.9152,
+      "call": 3.6684902181093433,
+      "maturity_days": 90,
+      "mc_error": 0.019998431382267867,
+      "mc_price": 3.9697750397420366,
+      "mc_samples": 75520,
+      "put": 3.055836256144289,
+      "strike": 50
+    },
+    {
+      "cached_analytic": 1.5871,
+      "cached_mc": 1.8133,
+      "call": 1.581593949644232,
+      "maturity_days": 90,
+      "mc_error": 0.019804884102707088,
+      "mc_price": 1.8751454548248578,
+      "mc_samples": 38472,
+      "put": 5.9076745914826745,
+      "strike": 55
+    },
+    {
+      "cached_analytic": 0.5934,
+      "cached_mc": 0.701,
+      "call": 0.5895393798704623,
+      "maturity_days": 90,
+      "mc_error": 0.0198169245412917,
+      "mc_price": 0.746116643544994,
+      "mc_samples": 15454,
+      "put": 9.8543546255124,
+      "strike": 60
+    },
+    {
+      "cached_analytic": 16.9286,
+      "cached_mc": 16.5195,
+      "call": 16.780904476053323,
+      "maturity_days": 180,
+      "mc_error": 0.019970004790233805,
+      "mc_price": 16.558480394404985,
+      "mc_samples": 321411,
+      "put": 0.9284437575818032,
+      "strike": 35
+    },
+    {
+      "cached_analytic": 12.317,
+      "cached_mc": 12.3181,
+      "call": 12.186917556218477,
+      "maturity_days": 180,
+      "mc_error": 0.01996535823141677,
+      "mc_price": 12.378594106317815,
+      "mc_samples": 271164,
+      "put": 1.2126767351081682,
+      "strike": 40
+    },
+    {
+      "cached_analytic": 8.0405,
+      "cached_mc": 8.6085,
+      "call": 7.932706541478142,
+      "maturity_days": 180,
+      "mc_error": 0.01996118787831232,
+      "mc_price": 8.671990872355275,
+      "mc_samples": 210648,
+      "put": 1.8366856177290458,
+      "strike": 45
+    },
+    {
+      "cached_analytic": 4.6348,
+      "cached_mc": 5.57,
+      "call": 4.549127359763925,
+      "maturity_days": 180,
+      "mc_error": 0.019939002563578292,
+      "mc_price": 5.608519350580909,
+      "mc_samples": 147445,
+      "put": 3.3313263333760403,
+      "strike": 50
+    },
+    {
+      "cached_analytic": 2.3429,
+      "cached_mc": 3.3103,
+      "call": 2.2757542076827963,
+      "maturity_days": 180,
+      "mc_error": 0.019954845111068504,
+      "mc_price": 3.304118206059317,
+      "mc_samples": 92092,
+      "put": 5.936173078656125,
+      "strike": 55
+    },
+    {
+      "cached_analytic": 1.059,
+      "cached_mc": 1.8053,
+      "call": 1.0059758850936353,
+      "maturity_days": 180,
+      "mc_error": 0.01981581429435491,
+      "mc_price": 1.7758342314940583,
+      "mc_samples": 51904,
+      "put": 9.544614653428177,
+      "strike": 60
+    }
+  ]
+}
