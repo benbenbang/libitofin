@@ -5,6 +5,7 @@
 //! stack on top in later tickets.
 
 mod earlyexercisepathpricer;
+pub mod gjr_paths;
 mod longstaffschwartzpathpricer;
 mod lsmbasissystem;
 mod mcsimulation;
