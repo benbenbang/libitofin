@@ -16,6 +16,7 @@ __all__ = [
     "BatesModel",
     "CalibrationErrorType",
     "CapHelper",
+    "GJRGARCHModel",
     "HestonModel",
     "HestonModelHelper",
     "HullWhite",
@@ -88,6 +89,65 @@ class CapHelper:
     def calibration_error(self) -> builtins.float: ...
     def mandatory_times(self) -> builtins.list[builtins.float]: ...
     def set_tree_engine(self, engine: pricingengines.TreeCapFloorEngine) -> None: ...
+
+@typing.final
+class GJRGARCHModel:
+    r"""
+    Six-parameter GJR-GARCH model retaining live spot and yield curves.
+
+    Parameters and fixed masks are ordered omega, alpha, beta, gamma, lambda_,
+    daily_variance. Variance and omega use daily units, not annual units.
+    """
+    def __init__(self, process: processes.GJRGARCHProcess) -> None:
+        r"""
+        Seed the model from a retained process with FullTruncation discretization.
+        """
+    def daily_variance(self) -> builtins.float:
+        r"""
+        Return the fitted initial daily variance.
+        """
+    def omega(self) -> builtins.float:
+        r"""
+        Return the fitted daily variance intercept.
+        """
+    def alpha(self) -> builtins.float:
+        r"""
+        Return the fitted squared innovation coefficient.
+        """
+    def beta(self) -> builtins.float:
+        r"""
+        Return the fitted lagged variance coefficient.
+        """
+    def gamma(self) -> builtins.float:
+        r"""
+        Return the fitted asymmetric innovation coefficient.
+        """
+    def lambda_(self) -> builtins.float:
+        r"""
+        Return the fitted innovation risk premium.
+        """
+    def params(self) -> builtins.list[builtins.float]:
+        r"""
+        Return omega, alpha, beta, gamma, lambda_, daily_variance in that order.
+        """
+    def set_params(self, params: typing.Sequence[builtins.float]) -> None:
+        r"""
+        Atomically replace six validated parameters and invalidate pricing engines.
+        """
+    def process(self) -> processes.GJRGARCHProcess:
+        r"""
+        Return the current process snapshot, retaining live market inputs.
+
+        Replacing model parameters creates a new FullTruncation process; an
+        earlier returned process keeps its own parameter snapshot.
+        """
+    def calibrate(self, helpers: typing.Sequence[HestonModelHelper], method: optimization.LevenbergMarquardt | optimization.Simplex | optimization.ConjugateGradient | optimization.SteepestDescent, end_criteria: optimization.EndCriteria, *, constraint: optimization.NoConstraint | optimization.PositiveConstraint | optimization.BoundaryConstraint | optimization.CompositeConstraint | None = None, weights: typing.Optional[typing.Sequence[builtins.float]] = None, fix_parameters: typing.Optional[typing.Sequence[builtins.bool]] = None) -> None:
+        r"""
+        Fit Heston Black-volatility helpers with the analytic GJR approximation.
+
+        Weights correspond to helpers. The six-element fixed mask uses the
+        same order as params(). Failed calibration restores the model parameters.
+        """
 
 @typing.final
 class HestonModel:
