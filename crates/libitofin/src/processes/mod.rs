@@ -11,6 +11,7 @@
 mod batesprocess;
 mod blackscholesprocess;
 pub mod discretization;
+mod gjrgarchprocess;
 mod hestonprocess;
 mod merton76process;
 mod ornsteinuhlenbeckprocess;
@@ -21,6 +22,9 @@ pub use blackscholesprocess::{BlackScholesMertonProcess, GeneralizedBlackScholes
 pub use discretization::{
     DiscretizedProcess, DiscretizedProcess1D, EulerDiscretization, ProcessDiscretization,
     ProcessDiscretization1D,
+};
+pub use gjrgarchprocess::{
+    GjrGarchCoefficients, GjrGarchDiscretization, GjrGarchParameters, GjrGarchProcess,
 };
 pub use hestonprocess::{Discretization as HestonDiscretization, HestonProcess};
 pub use merton76process::Merton76Process;
