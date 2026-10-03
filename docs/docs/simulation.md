@@ -1,5 +1,8 @@
 # Seeded simulation
 
+For asymmetric-volatility spot/variance paths, see
+[GJR-GARCH process and paths](gjrgarch.md).
+
 `itofin.simulate_gbm` generates geometric Brownian paths with a fixed,
 nonzero seed. It shares the Rust simulation kernel with Go's `SimulateGBM`:
 the normal stream is consumed in path, time, asset order, so the same inputs

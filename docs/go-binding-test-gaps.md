@@ -9,6 +9,7 @@ This inventory does not claim exhaustive QuantLib product coverage.
 
 | Scope | Executable evidence |
 | --- | --- |
+| GJR daily annualization, all three truncation/reflection schemes, 27 QuantLib transitions, six seeded paths, retained live inputs and concurrent Close | `TestGJRQuantLibTransitionFixtures`, `TestGJRQuantLibSeededPathFixtures`, `TestGJRLiveMarketInputsAndRetainedOwnership`, `TestGJRProcessConcurrentQueriesAndClose` |
 | LSM basis selection and rejection, latest-only American, date-only Bermudan QuantLib oracles, retained inputs and quote recovery | `TestMCAmericanBasisAndLatestOnly`, `TestMCBermudanRetentionUpdatesAndErrors`, `TestMCBermudanQuantLibOracles` |
 | COS/exponential Heston engines: four COS prices at `1e-10`, 88 fitted-quadrature prices at `1e-8`, six control variates, retained inputs, invalid options and live-model calibration | `TestCosHestonQuantLibRetentionAndErrors`, `TestExponentialFittingHestonQuantLibGrid`, `TestExponentialFittingHestonVariatesAndErrors`, `TestAlternativeHestonCalibrationAndLiveModel` |
 | BMA ten-tenor QuantLib curve/swap/coupon values, weekly holidays, live quotes/history, recovery and cold retained ownership | `TestBMAQuantLibCurveSwapCouponAndHolidayOracles`, `TestBMAUpdatesHistoryRecoveryAndColdRetention`, `TestBMANilForeignSessionAndInvalidConstructors` |
