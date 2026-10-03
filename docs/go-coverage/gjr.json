@@ -1,0 +1,110 @@
+{
+  "domain": "gjr-garch-process-and-paths",
+  "entries": [
+    {
+      "c": "itofin_gjr_process_new",
+      "go": "Session.NewGJRProcess",
+      "python": "itofin.processes.GJRGARCHProcess.__init__",
+      "status": "implemented",
+      "tests": "TestGJRQuantLibTransitionFixtures"
+    },
+    {
+      "c": "itofin_gjr_process_query",
+      "go": "GJRProcess.Parameters",
+      "python": "itofin.processes.GJRGARCHProcess.daily_variance",
+      "status": "implemented",
+      "tests": "TestGJRQuantLibTransitionFixtures"
+    },
+    {
+      "c": "itofin_gjr_process_query",
+      "go": "GJRProcess.Parameters",
+      "python": "itofin.processes.GJRGARCHProcess.omega",
+      "status": "implemented",
+      "tests": "TestGJRQuantLibTransitionFixtures"
+    },
+    {
+      "c": "itofin_gjr_process_query",
+      "go": "GJRProcess.Parameters",
+      "python": "itofin.processes.GJRGARCHProcess.alpha",
+      "status": "implemented",
+      "tests": "TestGJRQuantLibTransitionFixtures"
+    },
+    {
+      "c": "itofin_gjr_process_query",
+      "go": "GJRProcess.Parameters",
+      "python": "itofin.processes.GJRGARCHProcess.beta",
+      "status": "implemented",
+      "tests": "TestGJRQuantLibTransitionFixtures"
+    },
+    {
+      "c": "itofin_gjr_process_query",
+      "go": "GJRProcess.Parameters",
+      "python": "itofin.processes.GJRGARCHProcess.gamma",
+      "status": "implemented",
+      "tests": "TestGJRQuantLibTransitionFixtures"
+    },
+    {
+      "c": "itofin_gjr_process_query",
+      "go": "GJRProcess.Parameters",
+      "python": "itofin.processes.GJRGARCHProcess.lambda_",
+      "status": "implemented",
+      "tests": "TestGJRQuantLibTransitionFixtures"
+    },
+    {
+      "c": "itofin_gjr_process_query",
+      "go": "GJRProcess.Parameters",
+      "python": "itofin.processes.GJRGARCHProcess.days_per_year",
+      "status": "implemented",
+      "tests": "TestGJRQuantLibTransitionFixtures"
+    },
+    {
+      "c": "itofin_gjr_process_query",
+      "go": "GJRProcess.Discretization",
+      "python": "itofin.processes.GJRGARCHProcess.discretization",
+      "status": "implemented",
+      "tests": "TestGJRQuantLibTransitionFixtures"
+    },
+    {
+      "c": "itofin_gjr_process_query",
+      "go": "GJRProcess.InitialValues",
+      "python": "itofin.processes.GJRGARCHProcess.initial_values",
+      "status": "implemented",
+      "tests": "TestGJRQuantLibTransitionFixtures"
+    },
+    {
+      "c": "itofin_gjr_process_query",
+      "go": "GJRProcess.Drift",
+      "python": "itofin.processes.GJRGARCHProcess.drift",
+      "status": "implemented",
+      "tests": "TestGJRQuantLibTransitionFixtures"
+    },
+    {
+      "c": "itofin_gjr_process_query",
+      "go": "GJRProcess.Diffusion",
+      "python": "itofin.processes.GJRGARCHProcess.diffusion",
+      "status": "implemented",
+      "tests": "TestGJRQuantLibTransitionFixtures"
+    },
+    {
+      "c": "itofin_gjr_process_evolve",
+      "go": "GJRProcess.Evolve",
+      "python": "itofin.processes.GJRGARCHProcess.evolve",
+      "status": "implemented",
+      "tests": "TestGJRQuantLibTransitionFixtures"
+    },
+    {
+      "c": "itofin_gjr_process_time",
+      "go": "GJRProcess.Time",
+      "python": "itofin.processes.GJRGARCHProcess.time",
+      "status": "implemented",
+      "tests": "TestGJRQuantLibTransitionFixtures"
+    },
+    {
+      "c": "itofin_gjr_paths",
+      "go": "SimulateGJR",
+      "python": "itofin.simulate_gjr",
+      "status": "implemented",
+      "tests": "TestGJRQuantLibSeededPathFixtures"
+    }
+  ]
+}
