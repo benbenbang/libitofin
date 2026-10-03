@@ -1,0 +1,75 @@
+{
+  "proof": {
+    "count": 40000,
+    "expected": [
+      100.00793682288563,
+      10003.175107133198,
+      0.038367688715554224,
+      1.5667085105450635e-05,
+      -2.4543571127163455e-06
+    ],
+    "generator": "one-step native QuantLib transitions with independent MT/Acklam draws",
+    "observed": [
+      100.00632153168682,
+      10002.843774678242,
+      0.0383312610281421,
+      1.5648684408292416e-05,
+      -2.3770224662914423e-06
+    ],
+    "ordering": "spotmean,spotsecond,variancemean,variancevariance,logspot_variancecovariance",
+    "seed": 5489,
+    "standard_deviations": [
+      -0.2563890039668679,
+      -0.2628617788377646,
+      -1.840634235592351,
+      -0.16609465015124997,
+      0.30977722497952737
+    ],
+    "standard_errors": [
+      0.006300157860949958,
+      1.2604816737574347,
+      1.979083443506781e-05,
+      1.1078440600863926e-07,
+      2.4964600425358634e-07
+    ]
+  },
+  "provenance": {
+    "absolute_tolerance": 1e-12,
+    "apply": "independent Python spot*exp(dx0), variance+dx1; SWIG omits apply",
+    "draw_order": "path,step,factor0,factor1",
+    "generator": "QuantLib-Python executable transitions",
+    "header_sigma2_typo": "executable 2+4*lambda^2, not header lambda^4",
+    "layout": "path,time,state(spot,annual_variance)",
+    "paths": "independent MT19937/Acklam normals fed into QuantLib evolve",
+    "quantlib_commit": "9863b578af0caa4cecabf697196533e84a8308b6",
+    "quantlib_version": "1.43",
+    "reference": "ql/processes/gjrgarchprocess.cpp",
+    "relative_tolerance": 2e-13,
+    "uniform": "(word+0.5)/4294967296"
+  },
+  "reference": {
+    "dt": 0.003968253968253968,
+    "expected_log_spot_variance_covariance": -2.4543571127163455e-06,
+    "expected_spot_mean": 100.00793682288563,
+    "expected_spot_second_moment": 10003.175107133198,
+    "expected_variance_mean": 0.038367688715554224,
+    "expected_variance_variance": 1.5667085105450635e-05,
+    "input": {
+      "alpha": 0.04,
+      "beta": 0.88,
+      "daily_variance": 0.00015873015873015873,
+      "days_per_year": 252.0,
+      "discretization": 1,
+      "dividend_yield": 0.01,
+      "gamma": 0.08,
+      "lambda": -0.4,
+      "omega": 2e-06,
+      "risk_free_rate": 0.03,
+      "spot": 100.0
+    },
+    "state": [
+      100.0,
+      0.04
+    ]
+  }
+}
