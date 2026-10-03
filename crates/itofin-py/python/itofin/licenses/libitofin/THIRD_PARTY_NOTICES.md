@@ -24,3 +24,14 @@ Ametrano; Copyright (C) 2004, 2005, 2007 StatPro Italia srl.
 The complete QuantLib license and contributor notices are included above.
 Cached Haug test values retain the attribution to E. G. Haug, *Option Pricing
 Formulas*, McGraw-Hill 1998, page 9, from QuantLib's `test-suite/jumpdiffusion.cpp`.
+
+## QuantLib GJR-GARCH
+
+The daily-parameter model, analytic Edgeworth expansion and European Monte
+Carlo conventions are adapted from QuantLib's `ql/models/equity/gjrgarchmodel`,
+`ql/pricingengines/vanilla/{analyticgjrgarchengine,mceuropeangjrgarchengine}`
+and `test-suite/gjrgarchmodel.cpp`. Copyright (C) 2008 Yee Man Chan.
+The complete QuantLib license and contributor notices are included above.
+The original DAX calibration data retain QuantLib's attribution to A. Sepp.
+Source pins, binary provenance and fixture reproduction are recorded in
+`sdk/go/testdata/gjrgarch-model-oracle.md`.

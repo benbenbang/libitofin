@@ -242,6 +242,21 @@ pub trait CalibratedModelHolder {
     /// The embedded [`CalibratedModel`], mutably.
     fn calibrated_model_mut(&mut self) -> &mut CalibratedModel;
 
+    /// Scalar and coupled parameter constraints used by calibration.
+    fn constraint(&self) -> Box<dyn Constraint> {
+        Box::new(self.calibrated_model().constraint())
+    }
+
+    /// Captures parameter and derived-state restoration for a failed fit.
+    /// Model-specific snapshots can restore without validating a changed market.
+    fn calibration_rollback(&self) -> CalibrationRollback<Self>
+    where
+        Self: Sized,
+    {
+        let params = self.calibrated_model().params();
+        Box::new(move |model| model.set_params(&params))
+    }
+
     /// `generateArguments()` (`model.hpp:154`): rebuild the parameters derived
     /// from the model's arguments. The base is a no-op.
     fn generate_arguments(&mut self) {}
@@ -260,6 +275,9 @@ pub trait CalibratedModelHolder {
         Ok(())
     }
 }
+
+/// Owned restoration action captured before calibration changes model state.
+pub type CalibrationRollback<M> = Box<dyn FnOnce(&mut M) -> QlResult<()>>;
 
 /// Term-structure consistent model base (`model.hpp:73`): holds the
 /// [`YieldTermStructure`] handle a fitted model reprices exactly, and exposes it.
@@ -420,6 +438,8 @@ impl<M: CalibratedModelHolder> CostFunction for CalibrationFunction<M> {
 /// Fails on empty `instruments`, a `weights` or `fix_parameters` length that
 /// does not match, negative or nonfinite weights, an all-fixed projection,
 /// failed minimization, or nonfinite residuals or cost at the final point.
+/// Failed fits invoke the holder's captured restoration action before returning.
+/// The default action reapplies the original parameters through `set_params`.
 pub fn calibrate<M: CalibratedModelHolder>(
     model: &SharedMut<M>,
     instruments: &[SharedMut<dyn CalibrationHelper>],
@@ -431,9 +451,9 @@ pub fn calibrate<M: CalibratedModelHolder>(
 ) -> QlResult<()> {
     require!(!instruments.is_empty(), "no instruments provided");
 
-    let private = model.borrow().calibrated_model().constraint();
+    let private = model.borrow().constraint();
     let constraint: Box<dyn Constraint> = match additional_constraint {
-        None => Box::new(private),
+        None => private,
         Some(additional) => Box::new(CompositeConstraint::new(private, additional)),
     };
 
@@ -471,39 +491,46 @@ pub fn calibrate<M: CalibratedModelHolder>(
         projection: projection.clone(),
     };
     let mut problem = Problem::new(&function, &projected_constraint, projection.project(&prms));
-    let end_criteria_result = method.minimize(&mut problem, end_criteria)?;
-    let result = problem.current_value().clone();
-    model
-        .borrow_mut()
-        .set_params(&projection.include(&result))?;
-    let problem_values = problem.values(&result);
-    require!(
-        problem_values.iter().all(|value| value.is_finite()),
-        "nonfinite final calibration residuals"
-    );
-    require!(
-        problem_values
-            .iter()
-            .map(|value| value * value)
-            .sum::<Real>()
-            .is_finite(),
-        "nonfinite final calibration cost"
-    );
-    let function_evaluation = problem.function_evaluation();
+    let rollback = model.borrow().calibration_rollback();
+    let outcome = (|| {
+        let end_criteria_result = method.minimize(&mut problem, end_criteria)?;
+        let result = problem.current_value().clone();
+        model
+            .borrow_mut()
+            .set_params(&projection.include(&result))?;
+        let problem_values = problem.values(&result);
+        require!(
+            problem_values.iter().all(|value| value.is_finite()),
+            "nonfinite final calibration residuals"
+        );
+        require!(
+            problem_values
+                .iter()
+                .map(|value| value * value)
+                .sum::<Real>()
+                .is_finite(),
+            "nonfinite final calibration cost"
+        );
+        let function_evaluation = problem.function_evaluation();
 
-    {
-        let mut borrowed = model.borrow_mut();
-        let calibrated = borrowed.calibrated_model_mut();
-        calibrated.end_criteria = end_criteria_result;
-        calibrated.problem_values = problem_values;
-        calibrated.function_evaluation = function_evaluation;
+        {
+            let mut borrowed = model.borrow_mut();
+            let calibrated = borrowed.calibrated_model_mut();
+            calibrated.end_criteria = end_criteria_result;
+            calibrated.problem_values = problem_values;
+            calibrated.function_evaluation = function_evaluation;
+        }
+        model
+            .borrow()
+            .calibrated_model()
+            .observable()
+            .notify_observers();
+        Ok(())
+    })();
+    if outcome.is_err() {
+        rollback(&mut *model.borrow_mut())?;
     }
-    model
-        .borrow()
-        .calibrated_model()
-        .observable()
-        .notify_observers();
-    Ok(())
+    outcome
 }
 
 /// `CalibratedModel::value` (`model.cpp:117`): the calibration cost of `params`
@@ -1168,7 +1195,7 @@ mod tests {
     fn calibration_never_reports_success_for_unpriceable_final_helpers() {
         use crate::math::optimization::simplex::Simplex;
         let derived = Rc::new(Cell::new(0.0));
-        let model = DerivedModel::new(1.0, derived);
+        let model = DerivedModel::new(1.0, Rc::clone(&derived));
         let instruments = vec![shared_mut(FailedHelper) as SharedMut<dyn CalibrationHelper>];
         let mut method = Simplex::new(0.1);
         assert!(
@@ -1189,6 +1216,8 @@ mod tests {
             EndCriteriaType::None
         );
         assert!(borrowed.calibrated_model().problem_values().is_empty());
+        assert_eq!(borrowed.calibrated_model().params(), Array::from([1.0]));
+        assert_eq!(derived.get(), 2.0);
     }
 
     #[test]
@@ -1215,5 +1244,129 @@ mod tests {
             EndCriteriaType::None
         );
         assert!(borrowed.calibrated_model().problem_values().is_empty());
+        assert_eq!(borrowed.calibrated_model().params(), Array::from([1.0]));
+        assert_eq!(derived.get(), 2.0);
+    }
+    struct TrialFailure;
+
+    impl OptimizationMethod for TrialFailure {
+        fn minimize(
+            &mut self,
+            problem: &mut Problem<'_>,
+            _criteria: &EndCriteria,
+        ) -> QlResult<EndCriteriaType> {
+            let trial = &problem.current_value().clone() + &Array::filled(1, 0.5);
+            assert!(problem.value(&trial).is_finite());
+            crate::fail!("failed after evaluating a calibration trial")
+        }
+    }
+
+    #[test]
+    fn failed_optimizer_restores_fitted_parameters_derived_state_and_metadata() {
+        let derived = Rc::new(Cell::new(0.0));
+        let model = DerivedModel::new(1.0, Rc::clone(&derived));
+        let instruments = vec![helper(&derived, 6.0)];
+        calibrate(
+            &model,
+            &instruments,
+            &mut LevenbergMarquardt::default(),
+            &criteria(),
+            None,
+            Vec::new(),
+            Vec::new(),
+        )
+        .unwrap();
+        let (params, end, residuals, evaluations) = {
+            let m = model.borrow();
+            let c = m.calibrated_model();
+            (
+                c.params(),
+                c.end_criteria(),
+                c.problem_values().clone(),
+                c.function_evaluation(),
+            )
+        };
+        let cached = derived.get();
+        let error = calibrate(
+            &model,
+            &instruments,
+            &mut TrialFailure,
+            &criteria(),
+            None,
+            Vec::new(),
+            Vec::new(),
+        )
+        .unwrap_err();
+        assert_eq!(
+            error.message(),
+            "failed after evaluating a calibration trial"
+        );
+        let m = model.borrow();
+        let c = m.calibrated_model();
+        assert_eq!(c.params(), params);
+        assert_eq!(c.end_criteria(), end);
+        assert_eq!(c.problem_values(), &residuals);
+        assert_eq!(c.function_evaluation(), evaluations);
+        assert_eq!(derived.get(), cached);
+    }
+
+    struct BoundedDerivedModel(DerivedModel);
+
+    impl CalibratedModelHolder for BoundedDerivedModel {
+        fn calibrated_model(&self) -> &CalibratedModel {
+            self.0.calibrated_model()
+        }
+        fn calibrated_model_mut(&mut self) -> &mut CalibratedModel {
+            self.0.calibrated_model_mut()
+        }
+        fn generate_arguments(&mut self) {
+            self.0.generate_arguments();
+        }
+        fn constraint(&self) -> Box<dyn Constraint> {
+            Box::new(crate::math::optimization::constraint::BoundaryConstraint::new(0.0, 1.5))
+        }
+    }
+
+    struct CheckHolderConstraint;
+
+    impl OptimizationMethod for CheckHolderConstraint {
+        fn minimize(
+            &mut self,
+            problem: &mut Problem<'_>,
+            _criteria: &EndCriteria,
+        ) -> QlResult<EndCriteriaType> {
+            assert!(problem.constraint().test(&Array::from([1.25])));
+            assert!(!problem.constraint().test(&Array::from([2.0])));
+            problem.set_current_value(Array::from([1.25]));
+            Ok(EndCriteriaType::StationaryFunctionValue)
+        }
+    }
+
+    #[test]
+    fn calibration_uses_the_holder_constraint_without_an_additional_constraint() {
+        let derived = Rc::new(Cell::new(0.0));
+        let mut m = CalibratedModel::new(1);
+        m.arguments_mut()[0] = ConstantParameter::new(1.0, Rc::new(NoConstraint)).unwrap();
+        let model = shared_mut(BoundedDerivedModel(DerivedModel {
+            model: m,
+            derived: Rc::clone(&derived),
+        }));
+        model.borrow_mut().generate_arguments();
+        let instruments = vec![helper(&derived, 2.5)];
+        calibrate(
+            &model,
+            &instruments,
+            &mut CheckHolderConstraint,
+            &criteria(),
+            None,
+            Vec::new(),
+            Vec::new(),
+        )
+        .unwrap();
+        assert_eq!(
+            model.borrow().calibrated_model().params(),
+            Array::from([1.25])
+        );
+        assert_eq!(derived.get(), 2.5);
     }
 }

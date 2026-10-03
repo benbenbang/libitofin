@@ -1,0 +1,153 @@
+{
+  "contract_commit": "9863b578af0caa4cecabf697196533e84a8308b6",
+  "day_counter": "ActualActual ISDA",
+  "input": {
+    "alpha": 0.024,
+    "beta": 0.93,
+    "daily_variance": 0.00012121212121212151,
+    "days_per_year": 365.0,
+    "discretization": 1,
+    "dividend_yield": 0.0,
+    "gamma": 0.059,
+    "lambda_parameter": 0.0,
+    "omega": 2e-06,
+    "risk_free_rate": 0.05,
+    "spot": 50.0
+  },
+  "quantlib_version": "1.43",
+  "reference_date": "2026-01-15",
+  "rows": [
+    {
+      "cached_analytic": 15.4315,
+      "cached_mc": 15.4332,
+      "call": 15.431040844905644,
+      "maturity_days": 90,
+      "mc_error": 0.01989585423914096,
+      "mc_price": 15.406277145037718,
+      "mc_samples": 66687,
+      "put": 0.0021830715301121018,
+      "strike": 35
+    },
+    {
+      "cached_analytic": 10.5552,
+      "cached_mc": 10.5453,
+      "call": 10.554690304370828,
+      "maturity_days": 90,
+      "mc_error": 0.019956637267353618,
+      "mc_price": 10.514179080688756,
+      "mc_samples": 63484,
+      "put": 0.06456713479879284,
+      "strike": 40
+    },
+    {
+      "cached_analytic": 5.9625,
+      "cached_mc": 5.9351,
+      "call": 5.962092917136372,
+      "maturity_days": 90,
+      "mc_error": 0.019913811285580604,
+      "mc_price": 5.9156868102525015,
+      "mc_samples": 50959,
+      "put": 0.41070435136783345,
+      "strike": 45
+    },
+    {
+      "cached_analytic": 2.3282,
+      "cached_mc": 2.3521,
+      "call": 2.328046464730164,
+      "maturity_days": 90,
+      "mc_error": 0.019879524532719947,
+      "mc_price": 2.367199311142267,
+      "mc_samples": 25825,
+      "put": 1.7153925027651127,
+      "strike": 50
+    },
+    {
+      "cached_analytic": 0.5408,
+      "cached_mc": 0.5597,
+      "call": 0.5406824963524928,
+      "maturity_days": 90,
+      "mc_error": 0.01868006325172078,
+      "mc_price": 0.571576646803616,
+      "mc_samples": 7183,
+      "put": 4.86676313819094,
+      "strike": 55
+    },
+    {
+      "cached_analytic": 0.0835,
+      "cached_mc": 0.0776,
+      "call": 0.08336414792584855,
+      "maturity_days": 90,
+      "mc_error": 0.016412903673491526,
+      "mc_price": 0.07827148581623224,
+      "mc_samples": 1023,
+      "put": 9.34817939356779,
+      "strike": 60
+    },
+    {
+      "cached_analytic": 15.8969,
+      "cached_mc": 15.891,
+      "call": 15.895153938943379,
+      "maturity_days": 180,
+      "mc_error": 0.01994905271531989,
+      "mc_price": 15.877542184480104,
+      "mc_samples": 129083,
+      "put": 0.04269322047186108,
+      "strike": 35
+    },
+    {
+      "cached_analytic": 11.2173,
+      "cached_mc": 11.1772,
+      "call": 11.215495881576947,
+      "maturity_days": 180,
+      "mc_error": 0.01994747486161142,
+      "mc_price": 11.171653580327682,
+      "mc_samples": 118199,
+      "put": 0.24125506046664213,
+      "strike": 40
+    },
+    {
+      "cached_analytic": 6.9112,
+      "cached_mc": 6.8827,
+      "call": 6.909990281867267,
+      "maturity_days": 180,
+      "mc_error": 0.019991283447596448,
+      "mc_price": 6.884870247469114,
+      "mc_samples": 92343,
+      "put": 0.8139693581181717,
+      "strike": 45
+    },
+    {
+      "cached_analytic": 3.4788,
+      "cached_mc": 3.5096,
+      "call": 3.478349778932519,
+      "maturity_days": 180,
+      "mc_error": 0.019836033189956716,
+      "mc_price": 3.513899381372895,
+      "mc_samples": 56142,
+      "put": 2.2605487525446364,
+      "strike": 50
+    },
+    {
+      "cached_analytic": 1.3769,
+      "cached_mc": 1.4196,
+      "call": 1.37657748901291,
+      "maturity_days": 180,
+      "mc_error": 0.019934612625471672,
+      "mc_price": 1.4155691643433685,
+      "mc_samples": 23548,
+      "put": 5.03699635998624,
+      "strike": 55
+    },
+    {
+      "cached_analytic": 0.4357,
+      "cached_mc": 0.4502,
+      "call": 0.4352148752178468,
+      "maturity_days": 180,
+      "mc_error": 0.019441051829474282,
+      "mc_price": 0.4760320161914779,
+      "mc_samples": 8289,
+      "put": 8.973853643552388,
+      "strike": 60
+    }
+  ]
+}
