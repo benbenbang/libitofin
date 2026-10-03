@@ -74,7 +74,21 @@ Validation uses 27 native QuantLib transition cases, six independent seeded
 path cases and analytic conditional moments. Retained live market inputs,
 invalid domains/dimensions, bounded allocation and concurrent Go calls are
 covered. See [units, schemes and examples](../docs/docs/gjrgarch.md).
-Models, calibration and European engines remain #1165.
+
+## GJR-GARCH model and European pricing
+
+Unreleased [#1165](https://github.com/benbenbang/libitofin/issues/1165) pairs a
+six-parameter daily-unit model, calibration and analytic/Monte Carlo European
+engines in Rust, Python, C and Go. Analytic pricing observes model updates;
+MC retains the supplied process snapshot and reports sampling standard error.
+Failed GJR calibration restores the exact previous process and fit diagnostics,
+even when a live market input becomes invalid during fitting.
+
+The analytic moment expansion preserves QuantLib's unusual dividend convention
+and is not exact MC-equivalent. Independent native prices, seeded MC price/error
+fixtures and the original DAX fit retain their acceptance bands; DAX SSE 7.8522
+passes the original <=15 bound. No Greeks, Brownian bridge or control variates
+are exposed by these engines. See [contracts and examples](../docs/docs/gjrgarch-pricing.md).
 
 ## Cap/floor normal and lattice engines
 
