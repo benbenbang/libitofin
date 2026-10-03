@@ -1,0 +1,133 @@
+{
+  "contract_commit": "9863b578af0caa4cecabf697196533e84a8308b6",
+  "day_counter": "Actual365Fixed",
+  "input": {
+    "alpha": 0.04,
+    "beta": 0.88,
+    "daily_variance": 0.00015873015873015873,
+    "days_per_year": 252.0,
+    "discretization": 1,
+    "dividend_yield": 0.01,
+    "gamma": 0.08,
+    "lambda_parameter": -0.4,
+    "omega": 2e-06,
+    "risk_free_rate": 0.03,
+    "spot": 100.0
+  },
+  "invalid_setter_cases": [
+    {
+      "calibration_constraint_valid": false,
+      "native_setter_accepted": true,
+      "params": [
+        0.0,
+        0.04,
+        0.88,
+        0.08,
+        -0.4,
+        0.00015873015873015873
+      ]
+    },
+    {
+      "calibration_constraint_valid": false,
+      "native_setter_accepted": true,
+      "params": [
+        2e-06,
+        1.1,
+        0.88,
+        0.08,
+        -0.4,
+        0.00015873015873015873
+      ]
+    },
+    {
+      "calibration_constraint_valid": false,
+      "native_setter_accepted": true,
+      "params": [
+        2e-06,
+        0.04,
+        1.1,
+        0.08,
+        -0.4,
+        0.00015873015873015873
+      ]
+    },
+    {
+      "calibration_constraint_valid": false,
+      "native_setter_accepted": true,
+      "params": [
+        2e-06,
+        0.04,
+        0.88,
+        -1.0,
+        -0.4,
+        0.00015873015873015873
+      ]
+    },
+    {
+      "calibration_constraint_valid": false,
+      "native_setter_accepted": true,
+      "params": [
+        2e-06,
+        0.04,
+        0.88,
+        0.08,
+        -0.4,
+        0.0
+      ]
+    }
+  ],
+  "model_reset": {
+    "expected_model_scheme": 1,
+    "input_scheme": 2,
+    "input_zero_dt": [
+      100.0,
+      0.04000000000000001
+    ],
+    "model_zero_dt": [
+      100.0,
+      -0.04
+    ]
+  },
+  "quantlib_version": "1.43",
+  "reference_date": "2026-01-15",
+  "rows": [
+    {
+      "changes": {},
+      "maturity_days": 90,
+      "name": "zero_strike",
+      "native_result": "nan",
+      "strike": 0
+    },
+    {
+      "changes": {
+        "alpha": 0.0,
+        "beta": 1.0,
+        "gamma": 0.0
+      },
+      "maturity_days": 90,
+      "name": "equal_moments",
+      "native_result": "nan",
+      "strike": 100
+    },
+    {
+      "changes": {
+        "alpha": 0.0,
+        "beta": 0.0,
+        "gamma": 0.0
+      },
+      "maturity_days": 90,
+      "name": "zero_moments",
+      "native_result": "nan",
+      "strike": 100
+    },
+    {
+      "changes": {
+        "daily_variance": 0.0
+      },
+      "maturity_days": 90,
+      "name": "zero_v0",
+      "native_result": "0: invalid value",
+      "strike": 100
+    }
+  ]
+}
