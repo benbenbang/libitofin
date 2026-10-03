@@ -95,6 +95,24 @@ class BaselineCoverageTests(unittest.TestCase):
             self.run_check("--baseline", baseline={})
         self.assertEqual(error.exception.code, 2)
 
+    def test_nested_native_exports_are_discovered_without_relaxing_validation(self):
+        native = self.root / "crates/libitofin-ffi/src/lib.rs"
+        nested = native.parent / "gjr_model_api/calibration.rs"
+        nested.parent.mkdir()
+        nested.write_text(native.read_text())
+        native.write_text("")
+        status, output = self.run_check("--baseline")
+        self.assertFalse(status, output)
+        nested.write_text("")
+        status, output = self.run_check("--baseline")
+        self.assertTrue(status)
+        self.assertIn("missing C export itofin_old", output)
+        nested.write_text(self.files["crates/libitofin-ffi/src/lib.rs"])
+        (self.root / "crates/libitofin-ffi/include/itofin.h").write_text("")
+        status, output = self.run_check("--baseline")
+        self.assertTrue(status)
+        self.assertIn("missing C export itofin_old", output)
+
     def test_unavailable_baseline_fails_closed(self):
         with patch.object(coverage.subprocess, "check_output", side_effect=subprocess.CalledProcessError(128, "git")), \
                 patch("sys.argv", ["check_go_coverage.py", "--strict", "--baseline"]), \

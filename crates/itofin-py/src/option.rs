@@ -3,6 +3,7 @@
 use crate::PyQlError;
 use crate::bates::PyBatesEngine;
 use crate::fdengine::PyFdBlackScholesVanillaEngine;
+use crate::gjr_model::{PyAnalyticGjrGarchEngine, PyMcEuropeanGjrGarchEngine};
 use crate::heston::PyHestonModel;
 use crate::heston_engines::{PyCosHestonEngine, PyExponentialFittingHestonEngine};
 use crate::market::PyBlackScholesProcess;
@@ -194,6 +195,28 @@ impl PyVanillaOption {
     /// Attach the Bates engine and return the option value.
     fn price_bates(&mut self, engine: &PyBatesEngine) -> PyResult<f64> {
         self.set_bates_engine(engine);
+        self.npv()
+    }
+
+    /// Attach the daily-moment GJR-GARCH European approximation.
+    fn set_gjr_engine(&mut self, engine: &PyAnalyticGjrGarchEngine) {
+        self.inner.base_mut().set_pricing_engine(engine.engine());
+    }
+
+    /// Attach the GJR-GARCH approximation and return its value.
+    fn price_gjr(&mut self, engine: &PyAnalyticGjrGarchEngine) -> PyResult<f64> {
+        self.set_gjr_engine(engine);
+        self.npv()
+    }
+
+    /// Attach a seeded two-factor GJR-GARCH European Monte Carlo engine.
+    fn set_mc_gjr_engine(&mut self, engine: &PyMcEuropeanGjrGarchEngine) {
+        self.inner.base_mut().set_pricing_engine(engine.engine());
+    }
+
+    /// Attach the GJR-GARCH Monte Carlo engine and return its value.
+    fn price_mc_gjr(&mut self, engine: &PyMcEuropeanGjrGarchEngine) -> PyResult<f64> {
+        self.set_mc_gjr_engine(engine);
         self.npv()
     }
 

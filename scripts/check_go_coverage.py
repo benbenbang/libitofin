@@ -89,7 +89,7 @@ def audit():
     symbols = inventory()
     records, classifications, errors = {}, {}, []
     eligible = nonconstructible_enums()
-    native = "\n".join(p.read_text() for p in (ROOT / "crates/libitofin-ffi/src").glob("*.rs"))
+    native = "\n".join(p.read_text() for p in (ROOT / "crates/libitofin-ffi/src").rglob("*.rs"))
     header = (ROOT / "crates/libitofin-ffi/include/itofin.h").read_text()
     go = "\n".join(p.read_text() for p in (ROOT / "sdk/go").glob("*.go") if not p.name.endswith("_test.go"))
     tests = native + "\n" + "\n".join(p.read_text() for p in (ROOT / "sdk/go").glob("*_test.go"))
