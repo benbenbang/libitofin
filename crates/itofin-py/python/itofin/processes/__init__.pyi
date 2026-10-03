@@ -9,6 +9,7 @@ import typing
 __all__ = [
     "BatesProcess",
     "BlackScholesProcess",
+    "GJRGARCHProcess",
     "HestonProcess",
     "Merton76Process",
 ]
@@ -129,6 +130,73 @@ class BlackScholesProcess:
         Returns:
             float: The continuously compounded zero rate on the dividend curve at the
             reference date.
+        """
+
+@typing.final
+class GJRGARCHProcess:
+    r"""
+    GJR-GARCH diffusion approximation retaining live spot and yield curves.
+
+    Parameters `daily_variance` and `omega` use daily units. The state is
+    `[spot, annual_variance]`, with initial annual variance equal to
+    `daily_variance * days_per_year`. Truncation schemes can return a negative
+    raw variance state; this is not a daily GJR recursion or a pricing model.
+    """
+    def __init__(self, spot: quotes.SimpleQuote, risk_free: termstructures.YieldTermStructure, dividend: termstructures.YieldTermStructure, daily_variance: builtins.float, omega: builtins.float, alpha: builtins.float, beta: builtins.float, gamma: builtins.float, lambda_: builtins.float, days_per_year: builtins.float = 252.0, scheme: builtins.str = 'FullTruncation') -> None:
+        r"""
+        Retain spot and curves and validate finite admissible GJR parameters.
+        """
+    def daily_variance(self) -> builtins.float:
+        r"""
+        Return initial daily variance, not the annualized state component.
+        """
+    def omega(self) -> builtins.float:
+        r"""
+        Return the daily variance intercept.
+        """
+    def alpha(self) -> builtins.float:
+        r"""
+        Return the squared innovation coefficient.
+        """
+    def beta(self) -> builtins.float:
+        r"""
+        Return the lagged variance coefficient.
+        """
+    def gamma(self) -> builtins.float:
+        r"""
+        Return the asymmetric innovation coefficient.
+        """
+    def lambda_(self) -> builtins.float:
+        r"""
+        Return the innovation risk premium.
+        """
+    def days_per_year(self) -> builtins.float:
+        r"""
+        Return the daily-to-annual conversion factor.
+        """
+    def discretization(self) -> builtins.str:
+        r"""
+        Return the configured scheme name.
+        """
+    def initial_values(self) -> builtins.list[builtins.float]:
+        r"""
+        Return current spot and initial annual variance.
+        """
+    def drift(self, t: builtins.float, state: typing.Sequence[builtins.float]) -> builtins.list[builtins.float]:
+        r"""
+        Return log-spot and annual-variance drift at a two-component state.
+        """
+    def diffusion(self, t: builtins.float, state: typing.Sequence[builtins.float]) -> builtins.list[builtins.list[builtins.float]]:
+        r"""
+        Return the two-by-two diffusion matrix, one row per state component.
+        """
+    def evolve(self, t0: builtins.float, state: typing.Sequence[builtins.float], dt: builtins.float, draws: typing.Sequence[builtins.float]) -> builtins.list[builtins.float]:
+        r"""
+        Evolve a state with two supplied independent standard-normal draws.
+        """
+    def time(self, date: time.Date) -> builtins.float:
+        r"""
+        Convert a date using the risk-free curve's reference date and day count.
         """
 
 @typing.final

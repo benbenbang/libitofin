@@ -38,6 +38,7 @@ __all__ = [
     "randomnumbers",
     "results",
     "simulate_gbm",
+    "simulate_gjr",
     "simulate_heston",
     "simulate_merton",
     "simulate_ou",
@@ -154,6 +155,30 @@ def simulate_gbm(initial: typing.Sequence[builtins.float], drift: typing.Sequenc
 
     Raises:
         ItofinError: If inputs, correlation, or output size are invalid.
+    """
+
+def simulate_gjr(spot: builtins.float, daily_variance: builtins.float, risk_free_rate: builtins.float, dividend_yield: builtins.float, omega: builtins.float, alpha: builtins.float, beta: builtins.float, gamma: builtins.float, lambda_: builtins.float, horizon: builtins.float, steps: builtins.int, paths: builtins.int, seed: builtins.int, days_per_year: builtins.float = 252.0, scheme: builtins.str = 'FullTruncation', terminal_only: builtins.bool = False, max_output_values: builtins.int = 0) -> numpy.typing.NDArray[numpy.float64]:
+    r"""
+    Generate seeded GJR-GARCH diffusion-approximation spot/variance paths.
+
+    Daily `daily_variance` and `omega` parameters are converted internally.
+    Output component zero is spot; component one is raw annual variance,
+    which may be negative with truncation schemes. This is not the daily
+    GJR recursion. Rates and horizon are annualized, continuously compounded.
+
+    `scheme` is `PartialTruncation`, `FullTruncation` or `Reflection`. Each
+    step consumes two MT19937/inverse-normal draws in path/time/factor order,
+    even for zero horizon. Equal seeds and inputs reproduce the same paths
+    across Python and Go. Zero seed is rejected.
+
+    Returns:
+        numpy.ndarray: Owned contiguous float64 values shaped
+            `(paths, steps + 1, 2)` including initial state, or `(paths, 2)`
+            with `terminal_only`. Terminal rows match final full rows exactly.
+
+    Raises:
+        ItofinError: If parameters, time grid, simulation or output size are
+            invalid. `max_output_values=0` selects 16,777,216 values (128 MiB).
     """
 
 def simulate_heston(spot: builtins.float, variance: builtins.float, risk_free_rate: builtins.float, dividend_yield: builtins.float, kappa: builtins.float, theta: builtins.float, sigma: builtins.float, rho: builtins.float, horizon: builtins.float, steps: builtins.int, paths: builtins.int, seed: builtins.int, scheme: builtins.str = 'qem', terminal_only: builtins.bool = False, max_output_values: builtins.int = 0) -> numpy.typing.NDArray[numpy.float64]:

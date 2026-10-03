@@ -28,6 +28,8 @@ mod curve;
 mod fdengine;
 mod fra;
 mod general_statistics;
+mod gjr;
+mod gjr_simulation;
 mod helpers;
 mod heston;
 mod heston_engines;
@@ -210,6 +212,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(simulation::simulate_heston, m)?)?;
     m.add_function(wrap_pyfunction!(ou_simulation::simulate_ou, m)?)?;
     m.add_function(wrap_pyfunction!(merton_simulation::simulate_merton, m)?)?;
+    m.add_function(wrap_pyfunction!(gjr_simulation::simulate_gjr, m)?)?;
     m.add_class::<PySettings>()?;
 
     let time = PyModule::new(py, "time")?;
@@ -307,6 +310,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     processes.add_class::<PyHestonProcess>()?;
     processes.add_class::<bates::PyBatesProcess>()?;
     processes.add_class::<merton::PyMerton76Process>()?;
+    processes.add_class::<gjr::PyGjrGarchProcess>()?;
 
     let indexes = PyModule::new(py, "indexes")?;
     indexes.add_class::<overnightfuture::PySofr>()?;
