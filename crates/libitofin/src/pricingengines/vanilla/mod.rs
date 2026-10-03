@@ -1281,3 +1281,6 @@ mod test_greeks {
 
 #[cfg(test)]
 mod qmc_oracle;
+
+pub mod analyticgjrgarchengine;
+pub use analyticgjrgarchengine::AnalyticGjrGarchEngine;
