@@ -1,0 +1,395 @@
+{
+  "cases": [
+    {
+      "apply": [
+        101.00501670841679,
+        0.010000000000000002
+      ],
+      "diffusion": [
+        [
+          0.2,
+          0.0
+        ],
+        [
+          -0.0030924899620225947,
+          0.06275780391639234
+        ]
+      ],
+      "drift": [
+        -3.530908898596863e-13,
+        -0.41134244368033557
+      ],
+      "dt": 0.003968253968253968,
+      "dw": [
+        -0.7,
+        -0.2
+      ],
+      "dx": [
+        0.01,
+        -0.03
+      ],
+      "evolve": [
+        99.12196037810331,
+        0.037713380695596294
+      ],
+      "initial": [
+        100.0,
+        0.04
+      ],
+      "input": {
+        "alpha": 0.04,
+        "beta": 0.88,
+        "daily_variance": 0.00015873015873015873,
+        "days_per_year": 252.0,
+        "discretization": 1,
+        "dividend_yield": 0.01,
+        "gamma": 0.08,
+        "lambda": -0.4,
+        "omega": 2e-06,
+        "risk_free_rate": 0.03,
+        "spot": 100.0
+      },
+      "name": "scheme_1_variance_0.04_shock_-1",
+      "state": [
+        100.0,
+        0.04
+      ]
+    },
+    {
+      "apply": [
+        101.00501670841679,
+        0.010000000000000002
+      ],
+      "diffusion": [
+        [
+          0.2,
+          0.0
+        ],
+        [
+          -0.0030924899620225947,
+          0.06275780391639234
+        ]
+      ],
+      "drift": [
+        -3.530908898596863e-13,
+        -0.41134244368033557
+      ],
+      "dt": 0.003968253968253968,
+      "dw": [
+        0.7,
+        -0.2
+      ],
+      "dx": [
+        0.01,
+        -0.03
+      ],
+      "evolve": [
+        100.88581745008614,
+        0.03744064871654711
+      ],
+      "initial": [
+        100.0,
+        0.04
+      ],
+      "input": {
+        "alpha": 0.04,
+        "beta": 0.88,
+        "daily_variance": 0.00015873015873015873,
+        "days_per_year": 252.0,
+        "discretization": 1,
+        "dividend_yield": 0.01,
+        "gamma": 0.08,
+        "lambda": -0.4,
+        "omega": 2e-06,
+        "risk_free_rate": 0.03,
+        "spot": 100.0
+      },
+      "name": "scheme_1_variance_0.04_shock_1",
+      "state": [
+        100.0,
+        0.04
+      ]
+    },
+    {
+      "apply": [
+        101.00501670841679,
+        -0.03
+      ],
+      "diffusion": [
+        [
+          1e-08,
+          0.0
+        ],
+        [
+          -7.731224905056487e-18,
+          1.5689450979098085e-16
+        ]
+      ],
+      "drift": [
+        0.01999999999964691,
+        0.12700799999999998
+      ],
+      "dt": 0.003968253968253968,
+      "dw": [
+        -0.7,
+        -0.2
+      ],
+      "dx": [
+        0.01,
+        -0.03
+      ],
+      "evolve": [
+        100.00793682288563,
+        0.0005039999999999999
+      ],
+      "initial": [
+        100.0,
+        0.04
+      ],
+      "input": {
+        "alpha": 0.04,
+        "beta": 0.88,
+        "daily_variance": 0.00015873015873015873,
+        "days_per_year": 252.0,
+        "discretization": 1,
+        "dividend_yield": 0.01,
+        "gamma": 0.08,
+        "lambda": -0.4,
+        "omega": 2e-06,
+        "risk_free_rate": 0.03,
+        "spot": 100.0
+      },
+      "name": "scheme_1_variance_0.0_shock_-1",
+      "state": [
+        100.0,
+        0.0
+      ]
+    },
+    {
+      "apply": [
+        101.00501670841679,
+        -0.03
+      ],
+      "diffusion": [
+        [
+          1e-08,
+          0.0
+        ],
+        [
+          -7.731224905056487e-18,
+          1.5689450979098085e-16
+        ]
+      ],
+      "drift": [
+        0.01999999999964691,
+        0.12700799999999998
+      ],
+      "dt": 0.003968253968253968,
+      "dw": [
+        0.7,
+        -0.2
+      ],
+      "dx": [
+        0.01,
+        -0.03
+      ],
+      "evolve": [
+        100.00793682288563,
+        0.0005039999999999999
+      ],
+      "initial": [
+        100.0,
+        0.04
+      ],
+      "input": {
+        "alpha": 0.04,
+        "beta": 0.88,
+        "daily_variance": 0.00015873015873015873,
+        "days_per_year": 252.0,
+        "discretization": 1,
+        "dividend_yield": 0.01,
+        "gamma": 0.08,
+        "lambda": -0.4,
+        "omega": 2e-06,
+        "risk_free_rate": 0.03,
+        "spot": 100.0
+      },
+      "name": "scheme_1_variance_0.0_shock_1",
+      "state": [
+        100.0,
+        0.0
+      ]
+    },
+    {
+      "apply": [
+        101.00501670841679,
+        -0.07
+      ],
+      "diffusion": [
+        [
+          1e-08,
+          0.0
+        ],
+        [
+          -7.731224905056487e-18,
+          1.5689450979098085e-16
+        ]
+      ],
+      "drift": [
+        0.01999999999964691,
+        0.12700799999999998
+      ],
+      "dt": 0.003968253968253968,
+      "dw": [
+        -0.7,
+        -0.2
+      ],
+      "dx": [
+        0.01,
+        -0.03
+      ],
+      "evolve": [
+        100.00793682288563,
+        -0.039496
+      ],
+      "initial": [
+        100.0,
+        0.04
+      ],
+      "input": {
+        "alpha": 0.04,
+        "beta": 0.88,
+        "daily_variance": 0.00015873015873015873,
+        "days_per_year": 252.0,
+        "discretization": 1,
+        "dividend_yield": 0.01,
+        "gamma": 0.08,
+        "lambda": -0.4,
+        "omega": 2e-06,
+        "risk_free_rate": 0.03,
+        "spot": 100.0
+      },
+      "name": "scheme_1_variance_-0.04_shock_-1",
+      "state": [
+        100.0,
+        -0.04
+      ]
+    },
+    {
+      "apply": [
+        101.00501670841679,
+        -0.07
+      ],
+      "diffusion": [
+        [
+          1e-08,
+          0.0
+        ],
+        [
+          -7.731224905056487e-18,
+          1.5689450979098085e-16
+        ]
+      ],
+      "drift": [
+        0.01999999999964691,
+        0.12700799999999998
+      ],
+      "dt": 0.003968253968253968,
+      "dw": [
+        0.7,
+        -0.2
+      ],
+      "dx": [
+        0.01,
+        -0.03
+      ],
+      "evolve": [
+        100.00793682288563,
+        -0.039496
+      ],
+      "initial": [
+        100.0,
+        0.04
+      ],
+      "input": {
+        "alpha": 0.04,
+        "beta": 0.88,
+        "daily_variance": 0.00015873015873015873,
+        "days_per_year": 252.0,
+        "discretization": 1,
+        "dividend_yield": 0.01,
+        "gamma": 0.08,
+        "lambda": -0.4,
+        "omega": 2e-06,
+        "risk_free_rate": 0.03,
+        "spot": 100.0
+      },
+      "name": "scheme_1_variance_-0.04_shock_1",
+      "state": [
+        100.0,
+        -0.04
+      ]
+    },
+    {
+      "diffusion": [
+        [
+          1e-08,
+          0.0
+        ],
+        [
+          -7.731224905056487e-18,
+          1.5689450979098085e-16
+        ]
+      ],
+      "drift": [
+        0.01999999999964691,
+        0.12700799999999998
+      ],
+      "dt": 0.0,
+      "dw": [
+        0.7,
+        -0.2
+      ],
+      "evolve": [
+        100.0,
+        -0.04
+      ],
+      "initial": [
+        100.0,
+        0.04
+      ],
+      "input": {
+        "alpha": 0.04,
+        "beta": 0.88,
+        "daily_variance": 0.00015873015873015873,
+        "days_per_year": 252.0,
+        "discretization": 1,
+        "dividend_yield": 0.01,
+        "gamma": 0.08,
+        "lambda": -0.4,
+        "omega": 2e-06,
+        "risk_free_rate": 0.03,
+        "spot": 100.0
+      },
+      "name": "zero_dt_negative_scheme_1",
+      "state": [
+        100.0,
+        -0.04
+      ]
+    }
+  ],
+  "provenance": {
+    "absolute_tolerance": 1e-12,
+    "apply": "independent Python spot*exp(dx0), variance+dx1; SWIG omits apply",
+    "draw_order": "path,step,factor0,factor1",
+    "generator": "QuantLib-Python executable transitions",
+    "header_sigma2_typo": "executable 2+4*lambda^2, not header lambda^4",
+    "layout": "path,time,state(spot,annual_variance)",
+    "paths": "independent MT19937/Acklam normals fed into QuantLib evolve",
+    "quantlib_commit": "9863b578af0caa4cecabf697196533e84a8308b6",
+    "quantlib_version": "1.43",
+    "reference": "ql/processes/gjrgarchprocess.cpp",
+    "relative_tolerance": 2e-13,
+    "uniform": "(word+0.5)/4294967296"
+  }
+}
