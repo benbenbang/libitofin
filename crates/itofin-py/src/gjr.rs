@@ -160,3 +160,13 @@ impl PyGjrGarchProcess {
         Ok(self.inner.time(&date.inner()).map_err(PyQlError::from)?)
     }
 }
+
+impl PyGjrGarchProcess {
+    pub(crate) fn inner(&self) -> Shared<GjrGarchProcess> {
+        Shared::clone(&self.inner)
+    }
+
+    pub(crate) fn from_inner(inner: Shared<GjrGarchProcess>) -> Self {
+        Self { inner }
+    }
+}

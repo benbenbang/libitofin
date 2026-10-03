@@ -1290,6 +1290,22 @@ class VanillaOption:
         r"""
         Attach the Bates engine and return the option value.
         """
+    def set_gjr_engine(self, engine: pricingengines.AnalyticGJRGARCHEngine) -> None:
+        r"""
+        Attach the daily-moment GJR-GARCH European approximation.
+        """
+    def price_gjr(self, engine: pricingengines.AnalyticGJRGARCHEngine) -> builtins.float:
+        r"""
+        Attach the GJR-GARCH approximation and return its value.
+        """
+    def set_mc_gjr_engine(self, engine: pricingengines.MCEuropeanGJRGARCHEngine) -> None:
+        r"""
+        Attach a seeded two-factor GJR-GARCH European Monte Carlo engine.
+        """
+    def price_mc_gjr(self, engine: pricingengines.MCEuropeanGJRGARCHEngine) -> builtins.float:
+        r"""
+        Attach the GJR-GARCH Monte Carlo engine and return its value.
+        """
     def set_heston_engine(self, model: models.HestonModel, integration_order: builtins.int) -> None:
         r"""
         Attach an analytic Heston engine built on model.

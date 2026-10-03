@@ -29,6 +29,7 @@ mod fdengine;
 mod fra;
 mod general_statistics;
 mod gjr;
+mod gjr_model;
 mod gjr_simulation;
 mod helpers;
 mod heston;
@@ -374,6 +375,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     let models = PyModule::new(py, "models")?;
     models.add_class::<PyHestonModel>()?;
     models.add_class::<bates::PyBatesModel>()?;
+    models.add_class::<gjr_model::PyGjrGarchModel>()?;
     models.add_class::<PyHullWhite>()?;
     models.add_class::<PyHestonModelHelper>()?;
     models.add_class::<PySwaptionHelper>()?;
@@ -400,6 +402,8 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     pricingengines.add_class::<PyMCEuropeanEngine>()?;
     pricingengines.add_class::<merton::PyJumpDiffusionEngine>()?;
     pricingengines.add_class::<bates::PyBatesEngine>()?;
+    pricingengines.add_class::<gjr_model::PyAnalyticGjrGarchEngine>()?;
+    pricingengines.add_class::<gjr_model::PyMcEuropeanGjrGarchEngine>()?;
     pricingengines.add_class::<PyQMCEuropeanEngine>()?;
     pricingengines.add_class::<heston_engines::PyCosHestonEngine>()?;
     pricingengines.add_class::<heston_engines::PyExponentialFittingHestonEngine>()?;

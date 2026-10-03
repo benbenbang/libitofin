@@ -12,6 +12,7 @@ from itofin import time
 import typing
 __all__ = [
     "AccrualBias",
+    "AnalyticGJRGARCHEngine",
     "BachelierCapFloorEngine",
     "BachelierSwaptionEngine",
     "BatesEngine",
@@ -29,6 +30,7 @@ __all__ = [
     "JumpDiffusionEngine",
     "MCAmericanEngine",
     "MCEuropeanEngine",
+    "MCEuropeanGJRGARCHEngine",
     "MCEuropeanHestonEngine",
     "MidPointCdsEngine",
     "NumericalFix",
@@ -37,6 +39,21 @@ __all__ = [
     "TreeSwaptionEngine",
     "YoYInflationCapFloorEngine",
 ]
+
+@typing.final
+class AnalyticGJRGARCHEngine:
+    r"""
+    European plain-vanilla pricing with QuantLib's GJR-GARCH moment approximation.
+
+    This is an approximation, not an exact characteristic-function valuation.
+    Preserves the source convention: call values omit the dividend discount,
+    and put minus call is strike * risk-free discount / dividend discount - spot.
+    Only NPV is supplied; unsupported exercises, payoffs and Greeks raise errors.
+    """
+    def __init__(self, model: models.GJRGARCHModel) -> None:
+        r"""
+        Retain the live model and its daily-unit parameters.
+        """
 
 @typing.final
 class BachelierCapFloorEngine:
@@ -452,6 +469,24 @@ class MCEuropeanEngine:
         Raises:
             ItofinError: If neither or both of steps and steps_per_year are
                 given, or if both samples and absolute_tolerance are given.
+        """
+
+@typing.final
+class MCEuropeanGJRGARCHEngine:
+    r"""
+    Seeded pseudo-random European pricing on any supported GJR process scheme.
+
+    Retains the supplied process snapshot: later model parameter updates do
+    not retarget an existing MC engine. Live spot and yield quotes still update.
+    Standard error is available through VanillaOption.error_estimate(). Brownian
+    bridge and control variates are not supported by this facade.
+    """
+    def __init__(self, process: processes.GJRGARCHProcess, steps: typing.Optional[builtins.int] = None, steps_per_year: typing.Optional[builtins.int] = None, samples: typing.Optional[builtins.int] = None, absolute_tolerance: typing.Optional[builtins.float] = None, max_samples: typing.Optional[builtins.int] = None, seed: typing.Optional[builtins.int] = None, antithetic: typing.Optional[builtins.bool] = None) -> None:
+        r"""
+        Configure the core factory, preserving its argument validation.
+
+        Specify exactly one of steps and steps_per_year, and exactly one of
+        samples and absolute_tolerance. max_samples caps tolerance-driven draws.
         """
 
 @typing.final
