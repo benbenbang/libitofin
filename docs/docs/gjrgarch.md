@@ -3,7 +3,8 @@
 GJR-GARCH couples spot returns and variance with an asymmetric leverage effect.
 The shared Rust process is exposed through C, Go and Python. This is a stochastic
 process and simulation API, not the historical `Garch11` estimator. Calibrated
-models and European pricing engines remain tracked separately in #1165.
+models and European engines are documented separately in
+[GJR-GARCH pricing](gjrgarch-pricing.md) (#1165, unreleased).
 
 ## Parameters and units
 
@@ -118,4 +119,4 @@ the process's retained inputs. Calls through a closed process/session fail.
 
 ::: itofin.simulate_gjr
 
-::: itofin.processes.GJRGARCHProcess
+See the [process API reference](api/processes.md#itofin.processes.GJRGARCHProcess).
