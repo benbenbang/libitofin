@@ -1,0 +1,154 @@
+{
+  "domain": "gjr-garch-model-calibration-and-european-engines",
+  "entries": [
+    {
+      "c": "itofin_gjr_model_new",
+      "go": "Session.NewGJRModel",
+      "python": "itofin.models.GJRGARCHModel",
+      "status": "implemented",
+      "tests": "TestGJRIndependentAnalyticOracles"
+    },
+    {
+      "c": "itofin_gjr_model_new",
+      "go": "Session.NewGJRModel",
+      "python": "itofin.models.GJRGARCHModel.__init__",
+      "status": "implemented",
+      "tests": "TestGJRIndependentAnalyticOracles"
+    },
+    {
+      "c": "itofin_gjr_model_params",
+      "go": "GJRModel.Params",
+      "python": "itofin.models.GJRGARCHModel.daily_variance",
+      "status": "implemented",
+      "tests": "TestGJRModelParametersLiveInputsAndRetainedGraph"
+    },
+    {
+      "c": "itofin_gjr_model_params",
+      "go": "GJRModel.Params",
+      "python": "itofin.models.GJRGARCHModel.omega",
+      "status": "implemented",
+      "tests": "TestGJRModelParametersLiveInputsAndRetainedGraph"
+    },
+    {
+      "c": "itofin_gjr_model_params",
+      "go": "GJRModel.Params",
+      "python": "itofin.models.GJRGARCHModel.alpha",
+      "status": "implemented",
+      "tests": "TestGJRModelParametersLiveInputsAndRetainedGraph"
+    },
+    {
+      "c": "itofin_gjr_model_params",
+      "go": "GJRModel.Params",
+      "python": "itofin.models.GJRGARCHModel.beta",
+      "status": "implemented",
+      "tests": "TestGJRModelParametersLiveInputsAndRetainedGraph"
+    },
+    {
+      "c": "itofin_gjr_model_params",
+      "go": "GJRModel.Params",
+      "python": "itofin.models.GJRGARCHModel.gamma",
+      "status": "implemented",
+      "tests": "TestGJRModelParametersLiveInputsAndRetainedGraph"
+    },
+    {
+      "c": "itofin_gjr_model_params",
+      "go": "GJRModel.Params",
+      "python": "itofin.models.GJRGARCHModel.lambda_",
+      "status": "implemented",
+      "tests": "TestGJRModelParametersLiveInputsAndRetainedGraph"
+    },
+    {
+      "c": "itofin_gjr_model_params",
+      "go": "GJRModel.Params",
+      "python": "itofin.models.GJRGARCHModel.params",
+      "status": "implemented",
+      "tests": "TestGJRModelParametersLiveInputsAndRetainedGraph"
+    },
+    {
+      "c": "itofin_gjr_model_set_params",
+      "go": "GJRModel.SetParams",
+      "python": "itofin.models.GJRGARCHModel.set_params",
+      "status": "implemented",
+      "tests": "TestGJRModelParametersLiveInputsAndRetainedGraph"
+    },
+    {
+      "c": "itofin_gjr_model_process",
+      "go": "GJRModel.Process",
+      "python": "itofin.models.GJRGARCHModel.process",
+      "status": "implemented",
+      "tests": "TestGJRModelParametersLiveInputsAndRetainedGraph"
+    },
+    {
+      "c": "itofin_gjr_calibrate_with_options",
+      "go": "GJRModel.Calibrate",
+      "python": "itofin.models.GJRGARCHModel.calibrate",
+      "status": "implemented",
+      "tests": "TestGJRIndependentWeightedFixedCalibrationOracle"
+    },
+    {
+      "c": "itofin_gjr_analytic_engine_new",
+      "go": "Session.NewAnalyticGJREngine",
+      "python": "itofin.pricingengines.AnalyticGJRGARCHEngine",
+      "status": "implemented",
+      "tests": "TestGJRIndependentAnalyticOracles"
+    },
+    {
+      "c": "itofin_gjr_analytic_engine_new",
+      "go": "Session.NewAnalyticGJREngine",
+      "python": "itofin.pricingengines.AnalyticGJRGARCHEngine.__init__",
+      "status": "implemented",
+      "tests": "TestGJRIndependentAnalyticOracles"
+    },
+    {
+      "c": "itofin_gjr_mc_engine_new",
+      "go": "Session.NewMCGJREngine",
+      "python": "itofin.pricingengines.MCEuropeanGJRGARCHEngine",
+      "status": "implemented",
+      "tests": "TestGJRIndependentSeededMCOracles"
+    },
+    {
+      "c": "itofin_gjr_mc_engine_new",
+      "go": "Session.NewMCGJREngine",
+      "python": "itofin.pricingengines.MCEuropeanGJRGARCHEngine.__init__",
+      "status": "implemented",
+      "tests": "TestGJRIndependentSeededMCOracles"
+    },
+    {
+      "c": "itofin_option_set_engine",
+      "go": "VanillaOption.SetAnalyticGJREngine",
+      "python": "itofin.instruments.VanillaOption.set_gjr_engine",
+      "status": "implemented",
+      "tests": [
+        "TestGJRModelParametersLiveInputsAndRetainedGraph",
+        "TestGJRModelRejectsWrongNativeTypes"
+      ]
+    },
+    {
+      "c": [
+        "itofin_option_set_engine",
+        "itofin_option_value"
+      ],
+      "go": "VanillaOption.PriceAnalyticGJR",
+      "python": "itofin.instruments.VanillaOption.price_gjr",
+      "status": "implemented",
+      "tests": "TestGJRIndependentAnalyticOracles"
+    },
+    {
+      "c": "itofin_option_set_engine",
+      "go": "VanillaOption.SetMCGJREngine",
+      "python": "itofin.instruments.VanillaOption.set_mc_gjr_engine",
+      "status": "implemented",
+      "tests": "TestGJRMCConstantVarianceIndependentBlackPrice"
+    },
+    {
+      "c": [
+        "itofin_option_set_engine",
+        "itofin_option_value"
+      ],
+      "go": "VanillaOption.PriceMCGJR",
+      "python": "itofin.instruments.VanillaOption.price_mc_gjr",
+      "status": "implemented",
+      "tests": "TestGJRIndependentSeededMCOracles"
+    }
+  ]
+}
