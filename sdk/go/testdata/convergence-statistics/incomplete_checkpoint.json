@@ -1,0 +1,41 @@
+{
+  "exact": {
+    "mean": 13.6,
+    "samples": 5,
+    "table": [
+      {
+        "mean": 2.0,
+        "samples": 1
+      },
+      {
+        "mean": 6.0,
+        "samples": 3
+      }
+    ],
+    "weight_sum": 5.0
+  },
+  "name": "incomplete_checkpoint",
+  "native": {
+    "mean": 13.6,
+    "samples": 5,
+    "table": [
+      {
+        "mean": 2,
+        "samples": 1
+      },
+      {
+        "mean": 6,
+        "samples": 3
+      }
+    ],
+    "weight_sum": 5
+  },
+  "observations": [
+    2,
+    6,
+    10,
+    20,
+    30
+  ],
+  "weights": null
+}

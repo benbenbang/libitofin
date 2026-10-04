@@ -1,0 +1,59 @@
+{
+  "exact": {
+    "mean": 5.714285714285714,
+    "samples": 7,
+    "table": [
+      {
+        "mean": 2.0,
+        "samples": 1
+      },
+      {
+        "mean": 6.5,
+        "samples": 3
+      },
+      {
+        "mean": 5.714285714285714,
+        "samples": 7
+      }
+    ],
+    "weight_sum": 7.0
+  },
+  "name": "zero_weight_count",
+  "native": {
+    "mean": 5.714285714285714,
+    "samples": 7,
+    "table": [
+      {
+        "mean": 2,
+        "samples": 1
+      },
+      {
+        "mean": 6.5,
+        "samples": 3
+      },
+      {
+        "mean": 5.714285714285714,
+        "samples": 7
+      }
+    ],
+    "weight_sum": 7
+  },
+  "observations": [
+    2,
+    100,
+    8,
+    -99,
+    4,
+    17,
+    6
+  ],
+  "weights": [
+    1,
+    0,
+    3,
+    0,
+    2,
+    0,
+    1
+  ]
+}

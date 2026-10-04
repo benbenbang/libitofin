@@ -1,0 +1,67 @@
+{
+  "exact": {
+    "mean": 8.0,
+    "samples": 15,
+    "table": [
+      {
+        "mean": 1.0,
+        "samples": 1
+      },
+      {
+        "mean": 2.0,
+        "samples": 3
+      },
+      {
+        "mean": 4.0,
+        "samples": 7
+      },
+      {
+        "mean": 8.0,
+        "samples": 15
+      }
+    ],
+    "weight_sum": 15.0
+  },
+  "name": "unit_fifteen",
+  "native": {
+    "mean": 8,
+    "samples": 15,
+    "table": [
+      {
+        "mean": 1,
+        "samples": 1
+      },
+      {
+        "mean": 2,
+        "samples": 3
+      },
+      {
+        "mean": 4,
+        "samples": 7
+      },
+      {
+        "mean": 8,
+        "samples": 15
+      }
+    ],
+    "weight_sum": 15
+  },
+  "observations": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15
+  ],
+  "weights": null
+}

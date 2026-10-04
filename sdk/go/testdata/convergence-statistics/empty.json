@@ -1,0 +1,17 @@
+{
+  "exact": {
+    "mean": null,
+    "samples": 0,
+    "table": [],
+    "weight_sum": 0.0
+  },
+  "name": "empty",
+  "native": {
+    "mean": null,
+    "samples": 0,
+    "table": [],
+    "weight_sum": 0
+  },
+  "observations": [],
+  "weights": null
+}
