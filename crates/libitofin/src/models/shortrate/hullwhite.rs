@@ -441,6 +441,11 @@ impl ShortRateDynamics for HullWhiteDynamics {
 /// rebuilds `phi_` (the fitting law for `dynamics()`), deferred here with the
 /// dynamics/tree path (see the module deferral note); `A(t,T)` reads the curve's
 /// forward live and never uses `phi_`.
+///
+/// Observer updates cannot return errors. An empty or invalid live curve leaves
+/// the last valid cached `r0` unchanged while the model observer still notifies
+/// consumers. Fallible pricing paths read the live handle and report errors;
+/// a later valid relink refreshes the cache normally.
 impl CalibratedModelHolder for HullWhite {
     fn calibrated_model(&self) -> &CalibratedModel {
         self.base.calibrated_model()
@@ -451,15 +456,16 @@ impl CalibratedModelHolder for HullWhite {
     }
 
     fn generate_arguments(&mut self) {
-        let zero = self
-            .ts_model
-            .term_structure()
-            .current_link()
-            .expect("the Hull-White model requires a non-empty term-structure handle")
-            .zero_rate(0.0, Compounding::Continuous, Frequency::NoFrequency, false)
-            .expect("the Hull-White zero rate at t=0 is well-defined on its curve")
-            .rate();
-        self.base.set_r0(zero);
+        let Ok(curve) = self.ts_model.term_structure().current_link() else {
+            return;
+        };
+        let Ok(zero) = curve.zero_rate(0.0, Compounding::Continuous, Frequency::NoFrequency, false)
+        else {
+            return;
+        };
+        if zero.rate().is_finite() {
+            self.base.set_r0(zero.rate());
+        }
     }
 }
 
