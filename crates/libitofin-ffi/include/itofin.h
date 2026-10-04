@@ -2114,6 +2114,105 @@ int32_t itofin_composite_constraint_new(struct ItofinContext *ctx,
                                         struct ItofinError *error);
 
 /**
+ * Evaluate running means at completed checkpoints 1, 3, 7, 15, ... .
+ * Null weights with zero length selects unit weights. Inputs are limited to
+ * 100,000 observations. The output length must equal the number of completed
+ * checkpoints; empty input requires length zero. All outputs stay unchanged
+ * on error. Each completed checkpoint requires positive cumulative weight.
+ * # Safety
+ * Inputs and output arrays follow the crate-level pointer contract.
+ */
+int32_t itofin_convergence_statistics_evaluate(const ItofinReal *values,
+                                               size_t len,
+                                               const ItofinReal *weights,
+                                               size_t weights_len,
+                                               size_t *out_counts,
+                                               ItofinReal *out_means,
+                                               size_t out_len,
+                                               struct ItofinError *error);
+
+/**
+ * Create an empty, context-owned accumulator. Release with `itofin_handle_release`.
+ * # Safety
+ * `out` holds one writable handle and follows the crate-level contract.
+ */
+int32_t itofin_convergence_statistics_new(struct ItofinContext *ctx,
+                                          uint64_t *out,
+                                          struct ItofinError *error);
+
+/**
+ * Atomically append one finite observation with finite nonnegative weight.
+ * A zero-total-weight checkpoint is rejected without changing state.
+ * # Safety
+ * Follow the crate-level context and pointer contract.
+ */
+int32_t itofin_convergence_statistics_add(struct ItofinContext *ctx,
+                                          uint64_t id,
+                                          ItofinReal value,
+                                          ItofinReal weight,
+                                          struct ItofinError *error);
+
+/**
+ * Atomically append a bounded batch; null weights with length zero selects unit weights.
+ * Invalid values, weights or checkpoints leave all state unchanged.
+ * # Safety
+ * Inputs follow the crate-level contract and hold their stated lengths.
+ */
+int32_t itofin_convergence_statistics_add_batch(struct ItofinContext *ctx,
+                                                uint64_t id,
+                                                const ItofinReal *values,
+                                                size_t len,
+                                                const ItofinReal *weights,
+                                                size_t weights_len,
+                                                struct ItofinError *error);
+
+/**
+ * Remove all observations and checkpoints.
+ * # Safety
+ * Follow the crate-level context and pointer contract.
+ */
+int32_t itofin_convergence_statistics_reset(struct ItofinContext *ctx,
+                                            uint64_t id,
+                                            struct ItofinError *error);
+
+/**
+ * Copy sample count, cumulative weight and completed table length.
+ * Outputs are optional but at least one must be present; errors preserve all outputs.
+ * # Safety
+ * Non-null outputs hold one writable value and follow the crate-level contract.
+ */
+int32_t itofin_convergence_statistics_summary(struct ItofinContext *ctx,
+                                              uint64_t id,
+                                              size_t *out_samples,
+                                              ItofinReal *out_weight_sum,
+                                              size_t *out_entries,
+                                              struct ItofinError *error);
+
+/**
+ * Copy the current running weighted mean, including observations after the last checkpoint.
+ * An empty accumulator is an error; errors leave `out` unchanged.
+ * # Safety
+ * `out` holds one writable double and follows the crate-level contract.
+ */
+int32_t itofin_convergence_statistics_mean(struct ItofinContext *ctx,
+                                           uint64_t id,
+                                           ItofinReal *out,
+                                           struct ItofinError *error);
+
+/**
+ * Copy the completed convergence table into independent caller-owned arrays.
+ * Output length must exactly match the completed table; errors preserve both arrays.
+ * # Safety
+ * Outputs follow the crate-level contract and hold `out_len` writable values.
+ */
+int32_t itofin_convergence_statistics_table(struct ItofinContext *ctx,
+                                            uint64_t id,
+                                            size_t *out_counts,
+                                            ItofinReal *out_means,
+                                            size_t out_len,
+                                            struct ItofinError *error);
+
+/**
  * # Safety
  * Pointers must be aligned, live and valid for their stated lengths. Outputs
  * must not overlap inputs or other outputs. Any context and its handles must
