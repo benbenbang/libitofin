@@ -69,6 +69,7 @@ pub mod rng_api;
 pub mod rng_gaussian_sobol;
 pub mod rng_low_discrepancy;
 pub mod rng_sequence_api;
+pub mod sequence_statistics_api;
 pub mod settings_api;
 pub mod smile_api;
 pub mod statistics_api;

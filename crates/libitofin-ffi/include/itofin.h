@@ -5744,6 +5744,35 @@ int32_t itofin_rng_sequence_draw(struct ItofinContext *ctx,
                                  struct ItofinError *error);
 
 /**
+ * Evaluate weighted vector statistics into a caller-owned row-major buffer.
+ *
+ * `values` holds `rows * dimension` row-major doubles; optional weights have
+ * one entry per row. Null weights with zero length selects unit weights.
+ * `measure` selects mean (0), variance (1), standard deviation (2), error
+ * estimate (3), minimum (4), maximum (5), covariance (6), or correlation (7).
+ * The exact output length is `dimension` for 0-5 and `dimension * dimension`
+ * for 6-7. Variance/covariance use the observation-count N/(N-1) correction,
+ * counting zero-weight rows. On every error, the entire output is unchanged.
+ * Dimensions are limited to 1-256, rows to 1-100,000, inputs to 1,000,000
+ * values and covariance/correlation work to 100,000,000 row-coordinate pairs.
+ *
+ * # Safety
+ *
+ * Inputs must be readable and `out` writable for their stated lengths.
+ * All pointers follow the crate-level alignment and non-overlap contract.
+ */
+int32_t itofin_sequence_statistics_evaluate(const ItofinReal *values,
+                                            size_t values_len,
+                                            size_t rows,
+                                            size_t dimension,
+                                            const ItofinReal *weights,
+                                            size_t weights_len,
+                                            int32_t measure,
+                                            ItofinReal *out,
+                                            size_t out_len,
+                                            struct ItofinError *error);
+
+/**
  * # Safety
  * Pointers must be aligned, live and valid for their stated lengths. Outputs
  * must not overlap inputs or other outputs. Any context and its handles must
