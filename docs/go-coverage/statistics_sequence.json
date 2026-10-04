@@ -1,0 +1,61 @@
+{
+  "domain": "statistics_sequence",
+  "entries": [
+    {
+      "c": "itofin_sequence_statistics_evaluate",
+      "go": "StatisticsSequenceMean",
+      "python": "itofin.statistics.sequence_mean",
+      "status": "implemented",
+      "tests": "TestStatisticsSequenceWeightedVectors"
+    },
+    {
+      "c": "itofin_sequence_statistics_evaluate",
+      "go": "StatisticsSequenceVariance",
+      "python": "itofin.statistics.sequence_variance",
+      "status": "implemented",
+      "tests": "TestStatisticsSequenceWeightedVectors"
+    },
+    {
+      "c": "itofin_sequence_statistics_evaluate",
+      "go": "StatisticsSequenceStandardDeviation",
+      "python": "itofin.statistics.sequence_standard_deviation",
+      "status": "implemented",
+      "tests": "TestStatisticsSequenceWeightedVectors"
+    },
+    {
+      "c": "itofin_sequence_statistics_evaluate",
+      "go": "StatisticsSequenceErrorEstimate",
+      "python": "itofin.statistics.sequence_error_estimate",
+      "status": "implemented",
+      "tests": "TestStatisticsSequenceWeightedVectors"
+    },
+    {
+      "c": "itofin_sequence_statistics_evaluate",
+      "go": "StatisticsSequenceMinimum",
+      "python": "itofin.statistics.sequence_minimum",
+      "status": "implemented",
+      "tests": "TestStatisticsSequenceWeightedVectors"
+    },
+    {
+      "c": "itofin_sequence_statistics_evaluate",
+      "go": "StatisticsSequenceMaximum",
+      "python": "itofin.statistics.sequence_maximum",
+      "status": "implemented",
+      "tests": "TestStatisticsSequenceWeightedVectors"
+    },
+    {
+      "c": "itofin_sequence_statistics_evaluate",
+      "go": "StatisticsCovariance",
+      "python": "itofin.statistics.covariance_matrix",
+      "status": "implemented",
+      "tests": "TestStatisticsSequenceCovarianceAndCorrelation"
+    },
+    {
+      "c": "itofin_sequence_statistics_evaluate",
+      "go": "StatisticsCorrelation",
+      "python": "itofin.statistics.correlation_matrix",
+      "status": "implemented",
+      "tests": "TestStatisticsSequenceCovarianceAndCorrelation"
+    }
+  ]
+}

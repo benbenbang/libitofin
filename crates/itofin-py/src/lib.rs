@@ -53,6 +53,7 @@ mod overnightfuture;
 mod poissonrng;
 mod randomnumbers;
 mod results;
+mod sequence_statistics;
 mod settings;
 mod simulation;
 mod smilesection;
@@ -475,6 +476,38 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
         &statistics
     )?)?;
     statistics.add_function(wrap_pyfunction!(statistics::top_percentile, &statistics)?)?;
+    statistics.add_function(wrap_pyfunction!(
+        sequence_statistics::sequence_mean,
+        &statistics
+    )?)?;
+    statistics.add_function(wrap_pyfunction!(
+        sequence_statistics::sequence_variance,
+        &statistics
+    )?)?;
+    statistics.add_function(wrap_pyfunction!(
+        sequence_statistics::sequence_standard_deviation,
+        &statistics
+    )?)?;
+    statistics.add_function(wrap_pyfunction!(
+        sequence_statistics::sequence_error_estimate,
+        &statistics
+    )?)?;
+    statistics.add_function(wrap_pyfunction!(
+        sequence_statistics::sequence_minimum,
+        &statistics
+    )?)?;
+    statistics.add_function(wrap_pyfunction!(
+        sequence_statistics::sequence_maximum,
+        &statistics
+    )?)?;
+    statistics.add_function(wrap_pyfunction!(
+        sequence_statistics::covariance_matrix,
+        &statistics
+    )?)?;
+    statistics.add_function(wrap_pyfunction!(
+        sequence_statistics::correlation_matrix,
+        &statistics
+    )?)?;
 
     let chart = PyModule::new(py, "chart")?;
     chart.add_class::<chart::PyChartSeries>()?;

@@ -7,6 +7,8 @@ __all__ = [
     "GeneralStatistics",
     "IncrementalStatistics",
     "average_shortfall",
+    "correlation_matrix",
+    "covariance_matrix",
     "downside_deviation",
     "downside_variance",
     "expected_shortfall",
@@ -16,6 +18,12 @@ __all__ = [
     "regret",
     "semi_deviation",
     "semi_variance",
+    "sequence_error_estimate",
+    "sequence_maximum",
+    "sequence_mean",
+    "sequence_minimum",
+    "sequence_standard_deviation",
+    "sequence_variance",
     "shortfall",
     "standard_deviation",
     "top_percentile",
@@ -157,6 +165,16 @@ def average_shortfall(observations: typing.Sequence[builtins.float], target: bui
     Weighted mean of target minus observations strictly below target.
     """
 
+def correlation_matrix(samples: typing.Sequence[typing.Sequence[builtins.float]], *, weights: typing.Optional[typing.Sequence[builtins.float]] = None) -> builtins.list[builtins.list[builtins.float]]:
+    r"""
+    Correlations with unit diagonal, both constant components one, exactly one constant zero.
+    """
+
+def covariance_matrix(samples: typing.Sequence[typing.Sequence[builtins.float]], *, weights: typing.Optional[typing.Sequence[builtins.float]] = None) -> builtins.list[builtins.list[builtins.float]]:
+    r"""
+    Symmetric weighted covariance matrix with row-count correction n/(n-1).
+    """
+
 def downside_deviation(observations: typing.Sequence[builtins.float], *, weights: typing.Optional[typing.Sequence[builtins.float]] = None) -> builtins.float:
     r"""
     Square root of downside variance.
@@ -200,6 +218,36 @@ def semi_deviation(observations: typing.Sequence[builtins.float], *, weights: ty
 def semi_variance(observations: typing.Sequence[builtins.float], *, weights: typing.Optional[typing.Sequence[builtins.float]] = None) -> builtins.float:
     r"""
     Count-corrected conditional variance below the weighted mean.
+    """
+
+def sequence_error_estimate(samples: typing.Sequence[typing.Sequence[builtins.float]], *, weights: typing.Optional[typing.Sequence[builtins.float]] = None) -> builtins.list[builtins.float]:
+    r"""
+    Component standard errors using the total row count, including zero-weight rows.
+    """
+
+def sequence_maximum(samples: typing.Sequence[typing.Sequence[builtins.float]], *, weights: typing.Optional[typing.Sequence[builtins.float]] = None) -> builtins.list[builtins.float]:
+    r"""
+    Component maxima over all rows, including zero-weight rows.
+    """
+
+def sequence_mean(samples: typing.Sequence[typing.Sequence[builtins.float]], *, weights: typing.Optional[typing.Sequence[builtins.float]] = None) -> builtins.list[builtins.float]:
+    r"""
+    Weighted component means of rectangular row samples.
+    """
+
+def sequence_minimum(samples: typing.Sequence[typing.Sequence[builtins.float]], *, weights: typing.Optional[typing.Sequence[builtins.float]] = None) -> builtins.list[builtins.float]:
+    r"""
+    Component minima over all rows, including zero-weight rows.
+    """
+
+def sequence_standard_deviation(samples: typing.Sequence[typing.Sequence[builtins.float]], *, weights: typing.Optional[typing.Sequence[builtins.float]] = None) -> builtins.list[builtins.float]:
+    r"""
+    Square roots of the count-corrected component variances.
+    """
+
+def sequence_variance(samples: typing.Sequence[typing.Sequence[builtins.float]], *, weights: typing.Optional[typing.Sequence[builtins.float]] = None) -> builtins.list[builtins.float]:
+    r"""
+    Component variances with row-count correction n/(n-1), including zero-weight rows.
     """
 
 def shortfall(observations: typing.Sequence[builtins.float], target: builtins.float, *, weights: typing.Optional[typing.Sequence[builtins.float]] = None) -> builtins.float:
