@@ -19,9 +19,10 @@
 //! use (the `with_*` methods below, each documented with its C++ cite): the
 //! effective / termination / settlement dates, the nominal, the fixed and
 //! floating leg calendars / conventions / termination-date conventions /
-//! end-of-month flags, the fixed-leg tenor and day count, the discounting term
-//! structure and the indexed-coupon mode. The swap tenor, index, optional fixed
-//! rate and forward start are the constructor arguments (`makevanillaswap.hpp:41`).
+//! end-of-month flags, the fixed-leg tenor and day count, the per-leg stub
+//! first / next-to-last dates, the discounting term structure and the
+//! indexed-coupon mode. The swap tenor, index, optional fixed rate and forward
+//! start are the constructor arguments (`makevanillaswap.hpp:41`).
 //!
 //! ## Deferred knobs
 //!
@@ -29,13 +30,8 @@
 //! C++ default (`makevanillaswap.hpp:95-116`):
 //!
 //! - swap type (`receiveFixed` / `withType`): defaults to `Payer`;
-//! - `withRule` / `withFixedLegRule` / `withFloatingLegRule`: the schedules use
-//!   `DateGeneration::Backward`;
 //! - `withPaymentConvention`: unset, so [`VanillaSwap::new`] resolves the payment
 //!   convention against the floating schedule;
-//! - `withFixedLegFirstDate` / `withFixedLegNextToLastDate` /
-//!   `withFloatingLegFirstDate` / `withFloatingLegNextToLastDate`: the stub dates
-//!   default to null;
 //! - `withFloatingLegTenor` / `withFloatingLegDayCount`: taken from the index
 //!   (`makevanillaswap.cpp:46/50`);
 //! - `withFloatingLegSpread`: defaults to `0.0`;
@@ -44,6 +40,19 @@
 //! - `withPricingEngine`: the engine is always the [`DiscountingSwapEngine`] over
 //!   the discounting curve (set) or the index's forwarding curve (default),
 //!   matching `makevanillaswap.cpp:171-199`.
+//! - `withSettlementCalendar`: spot derivation still uses the index fixing
+//!   calendar (default) or the floating-leg calendar (explicit settlement days).
+//!
+//! [`with_rule`](Self::with_rule) / [`with_fixed_leg_rule`](Self::with_fixed_leg_rule) /
+//! [`with_floating_leg_rule`](Self::with_floating_leg_rule) are ported; both
+//! schedules default to [`DateGeneration::Backward`].
+//!
+//! [`with_fixed_leg_first_date`](Self::with_fixed_leg_first_date) /
+//! [`with_fixed_leg_next_to_last_date`](Self::with_fixed_leg_next_to_last_date) /
+//! [`with_floating_leg_first_date`](Self::with_floating_leg_first_date) /
+//! [`with_floating_leg_next_to_last_date`](Self::with_floating_leg_next_to_last_date)
+//! thread into [`Schedule::new`] (`makevanillaswap.cpp:139/146`); unset stub
+//! dates stay null.
 //!
 //! ## Fixed-leg currency defaults (`makevanillaswap.cpp:104-163`)
 //!
@@ -125,6 +134,12 @@ pub struct MakeVanillaSwap {
     fixed_end_of_month: bool,
     float_end_of_month: bool,
     fixed_day_count: Option<DayCounter>,
+    fixed_rule: DateGeneration,
+    float_rule: DateGeneration,
+    fixed_first_date: Date,
+    fixed_next_to_last_date: Date,
+    float_first_date: Date,
+    float_next_to_last_date: Date,
 
     use_indexed_coupons: Option<bool>,
     discounting_curve: Option<Handle<dyn YieldTermStructure>>,
@@ -169,6 +184,12 @@ impl MakeVanillaSwap {
             fixed_end_of_month: false,
             float_end_of_month: false,
             fixed_day_count: None,
+            fixed_rule: DateGeneration::Backward,
+            float_rule: DateGeneration::Backward,
+            fixed_first_date: Date::null(),
+            fixed_next_to_last_date: Date::null(),
+            float_first_date: Date::null(),
+            float_next_to_last_date: Date::null(),
             use_indexed_coupons: None,
             discounting_curve: None,
         }
@@ -272,6 +293,49 @@ impl MakeVanillaSwap {
         self
     }
 
+    /// Sets the date-generation rule on both legs (`makevanillaswap.cpp:238`).
+    pub fn with_rule(mut self, rule: DateGeneration) -> MakeVanillaSwap {
+        self.fixed_rule = rule;
+        self.float_rule = rule;
+        self
+    }
+
+    /// Sets the fixed-leg date-generation rule (`makevanillaswap.cpp:286`).
+    pub fn with_fixed_leg_rule(mut self, rule: DateGeneration) -> MakeVanillaSwap {
+        self.fixed_rule = rule;
+        self
+    }
+
+    /// Sets the floating-leg date-generation rule (`makevanillaswap.cpp:336`).
+    pub fn with_floating_leg_rule(mut self, rule: DateGeneration) -> MakeVanillaSwap {
+        self.float_rule = rule;
+        self
+    }
+
+    /// Sets the fixed-leg first (stub) date (`makevanillaswap.cpp:296`).
+    pub fn with_fixed_leg_first_date(mut self, d: Date) -> MakeVanillaSwap {
+        self.fixed_first_date = d;
+        self
+    }
+
+    /// Sets the fixed-leg next-to-last (stub) date (`makevanillaswap.cpp:302`).
+    pub fn with_fixed_leg_next_to_last_date(mut self, d: Date) -> MakeVanillaSwap {
+        self.fixed_next_to_last_date = d;
+        self
+    }
+
+    /// Sets the floating-leg first (stub) date (`makevanillaswap.cpp:352`).
+    pub fn with_floating_leg_first_date(mut self, d: Date) -> MakeVanillaSwap {
+        self.float_first_date = d;
+        self
+    }
+
+    /// Sets the floating-leg next-to-last (stub) date (`makevanillaswap.cpp:358`).
+    pub fn with_floating_leg_next_to_last_date(mut self, d: Date) -> MakeVanillaSwap {
+        self.float_next_to_last_date = d;
+        self
+    }
+
     /// Prices the swap on `discounting_term_structure` rather than the index's
     /// forwarding curve (`makevanillaswap.cpp:249`).
     pub fn with_discounting_term_structure(
@@ -303,7 +367,8 @@ impl MakeVanillaSwap {
     /// Returns an error when both an effective date and settlement days are set,
     /// when the requested coupon mode conflicts with [`Settings`], when the start
     /// date must be derived but no evaluation date is set, when the currency has
-    /// no fixed-leg default, and propagates the swap construction and (for a
+    /// no fixed-leg default, when schedule stubs or end-of-month controls are
+    /// incompatible with the selected rule, and propagates the swap construction and (for a
     /// fair-rate fill) the pricing.
     pub fn build(self) -> QlResult<VanillaSwap> {
         if self.effective_date.is_some() && self.settlement_days.is_some() {
@@ -336,6 +401,25 @@ impl MakeVanillaSwap {
         let float_tenor = self.ibor_index.tenor();
         let float_day_count = self.ibor_index.day_counter().clone();
 
+        validate_schedule_inputs(
+            start_date,
+            end_date,
+            fixed_tenor,
+            self.fixed_rule,
+            self.fixed_end_of_month,
+            self.fixed_first_date,
+            self.fixed_next_to_last_date,
+        )?;
+        validate_schedule_inputs(
+            start_date,
+            end_date,
+            float_tenor,
+            self.float_rule,
+            self.float_end_of_month,
+            self.float_first_date,
+            self.float_next_to_last_date,
+        )?;
+
         let fixed_schedule = Schedule::new(
             start_date,
             end_date,
@@ -343,10 +427,10 @@ impl MakeVanillaSwap {
             self.fixed_calendar.clone(),
             self.fixed_convention,
             self.fixed_termination_date_convention,
-            DateGeneration::Backward,
+            self.fixed_rule,
             self.fixed_end_of_month,
-            Date::null(),
-            Date::null(),
+            self.fixed_first_date,
+            self.fixed_next_to_last_date,
         );
         let float_schedule = Schedule::new(
             start_date,
@@ -355,10 +439,10 @@ impl MakeVanillaSwap {
             self.float_calendar.clone(),
             self.float_convention,
             self.float_termination_date_convention,
-            DateGeneration::Backward,
+            self.float_rule,
             self.float_end_of_month,
-            Date::null(),
-            Date::null(),
+            self.float_first_date,
+            self.float_next_to_last_date,
         );
 
         let used_fixed_rate = match self.fixed_rate {
@@ -399,6 +483,15 @@ impl MakeVanillaSwap {
     pub fn floating_leg(&self) -> QlResult<Vec<Shared<IborCoupon>>> {
         let start_date = self.start_date()?;
         let end_date = self.end_date(start_date);
+        validate_schedule_inputs(
+            start_date,
+            end_date,
+            self.ibor_index.tenor(),
+            self.float_rule,
+            self.float_end_of_month,
+            self.float_first_date,
+            self.float_next_to_last_date,
+        )?;
         let float_schedule = Schedule::new(
             start_date,
             end_date,
@@ -406,10 +499,10 @@ impl MakeVanillaSwap {
             self.float_calendar.clone(),
             self.float_convention,
             self.float_termination_date_convention,
-            DateGeneration::Backward,
+            self.float_rule,
             self.float_end_of_month,
-            Date::null(),
-            Date::null(),
+            self.float_first_date,
+            self.float_next_to_last_date,
         );
         let resolved_convention = float_schedule.business_day_convention();
         IborLeg::new(float_schedule, Shared::clone(&self.ibor_index))
@@ -548,6 +641,65 @@ fn default_fixed_day_count(currency: &Currency) -> QlResult<DayCounter> {
     } else {
         crate::fail!("unknown fixed leg day counter for {}", currency.code());
     }
+}
+
+fn validate_schedule_inputs(
+    start: Date,
+    end: Date,
+    tenor: Period,
+    rule: DateGeneration,
+    end_of_month: bool,
+    first: Date,
+    next_to_last: Date,
+) -> QlResult<()> {
+    crate::require!(
+        start != Date::null() && end != Date::null() && start < end,
+        "invalid schedule date range"
+    );
+    crate::require!(tenor.length() >= 0, "non positive schedule tenor");
+    let effective_rule = if tenor.length() == 0 {
+        DateGeneration::Zero
+    } else {
+        rule
+    };
+    let has_first = first != Date::null() && first != start;
+    let has_next_to_last = next_to_last != Date::null() && next_to_last != end;
+    crate::require!(
+        !has_first || !has_next_to_last || first <= next_to_last,
+        "first stub date later than next-to-last stub date"
+    );
+    for (date, initial) in [(first, true), (next_to_last, false)] {
+        if date == Date::null() || (initial && date == start) || (!initial && date == end) {
+            continue;
+        }
+        match effective_rule {
+            DateGeneration::Forward | DateGeneration::Backward => {
+                let valid = if initial {
+                    date > start && date <= end
+                } else {
+                    date >= start && date < end
+                };
+                crate::require!(valid, "stub date outside schedule range");
+            }
+            DateGeneration::ThirdWednesday => {
+                crate::require!(
+                    crate::time::imm::is_imm_date(date, false),
+                    "stub date is not an IMM date"
+                );
+            }
+            _ => crate::fail!("stub date incompatible with {effective_rule} date generation rule"),
+        }
+    }
+    crate::require!(
+        !end_of_month
+            || !allows_end_of_month(tenor)
+            || matches!(
+                effective_rule,
+                DateGeneration::Forward | DateGeneration::Backward | DateGeneration::Zero
+            ),
+        "endOfMonth convention incompatible with {effective_rule} date generation rule"
+    );
+    Ok(())
 }
 
 #[cfg(test)]
