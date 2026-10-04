@@ -1,0 +1,71 @@
+{
+  "centered": {
+    "correlation": [
+      1.0
+    ],
+    "covariance": [
+      52.333333333333336
+    ],
+    "error_estimate": [
+      4.176654695380556
+    ],
+    "maximum": [
+      9
+    ],
+    "mean": [
+      3.3333333333333335
+    ],
+    "minimum": [
+      -4
+    ],
+    "standard_deviation": [
+      7.234178138070235
+    ],
+    "variance": [
+      52.333333333333336
+    ]
+  },
+  "name": "single_column",
+  "native": {
+    "correlation": [
+      1
+    ],
+    "covariance": [
+      52.33333333333333
+    ],
+    "error_estimate": [
+      4.176654695380556
+    ],
+    "maximum": [
+      9
+    ],
+    "mean": [
+      3.3333333333333335
+    ],
+    "minimum": [
+      -4
+    ],
+    "standard_deviation": [
+      7.234178138070236
+    ],
+    "variance": [
+      52.33333333333334
+    ]
+  },
+  "samples": [
+    [
+      -4
+    ],
+    [
+      1
+    ],
+    [
+      9
+    ]
+  ],
+  "weights": [
+    2,
+    1,
+    3
+  ]
+}
