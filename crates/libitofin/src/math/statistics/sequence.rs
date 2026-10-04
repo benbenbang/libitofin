@@ -190,3 +190,7 @@ impl SequenceStatistics {
 #[cfg(test)]
 #[path = "sequence_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "sequence_state_tests.rs"]
+mod state_tests;
