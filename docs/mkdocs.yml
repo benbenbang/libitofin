@@ -84,6 +84,7 @@ nav:
   - GBM simulation: simulation.md
   - Statistics and risk: statistics.md
   - Mean convergence: convergence.md
+  - QMC discrepancy: discrepancy.md
   - Chart indicators: chart.md
   - Cap/floor engines: cap-engines.md
   - Python API:
