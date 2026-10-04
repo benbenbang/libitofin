@@ -1,0 +1,171 @@
+{
+  "compiled_oracle": "PyPI QuantLib 1.43 Python bindings and compiled library",
+  "inputs": {
+    "base_compounding": "Continuous",
+    "base_rate": 0.03,
+    "day_counter": "Actual360",
+    "frequency": "Semiannual",
+    "leg": [
+      [
+        7,
+        "2026-07-07"
+      ],
+      [
+        20,
+        "2026-12-07"
+      ],
+      [
+        100,
+        "2027-07-07"
+      ]
+    ],
+    "npv_date": "2026-07-09",
+    "reference": "2026-07-01",
+    "settlement": "2026-07-07"
+  },
+  "local_source_revision": "9863b578af0caa4cecabf697196533e84a8308b6",
+  "local_source_version": "1.43-dev",
+  "quantlib_version": "1.43",
+  "rows": [
+    {
+      "compounding": "Simple",
+      "include_settlement_flows": false,
+      "npv": 118.33698251346071,
+      "recovered_spread": -0.014999999999991066,
+      "spread": -0.015
+    },
+    {
+      "compounding": "Simple",
+      "include_settlement_flows": true,
+      "npv": 125.33756638150949,
+      "recovered_spread": -0.01499999999999135,
+      "spread": -0.015
+    },
+    {
+      "compounding": "Simple",
+      "include_settlement_flows": false,
+      "npv": 114.25626219511594,
+      "recovered_spread": 0.02500000000000108,
+      "spread": 0.025
+    },
+    {
+      "compounding": "Simple",
+      "include_settlement_flows": true,
+      "npv": 121.25839980501728,
+      "recovered_spread": 0.025000000000001233,
+      "spread": 0.025
+    },
+    {
+      "compounding": "Compounded",
+      "include_settlement_flows": false,
+      "npv": 118.3553079435494,
+      "recovered_spread": -0.014999999999998032,
+      "spread": -0.015
+    },
+    {
+      "compounding": "Compounded",
+      "include_settlement_flows": true,
+      "npv": 125.3558978530758,
+      "recovered_spread": -0.01499999999999783,
+      "spread": -0.015
+    },
+    {
+      "compounding": "Compounded",
+      "include_settlement_flows": false,
+      "npv": 114.20318691680387,
+      "recovered_spread": 0.024999999999999786,
+      "spread": 0.025
+    },
+    {
+      "compounding": "Compounded",
+      "include_settlement_flows": true,
+      "npv": 121.20530580297749,
+      "recovered_spread": 0.025000000000000102,
+      "spread": 0.025
+    },
+    {
+      "compounding": "Continuous",
+      "include_settlement_flows": false,
+      "npv": 118.3734425191263,
+      "recovered_spread": -0.01499999999999994,
+      "spread": -0.015
+    },
+    {
+      "compounding": "Continuous",
+      "include_settlement_flows": true,
+      "npv": 125.37402587676586,
+      "recovered_spread": -0.0149999999999999,
+      "spread": -0.015
+    },
+    {
+      "compounding": "Continuous",
+      "include_settlement_flows": false,
+      "npv": 114.14903657951699,
+      "recovered_spread": 0.025000000000000272,
+      "spread": 0.025
+    },
+    {
+      "compounding": "Continuous",
+      "include_settlement_flows": true,
+      "npv": 121.15117579521386,
+      "recovered_spread": 0.025000000000000133,
+      "spread": 0.025
+    },
+    {
+      "compounding": "SimpleThenCompounded",
+      "include_settlement_flows": false,
+      "npv": 118.3550568365311,
+      "recovered_spread": -0.014999999999997769,
+      "spread": -0.015
+    },
+    {
+      "compounding": "SimpleThenCompounded",
+      "include_settlement_flows": true,
+      "npv": 125.35564070457987,
+      "recovered_spread": -0.014999999999998017,
+      "spread": -0.015
+    },
+    {
+      "compounding": "SimpleThenCompounded",
+      "include_settlement_flows": false,
+      "npv": 114.20393450465758,
+      "recovered_spread": 0.025000000000000158,
+      "spread": 0.025
+    },
+    {
+      "compounding": "SimpleThenCompounded",
+      "include_settlement_flows": true,
+      "npv": 121.20607211455892,
+      "recovered_spread": 0.02499999999999999,
+      "spread": 0.025
+    },
+    {
+      "compounding": "CompoundedThenSimple",
+      "include_settlement_flows": false,
+      "npv": 118.33723355582764,
+      "recovered_spread": -0.014999999999991203,
+      "spread": -0.015
+    },
+    {
+      "compounding": "CompoundedThenSimple",
+      "include_settlement_flows": true,
+      "npv": 125.33782346535402,
+      "recovered_spread": -0.014999999999991192,
+      "spread": -0.015
+    },
+    {
+      "compounding": "CompoundedThenSimple",
+      "include_settlement_flows": false,
+      "npv": 114.25551402700196,
+      "recovered_spread": 0.025000000000000945,
+      "spread": 0.025
+    },
+    {
+      "compounding": "CompoundedThenSimple",
+      "include_settlement_flows": true,
+      "npv": 121.25763291317557,
+      "recovered_spread": 0.025000000000000966,
+      "spread": 0.025
+    }
+  ]
+}

@@ -1,0 +1,109 @@
+{
+  "compiled_oracle": "PyPI QuantLib 1.43 Python bindings and compiled library",
+  "inputs": {
+    "base_compounding": "Continuous",
+    "base_rate": 0.03,
+    "coupon_rate": 0.05,
+    "day_counter": "Actual360",
+    "ex_coupon_dates": [
+      "2027-07-01",
+      "2028-07-01"
+    ],
+    "schedule": [
+      "2026-07-07",
+      "2027-07-07",
+      "2028-07-07"
+    ],
+    "yield_compounding": "Compounded",
+    "yield_frequency": "Semiannual",
+    "yield_rate": 0.045
+  },
+  "local_source_revision": "9863b578af0caa4cecabf697196533e84a8308b6",
+  "local_source_version": "1.43-dev",
+  "quantlib_version": "1.43",
+  "rows": [
+    {
+      "accrued": -0.05555555555556424,
+      "cashflows": [
+        {
+          "amount": 50.69444444444437,
+          "date": "2027-07-07"
+        },
+        {
+          "amount": 50.833333333333286,
+          "date": "2028-07-07"
+        },
+        {
+          "amount": 1000.0,
+          "date": "2028-07-07"
+        }
+      ],
+      "clean_yield": 100.44090988119183,
+      "curve_clean": 101.94826106211457,
+      "curve_dirty": 101.892705506559,
+      "dirty_yield": 100.38535432563626,
+      "name": "ex_coupon",
+      "notional": 1000.0,
+      "recovered_clean_yield": 0.04500000000000001,
+      "settlement": "2027-07-03"
+    },
+    {
+      "accrued": 0.0,
+      "cashflows": [
+        {
+          "amount": 50.69444444444437,
+          "date": "2027-07-07"
+        },
+        {
+          "amount": 400.0,
+          "date": "2027-07-07"
+        },
+        {
+          "amount": 30.49999999999997,
+          "date": "2028-07-07"
+        },
+        {
+          "amount": 600.0,
+          "date": "2028-07-07"
+        }
+      ],
+      "clean_yield": 100.43500293835395,
+      "curve_clean": 101.92667540306273,
+      "curve_dirty": 101.92667540306273,
+      "dirty_yield": 100.43500293835395,
+      "name": "amortizing",
+      "notional": 600.0,
+      "recovered_clean_yield": 0.04500000000000015,
+      "settlement": "2027-07-07"
+    },
+    {
+      "accrued": 0.04166666666667318,
+      "cashflows": [
+        {
+          "amount": 50.69444444444437,
+          "date": "2027-07-07"
+        },
+        {
+          "amount": 400.0,
+          "date": "2027-07-07"
+        },
+        {
+          "amount": 30.49999999999997,
+          "date": "2028-07-07"
+        },
+        {
+          "amount": 600.0,
+          "date": "2028-07-07"
+        }
+      ],
+      "clean_yield": 100.43058884492648,
+      "curve_clean": 101.91049359072086,
+      "curve_dirty": 101.95216025738753,
+      "dirty_yield": 100.47225551159315,
+      "name": "amortizing",
+      "notional": 600.0,
+      "recovered_clean_yield": 0.04499999999999972,
+      "settlement": "2027-07-10"
+    }
+  ]
+}
