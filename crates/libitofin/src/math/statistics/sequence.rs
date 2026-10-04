@@ -186,3 +186,7 @@ impl SequenceStatistics {
         Ok(result)
     }
 }
+
+#[cfg(test)]
+#[path = "sequence_tests.rs"]
+mod tests;
