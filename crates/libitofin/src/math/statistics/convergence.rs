@@ -228,3 +228,7 @@ fn validate_addition(current: usize, additional: usize) -> QlResult<usize> {
         .ok_or_else(|| QlError::new("convergence sample count overflow", file!(), line!()))?;
     validate_convergence_length(final_count)
 }
+
+#[cfg(test)]
+#[path = "convergence_tests.rs"]
+mod tests;
