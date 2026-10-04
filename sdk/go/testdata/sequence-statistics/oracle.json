@@ -1,0 +1,37 @@
+{
+  "cases": [
+    "unit_two_columns.json",
+    "unequal_weights.json",
+    "zero_weight_extrema.json",
+    "two_constant_columns.json",
+    "single_column.json",
+    "negative_correlation.json",
+    "large_offset_cancellation.json",
+    "zero_weight_count.json"
+  ],
+  "matrix_layout": "row-major flat",
+  "ordinary_native_tolerance": {
+    "absolute": 2e-12,
+    "relative": 2e-12
+  },
+  "provenance": {
+    "centered_reference": "Independent exact fractions, weighted centered products, N/(N-1)",
+    "compiler": "Apple clang version 21.0.0 (clang-2100.3.34.2)",
+    "compiler_flags": [
+      "-std=c++17",
+      "-O2"
+    ],
+    "generator_sha256": "8b1c609a4a3d3f4e79f3f94dbe56279479cf38adade794840abece9187688301",
+    "native_reference": "Actual QuantLib SequenceStatistics compiled from pinned sources",
+    "native_source_sha256": "a30e2128b3d836940a94441ba001ffcc66f44e21afd5a4475605771043535e78",
+    "source_commit": "9863b578af0caa4cecabf697196533e84a8308b6",
+    "source_sha256": {
+      "ql/errors.cpp": "342f04dfcfce966ded3626c7adc8daf81847b9431a16906488223cba0ee77a3e",
+      "ql/math/matrix.hpp": "a38b333395c730b4ade92f014cae5669e810e99804f4f7fa4d1ef24ab91a32d1",
+      "ql/math/statistics/generalstatistics.cpp": "8bd3aa4d0a163bc4cda025b16045ad8d7d9f38ef2f5b4b9a3876517dcf085fe6",
+      "ql/math/statistics/generalstatistics.hpp": "8515bf2592faa1586ee9a5b024698c4348ed74f152ed1aaaa965e1783e163192",
+      "ql/math/statistics/sequencestatistics.hpp": "5d118d8b4d6fcb418e999f30d09c4adca575cd5c06d50ce89b7edab623183b86",
+      "ql/math/statistics/statistics.hpp": "0f69ac3db372f9babb3e0b799bf713ca6dced77dbda63cc331f68963c4e67237"
+    }
+  }
+}
