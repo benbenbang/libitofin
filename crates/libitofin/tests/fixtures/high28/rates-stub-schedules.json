@@ -1,0 +1,77 @@
+{
+  "compiled_oracle": "PyPI QuantLib 1.43 Python bindings and compiled library",
+  "inputs": {
+    "calendar": "NullCalendar",
+    "convention": "Unadjusted",
+    "effective": "2026-01-15",
+    "end_of_month": false,
+    "termination": "2029-01-15"
+  },
+  "local_source_revision": "9863b578af0caa4cecabf697196533e84a8308b6",
+  "local_source_version": "1.43-dev",
+  "quantlib_version": "1.43",
+  "rows": [
+    {
+      "dates": [
+        "2026-01-15",
+        "2026-07-15",
+        "2027-07-15",
+        "2028-07-15",
+        "2028-10-15",
+        "2029-01-15"
+      ],
+      "first_date": "2026-07-15",
+      "next_to_last_date": "2028-10-15",
+      "rule": "Forward",
+      "tenor_months": 12
+    },
+    {
+      "dates": [
+        "2026-01-15",
+        "2026-04-15",
+        "2026-10-15",
+        "2027-04-15",
+        "2027-10-15",
+        "2028-04-15",
+        "2028-10-15",
+        "2028-11-15",
+        "2029-01-15"
+      ],
+      "first_date": "2026-04-15",
+      "next_to_last_date": "2028-11-15",
+      "rule": "Forward",
+      "tenor_months": 6
+    },
+    {
+      "dates": [
+        "2026-01-15",
+        "2026-07-15",
+        "2026-10-15",
+        "2027-10-15",
+        "2028-10-15",
+        "2029-01-15"
+      ],
+      "first_date": "2026-07-15",
+      "next_to_last_date": "2028-10-15",
+      "rule": "Backward",
+      "tenor_months": 12
+    },
+    {
+      "dates": [
+        "2026-01-15",
+        "2026-04-15",
+        "2026-05-15",
+        "2026-11-15",
+        "2027-05-15",
+        "2027-11-15",
+        "2028-05-15",
+        "2028-11-15",
+        "2029-01-15"
+      ],
+      "first_date": "2026-04-15",
+      "next_to_last_date": "2028-11-15",
+      "rule": "Backward",
+      "tenor_months": 6
+    }
+  ]
+}
