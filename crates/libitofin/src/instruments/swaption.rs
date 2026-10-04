@@ -666,4 +666,238 @@ mod tests {
             "wrong argument type"
         );
     }
+    fn oracle_swaption(cash: bool) -> (Swaption, Handle<dyn YieldTermStructure>) {
+        use crate::instruments::MakeVanillaSwap;
+        use crate::interestrate::Compounding;
+        use crate::termstructures::yields::FlatForward;
+        use crate::time::period::Period;
+        use crate::time::timeunit::TimeUnit;
+        let today = Date::new(7, Month::July, 2026);
+        let settings = settings_on(today);
+        let curve = Handle::new(shared(FlatForward::with_rate(
+            today,
+            0.02,
+            Actual360::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>);
+        let index = shared(Euribor::six_months(curve.clone(), Shared::clone(&settings)));
+        let swap = MakeVanillaSwap::new(
+            Period::new(5, TimeUnit::Years),
+            index,
+            Some(0.03),
+            Period::new(0, TimeUnit::Days),
+            Shared::clone(&settings),
+        )
+        .with_effective_date(Date::new(9, Month::July, 2027))
+        .build()
+        .unwrap();
+        (
+            Swaption::new(
+                shared_mut(swap.into_fixed_vs_floating()),
+                european(Date::new(7, Month::July, 2027)),
+                if cash {
+                    SettlementType::Cash
+                } else {
+                    SettlementType::Physical
+                },
+                if cash {
+                    SettlementMethod::ParYieldCurve
+                } else {
+                    SettlementMethod::PhysicalOTC
+                },
+                settings,
+            ),
+            curve,
+        )
+    }
+
+    /// QuantLib 1.43 Black/Bachelier engines, with their DiscountCurve annuity default.
+    #[test]
+    fn implied_volatility_matches_independent_quantlib_prices() {
+        let cases = [
+            (
+                false,
+                false,
+                0.2,
+                0.0,
+                0.00025057295935918054,
+                0.0002557058884618845,
+            ),
+            (
+                false,
+                true,
+                0.2,
+                0.0,
+                0.0002505730263925663,
+                0.00025570595686843367,
+            ),
+            (
+                false,
+                false,
+                0.3,
+                0.01,
+                0.004793571124123376,
+                0.004891766319613821,
+            ),
+            (
+                false,
+                true,
+                0.3,
+                0.01,
+                0.004793572406501582,
+                0.004891767628261249,
+            ),
+            (
+                true,
+                false,
+                0.01,
+                0.0,
+                0.004228008592218679,
+                0.0043146183700853045,
+            ),
+            (
+                true,
+                true,
+                0.01,
+                0.0,
+                0.004228009723297353,
+                0.004314619524333864,
+            ),
+        ];
+        for (normal, cash, expected, shift, spot, forward) in cases {
+            let (swaption, curve) = oracle_swaption(cash);
+            let vol_type = if normal {
+                VolatilityType::Normal
+            } else {
+                VolatilityType::ShiftedLognormal
+            };
+            for (target, price_type) in [
+                (spot, SwaptionPriceType::Spot),
+                (forward, SwaptionPriceType::Forward),
+            ] {
+                let recovered = swaption
+                    .implied_volatility(
+                        target,
+                        curve.clone(),
+                        if normal { 0.02 } else { 0.1 },
+                        1e-10,
+                        100,
+                        1e-7,
+                        4.0,
+                        vol_type,
+                        shift,
+                        price_type,
+                    )
+                    .unwrap();
+                assert!(
+                    (recovered - expected).abs() < 1e-9,
+                    "normal={normal} cash={cash} recovered={recovered}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn implied_volatility_rejects_invalid_targets_bounds_and_preserves_engine_errors() {
+        let (swaption, curve) = oracle_swaption(false);
+        let solve = |target, curve, min, max, evaluations| {
+            swaption.implied_volatility(
+                target,
+                curve,
+                0.1,
+                1e-10,
+                evaluations,
+                min,
+                max,
+                VolatilityType::ShiftedLognormal,
+                0.0,
+                SwaptionPriceType::Spot,
+            )
+        };
+        for target in [-1.0, Real::NAN, Real::INFINITY, 100.0] {
+            assert!(solve(target, curve.clone(), 1e-7, 4.0, 100).is_err());
+        }
+        assert!(solve(0.001, curve.clone(), -1.0, 4.0, 100).is_err());
+        assert!(solve(0.001, curve.clone(), 1.0, 0.5, 100).is_err());
+        assert!(solve(0.001, curve.clone(), 1e-7, 4.0, 1).is_err());
+        let error = solve(0.001, Handle::empty(), 1e-7, 4.0, 100).unwrap_err();
+        assert!(
+            !error.message().contains("non-finite"),
+            "engine error must propagate: {error}"
+        );
+    }
+    #[test]
+    fn implied_volatility_rejects_expired_and_non_european_exercise() {
+        use crate::exercise::AmericanExercise;
+        let (mut swaption, curve) = oracle_swaption(false);
+        let solve = |s: &Swaption| {
+            s.implied_volatility(
+                0.001,
+                curve.clone(),
+                0.1,
+                1e-8,
+                100,
+                1e-7,
+                4.0,
+                VolatilityType::ShiftedLognormal,
+                0.0,
+                SwaptionPriceType::Spot,
+            )
+        };
+        swaption.exercise = shared(
+            AmericanExercise::new(
+                Date::new(7, Month::July, 2026),
+                Date::new(7, Month::July, 2027),
+                false,
+            )
+            .unwrap(),
+        );
+        assert_eq!(
+            solve(&swaption).unwrap_err().message(),
+            "not a European option"
+        );
+        swaption.exercise = european(Date::new(6, Month::July, 2026));
+        assert_eq!(
+            solve(&swaption).unwrap_err().message(),
+            "instrument expired"
+        );
+    }
+
+    #[test]
+    fn implied_volatility_preserves_installed_swaption_engine() {
+        let (mut swaption, curve) = oracle_swaption(false);
+        let engine: SharedMut<dyn PricingEngine> = shared_mut(BlackSwaptionEngine::with_flat_vol(
+            curve.clone(),
+            Handle::new(shared(SimpleQuote::new(0.2)) as Shared<dyn Quote>),
+            Actual365Fixed::new(),
+            0.0,
+            CashAnnuityModel::DiscountCurve,
+            Shared::clone(&swaption.settings),
+        ));
+        swaption
+            .base_mut()
+            .set_pricing_engine(SharedMut::clone(&engine));
+        let before = swaption.npv().unwrap();
+        let vol = swaption
+            .implied_volatility(
+                0.004793571124123376,
+                curve,
+                0.1,
+                1e-10,
+                100,
+                1e-7,
+                4.0,
+                VolatilityType::ShiftedLognormal,
+                0.01,
+                SwaptionPriceType::Spot,
+            )
+            .unwrap();
+        assert!((vol - 0.3).abs() < 1e-9);
+        assert!(SharedMut::ptr_eq(
+            swaption.base().pricing_engine().unwrap(),
+            &engine
+        ));
+        assert!((swaption.npv().unwrap() - before).abs() < 1e-14);
+    }
 }
