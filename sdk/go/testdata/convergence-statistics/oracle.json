@@ -1,0 +1,39 @@
+{
+  "cases": [
+    "unit_fifteen.json",
+    "unequal_weights.json",
+    "zero_weight_count.json",
+    "constant.json",
+    "incomplete_checkpoint.json",
+    "empty.json"
+  ],
+  "checkpoint_rule": "initial=1; next=2*current+1",
+  "native_zero_first": {
+    "checkpoint_mean_is_nan": true,
+    "rejected": false,
+    "samples_after_error": 1,
+    "table_size_after_error": 1
+  },
+  "provenance": {
+    "compiler": "Apple clang version 21.0.0 (clang-2100.3.34.2)",
+    "compiler_flags": [
+      "-std=c++17",
+      "-O2"
+    ],
+    "exact_reference": "Independent Fraction weighted prefix means",
+    "generator_sha256": "a328baa681c00de4d0b34221eea1e64e88fc74463a3ba8c8628a6e26b1460f86",
+    "native_reference": "Actual ConvergenceStatistics<GeneralStatistics>",
+    "native_source_sha256": "5210de3612d99fac63eedc7c29063146301456baaf6192c0ea1e4082f4021305",
+    "source_commit": "9863b578af0caa4cecabf697196533e84a8308b6",
+    "source_sha256": {
+      "ql/errors.cpp": "342f04dfcfce966ded3626c7adc8daf81847b9431a16906488223cba0ee77a3e",
+      "ql/math/statistics/convergencestatistics.hpp": "b1e965a03cc3b6231868ecefeca581e49a40080b1596cd5b6a7c92c8507bcc7d",
+      "ql/math/statistics/generalstatistics.cpp": "8bd3aa4d0a163bc4cda025b16045ad8d7d9f38ef2f5b4b9a3876517dcf085fe6",
+      "ql/math/statistics/generalstatistics.hpp": "8515bf2592faa1586ee9a5b024698c4348ed74f152ed1aaaa965e1783e163192"
+    }
+  },
+  "tolerance": {
+    "absolute": 2e-12,
+    "relative": 2e-12
+  }
+}
