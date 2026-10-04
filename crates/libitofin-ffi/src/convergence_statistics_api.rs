@@ -287,5 +287,8 @@ pub unsafe extern "C" fn itofin_convergence_statistics_table(
 }
 
 #[cfg(test)]
+#[path = "convergence_statistics_state_tests.rs"]
+mod state_tests;
+#[cfg(test)]
 #[path = "convergence_statistics_api_tests.rs"]
 mod tests;
