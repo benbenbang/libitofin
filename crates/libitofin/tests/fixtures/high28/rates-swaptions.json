@@ -1,0 +1,70 @@
+{
+  "compiled_oracle": "PyPI QuantLib 1.43 Python bindings and compiled library",
+  "inputs": {
+    "cash_settlement_method": "ParYieldCurve",
+    "curve_day_counter": "Actual360",
+    "effective": "2027-07-09",
+    "exercise": "2027-07-07",
+    "fixed_rate": 0.03,
+    "index": "Euribor6M",
+    "physical_settlement_method": "PhysicalOTC",
+    "reference": "2026-07-07",
+    "risk_free": 0.02,
+    "swap_tenor_years": 5,
+    "using_at_par_coupons": true,
+    "volatility_day_counter": "Actual365Fixed"
+  },
+  "local_source_revision": "9863b578af0caa4cecabf697196533e84a8308b6",
+  "local_source_version": "1.43-dev",
+  "quantlib_version": "1.43",
+  "rows": [
+    {
+      "cash": false,
+      "forward": 0.0002557058884618845,
+      "normal": false,
+      "npv": 0.00025057295935918054,
+      "shift": 0,
+      "vol": 0.2
+    },
+    {
+      "cash": true,
+      "forward": 0.00025570595686843367,
+      "normal": false,
+      "npv": 0.0002505730263925663,
+      "shift": 0,
+      "vol": 0.2
+    },
+    {
+      "cash": false,
+      "forward": 0.004891766319613821,
+      "normal": false,
+      "npv": 0.004793571124123376,
+      "shift": 0.01,
+      "vol": 0.3
+    },
+    {
+      "cash": true,
+      "forward": 0.004891767628261249,
+      "normal": false,
+      "npv": 0.004793572406501582,
+      "shift": 0.01,
+      "vol": 0.3
+    },
+    {
+      "cash": false,
+      "forward": 0.0043146183700853045,
+      "normal": true,
+      "npv": 0.004228008592218679,
+      "shift": 0,
+      "vol": 0.01
+    },
+    {
+      "cash": true,
+      "forward": 0.004314619524333864,
+      "normal": true,
+      "npv": 0.004228009723297353,
+      "shift": 0,
+      "vol": 0.01
+    }
+  ]
+}
