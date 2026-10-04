@@ -18,6 +18,7 @@ mod generalstatistics;
 mod histogram;
 mod incrementalstatistics;
 mod riskstatistics;
+mod sequence;
 mod sequence_shape;
 
 pub use batch::{BatchStatistic, evaluate_batch};
@@ -26,6 +27,7 @@ pub use generalstatistics::GeneralStatistics;
 pub use histogram::{Histogram, HistogramAlgorithm};
 pub use incrementalstatistics::IncrementalStatistics;
 pub use riskstatistics::RiskStatistics;
+pub use sequence::{SequenceStatistics, evaluate_sequence_batch};
 pub use sequence_shape::{
     MAX_SEQUENCE_COMPONENTS, MAX_SEQUENCE_DIMENSION, MAX_SEQUENCE_MATRIX_WORK, MAX_SEQUENCE_ROWS,
     SequenceStatistic, validate_sequence_shape,
