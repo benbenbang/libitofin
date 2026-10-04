@@ -235,3 +235,7 @@ impl CompensatedSum {
         self.sum + self.correction
     }
 }
+
+#[cfg(test)]
+#[path = "discrepancy_tests.rs"]
+mod tests;
