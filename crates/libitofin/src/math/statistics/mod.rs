@@ -18,6 +18,7 @@ mod generalstatistics;
 mod histogram;
 mod incrementalstatistics;
 mod riskstatistics;
+mod sequence_shape;
 
 pub use batch::{BatchStatistic, evaluate_batch};
 pub use gaussianstatistics::{GaussianStatistics, StatsHolder};
@@ -25,6 +26,10 @@ pub use generalstatistics::GeneralStatistics;
 pub use histogram::{Histogram, HistogramAlgorithm};
 pub use incrementalstatistics::IncrementalStatistics;
 pub use riskstatistics::RiskStatistics;
+pub use sequence_shape::{
+    MAX_SEQUENCE_COMPONENTS, MAX_SEQUENCE_DIMENSION, MAX_SEQUENCE_MATRIX_WORK, MAX_SEQUENCE_ROWS,
+    SequenceStatistic, validate_sequence_shape,
+};
 
 /// Validate one `(value, weight)` sample before it enters an accumulator.
 ///
