@@ -1,0 +1,68 @@
+{
+  "domain": "statistics-convergence",
+  "entries": [
+    {
+      "c": "itofin_convergence_statistics_evaluate",
+      "go": "StatisticsConvergence",
+      "python": "itofin.statistics.convergence_table",
+      "status": "implemented",
+      "tests": "TestStatisticsConvergenceCheckpoints"
+    },
+    {
+      "c": "itofin_convergence_statistics_new",
+      "go": "Session.NewConvergenceStatistics",
+      "python": "itofin.statistics.ConvergenceStatistics.__init__",
+      "status": "implemented",
+      "tests": "TestConvergenceStatisticsStateAndReset"
+    },
+    {
+      "c": "itofin_convergence_statistics_add",
+      "go": "ConvergenceStatistics.Add",
+      "python": "itofin.statistics.ConvergenceStatistics.add",
+      "status": "implemented",
+      "tests": "TestConvergenceStatisticsStateAndReset"
+    },
+    {
+      "c": "itofin_convergence_statistics_add_batch",
+      "go": "ConvergenceStatistics.AddBatch",
+      "python": "itofin.statistics.ConvergenceStatistics.add_batch",
+      "status": "implemented",
+      "tests": "TestConvergenceStatisticsStateAndReset"
+    },
+    {
+      "c": "itofin_convergence_statistics_reset",
+      "go": "ConvergenceStatistics.Reset",
+      "python": "itofin.statistics.ConvergenceStatistics.reset",
+      "status": "implemented",
+      "tests": "TestConvergenceStatisticsStateAndReset"
+    },
+    {
+      "c": "itofin_convergence_statistics_summary",
+      "go": "ConvergenceStatistics.Samples",
+      "python": "itofin.statistics.ConvergenceStatistics.samples",
+      "status": "implemented",
+      "tests": "TestConvergenceStatisticsStateAndReset"
+    },
+    {
+      "c": "itofin_convergence_statistics_summary",
+      "go": "ConvergenceStatistics.WeightSum",
+      "python": "itofin.statistics.ConvergenceStatistics.weight_sum",
+      "status": "implemented",
+      "tests": "TestConvergenceStatisticsStateAndReset"
+    },
+    {
+      "c": "itofin_convergence_statistics_mean",
+      "go": "ConvergenceStatistics.Mean",
+      "python": "itofin.statistics.ConvergenceStatistics.mean",
+      "status": "implemented",
+      "tests": "TestConvergenceStatisticsStateAndReset"
+    },
+    {
+      "c": "itofin_convergence_statistics_table",
+      "go": "ConvergenceStatistics.Table",
+      "python": "itofin.statistics.ConvergenceStatistics.convergence_table",
+      "status": "implemented",
+      "tests": "TestConvergenceStatisticsStateAndReset"
+    }
+  ]
+}

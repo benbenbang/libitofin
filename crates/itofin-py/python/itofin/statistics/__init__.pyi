@@ -4,9 +4,11 @@
 import builtins
 import typing
 __all__ = [
+    "ConvergenceStatistics",
     "GeneralStatistics",
     "IncrementalStatistics",
     "average_shortfall",
+    "convergence_table",
     "correlation_matrix",
     "covariance_matrix",
     "downside_deviation",
@@ -30,6 +32,44 @@ __all__ = [
     "value_at_risk",
     "variance",
 ]
+
+@typing.final
+class ConvergenceStatistics:
+    r"""
+    Atomic bounded accumulator for cumulative mean-convergence diagnostics.
+    """
+    def __init__(self) -> None:
+        r"""
+        Construct an empty accumulator with checkpoints 1, 3, 7, 15, and so on.
+        """
+    def add(self, value: builtins.float, weight: builtins.float = 1.0) -> None:
+        r"""
+        Add one finite observation atomically with a nonnegative finite weight.
+        """
+    def add_batch(self, observations: typing.Sequence[builtins.float], *, weights: typing.Optional[typing.Sequence[builtins.float]] = None) -> None:
+        r"""
+        Add a complete ordered batch atomically; omitted weights are one.
+        """
+    def reset(self) -> None:
+        r"""
+        Clear every sample and checkpoint.
+        """
+    def samples(self) -> builtins.int:
+        r"""
+        Number of accepted observations, including zero-weight observations.
+        """
+    def weight_sum(self) -> builtins.float:
+        r"""
+        Sum of accepted weights.
+        """
+    def mean(self) -> builtins.float:
+        r"""
+        Weighted mean of all accepted observations, including an incomplete prefix.
+        """
+    def convergence_table(self) -> builtins.list[tuple[builtins.int, builtins.float]]:
+        r"""
+        Return a fresh list of immutable sample-count and cumulative-mean tuples.
+        """
 
 @typing.final
 class GeneralStatistics:
@@ -163,6 +203,14 @@ class IncrementalStatistics:
 def average_shortfall(observations: typing.Sequence[builtins.float], target: builtins.float, *, weights: typing.Optional[typing.Sequence[builtins.float]] = None) -> builtins.float:
     r"""
     Weighted mean of target minus observations strictly below target.
+    """
+
+def convergence_table(observations: typing.Sequence[builtins.float], *, weights: typing.Optional[typing.Sequence[builtins.float]] = None) -> builtins.list[tuple[builtins.int, builtins.float]]:
+    r"""
+    Cumulative weighted means at checkpoints 1, 3, 7, 15, and so on.
+
+    The incomplete final prefix is not recorded. Input order is preserved;
+    zero-weight observations count, but every checkpoint needs positive weight.
     """
 
 def correlation_matrix(samples: typing.Sequence[typing.Sequence[builtins.float]], *, weights: typing.Optional[typing.Sequence[builtins.float]] = None) -> builtins.list[builtins.list[builtins.float]]:

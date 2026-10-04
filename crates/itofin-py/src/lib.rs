@@ -19,6 +19,7 @@ mod chart_garch;
 mod chart_ohlc_overnight;
 mod chart_ohlc_volatility;
 mod chart_prices;
+mod convergence_statistics;
 mod credit;
 mod creditdensity;
 mod creditengine;
@@ -444,6 +445,11 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     results.add_class::<Results>()?;
 
     let statistics = PyModule::new(py, "statistics")?;
+    statistics.add_class::<convergence_statistics::PyConvergenceStatistics>()?;
+    statistics.add_function(wrap_pyfunction!(
+        convergence_statistics::convergence_table,
+        &statistics
+    )?)?;
     statistics.add_class::<general_statistics::PyGeneralStatistics>()?;
     statistics.add_class::<incremental_statistics::PyIncrementalStatistics>()?;
     statistics.add_function(wrap_pyfunction!(statistics::mean, &statistics)?)?;
