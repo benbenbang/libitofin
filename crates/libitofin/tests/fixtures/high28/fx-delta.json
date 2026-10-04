@@ -1,0 +1,277 @@
+{
+  "compiled_oracle": "PyPI QuantLib 1.43 Python bindings and compiled library",
+  "inputs": {
+    "domestic_discount": 0.997306,
+    "foreign_discount": 0.992266,
+    "spot": 1.421,
+    "stddev": 0.1180654,
+    "strike": 1.6
+  },
+  "local_source_revision": "9863b578af0caa4cecabf697196533e84a8308b6",
+  "local_source_version": "1.43-dev",
+  "quantlib_version": "1.43",
+  "rows": [
+    {
+      "atm": {
+        "AtmDeltaNeutral": {
+          "value": 1.4237071536606858
+        },
+        "AtmFwd": {
+          "value": 1.413818813884605
+        },
+        "AtmGammaMax": {
+          "value": 1.4237071536606858
+        },
+        "AtmNull": {
+          "error": "invalid atm type"
+        },
+        "AtmPutCall50": {
+          "error": "|PutDelta|=CallDelta=0.50 only possible for forward delta."
+        },
+        "AtmSpot": {
+          "value": 1.421
+        },
+        "AtmVegaMax": {
+          "value": 1.4237071536606858
+        }
+      },
+      "convention": "Spot",
+      "delta_at_strike": 0.16013974647836293,
+      "option": "call",
+      "strike_from_delta": {
+        "value": 1.6080794396498383
+      },
+      "target_delta": 0.15
+    },
+    {
+      "atm": {
+        "AtmDeltaNeutral": {
+          "value": 1.4237071536606858
+        },
+        "AtmFwd": {
+          "value": 1.413818813884605
+        },
+        "AtmGammaMax": {
+          "value": 1.4237071536606858
+        },
+        "AtmNull": {
+          "error": "invalid atm type"
+        },
+        "AtmPutCall50": {
+          "value": 1.4237071536606858
+        },
+        "AtmSpot": {
+          "value": 1.421
+        },
+        "AtmVegaMax": {
+          "value": 1.4237071536606858
+        }
+      },
+      "convention": "Fwd",
+      "delta_at_strike": 0.16138792065672203,
+      "option": "call",
+      "strike_from_delta": {
+        "value": 1.6090292778757842
+      },
+      "target_delta": 0.15
+    },
+    {
+      "atm": {
+        "AtmDeltaNeutral": {
+          "value": 1.4039991534456169
+        },
+        "AtmFwd": {
+          "value": 1.413818813884605
+        },
+        "AtmGammaMax": {
+          "value": 1.4237071536606858
+        },
+        "AtmNull": {
+          "error": "invalid atm type"
+        },
+        "AtmPutCall50": {
+          "error": "|PutDelta|=CallDelta=0.50 only possible for forward delta."
+        },
+        "AtmSpot": {
+          "value": 1.421
+        },
+        "AtmVegaMax": {
+          "value": 1.4237071536606858
+        }
+      },
+      "convention": "PaSpot",
+      "delta_at_strike": 0.15067826139118903,
+      "infeasible_delta_0_9": {
+        "error": "root not bracketed: f[1.16281,1.21788] -> [-1.289447e-01,-1.428567e-01]"
+      },
+      "option": "call",
+      "strike_from_delta": {
+        "value": 1.6005703561512619
+      },
+      "target_delta": 0.15
+    },
+    {
+      "atm": {
+        "AtmDeltaNeutral": {
+          "value": 1.4039991534456169
+        },
+        "AtmFwd": {
+          "value": 1.413818813884605
+        },
+        "AtmGammaMax": {
+          "value": 1.4237071536606858
+        },
+        "AtmNull": {
+          "error": "invalid atm type"
+        },
+        "AtmPutCall50": {
+          "error": "|PutDelta|=CallDelta=0.50 only possible for forward delta."
+        },
+        "AtmSpot": {
+          "value": 1.421
+        },
+        "AtmVegaMax": {
+          "value": 1.4237071536606858
+        }
+      },
+      "convention": "PaFwd",
+      "delta_at_strike": 0.15185269009639454,
+      "infeasible_delta_0_9": {
+        "error": "root not bracketed: f[1.16281,1.2238] -> [-1.229348e-01,-1.402805e-01]"
+      },
+      "option": "call",
+      "strike_from_delta": {
+        "value": 1.6015501875673384
+      },
+      "target_delta": 0.15
+    },
+    {
+      "atm": {
+        "AtmDeltaNeutral": {
+          "value": 1.4237071536606858
+        },
+        "AtmFwd": {
+          "value": 1.413818813884605
+        },
+        "AtmGammaMax": {
+          "value": 1.4237071536606858
+        },
+        "AtmNull": {
+          "error": "invalid atm type"
+        },
+        "AtmPutCall50": {
+          "error": "|PutDelta|=CallDelta=0.50 only possible for forward delta."
+        },
+        "AtmSpot": {
+          "value": 1.421
+        },
+        "AtmVegaMax": {
+          "value": 1.4237071536606858
+        }
+      },
+      "convention": "Spot",
+      "delta_at_strike": -0.832126253521637,
+      "option": "put",
+      "strike_from_delta": {
+        "value": 1.260473835686862
+      },
+      "target_delta": -0.15
+    },
+    {
+      "atm": {
+        "AtmDeltaNeutral": {
+          "value": 1.4237071536606858
+        },
+        "AtmFwd": {
+          "value": 1.413818813884605
+        },
+        "AtmGammaMax": {
+          "value": 1.4237071536606858
+        },
+        "AtmNull": {
+          "error": "invalid atm type"
+        },
+        "AtmPutCall50": {
+          "value": 1.4237071536606858
+        },
+        "AtmSpot": {
+          "value": 1.421
+        },
+        "AtmVegaMax": {
+          "value": 1.4237071536606858
+        }
+      },
+      "convention": "Fwd",
+      "delta_at_strike": -0.838612079343278,
+      "option": "put",
+      "strike_from_delta": {
+        "value": 1.2597297558566178
+      },
+      "target_delta": -0.15
+    },
+    {
+      "atm": {
+        "AtmDeltaNeutral": {
+          "value": 1.4039991534456169
+        },
+        "AtmFwd": {
+          "value": 1.413818813884605
+        },
+        "AtmGammaMax": {
+          "value": 1.4237071536606858
+        },
+        "AtmNull": {
+          "error": "invalid atm type"
+        },
+        "AtmPutCall50": {
+          "error": "|PutDelta|=CallDelta=0.50 only possible for forward delta."
+        },
+        "AtmSpot": {
+          "value": 1.421
+        },
+        "AtmVegaMax": {
+          "value": 1.4237071536606858
+        }
+      },
+      "convention": "PaSpot",
+      "delta_at_strike": -0.9722560102485015,
+      "option": "put",
+      "strike_from_delta": {
+        "value": 1.2546219991778351
+      },
+      "target_delta": -0.15
+    },
+    {
+      "atm": {
+        "AtmDeltaNeutral": {
+          "value": 1.4039991534456169
+        },
+        "AtmFwd": {
+          "value": 1.413818813884605
+        },
+        "AtmGammaMax": {
+          "value": 1.4237071536606858
+        },
+        "AtmNull": {
+          "error": "invalid atm type"
+        },
+        "AtmPutCall50": {
+          "error": "|PutDelta|=CallDelta=0.50 only possible for forward delta."
+        },
+        "AtmSpot": {
+          "value": 1.421
+        },
+        "AtmVegaMax": {
+          "value": 1.4237071536606858
+        }
+      },
+      "convention": "PaFwd",
+      "delta_at_strike": -0.9798340467661911,
+      "option": "put",
+      "strike_from_delta": {
+        "value": 1.2539067336573
+      },
+      "target_delta": -0.15
+    }
+  ]
+}
