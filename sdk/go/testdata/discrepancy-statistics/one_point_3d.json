@@ -1,0 +1,21 @@
+{
+  "dimension": 3,
+  "exact_discrepancy": 0.232126560656115,
+  "exact_squared": {
+    "denominator": "110592",
+    "numerator": "5959"
+  },
+  "name": "one_point_3d",
+  "native_discrepancy": 0.232126560656115,
+  "point_source": {
+    "kind": "hand-authored"
+  },
+  "samples": [
+    [
+      0.25,
+      0.5,
+      0.75
+    ]
+  ],
+  "weights": null
+}

@@ -1,0 +1,32 @@
+{
+  "dimension": 2,
+  "exact_discrepancy": 0.22047927592204922,
+  "exact_squared": {
+    "denominator": "144",
+    "numerator": "7"
+  },
+  "name": "boundary_corners",
+  "native_discrepancy": 0.2204792759220492,
+  "point_source": {
+    "kind": "hand-authored"
+  },
+  "samples": [
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      0
+    ],
+    [
+      1,
+      1
+    ]
+  ],
+  "weights": null
+}
