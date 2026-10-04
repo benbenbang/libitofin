@@ -714,6 +714,7 @@ mod tests {
     //! fair-rate fill) and the D5 indexed-coupon refusal.
 
     use super::*;
+    use crate::cashflows::Coupon;
     use crate::indexes::ibor::Euribor;
     use crate::instrument::Instrument;
     use crate::interestrate::Compounding;
@@ -1015,5 +1016,357 @@ mod tests {
         .with_settlement_days(2)
         .build();
         assert!(result.is_err());
+    }
+
+    /// `with_rule(ThirdWednesdayInclusive)` threads the rule into both schedules
+    /// (`makevanillaswap.cpp:238`): a 1Y swap effective 16-Sep-2015 snaps the
+    /// floating end to the third Wednesday of September 2016 (21-Sep-2016), the
+    /// same Inclusive pin as `swap.cpp` `testThirdWednesdayAdjustment`.
+    #[test]
+    fn with_rule_third_wednesday_inclusive_snaps_the_floating_end() {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(Date::new(14, Month::September, 2015));
+        let index = euribor6m(&settings);
+        let swap = MakeVanillaSwap::new(
+            Period::new(1, TimeUnit::Years),
+            index,
+            Some(0.03),
+            Period::new(0, TimeUnit::Days),
+            Shared::clone(&settings),
+        )
+        .with_effective_date(Date::new(16, Month::September, 2015))
+        .with_rule(DateGeneration::ThirdWednesdayInclusive)
+        .build()
+        .unwrap();
+
+        let floating = swap.fixed_vs_floating().floating_schedule();
+        assert_eq!(floating.start_date(), Date::new(16, Month::September, 2015));
+        assert_eq!(
+            floating.end_date(),
+            Date::new(21, Month::September, 2016),
+            "Inclusive must snap the 16-Sep-2016 maturity to the third Wednesday"
+        );
+    }
+
+    /// Stub first / next-to-last dates thread into both schedules and
+    /// [`MakeVanillaSwap::floating_leg`] (`makevanillaswap.cpp:139/146`). Pins
+    /// match the irregular-first / irregular-next-to-last cases already frozen
+    /// on `Schedule` (`schedule.rs` `backward_regular_first_period_with_first_date`),
+    /// using `NullCalendar` / `Unadjusted` so the given stub dates land verbatim.
+    /// First and next-to-last are exercised on separate builds (matching the
+    /// Schedule oracle, which does not combine both stubs under Forward).
+    #[test]
+    fn stub_first_and_next_to_last_dates_thread_into_schedules() {
+        use crate::time::calendars::NullCalendar;
+
+        let settings = settings_today();
+        let index = euribor6m(&settings);
+        let cal = NullCalendar::new();
+        let effective = Date::new(3, Month::September, 2017);
+        let termination = Date::new(30, Month::September, 2024);
+        let float_first = Date::new(31, Month::March, 2018);
+        let float_ntl = Date::new(15, Month::March, 2024);
+        let fixed_first = Date::new(30, Month::September, 2018);
+        let fixed_ntl = Date::new(15, Month::March, 2024);
+
+        let base = || {
+            MakeVanillaSwap::new(
+                Period::new(0, TimeUnit::Days),
+                Shared::clone(&index),
+                Some(0.03),
+                Period::new(0, TimeUnit::Days),
+                Shared::clone(&settings),
+            )
+            .with_effective_date(effective)
+            .with_termination_date(termination)
+            .with_fixed_leg_tenor(Period::new(1, TimeUnit::Years))
+            .with_fixed_leg_day_count(Thirty360::with_convention(Convention::BondBasis))
+            .with_fixed_leg_calendar(cal.clone())
+            .with_fixed_leg_convention(BusinessDayConvention::Unadjusted)
+            .with_fixed_leg_termination_date_convention(BusinessDayConvention::Unadjusted)
+            .with_fixed_leg_end_of_month(true)
+            .with_floating_leg_calendar(cal.clone())
+            .with_floating_leg_convention(BusinessDayConvention::Unadjusted)
+            .with_floating_leg_termination_date_convention(BusinessDayConvention::Unadjusted)
+            .with_floating_leg_end_of_month(true)
+        };
+
+        let swap_first = base()
+            .with_fixed_leg_first_date(fixed_first)
+            .with_floating_leg_first_date(float_first)
+            .with_floating_leg_rule(DateGeneration::Backward)
+            .build()
+            .unwrap();
+        let floating = swap_first.fixed_vs_floating().floating_schedule();
+        assert_eq!(floating.date(0), effective);
+        assert_eq!(
+            floating.date(1),
+            float_first,
+            "floating first stub must land on the given first date"
+        );
+        assert!(
+            !floating.is_regular_at(1),
+            "effective + 6M != first date ⇒ irregular first float period"
+        );
+        let fixed = swap_first.fixed_vs_floating().fixed_schedule();
+        assert_eq!(fixed.date(0), effective);
+        assert_eq!(
+            fixed.date(1),
+            fixed_first,
+            "fixed first stub must land on the given first date"
+        );
+
+        let swap_float_ntl = base()
+            .with_floating_leg_next_to_last_date(float_ntl)
+            .with_floating_leg_rule(DateGeneration::Forward)
+            .build()
+            .unwrap();
+        let floating = swap_float_ntl.fixed_vs_floating().floating_schedule();
+        let n = floating.len();
+        assert_eq!(
+            floating.date(n - 2),
+            float_ntl,
+            "floating next-to-last stub must land on the given next-to-last date"
+        );
+        assert!(
+            !floating.is_regular_at(n - 2),
+            "period ending at off-grid next-to-last must be irregular"
+        );
+        let hand_float = Schedule::new(
+            effective,
+            termination,
+            index.tenor(),
+            cal.clone(),
+            BusinessDayConvention::Unadjusted,
+            BusinessDayConvention::Unadjusted,
+            DateGeneration::Forward,
+            true,
+            Date::null(),
+            float_ntl,
+        );
+        let made_dates: Vec<Date> = (0..floating.len()).map(|i| floating.date(i)).collect();
+        let hand_dates: Vec<Date> = (0..hand_float.len()).map(|i| hand_float.date(i)).collect();
+        assert_eq!(
+            made_dates, hand_dates,
+            "maker floating schedule must match a hand-built Schedule with the same stubs"
+        );
+
+        let swap_fixed_ntl = base()
+            .with_fixed_leg_next_to_last_date(fixed_ntl)
+            .with_fixed_leg_rule(DateGeneration::Forward)
+            .build()
+            .unwrap();
+        let fixed = swap_fixed_ntl.fixed_vs_floating().fixed_schedule();
+        let n = fixed.len();
+        assert_eq!(
+            fixed.date(n - 2),
+            fixed_ntl,
+            "fixed next-to-last stub must land on the given next-to-last date"
+        );
+        assert!(
+            !fixed.is_regular_at(n - 2),
+            "period ending at off-grid fixed next-to-last must be irregular"
+        );
+        let hand_fixed = Schedule::new(
+            effective,
+            termination,
+            Period::new(1, TimeUnit::Years),
+            cal.clone(),
+            BusinessDayConvention::Unadjusted,
+            BusinessDayConvention::Unadjusted,
+            DateGeneration::Forward,
+            true,
+            Date::null(),
+            fixed_ntl,
+        );
+        let made_fixed: Vec<Date> = (0..fixed.len()).map(|i| fixed.date(i)).collect();
+        let hand_fixed_dates: Vec<Date> =
+            (0..hand_fixed.len()).map(|i| hand_fixed.date(i)).collect();
+        assert_eq!(
+            made_fixed, hand_fixed_dates,
+            "maker fixed schedule must match a hand-built Schedule with the same stubs"
+        );
+
+        let maker = base()
+            .with_floating_leg_first_date(float_first)
+            .with_floating_leg_rule(DateGeneration::Backward);
+        let built = maker.build().unwrap();
+        let built_starts: Vec<Date> = built
+            .fixed_vs_floating()
+            .floating_schedule()
+            .dates()
+            .windows(2)
+            .map(|w| w[0])
+            .collect();
+        let maker = base()
+            .with_floating_leg_first_date(float_first)
+            .with_floating_leg_rule(DateGeneration::Backward);
+        let leg = maker.floating_leg().unwrap();
+        let leg_starts: Vec<Date> = leg.iter().map(|c| c.accrual_start_date()).collect();
+        assert_eq!(
+            leg_starts, built_starts,
+            "floating_leg coupon starts must match build() floating schedule periods"
+        );
+        assert_eq!(leg_starts[0], effective);
+        assert_eq!(leg_starts[1], float_first);
+    }
+    #[test]
+    fn invalid_stub_controls_return_errors_instead_of_schedule_panics() {
+        let settings = settings_today();
+        let index = euribor6m(&settings);
+        let start = Date::new(9, Month::July, 2026);
+        let make = || {
+            MakeVanillaSwap::new(
+                Period::new(5, TimeUnit::Years),
+                Shared::clone(&index),
+                Some(0.03),
+                Period::new(0, TimeUnit::Days),
+                Shared::clone(&settings),
+            )
+            .with_effective_date(start)
+        };
+        assert!(make().with_fixed_leg_first_date(start - 1).build().is_err());
+        assert!(
+            make()
+                .with_floating_leg_next_to_last_date(start - 1)
+                .floating_leg()
+                .is_err()
+        );
+        assert!(
+            make()
+                .with_rule(DateGeneration::Twentieth)
+                .with_fixed_leg_first_date(start + 1)
+                .build()
+                .is_err()
+        );
+        assert!(
+            make()
+                .with_floating_leg_rule(DateGeneration::ThirdWednesday)
+                .with_floating_leg_end_of_month(true)
+                .floating_leg()
+                .is_err()
+        );
+        assert!(
+            make()
+                .with_fixed_leg_rule(DateGeneration::ThirdWednesday)
+                .with_fixed_leg_first_date(start + 1)
+                .build()
+                .is_err()
+        );
+    }
+    /// Complete combined-stub schedule dates generated by QuantLib 1.43.
+    #[test]
+    fn combined_distinct_leg_stubs_match_quantlib_forward_and_backward() {
+        use crate::time::calendars::NullCalendar;
+        let settings = settings_today();
+        let index = euribor6m(&settings);
+        let d = |month, year| Date::new(15, month, year);
+        let cases = [
+            (
+                DateGeneration::Forward,
+                vec![
+                    d(Month::January, 2026),
+                    d(Month::July, 2026),
+                    d(Month::July, 2027),
+                    d(Month::July, 2028),
+                    d(Month::October, 2028),
+                    d(Month::January, 2029),
+                ],
+                vec![
+                    d(Month::January, 2026),
+                    d(Month::April, 2026),
+                    d(Month::October, 2026),
+                    d(Month::April, 2027),
+                    d(Month::October, 2027),
+                    d(Month::April, 2028),
+                    d(Month::October, 2028),
+                    d(Month::November, 2028),
+                    d(Month::January, 2029),
+                ],
+            ),
+            (
+                DateGeneration::Backward,
+                vec![
+                    d(Month::January, 2026),
+                    d(Month::July, 2026),
+                    d(Month::October, 2026),
+                    d(Month::October, 2027),
+                    d(Month::October, 2028),
+                    d(Month::January, 2029),
+                ],
+                vec![
+                    d(Month::January, 2026),
+                    d(Month::April, 2026),
+                    d(Month::May, 2026),
+                    d(Month::November, 2026),
+                    d(Month::May, 2027),
+                    d(Month::November, 2027),
+                    d(Month::May, 2028),
+                    d(Month::November, 2028),
+                    d(Month::January, 2029),
+                ],
+            ),
+        ];
+        for (rule, fixed_dates, floating_dates) in cases {
+            let swap = MakeVanillaSwap::new(
+                Period::new(3, TimeUnit::Years),
+                Shared::clone(&index),
+                Some(0.03),
+                Period::new(0, TimeUnit::Days),
+                Shared::clone(&settings),
+            )
+            .with_effective_date(d(Month::January, 2026))
+            .with_rule(rule)
+            .with_fixed_leg_calendar(NullCalendar::new())
+            .with_floating_leg_calendar(NullCalendar::new())
+            .with_fixed_leg_convention(BusinessDayConvention::Unadjusted)
+            .with_floating_leg_convention(BusinessDayConvention::Unadjusted)
+            .with_fixed_leg_termination_date_convention(BusinessDayConvention::Unadjusted)
+            .with_floating_leg_termination_date_convention(BusinessDayConvention::Unadjusted)
+            .with_fixed_leg_first_date(d(Month::July, 2026))
+            .with_fixed_leg_next_to_last_date(d(Month::October, 2028))
+            .with_floating_leg_first_date(d(Month::April, 2026))
+            .with_floating_leg_next_to_last_date(d(Month::November, 2028))
+            .build()
+            .unwrap();
+            assert_eq!(
+                swap.fixed_vs_floating().fixed_schedule().dates(),
+                fixed_dates.as_slice()
+            );
+            assert_eq!(
+                swap.fixed_vs_floating().floating_schedule().dates(),
+                floating_dates.as_slice()
+            );
+        }
+    }
+
+    #[test]
+    fn schedule_validation_normalizes_eom_and_rejects_reversed_active_stubs() {
+        let start = Date::new(15, Month::January, 2026);
+        let end = Date::new(15, Month::January, 2029);
+        assert!(
+            validate_schedule_inputs(
+                start,
+                end,
+                Period::new(1, TimeUnit::Weeks),
+                DateGeneration::ThirdWednesday,
+                true,
+                Date::null(),
+                Date::null()
+            )
+            .is_ok()
+        );
+        assert!(
+            validate_schedule_inputs(
+                start,
+                end,
+                Period::new(1, TimeUnit::Years),
+                DateGeneration::Forward,
+                false,
+                end - 1,
+                start + 1
+            )
+            .is_err()
+        );
     }
 }
