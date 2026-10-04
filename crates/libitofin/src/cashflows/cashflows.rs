@@ -80,13 +80,16 @@ use crate::cashflow::{CashFlow, Leg};
 use crate::cashflows::Duration;
 use crate::errors::{QlError, QlResult};
 use crate::event::reference_date;
+use crate::handle::Handle;
 use crate::interestrate::{Compounding, InterestRate};
-use crate::math::solver1d::{DerivativeSolver, Function1D};
+use crate::math::solver1d::{DerivativeSolver, Function1D, Solver1D};
+use crate::math::solvers1d::brent::Brent;
 use crate::math::solvers1d::newtonsafe::NewtonSafe;
+use crate::quotes::{Quote, SimpleQuote};
 use crate::require;
 use crate::settings::Settings;
-use crate::shared::Shared;
-use crate::termstructures::yields::FlatForward;
+use crate::shared::{Shared, shared};
+use crate::termstructures::yields::{FlatForward, ZeroSpreadedTermStructure};
 use crate::termstructures::yieldtermstructure::YieldTermStructure;
 use crate::time::date::Date;
 use crate::time::daycounter::DayCounter;
@@ -461,6 +464,112 @@ impl CashFlows {
             true,
         )?;
         Ok(totals.npv / discount)
+    }
+
+    /// The NPV of the leg on `discount_curve` shifted by a parallel zero-rate
+    /// `z_spread` (`cashflows.cpp:1144`): wraps the curve in a
+    /// [`ZeroSpreadedTermStructure`] and delegates to [`npv`](Self::npv).
+    ///
+    /// # Errors
+    ///
+    /// As [`npv`](Self::npv), and when the spread or result is non-finite.
+    #[allow(clippy::too_many_arguments)]
+    pub fn npv_at_z_spread(
+        leg: &Leg,
+        discount_curve: Handle<dyn YieldTermStructure>,
+        z_spread: Spread,
+        compounding: Compounding,
+        frequency: Frequency,
+        settings: &Settings<Date>,
+        include_settlement_date_flows: Option<bool>,
+        settlement_date: Option<Date>,
+        npv_date: Option<Date>,
+    ) -> QlResult<Real> {
+        if leg.is_empty() {
+            return Ok(0.0);
+        }
+        require!(z_spread.is_finite(), "z-spread must be finite");
+        let quote = shared(SimpleQuote::new(z_spread));
+        let spreaded = ZeroSpreadedTermStructure::with_compounding(
+            discount_curve,
+            Handle::new(quote as Shared<dyn Quote>),
+            compounding,
+            frequency,
+        );
+        let value = Self::npv(
+            leg,
+            &spreaded,
+            settings,
+            include_settlement_date_flows,
+            settlement_date,
+            npv_date,
+        )?;
+        require!(value.is_finite(), "spreaded NPV must be finite");
+        Ok(value)
+    }
+
+    /// The zero-rate spread that reprices the leg to `npv` on `discount_curve`
+    /// (`cashflows.cpp:1188`): Brent inversion of [`npv_at_z_spread`](Self::npv_at_z_spread) with step
+    /// `0.01`. `accuracy` defaults to `1e-10`, `max_iterations` to `100` and
+    /// `guess` to `0.0`.
+    ///
+    /// # Errors
+    ///
+    /// As [`npv`](Self::npv), when the target is non-finite, or when the solver
+    /// fails to bracket or converge.
+    #[allow(clippy::too_many_arguments)]
+    pub fn z_spread(
+        leg: &Leg,
+        npv: Real,
+        discount_curve: Handle<dyn YieldTermStructure>,
+        compounding: Compounding,
+        frequency: Frequency,
+        settings: &Settings<Date>,
+        include_settlement_date_flows: Option<bool>,
+        settlement_date: Option<Date>,
+        npv_date: Option<Date>,
+        accuracy: Option<Real>,
+        max_iterations: Option<usize>,
+        guess: Option<Rate>,
+    ) -> QlResult<Spread> {
+        require!(npv.is_finite(), "target NPV must be finite");
+        let (settlement, npv_date) = Self::yield_dates(settings, settlement_date, npv_date)?;
+        let quote = shared(SimpleQuote::new(0.0));
+        let spreaded = ZeroSpreadedTermStructure::with_compounding(
+            discount_curve,
+            Handle::new(Shared::clone(&quote) as Shared<dyn Quote>),
+            compounding,
+            frequency,
+        );
+        let failure = RefCell::new(None);
+        let objective = |z: Rate| {
+            quote.set_value(z);
+            match Self::npv(
+                leg,
+                &spreaded,
+                settings,
+                include_settlement_date_flows,
+                Some(settlement),
+                Some(npv_date),
+            ) {
+                Ok(value) => npv - value,
+                Err(error) => {
+                    failure.borrow_mut().get_or_insert(error);
+                    Real::NAN
+                }
+            }
+        };
+        let mut solver = Brent::new().with_max_evaluations(max_iterations.unwrap_or(100));
+        let root = solver.solve(
+            objective,
+            accuracy.unwrap_or(1.0e-10),
+            guess.unwrap_or(0.0),
+            0.01,
+        );
+        match failure.into_inner() {
+            Some(error) => Err(error),
+            None => root,
+        }
     }
 
     /// The change in [`npv`](Self::npv) for a uniform one-basis-point change in

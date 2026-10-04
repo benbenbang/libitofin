@@ -69,7 +69,9 @@ impl BondFunctions {
     ) -> QlResult<Real> {
         let settlement = Self::settlement_or_eval(bond, settlement)?;
         let dirty = Self::dirty_price(bond, discount_curve, Some(settlement))?;
-        Ok(dirty - bond.accrued_amount(Some(settlement))?)
+        let clean = dirty - bond.accrued_amount(Some(settlement))?;
+        require!(clean.is_finite(), "clean price must be finite");
+        Ok(clean)
     }
 
     /// The dirty price per 100 of notional on `discount_curve`
@@ -93,7 +95,9 @@ impl BondFunctions {
             Some(settlement),
             None,
         )?;
-        Ok(npv * 100.0 / notional)
+        let dirty = (npv / notional) * 100.0;
+        require!(dirty.is_finite(), "dirty price must be finite");
+        Ok(dirty)
     }
 
     /// The basis-point value per 100 of notional on `discount_curve`
@@ -308,6 +312,90 @@ impl BondFunctions {
         Ok(bps * 100.0 / notional)
     }
 
+    /// The dirty price per 100 of notional under a flat `yield_rate`
+    /// (`CashFlows::npv * 100 / notional`, `bondfunctions.cpp:310`).
+    ///
+    /// # Errors
+    ///
+    /// The bond must be tradable at the settlement date.
+    pub fn dirty_price_at_yield(
+        bond: &Bond,
+        yield_rate: &InterestRate,
+        settlement: Option<Date>,
+    ) -> QlResult<Real> {
+        let settlement = Self::settlement_or_eval(bond, settlement)?;
+        let notional = Self::require_tradable(bond, settlement)?;
+        require!(yield_rate.rate().is_finite(), "yield rate must be finite");
+        let npv = CashFlows::npv_at_yield(
+            bond.cashflows(),
+            yield_rate,
+            bond.settings(),
+            Some(false),
+            Some(settlement),
+            None,
+        )?;
+        require!(npv.is_finite(), "yield NPV must be finite");
+        let dirty = (npv / notional) * 100.0;
+        require!(dirty.is_finite(), "dirty price must be finite");
+        Ok(dirty)
+    }
+
+    /// The clean price per 100 of notional under a flat `yield_rate`
+    /// (`dirtyPrice - accruedAmount`, `bondfunctions.cpp:296`).
+    ///
+    /// # Errors
+    ///
+    /// The bond must be tradable at the settlement date.
+    pub fn clean_price_at_yield(
+        bond: &Bond,
+        yield_rate: &InterestRate,
+        settlement: Option<Date>,
+    ) -> QlResult<Real> {
+        let settlement = Self::settlement_or_eval(bond, settlement)?;
+        let dirty = Self::dirty_price_at_yield(bond, yield_rate, Some(settlement))?;
+        let clean = dirty - bond.accrued_amount(Some(settlement))?;
+        require!(clean.is_finite(), "clean price must be finite");
+        Ok(clean)
+    }
+
+    /// Dirty price from a bare yield and its conventions
+    /// (`bondfunctions.cpp:320`).
+    ///
+    /// # Errors
+    ///
+    /// Propagates [`InterestRate::new`] and [`dirty_price_at_yield`](Self::dirty_price_at_yield).
+    #[allow(clippy::too_many_arguments)]
+    pub fn dirty_price_from_yield(
+        bond: &Bond,
+        yield_rate: Rate,
+        day_counter: DayCounter,
+        compounding: Compounding,
+        frequency: Frequency,
+        settlement: Option<Date>,
+    ) -> QlResult<Real> {
+        let y = InterestRate::new(yield_rate, day_counter, compounding, frequency)?;
+        Self::dirty_price_at_yield(bond, &y, settlement)
+    }
+
+    /// Clean price from a bare yield and its conventions
+    /// (`bondfunctions.cpp:302`).
+    ///
+    /// # Errors
+    ///
+    /// Propagates [`InterestRate::new`] and [`clean_price_at_yield`](Self::clean_price_at_yield).
+    #[allow(clippy::too_many_arguments)]
+    pub fn clean_price_from_yield(
+        bond: &Bond,
+        yield_rate: Rate,
+        day_counter: DayCounter,
+        compounding: Compounding,
+        frequency: Frequency,
+        settlement: Option<Date>,
+    ) -> QlResult<Real> {
+        let y = InterestRate::new(yield_rate, day_counter, compounding, frequency)?;
+        Self::clean_price_at_yield(bond, &y, settlement)
+    }
+
     fn settlement_or_eval(bond: &Bond, settlement: Option<Date>) -> QlResult<Date> {
         match settlement {
             Some(date) => Ok(date),
@@ -317,6 +405,7 @@ impl BondFunctions {
 
     fn require_tradable(bond: &Bond, settlement: Date) -> QlResult<Real> {
         let notional = bond.notional(Some(settlement))?;
+        require!(notional.is_finite(), "bond notional must be finite");
         require!(
             notional != 0.0,
             "non tradable at {settlement} settlement date (maturity being {})",
