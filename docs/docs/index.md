@@ -49,6 +49,12 @@ links to the language guides and project documentation.
 | Go SDK | [Installation, sessions, and examples](go.md), plus [API reference](https://pkg.go.dev/github.com/benbenbang/libitofin/sdk/go) |
 | Worked examples | [`example/python`](https://github.com/benbenbang/libitofin/tree/main/example/python), [`sdk/go/examples`](https://github.com/benbenbang/libitofin/tree/main/sdk/go/examples), and [`crates/libitofin/examples`](https://github.com/benbenbang/libitofin/tree/main/crates/libitofin/examples) |
 
+## Reviewed Rust additions
+
+- [Priority adoption scope and limits](priority-adoption.md): 18 retained High
+  rows, with 10 excluded because existing issue acceptance already owns them.
+- Rust-core only: no new Python, C or Go facades, and no release implied.
+
 ## Project guides
 
 - Language guides: [Rust](https://github.com/benbenbang/libitofin/blob/main/wiki/rust.md),
