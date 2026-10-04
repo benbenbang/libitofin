@@ -167,6 +167,11 @@ impl FloatingRateCoupon {
         &self.index
     }
 
+    /// The index fixing calendar the coupon's fixing dates advance on.
+    pub fn fixing_calendar(&self) -> &Calendar {
+        &self.fixing_calendar
+    }
+
     /// The number of fixing days.
     pub fn fixing_days(&self) -> Natural {
         self.fixing_days
