@@ -11,6 +11,7 @@ __all__ = [
     "convergence_table",
     "correlation_matrix",
     "covariance_matrix",
+    "discrepancy",
     "downside_deviation",
     "downside_variance",
     "expected_shortfall",
@@ -221,6 +222,14 @@ def correlation_matrix(samples: typing.Sequence[typing.Sequence[builtins.float]]
 def covariance_matrix(samples: typing.Sequence[typing.Sequence[builtins.float]], *, weights: typing.Optional[typing.Sequence[builtins.float]] = None) -> builtins.list[builtins.list[builtins.float]]:
     r"""
     Symmetric weighted covariance matrix with row-count correction n/(n-1).
+    """
+
+def discrepancy(samples: typing.Sequence[typing.Sequence[builtins.float]], *, weights: typing.Optional[typing.Sequence[builtins.float]] = None) -> builtins.float:
+    r"""
+    Star L2 discrepancy of rectangular samples in the closed unit cube.
+
+    Only omitted weights or exact unit weights are supported. Shape and work
+    bounds are checked before flattening; Python argument extraction occurs first.
     """
 
 def downside_deviation(observations: typing.Sequence[builtins.float], *, weights: typing.Optional[typing.Sequence[builtins.float]] = None) -> builtins.float:

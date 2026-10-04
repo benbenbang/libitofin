@@ -1,0 +1,12 @@
+{
+  "domain": "statistics-discrepancy",
+  "entries": [
+    {
+      "c": "itofin_discrepancy_statistics_evaluate",
+      "go": "StatisticsDiscrepancy",
+      "python": "itofin.statistics.discrepancy",
+      "status": "implemented",
+      "tests": "TestStatisticsDiscrepancyUnitCubeAndWeights"
+    }
+  ]
+}

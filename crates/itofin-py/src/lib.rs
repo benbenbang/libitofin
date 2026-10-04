@@ -26,6 +26,7 @@ mod creditengine;
 mod credithelpers;
 mod currency;
 mod curve;
+mod discrepancy_statistics;
 mod fdengine;
 mod fra;
 mod general_statistics;
@@ -448,6 +449,10 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     statistics.add_class::<convergence_statistics::PyConvergenceStatistics>()?;
     statistics.add_function(wrap_pyfunction!(
         convergence_statistics::convergence_table,
+        &statistics
+    )?)?;
+    statistics.add_function(wrap_pyfunction!(
+        discrepancy_statistics::discrepancy,
         &statistics
     )?)?;
     statistics.add_class::<general_statistics::PyGeneralStatistics>()?;
