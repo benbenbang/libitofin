@@ -11,6 +11,7 @@
 mod batesprocess;
 mod blackscholesprocess;
 pub mod discretization;
+pub mod forwardmeasureprocess;
 mod gjrgarchprocess;
 mod hestonprocess;
 mod merton76process;
@@ -23,6 +24,7 @@ pub use discretization::{
     DiscretizedProcess, DiscretizedProcess1D, EulerDiscretization, ProcessDiscretization,
     ProcessDiscretization1D,
 };
+pub use forwardmeasureprocess::{ForwardMeasureProcess1D, ForwardMeasureTime};
 pub use gjrgarchprocess::{
     GjrGarchCoefficients, GjrGarchDiscretization, GjrGarchParameters, GjrGarchProcess,
 };
