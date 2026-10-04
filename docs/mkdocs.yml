@@ -83,6 +83,7 @@ nav:
   - Random policies: random-policies.md
   - GBM simulation: simulation.md
   - Statistics and risk: statistics.md
+  - Mean convergence: convergence.md
   - Chart indicators: chart.md
   - Cap/floor engines: cap-engines.md
   - Python API:
