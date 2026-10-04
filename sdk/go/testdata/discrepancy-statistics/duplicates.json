@@ -1,0 +1,32 @@
+{
+  "dimension": 2,
+  "exact_discrepancy": 0.2825970826302195,
+  "exact_squared": {
+    "denominator": "288",
+    "numerator": "23"
+  },
+  "name": "duplicates",
+  "native_discrepancy": 0.28259708263021954,
+  "point_source": {
+    "kind": "hand-authored"
+  },
+  "samples": [
+    [
+      0.5,
+      0.5
+    ],
+    [
+      0.5,
+      0.5
+    ],
+    [
+      0.5,
+      0.5
+    ]
+  ],
+  "weights": [
+    1,
+    1,
+    1
+  ]
+}

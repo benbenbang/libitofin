@@ -1,0 +1,32 @@
+{
+  "dimension": 2,
+  "exact_discrepancy": 0.12412890924805194,
+  "exact_squared": {
+    "denominator": "4608",
+    "numerator": "71"
+  },
+  "name": "interior",
+  "native_discrepancy": 0.12412890924805191,
+  "point_source": {
+    "kind": "hand-authored"
+  },
+  "samples": [
+    [
+      0.25,
+      0.25
+    ],
+    [
+      0.75,
+      0.75
+    ],
+    [
+      0.25,
+      0.75
+    ],
+    [
+      0.75,
+      0.25
+    ]
+  ],
+  "weights": null
+}

@@ -1,0 +1,49 @@
+{
+  "cases": [
+    "boundary_corners.json",
+    "duplicates.json",
+    "interior.json",
+    "one_point_3d.json",
+    "sobol_2d_8.json",
+    "sobol_3d_16.json",
+    "mt19937_2d_8.json",
+    "mt19937_3d_16.json"
+  ],
+  "formula": "A/N^2 - 2^(1-d)*C/N + 3^(-d)",
+  "native_dimension_one": {
+    "rejected": true
+  },
+  "provenance": {
+    "compiler": "Apple clang version 21.0.0 (clang-2100.3.34.2)",
+    "compiler_flags": [
+      "-std=c++17",
+      "-O2"
+    ],
+    "exact_reference": "Fraction.from_float coordinates; independent ordered double sum; sqrt(float(exact squared))",
+    "generator_sha256": "aa23d7d0764bf55315e400e5bf7f77731930bd209cbfed76ac2aaed89529471c",
+    "native_reference": "Actual QuantLib DiscrepancyStatistics; actual pinned SobolRsg/Jaeckel and MersenneTwisterUniformRng",
+    "native_source_sha256": "21d3da58fefb9325c6c12da49efd00be7ca9a5983b86f52d52525082c74be4ca",
+    "source_commit": "9863b578af0caa4cecabf697196533e84a8308b6",
+    "source_sha256": {
+      "ql/errors.cpp": "342f04dfcfce966ded3626c7adc8daf81847b9431a16906488223cba0ee77a3e",
+      "ql/math/randomnumbers/mt19937uniformrng.cpp": "a9171816567baf59c5fc6f6d500428d65a5f122c27a9a76dfc0503c65446e85f",
+      "ql/math/randomnumbers/mt19937uniformrng.hpp": "b1719dd3059e111fcd055e20cf161e48cb116932b64e3ee69cdc57c4b00c9c81",
+      "ql/math/randomnumbers/primitivepolynomials.cpp": "7a702ada8dd26e1bd59a4ada28359e5b0cbb3e1f8afa4f9202eb141a6534f97a",
+      "ql/math/randomnumbers/primitivepolynomials.hpp": "3e22846e2f5979d60c3e0f4332172d476b15ea1055687057fb32df57c5f9138d",
+      "ql/math/randomnumbers/seedgenerator.cpp": "660d4a407e9bfcffdf2e806df258cc94167d38a5f6cf91b68221740c3d438a4b",
+      "ql/math/randomnumbers/seedgenerator.hpp": "6b2ff925dff7653c01d2f119a278fd0b84e37a0e7a8875d576283f1b8aef9bf6",
+      "ql/math/randomnumbers/sobolrsg.cpp": "b12c48dec3672583a184114ce30ce346814f10de73324218816632dc5cb0c2d4",
+      "ql/math/randomnumbers/sobolrsg.hpp": "3663c094008b098d5eee9ea33ed2ab703755645e83e391b7fde46763742d5d16",
+      "ql/math/statistics/discrepancystatistics.cpp": "93ab7d539569e766cbecdb23fc1517983b439640852aadcc5b1f729aa6960449",
+      "ql/math/statistics/discrepancystatistics.hpp": "4ac8af8774023d66b3c678b36ecf99403b38642a53b65ada5ec117224813c5fb",
+      "ql/math/statistics/generalstatistics.cpp": "8bd3aa4d0a163bc4cda025b16045ad8d7d9f38ef2f5b4b9a3876517dcf085fe6",
+      "ql/math/statistics/generalstatistics.hpp": "8515bf2592faa1586ee9a5b024698c4348ed74f152ed1aaaa965e1783e163192",
+      "ql/math/statistics/sequencestatistics.hpp": "5d118d8b4d6fcb418e999f30d09c4adca575cd5c06d50ce89b7edab623183b86",
+      "ql/math/statistics/statistics.hpp": "0f69ac3db372f9babb3e0b799bf713ca6dced77dbda63cc331f68963c4e67237"
+    }
+  },
+  "tolerance": {
+    "absolute": 2e-12,
+    "relative": 2e-12
+  }
+}
