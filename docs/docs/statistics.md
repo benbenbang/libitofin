@@ -155,3 +155,96 @@ statistics facade; the incremental accumulator has no empirical tail queries.
     if err != nil { panic(err) }
     _ = mean
     ```
+
+## Weighted vector statistics
+
+Sequence batch functions treat each **row as one observation** and each column
+as one component. All rows must have the same positive width. Pass one optional
+nonnegative weight per row, not per component; omitted Python weights or Go
+`nil` weights mean one per row. No NumPy/pandas array conversion or additional Go dependency is
+needed. Missing observations, NaN and infinities are rejected: callers align
+and clean their own data, including calendar alignment.
+
+| Python `statistics` function | Go function | Result |
+| --- | --- | --- |
+| `sequence_mean` | `StatisticsSequenceMean` | One weighted mean per column |
+| `sequence_variance` | `StatisticsSequenceVariance` | One count-corrected variance per column |
+| `sequence_standard_deviation` | `StatisticsSequenceStandardDeviation` | Square roots of those variances |
+| `sequence_error_estimate` | `StatisticsSequenceErrorEstimate` | `sqrt(variance / N)` per column |
+| `sequence_minimum` / `sequence_maximum` | `StatisticsSequenceMinimum` / `StatisticsSequenceMaximum` | Column extrema, including zero-weight rows |
+| `covariance_matrix` / `correlation_matrix` | `StatisticsCovariance` / `StatisticsCorrelation` | Symmetric column-by-column matrices |
+
+Let `W = Σwᵢ`, `μⱼ = Σ(wᵢ xᵢⱼ)/W`, and `N` be the number of rows.
+Covariance entry `(j, k)` is
+`N/(N-1) × Σ[wᵢ (xᵢⱼ - μⱼ)(xᵢₖ - μₖ)]/W`.
+Its diagonal is the sequence variance. This is **observation-count correction**,
+not frequency-weight or effective-sample-size correction. Zero-weight rows still
+increase `N`, change the correction/error estimate and can set extrema.
+
+Correlation is covariance divided by the two standard deviations, with these
+explicit constant-column conventions:
+
+- Diagonal entries are one, including constant columns.
+- Two zero-variance columns have correlation one.
+- One zero-variance and one varying column have correlation zero.
+
+Nonconstant correlations can differ from `[-1, 1]` by a few binary64 ULPs;
+values are not clipped. Python converts sequence arguments before validating
+shape; the limits below bound native storage, flattening and output allocation.
+
+Covariance uses centered products, avoiding QuantLib's raw-product cancellation
+for large offsets. For example, rows `[10¹²+i, 10¹²+2i]` for `i=0..3` have
+covariance `[[5/3, 10/3], [10/3, 20/3]]`, not a negative variance from subtracting
+large raw moments. This is an intentional stability correction; ordinary inputs
+retain the pinned native conventions.
+
+=== "Python"
+
+    ```python
+    from itofin import statistics
+
+    rows = [[1.0, 4.0], [3.0, 2.0], [100.0, -20.0]]
+    weights = [1.0, 3.0, 0.0]
+    assert statistics.sequence_mean(rows, weights=weights) == [2.5, 2.5]
+    covariance = statistics.covariance_matrix(rows, weights=weights)
+    correlation = statistics.correlation_matrix(rows, weights=weights)
+    assert abs(covariance[0][0] - 1.125) < 1e-12
+    assert abs(correlation[0][1] + 1.0) < 1e-12
+    assert statistics.sequence_maximum(rows, weights=weights) == [100.0, 4.0]
+    ```
+
+=== "Go"
+
+    ```go
+    import itofin "github.com/benbenbang/libitofin/sdk/go"
+
+    rows := [][]float64{{1, 4}, {3, 2}, {100, -20}}
+    weights := []float64{1, 3, 0}
+    mean, err := itofin.StatisticsSequenceMean(rows, weights)
+    if err != nil { panic(err) }
+    covariance, err := itofin.StatisticsCovariance(rows, weights)
+    if err != nil { panic(err) }
+    correlation, err := itofin.StatisticsCorrelation(rows, weights)
+    if err != nil { panic(err) }
+    _, _, _ = mean, covariance, correlation
+    ```
+
+Vector results are Python `list[float]` or Go `[]float64`; matrices are
+Python `list[list[float]]` or Go `[][]float64`, with independent rows. Rust batch
+inputs and Rust/C matrix outputs use flattened row-major storage. All functions
+are stateless and return independent results, with no binding handles or sessions.
+Every new sequence query, including min/max, requires a positive total weight. Mean/min/max need one row; variance, deviation, error
+estimate and matrices need at least two. This stricter sequence-batch rule does
+not change scalar `GeneralStatistics` min/max behavior.
+
+Limits are 256 columns, 100,000 rows and 1,000,000 input values. Matrix requests
+also require `rows × columns² ≤ 100,000,000`; output matrices have at most 65,536
+entries. Invalid shapes, mismatched weight counts, negative/nonfinite weights,
+zero total weight, exceeded limits and nonfinite arithmetic/results
+return errors, not partial output. Tiny positive weights do not grant additional
+sample-count or work-limit capacity.
+
+Rust also provides `SequenceStatistics::new(dimension)` and `add_weighted` for
+an owned accumulator; the binding APIs expose only these batch operations.
+Independent native and exact-centered fixtures are in
+[`sdk/go/testdata/sequence-statistics`](https://github.com/benbenbang/libitofin/tree/main/sdk/go/testdata/sequence-statistics).
