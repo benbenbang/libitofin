@@ -425,7 +425,9 @@ impl Bond {
             Some(false),
             Some(settlement),
         )?;
-        Ok(accrued * 100.0 / current_notional)
+        let amount = (accrued / current_notional) * 100.0;
+        require!(amount.is_finite(), "accrued amount must be finite");
+        Ok(amount)
     }
 
     /// The yield (internal rate of return) that reprices the bond at `price`
