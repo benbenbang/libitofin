@@ -5,6 +5,7 @@
 
 mod bond;
 mod bonds;
+mod callablebond;
 mod capfloor;
 mod claim;
 mod creditdefaultswap;
@@ -30,6 +31,9 @@ mod zerocouponinflationswap;
 
 pub use bond::{Bond, BondArguments, BondEngine, BondPrice, BondPriceType, BondResults};
 pub use bonds::FixedRateBond;
+pub use callablebond::{
+    Callability, CallabilitySchedule, CallabilityType, CallableBondArguments, CallableFixedRateBond,
+};
 pub use capfloor::{CapFloor, CapFloorArguments, CapFloorType};
 pub use claim::{Claim, FaceValueAccrualClaim, FaceValueClaim};
 pub use creditdefaultswap::{
