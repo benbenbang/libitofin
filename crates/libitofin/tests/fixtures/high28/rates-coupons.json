@@ -1,0 +1,73 @@
+{
+  "compiled_oracle": "PyPI QuantLib 1.43 Python bindings and compiled library",
+  "inputs": {
+    "day_counter": "Actual360",
+    "fixing_cases_accrual_end": "2026-08-01",
+    "fixing_cases_accrual_start": "2026-02-01",
+    "fixing_cases_fixing_days": 0,
+    "fixing_cases_index": "Euribor6M",
+    "fixing_cases_payment": "2026-08-02",
+    "notional": 100,
+    "rate_cases_fixing_days": 2,
+    "rate_cases_index": "USDLibor6M"
+  },
+  "local_source_revision": "9863b578af0caa4cecabf697196533e84a8308b6",
+  "local_source_version": "1.43-dev",
+  "quantlib_version": "1.43",
+  "rows": {
+    "coupon_rates": [
+      {
+        "curve_rate": 0.02,
+        "end": "2027-01-04",
+        "fixing": "2026-07-01",
+        "index_value_date": "2026-07-03",
+        "name": "future_fixing",
+        "rate": 0.02010313079341922,
+        "reference": "2026-06-30",
+        "start": "2026-07-03"
+      },
+      {
+        "curve_rate": 0.03,
+        "end": "2020-05-11",
+        "fixing": "2019-11-07",
+        "index_value_date": "2019-11-12",
+        "name": "holiday_value_date",
+        "rate": 0.03022865451309394,
+        "reference": "2019-11-06",
+        "start": "2019-11-11"
+      }
+    ],
+    "fixing_dates": [
+      {
+        "arrears": false,
+        "convention": "Preceding",
+        "fixing": "2026-01-30"
+      },
+      {
+        "arrears": false,
+        "convention": "Following",
+        "fixing": "2026-02-02"
+      },
+      {
+        "arrears": false,
+        "convention": "ModifiedFollowing",
+        "fixing": "2026-02-02"
+      },
+      {
+        "arrears": true,
+        "convention": "Preceding",
+        "fixing": "2026-07-31"
+      },
+      {
+        "arrears": true,
+        "convention": "Following",
+        "fixing": "2026-08-03"
+      },
+      {
+        "arrears": true,
+        "convention": "ModifiedFollowing",
+        "fixing": "2026-08-03"
+      }
+    ]
+  }
+}
