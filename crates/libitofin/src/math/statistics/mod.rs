@@ -13,6 +13,7 @@ use crate::fail;
 use crate::types::{Real, Size};
 
 mod batch;
+mod convergence;
 mod gaussianstatistics;
 mod generalstatistics;
 mod histogram;
@@ -22,6 +23,10 @@ mod sequence;
 mod sequence_shape;
 
 pub use batch::{BatchStatistic, evaluate_batch};
+pub use convergence::{
+    ConvergencePoint, ConvergenceStatistics, DoublingConvergenceSteps, MAX_CONVERGENCE_SAMPLES,
+    evaluate_convergence_batch, validate_convergence_length,
+};
 pub use gaussianstatistics::{GaussianStatistics, StatsHolder};
 pub use generalstatistics::GeneralStatistics;
 pub use histogram::{Histogram, HistogramAlgorithm};
