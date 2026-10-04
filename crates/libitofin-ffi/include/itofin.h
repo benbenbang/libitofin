@@ -2651,6 +2651,25 @@ int32_t itofin_curve_nodes(struct ItofinContext *ctx,
                            struct ItofinError *error);
 
 /**
+ * Evaluate normalized L2 star discrepancy for row-major points in [0, 1]^d.
+ * Dimensions are 2-256, rows 1-4096, inputs at most 1,000,000 coordinates,
+ * and pair-coordinate work at most 100,000,000. Null weights with length zero
+ * selects unit weights; explicit weights must all equal one. Other weights
+ * are rejected. Errors leave `out` unchanged. No random draws are performed.
+ * # Safety
+ * Inputs are readable for their lengths, `out` holds one writable double,
+ * and all pointers follow the crate-level alignment and non-overlap contract.
+ */
+int32_t itofin_discrepancy_statistics_evaluate(const ItofinReal *values,
+                                               size_t values_len,
+                                               size_t rows,
+                                               size_t dimension,
+                                               const ItofinReal *weights,
+                                               size_t weights_len,
+                                               ItofinReal *out,
+                                               struct ItofinError *error);
+
+/**
  * Construct an FD engine retaining the Black-Scholes process. Attach it to a
  * vanilla option with `itofin_option_set_engine` kind 2.
  * # Safety

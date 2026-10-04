@@ -30,6 +30,7 @@ pub mod credit_api;
 pub mod credit_helpers_api;
 pub mod credit_instruments_api;
 pub mod curves_api;
+pub mod discrepancy_statistics_api;
 pub mod fd_engine_api;
 pub mod garch_api;
 pub mod general_statistics_api;
