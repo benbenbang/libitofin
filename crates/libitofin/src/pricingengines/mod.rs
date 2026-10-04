@@ -5,6 +5,7 @@
 //! built on them.
 
 pub mod blackcalculator;
+pub mod blackdeltacalculator;
 pub mod blackformula;
 pub mod bond;
 pub mod capfloor;
@@ -16,6 +17,7 @@ pub mod swaption;
 pub mod vanilla;
 
 pub use blackcalculator::BlackCalculator;
+pub use blackdeltacalculator::BlackDeltaCalculator;
 pub use bond::{BondFunctions, DiscountingBondEngine};
 pub use capfloor::{AnalyticCapFloorEngine, BachelierCapFloorEngine, BlackCapFloorEngine};
 pub use credit::{IntegralCdsEngine, MidPointCdsEngine};

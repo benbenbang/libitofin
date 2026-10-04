@@ -227,3 +227,6 @@ impl BlackDeltaCalculator {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;
