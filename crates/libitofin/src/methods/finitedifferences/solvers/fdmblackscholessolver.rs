@@ -3,12 +3,14 @@
 //! Port of `ql/methods/finitedifferences/solvers/fdmblackscholessolver.hpp:40`
 //! and its `.cpp`.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 
 use crate::errors::QlResult;
 use crate::methods::finitedifferences::operators::{FdmBlackScholesOp, FdmLinearOpComposite};
+use crate::patterns::observable::{AsObservable, Observer};
 use crate::processes::GeneralizedBlackScholesProcess;
-use crate::shared::{Shared, SharedMut, shared_mut};
+use crate::require;
+use crate::shared::{Shared, SharedMut, shared, shared_mut};
 use crate::types::{Real, Size};
 
 use super::{Fdm1DimSolver, FdmSchemeDesc, FdmSolverDesc};
@@ -23,12 +25,9 @@ const DIRECTION: Size = 0;
 /// its logarithm down (`cpp:57-75`); delta and gamma carry the chain rule for
 /// that change of variable.
 ///
-/// C++ is a `LazyObject` registered with the process (`hpp:40`, `cpp:41-42`)
-/// and this is not. The engine of #668 builds a solver fresh inside its own
-/// calculation (`fdblackscholesvanillaengine.cpp:202-207`) and drops it again,
-/// so no notification could ever reach one; what the laziness buys is the
-/// compute-once behaviour within a single pricing, and that is a plain
-/// internal cache.
+/// Process notifications invalidate the cached rollback. Direct queries can
+/// reuse the wrapper after quote changes or handle relinking, while engines
+/// may continue constructing a fresh wrapper for each calculation.
 ///
 /// Deferred to #636, and omitted rather than accepted and ignored:
 ///
@@ -45,6 +44,18 @@ pub struct FdmBlackScholesSolver {
     solver_desc: FdmSolverDesc,
     scheme_desc: FdmSchemeDesc,
     solver: RefCell<Option<Fdm1DimSolver>>,
+    dirty: Shared<Cell<bool>>,
+    _listener: SharedMut<SolverInvalidator>,
+}
+
+struct SolverInvalidator {
+    dirty: Shared<Cell<bool>>,
+}
+
+impl Observer for SolverInvalidator {
+    fn update(&mut self) {
+        self.dirty.set(true);
+    }
 }
 
 impl FdmBlackScholesSolver {
@@ -57,20 +68,29 @@ impl FdmBlackScholesSolver {
     ///
     /// The process is held by [`Shared`] rather than C++'s
     /// `Handle<GeneralizedBlackScholesProcess>` (`hpp:59`). The handle buys
-    /// relinking, which reaches C++ through the observer registration this port
-    /// does not carry.
+    /// relinking the process itself. Its market-input handle relinks and quote
+    /// updates still reach this solver through process notifications.
     pub fn new(
         process: Shared<GeneralizedBlackScholesProcess>,
         strike: Real,
         solver_desc: FdmSolverDesc,
         scheme_desc: FdmSchemeDesc,
     ) -> Self {
+        let dirty = shared(Cell::new(true));
+        let listener = shared_mut(SolverInvalidator {
+            dirty: Shared::clone(&dirty),
+        });
+        process
+            .observable()
+            .register_observer(&(listener.clone() as SharedMut<dyn Observer>));
         FdmBlackScholesSolver {
             process,
             strike,
             solver_desc,
             scheme_desc,
             solver: RefCell::new(None),
+            dirty,
+            _listener: listener,
         }
     }
 
@@ -80,6 +100,7 @@ impl FdmBlackScholesSolver {
     ///
     /// Returns an error if the generator cannot be built or the rollback fails.
     pub fn value_at(&self, s: Real) -> QlResult<Real> {
+        require!(s.is_finite() && s > 0.0, "spot must be positive and finite");
         self.with_solver(|solver| solver.interpolate_at(s.ln()))
     }
 
@@ -90,6 +111,7 @@ impl FdmBlackScholesSolver {
     ///
     /// Returns an error if the generator cannot be built or the rollback fails.
     pub fn delta_at(&self, s: Real) -> QlResult<Real> {
+        require!(s.is_finite() && s > 0.0, "spot must be positive and finite");
         self.with_solver(|solver| Ok(solver.derivative_x(s.ln())? / s))
     }
 
@@ -100,6 +122,7 @@ impl FdmBlackScholesSolver {
     ///
     /// Returns an error if the generator cannot be built or the rollback fails.
     pub fn gamma_at(&self, s: Real) -> QlResult<Real> {
+        require!(s.is_finite() && s > 0.0, "spot must be positive and finite");
         self.with_solver(|solver| {
             let x = s.ln();
 
@@ -124,11 +147,15 @@ impl FdmBlackScholesSolver {
     ///
     /// Returns an error if the generator cannot be built or the rollback fails.
     pub fn theta_at(&self, s: Real) -> QlResult<Option<Real>> {
+        require!(s.is_finite() && s > 0.0, "spot must be positive and finite");
         self.with_solver(|solver| solver.theta_at(s.ln()))
     }
 
     /// Builds the generator and the solver over it, once (`cpp:45-55`).
     fn calculate(&self) -> QlResult<()> {
+        if self.dirty.replace(false) {
+            *self.solver.borrow_mut() = None;
+        }
         if self.solver.borrow().is_some() {
             return Ok(());
         }
@@ -365,5 +392,77 @@ mod tests {
                 .expect("a capture away from today has a theta"),
             asked_first
         );
+    }
+    #[test]
+    fn invalid_spots_fail_before_building_the_solver() {
+        let mesher = testops::mesher();
+        let solver = solver(&mesher);
+        for spot in [0.0, -1.0, Real::NAN, Real::INFINITY, Real::NEG_INFINITY] {
+            assert!(solver.value_at(spot).is_err());
+            assert!(solver.delta_at(spot).is_err());
+            assert!(solver.gamma_at(spot).is_err());
+            assert!(solver.theta_at(spot).is_err());
+        }
+        assert!(solver.solver.borrow().is_none());
+    }
+
+    #[test]
+    fn volatility_quote_updates_and_handle_relinks_refresh_cached_queries() {
+        use crate::handle::RelinkableHandle;
+        use crate::quotes::{Quote, SimpleQuote};
+        let dc = Actual365Fixed::new();
+        let today = Date::new(11, Month::February, 2018);
+        let volatility = shared(SimpleQuote::new(VOL));
+        let volatility_handle =
+            RelinkableHandle::new(Shared::clone(&volatility) as Shared<dyn Quote>);
+        let process = shared(GeneralizedBlackScholesProcess::new(
+            make_quote_handle(100.0).handle(),
+            flat_rate(today, Q, dc.clone()),
+            flat_rate(today, R, dc.clone()),
+            Handle::new(shared(BlackConstantVol::with_quote(
+                today,
+                None,
+                volatility_handle.handle(),
+                dc,
+            )) as Shared<dyn BlackVolTermStructure>),
+        ));
+        let mesher = testops::mesher();
+        let solver = FdmBlackScholesSolver::new(
+            Shared::clone(&process),
+            STRIKE,
+            desc(&mesher),
+            FdmSchemeDesc::douglas(),
+        );
+        let original = solver.value_at(SPOT).unwrap();
+        volatility.set_value(0.3);
+        let fresh = FdmBlackScholesSolver::new(
+            Shared::clone(&process),
+            STRIKE,
+            desc(&mesher),
+            FdmSchemeDesc::douglas(),
+        );
+        let changed = solver.value_at(SPOT).unwrap();
+        assert!((changed - original).abs() > 1e-3);
+        assert_eq!(changed, fresh.value_at(SPOT).unwrap());
+        assert_eq!(
+            solver.delta_at(SPOT).unwrap(),
+            fresh.delta_at(SPOT).unwrap()
+        );
+        assert_eq!(
+            solver.gamma_at(SPOT).unwrap(),
+            fresh.gamma_at(SPOT).unwrap()
+        );
+        assert_eq!(
+            solver.theta_at(SPOT).unwrap(),
+            fresh.theta_at(SPOT).unwrap()
+        );
+        volatility_handle.link_to(shared(SimpleQuote::new(0.15)) as Shared<dyn Quote>);
+        let fresh =
+            FdmBlackScholesSolver::new(process, STRIKE, desc(&mesher), FdmSchemeDesc::douglas());
+        assert_eq!(
+            solver.theta_at(SPOT).unwrap(),
+            fresh.theta_at(SPOT).unwrap()
+        );
+        assert!((solver.value_at(SPOT).unwrap() - changed).abs() > 1e-3);
     }
 }

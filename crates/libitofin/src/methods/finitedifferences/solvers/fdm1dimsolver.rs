@@ -13,6 +13,7 @@ use crate::methods::finitedifferences::operators::FdmLinearOpComposite;
 use crate::methods::finitedifferences::stepconditions::{
     FdmSnapshotCondition, FdmStepConditionComposite,
 };
+use crate::require;
 use crate::shared::{Shared, SharedMut, shared};
 use crate::types::{Real, Time};
 
@@ -95,6 +96,7 @@ impl Fdm1DimSolver {
     ///
     /// Returns an error if the rollback or the spline fails.
     pub fn interpolate_at(&self, x: Real) -> QlResult<Real> {
+        self.validate_query(x)?;
         self.read_off(|spline| spline.value(x))
     }
 
@@ -104,6 +106,7 @@ impl Fdm1DimSolver {
     ///
     /// Returns an error if the rollback or the spline fails.
     pub fn derivative_x(&self, x: Real) -> QlResult<Real> {
+        self.validate_query(x)?;
         self.read_off(|spline| spline.derivative(x))
     }
 
@@ -113,6 +116,7 @@ impl Fdm1DimSolver {
     ///
     /// Returns an error if the rollback or the spline fails.
     pub fn derivative_xx(&self, x: Real) -> QlResult<Real> {
+        self.validate_query(x)?;
         self.read_off(|spline| spline.second_derivative(x))
     }
 
@@ -136,6 +140,7 @@ impl Fdm1DimSolver {
     /// the model rolling that segment cuts a sub-step on the capture and the
     /// condition fires there.
     pub fn theta_at(&self, x: Real) -> QlResult<Option<Real>> {
+        self.validate_query(x)?;
         if self.conditions.stopping_times().first() == Some(&0.0) {
             return Ok(None);
         }
@@ -147,6 +152,15 @@ impl Fdm1DimSolver {
         Ok(Some(
             (capture_spline.value(x)? - value) / self.theta_condition.time(),
         ))
+    }
+
+    fn validate_query(&self, x: Real) -> QlResult<()> {
+        require!(
+            self.solver_desc.mesher.layout().dim().len() == 1,
+            "one-dimensional solver requires a one-dimensional grid"
+        );
+        require!(x.is_finite(), "query coordinate must be finite");
+        Ok(())
     }
 
     /// Rolls the seeded grid back and splines the result, once (`cpp:54-65`).
@@ -508,5 +522,34 @@ mod tests {
 
         assert!(after_first_read >= STEPS + DAMPING_STEPS);
         assert_eq!(*set_times.borrow(), after_first_read);
+    }
+    #[test]
+    fn invalid_query_coordinates_and_multidimensional_layouts_fail() {
+        let mesher = testops::mesher();
+        let solver = solver(&mesher, empty_condition());
+        for x in [Real::NAN, Real::INFINITY, Real::NEG_INFINITY] {
+            assert!(solver.interpolate_at(x).is_err());
+            assert!(solver.derivative_x(x).is_err());
+            assert!(solver.derivative_xx(x).is_err());
+            assert!(solver.theta_at(x).is_err());
+        }
+        let mesher: Shared<dyn FdmMesher> = shared(
+            crate::methods::finitedifferences::meshers::UniformGridMesher::new(
+                shared(
+                    crate::methods::finitedifferences::operators::FdmLinearOpLayout::new(vec![
+                        5, 4,
+                    ]),
+                ),
+                &[(4.0, 5.0), (0.0, 1.0)],
+            )
+            .unwrap(),
+        );
+        let solver = Fdm1DimSolver::new(
+            desc(&mesher, empty_condition(), MATURITY),
+            FdmSchemeDesc::douglas(),
+            testops::scaled_composite(&[COEFFICIENT]),
+        );
+        assert!(solver.interpolate_at(PROBE).is_err());
+        assert!(solver.theta_at(PROBE).is_err());
     }
 }
