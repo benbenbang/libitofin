@@ -1,0 +1,125 @@
+{
+  "inputs": {
+    "call_strikes": [
+      100.0,
+      110.0,
+      120.0,
+      130.0,
+      140.0,
+      150.0
+    ],
+    "day_counter": "Actual365Fixed",
+    "dividend_yield": 0.0,
+    "dk": 5.0,
+    "evaluation_date": "2026-10-05",
+    "maturity_date": "2026-10-12",
+    "maturity_days": 7,
+    "notional": 50000.0,
+    "position": "long",
+    "put_strikes": [
+      50.0,
+      60.0,
+      70.0,
+      80.0,
+      90.0,
+      100.0
+    ],
+    "risk_free_rate": 0.03,
+    "spot": 100.0,
+    "start_date": "2026-10-05",
+    "variance_strike": 0.04,
+    "volatility": 0.2
+  },
+  "name": "short_maturity",
+  "native": {
+    "discount_factor": 0.999424823011986,
+    "npv": 3781.4213275993393,
+    "variance": 0.11567195131702245,
+    "weights": [
+      {
+        "option_price": 1.1335941269532628,
+        "option_type": "call",
+        "strike": 100,
+        "weight": 0.048908124897754306,
+        "weighted_price": 0.05544196314439093
+      },
+      {
+        "option_price": 0.00023240959164682725,
+        "option_type": "call",
+        "strike": 110,
+        "weight": 0.0865446579246793,
+        "weighted_price": 2.0113808607489068e-05
+      },
+      {
+        "option_price": 1.1760184861929462e-11,
+        "option_type": "call",
+        "strike": 120,
+        "weight": 0.07267326572497154,
+        "weighted_price": 8.546510394457875e-13
+      },
+      {
+        "option_price": 5.438882616152547e-22,
+        "option_type": "call",
+        "strike": 130,
+        "weight": 0.061890813278067475,
+        "weighted_price": 3.366168684376244e-23
+      },
+      {
+        "option_price": 1.0058240352497093e-34,
+        "option_type": "call",
+        "strike": 140,
+        "weight": 0.05334319266774734,
+        "weighted_price": 5.3653865302176333e-36
+      },
+      {
+        "option_price": 2.4582762966227457e-49,
+        "option_type": "call",
+        "strike": 150,
+        "weight": 0.03559506948439889,
+        "weighted_price": 8.75025155901374e-51
+      },
+      {
+        "option_price": 1.0760764281518678,
+        "option_type": "put",
+        "strike": 100,
+        "weight": 0.05590252043161688,
+        "weighted_price": 0.0601553845107411
+      },
+      {
+        "option_price": 4.0229236606577515e-05,
+        "option_type": "put",
+        "strike": 90,
+        "weight": 0.12954913712781024,
+        "weighted_price": 5.211662889692634e-06
+      },
+      {
+        "option_price": 1.3302241903971393e-14,
+        "option_type": "put",
+        "strike": 80,
+        "weight": 0.16423286552488164,
+        "weighted_price": 2.1846653057943795e-15
+      },
+      {
+        "option_price": -3.335139097022763e-15,
+        "option_type": "put",
+        "strike": 70,
+        "weight": 0.2150297093999557,
+        "weighted_price": -7.171539908412354e-16
+      },
+      {
+        "option_price": -4.444723546912592e-15,
+        "option_type": "put",
+        "strike": 60,
+        "weight": 0.2937820026526903,
+        "weighted_price": -1.30577978484955e-15
+      },
+      {
+        "option_price": -5.554307996802421e-15,
+        "option_type": "put",
+        "strike": 50,
+        "weight": 0.2961659485834225,
+        "weighted_price": -1.6449968965974781e-15
+      }
+    ]
+  }
+}
