@@ -6685,6 +6685,105 @@ int32_t itofin_capfloor_vol_query(struct ItofinContext *ctx,
                                   double *out,
                                   struct ItofinError *error);
 
+/**
+ * Variance units, positive notional and start-before-maturity are required.
+ * Position is zero long or one short. Settings are retained.
+ * # Safety
+ * Pointers follow the crate-level C caller contract.
+ */
+int32_t itofin_variance_swap_new(struct ItofinContext *ctx,
+                                 int32_t position,
+                                 double strike,
+                                 double notional,
+                                 int32_t start,
+                                 int32_t maturity,
+                                 uint64_t settings,
+                                 uint64_t *out,
+                                 struct ItofinError *error);
+
+/**
+ * Each strip has 2..4096 raw entries with at least two distinct strikes.
+ * Finite positive dk and an exact shared call/put boundary are required.
+ * # Safety
+ * Arrays must be live for the stated lengths and outputs non-overlapping.
+ */
+int32_t itofin_replicating_variance_swap_engine_new(struct ItofinContext *ctx,
+                                                    uint64_t process,
+                                                    double dk,
+                                                    const double *calls,
+                                                    size_t calls_len,
+                                                    const double *puts,
+                                                    size_t puts_len,
+                                                    uint64_t *out,
+                                                    struct ItofinError *error);
+
+/**
+ * Attach only a replicating variance-swap engine; both owners are retained.
+ * # Safety
+ * Context, handles and error follow the crate-level caller contract.
+ */
+int32_t itofin_variance_swap_set_engine(struct ItofinContext *ctx,
+                                        uint64_t swap,
+                                        uint64_t engine,
+                                        struct ItofinError *error);
+
+/**
+ * Scalar field: zero NPV, one fair annualized variance, two strike, three notional.
+ * # Safety
+ * Outputs follow the crate-level caller contract and stay unchanged on error.
+ */
+int32_t itofin_variance_swap_value(struct ItofinContext *ctx,
+                                   uint64_t swap,
+                                   int32_t field,
+                                   double *out,
+                                   struct ItofinError *error);
+
+/**
+ * Integer field: zero position, one start serial, two maturity serial,
+ * three calculated flag, four expired flag.
+ * # Safety
+ * Outputs follow the crate-level caller contract and stay unchanged on error.
+ */
+int32_t itofin_variance_swap_integer(struct ItofinContext *ctx,
+                                     uint64_t swap,
+                                     int32_t field,
+                                     int32_t *out,
+                                     struct ItofinError *error);
+
+/**
+ * Force recalculation. Invalid market inputs return an error, not stale results.
+ * # Safety
+ * Context, handles and error follow the crate-level caller contract.
+ */
+int32_t itofin_variance_swap_recalculate(struct ItofinContext *ctx,
+                                         uint64_t swap,
+                                         struct ItofinError *error);
+
+/**
+ * Return the exact current weight count; unavailable after expiry.
+ * # Safety
+ * Outputs follow the crate-level caller contract and stay unchanged on error.
+ */
+int32_t itofin_variance_swap_weights_count(struct ItofinContext *ctx,
+                                           uint64_t swap,
+                                           size_t *out,
+                                           struct ItofinError *error);
+
+/**
+ * Copy fresh typed weights into exact-size arrays. Types are zero call, one put.
+ * Length and pointer errors are rejected before lazy calculation.
+ * Weights are unavailable after expiry.
+ * # Safety
+ * Arrays must be writable, aligned, exact-size and non-overlapping.
+ */
+int32_t itofin_variance_swap_weights(struct ItofinContext *ctx,
+                                     uint64_t swap,
+                                     int32_t *kinds,
+                                     double *strikes,
+                                     double *weights,
+                                     size_t len,
+                                     struct ItofinError *error);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
