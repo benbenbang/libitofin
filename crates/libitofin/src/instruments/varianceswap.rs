@@ -71,6 +71,10 @@ pub struct VarianceSwapResults {
     pub instrument: InstrumentResults,
     /// Annualized finite signed variance.
     pub variance: Option<f64>,
+    /// Annualized variance standard error, available only for Monte Carlo.
+    pub variance_error: Option<f64>,
+    /// Actual Monte Carlo sample count.
+    pub samples: Option<usize>,
     /// Calls ascending followed by puts descending.
     pub option_weights: Vec<VarianceSwapOptionWeight>,
 }
@@ -79,6 +83,8 @@ impl Results for VarianceSwapResults {
     fn reset(&mut self) {
         self.instrument.reset();
         self.variance = None;
+        self.variance_error = None;
+        self.samples = None;
         self.option_weights.clear();
     }
 
@@ -100,6 +106,8 @@ pub struct VarianceSwap {
     maturity_date: Date,
     settings: Shared<Settings<Date>>,
     variance: Option<f64>,
+    variance_error: Option<f64>,
+    samples: Option<usize>,
     option_weights: Vec<VarianceSwapOptionWeight>,
 }
 
@@ -133,6 +141,8 @@ impl VarianceSwap {
             maturity_date,
             settings,
             variance: None,
+            variance_error: None,
+            samples: None,
             option_weights: Vec::new(),
         })
     }
@@ -165,6 +175,24 @@ impl VarianceSwap {
             fail!("variance not provided");
         };
         Ok(variance)
+    }
+
+    /// Annualized variance standard error; unavailable for replication or expiry.
+    pub fn variance_error(&mut self) -> QlResult<f64> {
+        self.calculate()?;
+        let Some(error) = self.variance_error else {
+            fail!("variance standard error not provided");
+        };
+        Ok(error)
+    }
+
+    /// Actual Monte Carlo sample count; unavailable for replication or expiry.
+    pub fn samples(&mut self) -> QlResult<usize> {
+        self.calculate()?;
+        let Some(samples) = self.samples else {
+            fail!("variance sample count not provided");
+        };
+        Ok(samples)
     }
 
     /// Fresh owned copy of purchased option weights; unavailable after expiry.
@@ -214,8 +242,19 @@ impl Instrument for VarianceSwap {
                 && results.instrument.value.is_some_and(f64::is_finite),
             "invalid variance swap results"
         );
+        require!(
+            results
+                .variance_error
+                .is_none_or(|v| v.is_finite() && v >= 0.0)
+                && results.samples.is_none_or(|v| v >= 2)
+                && results.variance_error.is_some() == results.samples.is_some()
+                && results.instrument.error_estimate.is_none_or(f64::is_finite),
+            "invalid variance sampling results"
+        );
         self.base.store_results(&results.instrument);
         self.variance = results.variance;
+        self.variance_error = results.variance_error;
+        self.samples = results.samples;
         self.option_weights.clone_from(&results.option_weights);
         Ok(())
     }
@@ -228,6 +267,8 @@ impl Instrument for VarianceSwap {
         };
         self.base.store_results(&results);
         self.variance = None;
+        self.variance_error = None;
+        self.samples = None;
         self.option_weights.clear();
     }
 }
