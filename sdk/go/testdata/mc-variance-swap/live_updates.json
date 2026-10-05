@@ -1,0 +1,100 @@
+{
+  "inputs": {
+    "dividend_yield": 0.0,
+    "evaluation_date": "2026-10-06",
+    "maturity_days": 90,
+    "max_samples": 0,
+    "notional": 50000.0,
+    "position": "long",
+    "risk_free_rate": 0.05,
+    "samples": 1023,
+    "seed": 42,
+    "spot": 100.0,
+    "start_date": "2026-10-06",
+    "steps": 0,
+    "steps_per_year": 250,
+    "tolerance": 0.0,
+    "variance_strike": 0.04,
+    "volatility": 0.2,
+    "volatility_kind": "constant"
+  },
+  "native": {
+    "error_estimate": 1.0934040037345428e-12,
+    "integration_intervals": 61,
+    "npv": -3.3583968326640795e-11,
+    "path_steps": 61,
+    "samples": 1023,
+    "variance": 0.03999999999999932,
+    "variance_error": 2.2139355350102707e-17
+  },
+  "updates": [
+    {
+      "market": {
+        "dividend_yield": 0.0,
+        "risk_free_rate": 0.05,
+        "spot": 105,
+        "volatility": 0.2
+      },
+      "native": {
+        "error_estimate": 1.0934040037345428e-12,
+        "integration_intervals": 61,
+        "npv": -3.3583968326640795e-11,
+        "path_steps": 61,
+        "samples": 1023,
+        "variance": 0.03999999999999932,
+        "variance_error": 2.2139355350102707e-17
+      }
+    },
+    {
+      "market": {
+        "dividend_yield": 0.0,
+        "risk_free_rate": 0.04,
+        "spot": 100.0,
+        "volatility": 0.2
+      },
+      "native": {
+        "error_estimate": 1.0961033950502981e-12,
+        "integration_intervals": 61,
+        "npv": -3.366688028977602e-11,
+        "path_steps": 61,
+        "samples": 1023,
+        "variance": 0.03999999999999932,
+        "variance_error": 2.2139355350102707e-17
+      }
+    },
+    {
+      "market": {
+        "dividend_yield": 0.02,
+        "risk_free_rate": 0.05,
+        "spot": 100.0,
+        "volatility": 0.2
+      },
+      "native": {
+        "error_estimate": 1.0934040037345428e-12,
+        "integration_intervals": 61,
+        "npv": -3.3583968326640795e-11,
+        "path_steps": 61,
+        "samples": 1023,
+        "variance": 0.03999999999999932,
+        "variance_error": 2.2139355350102707e-17
+      }
+    },
+    {
+      "market": {
+        "dividend_yield": 0.0,
+        "risk_free_rate": 0.05,
+        "spot": 100.0,
+        "volatility": 0.25
+      },
+      "native": {
+        "error_estimate": 0,
+        "integration_intervals": 61,
+        "npv": 1111.2152858557863,
+        "path_steps": 61,
+        "samples": 1023,
+        "variance": 0.0625,
+        "variance_error": 0
+      }
+    }
+  ]
+}
