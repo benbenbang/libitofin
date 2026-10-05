@@ -94,3 +94,5 @@ mod swaption_facades_tests;
 
 #[cfg(test)]
 mod cap_calibration_tests;
+
+pub mod variance_swap_api;
