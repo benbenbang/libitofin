@@ -149,3 +149,182 @@ fn exact_snapshot_lengths_types_and_engine_replacement() {
     );
     assert_eq!(count, 7);
 }
+
+#[test]
+fn malformed_pointers_errors_bounds_and_wrong_handles_do_not_mutate() {
+    let mut m = Market::new();
+    let foreign = Context::new().insert(shared_mut(1_u32)).unwrap();
+    for id in [m.process, m.settings_id, foreign, 0] {
+        assert_eq!(
+            unsafe { itofin_variance_swap_set_engine(&mut m.c, m.swap, id, std::ptr::null_mut()) },
+            INVALID_HANDLE
+        );
+    }
+    assert_eq!(m.integer(3), 0);
+    let bad_error = std::ptr::without_provenance_mut::<ItofinError>(1);
+    assert_eq!(
+        unsafe { itofin_variance_swap_recalculate(&mut m.c, m.swap, bad_error) },
+        INVALID_ARGUMENT
+    );
+    assert_eq!(
+        unsafe { itofin_variance_swap_set_engine(&mut m.c, m.swap, m.engine, bad_error) },
+        INVALID_ARGUMENT
+    );
+    assert_eq!(m.integer(3), 0);
+    for out in [
+        std::ptr::null_mut(),
+        std::ptr::without_provenance_mut::<f64>(1),
+    ] {
+        assert_eq!(
+            unsafe { itofin_variance_swap_value(&mut m.c, m.swap, 0, out, std::ptr::null_mut()) },
+            INVALID_ARGUMENT
+        );
+    }
+    assert_eq!(m.integer(3), 0);
+    let mut out = 91;
+    assert_eq!(
+        unsafe {
+            itofin_replicating_variance_swap_engine_new(
+                &mut m.c,
+                m.process,
+                5.,
+                std::ptr::null(),
+                4097,
+                std::ptr::null(),
+                2,
+                &mut out,
+                std::ptr::null_mut(),
+            )
+        },
+        INVALID_ARGUMENT
+    );
+    assert_eq!(out, 91);
+    let calls = [100., 110.];
+    let puts = [90., 100.];
+    for dk in [0., -1., f64::NAN, f64::INFINITY, 100.] {
+        assert_ne!(
+            unsafe {
+                itofin_replicating_variance_swap_engine_new(
+                    &mut m.c,
+                    m.process,
+                    dk,
+                    calls.as_ptr(),
+                    2,
+                    puts.as_ptr(),
+                    2,
+                    &mut out,
+                    std::ptr::null_mut(),
+                )
+            },
+            0
+        );
+        assert_eq!(out, 91);
+    }
+    for field in [-1, 4, 99] {
+        let mut scalar = 91.;
+        assert_eq!(
+            unsafe {
+                itofin_variance_swap_value(
+                    &mut m.c,
+                    m.swap,
+                    field,
+                    &mut scalar,
+                    std::ptr::null_mut(),
+                )
+            },
+            INVALID_ARGUMENT
+        );
+        assert_eq!(scalar, 91.);
+    }
+    for field in [-1, 5, 99] {
+        let mut scalar = 91;
+        assert_eq!(
+            unsafe {
+                itofin_variance_swap_integer(
+                    &mut m.c,
+                    m.swap,
+                    field,
+                    &mut scalar,
+                    std::ptr::null_mut(),
+                )
+            },
+            INVALID_ARGUMENT
+        );
+        assert_eq!(scalar, 91);
+    }
+}
+
+#[test]
+fn weight_pointer_rejection_and_expiry_reference_date_semantics() {
+    let mut m = Market::new();
+    let mut kinds = [-91; 6];
+    let mut strikes = [91.; 6];
+    let mut weights = [91.; 6];
+    for invalid in [
+        std::ptr::null_mut(),
+        std::ptr::without_provenance_mut::<f64>(1),
+    ] {
+        assert_eq!(
+            unsafe {
+                itofin_variance_swap_weights(
+                    &mut m.c,
+                    m.swap,
+                    kinds.as_mut_ptr(),
+                    strikes.as_mut_ptr(),
+                    invalid,
+                    6,
+                    std::ptr::null_mut(),
+                )
+            },
+            INVALID_ARGUMENT
+        );
+        assert_eq!(m.integer(3), 0);
+        assert_eq!(weights, [91.; 6]);
+    }
+    let error = std::ptr::without_provenance_mut::<ItofinError>(1);
+    assert_eq!(
+        unsafe {
+            itofin_variance_swap_weights(
+                &mut m.c,
+                m.swap,
+                kinds.as_mut_ptr(),
+                strikes.as_mut_ptr(),
+                weights.as_mut_ptr(),
+                6,
+                error,
+            )
+        },
+        INVALID_ARGUMENT
+    );
+    assert_eq!(m.integer(3), 0);
+    let mut sentinel = 91;
+    assert_eq!(
+        unsafe {
+            itofin_variance_swap_new(
+                &mut m.c,
+                0,
+                0.04,
+                1000.,
+                m.today.serial_number(),
+                m.maturity.serial_number(),
+                m.settings_id,
+                &mut sentinel,
+                error,
+            )
+        },
+        INVALID_ARGUMENT
+    );
+    assert_eq!(sentinel, 91);
+    m.settings.set_evaluation_date(m.maturity);
+    assert_eq!(m.integer(4), 1);
+    assert_eq!(m.value(0), 0.);
+    m.settings.set_include_reference_date_events(true);
+    assert_eq!(m.integer(4), 0);
+    assert_ne!(
+        unsafe { itofin_variance_swap_recalculate(&mut m.c, m.swap, std::ptr::null_mut()) },
+        0
+    );
+    m.settings.set_evaluation_date(m.today);
+    assert_eq!(m.integer(4), 0);
+    assert!(m.value(1).is_finite());
+}
