@@ -74,6 +74,7 @@ nav:
   - Getting started: getting-started.md
   - Go SDK: go.md
   - Finite-difference options: finite-difference.md
+  - Exotic option scope: exotic-options.md
   - Merton jump diffusion: jump-diffusion.md
   - Bates stochastic volatility: bates.md
   - GJR-GARCH process and paths: gjrgarch.md
