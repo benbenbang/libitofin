@@ -52,3 +52,6 @@ pub(crate) mod hull_fixture {
     pub(crate) const DISCOUNT: Real = 0.951229424500714;
     pub(crate) const STD_DEV: Real = 0.14142135623730953;
 }
+
+pub mod forward;
+pub use forward::{MAX_VARIANCE_SWAP_STRIKES, ReplicatingVarianceSwapEngine};
