@@ -1,0 +1,308 @@
+{
+  "cases": [
+    {
+      "inputs": {
+        "curve_days": [
+          36,
+          90
+        ],
+        "curve_vols": [
+          0.1,
+          0.2
+        ],
+        "dividend_yield": 0.0,
+        "evaluation_date": "2026-10-06",
+        "maturity_date": "2027-01-04",
+        "maturity_days": 90,
+        "max_samples": 0,
+        "notional": 50000.0,
+        "position": "long",
+        "risk_free_rate": 0.05,
+        "samples": 1023,
+        "seed": 42,
+        "spot": 100.0,
+        "start_date": "2026-10-06",
+        "steps": 0,
+        "steps_per_year": 250,
+        "tolerance": 0.0,
+        "variance_strike": 0.04,
+        "volatility": 0.2,
+        "volatility_kind": "variance_curve"
+      },
+      "name": "literature_curve",
+      "native": {
+        "error_estimate": 6.003002373444548e-13,
+        "integration_intervals": 61,
+        "npv": 4.446321129440496,
+        "path_steps": 61,
+        "samples": 1023,
+        "variance": 0.040090029561945205,
+        "variance_error": 1.2154940192213251e-17
+      }
+    },
+    {
+      "inputs": {
+        "dividend_yield": 0.0,
+        "evaluation_date": "2026-10-06",
+        "maturity_date": "2027-01-04",
+        "maturity_days": 90,
+        "max_samples": 0,
+        "notional": 50000.0,
+        "position": "long",
+        "risk_free_rate": 0.05,
+        "samples": 1023,
+        "seed": 42,
+        "spot": 100.0,
+        "start_date": "2026-10-06",
+        "steps": 0,
+        "steps_per_year": 250,
+        "tolerance": 0.0,
+        "variance_strike": 0.04,
+        "volatility": 0.2,
+        "volatility_kind": "constant"
+      },
+      "name": "flat_base",
+      "native": {
+        "error_estimate": 1.0934040037345428e-12,
+        "integration_intervals": 61,
+        "npv": -3.3583968326640795e-11,
+        "path_steps": 61,
+        "samples": 1023,
+        "variance": 0.03999999999999932,
+        "variance_error": 2.2139355350102707e-17
+      }
+    },
+    {
+      "inputs": {
+        "dividend_yield": 0.0,
+        "evaluation_date": "2026-10-06",
+        "maturity_date": "2027-01-04",
+        "maturity_days": 90,
+        "max_samples": 0,
+        "notional": 50000.0,
+        "position": "short",
+        "risk_free_rate": 0.05,
+        "samples": 1023,
+        "seed": 42,
+        "spot": 100.0,
+        "start_date": "2026-10-06",
+        "steps": 0,
+        "steps_per_year": 250,
+        "tolerance": 0.0,
+        "variance_strike": 0.05,
+        "volatility": 0.2,
+        "volatility_kind": "constant"
+      },
+      "name": "short",
+      "native": {
+        "error_estimate": -1.0934040037345428e-12,
+        "integration_intervals": 61,
+        "npv": 493.87346038038316,
+        "path_steps": 61,
+        "samples": 1023,
+        "variance": 0.03999999999999932,
+        "variance_error": 2.2139355350102707e-17
+      }
+    },
+    {
+      "inputs": {
+        "dividend_yield": 0.0,
+        "evaluation_date": "2026-10-06",
+        "maturity_date": "2027-01-04",
+        "maturity_days": 90,
+        "max_samples": 0,
+        "notional": 50000.0,
+        "position": "long",
+        "risk_free_rate": 0.05,
+        "samples": 1023,
+        "seed": 42,
+        "spot": 100.0,
+        "start_date": "2026-10-06",
+        "steps": 0,
+        "steps_per_year": 250,
+        "tolerance": 0.0,
+        "variance_strike": 0.04,
+        "volatility": 0.0,
+        "volatility_kind": "constant"
+      },
+      "name": "zero_volatility",
+      "native": {
+        "error_estimate": 0,
+        "integration_intervals": 61,
+        "npv": -1975.493841521398,
+        "path_steps": 61,
+        "samples": 1023,
+        "variance": 0,
+        "variance_error": 0
+      }
+    },
+    {
+      "inputs": {
+        "dividend_yield": 0.02,
+        "evaluation_date": "2026-10-06",
+        "maturity_date": "2027-01-04",
+        "maturity_days": 90,
+        "max_samples": 0,
+        "notional": 50000.0,
+        "position": "long",
+        "risk_free_rate": -0.01,
+        "samples": 1023,
+        "seed": 42,
+        "spot": 100.0,
+        "start_date": "2026-10-06",
+        "steps": 0,
+        "steps_per_year": 250,
+        "tolerance": 0.0,
+        "variance_strike": 0.04,
+        "volatility": 0.2,
+        "volatility_kind": "constant"
+      },
+      "name": "negative_rate_dividend",
+      "native": {
+        "error_estimate": 1.1097006449852054e-12,
+        "integration_intervals": 61,
+        "npv": -3.4084520621788376e-11,
+        "path_steps": 61,
+        "samples": 1023,
+        "variance": 0.03999999999999932,
+        "variance_error": 2.2139355350102707e-17
+      }
+    },
+    {
+      "inputs": {
+        "dividend_yield": 0.0,
+        "evaluation_date": "2026-10-06",
+        "maturity_date": "2026-10-09",
+        "maturity_days": 3,
+        "max_samples": 0,
+        "notional": 50000.0,
+        "position": "long",
+        "risk_free_rate": 0.05,
+        "samples": 1023,
+        "seed": 42,
+        "spot": 100.0,
+        "start_date": "2026-10-06",
+        "steps": 7,
+        "steps_per_year": 0,
+        "tolerance": 0.0,
+        "variance_strike": 0.04,
+        "volatility": 0.2,
+        "volatility_kind": "constant"
+      },
+      "name": "explicit_steps",
+      "native": {
+        "error_estimate": 1.0739684443931249e-12,
+        "integration_intervals": 6,
+        "npv": -3.398661015873493e-11,
+        "path_steps": 7,
+        "samples": 1023,
+        "variance": 0.03999999999999932,
+        "variance_error": 2.148819783980557e-17
+      }
+    },
+    {
+      "inputs": {
+        "dividend_yield": 0.0,
+        "evaluation_date": "2026-10-06",
+        "maturity_date": "2026-10-09",
+        "maturity_days": 3,
+        "max_samples": 0,
+        "notional": 50000.0,
+        "position": "long",
+        "risk_free_rate": 0.05,
+        "samples": 2,
+        "seed": 42,
+        "spot": 100.0,
+        "start_date": "2026-10-06",
+        "steps": 0,
+        "steps_per_year": 1,
+        "tolerance": 0.0,
+        "variance_strike": 0.04,
+        "volatility": 0.2,
+        "volatility_kind": "constant"
+      },
+      "name": "minimum_grid",
+      "native": {
+        "error_estimate": 0,
+        "integration_intervals": 1,
+        "npv": 3.4680214447688706e-13,
+        "path_steps": 1,
+        "samples": 2,
+        "variance": 0.04000000000000001,
+        "variance_error": 0
+      }
+    },
+    {
+      "inputs": {
+        "dividend_yield": 0.0,
+        "evaluation_date": "2026-10-06",
+        "maturity_date": "2027-01-04",
+        "maturity_days": 90,
+        "max_samples": 2046,
+        "notional": 50000.0,
+        "position": "long",
+        "risk_free_rate": 0.05,
+        "samples": 0,
+        "seed": 42,
+        "spot": 100.0,
+        "start_date": "2026-10-06",
+        "steps": 0,
+        "steps_per_year": 250,
+        "tolerance": 1e-08,
+        "variance_strike": 0.04,
+        "volatility": 0.2,
+        "volatility_kind": "constant"
+      },
+      "name": "tolerance",
+      "native": {
+        "error_estimate": 1.0934040037345428e-12,
+        "integration_intervals": 61,
+        "npv": -3.3583968326640795e-11,
+        "path_steps": 61,
+        "samples": 1023,
+        "variance": 0.03999999999999932,
+        "variance_error": 2.2139355350102707e-17
+      }
+    },
+    {
+      "inputs": {
+        "curve_days": [
+          36,
+          90
+        ],
+        "curve_vols": [
+          0.1,
+          0.2
+        ],
+        "dividend_yield": 0.0,
+        "evaluation_date": "2026-10-06",
+        "maturity_date": "2027-01-04",
+        "maturity_days": 90,
+        "max_samples": 2046,
+        "notional": 50000.0,
+        "position": "long",
+        "risk_free_rate": 0.05,
+        "samples": 0,
+        "seed": 42,
+        "spot": 100.0,
+        "start_date": "2026-10-06",
+        "steps": 0,
+        "steps_per_year": 250,
+        "tolerance": 1e-08,
+        "variance_strike": 0.04,
+        "volatility": 0.2,
+        "volatility_kind": "variance_curve"
+      },
+      "name": "curve_tolerance",
+      "native": {
+        "error_estimate": 6.003002373444548e-13,
+        "integration_intervals": 61,
+        "npv": 4.446321129440496,
+        "path_steps": 61,
+        "samples": 1023,
+        "variance": 0.040090029561945205,
+        "variance_error": 1.2154940192213251e-17
+      }
+    }
+  ]
+}
