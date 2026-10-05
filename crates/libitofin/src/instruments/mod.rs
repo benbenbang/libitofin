@@ -73,3 +73,9 @@ pub use overnightindexfuture::OvernightIndexFuture;
 
 pub mod bmaswap;
 pub use bmaswap::BMASwap;
+
+mod varianceswap;
+pub use varianceswap::{
+    VarianceSwap, VarianceSwapArguments, VarianceSwapEngine, VarianceSwapOptionWeight,
+    VarianceSwapResults,
+};
