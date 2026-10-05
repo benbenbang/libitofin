@@ -38,6 +38,7 @@ __all__ = [
     "Swaption",
     "VanillaOption",
     "VanillaSwap",
+    "VarianceSwap",
     "YearOnYearInflationSwap",
     "YoYInflationCapFloor",
     "ZeroCouponInflationSwap",
@@ -1716,6 +1717,32 @@ class VanillaSwap:
 
         Returns:
             float: The rate the fixed leg accrues at.
+        """
+
+@typing.final
+class VarianceSwap:
+    r"""
+    A spot-start contract on annualized variance, not volatility.
+
+    Notional multiplies one whole variance unit. Live pricing requires start,
+    evaluation and all market reference dates to coincide. Realized fixings,
+    forward starts and discrete-monitoring corrections are unsupported.
+    """
+    def __init__(self, position: Position, strike: builtins.float, notional: builtins.float, start_date: time.Date, maturity_date: time.Date, settings: itofin.Settings) -> None:
+        r"""
+        Retain settings and immutable positive variance strike and notional.
+        """
+    def set_engine(self, engine: pricingengines.ReplicatingVarianceSwapEngine) -> None:
+        r"""
+        Attach an engine, retaining its process after Python owners disappear.
+        """
+    def npv(self) -> builtins.float:
+        r"""
+        Return the discounted signed payoff on one whole variance unit.
+        """
+    def variance(self) -> builtins.float:
+        r"""
+        Return the finite-strip annualized variance, which can be signed.
         """
 
 @typing.final
