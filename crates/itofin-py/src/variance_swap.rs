@@ -3,10 +3,13 @@
 use crate::PyQlError;
 use crate::fra::PyPosition;
 use crate::market::PyBlackScholesProcess;
+use crate::option::PyOptionType;
 use crate::settings::PySettings;
 use crate::time::PyDate;
 use libitofin::instrument::Instrument;
 use libitofin::instruments::VarianceSwap;
+use libitofin::option::OptionType;
+use libitofin::position::Position;
 use libitofin::pricingengine::PricingEngine;
 use libitofin::pricingengines::ReplicatingVarianceSwapEngine;
 use libitofin::shared::{SharedMut, shared_mut};
@@ -64,6 +67,69 @@ impl PyVarianceSwap {
     /// Return the finite-strip annualized variance, which can be signed.
     fn variance(&mut self) -> PyResult<f64> {
         Ok(self.inner.variance().map_err(PyQlError::from)?)
+    }
+
+    /// Return a fresh list of (option type, strike, weight) tuples.
+    ///
+    /// Calls ascend, then puts descend. Synthetic terminal strikes are not
+    /// purchased. Expired contracts have no variance or replication weights.
+    fn option_weights(&mut self) -> PyResult<Vec<(PyOptionType, f64, f64)>> {
+        Ok(self
+            .inner
+            .option_weights()
+            .map_err(PyQlError::from)?
+            .into_iter()
+            .map(|entry| {
+                let kind = match entry.option_type {
+                    OptionType::Call => PyOptionType::Call,
+                    OptionType::Put => PyOptionType::Put,
+                };
+                (kind, entry.strike, entry.weight)
+            })
+            .collect())
+    }
+
+    /// Force a fresh calculation without bypassing live-input validation.
+    fn recalculate(&mut self) -> PyResult<()> {
+        Ok(self.inner.recalculate().map_err(PyQlError::from)?)
+    }
+
+    /// Return whether a successful lazy valuation is cached.
+    fn is_calculated(&self) -> bool {
+        self.inner.base().is_calculated()
+    }
+
+    /// Return expiry under the retained explicit settings.
+    fn is_expired(&self) -> PyResult<bool> {
+        Ok(self.inner.is_expired().map_err(PyQlError::from)?)
+    }
+
+    /// Return the immutable long or short position.
+    fn position(&self) -> PyPosition {
+        match self.inner.position() {
+            Position::Long => PyPosition::Long,
+            Position::Short => PyPosition::Short,
+        }
+    }
+
+    /// Return the annualized variance strike, not volatility.
+    fn strike(&self) -> f64 {
+        self.inner.strike()
+    }
+
+    /// Return notional per one whole variance unit.
+    fn notional(&self) -> f64 {
+        self.inner.notional()
+    }
+
+    /// Return the immutable contract start date.
+    fn start_date(&self) -> PyDate {
+        PyDate::from_inner(self.inner.start_date())
+    }
+
+    /// Return the immutable contract maturity date.
+    fn maturity_date(&self) -> PyDate {
+        PyDate::from_inner(self.inner.maturity_date())
     }
 }
 

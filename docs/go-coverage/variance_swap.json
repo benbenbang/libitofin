@@ -67,6 +67,150 @@
       "validation": "Pinned QuantLib finite-strip variance/NPV/typed weight replay, live rate/dividend/volatility updates, retained sources, atomic C errors and session lifecycle"
     },
     {
+      "c": "itofin_variance_swap_weights",
+      "go": "VarianceSwap.OptionWeights",
+      "go_file": "sdk/go/variance_swap.go",
+      "native_file": "crates/libitofin-ffi/src/variance_swap_api.rs",
+      "python": "itofin.instruments.VarianceSwap.option_weights",
+      "source": "crates/itofin-py/python/itofin/instruments/__init__.pyi",
+      "status": "implemented",
+      "tests": [
+        "TestVarianceSwapNativeQuantLibOracle",
+        "TestVarianceSwapTermsLiveUpdatesAndRetainedOwners",
+        "TestVarianceSwapSnapshotsEngineReplacementAndConcurrency",
+        "TestVarianceSwapInvalidBoundariesAndSessionLifecycle"
+      ],
+      "validation": "Pinned QuantLib finite-strip variance/NPV/typed weight replay, live rate/dividend/volatility updates, retained sources, atomic C errors and session lifecycle"
+    },
+    {
+      "c": "itofin_variance_swap_recalculate",
+      "go": "VarianceSwap.Recalculate",
+      "go_file": "sdk/go/variance_swap.go",
+      "native_file": "crates/libitofin-ffi/src/variance_swap_api.rs",
+      "python": "itofin.instruments.VarianceSwap.recalculate",
+      "source": "crates/itofin-py/python/itofin/instruments/__init__.pyi",
+      "status": "implemented",
+      "tests": [
+        "TestVarianceSwapNativeQuantLibOracle",
+        "TestVarianceSwapTermsLiveUpdatesAndRetainedOwners",
+        "TestVarianceSwapSnapshotsEngineReplacementAndConcurrency",
+        "TestVarianceSwapInvalidBoundariesAndSessionLifecycle"
+      ],
+      "validation": "Pinned QuantLib finite-strip variance/NPV/typed weight replay, live rate/dividend/volatility updates, retained sources, atomic C errors and session lifecycle"
+    },
+    {
+      "c": "itofin_variance_swap_integer",
+      "go": "VarianceSwap.IsCalculated",
+      "go_file": "sdk/go/variance_swap.go",
+      "native_file": "crates/libitofin-ffi/src/variance_swap_api.rs",
+      "python": "itofin.instruments.VarianceSwap.is_calculated",
+      "source": "crates/itofin-py/python/itofin/instruments/__init__.pyi",
+      "status": "implemented",
+      "tests": [
+        "TestVarianceSwapNativeQuantLibOracle",
+        "TestVarianceSwapTermsLiveUpdatesAndRetainedOwners",
+        "TestVarianceSwapSnapshotsEngineReplacementAndConcurrency",
+        "TestVarianceSwapInvalidBoundariesAndSessionLifecycle"
+      ],
+      "validation": "Pinned QuantLib finite-strip variance/NPV/typed weight replay, live rate/dividend/volatility updates, retained sources, atomic C errors and session lifecycle"
+    },
+    {
+      "c": "itofin_variance_swap_integer",
+      "go": "VarianceSwap.IsExpired",
+      "go_file": "sdk/go/variance_swap.go",
+      "native_file": "crates/libitofin-ffi/src/variance_swap_api.rs",
+      "python": "itofin.instruments.VarianceSwap.is_expired",
+      "source": "crates/itofin-py/python/itofin/instruments/__init__.pyi",
+      "status": "implemented",
+      "tests": [
+        "TestVarianceSwapNativeQuantLibOracle",
+        "TestVarianceSwapTermsLiveUpdatesAndRetainedOwners",
+        "TestVarianceSwapSnapshotsEngineReplacementAndConcurrency",
+        "TestVarianceSwapInvalidBoundariesAndSessionLifecycle"
+      ],
+      "validation": "Pinned QuantLib finite-strip variance/NPV/typed weight replay, live rate/dividend/volatility updates, retained sources, atomic C errors and session lifecycle"
+    },
+    {
+      "c": "itofin_variance_swap_integer",
+      "go": "VarianceSwap.Position",
+      "go_file": "sdk/go/variance_swap.go",
+      "native_file": "crates/libitofin-ffi/src/variance_swap_api.rs",
+      "python": "itofin.instruments.VarianceSwap.position",
+      "source": "crates/itofin-py/python/itofin/instruments/__init__.pyi",
+      "status": "implemented",
+      "tests": [
+        "TestVarianceSwapNativeQuantLibOracle",
+        "TestVarianceSwapTermsLiveUpdatesAndRetainedOwners",
+        "TestVarianceSwapSnapshotsEngineReplacementAndConcurrency",
+        "TestVarianceSwapInvalidBoundariesAndSessionLifecycle"
+      ],
+      "validation": "Pinned QuantLib finite-strip variance/NPV/typed weight replay, live rate/dividend/volatility updates, retained sources, atomic C errors and session lifecycle"
+    },
+    {
+      "c": "itofin_variance_swap_value",
+      "go": "VarianceSwap.Strike",
+      "go_file": "sdk/go/variance_swap.go",
+      "native_file": "crates/libitofin-ffi/src/variance_swap_api.rs",
+      "python": "itofin.instruments.VarianceSwap.strike",
+      "source": "crates/itofin-py/python/itofin/instruments/__init__.pyi",
+      "status": "implemented",
+      "tests": [
+        "TestVarianceSwapNativeQuantLibOracle",
+        "TestVarianceSwapTermsLiveUpdatesAndRetainedOwners",
+        "TestVarianceSwapSnapshotsEngineReplacementAndConcurrency",
+        "TestVarianceSwapInvalidBoundariesAndSessionLifecycle"
+      ],
+      "validation": "Pinned QuantLib finite-strip variance/NPV/typed weight replay, live rate/dividend/volatility updates, retained sources, atomic C errors and session lifecycle"
+    },
+    {
+      "c": "itofin_variance_swap_value",
+      "go": "VarianceSwap.Notional",
+      "go_file": "sdk/go/variance_swap.go",
+      "native_file": "crates/libitofin-ffi/src/variance_swap_api.rs",
+      "python": "itofin.instruments.VarianceSwap.notional",
+      "source": "crates/itofin-py/python/itofin/instruments/__init__.pyi",
+      "status": "implemented",
+      "tests": [
+        "TestVarianceSwapNativeQuantLibOracle",
+        "TestVarianceSwapTermsLiveUpdatesAndRetainedOwners",
+        "TestVarianceSwapSnapshotsEngineReplacementAndConcurrency",
+        "TestVarianceSwapInvalidBoundariesAndSessionLifecycle"
+      ],
+      "validation": "Pinned QuantLib finite-strip variance/NPV/typed weight replay, live rate/dividend/volatility updates, retained sources, atomic C errors and session lifecycle"
+    },
+    {
+      "c": "itofin_variance_swap_integer",
+      "go": "VarianceSwap.StartDate",
+      "go_file": "sdk/go/variance_swap.go",
+      "native_file": "crates/libitofin-ffi/src/variance_swap_api.rs",
+      "python": "itofin.instruments.VarianceSwap.start_date",
+      "source": "crates/itofin-py/python/itofin/instruments/__init__.pyi",
+      "status": "implemented",
+      "tests": [
+        "TestVarianceSwapNativeQuantLibOracle",
+        "TestVarianceSwapTermsLiveUpdatesAndRetainedOwners",
+        "TestVarianceSwapSnapshotsEngineReplacementAndConcurrency",
+        "TestVarianceSwapInvalidBoundariesAndSessionLifecycle"
+      ],
+      "validation": "Pinned QuantLib finite-strip variance/NPV/typed weight replay, live rate/dividend/volatility updates, retained sources, atomic C errors and session lifecycle"
+    },
+    {
+      "c": "itofin_variance_swap_integer",
+      "go": "VarianceSwap.MaturityDate",
+      "go_file": "sdk/go/variance_swap.go",
+      "native_file": "crates/libitofin-ffi/src/variance_swap_api.rs",
+      "python": "itofin.instruments.VarianceSwap.maturity_date",
+      "source": "crates/itofin-py/python/itofin/instruments/__init__.pyi",
+      "status": "implemented",
+      "tests": [
+        "TestVarianceSwapNativeQuantLibOracle",
+        "TestVarianceSwapTermsLiveUpdatesAndRetainedOwners",
+        "TestVarianceSwapSnapshotsEngineReplacementAndConcurrency",
+        "TestVarianceSwapInvalidBoundariesAndSessionLifecycle"
+      ],
+      "validation": "Pinned QuantLib finite-strip variance/NPV/typed weight replay, live rate/dividend/volatility updates, retained sources, atomic C errors and session lifecycle"
+    },
+    {
       "c": "itofin_replicating_variance_swap_engine_new",
       "go": "Session.NewReplicatingVarianceSwapEngine",
       "go_file": "sdk/go/variance_swap.go",
