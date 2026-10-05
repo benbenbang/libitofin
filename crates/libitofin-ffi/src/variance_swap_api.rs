@@ -309,3 +309,7 @@ pub unsafe extern "C" fn itofin_variance_swap_weights(
         })
     }
 }
+
+#[cfg(test)]
+#[path = "variance_swap_api_tests.rs"]
+mod tests;
