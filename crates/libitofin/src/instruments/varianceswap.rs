@@ -231,3 +231,7 @@ impl Instrument for VarianceSwap {
         self.option_weights.clear();
     }
 }
+
+#[cfg(test)]
+#[path = "varianceswap_tests.rs"]
+mod tests;
