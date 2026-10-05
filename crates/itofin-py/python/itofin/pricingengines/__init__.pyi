@@ -35,6 +35,7 @@ __all__ = [
     "MidPointCdsEngine",
     "NumericalFix",
     "QMCEuropeanEngine",
+    "ReplicatingVarianceSwapEngine",
     "TreeCapFloorEngine",
     "TreeSwaptionEngine",
     "YoYInflationCapFloorEngine",
@@ -566,6 +567,25 @@ class QMCEuropeanEngine:
         No statistical error estimate is available. Absolute tolerance and
         max_samples are rejected. Seed selects Sobol direction initialization;
         it is deterministic even when omitted or zero.
+        """
+
+@typing.final
+class ReplicatingVarianceSwapEngine:
+    r"""
+    Discrete log-payoff replication on a retained live Black-Scholes market.
+
+    Each side requires 2..4096 positive finite raw strikes and at least two
+    distinct strikes. The minimum call equals the maximum put exactly. Tail
+    extension dk must remain positive and representable on both sides.
+    This is a finite strip, not infinite-tail integration or a sigma-squared
+    guarantee. Native nonzero-dividend drift has a boundary-dependent mismatch.
+    """
+    def __init__(self, process: processes.BlackScholesProcess, call_strikes: typing.Sequence[builtins.float], put_strikes: typing.Sequence[builtins.float], *, dk: builtins.float = 5.0) -> None:
+        r"""
+        Copy list or tuple strike inputs, canonicalizing each side independently.
+
+        PyO3 extracts Python sequences before core bounds; additional core
+        allocations are bounded. No iterator-only generator contract is promised.
         """
 
 @typing.final
