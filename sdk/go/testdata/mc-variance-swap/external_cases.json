@@ -1,0 +1,97 @@
+{
+  "cases": [
+    {
+      "inputs": {
+        "dividend_yield": 0.0,
+        "evaluation_date": "2026-10-06",
+        "maturity_days": 90,
+        "max_samples": 0,
+        "notional": 50000.0,
+        "position": "long",
+        "risk_free_rate": 0.05,
+        "samples": 1023,
+        "seed": 42,
+        "spot": 100.0,
+        "start_date": "2026-10-06",
+        "steps": 7,
+        "steps_per_year": 0,
+        "tolerance": 0.0,
+        "variance_strike": 0.04,
+        "volatility": 0.2,
+        "volatility_kind": "external_local_vol"
+      },
+      "name": "external_fixed",
+      "native": {
+        "error_estimate": 0.8829077803505778,
+        "integration_intervals": 7,
+        "npv": 2.950988723787132,
+        "path_steps": 7,
+        "samples": 1023,
+        "variance": 0.04005975191947983,
+        "variance_error": 1.7877206434025007e-05
+      }
+    },
+    {
+      "inputs": {
+        "dividend_yield": 0.0,
+        "evaluation_date": "2026-10-06",
+        "maturity_days": 90,
+        "max_samples": 0,
+        "notional": 50000.0,
+        "position": "short",
+        "risk_free_rate": 0.05,
+        "samples": 1023,
+        "seed": 42,
+        "spot": 100.0,
+        "start_date": "2026-10-06",
+        "steps": 7,
+        "steps_per_year": 0,
+        "tolerance": 0.0,
+        "variance_strike": 0.04,
+        "volatility": 0.2,
+        "volatility_kind": "external_local_vol"
+      },
+      "name": "external_short",
+      "native": {
+        "error_estimate": -0.8829077803505778,
+        "integration_intervals": 7,
+        "npv": -2.950988723787132,
+        "path_steps": 7,
+        "samples": 1023,
+        "variance": 0.04005975191947983,
+        "variance_error": 1.7877206434025007e-05
+      }
+    },
+    {
+      "inputs": {
+        "dividend_yield": 0.0,
+        "evaluation_date": "2026-10-06",
+        "maturity_days": 90,
+        "max_samples": 16368,
+        "notional": 50000.0,
+        "position": "long",
+        "risk_free_rate": 0.05,
+        "samples": 0,
+        "seed": 42,
+        "spot": 100.0,
+        "start_date": "2026-10-06",
+        "steps": 7,
+        "steps_per_year": 0,
+        "tolerance": 1e-05,
+        "variance_strike": 0.04,
+        "volatility": 0.2,
+        "volatility_kind": "external_local_vol"
+      },
+      "name": "external_tolerance",
+      "native": {
+        "error_estimate": 0.46518792564120276,
+        "integration_intervals": 7,
+        "npv": 1.5200373106256817,
+        "path_steps": 7,
+        "samples": 3638,
+        "variance": 0.04003077786989111,
+        "variance_error": 9.419172378344547e-06
+      }
+    }
+  ]
+}
