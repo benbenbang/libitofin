@@ -1744,6 +1744,45 @@ class VarianceSwap:
         r"""
         Return the finite-strip annualized variance, which can be signed.
         """
+    def option_weights(self) -> builtins.list[tuple[OptionType, builtins.float, builtins.float]]:
+        r"""
+        Return a fresh list of (option type, strike, weight) tuples.
+
+        Calls ascend, then puts descend. Synthetic terminal strikes are not
+        purchased. Expired contracts have no variance or replication weights.
+        """
+    def recalculate(self) -> None:
+        r"""
+        Force a fresh calculation without bypassing live-input validation.
+        """
+    def is_calculated(self) -> builtins.bool:
+        r"""
+        Return whether a successful lazy valuation is cached.
+        """
+    def is_expired(self) -> builtins.bool:
+        r"""
+        Return expiry under the retained explicit settings.
+        """
+    def position(self) -> Position:
+        r"""
+        Return the immutable long or short position.
+        """
+    def strike(self) -> builtins.float:
+        r"""
+        Return the annualized variance strike, not volatility.
+        """
+    def notional(self) -> builtins.float:
+        r"""
+        Return notional per one whole variance unit.
+        """
+    def start_date(self) -> time.Date:
+        r"""
+        Return the immutable contract start date.
+        """
+    def maturity_date(self) -> time.Date:
+        r"""
+        Return the immutable contract maturity date.
+        """
 
 @typing.final
 class YearOnYearInflationSwap:
