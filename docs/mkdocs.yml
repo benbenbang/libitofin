@@ -85,6 +85,7 @@ nav:
   - Municipal BMA swaps: bma.md
   - Random policies: random-policies.md
   - GBM simulation: simulation.md
+  - Standalone Euler GBM: geometric-brownian.md
   - Statistics and risk: statistics.md
   - Mean convergence: convergence.md
   - QMC discrepancy: discrepancy.md
