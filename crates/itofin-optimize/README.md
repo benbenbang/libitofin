@@ -28,45 +28,24 @@ records the SciPy version and the generation date into every fixture it writes.
 
 ## Release
 
-The first publication is a maintainer bootstrap, not a new workspace release.
-Do not merge the optimizer publish job or the core dependency until this bootstrap
-and its trusted-publisher configuration are verified ([#1091](https://github.com/benbenbang/libitofin/issues/1091)).
+The initial **0.36.0** publication is available on
+[crates.io](https://crates.io/crates/itofin-optimize/0.36.0). Bootstrap and the
+GitHub trusted-publisher configuration are verified:
 
-1. Review and merge the license/bootstrap-only setup commit, still version
-   **0.36.0**. Its optimizer source must match **v0.36.0**; the pristine tag lacks
-   the bundled BSD license text. Do not use the differential evolution draft.
-   Set `BOOTSTRAP_COMMIT` to that reviewed commit, then use a clean checkout:
+- Owner `benbenbang`, repository `libitofin`, workflow `semantic-release.yml`;
+  no GitHub environment is configured for the Rust publish jobs.
+- Future coordinated releases publish `itofin-optimize` before `libitofin`, using
+  the same released tag, committed-version checks and OIDC authentication.
+  Optimizer publication failure blocks core publication.
+- Python and Go release jobs remain independently gated by the release; their
+  existing artifacts bundle optimizer code without an additional runtime install.
+- CI dry runs perform no publication. The first successful future CI publication
+  is still pending; [#1091](https://github.com/benbenbang/libitofin/issues/1091)
+  remains open until it is verified. That issue retains historical bootstrap details.
 
-   ```sh
-   git diff --exit-code v0.36.0 "$BOOTSTRAP_COMMIT" -- Cargo.toml Cargo.lock \
-     crates/itofin-optimize/Cargo.toml crates/itofin-optimize/src crates/itofin-optimize/tests
-   git worktree add --detach /private/tmp/itofin-optimize-bootstrap "$BOOTSTRAP_COMMIT"
-   cd /private/tmp/itofin-optimize-bootstrap
-   python3 scripts/check_release_version.py v0.36.0
-   cargo test -p itofin-optimize --locked
-   cmp LICENSE crates/itofin-optimize/LICENSE
-   cargo publish -p itofin-optimize --locked --dry-run
-   ```
-
-2. Review the package and obtain explicit publication approval. Authenticate
-   locally with a maintainer crates.io token using `cargo login`, then run
-   `cargo publish -p itofin-optimize --locked`. Never put the token in a command,
-   repository file, log or GitHub secret. Verify version 0.36.0 on crates.io.
-3. In that crate's crates.io settings, add a GitHub trusted publisher with owner
-   `benbenbang`, repository `libitofin`, and workflow `semantic-release.yml`.
-   Leave the environment field empty: the Rust publish jobs have no environment.
-4. Keep the CI workflow activation in a separate, unmerged checkpoint until
-   bootstrap and configuration are verified. Then merge the reviewed CI job.
-   It publishes `itofin-optimize` before `libitofin`, from the same released tag,
-   with the same version validator and OIDC authentication. Optimizer failure
-   blocks core publication; Python and Go remain independently gated by release.
-5. Verify a CI dry run performs no uploads, then observe both crate publications
-   on the next authorized release before closing #1091. Do not rerun the old
-   v0.36.0 coordinated release just to bootstrap this crate.
-
-[Trusted Publishing](https://crates.io/docs/trusted-publishing) requires an
-initial manual publication. The [Cargo publishing guide](https://doc.rust-lang.org/cargo/reference/publishing.html)
-explains dry-run package validation.
+See [Trusted Publishing](https://crates.io/docs/trusted-publishing) for authentication
+and the [Cargo publishing guide](https://doc.rust-lang.org/cargo/reference/publishing.html)
+for package validation.
 
 ## Citations
 
