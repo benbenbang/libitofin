@@ -3,6 +3,7 @@
 use crate::PyQlError;
 use crate::fra::PyPosition;
 use crate::market::PyBlackScholesProcess;
+use crate::mc_variance_swap::PyMCVarianceSwapEngine;
 use crate::option::PyOptionType;
 use crate::settings::PySettings;
 use crate::time::PyDate;
@@ -13,6 +14,7 @@ use libitofin::position::Position;
 use libitofin::pricingengine::PricingEngine;
 use libitofin::pricingengines::ReplicatingVarianceSwapEngine;
 use libitofin::shared::{SharedMut, shared_mut};
+use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 
@@ -55,8 +57,26 @@ impl PyVarianceSwap {
     }
 
     /// Attach an engine, retaining its process after Python owners disappear.
-    fn set_engine(&mut self, engine: &PyReplicatingVarianceSwapEngine) {
-        self.inner.base_mut().set_pricing_engine(engine.engine());
+    fn set_engine(
+        &mut self,
+        #[gen_stub(override_type(
+            type_repr = "pricingengines.ReplicatingVarianceSwapEngine | pricingengines.MCVarianceSwapEngine",
+            imports = ("itofin.pricingengines")
+        ))]
+        engine: &Bound<'_, PyAny>,
+    ) -> PyResult<()> {
+        let engine =
+            if let Ok(engine) = engine.extract::<PyRef<'_, PyReplicatingVarianceSwapEngine>>() {
+                engine.engine()
+            } else if let Ok(engine) = engine.extract::<PyRef<'_, PyMCVarianceSwapEngine>>() {
+                engine.engine()
+            } else {
+                return Err(PyTypeError::new_err(
+                    "expected ReplicatingVarianceSwapEngine or MCVarianceSwapEngine",
+                ));
+            };
+        self.inner.base_mut().set_pricing_engine(engine);
+        Ok(())
     }
 
     /// Return the discounted signed payoff on one whole variance unit.
@@ -64,9 +84,24 @@ impl PyVarianceSwap {
         Ok(self.inner.npv().map_err(PyQlError::from)?)
     }
 
-    /// Return the finite-strip annualized variance, which can be signed.
+    /// Return annualized variance; finite-strip replication can be signed.
     fn variance(&mut self) -> PyResult<f64> {
         Ok(self.inner.variance().map_err(PyQlError::from)?)
+    }
+
+    /// Return nonnegative annualized-variance Monte Carlo standard error.
+    fn variance_error(&mut self) -> PyResult<f64> {
+        Ok(self.inner.variance_error().map_err(PyQlError::from)?)
+    }
+
+    /// Return the native signed monetary error estimate: negative for shorts.
+    fn error_estimate(&mut self) -> PyResult<f64> {
+        Ok(self.inner.error_estimate().map_err(PyQlError::from)?)
+    }
+
+    /// Return actual Monte Carlo observations, not a configured sample cap.
+    fn samples(&mut self) -> PyResult<usize> {
+        Ok(self.inner.samples().map_err(PyQlError::from)?)
     }
 
     /// Return a fresh list of (option type, strike, weight) tuples.

@@ -1732,7 +1732,7 @@ class VarianceSwap:
         r"""
         Retain settings and immutable positive variance strike and notional.
         """
-    def set_engine(self, engine: pricingengines.ReplicatingVarianceSwapEngine) -> None:
+    def set_engine(self, engine: pricingengines.ReplicatingVarianceSwapEngine | pricingengines.MCVarianceSwapEngine) -> None:
         r"""
         Attach an engine, retaining its process after Python owners disappear.
         """
@@ -1742,7 +1742,19 @@ class VarianceSwap:
         """
     def variance(self) -> builtins.float:
         r"""
-        Return the finite-strip annualized variance, which can be signed.
+        Return annualized variance; finite-strip replication can be signed.
+        """
+    def variance_error(self) -> builtins.float:
+        r"""
+        Return nonnegative annualized-variance Monte Carlo standard error.
+        """
+    def error_estimate(self) -> builtins.float:
+        r"""
+        Return the native signed monetary error estimate: negative for shorts.
+        """
+    def samples(self) -> builtins.int:
+        r"""
+        Return actual Monte Carlo observations, not a configured sample cap.
         """
     def option_weights(self) -> builtins.list[tuple[OptionType, builtins.float, builtins.float]]:
         r"""

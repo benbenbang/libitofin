@@ -1,0 +1,74 @@
+{
+  "implementation_gaps": [],
+  "scope": "Spot-start Monte Carlo variance swaps and sampling statistics",
+  "symbols": [
+    {
+      "c": "itofin_mc_variance_swap_engine_new",
+      "go": "Session.NewMCVarianceSwapEngine",
+      "go_file": "sdk/go/mc_variance_swap.go",
+      "native_file": "crates/libitofin-ffi/src/mc_variance_swap_api.rs",
+      "python": "itofin.pricingengines.MCVarianceSwapEngine.__init__",
+      "source": "crates/itofin-py/python/itofin/pricingengines/__init__.pyi",
+      "status": "implemented",
+      "tests": [
+        "TestMCVarianceSwapNativeQuantLibOracle",
+        "TestMCVarianceSwapNativeLiveSnapshots",
+        "TestMCVarianceSwapStatisticsLiveInputsRetentionAndExpiry",
+        "TestMCVarianceSwapEngineReplacementToleranceAndConcurrency",
+        "TestMCVarianceSwapInvalidConfigurationAndSessions"
+      ],
+      "validation": "Bounded seeded diffusion-squared estimator, actual samples, native signed monetary error and variance-unit tolerance, empty weights, retained owners, engine replacement, live updates and lifecycle rejection; native spot cases reconstruct the scalar facade, while rate/dividend/volatility updates reuse live quote owners"
+    },
+    {
+      "c": "itofin_variance_swap_value",
+      "go": "VarianceSwap.ErrorEstimate",
+      "go_file": "sdk/go/mc_variance_swap.go",
+      "native_file": "crates/libitofin-ffi/src/variance_swap_api.rs",
+      "python": "itofin.instruments.VarianceSwap.error_estimate",
+      "source": "crates/itofin-py/python/itofin/instruments/__init__.pyi",
+      "status": "implemented",
+      "tests": [
+        "TestMCVarianceSwapNativeQuantLibOracle",
+        "TestMCVarianceSwapNativeLiveSnapshots",
+        "TestMCVarianceSwapStatisticsLiveInputsRetentionAndExpiry",
+        "TestMCVarianceSwapEngineReplacementToleranceAndConcurrency",
+        "TestMCVarianceSwapInvalidConfigurationAndSessions"
+      ],
+      "validation": "Bounded seeded diffusion-squared estimator, actual samples, native signed monetary error and variance-unit tolerance, empty weights, retained owners, engine replacement, live updates and lifecycle rejection; native spot cases reconstruct the scalar facade, while rate/dividend/volatility updates reuse live quote owners"
+    },
+    {
+      "c": "itofin_variance_swap_value",
+      "go": "VarianceSwap.VarianceError",
+      "go_file": "sdk/go/mc_variance_swap.go",
+      "native_file": "crates/libitofin-ffi/src/variance_swap_api.rs",
+      "python": "itofin.instruments.VarianceSwap.variance_error",
+      "source": "crates/itofin-py/python/itofin/instruments/__init__.pyi",
+      "status": "implemented",
+      "tests": [
+        "TestMCVarianceSwapNativeQuantLibOracle",
+        "TestMCVarianceSwapNativeLiveSnapshots",
+        "TestMCVarianceSwapStatisticsLiveInputsRetentionAndExpiry",
+        "TestMCVarianceSwapEngineReplacementToleranceAndConcurrency",
+        "TestMCVarianceSwapInvalidConfigurationAndSessions"
+      ],
+      "validation": "Bounded seeded diffusion-squared estimator, actual samples, native signed monetary error and variance-unit tolerance, empty weights, retained owners, engine replacement, live updates and lifecycle rejection; native spot cases reconstruct the scalar facade, while rate/dividend/volatility updates reuse live quote owners"
+    },
+    {
+      "c": "itofin_variance_swap_samples",
+      "go": "VarianceSwap.Samples",
+      "go_file": "sdk/go/mc_variance_swap.go",
+      "native_file": "crates/libitofin-ffi/src/mc_variance_swap_api.rs",
+      "python": "itofin.instruments.VarianceSwap.samples",
+      "source": "crates/itofin-py/python/itofin/instruments/__init__.pyi",
+      "status": "implemented",
+      "tests": [
+        "TestMCVarianceSwapNativeQuantLibOracle",
+        "TestMCVarianceSwapNativeLiveSnapshots",
+        "TestMCVarianceSwapStatisticsLiveInputsRetentionAndExpiry",
+        "TestMCVarianceSwapEngineReplacementToleranceAndConcurrency",
+        "TestMCVarianceSwapInvalidConfigurationAndSessions"
+      ],
+      "validation": "Bounded seeded diffusion-squared estimator, actual samples, native signed monetary error and variance-unit tolerance, empty weights, retained owners, engine replacement, live updates and lifecycle rejection; native spot cases reconstruct the scalar facade, while rate/dividend/volatility updates reuse live quote owners"
+    }
+  ]
+}
