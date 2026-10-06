@@ -32,6 +32,7 @@ mod bfgs;
 mod counters;
 mod error;
 mod finite_difference;
+mod global;
 mod lbfgsb;
 mod line_search;
 mod lsq;
@@ -47,6 +48,7 @@ mod tests;
 pub use counters::{Counters, Halt};
 pub use error::{InvalidInput, MinimizeError};
 pub use finite_difference::FiniteDifference;
+pub use global::{DifferentialEvolutionOptions, GlobalOptions};
 pub use objective::{ConstraintKind, Flow, IterationState, Objective};
 pub use outcome::{Converged, Minimize, Termination};
 pub use problem::{
