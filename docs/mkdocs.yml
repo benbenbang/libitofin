@@ -89,6 +89,7 @@ nav:
   - Statistics and risk: statistics.md
   - Mean convergence: convergence.md
   - QMC discrepancy: discrepancy.md
+  - Global optimization: global-optimization.md
   - Chart indicators: chart.md
   - Cap/floor engines: cap-engines.md
   - Python API:
