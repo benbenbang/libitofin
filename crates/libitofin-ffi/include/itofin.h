@@ -2816,6 +2816,35 @@ int32_t itofin_general_statistics_query(struct ItofinContext *ctx,
                                         struct ItofinError *error);
 
 /**
+ * Create a scalar process with finite initial value/drift and nonnegative volatility.
+ * # Safety
+ * Follow the crate-level C caller contract. Output is written only on success.
+ */
+int32_t itofin_geometric_brownian_new(struct ItofinContext *ctx,
+                                      double initial,
+                                      double mu,
+                                      double volatility,
+                                      uint64_t *out,
+                                      struct ItofinError *error);
+
+/**
+ * Kind: 0 initial, 1 mu, 2 volatility, 3 drift, 4 diffusion, 5 expectation,
+ * 6 variance, 7 signed standard deviation, 8 Euler evolve with Gaussian `draw`.
+ * State/time are used by 3-8; dt by 5-8; draw only by 8. Unused inputs are ignored.
+ * # Safety
+ * Follow the crate-level C caller contract. Output is written only on success.
+ */
+int32_t itofin_geometric_brownian_query(struct ItofinContext *ctx,
+                                        uint64_t process,
+                                        int32_t kind,
+                                        double t,
+                                        double state,
+                                        double dt,
+                                        double draw,
+                                        double *out,
+                                        struct ItofinError *error);
+
+/**
  * Retain a live spot quote and live risk-free/dividend curves.
  * # Safety
  * All pointers obey the crate-level C caller contract. Parameters are read
