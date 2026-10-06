@@ -10,6 +10,11 @@ use crate::math::optimization::problem::Problem;
 
 /// A constrained optimization method.
 pub trait OptimizationMethod {
+    /// The exact last global-solver outcome, absent for legacy local methods.
+    fn global_result(&self) -> Option<&itofin_optimize::Minimize> {
+        None
+    }
+
     /// Minimizes `problem`, stopping when `end_criteria` are met, and returns
     /// the criterion that ended the run.
     ///
