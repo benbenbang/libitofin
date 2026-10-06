@@ -308,6 +308,11 @@ pub(crate) fn with_method<R>(
         let mut method = method.extract::<PyRefMut<'_, PyLevenbergMarquardt>>()?;
         return run(method.inner_mut());
     }
+    if method.is_instance_of::<crate::global_calibration::PyDifferentialEvolution>() {
+        let mut method =
+            method.extract::<PyRefMut<'_, crate::global_calibration::PyDifferentialEvolution>>()?;
+        return run(method.inner_mut());
+    }
     if method.is_instance_of::<PySimplex>() {
         let mut method = method.extract::<PyRefMut<'_, PySimplex>>()?;
         return run(&mut method.inner);
@@ -321,7 +326,7 @@ pub(crate) fn with_method<R>(
         return run(&mut method.inner);
     }
     Err(PyTypeError::new_err(
-        "method must be LevenbergMarquardt, Simplex, ConjugateGradient or SteepestDescent",
+        "method must be LevenbergMarquardt, Simplex, ConjugateGradient, SteepestDescent or DifferentialEvolution",
     ))
 }
 

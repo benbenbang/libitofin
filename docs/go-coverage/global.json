@@ -1,0 +1,45 @@
+{
+  "domain": "global-optimization",
+  "entries": [
+    {
+      "c": "itofin_optimize_differential_evolution",
+      "go": "Minimize",
+      "python": "itofin.optimize.minimize",
+      "status": "implemented",
+      "tests": [
+        "TestDifferentialEvolutionNegativeSeededObjective",
+        "TestDifferentialEvolutionMultimodalBudgetAndInitialRows",
+        "TestDifferentialEvolutionInvalidOptionsNeverEvaluate",
+        "TestDifferentialEvolutionErrorPanicCancellationAndReentry",
+        "TestDifferentialEvolutionFixedCoordinatesAndInputCopies"
+      ]
+    },
+    {
+      "c": "itofin_differential_evolution_new",
+      "go": "DifferentialEvolutionMethod",
+      "python": "itofin.optimization.DifferentialEvolution",
+      "status": "implemented",
+      "tests": "TestGlobalCalibrationConstructorValidation"
+    },
+    {
+      "c": "itofin_differential_evolution_new",
+      "go": "Session.NewDifferentialEvolution",
+      "python": "itofin.optimization.DifferentialEvolution.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestGlobalCalibrationFixedParametersAndResultOwnership",
+        "TestGlobalCalibrationBudgetAndCrossSession"
+      ]
+    },
+    {
+      "c": "itofin_differential_evolution_result",
+      "go": "DifferentialEvolutionMethod.LastResult",
+      "python": "itofin.optimization.DifferentialEvolution.last_result",
+      "status": "implemented",
+      "tests": [
+        "TestGlobalCalibrationFixedParametersAndResultOwnership",
+        "TestGlobalCalibrationBudgetAndCrossSession"
+      ]
+    }
+  ]
+}
