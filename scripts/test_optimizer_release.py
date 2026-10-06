@@ -107,7 +107,7 @@ class OptimizerReleaseTests(unittest.TestCase):
                          "no GitHub environment", "`itofin-optimize` before `libitofin`",
                          "committed-version checks and OIDC", "CI dry runs perform no publication",
                          "first successful future CI publication", "is still pending",
-                         "remains open until it is verified"):
+                         "was closed by the maintainer"):
             with self.subTest(text=required):
                 self.assertIn(required, readme)
 
