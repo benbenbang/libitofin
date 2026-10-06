@@ -48,9 +48,11 @@ GitHub trusted-publisher configuration are verified:
   Optimizer publication failure blocks core publication.
 - Python and Go release jobs remain independently gated by the release; their
   existing artifacts bundle optimizer code without an additional runtime install.
-- CI dry runs perform no publication. The first successful future CI publication
-  is still pending; [#1091](https://github.com/benbenbang/libitofin/issues/1091)
-  was closed by the maintainer. That issue retains historical bootstrap details.
+- CI dry runs perform no publication. The first coordinated **v0.37.0** release
+  verified optimizer-before-core OIDC publishing in
+  [CI run 37492675222](https://github.com/benbenbang/libitofin/actions/runs/37492675222).
+  [#1091](https://github.com/benbenbang/libitofin/issues/1091) was closed by the maintainer
+  and retains historical bootstrap details.
 
 See [Trusted Publishing](https://crates.io/docs/trusted-publishing) for authentication
 and the [Cargo publishing guide](https://doc.rust-lang.org/cargo/reference/publishing.html)

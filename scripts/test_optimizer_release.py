@@ -100,13 +100,14 @@ class OptimizerReleaseTests(unittest.TestCase):
         self.assertNotIn("exclude", package)
         self.assertNotEqual(package.get("publish"), False)
 
-    def test_release_docs_distinguish_verified_bootstrap_from_pending_ci(self):
+    def test_release_docs_record_verified_bootstrap_and_first_coordinated_ci(self):
         readme = (ROOT / "crates/itofin-optimize/README.md").read_text()
         for required in ("initial **0.36.0** publication", "configuration are verified",
                          "Owner `benbenbang`, repository `libitofin`, workflow `semantic-release.yml`",
                          "no GitHub environment", "`itofin-optimize` before `libitofin`",
                          "committed-version checks and OIDC", "CI dry runs perform no publication",
-                         "first successful future CI publication", "is still pending",
+                         "first coordinated **v0.37.0** release", "verified optimizer-before-core OIDC",
+                         "https://github.com/benbenbang/libitofin/actions/runs/37492675222",
                          "was closed by the maintainer"):
             with self.subTest(text=required):
                 self.assertIn(required, readme)
