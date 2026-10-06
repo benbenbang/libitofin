@@ -1,6 +1,6 @@
 use super::*;
 #[path = "variance_swap_api_test_helpers.rs"]
-mod helpers;
+pub(super) mod helpers;
 use helpers::Market;
 
 #[test]
@@ -220,7 +220,7 @@ fn malformed_pointers_errors_bounds_and_wrong_handles_do_not_mutate() {
         );
         assert_eq!(out, 91);
     }
-    for field in [-1, 4, 99] {
+    for field in [-1, 6, 99] {
         let mut scalar = 91.;
         assert_eq!(
             unsafe {

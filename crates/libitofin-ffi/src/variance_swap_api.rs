@@ -1,4 +1,6 @@
-//! Concrete variance swaps and finite option-strip replication.
+//! Concrete variance swaps and typed replication or Monte Carlo engines.
+#[path = "mc_variance_swap_api.rs"]
+mod mc_variance_swap_api;
 use crate::boundary::*;
 use crate::time_api::date;
 use libitofin::instrument::Instrument;
@@ -11,6 +13,7 @@ use libitofin::processes::GeneralizedBlackScholesProcess;
 use libitofin::settings::Settings;
 use libitofin::shared::{Shared, SharedMut, shared_mut};
 use libitofin::time::date::Date;
+pub use mc_variance_swap_api::*;
 
 #[derive(Clone)]
 struct EngineOwner {
@@ -119,7 +122,7 @@ pub unsafe extern "C" fn itofin_replicating_variance_swap_engine_new(
     }
 }
 
-/// Attach only a replicating variance-swap engine; both owners are retained.
+/// Attach a typed variance-swap engine; both owners are retained.
 /// # Safety
 /// Context, handles and error follow the crate-level caller contract.
 #[unsafe(no_mangle)]
@@ -144,7 +147,8 @@ pub unsafe extern "C" fn itofin_variance_swap_set_engine(
     }
 }
 
-/// Scalar field: zero NPV, one fair annualized variance, two strike, three notional.
+/// Scalar fields: zero NPV, one variance, two strike, three notional,
+/// four signed NPV sampling error, five nonnegative variance sampling error.
 /// # Safety
 /// Outputs follow the crate-level caller contract and stay unchanged on error.
 #[unsafe(no_mangle)]
@@ -168,6 +172,8 @@ pub unsafe extern "C" fn itofin_variance_swap_value(
                 1 => owner.swap.variance()?,
                 2 => owner.swap.strike(),
                 3 => owner.swap.notional(),
+                4 => owner.swap.error_estimate()?,
+                5 => owner.swap.variance_error()?,
                 _ => return Err(BindingError::invalid("invalid variance-swap scalar field")),
             };
             output(out, value)
