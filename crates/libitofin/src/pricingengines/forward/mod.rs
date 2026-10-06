@@ -1,5 +1,6 @@
 //! Forward-product pricing engines.
 
+mod mcvarianceswapengine;
 mod replicatingvarianceswapengine;
 mod varianceswapstrip;
 
@@ -18,3 +19,5 @@ mod variance_native_weights;
 mod variance_numerical_tests;
 #[cfg(test)]
 mod variance_strip_tests;
+
+pub use mcvarianceswapengine::MCVarianceSwapEngine;
