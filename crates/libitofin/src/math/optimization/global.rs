@@ -203,3 +203,6 @@ impl OptimizationMethod for DifferentialEvolution {
         self.last_result()
     }
 }
+
+#[cfg(test)]
+mod tests;
