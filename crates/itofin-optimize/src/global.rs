@@ -183,3 +183,34 @@ fn range(option: &'static str, found: usize, min: usize, max: usize) -> Result<(
     }
     Ok(())
 }
+
+pub(crate) struct Random(u64);
+
+impl Random {
+    pub(crate) fn new(seed: u64) -> Self {
+        Self(seed)
+    }
+
+    fn next(&mut self) -> u64 {
+        self.0 = self.0.wrapping_add(0x9e3779b97f4a7c15);
+        let mut value = self.0;
+        value = (value ^ (value >> 30)).wrapping_mul(0xbf58476d1ce4e5b9);
+        value = (value ^ (value >> 27)).wrapping_mul(0x94d049bb133111eb);
+        value ^ (value >> 31)
+    }
+
+    pub(crate) fn unit(&mut self) -> f64 {
+        (self.next() >> 11) as f64 * (1.0 / 9_007_199_254_740_992.0)
+    }
+
+    pub(crate) fn index(&mut self, size: usize) -> usize {
+        let bound = size as u64;
+        let threshold = bound.wrapping_neg() % bound;
+        loop {
+            let value = self.next();
+            if value >= threshold {
+                return (value % bound) as usize;
+            }
+        }
+    }
+}

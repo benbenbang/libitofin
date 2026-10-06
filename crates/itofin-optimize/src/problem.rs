@@ -1,5 +1,6 @@
 use crate::error::InvalidInput;
 use crate::finite_difference::FiniteDifference;
+use crate::global::DifferentialEvolutionOptions;
 
 /// Box bounds, one entry per coordinate.
 ///
@@ -262,6 +263,8 @@ pub enum Method {
     /// Sequential least-squares quadratic programming, which honours box
     /// bounds and general constraints.
     Slsqp(SlsqpOptions),
+    /// Serial, deferred-generation DE/rand/1/bin with finite box bounds.
+    DifferentialEvolution(DifferentialEvolutionOptions),
 }
 
 impl Method {
@@ -272,6 +275,7 @@ impl Method {
             Method::Bfgs(_) => "BFGS",
             Method::Lbfgsb(_) => "L-BFGS-B",
             Method::Slsqp(_) => "SLSQP",
+            Method::DifferentialEvolution(_) => "Differential-Evolution",
         }
     }
 
@@ -279,7 +283,7 @@ impl Method {
     pub fn supports_bounds(&self) -> bool {
         match self {
             Method::NelderMead(_) | Method::Bfgs(_) => false,
-            Method::Lbfgsb(_) | Method::Slsqp(_) => true,
+            Method::Lbfgsb(_) | Method::Slsqp(_) | Method::DifferentialEvolution(_) => true,
         }
     }
 
@@ -300,6 +304,7 @@ impl Method {
             Method::Bfgs(options) => options.validate(),
             Method::Lbfgsb(options) => options.validate(),
             Method::Slsqp(options) => options.validate(),
+            Method::DifferentialEvolution(options) => options.validate(problem),
         }
     }
 }

@@ -13,6 +13,9 @@
 //! An independent implementation from the papers below. Nothing is adapted from
 //! another optimizer; see `THIRD_PARTY_NOTICES.md` in this crate.
 //!
+//! - Storn, R. and Price, K. (1997), "Differential Evolution - A Simple and
+//!   Efficient Heuristic for Global Optimization over Continuous Spaces",
+//!   Journal of Global Optimization 11, 341-359.
 //! - Nelder, J. A. and Mead, R. (1965), "A simplex method for function
 //!   minimization", The Computer Journal 7(4), 308-313.
 //! - Gao, F. and Han, L. (2012), "Implementing the Nelder-Mead simplex
@@ -30,6 +33,7 @@
 
 mod bfgs;
 mod counters;
+mod differential_evolution;
 mod error;
 mod finite_difference;
 mod global;
@@ -111,5 +115,8 @@ pub fn minimize<O: Objective>(
         Method::Bfgs(options) => bfgs::minimize(objective, problem, options, common),
         Method::Lbfgsb(options) => lbfgsb::minimize(objective, problem, options, common),
         Method::Slsqp(options) => slsqp::minimize(objective, problem, options, common),
+        Method::DifferentialEvolution(options) => {
+            differential_evolution::minimize(objective, problem, options, common)
+        }
     }
 }
