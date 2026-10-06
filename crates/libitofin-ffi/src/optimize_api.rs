@@ -4,9 +4,9 @@
 //! point, including context APIs, while the solver runs.
 use crate::boundary::*;
 use itofin_optimize::{
-    BfgsOptions, Bounds, Common, ConstraintKind, Converged, FiniteDifference, Flow, IterationState,
-    LbfgsbOptions, Method, MinimizeError, NelderMeadOptions, Objective, Problem, SlsqpOptions,
-    Termination, minimize,
+    BfgsOptions, Bounds, Common, ConstraintKind, Converged, DifferentialEvolutionOptions,
+    FiniteDifference, Flow, GlobalOptions, IterationState, LbfgsbOptions, Method, MinimizeError,
+    NelderMeadOptions, Objective, Problem, SlsqpOptions, Termination, minimize,
 };
 use std::ffi::c_char;
 use std::fmt;
@@ -125,6 +125,33 @@ pub struct ItofinSlsqpOptions {
     pub ftol: f64,
     pub maxiter: usize,
     pub maxfev: usize,
+}
+
+/// Shared global-search controls. Zero population and budget fields select
+/// defaults. Tolerances use presence flags so explicit zero is preserved.
+#[derive(Clone, Copy, Default)]
+#[repr(C)]
+pub struct ItofinGlobalOptions {
+    pub seed: u64,
+    pub population_size: usize,
+    pub maxiter: usize,
+    pub maxfev: usize,
+    pub xatol: f64,
+    pub fatol: f64,
+    pub has_xatol: bool,
+    pub has_fatol: bool,
+}
+
+/// Differential-evolution controls. Mutation and recombination use presence
+/// flags; a zero-initialized struct selects all defaults and deterministic seed 0.
+#[derive(Clone, Copy, Default)]
+#[repr(C)]
+pub struct ItofinDifferentialEvolutionOptions {
+    pub global: ItofinGlobalOptions,
+    pub mutation: f64,
+    pub recombination: f64,
+    pub has_mutation: bool,
+    pub has_recombination: bool,
 }
 
 /// One vector constraint with `dimension` scalar components. `kind` is 0 for
@@ -361,7 +388,7 @@ impl Objective for Released {
     }
 }
 
-fn status(termination: Termination) -> BindingResult<ItofinOptimizeStatus> {
+pub(crate) fn status(termination: Termination) -> BindingResult<ItofinOptimizeStatus> {
     Ok(match termination {
         Termination::Converged(Converged::XTol) => ITOFIN_OPTIMIZE_CONVERGED_XTOL,
         Termination::Converged(Converged::FTol) => ITOFIN_OPTIMIZE_CONVERGED_FTOL,
@@ -1048,3 +1075,172 @@ mod tests {
         assert_eq!(RELEASES.load(Ordering::SeqCst) - before, 6);
     }
 }
+
+/// Minimize with seeded bounded differential evolution. Bounds must be finite,
+/// contain x0 and have finite widths. Optional initial rows are preserved exactly;
+/// zero rows and zero length mean automatic initialization. Row-major storage must
+/// contain `initial_rows * n` values. A supplied gradient is not used.
+/// # Safety
+/// Objective/options/output follow the `itofin_optimize_lbfgsb` contract.
+/// Each input pointer must be readable for its declared length. Output fields
+/// and its x buffer remain untouched when the call returns an error.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn itofin_optimize_differential_evolution(
+    objective: *const ItofinObjective,
+    x0: *const f64,
+    n: usize,
+    lower: *const f64,
+    lower_len: usize,
+    upper: *const f64,
+    upper_len: usize,
+    initial_population: *const f64,
+    initial_rows: usize,
+    initial_len: usize,
+    options: *const ItofinDifferentialEvolutionOptions,
+    out_result: *mut ItofinOptimizeResult,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        without_context(error, || {
+            check_ptr(objective)?;
+            let mut objective = Released(*objective);
+            if objective.0.value.is_none() {
+                return Err(BindingError::invalid("objective value must not be null"));
+            }
+            check_ptr(options)?;
+            check_ptr(out_result)?;
+            let options = *options;
+            if n == 0 || n > 256 {
+                return Err(BindingError::invalid(
+                    "global dimensions must be in 1..=256",
+                ));
+            }
+            if lower_len != n || upper_len != n {
+                return Err(BindingError::invalid("bounds length must match x0"));
+            }
+            let cells = initial_rows
+                .checked_mul(n)
+                .ok_or_else(|| BindingError::invalid("initial population shape overflows"))?;
+            if cells != initial_len || cells > 1_000_000 {
+                return Err(BindingError::invalid("invalid initial population shape"));
+            }
+            if initial_rows != 0 && !(4..=4096).contains(&initial_rows) {
+                return Err(BindingError::invalid(
+                    "initial population rows must be in 4..=4096",
+                ));
+            }
+            let controls = options.global;
+            if controls.population_size != 0 && !(4..=4096).contains(&controls.population_size) {
+                return Err(BindingError::invalid("population_size must be in 4..=4096"));
+            }
+            if controls.population_size.saturating_mul(n) > 1_000_000
+                || controls.maxiter > 1_000_000
+                || controls.maxfev > 10_000_000
+            {
+                return Err(BindingError::invalid("global resource limit exceeded"));
+            }
+            check_ptr((*out_result).x)?;
+            let initial_population = if initial_rows == 0 {
+                None
+            } else {
+                Some(
+                    input_slice(initial_population, initial_len)?
+                        .chunks_exact(n)
+                        .map(<[f64]>::to_vec)
+                        .collect(),
+                )
+            };
+            let problem = Problem {
+                x0: input_slice(x0, n)?.to_vec(),
+                bounds: Some(Bounds {
+                    lower: input_slice(lower, lower_len)?.to_vec(),
+                    upper: input_slice(upper, upper_len)?.to_vec(),
+                }),
+            };
+            let (options, common) = decode_differential_evolution(options, initial_population)?;
+            let method = Method::DifferentialEvolution(options);
+            let run =
+                minimize(&mut objective, &problem, &method, &common).map_err(|e| match e {
+                    MinimizeError::InvalidInput(e) => BindingError::invalid(e.to_string()),
+                    MinimizeError::Objective(e) => BindingError {
+                        code: CORE_ERROR,
+                        message: e.0,
+                    },
+                })?;
+            let run_status = status(run.status)?;
+            let result = &mut *out_result;
+            std::slice::from_raw_parts_mut(result.x, n).copy_from_slice(&run.x);
+            result.fun = run.fun;
+            result.nit = run.nit;
+            result.nfev = run.nfev;
+            result.njev = run.njev;
+            result.status = run_status;
+            result.success = run.success;
+            Ok(())
+        })
+    }
+}
+
+pub(crate) fn decode_differential_evolution(
+    options: ItofinDifferentialEvolutionOptions,
+    population: Option<Vec<Vec<f64>>>,
+) -> BindingResult<(DifferentialEvolutionOptions, Common)> {
+    let controls = options.global;
+    if controls.population_size != 0 && !(4..=4096).contains(&controls.population_size) {
+        return Err(BindingError::invalid("population_size must be in 4..=4096"));
+    }
+    if controls.maxiter > 1_000_000 || controls.maxfev > 10_000_000 {
+        return Err(BindingError::invalid("global resource limit exceeded"));
+    }
+    for (present, value) in [
+        (controls.has_xatol, controls.xatol),
+        (controls.has_fatol, controls.fatol),
+    ] {
+        if present && (!value.is_finite() || value < 0.0) {
+            return Err(BindingError::invalid(
+                "global tolerances must be finite and nonnegative",
+            ));
+        }
+    }
+    if options.has_mutation
+        && (!options.mutation.is_finite() || options.mutation <= 0.0 || options.mutation > 2.0)
+    {
+        return Err(BindingError::invalid("mutation must be in (0, 2]"));
+    }
+    if options.has_recombination
+        && (!options.recombination.is_finite() || !(0.0..=1.0).contains(&options.recombination))
+    {
+        return Err(BindingError::invalid("recombination must be in [0, 1]"));
+    }
+    let defaults = DifferentialEvolutionOptions::default();
+    Ok((
+        DifferentialEvolutionOptions {
+            global: GlobalOptions {
+                seed: controls.seed,
+                population_size: nonzero(controls.population_size),
+                initial_population: population,
+                xatol: controls.has_xatol.then_some(controls.xatol),
+                fatol: controls.has_fatol.then_some(controls.fatol),
+            },
+            mutation: if options.has_mutation {
+                options.mutation
+            } else {
+                defaults.mutation
+            },
+            recombination: if options.has_recombination {
+                options.recombination
+            } else {
+                defaults.recombination
+            },
+        },
+        Common {
+            maxiter: nonzero(controls.maxiter),
+            maxfev: nonzero(controls.maxfev),
+            tol: None,
+        },
+    ))
+}
+
+#[cfg(test)]
+#[path = "optimize_api/global_tests.rs"]
+mod global_tests;

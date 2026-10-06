@@ -975,6 +975,33 @@ typedef struct ItofinSlsqpOptions {
   size_t maxfev;
 } ItofinSlsqpOptions;
 
+/**
+ * Shared global-search controls. Zero population and budget fields select
+ * defaults. Tolerances use presence flags so explicit zero is preserved.
+ */
+typedef struct ItofinGlobalOptions {
+  uint64_t seed;
+  size_t population_size;
+  size_t maxiter;
+  size_t maxfev;
+  double xatol;
+  double fatol;
+  bool has_xatol;
+  bool has_fatol;
+} ItofinGlobalOptions;
+
+/**
+ * Differential-evolution controls. Mutation and recombination use presence
+ * flags; a zero-initialized struct selects all defaults and deterministic seed 0.
+ */
+typedef struct ItofinDifferentialEvolutionOptions {
+  struct ItofinGlobalOptions global;
+  double mutation;
+  double recombination;
+  bool has_mutation;
+  bool has_recombination;
+} ItofinDifferentialEvolutionOptions;
+
 typedef struct ItofinOvernightFutureConfig {
   uint64_t index;
   int32_t value_date;
@@ -5115,6 +5142,30 @@ int32_t itofin_optimize_slsqp(const struct ItofinObjective *objective,
                               const struct ItofinSlsqpOptions *options,
                               struct ItofinOptimizeResult *out_result,
                               struct ItofinError *error);
+
+/**
+ * Minimize with seeded bounded differential evolution. Bounds must be finite,
+ * contain x0 and have finite widths. Optional initial rows are preserved exactly;
+ * zero rows and zero length mean automatic initialization. Row-major storage must
+ * contain `initial_rows * n` values. A supplied gradient is not used.
+ * # Safety
+ * Objective/options/output follow the `itofin_optimize_lbfgsb` contract.
+ * Each input pointer must be readable for its declared length. Output fields
+ * and its x buffer remain untouched when the call returns an error.
+ */
+int32_t itofin_optimize_differential_evolution(const struct ItofinObjective *objective,
+                                               const double *x0,
+                                               size_t n,
+                                               const double *lower,
+                                               size_t lower_len,
+                                               const double *upper,
+                                               size_t upper_len,
+                                               const double *initial_population,
+                                               size_t initial_rows,
+                                               size_t initial_len,
+                                               const struct ItofinDifferentialEvolutionOptions *options,
+                                               struct ItofinOptimizeResult *out_result,
+                                               struct ItofinError *error);
 
 /**
  * `american`: 0 European, 1 American; earliest ignored for European exercise.
