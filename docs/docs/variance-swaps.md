@@ -3,6 +3,8 @@
 Price annualized variance using a **finite European call/put strip** on a
 Black-Scholes market. This is the pinned QuantLib discrete log-payoff replication
 rule, not a realized-variance estimator or an accuracy certificate.
+For Monte Carlo integrated local variance on the same instrument, see
+[MC variance swaps](mc-variance-swaps.md).
 
 ## Units and supported contracts
 

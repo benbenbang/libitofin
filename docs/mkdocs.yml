@@ -76,6 +76,7 @@ nav:
   - Finite-difference options: finite-difference.md
   - Exotic option scope: exotic-options.md
   - Variance swaps: variance-swaps.md
+  - Monte Carlo variance swaps: mc-variance-swaps.md
   - Merton jump diffusion: jump-diffusion.md
   - Bates stochastic volatility: bates.md
   - GJR-GARCH process and paths: gjrgarch.md
