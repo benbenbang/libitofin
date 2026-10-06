@@ -7,14 +7,14 @@
 
 use crate::ItofinError;
 use itofin_optimize::{
-    BfgsOptions, Bounds, Common, ConstraintKind, Converged, Flow, IterationState, LbfgsbOptions,
-    Method, Minimize, MinimizeError, NelderMeadOptions, Objective, Problem, SlsqpOptions,
-    Termination, minimize as run,
+    BfgsOptions, Bounds, Common, ConstraintKind, Converged, DifferentialEvolutionOptions, Flow,
+    IterationState, LbfgsbOptions, Method, Minimize, MinimizeError, NelderMeadOptions, Objective,
+    Problem, SlsqpOptions, Termination, minimize as run,
 };
 use numpy::PyArray1;
 use pyo3::exceptions::{PyStopIteration, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::types::{PyBool, PyDict};
 use pyo3_stub_gen::derive::{
     gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pyfunction, gen_stub_pymethods,
 };
@@ -93,6 +93,21 @@ impl PyOptimizeResult {
     #[getter]
     fn x<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
         PyArray1::from_slice(py, &self.x_values)
+    }
+}
+
+impl PyOptimizeResult {
+    pub(crate) fn from_core(result: Minimize) -> PyResult<Self> {
+        Ok(Self {
+            status: PyStatus::from_termination(result.status)?,
+            x_values: result.x,
+            fun: result.fun,
+            nit: result.nit,
+            nfev: result.nfev,
+            njev: result.njev,
+            success: result.success,
+            message: result.message,
+        })
     }
 }
 
@@ -351,23 +366,84 @@ fn slsqp(options: Option<&Bound<'_, PyDict>>) -> PyResult<(SlsqpOptions, Common)
     Ok((method, common))
 }
 
+pub(crate) fn strict_global_usize(value: &Bound<'_, PyAny>, name: &str) -> PyResult<usize> {
+    reject_global_bool(value, name)?;
+    value.extract()
+}
+
+pub(crate) fn strict_global_seed(value: &Bound<'_, PyAny>) -> PyResult<u64> {
+    reject_global_bool(value, "seed")?;
+    value.extract()
+}
+
+fn reject_global_bool(value: &Bound<'_, PyAny>, name: &str) -> PyResult<()> {
+    if value.is_instance_of::<PyBool>() {
+        return Err(PyValueError::new_err(format!(
+            "option {name} must be an integer, not bool"
+        )));
+    }
+    Ok(())
+}
+
+fn differential_evolution(
+    options: Option<&Bound<'_, PyDict>>,
+) -> PyResult<(DifferentialEvolutionOptions, Common)> {
+    let mut method = DifferentialEvolutionOptions::default();
+    let mut common = Common::default();
+    for (key, value) in options.into_iter().flat_map(|options| options.iter()) {
+        let key = key.extract::<String>()?;
+        match key.as_str() {
+            "maxiter" => common.maxiter = Some(strict_global_usize(&value, "maxiter")?),
+            "maxfev" => common.maxfev = Some(strict_global_usize(&value, "maxfev")?),
+            "seed" => method.global.seed = strict_global_seed(&value)?,
+            "population_size" => {
+                method.global.population_size =
+                    Some(strict_global_usize(&value, "population_size")?)
+            }
+            "initial_population" => method.global.initial_population = Some(value.extract()?),
+            "xatol" => method.global.xatol = Some(value.extract()?),
+            "fatol" => method.global.fatol = Some(value.extract()?),
+            "mutation" => method.mutation = value.extract()?,
+            "recombination" => method.recombination = value.extract()?,
+            other => {
+                return Err(PyValueError::new_err(format!(
+                    "method Differential-Evolution does not support option {other}"
+                )));
+            }
+        }
+    }
+    if common.maxiter == Some(0) || common.maxfev == Some(0) {
+        return Err(PyValueError::new_err(
+            "Differential-Evolution maxiter and maxfev must be positive",
+        ));
+    }
+    Ok((method, common))
+}
+
 /// Minimize a scalar function of one or more variables.
 ///
 /// Args:
 ///     fun (Callable): Called as fun(x) with a float64 array; returns a float.
 ///     x0 (Sequence[float]): The starting point.
-///     method (str): "Nelder-Mead", "BFGS", "L-BFGS-B", or "SLSQP" (any case).
+///     method (str): "Nelder-Mead", "BFGS", "L-BFGS-B", "SLSQP", or
+///         "Differential-Evolution" (any case).
 ///     options (dict | None): Nelder-Mead accepts maxiter, maxfev, xatol,
 ///         fatol and adaptive. BFGS accepts maxiter, gtol and eps. L-BFGS-B
 ///         accepts maxiter, maxfev, maxcor, ftol, gtol and eps. SLSQP accepts
-///         maxiter, maxfev and ftol.
+///         maxiter, maxfev and ftol. Differential-Evolution accepts maxiter,
+///         maxfev, seed, population_size, initial_population, xatol, fatol,
+///         mutation and recombination. Seed zero is deterministic; population
+///         rows are used unchanged, without inserting x0. Global convergence
+///         tolerances are normalized coordinate spread and absolute fun spread.
 ///     callback (Callable | None): Called as callback(xk) after every
 ///         iteration. Raising StopIteration stops the run with
 ///         Status.Cancelled.
 ///     jac (Callable | None): Analytic objective gradient for BFGS, L-BFGS-B
 ///         or SLSQP, called as jac(x).
 ///     bounds: L-BFGS-B or SLSQP pairs of (lower, upper), with None for an
-///         open side. Other methods reject bounds.
+///         open side. Differential-Evolution requires finite bounds and x0
+///         inside them; equal lower and upper bounds fix a coordinate. Other
+///         methods reject bounds.
 ///     constraints (Sequence[dict] | None): SLSQP constraints with type "eq"
 ///         (fun(x) == 0) or "ineq" (fun(x) >= 0), fun(x) returning a scalar
 ///         or vector, and optional jac(x) returning a gradient or 2-D rows.
@@ -399,7 +475,8 @@ pub(crate) fn minimize(
 ) -> PyResult<PyOptimizeResult> {
     let is_lbfgsb = method.eq_ignore_ascii_case("l-bfgs-b");
     let is_slsqp = method.eq_ignore_ascii_case("slsqp");
-    if bounds.is_some() && !is_lbfgsb && !is_slsqp {
+    let is_global = method.eq_ignore_ascii_case("differential-evolution");
+    if bounds.is_some() && !is_lbfgsb && !is_slsqp && !is_global {
         return Err(PyValueError::new_err(format!(
             "method {method} does not support bounds"
         )));
@@ -426,6 +503,14 @@ pub(crate) fn minimize(
     } else if is_slsqp {
         let (options, common) = slsqp(options.as_ref())?;
         (Method::Slsqp(options), common)
+    } else if is_global {
+        if jac.is_some() {
+            return Err(PyValueError::new_err(
+                "method Differential-Evolution does not support jac",
+            ));
+        }
+        let (options, common) = differential_evolution(options.as_ref())?;
+        (Method::DifferentialEvolution(options), common)
     } else {
         return Err(ItofinError::new_err(format!("unknown method {method}")));
     };
@@ -477,14 +562,5 @@ pub(crate) fn minimize(
         }
         Err(MinimizeError::Objective(error)) => return Err(error),
     };
-    Ok(PyOptimizeResult {
-        status: PyStatus::from_termination(result.status)?,
-        x_values: result.x,
-        fun: result.fun,
-        nit: result.nit,
-        nfev: result.nfev,
-        njev: result.njev,
-        success: result.success,
-        message: result.message,
-    })
+    PyOptimizeResult::from_core(result)
 }
