@@ -10,10 +10,11 @@ these methods to `HestonModel.calibrate*` or `HullWhite.calibrate*`, with an
 | `Simplex(lambda_)` | You want a derivative-free search and can choose a positive starting scale. |
 | `ConjugateGradient` | You want a gradient-based search using the core Armijo line search. |
 | `SteepestDescent` | You want a basic gradient-based search using the same line search. |
+| `DifferentialEvolution` | You have a finite search box entirely inside the model domain and want a seeded population search. |
 
 These methods belong to `itofin.optimization`. The separate `itofin.optimize`
-API for standalone scalar minimization is tracked in
-[EPIC-OPT](https://github.com/benbenbang/libitofin/issues/1078).
+API minimizes scalar objectives directly. See [Global optimization](../global-optimization.md)
+for the shared solver contract, calibration bounds and diagnostic results.
 
 Every `HestonModel.calibrate*` and `HullWhite.calibrate*` method also accepts
 keyword-only `constraint=`, `weights=`, and `fix_parameters=` arguments. Use
