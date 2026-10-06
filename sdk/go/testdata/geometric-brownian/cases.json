@@ -1,0 +1,193 @@
+{
+  "cases": [
+    {
+      "inputs": {
+        "dt": 0.25,
+        "dw": 0.5,
+        "initial_value": 100,
+        "mu": 0.05,
+        "state": 100,
+        "time": 0,
+        "volatility": 0.2
+      },
+      "name": "positive",
+      "native": {
+        "diffusion": 20,
+        "drift": 5,
+        "evolve": 106.25,
+        "expectation": 101.25,
+        "std_deviation": 10,
+        "variance": 100,
+        "x0": 100
+      }
+    },
+    {
+      "inputs": {
+        "dt": 0.5,
+        "dw": -0.75,
+        "initial_value": -100,
+        "mu": 0.05,
+        "state": -80,
+        "time": 1,
+        "volatility": 0.2
+      },
+      "name": "negative_state",
+      "native": {
+        "diffusion": -16,
+        "drift": -4,
+        "evolve": -73.51471862576143,
+        "expectation": -82,
+        "std_deviation": -11.313708498984761,
+        "variance": 128,
+        "x0": -100
+      }
+    },
+    {
+      "inputs": {
+        "dt": 1,
+        "dw": 1,
+        "initial_value": 0,
+        "mu": -0.03,
+        "state": 0,
+        "time": 2,
+        "volatility": 0.2
+      },
+      "name": "zero_state",
+      "native": {
+        "diffusion": 0,
+        "drift": 0,
+        "evolve": 0,
+        "expectation": 0,
+        "std_deviation": 0,
+        "variance": 0,
+        "x0": 0
+      }
+    },
+    {
+      "inputs": {
+        "dt": 0.1,
+        "dw": -1.5,
+        "initial_value": 12,
+        "mu": -0.3,
+        "state": 15,
+        "time": 0.75,
+        "volatility": 0.45
+      },
+      "name": "negative_drift",
+      "native": {
+        "diffusion": 6.75,
+        "drift": -4.5,
+        "evolve": 11.348193869079516,
+        "expectation": 14.55,
+        "std_deviation": 2.1345374206136563,
+        "variance": 4.55625,
+        "x0": 12
+      }
+    },
+    {
+      "inputs": {
+        "dt": 0.5,
+        "dw": 2,
+        "initial_value": -20,
+        "mu": 0.2,
+        "state": -10,
+        "time": 0,
+        "volatility": 0
+      },
+      "name": "zero_volatility",
+      "native": {
+        "diffusion": 0,
+        "drift": -2,
+        "evolve": -11,
+        "expectation": -11,
+        "std_deviation": 0,
+        "variance": 0,
+        "x0": -20
+      }
+    },
+    {
+      "inputs": {
+        "dt": 0,
+        "dw": -3,
+        "initial_value": 100,
+        "mu": 0.1,
+        "state": 90,
+        "time": 5,
+        "volatility": 0.4
+      },
+      "name": "zero_dt",
+      "native": {
+        "diffusion": 36,
+        "drift": 9,
+        "evolve": 90,
+        "expectation": 90,
+        "std_deviation": 0,
+        "variance": 0,
+        "x0": 100
+      }
+    },
+    {
+      "inputs": {
+        "dt": 1,
+        "dw": -2,
+        "initial_value": 100,
+        "mu": 0.1,
+        "state": 100,
+        "time": 0,
+        "volatility": 0.8
+      },
+      "name": "cross_zero",
+      "native": {
+        "diffusion": 80,
+        "drift": 10,
+        "evolve": -50,
+        "expectation": 110,
+        "std_deviation": 80,
+        "variance": 6400,
+        "x0": 100
+      }
+    },
+    {
+      "inputs": {
+        "dt": 0.019,
+        "dw": -0.127,
+        "initial_value": 0.123,
+        "mu": -0.007,
+        "state": 0.234,
+        "time": 0.37,
+        "volatility": 0.031
+      },
+      "name": "fractional",
+      "native": {
+        "diffusion": 0.007254,
+        "drift": -0.0016380000000000001,
+        "evolve": 0.23384189134814748,
+        "expectation": 0.23396887800000002,
+        "std_deviation": 0.0009998948964766248,
+        "variance": 9.99789804e-07,
+        "x0": 0.123
+      }
+    },
+    {
+      "inputs": {
+        "dt": 2,
+        "dw": 0.1,
+        "initial_value": 0,
+        "mu": 0.03,
+        "state": 30,
+        "time": 0,
+        "volatility": 0.2
+      },
+      "name": "zero_initial_positive_state",
+      "native": {
+        "diffusion": 6,
+        "drift": 0.8999999999999999,
+        "evolve": 32.64852813742386,
+        "expectation": 31.8,
+        "std_deviation": 8.485281374238571,
+        "variance": 72,
+        "x0": 0
+      }
+    }
+  ]
+}
