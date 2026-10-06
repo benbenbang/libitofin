@@ -124,3 +124,6 @@ pub unsafe extern "C" fn itofin_differential_evolution_result(
         })
     }
 }
+
+#[cfg(test)]
+mod tests;
