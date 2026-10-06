@@ -210,7 +210,7 @@ impl PyBatesModel {
     fn calibrate(
         &mut self,
         helpers: Vec<PyRef<PyHestonModelHelper>>,
-        #[gen_stub(override_type(type_repr = "optimization.LevenbergMarquardt | optimization.Simplex | optimization.ConjugateGradient | optimization.SteepestDescent", imports = ("itofin.optimization")))]
+        #[gen_stub(override_type(type_repr = "optimization.LevenbergMarquardt | optimization.Simplex | optimization.ConjugateGradient | optimization.SteepestDescent | optimization.DifferentialEvolution", imports = ("itofin.optimization")))]
         method: &Bound<'_, PyAny>,
         end_criteria: &PyEndCriteria,
         integration_order: usize,
