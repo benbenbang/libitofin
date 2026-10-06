@@ -23,6 +23,9 @@ awk -v v="$version" '
       done = 1
       next
   }
+  /^itofin-optimize = \{/ {
+      sub(/version = "[^"]*"/, "version = \"" v "\"")
+  }
   { print }
 ' Cargo.toml > "$tmp"
 mv "$tmp" Cargo.toml

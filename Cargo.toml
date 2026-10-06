@@ -11,3 +11,6 @@ exclude = ["crates/worktrees", "crates/graphify-out"]
 [workspace.package]
 version = "0.36.0"
 edition = "2024"
+
+[workspace.dependencies]
+itofin-optimize = { path = "crates/itofin-optimize", version = "0.36.0" }
