@@ -43,6 +43,7 @@ mod iterativebootstrap;
 mod jointcurves;
 mod makeswaption;
 mod market;
+mod mc_variance_swap;
 mod mcengine;
 mod merton;
 mod merton_simulation;
@@ -388,6 +389,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     let pricingengines = PyModule::new(py, "pricingengines")?;
     pricingengines.add_class::<variance_swap::PyReplicatingVarianceSwapEngine>()?;
+    pricingengines.add_class::<mc_variance_swap::PyMCVarianceSwapEngine>()?;
     pricingengines.add_class::<PyCashAnnuityModel>()?;
     pricingengines.add_class::<PyBlackSwaptionEngine>()?;
     pricingengines.add_class::<PyTreeSwaptionEngine>()?;

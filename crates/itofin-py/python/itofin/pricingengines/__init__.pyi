@@ -32,6 +32,7 @@ __all__ = [
     "MCEuropeanEngine",
     "MCEuropeanGJRGARCHEngine",
     "MCEuropeanHestonEngine",
+    "MCVarianceSwapEngine",
     "MidPointCdsEngine",
     "NumericalFix",
     "QMCEuropeanEngine",
@@ -525,6 +526,26 @@ class MCEuropeanHestonEngine:
         Raises:
             ItofinError: If neither or both of steps and steps_per_year are
                 given, or if both samples and absolute_tolerance are given.
+        """
+
+@typing.final
+class MCVarianceSwapEngine:
+    r"""
+    Estimate integrated log-price diffusion variance, not squared returns.
+
+    Exactly one grid selector and one stopping selector are required. Tolerance
+    is an absolute annualized-variance standard-error target, not a cash target.
+    Sampling error excludes grid/integration bias. Nonzero seeds reproduce each
+    recalculation; zero selects the existing randomized convention. No advanced
+    Monte Carlo features or historical observations are supported.
+    """
+    def __init__(self, process: processes.BlackScholesProcess, *, steps: typing.Optional[builtins.int] = None, steps_per_year: typing.Optional[builtins.int] = None, samples: typing.Optional[builtins.int] = None, tolerance: typing.Optional[builtins.float] = None, max_samples: typing.Optional[builtins.int] = None, seed: builtins.int = 0) -> None:
+        r"""
+        Retain a Black-Scholes process with bounded sampling and grid work.
+
+        Fixed samples require at least two. Tolerance sampling starts with 1023
+        observations and defaults to a 50000-sample maximum. Failure to reach
+        tolerance within the permitted budget raises ItofinError.
         """
 
 @typing.final

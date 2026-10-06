@@ -30,9 +30,11 @@
         "TestVarianceSwapNativeQuantLibOracle",
         "TestVarianceSwapTermsLiveUpdatesAndRetainedOwners",
         "TestVarianceSwapSnapshotsEngineReplacementAndConcurrency",
-        "TestVarianceSwapInvalidBoundariesAndSessionLifecycle"
+        "TestVarianceSwapInvalidBoundariesAndSessionLifecycle",
+        "TestMCVarianceSwapStatisticsLiveInputsRetentionAndExpiry",
+        "TestMCVarianceSwapEngineReplacementToleranceAndConcurrency"
       ],
-      "validation": "Pinned QuantLib finite-strip variance/NPV/typed weight replay, live rate/dividend/volatility updates, retained sources, atomic C errors and session lifecycle"
+      "validation": "Pinned QuantLib finite-strip variance/NPV/typed weight replay, live rate/dividend/volatility updates, retained sources, atomic C errors and session lifecycle; Go SetMCEngine shares the typed attachment ABI and Python set_engine union without breaking replication SetEngine"
     },
     {
       "c": "itofin_variance_swap_value",
