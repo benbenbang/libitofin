@@ -406,6 +406,53 @@ typedef struct ItofinGjrMcConfig {
   int32_t antithetic;
 } ItofinGjrMcConfig;
 
+/**
+ * Shared global-search controls. Zero population and budget fields select
+ * defaults. Tolerances use presence flags so explicit zero is preserved.
+ */
+typedef struct ItofinGlobalOptions {
+  uint64_t seed;
+  size_t population_size;
+  size_t maxiter;
+  size_t maxfev;
+  double xatol;
+  double fatol;
+  bool has_xatol;
+  bool has_fatol;
+} ItofinGlobalOptions;
+
+/**
+ * Differential-evolution controls. Mutation and recombination use presence
+ * flags; a zero-initialized struct selects all defaults and deterministic seed 0.
+ */
+typedef struct ItofinDifferentialEvolutionOptions {
+  struct ItofinGlobalOptions global;
+  double mutation;
+  double recombination;
+  bool has_mutation;
+  bool has_recombination;
+} ItofinDifferentialEvolutionOptions;
+
+/**
+ * Why a run stopped. Values are fixed and append-only: `8` (infeasible)
+ * is reserved for a constrained solver.
+ */
+typedef int32_t ItofinOptimizeStatus;
+
+/**
+ * Run outcome. The caller sets `x` to a writable buffer of `n` values before
+ * the call; every other field is written by it.
+ */
+typedef struct ItofinOptimizeResult {
+  double *x;
+  double fun;
+  size_t nit;
+  size_t nfev;
+  size_t njev;
+  ItofinOptimizeStatus status;
+  bool success;
+} ItofinOptimizeResult;
+
 typedef struct ItofinSwapHelperConfig {
   uint64_t quote;
   int32_t tenor_length;
@@ -903,26 +950,6 @@ typedef struct ItofinOptimizeOptions {
 } ItofinOptimizeOptions;
 
 /**
- * Why a run stopped. Values are fixed and append-only: `8` (infeasible)
- * is reserved for a constrained solver.
- */
-typedef int32_t ItofinOptimizeStatus;
-
-/**
- * Run outcome. The caller sets `x` to a writable buffer of `n` values before
- * the call; every other field is written by it.
- */
-typedef struct ItofinOptimizeResult {
-  double *x;
-  double fun;
-  size_t nit;
-  size_t nfev;
-  size_t njev;
-  ItofinOptimizeStatus status;
-  bool success;
-} ItofinOptimizeResult;
-
-/**
  * BFGS options. Zero values select defaults. `finite_difference` is 0 for
  * forward and 1 for central differences; any other value is rejected.
  */
@@ -974,33 +1001,6 @@ typedef struct ItofinSlsqpOptions {
   size_t maxiter;
   size_t maxfev;
 } ItofinSlsqpOptions;
-
-/**
- * Shared global-search controls. Zero population and budget fields select
- * defaults. Tolerances use presence flags so explicit zero is preserved.
- */
-typedef struct ItofinGlobalOptions {
-  uint64_t seed;
-  size_t population_size;
-  size_t maxiter;
-  size_t maxfev;
-  double xatol;
-  double fatol;
-  bool has_xatol;
-  bool has_fatol;
-} ItofinGlobalOptions;
-
-/**
- * Differential-evolution controls. Mutation and recombination use presence
- * flags; a zero-initialized struct selects all defaults and deterministic seed 0.
- */
-typedef struct ItofinDifferentialEvolutionOptions {
-  struct ItofinGlobalOptions global;
-  double mutation;
-  double recombination;
-  bool has_mutation;
-  bool has_recombination;
-} ItofinDifferentialEvolutionOptions;
 
 typedef struct ItofinOvernightFutureConfig {
   uint64_t index;
@@ -3029,6 +3029,39 @@ int32_t itofin_gjr_mc_engine_new(struct ItofinContext *ctx,
                                  const struct ItofinGjrMcConfig *config,
                                  uint64_t *out,
                                  struct ItofinError *error);
+
+/**
+ * Construct a calibration method in projected free-parameter order.
+ * A zeroed options record selects defaults, including deterministic seed zero.
+ * Population is optional row-major `rows * n`, with exact length required.
+ * Every candidate must satisfy the model constraint before its cost is called.
+ * # Safety
+ * Pointers must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_differential_evolution_new(struct ItofinContext *ctx,
+                                          const double *lower,
+                                          size_t lower_len,
+                                          const double *upper,
+                                          size_t upper_len,
+                                          const struct ItofinDifferentialEvolutionOptions *options,
+                                          const double *population,
+                                          size_t population_rows,
+                                          size_t population_len,
+                                          uint64_t *out,
+                                          struct ItofinError *error);
+
+/**
+ * Copy the preserved global outcome without evaluating or changing the model.
+ * Returns an invalid-argument error when the handle has no completed global run.
+ * # Safety
+ * `out` must point to a valid result record whose `x` is writable for `n` doubles.
+ * All pointers must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_differential_evolution_result(struct ItofinContext *ctx,
+                                             uint64_t method,
+                                             size_t n,
+                                             struct ItofinOptimizeResult *out,
+                                             struct ItofinError *error);
 
 /**
  * # Safety
