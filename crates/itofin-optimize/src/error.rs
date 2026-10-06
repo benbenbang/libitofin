@@ -55,6 +55,49 @@ pub enum InvalidInput {
     /// A coordinate of an initial simplex is infinite or `NaN`.
     #[error("initial simplex point {point} is not finite at index {index}")]
     NonfiniteSimplex { point: usize, index: usize },
+    /// A global method requires a finite bound on every coordinate.
+    #[error("global optimization requires box bounds")]
+    MissingGlobalBounds,
+    /// An endpoint or the bound width is not finite.
+    #[error("global bounds at index {index} must have finite endpoints and width")]
+    NonfiniteGlobalBound { index: usize },
+    /// A point lies outside the global method's box.
+    #[error("{option} point {point} lies outside bounds at index {index}")]
+    OutsideGlobalBounds {
+        option: &'static str,
+        point: usize,
+        index: usize,
+    },
+    /// A global work parameter exceeds its supported range.
+    #[error("{option} must be between {min} and {max}, found {found}")]
+    GlobalRange {
+        option: &'static str,
+        min: usize,
+        max: usize,
+        found: usize,
+    },
+    /// The population's coordinate count exceeds the allocation cap.
+    #[error("population coordinate count exceeds {max}")]
+    PopulationCells { max: usize },
+    /// Explicit population count and requested population size disagree.
+    #[error("initial population has {found} rows, expected {expected}")]
+    PopulationPointCount { expected: usize, found: usize },
+    /// An explicit population row has the wrong dimension.
+    #[error("initial population point {point} has length {found}, expected {expected}")]
+    PopulationPointLength {
+        point: usize,
+        expected: usize,
+        found: usize,
+    },
+    /// A coordinate of an explicit population is not finite.
+    #[error("initial population point {point} is not finite at index {index}")]
+    NonfinitePopulation { point: usize, index: usize },
+    /// A differential-evolution coefficient is outside its supported interval.
+    #[error("{option} must be finite and in {range}")]
+    DifferentialEvolutionCoefficient {
+        option: &'static str,
+        range: &'static str,
+    },
 }
 
 /// Everything a run can fail with. Neither variant is a [`Termination`](crate::Termination).
