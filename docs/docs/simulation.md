@@ -1,5 +1,8 @@
 # Seeded simulation
 
+For the named arithmetic Euler process, see [Standalone GBM](geometric-brownian.md).
+It is distinct from the exact-lognormal GBM path helper below.
+
 For asymmetric-volatility spot/variance paths, see
 [GJR-GARCH process and paths](gjrgarch.md).
 
