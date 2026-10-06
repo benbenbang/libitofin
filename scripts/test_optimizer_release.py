@@ -100,12 +100,14 @@ class OptimizerReleaseTests(unittest.TestCase):
         self.assertNotIn("exclude", package)
         self.assertNotEqual(package.get("publish"), False)
 
-    def test_bootstrap_docs_keep_setup_and_publication_distinct(self):
+    def test_release_docs_distinguish_verified_bootstrap_from_pending_ci(self):
         readme = (ROOT / "crates/itofin-optimize/README.md").read_text()
-        for required in ('--detach /private/tmp/itofin-optimize-bootstrap "$BOOTSTRAP_COMMIT"',
-                         "Do not use the differential", "license/bootstrap-only setup commit", "--locked --dry-run",
-                         "explicit publication approval", "semantic-release.yml",
-                         "environment field empty", "before closing #1091"):
+        for required in ("initial **0.36.0** publication", "configuration are verified",
+                         "Owner `benbenbang`, repository `libitofin`, workflow `semantic-release.yml`",
+                         "no GitHub environment", "`itofin-optimize` before `libitofin`",
+                         "committed-version checks and OIDC", "CI dry runs perform no publication",
+                         "first successful future CI publication", "is still pending",
+                         "remains open until it is verified"):
             with self.subTest(text=required):
                 self.assertIn(required, readme)
 
