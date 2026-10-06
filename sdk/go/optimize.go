@@ -144,9 +144,11 @@ func Minimize(ctx context.Context, fn func(x []float64) (float64, error), x0 []f
 	var bfgs BFGS
 	var lbfgsb LBFGSB
 	var slsqp SLSQP
+	var de DifferentialEvolution
 	isBFGS := false
 	isLBFGSB := false
 	isSLSQP := false
+	isDE := false
 	switch selected := method.(type) {
 	case NelderMeadOptions:
 		nm = selected
@@ -182,6 +184,15 @@ func Minimize(ctx context.Context, fn func(x []float64) (float64, error), x0 []f
 		}
 		isSLSQP = true
 		slsqp = *selected
+	case DifferentialEvolution:
+		isDE = true
+		de = selected
+	case *DifferentialEvolution:
+		if selected == nil {
+			return OptimizeResult{}, fmt.Errorf("%w: nil method", ErrInvalidArgument)
+		}
+		isDE = true
+		de = *selected
 	default:
 		return OptimizeResult{}, fmt.Errorf("%w: unknown method", ErrInvalidArgument)
 	}
@@ -189,7 +200,11 @@ func Minimize(ctx context.Context, fn func(x []float64) (float64, error), x0 []f
 		return OptimizeResult{}, err
 	}
 	var dimensions []int
-	if isBFGS {
+	if isDE {
+		if err := validateDifferentialEvolution(de, x0); err != nil {
+			return OptimizeResult{}, err
+		}
+	} else if isBFGS {
 		if bfgs.Bounds != nil || bfgs.MaxIter < 0 || bfgs.GTol < 0 || bfgs.Eps < 0 {
 			return OptimizeResult{}, fmt.Errorf("%w: unsupported bounds or invalid BFGS option", ErrInvalidArgument)
 		}
@@ -241,7 +256,9 @@ func Minimize(ctx context.Context, fn func(x []float64) (float64, error), x0 []f
 	out.x = (*C.double)(unsafe.Pointer(unsafe.SliceData(x)))
 	var e C.ItofinError
 	var status C.int32_t
-	if isBFGS {
+	if isDE {
+		status = runDifferentialEvolution(&objective, x0, de, &out, &e)
+	} else if isBFGS {
 		fd := C.int32_t(0)
 		if bfgs.CentralDifference {
 			fd = 1
