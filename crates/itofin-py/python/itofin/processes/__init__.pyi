@@ -10,6 +10,7 @@ __all__ = [
     "BatesProcess",
     "BlackScholesProcess",
     "GJRGARCHProcess",
+    "GeometricBrownianMotionProcess",
     "HestonProcess",
     "Merton76Process",
 ]
@@ -197,6 +198,57 @@ class GJRGARCHProcess:
     def time(self, date: time.Date) -> builtins.float:
         r"""
         Convert a date using the risk-free curve's reference date and day count.
+        """
+
+@typing.final
+class GeometricBrownianMotionProcess:
+    r"""
+    Constant-coefficient `dX = mu * X * dt + volatility * X * dW` process.
+
+    Finite signed states are supported. Discrete transitions use additive Euler,
+    not the exact lognormal scheme of `itofin.simulate_gbm`. A sufficiently large
+    draw can cross zero. Standard deviation retains the sign of the state,
+    matching native diffusion-based Euler transitions.
+    """
+    def __init__(self, initial: builtins.float, mu: builtins.float, volatility: builtins.float) -> None:
+        r"""
+        Copy finite initial state and drift, and finite nonnegative volatility.
+        """
+    def x0(self) -> builtins.float:
+        r"""
+        Return the copied initial state.
+        """
+    def mu(self) -> builtins.float:
+        r"""
+        Return the constant proportional drift coefficient.
+        """
+    def volatility(self) -> builtins.float:
+        r"""
+        Return the constant nonnegative volatility coefficient.
+        """
+    def drift(self, t: builtins.float, x: builtins.float) -> builtins.float:
+        r"""
+        Return `mu * x` for a finite state and nonnegative finite time.
+        """
+    def diffusion(self, t: builtins.float, x: builtins.float) -> builtins.float:
+        r"""
+        Return signed diffusion `volatility * x`.
+        """
+    def expectation(self, t0: builtins.float, x: builtins.float, dt: builtins.float) -> builtins.float:
+        r"""
+        Return Euler expectation `x + mu * x * dt`, not the exact GBM mean.
+        """
+    def variance(self, t0: builtins.float, x: builtins.float, dt: builtins.float) -> builtins.float:
+        r"""
+        Return Euler variance `volatility**2 * x**2 * dt`.
+        """
+    def std_deviation(self, t0: builtins.float, x: builtins.float, dt: builtins.float) -> builtins.float:
+        r"""
+        Return signed Euler deviation `volatility * x * sqrt(dt)`.
+        """
+    def evolve(self, t0: builtins.float, x: builtins.float, dt: builtins.float, dw: builtins.float) -> builtins.float:
+        r"""
+        Return Euler expectation plus signed deviation times a standard draw.
         """
 
 @typing.final

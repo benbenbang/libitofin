@@ -1,0 +1,75 @@
+{
+  "domain": "geometric-brownian-motion-process",
+  "entries": [
+    {
+      "c": "itofin_geometric_brownian_new",
+      "go": "Session.NewGeometricBrownianMotionProcess",
+      "python": "itofin.processes.GeometricBrownianMotionProcess.__init__",
+      "status": "implemented",
+      "tests": "TestGeometricBrownianEulerTransitions"
+    },
+    {
+      "c": "itofin_geometric_brownian_query",
+      "go": "GeometricBrownianMotionProcess.X0",
+      "python": "itofin.processes.GeometricBrownianMotionProcess.x0",
+      "status": "implemented",
+      "tests": "TestGeometricBrownianEulerTransitions"
+    },
+    {
+      "c": "itofin_geometric_brownian_query",
+      "go": "GeometricBrownianMotionProcess.Mu",
+      "python": "itofin.processes.GeometricBrownianMotionProcess.mu",
+      "status": "implemented",
+      "tests": "TestGeometricBrownianEulerTransitions"
+    },
+    {
+      "c": "itofin_geometric_brownian_query",
+      "go": "GeometricBrownianMotionProcess.Volatility",
+      "python": "itofin.processes.GeometricBrownianMotionProcess.volatility",
+      "status": "implemented",
+      "tests": "TestGeometricBrownianEulerTransitions"
+    },
+    {
+      "c": "itofin_geometric_brownian_query",
+      "go": "GeometricBrownianMotionProcess.Drift",
+      "python": "itofin.processes.GeometricBrownianMotionProcess.drift",
+      "status": "implemented",
+      "tests": "TestGeometricBrownianEulerTransitions"
+    },
+    {
+      "c": "itofin_geometric_brownian_query",
+      "go": "GeometricBrownianMotionProcess.Diffusion",
+      "python": "itofin.processes.GeometricBrownianMotionProcess.diffusion",
+      "status": "implemented",
+      "tests": "TestGeometricBrownianEulerTransitions"
+    },
+    {
+      "c": "itofin_geometric_brownian_query",
+      "go": "GeometricBrownianMotionProcess.Expectation",
+      "python": "itofin.processes.GeometricBrownianMotionProcess.expectation",
+      "status": "implemented",
+      "tests": "TestGeometricBrownianEulerTransitions"
+    },
+    {
+      "c": "itofin_geometric_brownian_query",
+      "go": "GeometricBrownianMotionProcess.Variance",
+      "python": "itofin.processes.GeometricBrownianMotionProcess.variance",
+      "status": "implemented",
+      "tests": "TestGeometricBrownianEulerTransitions"
+    },
+    {
+      "c": "itofin_geometric_brownian_query",
+      "go": "GeometricBrownianMotionProcess.StdDeviation",
+      "python": "itofin.processes.GeometricBrownianMotionProcess.std_deviation",
+      "status": "implemented",
+      "tests": "TestGeometricBrownianEulerTransitions"
+    },
+    {
+      "c": "itofin_geometric_brownian_query",
+      "go": "GeometricBrownianMotionProcess.Evolve",
+      "python": "itofin.processes.GeometricBrownianMotionProcess.evolve",
+      "status": "implemented",
+      "tests": "TestGeometricBrownianEulerTransitions"
+    }
+  ]
+}

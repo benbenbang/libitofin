@@ -30,6 +30,7 @@ mod discrepancy_statistics;
 mod fdengine;
 mod fra;
 mod general_statistics;
+mod geometric_brownian;
 mod gjr;
 mod gjr_model;
 mod gjr_simulation;
@@ -316,6 +317,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     processes.add_class::<PyHestonProcess>()?;
     processes.add_class::<bates::PyBatesProcess>()?;
     processes.add_class::<merton::PyMerton76Process>()?;
+    processes.add_class::<geometric_brownian::PyGeometricBrownianMotionProcess>()?;
     processes.add_class::<gjr::PyGjrGarchProcess>()?;
 
     let indexes = PyModule::new(py, "indexes")?;
