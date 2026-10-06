@@ -1281,6 +1281,21 @@ typedef struct ItofinVolGridConfig {
   int32_t flat_extrapolation;
 } ItofinVolGridConfig;
 
+/**
+ * Zero denotes an unset option. Exactly one grid and one sampling mode is required.
+ * Tolerance measures annualized variance standard error, not monetary NPV error.
+ * Seed zero is randomized; nonzero seeds must fit uint32.
+ * Tolerance mode defaults to 50,000 maximum samples.
+ */
+typedef struct ItofinVarianceSwapMcConfig {
+  size_t steps;
+  size_t steps_per_year;
+  size_t samples;
+  double absolute_tolerance;
+  size_t max_samples;
+  uint64_t seed;
+} ItofinVarianceSwapMcConfig;
+
 #define ITOFIN_OPTIMIZE_CONVERGED_XTOL 0
 
 #define ITOFIN_OPTIMIZE_CONVERGED_FTOL 1
@@ -6718,7 +6733,7 @@ int32_t itofin_replicating_variance_swap_engine_new(struct ItofinContext *ctx,
                                                     struct ItofinError *error);
 
 /**
- * Attach only a replicating variance-swap engine; both owners are retained.
+ * Attach a typed variance-swap engine; both owners are retained.
  * # Safety
  * Context, handles and error follow the crate-level caller contract.
  */
@@ -6728,7 +6743,8 @@ int32_t itofin_variance_swap_set_engine(struct ItofinContext *ctx,
                                         struct ItofinError *error);
 
 /**
- * Scalar field: zero NPV, one fair annualized variance, two strike, three notional.
+ * Scalar fields: zero NPV, one variance, two strike, three notional,
+ * four signed NPV sampling error, five nonnegative variance sampling error.
  * # Safety
  * Outputs follow the crate-level caller contract and stay unchanged on error.
  */
@@ -6782,6 +6798,28 @@ int32_t itofin_variance_swap_weights(struct ItofinContext *ctx,
                                      double *strikes,
                                      double *weights,
                                      size_t len,
+                                     struct ItofinError *error);
+
+/**
+ * Retain the generalized Black-Scholes process and construct a typed MC engine.
+ * No antithetic, bridge or discrete squared-return estimator is selected.
+ * # Safety
+ * Config and output pointers follow the crate-level C caller contract.
+ */
+int32_t itofin_mc_variance_swap_engine_new(struct ItofinContext *ctx,
+                                           uint64_t process,
+                                           const struct ItofinVarianceSwapMcConfig *config,
+                                           uint64_t *out,
+                                           struct ItofinError *error);
+
+/**
+ * Return actual MC samples. Replication and expired sampling results are unavailable.
+ * # Safety
+ * Output follows the C caller contract and remains unchanged on failure.
+ */
+int32_t itofin_variance_swap_samples(struct ItofinContext *ctx,
+                                     uint64_t swap,
+                                     size_t *out,
                                      struct ItofinError *error);
 
 #ifdef __cplusplus
