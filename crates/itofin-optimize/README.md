@@ -4,17 +4,26 @@ SciPy-inspired numerical optimization in Rust, over plain `f64` slices.
 
 ## Scope
 
-A general-purpose `minimize` for Nelder-Mead, BFGS, L-BFGS-B and SLSQP, with an
+A general-purpose `minimize` for Nelder-Mead, BFGS, L-BFGS-B, SLSQP and
+Differential-Evolution, with an
 `Objective` trait carrying its own error type, explicit budgets, a cancellation
-hook and validated inputs. All four Rust solvers use the single `minimize`
+hook and validated inputs. All five Rust solvers use the single `minimize`
 entry point. L-BFGS-B bindings are tracked in issue #1086.
+
+Differential-Evolution is serial deferred-generation DE/rand/1/bin. It requires
+finite-width box bounds and minimizes signed scalar values directly. Seed zero
+is deterministic. It stops only when both box-normalized physical population
+spread and absolute value spread satisfy their tolerances. Population convergence
+is not a guarantee of global optimality. Equal-valued trials are accepted, and
+out-of-box mutant coordinates are resampled uniformly. No polishing, gradients,
+general constraints, alternative strategies or parallel workers are supplied.
 
 ## Independent of libitofin
 
-This crate is finance-independent and never depends on `libitofin`, in either
-direction of the workspace. Its only runtime dependency is `thiserror`. The
-QuantLib-ported optimizers in `libitofin::math::optimization` are a separate,
-untouched code path.
+This crate is finance-independent and never depends on `libitofin`. Its only
+runtime dependency is `thiserror`. The finance crate depends on this crate to
+adapt global search to calibration; existing QuantLib-ported local optimizers
+remain separate and unchanged.
 
 ## Acceptance policy
 
@@ -41,13 +50,17 @@ GitHub trusted-publisher configuration are verified:
   existing artifacts bundle optimizer code without an additional runtime install.
 - CI dry runs perform no publication. The first successful future CI publication
   is still pending; [#1091](https://github.com/benbenbang/libitofin/issues/1091)
-  remains open until it is verified. That issue retains historical bootstrap details.
+  was closed by the maintainer. That issue retains historical bootstrap details.
 
 See [Trusted Publishing](https://crates.io/docs/trusted-publishing) for authentication
 and the [Cargo publishing guide](https://doc.rust-lang.org/cargo/reference/publishing.html)
 for package validation.
 
 ## Citations
+
+* Storn, R. and Price, K. (1997), "Differential Evolution - A Simple and Efficient
+  Heuristic for Global Optimization over Continuous Spaces", Journal of Global
+  Optimization 11, 341-359, <https://doi.org/10.1023/A:1008202821328>.
 
 * Nelder, J. A. and Mead, R. (1965), "A simplex method for function
   minimization", The Computer Journal 7(4), 308-313.

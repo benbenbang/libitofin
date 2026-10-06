@@ -15,6 +15,14 @@ procedure was followed, so no clean-room claim is made here.
 | argmin | 0.11.0 | MIT OR Apache-2.0 | https://github.com/argmin-rs/argmin |
 | optimization | 0.2.0 | MIT | https://github.com/b52/optimization-rust |
 
+## Differential evolution
+
+The DE/rand/1/bin solver is independently written from the mathematical algorithm
+in Storn and Price (1997), DOI <https://doi.org/10.1023/A:1008202821328>. Its
+SplitMix64 recurrence uses the published 64-bit arithmetic description, with our
+own bounded-index sampling and population code. No SciPy, QuantLib, Argmin or
+optimization-rust differential-evolution source or tests were adapted.
+
 ## SciPy
 
 SciPy is used at development time only, by `scripts/fixtures/optimize/gen_fixtures.py`,
