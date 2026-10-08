@@ -453,6 +453,22 @@ typedef struct ItofinOptimizeResult {
   bool success;
 } ItofinOptimizeResult;
 
+/**
+ * Particle-swarm controls. Presence flags preserve explicit zero coefficients.
+ * Zero-initialized options select inertia .7, cognitive/social 1.4 and clamp .2.
+ */
+typedef struct ItofinParticleSwarmOptions {
+  struct ItofinGlobalOptions global;
+  double inertia;
+  double cognitive;
+  double social;
+  double velocity_clamp;
+  bool has_inertia;
+  bool has_cognitive;
+  bool has_social;
+  bool has_velocity_clamp;
+} ItofinParticleSwarmOptions;
+
 typedef struct ItofinSwapHelperConfig {
   uint64_t quote;
   int32_t tenor_length;
@@ -1001,22 +1017,6 @@ typedef struct ItofinSlsqpOptions {
   size_t maxiter;
   size_t maxfev;
 } ItofinSlsqpOptions;
-
-/**
- * Particle-swarm controls. Presence flags preserve explicit zero coefficients.
- * Zero-initialized options select inertia .7, cognitive/social 1.4 and clamp .2.
- */
-typedef struct ItofinParticleSwarmOptions {
-  struct ItofinGlobalOptions global;
-  double inertia;
-  double cognitive;
-  double social;
-  double velocity_clamp;
-  bool has_inertia;
-  bool has_cognitive;
-  bool has_social;
-  bool has_velocity_clamp;
-} ItofinParticleSwarmOptions;
 
 typedef struct ItofinOvernightFutureConfig {
   uint64_t index;
@@ -3078,6 +3078,37 @@ int32_t itofin_differential_evolution_result(struct ItofinContext *ctx,
                                              size_t n,
                                              struct ItofinOptimizeResult *out,
                                              struct ItofinError *error);
+
+/**
+ * Construct a calibration method in projected free-parameter order.
+ * A zeroed options record selects defaults, including deterministic seed zero.
+ * Population is optional row-major `rows * n`, with exact length required.
+ * Every candidate must satisfy the model constraint before its cost is called.
+ * # Safety
+ * Pointers must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_particle_swarm_new(struct ItofinContext *ctx,
+                                  const double *lower,
+                                  size_t lower_len,
+                                  const double *upper,
+                                  size_t upper_len,
+                                  const struct ItofinParticleSwarmOptions *options,
+                                  const double *population,
+                                  size_t population_rows,
+                                  size_t population_len,
+                                  uint64_t *out,
+                                  struct ItofinError *error);
+
+/**
+ * Copy the preserved particle-swarm outcome without repricing.
+ * # Safety
+ * `out` and all other pointers follow `itofin_differential_evolution_result`.
+ */
+int32_t itofin_particle_swarm_result(struct ItofinContext *ctx,
+                                     uint64_t method,
+                                     size_t n,
+                                     struct ItofinOptimizeResult *out,
+                                     struct ItofinError *error);
 
 /**
  * # Safety
