@@ -1018,6 +1018,32 @@ typedef struct ItofinSlsqpOptions {
   size_t maxfev;
 } ItofinSlsqpOptions;
 
+/**
+ * Single-chain annealing controls. Presence flags preserve explicit values;
+ * a zero-initialized record selects deterministic seed zero and solver defaults.
+ */
+typedef struct ItofinHybridSimulatedAnnealingOptions {
+  uint64_t seed;
+  size_t maxiter;
+  size_t maxfev;
+  double xatol;
+  double fatol;
+  double initial_temperature;
+  double cooling_rate;
+  double step_size;
+  size_t local_search_interval;
+  size_t local_search_steps;
+  size_t reanneal_interval;
+  bool has_xatol;
+  bool has_fatol;
+  bool has_initial_temperature;
+  bool has_cooling_rate;
+  bool has_step_size;
+  bool has_local_search_interval;
+  bool has_local_search_steps;
+  bool has_reanneal_interval;
+} ItofinHybridSimulatedAnnealingOptions;
+
 typedef struct ItofinOvernightFutureConfig {
   uint64_t index;
   int32_t value_date;
@@ -5270,6 +5296,26 @@ int32_t itofin_optimize_particle_swarm(const struct ItofinObjective *objective,
                                        const struct ItofinParticleSwarmOptions *options,
                                        struct ItofinOptimizeResult *out_result,
                                        struct ItofinError *error);
+
+/**
+ * Minimize a signed scalar cost using seeded bounded hybrid annealing.
+ * Bounds are mandatory, finite, contain x0 and have finite widths.
+ * A null options pointer selects defaults. A supplied gradient is not used.
+ * # Safety
+ * The objective and output follow `itofin_optimize_lbfgsb` ownership rules.
+ * Inputs must be readable for their lengths; result.x must hold n doubles.
+ * Errors leave the result and its x buffer untouched.
+ */
+int32_t itofin_optimize_hybrid_simulated_annealing(const struct ItofinObjective *objective,
+                                                   const double *x0,
+                                                   size_t n,
+                                                   const double *lower,
+                                                   size_t lower_len,
+                                                   const double *upper,
+                                                   size_t upper_len,
+                                                   const struct ItofinHybridSimulatedAnnealingOptions *options,
+                                                   struct ItofinOptimizeResult *out_result,
+                                                   struct ItofinError *error);
 
 /**
  * `american`: 0 European, 1 American; earliest ignored for European exercise.
