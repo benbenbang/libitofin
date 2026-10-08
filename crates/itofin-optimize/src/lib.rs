@@ -13,6 +13,10 @@
 //! An independent implementation from the papers below. Nothing is adapted from
 //! another optimizer; see `THIRD_PARTY_NOTICES.md` in this crate.
 //!
+//! - Kennedy, J. and Eberhart, R. (1995), "Particle swarm optimization",
+//!   Proceedings of ICNN, <https://doi.org/10.1109/ICNN.1995.488968>.
+//! - Shi, Y. and Eberhart, R. (1998), "A modified particle swarm optimizer",
+//!   Proceedings of ICEC, <https://doi.org/10.1109/ICEC.1998.699146>.
 //! - Storn, R. and Price, K. (1997), "Differential Evolution - A Simple and
 //!   Efficient Heuristic for Global Optimization over Continuous Spaces",
 //!   Journal of Global Optimization 11, 341-359.
@@ -43,6 +47,7 @@ mod lsq;
 mod nelder_mead;
 mod objective;
 mod outcome;
+mod particle_swarm;
 mod problem;
 mod slsqp;
 
@@ -52,7 +57,7 @@ mod tests;
 pub use counters::{Counters, Halt};
 pub use error::{InvalidInput, MinimizeError};
 pub use finite_difference::FiniteDifference;
-pub use global::{DifferentialEvolutionOptions, GlobalOptions};
+pub use global::{DifferentialEvolutionOptions, GlobalOptions, ParticleSwarmOptions};
 pub use objective::{ConstraintKind, Flow, IterationState, Objective};
 pub use outcome::{Converged, Minimize, Termination};
 pub use problem::{
@@ -115,6 +120,9 @@ pub fn minimize<O: Objective>(
         Method::Bfgs(options) => bfgs::minimize(objective, problem, options, common),
         Method::Lbfgsb(options) => lbfgsb::minimize(objective, problem, options, common),
         Method::Slsqp(options) => slsqp::minimize(objective, problem, options, common),
+        Method::ParticleSwarm(options) => {
+            particle_swarm::minimize(objective, problem, options, common)
+        }
         Method::DifferentialEvolution(options) => {
             differential_evolution::minimize(objective, problem, options, common)
         }
