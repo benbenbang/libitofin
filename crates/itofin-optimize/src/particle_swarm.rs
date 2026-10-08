@@ -236,3 +236,7 @@ pub(crate) fn minimize<O: Objective>(
         status,
     ))
 }
+
+#[cfg(test)]
+#[path = "particle_swarm_tests.rs"]
+mod tests;
