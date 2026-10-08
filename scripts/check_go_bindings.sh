@@ -34,6 +34,12 @@ cc -std=c11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
 c++ -x c++ -std=c++11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
   crates/libitofin-ffi/tests/c_smoke.c -Ltarget/release -litofin_ffi -o target/cpp-smoke
 ./target/cpp-smoke
+cc -std=c11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
+  crates/libitofin-ffi/tests/chart_vwap_obv.c -Ltarget/release -litofin_ffi -o target/c-chart-vwap_obv
+./target/c-chart-vwap_obv
+c++ -x c++ -std=c++11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
+  crates/libitofin-ffi/tests/chart_vwap_obv.c -Ltarget/release -litofin_ffi -o target/cpp-chart-vwap_obv
+./target/cpp-chart-vwap_obv
 cargo build -p libitofin-ffi --release --features optimization-method-oracle
 cd sdk/go
 go vet ./...
