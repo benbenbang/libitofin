@@ -228,6 +228,28 @@ pub(crate) fn ema(close: Vec<f64>, period: usize) -> PyResult<PyChartSeries> {
         .map_err(Into::into)
 }
 
+/// Cumulative VWAP of supplied prices; a separate call starts a new session.
+/// Zero-volume prefixes are missing; later zero volume carries the last value.
+#[gen_stub_pyfunction(module = "itofin.chart")]
+#[pyfunction]
+pub(crate) fn vwap(price: Vec<f64>, volume: Vec<f64>) -> PyResult<PyChartSeries> {
+    chart::vwap(&price, &volume)
+        .map(PyChartSeries::from_core)
+        .map_err(PyQlError::from)
+        .map_err(Into::into)
+}
+
+/// Zero-seeded OBV; rises add volume, falls subtract it, equal closes preserve it.
+/// The initial volume is validated but does not contribute to the zero seed.
+#[gen_stub_pyfunction(module = "itofin.chart")]
+#[pyfunction]
+pub(crate) fn obv(close: Vec<f64>, volume: Vec<f64>) -> PyResult<PyChartSeries> {
+    chart::obv(&close, &volume)
+        .map(PyChartSeries::from_core)
+        .map_err(PyQlError::from)
+        .map_err(Into::into)
+}
+
 /// Validate OHLCV bars and return raw volume with close-versus-open direction.
 #[gen_stub_pyfunction(module = "itofin.chart")]
 #[pyfunction]

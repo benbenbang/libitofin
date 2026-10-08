@@ -26,6 +26,7 @@ __all__ = [
     "interval_prices",
     "kd",
     "macd",
+    "obv",
     "ohlc_overnight_volatility",
     "ohlc_overnight_volatility_constant_fraction",
     "ohlc_point_volatility",
@@ -35,6 +36,7 @@ __all__ = [
     "simple_local_volatility_constant_fraction",
     "sma",
     "volume_bars",
+    "vwap",
 ]
 
 @typing.final
@@ -306,6 +308,12 @@ def macd(close: typing.Sequence[builtins.float], fast_period: builtins.int = 12,
     MACD with SMA-seeded fast, slow, and signal exponential averages.
     """
 
+def obv(close: typing.Sequence[builtins.float], volume: typing.Sequence[builtins.float]) -> ChartSeries:
+    r"""
+    Zero-seeded OBV; rises add volume, falls subtract it, equal closes preserve it.
+    The initial volume is validated but does not contribute to the zero seed.
+    """
+
 def ohlc_overnight_volatility(open: typing.Sequence[builtins.float], high: typing.Sequence[builtins.float], low: typing.Sequence[builtins.float], close: typing.Sequence[builtins.float], year_fractions: typing.Sequence[builtins.float], overnight_fraction: builtins.float) -> OhlcOvernightEstimates:
     r"""
     Estimate three annualized overnight series using each bar's year fraction.
@@ -349,4 +357,10 @@ def sma(close: typing.Sequence[builtins.float], period: builtins.int) -> ChartSe
 def volume_bars(open: typing.Sequence[builtins.float], high: typing.Sequence[builtins.float], low: typing.Sequence[builtins.float], close: typing.Sequence[builtins.float], volume: typing.Sequence[builtins.float]) -> VolumeBars:
     r"""
     Validate OHLCV bars and return raw volume with close-versus-open direction.
+    """
+
+def vwap(price: typing.Sequence[builtins.float], volume: typing.Sequence[builtins.float]) -> ChartSeries:
+    r"""
+    Cumulative VWAP of supplied prices; a separate call starts a new session.
+    Zero-volume prefixes are missing; later zero volume carries the last value.
     """
