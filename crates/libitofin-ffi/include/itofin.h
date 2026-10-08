@@ -1746,6 +1746,36 @@ int32_t itofin_handle_release(struct ItofinContext *ctx,
                               struct ItofinError *error);
 
 /**
+ * Compute cumulative VWAP of supplied prices, starting a session per call.
+ * Zero cumulative volume is missing; later zero volume carries the last VWAP.
+ * # Safety
+ * Inputs each hold `len` doubles. Follow the crate-level pointer/non-overlap
+ * contract. `out` holds `capacity` doubles and `first_valid` holds one size_t.
+ */
+int32_t itofin_chart_vwap(const ItofinReal *price,
+                          const ItofinReal *volume,
+                          size_t len,
+                          ItofinReal *out,
+                          size_t capacity,
+                          size_t *first_valid,
+                          struct ItofinError *error);
+
+/**
+ * Compute zero-seeded OBV; equal closes leave signed volume unchanged.
+ * The initial volume is validated but does not contribute to the seed.
+ * # Safety
+ * Inputs each hold `len` doubles. Follow the crate-level pointer/non-overlap
+ * contract. `out` holds `capacity` doubles and `first_valid` holds one size_t.
+ */
+int32_t itofin_chart_obv(const ItofinReal *close,
+                         const ItofinReal *volume,
+                         size_t len,
+                         ItofinReal *out,
+                         size_t capacity,
+                         size_t *first_valid,
+                         struct ItofinError *error);
+
+/**
  * Compute an input-aligned simple moving average. Prefix values before
  * `first_valid` are zero placeholders, not observations.
  * # Safety
