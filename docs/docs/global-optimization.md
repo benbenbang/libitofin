@@ -1,22 +1,23 @@
 # Global optimization
 
-Particle swarm and hybrid simulated annealing are not included in v0.37.0
-artifacts; build from this source checkout until the next coordinated release.
+The v0.37.0 artifacts include only differential evolution. Particle swarm,
+hybrid annealing and firefly require a newer coordinated release or a source
+checkout.
 
-Differential evolution (DE) and particle swarm (PSO) are seeded, box-bounded
-population searches, available in Rust, C, Go and Python. Both solvers live in
-finance-independent `itofin-optimize`;
-existing binding artifacts include it without another optimizer installation.
+Differential evolution (DE), particle swarm (PSO) and firefly are seeded,
+box-bounded population searches, available in Rust, C, Go and Python. They live in
+finance-independent `itofin-optimize`; existing binding artifacts include it
+without another optimizer installation.
 Hybrid simulated annealing adds a single-chain search with local coordinate
-polling. All three share bounds, budgets and result types, while retaining
-separate update rules and controls. Node and firefly search are not implemented.
+polling. All four share bounds, budgets and result types, while retaining
+separate update rules and controls. Node is not implemented.
 
 ## Two entry points
 
 | Need | API | Objective |
 | --- | --- | --- |
 | Standalone minimization | Rust `minimize`, Python `itofin.optimize.minimize`, Go `Minimize`, context-free C optimizer | Signed scalar `f(x)`, including negative values |
-| Existing model calibration | Rust `OptimizationMethod`, Python `itofin.optimization.{DifferentialEvolution, ParticleSwarm, HybridSimulatedAnnealing}`, Go `Session.NewDifferentialEvolution` / `Session.NewParticleSwarm` / `Session.NewHybridSimulatedAnnealing` | Existing cost function's scalar value |
+| Existing model calibration | Rust `OptimizationMethod`, Python `itofin.optimization.{DifferentialEvolution, ParticleSwarm, HybridSimulatedAnnealing, Firefly}`, Go `Session.NewDifferentialEvolution` / `Session.NewParticleSwarm` / `Session.NewHybridSimulatedAnnealing` / `Session.NewFirefly` | Existing cost function's scalar value |
 
 The standalone API rejects an out-of-box `x0`. The calibration adapter instead
 clamps initially valid model parameters into the effective search box before
@@ -30,7 +31,7 @@ This is **root-RSS**, not the unrooted sum of squared residuals.
 
 ## Search contract
 
-### DE/PSO population settings
+### Population settings
 
 | Setting | Meaning / default |
 | --- | --- |
@@ -89,6 +90,40 @@ requires every free-coordinate absolute normalized velocity to be at most
 - Explicit zero inertia, cognitive or social coefficients are supported.
   DE controls are rejected for PSO, and PSO controls are rejected for DE.
 
+### Firefly
+
+| Control | Meaning / default |
+| --- | --- |
+| `alpha` | Initial normalized random-step amplitude, finite in `[0, 1]`; default `0.25` |
+| `beta0` | Attraction coefficient at zero distance, finite in `(0, 1]`; default `1.0` |
+| `gamma` | Normalized squared-distance decay coefficient, finite in `[0, 1,000,000]`; default `1.0` |
+| `alpha_decay` | Random-step multiplier per completed generation, finite in `(0, 1]`; default `0.97` |
+
+- Lower scalar cost means brighter. Every generation freezes the old population,
+  scores and brighter-than relations. For each firefly `i`, visit strictly
+  brighter old-generation targets `j` in original row order, updating `i`
+  sequentially. Eligibility stays frozen even if an intermediate move makes
+  `i` brighter. Equal-score targets do not attract; there is no resorting.
+- Squared distance sums squared box-scaled physical coordinate differences:
+  `distance² = sum(((target_j-current_i)/width)²)` over free coordinates.
+  Attraction uses `beta = beta0 * exp(-gamma * distance²)`.
+  Each move adds independent `alpha_t * (U - 0.5)` noise per free coordinate.
+  Boundary crossings reflect into the box, and fixed coordinates stay exact.
+  Every proposal draws one uniform value per free coordinate, including when
+  `alpha=0`; unchanged physical proposals consume no objective evaluation.
+- Fireflies without brighter targets take one random-only move. Every distinct
+  candidate is evaluated, even if it is worse than its starting point. The result
+  separately archives the earliest strict best across all evaluated candidates.
+  Thus calls per generation are not generally equal to population size;
+  all-pairs movement has quadratic population-size cost. Initialization still
+  charges every supplied row, including duplicate points.
+- `alpha_t` decays after each complete generation, before its iteration callback.
+  Termination requires coordinate and objective population spread tolerances plus
+  random-step amplitude `<= xatol`. This finite-budget test is not a global-optimum
+  guarantee. Zero noise or distance decay is supported; zero attraction is invalid.
+- No neighborhood mode, parallel evaluation, local polishing or imported runtime
+  optimizer framework is used. DE, PSO and annealing controls are rejected.
+
 ### Hybrid simulated annealing
 
 | Control | Meaning / default |
@@ -141,7 +176,7 @@ requires every free-coordinate absolute normalized velocity to be at most
 Resource limits: at most **256 coordinates**, **4096 population members** and
 **1,000,000 population coordinates**. Population size is at least four. Iteration
 and evaluation budgets are capped at **1,000,000** and **10,000,000** respectively.
-All three solvers require a finite box and reject general constraints.
+All four solvers require a finite box and reject general constraints.
 Invalid shapes, nonfinite inputs and nonfinite interval widths are rejected before the objective runs. Python `jac` is unsupported; the
 Rust solver never calls `Objective::gradient`.
 
@@ -179,6 +214,11 @@ and `has_velocity_clamp` flags; zero attraction coefficients are expressible.
 Calibration uses `itofin_differential_evolution_new/result` or
 `itofin_particle_swarm_new/result` on a Session. Objective release runs exactly
 once, including rejected inputs and callback errors; an error return leaves the caller's result buffer untouched.
+
+Firefly uses context-free `itofin_optimize_firefly` and Session
+`itofin_firefly_new/result`, with `ItofinFireflyOptions` containing
+`ItofinGlobalOptions`. Its coefficient presence flags preserve explicit values, including supported zeros.
+The callback ownership and result-buffer rules above remain unchanged.
 
 Hybrid annealing uses context-free `itofin_optimize_hybrid_simulated_annealing`
 and Session `itofin_hybrid_simulated_annealing_new/result`. Bounds are passed
@@ -294,6 +334,30 @@ or a transformed scalar.
     --8<-- "sdk/go/examples/hybrid_simulated_annealing/main.go"
     ```
 
+### Firefly
+
+The examples check the signed quadratic and actual evaluation counts. Python
+uses `method="Firefly"` and `optimization.Firefly` for the paired Hull-White fit.
+The calibration scalar remains root-RSS, not the unrooted sum of squares.
+
+=== "Python"
+
+    ```python
+    --8<-- "example/python/firefly.py"
+    ```
+
+=== "Rust"
+
+    ```rust
+    --8<-- "crates/libitofin/examples/firefly.rs"
+    ```
+
+=== "Go"
+
+    ```go
+    --8<-- "sdk/go/examples/firefly/main.go"
+    ```
+
 ## Algorithm references
 
 Implemented independently from Storn and Price (1997),
@@ -317,6 +381,12 @@ and exploratory coordinate polling inspired by Hooke and Jeeves (1961),
 [Direct Search Solution of Numerical and Statistical Problems](https://doi.org/10.1145/321062.321069).
 Reflected uniform proposals, geometric cooling, periodic best-point reannealing,
 local polling and finite-budget stopping are explicit implementation policies.
+
+Firefly attraction and random motion are independently implemented from Yang
+(2009), [Firefly Algorithms for Multimodal Optimization](https://arxiv.org/html/1003.1466).
+Frozen eligibility, row-ordered sequential moves, box-scaled distance, reflection,
+noise decay and best-point archival are explicit local policies, not a promise
+of matching the paper's experiments or another library's trajectory.
 
 No upstream optimizer implementation is copied or imported. This is not a claim
 of clean-room provenance or QuantLib/SciPy trajectory equivalence.
