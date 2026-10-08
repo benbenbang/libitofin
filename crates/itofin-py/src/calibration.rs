@@ -323,6 +323,10 @@ pub(crate) fn with_method<R>(
             .extract::<PyRefMut<'_, crate::global_calibration::PyHybridSimulatedAnnealing>>()?;
         return run(method.inner_mut());
     }
+    if method.is_instance_of::<crate::global_calibration::PyFirefly>() {
+        let mut method = method.extract::<PyRefMut<'_, crate::global_calibration::PyFirefly>>()?;
+        return run(method.inner_mut());
+    }
     if method.is_instance_of::<PySimplex>() {
         let mut method = method.extract::<PyRefMut<'_, PySimplex>>()?;
         return run(&mut method.inner);
@@ -336,7 +340,7 @@ pub(crate) fn with_method<R>(
         return run(&mut method.inner);
     }
     Err(PyTypeError::new_err(
-        "method must be LevenbergMarquardt, Simplex, ConjugateGradient, SteepestDescent, DifferentialEvolution, ParticleSwarm or HybridSimulatedAnnealing",
+        "method must be LevenbergMarquardt, Simplex, ConjugateGradient, SteepestDescent, DifferentialEvolution, ParticleSwarm, HybridSimulatedAnnealing or Firefly",
     ))
 }
 

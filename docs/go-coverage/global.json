@@ -129,6 +129,49 @@
         "TestHybridSimulatedAnnealingCalibrationFixedParametersAndResultOwnership",
         "TestHybridSimulatedAnnealingCalibrationBudgetAndCrossSession"
       ]
+    },
+    {
+      "c": "itofin_optimize_firefly",
+      "go": "Minimize",
+      "python": "itofin.optimize.minimize",
+      "status": "implemented",
+      "tests": [
+        "TestFireflyNegativeSeededObjective",
+        "TestFireflyMultimodalBudgetAndInitialRows",
+        "TestFireflyErrorPanicCancellationAndReentry",
+        "TestFireflyInvalidOptionsNeverEvaluate",
+        "TestFireflyIndependentPolicyFixtures"
+      ]
+    },
+    {
+      "c": "itofin_firefly_new",
+      "go": "FireflyMethod",
+      "python": "itofin.optimization.Firefly",
+      "status": "implemented",
+      "tests": [
+        "TestFireflyCalibrationConstructorValidation",
+        "TestFireflyCalibrationNilAndClosedSession"
+      ]
+    },
+    {
+      "c": "itofin_firefly_new",
+      "go": "Session.NewFirefly",
+      "python": "itofin.optimization.Firefly.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestFireflyCalibrationFixedParametersAndResultOwnership",
+        "TestFireflyCalibrationBudgetAndCrossSession"
+      ]
+    },
+    {
+      "c": "itofin_firefly_result",
+      "go": "FireflyMethod.LastResult",
+      "python": "itofin.optimization.Firefly.last_result",
+      "status": "implemented",
+      "tests": [
+        "TestFireflyCalibrationFixedParametersAndResultOwnership",
+        "TestFireflyCalibrationBudgetAndCrossSession"
+      ]
     }
   ]
 }

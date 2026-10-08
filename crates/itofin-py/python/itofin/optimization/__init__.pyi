@@ -10,6 +10,7 @@ __all__ = [
     "ConjugateGradient",
     "DifferentialEvolution",
     "EndCriteria",
+    "Firefly",
     "HybridSimulatedAnnealing",
     "LevenbergMarquardt",
     "NoConstraint",
@@ -95,6 +96,24 @@ class EndCriteria:
         Raises:
             ItofinError: Unless 1 < max_stationary_state_iterations <
                 max_iterations, or if any epsilon is negative or non-finite.
+        """
+
+@typing.final
+class Firefly:
+    r"""
+    Bounded global calibration in projected free-parameter order.
+    The complete search box must satisfy the model's constraint.
+    """
+    def __init__(self, bounds: typing.Sequence[tuple[builtins.float, builtins.float]], *, seed: builtins.int = 0, population_size: typing.Optional[builtins.int] = None, initial_population: typing.Optional[typing.Sequence[typing.Sequence[builtins.float]]] = None, xatol: typing.Optional[builtins.float] = None, fatol: typing.Optional[builtins.float] = None, alpha: builtins.float = 0.25, beta0: builtins.float = 1.0, gamma: builtins.float = 1.0, alpha_decay: builtins.float = 0.97, maxiter: typing.Optional[builtins.int] = None, maxfev: typing.Optional[builtins.int] = None) -> None:
+        r"""
+        Construct a bounded, deterministic synchronous normalized firefly calibration method.
+        Bounds and population coordinates use the free parameter order.
+        Invalid candidates abort before pricing rather than receiving a penalty.
+        """
+    def last_result(self) -> typing.Optional[optimize.OptimizeResult]:
+        r"""
+        Copy the exact last global result, or None before a completed run.
+        Exhausted runs are retained without being labelled successful.
         """
 
 @typing.final
