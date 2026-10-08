@@ -221,3 +221,4 @@ fn firefly_all_fixed_uses_one_value_and_no_gradient() {
 }
 
 mod boundary_tests;
+mod fixtures;
