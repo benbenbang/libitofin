@@ -207,3 +207,6 @@ pub(crate) fn decode_hybrid_simulated_annealing(
         },
     ))
 }
+
+#[cfg(test)]
+mod tests;
