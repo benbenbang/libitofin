@@ -2,6 +2,9 @@ use super::*;
 use crate::{Flow, IterationState, Method};
 use std::io;
 
+#[path = "simulated_annealing_numeric_tests.rs"]
+mod numeric;
+
 fn problem() -> Problem {
     Problem {
         x0: vec![0.0],
