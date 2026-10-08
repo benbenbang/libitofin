@@ -324,3 +324,6 @@ fn fixed_box_evaluates_scalar_once_and_maps_success() {
     assert_eq!(result.x, vec![0.25]);
     assert_eq!(result.fun, -5.0);
 }
+
+#[path = "hybrid_simulated_annealing_model_tests.rs"]
+mod model;
