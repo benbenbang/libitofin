@@ -307,3 +307,7 @@ pub(crate) fn minimize<O: Objective>(
         status,
     ))
 }
+
+#[cfg(test)]
+#[path = "firefly_tests.rs"]
+mod tests;
