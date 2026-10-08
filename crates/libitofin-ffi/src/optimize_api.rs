@@ -1252,3 +1252,6 @@ pub(crate) mod hybrid_simulated_annealing;
 pub use hybrid_simulated_annealing::{
     ItofinHybridSimulatedAnnealingOptions, itofin_optimize_hybrid_simulated_annealing,
 };
+
+pub(crate) mod firefly;
+pub use firefly::{ItofinFireflyOptions, itofin_optimize_firefly};
