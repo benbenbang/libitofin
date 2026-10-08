@@ -1,0 +1,171 @@
+{"kind": "provenance", "value": {"implementation": "Independent standard-library synchronous global-best equations", "references": ["https://doi.org/10.1109/ICNN.1995.488968", "https://doi.org/10.1109/ICEC.1998.699146"], "comparison": "Exact short-policy traces; analytic multimodal quality, no optimum guarantee", "format": "JSONL: one auditable input, result, objective call or callback per record"}}
+{"kind": "input", "name": "signed_explicit_seed_zero", "value": {"name": "signed_explicit_seed_zero", "objective": "signed_quadratic", "x0": [0.0, 0.0, 7.0], "bounds": [[-4.0, 4.0], [-3.0, 3.0], [7.0, 7.0]], "initial_population": [[3.0, 1.0, 7.0], [-2.0, -2.0, 7.0], [0.0, 2.0, 7.0], [1.0, -1.0, 7.0]], "seed": 0, "xatol": 0.0, "fatol": 0.0, "maxiter": 3}, "trace": true}
+{"kind": "result", "name": "signed_explicit_seed_zero", "value": {"x": [1.0, -1.0, 7.0], "fun": -2.6875, "nit": 3, "nfev": 16, "njev": 0, "status": "max_iterations", "success": false}}
+{"kind": "evaluation", "name": "signed_explicit_seed_zero", "value": {"x": [3.0, 1.0, 7.0], "fun": 12.3125}}
+{"kind": "evaluation", "name": "signed_explicit_seed_zero", "value": {"x": [-2.0, -2.0, 7.0], "fun": 13.8125}}
+{"kind": "evaluation", "name": "signed_explicit_seed_zero", "value": {"x": [0.0, 2.0, 7.0], "fun": 28.8125}}
+{"kind": "evaluation", "name": "signed_explicit_seed_zero", "value": {"x": [1.0, -1.0, 7.0], "fun": -2.6875}}
+{"kind": "evaluation", "name": "signed_explicit_seed_zero", "value": {"x": [1.7917216082641723, -0.20000000000000018, 7.0], "fun": -1.4965376991396795}}
+{"kind": "evaluation", "name": "signed_explicit_seed_zero", "value": {"x": [-0.625231790283872, -0.9198348211358063, 7.0], "fun": 0.6318697331721808}}
+{"kind": "evaluation", "name": "signed_explicit_seed_zero", "value": {"x": [1.3328429679149565, 0.7999999999999998, 7.0], "fun": 6.616862957332955}}
+{"kind": "evaluation", "name": "signed_explicit_seed_zero", "value": {"x": [1.0, -1.0, 7.0], "fun": -2.6875}}
+{"kind": "evaluation", "name": "signed_explicit_seed_zero", "value": {"x": [0.19172160826417262, -1.4000000000000004, 7.0], "fun": -0.19004684558502882}}
+{"kind": "evaluation", "name": "signed_explicit_seed_zero", "value": {"x": [0.9747682097161281, -0.20067080311092456, 7.0], "fun": -1.7171971953979484}}
+{"kind": "evaluation", "name": "signed_explicit_seed_zero", "value": {"x": [1.9975864988123213, -0.40000000000000036, 7.0], "fun": -1.951114426793536}}
+{"kind": "evaluation", "name": "signed_explicit_seed_zero", "value": {"x": [1.0, -1.0, 7.0], "fun": -2.6875}}
+{"kind": "evaluation", "name": "signed_explicit_seed_zero", "value": {"x": [-0.7953510715787964, -0.6291760883965867, 7.0], "fun": 1.2418546764691287}}
+{"kind": "evaluation", "name": "signed_explicit_seed_zero", "value": {"x": [2.1030798696587407, -0.04549364973467007, 7.0], "fun": -0.28693794572632303}}
+{"kind": "evaluation", "name": "signed_explicit_seed_zero", "value": {"x": [2.357558576892867, -1.3015245220642147, 7.0], "fun": -0.556596804998406}}
+{"kind": "evaluation", "name": "signed_explicit_seed_zero", "value": {"x": [1.0, -1.0, 7.0], "fun": -2.6875}}
+{"kind": "callback", "name": "signed_explicit_seed_zero", "value": {"x": [1.0, -1.0, 7.0], "fun": -2.6875, "nit": 1, "nfev": 8, "njev": 0}}
+{"kind": "callback", "name": "signed_explicit_seed_zero", "value": {"x": [1.0, -1.0, 7.0], "fun": -2.6875, "nit": 2, "nfev": 12, "njev": 0}}
+{"kind": "callback", "name": "signed_explicit_seed_zero", "value": {"x": [1.0, -1.0, 7.0], "fun": -2.6875, "nit": 3, "nfev": 16, "njev": 0}}
+{"kind": "input", "name": "zero_coefficients", "value": {"name": "zero_coefficients", "objective": "signed_quadratic", "x0": [0.0, 0.0, 7.0], "bounds": [[-4.0, 4.0], [-3.0, 3.0], [7.0, 7.0]], "initial_population": [[3.0, 1.0, 7.0], [-2.0, -2.0, 7.0], [0.0, 2.0, 7.0], [1.0, -1.0, 7.0]], "seed": 0, "xatol": 0.0, "fatol": 0.0, "maxiter": 2, "coefficients": {"inertia": 0.0, "cognitive": 0.0, "social": 0.0}}, "trace": true}
+{"kind": "result", "name": "zero_coefficients", "value": {"x": [1.0, -1.0, 7.0], "fun": -2.6875, "nit": 2, "nfev": 12, "njev": 0, "status": "max_iterations", "success": false}}
+{"kind": "evaluation", "name": "zero_coefficients", "value": {"x": [3.0, 1.0, 7.0], "fun": 12.3125}}
+{"kind": "evaluation", "name": "zero_coefficients", "value": {"x": [-2.0, -2.0, 7.0], "fun": 13.8125}}
+{"kind": "evaluation", "name": "zero_coefficients", "value": {"x": [0.0, 2.0, 7.0], "fun": 28.8125}}
+{"kind": "evaluation", "name": "zero_coefficients", "value": {"x": [1.0, -1.0, 7.0], "fun": -2.6875}}
+{"kind": "evaluation", "name": "zero_coefficients", "value": {"x": [3.0, 1.0, 7.0], "fun": 12.3125}}
+{"kind": "evaluation", "name": "zero_coefficients", "value": {"x": [-2.0, -2.0, 7.0], "fun": 13.8125}}
+{"kind": "evaluation", "name": "zero_coefficients", "value": {"x": [0.0, 2.0, 7.0], "fun": 28.8125}}
+{"kind": "evaluation", "name": "zero_coefficients", "value": {"x": [1.0, -1.0, 7.0], "fun": -2.6875}}
+{"kind": "evaluation", "name": "zero_coefficients", "value": {"x": [3.0, 1.0, 7.0], "fun": 12.3125}}
+{"kind": "evaluation", "name": "zero_coefficients", "value": {"x": [-2.0, -2.0, 7.0], "fun": 13.8125}}
+{"kind": "evaluation", "name": "zero_coefficients", "value": {"x": [0.0, 2.0, 7.0], "fun": 28.8125}}
+{"kind": "evaluation", "name": "zero_coefficients", "value": {"x": [1.0, -1.0, 7.0], "fun": -2.6875}}
+{"kind": "callback", "name": "zero_coefficients", "value": {"x": [1.0, -1.0, 7.0], "fun": -2.6875, "nit": 1, "nfev": 8, "njev": 0}}
+{"kind": "callback", "name": "zero_coefficients", "value": {"x": [1.0, -1.0, 7.0], "fun": -2.6875, "nit": 2, "nfev": 12, "njev": 0}}
+{"kind": "input", "name": "partial_initialization_budget", "value": {"name": "partial_initialization_budget", "objective": "signed_quadratic", "x0": [0.0, 0.0, 7.0], "bounds": [[-4.0, 4.0], [-3.0, 3.0], [7.0, 7.0]], "initial_population": [[3.0, 1.0, 7.0], [-2.0, -2.0, 7.0], [0.0, 2.0, 7.0], [1.0, -1.0, 7.0]], "seed": 0, "xatol": 0.0, "fatol": 0.0, "maxiter": 3, "maxfev": 2}, "trace": true}
+{"kind": "result", "name": "partial_initialization_budget", "value": {"x": [3.0, 1.0, 7.0], "fun": 12.3125, "nit": 0, "nfev": 2, "njev": 0, "status": "max_evaluations", "success": false}}
+{"kind": "evaluation", "name": "partial_initialization_budget", "value": {"x": [3.0, 1.0, 7.0], "fun": 12.3125}}
+{"kind": "evaluation", "name": "partial_initialization_budget", "value": {"x": [-2.0, -2.0, 7.0], "fun": 13.8125}}
+{"kind": "input", "name": "partial_first_generation_budget", "value": {"name": "partial_first_generation_budget", "objective": "signed_quadratic", "x0": [0.0, 0.0, 7.0], "bounds": [[-4.0, 4.0], [-3.0, 3.0], [7.0, 7.0]], "initial_population": [[3.0, 1.0, 7.0], [-2.0, -2.0, 7.0], [0.0, 2.0, 7.0], [1.0, -1.0, 7.0]], "seed": 0, "xatol": 0.0, "fatol": 0.0, "maxiter": 3, "maxfev": 7}, "trace": true}
+{"kind": "result", "name": "partial_first_generation_budget", "value": {"x": [1.0, -1.0, 7.0], "fun": -2.6875, "nit": 0, "nfev": 7, "njev": 0, "status": "max_evaluations", "success": false}}
+{"kind": "evaluation", "name": "partial_first_generation_budget", "value": {"x": [3.0, 1.0, 7.0], "fun": 12.3125}}
+{"kind": "evaluation", "name": "partial_first_generation_budget", "value": {"x": [-2.0, -2.0, 7.0], "fun": 13.8125}}
+{"kind": "evaluation", "name": "partial_first_generation_budget", "value": {"x": [0.0, 2.0, 7.0], "fun": 28.8125}}
+{"kind": "evaluation", "name": "partial_first_generation_budget", "value": {"x": [1.0, -1.0, 7.0], "fun": -2.6875}}
+{"kind": "evaluation", "name": "partial_first_generation_budget", "value": {"x": [1.7917216082641723, -0.20000000000000018, 7.0], "fun": -1.4965376991396795}}
+{"kind": "evaluation", "name": "partial_first_generation_budget", "value": {"x": [-0.625231790283872, -0.9198348211358063, 7.0], "fun": 0.6318697331721808}}
+{"kind": "evaluation", "name": "partial_first_generation_budget", "value": {"x": [1.3328429679149565, 0.7999999999999998, 7.0], "fun": 6.616862957332955}}
+{"kind": "input", "name": "completed_generation_budget", "value": {"name": "completed_generation_budget", "objective": "signed_quadratic", "x0": [0.0, 0.0, 7.0], "bounds": [[-4.0, 4.0], [-3.0, 3.0], [7.0, 7.0]], "initial_population": [[3.0, 1.0, 7.0], [-2.0, -2.0, 7.0], [0.0, 2.0, 7.0], [1.0, -1.0, 7.0]], "seed": 0, "xatol": 0.0, "fatol": 0.0, "maxiter": 3, "maxfev": 8}, "trace": true}
+{"kind": "result", "name": "completed_generation_budget", "value": {"x": [1.0, -1.0, 7.0], "fun": -2.6875, "nit": 1, "nfev": 8, "njev": 0, "status": "max_evaluations", "success": false}}
+{"kind": "evaluation", "name": "completed_generation_budget", "value": {"x": [3.0, 1.0, 7.0], "fun": 12.3125}}
+{"kind": "evaluation", "name": "completed_generation_budget", "value": {"x": [-2.0, -2.0, 7.0], "fun": 13.8125}}
+{"kind": "evaluation", "name": "completed_generation_budget", "value": {"x": [0.0, 2.0, 7.0], "fun": 28.8125}}
+{"kind": "evaluation", "name": "completed_generation_budget", "value": {"x": [1.0, -1.0, 7.0], "fun": -2.6875}}
+{"kind": "evaluation", "name": "completed_generation_budget", "value": {"x": [1.7917216082641723, -0.20000000000000018, 7.0], "fun": -1.4965376991396795}}
+{"kind": "evaluation", "name": "completed_generation_budget", "value": {"x": [-0.625231790283872, -0.9198348211358063, 7.0], "fun": 0.6318697331721808}}
+{"kind": "evaluation", "name": "completed_generation_budget", "value": {"x": [1.3328429679149565, 0.7999999999999998, 7.0], "fun": 6.616862957332955}}
+{"kind": "evaluation", "name": "completed_generation_budget", "value": {"x": [1.0, -1.0, 7.0], "fun": -2.6875}}
+{"kind": "callback", "name": "completed_generation_budget", "value": {"x": [1.0, -1.0, 7.0], "fun": -2.6875, "nit": 1, "nfev": 8, "njev": 0}}
+{"kind": "input", "name": "callback_cancels_at_maxiter", "value": {"name": "callback_cancels_at_maxiter", "objective": "signed_quadratic", "x0": [0.0, 0.0, 7.0], "bounds": [[-4.0, 4.0], [-3.0, 3.0], [7.0, 7.0]], "initial_population": [[3.0, 1.0, 7.0], [-2.0, -2.0, 7.0], [0.0, 2.0, 7.0], [1.0, -1.0, 7.0]], "seed": 0, "xatol": 0.0, "fatol": 0.0, "maxiter": 1, "cancel_after_generation": 1}, "trace": true}
+{"kind": "result", "name": "callback_cancels_at_maxiter", "value": {"x": [1.0, -1.0, 7.0], "fun": -2.6875, "nit": 1, "nfev": 8, "njev": 0, "status": "cancelled", "success": false}}
+{"kind": "evaluation", "name": "callback_cancels_at_maxiter", "value": {"x": [3.0, 1.0, 7.0], "fun": 12.3125}}
+{"kind": "evaluation", "name": "callback_cancels_at_maxiter", "value": {"x": [-2.0, -2.0, 7.0], "fun": 13.8125}}
+{"kind": "evaluation", "name": "callback_cancels_at_maxiter", "value": {"x": [0.0, 2.0, 7.0], "fun": 28.8125}}
+{"kind": "evaluation", "name": "callback_cancels_at_maxiter", "value": {"x": [1.0, -1.0, 7.0], "fun": -2.6875}}
+{"kind": "evaluation", "name": "callback_cancels_at_maxiter", "value": {"x": [1.7917216082641723, -0.20000000000000018, 7.0], "fun": -1.4965376991396795}}
+{"kind": "evaluation", "name": "callback_cancels_at_maxiter", "value": {"x": [-0.625231790283872, -0.9198348211358063, 7.0], "fun": 0.6318697331721808}}
+{"kind": "evaluation", "name": "callback_cancels_at_maxiter", "value": {"x": [1.3328429679149565, 0.7999999999999998, 7.0], "fun": 6.616862957332955}}
+{"kind": "evaluation", "name": "callback_cancels_at_maxiter", "value": {"x": [1.0, -1.0, 7.0], "fun": -2.6875}}
+{"kind": "callback", "name": "callback_cancels_at_maxiter", "value": {"x": [1.0, -1.0, 7.0], "fun": -2.6875, "nit": 1, "nfev": 8, "njev": 0}}
+{"kind": "input", "name": "random_seed_zero", "value": {"name": "random_seed_zero", "objective": "signed_quadratic", "x0": [0.0, 0.0, 7.0], "bounds": [[-4.0, 4.0], [-3.0, 3.0], [7.0, 7.0]], "seed": 0, "xatol": 0.0, "fatol": 0.0, "maxiter": 2, "population_size": 4}, "trace": true}
+{"kind": "result", "name": "random_seed_zero", "value": {"x": [1.5999999999999996, -0.547574565797674, 7.0], "fun": -2.7135957743519996, "nit": 2, "nfev": 12, "njev": 0, "status": "max_iterations", "success": false}}
+{"kind": "evaluation", "name": "random_seed_zero", "value": {"x": [0.0, 0.0, 7.0], "fun": 0.8125}}
+{"kind": "evaluation", "name": "random_seed_zero", "value": {"x": [3.066486465709141, -0.4108320177089402, 7.0], "fun": 0.7597627609500401}}
+{"kind": "evaluation", "name": "random_seed_zero", "value": {"x": [-3.788529827259218, 2.825291868922971, 7.0], "fun": 73.51763061212765}}
+{"kind": "evaluation", "name": "random_seed_zero", "value": {"x": [-3.1492264674623005, -1.0360454146912454, 7.0], "fun": 16.680481429084377}}
+{"kind": "evaluation", "name": "random_seed_zero", "value": {"x": [1.5999999999999996, -0.547574565797674, 7.0], "fun": -2.7135957743519996}}
+{"kind": "evaluation", "name": "random_seed_zero", "value": {"x": [3.066486465709141, -0.4108320177089402, 7.0], "fun": 0.7597627609500401}}
+{"kind": "evaluation", "name": "random_seed_zero", "value": {"x": [-2.188529827259218, 1.6252918689229712, 7.0], "fun": 31.39153322323763}}
+{"kind": "evaluation", "name": "random_seed_zero", "value": {"x": [-1.5492264674623004, -0.45816417296001344, 7.0], "fun": 5.176341415917921}}
+{"kind": "evaluation", "name": "random_seed_zero", "value": {"x": [2.7199999999999998, -0.9308767618560454, 7.0], "fun": -0.7082343880818862}}
+{"kind": "evaluation", "name": "random_seed_zero", "value": {"x": [2.5466179995467586, -0.5890508599562212, 7.0], "fun": -1.2151632605280343}}
+{"kind": "evaluation", "name": "random_seed_zero", "value": {"x": [-0.5885298272592179, 0.7217846197669906, 7.0], "fun": 9.044791793652468}}
+{"kind": "evaluation", "name": "random_seed_zero", "value": {"x": [0.05077353253769967, -0.08310017935631198, 7.0], "fun": 0.21716560336044077}}
+{"kind": "callback", "name": "random_seed_zero", "value": {"x": [1.5999999999999996, -0.547574565797674, 7.0], "fun": -2.7135957743519996, "nit": 1, "nfev": 8, "njev": 0}}
+{"kind": "callback", "name": "random_seed_zero", "value": {"x": [1.5999999999999996, -0.547574565797674, 7.0], "fun": -2.7135957743519996, "nit": 2, "nfev": 12, "njev": 0}}
+{"kind": "input", "name": "random_partial_generation_preserves_improvement", "value": {"name": "random_partial_generation_preserves_improvement", "objective": "signed_quadratic", "x0": [0.0, 0.0, 7.0], "bounds": [[-4.0, 4.0], [-3.0, 3.0], [7.0, 7.0]], "seed": 0, "xatol": 0.0, "fatol": 0.0, "maxiter": 2, "population_size": 4, "maxfev": 5}, "trace": true}
+{"kind": "result", "name": "random_partial_generation_preserves_improvement", "value": {"x": [1.5999999999999996, -0.547574565797674, 7.0], "fun": -2.7135957743519996, "nit": 0, "nfev": 5, "njev": 0, "status": "max_evaluations", "success": false}}
+{"kind": "evaluation", "name": "random_partial_generation_preserves_improvement", "value": {"x": [0.0, 0.0, 7.0], "fun": 0.8125}}
+{"kind": "evaluation", "name": "random_partial_generation_preserves_improvement", "value": {"x": [3.066486465709141, -0.4108320177089402, 7.0], "fun": 0.7597627609500401}}
+{"kind": "evaluation", "name": "random_partial_generation_preserves_improvement", "value": {"x": [-3.788529827259218, 2.825291868922971, 7.0], "fun": 73.51763061212765}}
+{"kind": "evaluation", "name": "random_partial_generation_preserves_improvement", "value": {"x": [-3.1492264674623005, -1.0360454146912454, 7.0], "fun": 16.680481429084377}}
+{"kind": "evaluation", "name": "random_partial_generation_preserves_improvement", "value": {"x": [1.5999999999999996, -0.547574565797674, 7.0], "fun": -2.7135957743519996}}
+{"kind": "input", "name": "boundary_clipping_zeroes_outward_velocity", "value": {"name": "boundary_clipping_zeroes_outward_velocity", "objective": "boundary_quadratic", "x0": [0.5], "bounds": [[0.0, 1.0]], "initial_population": [[0.0], [0.5], [0.9], [1.0]], "seed": 0, "xatol": 0.0, "fatol": 0.0, "maxiter": 3, "coefficients": {"inertia": 1.0, "cognitive": 4.0, "social": 4.0, "velocity_clamp": 1.0}}, "trace": true}
+{"kind": "result", "name": "boundary_clipping_zeroes_outward_velocity", "value": {"x": [1.0], "fun": -16.0, "nit": 1, "nfev": 8, "njev": 0, "status": "converged", "success": true}}
+{"kind": "evaluation", "name": "boundary_clipping_zeroes_outward_velocity", "value": {"x": [0.0], "fun": -11.0}}
+{"kind": "evaluation", "name": "boundary_clipping_zeroes_outward_velocity", "value": {"x": [0.5], "fun": -13.75}}
+{"kind": "evaluation", "name": "boundary_clipping_zeroes_outward_velocity", "value": {"x": [0.9], "fun": -15.59}}
+{"kind": "evaluation", "name": "boundary_clipping_zeroes_outward_velocity", "value": {"x": [1.0], "fun": -16.0}}
+{"kind": "evaluation", "name": "boundary_clipping_zeroes_outward_velocity", "value": {"x": [1.0], "fun": -16.0}}
+{"kind": "evaluation", "name": "boundary_clipping_zeroes_outward_velocity", "value": {"x": [1.0], "fun": -16.0}}
+{"kind": "evaluation", "name": "boundary_clipping_zeroes_outward_velocity", "value": {"x": [1.0], "fun": -16.0}}
+{"kind": "evaluation", "name": "boundary_clipping_zeroes_outward_velocity", "value": {"x": [1.0], "fun": -16.0}}
+{"kind": "callback", "name": "boundary_clipping_zeroes_outward_velocity", "value": {"x": [1.0], "fun": -16.0, "nit": 1, "nfev": 8, "njev": 0}}
+{"kind": "input", "name": "strict_ties_keep_earliest", "value": {"name": "strict_ties_keep_earliest", "objective": "constant", "x0": [0.0], "bounds": [[-1.0, 1.0]], "initial_population": [[0.2], [-0.8], [0.8], [0.1]], "seed": 0, "xatol": 0.0, "fatol": 0.0, "maxiter": 2}, "trace": true}
+{"kind": "result", "name": "strict_ties_keep_earliest", "value": {"x": [0.2], "fun": -7.0, "nit": 2, "nfev": 12, "njev": 0, "status": "max_iterations", "success": false}}
+{"kind": "evaluation", "name": "strict_ties_keep_earliest", "value": {"x": [0.2], "fun": -7.0}}
+{"kind": "evaluation", "name": "strict_ties_keep_earliest", "value": {"x": [-0.8], "fun": -7.0}}
+{"kind": "evaluation", "name": "strict_ties_keep_earliest", "value": {"x": [0.8], "fun": -7.0}}
+{"kind": "evaluation", "name": "strict_ties_keep_earliest", "value": {"x": [0.1], "fun": -7.0}}
+{"kind": "evaluation", "name": "strict_ties_keep_earliest", "value": {"x": [0.2], "fun": -7.0}}
+{"kind": "evaluation", "name": "strict_ties_keep_earliest", "value": {"x": [-0.4], "fun": -7.0}}
+{"kind": "evaluation", "name": "strict_ties_keep_earliest", "value": {"x": [0.5250463580567744], "fun": -7.0}}
+{"kind": "evaluation", "name": "strict_ties_keep_earliest", "value": {"x": [0.2080165178864195], "fun": -7.0}}
+{"kind": "evaluation", "name": "strict_ties_keep_earliest", "value": {"x": [0.2], "fun": -7.0}}
+{"kind": "evaluation", "name": "strict_ties_keep_earliest", "value": {"x": [0.0], "fun": -7.0}}
+{"kind": "evaluation", "name": "strict_ties_keep_earliest", "value": {"x": [0.28162853049705094], "fun": -7.0}}
+{"kind": "evaluation", "name": "strict_ties_keep_earliest", "value": {"x": [0.17070949534186752], "fun": -7.0}}
+{"kind": "callback", "name": "strict_ties_keep_earliest", "value": {"x": [0.2], "fun": -7.0, "nit": 1, "nfev": 8, "njev": 0}}
+{"kind": "callback", "name": "strict_ties_keep_earliest", "value": {"x": [0.2], "fun": -7.0, "nit": 2, "nfev": 12, "njev": 0}}
+{"kind": "input", "name": "velocity_prevents_false_convergence", "value": {"name": "velocity_prevents_false_convergence", "objective": "constant", "x0": [0.0], "bounds": [[-1.0, 1.0]], "initial_population": [[0.2], [-0.8], [0.8], [0.1]], "seed": 0, "xatol": 0.15, "fatol": 0.0, "maxiter": 3}, "trace": true}
+{"kind": "result", "name": "velocity_prevents_false_convergence", "value": {"x": [0.2], "fun": -7.0, "nit": 3, "nfev": 16, "njev": 0, "status": "max_iterations", "success": false}}
+{"kind": "evaluation", "name": "velocity_prevents_false_convergence", "value": {"x": [0.2], "fun": -7.0}}
+{"kind": "evaluation", "name": "velocity_prevents_false_convergence", "value": {"x": [-0.8], "fun": -7.0}}
+{"kind": "evaluation", "name": "velocity_prevents_false_convergence", "value": {"x": [0.8], "fun": -7.0}}
+{"kind": "evaluation", "name": "velocity_prevents_false_convergence", "value": {"x": [0.1], "fun": -7.0}}
+{"kind": "evaluation", "name": "velocity_prevents_false_convergence", "value": {"x": [0.2], "fun": -7.0}}
+{"kind": "evaluation", "name": "velocity_prevents_false_convergence", "value": {"x": [-0.4], "fun": -7.0}}
+{"kind": "evaluation", "name": "velocity_prevents_false_convergence", "value": {"x": [0.5250463580567744], "fun": -7.0}}
+{"kind": "evaluation", "name": "velocity_prevents_false_convergence", "value": {"x": [0.2080165178864195], "fun": -7.0}}
+{"kind": "evaluation", "name": "velocity_prevents_false_convergence", "value": {"x": [0.2], "fun": -7.0}}
+{"kind": "evaluation", "name": "velocity_prevents_false_convergence", "value": {"x": [0.0], "fun": -7.0}}
+{"kind": "evaluation", "name": "velocity_prevents_false_convergence", "value": {"x": [0.28162853049705094], "fun": -7.0}}
+{"kind": "evaluation", "name": "velocity_prevents_false_convergence", "value": {"x": [0.17070949534186752], "fun": -7.0}}
+{"kind": "evaluation", "name": "velocity_prevents_false_convergence", "value": {"x": [0.2], "fun": -7.0}}
+{"kind": "evaluation", "name": "velocity_prevents_false_convergence", "value": {"x": [0.2871046796541479], "fun": -7.0}}
+{"kind": "evaluation", "name": "velocity_prevents_false_convergence", "value": {"x": [0.6566333213350575], "fun": -7.0}}
+{"kind": "evaluation", "name": "velocity_prevents_false_convergence", "value": {"x": [0.06607820444701584], "fun": -7.0}}
+{"kind": "callback", "name": "velocity_prevents_false_convergence", "value": {"x": [0.2], "fun": -7.0, "nit": 1, "nfev": 8, "njev": 0}}
+{"kind": "callback", "name": "velocity_prevents_false_convergence", "value": {"x": [0.2], "fun": -7.0, "nit": 2, "nfev": 12, "njev": 0}}
+{"kind": "callback", "name": "velocity_prevents_false_convergence", "value": {"x": [0.2], "fun": -7.0, "nit": 3, "nfev": 16, "njev": 0}}
+{"kind": "input", "name": "rounded_normalization_does_not_converge", "value": {"name": "rounded_normalization_does_not_converge", "objective": "rounded_normalization", "x0": [0.0], "bounds": [[-1e+308, 7e+307]], "initial_population": [[0.0], [1e-100], [-1e-100], [5e-324]], "seed": 0, "xatol": 0.0, "fatol": 0.0, "maxiter": 2, "coefficients": {"inertia": 0.0, "cognitive": 0.0, "social": 0.0}}, "trace": true}
+{"kind": "result", "name": "rounded_normalization_does_not_converge", "value": {"x": [0.0], "fun": -7.0, "nit": 2, "nfev": 12, "njev": 0, "status": "max_iterations", "success": false}}
+{"kind": "evaluation", "name": "rounded_normalization_does_not_converge", "value": {"x": [0.0], "fun": -7.0}}
+{"kind": "evaluation", "name": "rounded_normalization_does_not_converge", "value": {"x": [1e-100], "fun": -7.0}}
+{"kind": "evaluation", "name": "rounded_normalization_does_not_converge", "value": {"x": [-1e-100], "fun": -7.0}}
+{"kind": "evaluation", "name": "rounded_normalization_does_not_converge", "value": {"x": [5e-324], "fun": -7.0}}
+{"kind": "evaluation", "name": "rounded_normalization_does_not_converge", "value": {"x": [0.0], "fun": -7.0}}
+{"kind": "evaluation", "name": "rounded_normalization_does_not_converge", "value": {"x": [1e-100], "fun": -7.0}}
+{"kind": "evaluation", "name": "rounded_normalization_does_not_converge", "value": {"x": [-1e-100], "fun": -7.0}}
+{"kind": "evaluation", "name": "rounded_normalization_does_not_converge", "value": {"x": [5e-324], "fun": -7.0}}
+{"kind": "evaluation", "name": "rounded_normalization_does_not_converge", "value": {"x": [0.0], "fun": -7.0}}
+{"kind": "evaluation", "name": "rounded_normalization_does_not_converge", "value": {"x": [1e-100], "fun": -7.0}}
+{"kind": "evaluation", "name": "rounded_normalization_does_not_converge", "value": {"x": [-1e-100], "fun": -7.0}}
+{"kind": "evaluation", "name": "rounded_normalization_does_not_converge", "value": {"x": [5e-324], "fun": -7.0}}
+{"kind": "callback", "name": "rounded_normalization_does_not_converge", "value": {"x": [0.0], "fun": -7.0, "nit": 1, "nfev": 8, "njev": 0}}
+{"kind": "callback", "name": "rounded_normalization_does_not_converge", "value": {"x": [0.0], "fun": -7.0, "nit": 2, "nfev": 12, "njev": 0}}
+{"kind": "input", "name": "all_fixed_evaluates_x0_once", "value": {"name": "all_fixed_evaluates_x0_once", "objective": "signed_quadratic", "x0": [1.25, -0.75], "bounds": [[1.25, 1.25], [-0.75, -0.75]], "initial_population": [[1.25, -0.75], [1.25, -0.75], [1.25, -0.75], [1.25, -0.75]], "seed": 0}, "trace": true}
+{"kind": "result", "name": "all_fixed_evaluates_x0_once", "value": {"x": [1.25, -0.75], "fun": -3.0, "nit": 0, "nfev": 1, "njev": 0, "status": "converged", "success": true}}
+{"kind": "evaluation", "name": "all_fixed_evaluates_x0_once", "value": {"x": [1.25, -0.75], "fun": -3.0}}
+{"kind": "input", "name": "signed_analytic_quality", "value": {"name": "signed_analytic_quality", "objective": "signed_quadratic", "x0": [0.0, 0.0], "bounds": [[-4.0, 4.0], [-3.0, 3.0]], "analytic_x": [1.25, -0.75], "analytic_fun": -3.0, "seed": 42, "population_size": 64, "xatol": 1e-06, "fatol": 1e-08, "maxiter": 1000}, "trace": false}
+{"kind": "result", "name": "signed_analytic_quality", "value": {"x": [1.2500000013883499, -0.7499999934042862], "fun": -3.0, "nit": 171, "nfev": 11008, "njev": 0, "status": "converged", "success": true}}
+{"kind": "input", "name": "multimodal_polynomial_analytic_quality", "value": {"name": "multimodal_polynomial_analytic_quality", "objective": "multimodal_polynomial", "x0": [-2.0], "bounds": [[-3.0, 3.0]], "analytic_x": [1.0], "analytic_fun": 0.0, "seed": 42, "population_size": 64, "xatol": 1e-06, "fatol": 1e-08, "maxiter": 1000}, "trace": false}
+{"kind": "result", "name": "multimodal_polynomial_analytic_quality", "value": {"x": [1.0000000000000024], "fun": 5.42884214211786e-29, "nit": 185, "nfev": 11904, "njev": 0, "status": "converged", "success": true}}
+{"kind": "input", "name": "himmelblau_analytic_quality", "value": {"name": "himmelblau_analytic_quality", "objective": "himmelblau", "x0": [0.0, 0.0], "bounds": [[-5.0, 5.0], [-5.0, 5.0]], "analytic_x": [3.0, 2.0], "analytic_fun": 0.0, "multiple_minima": true, "minima": [[3.0, 2.0], [-2.805118086952745, 3.131312518250573], [-3.779310253377747, -3.283185991286169], [3.5844283403304917, -1.8481265269644036]], "seed": 42, "population_size": 64, "xatol": 1e-06, "fatol": 1e-08, "maxiter": 1000}, "trace": false}
+{"kind": "result", "name": "himmelblau_analytic_quality", "value": {"x": [-2.805118086952745, 3.131312518250573], "fun": 7.888609052210118e-31, "nit": 1000, "nfev": 64064, "njev": 0, "status": "max_iterations", "success": false}}
+{"kind": "input", "name": "shifted_rastrigin_analytic_quality", "value": {"name": "shifted_rastrigin_analytic_quality", "objective": "shifted_rastrigin", "x0": [2.4, -1.7], "bounds": [[-5.12, 5.12], [-5.12, 5.12]], "analytic_x": [0.0, 0.0], "analytic_fun": -5.0, "seed": 42, "population_size": 64, "xatol": 1e-06, "fatol": 1e-08, "maxiter": 1000}, "trace": false}
+{"kind": "result", "name": "shifted_rastrigin_analytic_quality", "value": {"x": [-3.5244234197762125e-09, 6.722800094394188e-11], "fun": -5.0, "nit": 254, "nfev": 16320, "njev": 0, "status": "converged", "success": true}}
