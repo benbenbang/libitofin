@@ -378,3 +378,6 @@ pub unsafe extern "C" fn itofin_firefly_result(
 ) -> i32 {
     unsafe { itofin_differential_evolution_result(ctx, method, n, out, error) }
 }
+
+#[cfg(test)]
+mod firefly_tests;
