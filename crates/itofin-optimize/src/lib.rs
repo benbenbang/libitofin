@@ -13,6 +13,8 @@
 //! An independent implementation from the papers below. Nothing is adapted from
 //! another optimizer; see `THIRD_PARTY_NOTICES.md` in this crate.
 //!
+//! - Yang, X. S. (2009), "Firefly Algorithms for Multimodal Optimization",
+//!   <https://arxiv.org/abs/1003.1466>; introduced in his 2008 book.
 //! - Kirkpatrick, S., Gelatt, C. D. and Vecchi, M. P. (1983), "Optimization
 //!   by Simulated Annealing", <https://doi.org/10.1126/science.220.4598.671>.
 //! - Hooke, R. and Jeeves, T. A. (1961), "Direct Search Solution of Numerical
@@ -63,7 +65,7 @@ pub use counters::{Counters, Halt};
 pub use error::{InvalidInput, MinimizeError};
 pub use finite_difference::FiniteDifference;
 pub use global::{
-    DifferentialEvolutionOptions, GlobalOptions, HybridSimulatedAnnealingOptions,
+    DifferentialEvolutionOptions, FireflyOptions, GlobalOptions, HybridSimulatedAnnealingOptions,
     ParticleSwarmOptions,
 };
 pub use objective::{ConstraintKind, Flow, IterationState, Objective};

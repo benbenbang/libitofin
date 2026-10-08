@@ -104,6 +104,12 @@ pub enum InvalidInput {
         option: &'static str,
         range: &'static str,
     },
+    /// A firefly coefficient is outside its supported interval.
+    #[error("{option} must be finite and in {range}")]
+    FireflyCoefficient {
+        option: &'static str,
+        range: &'static str,
+    },
     /// A hybrid-annealing coefficient is outside its supported interval.
     #[error("{option} must be finite and in {range}")]
     HybridSimulatedAnnealingCoefficient {

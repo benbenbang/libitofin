@@ -376,6 +376,87 @@ impl HybridSimulatedAnnealingOptions {
     }
 }
 
+/// Serial pairwise firefly search with frozen generation brightness.
+#[derive(Debug, Clone, PartialEq)]
+pub struct FireflyOptions {
+    /// Shared finite-box population controls.
+    pub global: GlobalOptions,
+    /// Initial normalized uniform-noise scale in `[0, 1]`, default `0.25`.
+    pub alpha: f64,
+    /// Attraction at zero distance in `(0, 1]`, default `1.0`.
+    pub beta0: f64,
+    /// Normalized squared-distance absorption in `[0, 1e6]`, default `1.0`.
+    pub gamma: f64,
+    /// Noise multiplier per completed generation in `(0, 1]`, default `0.97`.
+    pub alpha_decay: f64,
+}
+
+impl Default for FireflyOptions {
+    fn default() -> Self {
+        Self {
+            global: GlobalOptions::default(),
+            alpha: 0.25,
+            beta0: 1.0,
+            gamma: 1.0,
+            alpha_decay: 0.97,
+        }
+    }
+}
+
+impl FireflyOptions {
+    /// Validates finite-box controls and the firefly coefficients.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InvalidInput`] for an invalid shape, bound, point or option.
+    pub fn validate(&self, problem: &Problem) -> Result<(), InvalidInput> {
+        self.global.validate(problem)?;
+        for (option, value, valid, interval) in [
+            (
+                "alpha",
+                self.alpha,
+                (0.0..=1.0).contains(&self.alpha),
+                "[0, 1]",
+            ),
+            (
+                "beta0",
+                self.beta0,
+                self.beta0 > 0.0 && self.beta0 <= 1.0,
+                "(0, 1]",
+            ),
+            (
+                "gamma",
+                self.gamma,
+                (0.0..=1e6).contains(&self.gamma),
+                "[0, 1e6]",
+            ),
+            (
+                "alpha_decay",
+                self.alpha_decay,
+                self.alpha_decay > 0.0 && self.alpha_decay <= 1.0,
+                "(0, 1]",
+            ),
+        ] {
+            if !value.is_finite() || !valid {
+                return Err(InvalidInput::FireflyCoefficient {
+                    option,
+                    range: interval,
+                });
+            }
+        }
+        Ok(())
+    }
+
+    /// Validates shared budgets and supplies bounded global-solver defaults.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InvalidInput`] for invalid shared options or work caps.
+    pub fn budgets(&self, common: &Common) -> Result<Common, InvalidInput> {
+        DifferentialEvolutionOptions::default().budgets(common)
+    }
+}
+
 fn range(option: &'static str, found: usize, min: usize, max: usize) -> Result<(), InvalidInput> {
     if found < min || found > max {
         return Err(InvalidInput::GlobalRange {
