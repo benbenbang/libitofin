@@ -2,6 +2,9 @@ use super::*;
 use crate::{Flow, GlobalOptions, IterationState, Method};
 use std::io;
 
+#[path = "particle_swarm_validation_tests.rs"]
+mod validation;
+
 fn problem() -> Problem {
     Problem {
         x0: vec![0.0],
