@@ -4,6 +4,8 @@ use std::io;
 
 #[path = "simulated_annealing_numeric_tests.rs"]
 mod numeric;
+#[path = "simulated_annealing_validation_tests.rs"]
+mod validation;
 
 fn problem() -> Problem {
     Problem {
