@@ -23,6 +23,19 @@ SplitMix64 recurrence uses the published 64-bit arithmetic description, with our
 own bounded-index sampling and population code. No SciPy, QuantLib, Argmin or
 optimization-rust differential-evolution source or tests were adapted.
 
+## Particle swarm
+
+The global-best PSO solver is independently written from the mathematical
+algorithm in Kennedy and Eberhart (1995), DOI
+<https://doi.org/10.1109/ICNN.1995.488968>, and the inertia formulation in
+Shi and Eberhart (1998), DOI <https://doi.org/10.1109/ICEC.1998.699146>.
+The original 1995 paper is available from
+<https://staff.washington.edu/paymana/swarm/kennedy95-ijcnn.pdf>.
+Synchronous updates, zero initial velocities, clipping with absorbing bounds,
+strict best-update ties and velocity-aware convergence are our explicit policies.
+No QuantLib, Argmin or other upstream particle-swarm implementation or tests
+were copied, adapted or translated. This is not a clean-room claim.
+
 ## SciPy
 
 SciPy is used at development time only, by `scripts/fixtures/optimize/gen_fixtures.py`,
