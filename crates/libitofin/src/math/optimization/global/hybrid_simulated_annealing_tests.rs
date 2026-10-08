@@ -327,3 +327,6 @@ fn fixed_box_evaluates_scalar_once_and_maps_success() {
 
 #[path = "hybrid_simulated_annealing_model_tests.rs"]
 mod model;
+
+#[path = "hybrid_simulated_annealing_heston_tests.rs"]
+mod heston;
