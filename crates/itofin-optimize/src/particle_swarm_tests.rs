@@ -2,6 +2,8 @@ use super::*;
 use crate::{Flow, GlobalOptions, IterationState, Method};
 use std::io;
 
+#[path = "particle_swarm_numeric_tests.rs"]
+mod numeric;
 #[path = "particle_swarm_validation_tests.rs"]
 mod validation;
 
