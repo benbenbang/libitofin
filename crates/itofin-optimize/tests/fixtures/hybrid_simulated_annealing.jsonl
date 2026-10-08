@@ -1,0 +1,225 @@
+{"kind": "provenance", "value": {"implementation": "Independent standard-library equations from approved policy", "references": ["https://doi.org/10.1126/science.220.4598.671", "https://doi.org/10.1287/moor.13.2.311"], "limitation": "Finite-budget geometric reheating hybrid, no global optimum guarantee", "selection": "Rastrigin seed1 reaches known optimum; seed42 retains local optimum limitation", "format": "JSONL: one auditable input, result, evaluation, callback or cycle per record"}}
+{"kind": "acceptance", "value": {"current": -2.0, "trial": -3.0, "temperature": 1.0, "probability": 1.0}}
+{"kind": "acceptance", "value": {"current": -2.0, "trial": -2.0, "temperature": 1.0, "probability": 1.0}}
+{"kind": "acceptance", "value": {"current": -2.0, "trial": -1.0, "temperature": 1.0, "probability": 0.36787944117144233}}
+{"kind": "acceptance", "value": {"current": 0.0, "trial": 2.0, "temperature": 2.0, "probability": 0.36787944117144233}}
+{"kind": "acceptance", "value": {"current": -1e+308, "trial": 1e+308, "temperature": 1e+308, "probability": 0.1353352832366127}}
+{"kind": "acceptance", "value": {"current": -1e+308, "trial": 1e+308, "temperature": 1.0, "probability": 0.0}}
+{"kind": "input", "name": "signed_reflection_and_polish", "value": {"name": "signed_reflection_and_polish", "objective": "signed_quadratic", "x0": [3.5, 2.5, 7.0], "bounds": [[-4.0, 4.0], [-3.0, 3.0], [7.0, 7.0]], "maxiter": 4, "options": {"seed": 0, "local_search_interval": 2, "local_search_steps": 2, "reanneal_interval": 3, "xatol": 0.0, "fatol": 0.0}}, "trace": true}
+{"kind": "result", "name": "signed_reflection_and_polish", "value": {"x": [1.072491853515821, -0.7072299256070158, 7.0], "fun": -2.9611737408774257, "nit": 4, "nfev": 21, "njev": 0, "status": "max_iterations", "success": false}}
+{"kind": "evaluation", "name": "signed_reflection_and_polish", "value": {"x": [3.5, 2.5, 7.0], "fun": 44.3125, "stage": "initial"}}
+{"kind": "evaluation", "name": "signed_reflection_and_polish", "value": {"x": [2.96675676714543, 2.2945839911455295, 7.0], "fun": 37.025220514098194, "stage": "proposal"}}
+{"kind": "evaluation", "name": "signed_reflection_and_polish", "value": {"x": [1.072491853515821, 2.292770074392984, 7.0], "fun": 34.0653080445542, "stage": "proposal"}}
+{"kind": "evaluation", "name": "signed_reflection_and_polish", "value": {"x": [3.072491853515821, 2.292770074392984, 7.0], "fun": 37.355275458617484, "stage": "local"}}
+{"kind": "evaluation", "name": "signed_reflection_and_polish", "value": {"x": [-0.927508146484179, 2.292770074392984, 7.0], "fun": 38.775340630490916, "stage": "local"}}
+{"kind": "evaluation", "name": "signed_reflection_and_polish", "value": {"x": [1.072491853515821, 3.0, 7.0], "fun": 53.28150914206825, "stage": "local"}}
+{"kind": "evaluation", "name": "signed_reflection_and_polish", "value": {"x": [1.072491853515821, 0.7927700743929842, 7.0], "fun": 6.552067151838385, "stage": "local"}}
+{"kind": "evaluation", "name": "signed_reflection_and_polish", "value": {"x": [3.072491853515821, 0.7927700743929842, 7.0], "fun": 9.842034565901669, "stage": "local"}}
+{"kind": "evaluation", "name": "signed_reflection_and_polish", "value": {"x": [-0.927508146484179, 0.7927700743929842, 7.0], "fun": 11.2620997377751, "stage": "local"}}
+{"kind": "evaluation", "name": "signed_reflection_and_polish", "value": {"x": [1.072491853515821, 2.292770074392984, 7.0], "fun": 34.0653080445542, "stage": "local"}}
+{"kind": "evaluation", "name": "signed_reflection_and_polish", "value": {"x": [1.072491853515821, -0.7072299256070158, 7.0], "fun": -2.9611737408774257, "stage": "local"}}
+{"kind": "evaluation", "name": "signed_reflection_and_polish", "value": {"x": [-0.5021213802153293, -1.2252526329526385, 7.0], "fun": 0.9733895915213315, "stage": "proposal"}}
+{"kind": "evaluation", "name": "signed_reflection_and_polish", "value": {"x": [2.1586780788420885, -1.4701630790866216, 7.0], "fun": -0.09976470711375685, "stage": "proposal"}}
+{"kind": "evaluation", "name": "signed_reflection_and_polish", "value": {"x": [3.072491853515821, -0.7072299256070158, 7.0], "fun": 0.3287936731858587, "stage": "local"}}
+{"kind": "evaluation", "name": "signed_reflection_and_polish", "value": {"x": [-0.927508146484179, -0.7072299256070158, 7.0], "fun": 1.7488588450592903, "stage": "local"}}
+{"kind": "evaluation", "name": "signed_reflection_and_polish", "value": {"x": [1.072491853515821, 0.7927700743929842, 7.0], "fun": 6.552067151838385, "stage": "local"}}
+{"kind": "evaluation", "name": "signed_reflection_and_polish", "value": {"x": [1.072491853515821, -2.207229925607016, 7.0], "fun": 5.525585366406764, "stage": "local"}}
+{"kind": "evaluation", "name": "signed_reflection_and_polish", "value": {"x": [2.072491853515821, -0.7072299256070158, 7.0], "fun": -2.3161900338457837, "stage": "local"}}
+{"kind": "evaluation", "name": "signed_reflection_and_polish", "value": {"x": [0.07249185351582099, -0.7072299256070158, 7.0], "fun": -1.6061574479090677, "stage": "local"}}
+{"kind": "evaluation", "name": "signed_reflection_and_polish", "value": {"x": [1.072491853515821, 0.04277007439298419, 7.0], "fun": -0.4545532945195201, "stage": "local"}}
+{"kind": "evaluation", "name": "signed_reflection_and_polish", "value": {"x": [1.072491853515821, -1.4572299256070158, 7.0], "fun": -0.9677941872353304, "stage": "local"}}
+{"kind": "callback", "name": "signed_reflection_and_polish", "value": {"x": [2.96675676714543, 2.2945839911455295, 7.0], "fun": 37.025220514098194, "nit": 1, "nfev": 2, "njev": 0}}
+{"kind": "callback", "name": "signed_reflection_and_polish", "value": {"x": [1.072491853515821, -0.7072299256070158, 7.0], "fun": -2.9611737408774257, "nit": 2, "nfev": 11, "njev": 0}}
+{"kind": "callback", "name": "signed_reflection_and_polish", "value": {"x": [1.072491853515821, -0.7072299256070158, 7.0], "fun": -2.9611737408774257, "nit": 3, "nfev": 12, "njev": 0}}
+{"kind": "callback", "name": "signed_reflection_and_polish", "value": {"x": [1.072491853515821, -0.7072299256070158, 7.0], "fun": -2.9611737408774257, "nit": 4, "nfev": 21, "njev": 0}}
+{"kind": "cycle", "name": "signed_reflection_and_polish", "value": {"cycle": 1, "temperature": 1.0, "radius": 0.25, "accepted": true, "chain": [2.96675676714543, 2.2945839911455295, 7.0], "chain_fun": 37.025220514098194, "rng_draws": 2}}
+{"kind": "cycle", "name": "signed_reflection_and_polish", "value": {"cycle": 2, "temperature": 0.95, "radius": 0.25, "accepted": true, "chain": [1.072491853515821, -0.7072299256070158, 7.0], "chain_fun": -2.9611737408774257, "rng_draws": 4}}
+{"kind": "cycle", "name": "signed_reflection_and_polish", "value": {"cycle": 3, "temperature": 0.9025, "radius": 0.25, "accepted": false, "chain": [1.072491853515821, -0.7072299256070158, 7.0], "chain_fun": -2.9611737408774257, "rng_draws": 7}}
+{"kind": "cycle", "name": "signed_reflection_and_polish", "value": {"cycle": 4, "temperature": 1.0, "radius": 0.0625, "accepted": false, "chain": [1.072491853515821, -0.7072299256070158, 7.0], "chain_fun": -2.9611737408774257, "rng_draws": 10}}
+{"kind": "input", "name": "initial_only_budget", "value": {"name": "initial_only_budget", "objective": "signed_quadratic", "x0": [3.5, 2.5, 7.0], "bounds": [[-4.0, 4.0], [-3.0, 3.0], [7.0, 7.0]], "maxiter": 4, "options": {"seed": 0, "local_search_interval": 2, "local_search_steps": 2, "reanneal_interval": 3, "xatol": 0.0, "fatol": 0.0}, "maxfev": 1}, "trace": true}
+{"kind": "result", "name": "initial_only_budget", "value": {"x": [3.5, 2.5, 7.0], "fun": 44.3125, "nit": 0, "nfev": 1, "njev": 0, "status": "max_evaluations", "success": false}}
+{"kind": "evaluation", "name": "initial_only_budget", "value": {"x": [3.5, 2.5, 7.0], "fun": 44.3125, "stage": "initial"}}
+{"kind": "input", "name": "partial_local_poll_budget", "value": {"name": "partial_local_poll_budget", "objective": "signed_quadratic", "x0": [3.5, 2.5, 7.0], "bounds": [[-4.0, 4.0], [-3.0, 3.0], [7.0, 7.0]], "maxiter": 4, "options": {"seed": 0, "local_search_interval": 2, "local_search_steps": 2, "reanneal_interval": 3, "xatol": 0.0, "fatol": 0.0}, "maxfev": 4}, "trace": true}
+{"kind": "result", "name": "partial_local_poll_budget", "value": {"x": [1.072491853515821, 2.292770074392984, 7.0], "fun": 34.0653080445542, "nit": 1, "nfev": 4, "njev": 0, "status": "max_evaluations", "success": false}}
+{"kind": "evaluation", "name": "partial_local_poll_budget", "value": {"x": [3.5, 2.5, 7.0], "fun": 44.3125, "stage": "initial"}}
+{"kind": "evaluation", "name": "partial_local_poll_budget", "value": {"x": [2.96675676714543, 2.2945839911455295, 7.0], "fun": 37.025220514098194, "stage": "proposal"}}
+{"kind": "evaluation", "name": "partial_local_poll_budget", "value": {"x": [1.072491853515821, 2.292770074392984, 7.0], "fun": 34.0653080445542, "stage": "proposal"}}
+{"kind": "evaluation", "name": "partial_local_poll_budget", "value": {"x": [3.072491853515821, 2.292770074392984, 7.0], "fun": 37.355275458617484, "stage": "local"}}
+{"kind": "callback", "name": "partial_local_poll_budget", "value": {"x": [2.96675676714543, 2.2945839911455295, 7.0], "fun": 37.025220514098194, "nit": 1, "nfev": 2, "njev": 0}}
+{"kind": "cycle", "name": "partial_local_poll_budget", "value": {"cycle": 1, "temperature": 1.0, "radius": 0.25, "accepted": true, "chain": [2.96675676714543, 2.2945839911455295, 7.0], "chain_fun": 37.025220514098194, "rng_draws": 2}}
+{"kind": "input", "name": "completed_cycle_budget", "value": {"name": "completed_cycle_budget", "objective": "signed_quadratic", "x0": [3.5, 2.5, 7.0], "bounds": [[-4.0, 4.0], [-3.0, 3.0], [7.0, 7.0]], "maxiter": 4, "options": {"seed": 0, "local_search_interval": 2, "local_search_steps": 2, "reanneal_interval": 3, "xatol": 0.0, "fatol": 0.0}, "maxfev": 2}, "trace": true}
+{"kind": "result", "name": "completed_cycle_budget", "value": {"x": [2.96675676714543, 2.2945839911455295, 7.0], "fun": 37.025220514098194, "nit": 1, "nfev": 2, "njev": 0, "status": "max_evaluations", "success": false}}
+{"kind": "evaluation", "name": "completed_cycle_budget", "value": {"x": [3.5, 2.5, 7.0], "fun": 44.3125, "stage": "initial"}}
+{"kind": "evaluation", "name": "completed_cycle_budget", "value": {"x": [2.96675676714543, 2.2945839911455295, 7.0], "fun": 37.025220514098194, "stage": "proposal"}}
+{"kind": "callback", "name": "completed_cycle_budget", "value": {"x": [2.96675676714543, 2.2945839911455295, 7.0], "fun": 37.025220514098194, "nit": 1, "nfev": 2, "njev": 0}}
+{"kind": "cycle", "name": "completed_cycle_budget", "value": {"cycle": 1, "temperature": 1.0, "radius": 0.25, "accepted": true, "chain": [2.96675676714543, 2.2945839911455295, 7.0], "chain_fun": 37.025220514098194, "rng_draws": 2}}
+{"kind": "input", "name": "callback_cancel_wins_iteration_limit", "value": {"name": "callback_cancel_wins_iteration_limit", "objective": "signed_quadratic", "x0": [3.5, 2.5, 7.0], "bounds": [[-4.0, 4.0], [-3.0, 3.0], [7.0, 7.0]], "maxiter": 1, "options": {"seed": 0, "local_search_interval": 2, "local_search_steps": 2, "reanneal_interval": 3, "xatol": 0.0, "fatol": 0.0}, "cancel_after_cycle": 1}, "trace": true}
+{"kind": "result", "name": "callback_cancel_wins_iteration_limit", "value": {"x": [2.96675676714543, 2.2945839911455295, 7.0], "fun": 37.025220514098194, "nit": 1, "nfev": 2, "njev": 0, "status": "cancelled", "success": false}}
+{"kind": "evaluation", "name": "callback_cancel_wins_iteration_limit", "value": {"x": [3.5, 2.5, 7.0], "fun": 44.3125, "stage": "initial"}}
+{"kind": "evaluation", "name": "callback_cancel_wins_iteration_limit", "value": {"x": [2.96675676714543, 2.2945839911455295, 7.0], "fun": 37.025220514098194, "stage": "proposal"}}
+{"kind": "callback", "name": "callback_cancel_wins_iteration_limit", "value": {"x": [2.96675676714543, 2.2945839911455295, 7.0], "fun": 37.025220514098194, "nit": 1, "nfev": 2, "njev": 0}}
+{"kind": "cycle", "name": "callback_cancel_wins_iteration_limit", "value": {"cycle": 1, "temperature": 1.0, "radius": 0.25, "accepted": true, "chain": [2.96675676714543, 2.2945839911455295, 7.0], "chain_fun": 37.025220514098194, "rng_draws": 2}}
+{"kind": "input", "name": "callback_error", "value": {"name": "callback_error", "objective": "signed_quadratic", "x0": [3.5, 2.5, 7.0], "bounds": [[-4.0, 4.0], [-3.0, 3.0], [7.0, 7.0]], "maxiter": 4, "options": {"seed": 0, "local_search_interval": 2, "local_search_steps": 2, "reanneal_interval": 3, "xatol": 0.0, "fatol": 0.0}, "fail_at_callback": 1}, "trace": true}
+{"kind": "result", "name": "callback_error", "value": {"x": [2.96675676714543, 2.2945839911455295, 7.0], "fun": 37.025220514098194, "nit": 1, "nfev": 2, "njev": 0, "status": "callback_error", "success": false}}
+{"kind": "evaluation", "name": "callback_error", "value": {"x": [3.5, 2.5, 7.0], "fun": 44.3125, "stage": "initial"}}
+{"kind": "evaluation", "name": "callback_error", "value": {"x": [2.96675676714543, 2.2945839911455295, 7.0], "fun": 37.025220514098194, "stage": "proposal"}}
+{"kind": "callback", "name": "callback_error", "value": {"x": [2.96675676714543, 2.2945839911455295, 7.0], "fun": 37.025220514098194, "nit": 1, "nfev": 2, "njev": 0}}
+{"kind": "cycle", "name": "callback_error", "value": {"cycle": 1, "temperature": 1.0, "radius": 0.25, "accepted": true, "chain": [2.96675676714543, 2.2945839911455295, 7.0], "chain_fun": 37.025220514098194, "rng_draws": 2}}
+{"kind": "input", "name": "objective_error_in_local_poll", "value": {"name": "objective_error_in_local_poll", "objective": "signed_quadratic", "x0": [3.5, 2.5, 7.0], "bounds": [[-4.0, 4.0], [-3.0, 3.0], [7.0, 7.0]], "maxiter": 4, "options": {"seed": 0, "local_search_interval": 2, "local_search_steps": 2, "reanneal_interval": 3, "xatol": 0.0, "fatol": 0.0}, "fail_at_evaluation": 4}, "trace": true}
+{"kind": "result", "name": "objective_error_in_local_poll", "value": {"x": [1.072491853515821, 2.292770074392984, 7.0], "fun": 34.0653080445542, "nit": 1, "nfev": 4, "njev": 0, "status": "objective_error", "success": false}}
+{"kind": "evaluation", "name": "objective_error_in_local_poll", "value": {"x": [3.5, 2.5, 7.0], "fun": 44.3125, "stage": "initial"}}
+{"kind": "evaluation", "name": "objective_error_in_local_poll", "value": {"x": [2.96675676714543, 2.2945839911455295, 7.0], "fun": 37.025220514098194, "stage": "proposal"}}
+{"kind": "evaluation", "name": "objective_error_in_local_poll", "value": {"x": [1.072491853515821, 2.292770074392984, 7.0], "fun": 34.0653080445542, "stage": "proposal"}}
+{"kind": "evaluation", "name": "objective_error_in_local_poll", "value": {"x": [3.072491853515821, 2.292770074392984, 7.0], "fun": null, "stage": "local", "error": true}}
+{"kind": "callback", "name": "objective_error_in_local_poll", "value": {"x": [2.96675676714543, 2.2945839911455295, 7.0], "fun": 37.025220514098194, "nit": 1, "nfev": 2, "njev": 0}}
+{"kind": "cycle", "name": "objective_error_in_local_poll", "value": {"cycle": 1, "temperature": 1.0, "radius": 0.25, "accepted": true, "chain": [2.96675676714543, 2.2945839911455295, 7.0], "chain_fun": 37.025220514098194, "rng_draws": 2}}
+{"kind": "input", "name": "nonfinite_initial", "value": {"name": "nonfinite_initial", "objective": "signed_quadratic", "x0": [3.5, 2.5, 7.0], "bounds": [[-4.0, 4.0], [-3.0, 3.0], [7.0, 7.0]], "maxiter": 4, "options": {"seed": 0, "local_search_interval": 2, "local_search_steps": 2, "reanneal_interval": 3, "xatol": 0.0, "fatol": 0.0}, "nonfinite_at_evaluation": 1}, "trace": true}
+{"kind": "result", "name": "nonfinite_initial", "value": {"x": [3.5, 2.5, 7.0], "fun": null, "nit": 0, "nfev": 1, "njev": 0, "status": "nonfinite", "success": false}}
+{"kind": "evaluation", "name": "nonfinite_initial", "value": {"x": [3.5, 2.5, 7.0], "fun": null, "stage": "initial"}}
+{"kind": "input", "name": "nonfinite_local_keeps_prior_best", "value": {"name": "nonfinite_local_keeps_prior_best", "objective": "signed_quadratic", "x0": [3.5, 2.5, 7.0], "bounds": [[-4.0, 4.0], [-3.0, 3.0], [7.0, 7.0]], "maxiter": 4, "options": {"seed": 0, "local_search_interval": 2, "local_search_steps": 2, "reanneal_interval": 3, "xatol": 0.0, "fatol": 0.0}, "nonfinite_at_evaluation": 4}, "trace": true}
+{"kind": "result", "name": "nonfinite_local_keeps_prior_best", "value": {"x": [1.072491853515821, 2.292770074392984, 7.0], "fun": 34.0653080445542, "nit": 1, "nfev": 4, "njev": 0, "status": "nonfinite", "success": false}}
+{"kind": "evaluation", "name": "nonfinite_local_keeps_prior_best", "value": {"x": [3.5, 2.5, 7.0], "fun": 44.3125, "stage": "initial"}}
+{"kind": "evaluation", "name": "nonfinite_local_keeps_prior_best", "value": {"x": [2.96675676714543, 2.2945839911455295, 7.0], "fun": 37.025220514098194, "stage": "proposal"}}
+{"kind": "evaluation", "name": "nonfinite_local_keeps_prior_best", "value": {"x": [1.072491853515821, 2.292770074392984, 7.0], "fun": 34.0653080445542, "stage": "proposal"}}
+{"kind": "evaluation", "name": "nonfinite_local_keeps_prior_best", "value": {"x": [3.072491853515821, 2.292770074392984, 7.0], "fun": null, "stage": "local"}}
+{"kind": "callback", "name": "nonfinite_local_keeps_prior_best", "value": {"x": [2.96675676714543, 2.2945839911455295, 7.0], "fun": 37.025220514098194, "nit": 1, "nfev": 2, "njev": 0}}
+{"kind": "cycle", "name": "nonfinite_local_keeps_prior_best", "value": {"cycle": 1, "temperature": 1.0, "radius": 0.25, "accepted": true, "chain": [2.96675676714543, 2.2945839911455295, 7.0], "chain_fun": 37.025220514098194, "rng_draws": 2}}
+{"kind": "input", "name": "rounded_proposals_are_not_charged", "value": {"name": "rounded_proposals_are_not_charged", "objective": "constant", "x0": [1.0], "bounds": [[1.0, 1.0000000000000002]], "maxiter": 3, "options": {"step_size": 1e-300, "local_search_interval": 1, "xatol": 0.0}}, "trace": true}
+{"kind": "result", "name": "rounded_proposals_are_not_charged", "value": {"x": [1.0], "fun": -7.0, "nit": 3, "nfev": 1, "njev": 0, "status": "max_iterations", "success": false}}
+{"kind": "evaluation", "name": "rounded_proposals_are_not_charged", "value": {"x": [1.0], "fun": -7.0, "stage": "initial"}}
+{"kind": "callback", "name": "rounded_proposals_are_not_charged", "value": {"x": [1.0], "fun": -7.0, "nit": 1, "nfev": 1, "njev": 0}}
+{"kind": "callback", "name": "rounded_proposals_are_not_charged", "value": {"x": [1.0], "fun": -7.0, "nit": 2, "nfev": 1, "njev": 0}}
+{"kind": "callback", "name": "rounded_proposals_are_not_charged", "value": {"x": [1.0], "fun": -7.0, "nit": 3, "nfev": 1, "njev": 0}}
+{"kind": "cycle", "name": "rounded_proposals_are_not_charged", "value": {"cycle": 1, "temperature": 1.0, "radius": 6.25e-302, "accepted": true, "chain": [1.0], "chain_fun": -7.0, "rng_draws": 1}}
+{"kind": "cycle", "name": "rounded_proposals_are_not_charged", "value": {"cycle": 2, "temperature": 0.95, "radius": 3.90625e-303, "accepted": true, "chain": [1.0], "chain_fun": -7.0, "rng_draws": 2}}
+{"kind": "cycle", "name": "rounded_proposals_are_not_charged", "value": {"cycle": 3, "temperature": 0.9025, "radius": 2.44140625e-304, "accepted": true, "chain": [1.0], "chain_fun": -7.0, "rng_draws": 3}}
+{"kind": "input", "name": "temperature_underflow_floor", "value": {"name": "temperature_underflow_floor", "objective": "constant", "x0": [0.2], "bounds": [[-1.0, 1.0]], "maxiter": 3, "options": {"initial_temperature": 5e-324, "cooling_rate": 0.5}}, "trace": true}
+{"kind": "result", "name": "temperature_underflow_floor", "value": {"x": [0.2], "fun": -7.0, "nit": 3, "nfev": 4, "njev": 0, "status": "max_iterations", "success": false}}
+{"kind": "evaluation", "name": "temperature_underflow_floor", "value": {"x": [0.2], "fun": -7.0, "stage": "initial"}}
+{"kind": "evaluation", "name": "temperature_underflow_floor", "value": {"x": [0.5833108082136427], "fun": -7.0, "stage": "proposal"}}
+{"kind": "evaluation", "name": "temperature_underflow_floor", "value": {"x": [0.5148388052621526], "fun": -7.0, "stage": "proposal"}}
+{"kind": "evaluation", "name": "temperature_underflow_floor", "value": {"x": [0.04127257685475039], "fun": -7.0, "stage": "proposal"}}
+{"kind": "callback", "name": "temperature_underflow_floor", "value": {"x": [0.2], "fun": -7.0, "nit": 1, "nfev": 2, "njev": 0}}
+{"kind": "callback", "name": "temperature_underflow_floor", "value": {"x": [0.2], "fun": -7.0, "nit": 2, "nfev": 3, "njev": 0}}
+{"kind": "callback", "name": "temperature_underflow_floor", "value": {"x": [0.2], "fun": -7.0, "nit": 3, "nfev": 4, "njev": 0}}
+{"kind": "cycle", "name": "temperature_underflow_floor", "value": {"cycle": 1, "temperature": 5e-324, "radius": 0.25, "accepted": true, "chain": [0.5833108082136427], "chain_fun": -7.0, "rng_draws": 1}}
+{"kind": "cycle", "name": "temperature_underflow_floor", "value": {"cycle": 2, "temperature": 5e-324, "radius": 0.25, "accepted": true, "chain": [0.5148388052621526], "chain_fun": -7.0, "rng_draws": 2}}
+{"kind": "cycle", "name": "temperature_underflow_floor", "value": {"cycle": 3, "temperature": 5e-324, "radius": 0.25, "accepted": true, "chain": [0.04127257685475039], "chain_fun": -7.0, "rng_draws": 3}}
+{"kind": "input", "name": "boundary_local_clipping_skips_duplicates", "value": {"name": "boundary_local_clipping_skips_duplicates", "objective": "boundary_quadratic", "x0": [1.0], "bounds": [[0.0, 1.0]], "maxiter": 3, "options": {"step_size": 1.0, "local_search_interval": 1, "local_search_steps": 2, "reanneal_interval": 2}}, "trace": true}
+{"kind": "result", "name": "boundary_local_clipping_skips_duplicates", "value": {"x": [1.0], "fun": -16.0, "nit": 3, "nfev": 10, "njev": 0, "status": "max_iterations", "success": false}}
+{"kind": "evaluation", "name": "boundary_local_clipping_skips_duplicates", "value": {"x": [1.0], "fun": -16.0, "stage": "initial"}}
+{"kind": "evaluation", "name": "boundary_local_clipping_skips_duplicates", "value": {"x": [0.2333783835727148], "fun": -12.345804831517277, "stage": "proposal"}}
+{"kind": "evaluation", "name": "boundary_local_clipping_skips_duplicates", "value": {"x": [0.0], "fun": -11.0, "stage": "local"}}
+{"kind": "evaluation", "name": "boundary_local_clipping_skips_duplicates", "value": {"x": [0.5], "fun": -13.75, "stage": "local"}}
+{"kind": "evaluation", "name": "boundary_local_clipping_skips_duplicates", "value": {"x": [0.05286754318519549], "fun": -11.314410281988735, "stage": "proposal"}}
+{"kind": "evaluation", "name": "boundary_local_clipping_skips_duplicates", "value": {"x": [0.75], "fun": -14.9375, "stage": "local"}}
+{"kind": "evaluation", "name": "boundary_local_clipping_skips_duplicates", "value": {"x": [0.875], "fun": -15.484375, "stage": "local"}}
+{"kind": "evaluation", "name": "boundary_local_clipping_skips_duplicates", "value": {"x": [0.21269338313442487], "fun": -12.230921823577383, "stage": "proposal"}}
+{"kind": "evaluation", "name": "boundary_local_clipping_skips_duplicates", "value": {"x": [0.9375], "fun": -15.74609375, "stage": "local"}}
+{"kind": "evaluation", "name": "boundary_local_clipping_skips_duplicates", "value": {"x": [0.96875], "fun": -15.8740234375, "stage": "local"}}
+{"kind": "callback", "name": "boundary_local_clipping_skips_duplicates", "value": {"x": [1.0], "fun": -16.0, "nit": 1, "nfev": 4, "njev": 0}}
+{"kind": "callback", "name": "boundary_local_clipping_skips_duplicates", "value": {"x": [1.0], "fun": -16.0, "nit": 2, "nfev": 7, "njev": 0}}
+{"kind": "callback", "name": "boundary_local_clipping_skips_duplicates", "value": {"x": [1.0], "fun": -16.0, "nit": 3, "nfev": 10, "njev": 0}}
+{"kind": "cycle", "name": "boundary_local_clipping_skips_duplicates", "value": {"cycle": 1, "temperature": 1.0, "radius": 0.25, "accepted": false, "chain": [1.0], "chain_fun": -16.0, "rng_draws": 2}}
+{"kind": "cycle", "name": "boundary_local_clipping_skips_duplicates", "value": {"cycle": 2, "temperature": 0.95, "radius": 0.0625, "accepted": false, "chain": [1.0], "chain_fun": -16.0, "rng_draws": 4}}
+{"kind": "cycle", "name": "boundary_local_clipping_skips_duplicates", "value": {"cycle": 3, "temperature": 1.0, "radius": 0.015625, "accepted": false, "chain": [1.0], "chain_fun": -16.0, "rng_draws": 6}}
+{"kind": "input", "name": "ties_preserve_first", "value": {"name": "ties_preserve_first", "objective": "constant", "x0": [0.2], "bounds": [[-1.0, 1.0]], "maxiter": 3, "options": {"local_search_interval": 1, "local_search_steps": 2, "xatol": 0.0}}, "trace": true}
+{"kind": "result", "name": "ties_preserve_first", "value": {"x": [0.2], "fun": -7.0, "nit": 3, "nfev": 16, "njev": 0, "status": "max_iterations", "success": false}}
+{"kind": "evaluation", "name": "ties_preserve_first", "value": {"x": [0.2], "fun": -7.0, "stage": "initial"}}
+{"kind": "evaluation", "name": "ties_preserve_first", "value": {"x": [0.5833108082136427], "fun": -7.0, "stage": "proposal"}}
+{"kind": "evaluation", "name": "ties_preserve_first", "value": {"x": [0.7], "fun": -7.0, "stage": "local"}}
+{"kind": "evaluation", "name": "ties_preserve_first", "value": {"x": [-0.30000000000000004], "fun": -7.0, "stage": "local"}}
+{"kind": "evaluation", "name": "ties_preserve_first", "value": {"x": [0.44999999999999996], "fun": -7.0, "stage": "local"}}
+{"kind": "evaluation", "name": "ties_preserve_first", "value": {"x": [-0.050000000000000044], "fun": -7.0, "stage": "local"}}
+{"kind": "evaluation", "name": "ties_preserve_first", "value": {"x": [0.13152799704850993], "fun": -7.0, "stage": "proposal"}}
+{"kind": "evaluation", "name": "ties_preserve_first", "value": {"x": [0.32499999999999996], "fun": -7.0, "stage": "local"}}
+{"kind": "evaluation", "name": "ties_preserve_first", "value": {"x": [0.07499999999999996], "fun": -7.0, "stage": "local"}}
+{"kind": "evaluation", "name": "ties_preserve_first", "value": {"x": [0.26249999999999996], "fun": -7.0, "stage": "local"}}
+{"kind": "evaluation", "name": "ties_preserve_first", "value": {"x": [0.13749999999999996], "fun": -7.0, "stage": "local"}}
+{"kind": "evaluation", "name": "ties_preserve_first", "value": {"x": [-0.2735662284074023], "fun": -7.0, "stage": "proposal"}}
+{"kind": "evaluation", "name": "ties_preserve_first", "value": {"x": [0.23124999999999996], "fun": -7.0, "stage": "local"}}
+{"kind": "evaluation", "name": "ties_preserve_first", "value": {"x": [0.16874999999999996], "fun": -7.0, "stage": "local"}}
+{"kind": "evaluation", "name": "ties_preserve_first", "value": {"x": [0.21562499999999996], "fun": -7.0, "stage": "local"}}
+{"kind": "evaluation", "name": "ties_preserve_first", "value": {"x": [0.18437499999999996], "fun": -7.0, "stage": "local"}}
+{"kind": "callback", "name": "ties_preserve_first", "value": {"x": [0.2], "fun": -7.0, "nit": 1, "nfev": 6, "njev": 0}}
+{"kind": "callback", "name": "ties_preserve_first", "value": {"x": [0.2], "fun": -7.0, "nit": 2, "nfev": 11, "njev": 0}}
+{"kind": "callback", "name": "ties_preserve_first", "value": {"x": [0.2], "fun": -7.0, "nit": 3, "nfev": 16, "njev": 0}}
+{"kind": "cycle", "name": "ties_preserve_first", "value": {"cycle": 1, "temperature": 1.0, "radius": 0.0625, "accepted": true, "chain": [0.2], "chain_fun": -7.0, "rng_draws": 1}}
+{"kind": "cycle", "name": "ties_preserve_first", "value": {"cycle": 2, "temperature": 0.95, "radius": 0.015625, "accepted": true, "chain": [0.2], "chain_fun": -7.0, "rng_draws": 2}}
+{"kind": "cycle", "name": "ties_preserve_first", "value": {"cycle": 3, "temperature": 0.9025, "radius": 0.00390625, "accepted": true, "chain": [0.2], "chain_fun": -7.0, "rng_draws": 3}}
+{"kind": "input", "name": "constant_local_convergence", "value": {"name": "constant_local_convergence", "objective": "constant", "x0": [0.2], "bounds": [[-1.0, 1.0]], "maxiter": 3, "options": {"local_search_interval": 1, "local_search_steps": 2, "xatol": 0.25}}, "trace": true}
+{"kind": "result", "name": "constant_local_convergence", "value": {"x": [0.2], "fun": -7.0, "nit": 1, "nfev": 4, "njev": 0, "status": "converged", "success": true}}
+{"kind": "evaluation", "name": "constant_local_convergence", "value": {"x": [0.2], "fun": -7.0, "stage": "initial"}}
+{"kind": "evaluation", "name": "constant_local_convergence", "value": {"x": [0.5833108082136427], "fun": -7.0, "stage": "proposal"}}
+{"kind": "evaluation", "name": "constant_local_convergence", "value": {"x": [0.7], "fun": -7.0, "stage": "local"}}
+{"kind": "evaluation", "name": "constant_local_convergence", "value": {"x": [-0.30000000000000004], "fun": -7.0, "stage": "local"}}
+{"kind": "callback", "name": "constant_local_convergence", "value": {"x": [0.2], "fun": -7.0, "nit": 1, "nfev": 4, "njev": 0}}
+{"kind": "cycle", "name": "constant_local_convergence", "value": {"cycle": 1, "temperature": 1.0, "radius": 0.25, "accepted": true, "chain": [0.2], "chain_fun": -7.0, "rng_draws": 1}}
+{"kind": "input", "name": "convergence_loses_to_iteration_limit", "value": {"name": "convergence_loses_to_iteration_limit", "objective": "constant", "x0": [0.2], "bounds": [[-1.0, 1.0]], "maxiter": 1, "options": {"local_search_interval": 1, "xatol": 0.25}}, "trace": true}
+{"kind": "result", "name": "convergence_loses_to_iteration_limit", "value": {"x": [0.2], "fun": -7.0, "nit": 1, "nfev": 4, "njev": 0, "status": "max_iterations", "success": false}}
+{"kind": "evaluation", "name": "convergence_loses_to_iteration_limit", "value": {"x": [0.2], "fun": -7.0, "stage": "initial"}}
+{"kind": "evaluation", "name": "convergence_loses_to_iteration_limit", "value": {"x": [0.5833108082136427], "fun": -7.0, "stage": "proposal"}}
+{"kind": "evaluation", "name": "convergence_loses_to_iteration_limit", "value": {"x": [0.7], "fun": -7.0, "stage": "local"}}
+{"kind": "evaluation", "name": "convergence_loses_to_iteration_limit", "value": {"x": [-0.30000000000000004], "fun": -7.0, "stage": "local"}}
+{"kind": "callback", "name": "convergence_loses_to_iteration_limit", "value": {"x": [0.2], "fun": -7.0, "nit": 1, "nfev": 4, "njev": 0}}
+{"kind": "cycle", "name": "convergence_loses_to_iteration_limit", "value": {"cycle": 1, "temperature": 1.0, "radius": 0.25, "accepted": true, "chain": [0.2], "chain_fun": -7.0, "rng_draws": 1}}
+{"kind": "input", "name": "reanneal_does_not_restore_radius", "value": {"name": "reanneal_does_not_restore_radius", "objective": "constant", "x0": [0.2], "bounds": [[-1.0, 1.0]], "maxiter": 4, "options": {"local_search_interval": 1, "local_search_steps": 1, "reanneal_interval": 2, "xatol": 0.0}}, "trace": true}
+{"kind": "result", "name": "reanneal_does_not_restore_radius", "value": {"x": [0.2], "fun": -7.0, "nit": 4, "nfev": 13, "njev": 0, "status": "max_iterations", "success": false}}
+{"kind": "evaluation", "name": "reanneal_does_not_restore_radius", "value": {"x": [0.2], "fun": -7.0, "stage": "initial"}}
+{"kind": "evaluation", "name": "reanneal_does_not_restore_radius", "value": {"x": [0.5833108082136427], "fun": -7.0, "stage": "proposal"}}
+{"kind": "evaluation", "name": "reanneal_does_not_restore_radius", "value": {"x": [0.7], "fun": -7.0, "stage": "local"}}
+{"kind": "evaluation", "name": "reanneal_does_not_restore_radius", "value": {"x": [-0.30000000000000004], "fun": -7.0, "stage": "local"}}
+{"kind": "evaluation", "name": "reanneal_does_not_restore_radius", "value": {"x": [0.13152799704850993], "fun": -7.0, "stage": "proposal"}}
+{"kind": "evaluation", "name": "reanneal_does_not_restore_radius", "value": {"x": [0.44999999999999996], "fun": -7.0, "stage": "local"}}
+{"kind": "evaluation", "name": "reanneal_does_not_restore_radius", "value": {"x": [-0.050000000000000044], "fun": -7.0, "stage": "local"}}
+{"kind": "evaluation", "name": "reanneal_does_not_restore_radius", "value": {"x": [-0.2735662284074023], "fun": -7.0, "stage": "proposal"}}
+{"kind": "evaluation", "name": "reanneal_does_not_restore_radius", "value": {"x": [0.32499999999999996], "fun": -7.0, "stage": "local"}}
+{"kind": "evaluation", "name": "reanneal_does_not_restore_radius", "value": {"x": [0.07499999999999996], "fun": -7.0, "stage": "local"}}
+{"kind": "evaluation", "name": "reanneal_does_not_restore_radius", "value": {"x": [0.6708819781538284], "fun": -7.0, "stage": "proposal"}}
+{"kind": "evaluation", "name": "reanneal_does_not_restore_radius", "value": {"x": [0.26249999999999996], "fun": -7.0, "stage": "local"}}
+{"kind": "evaluation", "name": "reanneal_does_not_restore_radius", "value": {"x": [0.13749999999999996], "fun": -7.0, "stage": "local"}}
+{"kind": "callback", "name": "reanneal_does_not_restore_radius", "value": {"x": [0.2], "fun": -7.0, "nit": 1, "nfev": 4, "njev": 0}}
+{"kind": "callback", "name": "reanneal_does_not_restore_radius", "value": {"x": [0.2], "fun": -7.0, "nit": 2, "nfev": 7, "njev": 0}}
+{"kind": "callback", "name": "reanneal_does_not_restore_radius", "value": {"x": [0.2], "fun": -7.0, "nit": 3, "nfev": 10, "njev": 0}}
+{"kind": "callback", "name": "reanneal_does_not_restore_radius", "value": {"x": [0.2], "fun": -7.0, "nit": 4, "nfev": 13, "njev": 0}}
+{"kind": "cycle", "name": "reanneal_does_not_restore_radius", "value": {"cycle": 1, "temperature": 1.0, "radius": 0.125, "accepted": true, "chain": [0.2], "chain_fun": -7.0, "rng_draws": 1}}
+{"kind": "cycle", "name": "reanneal_does_not_restore_radius", "value": {"cycle": 2, "temperature": 0.95, "radius": 0.0625, "accepted": true, "chain": [0.2], "chain_fun": -7.0, "rng_draws": 2}}
+{"kind": "cycle", "name": "reanneal_does_not_restore_radius", "value": {"cycle": 3, "temperature": 1.0, "radius": 0.03125, "accepted": true, "chain": [0.2], "chain_fun": -7.0, "rng_draws": 3}}
+{"kind": "cycle", "name": "reanneal_does_not_restore_radius", "value": {"cycle": 4, "temperature": 0.95, "radius": 0.015625, "accepted": true, "chain": [0.2], "chain_fun": -7.0, "rng_draws": 4}}
+{"kind": "input", "name": "huge_finite_box_stays_finite", "value": {"name": "huge_finite_box_stays_finite", "objective": "rounded_normalization", "x0": [0.0], "bounds": [[-1e+308, 7e+307]], "maxiter": 3, "options": {"local_search_interval": 1, "local_search_steps": 2, "xatol": 0.0}}, "trace": true}
+{"kind": "result", "name": "huge_finite_box_stays_finite", "value": {"x": [0.0], "fun": -7.0, "nit": 3, "nfev": 16, "njev": 0, "status": "max_iterations", "success": false}}
+{"kind": "evaluation", "name": "huge_finite_box_stays_finite", "value": {"x": [0.0], "fun": -7.0, "stage": "initial"}}
+{"kind": "evaluation", "name": "huge_finite_box_stays_finite", "value": {"x": [3.2581418698159637e+307], "fun": -7.0, "stage": "proposal"}}
+{"kind": "evaluation", "name": "huge_finite_box_stays_finite", "value": {"x": [4.250000000000001e+307], "fun": -7.0, "stage": "local"}}
+{"kind": "evaluation", "name": "huge_finite_box_stays_finite", "value": {"x": [-4.25e+307], "fun": -7.0, "stage": "local"}}
+{"kind": "evaluation", "name": "huge_finite_box_stays_finite", "value": {"x": [2.1250000000000004e+307], "fun": -7.0, "stage": "local"}}
+{"kind": "evaluation", "name": "huge_finite_box_stays_finite", "value": {"x": [-2.1250000000000004e+307], "fun": -7.0, "stage": "local"}}
+{"kind": "evaluation", "name": "huge_finite_box_stays_finite", "value": {"x": [-5.820120250876647e+306], "fun": -7.0, "stage": "proposal"}}
+{"kind": "evaluation", "name": "huge_finite_box_stays_finite", "value": {"x": [1.0625000000000012e+307], "fun": -7.0, "stage": "local"}}
+{"kind": "evaluation", "name": "huge_finite_box_stays_finite", "value": {"x": [-1.0624999999999992e+307], "fun": -7.0, "stage": "local"}}
+{"kind": "evaluation", "name": "huge_finite_box_stays_finite", "value": {"x": [5.312500000000006e+306], "fun": -7.0, "stage": "local"}}
+{"kind": "evaluation", "name": "huge_finite_box_stays_finite", "value": {"x": [-5.312499999999996e+306], "fun": -7.0, "stage": "local"}}
+{"kind": "evaluation", "name": "huge_finite_box_stays_finite", "value": {"x": [-4.0253129414629187e+307], "fun": -7.0, "stage": "proposal"}}
+{"kind": "evaluation", "name": "huge_finite_box_stays_finite", "value": {"x": [2.656250000000013e+306], "fun": -7.0, "stage": "local"}}
+{"kind": "evaluation", "name": "huge_finite_box_stays_finite", "value": {"x": [-2.656249999999993e+306], "fun": -7.0, "stage": "local"}}
+{"kind": "evaluation", "name": "huge_finite_box_stays_finite", "value": {"x": [1.3281250000000115e+306], "fun": -7.0, "stage": "local"}}
+{"kind": "evaluation", "name": "huge_finite_box_stays_finite", "value": {"x": [-1.3281249999999915e+306], "fun": -7.0, "stage": "local"}}
+{"kind": "callback", "name": "huge_finite_box_stays_finite", "value": {"x": [0.0], "fun": -7.0, "nit": 1, "nfev": 6, "njev": 0}}
+{"kind": "callback", "name": "huge_finite_box_stays_finite", "value": {"x": [0.0], "fun": -7.0, "nit": 2, "nfev": 11, "njev": 0}}
+{"kind": "callback", "name": "huge_finite_box_stays_finite", "value": {"x": [0.0], "fun": -7.0, "nit": 3, "nfev": 16, "njev": 0}}
+{"kind": "cycle", "name": "huge_finite_box_stays_finite", "value": {"cycle": 1, "temperature": 1.0, "radius": 0.0625, "accepted": true, "chain": [0.0], "chain_fun": -7.0, "rng_draws": 1}}
+{"kind": "cycle", "name": "huge_finite_box_stays_finite", "value": {"cycle": 2, "temperature": 0.95, "radius": 0.015625, "accepted": true, "chain": [0.0], "chain_fun": -7.0, "rng_draws": 2}}
+{"kind": "cycle", "name": "huge_finite_box_stays_finite", "value": {"cycle": 3, "temperature": 0.9025, "radius": 0.00390625, "accepted": true, "chain": [0.0], "chain_fun": -7.0, "rng_draws": 3}}
+{"kind": "input", "name": "all_fixed_once", "value": {"name": "all_fixed_once", "objective": "signed_quadratic", "x0": [1.25, -0.75], "bounds": [[1.25, 1.25], [-0.75, -0.75]]}, "trace": true}
+{"kind": "result", "name": "all_fixed_once", "value": {"x": [1.25, -0.75], "fun": -3.0, "nit": 0, "nfev": 1, "njev": 0, "status": "converged", "success": true}}
+{"kind": "evaluation", "name": "all_fixed_once", "value": {"x": [1.25, -0.75], "fun": -3.0, "stage": "initial"}}
+{"kind": "input", "name": "signed_analytic_quality", "value": {"name": "signed_analytic_quality", "objective": "signed_quadratic", "x0": [0.0, 0.0], "bounds": [[-4.0, 4.0], [-3.0, 3.0]], "analytic_x": [1.25, -0.75], "analytic_fun": -3.0, "maxiter": 1000, "options": {"seed": 42, "initial_temperature": 20.0}}, "trace": false}
+{"kind": "result", "name": "signed_analytic_quality", "value": {"x": [1.2499966977044803, -0.7499994274483415], "fun": -2.9999999999877835, "nit": 80, "nfev": 209, "njev": 0, "status": "converged", "success": true}}
+{"kind": "input", "name": "multimodal_analytic_quality", "value": {"name": "multimodal_analytic_quality", "objective": "multimodal_polynomial", "x0": [-2.0], "bounds": [[-3.0, 3.0]], "analytic_x": [1.0], "analytic_fun": 0.0, "maxiter": 1000, "options": {"seed": 42, "initial_temperature": 20.0}}, "trace": false}
+{"kind": "result", "name": "multimodal_analytic_quality", "value": {"x": [0.9999995700904138], "fun": 1.681882018878829e-12, "nit": 380, "nfev": 679, "njev": 0, "status": "converged", "success": true}}
+{"kind": "input", "name": "himmelblau_analytic_quality", "value": {"name": "himmelblau_analytic_quality", "objective": "himmelblau", "x0": [0.0, 0.0], "bounds": [[-5.0, 5.0], [-5.0, 5.0]], "analytic_fun": 0.0, "multiple_minima": true, "maxiter": 1000, "options": {"seed": 42, "initial_temperature": 20.0}}, "trace": false}
+{"kind": "result", "name": "himmelblau_analytic_quality", "value": {"x": [-3.7793090892088848, -3.283186615287152], "fun": 1.1648689413653227e-10, "nit": 90, "nfev": 223, "njev": 0, "status": "converged", "success": true}}
+{"kind": "input", "name": "rastrigin_analytic_quality", "value": {"name": "rastrigin_analytic_quality", "objective": "shifted_rastrigin", "x0": [2.4, -1.7], "bounds": [[-5.12, 5.12], [-5.12, 5.12]], "analytic_x": [0.0, 0.0], "analytic_fun": -5.0, "maxiter": 1000, "options": {"seed": 1, "initial_temperature": 20.0}}, "trace": false}
+{"kind": "result", "name": "rastrigin_analytic_quality", "value": {"x": [7.37987753574032e-07, 2.251214707094107e-06], "fun": -4.999999998886505, "nit": 90, "nfev": 227, "njev": 0, "status": "converged", "success": true}}
+{"kind": "input", "name": "rastrigin_local_minimum_is_not_global", "value": {"name": "rastrigin_local_minimum_is_not_global", "objective": "shifted_rastrigin", "x0": [2.4, -1.7], "bounds": [[-5.12, 5.12], [-5.12, 5.12]], "analytic_x": [0.0, 0.0], "analytic_fun": -5.0, "maxiter": 1000, "options": {"seed": 42, "initial_temperature": 20.0}, "global_gap": 0.994959058809727}, "trace": false}
+{"kind": "result", "name": "rastrigin_local_minimum_is_not_global", "value": {"x": [-0.9949604596018649, -2.309517813436912e-06], "fun": -4.005040941190273, "nit": 90, "nfev": 223, "njev": 0, "status": "converged", "success": true}}
