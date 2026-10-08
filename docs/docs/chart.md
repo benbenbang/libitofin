@@ -292,6 +292,66 @@ contain both open and close, and volume must be nonnegative. Volume direction
 compares each close with its open: `-1` down, `0` flat, `1` up. Chart colors
 remain the caller's choice.
 
+## Cumulative VWAP and on-balance volume
+
+`vwap`/`VWAP` takes **caller-supplied prices** and nonnegative volumes. Choose
+trade prices, closes, or precomputed typical prices explicitly. It computes
+`sum(price * volume) / sum(volume)` cumulatively from the beginning of each
+call, not a rolling window. Call it separately for each session or anchor;
+there are no inferred dates or automatic intraday resets.
+
+A zero-volume prefix is missing: `first_valid` is the first positive-volume
+bar, or the input length when none exists. After that, zero volume carries the
+previous VWAP. `obv`/`OBV` instead starts with a **valid zero at index 0** and
+ignores the initial volume after validating it. Later price rises add volume,
+falls subtract it, and equal closes preserve the previous OBV.
+
+=== "Python"
+
+    ```python
+    from itofin import chart
+
+    price = [10.0, 12.0, 11.0, 11.0, 9.0]
+    volume = [0.0, 2.0, 1.0, 0.0, 3.0]
+    weighted = chart.vwap(price, volume)
+    signed = chart.obv(price, volume)
+    assert weighted.first_valid == 1
+    assert weighted.to_list()[0] is None
+    assert abs(weighted.values[-1] - 31 / 3) < 1e-12
+    assert signed.to_list() == [0.0, 2.0, 1.0, 1.0, -2.0]
+    ```
+
+=== "Go"
+
+    ```go
+    import itofin "github.com/benbenbang/libitofin/sdk/go"
+
+    price := []float64{10, 12, 11, 11, 9}
+    volume := []float64{0, 2, 1, 0, 3}
+    weighted, err := itofin.VWAP(price, volume)
+    if err != nil { panic(err) }
+    signed, err := itofin.OBV(price, volume)
+    if err != nil { panic(err) }
+    _ = weighted.NullableValues()
+    _ = signed.Values
+    ```
+
+Rust exposes `math::chart::{vwap, obv}` with the same `ChartSeries` result.
+C exposes `itofin_chart_vwap` and `itofin_chart_obv` with caller-owned output
+buffers and one `first_valid` index. The hand fixture above has VWAP values
+`[missing, 12, 35/3, 35/3, 31/3]`; all four facades use the same core.
+
+Inputs must have equal lengths and finite prices/volumes. Negative prices are
+valid, but negative volume is not. Overflowing cumulative volume or signed OBV
+returns an error. VWAP uses an online weighted mean rather than raw products,
+so extreme finite prices and tiny positive volumes need not overflow or
+underflow artificially. Ordinary floating-point rounding still applies;
+very small relative weights may round their contribution to zero.
+
+The formulas follow [StockCharts VWAP](https://chartschool.stockcharts.com/table-of-contents/technical-indicators-and-overlays/technical-overlays/volume-weighted-average-price-vwap)
+and [OBV](https://chartschool.stockcharts.com/table-of-contents/technical-indicators-and-overlays/technical-indicators/on-balance-volume-obv).
+The zero OBV seed and missing zero-volume VWAP prefix are explicit local conventions.
+
 ## Bollinger Bands and RSI
 
 Bollinger Bands use a trailing population standard deviation. The default is

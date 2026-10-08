@@ -156,6 +156,20 @@
       "python": "itofin.chart.Macd.histogram",
       "status": "implemented",
       "tests": "TestChartMACD"
+    },
+    {
+      "c": "itofin_chart_vwap",
+      "go": "VWAP",
+      "python": "itofin.chart.vwap",
+      "status": "implemented",
+      "tests": "TestChartVWAPOBVHandFixture"
+    },
+    {
+      "c": "itofin_chart_obv",
+      "go": "OBV",
+      "python": "itofin.chart.obv",
+      "status": "implemented",
+      "tests": "TestChartVWAPOBVHandFixture"
     }
   ]
 }

@@ -545,6 +545,8 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     chart.add_class::<chart_prices::PyDatedIntervalPrice>()?;
     chart.add_function(wrap_pyfunction!(chart::sma, &chart)?)?;
     chart.add_function(wrap_pyfunction!(chart::ema, &chart)?)?;
+    chart.add_function(wrap_pyfunction!(chart::vwap, &chart)?)?;
+    chart.add_function(wrap_pyfunction!(chart::obv, &chart)?)?;
     chart.add_function(wrap_pyfunction!(chart::volume_bars, &chart)?)?;
     chart.add_function(wrap_pyfunction!(chart::bollinger_bands, &chart)?)?;
     chart.add_function(wrap_pyfunction!(chart::rsi, &chart)?)?;
