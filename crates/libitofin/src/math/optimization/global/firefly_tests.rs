@@ -271,6 +271,8 @@ fn fixed_box_prices_once_and_records_convergence() {
     assert_eq!(cost.0.get(), 1);
 }
 
+#[path = "firefly_heston_tests.rs"]
+mod heston;
 #[path = "firefly_model_tests.rs"]
 mod model;
 #[path = "firefly_validation_tests.rs"]
