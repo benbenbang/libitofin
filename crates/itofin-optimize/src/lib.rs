@@ -13,6 +13,10 @@
 //! An independent implementation from the papers below. Nothing is adapted from
 //! another optimizer; see `THIRD_PARTY_NOTICES.md` in this crate.
 //!
+//! - Kirkpatrick, S., Gelatt, C. D. and Vecchi, M. P. (1983), "Optimization
+//!   by Simulated Annealing", <https://doi.org/10.1126/science.220.4598.671>.
+//! - Hooke, R. and Jeeves, T. A. (1961), "Direct Search Solution of Numerical
+//!   and Statistical Problems", <https://doi.org/10.1145/321062.321069>.
 //! - Kennedy, J. and Eberhart, R. (1995), "Particle swarm optimization",
 //!   Proceedings of ICNN, <https://doi.org/10.1109/ICNN.1995.488968>.
 //! - Shi, Y. and Eberhart, R. (1998), "A modified particle swarm optimizer",
@@ -57,7 +61,10 @@ mod tests;
 pub use counters::{Counters, Halt};
 pub use error::{InvalidInput, MinimizeError};
 pub use finite_difference::FiniteDifference;
-pub use global::{DifferentialEvolutionOptions, GlobalOptions, ParticleSwarmOptions};
+pub use global::{
+    DifferentialEvolutionOptions, GlobalOptions, HybridSimulatedAnnealingOptions,
+    ParticleSwarmOptions,
+};
 pub use objective::{ConstraintKind, Flow, IterationState, Objective};
 pub use outcome::{Converged, Minimize, Termination};
 pub use problem::{

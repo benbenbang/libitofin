@@ -253,6 +253,129 @@ impl ParticleSwarmOptions {
     }
 }
 
+/// Hybrid annealing with reflecting random proposals and bounded coordinate polls.
+///
+/// This is a finite-budget heuristic, not a global-optimum guarantee. Local
+/// polls use a persistent normalized radius, initially `step_size`, halved only
+/// after unsuccessful complete sweeps. Reannealing preserves that radius.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HybridSimulatedAnnealingOptions {
+    /// Reproducible SplitMix64 seed, including deterministic zero.
+    pub seed: u64,
+    /// Initial objective-unit temperature, finite and positive, default `1.0`.
+    pub initial_temperature: f64,
+    /// Geometric cooling factor in `(0, 1)`, default `0.95`.
+    pub cooling_rate: f64,
+    /// Uniform proposal half-width normalized by box width, `(0, 1]`, default `0.25`.
+    pub step_size: f64,
+    /// Completed cycles between local searches, `1..=1_000_000`, default `10`.
+    pub local_search_interval: usize,
+    /// Maximum complete coordinate sweeps per local search, `1..=256`, default `4`.
+    pub local_search_steps: usize,
+    /// Completed cycles between temperature resets, `1..=1_000_000`, default `100`.
+    pub reanneal_interval: usize,
+    /// Normalized unsuccessful local-poll radius tolerance.
+    /// Unset falls back to [`Common::tol`] and then `1e-6`.
+    pub xatol: Option<f64>,
+    /// Absolute objective spread of an unsuccessful complete local poll.
+    /// Unset falls back to [`Common::tol`] and then `1e-8`.
+    pub fatol: Option<f64>,
+}
+
+impl Default for HybridSimulatedAnnealingOptions {
+    fn default() -> Self {
+        Self {
+            seed: 0,
+            initial_temperature: 1.0,
+            cooling_rate: 0.95,
+            step_size: 0.25,
+            local_search_interval: 10,
+            local_search_steps: 4,
+            reanneal_interval: 100,
+            xatol: None,
+            fatol: None,
+        }
+    }
+}
+
+impl HybridSimulatedAnnealingOptions {
+    /// Validates the finite box, feasible starting point and annealing controls.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InvalidInput`] for an invalid shape, bound, point or option.
+    pub fn validate(&self, problem: &Problem) -> Result<(), InvalidInput> {
+        problem.validate()?;
+        range("dimension", problem.x0.len(), 1, 256)?;
+        let bounds = problem
+            .bounds
+            .as_ref()
+            .ok_or(InvalidInput::MissingGlobalBounds)?;
+        for (index, (&lower, &upper)) in bounds.lower.iter().zip(&bounds.upper).enumerate() {
+            if !lower.is_finite() || !upper.is_finite() || !(upper - lower).is_finite() {
+                return Err(InvalidInput::NonfiniteGlobalBound { index });
+            }
+            if problem.x0[index] < lower || problem.x0[index] > upper {
+                return Err(InvalidInput::OutsideGlobalBounds {
+                    option: "x0",
+                    point: 0,
+                    index,
+                });
+            }
+        }
+        for (option, value, valid, interval) in [
+            (
+                "initial_temperature",
+                self.initial_temperature,
+                self.initial_temperature > 0.0,
+                "(0, infinity)",
+            ),
+            (
+                "cooling_rate",
+                self.cooling_rate,
+                self.cooling_rate > 0.0 && self.cooling_rate < 1.0,
+                "(0, 1)",
+            ),
+            (
+                "step_size",
+                self.step_size,
+                self.step_size > 0.0 && self.step_size <= 1.0,
+                "(0, 1]",
+            ),
+        ] {
+            if !value.is_finite() || !valid {
+                return Err(InvalidInput::HybridSimulatedAnnealingCoefficient {
+                    option,
+                    range: interval,
+                });
+            }
+        }
+        range(
+            "local_search_interval",
+            self.local_search_interval,
+            1,
+            1_000_000,
+        )?;
+        range("local_search_steps", self.local_search_steps, 1, 256)?;
+        range("reanneal_interval", self.reanneal_interval, 1, 1_000_000)?;
+        for (option, value) in [("xatol", self.xatol), ("fatol", self.fatol)] {
+            if value.is_some_and(|value| !value.is_finite() || value < 0.0) {
+                return Err(InvalidInput::NotFiniteNonnegative { option });
+            }
+        }
+        Ok(())
+    }
+
+    /// Validates shared budgets and supplies the bounded global-solver defaults.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InvalidInput`] for invalid shared options or work caps.
+    pub fn budgets(&self, common: &Common) -> Result<Common, InvalidInput> {
+        DifferentialEvolutionOptions::default().budgets(common)
+    }
+}
+
 fn range(option: &'static str, found: usize, min: usize, max: usize) -> Result<(), InvalidInput> {
     if found < min || found > max {
         return Err(InvalidInput::GlobalRange {
