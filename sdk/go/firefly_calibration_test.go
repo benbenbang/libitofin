@@ -18,10 +18,12 @@ func TestFireflyCalibrationFixedParametersAndResultOwnership(t *testing.T) {
 	if _, err := method.LastResult(); err == nil {
 		t.Fatal("missing result accepted")
 	}
-	model, helpers, criteria := globalCalibrationMarket(t, s)
+	model, helpers, _ := globalCalibrationMarket(t, s)
+	criteria := pricingMust(s.NewEndCriteria(EndCriteriaConfig{MaxIterations: 1000,
+		MaxStationaryStateIterations: pricingPtr(uint(50)), RootEpsilon: 1e-8, FunctionEpsilon: 1e-8}))
 	pricingOK(t, model.Calibrate(helpers, method, criteria, true))
 	result := pricingMust(method.LastResult())
-	if !result.Success || result.Nfev <= 8 || result.Njev != 0 {
+	if !result.Success || result.Nit <= 0 || result.Nit > 1000 || result.Nfev <= 8 || result.Njev != 0 {
 		t.Fatalf("unexpected global result: %+v", result)
 	}
 	if pricingMust(model.A()) != .05 {
