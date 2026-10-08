@@ -187,3 +187,6 @@ pub(crate) fn decode_firefly(
         common,
     ))
 }
+
+#[cfg(test)]
+mod tests;
