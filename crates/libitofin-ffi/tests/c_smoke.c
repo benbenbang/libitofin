@@ -144,6 +144,37 @@ static void smoke_particle_swarm(void) {
     assert(itofin_context_free(ctx, &error) == 0);
 }
 
+static void smoke_hybrid_simulated_annealing(void) {
+    ItofinObjective objective;
+    ItofinHybridSimulatedAnnealingOptions options;
+    ItofinOptimizeResult result;
+    memset(&objective, 0, sizeof(objective));
+    memset(&options, 0, sizeof(options));
+    memset(&result, 0, sizeof(result));
+    ItofinError error;
+    double x0 = 0.0, lower = -4.0, upper = 4.0, x = 99.0;
+    int before = releases;
+    objective.value = shifted_square;
+    objective.release = count_release;
+    result.x = &x;
+    assert(itofin_optimize_hybrid_simulated_annealing(&objective, &x0, 1, &lower, 1, &upper, 1,
+        NULL, &result, &error) == 0);
+    assert(result.success && fabs(x - 3.0) < 1e-5 && result.njev == 0);
+    assert(releases == before + 1);
+    options.has_cooling_rate = true;
+    options.cooling_rate = 1.0;
+    assert(itofin_optimize_hybrid_simulated_annealing(&objective, &x0, 1, &lower, 1, &upper, 1,
+        &options, &result, &error) == ITOFIN_INVALID_ARGUMENT);
+    assert(releases == before + 2);
+    ItofinContext *ctx = NULL;
+    uint64_t method = 0;
+    assert(itofin_context_new(&ctx, &error) == 0);
+    assert(itofin_hybrid_simulated_annealing_new(ctx, &lower, 1, &upper, 1, NULL, &method, &error) == 0);
+    assert(itofin_hybrid_simulated_annealing_result(ctx, method, 1, &result, &error) == ITOFIN_INVALID_ARGUMENT);
+    assert(itofin_handle_release(ctx, method, &error) == 0);
+    assert(itofin_context_free(ctx, &error) == 0);
+}
+
 int main(void) {
     ItofinContext *ctx = NULL;
     ItofinError error;
@@ -164,5 +195,6 @@ int main(void) {
     assert(itofin_context_free(ctx, &error) == 0);
     smoke_optimize();
     smoke_particle_swarm();
+    smoke_hybrid_simulated_annealing();
     return 0;
 }
