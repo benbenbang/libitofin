@@ -40,6 +40,51 @@
         "TestGlobalCalibrationFixedParametersAndResultOwnership",
         "TestGlobalCalibrationBudgetAndCrossSession"
       ]
+    },
+    {
+      "c": "itofin_optimize_particle_swarm",
+      "go": "Minimize",
+      "python": "itofin.optimize.minimize",
+      "status": "implemented",
+      "tests": [
+        "TestParticleSwarmNegativeSeededObjective",
+        "TestParticleSwarmMultimodalBudgetAndInitialRows",
+        "TestParticleSwarmInvalidOptionsNeverEvaluate",
+        "TestParticleSwarmErrorPanicCancellationAndReentry",
+        "TestParticleSwarmFixedCoordinatesAndInputCopies",
+        "TestParticleSwarmAllFixedAndZeroCoefficients",
+        "TestParticleSwarmNonfiniteIsNotCallbackError"
+      ]
+    },
+    {
+      "c": "itofin_particle_swarm_new",
+      "go": "ParticleSwarmMethod",
+      "python": "itofin.optimization.ParticleSwarm",
+      "status": "implemented",
+      "tests": [
+        "TestParticleSwarmCalibrationConstructorValidation",
+        "TestParticleSwarmCalibrationNilAndClosedSession"
+      ]
+    },
+    {
+      "c": "itofin_particle_swarm_new",
+      "go": "Session.NewParticleSwarm",
+      "python": "itofin.optimization.ParticleSwarm.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestParticleSwarmCalibrationFixedParametersAndResultOwnership",
+        "TestParticleSwarmCalibrationBudgetAndCrossSession"
+      ]
+    },
+    {
+      "c": "itofin_particle_swarm_result",
+      "go": "ParticleSwarmMethod.LastResult",
+      "python": "itofin.optimization.ParticleSwarm.last_result",
+      "status": "implemented",
+      "tests": [
+        "TestParticleSwarmCalibrationFixedParametersAndResultOwnership",
+        "TestParticleSwarmCalibrationBudgetAndCrossSession"
+      ]
     }
   ]
 }

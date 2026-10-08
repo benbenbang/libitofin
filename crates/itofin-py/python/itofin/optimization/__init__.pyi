@@ -12,6 +12,7 @@ __all__ = [
     "EndCriteria",
     "LevenbergMarquardt",
     "NoConstraint",
+    "ParticleSwarm",
     "PositiveConstraint",
     "Simplex",
     "SteepestDescent",
@@ -126,6 +127,24 @@ class NoConstraint:
     def __init__(self) -> None:
         r"""
         Build an unconstrained parameter region.
+        """
+
+@typing.final
+class ParticleSwarm:
+    r"""
+    Bounded global calibration in projected free-parameter order.
+    The complete search box must satisfy the model's constraint.
+    """
+    def __init__(self, bounds: typing.Sequence[tuple[builtins.float, builtins.float]], *, seed: builtins.int = 0, population_size: typing.Optional[builtins.int] = None, initial_population: typing.Optional[typing.Sequence[typing.Sequence[builtins.float]]] = None, xatol: typing.Optional[builtins.float] = None, fatol: typing.Optional[builtins.float] = None, inertia: builtins.float = 0.7, cognitive: builtins.float = 1.4, social: builtins.float = 1.4, velocity_clamp: builtins.float = 0.2, maxiter: typing.Optional[builtins.int] = None, maxfev: typing.Optional[builtins.int] = None) -> None:
+        r"""
+        Construct a bounded, deterministic global-best particle swarm calibration method.
+        Bounds and population coordinates use the free parameter order.
+        Invalid candidates abort before pricing rather than receiving a penalty.
+        """
+    def last_result(self) -> typing.Optional[optimize.OptimizeResult]:
+        r"""
+        Copy the exact last global result, or None before a completed run.
+        Exhausted runs are retained without being labelled successful.
         """
 
 @typing.final

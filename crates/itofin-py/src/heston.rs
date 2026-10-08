@@ -247,7 +247,7 @@ impl PyHestonModel {
     fn calibrate(
         &mut self,
         helpers: Vec<PyRef<PyHestonModelHelper>>,
-        #[gen_stub(override_type(type_repr = "optimization.LevenbergMarquardt | optimization.Simplex | optimization.ConjugateGradient | optimization.SteepestDescent | optimization.DifferentialEvolution", imports = ("itofin.optimization")))]
+        #[gen_stub(override_type(type_repr = "optimization.LevenbergMarquardt | optimization.Simplex | optimization.ConjugateGradient | optimization.SteepestDescent | optimization.DifferentialEvolution | optimization.ParticleSwarm", imports = ("itofin.optimization")))]
         method: &Bound<'_, PyAny>,
         end_criteria: &PyEndCriteria,
         integration_order: usize,
@@ -270,7 +270,7 @@ impl PyHestonModel {
     fn calibrate_cos(
         &mut self,
         helpers: Vec<PyRef<PyHestonModelHelper>>,
-        #[gen_stub(override_type(type_repr = "optimization.LevenbergMarquardt | optimization.Simplex | optimization.ConjugateGradient | optimization.SteepestDescent | optimization.DifferentialEvolution", imports = ("itofin.optimization")))]
+        #[gen_stub(override_type(type_repr = "optimization.LevenbergMarquardt | optimization.Simplex | optimization.ConjugateGradient | optimization.SteepestDescent | optimization.DifferentialEvolution | optimization.ParticleSwarm", imports = ("itofin.optimization")))]
         method: &Bound<'_, PyAny>,
         end_criteria: &PyEndCriteria,
         l: f64,
@@ -291,7 +291,7 @@ impl PyHestonModel {
     fn calibrate_exponential_fitting(
         &mut self,
         helpers: Vec<PyRef<PyHestonModelHelper>>,
-        #[gen_stub(override_type(type_repr = "optimization.LevenbergMarquardt | optimization.Simplex | optimization.ConjugateGradient | optimization.SteepestDescent | optimization.DifferentialEvolution", imports = ("itofin.optimization")))]
+        #[gen_stub(override_type(type_repr = "optimization.LevenbergMarquardt | optimization.Simplex | optimization.ConjugateGradient | optimization.SteepestDescent | optimization.DifferentialEvolution | optimization.ParticleSwarm", imports = ("itofin.optimization")))]
         method: &Bound<'_, PyAny>,
         end_criteria: &PyEndCriteria,
         control_variate: PyExponentialFittingControlVariate,
