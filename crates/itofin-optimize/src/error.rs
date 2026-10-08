@@ -104,6 +104,12 @@ pub enum InvalidInput {
         option: &'static str,
         range: &'static str,
     },
+    /// A hybrid-annealing coefficient is outside its supported interval.
+    #[error("{option} must be finite and in {range}")]
+    HybridSimulatedAnnealingCoefficient {
+        option: &'static str,
+        range: &'static str,
+    },
 }
 
 /// Everything a run can fail with. Neither variant is a [`Termination`](crate::Termination).
