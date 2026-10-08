@@ -219,3 +219,5 @@ fn firefly_all_fixed_uses_one_value_and_no_gradient() {
     assert_eq!(calls.releases, 1);
     assert_eq!(calls.values, [vec![0.25]]);
 }
+
+mod boundary_tests;
