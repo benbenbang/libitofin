@@ -10,6 +10,7 @@ these methods to `HestonModel.calibrate*` or `HullWhite.calibrate*`, with an
 | `Simplex(lambda_)` | You want a derivative-free search and can choose a positive starting scale. |
 | `ConjugateGradient` | You want a gradient-based search using the core Armijo line search. |
 | `SteepestDescent` | You want a basic gradient-based search using the same line search. |
+| `ParticleSwarm` | You have a wholly feasible finite box and want synchronous seeded global-best swarm search. |
 | `DifferentialEvolution` | You have a finite search box entirely inside the model domain and want a seeded population search. |
 
 These methods belong to `itofin.optimization`. The separate `itofin.optimize`

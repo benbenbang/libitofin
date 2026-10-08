@@ -27,3 +27,8 @@ greeks.
 - [Rust documentation entry point](https://benbenbang.github.io/libitofin/rust/).
 - [Core source](../crates/libitofin/src/) and [tests](../crates/libitofin/tests/).
 - [Project status](status.md): implementation scope and remaining work.
+
+## Global optimization examples
+
+- [Particle swarm](../crates/libitofin/examples/particle_swarm.rs): seeded signed-scalar minimization, with checked analytic value `-3`.
+- [Shared global-search contract](https://benbenbang.github.io/libitofin/global-optimization/): DE/PSO controls, feasible calibration boxes, budgets and numerical limits.

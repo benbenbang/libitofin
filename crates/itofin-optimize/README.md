@@ -1,13 +1,16 @@
 # itofin-optimize
 
+Particle swarm is not included in v0.37.0 artifacts; build from this source
+checkout until the next coordinated release.
+
 SciPy-inspired numerical optimization in Rust, over plain `f64` slices.
 
 ## Scope
 
 A general-purpose `minimize` for Nelder-Mead, BFGS, L-BFGS-B, SLSQP and
-Differential-Evolution, with an
+Differential-Evolution and Particle-Swarm, with an
 `Objective` trait carrying its own error type, explicit budgets, a cancellation
-hook and validated inputs. All five Rust solvers use the single `minimize`
+hook and validated inputs. All six Rust solvers use the single `minimize`
 entry point. L-BFGS-B bindings are tracked in issue #1086.
 
 Differential-Evolution is serial deferred-generation DE/rand/1/bin. It requires
@@ -17,6 +20,15 @@ spread and absolute value spread satisfy their tolerances. Population convergenc
 is not a guarantee of global optimality. Equal-valued trials are accepted, and
 out-of-box mutant coordinates are resampled uniformly. No polishing, gradients,
 general constraints, alternative strategies or parallel workers are supplied.
+
+Particle-Swarm is serial synchronous global-best PSO with zero initial velocities.
+It uses the same finite-width bounds, seeded initialization and budgets as DE,
+but its own inertia, cognitive/social attraction and velocity-clamp controls.
+Crossing positions are clipped with outward velocity zeroed. Strict improvement
+updates bests; ties retain the earliest evaluated best. Convergence requires
+current physical population spread, current value spread and every normalized
+velocity to satisfy their tolerances. Neither solver guarantees global optimality.
+No gradients, general constraints, polishing or parallel workers are supplied.
 
 ## Independent of libitofin
 
@@ -60,6 +72,12 @@ for package validation.
 
 ## Citations
 
+* Kennedy, J. and Eberhart, R. (1995), "Particle Swarm Optimization", IEEE
+  International Conference on Neural Networks, 1942-1948,
+  <https://doi.org/10.1109/ICNN.1995.488968>.
+* Shi, Y. and Eberhart, R. (1998), "A Modified Particle Swarm Optimizer", IEEE
+  International Conference on Evolutionary Computation, 69-73,
+  <https://doi.org/10.1109/ICEC.1998.699146>.
 * Storn, R. and Price, K. (1997), "Differential Evolution - A Simple and Efficient
   Heuristic for Global Optimization over Continuous Spaces", Journal of Global
   Optimization 11, 341-359, <https://doi.org/10.1023/A:1008202821328>.

@@ -1,8 +1,11 @@
 # Optimize
 
+Particle swarm is not included in v0.37.0 artifacts; build from this source
+checkout until the next coordinated release.
+
 SciPy-style `minimize` over the finance-independent `itofin-optimize` crate.
-Python, Go, C and Rust expose Nelder-Mead, BFGS, L-BFGS-B, SLSQP and
-[Differential Evolution](../global-optimization.md).
+Python, Go, C and Rust expose Nelder-Mead, BFGS, L-BFGS-B, SLSQP,
+[Differential Evolution and Particle Swarm](../global-optimization.md).
 
 This is distinct from [Optimization](optimization.md), the QuantLib
 calibration port. The objective runs outside any bootstrap callback, so it may
@@ -23,6 +26,7 @@ print(result.x, result.status, result.message)
 | BFGS | `maxiter`, `gtol`, `eps` | `jac(x)` or finite differences | Rejected | Rejected |
 | L-BFGS-B | `maxiter`, `maxfev`, `maxcor`, `ftol`, `gtol`, `eps` | `jac(x)` or bounded finite differences | `(lower, upper)` pairs; `None` opens a side | Rejected |
 | SLSQP | `maxiter`, `maxfev`, `ftol` | `jac(x)` or finite differences | `(lower, upper)` pairs; `None` opens a side | `constraints` dictionaries |
+| Particle-Swarm | `seed`, `population_size`, `initial_population`, `xatol`, `fatol`, `inertia`, `cognitive`, `social`, `velocity_clamp`, `maxiter`, `maxfev` | Rejected | Finite pairs required | Rejected |
 | Differential-Evolution | `seed`, `population_size`, `initial_population`, `xatol`, `fatol`, `mutation`, `recombination`, `maxiter`, `maxfev` | Rejected | Finite pairs required | Rejected |
 
 `eps` is an absolute finite-difference step; it has no effect when `jac` is
